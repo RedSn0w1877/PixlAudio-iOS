@@ -28,9 +28,9 @@ struct RootTabView: View {
                     SearchView()
                         .withRouteDestinations()
                 }
+                .searchable(text: $router.searchText, prompt: "Songs, artists, albums")
             }
         }
-        .searchable(text: $router.searchText, prompt: "Songs, artists, albums")
         .tabBarMinimizeBehavior(.onScrollDown)
         .tabViewBottomAccessory(isEnabled: playback.hasItem) {
             MiniPlayerAccessory()

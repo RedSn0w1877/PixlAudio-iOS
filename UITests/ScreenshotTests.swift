@@ -59,7 +59,11 @@ final class ScreenshotTests: XCTestCase {
 
         if screen == .miniPlayer {
             // Scroll down so the tab bar minimizes and the accessory moves inline.
-            app.swipeUp(velocity: .slow)
+            let list = app.collectionViews.firstMatch
+            let target = list.exists ? list : app.windows.firstMatch
+            target.swipeUp()
+            Thread.sleep(forTimeInterval: 0.8)
+            target.swipeUp()
             Thread.sleep(forTimeInterval: 1.0)
         }
 

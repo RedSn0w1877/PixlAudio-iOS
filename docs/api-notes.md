@@ -12,7 +12,7 @@ an API (AGENTS.md). "CI" = proven to compile on the `xcode-27` lane (Xcode 27.0,
 | `View.environment(_:)` (Observable object), `@Environment(T.self)`, `@Bindable` | 17 | /documentation/swiftui/view/environment(_:)-4516h | shell | |
 | `TabView(selection:)` + `Tab(_:systemImage:value:content:)` | 18 | /documentation/swiftui/tab | `RootTabView` | |
 | `Tab(value:role:content:)`, `TabRole.search` | 18 | /documentation/swiftui/tabrole/search | `RootTabView` | Search tab sits at the trailing end, glass search field. |
-| `View.searchable(text:prompt:)` | 15 | /documentation/swiftui/view/searchable(text:placement:prompt:)-18a8f | `RootTabView` | Applied to the `TabView` with the search-role tab. |
+| `View.searchable(text:prompt:)` | 15 | /documentation/swiftui/view/searchable(text:placement:prompt:)-18a8f | `RootTabView` | Applied to the search tab's `NavigationStack` (on the `TabView` it showed no field on iOS 27 — verified in CI screenshots). |
 | `View.tabBarMinimizeBehavior(_:)`, `.onScrollDown` | 26.0 | /documentation/swiftui/view/tabbarminimizebehavior(_:) | `RootTabView` | |
 | `View.tabViewBottomAccessory(isEnabled:content:)` | **26.1** | /documentation/swiftui/view/tabviewbottomaccessory(isenabled:content:) | `RootTabView` | Reason for the 26.1 deployment target. |
 | `EnvironmentValues.tabViewBottomAccessoryPlacement`, `TabViewBottomAccessoryPlacement.inline/.expanded` | 26.0 | /documentation/swiftui/tabviewbottomaccessoryplacement | `MiniPlayerAccessory` | Optional value (nil outside an accessory). |
