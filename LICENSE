@@ -1,0 +1,9 @@
+Copyright (c) 2026 RedSn0w1877. All rights reserved.
+
+PixlAudio for iOS is proprietary software. This repository is public so that its
+continuous-integration builds run on GitHub-hosted runners; public visibility does
+not grant any licence to use, copy, modify, or distribute the code, assets, or
+builds. A full licence text will replace this placeholder.
+
+Third-party notices: the app ships no third-party code. It uses only Apple system
+frameworks and the system font.

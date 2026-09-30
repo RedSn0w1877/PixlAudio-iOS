@@ -1,0 +1,190 @@
+name: ci
+
+on:
+  push:
+    branches: ['**']
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - 'LICENSE'
+  workflow_dispatch:
+    inputs:
+      shots:
+        description: Run the screenshot job
+        type: boolean
+        default: true
+      ipa:
+        description: Build the unsigned IPA
+        type: boolean
+        default: true
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  XCODE_VERSION: '27.0'
+  XCODEGEN_VERSION: '2.46.0'
+  XCODEGEN_SHA256: '4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806'
+  SIM_IOS_MAJOR: '27'
+
+jobs:
+  core:
+    name: core (PixlCore swift test)
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+      - name: swift test
+        run: swift test --package-path Packages/PixlCore --parallel
+
+  app:
+    name: app (build + unit tests, Xcode 27)
+    runs-on: xcode-27
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check forbidden patterns
+        run: bash ci/check-forbidden.sh
+      - name: Select Xcode
+        run: bash ci/select-xcode.sh "$XCODE_VERSION"
+      - name: Install XcodeGen
+        run: bash ci/install-xcodegen.sh "$XCODEGEN_VERSION"
+      - name: Generate project
+        run: xcodegen generate
+      - name: Pick simulator
+        run: bash ci/pick-sim.sh "$SIM_IOS_MAJOR"
+      - name: Build for testing
+        run: |
+          set -o pipefail
+          mkdir -p build
+          xcodebuild build-for-testing \
+            -project PixlAudio.xcodeproj -scheme PixlAudio \
+            -destination "id=$SIM_UDID" \
+            -derivedDataPath build/DerivedData \
+            2>&1 | tee build/build.log | xcbeautify --quieter
+      - name: Unit tests
+        run: |
+          set -o pipefail
+          xcodebuild test-without-building \
+            -project PixlAudio.xcodeproj -scheme PixlAudio \
+            -destination "id=$SIM_UDID" \
+            -derivedDataPath build/DerivedData \
+            -only-testing:PixlAudioTests \
+            -resultBundlePath build/UnitTests.xcresult \
+            2>&1 | tee build/test.log | xcbeautify --quieter
+      - name: Summarise errors
+        if: failure()
+        run: |
+          cat build/build.log build/test.log > build/all.log 2>/dev/null || true
+          bash ci/xcerrors.sh build/all.log build/UnitTests.xcresult
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-xcresult-${{ github.sha }}
+          path: |
+            build/UnitTests.xcresult
+            build/*.log
+          retention-days: 5
+          if-no-files-found: ignore
+
+  shots:
+    name: shots (UI screenshots, light + dark)
+    if: >-
+      github.ref == 'refs/heads/main' ||
+      contains(github.event.head_commit.message, '[shots]') ||
+      (github.event_name == 'workflow_dispatch' && inputs.shots)
+    runs-on: xcode-27
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: Select Xcode
+        run: bash ci/select-xcode.sh "$XCODE_VERSION"
+      - name: Install XcodeGen
+        run: bash ci/install-xcodegen.sh "$XCODEGEN_VERSION"
+      - name: Generate project
+        run: xcodegen generate
+      - name: Pick and boot simulator
+        run: |
+          bash ci/pick-sim.sh "$SIM_IOS_MAJOR"
+          xcrun simctl boot "$SIM_UDID" || true
+          xcrun simctl bootstatus "$SIM_UDID" -b
+          xcrun simctl status_bar "$SIM_UDID" override --time 9:41 \
+            --dataNetwork wifi --wifiMode active --wifiBars 3 \
+            --cellularMode active --cellularBars 4 \
+            --batteryState charged --batteryLevel 100
+      - name: Screenshot tests
+        run: |
+          set -o pipefail
+          mkdir -p build
+          xcodebuild test \
+            -project PixlAudio.xcodeproj -scheme PixlAudio \
+            -destination "id=$SIM_UDID" \
+            -derivedDataPath build/DerivedData \
+            -only-testing:PixlAudioUITests/ScreenshotTests \
+            -resultBundlePath build/Shots.xcresult \
+            2>&1 | tee build/shots.log | xcbeautify --quieter
+      - name: Export screenshots
+        if: always()
+        run: |
+          if [ -d build/Shots.xcresult ]; then bash ci/export-shots.sh build/Shots.xcresult build/shots; fi
+      - name: Summarise errors
+        if: failure()
+        run: bash ci/xcerrors.sh build/shots.log build/Shots.xcresult
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shots-${{ github.sha }}
+          path: build/shots
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Upload result bundle
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shots-xcresult-${{ github.sha }}
+          path: build/Shots.xcresult
+          retention-days: 5
+          if-no-files-found: ignore
+
+  ipa:
+    name: ipa (unsigned archive)
+    if: >-
+      github.ref == 'refs/heads/main' ||
+      contains(github.event.head_commit.message, '[ipa]') ||
+      (github.event_name == 'workflow_dispatch' && inputs.ipa)
+    runs-on: xcode-27
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check forbidden patterns
+        run: bash ci/check-forbidden.sh
+      - name: Select Xcode
+        run: bash ci/select-xcode.sh "$XCODE_VERSION"
+      - name: Install XcodeGen
+        run: bash ci/install-xcodegen.sh "$XCODEGEN_VERSION"
+      - name: Generate project
+        run: xcodegen generate
+      - name: Archive and package
+        env:
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+        run: bash ci/make-ipa.sh
+      - name: Summarise errors
+        if: failure()
+        run: bash ci/xcerrors.sh build/archive.log
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: PixlAudio-unsigned-ipa
+          path: build/PixlAudio-unsigned.ipa
+          retention-days: 14
+          if-no-files-found: error

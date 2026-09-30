@@ -1,0 +1,59 @@
+name: fallback-xcode26
+
+# Keeps the app building with the previous Xcode (26.6, iOS 26.5 SDK) on the GA macos-26 image, in case
+# the xcode-27 preview image changes or disappears. iOS 27-only code must stay inside Compat27.swift
+# behind `#if compiler(>=6.4)`.
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  XCODE_VERSION: '26.6'
+  XCODEGEN_VERSION: '2.46.0'
+  XCODEGEN_SHA256: '4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806'
+  SIM_IOS_MAJOR: '26'
+
+jobs:
+  app:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check forbidden patterns
+        run: bash ci/check-forbidden.sh
+      - name: Select Xcode
+        run: bash ci/select-xcode.sh "$XCODE_VERSION"
+      - name: Install XcodeGen
+        run: bash ci/install-xcodegen.sh "$XCODEGEN_VERSION"
+      - name: Generate project
+        run: xcodegen generate
+      - name: Pick simulator
+        run: bash ci/pick-sim.sh "$SIM_IOS_MAJOR"
+      - name: Build for testing
+        run: |
+          set -o pipefail
+          mkdir -p build
+          xcodebuild build-for-testing \
+            -project PixlAudio.xcodeproj -scheme PixlAudio \
+            -destination "id=$SIM_UDID" \
+            -derivedDataPath build/DerivedData \
+            2>&1 | tee build/build.log | xcbeautify --quieter
+      - name: Unit tests
+        run: |
+          set -o pipefail
+          xcodebuild test-without-building \
+            -project PixlAudio.xcodeproj -scheme PixlAudio \
+            -destination "id=$SIM_UDID" \
+            -derivedDataPath build/DerivedData \
+            -only-testing:PixlAudioTests \
+            -resultBundlePath build/UnitTests.xcresult \
+            2>&1 | tee build/test.log | xcbeautify --quieter
+      - name: Summarise errors
+        if: failure()
+        run: |
+          cat build/build.log build/test.log > build/all.log 2>/dev/null || true
+          bash ci/xcerrors.sh build/all.log build/UnitTests.xcresult

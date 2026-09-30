@@ -1,0 +1,191 @@
+# XcodeGen spec for PixlAudio. The .xcodeproj (and App/Info.plist) are generated on CI — never commit them.
+# Rules (CI-enforced by ci/check-forbidden.sh): local packages only, no app extensions.
+name: PixlAudio
+
+options:
+  bundleIdPrefix: io.github.redsn0w1877
+  deploymentTarget:
+    iOS: "26.1"
+  developmentLanguage: en
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+packages:
+  PixlCore:
+    path: Packages/PixlCore
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_APPROACHABLE_CONCURRENCY: YES
+    SWIFT_STRICT_CONCURRENCY: complete
+    IPHONEOS_DEPLOYMENT_TARGET: "26.1"
+    TARGETED_DEVICE_FAMILY: "1"
+    SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
+    SUPPORTS_MACCATALYST: NO
+    SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+    SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: NO
+    MARKETING_VERSION: 0.1.0
+    CURRENT_PROJECT_VERSION: 1
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+    SWIFT_EMIT_LOC_STRINGS: YES
+    # Spotify client id: injected on CI from a secret (empty = Spotify sign-in disabled; overridable in-app).
+    SPOTIFY_CLIENT_ID: ""
+
+targets:
+  PixlAudio:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+    dependencies:
+      - package: PixlCore
+        products:
+          - PixlFoundation
+          - PixlModel
+          - PixlLyrics
+          - PixlLibrary
+          - PixlAudioCore
+          - PixlTags
+          - PixlNet
+          - PixlBackup
+    settings:
+      base:
+        PRODUCT_NAME: PixlAudio
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.redsn0w1877.pixlaudio
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        GENERATE_INFOPLIST_FILE: NO
+        ENABLE_PREVIEWS: YES
+        SPOTIFY_CLIENT_ID: $(inherited)
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: PixlAudio
+        CFBundleName: PixlAudio
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleDevelopmentRegion: en
+        LSRequiresIPhoneOS: true
+        ITSAppUsesNonExemptEncryption: false
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UIApplicationSupportsIndirectInputEvents: true
+        UIRequiredDeviceCapabilities: [arm64]
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # 120 Hz ProMotion for custom animations (lyrics, scrubbing).
+        CADisableMinimumFrameDurationOnPhone: true
+        # Background playback + background library sync.
+        UIBackgroundModes: [audio, fetch, processing]
+        BGTaskSchedulerPermittedIdentifiers:
+          - io.github.redsn0w1877.pixlaudio.refresh
+          - io.github.redsn0w1877.pixlaudio.library-sync
+        NSAppleMusicUsageDescription: PixlAudio plays the DRM-free songs in your music library.
+        NSLocalNetworkUsageDescription: PixlAudio connects to AI servers you run on your local network.
+        # Only NSAllowsArbitraryLoads: iOS ignores it when NSAllowsLocalNetworking is also present
+        # (developer.apple.com/documentation/bundleresources/information-property-list/nsapptransportsecurity).
+        # User-typed AI endpoints (LAN Ollama etc.) may be plain HTTP; built-in endpoints are HTTPS.
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        # pixlaudio:// — Spotify OAuth redirect (pixlaudio://spotify-callback) and deep links.
+        CFBundleURLTypes:
+          - CFBundleURLName: io.github.redsn0w1877.pixlaudio
+            CFBundleTypeRole: Viewer
+            CFBundleURLSchemes: [pixlaudio]
+        # Files app: expose Documents, open files in place.
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Audio
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.audio, public.mp3, public.mpeg-4-audio, org.xiph.flac, com.microsoft.waveform-audio, public.aiff-audio]
+          - CFBundleTypeName: Lyrics
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [io.github.redsn0w1877.pixlaudio.lrc, io.github.redsn0w1877.pixlaudio.ttml]
+          - CFBundleTypeName: Playlist
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.m3u-playlist, io.github.redsn0w1877.pixlaudio.m3u8]
+          - CFBundleTypeName: PixlAudio Backup
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Owner
+            LSItemContentTypes: [io.github.redsn0w1877.pixlaudio.backup]
+        UTImportedTypeDeclarations:
+          - UTTypeIdentifier: io.github.redsn0w1877.pixlaudio.lrc
+            UTTypeDescription: LRC Lyrics
+            UTTypeConformsTo: [public.plain-text]
+            UTTypeTagSpecification:
+              public.filename-extension: [lrc]
+          - UTTypeIdentifier: io.github.redsn0w1877.pixlaudio.ttml
+            UTTypeDescription: TTML Lyrics
+            UTTypeConformsTo: [public.xml]
+            UTTypeTagSpecification:
+              public.filename-extension: [ttml]
+          - UTTypeIdentifier: io.github.redsn0w1877.pixlaudio.m3u8
+            UTTypeDescription: M3U8 Playlist
+            UTTypeConformsTo: [public.plain-text]
+            UTTypeTagSpecification:
+              public.filename-extension: [m3u8]
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: io.github.redsn0w1877.pixlaudio.backup
+            UTTypeDescription: PixlAudio Backup
+            UTTypeConformsTo: [public.data]
+            UTTypeTagSpecification:
+              public.filename-extension: [pxpl]
+        SpotifyClientID: $(SPOTIFY_CLIENT_ID)
+
+  PixlAudioTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: AppTests
+    dependencies:
+      - target: PixlAudio
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.redsn0w1877.pixlaudio.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+  PixlAudioUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: PixlAudio
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.redsn0w1877.pixlaudio.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: PixlAudio
+
+schemes:
+  PixlAudio:
+    build:
+      targets:
+        PixlAudio: all
+        PixlAudioTests: [test]
+        PixlAudioUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: false
+      targets:
+        - name: PixlAudioTests
+          parallelizable: false
+        - name: PixlAudioUITests
+          parallelizable: false
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
