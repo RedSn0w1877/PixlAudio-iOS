@@ -31,6 +31,7 @@ nonisolated struct LaunchConfiguration: Equatable, Sendable {
     /// TabView, and hide the bottom accessory.
     var searchOnStack: Bool
     var hideAccessory: Bool
+    var presentSearch: Bool
 
     init(arguments: [String]) {
         func value(after flag: String) -> String? {
@@ -45,6 +46,7 @@ nonisolated struct LaunchConfiguration: Equatable, Sendable {
         searchQuery = value(after: "-searchQuery")
         searchOnStack = arguments.contains("-searchOnStack")
         hideAccessory = arguments.contains("-hideAccessory")
+        presentSearch = arguments.contains("-presentSearch")
     }
 
     /// The configuration of this process.

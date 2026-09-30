@@ -29,12 +29,12 @@ struct RootTabView: View {
                     SearchView()
                         .withRouteDestinations()
                 }
-                .modifier(SearchableIf(isOn: environment.launch.searchOnStack, text: $router.searchText))
+                .modifier(SearchableIf(isOn: environment.launch.searchOnStack, text: $router.searchText, isPresented: $router.isSearchPresented))
             }
         }
         // On the TabView (WWDC25 "Build a SwiftUI app with the new design"): with a search-role tab the
         // field moves to the bottom of the screen on iPhone.
-        .modifier(SearchableIf(isOn: !environment.launch.searchOnStack, text: $router.searchText))
+        .modifier(SearchableIf(isOn: !environment.launch.searchOnStack, text: $router.searchText, isPresented: $router.isSearchPresented))
         .tabBarMinimizeBehavior(.onScrollDown)
         .tabViewBottomAccessory(isEnabled: playback.hasItem && !environment.launch.hideAccessory) {
             MiniPlayerAccessory()
@@ -46,10 +46,11 @@ struct RootTabView: View {
 private struct SearchableIf: ViewModifier {
     let isOn: Bool
     @Binding var text: String
+    @Binding var isPresented: Bool
 
     func body(content: Content) -> some View {
         if isOn {
-            content.searchable(text: $text, prompt: "Songs, artists, albums")
+            content.searchable(text: $text, isPresented: $isPresented, prompt: "Songs, artists, albums")
         } else {
             content
         }

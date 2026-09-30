@@ -23,6 +23,8 @@ final class Router {
     var libraryPath: [Route]
     var searchPath: [Route]
     var searchText: String
+    /// Whether the search field is active (focused). Bound to `.searchable(isPresented:)`.
+    var isSearchPresented: Bool
 
     init(launch: LaunchConfiguration) {
         let start = UITestLaunchRouter.initialState(for: launch)
@@ -31,6 +33,7 @@ final class Router {
         libraryPath = start.libraryPath
         searchPath = []
         searchText = start.searchText
+        isSearchPresented = launch.presentSearch
     }
 }
 

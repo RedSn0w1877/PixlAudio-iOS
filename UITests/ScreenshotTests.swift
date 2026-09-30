@@ -24,10 +24,35 @@ final class ScreenshotTests: XCTestCase {
 
     // MARK: Search placement experiments (temporary)
 
-    func testSearchExperimentStackLight() throws { try capture(.searchResults, "light", extra: ["-searchOnStack"], suffix: "stack") }
-    func testSearchExperimentNoAccessoryLight() throws { try capture(.searchResults, "light", extra: ["-hideAccessory"], suffix: "noacc") }
-    func testSearchExperimentStackNoAccessoryLight() throws {
-        try capture(.searchResults, "light", extra: ["-searchOnStack", "-hideAccessory"], suffix: "stack-noacc")
+    func testSearchExperimentPresentedLight() throws { try capture(.searchResults, "light", extra: ["-presentSearch"], suffix: "presented") }
+    func testSearchExperimentPresentedStackLight() throws {
+        try capture(.searchResults, "light", extra: ["-presentSearch", "-searchOnStack"], suffix: "presented-stack")
+    }
+    func testSearchExperimentTapFromHomeLight() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTest", "-screen", "home", "-appearance", "light", "-searchQuery", "Luma"]
+        app.launch()
+        XCTAssertTrue(app.descendants(matching: .any)["screen.home"].firstMatch.waitForExistence(timeout: 20))
+        let search = app.buttons["Search"].firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: 5), "Search tab button not found")
+        search.tap()
+        Thread.sleep(forTimeInterval: 1.5)
+        snap(app, "exp-tapFromHome")
+        search.tap()
+        Thread.sleep(forTimeInterval: 1.5)
+        snap(app, "exp-tapTwice")
+        let tree = XCTAttachment(string: app.debugDescription)
+        tree.name = "exp-tapTwice-tree"
+        tree.lifetime = .keepAlways
+        add(tree)
+    }
+
+    private func snap(_ app: XCUIApplication, _ name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     // MARK: Mini player inline (tab bar minimized after scrolling down)
