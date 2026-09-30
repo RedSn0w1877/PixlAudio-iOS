@@ -22,6 +22,14 @@ final class ScreenshotTests: XCTestCase {
     func testSearchResultsLight() throws { try capture(.searchResults, "light") }
     func testSearchResultsDark() throws { try capture(.searchResults, "dark") }
 
+    // MARK: Search placement experiments (temporary)
+
+    func testSearchExperimentStackLight() throws { try capture(.searchResults, "light", extra: ["-searchOnStack"], suffix: "stack") }
+    func testSearchExperimentNoAccessoryLight() throws { try capture(.searchResults, "light", extra: ["-hideAccessory"], suffix: "noacc") }
+    func testSearchExperimentStackNoAccessoryLight() throws {
+        try capture(.searchResults, "light", extra: ["-searchOnStack", "-hideAccessory"], suffix: "stack-noacc")
+    }
+
     // MARK: Mini player inline (tab bar minimized after scrolling down)
 
     func testMiniPlayerLight() throws { try capture(.miniPlayer, "light") }
@@ -48,10 +56,10 @@ final class ScreenshotTests: XCTestCase {
         }
     }
 
-    private func capture(_ screen: Screen, _ appearance: String) throws {
+    private func capture(_ screen: Screen, _ appearance: String, extra: [String] = [], suffix: String? = nil) throws {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["-uiTest", "-screen", screen.rawValue, "-appearance", appearance]
+        app.launchArguments = ["-uiTest", "-screen", screen.rawValue, "-appearance", appearance] + extra
         app.launch()
 
         let ready = app.descendants(matching: .any)[screen.readyIdentifier].firstMatch
@@ -67,7 +75,7 @@ final class ScreenshotTests: XCTestCase {
             if search.waitForExistence(timeout: 5) { search.tap() }
             _ = app.searchFields.firstMatch.waitForExistence(timeout: 5)
             let tree = XCTAttachment(string: app.debugDescription)
-            tree.name = "\(screen.rawValue)-\(appearance)-tree"
+            tree.name = "\(screen.rawValue)-\(appearance)\(suffix.map { "-" + $0 } ?? "")-tree"
             tree.lifetime = .keepAlways
             add(tree)
         }
@@ -86,7 +94,7 @@ final class ScreenshotTests: XCTestCase {
         Thread.sleep(forTimeInterval: 1.5)
 
         let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = "\(screen.rawValue)-\(appearance)"
+        attachment.name = "\(screen.rawValue)-\(appearance)\(suffix.map { "-" + $0 } ?? "")"
         attachment.lifetime = .keepAlways
         add(attachment)
 
