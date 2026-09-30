@@ -28,9 +28,11 @@ struct RootTabView: View {
                     SearchView()
                         .withRouteDestinations()
                 }
-                .searchable(text: $router.searchText, prompt: "Songs, artists, albums")
             }
         }
+        // On the TabView (WWDC25 "Build a SwiftUI app with the new design"): with a search-role tab the
+        // field moves to the bottom of the screen on iPhone.
+        .searchable(text: $router.searchText, prompt: "Songs, artists, albums")
         .tabBarMinimizeBehavior(.onScrollDown)
         .tabViewBottomAccessory(isEnabled: playback.hasItem) {
             MiniPlayerAccessory()

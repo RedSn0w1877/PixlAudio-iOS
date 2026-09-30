@@ -58,16 +58,18 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(ready.waitForExistence(timeout: 20), "\(screen.readyIdentifier) did not appear")
 
         if screen == .search || screen == .searchResults {
-            // The search tab morphs the tab bar into a search field when the user selects it, not when the
-            // app launches already on it — so re-select it like a user would.
-            let home = app.tabBars.buttons["Home"].firstMatch
-            let search = app.tabBars.buttons["Search"].firstMatch
+            // The search tab turns into a bottom search field when the user selects it, so select Home and
+            // then Search like a user would (tab items are buttons; on iOS 26+ they may not sit in `tabBars`).
+            let home = app.buttons["Home"].firstMatch
+            let search = app.buttons["Search"].firstMatch
             if home.waitForExistence(timeout: 5) { home.tap() }
+            Thread.sleep(forTimeInterval: 0.5)
             if search.waitForExistence(timeout: 5) { search.tap() }
-            let field = app.searchFields.firstMatch
-            if !field.waitForExistence(timeout: 5) {
-                XCTContext.runActivity(named: "search field not visible") { _ in }
-            }
+            _ = app.searchFields.firstMatch.waitForExistence(timeout: 5)
+            let tree = XCTAttachment(string: app.debugDescription)
+            tree.name = "\(screen.rawValue)-\(appearance)-tree"
+            tree.lifetime = .keepAlways
+            add(tree)
         }
 
         if screen == .miniPlayer {
