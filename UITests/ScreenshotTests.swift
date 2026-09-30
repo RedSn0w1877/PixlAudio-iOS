@@ -57,6 +57,19 @@ final class ScreenshotTests: XCTestCase {
         let ready = app.descendants(matching: .any)[screen.readyIdentifier].firstMatch
         XCTAssertTrue(ready.waitForExistence(timeout: 20), "\(screen.readyIdentifier) did not appear")
 
+        if screen == .search || screen == .searchResults {
+            // The search tab morphs the tab bar into a search field when the user selects it, not when the
+            // app launches already on it — so re-select it like a user would.
+            let home = app.tabBars.buttons["Home"].firstMatch
+            let search = app.tabBars.buttons["Search"].firstMatch
+            if home.waitForExistence(timeout: 5) { home.tap() }
+            if search.waitForExistence(timeout: 5) { search.tap() }
+            let field = app.searchFields.firstMatch
+            if !field.waitForExistence(timeout: 5) {
+                XCTContext.runActivity(named: "search field not visible") { _ in }
+            }
+        }
+
         if screen == .miniPlayer {
             // Scroll down so the tab bar minimizes and the accessory moves inline.
             let list = app.collectionViews.firstMatch
