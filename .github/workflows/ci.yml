@@ -122,6 +122,8 @@ jobs:
             --dataNetwork wifi --wifiMode active --wifiBars 3 \
             --cellularMode active --cellularBars 4 \
             --batteryState charged --batteryLevel 100
+          # Suppress the first-run "slide to type" keyboard tip in search screenshots.
+          xcrun simctl spawn "$SIM_UDID" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true || true
       - name: Screenshot tests
         run: |
           set -o pipefail
