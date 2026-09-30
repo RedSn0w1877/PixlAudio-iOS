@@ -41,6 +41,12 @@ final class LaunchConfigurationTests: XCTestCase {
         XCTAssertEqual(state(.diagnostics).homePath, [.settings, .diagnostics])
     }
 
+    func testRouterActivatesSearchOnlyForSearchScreens() {
+        XCTAssertTrue(Router(launch: LaunchConfiguration(arguments: ["-uiTest", "-screen", "search"])).isSearchPresented)
+        XCTAssertTrue(Router(launch: LaunchConfiguration(arguments: ["-uiTest", "-screen", "searchResults"])).isSearchPresented)
+        XCTAssertFalse(Router(launch: LaunchConfiguration(arguments: ["-uiTest", "-screen", "home"])).isSearchPresented)
+    }
+
     func testDemoSearchMatchesTitleArtistAndAlbum() {
         let library = DemoLibrary()
         XCTAssertFalse(library.search(UITestLaunchRouter.defaultSearchQuery).isEmpty)

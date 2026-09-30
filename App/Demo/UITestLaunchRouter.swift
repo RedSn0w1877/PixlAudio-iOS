@@ -27,11 +27,6 @@ nonisolated struct LaunchConfiguration: Equatable, Sendable {
     var screen: DemoScreen?
     var appearance: Appearance
     var searchQuery: String?
-    /// Experiment flags (UI tests only): attach `.searchable` to the search tab's stack instead of the
-    /// TabView, and hide the bottom accessory.
-    var searchOnStack: Bool
-    var hideAccessory: Bool
-    var presentSearch: Bool
 
     init(arguments: [String]) {
         func value(after flag: String) -> String? {
@@ -44,9 +39,6 @@ nonisolated struct LaunchConfiguration: Equatable, Sendable {
         screen = value(after: "-screen").flatMap(DemoScreen.init(rawValue:))
         appearance = value(after: "-appearance").flatMap(Appearance.init(rawValue:)) ?? .system
         searchQuery = value(after: "-searchQuery")
-        searchOnStack = arguments.contains("-searchOnStack")
-        hideAccessory = arguments.contains("-hideAccessory")
-        presentSearch = arguments.contains("-presentSearch")
     }
 
     /// The configuration of this process.

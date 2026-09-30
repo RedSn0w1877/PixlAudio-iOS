@@ -23,7 +23,9 @@ final class Router {
     var libraryPath: [Route]
     var searchPath: [Route]
     var searchText: String
-    /// Whether the search field is active (focused). Bound to `.searchable(isPresented:)`.
+    /// Whether search is active. Bound to `.searchable(isPresented:)`. On iOS 27 a search-role tab shows
+    /// no idle search field (verified on the iOS 27.0 simulator), so selecting the Search tab activates
+    /// search — see `RootTabView`.
     var isSearchPresented: Bool
 
     init(launch: LaunchConfiguration) {
@@ -33,7 +35,7 @@ final class Router {
         libraryPath = start.libraryPath
         searchPath = []
         searchText = start.searchText
-        isSearchPresented = launch.presentSearch
+        isSearchPresented = start.tab == .search
     }
 }
 

@@ -5,7 +5,6 @@ import SwiftUI
 struct RootTabView: View {
     @Environment(Router.self) private var router
     @Environment(PlaybackStore.self) private var playback
-    @Environment(AppEnvironment.self) private var environment
 
     var body: some View {
         @Bindable var router = router
@@ -29,30 +28,18 @@ struct RootTabView: View {
                     SearchView()
                         .withRouteDestinations()
                 }
-                .modifier(SearchableIf(isOn: environment.launch.searchOnStack, text: $router.searchText, isPresented: $router.isSearchPresented))
             }
         }
-        // On the TabView (WWDC25 "Build a SwiftUI app with the new design"): with a search-role tab the
-        // field moves to the bottom of the screen on iPhone.
-        .modifier(SearchableIf(isOn: !environment.launch.searchOnStack, text: $router.searchText, isPresented: $router.isSearchPresented))
+        // On the TabView (WWDC25 "Build a SwiftUI app with the new design"), paired with the search-role tab.
+        .searchable(text: $router.searchText, isPresented: $router.isSearchPresented, prompt: "Songs, artists, albums")
+        .onChange(of: router.selection) { _, selection in
+            // iOS 27 shows the (glass) search field only while search is active: activate it with the tab.
+            if selection == .search { router.isSearchPresented = true }
+        }
         .tabBarMinimizeBehavior(.onScrollDown)
-        .tabViewBottomAccessory(isEnabled: playback.hasItem && !environment.launch.hideAccessory) {
+        .tabViewBottomAccessory(isEnabled: playback.hasItem) {
             MiniPlayerAccessory()
         }
     }
 }
 
-/// Applies `.searchable` only when `isOn` (lets UI tests compare placements).
-private struct SearchableIf: ViewModifier {
-    let isOn: Bool
-    @Binding var text: String
-    @Binding var isPresented: Bool
-
-    func body(content: Content) -> some View {
-        if isOn {
-            content.searchable(text: $text, isPresented: $isPresented, prompt: "Songs, artists, albums")
-        } else {
-            content
-        }
-    }
-}

@@ -12,10 +12,11 @@ an API (AGENTS.md). "CI" = proven to compile on the `xcode-27` lane (Xcode 27.0,
 | `View.environment(_:)` (Observable object), `@Environment(T.self)`, `@Bindable` | 17 | /documentation/swiftui/view/environment(_:)-4516h | shell | |
 | `TabView(selection:)` + `Tab(_:systemImage:value:content:)` | 18 | /documentation/swiftui/tab | `RootTabView` | |
 | `Tab(value:role:content:)`, `TabRole.search` | 18 | /documentation/swiftui/tabrole/search | `RootTabView` | Search tab sits at the trailing end, glass search field. |
-| `View.searchable(text:prompt:)` | 15 | /documentation/swiftui/view/searchable(text:placement:prompt:)-18a8f | `RootTabView` | Applied to the `TabView` (WWDC25 session 323 code). |
+| `View.searchable(text:isPresented:prompt:)` | 17 | /documentation/swiftui/view/searchable(text:ispresented:placement:prompt:) | `RootTabView` | On the `TabView` (WWDC25 session 323 code). **iOS 27.0 simulator: a search-role tab shows no idle search field** (with or without the bottom accessory, on the TabView or the tab's stack — CI experiments on s00-bootstrap); the field appears only while search is presented, so selecting the Search tab sets `isPresented = true`. |
 | `View.tabBarMinimizeBehavior(_:)`, `.onScrollDown` | 26.0 | /documentation/swiftui/view/tabbarminimizebehavior(_:) | `RootTabView` | |
 | `View.tabViewBottomAccessory(isEnabled:content:)` | **26.1** | /documentation/swiftui/view/tabviewbottomaccessory(isenabled:content:) | `RootTabView` | Reason for the 26.1 deployment target. |
 | `EnvironmentValues.tabViewBottomAccessoryPlacement`, `TabViewBottomAccessoryPlacement.inline/.expanded` | 26.0 | /documentation/swiftui/tabviewbottomaccessoryplacement | `MiniPlayerAccessory` | Optional value (nil outside an accessory). |
+| `View.onChange(of:initial:_:)` (two-parameter closure) | 17 | /documentation/swiftui/view/onchange(of:initial:_:)-4psgg | `RootTabView` | |
 | `NavigationStack(path:)`, `navigationDestination(for:destination:)`, `NavigationLink(value:)` | 16 | /documentation/swiftui/navigationstack | shell | Value types used as routes are `nonisolated` so `Hashable` isn't main-actor isolated. |
 | `ToolbarItem(placement: .topBarTrailing)`, `Menu` | 17 / 14 | /documentation/swiftui/toolbaritemplacement/topbartrailing | Home, Library | Toolbar items get system glass. |
 | `List`, `Section(_:content:)`, `Section(content:header:footer:)`, `Form`, `LabeledContent` | 13–16 | /documentation/swiftui/list | screens | Content layer, never glass. |

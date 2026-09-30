@@ -22,39 +22,6 @@ final class ScreenshotTests: XCTestCase {
     func testSearchResultsLight() throws { try capture(.searchResults, "light") }
     func testSearchResultsDark() throws { try capture(.searchResults, "dark") }
 
-    // MARK: Search placement experiments (temporary)
-
-    func testSearchExperimentPresentedLight() throws { try capture(.searchResults, "light", extra: ["-presentSearch"], suffix: "presented") }
-    func testSearchExperimentPresentedStackLight() throws {
-        try capture(.searchResults, "light", extra: ["-presentSearch", "-searchOnStack"], suffix: "presented-stack")
-    }
-    func testSearchExperimentTapFromHomeLight() throws {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchArguments = ["-uiTest", "-screen", "home", "-appearance", "light", "-searchQuery", "Luma"]
-        app.launch()
-        XCTAssertTrue(app.descendants(matching: .any)["screen.home"].firstMatch.waitForExistence(timeout: 20))
-        let search = app.buttons["Search"].firstMatch
-        XCTAssertTrue(search.waitForExistence(timeout: 5), "Search tab button not found")
-        search.tap()
-        Thread.sleep(forTimeInterval: 1.5)
-        snap(app, "exp-tapFromHome")
-        search.tap()
-        Thread.sleep(forTimeInterval: 1.5)
-        snap(app, "exp-tapTwice")
-        let tree = XCTAttachment(string: app.debugDescription)
-        tree.name = "exp-tapTwice-tree"
-        tree.lifetime = .keepAlways
-        add(tree)
-    }
-
-    private func snap(_ app: XCUIApplication, _ name: String) {
-        let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = name
-        attachment.lifetime = .keepAlways
-        add(attachment)
-    }
-
     // MARK: Mini player inline (tab bar minimized after scrolling down)
 
     func testMiniPlayerLight() throws { try capture(.miniPlayer, "light") }
@@ -81,28 +48,18 @@ final class ScreenshotTests: XCTestCase {
         }
     }
 
-    private func capture(_ screen: Screen, _ appearance: String, extra: [String] = [], suffix: String? = nil) throws {
+    private func capture(_ screen: Screen, _ appearance: String) throws {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["-uiTest", "-screen", screen.rawValue, "-appearance", appearance] + extra
+        app.launchArguments = ["-uiTest", "-screen", screen.rawValue, "-appearance", appearance]
         app.launch()
 
         let ready = app.descendants(matching: .any)[screen.readyIdentifier].firstMatch
         XCTAssertTrue(ready.waitForExistence(timeout: 20), "\(screen.readyIdentifier) did not appear")
 
         if screen == .search || screen == .searchResults {
-            // The search tab turns into a bottom search field when the user selects it, so select Home and
-            // then Search like a user would (tab items are buttons; on iOS 26+ they may not sit in `tabBars`).
-            let home = app.buttons["Home"].firstMatch
-            let search = app.buttons["Search"].firstMatch
-            if home.waitForExistence(timeout: 5) { home.tap() }
-            Thread.sleep(forTimeInterval: 0.5)
-            if search.waitForExistence(timeout: 5) { search.tap() }
-            _ = app.searchFields.firstMatch.waitForExistence(timeout: 5)
-            let tree = XCTAttachment(string: app.debugDescription)
-            tree.name = "\(screen.rawValue)-\(appearance)\(suffix.map { "-" + $0 } ?? "")-tree"
-            tree.lifetime = .keepAlways
-            add(tree)
+            // Selecting the Search tab activates search, which shows the system glass search field.
+            XCTAssertTrue(app.searchFields.firstMatch.waitForExistence(timeout: 10), "search field is not visible")
         }
 
         if screen == .miniPlayer {
@@ -119,7 +76,7 @@ final class ScreenshotTests: XCTestCase {
         Thread.sleep(forTimeInterval: 1.5)
 
         let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = "\(screen.rawValue)-\(appearance)\(suffix.map { "-" + $0 } ?? "")"
+        attachment.name = "\(screen.rawValue)-\(appearance)"
         attachment.lifetime = .keepAlways
         add(attachment)
 
