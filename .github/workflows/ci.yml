@@ -114,7 +114,8 @@ jobs:
         run: xcodegen generate
       - name: Pick and boot simulator
         run: |
-          bash ci/pick-sim.sh "$SIM_IOS_MAJOR"
+          # pick-sim.sh exports SIM_UDID for later steps; this step needs it now.
+          SIM_UDID="$(bash ci/pick-sim.sh "$SIM_IOS_MAJOR")"
           xcrun simctl boot "$SIM_UDID" || true
           xcrun simctl bootstatus "$SIM_UDID" -b
           xcrun simctl status_bar "$SIM_UDID" override --time 9:41 \
