@@ -51,8 +51,8 @@ struct SheetDestination: View {
         case .sleepTimer: SleepTimerSheet().sleepTimerPresentation()
         case .lyricsOptions(let songId): LyricsOptionsSheet(songId: songId).pixlSheet()
         case .changelog, .betaInfo, .jobs: HomeInfoSheet(sheet: sheet).pixlSheet()
-        case .devices: DevicesSheet().pixlSheet(detents: [.large])
-        case .artistPicker(let songId): PlayerArtistPickerSheet(songId: songId).pixlSheet(detents: [.medium, .large])
+        case .devices: DevicesSheet() // sizes its own detent
+        case .artistPicker(let songId): PlayerArtistPickerSheet(songId: songId) // sizes its own detent
         case .aiDJ: AIDJSheet().pixlSheet()
         }
     }

@@ -18,6 +18,11 @@ struct DevicesSheet: View {
 
     @State private var page = 0
     @State private var volume = SystemVolumeObserver()
+    /// Natural heights of the two pages and of the whole sheet: Android's sheet wraps its content and animates
+    /// between the pages' heights (`animateContentSize`), so the detent follows the visible page.
+    @State private var controlsHeight: CGFloat?
+    @State private var devicesHeight: CGFloat?
+    @State private var sheetHeight: CGFloat?
 
     private var route: AudioRouteMonitor { AudioRouteMonitor.shared }
 
@@ -38,17 +43,20 @@ struct DevicesSheet: View {
             Spacer().frame(height: 8)
             ZStack(alignment: .top) {
                 if page == 0 {
-                    ScrollView { controlsPage }
+                    ScrollView { controlsPage.measuringHeight($controlsHeight) }
                         .transition(.move(edge: .leading).combined(with: .opacity))
                 } else {
-                    ScrollView { devicesPage }
+                    ScrollView { devicesPage.measuringHeight($devicesHeight) }
                         .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
             .animation(.spring(response: 0.38, dampingFraction: 0.86), value: page)
-            .frame(maxHeight: .infinity, alignment: .top)
+            .frame(height: (page == 0 ? controlsHeight : devicesHeight) ?? 320, alignment: .top)
             tabBar
         }
+        .measuringHeight($sheetHeight)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .fittedSheetDetent(sheetHeight)
         .onAppear {
             volume.start()
             route.setDetecting(true)

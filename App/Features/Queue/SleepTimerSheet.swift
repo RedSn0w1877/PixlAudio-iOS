@@ -19,6 +19,7 @@ struct SleepTimerSheet: View {
     @State private var counterPosition: Double = 1
     @State private var isTimerMode = true
     @State private var showsCustomTime = false
+    @State private var contentHeight: CGFloat?
 
     private static let stops = SleepTimer.predefinedMinutes
 
@@ -62,7 +63,9 @@ struct SleepTimerSheet: View {
             }
             .padding(.horizontal, 18)
             .padding(.top, 28)
+            .measuringHeight($contentHeight)
         }
+        .fittedSheetDetent(contentHeight)
         .tint(theme.primary)
         .onAppear(perform: syncFromState)
         .onChange(of: timer.toastMessage) { _, message in
@@ -203,10 +206,10 @@ struct SleepTimerSheet: View {
 }
 
 extension View {
-    /// The timer sheet's presentation: tall enough for its content without scrolling, the system handle.
+    /// The timer sheet's presentation. The sheet sizes its own wrap-content detent (`fittedSheetDetent`), as
+    /// Android's `TimerOptionsBottomSheet` wraps its content.
     func sleepTimerPresentation() -> some View {
-        presentationDetents([.height(560), .large])
-            .presentationDragIndicator(.visible)
+        presentationDragIndicator(.visible)
     }
 }
 

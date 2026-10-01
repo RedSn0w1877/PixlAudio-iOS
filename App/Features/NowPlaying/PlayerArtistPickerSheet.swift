@@ -15,6 +15,7 @@ struct PlayerArtistPickerSheet: View {
     @Environment(PlaybackStore.self) private var playback
     @Environment(Router.self) private var router
     @Environment(\.appTheme) private var theme
+    @State private var contentHeight: CGFloat?
 
     private struct Item: Identifiable {
         let ref: ArtistRef
@@ -42,7 +43,9 @@ struct PlayerArtistPickerSheet: View {
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
             .padding(.top, 8)
+            .measuringHeight($contentHeight)
         }
+        .fittedSheetDetent(contentHeight)
         .accessibilityIdentifier("screen.artistPicker")
     }
 
