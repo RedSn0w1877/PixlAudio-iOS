@@ -38,6 +38,8 @@ struct LyricsView: View {
     @State private var exportDocument: LyricsTextDocument?
     @State private var syncChipDismissedFor: String?
     @State private var translationConfig: TranslationSession.Configuration?
+    @State private var translationLines: [String] = []
+    @State private var translationSongId: String?
     @State private var shownPrepared: PreparedLyrics?
     @State private var shownPreparedSong: String?
 
@@ -209,7 +211,14 @@ struct LyricsView: View {
                       defaultFilename: song.map { "\($0.displayArtist) - \($0.title).lrc" } ?? "lyrics.lrc") { result in
             if case .success = result { controller.message = "Lyrics file saved" }
         }
-        .translationTask(translationConfig) { session in await translate(with: session) }
+        .translationTask(translationConfig) { session in
+            // The session is not Sendable: it is only ever used inside LyricsTranslator (one @concurrent
+            // call, awaited here, never shared), so it is handed over unchecked; plain values come back.
+            nonisolated(unsafe) let session = session
+            let songId = translationSongId
+            let map = await LyricsTranslator.translate(lines: translationLines, session: session)
+            finishTranslation(map, songId: songId)
+        }
     }
 
     // MARK: Lyrics content
@@ -397,7 +406,10 @@ struct LyricsView: View {
             controller.message = "These lyrics already have a translation"
             return
         }
-        guard !(lyrics?.synced ?? []).isEmpty else { return }
+        guard let synced = lyrics?.synced, !synced.isEmpty else { return }
+        translationLines = synced.map(\.line)
+        translationSongId = song?.id
+        controller.message = "Translating lyrics..."
         if translationConfig == nil {
             translationConfig = TranslationSession.Configuration(source: nil, target: Locale.current.language)
         } else {
@@ -405,30 +417,16 @@ struct LyricsView: View {
         }
     }
 
-    private func translate(with session: TranslationSession) async {
-        guard let song, let synced = lyrics?.synced, !synced.isEmpty else { return }
-        controller.message = "Translating lyrics..."
-        let requests = synced.enumerated().compactMap { index, line -> TranslationSession.Request? in
-            let text = line.line.trimmingCharacters(in: .whitespaces)
-            return text.isEmpty ? nil : TranslationSession.Request(sourceText: text, clientIdentifier: String(index))
-        }
-        do {
-            let responses = try await session.translations(from: requests)
-            var map: [Int: String] = [:]
-            for response in responses {
-                guard let id = response.clientIdentifier, let index = Int(id), synced.indices.contains(index) else { continue }
-                let original = synced[index].line.trimmingCharacters(in: .whitespaces)
-                if response.targetText.trimmingCharacters(in: .whitespaces) != original {
-                    map[index] = response.targetText
-                }
-            }
-            if map.isEmpty {
-                controller.message = "These lyrics are already in this language"
-            } else {
-                controller.applyTranslations(map, song: song)
-            }
-        } catch {
+    private func finishTranslation(_ map: [Int: String]?, songId: String?) {
+        guard let song = playback.current, song.id == songId else { return }
+        guard let map else {
             controller.message = "Translation isn't available for these lyrics"
+            return
+        }
+        if map.isEmpty {
+            controller.message = "These lyrics are already in this language"
+        } else {
+            controller.applyTranslations(map, song: song)
         }
     }
 
@@ -538,6 +536,31 @@ private struct LyricsSwipeOverlay: View {
         }
         .allowsHitTesting(false)
         .sensoryFeedback(.impact(weight: .heavy), trigger: swipe.commits)
+    }
+}
+
+/// On-device translation of lyric lines (the session is not Sendable, so this stays off the main actor).
+nonisolated enum LyricsTranslator {
+    /// index → translated text for the lines that changed; nil when the session failed.
+    @concurrent
+    static func translate(lines: [String], session: TranslationSession) async -> [Int: String]? {
+        let requests = lines.enumerated().compactMap { index, line -> TranslationSession.Request? in
+            let text = line.trimmingCharacters(in: .whitespaces)
+            return text.isEmpty ? nil : TranslationSession.Request(sourceText: text, clientIdentifier: String(index))
+        }
+        guard !requests.isEmpty else { return [:] }
+        do {
+            let responses = try await session.translations(from: requests)
+            var map: [Int: String] = [:]
+            for response in responses {
+                guard let id = response.clientIdentifier, let index = Int(id), lines.indices.contains(index) else { continue }
+                let original = lines[index].trimmingCharacters(in: .whitespaces)
+                if response.targetText.trimmingCharacters(in: .whitespaces) != original { map[index] = response.targetText }
+            }
+            return map
+        } catch {
+            return nil
+        }
     }
 }
 
