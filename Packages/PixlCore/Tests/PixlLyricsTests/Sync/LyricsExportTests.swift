@@ -1,7 +1,7 @@
 // Port of the Android `data/lyrics/sync/LyricsExportTest.kt`. The TTML checks parse the output with Foundation's
 // `XMLParser` (namespace-aware, FoundationXML on Windows/Linux) into a tiny DOM, like the Android test's
-// `DocumentBuilder`. The three round trips through the app's lyrics parser need the stage 2b parser port and are
-// disabled until the integrator wires it in (see `parseLyrics`).
+// `DocumentBuilder`. The three round trips read the exports back through the app's lyrics parser
+// (`LyricsUtils.parseLyrics`), as the Android test does.
 
 import Foundation
 #if canImport(FoundationXML)
@@ -15,11 +15,8 @@ import Testing
 @Suite("LyricsExport")
 struct LyricsExportTests {
 
-    /// TODO(integrator): once the s02b lyrics parsers are merged, set this to the Swift port of
-    /// `LyricsUtils.parseLyrics(String): Lyrics` (e.g. `{ LyricsUtils.parseLyrics($0) }`) and delete the
-    /// `.disabled(...)` traits of `lrcRoundTripsThroughTheAppParser`, `lrcRoundTripsTappedDrafts` and
-    /// `ttmlReadsBackThroughTheAppParser`.
-    static let parseLyrics: (@Sendable (String) -> Lyrics)? = nil
+    /// The app's lyrics parser, the Swift port of Android's `LyricsUtils.parseLyrics(String): Lyrics`.
+    static let parseLyrics: @Sendable (String) -> Lyrics = { LyricsUtils.parseLyrics($0) }
 
     static let ttmlNs = "http://www.w3.org/ns/ttml"
     static let ttmlMetadataNs = "http://www.w3.org/ns/ttml#metadata"
@@ -98,12 +95,12 @@ struct LyricsExportTests {
         #expect(nonEmptyLines(LyricsExport.toEnhancedLrc(Self.bare)) == ["[ti:Two lines]", "[by:PixlAudio]", "[00:00.00]plain words"])
     }
 
-    @Test(.disabled("Needs the stage 2b LRC parser: set LyricsExportTests.parseLyrics"))
+    @Test
     func lrcRoundTripsThroughTheAppParser() throws {
         try assertRoundTrip(Self.doc)
     }
 
-    @Test(.disabled("Needs the stage 2b LRC parser: set LyricsExportTests.parseLyrics"))
+    @Test
     func lrcRoundTripsTappedDrafts() throws {
         for seed in Int32(0)..<40 {
             var random = KotlinRandom(seed: seed)
@@ -126,7 +123,7 @@ struct LyricsExportTests {
     }
 
     private func assertRoundTrip(_ source: LyricsDoc) throws {
-        let parse = try #require(Self.parseLyrics)
+        let parse = Self.parseLyrics
         let parsed = try #require(parse(LyricsExport.toEnhancedLrc(source)).synced)
         #expect(source.lines.count == parsed.count)
         for (expected, actual) in zip(source.lines, parsed) {
@@ -198,9 +195,9 @@ struct LyricsExportTests {
         #expect(body.attribute("dur") == nil)
     }
 
-    @Test(.disabled("Needs the stage 2b TTML parser: set LyricsExportTests.parseLyrics"))
+    @Test
     func ttmlReadsBackThroughTheAppParser() throws {
-        let parse = try #require(Self.parseLyrics)
+        let parse = Self.parseLyrics
         let parsed = try #require(parse(LyricsExport.toTtml(Self.doc)).synced)
         #expect(parsed.map(\.line) == ["Hello there, world", "beautiful day"])
         for (expected, actual) in zip(Self.doc.lines, parsed) {

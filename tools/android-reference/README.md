@@ -1,6 +1,6 @@
 # Android reference generators (dev tooling, never shipped)
 
-PixlCore ports Android/Compose logic that must behave **exactly** like the original. These two small Java
+PixlCore ports Android/Compose logic that must behave **exactly** like the original. These small Java
 programs run the real Android implementations on a desktop JVM and write the fixtures the Swift tests compare
 against. They are only needed when a fixture has to be regenerated (for example after a Compose upgrade on
 Android).
@@ -9,8 +9,16 @@ Android).
 |---|---|---|---|
 | `RefGen.java` | Compose `FloatSpringSpec` (value, velocity, `getDurationNanos`), `CubicBezierEasing`, `FloatExponentialDecaySpec` from `androidx.compose.animation:animation-core` | `Packages/PixlCore/Tests/PixlFoundationTests/Fixtures/compose-reference.txt` | `ComposeReferenceTests` |
 | `DocGen.java` + `cases.txt` | The Android app's compiled `LyricsDocCodec.decode` / `encode` (kotlinx.serialization) over every line of `cases.txt` | `Packages/PixlCore/Tests/PixlModelTests/Fixtures/lyricsdoc-android-golden.txt` | `LyricsDocGoldenTests` |
+| `LyricsGen.java` + `lyrics-cases.txt` (see [`LyricsGen.md`](LyricsGen.md)) | The app's compiled lyrics parsers: `LyricsUtils.parseLyrics`/`toLrcString`, `TtmlLyricsParser`, `WordSyncTranspilers`, `LyricsfileParser` (SnakeYAML), `LyricsImportSecurity`, `MultiLangRomanizer`, the `LyricsRepositoryImpl` matching helpers and the AMLL/NetEase matchers. `gen-romanizer-tables.js` generates `RomanizerTables.swift` from `LyricsUtils.kt`. | `Packages/PixlCore/Tests/PixlLyricsTests/Fixtures/parsing/lyrics-android-golden.txt` | `ParsingGoldenTests` |
+| `EngineGen.java` + `lyrics-engine-cases.txt` | The app's compiled `PreparedLyricsBuilder`, `LyricsEngine`, `LyricsClock` and lyrics maths (springs, blur, cascade, emphasis, background grade, sprite baking) | `Tests/PixlLyricsTests/Fixtures/lyrics-prepared-golden.txt`, `lyrics-engine-golden.txt`, `lyrics-math-golden.txt` | `LyricsGoldenTests` |
+| `TapSyncGen.java` | The app's compiled `LyricsTapSync`, `LyricsExport` and `LyricsSyncDraftStore` codec (all 500 property-test sessions hashed step by step); `java TapSyncGen debug <seed>` prints one seed | `Tests/PixlLyricsTests/Fixtures/tapsync-android-golden.txt` | `TapSyncGoldenTests` |
+| `LibGen.java` | The app's compiled library logic (artist parsing, folder tree, random/shuffle, recommendations, stats, history codec) plus the real `songs_fts` SQL through xerial sqlite-jdbc | `Tests/PixlLibraryTests/Fixtures/*-golden.jsonl`, `Sources/PixlLibrary/Unicode61Tables.swift` | `GoldenVectorTests`, `ArtistParsingTests` |
 
 ## Classpath
+
+The stage 2b–3a generators document their full classpath and command in their header comment (`LyricsGen` in
+`LyricsGen.md`). `stubs/` holds minimal Android stand-ins (`Context`, `Uri`, `Parcel`/`Parcelable`, `LruCache`) that
+are compiled and put before `android.jar` so app classes load on the JVM. The two stage 2a generators:
 
 Everything comes from the Android project's Gradle cache (`~/.gradle/caches/modules-2/files-2.1`) and build output
 (no downloads):
