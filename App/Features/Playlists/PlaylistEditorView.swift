@@ -305,6 +305,7 @@ private struct PlaylistCoverFormView: View {
 
     @Environment(LibraryStore.self) private var library
     @Environment(\.appTheme) private var theme
+    @State private var showsPhotoPicker = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -343,6 +344,7 @@ private struct PlaylistCoverFormView: View {
             }
             .scrollDismissesKeyboard(.immediately)
         }
+        .photosPicker(isPresented: $showsPhotoPicker, selection: $photoItem, matching: .images)
         .accessibilityIdentifier("editor.form")
     }
 
@@ -389,7 +391,7 @@ private struct PlaylistCoverFormView: View {
             VStack(spacing: 12) {
                 ArtworkView(source: source, size: 180, cornerRadius: 32)
                 HStack(spacing: 8) {
-                    PhotosPicker(selection: $photoItem, matching: .images) {
+                    Button { showsPhotoPicker = true } label: {
                         smallActionLabel("Change", systemImage: "photo.badge.plus")
                     }
                     .buttonStyle(.plain)
@@ -406,7 +408,7 @@ private struct PlaylistCoverFormView: View {
                 .frame(maxWidth: 260)
             }
         } else {
-            PhotosPicker(selection: $photoItem, matching: .images) {
+            Button { showsPhotoPicker = true } label: {
                 VStack(spacing: 12) {
                     Image(systemName: "photo.badge.plus")
                         .font(.system(size: 48, weight: .regular))
