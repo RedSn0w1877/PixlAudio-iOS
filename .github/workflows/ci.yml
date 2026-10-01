@@ -35,17 +35,25 @@ env:
   XCODEGEN_SHA256: '4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806'
   SIM_IOS_MAJOR: '27'
 
+# Runner time matters: only 5 macOS jobs run at once across everyone. Rules of thumb in this file:
+# - the simulator's first boot (2–6 min) starts in the background right after Xcode is selected and is only
+#   awaited after the build (ci/sim.sh);
+# - every xcodebuild test run passes `-collect-test-diagnostics never`: otherwise xcodebuild runs
+#   `simctl diagnose` after the tests, which never answers on the hosted VMs and costs a 600 s timeout per run;
+# - raw xcodebuild output is kept, timestamped, in build/*.log (ci/timestamp.sh); the console shows xcbeautify.
+
 jobs:
   core:
+    # PixlCore has zero dependencies and builds on Windows, so it runs on Linux in the official Swift image:
+    # no macOS runner needed.
     name: core (PixlCore swift test)
-    runs-on: macos-26
+    runs-on: ubuntu-latest
+    container: swift:6.4-noble
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - name: Toolchain
-        run: |
-          xcodebuild -version
-          swift --version
+        run: swift --version
       - name: swift test
         run: swift test --package-path Packages/PixlCore --parallel
       # Stage 11: search + VISIONOS-first resolution + a ranged probe + BotGuard Create against the real services.
@@ -60,81 +68,48 @@ jobs:
   app:
     name: app (build + unit tests, Xcode 27)
     runs-on: xcode-27
-    timeout-minutes: 60
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
-      - name: Check forbidden patterns
-        run: bash ci/check-forbidden.sh
       - name: Select Xcode
         run: bash ci/select-xcode.sh "$XCODE_VERSION"
+      - name: Start booting the simulator
+        run: bash ci/sim.sh boot "$SIM_IOS_MAJOR"
+      - name: Check forbidden patterns
+        run: bash ci/check-forbidden.sh
       - name: Install XcodeGen
         run: bash ci/install-xcodegen.sh "$XCODEGEN_VERSION"
       - name: Generate project
         run: xcodegen generate
-      - name: Pick simulator
-        run: bash ci/pick-sim.sh "$SIM_IOS_MAJOR"
       - name: Build for testing
         run: |
           set -o pipefail
-          mkdir -p build
           xcodebuild build-for-testing \
             -project PixlAudio.xcodeproj -scheme PixlAudio \
             -destination "id=$SIM_UDID" \
             -derivedDataPath build/DerivedData \
-            2>&1 | tee build/build.log | xcbeautify --quieter
-      - name: xcodebuild options (diagnostics)
-        run: |
-          mkdir -p build/diag
-          xcodebuild -help > build/diag/xcodebuild-help.txt 2>&1 || true
-          man xcodebuild 2>/dev/null | col -b > build/diag/xcodebuild-man.txt || true
-          grep -nEi 'test|timeout|diagnos|result|parallel|relaunch|clone|destination' build/diag/xcodebuild-help.txt | head -150 || true
-          sysctl -n machdep.cpu.brand_string hw.ncpu hw.memsize || true
+            2>&1 | bash ci/timestamp.sh | tee build/build.log | cut -c14- | xcbeautify --quieter
+      - name: Wait for the simulator
+        run: bash ci/sim.sh wait
       - name: Unit tests
         run: |
           set -o pipefail
-          bash ci/diag-sampler.sh build/test.log build/diag >/dev/null 2>&1 &
-          SAMPLER=$!
-          trap 'kill $SAMPLER 2>/dev/null || true' EXIT
           xcodebuild test-without-building \
             -project PixlAudio.xcodeproj -scheme PixlAudio \
             -destination "id=$SIM_UDID" \
             -derivedDataPath build/DerivedData \
             -only-testing:PixlAudioTests \
+            -collect-test-diagnostics never \
             -resultBundlePath build/UnitTests.xcresult \
-            -verbose \
-            2>&1 | bash ci/timestamp.sh | tee build/test.log
-      - name: Collect diagnostics
-        if: always()
-        run: |
-          mkdir -p build/diag
-          if [ -d build/UnitTests.xcresult ]; then
-            xcrun xcresulttool get log --path build/UnitTests.xcresult --type action > build/diag/action-log.json 2>&1 || true
-            xcrun xcresulttool get log --path build/UnitTests.xcresult --type console > build/diag/console-log.json 2>&1 || true
-            xcrun xcresulttool get test-results summary --path build/UnitTests.xcresult > build/diag/summary.json 2>&1 || true
-            du -sh build/UnitTests.xcresult; find build/UnitTests.xcresult -maxdepth 3 | head -50
-          fi
-          xcrun simctl spawn "$SIM_UDID" log show --last 25m --style compact \
-            --predicate 'process == "PixlAudio" OR process == "testmanagerd" OR process CONTAINS "xctest" OR process == "SpringBoard"' \
-            2>&1 | tail -c 30000000 > build/diag/sim-log.txt || true
-          ls -la build/diag
-      - name: Upload diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: diag-unit-${{ github.sha }}
-          path: |
-            build/UnitTests.xcresult
-            build/*.log
-            build/diag
-          retention-days: 5
-          if-no-files-found: ignore
+            2>&1 | bash ci/timestamp.sh | tee build/test.log | cut -c14- | xcbeautify --quieter
       - name: Summarise errors
         if: failure()
         run: |
           cat build/build.log build/test.log > build/all.log 2>/dev/null || true
           bash ci/xcerrors.sh build/all.log build/UnitTests.xcresult
       - name: Upload test results
-        if: failure()
+        # TEMPORARY (ci-speed measurements): always; back to failure() before merging.
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: unit-xcresult-${{ github.sha }}
@@ -157,61 +132,77 @@ jobs:
       - uses: actions/checkout@v5
       - name: Select Xcode
         run: bash ci/select-xcode.sh "$XCODE_VERSION"
+      - name: Start booting the simulator
+        run: bash ci/sim.sh boot "$SIM_IOS_MAJOR"
       - name: Install XcodeGen
         run: bash ci/install-xcodegen.sh "$XCODEGEN_VERSION"
       - name: Generate project
         run: xcodegen generate
-      - name: Pick and boot simulator
+      - name: Build for testing
         run: |
-          # pick-sim.sh exports SIM_UDID for later steps; this step needs it now.
-          SIM_UDID="$(bash ci/pick-sim.sh "$SIM_IOS_MAJOR")"
-          xcrun simctl boot "$SIM_UDID" || true
-          xcrun simctl bootstatus "$SIM_UDID" -b
+          set -o pipefail
+          xcodebuild build-for-testing \
+            -project PixlAudio.xcodeproj -scheme PixlAudio \
+            -destination "id=$SIM_UDID" \
+            -derivedDataPath build/DerivedData \
+            2>&1 | bash ci/timestamp.sh | tee build/build.log | cut -c14- | xcbeautify --quieter
+      - name: Prepare the simulator
+        run: |
+          bash ci/sim.sh wait
+          date -u +'%T status bar'
           xcrun simctl status_bar "$SIM_UDID" override --time 9:41 \
             --dataNetwork wifi --wifiMode active --wifiBars 3 \
             --cellularMode active --cellularBars 4 \
             --batteryState charged --batteryLevel 100
+          date -u +'%T keyboard defaults'
           # Suppress the first-run "slide to type" keyboard tip in search screenshots.
           xcrun simctl spawn "$SIM_UDID" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true || true
+          date -u +'%T ready'
       - name: Screenshot tests
         env:
           COMMIT_MSG: ${{ github.event.head_commit.message }}
           SHOTS_ONLY_INPUT: ${{ inputs.shots_only }}
         run: |
           set -o pipefail
-          mkdir -p build
-          # Which UI test classes to run: the shots_only dispatch input, or "[shots:A,B]" in the commit message;
-          # otherwise every class (main always runs all of them).
-          FILTER="$SHOTS_ONLY_INPUT"
-          if [ -z "$FILTER" ]; then
-            FILTER="$(printf '%s' "$COMMIT_MSG" | grep -o '\[shots:[^]]*\]' | head -1 | sed 's/^\[shots://; s/\]$//' || true)"
-          fi
-          if [ "$GITHUB_REF" = "refs/heads/main" ]; then FILTER=""; fi
-          ONLY=()
-          if [ -n "$FILTER" ]; then
-            IFS=',' read -ra CLASSES <<< "$FILTER"
-            for c in "${CLASSES[@]}"; do
-              c="$(echo "$c" | tr -d '[:space:]')"
-              if [[ "$c" =~ ^[A-Za-z0-9_]+$ ]]; then ONLY+=("-only-testing:PixlAudioUITests/$c"); fi
-            done
-          fi
-          if [ ${#ONLY[@]} -eq 0 ]; then ONLY=("-only-testing:PixlAudioUITests"); fi
-          echo "Running UI tests: ${ONLY[*]}"
-          xcodebuild test \
+          # Which UI tests run: ci/ui-test-args.sh ([shots:A,B] or shots_only on branches; main runs every class;
+          # opt-in classes such as TransitionPerformanceTests only when named).
+          SELECTION=()
+          while IFS= read -r arg; do SELECTION+=("$arg"); done < <(bash ci/ui-test-args.sh)
+          xcodebuild test-without-building \
             -project PixlAudio.xcodeproj -scheme PixlAudio \
             -destination "id=$SIM_UDID" \
             -derivedDataPath build/DerivedData \
-            "${ONLY[@]}" \
+            "${SELECTION[@]}" \
             -retry-tests-on-failure -test-iterations 3 \
+            -collect-test-diagnostics never \
             -resultBundlePath build/Shots.xcresult \
-            2>&1 | bash ci/timestamp.sh | tee build/shots.log | xcbeautify
+            2>&1 | bash ci/timestamp.sh | tee build/shots.log | cut -c14- | xcbeautify --quieter
+          bash ci/check-ui-tests-ran.sh build/shots.log
+      - name: Enumerate the every-class selection (TEMPORARY check)
+        if: always()
+        run: |
+          set -o pipefail
+          xcodebuild test-without-building \
+            -project PixlAudio.xcodeproj -scheme PixlAudio \
+            -destination "id=$SIM_UDID" \
+            -derivedDataPath build/DerivedData \
+            -skip-testing:PixlAudioTests \
+            -skip-testing:PixlAudioUITests/TransitionPerformanceTests \
+            -skip-testing:PixlAudioUITests/AIScreenshotTests \
+            -collect-test-diagnostics never \
+            -enumerate-tests -test-enumeration-style hierarchical -test-enumeration-format json \
+            -test-enumeration-output-path build/enumerate-all.json \
+            2>&1 | bash ci/timestamp.sh | tail -n 30
+          head -c 6000 build/enumerate-all.json || true
       - name: Export screenshots
         if: always()
         run: |
           if [ -d build/Shots.xcresult ]; then bash ci/export-shots.sh build/Shots.xcresult build/shots; fi
       - name: Summarise errors
         if: failure()
-        run: bash ci/xcerrors.sh build/shots.log build/Shots.xcresult
+        run: |
+          cat build/build.log build/shots.log > build/all.log 2>/dev/null || true
+          bash ci/xcerrors.sh build/all.log build/Shots.xcresult
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -221,13 +212,14 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
       - name: Upload result bundle
+        # TEMPORARY (ci-speed measurements): always; back to failure() before merging.
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: shots-xcresult-${{ github.sha }}
           path: |
             build/Shots.xcresult
-            build/shots.log
+            build/*.log
           retention-days: 5
           if-no-files-found: ignore
 
