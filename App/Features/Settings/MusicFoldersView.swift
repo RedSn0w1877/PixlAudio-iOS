@@ -46,7 +46,7 @@ struct MusicFoldersView: View {
         }
         .fileImporter(isPresented: $showsPicker, allowedContentTypes: [.folder]) { result in
             guard case .success(let url) = result else { return }
-            Task { await model.addFolder(url, persistence: environment.persistence) }
+            Task { await model.addFolder(url, importer: environment.libraryImporter, persistence: environment.persistence) }
         }
         .accessibilityIdentifier("screen.musicFolders")
     }
@@ -141,7 +141,8 @@ struct MusicFoldersView: View {
                 }
                 if let root = model.selectedRoot, root.isRemovable, model.crumbs.count <= 1 {
                     SettingsFillButton(title: L10n.commonRemove, systemImage: "minus.circle", style: .destructive) {
-                        Task { await model.removeRoot(root, persistence: environment.persistence) }
+                        Task { await model.removeRoot(root, importer: environment.libraryImporter,
+                                                    persistence: environment.persistence) }
                     }
                     .padding(.top, 12)
                 }
@@ -310,7 +311,8 @@ final class MusicFoldersModel {
 
     func load(persistence: PersistenceActor?) async {
         let sources = (try? await persistence?.settingsFolderSources()) ?? []
-        roots = [MusicFolderRoot(id: "documents", displayName: "On My iPhone", pathKey: "Documents", bookmark: nil,
+        roots = [MusicFolderRoot(id: FolderRoot.documentsID, displayName: "On My iPhone",
+                                 pathKey: FolderRoot.documentsDisplayName, bookmark: nil,
                                  isRemovable: false)]
             + sources.map { MusicFolderRoot(id: $0.id, displayName: $0.displayName, pathKey: $0.displayName,
                                             bookmark: $0.bookmark, isRemovable: true) }
@@ -342,19 +344,29 @@ final class MusicFoldersModel {
         Task { await reload() }
     }
 
-    func addFolder(_ url: URL, persistence: PersistenceActor?) async {
-        let accessing = url.startAccessingSecurityScopedResource()
-        defer { if accessing { url.stopAccessingSecurityScopedResource() } }
-        guard let bookmark = try? url.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil,
-                                                   relativeTo: nil) else { return }
-        try? await persistence?.settingsAddFolderSource(displayName: url.lastPathComponent, bookmark: bookmark,
-                                                        addedAt: Int64(Date().timeIntervalSince1970 * 1000))
+    /// Adds a picked folder through the stage-6 importer (unique display name, security scope kept open), or straight
+    /// into the store when there is no importer (UI-test launches).
+    func addFolder(_ url: URL, importer: LocalLibraryImporter?, persistence: PersistenceActor?) async {
+        if let importer {
+            guard (try? await importer.addFolder(url)) != nil else { return }
+        } else {
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+            guard let bookmark = try? url.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil,
+                                                       relativeTo: nil) else { return }
+            try? await persistence?.settingsAddFolderSource(displayName: url.lastPathComponent, bookmark: bookmark,
+                                                            addedAt: Int64(Date().timeIntervalSince1970 * 1000))
+        }
         didChangeRoots = true
         await load(persistence: persistence)
     }
 
-    func removeRoot(_ root: MusicFolderRoot, persistence: PersistenceActor?) async {
-        try? await persistence?.settingsRemoveFolderSource(id: root.id)
+    func removeRoot(_ root: MusicFolderRoot, importer: LocalLibraryImporter?, persistence: PersistenceActor?) async {
+        if let importer {
+            try? await importer.removeFolder(id: root.id)
+        } else {
+            try? await persistence?.settingsRemoveFolderSource(id: root.id)
+        }
         didChangeRoots = true
         selectedRootID = "documents"
         relativeStack = []

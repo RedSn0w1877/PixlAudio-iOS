@@ -45,7 +45,8 @@ final class AppEnvironment {
         let extractor = ColorExtractor(pipeline: .shared, persistence: persistence)
         colorExtractor = extractor
         theme = ThemeStore(extractor: extractor, appearance: settings.appearance)
-        home = HomeStore.make(launch: launch)
+        let home = HomeStore.make(launch: launch)
+        self.home = home
 
         // Stage 5: the dual-deck AVPlayer engine for real launches; UI tests keep the demo engine.
         if isUITest {
@@ -53,6 +54,11 @@ final class AppEnvironment {
             playback = PlaybackStore(engine: DemoPlaybackEngine())
         } else {
             let services = PlaybackServices(settings: settings, persistence: persistence)
+            // Listening sessions feed Home's history (Recently Played, Stats, mixes) — one owner of the file.
+            let history = home.history
+            services.recordHistory = { songId, durationMs, timestamp in
+                history.record(songId: songId, durationMs: durationMs, endTimestampMs: timestamp)
+            }
             playbackServices = services
             playback = PlaybackStore(engine: services.engine)
         }

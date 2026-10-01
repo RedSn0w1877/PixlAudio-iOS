@@ -17,6 +17,9 @@ final class PlaybackServices {
     let stats = ListeningStatsTracker()
     let snapshots: QueueSnapshotStore
     let history: PlaybackHistoryStore?
+    /// Where finished listening sessions go. `AppEnvironment` points this at Home's `ListeningHistoryStore`, so one
+    /// object owns `playback_history.json`; without it the sessions are written through `history`.
+    var recordHistory: ((_ songId: String, _ durationMs: Int64, _ timestamp: Int64) -> Void)?
 
     private let settings: SettingsStore
     private let defaults: UserDefaults
@@ -125,7 +128,8 @@ final class PlaybackServices {
         }
         stats.onRecord = { [weak self] record in
             guard let self else { return }
-            let history = self.history
+            let history = self.recordHistory == nil ? self.history : nil
+            self.recordHistory?(record.songId, record.listenedMs, record.timestamp)
             let persistence = self.persistence
             Task.detached(priority: .utility) {
                 await history?.recordPlayback(songId: record.songId, durationMs: record.listenedMs,
@@ -150,12 +154,13 @@ final class PlaybackServices {
     private func applySettings() {
         let playback = settings.playback
         engine.crossfadeEnabled = playback.isCrossfadeEnabled
-        engine.globalTransition = Self.globalTransition(json: defaults.string(forKey: PreferenceKeys.globalTransitionSettings),
+        engine.globalTransition = Self.globalTransition(json: playback.globalTransitionSettingsJSON,
                                                         crossfadeDurationMs: playback.crossfadeDurationMs)
         engine.replayGainEnabled = playback.replayGainEnabled
         engine.replayGainUseAlbumGain = playback.replayGainUseAlbumGain
         session.resumeOnHeadsetReconnect = playback.resumeOnHeadsetReconnect
-        engine.applyEqualizer(Self.equalizerSettings(settings.equalizer, defaults: defaults))
+        // Stage 7d's mapping: observed preferences, saved custom presets and loudness included.
+        engine.applyEqualizer(settings.equalizer.engineSettings)
     }
 
     /// Android `globalTransitionSettingsFlow`: the stored JSON (or defaults) with `crossfade_duration` (1–12 s).
@@ -166,25 +171,6 @@ final class PlaybackServices {
             settings = decoded
         }
         settings.durationMs = min(max(crossfadeDurationMs, 1000), 12_000)
-        return settings
-    }
-
-    /// `EqualizerManager.restoreState` from the stored preferences (custom bands are a JSON int list, Android
-    /// `equalizer_custom_bands`; loudness keys are read straight from the defaults until stage 7d adds them).
-    static func equalizerSettings(_ preferences: EqualizerPreferences, defaults: UserDefaults) -> EqualizerSettings {
-        var customBands = Array(repeating: 0, count: EqualizerBands.count)
-        if let text = defaults.string(forKey: PreferenceKeys.equalizerCustomBands), let data = text.data(using: .utf8),
-           let bands = try? JSONDecoder().decode([Int].self, from: data) {
-            customBands = bands
-        }
-        var settings = EqualizerSettings()
-        settings.restore(enabled: preferences.isEnabled, presetName: preferences.presetName, customBands: customBands,
-                         bassBoostEnabled: preferences.bassBoostEnabled,
-                         bassBoostStrength: preferences.bassBoostStrength,
-                         virtualizerEnabled: preferences.virtualizerEnabled,
-                         virtualizerStrength: preferences.virtualizerStrength,
-                         loudnessEnabled: defaults.bool(PreferenceKeys.loudnessEnhancerEnabled, default: false),
-                         loudnessStrength: defaults.int(PreferenceKeys.loudnessEnhancerStrength, default: 0))
         return settings
     }
 

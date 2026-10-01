@@ -27,6 +27,8 @@ struct EditTransitionView: View {
                 Task {
                     await model.save(playlistId: playlistId, playback: settings.playback,
                                      persistence: environment.persistence)
+                    // Playlist rules live in the store; the engine re-reads them (global settings are observed).
+                    if isPlaylist { await environment.playbackServices?.reloadTransitionRules() }
                     toast = isPlaylist && model.useGlobalDefaults ? L10n.transitionSnackbarUsingGlobal
                                                                    : L10n.transitionSnackbarSaved
                 }

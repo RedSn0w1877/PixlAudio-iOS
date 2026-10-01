@@ -66,23 +66,7 @@ extension PlaybackStore {
         play(QueueUtils.fisherYatesCopy(songs))
     }
 
-    /// Appends to the queue (starts playback when nothing is loaded).
-    /// The `PlaybackEngine` seam has no insert command yet, so the queue is re-set at the current position;
-    /// stage 5 can replace this with a native insert.
-    func addToQueue(_ songs: [Song]) {
-        guard !songs.isEmpty else { return }
-        guard let index = currentIndex, hasItem else { play(songs); return }
-        play(queue + songs, startIndex: index, startPositionMs: positionMs(), playWhenReady: isPlaying)
-    }
-
-    /// Inserts right after the current song (Android "Play next").
-    func playNext(_ songs: [Song]) {
-        guard !songs.isEmpty else { return }
-        guard let index = currentIndex, hasItem else { play(songs); return }
-        var next = queue
-        next.insert(contentsOf: songs, at: min(index + 1, next.count))
-        play(next, startIndex: index, startPositionMs: positionMs(), playWhenReady: isPlaying)
-    }
+    // `playNext` / `addToQueue` are native engine inserts on `PlaybackStore` (stage 5).
 }
 
 // MARK: - Toast (Android `Toast` / `sendToast`)

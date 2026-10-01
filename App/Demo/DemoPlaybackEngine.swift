@@ -72,6 +72,18 @@ final class DemoPlaybackEngine: PlaybackEngine {
     func setRepeatMode(_ mode: RepeatMode) { repeatMode = mode }
     func setShuffleEnabled(_ enabled: Bool) {}
 
+    func playNext(_ songs: [Song]) {
+        guard let index else { return }
+        queue.insert(contentsOf: songs, at: min(index + 1, queue.count))
+        continuation.yield(.queueChanged(queue, currentIndex: index))
+    }
+
+    func addToQueue(_ songs: [Song]) {
+        guard index != nil else { return }
+        queue.append(contentsOf: songs)
+        continuation.yield(.queueChanged(queue, currentIndex: index))
+    }
+
     func currentPositionMs() -> Int64 {
         let running = startedAt.map { Int64(Date().timeIntervalSince($0) * 1000) } ?? 0
         return min(accumulatedMs + running, currentDurationMs())

@@ -71,8 +71,19 @@ final class PlaybackStore {
     }
 
     // Queue editing (stage 5): the engine answers with `queueChanged`.
-    func playNext(_ songs: [Song]) { engine.playNext(songs) }
-    func addToQueue(_ songs: [Song]) { engine.addToQueue(songs) }
+    /// Inserts right after the current song (Android "Play next"); starts playback when nothing is loaded.
+    func playNext(_ songs: [Song]) {
+        guard !songs.isEmpty else { return }
+        guard hasItem else { play(songs); return }
+        engine.playNext(songs)
+    }
+
+    /// Appends to the queue (Android "Add to queue"); starts playback when nothing is loaded.
+    func addToQueue(_ songs: [Song]) {
+        guard !songs.isEmpty else { return }
+        guard hasItem else { play(songs); return }
+        engine.addToQueue(songs)
+    }
     func moveQueueItem(from: Int, to: Int) { engine.moveQueueItem(from: from, to: to) }
     func removeQueueItem(at index: Int) { engine.removeQueueItem(at: index) }
     func skipToQueueItem(at index: Int) { engine.skipToQueueItem(at: index) }

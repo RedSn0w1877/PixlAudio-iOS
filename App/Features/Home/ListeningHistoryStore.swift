@@ -54,6 +54,14 @@ final class ListeningHistoryStore {
     /// `recordPlayback`: appends one listening span (events older than two years before it are pruned).
     func record(songId: String, durationMs: Int64, endTimestampMs: Int64? = nil) {
         let end = endTimestampMs ?? clock.nowMs()
+        // Never write before the file was read: the write would replace the stored history with this one event.
+        guard isLoaded else {
+            Task { [weak self] in
+                await self?.ensureLoaded()
+                self?.record(songId: songId, durationMs: durationMs, endTimestampMs: end)
+            }
+            return
+        }
         guard let updated = PlaybackStats.recordingPlayback(songId: songId, durationMs: durationMs, timestamp: end,
                                                             into: events) else { return }
         replace(with: updated)
