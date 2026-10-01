@@ -11,6 +11,12 @@ nonisolated enum PlaybackEngineEvent: Sendable, Equatable {
     /// The queue reached its end with repeat off.
     case queueEnded
     case failed(message: String)
+    /// The play order changed (shuffle, queue edits, a restored queue). `currentIndex` indexes `songs`.
+    case queueChanged([Song], currentIndex: Int?)
+    /// Repeat mode changed outside `setRepeatMode` (lock screen, sleep timer's counted play, restore).
+    case repeatModeChanged(RepeatMode)
+    /// Shuffle changed outside `setShuffleEnabled` (lock screen, restore).
+    case shuffleChanged(Bool)
 }
 
 /// Android `Player.REPEAT_MODE_*` values (stored under `repeat_mode`).
@@ -45,4 +51,26 @@ protocol PlaybackEngine: AnyObject {
     func currentPositionMs() -> Int64
     /// The current item's duration (0 while unknown).
     func currentDurationMs() -> Int64
+
+    // Queue editing and rate (stage 5). Defaults below make them optional for engines without a queue model.
+    /// Inserts songs right after the current one ("Play next").
+    func playNext(_ songs: [Song])
+    /// Appends songs to the queue ("Add to queue").
+    func addToQueue(_ songs: [Song])
+    /// Moves the queue entry at `from` to `to` (indices into the current play order).
+    func moveQueueItem(from: Int, to: Int)
+    func removeQueueItem(at index: Int)
+    /// Plays the queue entry at `index` from its start.
+    func skipToQueueItem(at index: Int)
+    /// Pitch-preserving playback rate (1 = normal).
+    func setPlaybackRate(_ rate: Float)
+}
+
+extension PlaybackEngine {
+    func playNext(_ songs: [Song]) {}
+    func addToQueue(_ songs: [Song]) {}
+    func moveQueueItem(from: Int, to: Int) {}
+    func removeQueueItem(at index: Int) {}
+    func skipToQueueItem(at index: Int) {}
+    func setPlaybackRate(_ rate: Float) {}
 }

@@ -14,7 +14,7 @@ allowed_imports=(
   Swift Foundation FoundationEssentials FoundationNetworking FoundationXML Dispatch Darwin Glibc Musl ucrt WinSDK
   CRT PackageDescription Synchronization Observation RegexBuilder Distributed Testing XCTest os OSLog
   # Apple frameworks
-  SwiftUI UIKit AVFoundation AVKit AVRouting MediaPlayer MusicKit CoreMedia CoreAudio CoreAudioTypes AudioToolbox
+  SwiftUI UIKit AVFoundation AVKit AVRouting MediaPlayer MediaToolbox MusicKit CoreMedia CoreAudio CoreAudioTypes AudioToolbox
   Accelerate CoreImage CoreGraphics CoreText CoreFoundation CoreServices ImageIO QuartzCore Metal MetalKit simd
   UniformTypeIdentifiers Security CryptoKit LocalAuthentication SwiftData CoreData Combine Charts
   FoundationModels NaturalLanguage Translation CoreML Vision Speech SoundAnalysis

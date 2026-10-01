@@ -19,6 +19,8 @@ final class AppEnvironment {
     let artwork: ArtworkPipeline
     let colorExtractor: ColorExtractor
     let persistence: PersistenceActor?
+    /// The real playback stack (stage 5); nil for UI tests, which use `DemoPlaybackEngine`.
+    let playbackServices: PlaybackServices?
     /// Search providers by source (stage 7c builds the library one on `SearchIndex`; 11/12 add the others).
     let searchProviders: [SearchSource: any SearchProviding]
 
@@ -38,8 +40,15 @@ final class AppEnvironment {
         colorExtractor = extractor
         theme = ThemeStore(extractor: extractor, appearance: settings.appearance)
 
-        // Stage 5 replaces the demo engine with the dual-deck AVPlayer engine for real launches.
-        playback = PlaybackStore(engine: DemoPlaybackEngine())
+        // Stage 5: the dual-deck AVPlayer engine for real launches; UI tests keep the demo engine.
+        if isUITest {
+            playbackServices = nil
+            playback = PlaybackStore(engine: DemoPlaybackEngine())
+        } else {
+            let services = PlaybackServices(settings: settings, persistence: persistence)
+            playbackServices = services
+            playback = PlaybackStore(engine: services.engine)
+        }
 
         if isUITest {
             library = LibraryStore(snapshot: DemoLibrary.snapshot)
@@ -64,7 +73,9 @@ final class AppEnvironment {
     /// Launch work, off the first frame: load the library snapshot (cache first, then the store).
     func start() async {
         guard !launch.isUITest else { return }
+        playbackServices?.start()
         await library.load()
+        playbackServices?.restoreQueue(lookup: library.song(id:))
     }
 
     /// The colour scheme forced by UI tests, else the user's `app_theme_mode`.
