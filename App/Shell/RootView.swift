@@ -13,6 +13,7 @@ struct RootView: View {
     @Environment(Router.self) private var router
     @Environment(PlaybackStore.self) private var playback
     @Environment(ThemeStore.self) private var themeStore
+    @Environment(AppEnvironment.self) private var environment
     @Environment(\.colorScheme) private var colorScheme
     @State private var isKeyboardVisible = false
 
@@ -32,6 +33,7 @@ struct RootView: View {
             // Stage 8: the player sheet — the mini player resting in `MiniPlayerSlot` and expanding over everything.
             PlayerSheetHost()
         }
+        .updateBanner(environment.updates)
         .environment(\.appTheme, colors.app)
         .environment(\.playerTheme, colors.player)
         .tint(colors.app.primary)

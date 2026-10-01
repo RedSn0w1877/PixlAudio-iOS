@@ -118,6 +118,11 @@ targets:
             CFBundleTypeRole: Editor
             LSHandlerRank: Owner
             LSItemContentTypes: [io.github.redsn0w1877.pixlaudio.backup]
+          # The Android app's legacy v1 backups (`.json.gz`); the backup reader detects the format from the bytes.
+          - CFBundleTypeName: PixlAudio Legacy Backup
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [org.gnu.gnu-zip-archive]
         UTImportedTypeDeclarations:
           - UTTypeIdentifier: io.github.redsn0w1877.pixlaudio.lrc
             UTTypeDescription: LRC Lyrics

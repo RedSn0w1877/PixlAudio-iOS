@@ -147,11 +147,12 @@ PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact ba
 | Playback test ("Test playback" / "Deep probe", Android: Spotify dashboard cards) | `.playbackDiagnostics` | `PlaybackDiagnosticsView` (Features/YouTube) | 11 |
 | Offline download card (song sheet) | inside `SongOptionsSheet` | `OfflineDownloadCard` (Features/YouTube) | 11 |
 | Spotify dashboard / browse | `.spotifyDashboard`, `.spotifyBrowse(query:)` | Features/Spotify | 12 |
-| Accounts | `.accounts` | `AccountsView` (Features/Accounts) | 15 |
+| Accounts | `.accounts` | `AccountsView` (Features/Accounts) | 12 (Spotify card), 11 (YouTube links) |
 | AI playlist sheet (Daily Mix sparkle button) | `AppSheet.aiPlaylist` | `AiPlaylistSheet` (Features/AI) | 13 |
 | AI Playlist Lab (Library › Create playlist › With AI) | `AppCover.aiPlaylistLab` | `AiPlaylistLabView` (Features/AI) | 13 |
 | TAIS DJ chat (Experimental › TAIS DJ; player's Taizo button) | `AppSheet.taisChat` | `TaisChatSheet` (Features/AI) | 13 |
 | Setup | `AppCover.setup` | `SetupView` (Features/Onboarding) | 15 |
+| Backup export / restore | `AppCover.backupExport`, `.backupImport` | `BackupExportCover`, `BackupImportCover` (Features/Backup) | 15 |
 | Plus / license debug, nav-bar corner radius | — (dropped: everything unlocked; Material-only setting) | — | — |
 
 Stage 7d notes: settings rows are glass shapes inside a group clipped to 24 pt (the Compose `clip` on the
@@ -420,3 +421,28 @@ lyricsCascade.f0…f7 (first-show cascade frames, live clock).
   from `DownloadBadges`, injected at the root — kind only, so progress ticks never re-render the lists.
 - **Screenshot ids:** `youTubeLogin`, `youTubeLoginCode`, `youTubeLoginCookie`, `youTubeLoginSignedIn`, `playbackDiagnostics`
   (all steps green), `playbackDiagnosticsFailed` (audio step red) — `UITests/YouTubeScreenshotTests`, light + dark.
+
+## Stage 15 notes (backup, setup, updates, localisation)
+
+- **Backup** (`App/Services/Backup`, `Features/Backup`): `env.backup` (`BackupService`) exports, inspects and restores on
+  PixlBackup. Settings › Backup & Restore opens one root cover per flow (`AppCover.backupExport` / `.backupImport`,
+  so the flows never hang off Settings' lazy list): export = `BackupSectionPicker` → progress →
+  `fileExporter`; restore = `BackupImportPicker` → `BackupRestorePlanView` (Android `BackupModuleSelectionDialog`) →
+  progress (`BackupTransferProgressView`, Android's dialog as a glass card over a scrim) → `BackupImportReportView`.
+  The report is iOS's addition: per module what was restored and how many entries matched no song — Android backups
+  describe songs only inside playlists, so favourites / plays / history / lyrics / rules of other songs can't be
+  matched, and the report says so. Settings go to `UserDefaults` under the Android keys (typed by Android's declared
+  key types on export), API keys to the Keychain; `SettingsStore.reload(from:)` refreshes the observable stores.
+- **Setup** (`Features/Onboarding`): Android `SetupScreen` page by page — `SetupPermissionPage` (Android
+  `PermissionPageLayout`), `SetupIconCollage` (glass tiles in one container; the star tile is a circle),
+  `SetupBottomBar` (glass bar, 80 pt next button turning and changing shape per page), `WelcomeArt` (the Android vector
+  drawable's paths filled with palette roles). Order: welcome, music library, music folders, backup, theme, library
+  layout, Spotify, finish. `AppEnvironment.start()` presents it while `initial_setup_done` is false.
+- **Updates**: `env.updates` (`UpdateNotifier`) checks GitHub at most every 12 h; `RootView` shows the banner.
+- **Localisation**: `tools/localization/android_strings_to_xcstrings.py <android res>` regenerates the catalog.
+  New strings: use `String(localized: "<android key>", defaultValue: "<English>")` (Android's key when Android has the
+  string) and re-run the script.
+- Screenshot ids: `setup`, `setupPermission`, `setupFolders`, `setupBackup`, `setupTheme`, `setupLibraryLayout`,
+  `setupSpotify`, `setupFinish` (ready `screen.setup`); `backupRestorePlan` (ready `screen.backupRestorePlan`) and
+  `backupImportReport` (ready `screen.backupReport`), both on the `backupImport` cover. Class:
+  `UITests/BackupOnboardingScreenshotTests`.

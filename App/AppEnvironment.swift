@@ -55,6 +55,11 @@ final class AppEnvironment {
         return service
     }
 
+    /// Stage 15: `.pxpl` export, inspection and restore (PixlBackup) and the pending playlist restore.
+    let backup: BackupService
+    /// Stage 15: the notify-only GitHub release check.
+    let updates: UpdateNotifier
+
     init(launch: LaunchConfiguration) {
         self.launch = launch
         let isUITest = launch.isUITest
@@ -137,12 +142,19 @@ final class AppEnvironment {
                                .spotify: SpotifyCatalogSearchProvider(service: spotify),
                                .youtubeMusic: youtube.searchProvider ?? (UnavailableSearchProvider(source: .youtubeMusic) as any SearchProviding)]
         }
+
+        let settingsDefaults = isUITest ? (UserDefaults(suiteName: "pixlaudio.uitest") ?? .standard) : .standard
+        backup = BackupService(persistence: persistence, library: library, settings: settings, defaults: settingsDefaults,
+                               history: home.history, playbackServices: playbackServices, isUITest: isUITest)
+        updates = UpdateNotifier(isEnabled: !isUITest)
     }
 
     /// Launch work, off the first frame: load the library snapshot (cache first, then the store), then start the
     /// automatic incremental rescans (launch, foreground, music-library changes).
     func start() async {
         guard !launch.isUITest else { return }
+        // First run: PixlAudio's setup (Android shows `SetupScreen` until `initial_setup_done`).
+        if !settings.behavior.initialSetupDone, router.cover == nil { router.present(AppCover.setup) }
         playbackServices?.start()
         youtube.start()
         let library = self.library, playback = self.playback
@@ -151,7 +163,9 @@ final class AppEnvironment {
         await library.load()
         playbackServices?.restoreQueue(lookup: library.song(id:))
         libraryAutoRefresh?.start()
+        backup.start()
         await spotify.start()
+        await updates.checkIfDue()
     }
 
     /// Call after music-library access was granted so its change notifications start.

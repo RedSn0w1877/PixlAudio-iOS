@@ -61,6 +61,10 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     // Stage 13: AI playlist sheet (from Daily Mix), TAIS DJ chat (empty, and a scripted conversation), AI Playlist Lab
     case aiPlaylist, taisChat, taisChatConversation, aiPlaylistLab
 
+    // Stage 15: the setup pages (cover `setup` opened on a page) and the backup restore steps (cover `backupImport`)
+    case setupPermission, setupFolders, setupBackup, setupTheme, setupLibraryLayout, setupSpotify, setupFinish
+    case backupRestorePlan, backupImportReport
+
     /// The accessibility identifier present once the screen is up (`screen.<id>`).
     var readyIdentifier: String {
         switch self {
@@ -142,6 +146,11 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
              .nowPlaying, .lyrics, .lyricsSync, .setup, .devices, .artistPicker, .editSong:
             return nil
         case .aiPlaylist, .taisChat, .taisChatConversation, .aiPlaylistLab: return nil
+
+        case .setupPermission, .setupFolders, .setupBackup, .setupTheme, .setupLibraryLayout, .setupSpotify, .setupFinish:
+            return nil
+        // A full-screen cover: nothing needs to be pushed underneath (one destination per demo screen).
+        case .backupRestorePlan, .backupImportReport: return nil
         }
     }
 
@@ -194,8 +203,11 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .editSong: .editSong(songId: DemoLibrary.songs.first?.id ?? "")
         case .lyrics: .lyrics
         case .lyricsSync: .lyricsSync(songId: DemoLibrary.songs.first?.id ?? "")
-        case .setup: .setup
+        case .setup, .setupPermission, .setupFolders, .setupBackup, .setupTheme, .setupLibraryLayout, .setupSpotify,
+             .setupFinish:
+            .setup
         case .aiPlaylistLab: .aiPlaylistLab
+        case .backupRestorePlan, .backupImportReport: .backupImport
         default: nil
         }
     }

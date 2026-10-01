@@ -3,15 +3,13 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// Settings › Backup & Restore (Android `SettingsCategoryScreen` BACKUP_RESTORE): the "How backup works" notice, the
-/// export row (opens the section picker) and the restore row (opens the file step). UI only for now — stage 15 wires
-/// PixlBackup's `.pxpl` writer and reader behind `BackupFlow`.
+/// export row (opens the section picker, then builds and saves the `.pxpl`) and the restore row (file step, module
+/// step, restore, report). The flows live in `Features/Backup` on `BackupService` (stage 15).
 struct BackupSettingsSection: View {
     @Environment(SettingsStore.self) private var settings
-    @Environment(\.appTheme) private var theme
+    @Environment(AppEnvironment.self) private var env
+    @Environment(Router.self) private var router
 
-    @State private var exportSections: Set<BackupSection> = BackupSection.defaultSelection
-    @State private var showsExport = false
-    @State private var showsImport = false
     @State private var toast: String?
 
     var body: some View {
@@ -24,42 +22,33 @@ struct BackupSettingsSection: View {
                 ActionSettingRow(title: L10n.settingsExportBackupTitle,
                                  subtitle: L10n.settingsExportBackupSubtitle(selectionSummary),
                                  systemImage: "square.and.arrow.down",
-                                 primaryLabel: L10n.settingsActionSelectExport) { showsExport = true }
+                                 primaryLabel: L10n.settingsActionSelectExport) { router.present(AppCover.backupExport) }
             }
             SettingsSubsection(title: L10n.settingsRestoreBackupSection, addBottomSpace: false) {
                 ActionSettingRow(title: L10n.settingsImportBackupTitle, subtitle: L10n.settingsImportBackupSubtitle,
                                  systemImage: "clock.arrow.circlepath",
-                                 primaryLabel: L10n.settingsActionSelectRestore) { showsImport = true }
+                                 primaryLabel: L10n.settingsActionSelectRestore) {
+                    env.backup.importStart = .pick
+                    router.present(AppCover.backupImport)
+                }
             }
         }
-        .fullScreenCover(isPresented: $showsExport) {
-            BackupSectionPicker(selection: $exportSections) {
-                showsExport = false
-                toast = BackupFlow.unavailableMessage
-            }
-            .environment(\.appTheme, theme)
-        }
-        .fullScreenCover(isPresented: $showsImport) {
-            BackupImportPicker { _ in
-                showsImport = false
-                toast = BackupFlow.unavailableMessage
-            }
-            .environment(\.appTheme, theme)
+        // The flows are root covers (`AppCover.backupExport` / `.backupImport`); the export result comes back here.
+        .onChange(of: env.backup.exportMessage) { _, message in
+            guard let message else { return }
+            toast = message
+            env.backup.exportMessage = nil
         }
         .settingsToast($toast)
     }
 
     private var selectionSummary: String {
-        if exportSections.isEmpty { return L10n.settingsExportBackupNone }
+        let selection = env.backup.exportSelection
+        if selection.isEmpty { return L10n.settingsExportBackupNone }
         let total = BackupSection.allCases.count
-        return exportSections.count == total ? L10n.settingsExportBackupAll
-            : L10n.settingsExportBackupPartial(exportSections.count, total)
+        return selection.count == total ? L10n.settingsExportBackupAll
+            : L10n.settingsExportBackupPartial(selection.count, total)
     }
-}
-
-/// Where stage 15 plugs in the `.pxpl` export / inspect / restore (PixlBackup).
-nonisolated enum BackupFlow {
-    static let unavailableMessage = "Backups aren't available in this build yet."
 }
 
 /// Android `BackupInfoNoticeCard`: `primaryContainer` 55 % panel, 20 pt corners, upload icon, title, body, close.
@@ -280,7 +269,7 @@ struct BackupImportPicker: View {
             .padding(.vertical, 8)
         }
         .background(theme.surfaceContainerLowest.ignoresSafeArea())
-        .fileImporter(isPresented: $showsPicker, allowedContentTypes: [.data]) { result in
+        .fileImporter(isPresented: $showsPicker, allowedContentTypes: UTType.backupImportTypes) { result in
             if case .success(let url) = result { onPicked(url) }
         }
         .accessibilityIdentifier("screen.backupImport")

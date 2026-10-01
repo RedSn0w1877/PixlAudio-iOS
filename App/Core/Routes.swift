@@ -233,6 +233,10 @@ nonisolated enum AppCover: Hashable, Sendable, Identifiable {
     /// Stage 13: AI Playlist Lab (Android `CreateAiPlaylistDialog`, a full-screen dialog).
     case aiPlaylistLab
 
+    /// Stage 15: the restore and export flows of Settings › Backup & Restore, presented from the root.
+    case backupImport
+    case backupExport
+
     var id: String {
         switch self {
         case .nowPlaying: "nowPlaying"
@@ -242,6 +246,9 @@ nonisolated enum AppCover: Hashable, Sendable, Identifiable {
         case .editSong(let id): "editSong.\(id)"
 
         case .aiPlaylistLab: "aiPlaylistLab"
+
+        case .backupImport: "backupImport"
+        case .backupExport: "backupExport"
         }
     }
 }

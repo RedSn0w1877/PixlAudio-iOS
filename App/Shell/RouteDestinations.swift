@@ -74,6 +74,9 @@ struct CoverDestination: View {
         case .editSong(let songId): EditSongSheet(songId: songId)
 
         case .aiPlaylistLab: AiPlaylistLabView()
+
+        case .backupImport: BackupImportCover()
+        case .backupExport: BackupExportCover()
         }
     }
 }
