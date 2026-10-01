@@ -30,6 +30,12 @@ final class BackupService {
     /// The running transfer (Android `dataTransferProgress`); nil when idle.
     private(set) var progress: BackupTransferProgressUpdate?
     private(set) var isBusy = false
+    /// The sections the export flow writes (Settings › Backup & Restore shows "n of m" from it).
+    var exportSelection: Set<BackupSection> = BackupSection.defaultSelection
+    /// The export flow's closing message, toasted by Settings › Backup & Restore once the cover is gone.
+    var exportMessage: String?
+    /// Where the next `AppCover.backupImport` starts (the file step unless a caller has a backup already).
+    @ObservationIgnored var importStart: BackupImportFlowView.Start = .pick
 
     @ObservationIgnored private let persistence: PersistenceActor?
     @ObservationIgnored private let library: LibraryStore

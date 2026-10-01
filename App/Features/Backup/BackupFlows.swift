@@ -141,6 +141,42 @@ struct BackupExportFlowView: View {
     }
 }
 
+/// `AppCover.backupImport`: the restore flow presented from the root (a cover attached inside Settings' lazy list did
+/// not present reliably). UI tests open it on the module step or the report (`-screen backupRestorePlan|…Report`).
+struct BackupImportCover: View {
+    @Environment(AppEnvironment.self) private var env
+    @Environment(Router.self) private var router
+
+    var body: some View {
+        BackupImportFlowView(start: start) { _ in
+            env.backup.importStart = .pick
+            router.dismissCover()
+        }
+    }
+
+    private var start: BackupImportFlowView.Start {
+        switch env.launch.screen {
+        case .backupRestorePlan?: .inspected(.demo)
+        case .backupImportReport?: .report(.demo)
+        default: env.backup.importStart
+        }
+    }
+}
+
+/// `AppCover.backupExport`: the export flow presented from the root; its message is toasted by the settings screen.
+struct BackupExportCover: View {
+    @Environment(AppEnvironment.self) private var env
+    @Environment(Router.self) private var router
+
+    var body: some View {
+        @Bindable var backup = env.backup
+        BackupExportFlowView(selection: $backup.exportSelection) { message in
+            backup.exportMessage = message
+            router.dismissCover()
+        }
+    }
+}
+
 /// A small busy capsule (Android's "Inspecting…" state of the browse button).
 struct BackupBusyCapsule: View {
     let text: String

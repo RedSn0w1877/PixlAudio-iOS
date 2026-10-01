@@ -209,6 +209,9 @@ nonisolated enum AppCover: Hashable, Sendable, Identifiable {
     case lyrics
     case lyricsSync(songId: String)
     case setup
+    /// Stage 15: the restore and export flows of Settings › Backup & Restore, presented from the root.
+    case backupImport
+    case backupExport
 
     var id: String {
         switch self {
@@ -216,6 +219,8 @@ nonisolated enum AppCover: Hashable, Sendable, Identifiable {
         case .lyrics: "lyrics"
         case .lyricsSync(let id): "lyricsSync.\(id)"
         case .setup: "setup"
+        case .backupImport: "backupImport"
+        case .backupExport: "backupExport"
         }
     }
 }

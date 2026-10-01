@@ -33,6 +33,31 @@ final class BackupOnboardingScreenshotTests: XCTestCase {
     func testBackupImportReportLight() throws { try capture("backupImportReport", "light", ready: "screen.backupReport") }
     func testBackupImportReportDark() throws { try capture("backupImportReport", "dark", ready: "screen.backupReport") }
 
+    /// Tapping "Select & Export" opens the export cover from the root (the real tap path, not the demo launch).
+    func testBackupExportPickerLight() throws {
+        try capture("settingsCategory.backup_restore", "light", ready: "screen.settingsCategory.backup_restore") { app in
+            let button = app.buttons["Select & Export"].firstMatch
+            XCTAssertTrue(button.waitForExistence(timeout: 5), "Select & Export missing")
+            button.tap()
+            XCTAssertTrue(app.descendants(matching: .any)["screen.backupExport"].firstMatch.waitForExistence(timeout: 10),
+                          "screen.backupExport did not appear")
+        }
+    }
+
+    /// Diagnostic for a cover attached inside Settings' lazy list (Library › Music folders, stage 7d's code): does a
+    /// tap present it? Recorded as a screenshot, never fails the run.
+    func testLibraryFoldersCoverProbeLight() throws {
+        try capture("settingsCategory.library", "light", ready: "screen.settingsCategory.library") { app in
+            let row = app.descendants(matching: .any)["settings.library.folders"].firstMatch
+            guard row.waitForExistence(timeout: 5) else { return }
+            row.tap()
+            let shown = app.descendants(matching: .any)["screen.musicFolders"].firstMatch.waitForExistence(timeout: 8)
+            let note = XCTAttachment(string: "musicFolders cover presented: \(shown)")
+            note.lifetime = .keepAlways
+            self.add(note)
+        }
+    }
+
     // MARK: - Helper
 
     private func capture(_ screen: String, _ appearance: String, ready: String,

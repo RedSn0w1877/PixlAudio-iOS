@@ -166,6 +166,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .setup, .setupPermission, .setupFolders, .setupBackup, .setupTheme, .setupLibraryLayout, .setupSpotify,
              .setupFinish:
             .setup
+        case .backupRestorePlan, .backupImportReport: .backupImport
         default: nil
         }
     }

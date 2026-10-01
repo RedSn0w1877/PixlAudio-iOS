@@ -147,6 +147,7 @@ PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact ba
 | Spotify dashboard / browse | `.spotifyDashboard`, `.spotifyBrowse(query:)` | Features/Spotify | 12 |
 | Accounts | `.accounts` | `AccountsView` (Features/Accounts) | 15 (still a placeholder — rows come with stages 11/12) |
 | Setup | `AppCover.setup` | `SetupView` (Features/Onboarding) | 15 |
+| Backup export / restore | `AppCover.backupExport`, `.backupImport` | `BackupExportCover`, `BackupImportCover` (Features/Backup) | 15 |
 | Plus / license debug, nav-bar corner radius | — (dropped: everything unlocked; Material-only setting) | — | — |
 
 Stage 7d notes: settings rows are glass shapes inside a group clipped to 24 pt (the Compose `clip` on the
@@ -259,7 +260,8 @@ categories, sheets; glass in place of Material; text legible in light and dark. 
 ## Stage 15 notes (backup, setup, updates, localisation)
 
 - **Backup** (`App/Services/Backup`, `Features/Backup`): `env.backup` (`BackupService`) exports, inspects and restores on
-  PixlBackup. Settings › Backup & Restore opens one cover per flow: export = `BackupSectionPicker` → progress →
+  PixlBackup. Settings › Backup & Restore opens one root cover per flow (`AppCover.backupExport` / `.backupImport`,
+  so the flows never hang off Settings' lazy list): export = `BackupSectionPicker` → progress →
   `fileExporter`; restore = `BackupImportPicker` → `BackupRestorePlanView` (Android `BackupModuleSelectionDialog`) →
   progress (`BackupTransferProgressView`, Android's dialog as a glass card over a scrim) → `BackupImportReportView`.
   The report is iOS's addition: per module what was restored and how many entries matched no song — Android backups

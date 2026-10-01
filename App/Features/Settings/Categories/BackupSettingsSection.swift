@@ -8,12 +8,8 @@ import UniformTypeIdentifiers
 struct BackupSettingsSection: View {
     @Environment(SettingsStore.self) private var settings
     @Environment(AppEnvironment.self) private var env
-    @Environment(\.appTheme) private var theme
+    @Environment(Router.self) private var router
 
-    @State private var exportSections: Set<BackupSection> = BackupSection.defaultSelection
-    @State private var showsExport = false
-    @State private var showsImport = false
-    @State private var importStart: BackupImportFlowView.Start = .pick
     @State private var toast: String?
 
     var body: some View {
@@ -26,51 +22,32 @@ struct BackupSettingsSection: View {
                 ActionSettingRow(title: L10n.settingsExportBackupTitle,
                                  subtitle: L10n.settingsExportBackupSubtitle(selectionSummary),
                                  systemImage: "square.and.arrow.down",
-                                 primaryLabel: L10n.settingsActionSelectExport) { showsExport = true }
+                                 primaryLabel: L10n.settingsActionSelectExport) { router.present(AppCover.backupExport) }
             }
             SettingsSubsection(title: L10n.settingsRestoreBackupSection, addBottomSpace: false) {
                 ActionSettingRow(title: L10n.settingsImportBackupTitle, subtitle: L10n.settingsImportBackupSubtitle,
                                  systemImage: "clock.arrow.circlepath",
                                  primaryLabel: L10n.settingsActionSelectRestore) {
-                    importStart = .pick
-                    showsImport = true
+                    env.backup.importStart = .pick
+                    router.present(AppCover.backupImport)
                 }
             }
         }
-        .fullScreenCover(isPresented: $showsExport) {
-            BackupExportFlowView(selection: $exportSections) { message in
-                showsExport = false
-                toast = message
-            }
-            .environment(\.appTheme, theme)
-        }
-        .fullScreenCover(isPresented: $showsImport) {
-            BackupImportFlowView(start: importStart) { _ in showsImport = false }
-                .environment(\.appTheme, theme)
+        // The flows are root covers (`AppCover.backupExport` / `.backupImport`); the export result comes back here.
+        .onChange(of: env.backup.exportMessage) { _, message in
+            guard let message else { return }
+            toast = message
+            env.backup.exportMessage = nil
         }
         .settingsToast($toast)
-        .task { await openDemoFlowIfNeeded() }
     }
 
     private var selectionSummary: String {
-        if exportSections.isEmpty { return L10n.settingsExportBackupNone }
+        let selection = env.backup.exportSelection
+        if selection.isEmpty { return L10n.settingsExportBackupNone }
         let total = BackupSection.allCases.count
-        return exportSections.count == total ? L10n.settingsExportBackupAll
-            : L10n.settingsExportBackupPartial(exportSections.count, total)
-    }
-
-    /// UI tests open the module step or the report straight away (`-screen backupRestorePlan|backupImportReport`).
-    private func openDemoFlowIfNeeded() async {
-        let start: BackupImportFlowView.Start
-        switch env.launch.screen {
-        case .backupRestorePlan: start = .inspected(.demo)
-        case .backupImportReport: start = .report(.demo)
-        default: return
-        }
-        // A cover requested while the launch path is still being pushed is dropped; wait for the push to settle.
-        try? await Task.sleep(for: .milliseconds(900))
-        importStart = start
-        showsImport = true
+        return selection.count == total ? L10n.settingsExportBackupAll
+            : L10n.settingsExportBackupPartial(selection.count, total)
     }
 }
 

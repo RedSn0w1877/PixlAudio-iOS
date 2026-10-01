@@ -65,6 +65,8 @@ struct CoverDestination: View {
         case .lyrics: LyricsView()
         case .lyricsSync(let songId): LyricsSyncEditorView(songId: songId)
         case .setup: SetupView()
+        case .backupImport: BackupImportCover()
+        case .backupExport: BackupExportCover()
         }
     }
 }
