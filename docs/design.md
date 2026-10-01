@@ -52,7 +52,7 @@ Forbidden in `App/` (CI, `ci/check-forbidden.sh`): Material / Compose names as i
   (key `<artwork>|<style>|accuracy_<n>|algo_v7`, like Android).
 - Where Android **filled** a surface with a role, the port **tints glass** with it, at the strength in `GlassTint`:
   `prominent` 0.85 (primary action / selected item), `container` 0.62 (album-coloured panels: mini player, playing
-  song, mix cards), `surface` 0.28 (neutral panels). Text keeps Android's `on…` role.
+  song, mix cards), `surface` 0.28 (neutral panels), `bar` 0.6 (the bottom bar, which content scrolls under). Text keeps Android's `on…` role.
 - Light and dark as Android: schemes come in pairs; `app_theme_mode` forces one. Lyrics and the player background
   follow their own rules (always dark lyrics).
 
@@ -111,7 +111,7 @@ PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact ba
 - Bottom, inset 16 pt from the sides and sitting on the home-indicator safe area: the **mini player** (64 pt, top
   corners 32, bottom corners 10) floating **8 pt** above the **bottom bar** (64 pt, top corners 10 while the mini
   player is shown else 32, bottom corners 32). Both are glass; the mini player is tinted with the album's
-  `primaryContainer`, the bar with the scheme's `surfaceContainer`.
+  `primaryContainer`, the bar with the scheme's `surfaceContainer` (at `GlassTint.bar`).
 - Bottom bar: Home, Search, Library — icons only, evenly spread (10 pt row padding), 56×32 selection bubble
   (`secondaryContainer` glass) behind the selected icon, which is `primary`, filled, 1.1×; others
   `onSurfaceVariant`. Re-tapping the selected tab pops it to its root.

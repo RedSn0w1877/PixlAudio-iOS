@@ -10,6 +10,8 @@ nonisolated enum GlassTint {
     static let container: Double = 0.62
     /// Neutral panels (Android `surfaceContainer*` fills): a hint of the scheme.
     static let surface: Double = 0.28
+    /// The bottom bar: content scrolls under it, so it stays legible (Android draws it opaque).
+    static let bar: Double = 0.6
 }
 
 extension View {

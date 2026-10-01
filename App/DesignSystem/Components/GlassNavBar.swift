@@ -26,7 +26,7 @@ struct GlassNavBar: View {
         .padding(.horizontal, Tokens.Shell.navRowPadding)
         .frame(height: Tokens.Shell.navBarHeight)
         .frame(maxWidth: .infinity)
-        .pixlGlass(in: shape, tint: theme.surfaceContainer.opacity(GlassTint.surface))
+        .pixlGlass(in: shape, tint: theme.surfaceContainer.opacity(GlassTint.bar))
         .sensoryFeedback(.selection, trigger: selection)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("navBar")
