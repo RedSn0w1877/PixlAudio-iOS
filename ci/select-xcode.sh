@@ -25,6 +25,15 @@ fi
 # download that hosted runners may not have installed; fetch it once per job when it is missing.
 if git ls-files '*.metal' 2>/dev/null | grep -q . && ! xcrun metal --version >/dev/null 2>&1; then
   echo "Downloading the Metal toolchain…"
-  xcodebuild -downloadComponent MetalToolchain
-  xcrun metal --version
+  # The component can take a moment to register after "Done downloading" (seen on main, 2026-10-01): retry the check,
+  # then the download once more, before giving up. The build step reports a real absence on its own.
+  for attempt in 1 2 3; do
+    xcodebuild -downloadComponent MetalToolchain || true
+    for wait in 2 5 10; do
+      if xcrun metal --version >/dev/null 2>&1; then xcrun metal --version; exit 0; fi
+      sleep "$wait"
+    done
+    echo "Metal toolchain not usable yet (attempt $attempt)"
+  done
+  echo "::warning::Metal toolchain still unavailable after download; the build may fail on .metal files"
 fi

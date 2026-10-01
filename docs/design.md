@@ -499,3 +499,8 @@ the light tint (decision 11). Fixed in review:
 Known differences, not bugs: the song sheet has no Remaster card (instrumental / word sync arrive with stage 14) and
 no "Set as sound" (iOS apps can't set ringtones), so the large sheet shows empty space below the buttons; the devices
 hero's `MPVolumeView` is empty in the Simulator; screenshots use the demo library's placeholder art.
+Final check on `main` 3a376e8 (CI run 36934265005, all classes, 208 shots green), re-reviewed side by side: player,
+queue, timer, lyrics, Spotify, AI, setup, backup, YouTube and devices screens all match the review above. Left for
+their owners: Settings › Library › Music folders (stage 7d) draws its "Excluded Directories" title under the `+`
+button; `ci/export-shots.sh` names the backup probe's text attachment `public.plain-text.txt.png` (it is text, not
+an image).
