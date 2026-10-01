@@ -1,0 +1,529 @@
+# Inputs for EngineGen.java (Android PreparedLyricsBuilder + LyricsEngine + LyricsClock on the JVM).
+# Fields are TAB-separated. In text fields: \t = tab, \n = newline, \s = space (editors strip trailing spaces),
+# \\ = backslash; a lone "-" = null; a missing trailing text field = empty text.
+#
+# Lyrics definitions (used by the builder golden and by scenarios):
+#   LYRICS <name>
+#   SL <time> <endTime|-> <voiceRole|-> <text>          synced line
+#   SW <time> <endTime|-> <startsNewWord 0|1> <word>     a word of the previous SL
+#   ST <translation>                                     translation of the previous SL
+#   SR <romanization>                                    romanisation of the previous SL
+#   PLAIN <line>                                         a plain line
+#   DV <id> <role>                                       a voice of Lyrics.document (DVDEFAULT = [Voice()])
+#   DL <startMs> <endMs> <voiceId> <text>                a TimedLine of Lyrics.document
+#   DS <startMs> <durationMs> <text>                     a TimedSyllable of the previous DL
+#   (Documents are built with the model constructors, not the codec, so invalid documents can be tested.)
+#   END
+#
+# Scenarios (engine traces; frames dump the engine state):
+#   SCENARIO <name>    NEWENGINE    CONFIG <density> <blurSupported> <blurEnabled> <strength> <reduced>
+#   LYRICS-SET <name> <animateIn 0|1>    VIEW <height> <anchor>    HEIGHTS <h>    HEIGHTLIST <h0> <h1> ...
+#   HEIGHT <row> <h>    PLAY <0|1>    POS <ms>    OFFSET <ms>    STEPNS <ns>
+#   FRAME    ADV <ms> <dumpStride>    GAP <ms>    REBASE    RESET    MARKSEEK
+#   DRAGSTART    DRAG <dy>    DRAGEND <v>    TAP <line>    SCROLLBY <dy>
+#   ENDSCENARIO
+# Frames: STEPNS-long frames (default 16 ms); the player position advances with the frame clock while playing and
+# is read as whole milliseconds (playerNanos / 1e6). GAP moves only the frame clock (wall time without frames).
+
+LYRICS	thirty
+SL	1000	-	-	line 0
+SL	3000	-	-	line 1
+SL	5000	-	-	line 2
+SL	7000	-	-	line 3
+SL	9000	-	-	line 4
+SL	11000	-	-	line 5
+SL	13000	-	-	line 6
+SL	15000	-	-	line 7
+SL	17000	-	-	line 8
+SL	19000	-	-	line 9
+SL	21000	-	-	line 10
+SL	23000	-	-	line 11
+SL	25000	-	-	line 12
+SL	27000	-	-	line 13
+SL	29000	-	-	line 14
+SL	31000	-	-	line 15
+SL	33000	-	-	line 16
+SL	35000	-	-	line 17
+SL	37000	-	-	line 18
+SL	39000	-	-	line 19
+SL	41000	-	-	line 20
+SL	43000	-	-	line 21
+SL	45000	-	-	line 22
+SL	47000	-	-	line 23
+SL	49000	-	-	line 24
+SL	51000	-	-	line 25
+SL	53000	-	-	line 26
+SL	55000	-	-	line 27
+SL	57000	-	-	line 28
+SL	59000	-	-	line 29
+END
+
+LYRICS	sorted
+SL	5000	-	-	third
+SL	1000	-	-	first
+SL	3000	-	-	second
+END
+
+LYRICS	inferred
+SL	1000	-	-	a b
+SL	3000	-	-	c
+SL	5000	-	-	d
+END
+
+LYRICS	explicitEnd
+SL	1000	2500	-	hello
+SL	3000	-	-	world
+END
+
+LYRICS	lastWordLater
+SL	1000	-	-	Hello world
+SW	1000	-	1	Hello
+SW	2500	-	1	world
+SL	2000	-	-	next
+END
+
+LYRICS	skipBackground
+SL	1000	-	-	lead one
+SL	1500	-	background	ooh
+SL	4000	-	-	lead two
+END
+
+LYRICS	emptyLineEnd
+SL	1000	-	-	hello
+SL	4000	-	-
+SL	6000	-	-	next
+END
+
+LYRICS	intro
+SL	12000	-	-	late start
+SL	14000	-	-	then
+END
+
+LYRICS	shortIntro
+SL	8000	-	-	soon
+SL	10000	-	-	then
+END
+
+LYRICS	emptyLineInterlude
+SL	1000	-	-	hello
+SL	4000	-	-
+SL	20000	-	-	next
+END
+
+LYRICS	inferredInterlude
+SL	1000	-	-	one two three
+SL	30000	-	-	after the solo
+END
+
+LYRICS	shortGap
+SL	1000	2000	-	a
+SL	10500	-	-	b
+END
+
+LYRICS	duetInterlude
+SL	1000	2000	-	lead
+SL	20000	-	duet	duet
+END
+
+LYRICS	syllables
+SL	1000	-	-	Hello world
+SW	1000	-	1	Hel
+SW	1600	-	0	lo
+SW	2000	-	1	world
+SL	6000	-	-	next
+END
+
+LYRICS	mismatch
+SL	1000	-	-	Totally different
+SW	1000	-	1	Howdy
+SW	1500	-	1	there
+END
+
+LYRICS	voiceTag
+SL	1000	-	-	v1: Hello
+END
+
+LYRICS	inferredEmphasis
+SL	1000	-	-	Hold on
+SW	1000	-	1	Hold
+SW	4000	-	1	on
+SL	9000	-	-	next
+END
+
+LYRICS	explicitEmphasis
+SL	1000	-	-	Hello world
+SW	1000	2500	1	Hello
+SW	2600	2900	1	world
+END
+
+LYRICS	graphemeRule
+SL	1000	-	-	extraordinary 爱 a
+SW	1000	3000	1	extraordinary
+SW	3000	4500	1	爱
+SW	4500	6000	1	a
+END
+
+LYRICS	sugar
+SL	1000	-	-	sugar
+SW	1000	1500	1	su
+SW	1500	2200	0	gar
+END
+
+LYRICS	doc
+DV	v1	lead
+DV	v2	background
+DV	v3	duet
+DL	900	2000	v2	ooh
+DL	1000	4000	v1	Hello world
+DS	1000	1500	Hello\s
+DS	2600	1400	world
+DL	3000	3800	v2	yeah
+DL	5000	7000	v3	hi there
+DL	40000	41000	v2	lonely echo
+END
+
+LYRICS	docWithSynced
+SL	1000	-	-	Hello world
+ST	Hola mundo
+DV	v1	lead
+DV	v2	background
+DV	v3	duet
+DL	900	2000	v2	ooh
+DL	1000	4000	v1	Hello world
+DS	1000	1500	Hello\s
+DS	2600	1400	world
+DL	3000	3800	v2	yeah
+DL	5000	7000	v3	hi there
+DL	40000	41000	v2	lonely echo
+END
+
+LYRICS	plainOnly
+PLAIN	a
+PLAIN	b
+END
+
+LYRICS	emptySynced
+END
+
+LYRICS	docWhitespace
+DVDEFAULT
+DL	500	3000	lead	\s\sHi  there you\s\s
+DS	500	300	\s\sHi
+DS	800	0	\s\s
+DS	900	400	there\s
+DS	1300	0	you
+DS	1400	900	\s\s
+DL	3000	3000	lead	zero length
+DL	2000	5000	lead	\s\s\s
+END
+
+LYRICS	docCjkEmoji
+DV	lead	lead
+DV	bg	\sBG\s
+DL	1000	5000	lead	我爱你 😀 café
+DS	1000	400	我
+DS	1400	1200	爱
+DS	2600	300	你\s
+DS	2900	1100	😀\s
+DS	4000	1000	café
+DL	4500	6000	bg	oh oh
+DS	4500	700	oh\s
+DS	5200	800	oh
+END
+
+LYRICS	syncedCjk
+SL	2000	-	-	[00:02.00]夜に駆ける
+SW	2000	-	1	夜
+SW	2300	2900	0	に
+SW	2900	-	0	駆
+SW	3400	4600	0	ける
+SL	6000	-	-	\s\sv12:   次へ\s\s
+SW	6000	-	0	v12:
+SW	6200	-	0	次
+SW	6900	-	0	へ
+END
+
+LYRICS	syncedRtl
+SL	1000	-	-	حبيبي يا نور العين
+SW	1000	2400	1	حبيبي
+SW	2400	2800	1	يا
+SW	2800	3300	1	نور
+SW	3300	5200	1	العين
+ST	my love, light of my eye
+SR	habibi ya nour el ain
+SL	1500	2500	bg	(habibi)
+SL	7000	-	duet	שלום עולם
+END
+
+LYRICS	syncedDuetBg
+SL	1000	-	-	Lead one here
+SW	1000	-	1	Lead
+SW	1400	-	1	one
+SW	1900	-	1	here
+SL	1200	2600	x-bg	(ooh ah)
+SW	1200	1900	1	(ooh
+SW	1900	2600	1	ah)
+SL	3000	5000	duet	Duet answer
+SW	3000	4100	1	Duet
+SW	4100	5000	1	answer
+SL	3500	4800	background	(yeah)
+SL	16000	-	-	After the break
+SW	16000	17200	1	After
+SW	17200	17500	1	the
+SW	17500	18900	1	break
+SL	16000	-	-	same start line
+END
+
+LYRICS	sameStarts
+SL	1000	-	-	b first
+SL	1000	-	-	a second
+SL	1000	-	background	c bg
+SL	900	-	-	before
+END
+
+LYRICS	gaps
+SL	10000	-	-	intro over
+SW	10000	10500	1	intro
+SW	10500	11500	1	over
+SL	10100	-	-	fast one
+SL	10450	-	-	fast two
+SL	11000	-	-	medium
+SL	11800	-	-	slow
+SL	14000	-	-	before solo
+SW	14000	14600	1	before
+SW	14600	15900	1	solo
+SL	27000	-	-	back again
+SW	27000	27400	1	back
+SW	27400	29000	1	again
+SL	29200	-	-	the end
+END
+
+LYRICS	bgsynced
+SL	1000	-	-	Main line one
+SL	1400	2600	background	(echo one)
+SL	4000	-	-	Main line two
+SL	3600	4400	background	(lead-in echo)
+SL	7000	-	duet	Duet line
+SL	9000	-	-	Final main
+SL	9800	10800	background	(final echo)
+END
+
+# ---- engine scenarios ------------------------------------------------------------------------
+
+SCENARIO	firstLayoutAndCascade
+NEWENGINE
+CONFIG	1	1	1	1	0
+LYRICS-SET	thirty	0
+VIEW	1000	250
+HEIGHTS	50
+PLAY	1
+POS	3100
+FRAME
+ADV	1900	3
+ADV	6000	15
+ENDSCENARIO
+
+SCENARIO	animateIn120Hz
+NEWENGINE
+CONFIG	1	1	1	1	0
+STEPNS	8333333
+LYRICS-SET	thirty	1
+VIEW	1000	250
+HEIGHTS	50
+PLAY	1
+POS	3100
+FRAME
+ADV	2400	7
+ENDSCENARIO
+
+SCENARIO	seekAndJitter
+NEWENGINE
+CONFIG	1	1	1	1	0
+LYRICS-SET	thirty	0
+VIEW	1000	250
+HEIGHTS	50
+PLAY	1
+POS	3100
+FRAME
+ADV	400	5
+POS	21100
+ADV	64	1
+POS	21140
+ADV	32	1
+ADV	2000	6
+POS	9500
+ADV	1600	6
+ENDSCENARIO
+
+SCENARIO	dragFlingSnapBack
+NEWENGINE
+CONFIG	1	1	1	1	0
+LYRICS-SET	thirty	0
+VIEW	1000	250
+HEIGHTS	50
+PLAY	0
+POS	5100
+FRAME
+ADV	500	10
+DRAGSTART
+DRAG	-100
+DRAG	10000
+DRAGEND	0
+ADV	300	3
+ADV	4400	40
+ADV	1500	12
+DRAGSTART
+DRAG	-10
+DRAGEND	-5000
+ADV	1200	8
+DRAGSTART
+DRAG	-40.5
+DRAG	-15.25
+DRAGEND	900
+ADV	800	4
+PLAY	1
+ADV	3000	16
+ENDSCENARIO
+
+SCENARIO	seekEndsUserScroll
+NEWENGINE
+CONFIG	2.75	1	1	1.2	0
+LYRICS-SET	thirty	0
+VIEW	1000	250
+HEIGHTS	50
+PLAY	1
+POS	5100
+FRAME
+DRAGSTART
+DRAG	-200
+DRAGEND	0
+ADV	100	2
+POS	40000
+ADV	16	1
+ADV	1200	6
+ENDSCENARIO
+
+SCENARIO	noBlurFallback
+NEWENGINE
+CONFIG	1	0	1	1	0
+LYRICS-SET	thirty	0
+VIEW	1000	250
+HEIGHTS	50
+PLAY	1
+POS	5100
+FRAME
+ADV	3000	6
+ENDSCENARIO
+
+SCENARIO	reducedMotion
+NEWENGINE
+CONFIG	1	1	1	1	1
+LYRICS-SET	thirty	1
+VIEW	1000	250
+HEIGHTS	50
+PLAY	1
+POS	3100
+FRAME
+ADV	2500	5
+ENDSCENARIO
+
+SCENARIO	pauseSettles
+NEWENGINE
+CONFIG	1	1	0	1	0
+LYRICS-SET	thirty	0
+VIEW	1000	250
+HEIGHTS	50
+PLAY	1
+POS	5100
+FRAME
+ADV	1500	6
+PLAY	0
+ADV	2500	12
+REBASE
+GAP	30000
+PLAY	1
+ADV	600	3
+ENDSCENARIO
+
+SCENARIO	variableHeights
+NEWENGINE
+CONFIG	1	1	1	1	0
+LYRICS-SET	thirty	1
+VIEW	1000	250
+HEIGHTLIST	40	77	54	91	68	45	82	59	96	73	50	87	64	41	78	55	92	69	46	83	60	97	74	51	88	65	42	79	56	93
+PLAY	1
+POS	25100
+FRAME
+ADV	2500	5
+ENDSCENARIO
+
+SCENARIO	docGroupsAndInterlude
+NEWENGINE
+CONFIG	1	1	1	1	0
+LYRICS-SET	doc	1
+VIEW	800	200
+HEIGHTLIST	40	70	40	70	62	70
+PLAY	1
+POS	0
+FRAME
+ADV	9000	6
+ADV	26000	40
+ADV	8000	6
+ENDSCENARIO
+
+SCENARIO	gapsTapResize
+NEWENGINE
+CONFIG	1	1	1	1.2	0
+STEPNS	8333333
+LYRICS-SET	gaps	1
+VIEW	900	225
+HEIGHTS	60
+PLAY	1
+POS	0
+FRAME
+ADV	3000	24
+POS	9800
+ADV	3500	8
+TAP	2
+POS	10100
+ADV	400	2
+VIEW	700	175
+ADV	1500	6
+SCROLLBY	-80
+ADV	1000	6
+ADV	17000	60
+ADV	5000	10
+ENDSCENARIO
+
+SCENARIO	bgSyncedOffset
+NEWENGINE
+CONFIG	1	1	1	1	0
+LYRICS-SET	bgsynced	0
+VIEW	1000	250
+HEIGHTLIST	60	40	60	40	60	60	40
+OFFSET	300
+PLAY	1
+POS	0
+FRAME
+ADV	12000	6
+ENDSCENARIO
+
+SCENARIO	rebuildAndSongChange
+NEWENGINE
+CONFIG	1	1	1	1	0
+LYRICS-SET	syncedDuetBg	1
+VIEW	1000	250
+HEIGHTS	55
+PLAY	1
+POS	2000
+FRAME
+ADV	1200	6
+LYRICS-SET	bgsynced	0
+HEIGHTS	55
+ADV	1200	6
+RESET
+LYRICS-SET	thirty	1
+HEIGHTS	50
+POS	30000
+ADV	2400	6
+ENDSCENARIO

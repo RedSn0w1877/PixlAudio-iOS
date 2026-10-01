@@ -1,0 +1,687 @@
+// PreparedLyricsBuilder golden: I = input line, P/PL/PS/PN/PR/PM = Android output
+I	LYRICS	thirty
+I	SL	1000	-	-	line 0
+I	SL	3000	-	-	line 1
+I	SL	5000	-	-	line 2
+I	SL	7000	-	-	line 3
+I	SL	9000	-	-	line 4
+I	SL	11000	-	-	line 5
+I	SL	13000	-	-	line 6
+I	SL	15000	-	-	line 7
+I	SL	17000	-	-	line 8
+I	SL	19000	-	-	line 9
+I	SL	21000	-	-	line 10
+I	SL	23000	-	-	line 11
+I	SL	25000	-	-	line 12
+I	SL	27000	-	-	line 13
+I	SL	29000	-	-	line 14
+I	SL	31000	-	-	line 15
+I	SL	33000	-	-	line 16
+I	SL	35000	-	-	line 17
+I	SL	37000	-	-	line 18
+I	SL	39000	-	-	line 19
+I	SL	41000	-	-	line 20
+I	SL	43000	-	-	line 21
+I	SL	45000	-	-	line 22
+I	SL	47000	-	-	line 23
+I	SL	49000	-	-	line 24
+I	SL	51000	-	-	line 25
+I	SL	53000	-	-	line 26
+I	SL	55000	-	-	line 27
+I	SL	57000	-	-	line 28
+I	SL	59000	-	-	line 29
+I	END
+P	thirty
+PL	0	1000	3000	0	LEAD	0	0	line\s0	-	-
+PN
+PL	1	3000	5000	0	LEAD	1	0	line\s1	-	-
+PN
+PL	2	5000	7000	0	LEAD	2	0	line\s2	-	-
+PN
+PL	3	7000	9000	0	LEAD	3	0	line\s3	-	-
+PN
+PL	4	9000	11000	0	LEAD	4	0	line\s4	-	-
+PN
+PL	5	11000	13000	0	LEAD	5	0	line\s5	-	-
+PN
+PL	6	13000	15000	0	LEAD	6	0	line\s6	-	-
+PN
+PL	7	15000	17000	0	LEAD	7	0	line\s7	-	-
+PN
+PL	8	17000	19000	0	LEAD	8	0	line\s8	-	-
+PN
+PL	9	19000	21000	0	LEAD	9	0	line\s9	-	-
+PN
+PL	10	21000	23000	0	LEAD	10	0	line\s10	-	-
+PN
+PL	11	23000	25000	0	LEAD	11	0	line\s11	-	-
+PN
+PL	12	25000	27000	0	LEAD	12	0	line\s12	-	-
+PN
+PL	13	27000	29000	0	LEAD	13	0	line\s13	-	-
+PN
+PL	14	29000	31000	0	LEAD	14	0	line\s14	-	-
+PN
+PL	15	31000	33000	0	LEAD	15	0	line\s15	-	-
+PN
+PL	16	33000	35000	0	LEAD	16	0	line\s16	-	-
+PN
+PL	17	35000	37000	0	LEAD	17	0	line\s17	-	-
+PN
+PL	18	37000	39000	0	LEAD	18	0	line\s18	-	-
+PN
+PL	19	39000	41000	0	LEAD	19	0	line\s19	-	-
+PN
+PL	20	41000	43000	0	LEAD	20	0	line\s20	-	-
+PN
+PL	21	43000	45000	0	LEAD	21	0	line\s21	-	-
+PN
+PL	22	45000	47000	0	LEAD	22	0	line\s22	-	-
+PN
+PL	23	47000	49000	0	LEAD	23	0	line\s23	-	-
+PN
+PL	24	49000	51000	0	LEAD	24	0	line\s24	-	-
+PN
+PL	25	51000	53000	0	LEAD	25	0	line\s25	-	-
+PN
+PL	26	53000	55000	0	LEAD	26	0	line\s26	-	-
+PN
+PL	27	55000	57000	0	LEAD	27	0	line\s27	-	-
+PN
+PL	28	57000	59000	0	LEAD	28	0	line\s28	-	-
+PN
+PL	29	59000	63000	0	LEAD	29	0	line\s29	-	-
+PN
+PR	line	0
+PR	line	1
+PR	line	2
+PR	line	3
+PR	line	4
+PR	line	5
+PR	line	6
+PR	line	7
+PR	line	8
+PR	line	9
+PR	line	10
+PR	line	11
+PR	line	12
+PR	line	13
+PR	line	14
+PR	line	15
+PR	line	16
+PR	line	17
+PR	line	18
+PR	line	19
+PR	line	20
+PR	line	21
+PR	line	22
+PR	line	23
+PR	line	24
+PR	line	25
+PR	line	26
+PR	line	27
+PR	line	28
+PR	line	29
+PM	0	0	4000	63000
+I	LYRICS	sorted
+I	SL	5000	-	-	third
+I	SL	1000	-	-	first
+I	SL	3000	-	-	second
+I	END
+P	sorted
+PL	0	1000	3000	0	LEAD	0	0	first	-	-
+PN
+PL	1	3000	5000	0	LEAD	1	0	second	-	-
+PN
+PL	2	5000	9000	0	LEAD	2	0	third	-	-
+PN
+PR	line	0
+PR	line	1
+PR	line	2
+PM	0	0	4000	9000
+I	LYRICS	inferred
+I	SL	1000	-	-	a b
+I	SL	3000	-	-	c
+I	SL	5000	-	-	d
+I	END
+P	inferred
+PL	0	1000	3000	0	LEAD	0	0	a\sb	-	-
+PN
+PL	1	3000	5000	0	LEAD	1	0	c	-	-
+PN
+PL	2	5000	9000	0	LEAD	2	0	d	-	-
+PN
+PR	line	0
+PR	line	1
+PR	line	2
+PM	0	0	4000	9000
+I	LYRICS	explicitEnd
+I	SL	1000	2500	-	hello
+I	SL	3000	-	-	world
+I	END
+P	explicitEnd
+PL	0	1000	2500	1	LEAD	0	0	hello	-	-
+PN
+PL	1	3000	7000	0	LEAD	1	0	world	-	-
+PN
+PR	line	0
+PR	line	1
+PM	0	0	4000	7000
+I	LYRICS	lastWordLater
+I	SL	1000	-	-	Hello world
+I	SW	1000	-	1	Hello
+I	SW	2500	-	1	world
+I	SL	2000	-	-	next
+I	END
+P	lastWordLater
+PL	0	1000	2501	0	LEAD	0	0	Hello\sworld	-	-
+PS	0	5	1000	2500	0	0	0
+PS	6	11	2500	2501	0	1	0
+PL	1	2000	6000	0	LEAD	1	0	next	-	-
+PN
+PR	line	0
+PR	line	1
+PM	1	0	4000	6000
+I	LYRICS	skipBackground
+I	SL	1000	-	-	lead one
+I	SL	1500	-	background	ooh
+I	SL	4000	-	-	lead two
+I	END
+P	skipBackground
+PL	0	1000	4000	0	LEAD	0	0	lead\sone	-	-
+PN
+PL	1	1500	4000	0	BACKGROUND	0	0	ooh	-	-
+PN
+PL	2	4000	8000	0	LEAD	2	0	lead\stwo	-	-
+PN
+PR	line	0
+PR	line	1
+PR	line	2
+PM	0	0	4000	8000
+I	LYRICS	emptyLineEnd
+I	SL	1000	-	-	hello
+I	SL	4000	-	-
+I	SL	6000	-	-	next
+I	END
+P	emptyLineEnd
+PL	0	1000	4000	1	LEAD	0	0	hello	-	-
+PN
+PL	1	6000	10000	0	LEAD	1	0	next	-	-
+PN
+PR	line	0
+PR	line	1
+PM	0	0	4000	10000
+I	LYRICS	intro
+I	SL	12000	-	-	late start
+I	SL	14000	-	-	then
+I	END
+P	intro
+PL	0	12000	14000	0	LEAD	0	0	late\sstart	-	-
+PN
+PL	1	14000	18000	0	LEAD	1	0	then	-	-
+PN
+PR	interlude	0	12000	0
+PR	line	0
+PR	line	1
+PM	0	0	4000	18000
+I	LYRICS	shortIntro
+I	SL	8000	-	-	soon
+I	SL	10000	-	-	then
+I	END
+P	shortIntro
+PL	0	8000	10000	0	LEAD	0	0	soon	-	-
+PN
+PL	1	10000	14000	0	LEAD	1	0	then	-	-
+PN
+PR	line	0
+PR	line	1
+PM	0	0	4000	14000
+I	LYRICS	emptyLineInterlude
+I	SL	1000	-	-	hello
+I	SL	4000	-	-
+I	SL	20000	-	-	next
+I	END
+P	emptyLineInterlude
+PL	0	1000	4000	1	LEAD	0	0	hello	-	-
+PN
+PL	1	20000	24000	0	LEAD	1	0	next	-	-
+PN
+PR	line	0
+PR	interlude	4000	20000	0
+PR	line	1
+PM	0	0	4000	24000
+I	LYRICS	inferredInterlude
+I	SL	1000	-	-	one two three
+I	SL	30000	-	-	after the solo
+I	END
+P	inferredInterlude
+PL	0	1000	3150	0	LEAD	0	0	one\stwo\sthree	-	-
+PN
+PL	1	30000	34000	0	LEAD	1	0	after\sthe\ssolo	-	-
+PN
+PR	line	0
+PR	interlude	3150	30000	0
+PR	line	1
+PM	0	0	4000	34000
+I	LYRICS	shortGap
+I	SL	1000	2000	-	a
+I	SL	10500	-	-	b
+I	END
+P	shortGap
+PL	0	1000	2000	1	LEAD	0	0	a	-	-
+PN
+PL	1	10500	14500	0	LEAD	1	0	b	-	-
+PN
+PR	line	0
+PR	line	1
+PM	0	0	4000	14500
+I	LYRICS	duetInterlude
+I	SL	1000	2000	-	lead
+I	SL	20000	-	duet	duet
+I	END
+P	duetInterlude
+PL	0	1000	2000	1	LEAD	0	0	lead	-	-
+PN
+PL	1	20000	24000	0	DUET	1	0	duet	-	-
+PN
+PR	line	0
+PR	interlude	2000	20000	1
+PR	line	1
+PM	0	1	4000	24000
+I	LYRICS	syllables
+I	SL	1000	-	-	Hello world
+I	SW	1000	-	1	Hel
+I	SW	1600	-	0	lo
+I	SW	2000	-	1	world
+I	SL	6000	-	-	next
+I	END
+P	syllables
+PL	0	1000	6000	0	LEAD	0	0	Hello\sworld	-	-
+PS	0	3	1000	1600	0	0	0
+PS	3	5	1600	2000	0	0	0
+PS	6	11	2000	3200	0	1	0
+PL	1	6000	10000	0	LEAD	1	0	next	-	-
+PN
+PR	line	0
+PR	line	1
+PM	1	0	5000	10000
+I	LYRICS	mismatch
+I	SL	1000	-	-	Totally different
+I	SW	1000	-	1	Howdy
+I	SW	1500	-	1	there
+I	END
+P	mismatch
+PL	0	1000	5000	0	LEAD	0	0	Howdy\sthere	-	-
+PS	0	5	1000	1500	0	0	0
+PS	6	11	1500	2700	0	1	0
+PR	line	0
+PM	1	0	4000	5000
+I	LYRICS	voiceTag
+I	SL	1000	-	-	v1: Hello
+I	END
+P	voiceTag
+PL	0	1000	5000	0	LEAD	0	0	Hello	-	-
+PN
+PR	line	0
+PM	0	0	4000	5000
+I	LYRICS	inferredEmphasis
+I	SL	1000	-	-	Hold on
+I	SW	1000	-	1	Hold
+I	SW	4000	-	1	on
+I	SL	9000	-	-	next
+I	END
+P	inferredEmphasis
+PL	0	1000	9000	0	LEAD	0	0	Hold\son	-	-
+PS	0	4	1000	4000	0	0	0
+PS	5	7	4000	5200	0	1	0
+PL	1	9000	13000	0	LEAD	1	0	next	-	-
+PN
+PR	line	0
+PR	line	1
+PM	1	0	8000	13000
+I	LYRICS	explicitEmphasis
+I	SL	1000	-	-	Hello world
+I	SW	1000	2500	1	Hello
+I	SW	2600	2900	1	world
+I	END
+P	explicitEmphasis
+PL	0	1000	5000	0	LEAD	0	0	Hello\sworld	-	-
+PS	0	5	1000	2500	1	0	1
+PS	6	11	2600	2900	1	1	0
+PR	line	0
+PM	1	0	4000	5000
+I	LYRICS	graphemeRule
+I	SL	1000	-	-	extraordinary 爱 a
+I	SW	1000	3000	1	extraordinary
+I	SW	3000	4500	1	爱
+I	SW	4500	6000	1	a
+I	END
+P	graphemeRule
+PL	0	1000	6000	0	LEAD	0	0	extraordinary\s爱\sa	-	-
+PS	0	13	1000	3000	1	0	0
+PS	14	15	3000	4500	1	1	1
+PS	16	17	4500	6000	1	2	0
+PR	line	0
+PM	1	0	5000	6000
+I	LYRICS	sugar
+I	SL	1000	-	-	sugar
+I	SW	1000	1500	1	su
+I	SW	1500	2200	0	gar
+I	END
+P	sugar
+PL	0	1000	5000	0	LEAD	0	0	sugar	-	-
+PS	0	2	1000	1500	1	0	1
+PS	2	5	1500	2200	1	0	1
+PR	line	0
+PM	1	0	4000	5000
+I	LYRICS	doc
+I	DV	v1	lead
+I	DV	v2	background
+I	DV	v3	duet
+I	DL	900	2000	v2	ooh
+I	DL	1000	4000	v1	Hello world
+I	DS	1000	1500	Hello\s
+I	DS	2600	1400	world
+I	DL	3000	3800	v2	yeah
+I	DL	5000	7000	v3	hi there
+I	DL	40000	41000	v2	lonely echo
+I	END
+P	doc
+PL	0	900	2000	1	BACKGROUND	1	1	ooh	-	-
+PN
+PL	1	1000	4000	1	LEAD	1	0	Hello\sworld	-	-
+PS	0	5	1000	2500	1	0	1
+PS	6	11	2600	4000	1	1	1
+PL	2	3000	3800	1	BACKGROUND	1	0	yeah	-	-
+PN
+PL	3	5000	7000	1	DUET	3	0	hi\sthere	-	-
+PN
+PL	4	40000	41000	1	BACKGROUND	4	0	lonely\secho	-	-
+PN
+PR	line	0
+PR	line	1
+PR	line	2
+PR	line	3
+PR	interlude	7000	40000	0
+PR	line	4
+PM	1	1	3000	41000
+I	LYRICS	docWithSynced
+I	SL	1000	-	-	Hello world
+I	ST	Hola mundo
+I	DV	v1	lead
+I	DV	v2	background
+I	DV	v3	duet
+I	DL	900	2000	v2	ooh
+I	DL	1000	4000	v1	Hello world
+I	DS	1000	1500	Hello\s
+I	DS	2600	1400	world
+I	DL	3000	3800	v2	yeah
+I	DL	5000	7000	v3	hi there
+I	DL	40000	41000	v2	lonely echo
+I	END
+P	docWithSynced
+PL	0	900	2000	1	BACKGROUND	1	1	ooh	-	-
+PN
+PL	1	1000	4000	1	LEAD	1	0	Hello\sworld	Hola\smundo	-
+PS	0	5	1000	2500	1	0	1
+PS	6	11	2600	4000	1	1	1
+PL	2	3000	3800	1	BACKGROUND	1	0	yeah	-	-
+PN
+PL	3	5000	7000	1	DUET	3	0	hi\sthere	-	-
+PN
+PL	4	40000	41000	1	BACKGROUND	4	0	lonely\secho	-	-
+PN
+PR	line	0
+PR	line	1
+PR	line	2
+PR	line	3
+PR	interlude	7000	40000	0
+PR	line	4
+PM	1	1	3000	41000
+I	LYRICS	plainOnly
+I	PLAIN	a
+I	PLAIN	b
+I	END
+P	plainOnly	null
+I	LYRICS	emptySynced
+I	END
+P	emptySynced	null
+I	LYRICS	docWhitespace
+I	DVDEFAULT
+I	DL	500	3000	lead	\s\sHi  there you\s\s
+I	DS	500	300	\s\sHi
+I	DS	800	0	\s\s
+I	DS	900	400	there\s
+I	DS	1300	0	you
+I	DS	1400	900	\s\s
+I	DL	3000	3000	lead	zero length
+I	DL	2000	5000	lead	\s\s\s
+I	END
+P	docWhitespace
+PL	0	500	3000	1	LEAD	0	0	Hi\s\sthere\syou	-	-
+PS	0	2	500	800	1	0	0
+PS	4	9	900	1300	1	1	0
+PS	10	13	1300	2500	0	2	0
+PL	1	3000	3001	0	LEAD	1	0	zero\slength	-	-
+PN
+PR	line	0
+PR	line	1
+PM	1	0	2500	3001
+I	LYRICS	docCjkEmoji
+I	DV	lead	lead
+I	DV	bg	\sBG\s
+I	DL	1000	5000	lead	我爱你 😀 café
+I	DS	1000	400	我
+I	DS	1400	1200	爱
+I	DS	2600	300	你\s
+I	DS	2900	1100	😀\s
+I	DS	4000	1000	café
+I	DL	4500	6000	bg	oh oh
+I	DS	4500	700	oh\s
+I	DS	5200	800	oh
+I	END
+P	docCjkEmoji
+PL	0	1000	5000	1	LEAD	0	0	我爱你\s😀\scafé	-	-
+PS	0	1	1000	1400	1	0	0
+PS	1	2	1400	2600	1	1	1
+PS	2	3	2600	2900	1	2	0
+PS	4	6	2900	4000	1	3	0
+PS	7	11	4000	5000	1	4	1
+PL	1	4500	6000	1	BACKGROUND	0	0	oh\soh	-	-
+PS	0	2	4500	5200	1	0	0
+PS	3	5	5200	6000	1	1	0
+PR	line	0
+PR	line	1
+PM	1	0	4000	6000
+I	LYRICS	syncedCjk
+I	SL	2000	-	-	[00:02.00]夜に駆ける
+I	SW	2000	-	1	夜
+I	SW	2300	2900	0	に
+I	SW	2900	-	0	駆
+I	SW	3400	4600	0	ける
+I	SL	6000	-	-	\s\sv12:   次へ\s\s
+I	SW	6000	-	0	v12:
+I	SW	6200	-	0	次
+I	SW	6900	-	0	へ
+I	END
+P	syncedCjk
+PL	0	2000	6000	0	LEAD	0	0	夜に駆ける	-	-
+PS	0	1	2000	2300	0	0	0
+PS	1	2	2300	2900	1	1	0
+PS	2	3	2900	3400	0	2	0
+PS	3	5	3400	4600	1	3	1
+PL	1	6000	10000	0	LEAD	1	0	次へ	-	-
+PS	0	1	6200	6900	0	0	0
+PS	1	2	6900	8100	0	1	0
+PR	line	0
+PR	line	1
+PM	1	0	4000	10000
+I	LYRICS	syncedRtl
+I	SL	1000	-	-	حبيبي يا نور العين
+I	SW	1000	2400	1	حبيبي
+I	SW	2400	2800	1	يا
+I	SW	2800	3300	1	نور
+I	SW	3300	5200	1	العين
+I	ST	my love, light of my eye
+I	SR	habibi ya nour el ain
+I	SL	1500	2500	bg	(habibi)
+I	SL	7000	-	duet	שלום עולם
+I	END
+P	syncedRtl
+PL	0	1000	7000	0	LEAD	0	0	حبيبي\sيا\sنور\sالعين	my\slove,\slight\sof\smy\seye	habibi\sya\snour\sel\sain
+PS	0	5	1000	2400	1	0	1
+PS	6	8	2400	2800	1	1	0
+PS	9	12	2800	3300	1	2	0
+PS	13	18	3300	5200	1	3	1
+PL	1	1500	2500	1	BACKGROUND	0	0	(habibi)	-	-
+PN
+PL	2	7000	11000	0	DUET	2	0	שלום\sעולם	-	-
+PN
+PR	line	0
+PR	line	1
+PR	line	2
+PM	1	1	6000	11000
+I	LYRICS	syncedDuetBg
+I	SL	1000	-	-	Lead one here
+I	SW	1000	-	1	Lead
+I	SW	1400	-	1	one
+I	SW	1900	-	1	here
+I	SL	1200	2600	x-bg	(ooh ah)
+I	SW	1200	1900	1	(ooh
+I	SW	1900	2600	1	ah)
+I	SL	3000	5000	duet	Duet answer
+I	SW	3000	4100	1	Duet
+I	SW	4100	5000	1	answer
+I	SL	3500	4800	background	(yeah)
+I	SL	16000	-	-	After the break
+I	SW	16000	17200	1	After
+I	SW	17200	17500	1	the
+I	SW	17500	18900	1	break
+I	SL	16000	-	-	same start line
+I	END
+P	syncedDuetBg
+PL	0	1000	3000	0	LEAD	0	0	Lead\sone\shere	-	-
+PS	0	4	1000	1400	0	0	0
+PS	5	8	1400	1900	0	1	0
+PS	9	13	1900	3000	0	2	0
+PL	1	1200	2600	1	BACKGROUND	0	0	(ooh\sah)	-	-
+PS	0	4	1200	1900	1	0	0
+PS	5	8	1900	2600	1	1	0
+PL	2	3000	5000	1	DUET	2	0	Duet\sanswer	-	-
+PS	0	4	3000	4100	1	0	1
+PS	5	11	4100	5000	1	1	0
+PL	3	3500	4800	1	BACKGROUND	2	0	(yeah)	-	-
+PN
+PL	4	16000	20000	0	LEAD	4	0	After\sthe\sbreak	-	-
+PS	0	5	16000	17200	1	0	1
+PS	6	9	17200	17500	1	1	0
+PS	10	15	17500	18900	1	2	1
+PL	5	16000	20000	0	LEAD	5	0	same\sstart\sline	-	-
+PN
+PR	line	0
+PR	line	1
+PR	line	2
+PR	line	3
+PR	interlude	5000	16000	0
+PR	line	4
+PR	line	5
+PM	1	1	4000	20000
+I	LYRICS	sameStarts
+I	SL	1000	-	-	b first
+I	SL	1000	-	-	a second
+I	SL	1000	-	background	c bg
+I	SL	900	-	-	before
+I	END
+P	sameStarts
+PL	0	900	1000	0	LEAD	0	0	before	-	-
+PN
+PL	1	1000	5000	0	LEAD	1	0	b\sfirst	-	-
+PN
+PL	2	1000	5000	0	LEAD	2	0	a\ssecond	-	-
+PN
+PL	3	1000	5000	0	BACKGROUND	2	0	c\sbg	-	-
+PN
+PR	line	0
+PR	line	1
+PR	line	2
+PR	line	3
+PM	0	0	4000	5000
+I	LYRICS	gaps
+I	SL	10000	-	-	intro over
+I	SW	10000	10500	1	intro
+I	SW	10500	11500	1	over
+I	SL	10100	-	-	fast one
+I	SL	10450	-	-	fast two
+I	SL	11000	-	-	medium
+I	SL	11800	-	-	slow
+I	SL	14000	-	-	before solo
+I	SW	14000	14600	1	before
+I	SW	14600	15900	1	solo
+I	SL	27000	-	-	back again
+I	SW	27000	27400	1	back
+I	SW	27400	29000	1	again
+I	SL	29200	-	-	the end
+I	END
+P	gaps
+PL	0	10000	11500	0	LEAD	0	0	intro\sover	-	-
+PS	0	5	10000	10500	1	0	0
+PS	6	10	10500	11500	1	1	1
+PL	1	10100	10450	0	LEAD	1	0	fast\sone	-	-
+PN
+PL	2	10450	11000	0	LEAD	2	0	fast\stwo	-	-
+PN
+PL	3	11000	11800	0	LEAD	3	0	medium	-	-
+PN
+PL	4	11800	14000	0	LEAD	4	0	slow	-	-
+PN
+PL	5	14000	15900	0	LEAD	5	0	before\ssolo	-	-
+PS	0	6	14000	14600	1	0	0
+PS	7	11	14600	15900	1	1	1
+PL	6	27000	29200	0	LEAD	6	0	back\sagain	-	-
+PS	0	4	27000	27400	1	0	0
+PS	5	10	27400	29000	1	1	1
+PL	7	29200	33200	0	LEAD	7	0	the\send	-	-
+PN
+PR	interlude	0	10000	0
+PR	line	0
+PR	line	1
+PR	line	2
+PR	line	3
+PR	line	4
+PR	line	5
+PR	interlude	15900	27000	0
+PR	line	6
+PR	line	7
+PM	1	0	4000	33200
+I	LYRICS	bgsynced
+I	SL	1000	-	-	Main line one
+I	SL	1400	2600	background	(echo one)
+I	SL	4000	-	-	Main line two
+I	SL	3600	4400	background	(lead-in echo)
+I	SL	7000	-	duet	Duet line
+I	SL	9000	-	-	Final main
+I	SL	9800	10800	background	(final echo)
+I	END
+P	bgsynced
+PL	0	1000	4000	0	LEAD	0	0	Main\sline\sone	-	-
+PN
+PL	1	1400	2600	1	BACKGROUND	0	0	(echo\sone)	-	-
+PN
+PL	2	3600	4400	1	BACKGROUND	0	0	(lead-in\secho)	-	-
+PN
+PL	3	4000	7000	0	LEAD	3	0	Main\sline\stwo	-	-
+PN
+PL	4	7000	9000	0	DUET	4	0	Duet\sline	-	-
+PN
+PL	5	9000	13000	0	LEAD	5	0	Final\smain	-	-
+PN
+PL	6	9800	10800	1	BACKGROUND	5	0	(final\secho)	-	-
+PN
+PR	line	0
+PR	line	1
+PR	line	2
+PR	line	3
+PR	line	4
+PR	line	5
+PR	line	6
+PM	0	1	4000	13000
