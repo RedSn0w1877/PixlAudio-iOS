@@ -47,7 +47,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case playlistEdit, playlistAddSongs, playlistOptions, playlistReorder, genreSort
 
     // Stage 8: the player's sheets (presented over the expanded player) and the song editor
-    case devices, artistPicker, aiDJ, editSong
+    case devices, artistPicker, editSong
 
     // Stage 12: account screens signed in with demo data (plain ids are signed out), dashboard with a playback test
     // report, browse drill-downs (search results, an artist, an album)
@@ -57,6 +57,9 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case spotifyBrowseResults = "spotifyBrowse.results"
     case spotifyBrowseArtist = "spotifyBrowse.artist"
     case spotifyBrowseAlbum = "spotifyBrowse.album"
+
+    // Stage 13: AI playlist sheet (from Daily Mix), TAIS DJ chat (empty, and a scripted conversation), AI Playlist Lab
+    case aiPlaylist, taisChat, taisChatConversation, aiPlaylistLab
 
     /// The accessibility identifier present once the screen is up (`screen.<id>`).
     var readyIdentifier: String {
@@ -70,6 +73,9 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
             return "screen.library"
         case .songOptionsInfo: return "screen.songInfo"
         case .miniPlayerAlone: return "screen.albumDetail"
+        case .aiPlaylist: return "screen.aiPlaylist"
+        case .taisChat, .taisChatConversation: return "screen.taisChat"
+        case .aiPlaylistLab: return "screen.aiPlaylistLab"
         default:
             if let route { return "screen.\(route.screenID)" }
             if let sheet { return "screen.\(sheet.id.split(separator: ".").first ?? "")" }
@@ -133,8 +139,9 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .youTubeLogin, .youTubeLoginCode, .youTubeLoginCookie, .youTubeLoginSignedIn: return .youTubeLogin
         case .playbackDiagnostics, .playbackDiagnosticsFailed: return .playbackDiagnostics
         case .queue, .songInfo, .sleepTimer, .lyricsOptions, .changelog, .betaInfo, .jobs,
-             .nowPlaying, .lyrics, .lyricsSync, .setup, .devices, .artistPicker, .aiDJ, .editSong:
+             .nowPlaying, .lyrics, .lyricsSync, .setup, .devices, .artistPicker, .editSong:
             return nil
+        case .aiPlaylist, .taisChat, .taisChatConversation, .aiPlaylistLab: return nil
         }
     }
 
@@ -166,7 +173,9 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .jobs: return .jobs
         case .devices: return .devices
         case .artistPicker: return .artistPicker(songId: DemoLibrary.songs[DemoLibrary.featuredSongIndex].id)
-        case .aiDJ: return .aiDJ
+
+        case .aiPlaylist: return .aiPlaylist
+        case .taisChat, .taisChatConversation: return .taisChat
         default: return nil
         }
     }
@@ -174,7 +183,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     /// Stage 8: the player's sheets open over the expanded player, as on Android (`AppEnvironment` expands it).
     var opensOverPlayer: Bool {
         switch self {
-        case .queue, .sleepTimer, .devices, .artistPicker, .aiDJ: true
+        case .queue, .sleepTimer, .devices, .artistPicker: true
         default: false
         }
     }
@@ -186,6 +195,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .lyrics: .lyrics
         case .lyricsSync: .lyricsSync(songId: DemoLibrary.songs.first?.id ?? "")
         case .setup: .setup
+        case .aiPlaylistLab: .aiPlaylistLab
         default: nil
         }
     }

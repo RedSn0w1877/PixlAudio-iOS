@@ -535,6 +535,24 @@ Signatures checked against the developer.apple.com documentation JSON (2026-10-0
 | `Animation.repeatForever(autoreverses:)` | 13 | /documentation/swiftui/animation/repeatforever(autoreverses:) | `SpotifyIndeterminateProgress` | Runs only while the loading line is on screen. |
 | `InsettableShape.strokeBorder(_:lineWidth:antialiased:)` | 17 | /documentation/swiftui/insettableshape/strokeborder(_:linewidth:antialiased:) | `SpotifyOutlinedButton` | Material `OutlinedButton` outline. |
 
+## Stage 13 — AI (services, AI playlist sheet and Lab, TAIS DJ chat)
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `LanguageModelSession(instructions:)` (String overload), `respond(to:options:)` → `Response<String>.content` | 26.0 | /documentation/foundationmodels/languagemodelsession | `OnDeviceAiClient` | One fresh session per request; the orchestrator's layered system prompt is the instructions. Signatures from Apple's sample on the page (`LanguageModelSession(instructions: "…")`, `session.respond(to: prompt)` with a `String`). |
+| `respond(to:generating:includeSchemaInPrompt:options:)` with a `@Generable` type | 26.0 | /documentation/foundationmodels/languagemodelsession/respond(to:generating:includeschemainprompt:options:) | `OnDeviceAiClient` | Guided generation for playlist / Daily Mix prompts (`OnDevicePlaylistSelection.songIds`), re-serialised to the JSON array PixlNet parses. |
+| `@Generable(description:)`, `@Guide(description:)` | 26.0 | /documentation/foundationmodels/generable(description:) | `OnDevicePlaylistSelection` | Declared `nonisolated` so its generated conformances aren't main-actor isolated. |
+| `GenerationOptions(sampling:temperature:maximumResponseTokens:)` | 26.0 | /documentation/foundationmodels/generationoptions/init(sampling:temperature:maximumresponsetokens:) | `OnDeviceAiClient` | `sampling: nil` passed explicitly (the current page shows no default for it). Temperature from the AI settings; tokens capped 256…4096. |
+| `LanguageModelSession.GenerationError` (`.exceededContextWindowSize`, `.guardrailViolation`, `.refusal`, `.unsupportedLanguageOrLocale`, `.assetsUnavailable`, `.rateLimited`, `.concurrentRequests`) | 26.0 | /documentation/foundationmodels/languagemodelsession/generationerror | `OnDeviceAiClient` | Mapped to user-facing provider errors (no vendor names). |
+| `View.keyframeAnimator(initialValue:repeating:content:keyframes:)`, `KeyframeTrack`, `CubicKeyframe` | 17 | /documentation/swiftui/view/keyframeanimator(initialvalue:repeating:content:keyframes:) | `AIBadge` | Spin (3 s) + breathe while generating; `repeating: false` parks it at rest. Content closure is `@Sendable` (modifiers are `nonisolated`). |
+| `TimelineView(.animation)` | 15 | /documentation/swiftui/timelineschedule/animation | `ThinkingDots` | Only while a DJ prompt is in flight (the row exists only then). |
+| `View.defaultScrollAnchor(_:)` | 17 | /documentation/swiftui/view/defaultscrollanchor(_:) | DJ chat list | Opens at the latest message; `ScrollViewReader.scrollTo` follows new ones. |
+| `View.interactiveDismissDisabled(_:)` | 15 | /documentation/swiftui/view/interactivedismissdisabled(_:) | AI Playlist Lab | Android ignores dismiss while generating. |
+| `TextField(_:text:prompt:axis:)`, `lineLimit(_:)` (range) | 16 | /documentation/swiftui/textfield/init(_:text:prompt:axis:) | AI playlist prompt | Android `minLines = 2, maxLines = 4`. |
+| `View.keyboardType(_:)` (`.numberPad`) | 13 | /documentation/swiftui/view/keyboardtype(_:) | min / max songs | Android `KeyboardType.Number`; input also filtered to digits. |
+| `Bindable(_:)` (wrapping an `@Observable` from the environment) | 17 | /documentation/swiftui/bindable | DJ chat field | Binding to `TaisChatModel.inputText`. |
+| `Locale.localizedString(forLanguageCode:)`, `Locale.Language.languageCode` | 2 / 16 | /documentation/foundation/locale/localizedstring(forlanguagecode:) | `AILyricsTranslator` | Android `locales[0].displayLanguage` (the translation target). |
+| `JSONSerialization.data(withJSONObject:)` / `jsonObject(with:)` | 5 | /documentation/foundation/jsonserialization | `AIPromptShape` | Id arrays for guided output, the scripted provider's candidate pool. |
+
 ## Testing and tooling
 | API / tool | Docs | Notes |
 |---|---|---|

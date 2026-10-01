@@ -9,8 +9,7 @@ import UIKit
 /// "Advanced" block (generation parameters, song data, usage report).
 ///
 /// iOS: the on-device provider uses the system's on-device language model (Foundation Models) instead of importing
-/// a MediaPipe file. Fetching the provider's model list belongs to stage 13; until then the model picker offers the
-/// provider's default model.
+/// a MediaPipe file. The model picker lists the provider's chat models (stage 13, `AIService.availableModels`).
 struct AISettingsSection: View {
     @Environment(SettingsStore.self) private var settings
     @Environment(AppEnvironment.self) private var environment
@@ -20,6 +19,9 @@ struct AISettingsSection: View {
     @State private var showsAdvanced = false
     @State private var usage: (recent: [AIUsageEntry], prompt: Int, output: Int, thought: Int) = ([], 0, 0, 0)
     @State private var showsLogs = false
+    @State private var models: [GeminiModel] = []
+    @State private var isLoadingModels = false
+    @State private var selectedModel = ""
 
     private var provider: AiProvider { AiProvider.fromString(settings.ai.provider) }
 
@@ -57,13 +59,7 @@ struct AISettingsSection: View {
             }
             if !apiKey.isEmpty {
                 SettingsSubsection(title: L10n.settingsModelSelectionSection) {
-                    let model = ai.model(for: provider.rawValue)
-                    let fallback = provider.openAICompatibleEndpoint?.defaultModel ?? "gemini-2.5-flash"
-                    ThemeSelectorRow(label: L10n.settingsAiModelTitle, description: L10n.settingsAiModelSubtitle,
-                                     options: [SettingsOption(key: fallback, label: fallback)],
-                                     selectedKey: model.isEmpty ? fallback : model, systemImage: "flask") {
-                        ai.setModel($0, for: provider.rawValue)
-                    }
+                    modelSelection
                 }
             }
             if provider.hasConfigurableUrl {
@@ -94,9 +90,62 @@ struct AISettingsSection: View {
         }
         .animation(PixlMotion.state, value: showsAdvanced)
         .task(id: provider) { apiKey = loadKey() }
+        .task(id: modelsKey) { await loadModels() }
         .task(id: showsAdvanced) {
             guard showsAdvanced, let persistence = environment.persistence else { return }
             if let loaded = try? await persistence.settingsAiUsage() { usage = loaded }
+        }
+    }
+
+    // MARK: Models (Android `SettingsViewModel.fetchAvailableModels` + `SearchableModelSelector`)
+
+    /// Reloads when the provider, its key or its base URL changes.
+    private var modelsKey: String { "\(provider.rawValue)|\(apiKey)|\(settings.ai.baseUrl(for: provider.rawValue))" }
+
+    @ViewBuilder
+    private var modelSelection: some View {
+        if isLoadingModels {
+            HStack(spacing: 12) {
+                ProgressView().tint(theme.primary)
+                Text(L10n.settingsLoadingModels).pixlFont(.bodyMedium).foregroundStyle(theme.onSurfaceVariant)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .settingsRowGlass()
+        } else if models.isEmpty {
+            Text(L10n.settingsModelsFetchFailed)
+                .pixlFont(.bodyMedium)
+                .foregroundStyle(theme.onErrorContainer)
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .settingsRowGlass(tint: theme.errorContainer)
+        } else {
+            ThemeSelectorRow(label: L10n.settingsAiModelTitle, description: L10n.settingsAiModelSubtitle,
+                             options: models.map { SettingsOption(key: $0.name, label: $0.displayName) },
+                             selectedKey: selectedModel.isEmpty ? (models.first?.name ?? "") : selectedModel,
+                             systemImage: "flask") { name in
+                settings.ai.setModel(name, for: provider.rawValue)
+                selectedModel = name
+            }
+        }
+    }
+
+    /// Fetches the provider's chat models; picks the first when nothing (or a vanished model) is selected.
+    private func loadModels() async {
+        let key = apiKey
+        selectedModel = settings.ai.model(for: provider.rawValue)
+        guard !key.isEmpty else {
+            models = []
+            return
+        }
+        isLoadingModels = true
+        let loaded = await environment.ai.availableModels(for: provider, apiKey: key)
+        guard !Task.isCancelled else { return }
+        models = loaded
+        isLoadingModels = false
+        if let first = loaded.first, selectedModel.isEmpty || !loaded.contains(where: { $0.name == selectedModel }) {
+            settings.ai.setModel(first.name, for: provider.rawValue)
+            selectedModel = first.name
         }
     }
 
@@ -211,6 +260,8 @@ struct AISettingsSection: View {
             if trimmed.isEmpty { try? KeychainStore.delete(account: account) }
             else { try? KeychainStore.set(Data(trimmed.utf8), for: account) }
         }
+        // Android `clearModelsState`: removing the key forgets the chosen model.
+        if trimmed.isEmpty { settings.ai.setModel("", for: provider.rawValue) }
         apiKey = trimmed
     }
 }

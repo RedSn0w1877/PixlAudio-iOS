@@ -265,7 +265,7 @@ private struct PlayerMetadataRow: View {
                 router.present(AppCover.lyrics)
             }
             circle(systemImage: "sparkles", label: "Ask the AI DJ", identifier: "player.aiDJ", iconSize: 20) {
-                router.present(AppSheet.aiDJ)
+                router.present(AppSheet.taisChat)
             }
         }
         .frame(minHeight: 70)

@@ -41,6 +41,20 @@ final class AppEnvironment {
     /// Spotify account, library sync, YouTube matching and catalogue (stage 12).
     let spotify: SpotifyService
 
+    @ObservationIgnored private var aiStorage: AIService?
+
+    /// Stage 13: AI providers (cloud, local and on-device), the AI playlist and TAIS DJ state, lyric translation.
+    /// Built on first use, so nothing AI-related runs at launch.
+    var ai: AIService {
+        if let aiStorage { return aiStorage }
+        let library = self.library, persistence = self.persistence, writesCache = !launch.isUITest
+        let service = AIService(launch: launch, settings: settings, persistence: persistence, library: library, home: home,
+                                playback: playback, router: router, searchProviders: searchProviders,
+                                libraryEditor: { LibraryEditor(store: library, persistence: persistence, writesCache: writesCache) })
+        aiStorage = service
+        return service
+    }
+
     init(launch: LaunchConfiguration) {
         self.launch = launch
         let isUITest = launch.isUITest

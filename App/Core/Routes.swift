@@ -196,8 +196,11 @@ nonisolated enum AppSheet: Hashable, Sendable, Identifiable {
     case devices
     /// Stage 8: "Pick an Artist" from the player's artist line (Android `PlayerArtistPickerBottomSheet`).
     case artistPicker(songId: String)
-    /// Stage 8 adds the player's AI DJ entry; stage 13 builds the sheet (Android `TaisChatSheet`).
-    case aiDJ
+
+    /// Stage 13: the AI playlist sheet (Android `AiPlaylistSheet`, Daily Mix's sparkle button).
+    case aiPlaylist
+    /// Stage 13: the TAIS DJ chat (Android `TaisChatSheet`) — from the player's sparkles circle and Experimental.
+    case taisChat
 
     var id: String {
         switch self {
@@ -210,7 +213,9 @@ nonisolated enum AppSheet: Hashable, Sendable, Identifiable {
         case .jobs: "jobs"
         case .devices: "devices"
         case .artistPicker(let id): "artistPicker.\(id)"
-        case .aiDJ: "aiDJ"
+
+        case .aiPlaylist: "aiPlaylist"
+        case .taisChat: "taisChat"
         }
     }
 }
@@ -225,6 +230,9 @@ nonisolated enum AppCover: Hashable, Sendable, Identifiable {
     /// Stage 8: "Edit song" (Android `EditSongSheet`, a full-screen dialog).
     case editSong(songId: String)
 
+    /// Stage 13: AI Playlist Lab (Android `CreateAiPlaylistDialog`, a full-screen dialog).
+    case aiPlaylistLab
+
     var id: String {
         switch self {
         case .nowPlaying: "nowPlaying"
@@ -232,6 +240,8 @@ nonisolated enum AppCover: Hashable, Sendable, Identifiable {
         case .lyricsSync(let id): "lyricsSync.\(id)"
         case .setup: "setup"
         case .editSong(let id): "editSong.\(id)"
+
+        case .aiPlaylistLab: "aiPlaylistLab"
         }
     }
 }

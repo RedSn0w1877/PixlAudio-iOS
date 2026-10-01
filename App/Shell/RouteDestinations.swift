@@ -54,7 +54,9 @@ struct SheetDestination: View {
         case .changelog, .betaInfo, .jobs: HomeInfoSheet(sheet: sheet).pixlSheet()
         case .devices: DevicesSheet() // sizes its own detent
         case .artistPicker(let songId): PlayerArtistPickerSheet(songId: songId) // sizes its own detent
-        case .aiDJ: AIDJSheet().pixlSheet()
+
+        case .aiPlaylist: AiPlaylistSheet().pixlSheet(detents: [.large])
+        case .taisChat: TaisChatSheet().pixlSheet(detents: [.large])
         }
     }
 }
@@ -70,6 +72,8 @@ struct CoverDestination: View {
         case .lyricsSync(let songId): LyricsSyncEditorView(songId: songId)
         case .setup: SetupView()
         case .editSong(let songId): EditSongSheet(songId: songId)
+
+        case .aiPlaylistLab: AiPlaylistLabView()
         }
     }
 }
