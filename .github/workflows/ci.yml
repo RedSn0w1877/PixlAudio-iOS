@@ -132,8 +132,7 @@ jobs:
             -project PixlAudio.xcodeproj -scheme PixlAudio \
             -destination "id=$SIM_UDID" \
             -derivedDataPath build/DerivedData \
-            -only-testing:PixlAudioUITests/ScreenshotTests \
-            -only-testing:PixlAudioUITests/LibraryScreenshotTests \
+            -only-testing:PixlAudioUITests \
             -resultBundlePath build/Shots.xcresult \
             2>&1 | tee build/shots.log | xcbeautify --quieter
       - name: Export screenshots

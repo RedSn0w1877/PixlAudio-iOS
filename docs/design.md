@@ -126,7 +126,7 @@ PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact ba
 | Android screen / sheet | iOS route / presentation | View (file) | Stage |
 |---|---|---|---|
 | Home | tab `.home` root | `HomeView` (Features/Home/HomeView.swift) | 7b |
-| Daily Mix / Your Mix / Recently Played / Stats | `.dailyMix` `.yourMix` `.recentlyPlayed` `.stats` | `DailyMixView` `YourMixView` `RecentlyPlayedView` `StatsView` (Features/Home) | 7b |
+| Daily Mix / Your Mix / Recently Played / Stats | `.dailyMix` `.yourMix` `.recentlyPlayed` `.stats` | `DailyMixView` `YourMixView` (Features/Mixes), `RecentlyPlayedView` (Features/Home), `StatsView` (Features/Stats) | 7b |
 | Beta info / Changelog / Jobs sheets | `AppSheet.betaInfo/.changelog/.jobs` | `HomeInfoSheet` (Features/Home) | 7b |
 | Search | tab `.search` root | `SearchView` (Features/Search) | 7c |
 | Library (tabs, action row, songs/albums/artists/playlists/folders/liked) | tab `.library` root | `LibraryView` (Features/Library) | 7a |
@@ -163,7 +163,11 @@ Parallel stages **own and replace** only these:
   `PersistenceActor` (add queries in `extension PersistenceActor` files there), `ArtworkPipeline.embeddedArtworkLoader`;
   one line in `AppEnvironment.init` passes the importer to `LibraryStore`.
 - **Stage 7a:** `Features/Library/**`, `Features/Detail/**`, `Features/Playlists/**`.
-- **Stage 7b:** `Features/Home/**` (incl. mixes, recently played, stats, home sheets).
+- **Stage 7b:** `Features/Home/**`, `Features/Mixes/**`, `Features/Stats/**` (Home, mixes, recently played, stats, home
+  sheets). `HomeStore` (in `AppEnvironment.home`) owns `ListeningHistoryStore` — the `playback_history.json` events
+  behind Recently Played, Stats, the greeting and the recommendations. **Stage 5 reports each finished listening span
+  with `env.home.history.record(songId:durationMs:)`** (Android `PlaybackStatsRepository.recordPlayback`); stage 15's
+  backup restore calls `importEvents(_:)`.
 - **Stage 7c:** `Features/Search/**` and a `SearchIndex`-backed `SearchProviding` (replace `LocalSearchProvider` in
   `Core/SearchProviding.swift` with a new type in Features/Search and point `AppEnvironment` at it).
 - **Stage 7d:** `Features/Settings/**`, `Features/Delimiters/**`, `Features/Equalizer/**`, `Features/Transitions/**`;

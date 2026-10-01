@@ -342,3 +342,24 @@ CI by the stage-6 build. Paths are under https://developer.apple.com.
 | `XCUIElement.coordinate(withNormalizedOffset:)`, `XCUICoordinate.press(forDuration:thenDragTo:)`, `XCUIElement.frame` | /documentation/xctest/xcuicoordinate/press(forduration:thendragto:) | `UITests/LibraryImportScreenshotTests`: short drags that bring a row clear of the floating mini player before tapping it. |
 | `xcrun xcresulttool export attachments` / `get test-results summary` | `man xcresulttool` (Xcode 16+) | `ci/export-shots.sh`, `ci/xcerrors.sh`. |
 | `xcrun simctl list -j`, `boot`, `bootstatus -b`, `status_bar … override` | `xcrun simctl help` | `ci/pick-sim.sh`, shots job. |
+
+## Stage 7b — Home, Stats, mixes
+Proven on the `xcode-27` lane by the stage-7b build.
+
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `View.onScrollGeometryChange(for:of:action:)`, `ScrollGeometry` (`contentOffset`, `contentInsets`) | 18 | /documentation/swiftui/view/onscrollgeometrychange(for:of:action:) | Home top-bar scrim, Stats collapsing header | The transform returns a `Bool` / a fraction rounded to 0.01, so the action fires only on real changes. |
+| `View.visualEffect(_:)`, `VisualEffect.offset(x:y:)` / `.opacity(_:)`, `GeometryProxy.frame(in: .scrollView)` | 17 | /documentation/swiftui/view/visualeffect(_:) | Mix and Recently Played header parallax | Scroll-driven effect without state updates (no re-render while scrolling). |
+| `Text.fontWidth(_:)` (`Font.Width.expanded`) | 16 | /documentation/swiftui/text/fontwidth(_:) | YOUR MIX / Recently Played titles | SF Pro's wide width for Android's wide variable-font titles. |
+| `Text.lineLimit(_:reservesSpace:)` | 16 | /documentation/swiftui/view/linelimit(_:reservesspace:) | mix cards, shelf cards | Android's `minLines = maxLines = 2`. |
+| `RadialGradient(colors:center:startRadius:endRadius:)`, `LinearGradient(stops:startPoint:endPoint:)` | 13 | /documentation/swiftui/radialgradient | greeting washes, scrims, YOUR MIX header | Content colour (Android's own gradients), never a glass substitute. |
+| `TimelineView(.animation(minimumInterval:paused:))`, `Canvas` | 15 | /documentation/swiftui/timelineview | `HomeSineWaveLine` in the Beta / Changelog sheets | Only that small canvas redraws; paused with Reduce Motion. |
+| `EnvironmentValues.accessibilityReduceMotion`, `EnvironmentValues.openURL` | 13 / 14 | /documentation/swiftui/environmentvalues/openurl | sheets | |
+| `ProgressView(value:total:)`, `ProgressView().controlSize(.large)` | 14 / 15 | /documentation/swiftui/progressview | jobs sheet, loading states | Android `LoadingIndicator` / `LinearProgressIndicator`. |
+| `View.refreshable(action:)` | 15 | /documentation/swiftui/view/refreshable(action:) | Stats | Android `PullToRefreshBox`. |
+| Swift Charts `Chart`, `BarMark(x:yStart:yEnd:width:)`, `MarkDimension.fixed(_:)`, `ChartContent.cornerRadius(_:style:)`, `.foregroundStyle(_:)` | 16 | /documentation/charts/barmark | Stats timeline | One capsule track + one capsule value bar per segment, numeric x (`chartXScale(domain: -0.5...n-0.5)`) so labels laid out at `itemWidth + 10` line up exactly. |
+| `chartXScale(domain:)`, `chartYScale(domain:)`, `chartXAxis(.hidden)`, `chartYAxis(.hidden)`, `chartLegend(.hidden)` | 16 | /documentation/swiftui/view/chartxscale(domain:type:) | Stats charts | Axes drawn as SwiftUI text, like Android. |
+| `SectorMark(angle:innerRadius:outerRadius:angularInset:)`, `MarkDimension.ratio(_:)` / `.inset(_:)` | 17 | /documentation/charts/sectormark | Track concentration donut | 18 pt ring of rounded sectors (Android `drawArc` with round caps). |
+| `DateFormatter.dateFormat(fromTemplate:options:locale:)` | 4 | /documentation/foundation/dateformatter/dateformat(fromtemplate:options:locale:) | `HomeLogic.uses24HourClock` | Android `DateFormat.is24HourFormat`. |
+| `Layout` (`sizeThatFits(proposal:subviews:cache:)`, `placeSubviews(in:proposal:subviews:cache:)`), `LayoutSubview.sizeThatFits(_:)` / `.place(at:anchor:proposal:)`, `ProposedViewSize` | 16 | /documentation/swiftui/layout | `StatsFlowLayout` (Stats metric / dimension chips) | Compose `FlowRow`; declared `nonisolated` (same shape as stage 7c's `SearchFlowLayout`, proven on CI). |
+| `String(format:locale:_:)` | 2 | /documentation/swift/string/init(format:locale:_:) | Stats ("%.1f", Locale.US like Android) | |
