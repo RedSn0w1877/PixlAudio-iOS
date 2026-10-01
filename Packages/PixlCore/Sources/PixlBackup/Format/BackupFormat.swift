@@ -7,6 +7,7 @@
 
 import Foundation
 import PixlFoundation
+import PixlLibrary
 import PixlModel
 
 /// `BackupFormatDetector.Format`.
@@ -240,13 +241,12 @@ public enum BackupWriter {
                              onProgress: (_ current: Int, _ total: Int) -> Void = { _, _ in }) -> [UInt8] {
         let total = modulePayloads.count + 1
         var step = 0
+        // A `LinkedHashMap` on Android: a repeated key keeps its first position and takes the last payload.
         var infos = GsonMap<BackupModuleInfo>()
-        var payloadBytes: [(String, [UInt8])] = []
+        var payloadBytes = GsonMap<[UInt8]>()
         for (key, payload) in modulePayloads {
             let bytes = Array(payload.utf8)
-            if !infos.contains(key) { payloadBytes.append((key, bytes)) } else {
-                payloadBytes = payloadBytes.map { $0.0 == key ? (key, bytes) : $0 }
-            }
+            payloadBytes.put(key, bytes)
             infos.put(key, BackupModuleInfo(checksum: "sha256:" + BackupHashing.hex(bytes, hasher: hasher),
                                             entryCount: countJsonArrayEntries(payload), sizeBytes: Int64(bytes.count)))
         }
@@ -256,8 +256,8 @@ public enum BackupWriter {
         zip.addStored(name: BackupManifest.manifestFilename, data: Array(finalManifest.json.utf8))
         step += 1
         onProgress(step, total)
-        for (key, bytes) in payloadBytes {
-            zip.addStored(name: key + ".json", data: bytes)
+        for (key, bytes) in payloadBytes.entries {
+            zip.addStored(name: key + ".json", data: bytes ?? [])
             step += 1
             onProgress(step, total)
         }
@@ -308,7 +308,7 @@ public enum LegacyPayloadAdapter {
                 for element in preferences {
                     let obj = try GsonElement.asObject(element)
                     let key = try Gson.member(obj, "key").map(GsonElement.asString) ?? ""
-                    if playlistKeys.contains(where: { KotlinTextEquals($0, key) }) {
+                    if playlistKeys.contains(where: { KotlinText.equals($0, key) }) {
                         playlistEntries.append(element)
                     } else {
                         globalEntries.append(element)
@@ -346,6 +346,3 @@ public enum LegacyPayloadAdapter {
                                 entryCount: BackupWriter.countJsonArrayEntries(json), sizeBytes: Int64(bytes.count))
     }
 }
-
-@inline(__always)
-func KotlinTextEquals(_ a: String, _ b: String) -> Bool { a.utf8.elementsEqual(b.utf8) }
