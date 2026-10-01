@@ -73,20 +73,22 @@ PixlCore must build on swift-corelibs-foundation, so it sticks to these. Swift T
 |---|---|---|---|---|
 | `exp`, `log`, `sin`, `cos`, `acos`, `pow`, `cbrt` (C math re-exported by Foundation) | 2 | /documentation/foundation (Darwin libm) | `PixlFoundation` springs, Bézier, decay | Windows uses the UCRT libm; the Compose reference vectors are bit-identical on Windows (720/720 springs, 2508/2508 Bézier samples). |
 | `Date().timeIntervalSince1970` | 2 | /documentation/foundation/date/timeintervalsince1970 | `currentTimeMillis()` (PixlModel) | Kotlin `System.currentTimeMillis()` defaults. |
-| `JSONEncoder` / `JSONDecoder` (`Codable`) | 7 | /documentation/foundation/jsondecoder | PixlModel Codable conformances, tests | Not used for the Android wire format (key order and escaping are not guaranteed): `JSONWriter`/`JSONParser` in PixlFoundation do that. |
+| `JSONEncoder` / `JSONDecoder` (`Codable`) | 7 | /documentation/foundation/jsondecoder | PixlModel Codable conformances, `PreferencesModule.customPresets/pinnedPresets` (PixlBackup: kotlinx-encoded EQ presets into `EqualizerPreset`), tests | Not used for the Android wire format (key order and escaping are not guaranteed): `JSONWriter`/`JSONParser` in PixlFoundation do that. |
 | `Bundle.module`, `Bundle.url(forResource:withExtension:subdirectory:)`, `String(contentsOf:encoding:)` | 2 | /documentation/foundation/bundle/url(forresource:withextension:subdirectory:) | PixlCore test fixtures | Verified on Windows (stage 2a). |
 | `Unicode.Scalar.Properties.generalCategory`, `Character` (extended grapheme clusters) | — (stdlib) | /documentation/swift/unicode/scalar/properties-swift.struct/generalcategory | `TextScripts`, `TextSegmentation` | The stdlib has no Script or Bidi_Class property: those ranges are tabulated in `TextScripts`. |
 | `cbrt`, `pow`, `log` (C math via Foundation) | 2 | (Darwin libm) | `PaletteExtractor` (Oklab), recommendation scores (PixlLibrary) | Recommendation scores are bit-identical to the JVM on Windows (stage 3a). |
+| `cos`, `sin`, `pow`, `log`, `log10`, `exp`, `tanh` (C math via Foundation) | 2 | (Darwin libm) | `TransitionEnvelope` (S-curve), `ReplayGain.gainDbToVolume`, `BiquadDesigner`, `EqualizerResponse`, `SoftLimiter`, `Fft` twiddles (PixlAudioCore); `ReplayGainTags.gainDbToVolume` (PixlTags) | FFT, envelope and ReplayGain vectors are bit-identical to the JVM on Windows (UCRT libm) and macOS arm64; tests allow 2 ulps where `cos`/`pow` feed the result. PixlTags' `gainDbToVolume` is bit-identical for all 494 vectors. |
 | `Unicode.Scalar.Properties`: `isAlphabetic`, `isLowercase`, `isUppercase`, `isCased`, `isCaseIgnorable`, `lowercaseMapping`, `uppercaseMapping`, `titlecaseMapping`, `numericValue` | — (stdlib) | /documentation/swift/unicode/scalar/properties-swift.struct | PixlLyrics `ParseKit`, romanisers, `capitalizeFirstLetter`; PixlLibrary `KotlinText`, `SearchIndex.queryTokens` | Java `Character.getType`/`isLetterOrDigit`/`isLowerCase`/`titlecase`/`Character.digit`/`toUpperCase`/`toLowerCase`, Kotlin `lowercase()` with Java's Final_Sigma rule, `equals(ignoreCase)`, regex UNICODE_CASE folding, Java `\p{L}\p{N}`. |
 | `String.decomposedStringWithCanonicalMapping` (NFD) | 2 | /documentation/foundation/nsstring/decomposedstringwithcanonicalmapping | `LrcLibMatching.normalizeForMatch` | Java `Normalizer.normalize(…, NFD)`. Hangul syllables decompose to conjoining jamo, as on Android. |
-| `String.decomposedStringWithCompatibilityMapping` (NFKD) | 2 | /documentation/foundation/nsstring/decomposedstringwithcompatibilitymapping | `CatalogText.normalized` (AMLL/NetEase matching) | Java `Normalizer.normalize(…, NFKD)`. |
+| `String.decomposedStringWithCompatibilityMapping` (NFKD) | 2 | /documentation/foundation/nsstring/decomposedstringwithcompatibilitymapping | `CatalogText.normalized` (AMLL/NetEase matching), `TrackMatcher.normalize` (PixlNet) | Java `Normalizer.normalize(…, NFKD)`. |
 | `String.precomposedStringWithCanonicalMapping` / `precomposedStringWithCompatibilityMapping` | 2 | /documentation/foundation/nsstring/precomposedstringwithcanonicalmapping | `KotlinText.nfc` / `nfkc` (metadata repair, recommendation keys) | Java `Normalizer` NFC/NFKC; ASCII strings skip the call. |
-| `String.replacingOccurrences(of:with:)` | 2 | /documentation/foundation/nsstring/replacingoccurrences(of:with:) | `ParseKit.parseDouble` (ASCII literal tidy-up only) | Not used on user text (it compares by canonical equivalence). |
+| `String.replacingOccurrences(of:with:)` | 2 | /documentation/foundation/nsstring/replacingoccurrences(of:with:) | `ParseKit.parseDouble`, `JavaNumbers.parseDouble`, `JavaNumberText.format` (ASCII literal tidy-up only); PixlNet parsing helpers and AI response cleaner | Not used on user text in PixlLyrics/PixlTags/PixlBackup (it compares by canonical equivalence). |
+| `String(decoding:as:)` (`UTF8`, `UTF16`) | — (stdlib) | /documentation/swift/string/init(decoding:as:) | `TagText` (ID3v2/Vorbis/MP4 text, PixlTags), `ContentSanitizer.sanitizeString` (PixlBackup) | Replacement-character decoding like TagLib's lenient `String` constructors (results cut at the first NUL like TagLib); rebuilds strings after Kotlin-style UTF-16 truncation. |
 | `String(validating:as:)` (`UTF8`, `UTF16`) | 18 (Swift 6.0 stdlib) | /documentation/swift/string/init(validating:as:) | `LyricsImportSecurity.decodeText` | Strict decoding (malformed input → nil), like Java's `CharsetDecoder` with `REPORT`. |
 | `String.withUTF8(_:)`, `Hasher.combine(bytes:)`, `memcmp` | — (stdlib / C library) | /documentation/swift/string/withutf8(_:) | `KotlinKey`, `KotlinText.equals` | Code-unit string equality/hashing (Kotlin semantics) without per-byte overhead. |
-| `Float(_: String)` (`LosslessStringConvertible`), `Float.description` | — (stdlib) | /documentation/swift/float/init(_:)-5wmm8 | `LyricsSyncDraftCodec` | Decimal parsing for kotlinx `decodeFloat` (Java `parseFloat` subset); `description` gives the shortest round-trip digits that `javaFloatString` lays out like Java's `Float.toString`. |
+| `Float(_: String)` (`LosslessStringConvertible`), `Float.description`, `Double.description` | — (stdlib) | /documentation/swift/float/init(_:)-5wmm8 | `LyricsSyncDraftCodec`; `KotlinText.toFloatOrNull` (ReplayGain tags, PixlAudioCore + PixlTags); `KotlinText.formatFixed` (PixlTags); `JavaNumberText` (PixlBackup) | Decimal parsing for kotlinx `decodeFloat` (Java `parseFloat` subset) and Kotlin `toFloatOrNull` (correctly rounded; out-of-range literals fall back to `Double` → ±∞/±0 like Java). **Hex literals need a lower-case `0x…p…`: on Windows "0X1P-2" reads as 0**, so literals are lower-cased first. `description` gives the shortest round-trip digits, laid out like Java's `Float/Double.toString` and Java's `%.2f` (`FormattedFloatingDecimal` half-up on the shortest digits). |
 | `SIMD4<Float>` | — (stdlib) | /documentation/swift/simd4 | `LyricsBackgroundGrade`, `LyricsBackgroundMotion.shaderUniforms` | CPU reference of the lyrics background shader's float4 maths and uniforms. |
-| `Synchronization.Mutex` (`withLock`) | 18 (Swift 6 stdlib; also on Windows) | /documentation/synchronization/mutex | `LyricsSprings.normal(gapMs:)` | Guards the process-wide normal-spring cache, which mirrors Android's `normalCache`. Not on a per-frame path except a line change. |
+| `Synchronization.Mutex` (`withLock`) | 18 (Swift 6 stdlib; also on Windows) | /documentation/synchronization/mutex | `LyricsSprings.normal(gapMs:)`; `Fft` Bluestein plan cache (PixlAudioCore) | Guards the process-wide normal-spring cache, which mirrors Android's `normalCache`. Not on a per-frame path except a line change. |
 | `Task.yield()` | — (Swift concurrency) | /documentation/swift/task/yield() | `QueueUtils` async shuffle | Cooperative yield every 512 steps (Kotlin `yield()`). |
 | `TimeZone(identifier:)`, `TimeZone.secondsFromGMT(for:)` | 2 | /documentation/foundation/timezone/secondsfromgmt(for:) | `ZoneClock` (stats day boundaries) | Only offsets are read; java.time's gap/overlap rules for `atStartOfDay` are implemented on top. IANA zones incl. historical rules (São Paulo 2018, Lord Howe, Chatham) match java.time on Windows. |
 | `UUID().uuidString` | 6 | /documentation/foundation/uuid/uuidstring | `LyricsSyncDraftStore` temp file names | |
@@ -104,20 +106,78 @@ PixlCore must build on swift-corelibs-foundation, so it sticks to these. Swift T
 | `FileHandle(forReadingFrom:)`, `read(upToCount:)`, `close()` | 13.4 | /documentation/foundation/filehandle/read(uptocount:) | `LyricsImportSecurity.validateLocalLyricsFile(at:)` | Reads at most the size cap + 1 byte. |
 | `FileHandle(forWritingTo:)`, `write(contentsOf:)`, `synchronize()` | 4 / 13.4 / 13 | /documentation/foundation/filehandle/write(contentsof:) | `LyricsSyncDraftStore.save` | Throwing variants; `synchronize()` is the fsync Android does before the rename. |
 | `XMLParser(data:)`, `shouldProcessNamespaces`, `XMLParserDelegate` | 2 | /documentation/foundation/xmlparser | `LyricsExportTests` (`XMLTree`), **tests only** | `import FoundationXML` under `#if canImport(FoundationXML)` (Windows/Linux). Namespaced attribute keys are looked up by qualified name with a local-name fallback. |
+| `Unicode.Scalar.Properties.generalCategory` (`.spaceSeparator`, `.lineSeparator`, `.paragraphSeparator`) | — (stdlib) | /documentation/swift/unicode/scalar/properties-swift.struct/generalcategory | `KotlinText.isWhitespace` (Kotlin `trim()`, PixlAudioCore) | |
+| `Array.withUnsafeMutableBufferPointer`, `UnsafeMutablePointer<Float>` | — (stdlib) | /documentation/swift/array/withunsafemutablebufferpointer(_:) | `BiquadCascade`, `Fft.Workspace`, per-buffer processors (PixlAudioCore) | Per-buffer functions take caller buffers and never allocate (uniquely owned storage). |
+| `withUnsafeTemporaryAllocation(of:capacity:_:)` | — (Swift 5.6 stdlib) | /documentation/swift/withunsafetemporaryallocation(of:capacity:_:) | `SHA256` message schedule (PixlBackup) | Stack scratch space for the 64-word schedule (no heap allocation per block). |
+| `CancellationError`, `withCheckedThrowingContinuation(_:)`, `withTaskCancellationHandler(operation:onCancel:)`, `withThrowingTaskGroup`, `withTaskGroup`, `Task.sleep(nanoseconds:)`, `Task.checkCancellation()` | 13 | /documentation/swift/withcheckedthrowingcontinuation(isolation:function:_:) | `CtcAlignmentCore.align(checkCancelled:)` callers (PixlAudioCore); `URLSessionHTTPClient`, `withTimeout(seconds:_:)`, `LrcLibClient.runStrategiesFast`, retries (PixlNet) | Kotlin `withTimeoutOrNull`, `suspendCancellableCoroutine`, `CancellationException` and the "first non-empty batch wins" channel race. The app passes `{ try Task.checkCancellation() }` to the CTC aligner. |
+| `URLSession.dataTask(with:completionHandler:)`, `URLRequest` (`httpMethod`, `addValue(_:forHTTPHeaderField:)`, `httpBody`, `timeoutInterval`), `HTTPURLResponse.statusCode`/`allHeaderFields`, `URLSessionTask.cancel()` | 7 | /documentation/foundation/urlsession/datatask(with:completionhandler:) | `URLSessionHTTPClient` (PixlNet) | Imported via `#if canImport(FoundationNetworking)` off Apple platforms. Completion-handler API (not `data(for:)`) so it builds on corelibs too; cancellation bridged with `withTaskCancellationHandler`. The app may use it directly or inject its own `HTTPClient`. Tests never touch the network. |
+| `NSRegularExpression(pattern:options:)`, `firstMatch(in:options:range:)`, `NSTextCheckingResult.range(at:)`, `NSRegularExpression.escapedPattern(for:)`, `NSString.substring(with:)` | 4 | /documentation/foundation/nsregularexpression | `SignatureCipher` (base.js extraction, PixlNet) | Android's patterns used verbatim (ICU and java.util.regex agree on them for ASCII JavaScript; golden vectors pass). UTF-16 ranges, like Kotlin indices. |
+| `NSLock` | 2 | /documentation/foundation/nslock | `URLSessionHTTPClient` task box (PixlNet) | Only in synchronous helpers (Swift 6 forbids `lock()` in async contexts). |
+| `String.trimmingCharacters(in:)`, `CharacterSet(charactersIn:)`, `String.components(separatedBy:)`, `String.range(of:options:)` | 2 | /documentation/foundation/nsstring/trimmingcharacters(in:) | org.json number coercion, parsing helpers, AI response cleaner (PixlNet) | |
+| `Data(base64Encoded:)`, `Data.base64EncodedString()` | 7 | /documentation/foundation/data/init(base64encoded:options:) | `VorbisComment` (`METADATA_BLOCK_PICTURE`, `COVERART`), `FLACPicture.vorbisPictureBlock` (PixlTags); PixlBackup tests (inflate fixtures) | Android's `Base64.NO_WRAP` = no options. PixlBackup's sources use their own `BackupBase64` (follows `android.util.Base64`). |
+| `String.data(using:)` | 2 | /documentation/foundation/nsstring/data(using:) | `PreferencesModule` (UTF-8 for `JSONDecoder`, PixlBackup) | |
+| `ProcessInfo.processInfo.environment` | 2 | /documentation/foundation/processinfo/environment | `InteropDumpTests` (PixlTags, **tests only**) | Enables the dev-only interop dump. |
+| `String(format:)`, `NSString.deletingPathExtension`/`.pathExtension`, `String.range(of:)`/`replacingCharacters(in:with:)`, `Date.timeIntervalSince(_:)` | 2 | /documentation/foundation/nsstring/init(format:_:) | **tests only** (PixlTags hex dumps; PixlBackup fixture names, clock masking, inflate timing bound) | |
 
 Deliberately **not** used in PixlCore sources:
 - FoundationXML `XMLParser` (libxml2 on Windows, a different engine on Apple platforms, and neither rejects a DOCTYPE
   the way the Android configuration does): PixlLyrics has its own strict XML reader (`LyricsXML.swift`).
 - Swift `Regex` / `NSRegularExpression` (ICU/JDK regex semantics differ in places): every pattern is hand-written in
-  `ParseKit`, the parsers, `ArtistParsing` and `LyricsSheetLogic`, with the Java/device semantics documented there.
-- CryptoKit: tap-sync draft file names use a plain-Swift SHA-1 (`Sync/SHA1.swift`, internal), a name hash identical
-  to Android's `sha1(songId)`, not a security primitive.
+  `ParseKit`, the parsers, `ArtistParsing`, `LyricsSheetLogic`, PixlTags' `KotlinText` (the two ReplayGain regexes)
+  and PixlNet's `NetText` (java.util.regex ASCII classes), with the Java/device semantics documented there.
+  **One exception:** PixlNet's `SignatureCipher` runs Android's base.js patterns through `NSRegularExpression`
+  (see the table).
+- CryptoKit: tap-sync draft file names and SAPISIDHASH use a plain-Swift SHA-1 (internal), not a security primitive.
+  SHA-256 is injected by the app where it matters (PixlNet `SHA256Function` for PKCE, synthetic YouTube ids and AI
+  cache keys, plus `randomBytes`); PixlBackup has a pure-Swift SHA-256 (`Archive/Checksums.swift`, NIST vectors) for
+  module checksums, replaceable through `SHA256Hasher` (`BackupManager(hasher:)`, `BackupReader(hasher:)`,
+  `BackupWriter.write(hasher:)`).
+- **zlib / the Compression framework** (the architecture first planned to inject inflate from the app): Swift on
+  Windows has neither, so PixlBackup has its own RFC 1951 inflater (`Archive/Inflate.swift`, checked against 44 JDK
+  `Deflater` streams) and writes stored ZIP/gzip entries; PixlTags keeps compressed ID3v2 frames opaque. The app can
+  keep using the inflater on iOS (backups are small JSON).
+- `JSONSerialization` / `JSONEncoder` for Android wire formats: Gson's field order, escaping and number printing are
+  reproduced by `GsonWriter`/`JavaNumberText` (PixlBackup), org.json's by `OrgJSONWriter` (PixlNet).
+- `replacingOccurrences`/`components(separatedBy:)` on user text in PixlTags (canonical-equivalence matching differs
+  from Kotlin's per-char replace).
 
 For the app (stage 9): the lyrics engine's intended driver is a `CADisplayLink`
 (/documentation/quartzcore/cadisplaylink) calling `LyricsEngine.step(frameNanos:positionMs:offsetMs:)`, pushing
 `changedRows` into per-row observable state, then `clearChanges()` and pausing the link while `needsFrame` is false.
 `rowBlurSigma` is meant for SwiftUI `View.blur(radius:opaque:)` (radius treated as σ in points; calibrate against
 Android screenshots on device). Neither is in the ledger yet: add them when stage 9 first uses them.
+
+For the app (playback stage 5, EQ screen 7d), from PixlAudioCore (stage 3b):
+- `BiquadCoefficients.vDSPOrder` is `[b0, b1, b2, a1, a2]` normalised by a0, the layout `vDSP_biquadm_CreateSetupD`
+  / `vDSP_biquadm_SetTargetsDouble` expect (to be ledgered by the playback stage when it first uses them:
+  /documentation/accelerate/vdsp_biquadm_createsetupd).
+- `CrossfadeRamp.apply` / `ReplayGainStage.process` / `EqualizerProcessor.process` / `MidSideVocal.process` operate in
+  place on interleaved (or planar) Float buffers from a processing tap; state structs must be uniquely owned by the tap
+  context so array storage is never copied on the render thread.
+
+For the app (stages 11–13), from PixlNet (stage 3c): SHA-256 and random bytes are injected (`SHA256Function`,
+`randomBytes`); JavaScript (signature/`n` functions) runs through `JavaScriptEvaluating` (JavaScriptCore `JSContext` in
+stage 11). PixlNet deviations from Android:
+- Gson/kotlinx DTO decoding is lenient: a field of the wrong JSON type reads as absent instead of failing the whole
+  response (Spotify, Google OAuth, AI responses). Gemini/OpenAI responses whose required fields are missing are still
+  treated as failures, with the same error classes.
+- `HTTPResponse` has no reason phrase: provider errors use the standard HTTP/1.1 phrase (`HTTPReason`) as OkHttp's
+  `response.message` fallback.
+- LRCLIB User-Agent is `PixlAudio/1.0 (iOS; Music Player)` (Android's OkHttp interceptor sent
+  `PixelPlayer/1.0 (Android; Music Player)` to every non-YouTube host); AMLL/NetEase send `LyricsHTTP.userAgent`.
+- Spotify redirect is `pixlaudio://spotify-callback` (`SpotifyAuth.redirectURI`); Android's is kept as
+  `androidRedirectURI`. `SpotifyTrackRecord.toSong()` ids use the iOS `sp:` prefix.
+- Formats: `AudioFormatPolicy.iOS` (default for `ChainedYouTubeStreamResolver`) only picks AAC/MP4 (141/140/139) then
+  itag 18; Piped picks AAC audio streams by default (`aacOnly`). Android's `pickBestAudio` is kept as `.android`.
+- `InnerTubeRequests.nextBody`/`browseBody` are Swift-only builders (Android never called `next`/`browse`).
+- The Spotify session keeps a rotated refresh token in memory when persisting it fails (and reports the failure), so the
+  next refresh in the same process still uses the newest token.
+- User-facing diagnostic strings keep Android's wording (some Spanish, e.g. "respondió HTTP 400", "Refresco de token
+  fallido"); the UI stages decide what to show.
+
+For the app (stage 6), from PixlTags (stage 3d): MP4/M4A tag write-back is meant to go through AVFoundation
+(`AVAssetExportSession` passthrough with `metadata`), and reading normally through `AVURLAsset.load(.metadata)` with
+PixlTags as the fallback for FLAC, SYLT and ReplayGain; neither is used yet, add the rows when stage 6 does.
 
 ## Testing and tooling
 | API / tool | Docs | Notes |

@@ -1,6 +1,7 @@
 import Foundation
 import PixlFoundation
 import Testing
+import PixlModel
 @testable import PixlTags
 
 /// Vectors produced by the Android app's compiled classes on the JVM (`tools/android-reference/TagsGen.java`).

@@ -13,10 +13,15 @@ Android).
 | `EngineGen.java` + `lyrics-engine-cases.txt` | The app's compiled `PreparedLyricsBuilder`, `LyricsEngine`, `LyricsClock` and lyrics maths (springs, blur, cascade, emphasis, background grade, sprite baking) | `Tests/PixlLyricsTests/Fixtures/lyrics-prepared-golden.txt`, `lyrics-engine-golden.txt`, `lyrics-math-golden.txt` | `LyricsGoldenTests` |
 | `TapSyncGen.java` | The app's compiled `LyricsTapSync`, `LyricsExport` and `LyricsSyncDraftStore` codec (all 500 property-test sessions hashed step by step); `java TapSyncGen debug <seed>` prints one seed | `Tests/PixlLyricsTests/Fixtures/tapsync-android-golden.txt` | `TapSyncGoldenTests` |
 | `LibGen.java` | The app's compiled library logic (artist parsing, folder tree, random/shuffle, recommendations, stats, history codec) plus the real `songs_fts` SQL through xerial sqlite-jdbc | `Tests/PixlLibraryTests/Fixtures/*-golden.jsonl`, `Sources/PixlLibrary/Unicode61Tables.swift` | `GoldenVectorTests`, `ArtistParsingTests` |
+| `AudioGen.java` | The app's compiled `Envelope.kt` `envelope`, `ReplayGainManager` (incl. the private `parseGainString`), `shouldResumeAfterTransientAudioFocusLoss`, `Fft`/`Fft.Workspace`, `CtcAlignmentCore` and `MidSideVocalProcessor` (via Media3 `AudioProcessor`) | `Tests/PixlAudioCoreTests/Fixtures/audio-android-golden.txt` | `AudioGoldenTests` |
+| `NetGen.java` | The app's compiled `TrackMatcher` (normalize/similarity/score), `pickBestAudio`, `TaisIntentParser`, `AiSystemPromptEngine`, `AiResponseCleaner`, `AiProviderSupport`, the private Gemini/OpenAI request classes (kotlinx), `SpotifyRepository.unifiedId` and `SignatureCipherSolver` extraction over synthetic base.js | `Tests/PixlNetTests/Fixtures/net-android-golden.jsonl` | `NetGoldenTests` |
+| `gen-ai-prompts.js` (Node) | Extracts the AI prompt templates from the Android Kotlin sources (`node gen-ai-prompts.js <android repo> <ios repo>`) | `Sources/PixlNet/AI/AiPromptTemplates.swift` | `AiSystemPromptEngine` port, `NetGoldenTests` |
+| `TagsGen.java` | The app's compiled `ReplayGainManager`, `AudioMetadataReader.parseReplayGainDb`, `SongMetadataEditor` helpers (private methods via reflection), Kotlin `toFloatOrNull`/`toIntOrNull`, Java `URLConnection.guessContentTypeFromStream` | `Tests/PixlTagsTests/Fixtures/tags-android-golden.jsonl` | `AndroidGoldenTests` |
+| `BackupGen.java` | The app's compiled `data/backup` classes with Gson 2.14 (format detection, sanitiser, schema/manifest validation, checksums, legacy adapter, record binding, engagement merge, song resolver) and Android-style `.pxpl` writers; JDK `Deflater` streams | `Tests/PixlBackupTests/Fixtures/backup-android-golden.jsonl`, `inflate-cases.jsonl`, `android-v3.pxpl`, `android-v3-stored.pxpl`, `android-v2-legacy.pxpl`, `android-v1-legacy.json(.gz)` | `BackupGoldenTests`, `InflateTests`, `BackupImportTests` |
 
 ## Classpath
 
-The stage 2b–3a generators document their full classpath and command in their header comment (`LyricsGen` in
+The stage 2b–3e generators document their full classpath and command in their header comment (`LyricsGen` in
 `LyricsGen.md`). `stubs/` holds minimal Android stand-ins (`Context`, `Uri`, `Parcel`/`Parcelable`, `LruCache`) that
 are compiled and put before `android.jar` so app classes load on the JVM. The two stage 2a generators:
 

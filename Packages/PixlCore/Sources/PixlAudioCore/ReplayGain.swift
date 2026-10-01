@@ -4,17 +4,9 @@
 
 import Foundation
 import PixlFoundation
+import PixlModel
 
-/// ReplayGain values read from one file's tags.
-public struct ReplayGainValues: Sendable, Hashable, Codable {
-    public var trackGainDb: Float?
-    public var albumGainDb: Float?
-
-    public init(trackGainDb: Float? = nil, albumGainDb: Float? = nil) {
-        self.trackGainDb = trackGainDb
-        self.albumGainDb = albumGainDb
-    }
-}
+// `ReplayGainValues` (track/album gain from one file's tags) lives in PixlModel, shared with PixlTags.
 
 /// `ReplayGainManager` without the file I/O and the LRU cache (the app caches by file).
 public enum ReplayGain {

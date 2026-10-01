@@ -53,7 +53,7 @@ The full architecture is in [`docs/research/architecture.md`](docs/research/arch
 - `Packages/PixlCore`: pure Swift, **zero dependencies**, `Sendable` value types, must build and test on **Windows**
   (Swift for Windows) and macOS. Use Foundation only as far as swift-corelibs-foundation supports it
   (`#if canImport(FoundationNetworking)`, `#if canImport(FoundationXML)`); no CryptoKit/os/Combine in PixlCore
-  (inject SHA-256, inflate, etc. from the app). `Package.swift` already declares every module and test target —
+  (inject SHA-256 etc. from the app; PixlBackup has its own pure-Swift inflate). `Package.swift` already declares every module and test target —
   **don't edit it** unless a stage genuinely needs a new module. Keep each module's `<Module>Module` enum (the
   app's Diagnostics screen lists them). Test fixtures go in `Tests/<Module>Tests/Fixtures/` (already bundled).
 - **API ledger**: every Apple API used for the first time goes into [`docs/api-notes.md`](docs/api-notes.md) with its

@@ -364,29 +364,7 @@ public enum PlaybackHistoryModule {
 
 // MARK: - AI usage
 
-/// One AI request (`AiUsageEntity`).
-public struct AiUsageRecord: Sendable, Hashable, Codable {
-    public var id: Int64
-    public var timestamp: Int64
-    public var provider: String
-    public var model: String
-    public var promptType: String
-    public var promptTokens: Int
-    public var outputTokens: Int
-    public var thoughtTokens: Int
-
-    public init(id: Int64 = 0, timestamp: Int64, provider: String, model: String, promptType: String, promptTokens: Int,
-                outputTokens: Int, thoughtTokens: Int) {
-        self.id = id
-        self.timestamp = timestamp
-        self.provider = provider
-        self.model = model
-        self.promptType = promptType
-        self.promptTokens = promptTokens
-        self.outputTokens = outputTokens
-        self.thoughtTokens = thoughtTokens
-    }
-}
+// One AI request (`AiUsageEntity`) is PixlModel's `AiUsageRecord`, shared with PixlNet.
 
 public enum AiUsageModule {
     public static func restore(payload: String) throws(BackupError) -> [AiUsageRecord] {

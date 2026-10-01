@@ -74,7 +74,8 @@ import java.util.zip.ZipOutputStream;
  *
  * Classpath (Windows separators): the app's compileDebugKotlin/classes, its debug R.jar
  * (compile_and_runtime_r_class_jar), android.jar (platforms/android-37.0), kotlin-stdlib 2.4.0,
- * kotlinx-coroutines-core-jvm 1.10.2, kotlinx-serialization-{core,json}-jvm 1.11.0, gson 2.14.0.
+ * kotlinx-coroutines-core-jvm 1.10.2, kotlinx-serialization-{core,json}-jvm 1.11.0, gson 2.14.0, javax.inject-1.jar
+ * (the module handlers carry @Inject constructors).
  *   javac -cp "$CP" -d out BackupGen.java
  *   java -XX:+UnlockDiagnosticVMOptions -XX:-BytecodeVerificationRemote -cp "$CP;out" BackupGen <repo root>
  */

@@ -51,8 +51,32 @@ Status: **ported** (all cases) · **partial** (list what's missing) · **n/a** (
 | `data/recommendation/MusicDiscoveryRepositoryTest` | 0 of 5 | — | — | n/a | Network discovery (InnerTube search + Spotify import) — PixlNet/app. Its recording-key de-duplication is covered by the engine tests. |
 | `presentation/viewmodel/DailyMixPersistenceTest` | 0 of 3 | — | — | n/a | State-holder persistence/coroutine races — app stage 7b. `DailyMixTests` covers the pure selection and seeds. |
 | `presentation/viewmodel/ListeningStatsTrackerTest` | 0 of 2 | — | — | n/a | Live session tracking in the player — playback stage 5 (it feeds `PlaybackStats.recordingPlayback`). |
-| `data/backup/module/EngagementStatsModuleHandlerTest` | 0 of 3 | — | — | n/a | Backup module — PixlBackup (stage 3e). |
+| `data/backup/module/EngagementStatsModuleHandlerTest` | 3 of 3 | `EngagementStatsModuleHandlerTests` | PixlBackup | ported | Supersedes the stage-3a "n/a (stage 3e)" row. The DAO mock is replaced by the pure `EngagementStatsModule.restore/export`. |
 | `presentation/viewmodel/FileExplorerDirectoryMergeTest` | 0 of 1 | — | — | n/a | MediaStore/file-system directory merge — Android-specific (iOS lists folder bookmarks). |
+| `data/service/player/AudioFocusResumePolicyTest` | 4 of 4 | `AudioFocusResumePolicyTests` (+6 Swift-only: the `focusChangeListener` bookkeeping as `AudioFocusResumeState` — transient loss/gain, gain during a transition, paused stays paused, permanent loss, iOS `interruptionEnded(shouldResume:)`, delayed grant) | PixlAudioCore | ported | |
+| `data/tais/dsp/FftWorkspaceTest` | 7 of 7 | `FftTests` (+3 Swift-only: impulse/DC, Bluestein round trips for odd sizes, empty input) | PixlAudioCore | ported | JUnit thread pools → `withThrowingTaskGroup`. `accidentally shared workspace serializes concurrent transforms` → `copiedWorkspaceUsedConcurrentlyStaysBitExact`: `Fft.Workspace` is a value type, so "sharing" one gives each task its own copy (no `@Synchronized` needed); the bit-exactness check is the same. `IllegalArgumentException` → `FftError`. |
+| `data/tais/lyrics/CtcAlignmentCoreTest` | 8 of 8 | `CtcAlignmentCoreTests` (+4 Swift-only: empty input / too few frames, out-of-range tokens throw instead of trapping, flat-buffer entry point, short-clip window + constants) | PixlAudioCore | ported | `java.util.concurrent.CancellationException` → Swift `CancellationError` thrown from the `checkCancelled` closure. `IllegalArgumentException` → `CtcAlignmentError.tooLong`. |
+| _Android audio classes (not an app test)_ | 5,280 + 1,536 + 1,824 + 393 + 94 + 32 + 38 + 58 + 402 + 300 + 18 vectors | `AudioGoldenTests` | PixlAudioCore | new | `tools/android-reference/AudioGen.java` runs the app's compiled `utils/Envelope.kt` `envelope` (4 curves × 1,320 progress values incl. ±0, NaN, ±∞, out-of-range), the `performOverlapTransition` gain expression with the real `envelope` (8 durations × 16 curve pairs × 12 elapsed times, start volumes and ReplayGain targets incl. >1), `ReplayGainManager.gainDbToVolume` / `getVolumeMultiplier` and the private `parseGainString` (94 tag strings: dB spellings, Unicode whitespace, `NaN`/`Infinity`, suffixes, hex floats, overflow/underflow, denormals, control characters, junk), `shouldResumeAfterTransientAudioFocusLoss` (all 32 inputs), `Fft.transform` and `Fft.Workspace` (19 sizes 1…6144 × forward/inverse, random input), `CtcAlignmentCore.windows` (58 sample counts), `align` (400 random cases: ties, −∞, non-zero blank ids, malformed extended sequences, 0…40 frames) + the 64 Mi cell limit at its boundary, `acceptsWordEvidence` (300 score lists), and `MidSideVocalProcessor` through Media3's `AudioProcessor` (Float and 16-bit, 9 attenuations incl. NaN/negative/>1). Fixture `audio-android-golden.txt`. **FFT, CTC, mid/side, parsing and the non-S-curve gains are bit-identical on Windows and on macOS arm64 (CI)**; the S-curve (`cos`) and `pow` lines allow 2 ulps. |
+| `data/youtube/TrackMatcherTest` | 7 of 7 | `TrackMatcherTests` (6 scoring cases) + `AudioFormatSelectionTests.qualityCapNeverPromotesMuxedVideoAboveRealAudio` | PixlNet | ported | `SpotifySongEntity` → `MatchableTrack`; the matcher's search dependency is the `YouTubeMusicSearching` protocol (mockk → a fake). |
+| `data/ai/provider/AiProviderSupportTest` | 5 of 5 | `AiProviderTests` | PixlNet | ported | `createException` → `AiProviderSupport.makeError`, `AiProviderException` → `AiProviderError`. |
+| `data/tais/dj/TaisIntentParserTest` | 5 of 5 | `TaisIntentParserTests` | PixlNet | ported | `TaisIntentParser` is a stateless enum. |
+| `data/spotify/SpotifySnapshotRetentionTest` | 0 of 3 (rules ported) | `SpotifyWebAPITests.snapshotPaginationGuard` | PixlNet | partial | The three cases drive `SpotifyRepository.syncUserPlaylists` against a mocked DAO (pruning, failed first page, failed later page). The DAO/sync loop is the iOS persistence layer's (stage 12); its pure guard `nextSnapshotOffset` (repeated/skipped page, early end, empty continuation, no progress, `offset=` cursor) is ported and tested case by case; `SpotifyLibrary.browsePlaylistId`/`likedSongsPlaylistId` are the ids the sync must never prune. |
+| `data/repository/LyricsRepositoryImplTest` (network halves) | — | `LyricsProviderTests` | PixlNet | new | The ranking/matching halves were ported in 2b (PixlLyrics); PixlNet adds the request builders, retries, rate limit, fast parallel strategies, AMLL/NetEase flows and the catalog race. |
+| `data/network/lyrics/NeteaseLyricsSourceTest` | (3, parsing in 2b) | `LyricsProviderTests.neteaseMatchesTheRecordingAndReadsYRC` | PixlNet | new | The HTTP side of the same flow (search → matching track → `song/lyric/v1`), incl. the opaque `result` and non-200 `code` cases. |
+| `presentation/viewmodel/MetadataEditLyricsPreservationTest` | 3 (file half) | `MetadataEditorTests.titleOnlySaveLeavesTheLyricsTagAlone`, `clearingTheLyricsFieldRemovesTheTag`, `editedLyricsAreWrittenTrimmed` | PixlTags | partial | The tag-file half of each case (nil lyrics keep the USLT frame, blank removes it, edited lyrics are trimmed and written). The Room/`lyrics/{id}.json` half (`resetLyrics`/`updateLyrics` calls) is the app's `MetadataEditStateHolder` (stage 7a). |
+| _Android tag helpers (not an app test)_ | 1,103 vectors | `AndroidGoldenTests.everyVectorMatches` | PixlTags | new | `tools/android-reference/TagsGen.java` runs the app's compiled `ReplayGainManager.parseGainString`/`gainDbToVolume`/`getVolumeMultiplier`, `AudioMetadataReader.parseReplayGainDb`, `SongMetadataEditor.parseReplayGainUpdate`/`validateMetadataInput`/`detectContainerFormat`/`isProblematicFlacFile` (private methods via reflection, the editor allocated without its constructor), Kotlin `toFloatOrNull`/`toIntOrNull` and Java `URLConnection.guessContentTypeFromStream` (`guessImageMimeType`). Fixture `tags-android-golden.jsonl`. Floats compared bit for bit (`gainDbToVolume` included); all 1,103 identical on Windows. |
+| _Real third-party files (not an app test)_ | 4 files | `RealWriterFixtureTests` | PixlTags | new | FFmpeg 8 (Lavf 62.12) output: ID3v2.4 MP3, ID3v2.3 MP3 + ID3v1, FLAC with PICTURE block and 8 KiB padding, M4A with `ilst`/`covr`. Read, mapped through `AudioMetadataMapper`, edited and re-read; the MP3 audio bytes are checked unchanged. |
+| `data/backup/model/BackupSectionTest` | 9 of 9 | `BackupSectionTests` | PixlBackup | ported | |
+| `data/backup/format/BackupFormatDetectorTest` | 7 of 7 | `BackupFormatDetectorTests` | PixlBackup | ported | |
+| `data/backup/format/LegacyPayloadAdapterTest` | 5 of 5 | `LegacyPayloadAdapterTests` | PixlBackup | ported | The test's Gson is `setPrettyPrinting()` without `serializeNulls`; the Swift adapter always uses the backup Gson's output (pretty + nulls), which is what `BackupReader` passes on Android. |
+| `data/backup/validation/ContentSanitizerTest` | 9 of 9 | `ContentSanitizerTests` | PixlBackup | ported | Lengths are UTF-16 units, as in Kotlin. |
+| `data/backup/validation/ManifestValidatorTest` | 9 of 9 | `ManifestValidatorTests` | PixlBackup | ported | `System.currentTimeMillis()` → injected clock (`ManifestValidator(now:)`). |
+| `data/backup/validation/ModuleSchemaValidatorTest` | 15 of 15 | `ModuleSchemaValidatorTests` (+ `tooManyEntriesIsFatal`) | PixlBackup | ported | |
+| `data/backup/module/FavoritesModuleHandlerTest` | 2 of 2 | `FavoritesModuleHandlerTests` | PixlBackup | ported | `FavoritesModule.restore/export`. |
+| `data/backup/restore/RestoreExecutorTest` | 3 of 3 | `RestoreExecutorTests` | PixlBackup | ported | MockK handlers → the `RecordingHandler` actor; the mocked `BackupReader`/`ValidationPipeline` are replaced by real archives built with `BackupWriter` (so validation runs for real). |
+| `data/backup/BackupManagerTest` | 3 of 3 | `BackupManagerTests` | PixlBackup | ported | Real archives instead of mocks. The first case's warning is the validator's real message ("File extension is not .pxpl. The file may not be a valid backup."), the mock used a shortened one. |
+| _Android backup code (not an app test)_ | 764 vectors | `BackupGoldenTests` (15 tests) | PixlBackup | new | See below. |
+| _JDK `Deflater` (not an app test)_ | 44 streams | `InflateTests.inflatesJavaDeflaterOutput` | PixlBackup | new | Fixture `inflate-cases.jsonl`. |
 
 ### Swift-only tests added in stage 2a
 `SpringTests` (textbook closed forms for under/critically/over-damped and undamped springs, ms truncation,
@@ -171,13 +195,309 @@ determinism, luminance), `DailyMixTests` (seeds, alias favourites, engagement hi
   full mappings, title case for iota-subscript letters, `İ`→`i`); identical for every vector tested.
 - `buildFolderTree`'s Android storage-volume discovery is replaced by explicit root paths (iOS folder bookmarks).
 
+## Stage 3b — PixlAudioCore
+
+Sources `Packages/PixlCore/Sources/PixlAudioCore/`, tests `Packages/PixlCore/Tests/PixlAudioCoreTests/` (105 tests in 11
+suites; all pass on Windows, Swift 6.4).
+
+Android has no unit tests for `Envelope.kt`, `TransitionController`, `TransitionRepositoryImpl`, `ReplayGainManager`,
+`ReplayGainProcessor`, `EqualizerManager`, `SleepTimerStateHolder` or `MidSideVocalProcessor`; their Swift tests are
+listed below (the pure maths of the first four and of the mid/side processor is also covered by the golden vectors).
+
+### Swift-only tests added in stage 3b
+- `TransitionTests` (13): envelope endpoints/monotonicity/shapes; rule priority (pair → playlist default → global,
+  no playlist id → global, half-specified rules match neither query); skip reasons (global toggle only affects the global
+  default); plan clamping (650 ms boundary, guard window, 500 ms floor); fire decision; adaptive countdown sleep incl. the
+  0.1 speed floor; next target per repeat mode (no wrap with repeat-all, as on Android); suspensions; Android constants;
+  `CrossfadeRun` gains/finish/final volume; `CrossfadeRamp` per-deck media-time gains agree with the Android loop;
+  per-buffer interpolation; `GainRamp` no-ops.
+- `ReplayGainTests` (13): tag strings, tag maps (case-insensitive keys, key priority, empty list falls through, unparsable
+  first value decides), R128 Q7.8 conversion (deviation, below), gain → volume, fallbacks, the `ReplayGainProcessor`
+  bookkeeping (user volume vs echo, stale tokens, streams, crossfade pending volume + incoming target, transition
+  finished, metadata changes), the tap stage (parity cap at 1, boost + limiter, ramps) and `SoftLimiter` (transparent
+  below the knee, monotonic, odd, bounded).
+- `BiquadTests` (9): RBJ identities (0 dB = identity), peaking gain at the centre for 4 gains × 3 bands, shelf
+  asymptotes and corner (half gain), Butterworth LP/HP −3.01 dB, sanitised frequency/Q, the cascade against a Double
+  direct-form-I reference, steady-state sine amplitude = |H| with an independent silent channel, identity bypass and
+  reset, vDSP order and stability.
+- `EqualizerTests` (9): `setBandLevel` clamping/"custom"/out-of-range, effect toggles/strength clamps/unsupported
+  effects, `restoreState` (custom, built-in, unknown → flat, loudness clamp), Android's 10 → N device-band averaging
+  (Kotlin truncating division), millibel mapping incl. a ±1200 mB device, chain design (bass boost `15·s/1000` integer dB,
+  loudness make-up gain, width), the UI response curve and log frequencies, `StereoWidth`, the processor bypass and
+  bounded output.
+- `SleepTimerTests` (12): duration timer schedule/fire/clear, 0 = cancel, cancel toasts, end of track (no song, replaces a
+  duration timer, pauses at the end of the target song on an automatic transition, cancelled on a manual change, cleared
+  at the end of the queue), counted play (repeat-one, loops, pause past the target, cancelled by another song or a
+  repeat-mode change, restart, slider value), counted play independent of the timers.
+- `MidSideVocalTests` (4): attenuation 0 untouched, full attenuation removes the centre, half attenuation, clamping and
+  Int16 saturation.
+
+### Deviations from Android (intentional)
+- **R128 gains**: Android parses `R128_TRACK_GAIN`/`R128_ALBUM_GAIN` (Opus Q7.8 integers, −23 LUFS reference) as
+  decibels, which turns a typical "-1536" into silence. `ReplayGain.extractGainValue` converts them (`v / 256 + 5`).
+  `REPLAYGAIN_*` tags still win, as their keys come first.
+- **Sleep timer after it fires**: Android pauses but leaves the timer row showing (the job that cleared it was removed);
+  `SleepTimer.tick` clears the timer once it has paused.
+- **End-of-track replaces a duration timer**: Android clears the timer state but leaves its exact alarm armed, so the
+  old alarm could still pause later; `setEndOfTrack` emits `.cancelWakeUp`.
+- **`onPlaybackEnded`** clears an end-of-track timer (Android's service clears its own copy; the UI holder kept waiting).
+- `Fft.Workspace` is a value type (no `@Synchronized`); errors are thrown (`FftError`, `CtcAlignmentError`) instead of
+  `IllegalArgumentException`, and an out-of-range CTC token throws instead of crashing.
+- The equalizer runs as biquads in the tap instead of `android.media.audiofx`: bands = peaking filters at the Android
+  band frequencies with Android's level → millibel mapping (1 level = 1 dB); bass boost = a 90 Hz low shelf at AOSP's
+  `(15 × strength) / 1000` dB; virtualizer = mid/side stereo width (1 → 1.8); loudness enhancer = make-up gain + soft
+  limiter. `ReplayGainStage` keeps Android's volume cap of 1 unless `allowBoost` is set.
+- Every mode other than NONE runs the same overlap crossfade — that **is** Android's behaviour (FADE_IN_OUT and SMOOTH
+  differ only by their curves); kept and documented.
+
+## Stage 3c — PixlNet
+
+Tests in `Packages/PixlCore/Tests/PixlNetTests/` (145 tests in 18 suites, all on Windows; no live network — every
+request goes to a scripted `FixtureHTTPClient`). Fixtures in `Tests/PixlNetTests/Fixtures/`: `innertube-player.json`,
+`innertube-search.json`, `piped-streams.json`, `spotify-playlist-items.json` (hand-written in the shapes the services
+return) and the golden file `net-android-golden.jsonl`.
+
+### Golden vectors from the compiled Android code (new)
+`tools/android-reference/NetGen.java` runs the app's compiled classes on JDK 26 (classpath and command in its header:
+compileDebugKotlin/classes, kotlin-stdlib 2.4.0, kotlinx-serialization 1.11.0, gson 2.14.0, okhttp 4.12.0 + okio 3.18.1
+for the AI clients' constructors, kotlinx-coroutines-core-jvm for `SignatureCipherSolver`'s fields, android.jar 37) and
+writes `net-android-golden.jsonl` (612 lines). `NetGoldenTests` compares:
+
+| Function | Vectors | What must match |
+|---|---|---|
+| `TrackMatcher.normalize` | 69 | Exact strings (NFKD, Java lower case with final sigma, bracket/trailing noise, `\p{L}\p{N}`), CJK/Cyrillic/Arabic/Hangul kept. |
+| `TrackMatcher.similarity` | 69 | Float **bit patterns** (UTF-16 Levenshtein). |
+| `TrackMatcher.score` | 144 (8 songs × 18 candidates) | Float **bit patterns**: title/artist/duration/album weights, video "Artist - Title" split, " topic"/"vevo" suffixes, variant penalties. |
+| `pickBestAudio` | 48 | Chosen itag for 8 format sets × 6 caps (muxed last, cap ignored when it empties the list, Opus tie-break, first maximum kept). |
+| `TaisIntentParser.parse` + `isMediaRequest` | 58 prompts | Action, genres, moods, query, media flag. |
+| `AiSystemPromptEngine.buildPrompt` | 81 + default persona | **Byte for byte** for every type × 3 personas (incl. the multi-line default) × 3 contexts — Kotlin `trimIndent()` runs after template interpolation, so multi-line personas/contexts keep the template's indentation; reproduced by the generated `AiPromptTemplates.swift` (`tools/android-reference/gen-ai-prompts.js`). |
+| `AiResponseCleaner` | 19 inputs × 4 functions | Fences, bracket matching with strings/escapes, first array/object. |
+| `AiProviderSupport` | 12 chains, 10 recovery, 14 `createException`, 9 `wrapThrowable`, 3 model filters | Messages, parsed code/type, status inference (`\b[1-5]\d{2}\b`), the four classification flags. |
+| Gemini / OpenAI request bodies | 18 + 18 + 1 | kotlinx `encodeToString` of the private `@Serializable` request classes (reached by reflection): defaults omitted, Float settings as `Double.toString`. |
+| `SpotifyRepository.unifiedId` | 27 | FNV-1a ids in the song/album/artist bands. |
+| `SignatureCipherSolver` | 6 players + 5 iframes | `buildSignatureFunction`/`buildNFunction` output (or null) over synthetic base.js (all name patterns, array indirection, function declarations, braces inside strings/template literals, missing bodies) and the player-id regex. |
+
+### Swift-only tests added in stage 3c
+- `InnerTubeTests`: client table (VISIONOS first, cookie flags), endpoints/headers/origins, org.json-exact player body
+  (`\/` escaping), search request, authenticated headers, SAPISIDHASH against a known SHA-1 vector, player parsing
+  (formats, muxed fallback, ciphers, SABR-only "OK but unusable"), playability statuses, org.json coercions in
+  formats, search parsing order/limit/dedup/"not a results page", duration parsing, tree walking, visitorData from
+  `responseContext` and from `ytcfg` HTML.
+- `InnerTubeClientTests`: the cookie never reaches native clients; visitorData always sent (PoToken → anonymous →
+  stored); WEB_REMIX PoToken body; failure reasons; search body/interleave; one failed shelf; `VisitorDataProvider`
+  fetches once.
+- `AudioFormatSelectionTests`: the iOS AAC-only pick (141 → 140 → 139, caps, itag 18 last, Opus/AC-3 rejected),
+  PoToken eligibility.
+- `CipherAndStreamTests`: call quoting, cipher parts, `n` rebuild (first value per name, Android re-encoding),
+  `pot`, brace matching, `SignatureCipherSolver` (downloads once, deciphers, diagnose report), the strategy chain
+  (order by sign-in, VISIONOS wins, fall-through details, probe failures, exclusions, ciphered/PoToken details),
+  probe classification, timeout helper.
+- `PipedTests`, `GoogleDeviceAuthTests` (form bodies, RFC 8628 poll steps, slow_down, expiry, refresh/invalid_grant),
+  `SpotifyAuthTests` (RFC 7636 PKCE vector, authorize URL, callback validation, rotation persisted **before** the token
+  is used, concurrent refresh sharing, failed persistence kept in memory, full sign-in), `SpotifyWebAPITests`
+  (endpoints incl. the `/items` field filter, call policy, 401/429/403/transport retries, catalog paging + market
+  fallback, pagination guard, row mapping, YouTube Music rows, ISO instants, lenient models, id bands),
+  `LyricsProviderTests`, `AiProviderTests`/`AiOrchestratorTests`/`AiPlaylistTests` (codecs, clients, provider chain
+  with cooldowns, cache, model recovery, on-device client, candidate pool JSON, full prompt indentation, digest, Java
+  `%.2f`), `SupportTests` (Android/OkHttp encodings, org.json reader/writer, Java `Double.toString`, Kotlin text and
+  `trimIndent`), `CloudStreamSecurityTests`.
+
+### Notes
+- Regex classes follow java.util.regex on the JVM (ASCII `\w`/`\s`/`\b`), like the earlier stages; Android's ICU regex
+  differs only next to non-ASCII letters (e.g. `"ßhd"` in `TrackMatcher.normalize`), which the vectors include and
+  JVM semantics decide.
+- Regenerate: `javac -cp "$CP" NetGen.java && java -Duser.language=en -Duser.country=US -XX:+UnlockDiagnosticVMOptions
+  -XX:-BytecodeVerificationRemote -cp "$CP;." NetGen <ios repo root>`; prompts: `node tools/android-reference/
+  gen-ai-prompts.js <android repo> <ios repo>`. (Both are listed in `tools/android-reference/README.md`.)
+
+## Stage 3d — PixlTags
+
+Tests in `Packages/PixlCore/Tests/PixlTagsTests/` (73 tests, 9 suites; the interop dump test is skipped unless
+`PIXLTAGS_DUMP_DIR` is set). All pass on Windows (Swift 6.4).
+
+Android has **no unit tests** for its tag code (`data/media/*`: `SongMetadataEditor`, `ReplayGainManager`,
+`AudioMetadataReader`, `AudioMetadataUtils`); the tag I/O itself is TagLib (native, `com.kyant:taglib` 1.0.6, a
+TagLib 2.x build), JAudioTagger 3.0.1 and vorbis-java. So parity comes from three sources: golden vectors from the
+compiled Android helpers, the file-tag half of the one related app test, and Swift tests that pin TagLib 2's
+behaviour (read from TagLib's source and checked against the strings in the app's `libtaglib.so`).
+
+### Golden generator
+`tools/android-reference/TagsGen.java` (classpath and command in its header): the app's
+`compileDebugKotlin/classes`, `android.jar` (platforms/android-37.0), kotlin-stdlib 2.4.0, Timber 5.0.1 and the
+`com.kyant:taglib` 1.0.6 `classes.jar` (only for class loading; `libtaglib.so` is arm64-only and cannot run on the
+JVM), JDK 26. Output: `Packages/PixlCore/Tests/PixlTagsTests/Fixtures/tags-android-golden.jsonl`, one
+`{"fn","in","out"}` object per line.
+
+The FFmpeg fixtures were generated with (bash, FFmpeg 8.0, a 2×2 red PNG as `_cover.png`):
+```sh
+COMMON=(-metadata "title=Ünïcode Title 日本" -metadata "artist=Artist A" -metadata "album_artist=Album Artist" \
+  -metadata "album=The Album" -metadata "track=3/12" -metadata "disc=1/2" -metadata "date=2021" -metadata "genre=Rock" \
+  -metadata "composer=Composer C" -metadata "REPLAYGAIN_TRACK_GAIN=-6.54 dB" -metadata "REPLAYGAIN_ALBUM_GAIN=-8,20 dB" \
+  -metadata "lyrics=line one")
+IN=(-f lavfi -t 0.15 -i anullsrc=r=22050:cl=mono -i _cover.png -map 0:a -map 1)
+ffmpeg "${IN[@]}" -c:a libmp3lame -b:a 32k -id3v2_version 4 "${COMMON[@]}" -c:v copy -disposition:v attached_pic ffmpeg-id3v24.mp3
+ffmpeg "${IN[@]}" -c:a libmp3lame -b:a 32k -id3v2_version 3 -write_id3v1 1 "${COMMON[@]}" -c:v copy -disposition:v attached_pic ffmpeg-id3v23.mp3
+ffmpeg "${IN[@]}" -c:a flac "${COMMON[@]}" -c:v copy -disposition:v attached_pic ffmpeg.flac
+ffmpeg "${IN[@]}" -c:a aac -b:a 24k "${COMMON[@]}" -c:v copy -disposition:v attached_pic ffmpeg.m4a
+```
+
+### Interop check (manual, local)
+`PIXLTAGS_DUMP_DIR=<dir> swift test --filter InteropDumpTests` writes PixlTags-written ID3v2.3/2.4 MP3s (UTF-16 /
+UTF-8 text, APIC, USLT, SYLT, COMM, TXXX ReplayGain, TDRC→TYER/TDAT) and a rewritten FLAC. Checked on 2026-09-30 with
+ffprobe 8.0 and JAudioTagger 3.0.1: every field, the picture, the USLT/SYLT frames and the FLAC comment read back as
+written.
+
+### Swift-only tests added in stage 3d
+- `ID3v2ReadTests` (22): v2.4 core frames → TagLib keys (`TIT2`…`TCOM`, ISO `T` → space in `DATE`), the four text
+  encodings with terminators and BOM inheritance, empty-field dropping, TXXX keys (REPLAYGAIN, MusicBrainz/AcoustID
+  translation), COMM/USLT/WXXX/W***/UFID keys, APIC (incl. truncated), SYLT, v2.3 TYER+TDAT+TIME folding and its
+  rules, TORY/IPLS conversion and dropped v2.3 frames, v2.2 frame conversion incl. `PIC`, `TCON` genre references,
+  v2.3 tag-level and v2.4 frame-level unsynchronisation + data-length indicator + grouping byte, extended headers
+  (v2.3 with/without CRC, v2.4), the v2.4 footer, iTunes' plain frame sizes, frame flags and compressed (opaque)
+  frames, padding/garbage termination, header validation, TagLib's `String::toInt`.
+- `ID3v2WriteTests` (16): v2.4 layout and 1 KiB padding, TagLib's padding-reuse rule (1 %/1 KiB/1 MiB), in-place
+  rewrite, v2.3 rendering (UTF-16, plain sizes, TDRC → TYER/TDAT/TIME, TDOR → TORY, TIPL/TMCL → IPLS, 2.4-only frames
+  dropped), `checkTextEncoding`, discarded/unwritable frames, a round trip of every frame kind, `setProperties`
+  semantics (kept frames, new frames for every key type, TIPL/TMCL, UFID, WXXX, multi-value LYRICS → TXXX),
+  duplicate frames of a key, picture/SYLT setters, SYLT ↔ `SyncedLine`/LRC, whole-file MP3 writing (ID3v1 update,
+  version keep, tag removal, tag creation, unsupported-version tag replacement).
+- `FLACTests` (14): block parsing, STREAMINFO, Vorbis comment rules (key check, `METADATA_BLOCK_PICTURE`/`COVERART`,
+  malformed counts), sorted rendering, `setProperties`, padding reuse/4 KiB/threshold, comment placement before the
+  first picture, picture replace/remove, leading ID3v2 + trailing ID3v1 kept, empty comment → ID3 fallback, duplicate
+  comments/invalid pictures dropped, structural errors, Android's hi-res analysis and `buildVorbisPictureBlock`.
+- `MP4Tests` (5): every listed atom (`©nam ©ART aART ©alb trkn disk ©day ©gen covr ©lyr`, free-form
+  `----:com.apple.iTunes:REPLAYGAIN_*`), item types (`gnre`, bool, int, uint, byte, long), duplicates, QuickTime-style
+  `meta`, 64-bit sizes, missing/broken atoms, the key table.
+- `MetadataEditorTests` (11, incl. the 3 ported cases): `AudioMetadataReader` field mapping and artwork rules,
+  ReplayGain reading/volume, Java `%.2f`, editor property updates (album artist/composer/disc/ReplayGain/cover rules),
+  failures (validation, ReplayGain, MP4/Opus unsupported, broken FLAC), FLAC routing, ID3v1-only MP3s.
+
+### Deviations (documented in the sources)
+- **TagLib, not JAudioTagger/vorbis-java.** Android writes WAV, Ogg, high-res FLAC (> 96 kHz or > 24 bit) and TagLib
+  failures with JAudioTagger, and Opus with vorbis-java. PixlTags writes MP3 and every FLAC with TagLib's rules;
+  MP4/M4A is left to the app (AVFoundation passthrough export), Ogg/Opus and WAV return `UNSUPPORTED_FORMAT`.
+  `FLACStreamInfo.analyze` still ports `isProblematicFlacFile` exactly.
+- **No ID3v1 is added.** TagLib 2's `MPEG::File::save()` duplicates the ID3v2 fields into a new ID3v1 tag; PixlTags only
+  updates an existing ID3v1 tag (with TagLib's `setProperties`).
+- **FLAC behind an ID3v2 tag** is routed as FLAC; Android's magic check (`AudioContainer.detect`, ported as is) calls it
+  MP3 and TagLib's MPEG writer would then edit only the ID3v2 tag.
+- **ID3v2.3 extended header** is skipped per spec (4 + size bytes); TagLib skips only `size` bytes.
+- **Grouping byte** (v2.3/2.4 frame flag) is stripped before parsing; TagLib ignores the flag.
+- **Compressed or encrypted frames** are kept opaque and written back only in the same version (TagLib inflates zlib
+  frames; PixlCore has no zlib).
+- **ID3v2.2 frames without a 2.4 equivalent** are dropped when read (TagLib keeps them as unknown frames that it can
+  never write); v2.3 `TDAT`/`TIME` are folded into `TDRC` and not kept.
+- **Version written**: 2.4 by default like TagLib; `TagChanges.id3v2Version = nil` keeps a 2.3 tag 2.3.
+- **Artwork validity**: Android decodes the bounds with BitmapFactory; `ImageSniffing.isLikelyDecodableImage` checks
+  the JPEG/PNG/GIF/WebP/BMP/HEIF signatures (the app can confirm with ImageIO). `guessContentType` omits Java's
+  FlashPix branch.
+- **Audio properties** (duration, bitrate, sample rate from TagLib) are not part of the port; iOS reads them with
+  AVFoundation. FLAC `STREAMINFO` is exposed for convenience.
+- **SYLT** is new on iOS (Android never reads it): `ID3v2SyncedLyrics.syncedLines()`/`lrcText()` treat entries starting
+  with a line break as line starts.
+- **Ports from memory of TagLib 2 tables** (frame/TXXX/MP4 key tables, ID3v1 genre spellings, TIPL roles) were checked
+  against the strings in the app's `libtaglib.so`; TagLib behaviour cannot be executed on the JVM, so those parts
+  have no golden vectors.
+
+## Stage 3e — PixlBackup
+
+Tests in `Packages/PixlCore/Tests/PixlBackupTests/` (143 tests in 23 suites, all passing on Windows). Android tests
+live under `app/src/test/java/com/theveloper/pixelplay/data/backup/`.
+
+### Golden vectors from the compiled Android code (new)
+
+`tools/android-reference/BackupGen.java` (classpath and command in its header; it also needs `javax.inject-1.jar`)
+runs the app's compiled `data/backup` classes with Gson 2.14.0 on JDK 26 and writes
+`Tests/PixlBackupTests/Fixtures/`:
+
+| Vectors (`fn`) | Count | Swift test | What must match |
+|---|---|---|---|
+| `detect` | 26 | `formatDetectionMatchesAndroid` | `BackupFormatDetector.detect` for every header shape. |
+| `sanitizeString`, `sanitizeUrl`, `isValidModuleKey` | 87 + 28 + 21 | `sanitizerMatchesAndroid` | Kotlin `trim()` (NBSP, U+2003, U+3000, U+0085, ZWSP), UTF-16 truncation, control stripping, URL scheme rule, key regex. |
+| `schema` | 147 | `moduleSchemaValidationMatchesAndroid` | Every error code, message, module and severity of `ModuleSchemaValidator` for all 12 modules — and the **Java exception class** where the Android validator throws (`"content": null` → `UnsupportedOperationException`, `"settings": []` → `ClassCastException`, `"durationMs": "abc"` → `NumberFormatException`, `[1, 2]` as a number → `IllegalStateException`). Includes Gson's `BigDecimal` truncation (`12.5` → 12), long wrap-around, `toLongOrNull` vs `asLong`. |
+| `manifestValidate` | 252 | `manifestValidationMatchesAndroid` | Schema versions × timestamps × module sets. |
+| `verifyChecksum` | 9 | `checksumVerificationMatchesAndroid` | `sha256:` prefix rules, case-sensitive hex. |
+| `manifestDecode` | 26 | `manifestDecodingMatchesGson` | Gson binding of manifest.json (Kotlin defaults via the no-arg constructor, quoted numbers, `3.0` → 3, `3.5` fails, duplicate map keys fail, nulls kept) re-encoded byte for byte with the backup Gson. |
+| `legacyAdapt` | 20 | `legacyAdapterMatchesAndroid` | v1/v2 adaptation: module selection, re-serialised payloads byte for byte (number literals kept, HTML escaping), checksums, entry counts, and the exception class on bad input. |
+| `entities` | 92 | `gsonEntityBindingMatchesAndroid` | `gson.fromJson(payload, List<Entity>)` for every module record (alternate names with last-wins, JVM zero defaults, `nextLong`/`nextInt` coercions incl. `"5.0"` → 5 and `1.5` failing, `Boolean.parseBoolean`, unknown enum names → null, `LinkedHashSet` dedup, maps from arrays of pairs) re-encoded byte for byte. |
+| `gsonPretty`, `aiUsageExport`, `engagementExport` | 11 + 1 + 1 | `gsonWriterMatchesAndroid` | Gson's pretty printer and compact writer, HTML-safe escaping, `Float.toString`/`Double.toString`. |
+| `engagementRestore` | 15 | `engagementRestoreMatchesAndroid` | The private `parseEntries` merge (lenient names, truncating `toInt`, clamping, max-merge) and the empty-result failure. |
+| `resolveSongId`, `resolverLibrary` | 22 + 1 | `playlistSongResolutionMatchesAndroid` | The cross-device song resolver (direct id + metadata check, title/artist, album, ±2 s duration; Kotlin `lowercase()` incl. `İ`, no case folding for `ß`). |
+| `readV3`, `readLegacy` | 2 + 3 | `androidArchivesReadLikeAndroid` | The binary fixtures read like `BackupReader` (ZipInputStream / GZIPInputStream + the legacy adapter). |
+
+Binary fixtures (same generator): `android-v3.pxpl` (every module, written like `BackupWriter`: ZipOutputStream,
+DEFLATED, data descriptors), `android-v3-stored.pxpl`, `android-v2-legacy.pxpl` (written like
+`AppDataBackupManager.encodePayload`), `android-v1-legacy.json.gz`, `android-v1-legacy.json`.
+
+### Swift-only tests added in stage 3e
+- `ChecksumTests` — CRC-32 check values, SHA-256 NIST vectors (incl. one million `a`), incremental hashing across block
+  boundaries, injected hasher.
+- `InflateTests` — JDK streams, stored-block round trips, hand-built fixed-Huffman blocks, every corrupt-stream error,
+  the output limit (incl. a zip bomb stopped early), consumed-byte reporting, 8 MB of back-references in linear time.
+- `GzipTests` — the Android legacy fixtures, concatenated members, trailing garbage ignored like `GZIPInputStream`,
+  FEXTRA/FNAME/FCOMMENT/FHCRC headers, corrupt header/trailer/truncation.
+- `ZipTests` — the Android archive with data descriptors, the local-header walk for an archive without a central
+  directory, writer round trip (UTF-8 names, empty entries), first-entry-wins duplicates, CRC/encryption/method/size
+  guards, ZIP64 refusal, CP437 names.
+- `BackupImportTests` — end-to-end import of every Android fixture into PixlModel/PixlLibrary values (song ids resolved
+  by metadata, skipped settings reported, unresolved songs counted), selected-module import, PixlAudio's own backups
+  (pass Android's validators, round trip, resolve after a reinstall by metadata), `BackupManager.export` through
+  handlers, restore progress, partial failure when a rollback fails, snapshot failure, checksum mismatch.
+- `JavaNumberTextTests`, `GsonSemanticsTests`, `PreferenceTests` (coercions of `importPreferencesFromBackup`, the key
+  catalogue, clear scopes, export filters, preset fallbacks), `PlaylistsModuleTests` (legacy array, pending
+  resolution, export filters/metadata, Base64), `DataModuleTests` (Gson tree-reader numbers for lyrics rows, safe file
+  names, numeric ids for PixlAudio songs, Kotlin non-null failures), `ContainerValidationTests` (file checks, path
+  traversal, unexpected entries, oversized manifest, compression ratio bomb, reader messages, history list rules,
+  progress).
+
+### Deviations (documented in the sources)
+- **Gson's lenient-only syntax** (comments, single-quoted strings, unquoted names, `;`/`=` separators) is rejected;
+  unquoted values and case-insensitive `true/false/null` are accepted as Gson does. Android never writes the former.
+- **Kotlin null-safety failures** become `BackupError`s with English messages: where Gson leaves a null in a non-null
+  Kotlin field and Android later crashes (Room NOT NULL, `Intrinsics` checks, DataStore), the Swift restore fails the
+  module with a message instead (same outcome: the module fails and is rolled back). A null `modules` map or an empty
+  manifest document is an error at read/validation time instead of a later `NullPointerException`.
+- **Nullable fields kept optional** in the Android record types (`AndroidBackup.*`), so re-encoding is byte-identical;
+  conversion to PixlModel values fills Kotlin's defaults (`source` "LOCAL", ids/names "", null song ids dropped,
+  unknown transition enums → OVERLAP/S_CURVE when converting, but the transitions restore rejects them like Room).
+  `SongMetadataEntry` null strings compare as "" (Android would throw).
+- **Playlist covers**: Android writes `playlist_cover_<id>.jpg` and stores its path; PixlBackup returns the decoded
+  bytes and clears `coverImageUri` (a path from another device is meaningless) — the app writes the file and sets the URI.
+- **Song ids**: Android resolves only playlist songs by metadata; PixlBackup applies the same resolver to favourites,
+  lyrics, engagement, history and transition rules using the playlists' `songMetadata` (the only metadata in an Android
+  backup), dropping and counting what it cannot match. Legacy (v1/v2) playlists keep their ids, as on Android.
+- **Backups PixlAudio writes** stay readable by Android: stored ZIP entries, the same module JSON, plus a `pixlSongId`
+  member on favourites/lyrics rows (Android's Gson ignores it) with a stable positive numeric `songId`
+  (2⁵²…2⁵³−1 from FNV-1a 64), and `songMetadata` for every song any module references.
+- **Settings**: preference entries are classified by `AndroidPreferenceCatalog`; only portable keys are applied, the
+  rest are reported (Android-only, per-device state, id-keyed, unknown). Android applies every entry.
+- **Containers**: the reader opens the archive once and uses the central directory (walking local headers only when
+  there is none); `ZipInputStream` always walks local headers. They differ only for malformed archives. Archive-level
+  error messages are PixlBackup's, not Java's.
+- **`ContentSanitizer`**: a surrogate pair cut by the length limit loses its dangling high surrogate (Java keeps a lone
+  surrogate, which Swift strings cannot hold).
+- **`Float/Double.toString`** for subnormal values: Java's "two digits when the shortest has one" rule is not applied
+  (`Double.MIN_VALUE` prints `5.0E-324`, Java `4.9E-324`); backups never contain subnormals.
+- **Maps** in the array-of-pairs form with a null key are rejected (Gson would store a null key).
+- **Restore plans** list modules as arrays in manifest order (Android: insertion-ordered sets); restore/inspect still
+  process them in key order like Android.
+
+## Integration B notes
+- `ReplayGainValues` (defined in both PixlAudioCore and PixlTags) and `AiUsageRecord` (PixlNet and PixlBackup) now
+  live once in PixlModel (`SharedRecords.swift`), so the app, which imports every module, never meets two same-named
+  types. Each pair was the same Android entity; the merged types keep the superset (Codable, `id` defaulting to 0).
+- No stage left a test disabled pending another stage. `InteropDumpTests` (PixlTags) stays opt-in by design
+  (`PIXLTAGS_DUMP_DIR`).
+- Full local PixlCore run after the merge: 953 tests (Foundation 29, Model 47, Lyrics 289, Library 122, AudioCore 105,
+  Tags 73, Net 145, Backup 143), all passing on Windows.
+
 ## Priority list (from architecture §4, must pass on Windows before UI work)
 - ~~`LyricsEngineTest`, `LyricsClockTest`, `LyricsMotionMathTest`, `PreparedLyricsBuilderTest`,
   `LyricsBackgroundGradeTest` → PixlLyrics / PixlFoundation (stages 2b/2c).~~ Done (integration A).
 - ~~`ArtistParsingUtilsTest`, album grouping, folder tree, queue utils → PixlLibrary (stage 3a).~~ Done (integration A).
-- Transition controller / curves, ReplayGain, sleep timer, audio-focus policy → PixlAudioCore (stage 3b).
-- TrackMatcher, InnerTube parsing, Spotify token rotation → PixlNet (stage 3c).
-- Backup validators/sanitizer → PixlBackup (stage 3e).
+- ~~Transition controller / curves, ReplayGain, sleep timer, audio-focus policy → PixlAudioCore (stage 3b).~~ Done (integration B).
+- ~~TrackMatcher, InnerTube parsing, Spotify token rotation → PixlNet (stage 3c).~~ Done (integration B).
+- ~~Backup validators/sanitizer → PixlBackup (stage 3e).~~ Done (integration B).
 
 ## App tests (XCTest, not ported from Android)
 | Test | Covers |

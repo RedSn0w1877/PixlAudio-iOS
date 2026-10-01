@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import PixlModel
 @testable import PixlTags
 
 /// Files written by a real third-party tagger (FFmpeg 8 / Lavf 62: ID3v2.4, ID3v2.3 + ID3v1, FLAC with a PICTURE

@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import PixlModel
 @testable import PixlTags
 
 @Suite("Metadata mapping and editing")

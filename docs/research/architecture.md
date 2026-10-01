@@ -46,7 +46,7 @@ Packages/PixlCore/  Package.swift (swift-tools 6.2, ZERO dependencies)
           PixlNet         HTTPClient protocol, InnerTube contexts/requests/parsing, AAC format selection, TrackMatcher,
                           cipher-regex extraction, Piped, Spotify endpoints/PKCE (SHA-256 injected), token rotation,
                           Google device flow, AMLL/NetEase/LRCLIB, Gemini/OpenAI codecs, prompt engine, DJ intent parser
-          PixlBackup      Android .pxpl manifest/modules, validators, sanitizer, zip/gzip containers (inflate injected)
+          PixlBackup      Android .pxpl manifest/modules, validators, sanitizer, zip/gzip containers (pure-Swift inflate)
   Tests/<Module>Tests + Fixtures/ (copied from Android app/src/test/resources where relevant)
 AppTests/   UITests/ (ScreenshotTests, PerfTests)
 ci/ (parse-check.ps1, check-forbidden.sh, xcerrors.sh, make-ipa.sh, export-shots.sh, frames.swift, ml/*.py)
@@ -128,7 +128,7 @@ remote/config.json (InnerTube client profiles, announcements; fetched from raw.g
 | AI Gemini/OpenAI-compatible/Gemma | URLSession REST (keys in Keychain) / Foundation Models (`@Generable` playlists; availability-gated) |
 | AI playlists, daily mix, DJ, usage, cache | Ported prompt engine + intent parser; AICache/AIUsage records |
 | Stats, recommendations, Daily Mix | PixlLibrary + Swift Charts |
-| Backup/restore | PixlBackup; **imports Android .pxpl** (zip parsed in Swift, inflate via Compression framework) |
+| Backup/restore | PixlBackup; **imports Android .pxpl** (zip/gzip and inflate in pure Swift: no zlib/Compression on Windows) |
 | Cast | AirPlay (`AVRoutePickerView`) |
 | Wear OS | Apple Watch built-in Now Playing; watchOS app deferred |
 | Glance widgets, QS tile | Deferred (extensions unreliable under free signing); system Now Playing + **App Intents** shortcuts (no extension) |

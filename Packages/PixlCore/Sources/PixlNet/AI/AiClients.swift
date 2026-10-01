@@ -175,16 +175,7 @@ public protocol AiResponseCaching: Sendable {
     func store(hash: String, response: String, timestampMs: Int64) async
 }
 
-/// One usage row (`AiUsageEntity`).
-public struct AiUsageRecord: Sendable, Hashable, Codable {
-    public var timestamp: Int64
-    public var provider: String
-    public var model: String
-    public var promptType: String
-    public var promptTokens: Int
-    public var outputTokens: Int
-    public var thoughtTokens: Int
-}
+// One usage row (`AiUsageEntity`) is PixlModel's `AiUsageRecord`, shared with PixlBackup.
 
 /// Records usage (`AiUsageDao`).
 public protocol AiUsageRecording: Sendable {

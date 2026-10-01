@@ -3,17 +3,9 @@
 
 import Foundation
 import PixlFoundation
+import PixlModel
 
-/// Track and album gain read from tags (Android `ReplayGainManager.ReplayGainValues`).
-public struct ReplayGainValues: Sendable, Hashable {
-    public var trackGainDb: Float?
-    public var albumGainDb: Float?
-
-    public init(trackGainDb: Float? = nil, albumGainDb: Float? = nil) {
-        self.trackGainDb = trackGainDb
-        self.albumGainDb = albumGainDb
-    }
-}
+// `ReplayGainValues` (Android `ReplayGainManager.ReplayGainValues`) lives in PixlModel, shared with PixlAudioCore.
 
 /// How an edit changes one ReplayGain field (Android's private `ReplayGainUpdate`).
 public enum ReplayGainUpdate: Sendable, Hashable {

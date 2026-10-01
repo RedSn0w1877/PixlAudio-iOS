@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import PixlModel
 @testable import PixlAudioCore
 
 /// Swift tests for the ReplayGain port (Android has no unit test for ReplayGainManager/ReplayGainProcessor; the
