@@ -53,7 +53,17 @@ final class DualDeckEngineTests: XCTestCase {
         let second = try XCTUnwrap(engine.active.upcoming.first)
         XCTAssertEqual(second.entry.song.id, "f:b")
 
-        let advanced = await waitUntil(timeout: 6) { engine.queue.currentIndex == 1 && engine.activeItem === second }
+        // Sample (host time, item, timebase position) through the join. The timebase follows the audio clock, so
+        // extrapolating A's end and B's start from these pairs measures the gap the listener hears.
+        var samples: [(host: Double, item: DeckItem?, position: Double)] = []
+        let deadline = Date().addingTimeInterval(6)
+        while Date() < deadline {
+            let item = engine.activeItem
+            samples.append((host: seconds(mach_absolute_time()), item: item, position: item?.positionSeconds ?? 0))
+            if item === second, (item?.positionSeconds ?? 0) > 0.6 { break }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        let advanced = engine.queue.currentIndex == 1 && engine.activeItem === second
         XCTAssertTrue(advanced)
         let rendered = await waitUntil(timeout: 3) { second.tap.processedFrames.load(ordering: .relaxed) > 4_410 }
         XCTAssertTrue(rendered)
@@ -62,18 +72,30 @@ final class DualDeckEngineTests: XCTestCase {
         XCTAssertEqual(transitions.last?.automatic, true)
         XCTAssertTrue(engine.idle.items.isEmpty, "no second deck involved")
 
+        func median(_ values: [Double]) -> Double? {
+            guard !values.isEmpty else { return nil }
+            return values.sorted()[values.count / 2]
+        }
+        let aEnd = try XCTUnwrap(median(samples.filter { $0.item === first && $0.position > 0.2 && $0.position < 1.4 }
+            .map { $0.host + (1.5 - $0.position) }), "no samples while A played")
+        let bStart = try XCTUnwrap(median(samples.filter { $0.item === second && $0.position > 0.1 && $0.position < 0.6 }
+            .map { $0.host - $0.position }), "no samples while B played")
+        XCTAssertEqual(bStart - aEnd, 0, accuracy: 0.06, "gap between the songs on the player clock: \(bStart - aEnd) s")
+
         // The first item was rendered to its end…
         let rate = first.tap.sampleRate.load()
         XCTAssertGreaterThan(rate, 0)
-        XCTAssertEqual(Double(first.tap.processedFrames.load(ordering: .relaxed)), 1.5 * rate, accuracy: 2_048)
-        // …and the second followed straight on (same render stream: no gap between their buffers).
+        XCTAssertEqual(first.tap.processedMediaTime.load(), 1.5, accuracy: 0.05)
+        // …and the second item's tap started at its first frame.
         let firstLog = try XCTUnwrap(first.tap.log?.snapshot())
         let secondLog = try XCTUnwrap(second.tap.log?.snapshot())
         let lastOfFirst = try XCTUnwrap(firstLog.last), firstOfSecond = try XCTUnwrap(secondLog.first)
         XCTAssertEqual(lastOfFirst.mediaTime + Double(lastOfFirst.frames) / rate, 1.5, accuracy: 0.05)
         XCTAssertEqual(firstOfSecond.mediaTime, 0, accuracy: 0.01)
-        let gap = seconds(firstOfSecond.hostTime &- lastOfFirst.hostTime) - Double(lastOfFirst.frames) / rate
-        XCTAssertLessThan(gap, 0.15, "gap between the songs: \(gap) s")
+        // Tap pulls run ahead of the output (the player drains A's queue with silent buffers), so the host-time
+        // distance between the last real pull of A and the first pull of B is informational only.
+        let pullGap = seconds(firstOfSecond.hostTime &- lastOfFirst.hostTime) - Double(lastOfFirst.frames) / rate
+        print("gapless: player-clock gap \(bStart - aEnd) s, tap pull gap \(pullGap) s")
     }
 
     // MARK: Crossfade
