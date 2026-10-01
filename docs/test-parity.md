@@ -535,3 +535,5 @@ Windows and macOS):
 | `TestToneWriterTests` | WAV header/size, tone not silent and not clipping |
 | `KeychainStoreTests` | set/read/delete round trip (skips if the simulator build lacks keychain entitlement) |
 | `UITests/ScreenshotTests` | shell: home, library, miniPlayer (album-tinted), miniPlayerAlone (bar hidden) × light/dark; search, settings, nowPlaying, diagnostics |
+| `SettingsFeatureTests` (stage 7d) | main settings order; equalizer: band moves switch to custom + clamp, save/update/rename/delete custom presets and pins, tabs = pinned built-ins + Custom, engine settings from the preferences (Android `EqualizerViewModel`); transitions: global duration from `crossfade_duration` clamped 1–12 s, global save round trip, playlist follow/override (Android `TransitionViewModel`), curve labels; update version comparison; delimiter defaults |
+| `UITests/SettingsScreenshotTests` (stage 7d) | settings (dark) and every category × light/dark; experimental, artists, delimiters, word delimiters, transitions × 2, licences, easter egg (menu + playing), equalizer graph mode |

@@ -224,8 +224,8 @@ nonisolated struct OfflineStorageUsage: Sendable, Equatable {
 
     static func measure() async -> OfflineStorageUsage {
         await Task.detached(priority: .utility) {
-            let downloads = downloadsDirectory.map(directoryUsage) ?? (0, 0)
-            let caches = cachesDirectory.map(directoryUsage) ?? (0, 0)
+            let downloads = downloadsDirectory.map(directoryUsage) ?? (bytes: 0, files: 0)
+            let caches = cachesDirectory.map(directoryUsage) ?? (bytes: 0, files: 0)
             return OfflineStorageUsage(downloadedBytes: downloads.bytes, downloadedCount: downloads.files,
                                        cachedBytes: caches.bytes)
         }.value

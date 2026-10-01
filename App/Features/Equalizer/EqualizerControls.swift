@@ -42,8 +42,8 @@ struct EqualizerVerticalSlider: View {
             context.fill(Path(ellipseIn: CGRect(x: size.width / 2 - width / 2, y: thumbY - width / 2,
                                                 width: width, height: width)), with: .color(active))
             let rect = CGRect(x: left, y: thumbY, width: width, height: max(size.height - thumbY, 0))
-            context.fill(Path(UnevenRoundedRectangle(bottomLeadingRadius: width / 2, bottomTrailingRadius: width / 2)
-                .path(in: rect)), with: .color(active))
+            context.fill(UnevenRoundedRectangle(bottomLeadingRadius: width / 2, bottomTrailingRadius: width / 2)
+                .path(in: rect), with: .color(active))
             var thumb = context
             thumb.translateBy(x: size.width / 2, y: thumbY)
             thumb.rotate(by: .degrees(normalized * 360))
