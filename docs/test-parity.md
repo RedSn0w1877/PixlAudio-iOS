@@ -519,6 +519,12 @@ Windows and macOS):
 - Where WSMeans would index past its cluster array (more starting clusters than distinct pixels), Java throws and
   Android's `runCatching` returns `DarkColorScheme.primary` (`0xFFAB47BC`); the port returns the same seed.
 
+## Stage 7a — Library and detail screens
+| Android test (class) | Cases | Swift test | Module | Status | Notes |
+|---|---|---|---|---|---|
+| `ui/theme/GenreThemeUtilsTest` | 3 | `LibraryScreensTests.testGenreDetailScheme…` / `testUnknownGenreUsesTheMonochromeScheme` (+ Java `hashCode` index case) | App (`GenreTheme`) | ported | Compares all 48 roles through `ColorRoles` equality instead of a role list. |
+| `presentation/viewmodel/PlayerViewModelTest` | — | — | — | n/a | Covers PlayerViewModel playback plumbing, not the Library screens; stage 5/8 territory. |
+
 ## Priority list (from architecture §4, must pass on Windows before UI work)
 - ~~`LyricsEngineTest`, `LyricsClockTest`, `LyricsMotionMathTest`, `PreparedLyricsBuilderTest`,
   `LyricsBackgroundGradeTest` → PixlLyrics / PixlFoundation (stages 2b/2c).~~ Done (integration A).
@@ -535,3 +541,5 @@ Windows and macOS):
 | `TestToneWriterTests` | WAV header/size, tone not silent and not clipping |
 | `KeychainStoreTests` | set/read/delete round trip (skips if the simulator build lacks keychain entitlement) |
 | `UITests/ScreenshotTests` | shell: home, library, miniPlayer (album-tinted), miniPlayerAlone (bar hidden) × light/dark; search, settings, nowPlaying, diagnostics |
+| `LibraryScreensTests` (stage 7a) | genre colours/schemes; `OrderedSelection` order and select-all; `LibraryPreferences` per-playlist song order (`playlist_song_order_modes`, `"manual"`), sort keys, storage-filter cycle; playlist cover form (saved fields per tab, edit-mode tab choice); `LibraryModel.compute` sorting/filtering/folder tree on the demo library; folder-playlist ids; artist album sections; genre list grouping; M3U file names |
+| `UITests/LibraryScreenshotTests` (stage 7a) | Library tabs (playlists, albums grid/list, artists, folders, liked), selection, sort, reorder tabs, song multi-selection, creation chooser, add to playlist; song options (options + info pages); album, artist, genre (+ sort sheet), folder explorer; playlist detail (+ reorder/remove modes, options, add songs), playlist editor (create, edit with the Icon tab) |

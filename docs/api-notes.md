@@ -233,6 +233,26 @@ Proven on the `xcode-27` lane by the stage-4 build (fallback lane: its next week
 | `UserDefaults(suiteName:)`, `removePersistentDomain(forName:)`, `object(forKey:)` | 7 | /documentation/foundation/userdefaults | `SettingsStore` | Android preference keys; isolated suite for UI tests. |
 | `AsyncStream.makeStream(of:bufferingPolicy:)` | 17 (Swift 5.9) | /documentation/swift/asyncstream/makestream(of:bufferingpolicy:) | `DemoPlaybackEngine` | Engine → store events. |
 
+## Stage 7a — Library, detail and playlist screens
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `View.containerRelativeFrame(_:)`, `scrollTargetLayout()`, `scrollTargetBehavior(.paging)`, `scrollPosition(id:anchor:)` | 17 | /documentation/swiftui/view/scrollposition(id:anchor:) | `LibraryView` pager | Android `HorizontalPager` of the tab pages; the selected tab and the page stay in sync through the bound id. |
+| `ScrollViewReader` / `ScrollViewProxy.scrollTo(_:anchor:)` | 14 | /documentation/swiftui/scrollviewreader | tab row, pager, locate button, breadcrumbs | |
+| `View.onScrollGeometryChange(for:of:action:)`, `ScrollGeometry` (`contentOffset`, `contentInsets`) | 18 | /documentation/swiftui/view/onscrollgeometrychange(for:of:action:) | `trackingHeaderScroll` (detail headers) | Only the header reads the offset (`HeaderScrollState`), so scrolling never re-renders the list. |
+| `View.onScrollVisibilityChange(threshold:_:)` | 18 | /documentation/swiftui/view/onscrollvisibilitychange(threshold:_:) | Songs page | Shows the locate button only while the current song is off screen (Android `LibraryActionRow`). |
+| `View.refreshable(action:)` | 15 | /documentation/swiftui/view/refreshable(action:) | Library pages | Android pull-to-refresh → `LibraryStore.refresh()`. |
+| `View.fileImporter(isPresented:allowedContentTypes:onCompletion:)`, `UTType.m3uPlaylist`, `.plainText`, `URL.startAccessingSecurityScopedResource()` | 14 | /documentation/swiftui/view/fileimporter(ispresented:allowedcontenttypes:oncompletion:) | Library › Playlists › Import | M3U import (PixlLibrary `M3U.parse`). |
+| `ShareLink(item:label:)`, `ShareLink(items:label:)` | 16 | /documentation/swiftui/sharelink | song options, multi-selection, playlist options | Share song files / export `.m3u` (temporary file). |
+| `View.draggable(_:)`, `View.dropDestination(for:action:isTargeted:)` | 16 | /documentation/swiftui/view/dropdestination(for:action:istargeted:) | playlist custom order, tab reorder, playlist song reorder | Android `ReorderableItem` drag handles; the payload is the item id (`String` is `Transferable`). |
+| `View.confirmationDialog(_:isPresented:titleVisibility:actions:)`, `alert(_:isPresented:actions:message:)` with a `TextField` | 15 / 16 | /documentation/swiftui/view/alert(_:ispresented:actions:message:)-8dvt8 | delete confirmations, merge / new playlist names | Android `AlertDialog`s. |
+| `contentTransition(.numericText())`, `contentTransition(.symbolEffect(.replace))` | 16 / 17 | /documentation/swiftui/contenttransition | selection count, storage-filter icon | |
+| `Color.mix(with:by:in:)` | 18 | /documentation/swiftui/color/mix(with:by:in:) | genre header | Android `lerp` of the header content colour. |
+| `LazyVGrid`, `GridItem(.flexible / .adaptive)` | 14 | /documentation/swiftui/lazyvgrid | albums grid, quick-fill genres, editor colours/icons | Android `LazyVerticalGrid` / `FlowRow`. |
+| `PhotosPicker(selection:matching:label:)`, `PhotosPickerItem.loadTransferable(type:)` (PhotosUI) | 16 | /documentation/photosui/photospicker | playlist editor cover | Android `GetContent()`; the data is copied to Application Support/PlaylistCovers. No photo-library permission is needed (out-of-process picker). |
+| `Slider(value:in:step:)`, `ProgressView(value:)`, `Toggle` | 13–14 | /documentation/swiftui/slider | shape parameters, lyric-sync card, sort sheet toggles | System controls (Material `Slider` / `Switch` → native). |
+| `View.scrollDismissesKeyboard(_:)`, `submitLabel(_:)`, `monospacedDigit()` | 16 / 15 / 15 | /documentation/swiftui/view/scrolldismisseskeyboard(_:) | song picker, editor | |
+| `View.onLongPressGesture(minimumDuration:perform:)` | 13 | /documentation/swiftui/view/onlongpressgesture(minimumduration:maximumdistance:perform:onpressingchanged:) | song cards, album cards, playlist rows | Android long press → multi-selection. |
+
 ## Testing and tooling
 | API / tool | Docs | Notes |
 |---|---|---|

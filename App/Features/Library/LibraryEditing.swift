@@ -151,7 +151,8 @@ struct LibraryEditor {
         var snapshot = store.snapshot
         guard let index = snapshot.playlists.firstIndex(where: { $0.id == playlist.id }) else { return }
         snapshot.playlists[index] = updated
-        commit(snapshot) { try await $0.upsertPlaylist(updated, smartRuleKey: nil) }
+        let saved = updated
+        commit(snapshot) { try await $0.upsertPlaylist(saved, smartRuleKey: nil) }
     }
 
     func deletePlaylists(_ ids: [String]) {
