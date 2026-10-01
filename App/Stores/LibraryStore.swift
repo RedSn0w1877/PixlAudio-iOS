@@ -60,6 +60,12 @@ final class LibraryStore {
         apply(try await loader.loadFromStore(previous: snapshot))
     }
 
+    /// Re-reads the store after another writer changed it (stage 12: Spotify rows merged into the library).
+    func reloadFromStore() async {
+        guard let loader, let fresh = try? await loader.loadFromStore(previous: snapshot) else { return }
+        apply(fresh)
+    }
+
     func apply(_ newSnapshot: LibrarySnapshot) {
         guard newSnapshot != snapshot || isLoading else { return }
         songsById = Dictionary(newSnapshot.songs.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })

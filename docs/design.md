@@ -223,6 +223,33 @@ Stage 7c adds `-searchFilter all|songs|albums|artists|playlists`
 (with `-screen search -searchQuery <q>`) and the shots searchEmpty, searchTyping, searchAll, searchSongs, searchAlbums,
 searchArtists, searchPlaylists, searchNoResults (light + dark; `UITests/SearchScreenshotTests.swift`).
 
+## Stage 12 notes (Spotify)
+
+- **Screens:** `AccountsView` (Android `AccountsScreen`, on `SettingsScaffold`), `SpotifyDashboardView` and
+  `SpotifyBrowseView` (Android `SpotifyDashboardScreen` / `SpotifyBrowseScreen`, on `SpotifyScaffold` — the plain
+  64 pt `TopAppBar` with the glass back circle, glass filling in once content scrolls under it). Cards are glass in
+  Android's radii (30/28/24/20/16) tinted with their `surfaceContainer*` role (`GlassTint.surface`) or
+  `errorContainer`/`secondaryContainer` (`GlassTint.container`); tiles, chips and buttons sitting on a card are fills
+  (`SpotifyFilledButton`, `SpotifyOutlinedButton`); standalone buttons (Browse, Add whole album) are green glass
+  capsules. Spotify green `0xFF1DB954` and YouTube red stay as on Android.
+- **Seams:** `SpotifyService` (in `AppEnvironment.spotify`) owns the state and updates `AccountsStore.spotify`.
+  YouTube goes through `SpotifyYouTubeBridge` (search for the matcher, the URL for a matched video, a stream
+  resolution for "Test playback"); `PixlNetYouTubeBridge` works alone (anonymous InnerTube, pre-signed client chain)
+  until stage 11 passes its own. `SpotifyPlayableURLResolver` wraps the engine's resolver (keep it outermost): a
+  `spotify://<id>` song plays its matched video as a `yt:<videoId>` song (`pixlstream://<videoId>`) through the inner
+  resolver, else a direct pre-signed URL. Search's Spotify section is `SpotifyCatalogSearchProvider`.
+- **Data:** the Spotify tables are `SpotifySongRecord` / `SpotifyPlaylistRecord` (SchemaV1, unchanged);
+  `PersistenceActor` implements PixlNet's `SpotifyLibraryStore` and writes the unified rows (`sp:<id>` songs, albums /
+  artists in Android's negative id bands, `spotify_playlist:<id>` playlists with source `SPOTIFY`) after every sync
+  flush; local rescans never touch them.
+- **Background:** `.backgroundTask(.appRefresh("io.github.redsn0w1877.pixlaudio.spotify-sync"))` in `PixlAudioApp`:
+  a resumable sync slice when the last complete sync is > 12 h old, then a matching slice (~22 s in all).
+
+Stage 12 screenshot ids (signed out on the plain ids; demo data, no network): `accounts`, `accounts.signedIn`,
+`spotifyDashboard`, `spotifyDashboard.signedIn`, `spotifyDashboard.tested` (with a playback test report),
+`spotifyBrowse` (home: top artists and songs), `spotifyBrowse.results` (query "Luma"), `spotifyBrowse.artist`,
+`spotifyBrowse.album`. Shots: `UITests/SpotifyScreenshotTests`.
+
 ## Integration notes (run 3: stages 5, 6, 7a–7d merged)
 
 How the stages meet now that they share one `main`:

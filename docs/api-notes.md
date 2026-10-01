@@ -522,6 +522,19 @@ Signatures checked against the developer.apple.com documentation JSON (2026-10-0
 | `UIViewRepresentable` (`makeCoordinator`, `makeUIView`, `updateUIView`) | 13 | /documentation/swiftui/uiviewrepresentable | `YouTubeSignInWebView` | |
 | `Environment.init(_:)` for an optional `Observable` object (`@Environment(T.self) var x: T?`) | 17 | /documentation/swiftui/environment/init(_:)-8slkf | `SongCard` (`DownloadBadges`) | nil where no badge model is injected (previews). |
 
+## Stage 12 — Spotify
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `EnvironmentValues.webAuthenticationSession`, `WebAuthenticationSession.authenticate(using:callbackURLScheme:preferredBrowserSession:)`, `WebAuthenticationSession.BrowserSession.shared` | 16.4 | /documentation/authenticationservices/webauthenticationsession/authenticate(using:callbackurlscheme:preferredbrowsersession:) | `SpotifyDashboardView`, `AccountsView` | ASWebAuthenticationSession through SwiftUI (no presentation anchor). Callback scheme `pixlaudio` (`pixlaudio://spotify-callback`); the shared browser session keeps the user's Spotify login like Android's Custom Tabs. Throws on cancel. |
+| `Scene.backgroundTask(_:action:)`, `BackgroundTask.appRefresh(_:)` | 16 | /documentation/swiftui/scene/backgroundtask(_:action:) | `PixlAudioApp` | Handler for `io.github.redsn0w1877.pixlaudio.spotify-sync` (listed in `BGTaskSchedulerPermittedIdentifiers`; needs `UIBackgroundModes: fetch`). SwiftUI registers the identifier — no `BGTaskScheduler.register`. |
+| `BGTaskScheduler.shared.submit(_:)`, `cancel(taskRequestWithIdentifier:)`, `BGAppRefreshTaskRequest(identifier:)`, `BGTaskRequest.earliestBeginDate` | 13 | /documentation/backgroundtasks/bgtaskscheduler/submit(_:) | `SpotifyService.scheduleBackgroundRefresh` | Next refresh ≥ 6 h out; a sync runs only when the last complete one is > 12 h old (~22 s budget per run). |
+| `SecRandomCopyBytes(_:_:_:)`, `kSecRandomDefault` | 2 | /documentation/security/secrandomcopybytes(_:_:_:) | `SpotifyPlatform.randomBytes` | PKCE verifier and `state`. |
+| `SHA256.hash(data:)` (CryptoKit) | 13 | /documentation/cryptokit/sha256 | `SpotifyPlatform.sha256` | PKCE `code_challenge` (RFC 7636 vector in `SpotifyTests`) and synthetic YouTube Music ids, injected into PixlNet. |
+| `ModelContext.transaction(block:)` | 17 | /documentation/swiftdata/modelcontext/transaction(block:) | `PersistenceActor.replaceSongs(playlistId:with:)` | Delete + insert of a playlist's rows commit together (Android `@Transaction replaceSongsForPlaylist`). |
+| `LazyHStack(alignment:spacing:)` in a horizontal `ScrollView` | 14 | /documentation/swiftui/lazyhstack | `SpotifyBrowseView` artist bubbles | Android `LazyRow`. |
+| `Animation.repeatForever(autoreverses:)` | 13 | /documentation/swiftui/animation/repeatforever(autoreverses:) | `SpotifyIndeterminateProgress` | Runs only while the loading line is on screen. |
+| `InsettableShape.strokeBorder(_:lineWidth:antialiased:)` | 17 | /documentation/swiftui/insettableshape/strokeborder(_:linewidth:antialiased:) | `SpotifyOutlinedButton` | Material `OutlinedButton` outline. |
+
 ## Testing and tooling
 | API / tool | Docs | Notes |
 |---|---|---|

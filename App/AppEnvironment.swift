@@ -38,6 +38,8 @@ final class AppEnvironment {
     let sleepTimer: SleepTimerController
     /// Stage 11: YouTube session, streaming loader, downloads, YouTube Music search (demo variant in UI tests).
     let youtube: YouTubeServices
+    /// Spotify account, library sync, YouTube matching and catalogue (stage 12).
+    let spotify: SpotifyService
 
     init(launch: LaunchConfiguration) {
         self.launch = launch
@@ -83,6 +85,8 @@ final class AppEnvironment {
             let library = LibraryStore(snapshot: DemoLibrary.snapshot)
             self.library = library
             youtube = YouTubeServices(launch: launch, library: library, persistence: persistence, accounts: accounts)
+            let spotify = SpotifyService(launch: launch, accounts: accounts, persistence: persistence)
+            self.spotify = spotify
             libraryImporter = nil
             libraryAutoRefresh = nil
             searchProviders = [.library: LibrarySearchProvider(),
@@ -105,8 +109,18 @@ final class AppEnvironment {
             let youtube = YouTubeServices(launch: launch, library: library, persistence: persistence, accounts: accounts)
             self.youtube = youtube
             youtube.install(on: realPlayback)
+            // Stage 12 on stage 11: Spotify matches and plays through the YouTube session (signed-in search, the
+            // JavaScriptCore cipher + Piped chain, the `pixlstream://` loader and downloads).
+            let spotify = SpotifyService(launch: launch, accounts: accounts, persistence: persistence,
+                                         bridge: youtube.service.map { InnerTubeSpotifyBridge(service: $0) })
+            self.spotify = spotify
+            // Spotify songs (`spotify://<id>`) play their YouTube match; this stays the outermost resolver (after
+            // stage 11's streaming resolver) so other songs reach the inner ones unchanged.
+            if let realPlayback {
+                realPlayback.engine.factory.resolver = spotify.playableURLResolver(base: realPlayback.engine.factory.resolver)
+            }
             searchProviders = [.library: LibrarySearchProvider(),
-                               .spotify: UnavailableSearchProvider(source: .spotify),
+                               .spotify: SpotifyCatalogSearchProvider(service: spotify),
                                .youtubeMusic: youtube.searchProvider ?? (UnavailableSearchProvider(source: .youtubeMusic) as any SearchProviding)]
         }
     }
@@ -117,9 +131,13 @@ final class AppEnvironment {
         guard !launch.isUITest else { return }
         playbackServices?.start()
         youtube.start()
+        let library = self.library, playback = self.playback
+        spotify.attach(reloadLibrary: { await library.reloadFromStore() }, isPlaybackActive: { playback.isPlaying })
+        spotify.songLookup = { library.song(id: $0) }
         await library.load()
         playbackServices?.restoreQueue(lookup: library.song(id:))
         libraryAutoRefresh?.start()
+        await spotify.start()
     }
 
     /// Call after music-library access was granted so its change notifications start.
