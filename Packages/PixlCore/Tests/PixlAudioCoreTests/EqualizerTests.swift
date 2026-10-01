@@ -140,7 +140,7 @@ struct EqualizerTests {
 
     @Test func processorBypassesAndBoundsItsOutput() {
         var processor = EqualizerProcessor()
-        var samples: [Float] = (0..<512).map { Float(sin(Double($0) * 0.05)) * 0.9 }
+        var samples: [Float] = (0..<512).map { (i: Int) -> Float in Float(sin(Double(i) * 0.05)) * 0.9 }
         let original = samples
         samples.withUnsafeMutableBufferPointer { processor.process($0.baseAddress!, frames: 256) }
         #expect(samples == original)

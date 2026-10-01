@@ -34,7 +34,11 @@ public enum ReplayGain {
     /// value of a key counts). Returns nil when neither is present.
     public static func values(fromTags tags: [String: [String]]) -> ReplayGainValues? {
         var upper: [String: [String]] = [:]
-        for (key, value) in tags where upper[key.uppercased()] == nil { upper[key.uppercased()] = value }
+        // A key already in upper case wins over spellings that only differ in case (deterministic).
+        for (key, value) in tags {
+            let normalized = key.uppercased()
+            if normalized == key || upper[normalized] == nil { upper[normalized] = value }
+        }
         let track = extractGainValue(upper, keys: trackGainKeys)
         let album = extractGainValue(upper, keys: albumGainKeys)
         if track == nil && album == nil { return nil }

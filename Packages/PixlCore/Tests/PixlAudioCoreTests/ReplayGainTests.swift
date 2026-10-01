@@ -27,6 +27,9 @@ struct ReplayGainTests {
         let tags = ["replaygain_track_gain": ["-7.10 dB"], "REPLAYGAIN_ALBUM_GAIN": ["-8.20 dB", "ignored"]]
         #expect(ReplayGain.values(fromTags: tags) == ReplayGainValues(trackGainDb: -7.1, albumGainDb: -8.2))
         #expect(ReplayGain.values(fromTags: ["TITLE": ["x"]]) == nil)
+        // The upper-case spelling wins over a case variant, whatever the dictionary order.
+        let mixed = ["replaygain_track_gain": ["-1 dB"], "REPLAYGAIN_TRACK_GAIN": ["-4 dB"], "Replaygain_Track_Gain": ["-9 dB"]]
+        #expect(ReplayGain.values(fromTags: mixed)?.trackGainDb == -4)
         // The _DB variant is the second choice.
         #expect(ReplayGain.values(fromTags: ["REPLAYGAIN_TRACK_GAIN_DB": ["-2"]])?.trackGainDb == -2)
         // An empty value list falls through to the next key…

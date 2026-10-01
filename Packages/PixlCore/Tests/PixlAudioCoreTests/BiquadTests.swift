@@ -58,7 +58,11 @@ struct BiquadTests {
         var cascade = BiquadCascade(sectionCount: 1, channelCount: 1)
         cascade.setCoefficients(c, at: 0)
         #expect(cascade.coefficients(at: 0) == c)
-        let input: [Float] = (0..<256).map { Float(sin(Double($0) * 0.37) * 0.5 + (($0 == 3) ? 0.4 : 0)) }
+        let input: [Float] = (0..<256).map { (i: Int) -> Float in
+            let tone: Double = sin(Double(i) * 0.37) * 0.5
+            let click: Double = i == 3 ? 0.4 : 0
+            return Float(tone + click)
+        }
         var output = input
         output.withUnsafeMutableBufferPointer { cascade.process($0.baseAddress!, frames: 256) }
         // Direct form I reference in Double.
@@ -78,7 +82,8 @@ struct BiquadTests {
         let frames = 9600
         var buffer = [Float](repeating: 0, count: frames * 2)
         for i in 0..<frames {
-            buffer[2 * i] = Float(sin(2 * Double.pi * 1000 * Double(i) / Self.fs) * 0.25)
+            let phase: Double = 2 * Double.pi * 1000 * Double(i) / Self.fs
+            buffer[2 * i] = Float(sin(phase) * 0.25)
             buffer[2 * i + 1] = 0 // the right channel stays silent: channels are independent
         }
         buffer.withUnsafeMutableBufferPointer { cascade.process($0.baseAddress!, frames: frames) }

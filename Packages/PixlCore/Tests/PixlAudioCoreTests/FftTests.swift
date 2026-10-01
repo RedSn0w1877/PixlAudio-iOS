@@ -6,9 +6,11 @@ import Testing
 @Suite("Fft")
 struct FftTests {
     static func signal(_ size: Int, _ seed: Int) -> [Float] {
-        (0..<size).map { index in
-            Float(sin(Double((index + 1) * (seed + 1)) * 0.017) * 0.65
-                + cos(Double((index + 3) * (seed + 2)) * 0.031) * 0.2)
+        (0..<size).map { (index: Int) -> Float in
+            let a: Double = Double((index + 1) * (seed + 1)) * 0.017
+            let b: Double = Double((index + 3) * (seed + 2)) * 0.031
+            let value: Double = sin(a) * 0.65 + cos(b) * 0.2
+            return Float(value)
         }
     }
 
