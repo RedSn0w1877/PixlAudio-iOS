@@ -61,7 +61,7 @@ private struct AboutHeroCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             Spacer().frame(height: 12)
-            Text(L10n.aboutVersionFormat(AppInfo.versionString))
+            Text(L10n.aboutVersionFormat(AppUpdateChecker.installedVersion))
                 .pixlFont(.labelLarge, weight: .semibold)
                 .foregroundStyle(theme.onTertiaryContainer)
                 .padding(.horizontal, 12)

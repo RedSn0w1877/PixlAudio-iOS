@@ -169,7 +169,7 @@ final class DeviceCapabilitiesModel {
         var maxRate: Int?
         var cloud = 0
         var local = 0
-        var unavailable = 0
+        let unavailable = 0
         var bytes: Int64 = 0
         let fm = FileManager.default
         for song in songs {
@@ -189,12 +189,10 @@ final class DeviceCapabilitiesModel {
                 maxRate = max(maxRate ?? 0, rate)
                 if rate > sampleRate { resampled += 1 }
             }
-            if song.path.hasPrefix("/") {
-                if let size = (try? fm.attributesOfItem(atPath: song.path))?[.size] as? NSNumber {
-                    bytes += size.int64Value
-                } else {
-                    unavailable += 1
-                }
+            // Sizes of the files we can read. Unreadable files aren't counted as "unavailable": folder files need
+            // their security scope opened first, so a failed read here doesn't mean the file is gone.
+            if song.path.hasPrefix("/"), let size = (try? fm.attributesOfItem(atPath: song.path))?[.size] as? NSNumber {
+                bytes += size.int64Value
             }
         }
         let formats = knownFormats.indices.map { i in

@@ -35,7 +35,6 @@ struct EasterEggView: View {
             withAnimation(.easeOut(duration: 0.36)) { visible = true }
             toast = L10n.easterEggThankYou
         }
-        .accessibilityIdentifier("screen.easterEgg")
     }
 
     /// Android header: `surfaceContainer` under the status bar.
@@ -44,6 +43,8 @@ struct EasterEggView: View {
             Image(systemName: "star.fill").font(.system(size: 17, weight: .semibold)).foregroundStyle(theme.primary)
             Spacer().frame(width: 8)
             Text(L10n.aboutAppName).pixlFont(.titleMedium, weight: .bold).foregroundStyle(theme.onSurface)
+                // The ready element sits on one view: an identifier on the root would override the children's.
+                .accessibilityIdentifier("screen.easterEgg")
             Spacer()
             Text(L10n.brickHigh(game.highScore))
                 .pixlFont(.labelMedium, weight: .semibold)
