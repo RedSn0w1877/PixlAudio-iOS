@@ -38,7 +38,8 @@ actor ArtworkSpriteBaker {
 
     /// The sprite set for `image` (any size; it is drawn into 96×96, aspect-filled) at the view's aspect ratio.
     /// `deterministic` fixes the initial angles (UI tests).
-    func spriteSet(key: String, image: CGImage, width: Int, height: Int, deterministic: Bool) -> LyricsSpriteSet? {
+    func spriteSet(key: String, image artwork: ArtworkImage, width: Int, height: Int, deterministic: Bool) -> LyricsSpriteSet? {
+        let image = artwork.cgImage
         let bucket = ArtworkSprites.aspectBucket(width: width, height: height)
         let cacheKey = "\(key)#\(bucket)"
         if let hit = cache[cacheKey] { return hit }

@@ -112,13 +112,13 @@ struct LyricsArtworkBackground: View {
 
     private func load() async {
         guard size.width > 0, size.height > 0 else { return }
-        let image: CGImage?
+        let image: ArtworkImage?
         let key: String
         if let overrideImage {
-            image = overrideImage
+            image = ArtworkImage(cgImage: overrideImage)
             key = "override"
         } else if let artSource {
-            image = await ArtworkPipeline.shared.image(artSource, pixelSize: ArtworkSprites.artTexels)?.cgImage
+            image = await ArtworkPipeline.shared.image(artSource, pixelSize: ArtworkSprites.artTexels)
             key = artSource.cacheKey
         } else {
             image = nil

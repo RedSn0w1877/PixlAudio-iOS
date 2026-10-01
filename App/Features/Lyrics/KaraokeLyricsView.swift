@@ -325,8 +325,8 @@ private struct KaraokeRowContainer: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(Text(verbatim: line.text))
                 .accessibilityAddTraits(.isButton)
-                .accessibilityAction(named: Text("Play from here"), onActivate)
-                .accessibilityAction(onActivate)
+                .accessibilityAction(named: Text("Play from here")) { onActivate() }
+                .accessibilityAction { onActivate() }
         case .interlude(let g0, let g1, let alignEnd):
             InterludeDotsRow(g0: g0, g1: g1, alignEnd: alignEnd, row: row, clock: clock, style: style)
                 .accessibilityHidden(true)
