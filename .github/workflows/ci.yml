@@ -82,16 +82,52 @@ jobs:
             -destination "id=$SIM_UDID" \
             -derivedDataPath build/DerivedData \
             2>&1 | tee build/build.log | xcbeautify --quieter
+      - name: xcodebuild options (diagnostics)
+        run: |
+          mkdir -p build/diag
+          xcodebuild -help > build/diag/xcodebuild-help.txt 2>&1 || true
+          man xcodebuild 2>/dev/null | col -b > build/diag/xcodebuild-man.txt || true
+          grep -nEi 'test|timeout|diagnos|result|parallel|relaunch|clone|destination' build/diag/xcodebuild-help.txt | head -150 || true
+          sysctl -n machdep.cpu.brand_string hw.ncpu hw.memsize || true
       - name: Unit tests
         run: |
           set -o pipefail
+          bash ci/diag-sampler.sh build/test.log build/diag >/dev/null 2>&1 &
+          SAMPLER=$!
+          trap 'kill $SAMPLER 2>/dev/null || true' EXIT
           xcodebuild test-without-building \
             -project PixlAudio.xcodeproj -scheme PixlAudio \
             -destination "id=$SIM_UDID" \
             -derivedDataPath build/DerivedData \
             -only-testing:PixlAudioTests \
             -resultBundlePath build/UnitTests.xcresult \
-            2>&1 | tee build/test.log | xcbeautify --quieter
+            -verbose \
+            2>&1 | bash ci/timestamp.sh | tee build/test.log
+      - name: Collect diagnostics
+        if: always()
+        run: |
+          mkdir -p build/diag
+          if [ -d build/UnitTests.xcresult ]; then
+            xcrun xcresulttool get log --path build/UnitTests.xcresult --type action > build/diag/action-log.json 2>&1 || true
+            xcrun xcresulttool get log --path build/UnitTests.xcresult --type console > build/diag/console-log.json 2>&1 || true
+            xcrun xcresulttool get test-results summary --path build/UnitTests.xcresult > build/diag/summary.json 2>&1 || true
+            du -sh build/UnitTests.xcresult; find build/UnitTests.xcresult -maxdepth 3 | head -50
+          fi
+          xcrun simctl spawn "$SIM_UDID" log show --last 25m --style compact \
+            --predicate 'process == "PixlAudio" OR process == "testmanagerd" OR process CONTAINS "xctest" OR process == "SpringBoard"' \
+            2>&1 | tail -c 30000000 > build/diag/sim-log.txt || true
+          ls -la build/diag
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diag-unit-${{ github.sha }}
+          path: |
+            build/UnitTests.xcresult
+            build/*.log
+            build/diag
+          retention-days: 5
+          if-no-files-found: ignore
       - name: Summarise errors
         if: failure()
         run: |
@@ -168,7 +204,7 @@ jobs:
             "${ONLY[@]}" \
             -retry-tests-on-failure -test-iterations 3 \
             -resultBundlePath build/Shots.xcresult \
-            2>&1 | tee build/shots.log | xcbeautify --quieter
+            2>&1 | bash ci/timestamp.sh | tee build/shots.log | xcbeautify
       - name: Export screenshots
         if: always()
         run: |
@@ -185,11 +221,13 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
       - name: Upload result bundle
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: shots-xcresult-${{ github.sha }}
-          path: build/Shots.xcresult
+          path: |
+            build/Shots.xcresult
+            build/shots.log
           retention-days: 5
           if-no-files-found: ignore
 
