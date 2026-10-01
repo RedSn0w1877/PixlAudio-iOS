@@ -355,6 +355,39 @@ Proven on the `xcode-27` lane by the stage-7c build (fallback lane: its next wee
 | `XCUIElement.typeText(_:)`, `XCUIApplication.textFields` | — | /documentation/xctest/xcuielement/typetext(_:) | `UITests/SearchScreenshotTests` | Typing screenshot. |
 | `View.onReceive(_:perform:)`, `NotificationCenter.publisher(for:object:)`, `UIResponder.keyboardWillShowNotification` / `keyboardWillHideNotification` | 13 / 13 / 2 | /documentation/swiftui/view/onreceive(_:perform:), /documentation/uikit/uiresponder/keyboardwillshownotification | `RootView` (shared shell, small change) | Bars step aside while the keyboard is up instead of riding above it — on Android they stay under the IME. |
 
+## Stage 7d — settings, equalizer, transitions, about, easter egg
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `View.onScrollGeometryChange(for:of:action:)`, `ScrollGeometry.contentOffset/contentInsets` | 18 | /documentation/swiftui/view/onscrollgeometrychange(for:of:action:) | `SettingsScaffold` | Collapsing header offset; read only by the header. |
+| `ScrollTargetBehavior.updateTarget(_:context:)`, `View.scrollTargetBehavior(_:)` | 17 | /documentation/swiftui/scrolltargetbehavior | `SettingsHeaderSnap` | Snap a mid-collapse release to expanded/collapsed (Android `animateTo`). |
+| `UIViewControllerRepresentable`, `UINavigationController.interactivePopGestureRecognizer`, `UIGestureRecognizerDelegate.gestureRecognizerShouldBegin(_:)` | 13 / 7 | /documentation/uikit/uinavigationcontroller/interactivepopgesturerecognizer | `SettingsBackSwipeEnabler` | Keeps the edge back swipe with the system bar hidden. |
+| `Group(subviews:transform:)`, `Subview` | 18 | /documentation/swiftui/group/init(subviews:transform:) | `SettingsGroup` | Corner radii by position in a group. |
+| `Layout` (`sizeThatFits`, `placeSubviews`) | 16 | /documentation/swiftui/layout | `FlowChips` | Android `FlowRow`. |
+| `Toggle(_:isOn:)`, `Slider(value:in:step:onEditingChanged:)`, `.labelsHidden()` | 13 | /documentation/swiftui/slider | settings rows | System controls on glass rows (no glass on glass). |
+| `View.alert(_:isPresented:actions:message:)` with a `TextField` | 16 | /documentation/swiftui/view/alert(_:ispresented:actions:message:)-8dvt8 | `EqualizerView` (save / rename preset) | Android `SavePresetDialog` / `RenamePresetDialog`. |
+| `List` + `ForEach.onMove(perform:)`, `moveDisabled(_:)`, `EnvironmentValues.editMode` | 13 | /documentation/swiftui/dynamicviewcontent/onmove(perform:) | `ReorderPresetsView` | Drag to reorder pinned presets. |
+| `TabView` + `.tabViewStyle(.page(indexDisplayMode:))` | 14 | /documentation/swiftui/pagetabviewstyle | EQ slider pages, hybrid band pages | Android `HorizontalPager`. |
+| `Canvas`, `GraphicsContext` | 15 | /documentation/swiftui/canvas | EQ sliders, response curve, wavy arc, Brick Breaker | |
+| `TimelineView(.animation(minimumInterval:paused:))` | 15 | /documentation/swiftui/animationtimelineschedule | `EasterEggView` | Frames only while the ball flies or particles fall. |
+| `View.onGeometryChange(for:of:action:)` | 16 (back-deployed) | /documentation/swiftui/view/ongeometrychange(for:of:action:) | `WavyArcSlider`, Brick Breaker | |
+| `View.accessibilityAdjustableAction(_:)` | 13 | /documentation/swiftui/view/accessibilityadjustableaction(_:) | EQ band sliders, effect arcs | VoiceOver swipe up/down. |
+| `View.onLongPressGesture(minimumDuration:perform:)` | 13 | /documentation/swiftui/view/onlongpressgesture(minimumduration:maximumdistance:perform:onpressingchanged:) | About version capsule | Opens the easter egg. |
+| `ShareLink(item:subject:message:label:)` | 16 | /documentation/swiftui/sharelink | Device Capabilities report | Android share intent. |
+| `UIPasteboard.general.string` | 3 | /documentation/uikit/uipasteboard | Device Capabilities report | Copy. |
+| `View.textSelection(.enabled)` | 15 | /documentation/swiftui/view/textselection(_:) | report, notices | Android `SelectionContainer`. |
+| `EnvironmentValues.openURL` | 14 | /documentation/swiftui/openurlaction | About (release page), licences | |
+| `UIApplication.openSettingsURLString` | 8 | /documentation/uikit/uiapplication/opensettingsurlstring | Appearance › App language | iOS sets the app language in system Settings. |
+| `MPVolumeView(frame:)` | 2 | /documentation/mediaplayer/mpvolumeview | EQ volume card | Apps can't set the system volume; the system slider can. |
+| `AVAudioSession.outputVolume` (KVO), `NSObject.observe(_:options:changeHandler:)` | 6 / Swift 4 | /documentation/avfaudio/avaudiosession/outputvolume | `SystemVolumeObserver` | Handler built nonisolated; hops to the main actor. |
+| `AVAudioSession.sampleRate`, `ioBufferDuration`, `currentRoute.outputs` (`portName`, `portType`) | 6 | /documentation/avfaudio/avaudiosession/currentroute | Device Capabilities | |
+| `AudioFormatGetPropertyInfo` / `AudioFormatGetProperty`, `kAudioFormatProperty_Decoders`, `AudioClassDescription`, `kAppleHardwareAudioCodecManufacturer` | 2 | /documentation/audiotoolbox/1503220-audioformatgetproperty | Device Capabilities | Installed decoders per format; hardware codec flag. |
+| `os_proc_available_memory()` | 13 | /documentation/os/3191911-os_proc_available_memory | Device Capabilities | |
+| `ProcessInfo.physicalMemory`, `activeProcessorCount`, `thermalState`, `isLowPowerModeEnabled`; `uname(_:)` | 2–11 | /documentation/foundation/processinfo | Device Capabilities, report | |
+| `URLResourceValues.volumeAvailableCapacityForImportantUsage`, `volumeTotalCapacity` | 11 | /documentation/foundation/urlresourcevalues/volumeavailablecapacityforimportantusage | Device Capabilities | |
+| `URLSession.data(for:delegate:)` | 15 | /documentation/foundation/urlsession/data(for:delegate:) | `AppUpdateChecker` | GitHub latest release, once per visit (not in UI tests). |
+| `UIImpactFeedbackGenerator(style:)`, `impactOccurred()` | 10 | /documentation/uikit/uiimpactfeedbackgenerator | Brick Breaker | Respects the haptics setting. |
+| `DateFormatter.setLocalizedDateFormatFromTemplate(_:)`, `ISO8601DateFormatter` | 8 / 10 | /documentation/foundation/dateformatter/setlocalizeddateformatfromtemplate(_:) | diagnostics expiry, report | |
+
 ## Testing and tooling
 | API / tool | Docs | Notes |
 |---|---|---|

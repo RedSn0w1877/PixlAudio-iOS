@@ -149,6 +149,13 @@ PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact ba
 | Setup | `AppCover.setup` | `SetupView` (Features/Onboarding) | 15 |
 | Plus / license debug, nav-bar corner radius | — (dropped: everything unlocked; Material-only setting) | — | — |
 
+Stage 7d notes: settings rows are glass shapes inside a group clipped to 24 pt (the Compose `clip` on the
+group), 2 pt apart (`Features/Settings/Components/SettingsRows.swift`); every settings screen uses
+`SettingsScaffold` (Android `CollapsibleCommonTopBar`). Dropped as Material-only or Android-only, each noted in
+its view: album-art palette style, nav-bar corner radius, smooth corners, the visual-style switch, the Plus card and
+licence debug tools, battery optimisation, Chromecast autoplay, Hi-Fi float output, offload-ready formats and the
+ExoPlayer tile. TAIS tools in Experimental are UI shells until the TAIS stages.
+
 ## Seams — who owns what
 
 Shared files (stage 4; change only with a reason, in a small commit, and say so in the stage report):
