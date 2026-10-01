@@ -368,6 +368,7 @@ struct YourMixShelfSection: View {
                     .pixlFont(.bodyMedium)
                     .foregroundStyle(theme.onPrimary.opacity(0.85))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85) // SF Pro runs a little wider than Android's font here
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             HStack(spacing: -16) {

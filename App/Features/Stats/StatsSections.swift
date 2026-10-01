@@ -224,7 +224,8 @@ private struct StatsChipRow<ID: Hashable & Sendable>: View {
 
     var body: some View {
         GlassEffectContainer(spacing: 3) {
-            HStack(spacing: 8) {
+            // Android `FlowRow(spacedBy(8.dp))`: the chips wrap instead of truncating.
+            StatsFlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
                 ForEach(items, id: \.id) { item in
                     let isSelected = item.id == selection
                     Button {
@@ -234,7 +235,8 @@ private struct StatsChipRow<ID: Hashable & Sendable>: View {
                             .pixlFont(.labelLarge, weight: isSelected ? .bold : .medium)
                             .foregroundStyle(isSelected ? item.onAccent : theme.onSurface)
                             .lineLimit(1)
-                            .padding(.horizontal, 16)
+                            .fixedSize()
+                            .padding(.horizontal, 8) // Material 3 FilterChip label padding
                             .frame(height: 32)
                             .contentShape(.capsule)
                     }
@@ -248,6 +250,56 @@ private struct StatsChipRow<ID: Hashable & Sendable>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .sensoryFeedback(.selection, trigger: selection)
+    }
+}
+
+/// A wrapping row (Compose `FlowRow`): children left to right, wrapping to a new line when the width runs out.
+nonisolated struct StatsFlowLayout: Layout {
+    var horizontalSpacing: CGFloat
+    var verticalSpacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = arrange(width: proposal.width ?? .infinity, subviews: subviews)
+        let width = rows.map(\.width).max() ?? 0
+        let height = rows.reduce(0) { $0 + $1.height } + verticalSpacing * CGFloat(max(rows.count - 1, 0))
+        return CGSize(width: proposal.width ?? width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in arrange(width: bounds.width, subviews: subviews) {
+            var x = bounds.minX
+            for index in row.indices {
+                let size = subviews[index].sizeThatFits(.unspecified)
+                subviews[index].place(at: CGPoint(x: x, y: y + (row.height - size.height) / 2),
+                                      anchor: .topLeading, proposal: ProposedViewSize(size))
+                x += size.width + horizontalSpacing
+            }
+            y += row.height + verticalSpacing
+        }
+    }
+
+    nonisolated private struct Row {
+        var indices: [Int] = []
+        var width: CGFloat = 0
+        var height: CGFloat = 0
+    }
+
+    private func arrange(width maxWidth: CGFloat, subviews: Subviews) -> [Row] {
+        var rows: [Row] = []
+        var current = Row()
+        for index in subviews.indices {
+            let size = subviews[index].sizeThatFits(.unspecified)
+            if !current.indices.isEmpty, current.width + horizontalSpacing + size.width > maxWidth {
+                rows.append(current)
+                current = Row()
+            }
+            current.width = current.indices.isEmpty ? size.width : current.width + horizontalSpacing + size.width
+            current.height = max(current.height, size.height)
+            current.indices.append(index)
+        }
+        if !current.indices.isEmpty { rows.append(current) }
+        return rows
     }
 }
 

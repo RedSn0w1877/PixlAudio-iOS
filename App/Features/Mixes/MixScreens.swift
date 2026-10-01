@@ -205,8 +205,7 @@ private struct MixHeader: View {
             .padding(.leading, titleLeading)
             .padding(.trailing, 22)
         }
-        .frame(height: 340)
-        .clipped()
+        .frame(height: 340) // not clipped: Android's header box isn't, so the 96 pt button keeps its full glass
         .visualEffect { content, proxy in
             let offset = max(-proxy.frame(in: .scrollView).minY, 0)
             return content

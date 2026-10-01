@@ -38,10 +38,10 @@ struct StatsView: View {
                 StatsHeader(collapse: collapse, topInset: topInset, range: $range, isBusy: isLoading,
                             onBack: { router.pop() }, onRefresh: { refreshToken += 1 })
             }
+            // The stack (not the reader) spans the status bar so the header and list draw under it; a reader that
+            // ignored the safe area itself would report a top inset of 0 and put the buttons under the status bar.
+            .ignoresSafeArea(edges: .top)
         }
-        // The reader spans the status bar so the header and list can draw under it; its proxy still reports the
-        // top inset.
-        .ignoresSafeArea(edges: .top)
         .toolbar(.hidden, for: .navigationBar)
         .task(id: Key(range: range, revision: env.home.history.revision, songCount: library.songs.count,
                       token: refreshToken)) {

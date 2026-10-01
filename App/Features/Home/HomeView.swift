@@ -195,8 +195,9 @@ private struct HomeTopBar: View {
                 HStack(spacing: Tokens.TopBar.actionSpacing) {
                     if jobCount > 0 {
                         GlassCircleButton(systemImage: "hourglass", accessibilityLabel: "Active jobs",
-                                          tint: theme.surfaceContainerHigh.opacity(GlassTint.surface), badge: jobCount,
+                                          tint: theme.surfaceContainerHigh.opacity(GlassTint.surface),
                                           action: onJobs)
+                            .accessibilityValue(Text(verbatim: "\(jobCount)"))
                             .accessibilityIdentifier("home.jobs")
                     }
                     GlassCircleButton(systemImage: "newspaper", accessibilityLabel: "Changelog",
@@ -210,6 +211,23 @@ private struct HomeTopBar: View {
             .padding(.leading, HomeMetrics.topBarLeading)
             .padding(.trailing, HomeMetrics.topBarTrailing)
             .frame(height: HomeMetrics.topBarHeight)
+        }
+        // The jobs badge sits outside the container: a GlassEffectContainer composites its glass over the
+        // children's own overlays, which hid most of the badge. Placed where `BadgedBox` puts it on the jobs circle.
+        .overlay(alignment: .topTrailing) {
+            if jobCount > 0 {
+                let circle = Tokens.TopBar.circleButtonSize
+                Text("\(jobCount)")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(theme.onError)
+                    .padding(.horizontal, 5)
+                    .frame(minWidth: 16, minHeight: 16)
+                    .background(theme.error, in: Capsule())
+                    .padding(.top, (HomeMetrics.topBarHeight - circle) / 2 - 2)
+                    .padding(.trailing, HomeMetrics.topBarTrailing + 2 * (circle + Tokens.TopBar.actionSpacing) - 2)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
         }
         .background(alignment: .top) {
             let scrim = theme.surfaceContainerHighest
