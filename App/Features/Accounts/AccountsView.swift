@@ -79,6 +79,7 @@ private struct AccountsHeroSection: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .pixlGlass(in: RoundedRectangle(cornerRadius: 30, style: .continuous),
                    tint: theme.surfaceContainer.opacity(GlassTint.surface))
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("accounts.hero")
     }
 }
@@ -187,6 +188,7 @@ private struct ConnectedAccountCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .pixlGlass(in: RoundedRectangle(cornerRadius: 28, style: .continuous),
                    tint: theme.surfaceContainerHigh.opacity(GlassTint.surface))
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("accounts.spotifyCard")
     }
 }
@@ -214,6 +216,7 @@ private struct EmptyAccountsCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .pixlGlass(in: RoundedRectangle(cornerRadius: 28, style: .continuous),
                    tint: theme.surfaceContainer.opacity(GlassTint.surface))
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("accounts.empty")
     }
 }

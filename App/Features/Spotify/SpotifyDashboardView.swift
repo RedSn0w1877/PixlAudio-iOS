@@ -89,6 +89,7 @@ struct SpotifyDashboardView: View {
                 signedInContent
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("spotify.accountCard")
     }
 
@@ -318,6 +319,7 @@ struct SpotifyPlaybackTestCard: View {
                     .foregroundStyle(theme.onSurface)
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("spotify.testReport")
     }
 }
