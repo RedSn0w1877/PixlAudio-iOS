@@ -1,0 +1,605 @@
+# Structure/times from public LRCLIB record36497565; lyric text and metadata replaced.
+version: '1.0'
+metadata:
+  title: Public response structure fixture
+  artist: Test artist
+  duration_ms: 227000
+lines:
+- text: token token token token token token
+  words:
+  - text: 'token '
+    start_ms: '16742'
+  - text: 'token '
+    start_ms: '17179'
+  - text: 'token '
+    start_ms: '17573'
+  - text: 'token '
+    start_ms: '18061'
+  - text: 'token '
+    start_ms: '18258'
+  - text: token
+    start_ms: '18502'
+  start_ms: '16742'
+  end_ms: '20504'
+- text: token token token token token
+  words:
+  - text: 'token '
+    start_ms: '20504'
+  - text: 'token '
+    start_ms: '21045'
+  - text: 'token '
+    start_ms: '21242'
+  - text: 'token '
+    start_ms: '21730'
+  - text: token
+    start_ms: '22252'
+  start_ms: '20504'
+  end_ms: '24312'
+- text: tokentoken token
+  words:
+  - text: token
+    start_ms: '24312'
+  - text: 'token '
+    start_ms: '25062'
+  - text: token
+    start_ms: '25944'
+  start_ms: '24312'
+  end_ms: '27992'
+- text: token token token token
+  words:
+  - text: 'token '
+    start_ms: '27992'
+  - text: 'token '
+    start_ms: '28707'
+  - text: 'token '
+    start_ms: '29183'
+  - text: token
+    start_ms: '29706'
+  start_ms: '27992'
+  end_ms: '31707'
+- text: token token token token token
+  words:
+  - text: 'token '
+    start_ms: '31707'
+  - text: 'token '
+    start_ms: '32039'
+  - text: 'token '
+    start_ms: '32480'
+  - text: 'token '
+    start_ms: '32956'
+  - text: token
+    start_ms: '33397'
+  start_ms: '31707'
+  end_ms: '35434'
+- text: token token token token token
+  words:
+  - text: 'token '
+    start_ms: '35434'
+  - text: 'token '
+    start_ms: '35801'
+  - text: 'token '
+    start_ms: '35998'
+  - text: 'token '
+    start_ms: '36776'
+  - text: token
+    start_ms: '37287'
+  start_ms: '35434'
+  end_ms: '39196'
+- text: token token token token token token
+  words:
+  - text: 'token '
+    start_ms: '39196'
+  - text: 'token '
+    start_ms: '39586'
+  - text: 'token '
+    start_ms: '39830'
+  - text: 'token '
+    start_ms: '40039'
+  - text: 'token '
+    start_ms: '40515'
+  - text: token
+    start_ms: '40910'
+  start_ms: '39196'
+  end_ms: '41722'
+- text: token token token token token token
+  words:
+  - text: 'token '
+    start_ms: '42646'
+  - text: 'token '
+    start_ms: '42953'
+  - text: 'token '
+    start_ms: '43467'
+  - text: 'token '
+    start_ms: '43884'
+  - text: 'token '
+    start_ms: '44731'
+  - text: token
+    start_ms: '45254'
+  start_ms: '42646'
+  end_ms: '47727'
+- text: token token token token token token
+  words:
+  - text: 'token '
+    start_ms: '50188'
+  - text: 'token '
+    start_ms: '50555'
+  - text: 'token '
+    start_ms: '50752'
+  - text: 'token '
+    start_ms: '51240'
+  - text: 'token '
+    start_ms: '52273'
+  - text: token
+    start_ms: '52749'
+  start_ms: '50188'
+  end_ms: '54475'
+- text: Line without word timings
+  words: []
+  start_ms: '54475'
+  end_ms: '61708'
+- text: token token token
+  words:
+  - text: 'token '
+    start_ms: '61708'
+  - text: 'token '
+    start_ms: '62121'
+  - text: token
+    start_ms: '62539'
+  start_ms: '61708'
+  end_ms: '64269'
+- text: token token token token token token
+  words:
+  - text: 'token '
+    start_ms: '65220'
+  - text: 'token '
+    start_ms: '65842'
+  - text: 'token '
+    start_ms: '66045'
+  - text: 'token '
+    start_ms: '66307'
+  - text: 'token '
+    start_ms: '66806'
+  - text: token
+    start_ms: '67282'
+  start_ms: '65220'
+  end_ms: '69221'
+- text: token token token
+  words:
+  - text: 'token '
+    start_ms: '69221'
+  - text: 'token '
+    start_ms: '69658'
+  - text: token
+    start_ms: '70563'
+  start_ms: '69221'
+  end_ms: '72901'
+- text: token token token token token token
+  words:
+  - text: 'token '
+    start_ms: '72901'
+  - text: 'token '
+    start_ms: '73361'
+  - text: 'token '
+    start_ms: '73518'
+  - text: 'token '
+    start_ms: '73761'
+  - text: 'token '
+    start_ms: '74237'
+  - text: token
+    start_ms: '74760'
+  start_ms: '72901'
+  end_ms: '76709'
+- text: token token token token token token
+  words:
+  - text: 'token '
+    start_ms: '76709'
+  - text: 'token '
+    start_ms: '77146'
+  - text: 'token '
+    start_ms: '77285'
+  - text: 'token '
+    start_ms: '77505'
+  - text: 'token '
+    start_ms: '78045'
+  - text: token
+    start_ms: '78487'
+  start_ms: '76709'
+  end_ms: '80390'
+- text: token token token token token token token
+  words:
+  - text: 'token '
+    start_ms: '80390'
+  - text: 'token '
+    start_ms: '80519'
+  - text: 'token '
+    start_ms: '80774'
+  - text: 'token '
+    start_ms: '81279'
+  - text: 'token '
+    start_ms: '81755'
+  - text: 'token '
+    start_ms: '82197'
+  - text: token
+    start_ms: '82818'
+  start_ms: '80390'
+  end_ms: '84070'
+- text: token token token token token token token
+  words:
+  - text: 'token '
+    start_ms: '84070'
+  - text: 'token '
+    start_ms: '84367'
+  - text: 'token '
+    start_ms: '84628'
+  - text: 'token '
+    start_ms: '84925'
+  - text: 'token '
+    start_ms: '85488'
+  - text: 'token '
+    start_ms: '85964'
+  - text: token
+    start_ms: '86445'
+  start_ms: '84070'
+  end_ms: '87588'
+- text: token token token token token token
+  words:
+  - text: 'token '
+    start_ms: '87588'
+  - text: 'token '
+    start_ms: '87734'
+  - text: 'token '
+    start_ms: '87914'
+  - text: 'token '
+    start_ms: '88814'
+  - text: 'token '
+    start_ms: '89197'
+  - text: token
+    start_ms: '89772'
+  start_ms: '87588'
+  end_ms: '95343'
+- text: token token token token token token
+  words:
+  - text: 'token '
+    start_ms: '95343'
+  - text: 'token '
+    start_ms: '95495'
+  - text: 'token '
+    start_ms: '95762'
+  - text: 'token '
+    start_ms: '96256'
+  - text: 'token '
+    start_ms: '96761'
+  - text: token
+    start_ms: '97237'
+  start_ms: '95343'
+  end_ms: '101218'
+- text: Line without word timings
+  words: []
+  start_ms: '101218'
+  end_ms: '106247'
+- text: token token token token token token token
+  words:
+  - text: 'token '
+    start_ms: '106247'
+  - text: 'token '
+    start_ms: '106457'
+  - text: 'token '
+    start_ms: '106655'
+  - text: 'token '
+    start_ms: '107038'
+  - text: 'token '
+    start_ms: '107519'
+  - text: 'token '
+    start_ms: '108239'
+  - text: token
+    start_ms: '108454'
+  start_ms: '106247'
+  end_ms: '110503'
+- text: token token token token token token token
+  words:
+  - text: 'token '
+    start_ms: '110503'
+  - text: 'token '
+    start_ms: '110818'
+  - text: 'token '
+    start_ms: '111038'
+  - text: 'token '
+    start_ms: '111195'
+  - text: 'token '
+    start_ms: '111799'
+  - text: 'token '
+    start_ms: '111996'
+  - text: token
+    start_ms: '112234'
+  start_ms: '110503'
+  end_ms: '113563'
+- text: token token token token
+  words:
+  - text: 'token '
+    start_ms: '114048'
+  - text: 'token '
+    start_ms: '115518'
+  - text: 'token '
+    start_ms: '115715'
+  - text: token
+    start_ms: '115976'
+  start_ms: '114048'
+  end_ms: '117895'
+- text: token token token token token token
+  words:
+  - text: 'token '
+    start_ms: '117895'
+  - text: 'token '
+    start_ms: '118303'
+  - text: 'token '
+    start_ms: '118500'
+  - text: 'token '
+    start_ms: '118738'
+  - text: 'token '
+    start_ms: '119237'
+  - text: token
+    start_ms: '119742'
+  start_ms: '117895'
+  end_ms: '121652'
+- text: token token token token token token
+  words:
+  - text: 'token '
+    start_ms: '121652'
+  - text: 'token '
+    start_ms: '121827'
+  - text: 'token '
+    start_ms: '122112'
+  - text: 'token '
+    start_ms: '122530'
+  - text: 'token '
+    start_ms: '123250'
+  - text: token
+    start_ms: '123470'
+  start_ms: '121652'
+  end_ms: '125460'
+- text: token token token token token token token
+  words:
+  - text: 'token '
+    start_ms: '125460'
+  - text: 'token '
+    start_ms: '125868'
+  - text: 'token '
+    start_ms: '126047'
+  - text: 'token '
+    start_ms: '126285'
+  - text: 'token '
+    start_ms: '126767'
+  - text: 'token '
+    start_ms: '126988'
+  - text: token
+    start_ms: '127226'
+  start_ms: '125460'
+  end_ms: '129175'
+- text: token token token token
+  words:
+  - text: 'token '
+    start_ms: '129175'
+  - text: 'token '
+    start_ms: '130500'
+  - text: 'token '
+    start_ms: '130715'
+  - text: token
+    start_ms: '130993'
+  start_ms: '129175'
+  end_ms: '132937'
+- text: token token token token token token
+  words:
+  - text: 'token '
+    start_ms: '132937'
+  - text: 'token '
+    start_ms: '133374'
+  - text: 'token '
+    start_ms: '133536'
+  - text: 'token '
+    start_ms: '133774'
+  - text: 'token '
+    start_ms: '134233'
+  - text: token
+    start_ms: '134715'
+  start_ms: '132937'
+  end_ms: '136025'
+- text: Line without word timings
+  words: []
+  start_ms: '136025'
+  end_ms: '181133'
+- text: token token token token token token token
+  words:
+  - text: 'token '
+    start_ms: '181133'
+  - text: 'token '
+    start_ms: '181407'
+  - text: 'token '
+    start_ms: '181604'
+  - text: 'token '
+    start_ms: '182046'
+  - text: 'token '
+    start_ms: '182487'
+  - text: 'token '
+    start_ms: '183073'
+  - text: token
+    start_ms: '183462'
+  start_ms: '181133'
+  end_ms: '185270'
+- text: token token token token token token token
+  words:
+  - text: 'token '
+    start_ms: '185270'
+  - text: 'token '
+    start_ms: '185610'
+  - text: 'token '
+    start_ms: '185998'
+  - text: 'token '
+    start_ms: '186301'
+  - text: 'token '
+    start_ms: '186801'
+  - text: 'token '
+    start_ms: '186980'
+  - text: token
+    start_ms: '187242'
+  start_ms: '185270'
+  end_ms: '189151'
+- text: token token token token
+  words:
+  - text: 'token '
+    start_ms: '189151'
+  - text: 'token '
+    start_ms: '190522'
+  - text: 'token '
+    start_ms: '190737'
+  - text: token
+    start_ms: '190998'
+  start_ms: '189151'
+  end_ms: '192994'
+- text: token token token token token token
+  words:
+  - text: 'token '
+    start_ms: '192994'
+  - text: 'token '
+    start_ms: '193402'
+  - text: 'token '
+    start_ms: '193541'
+  - text: 'token '
+    start_ms: '193761'
+  - text: 'token '
+    start_ms: '194301'
+  - text: token
+    start_ms: '194742'
+  start_ms: '192994'
+  end_ms: '196558'
+- text: token token token token token token
+  words:
+  - text: 'token '
+    start_ms: '196558'
+  - text: 'token '
+    start_ms: '196728'
+  - text: 'token '
+    start_ms: '197024'
+  - text: 'token '
+    start_ms: '197488'
+  - text: 'token '
+    start_ms: '198208'
+  - text: token
+    start_ms: '198463'
+  start_ms: '196558'
+  end_ms: '200354'
+- text: token token token token token token token
+  words:
+  - text: 'token '
+    start_ms: '200354'
+  - text: 'token '
+    start_ms: '200872'
+  - text: 'token '
+    start_ms: '201029'
+  - text: 'token '
+    start_ms: '201267'
+  - text: 'token '
+    start_ms: '201772'
+  - text: 'token '
+    start_ms: '202010'
+  - text: token
+    start_ms: '202253'
+  start_ms: '200354'
+  end_ms: '204081'
+- text: token token token token
+  words:
+  - text: 'token '
+    start_ms: '204081'
+  - text: 'token '
+    start_ms: '205528'
+  - text: 'token '
+    start_ms: '205725'
+  - text: token
+    start_ms: '205986'
+  start_ms: '204081'
+  end_ms: '208018'
+- text: token token token token token token
+  words:
+  - text: 'token '
+    start_ms: '208035'
+  - text: 'token '
+    start_ms: '208344'
+  - text: 'token '
+    start_ms: '208524'
+  - text: 'token '
+    start_ms: '208802'
+  - text: 'token '
+    start_ms: '209307'
+  - text: token
+    start_ms: '209749'
+  start_ms: '208035'
+  end_ms: '210566'
+plain: 'I saw you at the edge
+
+  Wasn’t it all my fault?
+
+  Open-ended questions
+
+  Answers I don’t want
+
+  Might I’ve been someone else
+
+  You could’ve wrote me off
+
+  You’d do it all to prevent
+
+  What you don’t wanna think of
+
+  What you don’t wanna think of
+
+
+  I didn’t understand
+
+  What made you act like this
+
+  Don’t oversell yourself
+
+  I’d go to hell and back
+
+  But I won’t let you down
+
+  I don’t wanna hear you say it
+
+  I know you know I owe you
+
+  When you’re ready I’ll be waiting
+
+  But just don’t leave me waiting
+
+
+  But if you dive into the fire
+
+  Won’t I get caught in the flames?
+
+  Incineratе what was ours
+
+  You’d be the one thеy’d blame
+
+  If you dive into the fire
+
+  Won’t I get caught in the flames?
+
+  Incinerate what was what’s ours
+
+  You’d be the one they’d blame
+
+
+  But if you dive into the fire
+
+  Won’t I get caught in the flames?
+
+  Incinerate what was ours
+
+  You’d be the one they’d blame
+
+  If you dive into the fire
+
+  Won’t I get caught in the flames?
+
+  Incinerate what was what’s ours
+
+  You’d be the one they’d blame'
