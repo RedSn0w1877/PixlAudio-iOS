@@ -18,6 +18,7 @@ struct PlaylistEditorView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(LibraryStore.self) private var library
     @Environment(Router.self) private var router
+    @Environment(PlaybackStore.self) private var playback
     @Environment(\.appTheme) private var theme
 
     @State private var form = PlaylistCoverForm()
@@ -103,13 +104,14 @@ struct PlaylistEditorView: View {
             SongPickerBottomBar(storageFilter: $storageFilter,
                                 showsCloudFilter: library.songs.contains(where: LibrarySorting.isOnline),
                                 title: "Create", confirmLabel: "Create") { save() }
+                .padding(.bottom, playback.miniPlayerClearance)
         } else {
             HStack {
                 Spacer()
                 floatingAction
             }
             .padding(.trailing, 24)
-            .padding(.bottom, 24)
+            .padding(.bottom, 24 + playback.miniPlayerClearance)
         }
     }
 
@@ -474,7 +476,7 @@ private struct PlaylistCoverFormView: View {
                              tint: (selected ? theme.secondaryContainer : theme.surfaceContainerLow)
                                  .opacity(selected ? GlassTint.prominent : GlassTint.surface),
                              foreground: selected ? theme.onSecondaryContainer : theme.onSurface,
-                             titleStyle: .labelLarge, action: action)
+                             titleStyle: .labelLarge, fillsWidth: true, action: action)
             .frame(maxWidth: .infinity)
             .accessibilityAddTraits(selected ? .isSelected : [])
             .accessibilityIdentifier("editor.mode.\(title)")
@@ -536,7 +538,8 @@ private struct PlaylistCoverFormView: View {
                                          tint: (selected ? theme.primary : theme.surfaceContainerHigh)
                                              .opacity(selected ? GlassTint.prominent : GlassTint.container),
                                          foreground: selected ? theme.onPrimary : theme.onSurface,
-                                         titleStyle: .labelLarge.weight(selected ? .bold : .medium)) {
+                                         titleStyle: .labelLarge.weight(selected ? .bold : .medium),
+                                         fillsWidth: true) {
                         withAnimation(PixlMotion.selection) { form.tab = tab }
                     }
                     .frame(maxWidth: .infinity)

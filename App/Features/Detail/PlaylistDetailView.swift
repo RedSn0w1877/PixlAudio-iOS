@@ -149,7 +149,8 @@ struct PlaylistDetailView: View {
         return HStack(spacing: 8) {
             SegmentedGlassButton(title: "Play it", systemImage: "play.fill", accessibilityLabel: "Play",
                                  leading: 60, trailing: 14, height: 56, horizontalPadding: 10,
-                                 tint: theme.primary.opacity(GlassTint.prominent), foreground: theme.onPrimary) {
+                                 tint: theme.primary.opacity(GlassTint.prominent), foreground: theme.onPrimary,
+                                 fillsWidth: true) {
                 guard let first = songs.first else { return }
                 if playback.isShuffleEnabled { playback.setShuffleEnabled(false) }
                 playback.play(first, in: songs)
@@ -159,7 +160,7 @@ struct PlaylistDetailView: View {
             SegmentedGlassButton(title: "Shuffle", systemImage: "shuffle", accessibilityLabel: "Shuffle",
                                  leading: 14, trailing: 60, height: 56, horizontalPadding: 10,
                                  tint: theme.secondaryContainer.opacity(GlassTint.prominent),
-                                 foreground: theme.onSecondaryContainer) {
+                                 foreground: theme.onSecondaryContainer, fillsWidth: true) {
                 playback.playShuffled(songs)
             }
             .frame(maxWidth: .infinity)
@@ -200,7 +201,7 @@ struct PlaylistDetailView: View {
                                     tint: (isOn ? theme.tertiary : theme.surfaceContainerHigh)
                                         .opacity(isOn ? GlassTint.prominent : GlassTint.container),
                                     foreground: isOn ? theme.onTertiary : theme.onSurface,
-                                    titleStyle: .labelMedium, action: action)
+                                    titleStyle: .labelMedium, fillsWidth: true, action: action)
             .frame(maxWidth: .infinity)
             .animation(PixlMotion.state, value: isOn)
             .accessibilityAddTraits(isOn ? .isSelected : [])
@@ -241,11 +242,12 @@ struct PlaylistDetailView: View {
                 }
             }
             .padding(.top, 12)
-            .padding(.bottom, 16)
+            .padding(.bottom, 16 + playback.miniPlayerClearance)
         }
         .scrollIndicators(.hidden)
-        .background(panel.fill(theme.surfaceContainerHigh).ignoresSafeArea(edges: .bottom))
+        .background(panel.fill(theme.surfaceContainerHigh))
         .clipShape(panel)
+        .ignoresSafeArea(edges: .bottom)
     }
 
     /// Drop of a dragged song onto another row (Android `ReorderableItem` → `savePlaylistSongOrder`). The playlist

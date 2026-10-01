@@ -123,8 +123,9 @@ final class LibraryScreensTests: XCTestCase {
         XCTAssertEqual(lists.albums.first?.title, "Aurora")
         XCTAssertEqual(lists.playlists.map(\.name), ["Indie Favourites", "Late Night Drive", "Sunday Morning"])
         XCTAssertEqual(lists.liked.count, snapshot.songs.filter(\.isFavorite).count)
-        XCTAssertEqual(lists.folders.map(\.name), ["Demo"])
-        XCTAssertEqual(lists.folders.first?.totalSongCount, snapshot.songs.count)
+        // The tree lists the root's folders (one per demo artist), name A-Z, holding every song between them.
+        XCTAssertEqual(lists.folders.map(\.name), Set(snapshot.songs.map(\.artist)).sorted())
+        XCTAssertEqual(lists.folders.reduce(0) { $0 + $1.totalSongCount }, snapshot.songs.count)
         XCTAssertFalse(lists.folderPlaylists.isEmpty)
         XCTAssertTrue(lists.folderPlaylists.allSatisfy { !$0.songs.isEmpty })
 

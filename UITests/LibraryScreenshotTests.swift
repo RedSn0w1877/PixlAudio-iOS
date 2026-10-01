@@ -18,7 +18,7 @@ final class LibraryScreenshotTests: XCTestCase {
 
     // MARK: Library sheets and selection
 
-    func testLibrarySelectionLight() throws { try capture("librarySelection", "light", ready: "selectionCount") }
+    func testLibrarySelectionLight() throws { try capture("librarySelection", "light", ready: "screen.library") }
     func testLibrarySortLight() throws { try capture("librarySort", "light", ready: "sheet.sort") }
     func testLibrarySortDark() throws { try capture("librarySort", "dark", ready: "sheet.sort") }
     func testLibraryReorderTabsDark() throws { try capture("libraryReorderTabs", "dark", ready: "sheet.reorderTabs") }
@@ -40,7 +40,7 @@ final class LibraryScreenshotTests: XCTestCase {
     func testArtistDetailDark() throws { try capture("artistDetail", "dark", ready: "screen.artistDetail") }
     func testGenreDetailLight() throws { try capture("genreDetail", "light", ready: "screen.genreDetail") }
     func testGenreDetailDark() throws { try capture("genreDetail", "dark", ready: "screen.genreDetail") }
-    func testGenreSortLight() throws { try capture("genreSort", "light", ready: "screen.genreDetail", tap: "genre.options") }
+    func testGenreSortLight() throws { try capture("genreSort", "light", ready: "screen.genreDetail", tap: "Options") }
     func testFolderExplorerLight() throws { try capture("folderExplorer", "light", ready: "screen.folderExplorer") }
 
     // MARK: Playlists
@@ -65,7 +65,7 @@ final class LibraryScreenshotTests: XCTestCase {
         let element = app.descendants(matching: .any)[ready].firstMatch
         XCTAssertTrue(element.waitForExistence(timeout: 20), "\(ready) did not appear on \(screen)")
         if let tap {
-            let button = app.descendants(matching: .any)[tap].firstMatch
+            let button = app.buttons[tap].firstMatch
             XCTAssertTrue(button.waitForExistence(timeout: 10), "\(tap) is missing on \(screen)")
             button.tap()
         }

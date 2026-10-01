@@ -378,14 +378,14 @@ struct LibraryView: View {
             case .libraryLiked: selectedTab = .liked
             case .librarySelection:
                 selectedTab = .songs
-                for song in demo.songs.prefix(3) { songSelection.toggle(song.id) }
+                for song in LibrarySorting.sortSongs(demo.songs, by: prefs.songSort).prefix(3) { songSelection.toggle(song.id) }
             case .librarySort:
                 selectedTab = .songs
                 sheet = .sort
             case .libraryReorderTabs: sheet = .reorderTabs
             case .libraryMultiSelection:
                 selectedTab = .songs
-                for song in demo.songs.prefix(4) { songSelection.toggle(song.id) }
+                for song in LibrarySorting.sortSongs(demo.songs, by: prefs.songSort).prefix(4) { songSelection.toggle(song.id) }
                 sheet = .songSelection
             case .libraryCreatePlaylist:
                 selectedTab = .playlists

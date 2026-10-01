@@ -23,6 +23,8 @@ struct SegmentedGlassButton: View {
     var foreground: Color
     var iconRotation: Double = 0
     var titleStyle: PixlTextStyle = .labelLarge
+    /// Stretch to the offered width (Android `Modifier.weight(1f)` buttons); the glass follows the full width.
+    var fillsWidth = false
     let action: () -> Void
 
     var body: some View {
@@ -45,7 +47,7 @@ struct SegmentedGlassButton: View {
             }
             .foregroundStyle(foreground)
             .padding(.horizontal, title == nil ? 0 : horizontalPadding)
-            .frame(minWidth: minWidth ?? (title == nil ? height : nil))
+            .frame(minWidth: minWidth ?? (title == nil ? height : nil), maxWidth: fillsWidth ? .infinity : nil)
             .frame(height: height)
             .contentShape(shape)
         }

@@ -320,6 +320,10 @@ private struct GenreDetailContent: View {
         }
     }
 
+    /// The shell's mini player floats over pushed screens; the floating controls sit above it (Android pads by
+    /// `MiniPlayerHeight` while a song is loaded).
+    private var miniPlayerClearance: CGFloat { playback.miniPlayerClearance }
+
     @ViewBuilder
     private var bottomControl: some View {
         if selection.isActive {
@@ -331,7 +335,7 @@ private struct GenreDetailContent: View {
                 .pixlGlass(in: RoundedRectangle(cornerRadius: 28, style: .continuous),
                            tint: theme.surfaceContainer.opacity(GlassTint.container))
                 .padding(.horizontal, 16)
-                .padding(.bottom, 16)
+                .padding(.bottom, 16 + miniPlayerClearance)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
         } else {
             Button { showsSortSheet = true } label: {
@@ -346,7 +350,7 @@ private struct GenreDetailContent: View {
             .pixlGlass(in: RoundedRectangle(cornerRadius: 24, style: .continuous),
                        tint: theme.tertiaryContainer.opacity(GlassTint.prominent), interactive: true)
             .padding(.trailing, 16)
-            .padding(.bottom, 26)
+            .padding(.bottom, 26 + miniPlayerClearance)
             .accessibilityLabel("Options")
             .accessibilityIdentifier("genre.options")
             .transition(.scale.combined(with: .opacity))

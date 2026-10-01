@@ -54,6 +54,12 @@ let maxAlbumMultiSelection = 6
 // MARK: - Queue actions the Library offers (Android `addSongToQueue`, `addSongNextToQueue`, `playSongsShuffled`)
 
 extension PlaybackStore {
+    /// Space the shell's floating mini player takes over a pushed screen (Android pads lists and floating buttons
+    /// by `MiniPlayerHeight` while a song is loaded).
+    var miniPlayerClearance: CGFloat {
+        hasItem ? Tokens.Shell.miniPlayerHeight + Tokens.Shell.miniPlayerSpacing : 0
+    }
+
     /// Plays a shuffled copy (Android `playSongsShuffled(startAtZero = true)`).
     func playShuffled(_ songs: [Song]) {
         guard !songs.isEmpty else { return }

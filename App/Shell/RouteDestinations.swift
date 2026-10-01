@@ -47,7 +47,7 @@ struct SheetDestination: View {
     var body: some View {
         switch sheet {
         case .queue: QueueSheet().pixlSheet()
-        case .songInfo(let songId): SongInfoSheet(songId: songId).pixlSheet()
+        case .songInfo(let songId): SongInfoSheet(songId: songId).pixlSheet(detents: [.large])
         case .sleepTimer: SleepTimerSheet().pixlSheet(detents: [.medium])
         case .lyricsOptions(let songId): LyricsOptionsSheet(songId: songId).pixlSheet()
         case .changelog, .betaInfo, .jobs: HomeInfoSheet(sheet: sheet).pixlSheet()
