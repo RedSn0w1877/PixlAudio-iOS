@@ -2,81 +2,66 @@ import XCTest
 
 /// Screenshot tests: each test launches the app straight into one screen with demo data
 /// (`-uiTest -screen <id> -appearance light|dark`) and attaches a screenshot named `<screen>-<appearance>`.
-/// CI exports the attachments (`ci/export-shots.sh`) into the `shots-<sha>` artifact.
+/// CI exports the attachments (`ci/export-shots.sh`) into the `shots-<sha>` artifact. Compare each with the
+/// Android reference in docs/design-refs/ (see docs/design.md › Screenshot ids).
 @MainActor
 final class ScreenshotTests: XCTestCase {
-    // MARK: Home (tab bar + expanded mini-player accessory)
+    // MARK: Shell (stage 4): Home + Library placeholders in PixlAudio's layout, mini player over the glass bar
 
-    func testHomeLight() throws { try capture(.home, "light") }
-    func testHomeDark() throws { try capture(.home, "dark") }
+    func testHomeLight() throws { try capture("home", "light") }
+    func testHomeDark() throws { try capture("home", "dark") }
+    func testLibraryLight() throws { try capture("library", "light") }
+    func testLibraryDark() throws { try capture("library", "dark") }
 
-    // MARK: Library
+    /// Library with a vividly coloured song playing: the album-tinted glass mini player (ref: owner-library-songs).
+    func testMiniPlayerLight() throws { try capture("miniPlayer", "light") }
+    func testMiniPlayerDark() throws { try capture("miniPlayer", "dark") }
 
-    func testLibraryLight() throws { try capture(.library, "light") }
-    func testLibraryDark() throws { try capture(.library, "dark") }
+    /// A pushed screen: the bottom bar hides and the mini player sits alone with 32 pt corners.
+    func testMiniPlayerAloneLight() throws { try capture("miniPlayerAlone", "light") }
+    func testMiniPlayerAloneDark() throws { try capture("miniPlayerAlone", "dark") }
 
-    // MARK: Search (empty: genre grid; with a query: results)
+    // MARK: Other placeholders
 
-    func testSearchLight() throws { try capture(.search, "light") }
-    func testSearchDark() throws { try capture(.search, "dark") }
-    func testSearchResultsLight() throws { try capture(.searchResults, "light") }
-    func testSearchResultsDark() throws { try capture(.searchResults, "dark") }
-
-    // MARK: Mini player inline (tab bar minimized after scrolling down)
-
-    func testMiniPlayerLight() throws { try capture(.miniPlayer, "light") }
-    func testMiniPlayerDark() throws { try capture(.miniPlayer, "dark") }
-
-    // MARK: Diagnostics
-
-    func testDiagnosticsLight() throws { try capture(.diagnostics, "light") }
-    func testDiagnosticsDark() throws { try capture(.diagnostics, "dark") }
+    func testSearchDark() throws { try capture("search", "dark") }
+    func testSettingsLight() throws { try capture("settings", "light") }
+    func testNowPlayingDark() throws { try capture("nowPlaying", "dark", ready: "screen.nowPlaying") }
+    func testDiagnosticsLight() throws { try capture("diagnostics", "light", ready: "screen.diagnostics") }
 
     // MARK: - Helpers
 
-    private enum Screen: String {
-        case home, library, search, searchResults, miniPlayer, diagnostics
+    private static let readyIdentifiers: [String: String] = [
+        "home": "screen.home",
+        "library": "screen.library",
+        "miniPlayer": "screen.library",
+        "miniPlayerAlone": "screen.albumDetail",
+        "search": "screen.search",
+        "settings": "screen.settings",
+    ]
 
-        /// Accessibility identifier of the view that must exist before the screenshot.
-        var readyIdentifier: String {
-            switch self {
-            case .home: "screen.home"
-            case .library, .miniPlayer: "screen.library"
-            case .search, .searchResults: "screen.search"
-            case .diagnostics: "screen.diagnostics"
-            }
-        }
-    }
-
-    private func capture(_ screen: Screen, _ appearance: String) throws {
+    private func capture(_ screen: String, _ appearance: String, ready: String? = nil) throws {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["-uiTest", "-screen", screen.rawValue, "-appearance", appearance]
+        app.launchArguments = ["-uiTest", "-screen", screen, "-appearance", appearance]
         app.launch()
 
-        let ready = app.descendants(matching: .any)[screen.readyIdentifier].firstMatch
-        XCTAssertTrue(ready.waitForExistence(timeout: 20), "\(screen.readyIdentifier) did not appear")
+        let identifier = ready ?? Self.readyIdentifiers[screen] ?? "screen.\(screen)"
+        let element = app.descendants(matching: .any)[identifier].firstMatch
+        XCTAssertTrue(element.waitForExistence(timeout: 20), "\(identifier) did not appear")
 
-        if screen == .search || screen == .searchResults {
-            // Selecting the Search tab activates search, which shows the system glass search field.
-            XCTAssertTrue(app.searchFields.firstMatch.waitForExistence(timeout: 10), "search field is not visible")
+        if screen.hasPrefix("miniPlayer") || screen == "home" || screen == "library" {
+            XCTAssertTrue(app.descendants(matching: .any)["miniPlayer"].firstMatch.waitForExistence(timeout: 10),
+                          "the mini player is not visible")
+        }
+        if screen == "home" || screen == "library" || screen == "miniPlayer" {
+            XCTAssertTrue(app.descendants(matching: .any)["navBar"].firstMatch.exists, "the bottom bar is not visible")
         }
 
-        if screen == .miniPlayer {
-            // Scroll down so the tab bar minimizes and the accessory moves inline.
-            let list = app.collectionViews.firstMatch
-            let target = list.exists ? list : app.windows.firstMatch
-            target.swipeUp()
-            Thread.sleep(forTimeInterval: 0.8)
-            target.swipeUp()
-            Thread.sleep(forTimeInterval: 1.0)
-        }
-
-        // Let glass, symbol effects and navigation transitions settle.
-        Thread.sleep(forTimeInterval: 1.5)
+        // Let artwork decoding, album colour extraction, glass and transitions settle.
+        Thread.sleep(forTimeInterval: 2.0)
 
         let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = "\(screen.rawValue)-\(appearance)"
+        attachment.name = "\(screen)-\(appearance)"
         attachment.lifetime = .keepAlways
         add(attachment)
 

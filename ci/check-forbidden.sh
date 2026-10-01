@@ -33,7 +33,7 @@ while IFS= read -r line; do
   ok=0
   for a in "${allowed_imports[@]}"; do [ "$module" = "$a" ] && { ok=1; break; }; done
   [ $ok -eq 1 ] || err "$file:$lineno: import of '$module' is not an allowed Apple framework or PixlCore module"
-done < <(grep -rnE --include='*.swift' '^[[:space:]]*(@[A-Za-z_]+([(][^)]*[)])?[[:space:]]+)*((public|internal|package|private|fileprivate)[[:space:]]+)?import[[:space:]]+' "${swift_dirs[@]}" 2>/dev/null)
+done < <(grep -rnE --include='*.swift' --exclude-dir=.build '^[[:space:]]*(@[A-Za-z_]+([(][^)]*[)])?[[:space:]]+)*((public|internal|package|private|fileprivate)[[:space:]]+)?import[[:space:]]+' "${swift_dirs[@]}" 2>/dev/null)
 
 # 2. Local packages only.
 if grep -nE '^[[:space:]]+(url|from|exactVersion|majorVersion|minorVersion|minVersion|maxVersion|branch|revision|github):' project.yml; then
@@ -51,12 +51,20 @@ if grep -nE 'type:[[:space:]]*(app-extension|extensionkit-extension|watchkit2-ex
   err "project.yml: app extensions / watch apps are forbidden (free Apple ID sideloading)"
 fi
 
-# 4. No glassEffect in content rows/cells/cards.
-while IFS= read -r f; do
-  if grep -nE 'glassEffect|GlassEffectContainer' "$f" | grep -vE '^[0-9]+:[[:space:]]*//' | grep -q .; then
-    err "$f: glassEffect is forbidden in rows/cells/cards (content layer — HIG)"
-  fi
-done < <(find App -type f -name '*.swift' \( -path '*/Rows/*' -o -name '*Row*.swift' -o -name '*Cell*.swift' -o -name '*Card*.swift' \) 2>/dev/null)
+# 4. Decision 10 (a port of PixlAudio with Liquid Glass in place of Material): no Material leftovers in the app.
+#    - Material / Compose names used as identifiers (Ripple, FloatingActionButton, FAB, TonalElevation, MaterialTheme,
+#      Material3, "Material" types) — PixlAudio palette role names (primaryContainer, …) are fine.
+#    - Fake glass: blur materials (.ultraThinMaterial, .thinMaterial, .regularMaterial, .thickMaterial,
+#      .ultraThickMaterial, .bar, Material.*), UIBlurEffect / UIVisualEffectView. Use glassEffect / .glass styles.
+#    Comment lines are ignored, so docs may name what they replace.
+material_pattern="\b(Ripple[A-Za-z]*|FloatingActionButton|FAB[A-Z][A-Za-z]*|[A-Za-z]*TonalElevation|tonalElevation|MaterialTheme|Material3|Material[A-Z][A-Za-z]*|Material\.)"
+fake_glass_pattern="[(:,][[:space:]]*\.(ultraThinMaterial|thinMaterial|regularMaterial|thickMaterial|ultraThickMaterial|bar)\b|\bUIBlurEffect\b|\bUIVisualEffectView\b"
+while IFS= read -r hit; do
+  err "$hit: Material leftover — replace with the Liquid Glass equivalent (docs/design.md, component mapping)"
+done < <(grep -rnE --include="*.swift" "$material_pattern" App 2>/dev/null | grep -vE "^[^:]+:[0-9]+:[[:space:]]*//")
+while IFS= read -r hit; do
+  err "$hit: fake glass (blur material) — use glassEffect / .buttonStyle(.glass) (orchestrator notes, Liquid Glass rules)"
+done < <(grep -rnE --include="*.swift" "$fake_glass_pattern" App 2>/dev/null | grep -vE "^[^:]+:[0-9]+:[[:space:]]*//")
 
 # 5. No "Apple" / "Apple Music" in UI strings (string literals in app sources, the string catalog, Info.plist values).
 while IFS= read -r hit; do

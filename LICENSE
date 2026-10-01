@@ -5,5 +5,5 @@ continuous-integration builds run on GitHub-hosted runners; public visibility do
 not grant any licence to use, copy, modify, or distribute the code, assets, or
 builds. A full licence text will replace this placeholder.
 
-Third-party notices: the app ships no third-party code. It uses only Apple system
-frameworks and the system font.
+Third-party notices: the app links no third-party libraries. It uses only Apple system
+frameworks and the system font; ported open-source code is listed in THIRD_PARTY_NOTICES.md.

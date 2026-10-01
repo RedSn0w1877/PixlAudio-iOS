@@ -1,136 +1,86 @@
 import Foundation
+import PixlModel
 
-/// A song in the stage-0 demo library. Replaced by `PixlModel.Song` in later stages.
-nonisolated struct DemoSong: Identifiable, Hashable, Sendable {
-    let id: String
-    let title: String
-    let artist: String
-    let album: String
-    let durationSeconds: Int
-    /// Hue (0…1) of the generated gradient artwork.
-    let hue: Double
+/// Deterministic demo data for UI tests, screenshots and previews: a small library of invented songs with
+/// generated gradient artwork (`demo-art://<seed>`, one seed per album). All names are invented.
+nonisolated enum DemoLibrary {
+    private static let raw: [(title: String, artist: String, album: String, seconds: Int, genre: String)] = [
+        ("Neon Harbor", "Luma Vale", "City of Glass", 214, "Synthpop"),
+        ("Paper Satellites", "The Quiet Arcade", "Low Orbit", 187, "Indie"),
+        ("Midnight Transit", "Sora Kline", "Night Lines", 243, "Electronic"),
+        ("Velvet Static", "Luma Vale", "City of Glass", 198, "Synthpop"),
+        ("Golden Hour Loop", "Aurelio & The Tides", "Seaside Tapes", 226, "Indie"),
+        ("Glasshouse", "Mira Okafor", "Greenhouse Sessions", 201, "R&B"),
+        ("Signal Fire", "Northbound Echo", "Wayfinder", 255, "Rock"),
+        ("Soft Machines", "The Quiet Arcade", "Low Orbit", 176, "Indie"),
+        ("Cloud Atlas Drive", "Sora Kline", "Night Lines", 232, "Electronic"),
+        ("Lanterns", "Hollow Pines", "Evergreen", 209, "Folk"),
+        ("After the Rain", "Mira Okafor", "Greenhouse Sessions", 194, "R&B"),
+        ("Chromatic", "Pixel Parade", "Eight Bit Hearts", 168, "Electronic"),
+        ("Tidal Memory", "Aurelio & The Tides", "Seaside Tapes", 247, "Indie"),
+        ("Wildflower Radio", "Hollow Pines", "Evergreen", 221, "Folk"),
+        ("Parallel Lines", "Northbound Echo", "Wayfinder", 238, "Rock"),
+        ("Kaleidoscope Heart", "Pixel Parade", "Eight Bit Hearts", 183, "Electronic"),
+        ("Slow Burn", "Juniper Rae", "Embers", 262, "Soul"),
+        ("Silver Lining", "Juniper Rae", "Embers", 205, "Soul"),
+        ("Northern Lights", "Luma Vale", "Aurora", 229, "Synthpop"),
+        ("Blue Hour", "Sora Kline", "Aurora", 216, "Electronic"),
+        ("Echo Park", "The Quiet Arcade", "Postcards", 191, "Indie"),
+        ("Starling", "Mira Okafor", "Postcards", 203, "R&B"),
+        ("Weightless", "Hollow Pines", "Drift", 274, "Ambient"),
+        ("Afterglow", "Pixel Parade", "Drift", 199, "Ambient"),
+    ]
 
-    /// "m:ss", computed once at creation (never in `body`).
-    let durationText: String
+    /// The demo library as a snapshot (built once).
+    static let snapshot: LibrarySnapshot = build()
 
-    init(id: String, title: String, artist: String, album: String, durationSeconds: Int, hue: Double) {
-        self.id = id
-        self.title = title
-        self.artist = artist
-        self.album = album
-        self.durationSeconds = durationSeconds
-        self.hue = hue
-        self.durationText = "\(durationSeconds / 60):" + String(format: "%02d", durationSeconds % 60)
-    }
-}
+    static var songs: [Song] { snapshot.songs }
 
-/// Library categories shown on the Library tab (architecture §3).
-nonisolated enum LibraryCategory: String, Hashable, Sendable, CaseIterable, Identifiable {
-    case playlists, artists, albums, songs, genres, folders, liked, downloaded, spotify
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .playlists: "Playlists"
-        case .artists: "Artists"
-        case .albums: "Albums"
-        case .songs: "Songs"
-        case .genres: "Genres"
-        case .folders: "Folders"
-        case .liked: "Liked Songs"
-        case .downloaded: "Downloaded"
-        case .spotify: "Spotify"
+    private static func build() -> LibrarySnapshot {
+        var albumIds: [String: Int64] = [:]
+        var artistIds: [String: Int64] = [:]
+        for item in raw {
+            if albumIds[item.album] == nil { albumIds[item.album] = Int64(albumIds.count + 1) }
+            if artistIds[item.artist] == nil { artistIds[item.artist] = Int64(artistIds.count + 1) }
         }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .playlists: "music.note.list"
-        case .artists: "music.mic"
-        case .albums: "square.stack"
-        case .songs: "music.note"
-        case .genres: "guitars"
-        case .folders: "folder"
-        case .liked: "heart"
-        case .downloaded: "arrow.down.circle"
-        case .spotify: "dot.radiowaves.left.and.right"
+        // 2026-09-01T00:00:00Z, minus a day per song so "recently added" has an order.
+        let base: Int64 = 1_788_220_800_000
+        let songs = raw.enumerated().map { index, item -> Song in
+            let albumId = albumIds[item.album]!
+            let artistId = artistIds[item.artist]!
+            return Song(id: "demo:\(index)", title: item.title, artist: item.artist, artistId: artistId,
+                        artists: [ArtistRef(id: artistId, name: item.artist, isPrimary: true)],
+                        album: item.album, albumId: albumId, albumArtist: item.artist,
+                        path: "/Demo/\(item.artist)/\(item.album)/\(item.title).m4a",
+                        contentUriString: "demo://song/\(index)", albumArtUriString: "demo-art://\(albumId * 3)",
+                        duration: Int64(item.seconds) * 1000, genre: item.genre, isFavorite: index % 5 == 0,
+                        trackNumber: index % 6 + 1, year: 2020 + index % 6,
+                        dateAdded: base - Int64(index) * 86_400_000, dateModified: base - Int64(index) * 86_400_000,
+                        mimeType: "audio/mp4", bitrate: 256_000, sampleRate: 44_100)
         }
-    }
-}
-
-/// A genre tile on the empty Search screen.
-nonisolated struct DemoGenre: Identifiable, Hashable, Sendable {
-    let name: String
-    let hue: Double
-    var id: String { name }
-}
-
-/// Deterministic demo data for UI tests, screenshots and the placeholder screens.
-/// All names are invented.
-nonisolated struct DemoLibrary: Sendable {
-    let songs: [DemoSong]
-    let genres: [DemoGenre]
-
-    init() {
-        let raw: [(String, String, String, Int)] = [
-            ("Neon Harbor", "Luma Vale", "City of Glass", 214),
-            ("Paper Satellites", "The Quiet Arcade", "Low Orbit", 187),
-            ("Midnight Transit", "Sora Kline", "Night Lines", 243),
-            ("Velvet Static", "Luma Vale", "City of Glass", 198),
-            ("Golden Hour Loop", "Aurelio & The Tides", "Seaside Tapes", 226),
-            ("Glasshouse", "Mira Okafor", "Greenhouse Sessions", 201),
-            ("Signal Fire", "Northbound Echo", "Wayfinder", 255),
-            ("Soft Machines", "The Quiet Arcade", "Low Orbit", 176),
-            ("Cloud Atlas Drive", "Sora Kline", "Night Lines", 232),
-            ("Lanterns", "Hollow Pines", "Evergreen", 209),
-            ("After the Rain", "Mira Okafor", "Greenhouse Sessions", 194),
-            ("Chromatic", "Pixel Parade", "Eight Bit Hearts", 168),
-            ("Tidal Memory", "Aurelio & The Tides", "Seaside Tapes", 247),
-            ("Wildflower Radio", "Hollow Pines", "Evergreen", 221),
-            ("Parallel Lines", "Northbound Echo", "Wayfinder", 238),
-            ("Kaleidoscope Heart", "Pixel Parade", "Eight Bit Hearts", 183),
-            ("Slow Burn", "Juniper Rae", "Embers", 262),
-            ("Silver Lining", "Juniper Rae", "Embers", 205),
-            ("Northern Lights", "Luma Vale", "Aurora", 229),
-            ("Blue Hour", "Sora Kline", "Aurora", 216),
-            ("Echo Park", "The Quiet Arcade", "Postcards", 191),
-            ("Starling", "Mira Okafor", "Postcards", 203),
-            ("Weightless", "Hollow Pines", "Drift", 274),
-            ("Afterglow", "Pixel Parade", "Drift", 199),
+        let albums = albumIds.sorted { $0.value < $1.value }.map { name, id -> Album in
+            let tracks = songs.filter { $0.albumId == id }
+            return Album(id: id, title: name, artist: tracks.first?.artist ?? "", year: tracks.first?.year ?? 0,
+                         dateAdded: tracks.map(\.dateAdded).max() ?? 0, albumArtUriString: "demo-art://\(id * 3)",
+                         songCount: tracks.count, albumArtist: tracks.first?.artist)
+        }
+        let artists = artistIds.sorted { $0.value < $1.value }.map { name, id in
+            Artist(id: id, name: name, songCount: songs.filter { $0.artistId == id }.count)
+        }
+        let electronic = songs.filter { $0.genre == "Electronic" }.map(\.id)
+        let calm = songs.filter { ["Folk", "Soul", "Ambient"].contains($0.genre ?? "") }.map(\.id)
+        let indie = songs.filter { $0.genre == "Indie" }.map(\.id)
+        let playlists = [
+            Playlist(id: "demo-playlist-1", name: "Late Night Drive", songIds: electronic, createdAt: base,
+                     lastModified: base, sortOrder: 0),
+            Playlist(id: "demo-playlist-2", name: "Sunday Morning", songIds: calm, createdAt: base,
+                     lastModified: base, sortOrder: 1),
+            Playlist(id: "demo-playlist-3", name: "Indie Favourites", songIds: indie, createdAt: base,
+                     lastModified: base, isAiGenerated: true, sortOrder: 2),
         ]
-        songs = raw.enumerated().map { index, item in
-            DemoSong(
-                id: "demo:\(index)",
-                title: item.0,
-                artist: item.1,
-                album: item.2,
-                durationSeconds: item.3,
-                hue: Double((index * 37) % 100) / 100
-            )
-        }
-        genres = [
-            DemoGenre(name: "Pop", hue: 0.93), DemoGenre(name: "Indie", hue: 0.08),
-            DemoGenre(name: "Electronic", hue: 0.62), DemoGenre(name: "Hip-Hop", hue: 0.75),
-            DemoGenre(name: "Rock", hue: 0.02), DemoGenre(name: "Jazz", hue: 0.12),
-            DemoGenre(name: "Ambient", hue: 0.52), DemoGenre(name: "Classical", hue: 0.33),
-            DemoGenre(name: "R&B", hue: 0.83), DemoGenre(name: "Lo-fi", hue: 0.45),
-        ]
+        return LibrarySnapshot(songs: songs, albums: albums, artists: artists, playlists: playlists)
     }
 
-    var recentlyPlayed: ArraySlice<DemoSong> { songs.prefix(6) }
-    var recentlyAdded: ArraySlice<DemoSong> { songs.suffix(6) }
-
-    /// Case- and diacritic-insensitive match on title, artist or album. Demo only — the real app uses
-    /// PixlLibrary's SearchIndex.
-    func search(_ query: String) -> [DemoSong] {
-        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty else { return [] }
-        let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
-        return songs.filter {
-            $0.title.range(of: q, options: options) != nil
-                || $0.artist.range(of: q, options: options) != nil
-                || $0.album.range(of: q, options: options) != nil
-        }
-    }
+    /// Genres of the demo library (Search's genre grid placeholder).
+    static var genreNames: [String] { Array(Set(raw.map(\.genre))).sorted() }
 }

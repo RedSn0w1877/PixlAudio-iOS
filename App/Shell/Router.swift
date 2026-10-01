@@ -1,56 +1,78 @@
 import Observation
 import SwiftUI
 
-/// The root tabs.
-nonisolated enum RootTab: String, Hashable, Sendable, CaseIterable {
-    case home
-    case library
-    case search
-}
-
-/// Pushed destinations inside a tab's `NavigationStack`.
-nonisolated enum Route: Hashable, Sendable {
-    case settings
-    case diagnostics
-    case category(LibraryCategory)
-}
-
-/// Navigation state for the whole shell: selected tab, one path per tab, the search query.
+/// Navigation state for the whole shell: the selected tab, one stack per tab, and the presented sheet / cover.
+/// Feature code navigates through these methods (or `@Bindable` paths); it never owns navigation state itself.
 @Observable
 final class Router {
     var selection: RootTab
-    var homePath: [Route]
-    var libraryPath: [Route]
-    var searchPath: [Route]
+    var homePath: [AppRoute]
+    var searchPath: [AppRoute]
+    var libraryPath: [AppRoute]
+    var sheet: AppSheet?
+    var cover: AppCover?
+    /// The Search screen's query (stage 7c owns the field; kept here so deep links and UI tests can prefill it).
     var searchText: String
-    /// Whether search is active. Bound to `.searchable(isPresented:)`. On iOS 27 a search-role tab shows
-    /// no idle search field (verified on the iOS 27.0 simulator), so selecting the Search tab activates
-    /// search — see `RootTabView`.
-    var isSearchPresented: Bool
 
     init(launch: LaunchConfiguration) {
         let start = UITestLaunchRouter.initialState(for: launch)
         selection = start.tab
         homePath = start.homePath
+        searchPath = start.searchPath
         libraryPath = start.libraryPath
-        searchPath = []
+        sheet = start.sheet
+        cover = start.cover
         searchText = start.searchText
-        isSearchPresented = start.tab == .search
     }
-}
 
-extension View {
-    /// Registers every `Route` destination. Apply once at the root of each tab's `NavigationStack`.
-    func withRouteDestinations() -> some View {
-        navigationDestination(for: Route.self) { route in
-            switch route {
-            case .settings:
-                SettingsView()
-            case .diagnostics:
-                DiagnosticsView()
-            case .category(let category):
-                LibraryCategoryView(category: category)
-            }
+    /// The path of the selected tab.
+    var currentPath: [AppRoute] {
+        switch selection {
+        case .home: homePath
+        case .search: searchPath
+        case .library: libraryPath
         }
     }
+
+    /// Android shows the bottom bar only at a tab's root (MainActivity `routesWithHiddenNavigationBar`).
+    var isNavigationBarVisible: Bool {
+        guard let top = currentPath.last else { return true }
+        return !top.hidesNavigationBar
+    }
+
+    /// Pushes onto the selected tab's stack.
+    func push(_ route: AppRoute) {
+        switch selection {
+        case .home: homePath.append(route)
+        case .search: searchPath.append(route)
+        case .library: libraryPath.append(route)
+        }
+    }
+
+    /// Pops the selected tab's top route.
+    func pop() {
+        switch selection {
+        case .home: if !homePath.isEmpty { homePath.removeLast() }
+        case .search: if !searchPath.isEmpty { searchPath.removeLast() }
+        case .library: if !libraryPath.isEmpty { libraryPath.removeLast() }
+        }
+    }
+
+    /// Bottom-bar tap: switches tab; tapping the selected tab pops it to its root (Android `navigateToTopLevelSafely`).
+    func select(_ tab: RootTab) {
+        if tab == selection {
+            switch tab {
+            case .home: homePath.removeAll()
+            case .search: searchPath.removeAll()
+            case .library: libraryPath.removeAll()
+            }
+        } else {
+            selection = tab
+        }
+    }
+
+    func present(_ sheet: AppSheet) { self.sheet = sheet }
+    func present(_ cover: AppCover) { self.cover = cover }
+    func dismissSheet() { sheet = nil }
+    func dismissCover() { cover = nil }
 }

@@ -491,6 +491,34 @@ DEFLATED, data descriptors), `android-v3-stored.pxpl`, `android-v2-legacy.pxpl` 
 - Full local PixlCore run after the merge: 953 tests (Foundation 29, Model 47, Lyrics 289, Library 122, AudioCore 105,
   Tags 73, Net 145, Backup 143), all passing on Windows.
 
+## Stage 4 — album-art theme (PixlLibrary/ArtworkTheme)
+Android has no unit tests for `ColorRoles.kt` / `ColorSchemeProcessor`; the port is checked against golden vectors
+from the real Android classes instead (`tools/android-reference/ThemeGen.java` →
+`Tests/PixlLibraryTests/Fixtures/theme-golden.jsonl`, 9446 lines). `ThemeGoldenTests` (11 tests, all bit-exact on
+Windows and macOS):
+
+| Swift test | Android code it is checked against |
+|---|---|
+| `hctMatchesAndroid` | `Hct.fromInt` hue/chroma/tone for 139 colours (±1e-9) |
+| `solverMatchesAndroid` | `Hct.from(h, c, t)` (HctSolver) over a 24×16×21 grid, exact ARGB |
+| `tonalPalettesMatchAndroid` | `TonalPalette.fromHueAndChroma` key colour + 27 tones for 10 palettes |
+| `schemesMatchAndroid` | all 48 roles of `SchemeTonalSpot/Vibrant/Expressive/FruitSalad` × light/dark for 40 seeds |
+| `monochromeSchemesMatchAndroid` | `SchemeMonochrome` (Android `generateMonochromeColorSchemeFromSeed`) |
+| `neutralSchemeDecisionMatchesAndroid` | private `ColorRolesKt.shouldUseNeutralArtworkScheme` (+ the grey pair) |
+| `grayscaleMatchesAndroidX` | `toGrayscaleColorScheme`'s convert (AndroidX `ColorUtils.colorToHSL` / `HSLToColor`) |
+| `blendMatchesAndroid` | private `ColorRolesKt.blendArgb` (Float maths) |
+| `quantizersMatchAndroid` | `QuantizerWu` and `QuantizerCelebi` (Wu + WSMeans) on 48 procedural images, colours and populations in order |
+| `seedColorsMatchAndroid` | `ColorRolesKt.selectSeedColorArgbFromPixels` on 48 images × accuracy 0 / 4 / 10 |
+| `publicAPIBasics` | Swift-only: storage keys, accuracy clamp, cache key format, RGBA → ARGB conversion, empty input fallback |
+
+### Notes
+- Ported from the colour utilities in `com.google.android.material:material` 1.14.0 (= upstream commit
+  `03336bf6de`: on-container tones 30 in light, opacity on `DynamicColor`, `TonalPalette.KeyColor`), Apache-2.0
+  (THIRD_PARTY_NOTICES.md). Upstream's k-means keeps its sorted distance rows and overwrites them by position on
+  later iterations; the port keeps that quirk (results depend on it).
+- Where WSMeans would index past its cluster array (more starting clusters than distinct pixels), Java throws and
+  Android's `runCatching` returns `DarkColorScheme.primary` (`0xFFAB47BC`); the port returns the same seed.
+
 ## Priority list (from architecture §4, must pass on Windows before UI work)
 - ~~`LyricsEngineTest`, `LyricsClockTest`, `LyricsMotionMathTest`, `PreparedLyricsBuilderTest`,
   `LyricsBackgroundGradeTest` → PixlLyrics / PixlFoundation (stages 2b/2c).~~ Done (integration A).
@@ -502,7 +530,8 @@ DEFLATED, data descriptors), `android-v3-stored.pxpl`, `android-v2-legacy.pxpl` 
 ## App tests (XCTest, not ported from Android)
 | Test | Covers |
 |---|---|
-| `AppTests/LaunchConfigurationTests` | launch-argument parsing, UI-test routing for every `DemoScreen`, demo search, demo playback store |
+| `LaunchConfigurationTests` | launch-argument parsing; every `DemoScreen` routes to exactly one destination with its ready id; settings sub-screens stack on Settings; router push/pop/select/bar visibility/sheets |
+| `StoreTests` | demo library consistency; `LibraryStore` lookups; `PlaybackStore` + `DemoPlaybackEngine` (play, repeat-all wrap, pause, position ≤ duration); `SettingsStore` Android keys + defaults + persistence; `ArtworkSource` parsing; generated art → pixels → seed → coloured scheme; theme/type tokens; SwiftData round trip of the library and artwork themes |
 | `TestToneWriterTests` | WAV header/size, tone not silent and not clipping |
 | `KeychainStoreTests` | set/read/delete round trip (skips if the simulator build lacks keychain entitlement) |
-| `UITests/ScreenshotTests` | home, library, search, search results, mini player (inline), diagnostics × light/dark |
+| `UITests/ScreenshotTests` | shell: home, library, miniPlayer (album-tinted), miniPlayerAlone (bar hidden) × light/dark; search, settings, nowPlaying, diagnostics |
