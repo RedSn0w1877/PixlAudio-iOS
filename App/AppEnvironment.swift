@@ -82,6 +82,7 @@ final class AppEnvironment {
                 playback.play(songs, startIndex: min(launch.songIndex, songs.count - 1),
                               playWhenReady: launch.startsPlaying)
             }
+            if launch.hasSong, launch.screen?.opensOverPlayer == true { playerSheet.expand(animated: false) }
         } else {
             let loader = persistence.map { SnapshotLoader(persistence: $0, cacheURL: SnapshotLoader.defaultCacheURL()) }
             let importer = persistence.map { LocalLibraryImporter(persistence: $0) }

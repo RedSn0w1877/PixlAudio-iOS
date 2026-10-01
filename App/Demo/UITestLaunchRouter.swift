@@ -157,10 +157,17 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         }
     }
 
+    /// Stage 8: the player's sheets open over the expanded player, as on Android (`AppEnvironment` expands it).
+    var opensOverPlayer: Bool {
+        switch self {
+        case .queue, .sleepTimer, .devices, .artistPicker, .aiDJ: true
+        default: false
+        }
+    }
+
     var cover: AppCover? {
         switch self {
-        // The player's sheets open over the expanded player, as on Android.
-        case .nowPlaying, .queue, .sleepTimer, .devices, .artistPicker, .aiDJ: .nowPlaying
+        case .nowPlaying: .nowPlaying
         case .editSong: .editSong(songId: DemoLibrary.songs.first?.id ?? "")
         case .lyrics: .lyrics
         case .lyricsSync: .lyricsSync(songId: DemoLibrary.songs.first?.id ?? "")

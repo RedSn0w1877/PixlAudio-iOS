@@ -36,46 +36,48 @@ struct NowPlayingView: View {
 
     private func content(_ song: Song) -> some View {
         let isVisible = env.playerSheet.isExpanded || env.playerSheet.isDragging
-        return ZStack(alignment: .top) {
+        // The background never takes part in layout (a filled cover is wider than the screen).
+        return VStack(spacing: 0) {
+            PlayerTopBar(song: song)
+                .padding(.top, safeArea.top)
+                .playerSectionFade(start: 0)
+            VStack(spacing: 0) {
+                Spacer(minLength: 0)
+                VStack(spacing: 0) {
+                    AlbumCarousel(queue: playback.queue, currentIndex: playback.currentIndex,
+                                  style: PlayerCarouselStyle(storageKey: settings.appearance.carouselStyle),
+                                  isPlaying: playback.isPlaying,
+                                  onSelect: { index in playback.skipToQueueItem(at: index) },
+                                  onAlbumTap: { tapped in openAlbum(tapped) })
+                        .padding(.vertical, 8)
+                        .playerSectionFade(start: 0.08)
+                    VStack(alignment: .leading, spacing: 4) {
+                        PlayerMetadataRow(song: song)
+                            .playerSectionFade(start: 0.20, slide: 24)
+                        PlayerSeekBar(song: song, isPlaying: playback.isPlaying, isActive: isVisible,
+                                      clock: playback.clock,
+                                      onSeek: { playback.seek(toMs: $0) },
+                                      onScrubbingChange: { env.playerSheet.isScrubbing = $0 })
+                            .playerSectionFade(start: 0.08)
+                    }
+                }
+                Spacer(minLength: 0)
+                Spacer(minLength: 0)
+                controls(song)
+                    .playerSectionFade(start: 0.42)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, safeArea.bottom)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
             PlayerAmbientBackground(song: song, style: PlayerAmbientStyle(storageKey: settings.playback.playerAmbientStyle),
                                     isPlaying: playback.isPlaying, isVisible: isVisible)
                 .contentShape(.rect)
                 .onTapGesture {
                     if settings.behavior.tapBackgroundClosesPlayer { env.playerSheet.collapse() }
                 }
-            VStack(spacing: 0) {
-                PlayerTopBar(song: song)
-                    .padding(.top, safeArea.top)
-                    .playerSectionFade(start: 0)
-                VStack(spacing: 0) {
-                    Spacer(minLength: 0)
-                    VStack(spacing: 0) {
-                        AlbumCarousel(queue: playback.queue, currentIndex: playback.currentIndex,
-                                      style: PlayerCarouselStyle(storageKey: settings.appearance.carouselStyle),
-                                      isPlaying: playback.isPlaying,
-                                      onSelect: { index in playback.skipToQueueItem(at: index) },
-                                      onAlbumTap: { tapped in openAlbum(tapped) })
-                            .padding(.vertical, 8)
-                            .playerSectionFade(start: 0.08)
-                        VStack(alignment: .leading, spacing: 4) {
-                            PlayerMetadataRow(song: song)
-                                .playerSectionFade(start: 0.20, slide: 24)
-                            PlayerSeekBar(song: song, isPlaying: playback.isPlaying, isActive: isVisible,
-                                          clock: playback.clock,
-                                          onSeek: { playback.seek(toMs: $0) },
-                                          onScrubbingChange: { env.playerSheet.isScrubbing = $0 })
-                                .playerSectionFade(start: 0.08)
-                        }
-                    }
-                    Spacer(minLength: 0)
-                    Spacer(minLength: 0)
-                    controls(song)
-                        .playerSectionFade(start: 0.42)
-                    Spacer(minLength: 0)
-                }
-                .padding(.horizontal, 24)
-                .padding(.bottom, safeArea.bottom)
-            }
         }
         .environment(\.appTheme, theme)
         .accessibilityElement(children: .contain)

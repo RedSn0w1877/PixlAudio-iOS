@@ -70,17 +70,18 @@ private struct BlendedCoverBackground: View {
     @State private var image: ArtworkImage?
 
     var body: some View {
-        ZStack {
-            if let image {
-                Image(decorative: image.cgImage, scale: 1)
-                    .resizable()
-                    .scaledToFill()
-                    .opacity(0.5)
-                    .transition(.opacity)
+        // The filled image lives in an overlay of a flexible clear view, so it never widens its parent.
+        Color.clear
+            .overlay {
+                if let image {
+                    Image(decorative: image.cgImage, scale: 1)
+                        .resizable()
+                        .scaledToFill()
+                        .opacity(0.5)
+                        .transition(.opacity)
+                }
             }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .clipped()
+            .clipped()
         .allowsHitTesting(false)
         .task(id: song.albumArtUriString) {
             guard let source = ArtworkSource(song: song) else { image = nil; return }

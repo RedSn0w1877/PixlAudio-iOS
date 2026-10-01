@@ -46,7 +46,7 @@ final class PlayerScreenshotTests: XCTestCase {
     func testQueueLight() throws { try capture("queue", "light", ready: "screen.queue") }
     func testQueueDark() throws { try capture("queue", "dark", ready: "screen.queue") }
     func testQueueMenuLight() throws {
-        try capture("queue", "light", ready: "screen.queue", tap: "queue.more", name: "queueMenu")
+        try capture("queue", "light", ready: "screen.queue", tap: "More actions", name: "queueMenu")
     }
     func testSleepTimerLight() throws { try capture("sleepTimer", "light", ready: "screen.sleepTimer") }
     func testSleepTimerDark() throws { try capture("sleepTimer", "dark", ready: "screen.sleepTimer") }
@@ -59,7 +59,7 @@ final class PlayerScreenshotTests: XCTestCase {
     func testDevicesLight() throws { try capture("devices", "light", ready: "screen.devices") }
     func testDevicesDark() throws { try capture("devices", "dark", ready: "screen.devices") }
     func testDevicesTabLight() throws {
-        try capture("devices", "light", ready: "screen.devices", tap: "devices.tab.1", name: "devicesList")
+        try capture("devices", "light", ready: "screen.devices", tap: "DEVICES", name: "devicesList")
     }
 
     // MARK: - Helpers
@@ -78,7 +78,9 @@ final class PlayerScreenshotTests: XCTestCase {
         let element = app.descendants(matching: .any)[ready].firstMatch
         XCTAssertTrue(element.waitForExistence(timeout: 20), "\(ready) did not appear on \(screen)")
         if let tap {
-            let button = app.descendants(matching: .any)[tap].firstMatch
+            // By identifier or label (controls inside a GlassEffectContainer keep only their labels).
+            let predicate = NSPredicate(format: "identifier == %@ OR label == %@", tap, tap)
+            let button = app.buttons.matching(predicate).firstMatch
             XCTAssertTrue(button.waitForExistence(timeout: 10), "\(tap) is missing on \(screen)")
             button.tap()
         }

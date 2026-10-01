@@ -205,7 +205,7 @@ struct SleepTimerSheet: View {
 extension View {
     /// The timer sheet's presentation: tall enough for its content without scrolling, the system handle.
     func sleepTimerPresentation() -> some View {
-        presentationDetents([.height(620), .large])
+        presentationDetents([.height(560), .large])
             .presentationDragIndicator(.visible)
     }
 }
