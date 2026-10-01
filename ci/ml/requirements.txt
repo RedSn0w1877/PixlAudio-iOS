@@ -1,0 +1,8 @@
+# Build-time only (ml-convert.yml); nothing here ships in the app.
+numpy==1.26.4
+torch==2.5.0
+transformers==4.46.3
+coremltools==8.3.0
+onnx==1.16.2
+onnxruntime==1.19.2
+onnx2torch==1.5.15

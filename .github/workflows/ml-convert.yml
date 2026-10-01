@@ -1,0 +1,165 @@
+name: ml-convert
+
+# Manual, build-time only: converts the on-device ML models to Core ML and publishes them as assets of the GitHub
+# Release `models-v1` (a prerelease, so the app's update check never sees it). The app downloads them on demand
+# (App/Services/ML/ModelManager.swift) and pins each tar's SHA-256 in App/Services/ML/ModelCatalog.swift — so an
+# existing asset is only replaced when `replace` is ticked, and the catalog must be updated in the same change.
+#
+#   wav2vec2 — facebook/wav2vec2-base-960h (Android's TAIS lyric-sync model), fp16 ML Program, fixed 10 s windows,
+#              gated against PyTorch (ci/ml/convert_wav2vec2.py). Required.
+#   mdx      — ATTEMPT: UVR-MDX-NET-Voc_FT (Android's on-device instrumental model) via ONNX -> PyTorch -> Core ML,
+#              gated against ONNX Runtime (ci/ml/convert_mdx.py). Allowed to fail; its report says why.
+on:
+  workflow_dispatch:
+    inputs:
+      models:
+        description: Which models to convert
+        type: choice
+        options: [all, wav2vec2, mdx]
+        default: all
+      replace:
+        description: Replace assets that already exist on models-v1 (update ModelCatalog.swift's pins too!)
+        type: boolean
+        default: false
+  push:
+    # Development trigger for the stage-14 branch only (workflow_dispatch needs the file on the default branch).
+    branches: [s14-ml]
+    paths:
+      - .github/workflows/ml-convert.yml
+      - ci/ml/**
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ml-convert
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: models-v1
+  PIP_DISABLE_PIP_VERSION_CHECK: '1'
+
+jobs:
+  wav2vec2:
+    if: github.event_name == 'push' || inputs.models == 'all' || inputs.models == 'wav2vec2'
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Python environment
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          pip install -r ci/ml/requirements.txt
+          pip freeze | grep -iE 'torch|coreml|transformers|numpy'
+      - name: Convert + parity gate
+        env:
+          HF_HUB_DISABLE_TELEMETRY: '1'
+        run: |
+          . .venv/bin/activate
+          python ci/ml/convert_wav2vec2.py --out out
+      - name: Report
+        if: always()
+        run: |
+          if [ -f out/wav2vec2-report.json ]; then
+            echo '### wav2vec2 conversion' >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat out/wav2vec2-report.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ml-wav2vec2
+          path: |
+            out/wav2vec2-report.json
+            out/*.tar
+          retention-days: 7
+          if-no-files-found: warn
+
+  mdx:
+    if: github.event_name == 'push' || inputs.models == 'all' || inputs.models == 'mdx'
+    runs-on: macos-26
+    timeout-minutes: 60
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Python environment
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          pip install -r ci/ml/requirements.txt
+      - name: Convert + parity gate (attempt)
+        run: |
+          . .venv/bin/activate
+          python ci/ml/convert_mdx.py --out out
+      - name: Report
+        if: always()
+        run: |
+          if [ -f out/mdx-report.json ]; then
+            echo '### MDX-Net conversion (attempt)' >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat out/mdx-report.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ml-mdx
+          path: |
+            out/mdx-report.json
+            out/*.tar
+          retention-days: 7
+          if-no-files-found: warn
+
+  publish:
+    needs: [wav2vec2, mdx]
+    if: always() && (needs.wav2vec2.result == 'success' || needs.mdx.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ml-*
+          path: dist
+          merge-multiple: true
+      - name: Publish to the models-v1 release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPLACE: ${{ inputs.replace && 'true' || 'false' }}
+        run: |
+          set -euo pipefail
+          ls -la dist
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --prerelease --target "$GITHUB_SHA" \
+              --title "On-device models v1" \
+              --notes "Core ML models for PixlAudio's on-device features, downloaded by the app on demand. Built by .github/workflows/ml-convert.yml; see models-v1.json for checksums and parity results."
+          fi
+          mkdir -p previous
+          gh release download "$RELEASE_TAG" -p models-v1.json -D previous 2>/dev/null || true
+          existing="$(gh release view "$RELEASE_TAG" --json assets -q '.assets[].name')"
+          kept=""
+          for f in dist/*.tar; do
+            [ -e "$f" ] || continue
+            name="$(basename "$f")"
+            if printf '%s\n' "$existing" | grep -qx "$name" && [ "$REPLACE" != "true" ]; then
+              echo "::warning::$name already on $RELEASE_TAG — kept (tick 'replace' to overwrite, then update ModelCatalog.swift)"
+              kept="$kept $name"
+              continue
+            fi
+            gh release upload "$RELEASE_TAG" "$f" --clobber
+          done
+          # Kept assets keep their previous manifest entry, so the manifest always describes what is published.
+          python3 ci/ml/manifest.py dist dist/models-v1.json --previous previous/models-v1.json --kept $kept
+          gh release upload "$RELEASE_TAG" dist/models-v1.json dist/*-report.json --clobber
+          echo '### models-v1 manifest' >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat dist/models-v1.json >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
