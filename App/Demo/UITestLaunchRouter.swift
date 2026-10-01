@@ -38,12 +38,23 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     // Full-screen covers
     case nowPlaying, lyrics, lyricsSync, setup
 
+    // Stage 7a: Library tabs, sheets and selection; playlist and genre detail states
+    case libraryAlbums, libraryAlbumsList, libraryArtists, libraryPlaylists, libraryFolders, libraryLiked
+    case librarySelection, librarySort, libraryReorderTabs, libraryMultiSelection, libraryCreatePlaylist
+    case libraryAddToPlaylist, songOptionsInfo
+    case playlistEdit, playlistAddSongs, playlistOptions, playlistReorder, genreSort
+
     /// The accessibility identifier present once the screen is up (`screen.<id>`).
     var readyIdentifier: String {
         switch self {
         case .home: return "screen.home"
         case .search, .searchResults: return "screen.search"
         case .library, .miniPlayer: return "screen.library"
+        case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryFolders, .libraryLiked,
+             .librarySelection, .librarySort, .libraryReorderTabs, .libraryMultiSelection, .libraryCreatePlaylist,
+             .libraryAddToPlaylist:
+            return "screen.library"
+        case .songOptionsInfo: return "screen.songInfo"
         case .miniPlayerAlone: return "screen.albumDetail"
         default:
             if let route { return "screen.\(route.screenID)" }
@@ -58,6 +69,14 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         let demo = DemoLibrary.snapshot
         switch self {
         case .home, .search, .searchResults, .library, .miniPlayer: return nil
+        case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryFolders, .libraryLiked,
+             .librarySelection, .librarySort, .libraryReorderTabs, .libraryMultiSelection, .libraryCreatePlaylist,
+             .libraryAddToPlaylist, .songOptionsInfo:
+            return nil
+        case .playlistEdit: return .playlistEditor(playlistId: demo.playlists.first?.id)
+        case .playlistAddSongs, .playlistOptions, .playlistReorder:
+            return .playlistDetail(playlistId: demo.playlists.first?.id ?? "")
+        case .genreSort: return .genreDetail(genreId: "Indie")
         case .miniPlayerAlone, .albumDetail: return .albumDetail(albumId: demo.albums.first?.id ?? 1)
         case .artistDetail: return .artistDetail(artistId: demo.artists.first?.id ?? 1)
         case .genreDetail: return .genreDetail(genreId: "Indie")
@@ -109,6 +128,11 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .library, .miniPlayer, .miniPlayerAlone, .albumDetail, .artistDetail, .genreDetail, .playlistDetail,
              .playlistEditor, .folderExplorer:
             .library
+        case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryFolders, .libraryLiked,
+             .librarySelection, .librarySort, .libraryReorderTabs, .libraryMultiSelection, .libraryCreatePlaylist,
+             .libraryAddToPlaylist, .songOptionsInfo, .playlistEdit, .playlistAddSongs, .playlistOptions,
+             .playlistReorder, .genreSort:
+            .library
         default: .home
         }
     }
@@ -117,7 +141,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         let songId = DemoLibrary.songs.first?.id ?? ""
         switch self {
         case .queue: return .queue
-        case .songInfo: return .songInfo(songId: songId)
+        case .songInfo, .songOptionsInfo: return .songInfo(songId: songId)
         case .sleepTimer: return .sleepTimer
         case .lyricsOptions: return .lyricsOptions(songId: songId)
         case .changelog: return .changelog

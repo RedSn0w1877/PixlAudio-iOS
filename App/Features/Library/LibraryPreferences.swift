@@ -34,8 +34,22 @@ final class LibraryPreferences {
         didSet { defaults.set(storageFilter.value, forKey: PreferenceKeys.lastStorageFilter) }
     }
 
+    /// Android `playlist_song_order_modes`: per playlist, `"manual"` or a song sort storage key (JSON object).
+    var playlistSongOrderModes: [String: String] {
+        didSet {
+            let data = try? JSONEncoder().encode(playlistSongOrderModes)
+            defaults.set(data.map { String(decoding: $0, as: UTF8.self) }, forKey: Self.playlistSongOrderModesKey)
+        }
+    }
+
+    static let playlistSongOrderModesKey = "playlist_song_order_modes"
+    /// Android `MANUAL_ORDER_MODE`.
+    static let manualOrderMode = "manual"
+
     init(defaults: UserDefaults) {
         self.defaults = defaults
+        playlistSongOrderModes = defaults.string(forKey: Self.playlistSongOrderModesKey)
+            .flatMap { try? JSONDecoder().decode([String: String].self, from: Data($0.utf8)) } ?? [:]
         tabOrder = LibraryTab.decodeOrder(defaults.string(forKey: PreferenceKeys.libraryTabsOrder))
         func sort(_ key: String, _ allowed: [SortOption], _ fallback: SortOption) -> SortOption {
             SortOption.fromStorageKey(defaults.string(forKey: key), allowed: allowed, fallback: fallback)
@@ -60,6 +74,18 @@ final class LibraryPreferences {
     }
 
     private static var instance: LibraryPreferences?
+
+    // MARK: Playlist song order (Android `PlaylistSongsOrderMode`)
+
+    /// The song order of a playlist: `.songDefaultOrder` = manual (the playlist's own order, the default).
+    func songOrder(forPlaylist id: String) -> SortOption {
+        guard let stored = playlistSongOrderModes[id], stored != Self.manualOrderMode else { return .songDefaultOrder }
+        return SortOption.fromStorageKey(stored, allowed: SortOption.songs, fallback: .songTitleAZ)
+    }
+
+    func setSongOrder(_ option: SortOption, forPlaylist id: String) {
+        playlistSongOrderModes[id] = option == .songDefaultOrder ? Self.manualOrderMode : option.storageKey
+    }
 
     // MARK: Per-tab sort
 

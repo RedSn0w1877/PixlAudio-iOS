@@ -65,6 +65,10 @@ struct SongOptionsSheet: View {
                 dismiss()
             }
         }
+        .onAppear {
+            // UI tests open the Info page straight away.
+            if env.launch.screen == .songOptionsInfo { page = 1 }
+        }
         .accessibilityIdentifier("screen.songInfo")
     }
 

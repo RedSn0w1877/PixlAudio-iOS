@@ -31,10 +31,12 @@ struct SegmentedGlassButton: View {
                                            style: .continuous)
         Button(action: action) {
             HStack(spacing: Tokens.Spacing.s) {
-                Image(systemName: systemImage)
-                    .font(.system(size: iconSize * 0.85, weight: .semibold))
-                    .frame(width: iconSize, height: iconSize)
-                    .rotationEffect(.degrees(iconRotation))
+                if iconSize > 0 {
+                    Image(systemName: systemImage)
+                        .font(.system(size: iconSize * 0.85, weight: .semibold))
+                        .frame(width: iconSize, height: iconSize)
+                        .rotationEffect(.degrees(iconRotation))
+                }
                 if let title {
                     Text(title)
                         .pixlFont(titleStyle)
@@ -268,7 +270,7 @@ struct PlaylistCoverArt: View {
 }
 
 /// Clip shape of a playlist cover (Android `PlaylistCover` shapes); unknown / nil = 8 pt rounded square.
-struct PlaylistCoverShape: Shape {
+nonisolated struct PlaylistCoverShape: Shape {
     let type: String?
     let size: CGFloat
     let details: [Float?]
@@ -297,7 +299,7 @@ struct PlaylistCoverShape: Shape {
 
 /// Android `RoundedStarShape(sides, curve, rotation)`: a star whose radius follows `1 + curve·cos(sides·θ)`,
 /// sampled every degree.
-struct RoundedStar: Shape {
+nonisolated struct RoundedStar: Shape {
     var sides: Int
     var curve: Double
     var rotation: Double
