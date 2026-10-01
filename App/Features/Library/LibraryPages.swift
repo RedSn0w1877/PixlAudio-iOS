@@ -451,8 +451,8 @@ struct PlaylistRow: View {
             }
             if showsDragHandle, let dragPayload {
                 Spacer().frame(width: 4)
-                Image(systemName: "circle.grid.2x3.fill")
-                    .font(.system(size: 15, weight: .semibold))
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(theme.onSurfaceVariant)
                     .frame(width: 40, height: 40)
                     .contentShape(.rect)
