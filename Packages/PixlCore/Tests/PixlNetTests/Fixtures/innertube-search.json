@@ -1,0 +1,63 @@
+{
+  "responseContext": {"visitorData": "CgtTRUFSQ0g%3D"},
+  "contents": {
+    "tabbedSearchResultsRenderer": {
+      "tabs": [{
+        "tabRenderer": {
+          "content": {
+            "sectionListRenderer": {
+              "contents": [{
+                "musicShelfRenderer": {
+                  "contents": [
+                    {"musicResponsiveListItemRenderer": {
+                      "thumbnail": {"musicThumbnailRenderer": {"thumbnail": {"thumbnails": [
+                        {"url": "https://lh3.googleusercontent.com/small", "width": 60, "height": 60},
+                        {"url": "https://lh3.googleusercontent.com/large", "width": 120, "height": 120},
+                        {"url": "https://lh3.googleusercontent.com/same", "width": 120, "height": 120}
+                      ]}}},
+                      "flexColumns": [
+                        {"musicResponsiveListItemFlexColumnRenderer": {"text": {"runs": [{"text": "Northern "}, {"text": "Lights"}]}}},
+                        {"musicResponsiveListItemFlexColumnRenderer": {"text": {"runs": [
+                          {"text": "Song"}, {"text": " • "}, {"text": "Nova"}, {"text": " • "}, {"text": "First Light"}, {"text": " • "}, {"text": "3:03"}
+                        ]}}}
+                      ],
+                      "playlistItemData": {"videoId": "abcdefghijk"}
+                    }},
+                    {"musicResponsiveListItemRenderer": {
+                      "overlay": {"musicItemThumbnailOverlayRenderer": {"content": {"musicPlayButtonRenderer": {"playNavigationEndpoint": {"watchEndpoint": {"videoId": "  "}}}}}},
+                      "menu": {"navigationEndpoint": {"watchEndpoint": {"videoId": "videoIdBBBB"}}},
+                      "flexColumns": [
+                        {"musicResponsiveListItemFlexColumnRenderer": {"text": {"runs": [{"text": "Northern Lights (Official Video)"}]}}},
+                        {"musicResponsiveListItemFlexColumnRenderer": {"text": {"runs": [
+                          {"text": "Video"}, {"text": "•"}, {"text": "NovaVEVO"}, {"text": " • "}, {"text": "1.2M views"}, {"text": " • "}, {"text": "1:04:01"}
+                        ]}}}
+                      ]
+                    }},
+                    {"musicResponsiveListItemRenderer": {
+                      "flexColumns": [
+                        {"musicResponsiveListItemFlexColumnRenderer": {"text": {"runs": [{"text": "Duplicate"}]}}}
+                      ],
+                      "playlistItemData": {"videoId": "abcdefghijk"}
+                    }},
+                    {"musicResponsiveListItemRenderer": {"playlistItemData": {"videoId": "noColumns11"}}},
+                    {"musicResponsiveListItemRenderer": {
+                      "flexColumns": [{"musicResponsiveListItemFlexColumnRenderer": {"text": {"runs": [{"text": "  "}]}}}],
+                      "playlistItemData": {"videoId": "blankTitle1"}
+                    }},
+                    {"musicResponsiveListItemRenderer": {
+                      "flexColumns": [
+                        {"musicResponsiveListItemFlexColumnRenderer": {"text": {"runs": [{"text": "Aurora"}]}}},
+                        {"musicResponsiveListItemFlexColumnRenderer": {"text": {"runs": [{"text": "Single Artist"}, {"text": " • "}, {"text": "2.3K plays"}]}}}
+                      ],
+                      "playlistItemData": {"videoId": "auroraVideo"}
+                    }}
+                  ]
+                }
+              }]
+            }
+          }
+        }
+      }]
+    }
+  }
+}

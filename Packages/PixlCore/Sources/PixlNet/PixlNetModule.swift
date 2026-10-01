@@ -1,5 +1,5 @@
 // PixlNet — HTTPClient protocol, InnerTube contexts/requests/parsing, AAC format selection, TrackMatcher, cipher-regex extraction, Piped, Spotify endpoints/PKCE (SHA-256 injected), token rotation, Google device flow, AMLL/NetEase/LRCLIB, Gemini/OpenAI codecs, prompt engine, DJ intent parser.
-// Placeholder from stage 0. Keep the `PixlNetModule` enum: the app's Diagnostics screen lists it.
+// Stage 3c port of the Android network layer (pure logic; the app injects URLSession, JavaScriptCore, CryptoKit SHA-256).
 
 import PixlFoundation
 import PixlModel
