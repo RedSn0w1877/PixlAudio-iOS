@@ -126,7 +126,7 @@ final class BackupService {
         return try await Task.detached(priority: .userInitiated) { () async throws -> [BackupSection: String] in
             var payloads: [BackupSection: String] = [:]
             var favorites: [FavoriteBackupEntry] = []
-            var lyrics: [StoredLyricsRow] = []
+            var lyrics: [BackupLyricsRow] = []
             var engagement: [EngagementBackupEntry] = []
             var transitions: [TransitionRule] = []
             if let persistence {
@@ -336,13 +336,13 @@ final class BackupService {
 
         case .lyrics:
             var rows = (contents.lyrics ?? []).map {
-                StoredLyricsRow(songId: $0.backupSongId, content: $0.content, isSynced: $0.isSynced, source: $0.source)
+                BackupLyricsRow(songId: $0.backupSongId, content: $0.content, isSynced: $0.isSynced, source: $0.source)
             }
             let covered = Set(rows.map(\.songId))
             for file in contents.lyricsFiles ?? [] where !covered.contains(file.songId) {
                 guard let cache = file.file.cacheData, let raw = cache.preferredRawLyrics else { continue }
                 let synced = cache.lyricsDocument != nil || cache.syncedLyrics != nil || cache.wordByWordLyrics != nil
-                rows.append(StoredLyricsRow(songId: file.songId, content: raw, isSynced: synced, source: "backup"))
+                rows.append(BackupLyricsRow(songId: file.songId, content: raw, isSynced: synced, source: "backup"))
             }
             try await persistence?.restoreLyrics(rows, updatedAt: now)
             return rows.count

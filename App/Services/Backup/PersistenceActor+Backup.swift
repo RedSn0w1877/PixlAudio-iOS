@@ -9,7 +9,7 @@ import SwiftData
 
 /// A lyrics row as stored here (`LyricsRecord`): the raw text (document JSON, LRC or plain), like Android's
 /// `lyrics.content`.
-nonisolated struct StoredLyricsRow: Sendable, Hashable {
+nonisolated struct BackupLyricsRow: Sendable, Hashable {
     var songId: String
     var content: String
     var isSynced: Bool
@@ -33,9 +33,9 @@ extension PersistenceActor {
             .map { FavoriteBackupEntry(backupSongId: $0.songId, isFavorite: true, timestamp: $0.timestamp) }
     }
 
-    func backupLyrics() throws -> [StoredLyricsRow] {
+    func backupLyrics() throws -> [BackupLyricsRow] {
         try modelContext.fetch(FetchDescriptor<LyricsRecord>(sortBy: [SortDescriptor(\.songId)])).map {
-            StoredLyricsRow(songId: $0.songId, content: $0.docJSON, isSynced: $0.isSynced, source: $0.source)
+            BackupLyricsRow(songId: $0.songId, content: $0.docJSON, isSynced: $0.isSynced, source: $0.source)
         }
     }
 
@@ -110,7 +110,7 @@ extension PersistenceActor {
     }
 
     /// `LyricsModuleHandler.restore`: the restored rows replace the stored lyrics of those songs.
-    func restoreLyrics(_ rows: [StoredLyricsRow], updatedAt: Int64) throws {
+    func restoreLyrics(_ rows: [BackupLyricsRow], updatedAt: Int64) throws {
         let ids = rows.map(\.songId)
         try modelContext.delete(model: LyricsRecord.self, where: #Predicate { ids.contains($0.songId) })
         var seen = Set<String>()
