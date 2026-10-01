@@ -60,7 +60,7 @@ Status: **ported** (all cases) · **partial** (list what's missing) · **n/a** (
 | `data/youtube/TrackMatcherTest` | 7 of 7 | `TrackMatcherTests` (6 scoring cases) + `AudioFormatSelectionTests.qualityCapNeverPromotesMuxedVideoAboveRealAudio` | PixlNet | ported | `SpotifySongEntity` → `MatchableTrack`; the matcher's search dependency is the `YouTubeMusicSearching` protocol (mockk → a fake). |
 | `data/ai/provider/AiProviderSupportTest` | 5 of 5 | `AiProviderTests` | PixlNet | ported | `createException` → `AiProviderSupport.makeError`, `AiProviderException` → `AiProviderError`. |
 | `data/tais/dj/TaisIntentParserTest` | 5 of 5 | `TaisIntentParserTests` | PixlNet | ported | `TaisIntentParser` is a stateless enum. |
-| `data/spotify/SpotifySnapshotRetentionTest` | 0 of 3 (rules ported) | `SpotifyWebAPITests.snapshotPaginationGuard` | PixlNet | partial | The three cases drive `SpotifyRepository.syncUserPlaylists` against a mocked DAO (pruning, failed first page, failed later page). The DAO/sync loop is the iOS persistence layer's (stage 12); its pure guard `nextSnapshotOffset` (repeated/skipped page, early end, empty continuation, no progress, `offset=` cursor) is ported and tested case by case; `SpotifyLibrary.browsePlaylistId`/`likedSongsPlaylistId` are the ids the sync must never prune. |
+| `data/spotify/SpotifySnapshotRetentionTest` | 9 of 9 | `SpotifySnapshotRetentionTests` (all nine cases: pruning spares the browse playlist and Liked Songs, failed first / later playlist page, short page with a `next` cursor, failed Liked Songs, 403 on a playlist, partial Liked Songs, partial playlist after filtered + unfiltered failures, explicitly empty Liked Songs) + `SpotifyWebAPITests.snapshotPaginationGuard` | PixlNet | ported | The mocked `SpotifyDao` → `InMemorySpotifyLibraryStore` (same DAO semantics, a call log for the `coVerify(exactly = 0)` checks); Retrofit 503/403 → `FixtureHTTPClient`. The sync loop is PixlNet's `SpotifyLibrarySync`; the app's SwiftData store implements the same `SpotifyLibraryStore` (stage 12, `AppTests/SpotifyTests`). |
 | `data/repository/LyricsRepositoryImplTest` (network halves) | — | `LyricsProviderTests` | PixlNet | new | The ranking/matching halves were ported in 2b (PixlLyrics); PixlNet adds the request builders, retries, rate limit, fast parallel strategies, AMLL/NetEase flows and the catalog race. |
 | `data/network/lyrics/NeteaseLyricsSourceTest` | (3, parsing in 2b) | `LyricsProviderTests.neteaseMatchesTheRecordingAndReadsYRC` | PixlNet | new | The HTTP side of the same flow (search → matching track → `song/lyric/v1`), incl. the opaque `result` and non-200 `code` cases. |
 | `presentation/viewmodel/MetadataEditLyricsPreservationTest` | 3 (file half) | `MetadataEditorTests.titleOnlySaveLeavesTheLyricsTagAlone`, `clearingTheLyricsFieldRemovesTheTag`, `editedLyricsAreWrittenTrimmed` | PixlTags | partial | The tag-file half of each case (nil lyrics keep the USLT frame, blank removes it, edited lyrics are trimmed and written). The Room/`lyrics/{id}.json` half (`resetLyrics`/`updateLyrics` calls) is the app's `MetadataEditStateHolder` (stage 7a). |
@@ -581,3 +581,24 @@ run the real importer over generated files (see the App tests table). Behaviour 
 Android has no unit tests for `DualPlayerEngine`, `TransitionController`, `MusicService`, `ListeningStatsTracker` or
 `PlaybackStatsRepository.recordPlayback`; the app tests above are new. The pure decisions they rely on were ported with
 golden vectors in stage 3b (PixlAudioCore) and 3a (PixlLibrary `QueueUtils`, `PlaybackHistoryCodec`).
+
+## Stage 12 — Spotify
+
+PixlNet gained the sync loop and the matcher pass that Android ran in `SpotifyRepository` and `SpotifyMatchWorker`,
+behind `SpotifyLibraryStore` (Android `SpotifyDao`), so they run on Windows:
+
+- `SpotifySnapshotRetentionTests` — Android `SpotifySnapshotRetentionTest`, 9 of 9 (row above).
+- `SpotifyLibrarySyncTests` (Swift-only): re-import carries known matches and backfills genres in one batched
+  `/v1/artists` call, drops podcast episodes and local files, parses `added_at`; `syncAll` flushes after Liked Songs
+  and at the end, resumes past playlists fetched in the same pass and stops on `shouldContinue`; browse imports count
+  only new tracks, `removeFromExploredCatalog` refuses tracks that are also in a real playlist; YouTube Music rows are
+  stored MATCHED with 22-character synthetic ids; artist albums are distinct by name + track count and newest first
+  (stable); the 30-minute resume window.
+- `SpotifyMatchRunnerTests` (Swift-only, `SpotifyMatchWorker` has no Android test): matched / unmatched / errored
+  (stays PENDING) per track, every row of a track updated, MANUAL never overridden, "Find audio" re-queues UNMATCHED,
+  a fully failed batch stops the pass for a retry, the 8-minute budget, concurrency 2 while playing.
+- App (`AppTests/SpotifyTests`, XCTest): unified-library rows (`sp:` songs, Spotify id bands for albums/artists,
+  favourite and date kept, mirrored `SPOTIFY` playlists), the conservative artist delimiters, the SwiftData DAO and
+  diffed unified write (in-memory container), resolver id parsing, the RFC 7636 vector through CryptoKit and the
+  Keychain token round trip, demo states.
+

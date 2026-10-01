@@ -70,7 +70,8 @@ final class SpotifyService {
     init(launch: LaunchConfiguration, accounts: AccountsStore, persistence: PersistenceActor?,
          preferences: SpotifyPreferences = SpotifyPreferences(), http: any HTTPClient = URLSessionHTTPClient(),
          bridge: (any SpotifyYouTubeBridge)? = nil) {
-        isDemo = launch.isUITest
+        let isDemo = launch.isUITest
+        self.isDemo = isDemo
         self.preferences = preferences
         self.accounts = accounts
         self.persistence = isDemo ? nil : persistence
@@ -82,7 +83,8 @@ final class SpotifyService {
         self.session = session
         let api = SpotifyWebAPI(http: http, session: session)
         self.api = api
-        demo = isDemo ? SpotifyDemo(screen: launch.screen) : nil
+        let demo = isDemo ? SpotifyDemo(screen: launch.screen) : nil
+        self.demo = demo
         hasClientId = !preferences.clientId.isEmpty
         clientIdOverride = preferences.clientIdOverride
         if let persistence, !isDemo {

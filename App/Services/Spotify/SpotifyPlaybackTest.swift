@@ -56,7 +56,7 @@ nonisolated struct SpotifyPlaybackTest {
 
         // 3. Does one look close enough?
         let matcher = TrackMatcher(search: bridge.search)
-        guard let found = try? await matcher.findMatch(song.matchable), let match = found else {
+        guard let match = try? await matcher.findMatch(song.matchable) else {
             let best = candidates.map { TrackMatcher.score(song.matchable, $0) }.max() ?? 0
             steps.append(Step(title: "Track matching", ok: false,
                               detail: "Found results but none scored high enough (best \(Self.twoDecimals(best)), need \(TrackMatcher.minAcceptScore))."))

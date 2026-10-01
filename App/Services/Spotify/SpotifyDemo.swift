@@ -34,33 +34,33 @@ nonisolated struct SpotifyDemo: Sendable {
     static func image(_ seed: Int) -> [SpotifyImage] { [SpotifyImage(url: "demo-art://\(seed)", width: 300, height: 300)] }
 
     let topArtists: [SpotifyArtistFull] = [
-        SpotifyArtistFull(id: "demo-ar-1", name: "Luma Vale", images: image(41), genres: ["dream pop", "indie pop"]),
-        SpotifyArtistFull(id: "demo-ar-2", name: "Sora Kline", images: image(47), genres: ["synthwave"]),
-        SpotifyArtistFull(id: "demo-ar-3", name: "Hollow Pines", images: image(50), genres: ["indie folk"]),
-        SpotifyArtistFull(id: "demo-ar-4", name: "Neon Atlas", images: image(53), genres: ["electropop"]),
+        SpotifyArtistFull(id: "demo-ar-1", name: "Luma Vale", images: SpotifyDemo.image(41), genres: ["dream pop", "indie pop"]),
+        SpotifyArtistFull(id: "demo-ar-2", name: "Sora Kline", images: SpotifyDemo.image(47), genres: ["synthwave"]),
+        SpotifyArtistFull(id: "demo-ar-3", name: "Hollow Pines", images: SpotifyDemo.image(50), genres: ["indie folk"]),
+        SpotifyArtistFull(id: "demo-ar-4", name: "Neon Atlas", images: SpotifyDemo.image(53), genres: ["electropop"]),
         SpotifyArtistFull(id: "demo-ar-5", name: "Marlow Fields", images: nil, genres: []),
     ]
 
     static func track(_ id: String, _ name: String, _ artist: String, _ album: String, _ seed: Int, _ ms: Int64) -> SpotifyTrack {
         SpotifyTrack(id: id, name: name, durationMs: ms, artists: [SpotifyArtistRef(id: nil, name: artist)],
-                     album: SpotifyAlbumRef(id: "demo-al-\(seed)", name: album, images: image(seed)), type: "track")
+                     album: SpotifyAlbumRef(id: "demo-al-\(seed)", name: album, images: SpotifyDemo.image(seed)), type: "track")
     }
 
     let topTracks: [SpotifyTrack] = [
-        track("demo-tr-1", "Prism Avenue", "Luma Vale", "Prism Avenue", 41, 207_000),
-        track("demo-tr-2", "Midnight Transit", "Sora Kline", "Night Lines", 47, 268_000),
-        track("demo-tr-3", "Harbor Lights", "Luma Vale", "City of Glass", 44, 221_000),
-        track("demo-tr-4", "Night Swim", "Hollow Pines", "Drift", 50, 244_000),
-        track("demo-tr-5", "Static Bloom", "Neon Atlas", "Signal", 53, 198_000),
-        track("demo-tr-6", "Paper Moons", "Marlow Fields", "Paper Moons", 56, 233_000),
+        SpotifyDemo.track("demo-tr-1", "Prism Avenue", "Luma Vale", "Prism Avenue", 41, 207_000),
+        SpotifyDemo.track("demo-tr-2", "Midnight Transit", "Sora Kline", "Night Lines", 47, 268_000),
+        SpotifyDemo.track("demo-tr-3", "Harbor Lights", "Luma Vale", "City of Glass", 44, 221_000),
+        SpotifyDemo.track("demo-tr-4", "Night Swim", "Hollow Pines", "Drift", 50, 244_000),
+        SpotifyDemo.track("demo-tr-5", "Static Bloom", "Neon Atlas", "Signal", 53, 198_000),
+        SpotifyDemo.track("demo-tr-6", "Paper Moons", "Marlow Fields", "Paper Moons", 56, 233_000),
     ]
 
     let albums: [SpotifyAlbumFull] = [
-        SpotifyAlbumFull(id: "demo-al-44", name: "City of Glass", images: image(44), releaseDate: "2025-03-14", totalTracks: 11,
+        SpotifyAlbumFull(id: "demo-al-44", name: "City of Glass", images: SpotifyDemo.image(44), releaseDate: "2025-03-14", totalTracks: 11,
                          albumType: "album", artists: [SpotifyArtistRef(id: "demo-ar-1", name: "Luma Vale")]),
-        SpotifyAlbumFull(id: "demo-al-41", name: "Prism Avenue", images: image(41), releaseDate: "2024-09-06", totalTracks: 1,
+        SpotifyAlbumFull(id: "demo-al-41", name: "Prism Avenue", images: SpotifyDemo.image(41), releaseDate: "2024-09-06", totalTracks: 1,
                          albumType: "single", artists: [SpotifyArtistRef(id: "demo-ar-1", name: "Luma Vale")]),
-        SpotifyAlbumFull(id: "demo-al-59", name: "Soft Weather", images: image(59), releaseDate: "2022-05-20", totalTracks: 9,
+        SpotifyAlbumFull(id: "demo-al-59", name: "Soft Weather", images: SpotifyDemo.image(59), releaseDate: "2022-05-20", totalTracks: 9,
                          albumType: "album", artists: [SpotifyArtistRef(id: "demo-ar-1", name: "Luma Vale")]),
     ]
 
