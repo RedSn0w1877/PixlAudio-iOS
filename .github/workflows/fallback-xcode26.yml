@@ -25,6 +25,8 @@ jobs:
       - uses: actions/checkout@v5
       - name: Check forbidden patterns
         run: bash ci/check-forbidden.sh
+      - name: Tune the runner
+        run: bash ci/tune-runner.sh
       - name: Select Xcode
         run: bash ci/select-xcode.sh "$XCODE_VERSION"
       - name: Install XcodeGen
@@ -41,7 +43,10 @@ jobs:
             -project PixlAudio.xcodeproj -scheme PixlAudio \
             -destination "id=$SIM_UDID" \
             -derivedDataPath build/DerivedData \
-            2>&1 | tee build/build.log | xcbeautify --quieter
+            2>&1 | bash ci/timestamp.sh | tee build/build.log | cut -c14- | xcbeautify --quieter
+      # After the build, never alongside it (see ci.yml and ci/sim.sh).
+      - name: Boot the simulator
+        run: bash ci/sim.sh boot
       - name: Unit tests
         run: |
           set -o pipefail
@@ -50,8 +55,9 @@ jobs:
             -destination "id=$SIM_UDID" \
             -derivedDataPath build/DerivedData \
             -only-testing:PixlAudioTests \
+            -collect-test-diagnostics never \
             -resultBundlePath build/UnitTests.xcresult \
-            2>&1 | tee build/test.log | xcbeautify --quieter
+            2>&1 | bash ci/timestamp.sh | tee build/test.log | cut -c14- | xcbeautify --quieter
       - name: Summarise errors
         if: failure()
         run: |

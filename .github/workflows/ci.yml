@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       shots:
-        description: Run the screenshot job
+        description: Run the screenshot tests
         type: boolean
         default: true
       shots_only:
@@ -35,17 +35,23 @@ env:
   XCODEGEN_SHA256: '4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806'
   SIM_IOS_MAJOR: '27'
 
-# Runner time matters: only 5 macOS jobs run at once across everyone. Rules of thumb in this file:
-# - the simulator's first boot (2–6 min) starts in the background right after Xcode is selected and is only
-#   awaited after the build (ci/sim.sh);
-# - every xcodebuild test run passes `-collect-test-diagnostics never`: otherwise xcodebuild runs
-#   `simctl diagnose` after the tests, which never answers on the hosted VMs and costs a 600 s timeout per run;
-# - raw xcodebuild output is kept, timestamped, in build/*.log (ci/timestamp.sh); the console shows xcbeautify.
+# Runner time matters: only 5 macOS jobs run at once across everyone, so a push should hold as few macOS runners
+# for as short a time as possible (measurements: the ci-speed branch, runs 36899362105 → 36939967573).
+# - One macOS job per push (plus ipa on main): `app` builds once, boots one simulator and runs the unit tests and,
+#   when screenshots are requested, the UI screenshot tests on that same build and simulator. A separate shots job
+#   cost a second build and a second simulator boot (~8 runner-minutes) for ~2 minutes less latency.
+# - The simulator boots only after the build (ci/sim.sh): its first boot on these 3-CPU / 7 GB runners sets off
+#   10+ minutes of widget/wallpaper rendering that made an overlapping build 3x slower. The unit tests run during
+#   that storm; the screenshots come after them, so they are no longer taken on a machine that is still settling.
+# - Every xcodebuild test run passes `-collect-test-diagnostics never`: otherwise xcodebuild runs `simctl diagnose`
+#   after the tests, which never answers on the hosted VMs and cost a 600 s timeout per run.
+# - Spotlight indexing is off on the runner (ci/tune-runner.sh); PixlCore tests run on Linux (core job).
+# - Raw xcodebuild output is kept, timestamped, in build/*.log (ci/timestamp.sh); the console shows xcbeautify.
 
 jobs:
   core:
-    # PixlCore has zero dependencies and builds on Windows, so it runs on Linux in the official Swift image:
-    # no macOS runner needed.
+    # PixlCore has zero dependencies and builds on Windows, so it runs on Linux in the official Swift image (all of
+    # its tests pass there): no macOS runner needed.
     name: core (PixlCore swift test)
     runs-on: ubuntu-latest
     container: swift:6.4-noble
@@ -66,75 +72,29 @@ jobs:
         run: swift test --package-path Packages/PixlCore --filter YouTubeLiveSmokeTests
 
   app:
-    name: app (build + unit tests, Xcode 27)
+    # Screenshots (UI tests, light + dark) run on main, with [shots] or [shots:Class,…] in the commit message, or from
+    # a manual run (shots / shots_only inputs). The condition is spelled out twice: here for the name, below for steps.
+    name: >-
+      app (build + unit tests${{ (github.ref == 'refs/heads/main' ||
+      contains(github.event.head_commit.message, '[shots]') ||
+      contains(github.event.head_commit.message, '[shots:') ||
+      (github.event_name == 'workflow_dispatch' && inputs.shots)) && ' + UI screenshots' || '' }}, Xcode 27)
     runs-on: xcode-27
-    timeout-minutes: 45
+    timeout-minutes: 100
+    env:
+      RUN_SHOTS: >-
+        ${{ github.ref == 'refs/heads/main' ||
+        contains(github.event.head_commit.message, '[shots]') ||
+        contains(github.event.head_commit.message, '[shots:') ||
+        (github.event_name == 'workflow_dispatch' && inputs.shots) }}
     steps:
       - uses: actions/checkout@v5
-      - name: Start the load sampler (TEMPORARY)
-        run: (nohup bash ci/top-sampler.sh build/top.log </dev/null >/dev/null 2>&1 &)
-      - name: Select Xcode
-        run: bash ci/select-xcode.sh "$XCODE_VERSION"
-      - name: Start booting the simulator
-        run: bash ci/sim.sh boot "$SIM_IOS_MAJOR"
       - name: Check forbidden patterns
         run: bash ci/check-forbidden.sh
-      - name: Install XcodeGen
-        run: bash ci/install-xcodegen.sh "$XCODEGEN_VERSION"
-      - name: Generate project
-        run: xcodegen generate
-      - name: Build for testing
-        run: |
-          set -o pipefail
-          xcodebuild build-for-testing \
-            -project PixlAudio.xcodeproj -scheme PixlAudio \
-            -destination "id=$SIM_UDID" \
-            -derivedDataPath build/DerivedData \
-            2>&1 | bash ci/timestamp.sh | tee build/build.log | cut -c14- | xcbeautify --quieter
-      - name: Wait for the simulator
-        run: bash ci/sim.sh wait
-      - name: Unit tests
-        run: |
-          set -o pipefail
-          xcodebuild test-without-building \
-            -project PixlAudio.xcodeproj -scheme PixlAudio \
-            -destination "id=$SIM_UDID" \
-            -derivedDataPath build/DerivedData \
-            -only-testing:PixlAudioTests \
-            -collect-test-diagnostics never \
-            -resultBundlePath build/UnitTests.xcresult \
-            2>&1 | bash ci/timestamp.sh | tee build/test.log | cut -c14- | xcbeautify --quieter
-      - name: Summarise errors
-        if: failure()
-        run: |
-          cat build/build.log build/test.log > build/all.log 2>/dev/null || true
-          bash ci/xcerrors.sh build/all.log build/UnitTests.xcresult
-      - name: Upload test results
-        # TEMPORARY (ci-speed measurements): always; back to failure() before merging.
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: unit-xcresult-${{ github.sha }}
-          path: |
-            build/UnitTests.xcresult
-            build/*.log
-          retention-days: 5
-          if-no-files-found: ignore
-
-  app-seq:
-    # TEMPORARY (ci-speed A/B): the simulator boots only after the build (no overlap), then the unit tests and the
-    # selected UI tests run one after the other on that simulator — the candidate single-job layout.
-    name: app-seq (A/B experiment)
-    runs-on: xcode-27
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v5
-      - name: Start the load sampler (TEMPORARY)
-        run: (nohup bash ci/top-sampler.sh build/top.log </dev/null >/dev/null 2>&1 &)
+      - name: Tune the runner
+        run: bash ci/tune-runner.sh
       - name: Select Xcode
         run: bash ci/select-xcode.sh "$XCODE_VERSION"
-      - name: Check forbidden patterns
-        run: bash ci/check-forbidden.sh
       - name: Pick simulator
         run: bash ci/pick-sim.sh "$SIM_IOS_MAJOR"
       - name: Install XcodeGen
@@ -142,6 +102,7 @@ jobs:
       - name: Generate project
         run: xcodegen generate
       - name: Build for testing
+        timeout-minutes: 30
         run: |
           set -o pipefail
           mkdir -p build
@@ -151,11 +112,11 @@ jobs:
             -derivedDataPath build/DerivedData \
             2>&1 | bash ci/timestamp.sh | tee build/build.log | cut -c14- | xcbeautify --quieter
       - name: Boot the simulator
-        run: |
-          date -u +'%T boot start'
-          xcrun simctl bootstatus "$SIM_UDID" -b | grep -v 'isTerminal=NO' | grep . || true
-          date -u +'%T boot done'
+        id: boot
+        timeout-minutes: 15
+        run: bash ci/sim.sh boot
       - name: Unit tests
+        timeout-minutes: 25
         run: |
           set -o pipefail
           xcodebuild test-without-building \
@@ -166,96 +127,15 @@ jobs:
             -collect-test-diagnostics never \
             -resultBundlePath build/UnitTests.xcresult \
             2>&1 | bash ci/timestamp.sh | tee build/test.log | cut -c14- | xcbeautify --quieter
-      - name: Fresh app for the UI tests
-        if: ${{ !cancelled() }}
-        run: |
-          date -u +'%T reset'
-          xcrun simctl terminate "$SIM_UDID" io.github.redsn0w1877.pixlaudio || true
-          xcrun simctl uninstall "$SIM_UDID" io.github.redsn0w1877.pixlaudio || true
-          xcrun simctl keychain "$SIM_UDID" reset || true
-          date -u +'%T status bar'
-          xcrun simctl status_bar "$SIM_UDID" override --time 9:41 \
-            --dataNetwork wifi --wifiMode active --wifiBars 3 \
-            --cellularMode active --cellularBars 4 \
-            --batteryState charged --batteryLevel 100
-          xcrun simctl spawn "$SIM_UDID" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true || true
-          date -u +'%T ready'
+      # Screenshots still run when a unit test failed (the same signal two separate jobs gave), not after a failed
+      # build or boot.
+      - name: Prepare the simulator for screenshots
+        id: prepare
+        if: ${{ !cancelled() && env.RUN_SHOTS == 'true' && steps.boot.outcome == 'success' }}
+        run: bash ci/sim.sh prepare-shots
       - name: Screenshot tests
-        if: ${{ !cancelled() }}
-        env:
-          COMMIT_MSG: ${{ github.event.head_commit.message }}
-          SHOTS_ONLY_INPUT: ${{ inputs.shots_only }}
-        run: |
-          set -o pipefail
-          SELECTION=()
-          while IFS= read -r arg; do SELECTION+=("$arg"); done < <(bash ci/ui-test-args.sh)
-          xcodebuild test-without-building \
-            -project PixlAudio.xcodeproj -scheme PixlAudio \
-            -destination "id=$SIM_UDID" \
-            -derivedDataPath build/DerivedData \
-            "${SELECTION[@]}" \
-            -retry-tests-on-failure -test-iterations 3 \
-            -collect-test-diagnostics never \
-            -resultBundlePath build/Shots.xcresult \
-            2>&1 | bash ci/timestamp.sh | tee build/shots.log | cut -c14- | xcbeautify --quieter
-          bash ci/check-ui-tests-ran.sh build/shots.log
-      - name: Export screenshots
-        if: always()
-        run: |
-          if [ -d build/Shots.xcresult ]; then bash ci/export-shots.sh build/Shots.xcresult build/shots; fi
-      - name: Upload screenshots and logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: seq-${{ github.sha }}
-          path: |
-            build/shots
-            build/*.log
-          retention-days: 5
-          if-no-files-found: ignore
-
-  shots:
-    name: shots (UI screenshots, light + dark)
-    if: >-
-      github.ref == 'refs/heads/main' ||
-      contains(github.event.head_commit.message, '[shots]') ||
-      contains(github.event.head_commit.message, '[shots:') ||
-      (github.event_name == 'workflow_dispatch' && inputs.shots)
-    runs-on: xcode-27
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@v5
-      - name: Start the load sampler (TEMPORARY)
-        run: (nohup bash ci/top-sampler.sh build/top.log </dev/null >/dev/null 2>&1 &)
-      - name: Select Xcode
-        run: bash ci/select-xcode.sh "$XCODE_VERSION"
-      - name: Start booting the simulator
-        run: bash ci/sim.sh boot "$SIM_IOS_MAJOR"
-      - name: Install XcodeGen
-        run: bash ci/install-xcodegen.sh "$XCODEGEN_VERSION"
-      - name: Generate project
-        run: xcodegen generate
-      - name: Build for testing
-        run: |
-          set -o pipefail
-          xcodebuild build-for-testing \
-            -project PixlAudio.xcodeproj -scheme PixlAudio \
-            -destination "id=$SIM_UDID" \
-            -derivedDataPath build/DerivedData \
-            2>&1 | bash ci/timestamp.sh | tee build/build.log | cut -c14- | xcbeautify --quieter
-      - name: Prepare the simulator
-        run: |
-          bash ci/sim.sh wait
-          date -u +'%T status bar'
-          xcrun simctl status_bar "$SIM_UDID" override --time 9:41 \
-            --dataNetwork wifi --wifiMode active --wifiBars 3 \
-            --cellularMode active --cellularBars 4 \
-            --batteryState charged --batteryLevel 100
-          date -u +'%T keyboard defaults'
-          # Suppress the first-run "slide to type" keyboard tip in search screenshots.
-          xcrun simctl spawn "$SIM_UDID" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true || true
-          date -u +'%T ready'
-      - name: Screenshot tests
+        if: ${{ !cancelled() && env.RUN_SHOTS == 'true' && steps.prepare.outcome == 'success' }}
+        timeout-minutes: 75
         env:
           COMMIT_MSG: ${{ github.event.head_commit.message }}
           SHOTS_ONLY_INPUT: ${{ inputs.shots_only }}
@@ -276,32 +156,42 @@ jobs:
             2>&1 | bash ci/timestamp.sh | tee build/shots.log | cut -c14- | xcbeautify --quieter
           bash ci/check-ui-tests-ran.sh build/shots.log
       - name: Export screenshots
-        if: always()
+        if: ${{ always() && env.RUN_SHOTS == 'true' }}
         run: |
           if [ -d build/Shots.xcresult ]; then bash ci/export-shots.sh build/Shots.xcresult build/shots; fi
       - name: Summarise errors
         if: failure()
         run: |
-          cat build/build.log build/shots.log > build/all.log 2>/dev/null || true
-          bash ci/xcerrors.sh build/all.log build/Shots.xcresult
+          cat build/build.log build/test.log build/shots.log > build/all.log 2>/dev/null || true
+          bash ci/xcerrors.sh build/all.log build/UnitTests.xcresult build/Shots.xcresult
       - name: Upload screenshots
-        if: always()
+        if: ${{ always() && env.RUN_SHOTS == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: shots-${{ github.sha }}
           path: build/shots
           retention-days: 14
           if-no-files-found: warn
-      - name: Upload result bundle
-        # TEMPORARY (ci-speed measurements): always; back to failure() before merging.
-        if: always()
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-xcresult-${{ github.sha }}
+          path: |
+            build/UnitTests.xcresult
+            build/build.log
+            build/test.log
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: Upload screenshot result bundle
+        if: ${{ failure() && env.RUN_SHOTS == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: shots-xcresult-${{ github.sha }}
           path: |
             build/Shots.xcresult
-            build/*.log
-          retention-days: 5
+            build/shots.log
+          retention-days: 7
           if-no-files-found: ignore
 
   ipa:
@@ -316,6 +206,8 @@ jobs:
       - uses: actions/checkout@v5
       - name: Check forbidden patterns
         run: bash ci/check-forbidden.sh
+      - name: Tune the runner
+        run: bash ci/tune-runner.sh
       - name: Select Xcode
         run: bash ci/select-xcode.sh "$XCODE_VERSION"
       - name: Install XcodeGen

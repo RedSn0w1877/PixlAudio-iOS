@@ -1,34 +1,43 @@
 #!/usr/bin/env bash
-# Simulator lifecycle for CI jobs. A first boot on a hosted runner takes 2–6 minutes, so jobs start it early
-# in the background and only wait for it right before testing; meanwhile XcodeGen and the build run.
-#   ci/sim.sh boot <ios-major>   pick the simulator (ci/pick-sim.sh exports SIM_UDID/SIM_NAME/SIM_OS to
-#                                $GITHUB_ENV) and start booting it in the background
-#   ci/sim.sh wait               block until that simulator has finished booting (SIM_UDID from the env)
+# Simulator steps for CI jobs (SIM_UDID comes from ci/pick-sim.sh).
+#   ci/sim.sh boot            boot the simulator and wait until it is usable
+#   ci/sim.sh prepare-shots   fresh app + screenshot conditions on the booted simulator (before the UI tests)
+#
+# Boot AFTER the build, never during it. On the hosted 3-CPU / 7 GB runners the first boot of an iOS 27 simulator
+# sets off 10+ minutes of home-screen widget and wallpaper rendering (load average ~600, ~2 GB in the memory
+# compressor); a build running alongside took 8–10 min instead of 2.5 (ci-speed A/B, run 36939967573). The unit
+# tests run during that storm instead, and they cope.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-log="build/sim-boot.log"
+udid="${SIM_UDID:?SIM_UDID is not set; run ci/pick-sim.sh first}"
 case "${1:-}" in
   boot)
-    udid="$(bash ci/pick-sim.sh "${2:-27}")"
-    mkdir -p build
-    # `bootstatus -b` boots the device if needed and then follows the whole boot (data migration included) until
-    # the device is usable. Detach it completely (no inherited stdio) so this step returns at once and the boot
-    # keeps running into the following steps.
-    nohup bash -c "date -u +'%T boot started'; xcrun simctl bootstatus '$udid' -b; echo \"exit \$?\"; date -u +'%T boot finished'" \
-      < /dev/null > "$log" 2>&1 &
-    echo "Booting $udid in the background (log: $log)"
-    ;;
-  wait)
-    udid="${SIM_UDID:?SIM_UDID is not set; run ci/sim.sh boot first}"
     start=$(date +%s)
-    # Returns as soon as the device is booted; boots it itself if the background boot died.
-    xcrun simctl bootstatus "$udid" -b
-    echo "Waited $(( $(date +%s) - start )) s for the simulator."
-    [ -f "$log" ] && sed 's/^/  boot log: /' "$log" || true
+    # `bootstatus -b` boots the device if needed and follows the boot (data migration included) until it is usable.
+    xcrun simctl bootstatus "$udid" -b | grep -v 'isTerminal=NO' | grep . || true
+    xcrun simctl list devices | grep -F "$udid) (Booted)" >/dev/null || { echo "::error::simulator $udid did not boot"; exit 1; }
+    echo "Booted in $(( $(date +%s) - start )) s."
     if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
-      echo "**Simulator wait after the build:** $(( $(date +%s) - start )) s" >> "$GITHUB_STEP_SUMMARY"
+      echo "**Simulator boot:** $(( $(date +%s) - start )) s" >> "$GITHUB_STEP_SUMMARY"
     fi
     ;;
+  prepare-shots)
+    # The unit tests ran first in this simulator with the same app as their host: remove the app (its data
+    # container and preferences go with it) and reset the keychain, so the screenshots start from the same fresh
+    # state as on a simulator of their own. The UI test run installs the app again.
+    app="build/DerivedData/Build/Products/Debug-iphonesimulator/PixlAudio.app"
+    bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist")"
+    xcrun simctl terminate "$udid" "$bundle_id" 2>/dev/null || true
+    xcrun simctl uninstall "$udid" "$bundle_id"
+    xcrun simctl keychain "$udid" reset || true
+    xcrun simctl status_bar "$udid" override --time 9:41 \
+      --dataNetwork wifi --wifiMode active --wifiBars 3 \
+      --cellularMode active --cellularBars 4 \
+      --batteryState charged --batteryLevel 100
+    # Suppress the first-run "slide to type" keyboard tip in search screenshots.
+    xcrun simctl spawn "$udid" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true || true
+    echo "Simulator ready for screenshots ($bundle_id removed, status bar overridden)."
+    ;;
   *)
-    echo "usage: ci/sim.sh boot <ios-major> | wait" >&2; exit 2 ;;
+    echo "usage: ci/sim.sh boot | prepare-shots" >&2; exit 2 ;;
 esac
