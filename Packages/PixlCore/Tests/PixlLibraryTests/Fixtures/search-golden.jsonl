@@ -1,0 +1,701 @@
+{"fn":"library","in":{"songs":[[1,"Café del Mar","Energy 52","Chillout",1,865],[2,"Cafe Racer","Ünïcode Band",null,2,1095],[3,"CAFÉ","Beyoncé","Pop",3,1007],[4,"Halo","Beyoncé","R&B",4,1007],[5,"Crazy in Love","Beyoncé feat. JAY-Z","Pop",5,786],[6,"Über Alles","Die Band","Rock",6,759],[7,"uber eats","x","",7,220],[8,"東京事変","椎名林檎","J-Pop",8,458],[9,"女の子","東京事変","J-Pop",9,221],[10,"50% Off","Discount","Electronic",1,293],[11,"a_b_c","Under Score",null,2,222],[12,"Rock & Roll","Led Zeppelin","Rock",3,408],[13,"Straße","Rammstein","Metal",4,126],[14,"Strasse","Rammstein","Metal",5,126],[15,"İstanbul","Sezen Aksu","Pop",6,321],[16,"istanbul","They Might Be Giants","Rock",7,346],[17,"ΆΣΜΑ","Ελληνικά","Λαϊκά",8,164],[18,"Tiếng Việt","Sơn Tùng","V-Pop",9,606],[19,"Ǆungla","Ǳ",null,1,597],[20,"Café NFD","Énfd",null,2,1063],[21,"Ø Lake","Øystein","Folk",3,244],[22,"Æther","Ærø",null,4,160],[23,"Ångström","Åsa","Jazz",5,1079],[24,"Йога","Йорш","Rock",6,329],[25,"ﬁre","Ligature",null,7,295],[26,"Ⅻ","Roman",null,8,489],[27,"😀 Emoji Song","Smile","Pop",9,916],[28,"Hello-World","Dash",null,1,774],[29,"hello world","Space",null,2,322],[30,"Zeta","Alpha","Ambient",3,346],[31,"zeta","alpha","ambient",4,1018],[32,"Alpha","Zeta",null,5,1044],[33,"alpha","zeta",null,6,356],[34,"Mañana","Niño","Latin",7,285],[35,"Ça va","Ça","French",8,366],[36,"Ğ","ğ",null,9,387],[37,"x²","Math",null,1,924],[38,"Nº 5","Chanel",null,2,1077],[39,"İİ","ıı",null,3,860],[40,"ǅ","ǆ",null,4,554],[41,"Ⓐ circle","Ⓑ",null,5,499],[42,"ｆｕｌｌ","ＷＩＤＴＨ",null,6,806],[43,"pixelplayemptyquery","Trap",null,7,217],[44,"The Song","The Band","Pop",8,344],[45,"Song","Band","Pop",9,1033],[46,"Love & Hate","Lovers","Pop",1,1041],[47,"lovely","Love","Soul",2,646],[48,"Ģirts","Ķīlis",null,3,277]],"albums":[[1,"Café Album","Beyoncé"],[2,"Rock Hits","Various"],[3,"東京","椎名林檎"],[4,"50% Sale","Discount"],[5,"a_b","x"],[6,"Über","Die Band"],[7,"Love Songs","Lovers"],[8,"ÆON","Ærø"],[9,"Single","Solo"],[10,"Orphan Album","Nobody"]],"artists":[[126,"Rammstein"],[160,"Ærø"],[164,"Ελληνικά"],[217,"Trap"],[220,"x"],[221,"東京事変"],[222,"Under Score"],[244,"Øystein"],[277,"Ķīlis"],[285,"Niño"],[293,"Discount"],[295,"Ligature"],[321,"Sezen Aksu"],[322,"Space"],[329,"Йорш"],[344,"The Band"],[346,"They Might Be Giants"],[356,"zeta"],[366,"Ça"],[387,"ğ"],[408,"Led Zeppelin"],[458,"椎名林檎"],[489,"Roman"],[499,"Ⓑ"],[554,"ǆ"],[597,"Ǳ"],[606,"Sơn Tùng"],[646,"Love"],[759,"Die Band"],[774,"Dash"],[786,"Beyoncé feat. JAY-Z"],[806,"ＷＩＤＴＨ"],[860,"ıı"],[865,"Energy 52"],[916,"Smile"],[924,"Math"],[1007,"Beyoncé"],[1018,"alpha"],[1033,"Band"],[1041,"Lovers"],[1044,"Zeta"],[1063,"Énfd"],[1077,"Chanel"],[1079,"Åsa"],[1095,"Ünïcode Band"]]},"out":null}
+{"fn":"songs","in":{"q":"cafe","titleOnly":false},"out":{"match":"cafe*","fts":[3,2,20,1],"ftsError":null,"like":[2,20],"merged":[3,2,20,1]}}
+{"fn":"songs","in":{"q":"cafe","titleOnly":true},"out":{"match":"title:cafe*","fts":[3,2,20,1],"ftsError":null,"like":[2,20],"merged":[3,2,20,1]}}
+{"fn":"albums","in":{"q":"cafe","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"cafe","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"cafe","minTracks":6},"out":[]}
+{"fn":"artists","in":"cafe","out":[]}
+{"fn":"playlists","in":{"q":"cafe","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"Café","titleOnly":false},"out":{"match":"Café*","fts":[3,2,20,1],"ftsError":null,"like":[1],"merged":[3,2,20,1]}}
+{"fn":"songs","in":{"q":"Café","titleOnly":true},"out":{"match":"title:Café*","fts":[3,2,20,1],"ftsError":null,"like":[1],"merged":[3,2,20,1]}}
+{"fn":"albums","in":{"q":"Café","minTracks":1},"out":[1]}
+{"fn":"albums","in":{"q":"Café","minTracks":2},"out":[1]}
+{"fn":"albums","in":{"q":"Café","minTracks":6},"out":[1]}
+{"fn":"artists","in":"Café","out":[]}
+{"fn":"playlists","in":{"q":"Café","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[true,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"CAF","titleOnly":false},"out":{"match":"CAF*","fts":[3,2,20,1],"ftsError":null,"like":[3,2,20,1],"merged":[3,2,20,1]}}
+{"fn":"songs","in":{"q":"CAF","titleOnly":true},"out":{"match":"title:CAF*","fts":[3,2,20,1],"ftsError":null,"like":[3,2,20,1],"merged":[3,2,20,1]}}
+{"fn":"albums","in":{"q":"CAF","minTracks":1},"out":[1]}
+{"fn":"albums","in":{"q":"CAF","minTracks":2},"out":[1]}
+{"fn":"albums","in":{"q":"CAF","minTracks":6},"out":[1]}
+{"fn":"artists","in":"CAF","out":[]}
+{"fn":"playlists","in":{"q":"CAF","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[true,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"café","titleOnly":false},"out":{"match":"café*","fts":[3,2,20,1],"ftsError":null,"like":[1],"merged":[3,2,20,1]}}
+{"fn":"songs","in":{"q":"café","titleOnly":true},"out":{"match":"title:café*","fts":[3,2,20,1],"ftsError":null,"like":[1],"merged":[3,2,20,1]}}
+{"fn":"albums","in":{"q":"café","minTracks":1},"out":[1]}
+{"fn":"albums","in":{"q":"café","minTracks":2},"out":[1]}
+{"fn":"albums","in":{"q":"café","minTracks":6},"out":[1]}
+{"fn":"artists","in":"café","out":[]}
+{"fn":"playlists","in":{"q":"café","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[true,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"café","titleOnly":false},"out":{"match":"cafe*","fts":[3,2,20,1],"ftsError":null,"like":[20],"merged":[3,2,20,1]}}
+{"fn":"songs","in":{"q":"café","titleOnly":true},"out":{"match":"title:cafe*","fts":[3,2,20,1],"ftsError":null,"like":[20],"merged":[3,2,20,1]}}
+{"fn":"albums","in":{"q":"café","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"café","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"café","minTracks":6},"out":[]}
+{"fn":"artists","in":"café","out":[]}
+{"fn":"playlists","in":{"q":"café","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"beyo","titleOnly":false},"out":{"match":"beyo*","fts":[3,5,4],"ftsError":null,"like":[3,5,4],"merged":[3,5,4]}}
+{"fn":"songs","in":{"q":"beyo","titleOnly":true},"out":{"match":"title:beyo*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"beyo","minTracks":1},"out":[1]}
+{"fn":"albums","in":{"q":"beyo","minTracks":2},"out":[1]}
+{"fn":"albums","in":{"q":"beyo","minTracks":6},"out":[1]}
+{"fn":"artists","in":"beyo","out":[1007,786]}
+{"fn":"playlists","in":{"q":"beyo","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"beyonce","titleOnly":false},"out":{"match":"beyonce*","fts":[3,5,4],"ftsError":null,"like":[],"merged":[3,5,4]}}
+{"fn":"songs","in":{"q":"beyonce","titleOnly":true},"out":{"match":"title:beyonce*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"beyonce","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"beyonce","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"beyonce","minTracks":6},"out":[]}
+{"fn":"artists","in":"beyonce","out":[]}
+{"fn":"playlists","in":{"q":"beyonce","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"jay z","titleOnly":false},"out":{"match":"jay* AND z*","fts":[5],"ftsError":null,"like":[],"merged":[5]}}
+{"fn":"songs","in":{"q":"jay z","titleOnly":true},"out":{"match":"title:jay* AND title:z*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"jay z","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"jay z","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"jay z","minTracks":6},"out":[]}
+{"fn":"artists","in":"jay z","out":[]}
+{"fn":"playlists","in":{"q":"jay z","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"jay-z","titleOnly":false},"out":{"match":"jay* AND z*","fts":[5],"ftsError":null,"like":[5],"merged":[5]}}
+{"fn":"songs","in":{"q":"jay-z","titleOnly":true},"out":{"match":"title:jay* AND title:z*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"jay-z","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"jay-z","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"jay-z","minTracks":6},"out":[]}
+{"fn":"artists","in":"jay-z","out":[786]}
+{"fn":"playlists","in":{"q":"jay-z","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"über","titleOnly":false},"out":{"match":"über*","fts":[7,6],"ftsError":null,"like":[],"merged":[7,6]}}
+{"fn":"songs","in":{"q":"über","titleOnly":true},"out":{"match":"title:über*","fts":[7,6],"ftsError":null,"like":[],"merged":[7,6]}}
+{"fn":"albums","in":{"q":"über","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"über","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"über","minTracks":6},"out":[]}
+{"fn":"artists","in":"über","out":[]}
+{"fn":"playlists","in":{"q":"über","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"uber","titleOnly":false},"out":{"match":"uber*","fts":[7,6],"ftsError":null,"like":[7],"merged":[7,6]}}
+{"fn":"songs","in":{"q":"uber","titleOnly":true},"out":{"match":"title:uber*","fts":[7,6],"ftsError":null,"like":[7],"merged":[7,6]}}
+{"fn":"albums","in":{"q":"uber","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"uber","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"uber","minTracks":6},"out":[]}
+{"fn":"artists","in":"uber","out":[]}
+{"fn":"playlists","in":{"q":"uber","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"UBER","titleOnly":false},"out":{"match":"UBER*","fts":[7,6],"ftsError":null,"like":[7],"merged":[7,6]}}
+{"fn":"songs","in":{"q":"UBER","titleOnly":true},"out":{"match":"title:UBER*","fts":[7,6],"ftsError":null,"like":[7],"merged":[7,6]}}
+{"fn":"albums","in":{"q":"UBER","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"UBER","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"UBER","minTracks":6},"out":[]}
+{"fn":"artists","in":"UBER","out":[]}
+{"fn":"playlists","in":{"q":"UBER","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"東京","titleOnly":false},"out":{"match":"東京*","fts":[9,8],"ftsError":null,"like":[9,8],"merged":[9,8]}}
+{"fn":"songs","in":{"q":"東京","titleOnly":true},"out":{"match":"title:東京*","fts":[8],"ftsError":null,"like":[8],"merged":[8]}}
+{"fn":"albums","in":{"q":"東京","minTracks":1},"out":[3]}
+{"fn":"albums","in":{"q":"東京","minTracks":2},"out":[3]}
+{"fn":"albums","in":{"q":"東京","minTracks":6},"out":[3]}
+{"fn":"artists","in":"東京","out":[221]}
+{"fn":"playlists","in":{"q":"東京","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"京","titleOnly":false},"out":{"match":"京*","fts":[],"ftsError":null,"like":[9,8],"merged":[9,8]}}
+{"fn":"songs","in":{"q":"京","titleOnly":true},"out":{"match":"title:京*","fts":[],"ftsError":null,"like":[8],"merged":[8]}}
+{"fn":"albums","in":{"q":"京","minTracks":1},"out":[3]}
+{"fn":"albums","in":{"q":"京","minTracks":2},"out":[3]}
+{"fn":"albums","in":{"q":"京","minTracks":6},"out":[3]}
+{"fn":"artists","in":"京","out":[221]}
+{"fn":"playlists","in":{"q":"京","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"東京事変","titleOnly":false},"out":{"match":"東京事変*","fts":[9,8],"ftsError":null,"like":[9,8],"merged":[9,8]}}
+{"fn":"songs","in":{"q":"東京事変","titleOnly":true},"out":{"match":"title:東京事変*","fts":[8],"ftsError":null,"like":[8],"merged":[8]}}
+{"fn":"albums","in":{"q":"東京事変","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"東京事変","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"東京事変","minTracks":6},"out":[]}
+{"fn":"artists","in":"東京事変","out":[221]}
+{"fn":"playlists","in":{"q":"東京事変","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"%","titleOnly":false},"out":{"match":"pixelplayemptyquery*","fts":[43],"ftsError":null,"like":[10,32,3,2,20,1,5,4,28,46,34,38,12,45,14,13,44,18,30,11,33,29,16,47,43,7,37,31,23,22,35,21,6,36,48,15,39,19,40,17,24,26,41,9,8,25,42,27],"merged":[43,10,32,3,2,20,1,5,4,28,46,34,38,12,45,14,13,44,18,30,11,33,29,16,47,7,37,31,23,22,35,21,6,36,48,15,39,19,40,17,24,26,41,9,8,25,42,27]}}
+{"fn":"songs","in":{"q":"%","titleOnly":true},"out":{"match":"pixelplayemptyquery*","fts":[43],"ftsError":null,"like":[10,32,3,2,20,1,5,4,28,46,34,38,12,45,14,13,44,18,30,11,33,29,16,47,43,7,37,31,23,22,35,21,6,36,48,15,39,19,40,17,24,26,41,9,8,25,42,27],"merged":[43,10,32,3,2,20,1,5,4,28,46,34,38,12,45,14,13,44,18,30,11,33,29,16,47,7,37,31,23,22,35,21,6,36,48,15,39,19,40,17,24,26,41,9,8,25,42,27]}}
+{"fn":"albums","in":{"q":"%","minTracks":1},"out":[4,1,7,2,9,5,8,6,3]}
+{"fn":"albums","in":{"q":"%","minTracks":2},"out":[4,1,7,2,9,5,8,6,3]}
+{"fn":"albums","in":{"q":"%","minTracks":6},"out":[1,2,3]}
+{"fn":"artists","in":"%","out":[1033,1007,786,1077,774,759,293,865,408,295,646,1041,924,285,126,489,321,916,322,606,344,346,217,222,1044,1018,220,356,1079,160,366,1063,244,1095,387,860,277,554,597,164,329,499,221,458,806]}
+{"fn":"playlists","in":{"q":"%","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"_","titleOnly":false},"out":{"match":"pixelplayemptyquery*","fts":[43],"ftsError":null,"like":[10,32,3,2,20,1,5,4,28,46,34,38,12,45,14,13,44,18,30,11,33,29,16,47,43,7,37,31,23,22,35,21,6,36,48,15,39,19,40,17,24,26,41,9,8,25,42,27],"merged":[43,10,32,3,2,20,1,5,4,28,46,34,38,12,45,14,13,44,18,30,11,33,29,16,47,7,37,31,23,22,35,21,6,36,48,15,39,19,40,17,24,26,41,9,8,25,42,27]}}
+{"fn":"songs","in":{"q":"_","titleOnly":true},"out":{"match":"pixelplayemptyquery*","fts":[43],"ftsError":null,"like":[10,32,3,2,20,1,5,4,28,46,34,38,12,45,14,13,44,18,30,11,33,29,16,47,43,7,37,31,23,22,35,21,6,36,48,15,39,19,40,17,24,26,41,9,8,25,42,27],"merged":[43,10,32,3,2,20,1,5,4,28,46,34,38,12,45,14,13,44,18,30,11,33,29,16,47,7,37,31,23,22,35,21,6,36,48,15,39,19,40,17,24,26,41,9,8,25,42,27]}}
+{"fn":"albums","in":{"q":"_","minTracks":1},"out":[4,1,7,2,9,5,8,6,3]}
+{"fn":"albums","in":{"q":"_","minTracks":2},"out":[4,1,7,2,9,5,8,6,3]}
+{"fn":"albums","in":{"q":"_","minTracks":6},"out":[1,2,3]}
+{"fn":"artists","in":"_","out":[1033,1007,786,1077,774,759,293,865,408,295,646,1041,924,285,126,489,321,916,322,606,344,346,217,222,1044,1018,220,356,1079,160,366,1063,244,1095,387,860,277,554,597,164,329,499,221,458,806]}
+{"fn":"playlists","in":{"q":"_","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"a_b","titleOnly":false},"out":{"match":"a* AND b*","fts":[11,6],"ftsError":null,"like":[30,11,16,31,15],"merged":[11,6,30,16,31,15]}}
+{"fn":"songs","in":{"q":"a_b","titleOnly":true},"out":{"match":"title:a* AND title:b*","fts":[11],"ftsError":null,"like":[11,16,15],"merged":[11,16,15]}}
+{"fn":"albums","in":{"q":"a_b","minTracks":1},"out":[1,5]}
+{"fn":"albums","in":{"q":"a_b","minTracks":2},"out":[1,5]}
+{"fn":"albums","in":{"q":"a_b","minTracks":6},"out":[1]}
+{"fn":"artists","in":"a_b","out":[]}
+{"fn":"playlists","in":{"q":"a_b","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"50%","titleOnly":false},"out":{"match":"50*","fts":[10],"ftsError":null,"like":[10],"merged":[10]}}
+{"fn":"songs","in":{"q":"50%","titleOnly":true},"out":{"match":"title:50*","fts":[10],"ftsError":null,"like":[10],"merged":[10]}}
+{"fn":"albums","in":{"q":"50%","minTracks":1},"out":[4]}
+{"fn":"albums","in":{"q":"50%","minTracks":2},"out":[4]}
+{"fn":"albums","in":{"q":"50%","minTracks":6},"out":[]}
+{"fn":"artists","in":"50%","out":[]}
+{"fn":"playlists","in":{"q":"50%","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"50","titleOnly":false},"out":{"match":"50*","fts":[10],"ftsError":null,"like":[10],"merged":[10]}}
+{"fn":"songs","in":{"q":"50","titleOnly":true},"out":{"match":"title:50*","fts":[10],"ftsError":null,"like":[10],"merged":[10]}}
+{"fn":"albums","in":{"q":"50","minTracks":1},"out":[4]}
+{"fn":"albums","in":{"q":"50","minTracks":2},"out":[4]}
+{"fn":"albums","in":{"q":"50","minTracks":6},"out":[]}
+{"fn":"artists","in":"50","out":[]}
+{"fn":"playlists","in":{"q":"50","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"rock & roll","titleOnly":false},"out":{"match":"rock* AND roll*","fts":[12],"ftsError":null,"like":[12],"merged":[12]}}
+{"fn":"songs","in":{"q":"rock & roll","titleOnly":true},"out":{"match":"title:rock* AND title:roll*","fts":[12],"ftsError":null,"like":[12],"merged":[12]}}
+{"fn":"albums","in":{"q":"rock & roll","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"rock & roll","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"rock & roll","minTracks":6},"out":[]}
+{"fn":"artists","in":"rock & roll","out":[]}
+{"fn":"playlists","in":{"q":"rock & roll","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"rock roll","titleOnly":false},"out":{"match":"rock* AND roll*","fts":[12],"ftsError":null,"like":[],"merged":[12]}}
+{"fn":"songs","in":{"q":"rock roll","titleOnly":true},"out":{"match":"title:rock* AND title:roll*","fts":[12],"ftsError":null,"like":[],"merged":[12]}}
+{"fn":"albums","in":{"q":"rock roll","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"rock roll","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"rock roll","minTracks":6},"out":[]}
+{"fn":"artists","in":"rock roll","out":[]}
+{"fn":"playlists","in":{"q":"rock roll","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"","titleOnly":false},"out":{"match":"pixelplayemptyquery*","fts":[43],"ftsError":null,"like":[10,32,3,2,20,1,5,4,28,46,34,38,12,45,14,13,44,18,30,11,33,29,16,47,43,7,37,31,23,22,35,21,6,36,48,15,39,19,40,17,24,26,41,9,8,25,42,27],"merged":[43,10,32,3,2,20,1,5,4,28,46,34,38,12,45,14,13,44,18,30,11,33,29,16,47,7,37,31,23,22,35,21,6,36,48,15,39,19,40,17,24,26,41,9,8,25,42,27]}}
+{"fn":"songs","in":{"q":"","titleOnly":true},"out":{"match":"pixelplayemptyquery*","fts":[43],"ftsError":null,"like":[10,32,3,2,20,1,5,4,28,46,34,38,12,45,14,13,44,18,30,11,33,29,16,47,43,7,37,31,23,22,35,21,6,36,48,15,39,19,40,17,24,26,41,9,8,25,42,27],"merged":[43,10,32,3,2,20,1,5,4,28,46,34,38,12,45,14,13,44,18,30,11,33,29,16,47,7,37,31,23,22,35,21,6,36,48,15,39,19,40,17,24,26,41,9,8,25,42,27]}}
+{"fn":"albums","in":{"q":"","minTracks":1},"out":[4,1,7,2,9,5,8,6,3]}
+{"fn":"albums","in":{"q":"","minTracks":2},"out":[4,1,7,2,9,5,8,6,3]}
+{"fn":"albums","in":{"q":"","minTracks":6},"out":[1,2,3]}
+{"fn":"artists","in":"","out":[1033,1007,786,1077,774,759,293,865,408,295,646,1041,924,285,126,489,321,916,322,606,344,346,217,222,1044,1018,220,356,1079,160,366,1063,244,1095,387,860,277,554,597,164,329,499,221,458,806]}
+{"fn":"playlists","in":{"q":"","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[true,true,true,true,true,true,true,true,true]}
+{"fn":"songs","in":{"q":"  ","titleOnly":false},"out":{"match":"pixelplayemptyquery*","fts":[43],"ftsError":null,"like":[10,32,3,2,20,1,5,4,28,46,34,38,12,45,14,13,44,18,30,11,33,29,16,47,43,7,37,31,23,22,35,21,6,36,48,15,39,19,40,17,24,26,41,9,8,25,42,27],"merged":[43,10,32,3,2,20,1,5,4,28,46,34,38,12,45,14,13,44,18,30,11,33,29,16,47,7,37,31,23,22,35,21,6,36,48,15,39,19,40,17,24,26,41,9,8,25,42,27]}}
+{"fn":"songs","in":{"q":"  ","titleOnly":true},"out":{"match":"pixelplayemptyquery*","fts":[43],"ftsError":null,"like":[10,32,3,2,20,1,5,4,28,46,34,38,12,45,14,13,44,18,30,11,33,29,16,47,43,7,37,31,23,22,35,21,6,36,48,15,39,19,40,17,24,26,41,9,8,25,42,27],"merged":[43,10,32,3,2,20,1,5,4,28,46,34,38,12,45,14,13,44,18,30,11,33,29,16,47,7,37,31,23,22,35,21,6,36,48,15,39,19,40,17,24,26,41,9,8,25,42,27]}}
+{"fn":"albums","in":{"q":"  ","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"  ","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"  ","minTracks":6},"out":[]}
+{"fn":"artists","in":"  ","out":[]}
+{"fn":"playlists","in":{"q":"  ","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"ß","titleOnly":false},"out":{"match":"ß*","fts":[],"ftsError":null,"like":[13],"merged":[13]}}
+{"fn":"songs","in":{"q":"ß","titleOnly":true},"out":{"match":"title:ß*","fts":[],"ftsError":null,"like":[13],"merged":[13]}}
+{"fn":"albums","in":{"q":"ß","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"ß","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"ß","minTracks":6},"out":[]}
+{"fn":"artists","in":"ß","out":[]}
+{"fn":"playlists","in":{"q":"ß","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,true,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"ss","titleOnly":false},"out":{"match":"ss*","fts":[],"ftsError":null,"like":[14],"merged":[14]}}
+{"fn":"songs","in":{"q":"ss","titleOnly":true},"out":{"match":"title:ss*","fts":[],"ftsError":null,"like":[14],"merged":[14]}}
+{"fn":"albums","in":{"q":"ss","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"ss","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"ss","minTracks":6},"out":[]}
+{"fn":"artists","in":"ss","out":[]}
+{"fn":"playlists","in":{"q":"ss","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"straße","titleOnly":false},"out":{"match":"straße*","fts":[13],"ftsError":null,"like":[13],"merged":[13]}}
+{"fn":"songs","in":{"q":"straße","titleOnly":true},"out":{"match":"title:straße*","fts":[13],"ftsError":null,"like":[13],"merged":[13]}}
+{"fn":"albums","in":{"q":"straße","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"straße","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"straße","minTracks":6},"out":[]}
+{"fn":"artists","in":"straße","out":[]}
+{"fn":"playlists","in":{"q":"straße","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,true,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"strasse","titleOnly":false},"out":{"match":"strasse*","fts":[14],"ftsError":null,"like":[14],"merged":[14]}}
+{"fn":"songs","in":{"q":"strasse","titleOnly":true},"out":{"match":"title:strasse*","fts":[14],"ftsError":null,"like":[14],"merged":[14]}}
+{"fn":"albums","in":{"q":"strasse","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"strasse","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"strasse","minTracks":6},"out":[]}
+{"fn":"artists","in":"strasse","out":[]}
+{"fn":"playlists","in":{"q":"strasse","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"İstanbul","titleOnly":false},"out":{"match":"İstanbul*","fts":[16,15],"ftsError":null,"like":[15],"merged":[16,15]}}
+{"fn":"songs","in":{"q":"İstanbul","titleOnly":true},"out":{"match":"title:İstanbul*","fts":[16,15],"ftsError":null,"like":[15],"merged":[16,15]}}
+{"fn":"albums","in":{"q":"İstanbul","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"İstanbul","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"İstanbul","minTracks":6},"out":[]}
+{"fn":"artists","in":"İstanbul","out":[]}
+{"fn":"playlists","in":{"q":"İstanbul","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,true,false,false,false,false]}
+{"fn":"songs","in":{"q":"istanbul","titleOnly":false},"out":{"match":"istanbul*","fts":[16,15],"ftsError":null,"like":[16],"merged":[16,15]}}
+{"fn":"songs","in":{"q":"istanbul","titleOnly":true},"out":{"match":"title:istanbul*","fts":[16,15],"ftsError":null,"like":[16],"merged":[16,15]}}
+{"fn":"albums","in":{"q":"istanbul","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"istanbul","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"istanbul","minTracks":6},"out":[]}
+{"fn":"artists","in":"istanbul","out":[]}
+{"fn":"playlists","in":{"q":"istanbul","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,true,false,false,false,false]}
+{"fn":"songs","in":{"q":"ISTANBUL","titleOnly":false},"out":{"match":"ISTANBUL*","fts":[16,15],"ftsError":null,"like":[16],"merged":[16,15]}}
+{"fn":"songs","in":{"q":"ISTANBUL","titleOnly":true},"out":{"match":"title:ISTANBUL*","fts":[16,15],"ftsError":null,"like":[16],"merged":[16,15]}}
+{"fn":"albums","in":{"q":"ISTANBUL","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"ISTANBUL","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"ISTANBUL","minTracks":6},"out":[]}
+{"fn":"artists","in":"ISTANBUL","out":[]}
+{"fn":"playlists","in":{"q":"ISTANBUL","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,true,false,false,false,false]}
+{"fn":"songs","in":{"q":"ασμα","titleOnly":false},"out":{"match":"ασμα*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"songs","in":{"q":"ασμα","titleOnly":true},"out":{"match":"title:ασμα*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"ασμα","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"ασμα","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"ασμα","minTracks":6},"out":[]}
+{"fn":"artists","in":"ασμα","out":[]}
+{"fn":"playlists","in":{"q":"ασμα","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"άσμα","titleOnly":false},"out":{"match":"άσμα*","fts":[17],"ftsError":null,"like":[],"merged":[17]}}
+{"fn":"songs","in":{"q":"άσμα","titleOnly":true},"out":{"match":"title:άσμα*","fts":[17],"ftsError":null,"like":[],"merged":[17]}}
+{"fn":"albums","in":{"q":"άσμα","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"άσμα","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"άσμα","minTracks":6},"out":[]}
+{"fn":"artists","in":"άσμα","out":[]}
+{"fn":"playlists","in":{"q":"άσμα","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"ΑΣΜΑ","titleOnly":false},"out":{"match":"ΑΣΜΑ*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"songs","in":{"q":"ΑΣΜΑ","titleOnly":true},"out":{"match":"title:ΑΣΜΑ*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"ΑΣΜΑ","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"ΑΣΜΑ","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"ΑΣΜΑ","minTracks":6},"out":[]}
+{"fn":"artists","in":"ΑΣΜΑ","out":[]}
+{"fn":"playlists","in":{"q":"ΑΣΜΑ","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"tieng","titleOnly":false},"out":{"match":"tieng*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"songs","in":{"q":"tieng","titleOnly":true},"out":{"match":"title:tieng*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"tieng","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"tieng","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"tieng","minTracks":6},"out":[]}
+{"fn":"artists","in":"tieng","out":[]}
+{"fn":"playlists","in":{"q":"tieng","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"tiếng","titleOnly":false},"out":{"match":"tiếng*","fts":[18],"ftsError":null,"like":[18],"merged":[18]}}
+{"fn":"songs","in":{"q":"tiếng","titleOnly":true},"out":{"match":"title:tiếng*","fts":[18],"ftsError":null,"like":[18],"merged":[18]}}
+{"fn":"albums","in":{"q":"tiếng","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"tiếng","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"tiếng","minTracks":6},"out":[]}
+{"fn":"artists","in":"tiếng","out":[]}
+{"fn":"playlists","in":{"q":"tiếng","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"viet","titleOnly":false},"out":{"match":"viet*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"songs","in":{"q":"viet","titleOnly":true},"out":{"match":"title:viet*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"viet","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"viet","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"viet","minTracks":6},"out":[]}
+{"fn":"artists","in":"viet","out":[]}
+{"fn":"playlists","in":{"q":"viet","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"dz","titleOnly":false},"out":{"match":"dz*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"songs","in":{"q":"dz","titleOnly":true},"out":{"match":"title:dz*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"dz","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"dz","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"dz","minTracks":6},"out":[]}
+{"fn":"artists","in":"dz","out":[]}
+{"fn":"playlists","in":{"q":"dz","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"ǆ","titleOnly":false},"out":{"match":"ǆ*","fts":[19,40],"ftsError":null,"like":[40],"merged":[19,40]}}
+{"fn":"songs","in":{"q":"ǆ","titleOnly":true},"out":{"match":"title:ǆ*","fts":[19,40],"ftsError":null,"like":[],"merged":[19,40]}}
+{"fn":"albums","in":{"q":"ǆ","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"ǆ","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"ǆ","minTracks":6},"out":[]}
+{"fn":"artists","in":"ǆ","out":[554]}
+{"fn":"playlists","in":{"q":"ǆ","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,true,false,false,false]}
+{"fn":"songs","in":{"q":"o lake","titleOnly":false},"out":{"match":"o* AND lake*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"songs","in":{"q":"o lake","titleOnly":true},"out":{"match":"title:o* AND title:lake*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"o lake","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"o lake","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"o lake","minTracks":6},"out":[]}
+{"fn":"artists","in":"o lake","out":[]}
+{"fn":"playlists","in":{"q":"o lake","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"ø","titleOnly":false},"out":{"match":"ø*","fts":[21],"ftsError":null,"like":[22],"merged":[21,22]}}
+{"fn":"songs","in":{"q":"ø","titleOnly":true},"out":{"match":"title:ø*","fts":[21],"ftsError":null,"like":[],"merged":[21]}}
+{"fn":"albums","in":{"q":"ø","minTracks":1},"out":[8]}
+{"fn":"albums","in":{"q":"ø","minTracks":2},"out":[8]}
+{"fn":"albums","in":{"q":"ø","minTracks":6},"out":[]}
+{"fn":"artists","in":"ø","out":[160]}
+{"fn":"playlists","in":{"q":"ø","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"aether","titleOnly":false},"out":{"match":"aether*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"songs","in":{"q":"aether","titleOnly":true},"out":{"match":"title:aether*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"aether","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"aether","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"aether","minTracks":6},"out":[]}
+{"fn":"artists","in":"aether","out":[]}
+{"fn":"playlists","in":{"q":"aether","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"æ","titleOnly":false},"out":{"match":"æ*","fts":[22],"ftsError":null,"like":[],"merged":[22]}}
+{"fn":"songs","in":{"q":"æ","titleOnly":true},"out":{"match":"title:æ*","fts":[22],"ftsError":null,"like":[],"merged":[22]}}
+{"fn":"albums","in":{"q":"æ","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"æ","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"æ","minTracks":6},"out":[]}
+{"fn":"artists","in":"æ","out":[]}
+{"fn":"playlists","in":{"q":"æ","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"angstrom","titleOnly":false},"out":{"match":"angstrom*","fts":[23],"ftsError":null,"like":[],"merged":[23]}}
+{"fn":"songs","in":{"q":"angstrom","titleOnly":true},"out":{"match":"title:angstrom*","fts":[23],"ftsError":null,"like":[],"merged":[23]}}
+{"fn":"albums","in":{"q":"angstrom","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"angstrom","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"angstrom","minTracks":6},"out":[]}
+{"fn":"artists","in":"angstrom","out":[]}
+{"fn":"playlists","in":{"q":"angstrom","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"ångström","titleOnly":false},"out":{"match":"ångström*","fts":[23],"ftsError":null,"like":[],"merged":[23]}}
+{"fn":"songs","in":{"q":"ångström","titleOnly":true},"out":{"match":"title:ångström*","fts":[23],"ftsError":null,"like":[],"merged":[23]}}
+{"fn":"albums","in":{"q":"ångström","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"ångström","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"ångström","minTracks":6},"out":[]}
+{"fn":"artists","in":"ångström","out":[]}
+{"fn":"playlists","in":{"q":"ångström","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"йога","titleOnly":false},"out":{"match":"йога*","fts":[24],"ftsError":null,"like":[],"merged":[24]}}
+{"fn":"songs","in":{"q":"йога","titleOnly":true},"out":{"match":"title:йога*","fts":[24],"ftsError":null,"like":[],"merged":[24]}}
+{"fn":"albums","in":{"q":"йога","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"йога","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"йога","minTracks":6},"out":[]}
+{"fn":"artists","in":"йога","out":[]}
+{"fn":"playlists","in":{"q":"йога","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"иога","titleOnly":false},"out":{"match":"иога*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"songs","in":{"q":"иога","titleOnly":true},"out":{"match":"title:иога*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"иога","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"иога","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"иога","minTracks":6},"out":[]}
+{"fn":"artists","in":"иога","out":[]}
+{"fn":"playlists","in":{"q":"иога","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"fire","titleOnly":false},"out":{"match":"fire*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"songs","in":{"q":"fire","titleOnly":true},"out":{"match":"title:fire*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"fire","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"fire","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"fire","minTracks":6},"out":[]}
+{"fn":"artists","in":"fire","out":[]}
+{"fn":"playlists","in":{"q":"fire","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"ﬁ","titleOnly":false},"out":{"match":"ﬁ*","fts":[25],"ftsError":null,"like":[25],"merged":[25]}}
+{"fn":"songs","in":{"q":"ﬁ","titleOnly":true},"out":{"match":"title:ﬁ*","fts":[25],"ftsError":null,"like":[25],"merged":[25]}}
+{"fn":"albums","in":{"q":"ﬁ","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"ﬁ","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"ﬁ","minTracks":6},"out":[]}
+{"fn":"artists","in":"ﬁ","out":[]}
+{"fn":"playlists","in":{"q":"ﬁ","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"ⅻ","titleOnly":false},"out":{"match":"ⅻ*","fts":[26],"ftsError":null,"like":[],"merged":[26]}}
+{"fn":"songs","in":{"q":"ⅻ","titleOnly":true},"out":{"match":"title:ⅻ*","fts":[26],"ftsError":null,"like":[],"merged":[26]}}
+{"fn":"albums","in":{"q":"ⅻ","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"ⅻ","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"ⅻ","minTracks":6},"out":[]}
+{"fn":"artists","in":"ⅻ","out":[]}
+{"fn":"playlists","in":{"q":"ⅻ","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"xii","titleOnly":false},"out":{"match":"xii*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"songs","in":{"q":"xii","titleOnly":true},"out":{"match":"title:xii*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"xii","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"xii","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"xii","minTracks":6},"out":[]}
+{"fn":"artists","in":"xii","out":[]}
+{"fn":"playlists","in":{"q":"xii","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"😀","titleOnly":false},"out":{"match":"pixelplayemptyquery*","fts":[43],"ftsError":null,"like":[27],"merged":[43,27]}}
+{"fn":"songs","in":{"q":"😀","titleOnly":true},"out":{"match":"pixelplayemptyquery*","fts":[43],"ftsError":null,"like":[27],"merged":[43,27]}}
+{"fn":"albums","in":{"q":"😀","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"😀","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"😀","minTracks":6},"out":[]}
+{"fn":"artists","in":"😀","out":[]}
+{"fn":"playlists","in":{"q":"😀","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"emoji","titleOnly":false},"out":{"match":"emoji*","fts":[27],"ftsError":null,"like":[27],"merged":[27]}}
+{"fn":"songs","in":{"q":"emoji","titleOnly":true},"out":{"match":"title:emoji*","fts":[27],"ftsError":null,"like":[27],"merged":[27]}}
+{"fn":"albums","in":{"q":"emoji","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"emoji","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"emoji","minTracks":6},"out":[]}
+{"fn":"artists","in":"emoji","out":[]}
+{"fn":"playlists","in":{"q":"emoji","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"hello world","titleOnly":false},"out":{"match":"hello* AND world*","fts":[28,29],"ftsError":null,"like":[29],"merged":[28,29]}}
+{"fn":"songs","in":{"q":"hello world","titleOnly":true},"out":{"match":"title:hello* AND title:world*","fts":[28,29],"ftsError":null,"like":[29],"merged":[28,29]}}
+{"fn":"albums","in":{"q":"hello world","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"hello world","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"hello world","minTracks":6},"out":[]}
+{"fn":"artists","in":"hello world","out":[]}
+{"fn":"playlists","in":{"q":"hello world","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"hello-world","titleOnly":false},"out":{"match":"hello* AND world*","fts":[28,29],"ftsError":null,"like":[28],"merged":[28,29]}}
+{"fn":"songs","in":{"q":"hello-world","titleOnly":true},"out":{"match":"title:hello* AND title:world*","fts":[28,29],"ftsError":null,"like":[28],"merged":[28,29]}}
+{"fn":"albums","in":{"q":"hello-world","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"hello-world","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"hello-world","minTracks":6},"out":[]}
+{"fn":"artists","in":"hello-world","out":[]}
+{"fn":"playlists","in":{"q":"hello-world","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"hello","titleOnly":false},"out":{"match":"hello*","fts":[28,29],"ftsError":null,"like":[28,29],"merged":[28,29]}}
+{"fn":"songs","in":{"q":"hello","titleOnly":true},"out":{"match":"title:hello*","fts":[28,29],"ftsError":null,"like":[28,29],"merged":[28,29]}}
+{"fn":"albums","in":{"q":"hello","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"hello","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"hello","minTracks":6},"out":[]}
+{"fn":"artists","in":"hello","out":[]}
+{"fn":"playlists","in":{"q":"hello","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"zeta","titleOnly":false},"out":{"match":"zeta*","fts":[32,30,33,31],"ftsError":null,"like":[32,30,33,31],"merged":[32,30,33,31]}}
+{"fn":"songs","in":{"q":"zeta","titleOnly":true},"out":{"match":"title:zeta*","fts":[30,31],"ftsError":null,"like":[30,31],"merged":[30,31]}}
+{"fn":"albums","in":{"q":"zeta","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"zeta","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"zeta","minTracks":6},"out":[]}
+{"fn":"artists","in":"zeta","out":[1044,356]}
+{"fn":"playlists","in":{"q":"zeta","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"alpha","titleOnly":false},"out":{"match":"alpha*","fts":[32,30,33,31],"ftsError":null,"like":[32,30,33,31],"merged":[32,30,33,31]}}
+{"fn":"songs","in":{"q":"alpha","titleOnly":true},"out":{"match":"title:alpha*","fts":[32,33],"ftsError":null,"like":[32,33],"merged":[32,33]}}
+{"fn":"albums","in":{"q":"alpha","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"alpha","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"alpha","minTracks":6},"out":[]}
+{"fn":"artists","in":"alpha","out":[1018]}
+{"fn":"playlists","in":{"q":"alpha","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"a","titleOnly":false},"out":{"match":"a*","fts":[32,30,11,33,31,23,6,15],"ftsError":null,"like":[32,3,2,20,1,5,4,28,46,34,38,45,14,13,44,30,11,33,29,16,43,7,37,31,23,35,21,6,15,19,26,25],"merged":[32,30,11,33,31,23,6,15,3,2,20,1,5,4,28,46,34,38,45,14,13,44,29,16,43,7,37,35,21,19,26,25]}}
+{"fn":"songs","in":{"q":"a","titleOnly":true},"out":{"match":"title:a*","fts":[32,11,33,23,6],"ftsError":null,"like":[32,3,2,20,1,5,4,46,34,14,13,30,11,33,16,43,7,31,35,21,6,15,19],"merged":[32,11,33,23,6,3,2,20,1,5,4,46,34,14,13,30,16,43,7,31,35,21,15,19]}}
+{"fn":"albums","in":{"q":"a","minTracks":1},"out":[4,1,2,5,6]}
+{"fn":"albums","in":{"q":"a","minTracks":2},"out":[4,1,2,5,6]}
+{"fn":"albums","in":{"q":"a","minTracks":6},"out":[1,2]}
+{"fn":"artists","in":"a","out":[1033,786,1077,774,759,295,924,126,489,321,322,344,346,217,1044,1018,356,1079,366,1095]}
+{"fn":"playlists","in":{"q":"a","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[true,false,false,true,true,false,false,false,false]}
+{"fn":"songs","in":{"q":"z","titleOnly":false},"out":{"match":"z*","fts":[32,5,12,30,33,31],"ftsError":null,"like":[32,5,12,30,33,31,23,15],"merged":[32,5,12,30,33,31,23,15]}}
+{"fn":"songs","in":{"q":"z","titleOnly":true},"out":{"match":"title:z*","fts":[30,31],"ftsError":null,"like":[5,30,31],"merged":[30,31,5]}}
+{"fn":"albums","in":{"q":"z","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"z","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"z","minTracks":6},"out":[]}
+{"fn":"artists","in":"z","out":[786,408,321,1044,356]}
+{"fn":"playlists","in":{"q":"z","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"mañana","titleOnly":false},"out":{"match":"mañana*","fts":[34],"ftsError":null,"like":[34],"merged":[34]}}
+{"fn":"songs","in":{"q":"mañana","titleOnly":true},"out":{"match":"title:mañana*","fts":[34],"ftsError":null,"like":[34],"merged":[34]}}
+{"fn":"albums","in":{"q":"mañana","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"mañana","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"mañana","minTracks":6},"out":[]}
+{"fn":"artists","in":"mañana","out":[]}
+{"fn":"playlists","in":{"q":"mañana","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"manana","titleOnly":false},"out":{"match":"manana*","fts":[34],"ftsError":null,"like":[],"merged":[34]}}
+{"fn":"songs","in":{"q":"manana","titleOnly":true},"out":{"match":"title:manana*","fts":[34],"ftsError":null,"like":[],"merged":[34]}}
+{"fn":"albums","in":{"q":"manana","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"manana","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"manana","minTracks":6},"out":[]}
+{"fn":"artists","in":"manana","out":[]}
+{"fn":"playlists","in":{"q":"manana","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"nino","titleOnly":false},"out":{"match":"nino*","fts":[34],"ftsError":null,"like":[],"merged":[34]}}
+{"fn":"songs","in":{"q":"nino","titleOnly":true},"out":{"match":"title:nino*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"nino","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"nino","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"nino","minTracks":6},"out":[]}
+{"fn":"artists","in":"nino","out":[]}
+{"fn":"playlists","in":{"q":"nino","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"ca va","titleOnly":false},"out":{"match":"ca* AND va*","fts":[35],"ftsError":null,"like":[],"merged":[35]}}
+{"fn":"songs","in":{"q":"ca va","titleOnly":true},"out":{"match":"title:ca* AND title:va*","fts":[35],"ftsError":null,"like":[],"merged":[35]}}
+{"fn":"albums","in":{"q":"ca va","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"ca va","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"ca va","minTracks":6},"out":[]}
+{"fn":"artists","in":"ca va","out":[]}
+{"fn":"playlists","in":{"q":"ca va","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"ça","titleOnly":false},"out":{"match":"ça*","fts":[3,2,20,1,35],"ftsError":null,"like":[],"merged":[3,2,20,1,35]}}
+{"fn":"songs","in":{"q":"ça","titleOnly":true},"out":{"match":"title:ça*","fts":[3,2,20,1,35],"ftsError":null,"like":[],"merged":[3,2,20,1,35]}}
+{"fn":"albums","in":{"q":"ça","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"ça","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"ça","minTracks":6},"out":[]}
+{"fn":"artists","in":"ça","out":[]}
+{"fn":"playlists","in":{"q":"ça","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"g","titleOnly":false},"out":{"match":"g*","fts":[16,36,48],"ftsError":null,"like":[1,45,44,18,16,23,19,25,27],"merged":[16,36,48,1,45,44,18,23,19,25,27]}}
+{"fn":"songs","in":{"q":"g","titleOnly":true},"out":{"match":"title:g*","fts":[36,48],"ftsError":null,"like":[45,44,18,23,19,27],"merged":[36,48,45,44,18,23,19,27]}}
+{"fn":"albums","in":{"q":"g","minTracks":1},"out":[7,9]}
+{"fn":"albums","in":{"q":"g","minTracks":2},"out":[7,9]}
+{"fn":"albums","in":{"q":"g","minTracks":6},"out":[]}
+{"fn":"artists","in":"g","out":[865,295,606,346]}
+{"fn":"playlists","in":{"q":"g","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"ğ","titleOnly":false},"out":{"match":"ğ*","fts":[16,36,48],"ftsError":null,"like":[36],"merged":[16,36,48]}}
+{"fn":"songs","in":{"q":"ğ","titleOnly":true},"out":{"match":"title:ğ*","fts":[36,48],"ftsError":null,"like":[],"merged":[36,48]}}
+{"fn":"albums","in":{"q":"ğ","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"ğ","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"ğ","minTracks":6},"out":[]}
+{"fn":"artists","in":"ğ","out":[387]}
+{"fn":"playlists","in":{"q":"ğ","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"x2","titleOnly":false},"out":{"match":"x2*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"songs","in":{"q":"x2","titleOnly":true},"out":{"match":"title:x2*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"x2","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"x2","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"x2","minTracks":6},"out":[]}
+{"fn":"artists","in":"x2","out":[]}
+{"fn":"playlists","in":{"q":"x2","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"x²","titleOnly":false},"out":{"match":"x²*","fts":[37],"ftsError":null,"like":[37],"merged":[37]}}
+{"fn":"songs","in":{"q":"x²","titleOnly":true},"out":{"match":"title:x²*","fts":[37],"ftsError":null,"like":[37],"merged":[37]}}
+{"fn":"albums","in":{"q":"x²","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"x²","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"x²","minTracks":6},"out":[]}
+{"fn":"artists","in":"x²","out":[]}
+{"fn":"playlists","in":{"q":"x²","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"no 5","titleOnly":false},"out":{"match":"no* AND 5*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"songs","in":{"q":"no 5","titleOnly":true},"out":{"match":"title:no* AND title:5*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"no 5","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"no 5","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"no 5","minTracks":6},"out":[]}
+{"fn":"artists","in":"no 5","out":[]}
+{"fn":"playlists","in":{"q":"no 5","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"nº","titleOnly":false},"out":{"match":"nº*","fts":[38],"ftsError":null,"like":[38],"merged":[38]}}
+{"fn":"songs","in":{"q":"nº","titleOnly":true},"out":{"match":"title:nº*","fts":[38],"ftsError":null,"like":[38],"merged":[38]}}
+{"fn":"albums","in":{"q":"nº","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"nº","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"nº","minTracks":6},"out":[]}
+{"fn":"artists","in":"nº","out":[]}
+{"fn":"playlists","in":{"q":"nº","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"ⓐ","titleOnly":false},"out":{"match":"pixelplayemptyquery*","fts":[43],"ftsError":null,"like":[],"merged":[43]}}
+{"fn":"songs","in":{"q":"ⓐ","titleOnly":true},"out":{"match":"pixelplayemptyquery*","fts":[43],"ftsError":null,"like":[],"merged":[43]}}
+{"fn":"albums","in":{"q":"ⓐ","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"ⓐ","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"ⓐ","minTracks":6},"out":[]}
+{"fn":"artists","in":"ⓐ","out":[]}
+{"fn":"playlists","in":{"q":"ⓐ","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"full","titleOnly":false},"out":{"match":"full*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"songs","in":{"q":"full","titleOnly":true},"out":{"match":"title:full*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"full","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"full","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"full","minTracks":6},"out":[]}
+{"fn":"artists","in":"full","out":[]}
+{"fn":"playlists","in":{"q":"full","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"ｆｕｌｌ","titleOnly":false},"out":{"match":"ｆｕｌｌ*","fts":[42],"ftsError":null,"like":[42],"merged":[42]}}
+{"fn":"songs","in":{"q":"ｆｕｌｌ","titleOnly":true},"out":{"match":"title:ｆｕｌｌ*","fts":[42],"ftsError":null,"like":[42],"merged":[42]}}
+{"fn":"albums","in":{"q":"ｆｕｌｌ","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"ｆｕｌｌ","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"ｆｕｌｌ","minTracks":6},"out":[]}
+{"fn":"artists","in":"ｆｕｌｌ","out":[]}
+{"fn":"playlists","in":{"q":"ｆｕｌｌ","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"width","titleOnly":false},"out":{"match":"width*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"songs","in":{"q":"width","titleOnly":true},"out":{"match":"title:width*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"width","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"width","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"width","minTracks":6},"out":[]}
+{"fn":"artists","in":"width","out":[]}
+{"fn":"playlists","in":{"q":"width","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"pixelplayemptyquery","titleOnly":false},"out":{"match":"pixelplayemptyquery*","fts":[43],"ftsError":null,"like":[43],"merged":[43]}}
+{"fn":"songs","in":{"q":"pixelplayemptyquery","titleOnly":true},"out":{"match":"title:pixelplayemptyquery*","fts":[43],"ftsError":null,"like":[43],"merged":[43]}}
+{"fn":"albums","in":{"q":"pixelplayemptyquery","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"pixelplayemptyquery","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"pixelplayemptyquery","minTracks":6},"out":[]}
+{"fn":"artists","in":"pixelplayemptyquery","out":[]}
+{"fn":"playlists","in":{"q":"pixelplayemptyquery","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"the","titleOnly":false},"out":{"match":"the*","fts":[44,16],"ftsError":null,"like":[44,16,22],"merged":[44,16,22]}}
+{"fn":"songs","in":{"q":"the","titleOnly":true},"out":{"match":"title:the*","fts":[44],"ftsError":null,"like":[44,22],"merged":[44,22]}}
+{"fn":"albums","in":{"q":"the","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"the","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"the","minTracks":6},"out":[]}
+{"fn":"artists","in":"the","out":[344,346]}
+{"fn":"playlists","in":{"q":"the","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"song band","titleOnly":false},"out":{"match":"song* AND band*","fts":[45,44],"ftsError":null,"like":[],"merged":[45,44]}}
+{"fn":"songs","in":{"q":"song band","titleOnly":true},"out":{"match":"title:song* AND title:band*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"song band","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"song band","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"song band","minTracks":6},"out":[]}
+{"fn":"artists","in":"song band","out":[]}
+{"fn":"playlists","in":{"q":"song band","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"pop","titleOnly":false},"out":{"match":"pop*","fts":[3,5,46,45,44,18,15,9,8,27],"ftsError":null,"like":[3,5,46,45,44,18,15,9,8,27],"merged":[3,5,46,45,44,18,15,9,8,27]}}
+{"fn":"songs","in":{"q":"pop","titleOnly":true},"out":{"match":"title:pop*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"pop","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"pop","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"pop","minTracks":6},"out":[]}
+{"fn":"artists","in":"pop","out":[]}
+{"fn":"playlists","in":{"q":"pop","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"jpop","titleOnly":false},"out":{"match":"jpop*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"songs","in":{"q":"jpop","titleOnly":true},"out":{"match":"title:jpop*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"jpop","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"jpop","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"jpop","minTracks":6},"out":[]}
+{"fn":"artists","in":"jpop","out":[]}
+{"fn":"playlists","in":{"q":"jpop","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"j-pop","titleOnly":false},"out":{"match":"j* AND pop*","fts":[5,9,8],"ftsError":null,"like":[9,8],"merged":[5,9,8]}}
+{"fn":"songs","in":{"q":"j-pop","titleOnly":true},"out":{"match":"title:j* AND title:pop*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"j-pop","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"j-pop","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"j-pop","minTracks":6},"out":[]}
+{"fn":"artists","in":"j-pop","out":[]}
+{"fn":"playlists","in":{"q":"j-pop","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"love","titleOnly":false},"out":{"match":"love*","fts":[5,46,47],"ftsError":null,"like":[5,46,47],"merged":[5,46,47]}}
+{"fn":"songs","in":{"q":"love","titleOnly":true},"out":{"match":"title:love*","fts":[5,46,47],"ftsError":null,"like":[5,46,47],"merged":[5,46,47]}}
+{"fn":"albums","in":{"q":"love","minTracks":1},"out":[7]}
+{"fn":"albums","in":{"q":"love","minTracks":2},"out":[7]}
+{"fn":"albums","in":{"q":"love","minTracks":6},"out":[]}
+{"fn":"artists","in":"love","out":[646,1041]}
+{"fn":"playlists","in":{"q":"love","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"lov","titleOnly":false},"out":{"match":"lov*","fts":[5,46,47],"ftsError":null,"like":[5,46,47],"merged":[5,46,47]}}
+{"fn":"songs","in":{"q":"lov","titleOnly":true},"out":{"match":"title:lov*","fts":[5,46,47],"ftsError":null,"like":[5,46,47],"merged":[5,46,47]}}
+{"fn":"albums","in":{"q":"lov","minTracks":1},"out":[7]}
+{"fn":"albums","in":{"q":"lov","minTracks":2},"out":[7]}
+{"fn":"albums","in":{"q":"lov","minTracks":6},"out":[]}
+{"fn":"artists","in":"lov","out":[646,1041]}
+{"fn":"playlists","in":{"q":"lov","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"a b c d e f g","titleOnly":false},"out":{"match":"a* AND b* AND c* AND d* AND e* AND f*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"songs","in":{"q":"a b c d e f g","titleOnly":true},"out":{"match":"title:a* AND title:b* AND title:c* AND title:d* AND title:e* AND title:f*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"a b c d e f g","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"a b c d e f g","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"a b c d e f g","minTracks":6},"out":[]}
+{"fn":"artists","in":"a b c d e f g","out":[]}
+{"fn":"playlists","in":{"q":"a b c d e f g","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"rock pop metal jazz soul folk latin","titleOnly":false},"out":{"match":"rock* AND pop* AND metal* AND jazz* AND soul* AND folk*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"songs","in":{"q":"rock pop metal jazz soul folk latin","titleOnly":true},"out":{"match":"title:rock* AND title:pop* AND title:metal* AND title:jazz* AND title:soul* AND title:folk*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"rock pop metal jazz soul folk latin","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"rock pop metal jazz soul folk latin","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"rock pop metal jazz soul folk latin","minTracks":6},"out":[]}
+{"fn":"artists","in":"rock pop metal jazz soul folk latin","out":[]}
+{"fn":"playlists","in":{"q":"rock pop metal jazz soul folk latin","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"'","titleOnly":false},"out":{"match":"pixelplayemptyquery*","fts":[43],"ftsError":null,"like":[],"merged":[43]}}
+{"fn":"songs","in":{"q":"'","titleOnly":true},"out":{"match":"pixelplayemptyquery*","fts":[43],"ftsError":null,"like":[],"merged":[43]}}
+{"fn":"albums","in":{"q":"'","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"'","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"'","minTracks":6},"out":[]}
+{"fn":"artists","in":"'","out":[]}
+{"fn":"playlists","in":{"q":"'","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"\"","titleOnly":false},"out":{"match":"pixelplayemptyquery*","fts":[43],"ftsError":null,"like":[],"merged":[43]}}
+{"fn":"songs","in":{"q":"\"","titleOnly":true},"out":{"match":"pixelplayemptyquery*","fts":[43],"ftsError":null,"like":[],"merged":[43]}}
+{"fn":"albums","in":{"q":"\"","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"\"","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"\"","minTracks":6},"out":[]}
+{"fn":"artists","in":"\"","out":[]}
+{"fn":"playlists","in":{"q":"\"","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"*","titleOnly":false},"out":{"match":"pixelplayemptyquery*","fts":[43],"ftsError":null,"like":[],"merged":[43]}}
+{"fn":"songs","in":{"q":"*","titleOnly":true},"out":{"match":"pixelplayemptyquery*","fts":[43],"ftsError":null,"like":[],"merged":[43]}}
+{"fn":"albums","in":{"q":"*","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"*","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"*","minTracks":6},"out":[]}
+{"fn":"artists","in":"*","out":[]}
+{"fn":"playlists","in":{"q":"*","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"OR","titleOnly":false},"out":{"match":"OR*","fts":[],"ftsError":null,"like":[28,11,29],"merged":[28,11,29]}}
+{"fn":"songs","in":{"q":"OR","titleOnly":true},"out":{"match":"title:OR*","fts":[],"ftsError":null,"like":[28,29],"merged":[28,29]}}
+{"fn":"albums","in":{"q":"OR","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"OR","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"OR","minTracks":6},"out":[]}
+{"fn":"artists","in":"OR","out":[222]}
+{"fn":"playlists","in":{"q":"OR","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"NOT","titleOnly":false},"out":{"match":"NOT*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"songs","in":{"q":"NOT","titleOnly":true},"out":{"match":"title:NOT*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"NOT","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"NOT","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"NOT","minTracks":6},"out":[]}
+{"fn":"artists","in":"NOT","out":[]}
+{"fn":"playlists","in":{"q":"NOT","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"AND","titleOnly":false},"out":{"match":"AND*","fts":[],"ftsError":null,"like":[2,45,44,6],"merged":[2,45,44,6]}}
+{"fn":"songs","in":{"q":"AND","titleOnly":true},"out":{"match":"title:AND*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"AND","minTracks":1},"out":[6]}
+{"fn":"albums","in":{"q":"AND","minTracks":2},"out":[6]}
+{"fn":"albums","in":{"q":"AND","minTracks":6},"out":[]}
+{"fn":"artists","in":"AND","out":[1033,759,344,1095]}
+{"fn":"playlists","in":{"q":"AND","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"x OR y","titleOnly":false},"out":{"match":"x* AND OR* AND y*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"songs","in":{"q":"x OR y","titleOnly":true},"out":{"match":"title:x* AND title:OR* AND title:y*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"x OR y","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"x OR y","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"x OR y","minTracks":6},"out":[]}
+{"fn":"artists","in":"x OR y","out":[]}
+{"fn":"playlists","in":{"q":"x OR y","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"-rock","titleOnly":false},"out":{"match":"rock*","fts":[12,16,6,24],"ftsError":null,"like":[],"merged":[12,16,6,24]}}
+{"fn":"songs","in":{"q":"-rock","titleOnly":true},"out":{"match":"title:rock*","fts":[12],"ftsError":null,"like":[],"merged":[12]}}
+{"fn":"albums","in":{"q":"-rock","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"-rock","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"-rock","minTracks":6},"out":[]}
+{"fn":"artists","in":"-rock","out":[]}
+{"fn":"playlists","in":{"q":"-rock","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"rock*","titleOnly":false},"out":{"match":"rock*","fts":[12,16,6,24],"ftsError":null,"like":[],"merged":[12,16,6,24]}}
+{"fn":"songs","in":{"q":"rock*","titleOnly":true},"out":{"match":"title:rock*","fts":[12],"ftsError":null,"like":[],"merged":[12]}}
+{"fn":"albums","in":{"q":"rock*","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"rock*","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"rock*","minTracks":6},"out":[]}
+{"fn":"artists","in":"rock*","out":[]}
+{"fn":"playlists","in":{"q":"rock*","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"girts","titleOnly":false},"out":{"match":"girts*","fts":[48],"ftsError":null,"like":[],"merged":[48]}}
+{"fn":"songs","in":{"q":"girts","titleOnly":true},"out":{"match":"title:girts*","fts":[48],"ftsError":null,"like":[],"merged":[48]}}
+{"fn":"albums","in":{"q":"girts","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"girts","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"girts","minTracks":6},"out":[]}
+{"fn":"artists","in":"girts","out":[]}
+{"fn":"playlists","in":{"q":"girts","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"ģirts","titleOnly":false},"out":{"match":"ģirts*","fts":[48],"ftsError":null,"like":[],"merged":[48]}}
+{"fn":"songs","in":{"q":"ģirts","titleOnly":true},"out":{"match":"title:ģirts*","fts":[48],"ftsError":null,"like":[],"merged":[48]}}
+{"fn":"albums","in":{"q":"ģirts","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"ģirts","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"ģirts","minTracks":6},"out":[]}
+{"fn":"artists","in":"ģirts","out":[]}
+{"fn":"playlists","in":{"q":"ģirts","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"kilis","titleOnly":false},"out":{"match":"kilis*","fts":[48],"ftsError":null,"like":[],"merged":[48]}}
+{"fn":"songs","in":{"q":"kilis","titleOnly":true},"out":{"match":"title:kilis*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"kilis","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"kilis","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"kilis","minTracks":6},"out":[]}
+{"fn":"artists","in":"kilis","out":[]}
+{"fn":"playlists","in":{"q":"kilis","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"e e","titleOnly":false},"out":{"match":"e* AND e*","fts":[10,20,1,7,27],"ftsError":null,"like":[],"merged":[10,20,1,7,27]}}
+{"fn":"songs","in":{"q":"e e","titleOnly":true},"out":{"match":"title:e* AND title:e*","fts":[7,27],"ftsError":null,"like":[],"merged":[7,27]}}
+{"fn":"albums","in":{"q":"e e","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"e e","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"e e","minTracks":6},"out":[]}
+{"fn":"artists","in":"e e","out":[]}
+{"fn":"playlists","in":{"q":"e e","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"1","titleOnly":false},"out":{"match":"1*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"songs","in":{"q":"1","titleOnly":true},"out":{"match":"title:1*","fts":[],"ftsError":null,"like":[],"merged":[]}}
+{"fn":"albums","in":{"q":"1","minTracks":1},"out":[]}
+{"fn":"albums","in":{"q":"1","minTracks":2},"out":[]}
+{"fn":"albums","in":{"q":"1","minTracks":6},"out":[]}
+{"fn":"artists","in":"1","out":[]}
+{"fn":"playlists","in":{"q":"1","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,false,false,false,false,false,false]}
+{"fn":"songs","in":{"q":"s","titleOnly":false},"out":{"match":"s*","fts":[45,14,13,44,18,11,29,47,15,27],"ftsError":null,"like":[10,28,46,45,14,13,44,18,11,29,16,47,7,23,21,6,48,15,27],"merged":[45,14,13,44,18,11,29,47,15,27,10,28,46,16,7,23,21,6,48]}}
+{"fn":"songs","in":{"q":"s","titleOnly":true},"out":{"match":"title:s*","fts":[45,14,13,44,27],"ftsError":null,"like":[45,14,13,44,16,7,23,6,48,15,27],"merged":[45,14,13,44,27,16,7,23,6,48,15]}}
+{"fn":"albums","in":{"q":"s","minTracks":1},"out":[4,7,2,9]}
+{"fn":"albums","in":{"q":"s","minTracks":2},"out":[4,7,2,9]}
+{"fn":"albums","in":{"q":"s","minTracks":6},"out":[2]}
+{"fn":"artists","in":"s","out":[774,293,1041,126,321,916,322,606,346,222,1079,244,277]}
+{"fn":"playlists","in":{"q":"s","names":["Chill Café","ROCK","rock","Straße","İstanbul","ǅ","Σ","Ünï","日本"]},"out":[false,false,false,true,true,false,false,false,false]}

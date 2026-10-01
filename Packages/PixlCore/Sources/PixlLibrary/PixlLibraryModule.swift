@@ -1,5 +1,7 @@
-// PixlLibrary — ArtistParsing, AlbumGrouping, FolderTree, SearchIndex, sort/filter, smart rules, M3U, QueueUtils, recommendations/Daily Mix, stats aggregation, playback-history codec, k-means palette.
-// Placeholder from stage 0. Keep the `PixlLibraryModule` enum: the app's Diagnostics screen lists it.
+// PixlLibrary — ArtistParsing, AlbumGrouping (+ LibraryAssembler), FolderTree, SearchIndex, LibrarySorting, smart
+// playlists, M3U, QueueUtils, recommendations/Daily Mix/Home planner, playback stats + playback_history.json codec,
+// k-means palette. Ported from the Android app (stage 3a); golden vectors in Tests/PixlLibraryTests/Fixtures.
+// Keep the `PixlLibraryModule` enum: the app's Diagnostics screen lists it.
 
 import PixlFoundation
 import PixlModel
