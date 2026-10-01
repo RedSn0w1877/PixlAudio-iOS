@@ -12,6 +12,7 @@ struct YouTubeLoginView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(AccountsStore.self) private var accounts
     @Environment(Router.self) private var router
+    @Environment(PlaybackStore.self) private var playback
     @Environment(\.appTheme) private var theme
     @Environment(\.dismiss) private var dismiss
     @State private var model = YouTubeLoginModel()
@@ -92,7 +93,7 @@ struct YouTubeLoginView: View {
                 }
             }
             .padding(.top, 12)
-            .padding(.bottom, 8)
+            .padding(.bottom, 8 + playback.miniPlayerClearance)
         }
     }
 
@@ -133,7 +134,8 @@ struct YouTubeLoginView: View {
                 .accessibilityIdentifier("youtube.testPlayback")
             }
             .padding(.horizontal, YouTubeMetrics.screenPadding)
-            .padding(.vertical, 12)
+            .padding(.top, 12)
+            .padding(.bottom, 12 + playback.miniPlayerClearance)
         }
         .scrollIndicators(.hidden)
     }
