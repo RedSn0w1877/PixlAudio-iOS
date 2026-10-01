@@ -10,21 +10,21 @@ an API (AGENTS.md). "CI" = proven to compile on the `xcode-27` lane (Xcode 27.0,
 | `App`, `WindowGroup`, `@main` | 14 | /documentation/swiftui/app | `PixlAudioApp` | Scene life cycle (required by the iOS 27 SDK). |
 | `@Observable` macro, `@ObservationIgnored` | 17 | /documentation/observation/observable() | stores, `DiagnosticsModel` | Fine-grained stores. |
 | `View.environment(_:)` (Observable object), `@Environment(T.self)`, `@Bindable` | 17 | /documentation/swiftui/view/environment(_:)-4516h | shell | |
-| `TabView(selection:)` + `Tab(_:systemImage:value:content:)` | 18 | /documentation/swiftui/tab | `RootTabView` | |
-| `Tab(value:role:content:)`, `TabRole.search` | 18 | /documentation/swiftui/tabrole/search | `RootTabView` | Search tab sits at the trailing end, glass search field. |
-| `View.searchable(text:isPresented:prompt:)` | 17 | /documentation/swiftui/view/searchable(text:ispresented:placement:prompt:) | `RootTabView` | On the `TabView` (WWDC25 session 323 code). **iOS 27.0 simulator: a search-role tab shows no idle search field** (with or without the bottom accessory, on the TabView or the tab's stack — CI experiments on s00-bootstrap); the field appears only while search is presented, so selecting the Search tab sets `isPresented = true`. |
-| `View.tabBarMinimizeBehavior(_:)`, `.onScrollDown` | 26.0 | /documentation/swiftui/view/tabbarminimizebehavior(_:) | `RootTabView` | |
-| `View.tabViewBottomAccessory(isEnabled:content:)` | **26.1** | /documentation/swiftui/view/tabviewbottomaccessory(isenabled:content:) | `RootTabView` | Reason for the 26.1 deployment target. |
-| `EnvironmentValues.tabViewBottomAccessoryPlacement`, `TabViewBottomAccessoryPlacement.inline/.expanded` | 26.0 | /documentation/swiftui/tabviewbottomaccessoryplacement | `MiniPlayerAccessory` | Optional value (nil outside an accessory). |
+| `TabView(selection:)` + `Tab(_:systemImage:value:content:)` | 18 | /documentation/swiftui/tab | `RootTabView` |  **No longer used since stage 4** (decision 10: PixlAudio's custom shell and screens replace the system tab bar, accessory and plain lists; kept as the record of stage 0). |
+| `Tab(value:role:content:)`, `TabRole.search` | 18 | /documentation/swiftui/tabrole/search | `RootTabView` | Search tab sits at the trailing end, glass search field.  **No longer used since stage 4** (decision 10: PixlAudio's custom shell and screens replace the system tab bar, accessory and plain lists; kept as the record of stage 0). |
+| `View.searchable(text:isPresented:prompt:)` | 17 | /documentation/swiftui/view/searchable(text:ispresented:placement:prompt:) | `RootTabView` | On the `TabView` (WWDC25 session 323 code). **iOS 27.0 simulator: a search-role tab shows no idle search field** (with or without the bottom accessory, on the TabView or the tab's stack — CI experiments on s00-bootstrap); the field appears only while search is presented, so selecting the Search tab sets `isPresented = true`.  **No longer used since stage 4** (decision 10: PixlAudio's custom shell and screens replace the system tab bar, accessory and plain lists; kept as the record of stage 0). |
+| `View.tabBarMinimizeBehavior(_:)`, `.onScrollDown` | 26.0 | /documentation/swiftui/view/tabbarminimizebehavior(_:) | `RootTabView` |  **No longer used since stage 4** (decision 10: PixlAudio's custom shell and screens replace the system tab bar, accessory and plain lists; kept as the record of stage 0). |
+| `View.tabViewBottomAccessory(isEnabled:content:)` | **26.1** | /documentation/swiftui/view/tabviewbottomaccessory(isenabled:content:) | `RootTabView` | Reason for the 26.1 deployment target.  **No longer used since stage 4** (decision 10: PixlAudio's custom shell and screens replace the system tab bar, accessory and plain lists; kept as the record of stage 0). |
+| `EnvironmentValues.tabViewBottomAccessoryPlacement`, `TabViewBottomAccessoryPlacement.inline/.expanded` | 26.0 | /documentation/swiftui/tabviewbottomaccessoryplacement | `MiniPlayerAccessory` | Optional value (nil outside an accessory).  **No longer used since stage 4** (decision 10: PixlAudio's custom shell and screens replace the system tab bar, accessory and plain lists; kept as the record of stage 0). |
 | `View.onChange(of:initial:_:)` (two-parameter closure) | 17 | /documentation/swiftui/view/onchange(of:initial:_:)-4psgg | `RootTabView` | |
 | `NavigationStack(path:)`, `navigationDestination(for:destination:)`, `NavigationLink(value:)` | 16 | /documentation/swiftui/navigationstack | shell | Value types used as routes are `nonisolated` so `Hashable` isn't main-actor isolated. |
 | `ToolbarItem(placement: .topBarTrailing)`, `Menu` | 17 / 14 | /documentation/swiftui/toolbaritemplacement/topbartrailing | Home, Library | Toolbar items get system glass. |
-| `List`, `Section(_:content:)`, `Section(content:header:footer:)`, `Form`, `LabeledContent` | 13–16 | /documentation/swiftui/list | screens | Content layer, never glass. |
-| `LazyVGrid`, `GridItem` | 14 | /documentation/swiftui/lazyvgrid | Search | |
-| `ContentUnavailableView`, `.search(text:)` | 17 | /documentation/swiftui/contentunavailableview | Library, Search | |
-| `swipeActions(edge:content:)`, `contextMenu(menuItems:)` | 15 / 13 | /documentation/swiftui/view/swipeactions(edge:allowsfullswipe:content:) | `SongRow` | |
+| `List`, `Section(_:content:)`, `Section(content:header:footer:)`, `Form`, `LabeledContent` | 13–16 | /documentation/swiftui/list | screens | Content layer, never glass.  **No longer used since stage 4** (decision 10: PixlAudio's custom shell and screens replace the system tab bar, accessory and plain lists; kept as the record of stage 0). |
+| `LazyVGrid`, `GridItem` | 14 | /documentation/swiftui/lazyvgrid | Search |  **No longer used since stage 4** (decision 10: PixlAudio's custom shell and screens replace the system tab bar, accessory and plain lists; kept as the record of stage 0). |
+| `ContentUnavailableView`, `.search(text:)` | 17 | /documentation/swiftui/contentunavailableview | Library, Search |  **No longer used since stage 4** (decision 10: PixlAudio's custom shell and screens replace the system tab bar, accessory and plain lists; kept as the record of stage 0). |
+| `swipeActions(edge:content:)`, `contextMenu(menuItems:)` | 15 / 13 | /documentation/swiftui/view/swipeactions(edge:allowsfullswipe:content:) | `SongRow` |  **No longer used since stage 4** (decision 10: PixlAudio's custom shell and screens replace the system tab bar, accessory and plain lists; kept as the record of stage 0). |
 | `Button(_:systemImage:role:action:)` | 17 | /documentation/swiftui/button | screens | |
-| `symbolEffect(_:isActive:)`, `.variableColor.iterative` | 17 | /documentation/swiftui/view/symboleffect(_:options:isactive:) | `SongRow` | Now-playing indicator. |
+| `symbolEffect(_:isActive:)`, `.variableColor.iterative` | 17 | /documentation/swiftui/view/symboleffect(_:options:isactive:) | `SongRow` | Now-playing indicator.  **No longer used since stage 4** (decision 10: PixlAudio's custom shell and screens replace the system tab bar, accessory and plain lists; kept as the record of stage 0). |
 | `contentTransition(.symbolEffect(.replace))` | 17 | /documentation/swiftui/contenttransition/symboleffect(_:options:) | mini player | |
 | `fileImporter(isPresented:allowedContentTypes:allowsMultipleSelection:onCompletion:)` | 14 | /documentation/swiftui/view/fileimporter(ispresented:allowedcontenttypes:allowsmultipleselection:oncompletion:) | Diagnostics | Result is `Result<[URL], any Error>`. |
 | `UTType.folder` | 14 | /documentation/uniformtypeidentifiers/uttype-swift.struct/folder | Diagnostics | |
@@ -178,6 +178,60 @@ stage 11). PixlNet deviations from Android:
 For the app (stage 6), from PixlTags (stage 3d): MP4/M4A tag write-back is meant to go through AVFoundation
 (`AVAssetExportSession` passthrough with `metadata`), and reading normally through `AVURLAsset.load(.metadata)` with
 PixlTags as the fallback for FLAC, SYLT and ReplayGain; neither is used yet, add the rows when stage 6 does.
+
+## Stage 4 — design system, shell, persistence, artwork
+Proven on the `xcode-27` lane by the stage-4 build (fallback lane: its next weekly run).
+
+### Liquid Glass and SwiftUI
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `View.glassEffect(_:in:)` | 26.0 | /documentation/swiftui/view/glasseffect(_:in:) | `pixlGlass`, every design-system component | Default shape is a capsule; we always pass the shape. |
+| `Glass` `.regular`, `.tint(_:)` (`Color?`), `.interactive(_:)` | 26.0 | /documentation/swiftui/glass | `GlassStyle.swift` | Tint = the PixlAudio role Android filled with (`GlassTint` strengths). |
+| `GlassEffectContainer(spacing:content:)` | 26.0 | /documentation/swiftui/glasseffectcontainer | `GlassPillRow`, Home quick actions, Library action row | Spacing below the visual gap so capsules never blend at rest. |
+| `View.glassEffectID(_:in:)` (`(some Hashable & Sendable)?`) | 26.0 | /documentation/swiftui/view/glasseffectid(_:in:) | `GlassPillRow` | One shared id for the selected capsule → its tinted glass morphs to the new selection. The id enum is `nonisolated` (Sendable under default MainActor isolation). |
+| `@Namespace`, `View.matchedGeometryEffect(id:in:properties:anchor:isSource:)` | 14 | /documentation/swiftui/view/matchedgeometryeffect(id:in:properties:anchor:issource:) | `GlassNavBar` | Glides the glass selection bubble between bar items. |
+| `UnevenRoundedRectangle(topLeadingRadius:bottomLeadingRadius:bottomTrailingRadius:topTrailingRadius:style:)` | 16 | /documentation/swiftui/unevenroundedrectangle | `GlassNavBar`, `MiniPlayerBar` | PixlAudio's 32 / 10 pt corners where the mini player meets the bar. |
+| `RoundedRectangle(cornerRadius:style: .continuous)`, `Capsule`, `Circle`, `contentShape(_:)` | 13 | /documentation/swiftui/roundedrectangle | components | |
+| `@Entry` (custom `EnvironmentValues`), `View.environment(_:_:)` (key path) | 13 (macro back-deploys; Xcode 16+) | /documentation/swiftui/entry() | `\.appTheme`, `\.playerTheme` | Change only on song / scheme change. |
+| `View.safeAreaInset(edge:alignment:spacing:content:)` | 15 | /documentation/swiftui/view/safeareainset(edge:alignment:spacing:content:)-6gwby | `RootView` | Mini player + bar float over content; scroll views inset automatically. |
+| `View.sheet(item:onDismiss:content:)`, `View.fullScreenCover(item:onDismiss:content:)` | 14 | /documentation/swiftui/view/sheet(item:ondismiss:content:) | `RootView` | `AppSheet` / `AppCover` are `Identifiable`. |
+| `presentationDetents(_:)`, `presentationDragIndicator(_:)` | 16 | /documentation/swiftui/view/presentationdetents(_:) | `.pixlSheet()` | The system sheet keeps its glass background. |
+| `View.sensoryFeedback(_:trigger:)` (`.selection`, `.impact(weight:)`) | 17 | /documentation/swiftui/view/sensoryfeedback(_:trigger:) | bar, pill row, mini player | Android `TextHandleMove` haptics. |
+| `symbolEffect(.variableColor.iterative.reversing, isActive:)` | 17 | /documentation/swiftui/view/symboleffect(_:options:isactive:) | `PlayingIndicator` | System-driven: no per-frame view updates. |
+| `View.scrollClipDisabled(_:)`, `scrollIndicators(_:)` | 17 / 16 | /documentation/swiftui/view/scrollclipdisabled(_:) | pill rows | Glass edges aren't clipped by the horizontal scroll view. |
+| `toolbar(_:for:)` (`.hidden`, `.navigationBar`), `navigationBarTitleDisplayMode(_:)`, `ToolbarItem(placement: .cancellationAction / .confirmationAction)` | 16 / 14 | /documentation/swiftui/view/toolbar(_:for:) | tab roots, placeholders | Root screens draw PixlAudio's own headers. |
+| `EnvironmentValues.dynamicTypeSize`, `DynamicTypeSize` | 15 | /documentation/swiftui/dynamictypesize | `PixlFontModifier` | sp-like scaling of PixlAudio's fixed sizes (cap 1.6×). |
+| `Font.system(size:weight:)`, `tracking(_:)`, `lineSpacing(_:)`, `minimumScaleFactor(_:)` | 13–16 | /documentation/swiftui/font/system(size:weight:design:) | `Typography.swift`, headers | SF Pro only. |
+| `Image(decorative:scale:orientation:)` (CGImage), `interpolation(_:)` | 13 | /documentation/swiftui/image/init(decorative:scale:orientation:) | `ArtworkView` | |
+| `View.task(id:priority:_:)` | 15 | /documentation/swiftui/view/task(id:priority:_:) | `ArtworkView`, `RootView` theme update | Cancelled when the id changes. |
+| `ButtonStyle` (`configuration.isPressed`) | 13 | /documentation/swiftui/buttonstyle | `PressScaleButtonStyle` | Press feedback for fills sitting on glass. |
+| `accessibilityElement(children:)`, `accessibilityAddTraits(_:)`, `accessibilityHint(_:)` | 14 | /documentation/swiftui/view/accessibilityaddtraits(_:) | components | |
+
+### SwiftData
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `VersionedSchema` (`versionIdentifier`, `models`), `Schema.Version`, `Schema(versionedSchema:)` | 17 | /documentation/swiftdata/versionedschema | `SchemaV1` | Store-only models, string ids. |
+| `SchemaMigrationPlan` (`schemas`, `stages`), `MigrationStage` | 17 | /documentation/swiftdata/schemamigrationplan | `PixlMigrationPlan` | Empty until v2. |
+| `@Model`, `@Attribute(.unique)` | 17 | /documentation/swiftdata/model() | `SchemaV1` | Models are `nonisolated` (SE-0449) so the model actor can use them under default MainActor isolation. |
+| `#Index<T>(_:)` | 18 | /documentation/swiftdata/index(_:)-74ia2 | hot fields (title, albumId, playlistId, …) | |
+| `ModelContainer(for:migrationPlan:configurations:)` | 17 | /documentation/swiftdata/modelcontainer | `PersistenceActor.makeContainer` | |
+| `ModelConfiguration(_:schema:isStoredInMemoryOnly:allowsSave:groupContainer:cloudKitDatabase:)` | 17 | /documentation/swiftdata/modelconfiguration | same | `groupContainer: .none`, `cloudKitDatabase: .none` (free signing); in memory for UI tests. |
+| `@ModelActor` / `ModelActor` (`modelContext`, `init(modelContainer:)`) | 17 | /documentation/swiftdata/modelactor() | `PersistenceActor` | All reads/writes off the main thread; hands out value types only. |
+| `FetchDescriptor(predicate:sortBy:)`, `fetchLimit`, `#Predicate`, `SortDescriptor`, `ModelContext.fetch/insert/save`, `delete(model:where:includeSubclasses:)` | 17 | /documentation/swiftdata/fetchdescriptor | `PersistenceActor` | Saves every 500 inserts. |
+
+### Images, colour, caches
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `CGImageSourceCreateWithURL` / `CreateWithData`, `CGImageSourceCreateThumbnailAtIndex` + `kCGImageSourceCreateThumbnailFromImageAlways`, `…WithTransform`, `kCGImageSourceShouldCacheImmediately`, `kCGImageSourceThumbnailMaxPixelSize` | 4 | /documentation/imageio/cgimagesourcecreatethumbnailatindex(_:_:_:) | `ArtworkPipeline` | Decode at display size, off the main thread. |
+| `CGImageDestinationCreateWithURL`, `CGImageDestinationAddImage`, `CGImageDestinationFinalize`, `kCGImageDestinationLossyCompressionQuality` | 4 | /documentation/imageio/cgimagedestinationcreatewithurl(_:_:_:_:) | disk cache (JPEG thumbnails in Caches/Artwork) | |
+| `CGContext(data:width:height:bitsPerComponent:bytesPerRow:space:bitmapInfo:)`, `draw(_:in:)`, `makeImage()`, `drawLinearGradient`, `drawRadialGradient`, `strokeEllipse(in:)`, `CGGradient(colorsSpace:colors:locations:)`, `CGColor(srgbRed:green:blue:alpha:)`, `CGColorSpace(name: CGColorSpace.sRGB)` | 2–13 | /documentation/coregraphics/cgcontext | `ArtworkPipeline.argbPixels`, `GeneratedArtwork` | RGBA8 premultiplied → ARGB for the ported seed selection. |
+| `UTType.jpeg` | 14 | /documentation/uniformtypeidentifiers/uttype-swift.struct/jpeg | disk cache | |
+| `SHA256.hash(data:)` (CryptoKit) | 13 | /documentation/cryptokit/sha256 | disk-cache file names | Not a security use. |
+| `Synchronization.Mutex` (`withLock`) | 18 | /documentation/synchronization/mutex | `ArtworkPipeline.MemoryCache` | Synchronous memory-cache hits for a cell's first frame. |
+| `URLSession.data(from:delegate:)` | 15 | /documentation/foundation/urlsession/data(from:delegate:) | remote artwork | |
+| `PropertyListEncoder` (`outputFormat = .binary`) / `PropertyListDecoder` | 8 | /documentation/foundation/propertylistencoder | `SnapshotLoader` | Launch reads the binary-plist snapshot before SwiftData. |
+| `UserDefaults(suiteName:)`, `removePersistentDomain(forName:)`, `object(forKey:)` | 7 | /documentation/foundation/userdefaults | `SettingsStore` | Android preference keys; isolated suite for UI tests. |
+| `AsyncStream.makeStream(of:bufferingPolicy:)` | 17 (Swift 5.9) | /documentation/swift/asyncstream/makestream(of:bufferingpolicy:) | `DemoPlaybackEngine` | Engine → store events. |
 
 ## Testing and tooling
 | API / tool | Docs | Notes |
