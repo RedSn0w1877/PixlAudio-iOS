@@ -460,7 +460,7 @@ How the stages meet on `main`:
 - **Lyrics ↔ AI translation:** the lyrics More sheet has Android's "Translate via AI" (after Save Lyrics):
   `LyricsController.translateViaAI` sends the song's scanned lyrics, else the LRC of what the screen shows, through
   `env.ai.lyricsTranslator` in the device language, and imports a valid reply like a file (each translation pairs with
-  its line by timestamp; the toast is Android's message). Stage 9's on-device "Translate lyrics" stays below it.
+  its line by timestamp; the toast is Android's message). Stage 9's on-device translation stays below it, renamed "Translate on device" (character-bubble icon) so the two rows read apart.
 - **Lyrics ↔ sync editor:** "Sync the words yourself" / the sync chip present `AppCover.lyricsSync(songId:)` — still
   stage 10's placeholder (stage 10 is not in wave A).
 - **Spotify ↔ YouTube:** `AppEnvironment` builds `SpotifyService` after `YouTubeServices` and passes
@@ -476,3 +476,19 @@ How the stages meet on `main`:
   opened from Files / the share sheet is inspected and opens the restore flow (`AppCover.backupImport` starting at the
   module dialog); ignored while the first-run setup is showing (it has its own restore page).
 - **English only** (decision 12): see Stage 15 notes › Localisation.
+
+### Visual review (wave A, `int-wave-a` shots vs `docs/design-refs` + Compose)
+208 shots, light + dark. Same layout as PixlAudio on the full player (pp_full: top bar with collapse circle, output
+and queue buttons; cover; title/artist with the lyrics and AI DJ circles; seek bar with the quality pill; weighted
+prev / play / next; shuffle / repeat / favourite row), the mini player (pp_player), the lyrics screen (pp_lyr: track
+pill, play square + seek capsule, back · Synced · Static · more), the song sheet (pp_sheet: Play / ♥ / share,
+Add to queue / Next, Playlist / Delete, OPTIONS · INFO bar), queue, timer, devices, editor, AI sheets, Spotify,
+YouTube, backup and setup screens. Glass in place of Material; text legible in light and dark; coloured blocks keep
+the light tint (decision 11). Fixed in review:
+- Sleep timer: the disabled "Cancel timer" kept full red glass with a 38 % label (unreadable in dark) — now Android's
+  disabled button (faint `onSurface` container, 38 % label), red only while a timer runs.
+- Player top bar: the queue button uses `music.note.list` (Android `rounded_queue_music_24`), not a bullet list.
+- Lyrics More sheet: the two translate rows read apart ("Translate via AI" / "Translate on device").
+Known differences, not bugs: the song sheet has no Remaster card (instrumental / word sync arrive with stage 14) and
+no "Set as sound" (iOS apps can't set ringtones), so the large sheet shows empty space below the buttons; the devices
+hero's `MPVolumeView` is empty in the Simulator; screenshots use the demo library's placeholder art.

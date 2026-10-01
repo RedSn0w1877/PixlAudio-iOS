@@ -104,7 +104,7 @@ struct LyricsMoreSheet: View {
                 }
             }
             if lyrics != nil, let onTranslate = actions.onTranslate {
-                row("Translate lyrics", systemImage: "translate", corners: (8, 8)) {
+                row("Translate on device", systemImage: "character.bubble", corners: (8, 8)) {
                     dismiss()
                     onTranslate()
                 }

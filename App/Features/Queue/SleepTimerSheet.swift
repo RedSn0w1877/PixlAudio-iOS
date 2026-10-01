@@ -161,16 +161,18 @@ struct SleepTimerSheet: View {
             } label: {
                 Text("Cancel timer")
                     .pixlFont(.labelLarge)
-                    .foregroundStyle(theme.onErrorContainer)
+                    .foregroundStyle(canCancel ? theme.onErrorContainer : theme.onSurface.opacity(0.38))
                     .frame(maxWidth: .infinity, minHeight: 68)
                     .contentShape(.rect)
             }
             .buttonStyle(.plain)
             .disabled(!canCancel)
-            .opacity(canCancel ? 1 : 0.38)
             .pixlGlass(in: UnevenRoundedRectangle(topLeadingRadius: 8, bottomLeadingRadius: 8,
                                                   bottomTrailingRadius: 34, topTrailingRadius: 34, style: .continuous),
-                       tint: theme.errorContainer.opacity(GlassTint.prominent), interactive: true)
+                       tint: canCancel ? theme.errorContainer.opacity(GlassTint.prominent)
+                                       : theme.onSurface.opacity(0.12),
+                       interactive: canCancel)
+            // Disabled (no timer running) = Android's disabled button: a faint onSurface container, 38 % label.
         }
     }
 

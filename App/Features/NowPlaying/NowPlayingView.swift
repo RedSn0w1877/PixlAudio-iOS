@@ -166,7 +166,7 @@ private struct PlayerTopBar: View {
             HStack(spacing: 6) {
                 outputPill
                 Button { router.present(AppSheet.queue) } label: {
-                    Image(systemName: "list.bullet")
+                    Image(systemName: "music.note.list") // Android rounded_queue_music_24
                         .font(.system(size: 19, weight: .semibold))
                         .foregroundStyle(theme.primary)
                         .frame(width: 50, height: 42)
