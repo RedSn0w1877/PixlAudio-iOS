@@ -189,6 +189,10 @@ nonisolated enum AppSheet: Hashable, Sendable, Identifiable {
     case changelog
     case betaInfo
     case jobs
+    /// Stage 13: the AI playlist sheet (Android `AiPlaylistSheet`, Daily Mix's sparkle button).
+    case aiPlaylist
+    /// Stage 13: the TAIS DJ chat (Android `TaisChatSheet`).
+    case taisChat
 
     var id: String {
         switch self {
@@ -199,6 +203,8 @@ nonisolated enum AppSheet: Hashable, Sendable, Identifiable {
         case .changelog: "changelog"
         case .betaInfo: "betaInfo"
         case .jobs: "jobs"
+        case .aiPlaylist: "aiPlaylist"
+        case .taisChat: "taisChat"
         }
     }
 }
@@ -209,6 +215,8 @@ nonisolated enum AppCover: Hashable, Sendable, Identifiable {
     case lyrics
     case lyricsSync(songId: String)
     case setup
+    /// Stage 13: AI Playlist Lab (Android `CreateAiPlaylistDialog`, a full-screen dialog).
+    case aiPlaylistLab
 
     var id: String {
         switch self {
@@ -216,6 +224,7 @@ nonisolated enum AppCover: Hashable, Sendable, Identifiable {
         case .lyrics: "lyrics"
         case .lyricsSync(let id): "lyricsSync.\(id)"
         case .setup: "setup"
+        case .aiPlaylistLab: "aiPlaylistLab"
         }
     }
 }

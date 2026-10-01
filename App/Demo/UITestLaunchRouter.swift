@@ -44,6 +44,9 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case libraryAddToPlaylist, songOptionsInfo
     case playlistEdit, playlistAddSongs, playlistOptions, playlistReorder, genreSort
 
+    // Stage 13: AI playlist sheet (from Daily Mix), TAIS DJ chat (empty, and a scripted conversation), AI Playlist Lab
+    case aiPlaylist, taisChat, taisChatConversation, aiPlaylistLab
+
     /// The accessibility identifier present once the screen is up (`screen.<id>`).
     var readyIdentifier: String {
         switch self {
@@ -56,6 +59,9 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
             return "screen.library"
         case .songOptionsInfo: return "screen.songInfo"
         case .miniPlayerAlone: return "screen.albumDetail"
+        case .aiPlaylist: return "screen.aiPlaylist"
+        case .taisChat, .taisChatConversation: return "screen.taisChat"
+        case .aiPlaylistLab: return "screen.aiPlaylistLab"
         default:
             if let route { return "screen.\(route.screenID)" }
             if let sheet { return "screen.\(sheet.id.split(separator: ".").first ?? "")" }
@@ -118,6 +124,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .queue, .songInfo, .sleepTimer, .lyricsOptions, .changelog, .betaInfo, .jobs,
              .nowPlaying, .lyrics, .lyricsSync, .setup:
             return nil
+        case .aiPlaylist, .taisChat, .taisChatConversation, .aiPlaylistLab: return nil
         }
     }
 
@@ -147,6 +154,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .changelog: return .changelog
         case .betaInfo: return .betaInfo
         case .jobs: return .jobs
+        case .aiPlaylist: return .aiPlaylist
+        case .taisChat, .taisChatConversation: return .taisChat
         default: return nil
         }
     }
@@ -157,6 +166,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .lyrics: .lyrics
         case .lyricsSync: .lyricsSync(songId: DemoLibrary.songs.first?.id ?? "")
         case .setup: .setup
+        case .aiPlaylistLab: .aiPlaylistLab
         default: nil
         }
     }

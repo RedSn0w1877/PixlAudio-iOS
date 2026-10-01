@@ -157,6 +157,7 @@ private struct MixHeader: View {
     let showsAIButton: Bool
 
     @Environment(\.appTheme) private var theme
+    @Environment(Router.self) private var router
 
     var body: some View {
         let arts = distinctArt(songs)
@@ -196,10 +197,13 @@ private struct MixHeader: View {
                 }
                 Spacer()
                 if showsAIButton {
-                    // Android: a large star-shaped FAB opening the AI playlist sheet (stage 13 wires it).
+                    // Android: a large star-shaped FAB opening the AI playlist sheet (`showAiPlaylistSheet`).
                     GlassCircleButton(systemImage: "sparkles", accessibilityLabel: "AI Playlist Generator", size: 96,
                                       iconSize: 22, tint: theme.primaryContainer.opacity(GlassTint.prominent),
-                                      foreground: theme.onPrimaryContainer) {}
+                                      foreground: theme.onPrimaryContainer) {
+                        router.present(AppSheet.aiPlaylist)
+                    }
+                    .accessibilityIdentifier("dailyMix.ai")
                 }
             }
             .padding(.leading, titleLeading)

@@ -51,6 +51,8 @@ struct SheetDestination: View {
         case .sleepTimer: SleepTimerSheet().pixlSheet(detents: [.medium])
         case .lyricsOptions(let songId): LyricsOptionsSheet(songId: songId).pixlSheet()
         case .changelog, .betaInfo, .jobs: HomeInfoSheet(sheet: sheet).pixlSheet()
+        case .aiPlaylist: AiPlaylistSheet().pixlSheet(detents: [.large])
+        case .taisChat: TaisChatSheet().pixlSheet(detents: [.height(TaisChatSheet.sheetHeight), .large])
         }
     }
 }
@@ -65,6 +67,7 @@ struct CoverDestination: View {
         case .lyrics: LyricsView()
         case .lyricsSync(let songId): LyricsSyncEditorView(songId: songId)
         case .setup: SetupView()
+        case .aiPlaylistLab: AiPlaylistLabView()
         }
     }
 }

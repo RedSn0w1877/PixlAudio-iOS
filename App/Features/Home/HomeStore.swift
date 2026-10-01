@@ -160,6 +160,14 @@ final class HomeStore {
         defaults?.set(mix.map(\.id), forKey: PreferenceKeys.yourMixSongIds)
     }
 
+    /// Stage 13: an AI-curated mix replaces today's Daily Mix (Android `DailyMixStateHolder.setDailyMixSongs`):
+    /// shown at once and saved as today's picks.
+    func setDailyMix(_ songs: [Song]) {
+        content.dailyMix = songs
+        defaults?.set(songs.map(\.id), forKey: PreferenceKeys.dailyMixSongIds)
+        defaults?.set(Double(history.clock.nowMs()), forKey: PreferenceKeys.lastDailyMixUpdate)
+    }
+
     /// Per-song engagement from the history (Android `SongEngagementEntity`: plays, listened time, last play).
     nonisolated static func engagementStats(_ events: [PlaybackEvent]) -> [String: EngagementStats] {
         var engagements: [String: EngagementStats] = [:]

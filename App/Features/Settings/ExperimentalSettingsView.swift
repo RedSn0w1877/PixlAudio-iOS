@@ -5,12 +5,13 @@ import SwiftUI
 /// (delay, placeholders, trigger mode, thresholds) — then "Visual Quality" with the album-art resolution list. Rows
 /// are 10 pt glass panels 4 pt apart.
 ///
-/// TAIS tools are UI shells here: the controls store their Android keys, but rendering, word sync and the DJ chat
-/// arrive with the TAIS stages. Dropped: the visual-style switch (Liquid Glass / Material — iOS is glass only) and
+/// TAIS tools are UI shells here: the controls store their Android keys, but rendering and word sync arrive with
+/// the TAIS stages. TAIS DJ opens the DJ chat (stage 13). Dropped: the visual-style switch (Liquid Glass / Material — iOS is glass only) and
 /// the Plus licence debug tools (everything is unlocked).
 struct ExperimentalSettingsView: View {
     @Environment(SettingsStore.self) private var settings
     @Environment(PlaybackStore.self) private var playback
+    @Environment(Router.self) private var router
     @Environment(\.appTheme) private var theme
     @State private var toast: String?
 
@@ -38,7 +39,7 @@ struct ExperimentalSettingsView: View {
                 RoformerBackendPanel(experimental: experimental)
                 RemasterSongPanel(hasSong: playback.current != nil)
                 Button {
-                    toast = String(localized: "settings_exp_tais_dj_later", defaultValue: "TAIS DJ arrives with the TAIS update.")
+                    router.present(AppSheet.taisChat)
                 } label: {
                     HStack(spacing: 12) {
                         SettingsIcon(systemImage: "music.note")

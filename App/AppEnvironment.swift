@@ -29,6 +29,19 @@ final class AppEnvironment {
     /// Search providers by source: the library on `SearchIndex` (stage 7c); stages 11/12 replace the YouTube Music
     /// and Spotify ones (UI tests get demo providers so Search's remote sections render).
     let searchProviders: [SearchSource: any SearchProviding]
+    @ObservationIgnored private var aiStorage: AIService?
+
+    /// Stage 13: AI providers (cloud, local and on-device), the AI playlist and TAIS DJ state, lyric translation.
+    /// Built on first use, so nothing AI-related runs at launch.
+    var ai: AIService {
+        if let aiStorage { return aiStorage }
+        let library = self.library, persistence = self.persistence, writesCache = !launch.isUITest
+        let service = AIService(launch: launch, settings: settings, persistence: persistence, library: library, home: home,
+                                playback: playback, router: router, searchProviders: searchProviders,
+                                libraryEditor: { LibraryEditor(store: library, persistence: persistence, writesCache: writesCache) })
+        aiStorage = service
+        return service
+    }
 
     init(launch: LaunchConfiguration) {
         self.launch = launch

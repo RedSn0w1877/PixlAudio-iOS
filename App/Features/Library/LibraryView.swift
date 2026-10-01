@@ -438,6 +438,13 @@ struct LibraryView: View {
             }, onSetupAI: {
                 self.sheet = nil
                 router.push(.settingsCategory(.ai))
+            }, isAIEnabled: env.ai.isProviderConfigured, onAI: {
+                self.sheet = nil
+                // The Lab is full screen (Android `CreateAiPlaylistDialog`); present it once this sheet has gone.
+                Task {
+                    try? await Task.sleep(for: .milliseconds(450))
+                    router.present(AppCover.aiPlaylistLab)
+                }
             })
             .pixlSheet(detents: [.medium])
         }

@@ -647,8 +647,10 @@ nonisolated enum SongFiles {
 struct PlaylistCreationTypeSheet: View {
     let onManual: () -> Void
     let onSetupAI: () -> Void
-    /// Stage 13 (AI) enables this.
+    /// An AI provider is configured (Android `hasActiveAiProviderApiKey`).
     var isAIEnabled = false
+    /// Opens the AI Playlist Lab (stage 13).
+    var onAI: () -> Void = {}
 
     @Environment(\.appTheme) private var theme
 
@@ -673,7 +675,7 @@ struct PlaylistCreationTypeSheet: View {
                      systemImage: isAIEnabled ? "sparkles" : "key.fill",
                      fill: isAIEnabled ? theme.tertiaryContainer : theme.surfaceContainer,
                      content: isAIEnabled ? theme.onTertiaryContainer : theme.onSurfaceVariant,
-                     enabled: isAIEnabled, action: {})
+                     enabled: isAIEnabled, action: onAI)
             if !isAIEnabled {
                 Button(action: onSetupAI) {
                     HStack(spacing: 8) {
