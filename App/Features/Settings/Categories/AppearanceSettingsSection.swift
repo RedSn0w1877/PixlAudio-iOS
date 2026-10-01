@@ -62,13 +62,9 @@ struct AppearanceSettingsSection: View {
                                  subtitle: L10n.settingsAutoRotatePatternsSubtitle,
                                  isOn: $appearance.collageAutoRotate, systemImage: "shuffle")
             }
+            // The iOS-style tab bar has one shape, so Android's NavBar Style choice (default / full width) is gone;
+            // compact mode still applies (icons only, shorter bar). `navBarStyle` stays stored for backups.
             SettingsSubsection(title: L10n.settingsNavigationBarSection) {
-                ThemeSelectorRow(label: L10n.settingsNavbarStyleTitle, description: L10n.settingsNavbarStyleSubtitle,
-                                 options: [SettingsOption(key: "default", label: L10n.settingsNavbarStyleDefault),
-                                           SettingsOption(key: "full_width", label: L10n.settingsNavbarStyleFullWidth)],
-                                 selectedKey: appearance.navBarStyle, systemImage: "paintbrush") {
-                    appearance.navBarStyle = $0
-                }
                 SwitchSettingRow(title: L10n.settingsCompactModeTitle, subtitle: L10n.settingsCompactModeSubtitle,
                                  isOn: $appearance.navBarCompactMode, systemImage: "dock.rectangle")
             }

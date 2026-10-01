@@ -17,8 +17,8 @@ final class PlayerSheetController {
     /// The mini player's slot in global coordinates (reported by `MiniPlayerSlot`); nil while the shell hides it
     /// (keyboard up, nothing playing).
     private(set) var collapsedFrame: CGRect?
-    /// The slot's bottom corners: 10 pt where the mini player sits on the bottom bar, 32 pt when it is alone.
-    private(set) var collapsedBottomRadius: CGFloat = Tokens.Shell.joinCornerRadius
+    /// The slot's bottom corners (32 pt: the mini player floats as its own capsule above the tab bar).
+    private(set) var collapsedBottomRadius: CGFloat = Tokens.Shell.navBarCornerRadius
     /// A finger is moving the sheet (Android `isDragging`).
     var isDragging = false
     /// The seek bar is being scrubbed: the sheet's drag gesture stands aside (Android consumes vertical drags in

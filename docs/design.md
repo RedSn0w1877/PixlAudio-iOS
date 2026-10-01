@@ -24,7 +24,7 @@ Beta 2: `pp_*.png`; current Library › Songs: `owner-library-songs-2026-09-30.p
 | Song list item (`EnhancedSongListItem`) | Glass rounded card, same geometry; playing = capsule + brighter `primaryContainer` glass | `SongCard` |
 | `TopAppBar` with large title + actions | Same title in SF Pro + glass action circles | `LargeHeader` |
 | Section title + subtitle (+ refresh button) | Same text styles, optional glass circle | `SectionHeader` |
-| Bottom `NavigationBar` (custom compact bar, 3 icons) | Custom glass bar, same layout; glass selection bubble glides between icons | `GlassNavBar` |
+| Bottom `NavigationBar` (custom compact bar, 3 icons) | **Owner change 2026-10-01:** an iOS-style floating glass tab bar (symbol + label, icons only in compact mode) with an accent-tinted glass pill that glides between tabs and follows a dragging finger | `GlassNavBar` |
 | Mini player (player sheet, collapsed) | Glass bar tinted with the album's `primaryContainer`, same layout | `MiniPlayerBar` |
 | `ModalBottomSheet` | System sheet (glass by itself) + PixlAudio's sheet layout inside | `SheetScaffold` + `.pixlSheet()` |
 | Ripple, state layers | Glass `.interactive()` highlight; `PressScaleButtonStyle` for fills sitting on glass | `GlassStyle.swift` |
@@ -89,7 +89,7 @@ Compose file they come from.
   dimming when the art is bright (`relativeLuminance > 0.6`).
 - No glass on glass inside one element: a control sitting on a glass card/bar is a fill with `PressScaleButtonStyle`
   (mini-player transport, the song card's ⋮), or joins the card with `glassEffectUnion`. Exception by owner
-  request: the bottom bar's glass selection bubble.
+  request: the tab bar's accent glass selection pill.
 - Clusters of separate glass shapes share a `GlassEffectContainer` whose `spacing` is **smaller than the gap**
   between them, so they render together but never blend at rest.
 - Sheets use the system presentation; never override `presentationBackground`.
@@ -108,13 +108,18 @@ in `body`. Playback position is never observable (`PlaybackStore.positionMs()` o
 PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact bar), `Shell/RootView.swift`:
 
 - Content: the selected tab's `NavigationStack`, full screen. All three stacks stay alive (scroll state kept).
-- Bottom, inset 16 pt from the sides and sitting on the home-indicator safe area: the **mini player** (64 pt, top
-  corners 32, bottom corners 10) floating **8 pt** above the **bottom bar** (64 pt, top corners 10 while the mini
-  player is shown else 32, bottom corners 32). Both are glass; the mini player is tinted with the album's
-  `primaryContainer`, the bar with the scheme's `surfaceContainer` (at `GlassTint.bar`).
-- Bottom bar: Home, Search, Library — icons only, evenly spread (10 pt row padding), 56×32 selection bubble
-  (`secondaryContainer` glass) behind the selected icon, which is `primary`, filled, 1.1×; others
-  `onSurfaceVariant`. Re-tapping the selected tab pops it to its root.
+- Bottom, inset 16 pt from the sides and sitting on the home-indicator safe area: the **mini player** (64 pt
+  capsule, 32 pt corners, glass tinted with the album's `primaryContainer`) floating **8 pt** above the **tab bar**.
+- Tab bar (owner change 2026-10-01: "just an ios liquid navbar just with the accent color as the gliding glass
+  pill"): a floating `.regular` glass capsule, 62 pt (54 pt in compact mode), Home, Search, Library evenly spread —
+  19 pt semibold symbol over a 10 pt semibold label (`.primary`), symbols only (21 pt) in compact mode. Behind the
+  selected tab, inset 4 pt, a capsule pill of glass tinted with the accent (`primary` at `GlassTint.prominent`); the
+  selected symbol is filled and `onPrimary`. The pill glides to a tapped tab (`PixlMotion.selection`); press and drag
+  along the bar and it follows the finger (interactive spring), swells 1.12× while held, lights the tab under the
+  finger with a selection haptic, and settles on the nearest tab on release. Reduce Motion: no swell, short ease.
+  Re-tapping the selected tab pops it to its root. Android's NavBar Style (default / full width) setting is gone;
+  compact mode remains. Not the system `TabView` bar: its selection platter can't take the accent colour and the
+  player sheet expands from the mini player slot above the bar.
 - The bar shows only at a tab's root — every pushed screen hides it (Android `routesWithHiddenNavigationBar`); the
   mini player then sits alone with 32 pt corners.
 - The mini player is the collapsed player sheet (stage 8): tap or drag it up to expand (see Stage 8 notes).

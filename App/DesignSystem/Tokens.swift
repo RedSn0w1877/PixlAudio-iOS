@@ -26,26 +26,21 @@ nonisolated enum Tokens {
 
     /// Shell geometry (MainActivity, PlayerInternalNavigationBar, UnifiedPlayerSheetShared, SheetVisualState).
     enum Shell {
-        /// `NavBarCompactContentHeight` (three icons, no labels).
-        static let navBarHeight: CGFloat = 64
-        /// `nav_bar_corner_radius` default (`NAV_BAR_CORNER_RADIUS ?: 32`).
+        /// The iOS-style tab bar (2026-10-01, replaces Android's compact bar): a floating glass capsule as tall as
+        /// the system tab bar with labels, shorter in compact mode (icons only).
+        static let navBarHeight: CGFloat = 62
+        static let navBarCompactHeight: CGFloat = 54
+        /// Gap between the tab bar's edge and its accent selection pill.
+        static let navPillInset: CGFloat = 4
+        /// `nav_bar_corner_radius` default (`NAV_BAR_CORNER_RADIUS ?: 32`): the mini player's corners (a capsule at
+        /// 64 pt) and PixlAudio's large glass cards.
         static let navBarCornerRadius: CGFloat = 32
-        /// Corner where the mini player meets the bar (`animatedDefaultTopCornerRadius` / `collapsedRadius` 10 dp).
-        static let joinCornerRadius: CGFloat = 10
         /// Side inset of bar and mini player (`horizontalPadding`: 16 dp when the system inset is > 30 dp).
         static let horizontalInset: CGFloat = 16
         /// `MiniPlayerHeight`.
         static let miniPlayerHeight: CGFloat = 64
-        /// `MiniPlayerBottomSpacer`.
+        /// `MiniPlayerBottomSpacer`: the mini player floats this far above the tab bar.
         static let miniPlayerSpacing: CGFloat = 8
-        /// Nav item row inner padding (`padding(start = 10.dp, end = 10.dp)`).
-        static let navRowPadding: CGFloat = 10
-        /// Selection indicator (`CustomNavigationBarItem`: 64×32 box, 4 dp inner padding, 16 dp radius).
-        static let indicatorWidth: CGFloat = 64
-        static let indicatorHeight: CGFloat = 32
-        static let indicatorInset: CGFloat = 4
-        static let navIconSize: CGFloat = 24
-        static let navIconSelectedScale: CGFloat = 1.1
     }
 
     /// Mini player content (`MiniPlayerContentInternal`).
