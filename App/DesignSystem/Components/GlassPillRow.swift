@@ -30,6 +30,14 @@ struct GlassPillRow<ID: Hashable & Sendable>: View {
     /// Tint of the selected capsule (defaults to the theme's `primary`).
     var selectedTint: Color?
     var accessibilityIdentifierPrefix = "pill"
+    /// An extra unselectable capsule after the items (the equalizer's "Edit" tab).
+    var trailingAction: TrailingAction?
+
+    struct TrailingAction {
+        let systemImage: String
+        let accessibilityLabel: String
+        let action: () -> Void
+    }
 
     @Environment(\.appTheme) private var theme
     @Namespace private var glassNamespace
@@ -46,6 +54,20 @@ struct GlassPillRow<ID: Hashable & Sendable>: View {
                 HStack(spacing: spacing) {
                     ForEach(items) { item in
                         pill(item)
+                    }
+                    if let trailingAction {
+                        Button(action: trailingAction.action) {
+                            Image(systemName: trailingAction.systemImage)
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(theme.onSurface.opacity(0.9))
+                                .padding(.horizontal, textPadding)
+                                .frame(height: height)
+                                .contentShape(.capsule)
+                        }
+                        .buttonStyle(.plain)
+                        .glassEffect(Glass.regular.interactive(), in: Capsule())
+                        .accessibilityLabel(trailingAction.accessibilityLabel)
+                        .accessibilityIdentifier("\(accessibilityIdentifierPrefix).trailing")
                     }
                 }
                 .padding(.horizontal, edgePadding)

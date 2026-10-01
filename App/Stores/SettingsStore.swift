@@ -117,6 +117,49 @@ nonisolated enum PreferenceKeys {
     static let safeTokenLimit = "safe_token_limit"
     // Developer
     static let advancedPerformanceDiagnosticsEnabled = "advanced_performance_diagnostics_enabled"
+
+    // Stage 7d (settings screens) — appended, Android names and types.
+    static let disableBlurAllOver = "disable_blur_all_over"
+    static let navBarStyle = "nav_bar_style"
+    static let navBarCompactMode = "nav_bar_compact_mode"
+    static let folderBackGestureNavigationKey = "folder_back_gesture_navigation"
+    static let lyricsSourcePreferenceKey = "lyrics_source_preference"
+    static let backupInfoDismissed = "backup_info_dismissed"
+    static let advancedPerformanceDiagnosticsStartedAt = "advanced_performance_diagnostics_started_at_epoch_ms"
+    static let advancedPerformanceDiagnosticsExpiresAt = "advanced_performance_diagnostics_expires_at_epoch_ms"
+    static let bassBoostDismissed = "bass_boost_dismissed"
+    static let virtualizerDismissed = "virtualizer_dismissed"
+    static let loudnessDismissed = "loudness_dismissed"
+    static let aiPresencePenalty = "ai_presence_penalty"
+    static let aiFrequencyPenalty = "ai_frequency_penalty"
+    static let aiSampleSize = "ai_sample_size"
+    static let aiDigestMode = "ai_digest_mode"
+    static let aiIncludeExtendedFields = "ai_include_extended_fields"
+    /// Per-provider AI keys (Android `AiPreferencesRepository.Keys.get…`): `<provider lowercased>_model` etc.
+    /// API keys themselves live in the Keychain under `<provider lowercased>_api_key`.
+    static func aiModel(_ providerName: String) -> String { "\(providerName.lowercased())_model" }
+    static func aiSystemPrompt(_ providerName: String) -> String { "\(providerName.lowercased())_system_prompt" }
+    static func aiBaseUrl(_ providerName: String) -> String { "\(providerName.lowercased())_base_url" }
+    static func aiApiKeyAccount(_ providerName: String) -> String { "\(providerName.lowercased())_api_key" }
+    static let fullPlayerDelayAlbum = "full_player_delay_album"
+    static let fullPlayerDelayMetadata = "full_player_delay_metadata"
+    static let fullPlayerDelayProgress = "full_player_delay_progress"
+    static let fullPlayerDelayControls = "full_player_delay_controls"
+    static let fullPlayerPlaceholders = "full_player_placeholders"
+    static let fullPlayerPlaceholderTransparent = "full_player_placeholder_transparent"
+    static let fullPlayerPlaceholdersOnClose = "full_player_placeholders_on_close"
+    static let fullPlayerSwitchOnDragRelease = "full_player_switch_on_drag_release"
+    static let fullPlayerDelayThreshold = "full_player_delay_threshold_percent"
+    static let fullPlayerCloseThreshold = "full_player_close_threshold_percent"
+    static let taisRoformerBaseUrl = "tais_roformer_base_url"
+    static let taisRoformerApiName = "tais_roformer_api_name"
+    static let taisRoformerApiKey = "tais_roformer_api_key"
+    static let taisRoformerExtraArg = "tais_roformer_extra_arg"
+    static let taisRoformerBackendType = "tais_roformer_backend_type"
+    /// Android `MusicTasteRepository` (its own DataStore): learning, discovery, exploration fraction.
+    static let musicLearningEnabled = "learning_enabled"
+    static let musicDiscoveryEnabled = "discovery_enabled"
+    static let musicExplorationFraction = "exploration_fraction"
 }
 
 /// Android `AppThemeMode`.
@@ -145,6 +188,10 @@ final class SettingsStore {
     let library: LibrarySettings
     let lyrics: LyricsSettings
     let equalizer: EqualizerPreferences
+    /// Stage 7d: AI settings (Android `AiPreferencesRepository`).
+    let ai: AISettings
+    /// Stage 7d: Developer › Experimental (full-player loading tweaks, TAIS tools) and diagnostics.
+    let experimental: ExperimentalSettings
 
     init(defaults: UserDefaults = .standard) {
         appearance = AppearanceSettings(defaults: defaults)
@@ -153,6 +200,8 @@ final class SettingsStore {
         library = LibrarySettings(defaults: defaults)
         lyrics = LyricsSettings(defaults: defaults)
         equalizer = EqualizerPreferences(defaults: defaults)
+        ai = AISettings(defaults: defaults)
+        experimental = ExperimentalSettings(defaults: defaults)
     }
 
     /// An isolated store for UI tests and previews (its own suite, wiped on creation).
@@ -188,9 +237,38 @@ final class AppearanceSettings {
         didSet { defaults.set(ArtworkColorAccuracy.clamp(colorAccuracy), forKey: PreferenceKeys.albumArtColorAccuracy) }
     }
     var showScrollbar: Bool { didSet { defaults.set(showScrollbar, forKey: PreferenceKeys.showScrollbar) } }
+    var disableBlurAllOver: Bool {
+        didSet { defaults.set(disableBlurAllOver, forKey: PreferenceKeys.disableBlurAllOver) }
+    }
+    /// Android `CarouselStyle` (`no_peek` default, `one_peek`, `two_peek`).
+    var carouselStyle: String { didSet { defaults.set(carouselStyle, forKey: PreferenceKeys.carouselStyle) } }
+    /// Android `NavBarStyle` (`default`, `full_width`).
+    var navBarStyle: String { didSet { defaults.set(navBarStyle, forKey: PreferenceKeys.navBarStyle) } }
+    var navBarCompactMode: Bool { didSet { defaults.set(navBarCompactMode, forKey: PreferenceKeys.navBarCompactMode) } }
+    /// Android `CollagePattern.storageKey` (`cosmic_swirl` default).
+    var collagePattern: String { didSet { defaults.set(collagePattern, forKey: PreferenceKeys.collagePattern) } }
+    var collageAutoRotate: Bool { didSet { defaults.set(collageAutoRotate, forKey: PreferenceKeys.collageAutoRotate) } }
+    /// Android `LibraryNavigationMode` (`tab_row` default, `compact_pill`).
+    var libraryNavigationMode: String {
+        didSet { defaults.set(libraryNavigationMode, forKey: PreferenceKeys.libraryNavigationMode) }
+    }
+    var fullPlayerShowFileInfo: Bool {
+        didSet { defaults.set(fullPlayerShowFileInfo, forKey: PreferenceKeys.fullPlayerShowFileInfo) }
+    }
+    /// Android `AlbumArtQuality.name` (`MEDIUM` default).
+    var albumArtQuality: String { didSet { defaults.set(albumArtQuality, forKey: PreferenceKeys.albumArtQuality) } }
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
+        disableBlurAllOver = defaults.bool(PreferenceKeys.disableBlurAllOver, default: false)
+        carouselStyle = defaults.string(PreferenceKeys.carouselStyle, default: "no_peek")
+        navBarStyle = defaults.string(PreferenceKeys.navBarStyle, default: "default")
+        navBarCompactMode = defaults.bool(PreferenceKeys.navBarCompactMode, default: false)
+        collagePattern = defaults.string(PreferenceKeys.collagePattern, default: "cosmic_swirl")
+        collageAutoRotate = defaults.bool(PreferenceKeys.collageAutoRotate, default: false)
+        libraryNavigationMode = defaults.string(PreferenceKeys.libraryNavigationMode, default: "tab_row")
+        fullPlayerShowFileInfo = defaults.bool(PreferenceKeys.fullPlayerShowFileInfo, default: true)
+        albumArtQuality = defaults.string(PreferenceKeys.albumArtQuality, default: "MEDIUM")
         appThemeMode = AppThemeMode(rawValue: defaults.string(PreferenceKeys.appThemeMode, default: "")) ?? .followSystem
         playerTheme = PlayerThemePreference(rawValue: defaults.string(PreferenceKeys.playerThemePreference, default: ""))
             ?? .albumArt
@@ -212,9 +290,13 @@ final class BehaviorSettings {
     /// Android `LaunchTab` (`"Home"` default).
     var launchTab: RootTab { didSet { defaults.set(launchTab.launchTabKey, forKey: PreferenceKeys.launchTab) } }
     var initialSetupDone: Bool { didSet { defaults.set(initialSetupDone, forKey: PreferenceKeys.initialSetupDone) } }
+    var folderBackGestureNavigation: Bool {
+        didSet { defaults.set(folderBackGestureNavigation, forKey: PreferenceKeys.folderBackGestureNavigationKey) }
+    }
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
+        folderBackGestureNavigation = defaults.bool(PreferenceKeys.folderBackGestureNavigationKey, default: true)
         hapticsEnabled = defaults.bool(PreferenceKeys.hapticsEnabled, default: true)
         tapBackgroundClosesPlayer = defaults.bool(PreferenceKeys.tapBackgroundClosesPlayer, default: false)
         let tab = defaults.string(PreferenceKeys.launchTab, default: "Home")
@@ -250,9 +332,19 @@ final class PlaybackSettings {
     var automaticInstrumentals: Bool {
         didSet { defaults.set(automaticInstrumentals, forKey: PreferenceKeys.automaticInstrumentals) }
     }
+    var hiFiModeEnabled: Bool { didSet { defaults.set(hiFiModeEnabled, forKey: PreferenceKeys.hiFiModeEnabled) } }
+    /// Android `AudioQuality.name` (`ULTRASOUND` default = no bitrate cap).
+    var audioQuality: String { didSet { defaults.set(audioQuality, forKey: PreferenceKeys.audioQuality) } }
+    /// Android `PlayerAmbientStyle.name` (`BLENDED_COVER` default).
+    var playerAmbientStyle: String {
+        didSet { defaults.set(playerAmbientStyle, forKey: PreferenceKeys.playerAmbientStyle) }
+    }
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
+        hiFiModeEnabled = defaults.bool(PreferenceKeys.hiFiModeEnabled, default: false)
+        audioQuality = defaults.string(PreferenceKeys.audioQuality, default: "ULTRASOUND")
+        playerAmbientStyle = defaults.string(PreferenceKeys.playerAmbientStyle, default: "BLENDED_COVER")
         keepPlayingInBackground = defaults.bool(PreferenceKeys.keepPlayingInBackground, default: true)
         isCrossfadeEnabled = defaults.bool(PreferenceKeys.isCrossfadeEnabled, default: false)
         crossfadeDurationMs = defaults.int(PreferenceKeys.crossfadeDuration, default: 2000)
@@ -285,9 +377,38 @@ final class LibrarySettings {
     var isAlbumsListView: Bool { didSet { defaults.set(isAlbumsListView, forKey: PreferenceKeys.isAlbumsListView) } }
     var isGenreGridView: Bool { didSet { defaults.set(isGenreGridView, forKey: PreferenceKeys.isGenreGridView) } }
     var hideLocalMedia: Bool { didSet { defaults.set(hideLocalMedia, forKey: PreferenceKeys.hideLocalMedia) } }
+    /// Android `album_art_cache_limit_mb` (default 200, 50…1500).
+    var albumArtCacheLimitMb: Int {
+        didSet { defaults.set(albumArtCacheLimitMb, forKey: PreferenceKeys.albumArtCacheLimitMb) }
+    }
+    /// Character delimiters, stored as Android does: a JSON string array (`json.encodeToString`).
+    var artistDelimiters: [String] {
+        didSet { defaults.set(Self.encodeJSON(artistDelimiters), forKey: PreferenceKeys.artistDelimiters) }
+    }
+    var artistWordDelimiters: [String] {
+        didSet { defaults.set(Self.encodeJSON(artistWordDelimiters), forKey: PreferenceKeys.artistWordDelimiters) }
+    }
+    var artistSettingsRescanRequired: Bool {
+        didSet { defaults.set(artistSettingsRescanRequired, forKey: PreferenceKeys.artistSettingsRescanRequired) }
+    }
+    /// Android `allowed_directories` / `blocked_directories` (string sets) as library paths `/<folder>/<sub>`.
+    var allowedDirectories: [String] {
+        didSet { defaults.set(allowedDirectories, forKey: PreferenceKeys.allowedDirectories) }
+    }
+    var blockedDirectories: [String] {
+        didSet { defaults.set(blockedDirectories, forKey: PreferenceKeys.blockedDirectories) }
+    }
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
+        albumArtCacheLimitMb = defaults.int(PreferenceKeys.albumArtCacheLimitMb, default: 200)
+        artistDelimiters = ArtistParsing.normalizeLegacyDefaultArtistDelimiters(
+            Self.stringList(defaults, PreferenceKeys.artistDelimiters) ?? ArtistParsing.defaultArtistDelimiters)
+        artistWordDelimiters = Self.stringList(defaults, PreferenceKeys.artistWordDelimiters)
+            ?? ArtistParsing.defaultWordDelimiters
+        artistSettingsRescanRequired = defaults.bool(PreferenceKeys.artistSettingsRescanRequired, default: false)
+        allowedDirectories = Self.stringList(defaults, PreferenceKeys.allowedDirectories) ?? []
+        blockedDirectories = Self.stringList(defaults, PreferenceKeys.blockedDirectories) ?? []
         minSongDurationMs = defaults.int(PreferenceKeys.minSongDurationMs, default: 10_000)
         minTracksPerAlbum = defaults.int(PreferenceKeys.minTracksPerAlbum, default: 1)
         extractArtistsFromTitle = defaults.bool(PreferenceKeys.extractArtistsFromTitle, default: true)
@@ -296,6 +417,20 @@ final class LibrarySettings {
         isAlbumsListView = defaults.bool(PreferenceKeys.isAlbumsListView, default: false)
         isGenreGridView = defaults.bool(PreferenceKeys.isGenreGridView, default: true)
         hideLocalMedia = defaults.bool(PreferenceKeys.hideLocalMedia, default: false)
+    }
+
+    /// A `[String]`, or a JSON array encoded as a string (Android's DataStore format, also after a backup restore).
+    nonisolated static func stringList(_ defaults: UserDefaults, _ key: String) -> [String]? {
+        if let array = defaults.stringArray(forKey: key) { return array }
+        if let json = defaults.string(forKey: key), let data = json.data(using: .utf8),
+           let decoded = try? JSONDecoder().decode([String].self, from: data) {
+            return decoded
+        }
+        return nil
+    }
+
+    nonisolated static func encodeJSON(_ list: [String]) -> String {
+        (try? JSONEncoder().encode(list)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
     }
 }
 
@@ -328,9 +463,14 @@ final class LyricsSettings {
         didSet { defaults.set(syncDefaultSpeed, forKey: PreferenceKeys.lyricsSyncDefaultSpeed) }
     }
     var syncHaptics: Bool { didSet { defaults.set(syncHaptics, forKey: PreferenceKeys.lyricsSyncHaptics) } }
+    /// Android `LyricsSourcePreference.name` (`EMBEDDED_FIRST` default, `API_FIRST`, `LOCAL_FIRST`).
+    var sourcePreference: String {
+        didSet { defaults.set(sourcePreference, forKey: PreferenceKeys.lyricsSourcePreferenceKey) }
+    }
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
+        sourcePreference = defaults.string(PreferenceKeys.lyricsSourcePreferenceKey, default: "EMBEDDED_FIRST")
         automaticLyrics = defaults.bool(PreferenceKeys.automaticLyrics, default: true)
         autoScanLrcFiles = defaults.bool(PreferenceKeys.autoScanLrcFiles, default: false)
         immersiveLyricsEnabled = defaults.bool(PreferenceKeys.immersiveLyricsEnabled, default: false)
@@ -357,14 +497,226 @@ final class EqualizerPreferences {
     var virtualizerStrength: Int {
         didSet { defaults.set(virtualizerStrength, forKey: PreferenceKeys.virtualizerStrength) }
     }
+    /// The "custom" band levels (Android `equalizer_custom_bands`, a JSON int list).
+    var customBands: [Int] {
+        didSet { defaults.set(Self.encodeInts(customBands), forKey: PreferenceKeys.equalizerCustomBands) }
+    }
+    var loudnessEnhancerEnabled: Bool {
+        didSet { defaults.set(loudnessEnhancerEnabled, forKey: PreferenceKeys.loudnessEnhancerEnabled) }
+    }
+    var loudnessEnhancerStrength: Int {
+        didSet { defaults.set(loudnessEnhancerStrength, forKey: PreferenceKeys.loudnessEnhancerStrength) }
+    }
+    var bassBoostDismissed: Bool { didSet { defaults.set(bassBoostDismissed, forKey: PreferenceKeys.bassBoostDismissed) } }
+    var virtualizerDismissed: Bool {
+        didSet { defaults.set(virtualizerDismissed, forKey: PreferenceKeys.virtualizerDismissed) }
+    }
+    var loudnessDismissed: Bool { didSet { defaults.set(loudnessDismissed, forKey: PreferenceKeys.loudnessDismissed) } }
+    /// Android `EqualizerViewMode.name` (`SLIDERS` default, `GRAPH`, `HYBRID`).
+    var viewMode: String { didSet { defaults.set(viewMode, forKey: PreferenceKeys.equalizerViewMode) } }
+    /// Android `custom_presets_json` (a JSON list of `EqualizerPreset`), kept raw; the equalizer screen decodes it.
+    var customPresetsJSON: String? { didSet { defaults.set(customPresetsJSON, forKey: PreferenceKeys.customPresets) } }
+    /// Android `pinned_presets_json` (a JSON list of preset names); nil = every built-in preset.
+    var pinnedPresetsJSON: String? { didSet { defaults.set(pinnedPresetsJSON, forKey: PreferenceKeys.pinnedPresets) } }
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
+        customBands = Self.decodeInts(defaults.string(forKey: PreferenceKeys.equalizerCustomBands))
+        loudnessEnhancerEnabled = defaults.bool(PreferenceKeys.loudnessEnhancerEnabled, default: false)
+        loudnessEnhancerStrength = min(max(defaults.int(PreferenceKeys.loudnessEnhancerStrength, default: 0), 0), 1000)
+        bassBoostDismissed = defaults.bool(PreferenceKeys.bassBoostDismissed, default: false)
+        virtualizerDismissed = defaults.bool(PreferenceKeys.virtualizerDismissed, default: false)
+        loudnessDismissed = defaults.bool(PreferenceKeys.loudnessDismissed, default: false)
+        viewMode = defaults.string(PreferenceKeys.equalizerViewMode, default: "SLIDERS")
+        customPresetsJSON = defaults.string(forKey: PreferenceKeys.customPresets)
+        pinnedPresetsJSON = defaults.string(forKey: PreferenceKeys.pinnedPresets)
         isEnabled = defaults.bool(PreferenceKeys.equalizerEnabled, default: false)
         presetName = defaults.string(PreferenceKeys.equalizerPreset, default: "flat")
         bassBoostEnabled = defaults.bool(PreferenceKeys.bassBoostEnabled, default: false)
         bassBoostStrength = defaults.int(PreferenceKeys.bassBoostStrength, default: 0)
         virtualizerEnabled = defaults.bool(PreferenceKeys.virtualizerEnabled, default: false)
         virtualizerStrength = defaults.int(PreferenceKeys.virtualizerStrength, default: 0)
+    }
+}
+
+// MARK: - Stage 7d helpers and categories
+
+extension EqualizerPreferences {
+    /// Android `setEqualizerCustomBands` normalises to 10 levels clamped to −15…15.
+    nonisolated static func encodeInts(_ bands: [Int]) -> String {
+        let normalized = (0..<10).map { i in i < bands.count ? min(max(bands[i], -15), 15) : 0 }
+        return "[" + normalized.map(String.init).joined(separator: ",") + "]"
+    }
+
+    nonisolated static func decodeInts(_ json: String?) -> [Int] {
+        guard let json, let data = json.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode([Int].self, from: data), decoded.count == 10 else {
+            return Array(repeating: 0, count: 10)
+        }
+        return decoded
+    }
+}
+
+/// Android `AiPreferencesRepository`: provider, safety limit, generation parameters and per-provider model, prompt
+/// and base URL (API keys go to the Keychain). Defaults are Android's.
+@Observable
+final class AISettings {
+    private let defaults: UserDefaults
+
+    /// `AiProvider.name` (`GEMINI` default).
+    var provider: String { didSet { defaults.set(provider, forKey: PreferenceKeys.aiProvider) } }
+    var safeTokenLimit: Bool { didSet { defaults.set(safeTokenLimit, forKey: PreferenceKeys.safeTokenLimit) } }
+    var temperature: Double { didSet { defaults.set(temperature, forKey: PreferenceKeys.aiTemperature) } }
+    var topP: Double { didSet { defaults.set(topP, forKey: PreferenceKeys.aiTopP) } }
+    var topK: Int { didSet { defaults.set(topK, forKey: PreferenceKeys.aiTopK) } }
+    var maxTokens: Int { didSet { defaults.set(maxTokens, forKey: PreferenceKeys.aiMaxTokens) } }
+    var presencePenalty: Double { didSet { defaults.set(presencePenalty, forKey: PreferenceKeys.aiPresencePenalty) } }
+    var frequencyPenalty: Double { didSet { defaults.set(frequencyPenalty, forKey: PreferenceKeys.aiFrequencyPenalty) } }
+    var sampleSize: Int { didSet { defaults.set(sampleSize, forKey: PreferenceKeys.aiSampleSize) } }
+    /// `safe` (default) or `full`.
+    var digestMode: String { didSet { defaults.set(digestMode, forKey: PreferenceKeys.aiDigestMode) } }
+    var includeExtendedFields: Bool {
+        didSet { defaults.set(includeExtendedFields, forKey: PreferenceKeys.aiIncludeExtendedFields) }
+    }
+    var musicLearningEnabled: Bool {
+        didSet { defaults.set(musicLearningEnabled, forKey: PreferenceKeys.musicLearningEnabled) }
+    }
+    var musicDiscoveryEnabled: Bool {
+        didSet { defaults.set(musicDiscoveryEnabled, forKey: PreferenceKeys.musicDiscoveryEnabled) }
+    }
+    /// 0…0.6 (Android `exploration_fraction`).
+    var musicExploration: Double {
+        didSet { defaults.set(musicExploration, forKey: PreferenceKeys.musicExplorationFraction) }
+    }
+
+    init(defaults: UserDefaults) {
+        self.defaults = defaults
+        provider = defaults.string(PreferenceKeys.aiProvider, default: "GEMINI")
+        safeTokenLimit = defaults.bool(PreferenceKeys.safeTokenLimit, default: true)
+        temperature = defaults.double(PreferenceKeys.aiTemperature, default: 0.7)
+        topP = defaults.double(PreferenceKeys.aiTopP, default: 0.95)
+        topK = defaults.int(PreferenceKeys.aiTopK, default: 64)
+        maxTokens = defaults.int(PreferenceKeys.aiMaxTokens, default: 4096)
+        presencePenalty = defaults.double(PreferenceKeys.aiPresencePenalty, default: 0)
+        frequencyPenalty = defaults.double(PreferenceKeys.aiFrequencyPenalty, default: 0)
+        sampleSize = defaults.int(PreferenceKeys.aiSampleSize, default: 40)
+        digestMode = defaults.string(PreferenceKeys.aiDigestMode, default: "safe")
+        includeExtendedFields = defaults.bool(PreferenceKeys.aiIncludeExtendedFields, default: false)
+        musicLearningEnabled = defaults.bool(PreferenceKeys.musicLearningEnabled, default: true)
+        musicDiscoveryEnabled = defaults.bool(PreferenceKeys.musicDiscoveryEnabled, default: true)
+        musicExploration = defaults.double(PreferenceKeys.musicExplorationFraction, default: 0.25)
+    }
+
+    func model(for providerName: String) -> String { defaults.string(PreferenceKeys.aiModel(providerName), default: "") }
+
+    func setModel(_ model: String, for providerName: String) {
+        defaults.set(model, forKey: PreferenceKeys.aiModel(providerName))
+    }
+
+    /// nil = the default prompt (Android falls back to `DEFAULT_SYSTEM_PROMPT`).
+    func systemPrompt(for providerName: String) -> String? {
+        defaults.string(forKey: PreferenceKeys.aiSystemPrompt(providerName))
+    }
+
+    func setSystemPrompt(_ prompt: String?, for providerName: String) {
+        defaults.set(prompt, forKey: PreferenceKeys.aiSystemPrompt(providerName))
+    }
+
+    func baseUrl(for providerName: String) -> String { defaults.string(PreferenceKeys.aiBaseUrl(providerName), default: "") }
+
+    func setBaseUrl(_ url: String, for providerName: String) {
+        defaults.set(url, forKey: PreferenceKeys.aiBaseUrl(providerName))
+    }
+}
+
+/// Developer › Experimental (Android `FullPlayerLoadingTweaks`, TAIS tools) plus the diagnostics session and the
+/// backup notice. Defaults are Android's.
+@Observable
+final class ExperimentalSettings {
+    private let defaults: UserDefaults
+
+    var delayAlbumCarousel: Bool { didSet { defaults.set(delayAlbumCarousel, forKey: PreferenceKeys.fullPlayerDelayAlbum) } }
+    var delaySongMetadata: Bool { didSet { defaults.set(delaySongMetadata, forKey: PreferenceKeys.fullPlayerDelayMetadata) } }
+    var delayProgressBar: Bool { didSet { defaults.set(delayProgressBar, forKey: PreferenceKeys.fullPlayerDelayProgress) } }
+    var delayControls: Bool { didSet { defaults.set(delayControls, forKey: PreferenceKeys.fullPlayerDelayControls) } }
+    var showPlaceholders: Bool { didSet { defaults.set(showPlaceholders, forKey: PreferenceKeys.fullPlayerPlaceholders) } }
+    var transparentPlaceholders: Bool {
+        didSet { defaults.set(transparentPlaceholders, forKey: PreferenceKeys.fullPlayerPlaceholderTransparent) }
+    }
+    var applyPlaceholdersOnClose: Bool {
+        didSet { defaults.set(applyPlaceholdersOnClose, forKey: PreferenceKeys.fullPlayerPlaceholdersOnClose) }
+    }
+    var switchOnDragRelease: Bool {
+        didSet { defaults.set(switchOnDragRelease, forKey: PreferenceKeys.fullPlayerSwitchOnDragRelease) }
+    }
+    var appearThresholdPercent: Int {
+        didSet { defaults.set(appearThresholdPercent, forKey: PreferenceKeys.fullPlayerDelayThreshold) }
+    }
+    var closeThresholdPercent: Int {
+        didSet { defaults.set(closeThresholdPercent, forKey: PreferenceKeys.fullPlayerCloseThreshold) }
+    }
+    /// 0…1 (Android `tais_vocal_attenuation`).
+    var vocalAttenuation: Double { didSet { defaults.set(vocalAttenuation, forKey: PreferenceKeys.taisVocalAttenuation) } }
+    var roformerBaseUrl: String { didSet { defaults.set(roformerBaseUrl, forKey: PreferenceKeys.taisRoformerBaseUrl) } }
+    var roformerApiName: String { didSet { defaults.set(roformerApiName, forKey: PreferenceKeys.taisRoformerApiName) } }
+    var roformerApiKey: String { didSet { defaults.set(roformerApiKey, forKey: PreferenceKeys.taisRoformerApiKey) } }
+    var roformerExtraArg: String { didSet { defaults.set(roformerExtraArg, forKey: PreferenceKeys.taisRoformerExtraArg) } }
+    /// `GRADIO_SPACE` (default) or `DIRECT_POST`.
+    var roformerBackendType: String {
+        didSet { defaults.set(roformerBackendType, forKey: PreferenceKeys.taisRoformerBackendType) }
+    }
+    var backupInfoDismissed: Bool { didSet { defaults.set(backupInfoDismissed, forKey: PreferenceKeys.backupInfoDismissed) } }
+    private(set) var advancedDiagnosticsEnabled: Bool
+    private(set) var advancedDiagnosticsExpiresAtMs: Int64?
+
+    /// Android `delayAll` = every part delayed.
+    var delayAll: Bool { delayAlbumCarousel && delaySongMetadata && delayProgressBar && delayControls }
+
+    init(defaults: UserDefaults) {
+        self.defaults = defaults
+        delayAlbumCarousel = defaults.bool(PreferenceKeys.fullPlayerDelayAlbum, default: true)
+        delaySongMetadata = defaults.bool(PreferenceKeys.fullPlayerDelayMetadata, default: true)
+        delayProgressBar = defaults.bool(PreferenceKeys.fullPlayerDelayProgress, default: true)
+        delayControls = defaults.bool(PreferenceKeys.fullPlayerDelayControls, default: true)
+        showPlaceholders = defaults.bool(PreferenceKeys.fullPlayerPlaceholders, default: true)
+        transparentPlaceholders = defaults.bool(PreferenceKeys.fullPlayerPlaceholderTransparent, default: false)
+        applyPlaceholdersOnClose = defaults.bool(PreferenceKeys.fullPlayerPlaceholdersOnClose, default: false)
+        switchOnDragRelease = defaults.bool(PreferenceKeys.fullPlayerSwitchOnDragRelease, default: true)
+        appearThresholdPercent = defaults.int(PreferenceKeys.fullPlayerDelayThreshold, default: 98)
+        closeThresholdPercent = defaults.int(PreferenceKeys.fullPlayerCloseThreshold, default: 0)
+        vocalAttenuation = min(max(defaults.double(PreferenceKeys.taisVocalAttenuation, default: 0), 0), 1)
+        roformerBaseUrl = defaults.string(PreferenceKeys.taisRoformerBaseUrl, default: "")
+        roformerApiName = defaults.string(PreferenceKeys.taisRoformerApiName, default: "")
+        roformerApiKey = defaults.string(PreferenceKeys.taisRoformerApiKey, default: "")
+        roformerExtraArg = defaults.string(PreferenceKeys.taisRoformerExtraArg, default: "")
+        roformerBackendType = defaults.string(PreferenceKeys.taisRoformerBackendType, default: "GRADIO_SPACE")
+        backupInfoDismissed = defaults.bool(PreferenceKeys.backupInfoDismissed, default: false)
+        advancedDiagnosticsEnabled = defaults.bool(PreferenceKeys.advancedPerformanceDiagnosticsEnabled, default: false)
+        advancedDiagnosticsExpiresAtMs = (defaults.object(forKey: PreferenceKeys.advancedPerformanceDiagnosticsExpiresAt)
+            as? NSNumber)?.int64Value
+    }
+
+    /// Android `setDelayAllFullPlayerContent`.
+    func setDelayAll(_ enabled: Bool) {
+        delayAlbumCarousel = enabled
+        delaySongMetadata = enabled
+        delayProgressBar = enabled
+        delayControls = enabled
+    }
+
+    /// Android `setAdvancedPerformanceDiagnosticsEnabled`: a 24-hour session.
+    func setAdvancedDiagnostics(_ enabled: Bool, nowMs: Int64 = Int64(Date().timeIntervalSince1970 * 1000)) {
+        advancedDiagnosticsEnabled = enabled
+        defaults.set(enabled, forKey: PreferenceKeys.advancedPerformanceDiagnosticsEnabled)
+        if enabled {
+            let expires = nowMs + 24 * 60 * 60 * 1000
+            advancedDiagnosticsExpiresAtMs = expires
+            defaults.set(nowMs, forKey: PreferenceKeys.advancedPerformanceDiagnosticsStartedAt)
+            defaults.set(expires, forKey: PreferenceKeys.advancedPerformanceDiagnosticsExpiresAt)
+        } else {
+            advancedDiagnosticsExpiresAtMs = nil
+            defaults.removeObject(forKey: PreferenceKeys.advancedPerformanceDiagnosticsStartedAt)
+            defaults.removeObject(forKey: PreferenceKeys.advancedPerformanceDiagnosticsExpiresAt)
+        }
     }
 }
