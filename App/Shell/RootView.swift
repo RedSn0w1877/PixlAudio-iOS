@@ -29,7 +29,9 @@ struct RootView: View {
                 tab(.search, path: $router.searchPath) { SearchView() }
                 tab(.library, path: $router.libraryPath) { LibraryView() }
             }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
+            // A bar, not a plain inset: scroll views under it get the system's soft scroll edge effect, the way
+            // content fades under the system tab bar (this replaces Android's gradients behind its bar).
+            .safeAreaBar(edge: .bottom, spacing: 0) {
                 bottomBars
             }
             // Stage 8: the player sheet — the mini player resting in `MiniPlayerSlot` and expanding over everything.

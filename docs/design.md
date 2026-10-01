@@ -120,6 +120,8 @@ PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact ba
   Re-tapping the selected tab pops it to its root. Android's NavBar Style (default / full width) setting is gone;
   compact mode remains. Not the system `TabView` bar: its selection platter can't take the accent colour and the
   player sheet expands from the mini player slot above the bar.
+- The bars are attached with `safeAreaBar`, so content scrolls all the way down under them with the system's soft
+  scroll edge effect; Android's bottom gradients behind its bar (Home, Search) are gone.
 - The bar shows only at a tab's root — every pushed screen hides it (Android `routesWithHiddenNavigationBar`); the
   mini player then sits alone with 32 pt corners.
 - The mini player is the collapsed player sheet (stage 8): tap or drag it up to expand (see Stage 8 notes).

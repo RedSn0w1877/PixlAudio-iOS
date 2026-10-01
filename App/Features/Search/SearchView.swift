@@ -45,7 +45,6 @@ struct SearchView: View {
             .animation(.easeOut(duration: 0.3), value: showsGenres)
         }
         .background(theme.background.ignoresSafeArea())
-        .overlay(alignment: .bottom) { bottomScrim }
         .background { LibraryIndexFeeder(model: model, prepare: prepare) }
         .onChange(of: router.searchText, initial: true) { _, query in
             prepare()
@@ -254,24 +253,6 @@ struct SearchView: View {
                 playback.play(song)
             }
         }
-    }
-
-    // MARK: Bottom scrim
-
-    /// Android's bottom gradient (transparent to 20 %, `surfaceContainerLowest` from 80 %), filling the area behind
-    /// the mini player and the bar.
-    private var bottomScrim: some View {
-        LinearGradient(stops: [
-            .init(color: theme.surfaceContainerLowest.opacity(0), location: 0),
-            .init(color: theme.surfaceContainerLowest.opacity(0), location: 0.2),
-            .init(color: theme.surfaceContainerLowest, location: 0.8),
-            .init(color: theme.surfaceContainerLowest, location: 1),
-        ], startPoint: .top, endPoint: .bottom)
-        .frame(height: 0)
-        .frame(maxWidth: .infinity)
-        .ignoresSafeArea(.container, edges: .bottom)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
     }
 }
 
