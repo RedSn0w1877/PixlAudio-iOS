@@ -80,6 +80,9 @@ final class PlaybackStore {
 
     // MARK: Position (read on demand, never observed)
 
+    /// A non-observable clock over the engine's timebase, for the scrubber and the lyrics display link.
+    var clock: PlaybackClock { PlaybackClock(engine: engine) }
+
     func positionMs() -> Int64 { engine.currentPositionMs() }
     func durationMs() -> Int64 { engine.currentDurationMs() }
 

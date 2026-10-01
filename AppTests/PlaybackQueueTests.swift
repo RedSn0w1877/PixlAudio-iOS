@@ -56,7 +56,7 @@ final class PlaybackQueueTests: XCTestCase {
     func testShuffleAnchorsTheCurrentSongAndUnshuffleRestoresTheOrder() {
         var queue = PlaybackQueue()
         queue.replace(with: songs(20), startIndex: 7, shuffle: false)
-        var random = KotlinRandom(seed: 42)
+        var random = KotlinRandom(seed: Int64(42))
         queue.setShuffle(true, random: &random)
         XCTAssertTrue(queue.isShuffled)
         XCTAssertEqual(queue.currentIndex, 7)
@@ -65,7 +65,7 @@ final class PlaybackQueueTests: XCTestCase {
         XCTAssertEqual(Set(ids(queue)), Set(songs(20).map(\.id)))
 
         // Same order as PixlLibrary's anchored shuffle with the same seed (Android-exact).
-        var expectedRandom = KotlinRandom(seed: 42)
+        var expectedRandom = KotlinRandom(seed: Int64(42))
         let expected = QueueUtils.buildAnchoredShuffleQueue(songs(20).map(\.id), anchorIndex: 7, random: &expectedRandom)
         XCTAssertEqual(ids(queue), expected)
 
@@ -79,7 +79,7 @@ final class PlaybackQueueTests: XCTestCase {
 
     func testShuffledReplaceStartsAtTheChosenSong() {
         var queue = PlaybackQueue()
-        var random = KotlinRandom(seed: 3)
+        var random = KotlinRandom(seed: Int64(3))
         queue.replace(with: songs(10), startIndex: 4, shuffle: true, random: &random)
         XCTAssertEqual(queue.current?.song.id, "s4")
         XCTAssertTrue(queue.isShuffled)
@@ -122,7 +122,7 @@ final class PlaybackQueueTests: XCTestCase {
 
     func testEditsWhileShuffledSurviveUnshuffle() {
         var queue = PlaybackQueue()
-        var random = KotlinRandom(seed: 9)
+        var random = KotlinRandom(seed: Int64(9))
         queue.replace(with: songs(6), startIndex: 0, shuffle: true, random: &random)
         queue.append([Song(id: "extra", title: "", artist: "", artistId: 0, album: "", albumId: 0, path: "",
                            contentUriString: "", albumArtUriString: nil, duration: 0, mimeType: nil, bitrate: nil,

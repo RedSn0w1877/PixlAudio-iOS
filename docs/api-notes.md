@@ -148,9 +148,8 @@ For the app (stage 9): the lyrics engine's intended driver is a `CADisplayLink`
 Android screenshots on device). Neither is in the ledger yet: add them when stage 9 first uses them.
 
 For the app (playback stage 5, EQ screen 7d), from PixlAudioCore (stage 3b):
-- `BiquadCoefficients.vDSPOrder` is `[b0, b1, b2, a1, a2]` normalised by a0, the layout `vDSP_biquadm_CreateSetupD`
-  / `vDSP_biquadm_SetTargetsDouble` expect (to be ledgered by the playback stage when it first uses them:
-  /documentation/accelerate/vdsp_biquadm_createsetupd).
+- `BiquadCoefficients.vDSPOrder` is `[b0, b1, b2, a1, a2]` normalised by a0 (ledgered in "Stage 5": the Float setup
+  is `vDSP_biquadm_CreateSetup`, and multichannel coefficients are transposed per coefficient).
 - `CrossfadeRamp.apply` / `ReplayGainStage.process` / `EqualizerProcessor.process` / `MidSideVocal.process` operate in
   place on interleaved (or planar) Float buffers from a processing tap; state structs must be uniquely owned by the tap
   context so array storage is never copied on the render thread.
@@ -232,6 +231,55 @@ Proven on the `xcode-27` lane by the stage-4 build (fallback lane: its next week
 | `PropertyListEncoder` (`outputFormat = .binary`) / `PropertyListDecoder` | 8 | /documentation/foundation/propertylistencoder | `SnapshotLoader` | Launch reads the binary-plist snapshot before SwiftData. |
 | `UserDefaults(suiteName:)`, `removePersistentDomain(forName:)`, `object(forKey:)` | 7 | /documentation/foundation/userdefaults | `SettingsStore` | Android preference keys; isolated suite for UI tests. |
 | `AsyncStream.makeStream(of:bufferingPolicy:)` | 17 (Swift 5.9) | /documentation/swift/asyncstream/makestream(of:bufferingpolicy:) | `DemoPlaybackEngine` | Engine → store events. |
+
+## Stage 5 — playback engine
+Signatures checked against developer.apple.com (the JSON behind each page) before use; proven by the stage-5 CI build.
+
+### Audio session
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `AVAudioSession.setCategory(_:mode:policy:options:)`, `.playback`, `.default`, `RouteSharingPolicy.longFormAudio` | 11 | /documentation/avfaudio/avaudiosession/setcategory(_:mode:policy:options:) | `AudioSessionController.configure` | Falls back to `setCategory(_:mode:options:)` if long-form is refused. |
+| `AVAudioSession.setActive(_:options:)`, `.notifyOthersOnDeactivation` | 6 | /documentation/avfaudio/avaudiosession/setactive(_:options:) | activate / deactivate | |
+| `AVAudioSession.interruptionNotification`, `AVAudioSessionInterruptionTypeKey`, `AVAudioSessionInterruptionOptionKey`, `InterruptionType`, `InterruptionOptions.shouldResume` | 6 | /documentation/avfaudio/avaudiosession/interruptionnotification | interruptions → `AudioFocusResumeState` | Observed with `queue: .main` + `MainActor.assumeIsolated`; payload parsed in a `nonisolated` helper. |
+| `AVAudioSession.routeChangeNotification`, `AVAudioSessionRouteChangeReasonKey`, `RouteChangeReason.oldDeviceUnavailable / .newDeviceAvailable` | 6 | /documentation/avfaudio/avaudiosession/routechangenotification | pause on unplug, optional resume | Android "becoming noisy" + `resume_on_headset_reconnect`. |
+| `AVAudioSession.mediaServicesWereResetNotification` | 6 | /documentation/avfaudio/avaudiosession/mediaserviceswereresetnotification | `rebuildAfterMediaServicesReset` | New decks, taps and items; position and play state kept. |
+| `AVAudioSession.sampleRate`, `currentRoute.outputs` (`portName`, `portType`) | 6 | /documentation/avfaudio/avaudiosession/currentroute | EQ design rate, route description | |
+
+### Players, items, taps
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `AVQueuePlayer` `insert(_:after:)`, `canInsert(_:after:)`, `remove(_:)`, `removeAllItems()`, `advanceToNextItem()` | 4.1 | /documentation/avfoundation/avqueueplayer/insert(_:after:) | `Deck` | Gapless: the next item is pre-inserted on the active deck. |
+| `AVPlayer` `playImmediately(atRate:)`, `defaultRate` (16), `rate`, `pause()`, `timeControlStatus`, `actionAtItemEnd`, `allowsExternalPlayback`, `automaticallyWaitsToMinimizeStalling`, `seek(to:toleranceBefore:toleranceAfter:)` | 6–16 | /documentation/avfoundation/avplayer/defaultrate | `Deck` | `allowsExternalPlayback = false` keeps the taps running on AirPlay. KVO on `currentItem` / `timeControlStatus` with `@Sendable` handlers hopping to the main queue. |
+| `AVPlayerItem(asset:)`, `audioMix`, `audioTimePitchAlgorithm` + `.spectral`, `status`, `error`, `timebase`, `currentTime()`, `didPlayToEndTimeNotification`, `failedToPlayToEndTimeNotification` | 4–7 | /documentation/avfoundation/avplayeritem/audiotimepitchalgorithm | `DeckItemFactory`, `Deck` | Spectral = pitch-preserving rate for the sync editor (0.75 / 0.5). Seeks before `readyToPlay` are deferred. |
+| `CMTimebaseGetTime(_:)` | 6 | /documentation/coremedia/cmtimebasegettime(_:) | `DeckItem.positionSeconds` | Position read on demand, never observed. |
+| `AVURLAsset(url:)`, `loadTracks(withMediaType:)` (async, 15), `load(.duration)` (15), `resourceLoader`, `AVAssetResourceLoader.setDelegate(_:queue:)` | 6–15 | /documentation/avfoundation/avasset/loadtracks(withmediatype:completionhandler:) | `DeckItemFactory`, `StreamingResourceLoaderRegistry` | The registry is stage 11's hook (custom schemes); no YouTube code here. |
+| `AVMutableAudioMixInputParameters(track:)`, `audioTapProcessor`, `AVMutableAudioMix.inputParameters` | 4 / 6 | /documentation/avfoundation/avmutableaudiomixinputparameters/audiotapprocessor | `ProcessingTap.makeAudioMix` | One new tap per item. |
+| `MTAudioProcessingTapCreate(_:_:_:_:)` (`tapOut: UnsafeMutablePointer<MTAudioProcessingTap?>`), `MTAudioProcessingTapCallbacks(version:clientInfo:init:finalize:prepare:unprepare:process:)`, `kMTAudioProcessingTapCallbacksVersion_0`, `kMTAudioProcessingTapCreationFlag_PreEffects`, `MTAudioProcessingTapGetStorage(_:)`, `MTAudioProcessingTapGetSourceAudio(_:_:_:_:_:_:)` (with `CMTimeRange` out) | 6 | /documentation/mediatoolbox/mtaudioprocessingtapcreate(_:_:_:_:) | `ProcessingTap`, `TapContext` | `import MediaToolbox` (added to the CI allow-list). Callbacks are closure literals in a `nonisolated` function (C function pointers); the context is `Unmanaged.passRetained` and released in `finalize`. Pre-effects, so the time range is the item's own media time. |
+| `UnsafeMutableAudioBufferListPointer`, `AudioStreamBasicDescription`, `kAudioFormatLinearPCM`, `kAudioFormatFlagIsFloat`, `kAudioFormatFlagIsNonInterleaved` | 2 | /documentation/coreaudio/unsafemutableaudiobufferlistpointer | `TapContext` | Interleaved and planar float layouts both handled (strided channel views). |
+| `vDSP_biquadm_CreateSetup` (double coefficients → **Float** setup; `CreateSetupD` is the double-precision setup for `vDSP_biquadmD`), `vDSP_biquadm`, `vDSP_biquadm_SetTargetsDouble`, `vDSP_biquadm_ResetState`, `vDSP_biquadm_DestroySetup` | 7–9 | /documentation/accelerate/vdsp_biquadm_createsetup | `TapContext` | Coefficient layout per Apple's example: section → coefficient (b0 b1 b2 a1 a2) → channel, i.e. index `(s·5 + k)·N + c`. Swift types (per the Accelerate overlay): `X: UnsafeMutablePointer<UnsafePointer<Float>>`, `Y: UnsafeMutablePointer<UnsafeMutablePointer<Float>>`. In place, stride = channels for interleaved audio. `SetTargetsDouble` (rate 0.25 per call, threshold 1e-6) glides to new EQ settings without clicks and does not allocate. Corrects the stage-3b note that named `CreateSetupD`. |
+| `Synchronization.Atomic` (`load(ordering:)`, `store(_:ordering:)`, `wrappingAdd(_:ordering:)`), `Mutex` | 18 | /documentation/synchronization/atomic | `TapParameters` | Render-thread reads are atomics or slots of preallocated rings published with release/acquire. |
+| `mach_absolute_time()`, `mach_timebase_info(_:)` | 2 | /documentation/kernel/1462446-mach_absolute_time | tap meter log, gapless test | |
+| `AVAssetReader(asset:)`, `AVAssetReaderAudioMixOutput(audioTracks:audioSettings:)`, `audioMix`, `copyNextSampleBuffer()`, `CMSampleBufferGetDataBuffer`, `CMBlockBufferCopyDataBytes` | 4.1 | /documentation/avfoundation/avassetreaderaudiomixoutput/audiomix | AppTests (`TapOfflineRenderer`) | The tap also runs offline on the reader's audio mix: the tests measure the DSP chain without an audio device. |
+
+### Now Playing and routes
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `MPNowPlayingInfoCenter.default().nowPlayingInfo` with `MPMediaItemPropertyTitle/Artist/AlbumTitle/AlbumArtist/Genre/PlaybackDuration/Artwork`, `MPNowPlayingInfoPropertyElapsedPlaybackTime/PlaybackRate/DefaultPlaybackRate/MediaType/PlaybackQueueIndex/PlaybackQueueCount/ExternalContentIdentifier` | 3–10 | /documentation/mediaplayer/mpnowplayinginfocenter | `NowPlayingController.update` | Published on changes only; the system extrapolates elapsed time from the rate. |
+| `MPMediaItemArtwork(boundsSize:requestHandler:)` | 10 | /documentation/mediaplayer/mpmediaitemartwork/init(boundssize:requesthandler:) | `NowPlayingController.makeArtwork` | Built in a `nonisolated` function: the handler runs on a system queue. |
+| `MPRemoteCommandCenter.shared()` play / pause / togglePlayPause / nextTrack / previousTrack / changePlaybackPosition (`MPChangePlaybackPositionCommandEvent.positionTime`) / changeShuffleMode (`shuffleType`, `currentShuffleType`) / changeRepeatMode (`repeatType`, `currentRepeatType`) / like (`MPFeedbackCommand.isActive`, `localizedTitle`); `addTarget(handler:)`, `removeTarget(_:)`, `isEnabled` | 7.1–8 | /documentation/mediaplayer/mpremotecommandcenter | `NowPlayingController.install` | `@Sendable` handlers extract the event's values, then `MainActor.assumeIsolated` (handlers arrive on the main queue, as in `DiagnosticsModel`). Like stays disabled until a favourites API exists (`onLike`). |
+| `AVRoutePickerView` (`prioritizesVideoDevices`, `activeTintColor`, `tintColor`) | 11 / 13 | /documentation/avkit/avroutepickerview | `AirPlayRoutePicker` (stage 8 places it) | The cast-button equivalent. |
+| `UIApplication.didEnterBackgroundNotification` / `willEnterForegroundNotification` / `willTerminateNotification` | 4 | /documentation/uikit/uiapplication/didenterbackgroundnotification | `PlaybackServices` | Snapshot save, sleep-timer clock check, final stats session. |
+| `withObservationTracking(_:onChange:)` | 17 | /documentation/observation/withobservationtracking(_:onchange:) | `PlaybackServices.observeSettings` | Re-arms itself on the main actor after each change. |
+
+### Stage 5 decisions
+- **ReplayGain duplication** (PixlAudioCore `ReplayGain` vs PixlTags `ReplayGainTags`): playback uses PixlAudioCore's
+  `ReplayGain.values(fromTags:)` fed with PixlTags' property map (`AudioTagReader.read(_:).properties.dictionary`),
+  in `ReplayGainReader`. PixlTags reads every container; PixlAudioCore owns the maths (incl. the R128 Q7.8
+  conversion PixlTags' Android-exact copy lacks). PixlTags' `ReplayGainTags.values(from:)` stays for the tag editor.
+- ReplayGain is applied per item inside the tap (not as one shared player volume), so `ReplayGainVolumeController`'s
+  volume bookkeeping is not used: the crossfade's incoming curve × the item's ReplayGain gain equals Android's
+  `volIn × incomingTrackReplayGainVolume`. Boosts stay capped at unity (Android parity; `allowReplayGainBoost`).
+- The crossfade countdown and the fade monitor only run while playing (no timers while paused).
 
 ## Testing and tooling
 | API / tool | Docs | Notes |
