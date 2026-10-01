@@ -71,7 +71,12 @@ The full architecture is in [`docs/research/architecture.md`](docs/research/arch
 ## Workflow (no Mac)
 - App code cannot compile on Windows. Before pushing, run `pwsh ci/parse-check.ps1` (a `swiftc -parse` syntax
   check; it skips with a warning when Swift for Windows is not installed). PixlCore: `swift test --package-path
-  Packages/PixlCore` locally (only one local Swift build at a time — use the lock file `.swiftbuild.lock`).
+  Packages/PixlCore` locally (only one local Swift build at a time — use the lock file `.swiftbuild.lock`). On the
+  owner's Windows PC plain `swift` lacks its environment: run `cmd //c "ci\swiftw.cmd test --package-path
+  Packages\PixlCore"` (the wrapper sets SDKROOT and the MSVC linker; its paths are that machine's). PixlCore passes
+  on Windows, `Bundle.module` fixtures included.
+- Logic that must match Android/Compose exactly is checked against fixtures generated from the real Android code
+  (`tools/android-reference/`); regenerate them there rather than hand-editing.
 - Work on stage branches `sNN-name`; push; `gh run watch --exit-status`; on failure `gh run view <id> --log-failed`
   (the job summary lists `file:line: error` lines). `main` must stay green; merge only after CI passes; tag
   `stage-NN`.

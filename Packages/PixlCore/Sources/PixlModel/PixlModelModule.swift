@@ -1,5 +1,6 @@
-// PixlModel — Song/Album/Artist/Playlist/LyricsDoc(+Codec)/Transition/SmartRule/SortOption/EQPreset value types (Codable keys match Android JSON).
-// Placeholder from stage 0. Keep the `PixlModelModule` enum: the app's Diagnostics screen lists it.
+// PixlModel — Codable domain models mirroring the Android app (Song/Album/Artist/Playlist + smart rules, Lyrics,
+// LyricsDoc + the exact Android JSON codec, transitions, SortOption, library tabs, EQ presets, queue snapshot).
+// Keep the `PixlModelModule` enum: the app's Diagnostics screen lists it.
 
 import PixlFoundation
 

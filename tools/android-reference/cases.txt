@@ -1,0 +1,66 @@
+{"format":"pixelplay-lyrics","version":1,"metadata":{"title":"Example","artist":"Example artist","durationMs":20000},"voices":[{"id":"lead","role":"lead"},{"id":"echo","role":"background"}],"lines":[{"startMs":12000,"endMs":14500,"text":"Hello there","voiceId":"lead","syllables":[{"startMs":12000,"durationMs":400,"text":"Hel"},{"startMs":12400,"durationMs":600,"text":"lo "},{"startMs":13500,"durationMs":1000,"text":"there"}]},{"startMs":13700,"endMs":15000,"text":"there","voiceId":"echo"}]}
+{"lines":[{"startMs":1,"endMs":2,"text":"a"}]}
+  {\n    "lines" : [ { "startMs" : 0 , "endMs" : 5000 , "text" : "Pretty printed" } ] ,\n    "metadata" : { "title" : "T", "album" : "Al", "source" : "user", "durationMs" : null }\n  }\n
+{"future":{"a":[1,2,{"b":null}]},"lines":[{"startMs":1,"endMs":2,"text":"a","extra":true,"syllables":[{"startMs":1,"durationMs":1,"text":"a","x":"y"}]}],"voices":[{"id":"lead","role":"lead","name":"Singer","color":"#fff"}]}
+{"lines":[{"startMs":"1000","endMs":"2000","text":"quoted numbers"}]}
+{"lines":[{"startMs":1e3,"endMs":2E3,"text":"exponent"}]}
+{"lines":[{"startMs":1000.0,"endMs":2000,"text":"fraction"}]}
+{"version":2,"lines":[{"startMs":1,"endMs":2,"text":"a"}]}
+{"version":"1","lines":[{"startMs":1,"endMs":2,"text":"a"}]}
+{"format":"other","lines":[{"startMs":1,"endMs":2,"text":"a"}]}
+{"voices":[]}
+{"metadata":null,"lines":[{"startMs":1,"endMs":2,"text":"a"}]}
+{"metadata":{"durationMs":0},"lines":[{"startMs":1,"endMs":2,"text":"a"}]}
+{"metadata":{"durationMs":1500},"lines":[{"startMs":1,"endMs":2000,"text":"a"}]}
+{"lines":[{"startMs":0,"endMs":1000,"text":"full line","syllables":[{"startMs":0,"durationMs":500,"text":"half"}]}]}
+{"voices":[{"id":"lead","role":"lead"},{"id":"lead","role":"duet"}],"lines":[{"startMs":1,"endMs":2,"text":"a"}]}
+{"voices":[{"id":"lead","role":"choir"}],"lines":[{"startMs":1,"endMs":2,"text":"a"}]}
+{"voices":[{"id":"  ","role":"lead"}],"lines":[{"startMs":1,"endMs":2,"text":"a","voiceId":"  "}]}
+{"lines":[{"startMs":5,"endMs":9,"text":"b"},{"startMs":1,"endMs":2,"text":"a"}]}
+{"lines":[{"startMs":100,"endMs":200,"text":"a","syllables":[{"startMs":50,"durationMs":10,"text":"a"}]}]}
+{"lines":[{"startMs":100,"endMs":200,"text":"a","syllables":[{"startMs":150,"durationMs":51,"text":"a"}]}]}
+{"lines":[{"startMs":100,"endMs":200,"text":"ab","syllables":[{"startMs":150,"durationMs":10,"text":"a"},{"startMs":120,"durationMs":10,"text":"b"}]}]}
+{"lines":[{"startMs":100,"endMs":200,"text":"a","syllables":[{"startMs":150,"durationMs":0,"text":"a"}]}]}
+[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]
+{"lines":[{"startMs":1,"endMs":2,"text":"a"}]} x
+{"lines":[{"startMs":1,"endMs":2,"text":"a"}]}   \n
+{"lines":[{"startMs":1,"endMs":2,"text":"\\u00e9\\n\\t\\"q\\" \\\\ \\/ \\b\\f\\r\\u0001\\u001f\\u007f \\u2028 \\ud83c\\udfb5 é 夜 حبيبي"}]}
+{"lines":[]}
+[{"startMs":1,"endMs":2,"text":"a"}]
+{"lines":[{"startMs":1,"endMs":2,"text":"first"}],"lines":[{"startMs":3,"endMs":4,"text":"second"}]}
+{"lines":[{"startMs":true,"endMs":2,"text":"a"}]}
+{"lines":[{"startMs":1,"endMs":2,"text":5}]}
+{"lines":[{"startMs":-1,"endMs":2,"text":"a"}]}
+{"lines":[{"startMs":0,"endMs":86400000,"text":"a"}]}
+{"lines":[{"startMs":0,"endMs":86400001,"text":"a"}]}
+{"lines":[{"startMs":+5,"endMs":9,"text":"a"}]}
+{"lines":[{"startMs":005,"endMs":9,"text":"a"}]}
+{'lines':[{"startMs":5,"endMs":9,"text":"a"}]}
+{/*c*/"lines":[{"startMs":5,"endMs":9,"text":"a"}]}
+{"lines":[{"startMs":NaN,"endMs":9,"text":"a"}]}
+{"lines":[{"startMs":5,"endMs":9,"text":"a"},]}
+{"lines":[{"startMs":5,"endMs":9,"text":""}]}
+{"lines":[{"startMs":5,"endMs":9,"text":null}]}
+{"lines":[{"startMs":5,"endMs":9,"text":"a","syllables":null}]}
+{"lines":[{"startMs":5,"endMs":9,"text":"a","voiceId":"ghost"}]}
+{"version":4294967297,"lines":[{"startMs":5,"endMs":9,"text":"a"}]}
+{"lines":[{"startMs":9223372036854775808,"endMs":9,"text":"a"}]}
+{"lines":[{"startMs":5,"endMs":9,"text":"a"}],"metadata":{"title":"x","durationMs":"7000"}}
+{"lines":[{"startMs":5,"endMs":9,"text":"a","syllables":[{"startMs":5,"durationMs":4,"text":"a"}]},{"startMs":5,"endMs":9,"text":"b","voiceId":"lead"}]}
+{"lines":[{"startMs":1,"endMs":2,"text":"\\u0065\\u0301","syllables":[{"startMs":1,"durationMs":1,"text":"\\u00e9"}]}]}
+{"lines":[{"startMs":1,"endMs":2,"text":"a\\x"}]}
+{"lines":[{"startMs":1,"endMs":2,"text":"raw\ttab"}]}
+{"lines":[{"startMs":1,"endMs":2,"text":"a"}],"x":tru}
+{"lines":[{"startMs":1,"endMs":2,"text":"a"}],"x":-}
+{"lines":[{"startMs":1,"endMs":2,"text":"a"}],"x":1.5e-3}
+{"lines":[{"startMs":1000e-3,"endMs":2,"text":"a"}]}
+{"lines":[{"startMs":1,"endMs":2,"text":"a"}],"voices":[{"id":"lead"}]}
+{"lines":[{"startMs":1,"endMs":2,"text":"a"}],"voices":[{"role":"duet"}]}
+
+null
+{"lines":[{"startMs":1,"endMs":2,"text":"a"}]
+{"lines":[{"startMs":1,"endMs":2,"text":"a","syllables":[{"startMs":1,"durationMs":1,"text":"a"}]}],"metadata":{"title":"Ω \u0000"}}
+{"lines":[{"startMs":1,"endMs":2,"text":"a"}],"metadata":{"title":"A","title":"B"}}
+{"lines":[{"startMs":1,"endMs":2,"text":"a"}],"metadata":{"durationMs":-0}}
+{"lines":[{"startMs":-0,"endMs":2,"text":"a"}]}
+{"lines":[{"startMs":1,"endMs":2,"text":"a"}],"version":1.0}

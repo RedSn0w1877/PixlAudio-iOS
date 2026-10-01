@@ -1,0 +1,132 @@
+IN "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"Example\",\"artist\":\"Example artist\",\"durationMs\":20000},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\"},{\"id\":\"echo\",\"role\":\"background\"}],\"lines\":[{\"startMs\":12000,\"endMs\":14500,\"text\":\"Hello there\",\"voiceId\":\"lead\",\"syllables\":[{\"startMs\":12000,\"durationMs\":400,\"text\":\"Hel\"},{\"startMs\":12400,\"durationMs\":600,\"text\":\"lo \"},{\"startMs\":13500,\"durationMs\":1000,\"text\":\"there\"}]},{\"startMs\":13700,\"endMs\":15000,\"text\":\"there\",\"voiceId\":\"echo\"}]}"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"Example\",\"artist\":\"Example artist\",\"album\":\"\",\"durationMs\":20000,\"source\":null},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null},{\"id\":\"echo\",\"role\":\"background\",\"name\":null}],\"lines\":[{\"startMs\":12000,\"endMs\":14500,\"text\":\"Hello there\",\"voiceId\":\"lead\",\"syllables\":[{\"startMs\":12000,\"durationMs\":400,\"text\":\"Hel\"},{\"startMs\":12400,\"durationMs\":600,\"text\":\"lo \"},{\"startMs\":13500,\"durationMs\":1000,\"text\":\"there\"}]},{\"startMs\":13700,\"endMs\":15000,\"text\":\"there\",\"voiceId\":\"echo\",\"syllables\":[]}]}"
+IN "{\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\"}]}"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"\",\"artist\":\"\",\"album\":\"\",\"durationMs\":null,\"source\":null},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\",\"voiceId\":\"lead\",\"syllables\":[]}]}"
+IN "  {\n    \"lines\" : [ { \"startMs\" : 0 , \"endMs\" : 5000 , \"text\" : \"Pretty printed\" } ] ,\n    \"metadata\" : { \"title\" : \"T\", \"album\" : \"Al\", \"source\" : \"user\", \"durationMs\" : null }\n  }\n"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"T\",\"artist\":\"\",\"album\":\"Al\",\"durationMs\":null,\"source\":\"user\"},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"startMs\":0,\"endMs\":5000,\"text\":\"Pretty printed\",\"voiceId\":\"lead\",\"syllables\":[]}]}"
+IN "{\"future\":{\"a\":[1,2,{\"b\":null}]},\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\",\"extra\":true,\"syllables\":[{\"startMs\":1,\"durationMs\":1,\"text\":\"a\",\"x\":\"y\"}]}],\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":\"Singer\",\"color\":\"#fff\"}]}"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"\",\"artist\":\"\",\"album\":\"\",\"durationMs\":null,\"source\":null},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":\"Singer\"}],\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\",\"voiceId\":\"lead\",\"syllables\":[{\"startMs\":1,\"durationMs\":1,\"text\":\"a\"}]}]}"
+IN "{\"lines\":[{\"startMs\":\"1000\",\"endMs\":\"2000\",\"text\":\"quoted numbers\"}]}"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"\",\"artist\":\"\",\"album\":\"\",\"durationMs\":null,\"source\":null},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"startMs\":1000,\"endMs\":2000,\"text\":\"quoted numbers\",\"voiceId\":\"lead\",\"syllables\":[]}]}"
+IN "{\"lines\":[{\"startMs\":1e3,\"endMs\":2E3,\"text\":\"exponent\"}]}"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"\",\"artist\":\"\",\"album\":\"\",\"durationMs\":null,\"source\":null},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"startMs\":1000,\"endMs\":2000,\"text\":\"exponent\",\"voiceId\":\"lead\",\"syllables\":[]}]}"
+IN "{\"lines\":[{\"startMs\":1000.0,\"endMs\":2000,\"text\":\"fraction\"}]}"
+OUT null
+IN "{\"version\":2,\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\"}]}"
+OUT null
+IN "{\"version\":\"1\",\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\"}]}"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"\",\"artist\":\"\",\"album\":\"\",\"durationMs\":null,\"source\":null},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\",\"voiceId\":\"lead\",\"syllables\":[]}]}"
+IN "{\"format\":\"other\",\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\"}]}"
+OUT null
+IN "{\"voices\":[]}"
+OUT null
+IN "{\"metadata\":null,\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\"}]}"
+OUT null
+IN "{\"metadata\":{\"durationMs\":0},\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\"}]}"
+OUT null
+IN "{\"metadata\":{\"durationMs\":1500},\"lines\":[{\"startMs\":1,\"endMs\":2000,\"text\":\"a\"}]}"
+OUT null
+IN "{\"lines\":[{\"startMs\":0,\"endMs\":1000,\"text\":\"full line\",\"syllables\":[{\"startMs\":0,\"durationMs\":500,\"text\":\"half\"}]}]}"
+OUT null
+IN "{\"voices\":[{\"id\":\"lead\",\"role\":\"lead\"},{\"id\":\"lead\",\"role\":\"duet\"}],\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\"}]}"
+OUT null
+IN "{\"voices\":[{\"id\":\"lead\",\"role\":\"choir\"}],\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\"}]}"
+OUT null
+IN "{\"voices\":[{\"id\":\"  \",\"role\":\"lead\"}],\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\",\"voiceId\":\"  \"}]}"
+OUT null
+IN "{\"lines\":[{\"startMs\":5,\"endMs\":9,\"text\":\"b\"},{\"startMs\":1,\"endMs\":2,\"text\":\"a\"}]}"
+OUT null
+IN "{\"lines\":[{\"startMs\":100,\"endMs\":200,\"text\":\"a\",\"syllables\":[{\"startMs\":50,\"durationMs\":10,\"text\":\"a\"}]}]}"
+OUT null
+IN "{\"lines\":[{\"startMs\":100,\"endMs\":200,\"text\":\"a\",\"syllables\":[{\"startMs\":150,\"durationMs\":51,\"text\":\"a\"}]}]}"
+OUT null
+IN "{\"lines\":[{\"startMs\":100,\"endMs\":200,\"text\":\"ab\",\"syllables\":[{\"startMs\":150,\"durationMs\":10,\"text\":\"a\"},{\"startMs\":120,\"durationMs\":10,\"text\":\"b\"}]}]}"
+OUT null
+IN "{\"lines\":[{\"startMs\":100,\"endMs\":200,\"text\":\"a\",\"syllables\":[{\"startMs\":150,\"durationMs\":0,\"text\":\"a\"}]}]}"
+OUT null
+IN "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]"
+OUT null
+IN "{\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\"}]} x"
+OUT null
+IN "{\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\"}]}   \n"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"\",\"artist\":\"\",\"album\":\"\",\"durationMs\":null,\"source\":null},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\",\"voiceId\":\"lead\",\"syllables\":[]}]}"
+IN "{\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"\\u00e9\\n\\t\\\"q\\\" \\\\ \\/ \\b\\f\\r\\u0001\\u001f\\u007f \\u2028 \\ud83c\\udfb5 é 夜 حبيبي\"}]}"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"\",\"artist\":\"\",\"album\":\"\",\"durationMs\":null,\"source\":null},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"é\\n\\t\\\"q\\\" \\\\ / \\b\\f\\r\\u0001\\u001f   🎵 é 夜 حبيبي\",\"voiceId\":\"lead\",\"syllables\":[]}]}"
+IN "{\"lines\":[]}"
+OUT null
+IN "[{\"startMs\":1,\"endMs\":2,\"text\":\"a\"}]"
+OUT null
+IN "{\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"first\"}],\"lines\":[{\"startMs\":3,\"endMs\":4,\"text\":\"second\"}]}"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"\",\"artist\":\"\",\"album\":\"\",\"durationMs\":null,\"source\":null},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"startMs\":3,\"endMs\":4,\"text\":\"second\",\"voiceId\":\"lead\",\"syllables\":[]}]}"
+IN "{\"lines\":[{\"startMs\":true,\"endMs\":2,\"text\":\"a\"}]}"
+OUT null
+IN "{\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":5}]}"
+OUT null
+IN "{\"lines\":[{\"startMs\":-1,\"endMs\":2,\"text\":\"a\"}]}"
+OUT null
+IN "{\"lines\":[{\"startMs\":0,\"endMs\":86400000,\"text\":\"a\"}]}"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"\",\"artist\":\"\",\"album\":\"\",\"durationMs\":null,\"source\":null},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"startMs\":0,\"endMs\":86400000,\"text\":\"a\",\"voiceId\":\"lead\",\"syllables\":[]}]}"
+IN "{\"lines\":[{\"startMs\":0,\"endMs\":86400001,\"text\":\"a\"}]}"
+OUT null
+IN "{\"lines\":[{\"startMs\":+5,\"endMs\":9,\"text\":\"a\"}]}"
+OUT null
+IN "{\"lines\":[{\"startMs\":005,\"endMs\":9,\"text\":\"a\"}]}"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"\",\"artist\":\"\",\"album\":\"\",\"durationMs\":null,\"source\":null},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"startMs\":5,\"endMs\":9,\"text\":\"a\",\"voiceId\":\"lead\",\"syllables\":[]}]}"
+IN "{'lines':[{\"startMs\":5,\"endMs\":9,\"text\":\"a\"}]}"
+OUT null
+IN "{/*c*/\"lines\":[{\"startMs\":5,\"endMs\":9,\"text\":\"a\"}]}"
+OUT null
+IN "{\"lines\":[{\"startMs\":NaN,\"endMs\":9,\"text\":\"a\"}]}"
+OUT null
+IN "{\"lines\":[{\"startMs\":5,\"endMs\":9,\"text\":\"a\"},]}"
+OUT null
+IN "{\"lines\":[{\"startMs\":5,\"endMs\":9,\"text\":\"\"}]}"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"\",\"artist\":\"\",\"album\":\"\",\"durationMs\":null,\"source\":null},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"startMs\":5,\"endMs\":9,\"text\":\"\",\"voiceId\":\"lead\",\"syllables\":[]}]}"
+IN "{\"lines\":[{\"startMs\":5,\"endMs\":9,\"text\":null}]}"
+OUT null
+IN "{\"lines\":[{\"startMs\":5,\"endMs\":9,\"text\":\"a\",\"syllables\":null}]}"
+OUT null
+IN "{\"lines\":[{\"startMs\":5,\"endMs\":9,\"text\":\"a\",\"voiceId\":\"ghost\"}]}"
+OUT null
+IN "{\"version\":4294967297,\"lines\":[{\"startMs\":5,\"endMs\":9,\"text\":\"a\"}]}"
+OUT null
+IN "{\"lines\":[{\"startMs\":9223372036854775808,\"endMs\":9,\"text\":\"a\"}]}"
+OUT null
+IN "{\"lines\":[{\"startMs\":5,\"endMs\":9,\"text\":\"a\"}],\"metadata\":{\"title\":\"x\",\"durationMs\":\"7000\"}}"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"x\",\"artist\":\"\",\"album\":\"\",\"durationMs\":7000,\"source\":null},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"startMs\":5,\"endMs\":9,\"text\":\"a\",\"voiceId\":\"lead\",\"syllables\":[]}]}"
+IN "{\"lines\":[{\"startMs\":5,\"endMs\":9,\"text\":\"a\",\"syllables\":[{\"startMs\":5,\"durationMs\":4,\"text\":\"a\"}]},{\"startMs\":5,\"endMs\":9,\"text\":\"b\",\"voiceId\":\"lead\"}]}"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"\",\"artist\":\"\",\"album\":\"\",\"durationMs\":null,\"source\":null},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"startMs\":5,\"endMs\":9,\"text\":\"a\",\"voiceId\":\"lead\",\"syllables\":[{\"startMs\":5,\"durationMs\":4,\"text\":\"a\"}]},{\"startMs\":5,\"endMs\":9,\"text\":\"b\",\"voiceId\":\"lead\",\"syllables\":[]}]}"
+IN "{\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"\\u0065\\u0301\",\"syllables\":[{\"startMs\":1,\"durationMs\":1,\"text\":\"\\u00e9\"}]}]}"
+OUT null
+IN "{\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\\x\"}]}"
+OUT null
+IN "{\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"raw\ttab\"}]}"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"\",\"artist\":\"\",\"album\":\"\",\"durationMs\":null,\"source\":null},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"raw\\ttab\",\"voiceId\":\"lead\",\"syllables\":[]}]}"
+IN "{\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\"}],\"x\":tru}"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"\",\"artist\":\"\",\"album\":\"\",\"durationMs\":null,\"source\":null},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\",\"voiceId\":\"lead\",\"syllables\":[]}]}"
+IN "{\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\"}],\"x\":-}"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"\",\"artist\":\"\",\"album\":\"\",\"durationMs\":null,\"source\":null},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\",\"voiceId\":\"lead\",\"syllables\":[]}]}"
+IN "{\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\"}],\"x\":1.5e-3}"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"\",\"artist\":\"\",\"album\":\"\",\"durationMs\":null,\"source\":null},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\",\"voiceId\":\"lead\",\"syllables\":[]}]}"
+IN "{\"lines\":[{\"startMs\":1000e-3,\"endMs\":2,\"text\":\"a\"}]}"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"\",\"artist\":\"\",\"album\":\"\",\"durationMs\":null,\"source\":null},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\",\"voiceId\":\"lead\",\"syllables\":[]}]}"
+IN "{\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\"}],\"voices\":[{\"id\":\"lead\"}]}"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"\",\"artist\":\"\",\"album\":\"\",\"durationMs\":null,\"source\":null},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\",\"voiceId\":\"lead\",\"syllables\":[]}]}"
+IN "{\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\"}],\"voices\":[{\"role\":\"duet\"}]}"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"\",\"artist\":\"\",\"album\":\"\",\"durationMs\":null,\"source\":null},\"voices\":[{\"id\":\"lead\",\"role\":\"duet\",\"name\":null}],\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\",\"voiceId\":\"lead\",\"syllables\":[]}]}"
+IN ""
+OUT null
+IN "null"
+OUT null
+IN "{\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\"}]"
+OUT null
+IN "{\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\",\"syllables\":[{\"startMs\":1,\"durationMs\":1,\"text\":\"a\"}]}],\"metadata\":{\"title\":\"Ω \\u0000\"}}"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"Ω \\u0000\",\"artist\":\"\",\"album\":\"\",\"durationMs\":null,\"source\":null},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\",\"voiceId\":\"lead\",\"syllables\":[{\"startMs\":1,\"durationMs\":1,\"text\":\"a\"}]}]}"
+IN "{\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\"}],\"metadata\":{\"title\":\"A\",\"title\":\"B\"}}"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"B\",\"artist\":\"\",\"album\":\"\",\"durationMs\":null,\"source\":null},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\",\"voiceId\":\"lead\",\"syllables\":[]}]}"
+IN "{\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\"}],\"metadata\":{\"durationMs\":-0}}"
+OUT null
+IN "{\"lines\":[{\"startMs\":-0,\"endMs\":2,\"text\":\"a\"}]}"
+OUT "{\"format\":\"pixelplay-lyrics\",\"version\":1,\"metadata\":{\"title\":\"\",\"artist\":\"\",\"album\":\"\",\"durationMs\":null,\"source\":null},\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"startMs\":0,\"endMs\":2,\"text\":\"a\",\"voiceId\":\"lead\",\"syllables\":[]}]}"
+IN "{\"lines\":[{\"startMs\":1,\"endMs\":2,\"text\":\"a\"}],\"version\":1.0}"
+OUT null

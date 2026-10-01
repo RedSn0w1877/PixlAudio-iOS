@@ -15,6 +15,9 @@ shots/
 .swiftpm/
 Packages/*/.swiftpm/
 Packages/*/Package.resolved
+# SwiftPM on Windows writes the test resource bundle's Info.plist into the package root
+Packages/*/Info.plist
+.swiftbuild.lock
 xcuserdata/
 *.xcuserstate
 
