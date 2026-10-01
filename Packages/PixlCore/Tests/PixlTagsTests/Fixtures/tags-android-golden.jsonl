@@ -1,0 +1,1103 @@
+{"fn":"parseGainString","in":"-6.54 dB","out":"0xc0d147ae"}
+{"fn":"parseReplayGainDb","in":"-6.54 dB","out":"0xc0d147ae"}
+{"fn":"toFloatOrNull","in":"-6.54 dB","out":null}
+{"fn":"parseReplayGainUpdate","in":"-6.54 dB","out":{"set":"-6.54 dB"}}
+{"fn":"parseGainString","in":"+3.21 dB","out":"0x404d70a4"}
+{"fn":"parseReplayGainDb","in":"+3.21 dB","out":"0x404d70a4"}
+{"fn":"toFloatOrNull","in":"+3.21 dB","out":null}
+{"fn":"parseReplayGainUpdate","in":"+3.21 dB","out":{"set":"3.21 dB"}}
+{"fn":"parseGainString","in":"-6.54dB","out":"0xc0d147ae"}
+{"fn":"parseReplayGainDb","in":"-6.54dB","out":"0xc0d147ae"}
+{"fn":"toFloatOrNull","in":"-6.54dB","out":null}
+{"fn":"parseReplayGainUpdate","in":"-6.54dB","out":{"set":"-6.54 dB"}}
+{"fn":"parseGainString","in":"-6,54 dB","out":null}
+{"fn":"parseReplayGainDb","in":"-6,54 dB","out":"0xc0d147ae"}
+{"fn":"toFloatOrNull","in":"-6,54 dB","out":null}
+{"fn":"parseReplayGainUpdate","in":"-6,54 dB","out":{"set":"-6.54 dB"}}
+{"fn":"parseGainString","in":"  -6.54   DB  ","out":"0xc0d147ae"}
+{"fn":"parseReplayGainDb","in":"  -6.54   DB  ","out":"0xc0d147ae"}
+{"fn":"toFloatOrNull","in":"  -6.54   DB  ","out":null}
+{"fn":"parseReplayGainUpdate","in":"  -6.54   DB  ","out":{"set":"-6.54 dB"}}
+{"fn":"parseGainString","in":"-6.54 db","out":"0xc0d147ae"}
+{"fn":"parseReplayGainDb","in":"-6.54 db","out":"0xc0d147ae"}
+{"fn":"toFloatOrNull","in":"-6.54 db","out":null}
+{"fn":"parseReplayGainUpdate","in":"-6.54 db","out":{"set":"-6.54 dB"}}
+{"fn":"parseGainString","in":"-6.54 Db","out":"0xc0d147ae"}
+{"fn":"parseReplayGainDb","in":"-6.54 Db","out":"0xc0d147ae"}
+{"fn":"toFloatOrNull","in":"-6.54 Db","out":null}
+{"fn":"parseReplayGainUpdate","in":"-6.54 Db","out":{"set":"-6.54 dB"}}
+{"fn":"parseGainString","in":"-6.54 dB ","out":"0xc0d147ae"}
+{"fn":"parseReplayGainDb","in":"-6.54 dB ","out":"0xc0d147ae"}
+{"fn":"toFloatOrNull","in":"-6.54 dB ","out":null}
+{"fn":"parseReplayGainUpdate","in":"-6.54 dB ","out":{"set":"-6.54 dB"}}
+{"fn":"parseGainString","in":"1e2","out":"0x42c80000"}
+{"fn":"parseReplayGainDb","in":"1e2","out":"0x42c80000"}
+{"fn":"toFloatOrNull","in":"1e2","out":"0x42c80000"}
+{"fn":"parseReplayGainUpdate","in":"1e2","out":{"set":"100.00 dB"}}
+{"fn":"parseGainString","in":"0x1p3","out":"0x41000000"}
+{"fn":"parseReplayGainDb","in":"0x1p3","out":"0x41000000"}
+{"fn":"toFloatOrNull","in":"0x1p3","out":"0x41000000"}
+{"fn":"parseReplayGainUpdate","in":"0x1p3","out":{"set":"8.00 dB"}}
+{"fn":"parseGainString","in":"0x1.8P-1","out":"0x3f400000"}
+{"fn":"parseReplayGainDb","in":"0x1.8P-1","out":"0x3f400000"}
+{"fn":"toFloatOrNull","in":"0x1.8P-1","out":"0x3f400000"}
+{"fn":"parseReplayGainUpdate","in":"0x1.8P-1","out":{"set":"0.75 dB"}}
+{"fn":"parseGainString","in":"NaN","out":"0x7fc00000"}
+{"fn":"parseReplayGainDb","in":"NaN","out":"0x7fc00000"}
+{"fn":"toFloatOrNull","in":"NaN","out":"0x7fc00000"}
+{"fn":"parseReplayGainUpdate","in":"NaN","out":{"set":"NaN dB"}}
+{"fn":"parseGainString","in":"Infinity","out":"0x7f800000"}
+{"fn":"parseReplayGainDb","in":"Infinity","out":"0x7f800000"}
+{"fn":"toFloatOrNull","in":"Infinity","out":"0x7f800000"}
+{"fn":"parseReplayGainUpdate","in":"Infinity","out":{"set":"Infinity dB"}}
+{"fn":"parseGainString","in":"-Infinity","out":"0xff800000"}
+{"fn":"parseReplayGainDb","in":"-Infinity","out":"0xff800000"}
+{"fn":"toFloatOrNull","in":"-Infinity","out":"0xff800000"}
+{"fn":"parseReplayGainUpdate","in":"-Infinity","out":{"set":"-Infinity dB"}}
+{"fn":"parseGainString","in":"+Infinity","out":"0x7f800000"}
+{"fn":"parseReplayGainDb","in":"+Infinity","out":"0x7f800000"}
+{"fn":"toFloatOrNull","in":"+Infinity","out":"0x7f800000"}
+{"fn":"parseReplayGainUpdate","in":"+Infinity","out":{"set":"Infinity dB"}}
+{"fn":"parseGainString","in":"nan","out":null}
+{"fn":"parseReplayGainDb","in":"nan","out":null}
+{"fn":"toFloatOrNull","in":"nan","out":null}
+{"fn":"parseReplayGainUpdate","in":"nan","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"infinity","out":null}
+{"fn":"parseReplayGainDb","in":"infinity","out":null}
+{"fn":"toFloatOrNull","in":"infinity","out":null}
+{"fn":"parseReplayGainUpdate","in":"infinity","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"","out":null}
+{"fn":"parseReplayGainDb","in":"","out":null}
+{"fn":"toFloatOrNull","in":"","out":null}
+{"fn":"parseReplayGainUpdate","in":"","out":{"clear":true}}
+{"fn":"parseGainString","in":" ","out":null}
+{"fn":"parseReplayGainDb","in":" ","out":null}
+{"fn":"toFloatOrNull","in":" ","out":null}
+{"fn":"parseReplayGainUpdate","in":" ","out":{"clear":true}}
+{"fn":"parseGainString","in":"dB","out":null}
+{"fn":"parseReplayGainDb","in":"dB","out":null}
+{"fn":"toFloatOrNull","in":"dB","out":null}
+{"fn":"parseReplayGainUpdate","in":"dB","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"abc","out":null}
+{"fn":"parseReplayGainDb","in":"abc","out":null}
+{"fn":"toFloatOrNull","in":"abc","out":null}
+{"fn":"parseReplayGainUpdate","in":"abc","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"1.5f","out":"0x3fc00000"}
+{"fn":"parseReplayGainDb","in":"1.5f","out":"0x3fc00000"}
+{"fn":"toFloatOrNull","in":"1.5f","out":"0x3fc00000"}
+{"fn":"parseReplayGainUpdate","in":"1.5f","out":{"set":"1.50 dB"}}
+{"fn":"parseGainString","in":"1.5d","out":"0x3fc00000"}
+{"fn":"parseReplayGainDb","in":"1.5d","out":"0x3fc00000"}
+{"fn":"toFloatOrNull","in":"1.5d","out":"0x3fc00000"}
+{"fn":"parseReplayGainUpdate","in":"1.5d","out":{"set":"1.50 dB"}}
+{"fn":"parseGainString","in":"1.5F dB","out":"0x3fc00000"}
+{"fn":"parseReplayGainDb","in":"1.5F dB","out":"0x3fc00000"}
+{"fn":"toFloatOrNull","in":"1.5F dB","out":null}
+{"fn":"parseReplayGainUpdate","in":"1.5F dB","out":{"set":"1.50 dB"}}
+{"fn":"parseGainString","in":".5","out":"0x3f000000"}
+{"fn":"parseReplayGainDb","in":".5","out":"0x3f000000"}
+{"fn":"toFloatOrNull","in":".5","out":"0x3f000000"}
+{"fn":"parseReplayGainUpdate","in":".5","out":{"set":"0.50 dB"}}
+{"fn":"parseGainString","in":"5.","out":"0x40a00000"}
+{"fn":"parseReplayGainDb","in":"5.","out":"0x40a00000"}
+{"fn":"toFloatOrNull","in":"5.","out":"0x40a00000"}
+{"fn":"parseReplayGainUpdate","in":"5.","out":{"set":"5.00 dB"}}
+{"fn":"parseGainString","in":"-.5e-1","out":"0xbd4ccccd"}
+{"fn":"parseReplayGainDb","in":"-.5e-1","out":"0xbd4ccccd"}
+{"fn":"toFloatOrNull","in":"-.5e-1","out":"0xbd4ccccd"}
+{"fn":"parseReplayGainUpdate","in":"-.5e-1","out":{"set":"-0.05 dB"}}
+{"fn":"parseGainString","in":"1,5","out":null}
+{"fn":"parseReplayGainDb","in":"1,5","out":"0x3fc00000"}
+{"fn":"toFloatOrNull","in":"1,5","out":null}
+{"fn":"parseReplayGainUpdate","in":"1,5","out":{"set":"1.50 dB"}}
+{"fn":"parseGainString","in":"1,5,5","out":null}
+{"fn":"parseReplayGainDb","in":"1,5,5","out":null}
+{"fn":"toFloatOrNull","in":"1,5,5","out":null}
+{"fn":"parseReplayGainUpdate","in":"1,5,5","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"1.005","out":"0x3f80a3d7"}
+{"fn":"parseReplayGainDb","in":"1.005","out":"0x3f80a3d7"}
+{"fn":"toFloatOrNull","in":"1.005","out":"0x3f80a3d7"}
+{"fn":"parseReplayGainUpdate","in":"1.005","out":{"set":"1.00 dB"}}
+{"fn":"parseGainString","in":"0.125","out":"0x3e000000"}
+{"fn":"parseReplayGainDb","in":"0.125","out":"0x3e000000"}
+{"fn":"toFloatOrNull","in":"0.125","out":"0x3e000000"}
+{"fn":"parseReplayGainUpdate","in":"0.125","out":{"set":"0.13 dB"}}
+{"fn":"parseGainString","in":"-0.001","out":"0xba83126f"}
+{"fn":"parseReplayGainDb","in":"-0.001","out":"0xba83126f"}
+{"fn":"toFloatOrNull","in":"-0.001","out":"0xba83126f"}
+{"fn":"parseReplayGainUpdate","in":"-0.001","out":{"set":"-0.00 dB"}}
+{"fn":"parseGainString","in":"0.005","out":"0x3ba3d70a"}
+{"fn":"parseReplayGainDb","in":"0.005","out":"0x3ba3d70a"}
+{"fn":"toFloatOrNull","in":"0.005","out":"0x3ba3d70a"}
+{"fn":"parseReplayGainUpdate","in":"0.005","out":{"set":"0.00 dB"}}
+{"fn":"parseGainString","in":"2.675","out":"0x402b3333"}
+{"fn":"parseReplayGainDb","in":"2.675","out":"0x402b3333"}
+{"fn":"toFloatOrNull","in":"2.675","out":"0x402b3333"}
+{"fn":"parseReplayGainUpdate","in":"2.675","out":{"set":"2.67 dB"}}
+{"fn":"parseGainString","in":"1.115","out":"0x3f8eb852"}
+{"fn":"parseReplayGainDb","in":"1.115","out":"0x3f8eb852"}
+{"fn":"toFloatOrNull","in":"1.115","out":"0x3f8eb852"}
+{"fn":"parseReplayGainUpdate","in":"1.115","out":{"set":"1.12 dB"}}
+{"fn":"parseGainString","in":"-1.115","out":"0xbf8eb852"}
+{"fn":"parseReplayGainDb","in":"-1.115","out":"0xbf8eb852"}
+{"fn":"toFloatOrNull","in":"-1.115","out":"0xbf8eb852"}
+{"fn":"parseReplayGainUpdate","in":"-1.115","out":{"set":"-1.12 dB"}}
+{"fn":"parseGainString","in":"99999999999","out":"0x51ba43b7"}
+{"fn":"parseReplayGainDb","in":"99999999999","out":"0x51ba43b7"}
+{"fn":"toFloatOrNull","in":"99999999999","out":"0x51ba43b7"}
+{"fn":"parseReplayGainUpdate","in":"99999999999","out":{"set":"99999997952.00 dB"}}
+{"fn":"parseGainString","in":"1e40","out":"0x7f800000"}
+{"fn":"parseReplayGainDb","in":"1e40","out":"0x7f800000"}
+{"fn":"toFloatOrNull","in":"1e40","out":"0x7f800000"}
+{"fn":"parseReplayGainUpdate","in":"1e40","out":{"set":"Infinity dB"}}
+{"fn":"parseGainString","in":"-1e40","out":"0xff800000"}
+{"fn":"parseReplayGainDb","in":"-1e40","out":"0xff800000"}
+{"fn":"toFloatOrNull","in":"-1e40","out":"0xff800000"}
+{"fn":"parseReplayGainUpdate","in":"-1e40","out":{"set":"-Infinity dB"}}
+{"fn":"parseGainString","in":"-1e-50","out":"0x80000000"}
+{"fn":"parseReplayGainDb","in":"-1e-50","out":"0x80000000"}
+{"fn":"toFloatOrNull","in":"-1e-50","out":"0x80000000"}
+{"fn":"parseReplayGainUpdate","in":"-1e-50","out":{"set":"-0.00 dB"}}
+{"fn":"parseGainString","in":"3.4028235e38","out":"0x7f7fffff"}
+{"fn":"parseReplayGainDb","in":"3.4028235e38","out":"0x7f7fffff"}
+{"fn":"toFloatOrNull","in":"3.4028235e38","out":"0x7f7fffff"}
+{"fn":"parseReplayGainUpdate","in":"3.4028235e38","out":{"set":"340282346638528860000000000000000000000.00 dB"}}
+{"fn":"parseGainString","in":"3.4028236e38","out":"0x7f800000"}
+{"fn":"parseReplayGainDb","in":"3.4028236e38","out":"0x7f800000"}
+{"fn":"toFloatOrNull","in":"3.4028236e38","out":"0x7f800000"}
+{"fn":"parseReplayGainUpdate","in":"3.4028236e38","out":{"set":"Infinity dB"}}
+{"fn":"parseGainString","in":"1.4e-45","out":"0x1"}
+{"fn":"parseReplayGainDb","in":"1.4e-45","out":"0x1"}
+{"fn":"toFloatOrNull","in":"1.4e-45","out":"0x1"}
+{"fn":"parseReplayGainUpdate","in":"1.4e-45","out":{"set":"0.00 dB"}}
+{"fn":"parseGainString","in":"1 dB\n","out":"0x3f800000"}
+{"fn":"parseReplayGainDb","in":"1 dB\n","out":"0x3f800000"}
+{"fn":"toFloatOrNull","in":"1 dB\n","out":null}
+{"fn":"parseReplayGainUpdate","in":"1 dB\n","out":{"set":"1.00 dB"}}
+{"fn":"parseGainString","in":"1 dB\r\n","out":"0x3f800000"}
+{"fn":"parseReplayGainDb","in":"1 dB\r\n","out":"0x3f800000"}
+{"fn":"toFloatOrNull","in":"1 dB\r\n","out":null}
+{"fn":"parseReplayGainUpdate","in":"1 dB\r\n","out":{"set":"1.00 dB"}}
+{"fn":"parseGainString","in":"1 d b","out":null}
+{"fn":"parseReplayGainDb","in":"1 d b","out":null}
+{"fn":"toFloatOrNull","in":"1 d b","out":null}
+{"fn":"parseReplayGainUpdate","in":"1 d b","out":{"set":"1.00 dB"}}
+{"fn":"parseGainString","in":"1 D B","out":null}
+{"fn":"parseReplayGainDb","in":"1 D B","out":null}
+{"fn":"toFloatOrNull","in":"1 D B","out":null}
+{"fn":"parseReplayGainUpdate","in":"1 D B","out":{"set":"1.00 dB"}}
+{"fn":"parseGainString","in":"1dbdb","out":"0x3f800000"}
+{"fn":"parseReplayGainDb","in":"1dbdb","out":"0x3f800000"}
+{"fn":"toFloatOrNull","in":"1dbdb","out":null}
+{"fn":"parseReplayGainUpdate","in":"1dbdb","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"db1","out":"0x3f800000"}
+{"fn":"parseReplayGainDb","in":"db1","out":"0x3f800000"}
+{"fn":"toFloatOrNull","in":"db1","out":null}
+{"fn":"parseReplayGainUpdate","in":"db1","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"d1b","out":null}
+{"fn":"parseReplayGainDb","in":"d1b","out":null}
+{"fn":"toFloatOrNull","in":"d1b","out":null}
+{"fn":"parseReplayGainUpdate","in":"d1b","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"+","out":null}
+{"fn":"parseReplayGainDb","in":"+","out":null}
+{"fn":"toFloatOrNull","in":"+","out":null}
+{"fn":"parseReplayGainUpdate","in":"+","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"-","out":null}
+{"fn":"parseReplayGainDb","in":"-","out":null}
+{"fn":"toFloatOrNull","in":"-","out":null}
+{"fn":"parseReplayGainUpdate","in":"-","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"1e","out":null}
+{"fn":"parseReplayGainDb","in":"1e","out":null}
+{"fn":"toFloatOrNull","in":"1e","out":null}
+{"fn":"parseReplayGainUpdate","in":"1e","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"0x","out":null}
+{"fn":"parseReplayGainDb","in":"0x","out":null}
+{"fn":"toFloatOrNull","in":"0x","out":null}
+{"fn":"parseReplayGainUpdate","in":"0x","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"1e+","out":null}
+{"fn":"parseReplayGainDb","in":"1e+","out":null}
+{"fn":"toFloatOrNull","in":"1e+","out":null}
+{"fn":"parseReplayGainUpdate","in":"1e+","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"\uff11\uff12","out":null}
+{"fn":"parseReplayGainDb","in":"\uff11\uff12","out":null}
+{"fn":"toFloatOrNull","in":"\uff11\uff12","out":null}
+{"fn":"parseReplayGainUpdate","in":"\uff11\uff12","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"\u0661\u0662","out":null}
+{"fn":"parseReplayGainDb","in":"\u0661\u0662","out":null}
+{"fn":"toFloatOrNull","in":"\u0661\u0662","out":null}
+{"fn":"parseReplayGainUpdate","in":"\u0661\u0662","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"\u00a0-3 dB","out":"0xc0400000"}
+{"fn":"parseReplayGainDb","in":"\u00a0-3 dB","out":"0xc0400000"}
+{"fn":"toFloatOrNull","in":"\u00a0-3 dB","out":null}
+{"fn":"parseReplayGainUpdate","in":"\u00a0-3 dB","out":{"set":"-3.00 dB"}}
+{"fn":"parseGainString","in":"-3 dB\u00a0","out":"0xc0400000"}
+{"fn":"parseReplayGainDb","in":"-3 dB\u00a0","out":"0xc0400000"}
+{"fn":"toFloatOrNull","in":"-3 dB\u00a0","out":null}
+{"fn":"parseReplayGainUpdate","in":"-3 dB\u00a0","out":{"set":"-3.00 dB"}}
+{"fn":"parseGainString","in":"\t-3\t","out":"0xc0400000"}
+{"fn":"parseReplayGainDb","in":"\t-3\t","out":"0xc0400000"}
+{"fn":"toFloatOrNull","in":"\t-3\t","out":"0xc0400000"}
+{"fn":"parseReplayGainUpdate","in":"\t-3\t","out":{"set":"-3.00 dB"}}
+{"fn":"parseGainString","in":"\u22123 dB","out":null}
+{"fn":"parseReplayGainDb","in":"\u22123 dB","out":null}
+{"fn":"toFloatOrNull","in":"\u22123 dB","out":null}
+{"fn":"parseReplayGainUpdate","in":"\u22123 dB","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"12.345678 dB","out":"0x414587e6"}
+{"fn":"parseReplayGainDb","in":"12.345678 dB","out":"0x414587e6"}
+{"fn":"toFloatOrNull","in":"12.345678 dB","out":null}
+{"fn":"parseReplayGainUpdate","in":"12.345678 dB","out":{"set":"12.35 dB"}}
+{"fn":"parseGainString","in":"-0","out":"0x80000000"}
+{"fn":"parseReplayGainDb","in":"-0","out":"0x80000000"}
+{"fn":"toFloatOrNull","in":"-0","out":"0x80000000"}
+{"fn":"parseReplayGainUpdate","in":"-0","out":{"set":"-0.00 dB"}}
+{"fn":"parseGainString","in":"0","out":"0x0"}
+{"fn":"parseReplayGainDb","in":"0","out":"0x0"}
+{"fn":"toFloatOrNull","in":"0","out":"0x0"}
+{"fn":"parseReplayGainUpdate","in":"0","out":{"set":"0.00 dB"}}
+{"fn":"parseGainString","in":"-0.0","out":"0x80000000"}
+{"fn":"parseReplayGainDb","in":"-0.0","out":"0x80000000"}
+{"fn":"toFloatOrNull","in":"-0.0","out":"0x80000000"}
+{"fn":"parseReplayGainUpdate","in":"-0.0","out":{"set":"-0.00 dB"}}
+{"fn":"parseGainString","in":"100","out":"0x42c80000"}
+{"fn":"parseReplayGainDb","in":"100","out":"0x42c80000"}
+{"fn":"toFloatOrNull","in":"100","out":"0x42c80000"}
+{"fn":"parseReplayGainUpdate","in":"100","out":{"set":"100.00 dB"}}
+{"fn":"parseGainString","in":"-12.5 dB gain","out":null}
+{"fn":"parseReplayGainDb","in":"-12.5 dB gain","out":null}
+{"fn":"toFloatOrNull","in":"-12.5 dB gain","out":null}
+{"fn":"parseReplayGainUpdate","in":"-12.5 dB gain","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"1.0E-5","out":"0x3727c5ac"}
+{"fn":"parseReplayGainDb","in":"1.0E-5","out":"0x3727c5ac"}
+{"fn":"toFloatOrNull","in":"1.0E-5","out":"0x3727c5ac"}
+{"fn":"parseReplayGainUpdate","in":"1.0E-5","out":{"set":"0.00 dB"}}
+{"fn":"parseGainString","in":"123456.789","out":"0x47f12065"}
+{"fn":"parseReplayGainDb","in":"123456.789","out":"0x47f12065"}
+{"fn":"toFloatOrNull","in":"123456.789","out":"0x47f12065"}
+{"fn":"parseReplayGainUpdate","in":"123456.789","out":{"set":"123456.79 dB"}}
+{"fn":"parseGainString","in":"0.0049999","out":"0x3ba3d633"}
+{"fn":"parseReplayGainDb","in":"0.0049999","out":"0x3ba3d633"}
+{"fn":"toFloatOrNull","in":"0.0049999","out":"0x3ba3d633"}
+{"fn":"parseReplayGainUpdate","in":"0.0049999","out":{"set":"0.00 dB"}}
+{"fn":"parseGainString","in":"0.015","out":"0x3c75c28f"}
+{"fn":"parseReplayGainDb","in":"0.015","out":"0x3c75c28f"}
+{"fn":"toFloatOrNull","in":"0.015","out":"0x3c75c28f"}
+{"fn":"parseReplayGainUpdate","in":"0.015","out":{"set":"0.01 dB"}}
+{"fn":"parseGainString","in":"0.025","out":"0x3ccccccd"}
+{"fn":"parseReplayGainDb","in":"0.025","out":"0x3ccccccd"}
+{"fn":"toFloatOrNull","in":"0.025","out":"0x3ccccccd"}
+{"fn":"parseReplayGainUpdate","in":"0.025","out":{"set":"0.03 dB"}}
+{"fn":"parseGainString","in":"-0.005","out":"0xbba3d70a"}
+{"fn":"parseReplayGainDb","in":"-0.005","out":"0xbba3d70a"}
+{"fn":"toFloatOrNull","in":"-0.005","out":"0xbba3d70a"}
+{"fn":"parseReplayGainUpdate","in":"-0.005","out":{"set":"-0.00 dB"}}
+{"fn":"parseGainString","in":"7.775","out":"0x40f8cccd"}
+{"fn":"parseReplayGainDb","in":"7.775","out":"0x40f8cccd"}
+{"fn":"toFloatOrNull","in":"7.775","out":"0x40f8cccd"}
+{"fn":"parseReplayGainUpdate","in":"7.775","out":{"set":"7.78 dB"}}
+{"fn":"parseGainString","in":"-6.535","out":"0xc0d11eb8"}
+{"fn":"parseReplayGainDb","in":"-6.535","out":"0xc0d11eb8"}
+{"fn":"toFloatOrNull","in":"-6.535","out":"0xc0d11eb8"}
+{"fn":"parseReplayGainUpdate","in":"-6.535","out":{"set":"-6.53 dB"}}
+{"fn":"parseGainString","in":"-6.545","out":"0xc0d170a4"}
+{"fn":"parseReplayGainDb","in":"-6.545","out":"0xc0d170a4"}
+{"fn":"toFloatOrNull","in":"-6.545","out":"0xc0d170a4"}
+{"fn":"parseReplayGainUpdate","in":"-6.545","out":{"set":"-6.55 dB"}}
+{"fn":"parseGainString","in":"0.995","out":"0x3f7eb852"}
+{"fn":"parseReplayGainDb","in":"0.995","out":"0x3f7eb852"}
+{"fn":"toFloatOrNull","in":"0.995","out":"0x3f7eb852"}
+{"fn":"parseReplayGainUpdate","in":"0.995","out":{"set":"1.00 dB"}}
+{"fn":"parseGainString","in":"9.995","out":"0x411feb85"}
+{"fn":"parseReplayGainDb","in":"9.995","out":"0x411feb85"}
+{"fn":"toFloatOrNull","in":"9.995","out":"0x411feb85"}
+{"fn":"parseReplayGainUpdate","in":"9.995","out":{"set":"9.99 dB"}}
+{"fn":"parseGainString","in":"-9.995","out":"0xc11feb85"}
+{"fn":"parseReplayGainDb","in":"-9.995","out":"0xc11feb85"}
+{"fn":"toFloatOrNull","in":"-9.995","out":"0xc11feb85"}
+{"fn":"parseReplayGainUpdate","in":"-9.995","out":{"set":"-9.99 dB"}}
+{"fn":"parseGainString","in":"1e-3","out":"0x3a83126f"}
+{"fn":"parseReplayGainDb","in":"1e-3","out":"0x3a83126f"}
+{"fn":"toFloatOrNull","in":"1e-3","out":"0x3a83126f"}
+{"fn":"parseReplayGainUpdate","in":"1e-3","out":{"set":"0.00 dB"}}
+{"fn":"parseGainString","in":"5e-3","out":"0x3ba3d70a"}
+{"fn":"parseReplayGainDb","in":"5e-3","out":"0x3ba3d70a"}
+{"fn":"toFloatOrNull","in":"5e-3","out":"0x3ba3d70a"}
+{"fn":"parseReplayGainUpdate","in":"5e-3","out":{"set":"0.00 dB"}}
+{"fn":"parseGainString","in":"0.00999","out":"0x3c23ad19"}
+{"fn":"parseReplayGainDb","in":"0.00999","out":"0x3c23ad19"}
+{"fn":"toFloatOrNull","in":"0.00999","out":"0x3c23ad19"}
+{"fn":"parseReplayGainUpdate","in":"0.00999","out":{"set":"0.01 dB"}}
+{"fn":"parseGainString","in":"16777217","out":"0x4b800000"}
+{"fn":"parseReplayGainDb","in":"16777217","out":"0x4b800000"}
+{"fn":"toFloatOrNull","in":"16777217","out":"0x4b800000"}
+{"fn":"parseReplayGainUpdate","in":"16777217","out":{"set":"16777216.00 dB"}}
+{"fn":"parseGainString","in":"2.5 dB\u0085","out":null}
+{"fn":"parseReplayGainDb","in":"2.5 dB\u0085","out":null}
+{"fn":"toFloatOrNull","in":"2.5 dB\u0085","out":null}
+{"fn":"parseReplayGainUpdate","in":"2.5 dB\u0085","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"1 dB\u2028","out":"0x3f800000"}
+{"fn":"parseReplayGainDb","in":"1 dB\u2028","out":"0x3f800000"}
+{"fn":"toFloatOrNull","in":"1 dB\u2028","out":null}
+{"fn":"parseReplayGainUpdate","in":"1 dB\u2028","out":{"set":"1.00 dB"}}
+{"fn":"parseGainString","in":"1\u0000","out":"0x3f800000"}
+{"fn":"parseReplayGainDb","in":"1\u0000","out":"0x3f800000"}
+{"fn":"toFloatOrNull","in":"1\u0000","out":"0x3f800000"}
+{"fn":"parseReplayGainUpdate","in":"1\u0000","out":{"set":"1.00 dB"}}
+{"fn":"parseGainString","in":"\u00001","out":"0x3f800000"}
+{"fn":"parseReplayGainDb","in":"\u00001","out":"0x3f800000"}
+{"fn":"toFloatOrNull","in":"\u00001","out":"0x3f800000"}
+{"fn":"parseReplayGainUpdate","in":"\u00001","out":{"set":"1.00 dB"}}
+{"fn":"parseGainString","in":"  +0.00 dB","out":"0x0"}
+{"fn":"parseReplayGainDb","in":"  +0.00 dB","out":"0x0"}
+{"fn":"toFloatOrNull","in":"  +0.00 dB","out":null}
+{"fn":"parseReplayGainUpdate","in":"  +0.00 dB","out":{"set":"0.00 dB"}}
+{"fn":"parseGainString","in":"-0.00 dB","out":"0x80000000"}
+{"fn":"parseReplayGainDb","in":"-0.00 dB","out":"0x80000000"}
+{"fn":"toFloatOrNull","in":"-0.00 dB","out":null}
+{"fn":"parseReplayGainUpdate","in":"-0.00 dB","out":{"set":"-0.00 dB"}}
+{"fn":"parseGainString","in":"-1.23 dB dB","out":"0xbf9d70a4"}
+{"fn":"parseReplayGainDb","in":"-1.23 dB dB","out":"0xbf9d70a4"}
+{"fn":"toFloatOrNull","in":"-1.23 dB dB","out":null}
+{"fn":"parseReplayGainUpdate","in":"-1.23 dB dB","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"dB -1","out":"0xbf800000"}
+{"fn":"parseReplayGainDb","in":"dB -1","out":"0xbf800000"}
+{"fn":"toFloatOrNull","in":"dB -1","out":null}
+{"fn":"parseReplayGainUpdate","in":"dB -1","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"1.5 \t dB","out":"0x3fc00000"}
+{"fn":"parseReplayGainDb","in":"1.5 \t dB","out":"0x3fc00000"}
+{"fn":"toFloatOrNull","in":"1.5 \t dB","out":null}
+{"fn":"parseReplayGainUpdate","in":"1.5 \t dB","out":{"set":"1.50 dB"}}
+{"fn":"parseGainString","in":"1.5d B","out":null}
+{"fn":"parseReplayGainDb","in":"1.5d B","out":null}
+{"fn":"toFloatOrNull","in":"1.5d B","out":null}
+{"fn":"parseReplayGainUpdate","in":"1.5d B","out":{"set":"1.50 dB"}}
+{"fn":"parseGainString","in":"-6.54 dB\n\n","out":"0xc0d147ae"}
+{"fn":"parseReplayGainDb","in":"-6.54 dB\n\n","out":"0xc0d147ae"}
+{"fn":"toFloatOrNull","in":"-6.54 dB\n\n","out":null}
+{"fn":"parseReplayGainUpdate","in":"-6.54 dB\n\n","out":{"set":"-6.54 dB"}}
+{"fn":"parseGainString","in":"1_000","out":null}
+{"fn":"parseReplayGainDb","in":"1_000","out":null}
+{"fn":"toFloatOrNull","in":"1_000","out":null}
+{"fn":"parseReplayGainUpdate","in":"1_000","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"1.2.3","out":null}
+{"fn":"parseReplayGainDb","in":"1.2.3","out":null}
+{"fn":"toFloatOrNull","in":"1.2.3","out":null}
+{"fn":"parseReplayGainUpdate","in":"1.2.3","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"--1","out":null}
+{"fn":"parseReplayGainDb","in":"--1","out":null}
+{"fn":"toFloatOrNull","in":"--1","out":null}
+{"fn":"parseReplayGainUpdate","in":"--1","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"+-1","out":null}
+{"fn":"parseReplayGainDb","in":"+-1","out":null}
+{"fn":"toFloatOrNull","in":"+-1","out":null}
+{"fn":"parseReplayGainUpdate","in":"+-1","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"1e5f","out":"0x47c35000"}
+{"fn":"parseReplayGainDb","in":"1e5f","out":"0x47c35000"}
+{"fn":"toFloatOrNull","in":"1e5f","out":"0x47c35000"}
+{"fn":"parseReplayGainUpdate","in":"1e5f","out":{"set":"100000.00 dB"}}
+{"fn":"parseGainString","in":"0X1P3","out":"0x41000000"}
+{"fn":"parseReplayGainDb","in":"0X1P3","out":"0x41000000"}
+{"fn":"toFloatOrNull","in":"0X1P3","out":"0x41000000"}
+{"fn":"parseReplayGainUpdate","in":"0X1P3","out":{"set":"8.00 dB"}}
+{"fn":"parseGainString","in":"0x.8p1","out":"0x3f800000"}
+{"fn":"parseReplayGainDb","in":"0x.8p1","out":"0x3f800000"}
+{"fn":"toFloatOrNull","in":"0x.8p1","out":"0x3f800000"}
+{"fn":"parseReplayGainUpdate","in":"0x.8p1","out":{"set":"1.00 dB"}}
+{"fn":"parseGainString","in":"0x1","out":null}
+{"fn":"parseReplayGainDb","in":"0x1","out":null}
+{"fn":"toFloatOrNull","in":"0x1","out":null}
+{"fn":"parseReplayGainUpdate","in":"0x1","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"4.9E-324","out":"0x0"}
+{"fn":"parseReplayGainDb","in":"4.9E-324","out":"0x0"}
+{"fn":"toFloatOrNull","in":"4.9E-324","out":"0x0"}
+{"fn":"parseReplayGainUpdate","in":"4.9E-324","out":{"set":"0.00 dB"}}
+{"fn":"parseGainString","in":"1.7976931348623157E308","out":"0x7f800000"}
+{"fn":"parseReplayGainDb","in":"1.7976931348623157E308","out":"0x7f800000"}
+{"fn":"toFloatOrNull","in":"1.7976931348623157E308","out":"0x7f800000"}
+{"fn":"parseReplayGainUpdate","in":"1.7976931348623157E308","out":{"set":"Infinity dB"}}
+{"fn":"parseGainString","in":"  .  ","out":null}
+{"fn":"parseReplayGainDb","in":"  .  ","out":null}
+{"fn":"toFloatOrNull","in":"  .  ","out":null}
+{"fn":"parseReplayGainUpdate","in":"  .  ","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"-.e1","out":null}
+{"fn":"parseReplayGainDb","in":"-.e1","out":null}
+{"fn":"toFloatOrNull","in":"-.e1","out":null}
+{"fn":"parseReplayGainUpdate","in":"-.e1","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseGainString","in":"0.30000000000000004","out":"0x3e99999a"}
+{"fn":"parseReplayGainDb","in":"0.30000000000000004","out":"0x3e99999a"}
+{"fn":"toFloatOrNull","in":"0.30000000000000004","out":"0x3e99999a"}
+{"fn":"parseReplayGainUpdate","in":"0.30000000000000004","out":{"set":"0.30 dB"}}
+{"fn":"parseGainString","in":"1.10","out":"0x3f8ccccd"}
+{"fn":"parseReplayGainDb","in":"1.10","out":"0x3f8ccccd"}
+{"fn":"toFloatOrNull","in":"1.10","out":"0x3f8ccccd"}
+{"fn":"parseReplayGainUpdate","in":"1.10","out":{"set":"1.10 dB"}}
+{"fn":"parseGainString","in":"-14.33 dB","out":"0xc16547ae"}
+{"fn":"parseReplayGainDb","in":"-14.33 dB","out":"0xc16547ae"}
+{"fn":"toFloatOrNull","in":"-14.33 dB","out":null}
+{"fn":"parseReplayGainUpdate","in":"-14.33 dB","out":{"set":"-14.33 dB"}}
+{"fn":"parseGainString","in":"-8.20 dB","out":"0xc1033333"}
+{"fn":"parseReplayGainDb","in":"-8.20 dB","out":"0xc1033333"}
+{"fn":"toFloatOrNull","in":"-8.20 dB","out":null}
+{"fn":"parseReplayGainUpdate","in":"-8.20 dB","out":{"set":"-8.20 dB"}}
+{"fn":"parseGainString","in":"6.0 dB","out":"0x40c00000"}
+{"fn":"parseReplayGainDb","in":"6.0 dB","out":"0x40c00000"}
+{"fn":"toFloatOrNull","in":"6.0 dB","out":null}
+{"fn":"parseReplayGainUpdate","in":"6.0 dB","out":{"set":"6.00 dB"}}
+{"fn":"parseGainString","in":"-0.45 LUFS","out":null}
+{"fn":"parseReplayGainDb","in":"-0.45 LUFS","out":null}
+{"fn":"toFloatOrNull","in":"-0.45 LUFS","out":null}
+{"fn":"parseReplayGainUpdate","in":"-0.45 LUFS","out":{"error":"Track ReplayGain must be a valid dB value"}}
+{"fn":"parseReplayGainUpdate","in":null,"out":{"keep":true}}
+{"fn":"parseReplayGainUpdateAlbum","in":"x","out":{"error":"Album ReplayGain must be a valid dB value"}}
+{"fn":"gainDbToVolume","in":["0xc1f00000","0x0"],"out":"0x3d0186e2"}
+{"fn":"gainDbToVolume","in":["0xc1ed0a3d","0x0"],"out":"0x3d0729e8"}
+{"fn":"gainDbToVolume","in":["0xc1ea147b","0x0"],"out":"0x3d0d0bb4"}
+{"fn":"gainDbToVolume","in":["0xc1e71eb8","0x0"],"out":"0x3d132f0d"}
+{"fn":"gainDbToVolume","in":["0xc1e428f6","0x0"],"out":"0x3d1996c5"}
+{"fn":"gainDbToVolume","in":["0xc1e13333","0x0"],"out":"0x3d2045d9"}
+{"fn":"gainDbToVolume","in":["0xc1de3d71","0x0"],"out":"0x3d273f63"}
+{"fn":"gainDbToVolume","in":["0xc1db47ae","0x0"],"out":"0x3d2e86a4"}
+{"fn":"gainDbToVolume","in":["0xc1d851ec","0x0"],"out":"0x3d361ef8"}
+{"fn":"gainDbToVolume","in":["0xc1d55c29","0x0"],"out":"0x3d3e0be9"}
+{"fn":"gainDbToVolume","in":["0xc1d26666","0x0"],"out":"0x3d465129"}
+{"fn":"gainDbToVolume","in":["0xc1cf70a4","0x0"],"out":"0x3d4ef289"}
+{"fn":"gainDbToVolume","in":["0xc1cc7ae1","0x0"],"out":"0x3d57f40f"}
+{"fn":"gainDbToVolume","in":["0xc1c9851f","0x0"],"out":"0x3d6159ea"}
+{"fn":"gainDbToVolume","in":["0xc1c68f5c","0x0"],"out":"0x3d6b287c"}
+{"fn":"gainDbToVolume","in":["0xc1c3999a","0x0"],"out":"0x3d756446"}
+{"fn":"gainDbToVolume","in":["0xc1c0a3d7","0x0"],"out":"0x3d80090e"}
+{"fn":"gainDbToVolume","in":["0xc1bdae14","0x0"],"out":"0x3d859b75"}
+{"fn":"gainDbToVolume","in":["0xc1bab852","0x0"],"out":"0x3d8b6bea"}
+{"fn":"gainDbToVolume","in":["0xc1b7c28f","0x0"],"out":"0x3d917d2b"}
+{"fn":"gainDbToVolume","in":["0xc1b4cccd","0x0"],"out":"0x3d97d202"}
+{"fn":"gainDbToVolume","in":["0xc1b1d70a","0x0"],"out":"0x3d9e6d61"}
+{"fn":"gainDbToVolume","in":["0xc1aee148","0x0"],"out":"0x3da5525c"}
+{"fn":"gainDbToVolume","in":["0xc1abeb85","0x0"],"out":"0x3dac8428"}
+{"fn":"gainDbToVolume","in":["0xc1a8f5c2","0x0"],"out":"0x3db40619"}
+{"fn":"gainDbToVolume","in":["0xc1a60000","0x0"],"out":"0x3dbbdbad"}
+{"fn":"gainDbToVolume","in":["0xc1a30a3e","0x0"],"out":"0x3dc40888"}
+{"fn":"gainDbToVolume","in":["0xc1a0147b","0x0"],"out":"0x3dcc907a"}
+{"fn":"gainDbToVolume","in":["0xc19d1eb8","0x0"],"out":"0x3dd57774"}
+{"fn":"gainDbToVolume","in":["0xc19a28f6","0x0"],"out":"0x3ddec19b"}
+{"fn":"gainDbToVolume","in":["0xc1973333","0x0"],"out":"0x3de87342"}
+{"fn":"gainDbToVolume","in":["0xc1943d70","0x0"],"out":"0x3df290e8"}
+{"fn":"gainDbToVolume","in":["0xc19147ae","0x0"],"out":"0x3dfd1f3e"}
+{"fn":"gainDbToVolume","in":["0xc18e51ec","0x0"],"out":"0x3e041197"}
+{"fn":"gainDbToVolume","in":["0xc18b5c29","0x0"],"out":"0x3e09d0ec"}
+{"fn":"gainDbToVolume","in":["0xc1886666","0x0"],"out":"0x3e0fd049"}
+{"fn":"gainDbToVolume","in":["0xc18570a4","0x0"],"out":"0x3e161275"}
+{"fn":"gainDbToVolume","in":["0xc1827ae1","0x0"],"out":"0x3e1c9a5c"}
+{"fn":"gainDbToVolume","in":["0xc17f0a3d","0x0"],"out":"0x3e236b04"}
+{"fn":"gainDbToVolume","in":["0xc1791eb8","0x0"],"out":"0x3e2a879a"}
+{"fn":"gainDbToVolume","in":["0xc1733333","0x0"],"out":"0x3e31f368"}
+{"fn":"gainDbToVolume","in":["0xc16d47ae","0x0"],"out":"0x3e39b1e4"}
+{"fn":"gainDbToVolume","in":["0xc1675c29","0x0"],"out":"0x3e41c6a7"}
+{"fn":"gainDbToVolume","in":["0xc16170a4","0x0"],"out":"0x3e4a3570"}
+{"fn":"gainDbToVolume","in":["0xc15b851e","0x0"],"out":"0x3e53022e"}
+{"fn":"gainDbToVolume","in":["0xc155999a","0x0"],"out":"0x3e5c30f2"}
+{"fn":"gainDbToVolume","in":["0xc14fae14","0x0"],"out":"0x3e65c605"}
+{"fn":"gainDbToVolume","in":["0xc149c290","0x0"],"out":"0x3e6fc5d7"}
+{"fn":"gainDbToVolume","in":["0xc143d70a","0x0"],"out":"0x3e7a3511"}
+{"fn":"gainDbToVolume","in":["0xc13deb84","0x0"],"out":"0x3e828c45"}
+{"fn":"gainDbToVolume","in":["0xc1380000","0x0"],"out":"0x3e883aa8"}
+{"fn":"gainDbToVolume","in":["0xc132147a","0x0"],"out":"0x3e8e2857"}
+{"fn":"gainDbToVolume","in":["0xc12c28f6","0x0"],"out":"0x3e945810"}
+{"fn":"gainDbToVolume","in":["0xc1263d70","0x0"],"out":"0x3e9accb7"}
+{"fn":"gainDbToVolume","in":["0xc12051ec","0x0"],"out":"0x3ea18946"}
+{"fn":"gainDbToVolume","in":["0xc11a6666","0x0"],"out":"0x3ea890e5"}
+{"fn":"gainDbToVolume","in":["0xc1147ae0","0x0"],"out":"0x3eafe6d6"}
+{"fn":"gainDbToVolume","in":["0xc10e8f5c","0x0"],"out":"0x3eb78e7d"}
+{"fn":"gainDbToVolume","in":["0xc108a3d6","0x0"],"out":"0x3ebf8b6e"}
+{"fn":"gainDbToVolume","in":["0xc102b852","0x0"],"out":"0x3ec7e15a"}
+{"fn":"gainDbToVolume","in":["0xc0f99998","0x0"],"out":"0x3ed09427"}
+{"fn":"gainDbToVolume","in":["0xc0edc290","0x0"],"out":"0x3ed9a7d9"}
+{"fn":"gainDbToVolume","in":["0xc0e1eb84","0x0"],"out":"0x3ee320ad"}
+{"fn":"gainDbToVolume","in":["0xc0d6147c","0x0"],"out":"0x3eed0305"}
+{"fn":"gainDbToVolume","in":["0xc0ca3d70","0x0"],"out":"0x3ef7537c"}
+{"fn":"gainDbToVolume","in":["0xc0be6664","0x0"],"out":"0x3f010b6e"}
+{"fn":"gainDbToVolume","in":["0xc0b28f5c","0x0"],"out":"0x3f06a912"}
+{"fn":"gainDbToVolume","in":["0xc0a6b850","0x0"],"out":"0x3f0c8546"}
+{"fn":"gainDbToVolume","in":["0xc09ae148","0x0"],"out":"0x3f12a2c2"}
+{"fn":"gainDbToVolume","in":["0xc08f0a3c","0x0"],"out":"0x3f190461"}
+{"fn":"gainDbToVolume","in":["0xc0833334","0x0"],"out":"0x3f1fad16"}
+{"fn":"gainDbToVolume","in":["0xc06eb850","0x0"],"out":"0x3f269ffb"}
+{"fn":"gainDbToVolume","in":["0xc0570a40","0x0"],"out":"0x3f2de049"}
+{"fn":"gainDbToVolume","in":["0xc03f5c28","0x0"],"out":"0x3f357162"}
+{"fn":"gainDbToVolume","in":["0xc027ae10","0x0"],"out":"0x3f3d56c7"}
+{"fn":"gainDbToVolume","in":["0xc0100000","0x0"],"out":"0x3f459421"}
+{"fn":"gainDbToVolume","in":["0xbff0a3d0","0x0"],"out":"0x3f4e2d49"}
+{"fn":"gainDbToVolume","in":["0xbfc147b0","0x0"],"out":"0x3f572639"}
+{"fn":"gainDbToVolume","in":["0xbf91eb80","0x0"],"out":"0x3f608321"}
+{"fn":"gainDbToVolume","in":["0xbf451ec0","0x0"],"out":"0x3f6a4855"}
+{"fn":"gainDbToVolume","in":["0xbeccccc0","0x0"],"out":"0x3f747a66"}
+{"fn":"gainDbToVolume","in":["0xbcf5c000","0x0"],"out":"0x3f7f1e0c"}
+{"fn":"gainDbToVolume","in":["0x3eae1480","0x0"],"out":"0x3f851c1b"}
+{"fn":"gainDbToVolume","in":["0x3f35c2a0","0x0"],"out":"0x3f8ae709"}
+{"fn":"gainDbToVolume","in":["0x3f8a3d70","0x0"],"out":"0x3f90f27f"}
+{"fn":"gainDbToVolume","in":["0x3fb999a0","0x0"],"out":"0x3f97414e"}
+{"fn":"gainDbToVolume","in":["0x3fe8f5c0","0x0"],"out":"0x3f9dd661"}
+{"fn":"gainDbToVolume","in":["0x400c28f0","0x0"],"out":"0x3fa4b4c8"}
+{"fn":"gainDbToVolume","in":["0x4023d710","0x0"],"out":"0x3fabdfbb"}
+{"fn":"gainDbToVolume","in":["0x403b8520","0x0"],"out":"0x3fb35a83"}
+{"fn":"gainDbToVolume","in":["0x40533330","0x0"],"out":"0x3fbb289e"}
+{"fn":"gainDbToVolume","in":["0x406ae150","0x0"],"out":"0x3fc34db3"}
+{"fn":"gainDbToVolume","in":["0x408147b0","0x0"],"out":"0x3fcbcd80"}
+{"fn":"gainDbToVolume","in":["0x408d1eb8","0x0"],"out":"0x3fd4abfd"}
+{"fn":"gainDbToVolume","in":["0x4098f5c0","0x0"],"out":"0x3fdded48"}
+{"fn":"gainDbToVolume","in":["0x40a4ccd0","0x0"],"out":"0x3fe795b5"}
+{"fn":"gainDbToVolume","in":["0x40b0a3d8","0x0"],"out":"0x3ff1a9b4"}
+{"fn":"gainDbToVolume","in":["0x40bc7ae0","0x0"],"out":"0x3ffc2dfa"}
+{"fn":"gainDbToVolume","in":["0x40c851f0","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x40d428f8","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x40e00000","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x40ebd708","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x40f7ae18","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x4101c290","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x4107ae14","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x410d999c","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x41138520","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x411970a4","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x411f5c28","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x412547b0","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x412b3334","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x41311eb8","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x41370a40","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x413cf5c4","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x4142e148","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x4148cccc","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x414eb854","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x4154a3d8","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x415a8f5c","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x41607ae0","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x41666668","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0xc1f00000","0xc0400000"],"out":"0x3cb76563"}
+{"fn":"gainDbToVolume","in":["0xc1ed0a3d","0xc0400000"],"out":"0x3cbf608c"}
+{"fn":"gainDbToVolume","in":["0xc1ea147b","0xc0400000"],"out":"0x3cc7b495"}
+{"fn":"gainDbToVolume","in":["0xc1e71eb8","0xc0400000"],"out":"0x3cd06574"}
+{"fn":"gainDbToVolume","in":["0xc1e428f6","0xc0400000"],"out":"0x3cd9771e"}
+{"fn":"gainDbToVolume","in":["0xc1e13333","0xc0400000"],"out":"0x3ce2edd1"}
+{"fn":"gainDbToVolume","in":["0xc1de3d71","0xc0400000"],"out":"0x3ceccdf2"}
+{"fn":"gainDbToVolume","in":["0xc1db47ae","0xc0400000"],"out":"0x3cf71c1d"}
+{"fn":"gainDbToVolume","in":["0xc1d851ec","0xc0400000"],"out":"0x3d00ee87"}
+{"fn":"gainDbToVolume","in":["0xc1d55c29","0xc0400000"],"out":"0x3d068aea"}
+{"fn":"gainDbToVolume","in":["0xc1d26666","0xc0400000"],"out":"0x3d0c65d1"}
+{"fn":"gainDbToVolume","in":["0xc1cf70a4","0xc0400000"],"out":"0x3d1281ec"}
+{"fn":"gainDbToVolume","in":["0xc1cc7ae1","0xc0400000"],"out":"0x3d18e21e"}
+{"fn":"gainDbToVolume","in":["0xc1c9851f","0xc0400000"],"out":"0x3d1f8955"}
+{"fn":"gainDbToVolume","in":["0xc1c68f5c","0xc0400000"],"out":"0x3d267aab"}
+{"fn":"gainDbToVolume","in":["0xc1c3999a","0xc0400000"],"out":"0x3d2db95a"}
+{"fn":"gainDbToVolume","in":["0xc1c0a3d7","0xc0400000"],"out":"0x3d3548c2"}
+{"fn":"gainDbToVolume","in":["0xc1bdae14","0xc0400000"],"out":"0x3d3d2c60"}
+{"fn":"gainDbToVolume","in":["0xc1bab852","0xc0400000"],"out":"0x3d4567e3"}
+{"fn":"gainDbToVolume","in":["0xc1b7c28f","0xc0400000"],"out":"0x3d4dff20"}
+{"fn":"gainDbToVolume","in":["0xc1b4cccd","0xc0400000"],"out":"0x3d56f60e"}
+{"fn":"gainDbToVolume","in":["0xc1b1d70a","0xc0400000"],"out":"0x3d6050db"}
+{"fn":"gainDbToVolume","in":["0xc1aee148","0xc0400000"],"out":"0x3d6a13e0"}
+{"fn":"gainDbToVolume","in":["0xc1abeb85","0xc0400000"],"out":"0x3d7443a9"}
+{"fn":"gainDbToVolume","in":["0xc1a8f5c2","0xc0400000"],"out":"0x3d7ee4eb"}
+{"fn":"gainDbToVolume","in":["0xc1a60000","0xc0400000"],"out":"0x3d84fe4d"}
+{"fn":"gainDbToVolume","in":["0xc1a30a3e","0xc0400000"],"out":"0x3d8ac7ee"}
+{"fn":"gainDbToVolume","in":["0xc1a0147b","0xc0400000"],"out":"0x3d90d209"}
+{"fn":"gainDbToVolume","in":["0xc19d1eb8","0xc0400000"],"out":"0x3d971f70"}
+{"fn":"gainDbToVolume","in":["0xc19a28f6","0xc0400000"],"out":"0x3d9db30a"}
+{"fn":"gainDbToVolume","in":["0xc1973333","0xc0400000"],"out":"0x3da48fe8"}
+{"fn":"gainDbToVolume","in":["0xc1943d70","0xc0400000"],"out":"0x3dabb93f"}
+{"fn":"gainDbToVolume","in":["0xc19147ae","0xc0400000"],"out":"0x3db3325a"}
+{"fn":"gainDbToVolume","in":["0xc18e51ec","0xc0400000"],"out":"0x3dbafeb7"}
+{"fn":"gainDbToVolume","in":["0xc18b5c29","0xc0400000"],"out":"0x3dc321f5"}
+{"fn":"gainDbToVolume","in":["0xc1886666","0xc0400000"],"out":"0x3dcb9fdf"}
+{"fn":"gainDbToVolume","in":["0xc18570a4","0xc0400000"],"out":"0x3dd47c5e"}
+{"fn":"gainDbToVolume","in":["0xc1827ae1","0xc0400000"],"out":"0x3dddbb99"}
+{"fn":"gainDbToVolume","in":["0xc17f0a3d","0xc0400000"],"out":"0x3de761db"}
+{"fn":"gainDbToVolume","in":["0xc1791eb8","0xc0400000"],"out":"0x3df17397"}
+{"fn":"gainDbToVolume","in":["0xc1733333","0xc0400000"],"out":"0x3dfbf583"}
+{"fn":"gainDbToVolume","in":["0xc16d47ae","0xc0400000"],"out":"0x3e037640"}
+{"fn":"gainDbToVolume","in":["0xc1675c29","0xc0400000"],"out":"0x3e092ed3"}
+{"fn":"gainDbToVolume","in":["0xc16170a4","0xc0400000"],"out":"0x3e0f2720"}
+{"fn":"gainDbToVolume","in":["0xc15b851e","0xc0400000"],"out":"0x3e1561f2"}
+{"fn":"gainDbToVolume","in":["0xc155999a","0xc0400000"],"out":"0x3e1be229"}
+{"fn":"gainDbToVolume","in":["0xc14fae14","0xc0400000"],"out":"0x3e22aace"}
+{"fn":"gainDbToVolume","in":["0xc149c290","0xc0400000"],"out":"0x3e29bf03"}
+{"fn":"gainDbToVolume","in":["0xc143d70a","0xc0400000"],"out":"0x3e31221a"}
+{"fn":"gainDbToVolume","in":["0xc13deb84","0xc0400000"],"out":"0x3e38d77c"}
+{"fn":"gainDbToVolume","in":["0xc1380000","0xc0400000"],"out":"0x3e40e2ba"}
+{"fn":"gainDbToVolume","in":["0xc132147a","0xc0400000"],"out":"0x3e49479c"}
+{"fn":"gainDbToVolume","in":["0xc12c28f6","0xc0400000"],"out":"0x3e5209fc"}
+{"fn":"gainDbToVolume","in":["0xc1263d70","0xc0400000"],"out":"0x3e5b2df5"}
+{"fn":"gainDbToVolume","in":["0xc12051ec","0xc0400000"],"out":"0x3e64b7c1"}
+{"fn":"gainDbToVolume","in":["0xc11a6666","0xc0400000"],"out":"0x3e6eabd2"}
+{"fn":"gainDbToVolume","in":["0xc1147ae0","0xc0400000"],"out":"0x3e790ec6"}
+{"fn":"gainDbToVolume","in":["0xc10e8f5c","0xc0400000"],"out":"0x3e81f2b7"}
+{"fn":"gainDbToVolume","in":["0xc108a3d6","0xc0400000"],"out":"0x3e879a6d"}
+{"fn":"gainDbToVolume","in":["0xc102b852","0xc0400000"],"out":"0x3e8d8121"}
+{"fn":"gainDbToVolume","in":["0xc0f99998","0xc0400000"],"out":"0x3e93a995"}
+{"fn":"gainDbToVolume","in":["0xc0edc290","0xc0400000"],"out":"0x3e9a16a2"}
+{"fn":"gainDbToVolume","in":["0xc0e1eb84","0xc0400000"],"out":"0x3ea0cb47"}
+{"fn":"gainDbToVolume","in":["0xc0d6147c","0xc0400000"],"out":"0x3ea7ca9f"}
+{"fn":"gainDbToVolume","in":["0xc0ca3d70","0xc0400000"],"out":"0x3eaf17ee"}
+{"fn":"gainDbToVolume","in":["0xc0be6664","0xc0400000"],"out":"0x3eb6b697"}
+{"fn":"gainDbToVolume","in":["0xc0b28f5c","0xc0400000"],"out":"0x3ebeaa20"}
+{"fn":"gainDbToVolume","in":["0xc0a6b850","0xc0400000"],"out":"0x3ec6f642"}
+{"fn":"gainDbToVolume","in":["0xc09ae148","0xc0400000"],"out":"0x3ecf9ed0"}
+{"fn":"gainDbToVolume","in":["0xc08f0a3c","0xc0400000"],"out":"0x3ed8a7d8"}
+{"fn":"gainDbToVolume","in":["0xc0833334","0xc0400000"],"out":"0x3ee21585"}
+{"fn":"gainDbToVolume","in":["0xc06eb850","0xc0400000"],"out":"0x3eebec3f"}
+{"fn":"gainDbToVolume","in":["0xc0570a40","0xc0400000"],"out":"0x3ef63093"}
+{"fn":"gainDbToVolume","in":["0xc03f5c28","0xc0400000"],"out":"0x3f0073a5"}
+{"fn":"gainDbToVolume","in":["0xc027ae10","0xc0400000"],"out":"0x3f060aae"}
+{"fn":"gainDbToVolume","in":["0xc0100000","0xc0400000"],"out":"0x3f0bdffd"}
+{"fn":"gainDbToVolume","in":["0xbff0a3d0","0xc0400000"],"out":"0x3f11f64a"}
+{"fn":"gainDbToVolume","in":["0xbfc147b0","0xc0400000"],"out":"0x3f185065"}
+{"fn":"gainDbToVolume","in":["0xbf91eb80","0xc0400000"],"out":"0x3f1ef147"}
+{"fn":"gainDbToVolume","in":["0xbf451ec0","0xc0400000"],"out":"0x3f25dbfe"}
+{"fn":"gainDbToVolume","in":["0xbeccccc0","0xc0400000"],"out":"0x3f2d13c6"}
+{"fn":"gainDbToVolume","in":["0xbcf5c000","0xc0400000"],"out":"0x3f349bf9"}
+{"fn":"gainDbToVolume","in":["0x3eae1480","0xc0400000"],"out":"0x3f3c7812"}
+{"fn":"gainDbToVolume","in":["0x3f35c2a0","0xc0400000"],"out":"0x3f44abbd"}
+{"fn":"gainDbToVolume","in":["0x3f8a3d70","0xc0400000"],"out":"0x3f4d3ac6"}
+{"fn":"gainDbToVolume","in":["0x3fb999a0","0xc0400000"],"out":"0x3f56292b"}
+{"fn":"gainDbToVolume","in":["0x3fe8f5c0","0xc0400000"],"out":"0x3f5f7b0d"}
+{"fn":"gainDbToVolume","in":["0x400c28f0","0xc0400000"],"out":"0x3f6934c3"}
+{"fn":"gainDbToVolume","in":["0x4023d710","0xc0400000"],"out":"0x3f735ad8"}
+{"fn":"gainDbToVolume","in":["0x403b8520","0xc0400000"],"out":"0x3f7df1f8"}
+{"fn":"gainDbToVolume","in":["0x40533330","0xc0400000"],"out":"0x3f847f89"}
+{"fn":"gainDbToVolume","in":["0x406ae150","0xc0400000"],"out":"0x3f8a43a9"}
+{"fn":"gainDbToVolume","in":["0x408147b0","0xc0400000"],"out":"0x3f904803"}
+{"fn":"gainDbToVolume","in":["0x408d1eb8","0xc0400000"],"out":"0x3f968f64"}
+{"fn":"gainDbToVolume","in":["0x4098f5c0","0xc0400000"],"out":"0x3f9d1cb9"}
+{"fn":"gainDbToVolume","in":["0x40a4ccd0","0xc0400000"],"out":"0x3fa3f311"}
+{"fn":"gainDbToVolume","in":["0x40b0a3d8","0xc0400000"],"out":"0x3fab1590"}
+{"fn":"gainDbToVolume","in":["0x40bc7ae0","0xc0400000"],"out":"0x3fb2878c"}
+{"fn":"gainDbToVolume","in":["0x40c851f0","0xc0400000"],"out":"0x3fba4c7f"}
+{"fn":"gainDbToVolume","in":["0x40d428f8","0xc0400000"],"out":"0x3fc267fa"}
+{"fn":"gainDbToVolume","in":["0x40e00000","0xc0400000"],"out":"0x3fcaddc8"}
+{"fn":"gainDbToVolume","in":["0x40ebd708","0xc0400000"],"out":"0x3fd3b1d6"}
+{"fn":"gainDbToVolume","in":["0x40f7ae18","0xc0400000"],"out":"0x3fdce844"}
+{"fn":"gainDbToVolume","in":["0x4101c290","0xc0400000"],"out":"0x3fe6854f"}
+{"fn":"gainDbToVolume","in":["0x4107ae14","0xc0400000"],"out":"0x3ff08d74"}
+{"fn":"gainDbToVolume","in":["0x410d999c","0xc0400000"],"out":"0x3ffb0561"}
+{"fn":"gainDbToVolume","in":["0x41138520","0xc0400000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x411970a4","0xc0400000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x411f5c28","0xc0400000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x412547b0","0xc0400000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x412b3334","0xc0400000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x41311eb8","0xc0400000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x41370a40","0xc0400000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x413cf5c4","0xc0400000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x4142e148","0xc0400000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x4148cccc","0xc0400000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x414eb854","0xc0400000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x4154a3d8","0xc0400000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x415a8f5c","0xc0400000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x41607ae0","0xc0400000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x41666668","0xc0400000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0xc1f00000","0x40200000"],"out":"0x3d2cba15"}
+{"fn":"gainDbToVolume","in":["0xc1ed0a3d","0x40200000"],"out":"0x3d343e62"}
+{"fn":"gainDbToVolume","in":["0xc1ea147b","0x40200000"],"out":"0x3d3c1665"}
+{"fn":"gainDbToVolume","in":["0xc1e71eb8","0x40200000"],"out":"0x3d4445d2"}
+{"fn":"gainDbToVolume","in":["0xc1e428f6","0x40200000"],"out":"0x3d4cd06c"}
+{"fn":"gainDbToVolume","in":["0xc1e13333","0x40200000"],"out":"0x3d55ba2e"}
+{"fn":"gainDbToVolume","in":["0xc1de3d71","0x40200000"],"out":"0x3d5f073c"}
+{"fn":"gainDbToVolume","in":["0xc1db47ae","0x40200000"],"out":"0x3d68bbed"}
+{"fn":"gainDbToVolume","in":["0xc1d851ec","0x40200000"],"out":"0x3d72dcba"}
+{"fn":"gainDbToVolume","in":["0xc1d55c29","0x40200000"],"out":"0x3d7d6e5d"}
+{"fn":"gainDbToVolume","in":["0xc1d26666","0x40200000"],"out":"0x3d843ae2"}
+{"fn":"gainDbToVolume","in":["0xc1cf70a4","0x40200000"],"out":"0x3d89fc02"}
+{"fn":"gainDbToVolume","in":["0xc1cc7ae1","0x40200000"],"out":"0x3d8ffd3d"}
+{"fn":"gainDbToVolume","in":["0xc1c9851f","0x40200000"],"out":"0x3d96415e"}
+{"fn":"gainDbToVolume","in":["0xc1c68f5c","0x40200000"],"out":"0x3d9ccb51"}
+{"fn":"gainDbToVolume","in":["0xc1c3999a","0x40200000"],"out":"0x3da39e17"}
+{"fn":"gainDbToVolume","in":["0xc1c0a3d7","0x40200000"],"out":"0x3daabce8"}
+{"fn":"gainDbToVolume","in":["0xc1bdae14","0x40200000"],"out":"0x3db22b0b"}
+{"fn":"gainDbToVolume","in":["0xc1bab852","0x40200000"],"out":"0x3db9ebef"}
+{"fn":"gainDbToVolume","in":["0xc1b7c28f","0x40200000"],"out":"0x3dc2033b"}
+{"fn":"gainDbToVolume","in":["0xc1b4cccd","0x40200000"],"out":"0x3dca74a7"}
+{"fn":"gainDbToVolume","in":["0xc1b1d70a","0x40200000"],"out":"0x3dd34425"}
+{"fn":"gainDbToVolume","in":["0xc1aee148","0x40200000"],"out":"0x3ddc75c6"}
+{"fn":"gainDbToVolume","in":["0xc1abeb85","0x40200000"],"out":"0x3de60dda"}
+{"fn":"gainDbToVolume","in":["0xc1a8f5c2","0x40200000"],"out":"0x3df010ce"}
+{"fn":"gainDbToVolume","in":["0xc1a60000","0x40200000"],"out":"0x3dfa8347"}
+{"fn":"gainDbToVolume","in":["0xc1a30a3e","0x40200000"],"out":"0x3e02b513"}
+{"fn":"gainDbToVolume","in":["0xc1a0147b","0x40200000"],"out":"0x3e08653d"}
+{"fn":"gainDbToVolume","in":["0xc19d1eb8","0x40200000"],"out":"0x3e0e54c6"}
+{"fn":"gainDbToVolume","in":["0xc19a28f6","0x40200000"],"out":"0x3e14866f"}
+{"fn":"gainDbToVolume","in":["0xc1973333","0x40200000"],"out":"0x3e1afd1a"}
+{"fn":"gainDbToVolume","in":["0xc1943d70","0x40200000"],"out":"0x3e21bbc7"}
+{"fn":"gainDbToVolume","in":["0xc19147ae","0x40200000"],"out":"0x3e28c597"}
+{"fn":"gainDbToVolume","in":["0xc18e51ec","0x40200000"],"out":"0x3e301dd0"}
+{"fn":"gainDbToVolume","in":["0xc18b5c29","0x40200000"],"out":"0x3e37c7de"}
+{"fn":"gainDbToVolume","in":["0xc1886666","0x40200000"],"out":"0x3e3fc74e"}
+{"fn":"gainDbToVolume","in":["0xc18570a4","0x40200000"],"out":"0x3e481fd6"}
+{"fn":"gainDbToVolume","in":["0xc1827ae1","0x40200000"],"out":"0x3e50d55b"}
+{"fn":"gainDbToVolume","in":["0xc17f0a3d","0x40200000"],"out":"0x3e59ebe4"}
+{"fn":"gainDbToVolume","in":["0xc1791eb8","0x40200000"],"out":"0x3e6367ae"}
+{"fn":"gainDbToVolume","in":["0xc1733333","0x40200000"],"out":"0x3e6d4d1d"}
+{"fn":"gainDbToVolume","in":["0xc16d47ae","0x40200000"],"out":"0x3e77a0cc"}
+{"fn":"gainDbToVolume","in":["0xc1675c29","0x40200000"],"out":"0x3e8133c5"}
+{"fn":"gainDbToVolume","in":["0xc16170a4","0x40200000"],"out":"0x3e86d329"}
+{"fn":"gainDbToVolume","in":["0xc15b851e","0x40200000"],"out":"0x3e8cb133"}
+{"fn":"gainDbToVolume","in":["0xc155999a","0x40200000"],"out":"0x3e92d099"}
+{"fn":"gainDbToVolume","in":["0xc14fae14","0x40200000"],"out":"0x3e993436"}
+{"fn":"gainDbToVolume","in":["0xc149c290","0x40200000"],"out":"0x3e9fdf00"}
+{"fn":"gainDbToVolume","in":["0xc143d70a","0x40200000"],"out":"0x3ea6d412"}
+{"fn":"gainDbToVolume","in":["0xc13deb84","0x40200000"],"out":"0x3eae16a6"}
+{"fn":"gainDbToVolume","in":["0xc1380000","0x40200000"],"out":"0x3eb5aa1a"}
+{"fn":"gainDbToVolume","in":["0xc132147a","0x40200000"],"out":"0x3ebd91f7"}
+{"fn":"gainDbToVolume","in":["0xc12c28f6","0x40200000"],"out":"0x3ec5d1e4"}
+{"fn":"gainDbToVolume","in":["0xc1263d70","0x40200000"],"out":"0x3ece6dbd"}
+{"fn":"gainDbToVolume","in":["0xc12051ec","0x40200000"],"out":"0x3ed7697a"}
+{"fn":"gainDbToVolume","in":["0xc11a6666","0x40200000"],"out":"0x3ee0c950"}
+{"fn":"gainDbToVolume","in":["0xc1147ae0","0x40200000"],"out":"0x3eea9195"}
+{"fn":"gainDbToVolume","in":["0xc10e8f5c","0x40200000"],"out":"0x3ef4c6d2"}
+{"fn":"gainDbToVolume","in":["0xc108a3d6","0x40200000"],"out":"0x3eff6dcb"}
+{"fn":"gainDbToVolume","in":["0xc102b852","0x40200000"],"out":"0x3f0545b7"}
+{"fn":"gainDbToVolume","in":["0xc0f99998","0x40200000"],"out":"0x3f0b1275"}
+{"fn":"gainDbToVolume","in":["0xc0edc290","0x40200000"],"out":"0x3f111fce"}
+{"fn":"gainDbToVolume","in":["0xc0e1eb84","0x40200000"],"out":"0x3f177096"}
+{"fn":"gainDbToVolume","in":["0xc0d6147c","0x40200000"],"out":"0x3f1e07b8"}
+{"fn":"gainDbToVolume","in":["0xc0ca3d70","0x40200000"],"out":"0x3f24e847"}
+{"fn":"gainDbToVolume","in":["0xc0be6664","0x40200000"],"out":"0x3f2c1575"}
+{"fn":"gainDbToVolume","in":["0xc0b28f5c","0x40200000"],"out":"0x3f339293"}
+{"fn":"gainDbToVolume","in":["0xc0a6b850","0x40200000"],"out":"0x3f3b6322"}
+{"fn":"gainDbToVolume","in":["0xc09ae148","0x40200000"],"out":"0x3f438abe"}
+{"fn":"gainDbToVolume","in":["0xc08f0a3c","0x40200000"],"out":"0x3f4c0d35"}
+{"fn":"gainDbToVolume","in":["0xc0833334","0x40200000"],"out":"0x3f54ee78"}
+{"fn":"gainDbToVolume","in":["0xc06eb850","0x40200000"],"out":"0x3f5e32ab"}
+{"fn":"gainDbToVolume","in":["0xc0570a40","0x40200000"],"out":"0x3f67de16"}
+{"fn":"gainDbToVolume","in":["0xc03f5c28","0x40200000"],"out":"0x3f71f53f"}
+{"fn":"gainDbToVolume","in":["0xc027ae10","0x40200000"],"out":"0x3f7c7cd2"}
+{"fn":"gainDbToVolume","in":["0xc0100000","0x40200000"],"out":"0x3f83bcd8"}
+{"fn":"gainDbToVolume","in":["0xbff0a3d0","0x40200000"],"out":"0x3f89787d"}
+{"fn":"gainDbToVolume","in":["0xbfc147b0","0x40200000"],"out":"0x3f8f73ff"}
+{"fn":"gainDbToVolume","in":["0xbf91eb80","0x40200000"],"out":"0x3f95b229"}
+{"fn":"gainDbToVolume","in":["0xbf451ec0","0x40200000"],"out":"0x3f9c35dd"}
+{"fn":"gainDbToVolume","in":["0xbeccccc0","0x40200000"],"out":"0x3fa30227"}
+{"fn":"gainDbToVolume","in":["0xbcf5c000","0x40200000"],"out":"0x3faa1a2c"}
+{"fn":"gainDbToVolume","in":["0x3eae1480","0x40200000"],"out":"0x3fb18137"}
+{"fn":"gainDbToVolume","in":["0x3f35c2a0","0x40200000"],"out":"0x3fb93abd"}
+{"fn":"gainDbToVolume","in":["0x3f8a3d70","0x40200000"],"out":"0x3fc14a4e"}
+{"fn":"gainDbToVolume","in":["0x3fb999a0","0x40200000"],"out":"0x3fc9b3b0"}
+{"fn":"gainDbToVolume","in":["0x3fe8f5c0","0x40200000"],"out":"0x3fd27ac5"}
+{"fn":"gainDbToVolume","in":["0x400c28f0","0x40200000"],"out":"0x3fdba3a4"}
+{"fn":"gainDbToVolume","in":["0x4023d710","0x40200000"],"out":"0x3fe53295"}
+{"fn":"gainDbToVolume","in":["0x403b8520","0x40200000"],"out":"0x3fef2bfc"}
+{"fn":"gainDbToVolume","in":["0x40533330","0x40200000"],"out":"0x3ff99481"}
+{"fn":"gainDbToVolume","in":["0x406ae150","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x408147b0","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x408d1eb8","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x4098f5c0","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x40a4ccd0","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x40b0a3d8","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x40bc7ae0","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x40c851f0","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x40d428f8","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x40e00000","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x40ebd708","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x40f7ae18","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x4101c290","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x4107ae14","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x410d999c","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x41138520","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x411970a4","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x411f5c28","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x412547b0","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x412b3334","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x41311eb8","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x41370a40","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x413cf5c4","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x4142e148","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x4148cccc","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x414eb854","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x4154a3d8","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x415a8f5c","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x41607ae0","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x41666668","0x40200000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0xc1f00000","0x40c00000"],"out":"0x3d813855"}
+{"fn":"gainDbToVolume","in":["0xc1ed0a3d","0x40c00000"],"out":"0x3d86d7ef"}
+{"fn":"gainDbToVolume","in":["0xc1ea147b","0x40c00000"],"out":"0x3d8cb62d"}
+{"fn":"gainDbToVolume","in":["0xc1e71eb8","0x40c00000"],"out":"0x3d92d5ca"}
+{"fn":"gainDbToVolume","in":["0xc1e428f6","0x40c00000"],"out":"0x3d9939a0"}
+{"fn":"gainDbToVolume","in":["0xc1e13333","0x40c00000"],"out":"0x3d9fe4a9"}
+{"fn":"gainDbToVolume","in":["0xc1de3d71","0x40c00000"],"out":"0x3da6d9f8"}
+{"fn":"gainDbToVolume","in":["0xc1db47ae","0x40c00000"],"out":"0x3dae1ccc"}
+{"fn":"gainDbToVolume","in":["0xc1d851ec","0x40c00000"],"out":"0x3db5b085"}
+{"fn":"gainDbToVolume","in":["0xc1d55c29","0x40c00000"],"out":"0x3dbd98ab"}
+{"fn":"gainDbToVolume","in":["0xc1d26666","0x40c00000"],"out":"0x3dc5d8e4"}
+{"fn":"gainDbToVolume","in":["0xc1cf70a4","0x40c00000"],"out":"0x3dce7508"}
+{"fn":"gainDbToVolume","in":["0xc1cc7ae1","0x40c00000"],"out":"0x3dd7711a"}
+{"fn":"gainDbToVolume","in":["0xc1c9851f","0x40c00000"],"out":"0x3de0d142"}
+{"fn":"gainDbToVolume","in":["0xc1c68f5c","0x40c00000"],"out":"0x3dea99df"}
+{"fn":"gainDbToVolume","in":["0xc1c3999a","0x40c00000"],"out":"0x3df4cf79"}
+{"fn":"gainDbToVolume","in":["0xc1c0a3d7","0x40c00000"],"out":"0x3dff76d3"}
+{"fn":"gainDbToVolume","in":["0xc1bdae14","0x40c00000"],"out":"0x3e054a6e"}
+{"fn":"gainDbToVolume","in":["0xc1bab852","0x40c00000"],"out":"0x3e0b1760"}
+{"fn":"gainDbToVolume","in":["0xc1b7c28f","0x40c00000"],"out":"0x3e1124f1"}
+{"fn":"gainDbToVolume","in":["0xc1b4cccd","0x40c00000"],"out":"0x3e1775ef"}
+{"fn":"gainDbToVolume","in":["0xc1b1d70a","0x40c00000"],"out":"0x3e1e0d50"}
+{"fn":"gainDbToVolume","in":["0xc1aee148","0x40c00000"],"out":"0x3e24ee1b"}
+{"fn":"gainDbToVolume","in":["0xc1abeb85","0x40c00000"],"out":"0x3e2c1b89"}
+{"fn":"gainDbToVolume","in":["0xc1a8f5c2","0x40c00000"],"out":"0x3e3398ef"}
+{"fn":"gainDbToVolume","in":["0xc1a60000","0x40c00000"],"out":"0x3e3b69c1"}
+{"fn":"gainDbToVolume","in":["0xc1a30a3e","0x40c00000"],"out":"0x3e4391a7"}
+{"fn":"gainDbToVolume","in":["0xc1a0147b","0x40c00000"],"out":"0x3e4c146b"}
+{"fn":"gainDbToVolume","in":["0xc19d1eb8","0x40c00000"],"out":"0x3e54f601"}
+{"fn":"gainDbToVolume","in":["0xc19a28f6","0x40c00000"],"out":"0x3e5e3a85"}
+{"fn":"gainDbToVolume","in":["0xc1973333","0x40c00000"],"out":"0x3e67e64b"}
+{"fn":"gainDbToVolume","in":["0xc1943d70","0x40c00000"],"out":"0x3e71fdcf"}
+{"fn":"gainDbToVolume","in":["0xc19147ae","0x40c00000"],"out":"0x3e7c85bf"}
+{"fn":"gainDbToVolume","in":["0xc18e51ec","0x40c00000"],"out":"0x3e83c17f"}
+{"fn":"gainDbToVolume","in":["0xc18b5c29","0x40c00000"],"out":"0x3e897d59"}
+{"fn":"gainDbToVolume","in":["0xc1886666","0x40c00000"],"out":"0x3e8f7913"}
+{"fn":"gainDbToVolume","in":["0xc18570a4","0x40c00000"],"out":"0x3e95b772"}
+{"fn":"gainDbToVolume","in":["0xc1827ae1","0x40c00000"],"out":"0x3e9c3b65"}
+{"fn":"gainDbToVolume","in":["0xc17f0a3d","0x40c00000"],"out":"0x3ea307ea"}
+{"fn":"gainDbToVolume","in":["0xc1791eb8","0x40c00000"],"out":"0x3eaa202f"}
+{"fn":"gainDbToVolume","in":["0xc1733333","0x40c00000"],"out":"0x3eb1877f"}
+{"fn":"gainDbToVolume","in":["0xc16d47ae","0x40c00000"],"out":"0x3eb94148"}
+{"fn":"gainDbToVolume","in":["0xc1675c29","0x40c00000"],"out":"0x3ec15124"}
+{"fn":"gainDbToVolume","in":["0xc16170a4","0x40c00000"],"out":"0x3ec9bad1"}
+{"fn":"gainDbToVolume","in":["0xc15b851e","0x40c00000"],"out":"0x3ed28238"}
+{"fn":"gainDbToVolume","in":["0xc155999a","0x40c00000"],"out":"0x3edbab6b"}
+{"fn":"gainDbToVolume","in":["0xc14fae14","0x40c00000"],"out":"0x3ee53aae"}
+{"fn":"gainDbToVolume","in":["0xc149c290","0x40c00000"],"out":"0x3eef346f"}
+{"fn":"gainDbToVolume","in":["0xc143d70a","0x40c00000"],"out":"0x3ef99d56"}
+{"fn":"gainDbToVolume","in":["0xc13deb84","0x40c00000"],"out":"0x3f023d1b"}
+{"fn":"gainDbToVolume","in":["0xc1380000","0x40c00000"],"out":"0x3f07e80b"}
+{"fn":"gainDbToVolume","in":["0xc132147a","0x40c00000"],"out":"0x3f0dd222"}
+{"fn":"gainDbToVolume","in":["0xc12c28f6","0x40c00000"],"out":"0x3f13fe1a"}
+{"fn":"gainDbToVolume","in":["0xc1263d70","0x40c00000"],"out":"0x3f1a6ed6"}
+{"fn":"gainDbToVolume","in":["0xc12051ec","0x40c00000"],"out":"0x3f212751"}
+{"fn":"gainDbToVolume","in":["0xc11a6666","0x40c00000"],"out":"0x3f282aad"}
+{"fn":"gainDbToVolume","in":["0xc1147ae0","0x40c00000"],"out":"0x3f2f7c29"}
+{"fn":"gainDbToVolume","in":["0xc10e8f5c","0x40c00000"],"out":"0x3f371f2c"}
+{"fn":"gainDbToVolume","in":["0xc108a3d6","0x40c00000"],"out":"0x3f3f1746"}
+{"fn":"gainDbToVolume","in":["0xc102b852","0x40c00000"],"out":"0x3f476824"}
+{"fn":"gainDbToVolume","in":["0xc0f99998","0x40c00000"],"out":"0x3f5015aa"}
+{"fn":"gainDbToVolume","in":["0xc0edc290","0x40c00000"],"out":"0x3f5923db"}
+{"fn":"gainDbToVolume","in":["0xc0e1eb84","0x40c00000"],"out":"0x3f6296f1"}
+{"fn":"gainDbToVolume","in":["0xc0d6147c","0x40c00000"],"out":"0x3f6c7349"}
+{"fn":"gainDbToVolume","in":["0xc0ca3d70","0x40c00000"],"out":"0x3f76bd80"}
+{"fn":"gainDbToVolume","in":["0xc0be6664","0x40c00000"],"out":"0x3f80bd2d"}
+{"fn":"gainDbToVolume","in":["0xc0b28f5c","0x40c00000"],"out":"0x3f865768"}
+{"fn":"gainDbToVolume","in":["0xc0a6b850","0x40c00000"],"out":"0x3f8c300f"}
+{"fn":"gainDbToVolume","in":["0xc09ae148","0x40c00000"],"out":"0x3f9249d6"}
+{"fn":"gainDbToVolume","in":["0xc08f0a3c","0x40c00000"],"out":"0x3f98a796"}
+{"fn":"gainDbToVolume","in":["0xc0833334","0x40c00000"],"out":"0x3f9f4c41"}
+{"fn":"gainDbToVolume","in":["0xc06eb850","0x40c00000"],"out":"0x3fa63af0"}
+{"fn":"gainDbToVolume","in":["0xc0570a40","0x40c00000"],"out":"0x3fad76d8"}
+{"fn":"gainDbToVolume","in":["0xc03f5c28","0x40c00000"],"out":"0x3fb5035a"}
+{"fn":"gainDbToVolume","in":["0xc027ae10","0x40c00000"],"out":"0x3fbce3f5"}
+{"fn":"gainDbToVolume","in":["0xc0100000","0x40c00000"],"out":"0x3fc51c50"}
+{"fn":"gainDbToVolume","in":["0xbff0a3d0","0x40c00000"],"out":"0x3fcdb042"}
+{"fn":"gainDbToVolume","in":["0xbfc147b0","0x40c00000"],"out":"0x3fd6a3c0"}
+{"fn":"gainDbToVolume","in":["0xbf91eb80","0x40c00000"],"out":"0x3fdffafb"}
+{"fn":"gainDbToVolume","in":["0xbf451ec0","0x40c00000"],"out":"0x3fe9ba42"}
+{"fn":"gainDbToVolume","in":["0xbeccccc0","0x40c00000"],"out":"0x3ff3e624"}
+{"fn":"gainDbToVolume","in":["0xbcf5c000","0x40c00000"],"out":"0x3ffe8356"}
+{"fn":"gainDbToVolume","in":["0x3eae1480","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x3f35c2a0","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x3f8a3d70","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x3fb999a0","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x3fe8f5c0","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x400c28f0","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x4023d710","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x403b8520","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x40533330","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x406ae150","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x408147b0","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x408d1eb8","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x4098f5c0","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x40a4ccd0","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x40b0a3d8","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x40bc7ae0","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x40c851f0","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x40d428f8","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x40e00000","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x40ebd708","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x40f7ae18","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x4101c290","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x4107ae14","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x410d999c","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x41138520","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x411970a4","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x411f5c28","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x412547b0","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x412b3334","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x41311eb8","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x41370a40","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x413cf5c4","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x4142e148","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x4148cccc","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x414eb854","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x4154a3d8","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x415a8f5c","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x41607ae0","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x41666668","0x40c00000"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x7fc00000","0x0"],"out":"0x7fc00000"}
+{"fn":"gainDbToVolume","in":["0x7f800000","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0xff800000","0x0"],"out":"0x0"}
+{"fn":"gainDbToVolume","in":["0x0","0x0"],"out":"0x3f800000"}
+{"fn":"gainDbToVolume","in":["0x80000000","0x0"],"out":"0x3f800000"}
+{"fn":"gainDbToVolume","in":["0x40c0a8c1","0x0"],"out":"0x3fffffff"}
+{"fn":"gainDbToVolume","in":["0x40c0a993","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0xc3480000","0x0"],"out":"0x2edbe6ff"}
+{"fn":"gainDbToVolume","in":["0x43480000","0x0"],"out":"0x40000000"}
+{"fn":"gainDbToVolume","in":["0x33d6bf95","0x0"],"out":"0x3f800000"}
+{"fn":"getVolumeMultiplier","in":[null,null,false,"0x0"],"out":"0x3f800000"}
+{"fn":"getVolumeMultiplier","in":[null,null,false,"0xc0000000"],"out":"0x3f800000"}
+{"fn":"getVolumeMultiplier","in":[null,null,true,"0x0"],"out":"0x3f800000"}
+{"fn":"getVolumeMultiplier","in":[null,null,true,"0xc0000000"],"out":"0x3f800000"}
+{"fn":"getVolumeMultiplier","in":["0xc0d00000",null,false,"0x0"],"out":"0x3ef240e2"}
+{"fn":"getVolumeMultiplier","in":["0xc0d00000",null,false,"0xc0000000"],"out":"0x3ec06dc2"}
+{"fn":"getVolumeMultiplier","in":["0xc0d00000",null,true,"0x0"],"out":"0x3ef240e2"}
+{"fn":"getVolumeMultiplier","in":["0xc0d00000",null,true,"0xc0000000"],"out":"0x3ec06dc2"}
+{"fn":"getVolumeMultiplier","in":[null,"0xc1033333",false,"0x0"],"out":"0x3ec730ed"}
+{"fn":"getVolumeMultiplier","in":[null,"0xc1033333",false,"0xc0000000"],"out":"0x3e9e391f"}
+{"fn":"getVolumeMultiplier","in":[null,"0xc1033333",true,"0x0"],"out":"0x3ec730ed"}
+{"fn":"getVolumeMultiplier","in":[null,"0xc1033333",true,"0xc0000000"],"out":"0x3e9e391f"}
+{"fn":"getVolumeMultiplier","in":["0xc0d00000","0xc1033333",false,"0x0"],"out":"0x3ef240e2"}
+{"fn":"getVolumeMultiplier","in":["0xc0d00000","0xc1033333",false,"0xc0000000"],"out":"0x3ec06dc2"}
+{"fn":"getVolumeMultiplier","in":["0xc0d00000","0xc1033333",true,"0x0"],"out":"0x3ec730ed"}
+{"fn":"getVolumeMultiplier","in":["0xc0d00000","0xc1033333",true,"0xc0000000"],"out":"0x3e9e391f"}
+{"fn":"getVolumeMultiplier","in":["0x40400000","0x41100000",false,"0x0"],"out":"0x3fb4ce08"}
+{"fn":"getVolumeMultiplier","in":["0x40400000","0x41100000",false,"0xc0000000"],"out":"0x3f8f9e4d"}
+{"fn":"getVolumeMultiplier","in":["0x40400000","0x41100000",true,"0x0"],"out":"0x40000000"}
+{"fn":"getVolumeMultiplier","in":["0x40400000","0x41100000",true,"0xc0000000"],"out":"0x40000000"}
+{"fn":"getVolumeMultiplier","in":null,"out":"0x3f800000"}
+{"fn":"toIntOrNull","in":"3","out":3}
+{"fn":"toIntOrNull","in":"3/12","out":null}
+{"fn":"toIntOrNull","in":"+5","out":5}
+{"fn":"toIntOrNull","in":"-0","out":0}
+{"fn":"toIntOrNull","in":"007","out":7}
+{"fn":"toIntOrNull","in":"2147483647","out":2147483647}
+{"fn":"toIntOrNull","in":"2147483648","out":null}
+{"fn":"toIntOrNull","in":"-2147483648","out":-2147483648}
+{"fn":"toIntOrNull","in":"-2147483649","out":null}
+{"fn":"toIntOrNull","in":"","out":null}
+{"fn":"toIntOrNull","in":" 3","out":null}
+{"fn":"toIntOrNull","in":"3 ","out":null}
+{"fn":"toIntOrNull","in":"1.0","out":null}
+{"fn":"toIntOrNull","in":"\u0661\u0662","out":12}
+{"fn":"toIntOrNull","in":"\uff13","out":3}
+{"fn":"toIntOrNull","in":"\u0e53","out":3}
+{"fn":"toIntOrNull","in":"+","out":null}
+{"fn":"toIntOrNull","in":"-","out":null}
+{"fn":"toIntOrNull","in":"12a","out":null}
+{"fn":"toIntOrNull","in":"0x10","out":null}
+{"fn":"toIntOrNull","in":"\u00b2","out":null}
+{"fn":"toIntOrNull","in":"\u2163","out":null}
+{"fn":"validateMetadataInput","in":["Title","Artist","Album",null,null,"Pop",null],"out":null}
+{"fn":"validateMetadataInput","in":["","Artist","Album",null,null,"Pop",null],"out":"Title cannot be empty"}
+{"fn":"validateMetadataInput","in":["   ","Artist","Album",null,null,"Pop",null],"out":"Title cannot be empty"}
+{"fn":"validateMetadataInput","in":["\u3000","A","B",null,null,"",null],"out":"Title cannot be empty"}
+{"fn":"validateMetadataInput","in":[{"repeat":"a","count":500},"A","B",null,null,"",null],"out":null}
+{"fn":"validateMetadataInput","in":[{"repeat":"a","count":501},"A","B",null,null,"",null],"out":"Title too long"}
+{"fn":"validateMetadataInput","in":[{"repeat":"\ud83c\udfb5","count":250},"A","B",null,null,"",null],"out":null}
+{"fn":"validateMetadataInput","in":[{"repeat":"\ud83c\udfb5","count":251},"A","B",null,null,"",null],"out":"Title too long"}
+{"fn":"validateMetadataInput","in":["T",{"repeat":"a","count":501},"B",null,null,"",null],"out":"Artist name too long"}
+{"fn":"validateMetadataInput","in":["T","A",{"repeat":"a","count":501},null,null,"",null],"out":"Album name too long"}
+{"fn":"validateMetadataInput","in":["T","A","B",{"repeat":"a","count":501},null,"",null],"out":"Album artist name too long"}
+{"fn":"validateMetadataInput","in":["T","A","B",{"repeat":" ","count":501},null,"",null],"out":null}
+{"fn":"validateMetadataInput","in":["T","A","B",null,{"repeat":"a","count":501},"",null],"out":"Composer name too long"}
+{"fn":"validateMetadataInput","in":["T","A","B",null,{"repeat":" ","count":600},"",null],"out":null}
+{"fn":"validateMetadataInput","in":["T","A","B",null,null,{"repeat":"g","count":100},null],"out":null}
+{"fn":"validateMetadataInput","in":["T","A","B",null,null,{"repeat":"g","count":101},null],"out":"Genre too long"}
+{"fn":"validateMetadataInput","in":["T","A","B",null,null,"",{"repeat":"l","count":50000}],"out":null}
+{"fn":"validateMetadataInput","in":["T","A","B",null,null,"",{"repeat":"l","count":50001}],"out":"Lyrics too long"}
+{"fn":"validateMetadataInput","in":[{"repeat":"a","count":501},{"repeat":"a","count":501},{"repeat":"a","count":501},{"repeat":"a","count":501},{"repeat":"a","count":501},{"repeat":"g","count":101},{"repeat":"l","count":50001}],"out":"Title too long"}
+{"fn":"validateMetadataInput","in":["T","","","","","",""],"out":null}
+{"fn":"detectContainerFormat","in":"494433040000000000","out":"MP3"}
+{"fn":"detectContainerFormat","in":"4944","out":"UNKNOWN"}
+{"fn":"detectContainerFormat","in":"494433","out":"UNKNOWN"}
+{"fn":"detectContainerFormat","in":"49443300","out":"MP3"}
+{"fn":"detectContainerFormat","in":"fffb9064","out":"MP3"}
+{"fn":"detectContainerFormat","in":"ffe00000","out":"MP3"}
+{"fn":"detectContainerFormat","in":"ffd8ffe0","out":"UNKNOWN"}
+{"fn":"detectContainerFormat","in":"ff1f0000","out":"UNKNOWN"}
+{"fn":"detectContainerFormat","in":"000000206674797069736f6d","out":"MP4"}
+{"fn":"detectContainerFormat","in":"00000020667479","out":"UNKNOWN"}
+{"fn":"detectContainerFormat","in":"0000001c667479704d344120","out":"MP4"}
+{"fn":"detectContainerFormat","in":"664c614300000022","out":"FLAC"}
+{"fn":"detectContainerFormat","in":"664c6143","out":"FLAC"}
+{"fn":"detectContainerFormat","in":"4f6767530000000000000000000000000000000000000000000001004f70757348656164010200000000","out":"OGG_OPUS"}
+{"fn":"detectContainerFormat","in":"4f67675300000000000000000000000000000000000000000000010001766f7262697300000000000000","out":"OGG_VORBIS"}
+{"fn":"detectContainerFormat","in":"4f676753000000000000000000000000000000000000000000000100807468656f726100000000","out":"OGG"}
+{"fn":"detectContainerFormat","in":"4f67675300000000000000000000000000000000000000000000030000004f70757348656164010200000000","out":"OGG_OPUS"}
+{"fn":"detectContainerFormat","in":"4f67675300020000","out":"OGG"}
+{"fn":"detectContainerFormat","in":"4f676753000000000000000000000000000000000000000000000100","out":"OGG"}
+{"fn":"detectContainerFormat","in":"4f67675300000000000000000000000000000000000000000000c800000000000000000000000000","out":"OGG"}
+{"fn":"detectContainerFormat","in":"52494646240000005741564566","out":"WAV"}
+{"fn":"detectContainerFormat","in":"524946462400000041564920","out":"UNKNOWN"}
+{"fn":"detectContainerFormat","in":"5249464624000000574156","out":"UNKNOWN"}
+{"fn":"detectContainerFormat","in":"000102","out":"UNKNOWN"}
+{"fn":"detectContainerFormat","in":"","out":"UNKNOWN"}
+{"fn":"detectContainerFormat","in":"0001020304050607","out":"UNKNOWN"}
+{"fn":"detectContainerFormat","in":"234558544d33550a","out":"UNKNOWN"}
+{"fn":"isProblematicFlacFile","in":["flac","664c614380000022000000000000000000000ac442f00000000000000000000000000000000000000000"],"out":"Safe(sampleRate=44100, bitsPerSample=16)"}
+{"fn":"isProblematicFlacFile","in":["flac","664c614380000022000000000000000000000bb803700000000000000000000000000000000000000000"],"out":"Safe(sampleRate=48000, bitsPerSample=24)"}
+{"fn":"isProblematicFlacFile","in":["flac","664c61438000002200000000000000000000177003700000000000000000000000000000000000000000"],"out":"Safe(sampleRate=96000, bitsPerSample=24)"}
+{"fn":"isProblematicFlacFile","in":["flac","664c61438000002200000000000000000000177010f00000000000000000000000000000000000000000"],"out":"Problematic(sampleRate=96001, bitsPerSample=16)"}
+{"fn":"isProblematicFlacFile","in":["flac","664c614380000022000000000000000000002b1103700000000000000000000000000000000000000000"],"out":"Problematic(sampleRate=176400, bitsPerSample=24)"}
+{"fn":"isProblematicFlacFile","in":["flac","664c614380000022000000000000000000002ee00ff00000000000000000000000000000000000000000"],"out":"Problematic(sampleRate=192000, bitsPerSample=32)"}
+{"fn":"isProblematicFlacFile","in":["flac","664c614380000022000000000000000000000ac443800000000000000000000000000000000000000000"],"out":"Problematic(sampleRate=44100, bitsPerSample=25)"}
+{"fn":"isProblematicFlacFile","in":["flac","664c6143800000220000000000000000000001f400700000000000000000000000000000000000000000"],"out":"Safe(sampleRate=8000, bitsPerSample=8)"}
+{"fn":"isProblematicFlacFile","in":["flac","664c614380000022000000000000000000009fff63f00000000000000000000000000000000000000000"],"out":"Problematic(sampleRate=655350, bitsPerSample=32)"}
+{"fn":"isProblematicFlacFile","in":["flac","664c61438000002200000000000000000000000010300000000000000000000000000000000000000000"],"out":"Safe(sampleRate=1, bitsPerSample=4)"}
+{"fn":"isProblematicFlacFile","in":["FLAC","664c614380000022000000000000000000000ac442f00000000000000000000000000000000000000000"],"out":"Safe(sampleRate=44100, bitsPerSample=16)"}
+{"fn":"isProblematicFlacFile","in":["FLAC","664c614380000022000000000000000000000bb803700000000000000000000000000000000000000000"],"out":"Safe(sampleRate=48000, bitsPerSample=24)"}
+{"fn":"isProblematicFlacFile","in":["FLAC","664c61438000002200000000000000000000177003700000000000000000000000000000000000000000"],"out":"Safe(sampleRate=96000, bitsPerSample=24)"}
+{"fn":"isProblematicFlacFile","in":["FLAC","664c61438000002200000000000000000000177010f00000000000000000000000000000000000000000"],"out":"Problematic(sampleRate=96001, bitsPerSample=16)"}
+{"fn":"isProblematicFlacFile","in":["FLAC","664c614380000022000000000000000000002b1103700000000000000000000000000000000000000000"],"out":"Problematic(sampleRate=176400, bitsPerSample=24)"}
+{"fn":"isProblematicFlacFile","in":["FLAC","664c614380000022000000000000000000002ee00ff00000000000000000000000000000000000000000"],"out":"Problematic(sampleRate=192000, bitsPerSample=32)"}
+{"fn":"isProblematicFlacFile","in":["FLAC","664c614380000022000000000000000000000ac443800000000000000000000000000000000000000000"],"out":"Problematic(sampleRate=44100, bitsPerSample=25)"}
+{"fn":"isProblematicFlacFile","in":["FLAC","664c6143800000220000000000000000000001f400700000000000000000000000000000000000000000"],"out":"Safe(sampleRate=8000, bitsPerSample=8)"}
+{"fn":"isProblematicFlacFile","in":["FLAC","664c614380000022000000000000000000009fff63f00000000000000000000000000000000000000000"],"out":"Problematic(sampleRate=655350, bitsPerSample=32)"}
+{"fn":"isProblematicFlacFile","in":["FLAC","664c61438000002200000000000000000000000010300000000000000000000000000000000000000000"],"out":"Safe(sampleRate=1, bitsPerSample=4)"}
+{"fn":"isProblematicFlacFile","in":["mp3","664c614380000022000000000000000000000ac442f00000000000000000000000000000000000000000"],"out":"NotFlac"}
+{"fn":"isProblematicFlacFile","in":["mp3","664c614380000022000000000000000000000bb803700000000000000000000000000000000000000000"],"out":"NotFlac"}
+{"fn":"isProblematicFlacFile","in":["mp3","664c61438000002200000000000000000000177003700000000000000000000000000000000000000000"],"out":"NotFlac"}
+{"fn":"isProblematicFlacFile","in":["mp3","664c61438000002200000000000000000000177010f00000000000000000000000000000000000000000"],"out":"NotFlac"}
+{"fn":"isProblematicFlacFile","in":["mp3","664c614380000022000000000000000000002b1103700000000000000000000000000000000000000000"],"out":"NotFlac"}
+{"fn":"isProblematicFlacFile","in":["mp3","664c614380000022000000000000000000002ee00ff00000000000000000000000000000000000000000"],"out":"NotFlac"}
+{"fn":"isProblematicFlacFile","in":["mp3","664c614380000022000000000000000000000ac443800000000000000000000000000000000000000000"],"out":"NotFlac"}
+{"fn":"isProblematicFlacFile","in":["mp3","664c6143800000220000000000000000000001f400700000000000000000000000000000000000000000"],"out":"NotFlac"}
+{"fn":"isProblematicFlacFile","in":["mp3","664c614380000022000000000000000000009fff63f00000000000000000000000000000000000000000"],"out":"NotFlac"}
+{"fn":"isProblematicFlacFile","in":["mp3","664c61438000002200000000000000000000000010300000000000000000000000000000000000000000"],"out":"NotFlac"}
+{"fn":"isProblematicFlacFile","in":["flac","464c614380000022000000000000000000000ac442f00000000000000000000000000000000000000000"],"out":"NotFlac"}
+{"fn":"isProblematicFlacFile","in":["flac","664c614380000022000000000000000000000ac442f000000000000000000000000000000000000000"],"out":"NotFlac"}
+{"fn":"guessContentTypeFromStream","in":"ffd8ffe000104a46494600","out":"image/jpeg"}
+{"fn":"guessContentTypeFromStream","in":"ffd8ffee","out":"image/jpeg"}
+{"fn":"guessContentTypeFromStream","in":"ffd8ffe10000457869660000","out":"image/jpeg"}
+{"fn":"guessContentTypeFromStream","in":"ffd8ffe10000457869660100","out":null}
+{"fn":"guessContentTypeFromStream","in":"ffd8ffdb0043","out":null}
+{"fn":"guessContentTypeFromStream","in":"ffd8ffe1","out":null}
+{"fn":"guessContentTypeFromStream","in":"89504e470d0a1a0a0000","out":"image/png"}
+{"fn":"guessContentTypeFromStream","in":"89504e470d0a1a","out":null}
+{"fn":"guessContentTypeFromStream","in":"4749463839610100","out":"image/gif"}
+{"fn":"guessContentTypeFromStream","in":"47494638","out":"image/gif"}
+{"fn":"guessContentTypeFromStream","in":"474946","out":null}
+{"fn":"guessContentTypeFromStream","in":"52494646000000005745425056503820","out":"audio/x-wav"}
+{"fn":"guessContentTypeFromStream","in":"424d3a000000","out":null}
+{"fn":"guessContentTypeFromStream","in":"49492a00","out":"image/tiff"}
+{"fn":"guessContentTypeFromStream","in":"4d4d002a","out":"image/tiff"}
+{"fn":"guessContentTypeFromStream","in":"2e736e64","out":"audio/basic"}
+{"fn":"guessContentTypeFromStream","in":"646e732e","out":"audio/basic"}
+{"fn":"guessContentTypeFromStream","in":"cafebabe","out":"application/java-vm"}
+{"fn":"guessContentTypeFromStream","in":"aced0005","out":"application/x-java-serialized-object"}
+{"fn":"guessContentTypeFromStream","in":"3c21444f43","out":"text/html"}
+{"fn":"guessContentTypeFromStream","in":"3c68746d6c3e","out":"text/html"}
+{"fn":"guessContentTypeFromStream","in":"3c484541443e","out":"text/html"}
+{"fn":"guessContentTypeFromStream","in":"3c626f6479","out":"text/html"}
+{"fn":"guessContentTypeFromStream","in":"3c3f786d6c20","out":"application/xml"}
+{"fn":"guessContentTypeFromStream","in":"3c3f786d6c3f","out":null}
+{"fn":"guessContentTypeFromStream","in":"efbbbf3c3f786d6c","out":"application/xml"}
+{"fn":"guessContentTypeFromStream","in":"feff003c003f0078","out":"application/xml"}
+{"fn":"guessContentTypeFromStream","in":"fffe3c003f007800","out":"application/xml"}
+{"fn":"guessContentTypeFromStream","in":"0000feff0000003c0000003f00000078","out":"application/xml"}
+{"fn":"guessContentTypeFromStream","in":"fffe00003c0000003f00000078000000","out":"application/xml"}
+{"fn":"guessContentTypeFromStream","in":"2364656600","out":"image/x-bitmap"}
+{"fn":"guessContentTypeFromStream","in":"212058504932","out":null}
+{"fn":"guessContentTypeFromStream","in":"d0cf11e0a1b11ae1","out":null}
+{"fn":"guessContentTypeFromStream","in":"","out":null}
+{"fn":"guessContentTypeFromStream","in":"00","out":null}
+{"fn":"guessContentTypeFromStream","in":"0000000c6a502020","out":null}
+{"fn":"guessContentTypeFromStream","in":"000000186674797068656963","out":null}

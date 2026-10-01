@@ -1,5 +1,7 @@
-// PixlTags — ID3v2 read/write incl. SYLT, FLAC Vorbis comments/PICTURE read/write, MP4 atom read.
-// Placeholder from stage 0. Keep the `PixlTagsModule` enum: the app's Diagnostics screen lists it.
+// PixlTags — ID3v2.2/2.3/2.4 read and 2.3/2.4 write (incl. SYLT, unsynchronisation, extended headers, padding
+// reuse), ID3v1, FLAC Vorbis comments/PICTURE read/write, MP4 `ilst` read, and the ports of Android's
+// AudioMetadataReader / ReplayGainManager / SongMetadataEditor tag logic. Pure Swift on `Data`.
+// Keep the `PixlTagsModule` enum: the app's Diagnostics screen lists it.
 
 import PixlFoundation
 import PixlModel
