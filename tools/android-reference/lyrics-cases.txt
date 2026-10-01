@@ -1,0 +1,603 @@
+# One case per line: KIND, TAB, TAB-separated arguments (see LyricsGen.java).
+# Kinds: P parseLyrics, Z toLrcString(parseLyrics) [synced-first, plain-first], T TtmlLyricsParser, Y yrc, R richSync,
+# L LyricsfileParser, I import (name, mime, utf8 content[, reported size]), IH import (name, mime, hex), IC
+# validateImportedLrcContent, RO romanizers, NM normalisation helpers, TS title/artist score (mode, song, response),
+# M rank (mode, title, artist, path, durationMs, responses json), A AMLL matchesMetadata, N NetEase matchesRecording,
+# E parseBestEmbeddedLyricsField, RAW lyricsToRawContent + looksLikeFlattenedWordByWordCache.
+
+# ---------- LRC basics (LyricsUtilsTest) ----------
+P	\uFEFF[00:03.80]Time is standing still\n[00:09.86]Tracing my body
+P	\uFEFF   [00:03.80]Time is standing still\r\n\t[00:09.86]Tracing my body
+P	\u202a[00:03.80\u202c]Time is standing still\n[00:09.86]Tracing my body
+P	"[00:03.80]Time is standing still\n[00:09.86]Tracing my body\n[02:58.92]"
+P	"[00:03.80]Quoted\n[00:09.86]Lines"
+P	[00:12.57] Sinking under\n[00:26.42][01:12.34] Three in the morning, I ain't slept all weekend\n[00:41.71][00:52.96][01:27.42] My heart keeps breaking
+P	[00:10.00]Hello world\n[00:10.00]你好世界\n[00:20.00]Goodbye
+P	[00:10.00]Hello world\n[00:20.00]Goodbye\n[00:30.00]See you
+P	[00:10.00]Hello world\n[00:10.00]你好世界\n[00:10.00]Hola mundo
+P	[00:10.00]Hello world\n[00:10.00]你好世界\n[00:10.00]by: translator\n[00:20.00]Goodbye
+P	[00:10.00]Hello world\ncontinuation line\n[00:20.00]Next
+P	[00:00.000]作词: イマニシ\n[00:01.000]作曲: イマニシ\n[00:22:43]愛情なんて忘れて\n[00:25:39]一人ワルツを踊る\n[00:22.43]忘掉爱情什么的\n[00:25.39]一个人舞动华尔兹
+P	[00:00.00]<00:00.00>First <00:00.00>line\n[00:00.00]<00:00.00>Second <00:00.00>line\n[00:00.00]<00:00.00>First <00:00.00>line
+P	[00:01.00]<00:01.00>First\n[00:01.00]<00:01.00>Second
+P	[00:00.00]Zero one\n[00:00.00]Zero two\n[00:00.00]Zero three
+
+# ---------- LRC edge cases ----------
+P	<null>
+P	
+P	   \n\n
+P	Hello\nWorld\n\nAgain
+P	Intro line\n[00:01.00]First\nmore text\n[00:02.00]Second
+P	[00:20.00]second\n[00:10.00]first\n[00:15.00]middle
+P	[01:02.345]Three digit\n[99:59.999]End
+P	[0:01.00]one digit minute\n[00:01]no fraction\n[00:01.5]one digit fraction
+P	[ti:Song title]\n[ar:Artist]\n[al:Album]\n[offset:+100]\n[by:Someone]\n[00:01.00]Line
+P	[length: 03:20]\n[re:Editor 1.0]\n[00:01.00]Line\n[x-custom:value]
+P	[00:01.00]\n[00:02.00]   \n[00:03.00]"\n[00:04.00]'\n[00:05.00]real
+P	[00:01.00]Tab\there\n[00:02.00]Control\u0007char\n[00:03.00]Zero\u200Bwidth
+P	   leading [00:01.00]after junk\n  x[00:02.00]junk before bracket
+P	[00:01.00]Hello\u2028world\n[00:02.00]Next
+P	[00:01.00]Line one\r\n[00:02.00]Line two\r[00:03.00]Line three
+P	[00:10.00]Hello world\n[00:10.00]你好世界\n[00:10.00]BY ：translator\n[00:10.00]by:another
+P	[00:10.00]Hello\n[00:10.00]   \n[00:10.00]Bonjour
+P	[00:10.00]   \n[00:10.00]Bonjour
+P	[00:10.00]Hello\n[00:10.00]<00:10.00>Timed
+P	[00:10.00]Hello\n[00:10.00]Bonjour\n[00:10.00]Hola\n[00:10.00]Ciao
+P	[00:10.00]Hello\nmerged\n[00:10.00]Bonjour
+P	[00:10.00]Hello\n[00:10.00]Bonjour\n[00:10.00]by: x\n[00:10.00]by: y\n[00:11.00]Next
+P	[00:10.00]Hello\n[00:10.00]Bonjour\n[00:10.00][00:20.00]by: credit
+P	[00:10.00]by: first is credit\n[00:10.00]Second
+P	[00:01.00]a [02:03.45] b\n[00:02.00][3:04] c
+P	Plain [00:01] with stray stamp\nAnother line
+
+# ---------- Enhanced / word-tag LRC ----------
+P	[00:10.00]<00:10.00>To <00:10.30>fall <00:10.60>in <00:10.90>love\\n怦然心动
+P	[00:10:00]<00:10:00>Hello <00:10:50>world
+P	[00:10.00]<00:10.00>to<00:10.20>geth<00:10.40>er <00:10.60>now
+P	[00:10.00]<00:10.00>To<00:10.20> <00:10.40>fall
+P	[00:10.00]Lead <00:10.50>in <00:11.00>words
+P	[00:10.00] Lead <00:10.50>in
+P	[00:10.00]<00:10.00> spaced <00:10.50> words
+P	[00:10.00]<00:10.00>a<b <00:10.50>c
+P	[00:10.00]<00:10.00>Hello\\nWorld <00:10.50>next
+P	[00:10.00]<00:10.00>Hello\\rWorld <00:10.50>next
+P	[00:10.00]<00:10.000>Three <00:10.5>bad <00:11.25>ok
+P	[00:10.00]<00:10.00>Word\t<00:10.50>tab
+P	[00:10.00]<00:10.00>   <00:10.50>after blank
+P	[00:10.00]<00:12.00>late <00:11.00>early
+P	[00:10.00]<00:10.00>Hel<00:10.20>lo\n[00:10.00]Bonjour
+P	[00:10.00][00:30.00]<00:10.00>Multi <00:10.50>stamp
+P	[00:10.00]<00:10.00>"<00:10.20>quote
+P	[00:10.00]v1: <00:10.00>Hello <00:10.50>world
+P	[00:10.00]<00:10.00>Hello <00:10.50>world\ntrailing continuation
+P	[00:10.00]<00:10.00>日<00:10.20>本<00:10.40>語
+P	[00:10.00]<00:10.00>\u200BZero <00:10.20>width
+
+# ---------- Kugou / Paxsenix ----------
+P	[offset:500]\n[1000,2000]<0,500,0>Hel<500,500,0>lo <1000,1000,0>world\n[3000,1000]<0,1000,0>Next
+P	[1000,2000]<0,500,0>Hel<500,500,0>lo <1000,1000,0>world\n[1000,2000]<0,2000,0>Translation
+P	[OFFSET:100]\n[1500,500]<0,500,0>Upper offset
+P	[offset:-200]\n[1200,500]<0,500,0>Negative offset\n[900,100]<0,100,0>Small
+P	[500,100]<0,100,0>small start only
+P	[ti:Kugou]\n[2000,1000]Plain body no tokens\n[3000,1000]<0,500,0> <500,500,0>spaced
+P	[2000,1000]<0,500,0>   \n[3000,1000]<0,500,0>ok
+P	[99999999999999999999,1]<0,1,0>overflow\n[2000,1000]<0,500,0>fine
+P	[2000,1000]<0,500,0>A<99999999999999999999,1,0>B
+
+# ---------- YRC / richsync / JSON documents through parseLyrics ----------
+P	[12000,2500](12000,400,0)Hel(12400,600,0)lo (13500,1000,0)there
+P	{"t":0,"c":[{"tx":"作词: "},{"tx":"Someone"}]}\n[12000,2500](12000,400,0)Hel(12400,600,0)lo (13500,1000,0)there
+P	[12000,2500](12000,400,0)Hel(12400,600,0)lo\n[11000,500](11000,500,0)unsorted
+P	[{"ts":12.5,"te":14.0,"x":"Hi there","l":[{"c":"Hi ","o":0.0},{"c":"there","o":0.5}]}]
+P	[{"ts":12.5,"te":14.0,"x":"Hi there","l":[{"c":"Hi","o":0.0}]}]
+P	{"format":"pixelplay-lyrics","version":1,"lines":[{"startMs":1000,"endMs":3000,"text":"Lead"}]}
+P	  \uFEFF{"format":"pixelplay-lyrics","version":1,"voices":[{"id":"lead","role":"lead"},{"id":"back","role":"background"},{"id":"guest","role":"duet","name":"Guest"}],"lines":[{"startMs":1000,"endMs":3000,"text":"Lead words","syllables":[{"startMs":1000,"durationMs":500,"text":"Lead "},{"startMs":1500,"durationMs":1500,"text":"words"}]},{"startMs":1500,"endMs":2200,"text":"Echo","voiceId":"back"},{"startMs":2000,"endMs":3500,"text":"Guest","voiceId":"guest"}]}
+P	{"format":"pixelplay-lyrics","version":2,"lines":[{"startMs":1000,"endMs":3000,"text":"Lead"}]}
+P	{"not":"a lyrics doc"}\n[00:01.00]After json
+
+# ---------- TTML through parseLyrics ----------
+P	<?xml version='1.0' encoding='utf-8'?>\n<tt xmlns="http://www.w3.org/ns/ttml" xmlns:itunes="http://music.apple.com/lyric-ttml-internal" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" itunes:timing="Word" xml:lang="en">\n  <head>\n    <metadata>\n      <ttm:agent type="person" xml:id="v1">\n        <ttm:name type="full">Chase Atlantic</ttm:name>\n      </ttm:agent>\n    </metadata>\n  </head>\n  <body dur="0:15.000">\n    <div begin="7.531" end="12.005" itunes:songPart="Verse">\n      <p begin="7.531" end="12.005" itunes:key="L1" ttm:agent="v1"><span begin="7.531" end="7.782">Yeah,</span> <span begin="9.208" end="9.443">I</span> <span begin="9.443" end="9.675">bet</span></p>\n    </div>\n  </body>\n</tt>
+P	<?xml version='1.0' encoding='utf-8'?>\n<tt xmlns="http://www.w3.org/ns/ttml">\n  <body>\n    <div>\n      <p begin="00:01.000">Hello\n    </div>\n  </body>\n</tt>
+P	<tt xmlns="http://www.w3.org/ns/ttml">\n  <body>\n    <div>\n      <p begin="00:01.000" end="00:03.000">Hello world</p>\n      <p begin="00:04.000" end="00:06.000">Second line</p>\n    </div>\n  </body>\n</tt>
+P	<tt xmlns="http://www.w3.org/ns/ttml">\n  <body>\n    <div>\n      <p begin="00:14.780" end="00:18.750">\n        <span begin="00:14.780" end="00:15.100">When </span>\n        <span begin="00:15.100" end="00:15.300">I </span>\n        <span begin="00:15.300" end="00:15.700">talk</span>\n      </p>\n    </div>\n  </body>\n</tt>
+P	<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata"><body><div><p begin="1.0" ttm:agent="v1"><span begin="1.0">Main</span> <span begin="1.5">line</span><span ttm:role="x-bg"><span begin="2.0">(oh</span> <span begin="2.3">yeah)</span></span></p><p begin="3.0" ttm:agent="v2"><span begin="3.0">Duet</span><span ttm:role="x-translation" xml:lang="es">Dueto</span></p></div></body></tt>
+P	<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1.000">First<br/>second half</p><p begin="2.000">Line <br></br> break</p></div></body></tt>
+P	<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1.0">Tom &amp; Jerry &lt;3 &#233;t&#xE9; &quot;q&quot; &apos;a&apos;</p></div></body></tt>
+P	<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1.0">Non&nbsp;breaking</p></div></body></tt>
+P	<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1.0"><![CDATA[Raw <text> & more]]> after</p><p begin="2.0">a<!-- comment -->b<?pi data?>c</p></div></body></tt>
+P	<tt:tt xmlns:tt="http://www.w3.org/ns/ttml"><tt:body><tt:div><tt:p begin="00:00:05.250"><tt:span begin="00:00:05.250">Prefixed</tt:span> <tt:span begin="00:00:06.000">tags</tt:span></tt:p></tt:div></tt:body></tt:tt>
+P	<tt xmlns="http://www.w3.org/ns/ttml"><body><div><ttm:p begin="1.0">Unbound prefix</ttm:p></div></body></tt>
+P	<smil xmlns="http://www.w3.org/ns/SMIL"><body><p begin="2.5s">Smil wrapper</p></body></smil>
+P	<?xml version="1.0"?><!DOCTYPE tt [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><tt><body><p begin="1.0">&xxe;</p></body></tt>
+P	<TT><body><p begin="1">Upper root</p><P begin="2">Upper p</P><p begin="3"><SPAN begin="3.5">Upper span</SPAN><BR/>x</p></body></TT>
+P	<tt><body><p begin="1:02:03.5">Hours</p><p begin="00:01.123456">Long fraction</p><p begin="00:02.1">Short fraction</p><p begin="4.5s">Seconds</p><p begin="100ms">Milliseconds</p><p begin=" 7 ">Spaces</p><p begin="7.5S">Upper S</p></body></tt>
+P	<tt><body><p begin="-1.5">Negative</p><p begin="2.0">Fine</p></body></tt>
+P	<tt><body><p begin="NaN">Not a number</p><p begin="2.0">Fine</p></body></tt>
+P	<tt><body><p begin="Infinity">Infinite</p><p begin="2.0">Fine</p></body></tt>
+P	<tt><body><p>No timing<span>at all</span></p><p><span>first</span><span begin="3.0">timed later</span></p><p begin="5.0">   </p><p begin="6.0"><span begin="6.0">   </span></p></body></tt>
+P	<tt><body><p begin="9.0">Later</p><p begin="1.0">Earlier</p><p begin="1.0">Same</p></body></tt>
+P	<tt><body><p begin="1.0">Outer <p begin="2.0">inner</p> tail</p></body></tt>
+P	<tt><body><p begin="1.0">  lots   of\n\n   space  </p><p begin="2.0"><span begin="2.0">  a  </span>  <span begin="2.5">\n b \n</span></p></body></tt>
+P	<tt><body><p begin="1.0">Tab\tand\u000Bvtab</p><p begin="2.0">x\u00A0y</p><p begin="3.0"><span begin="3.0">\u00A0</span>z</p></body></tt>
+P	<tt><body><p begin="1.0" begin="2.0">Duplicate attribute</p></body></tt>
+P	<tt><body><p begin=1.0>Unquoted</p></body></tt>
+P	<tt><body><p begin='1.0'>Single quoted</p></body></tt>
+P	<tt><body><p begin="1.0">Unclosed</body></tt>
+P	<tt><body><p begin="1.0">ok</p></body></tt><extra/>
+P	<tt><body><p begin="1.0">ok</p></body></tt>\n<!-- trailing comment -->\n
+P	<tt><body><p begin="1.0">a ]]> b</p></body></tt>
+P	<tt><body><p begin="1.0">a & b</p></body></tt>
+P	<tt><body><p begin="1.0">ctrl \u0001 char</p></body></tt>
+P	<tt><body><p begin="1.0" end="2.0" xml:space="preserve">x</p></body></tt>
+P	<tt xmlns:a="urn:a" xmlns:b="urn:a"><body><p begin="1.0" a:x="1" b:x="2">ns duplicate</p></body></tt>
+P	<?xml version="1.0"?>   <tt><body><p begin="1.0">decl then spaces</p></body></tt>
+P	<?XML version="1.0"?><tt><body><p begin="1.0">upper decl</p></body></tt>
+P	<tt><body><p begin="1.0">Zero\u200Bwidth\u00ADsoft</p></body></tt>
+P	<tt><body><p begin="00:01.000"><span begin="00:01.000">[bracket]</span> <span begin="00:01.500">text</span></p></body></tt>
+P	<tt><body><p begin="00:01.000">"ts" in text</p></body></tt>
+
+# ---------- Direct TTML conversions ----------
+T	<tt><body><p begin="1.0"><span begin="1.0">Hello</span> <span begin="1.4">there</span></p></body></tt>
+T	<tt><body><p begin="61.25">Minute</p><p begin="3599.999">Almost hour</p><p begin="3600">Hour</p></body></tt>
+T	<tt><body><p begin="0.004">Rounding</p><p begin="0.0049">Rounding2</p><p begin="1.0005">Half</p></body></tt>
+T	<tt><body></body></tt>
+T	not xml at all
+T	
+T	   \n
+T	\uFEFF<?xml version="1.0"?><tt><body><p begin="1.0">BOM decl</p></body></tt>
+T	<tt><body><p begin="1.0">x</p></body></tt><tt/>
+T	<tt><body><p begin="1.0"><span begin="1.0">a</span><span begin="2.0"><span begin="2.5">nested</span></span></p></body></tt>
+T	<tt><body><p begin="1.0">a<span>b</span><span begin="1.5"> c </span>d</p></body></tt>
+T	<tt><body><p begin="5:00">MM:SS</p><p begin="1:2:3">H:M:S short</p><p begin="1:2:3:4">Four parts</p><p begin="a:b">Bad</p><p begin="1.5.5">Dots</p></body></tt>
+T	<tt><body><p begin="+2.0">Plus</p><p begin="2.0f">Suffix</p><p begin="1e1">Exponent</p><p begin="0x10">Hex</p></body></tt>
+
+# ---------- YRC transpiler (WordSyncTranspilersTest) ----------
+Y	[12000,2500](12000,400,0)Hel(12400,600,0)lo (13500,1000,0)there
+Y	[100,300](50,100,0)early
+Y	[100,300](100,999,0)long
+Y	[100,300](100,-1,0)bad
+Y	[100,300](<100,200,0>)wrong
+Y	[100,300](100,0,0)missing(100,300,0)word
+Y	[100,300](100,0,0), (100,300,0)word
+Y	@../../Packages/PixlCore/Tests/PixlLyricsTests/Fixtures/parsing/netease-yrc-structure.yrc
+Y	@../../Packages/PixlCore/Tests/PixlLyricsTests/Fixtures/parsing/netease-featured-punctuation.yrc
+Y	@../../Packages/PixlCore/Tests/PixlLyricsTests/Fixtures/parsing/netease-punctuation.yrc
+Y	[100,300]plain text only
+Y	[100,300](abc
+Y	[100,300]text (12,
+Y	{"t":0,"c":[{"tx":"credits"}]}\n\n[100,300](100,300,0)after json\r\n[500,200](500,200,0)crlf
+Y	[100,0](100,0,0)zero
+Y	[99999999999999999999,1](1,1,0)x
+Y	[500,300](500,300,0)b\n[100,300](100,300,0)a
+Y	[100,300](100,100,0)a(150,100,0)b
+Y	[100,300](100,100,0)a(100,100,0)b
+Y	[100,300](100,0,0)x(100,0,0)y
+Y	[100,300](100,0,0)…(100,200,0)word(300,0,0)!
+Y	[100,300](100,300,0)text with\u2028separator
+Y	not yrc
+Y	
+Y	[100,300](100,100,1)flag one
+Y	[100,300] (100,100,0)leading space
+Y	 [100,300](100,100,0)indented
+
+# ---------- RichSync transpiler ----------
+R	[{"ts":12.5,"te":14.0,"x":"Hi there","l":[{"c":"Hi ","o":0.0},{"c":"there","o":0.5}]}]
+R	[{"ts":1,"te":2,"x":"hello"}]
+R	[{"ts":1,"te":2,"x":"hello","l":[{"c":"hello","o":-1}]}]
+R	[{"ts":1,"te":2,"x":"full line","l":[{"c":"half","o":0}]}]
+R	[]
+R	{"ts":1}
+R	[{"ts":"1.5","te":"2","x":"str times","l":[{"c":"str times","o":"0"}]}]
+R	[{"ts":1,"te":2,"x":123,"l":[{"c":123,"o":0}]}]
+R	[{"ts":1,"te":2,"x":"a","l":{"c":"a","o":0}}]
+R	[{"ts":1,"te":2,"x":"a","l":null}]
+R	[{"ts":1,"te":2,"x":"a","l":[]}]
+R	[{"ts":-1,"te":2,"x":"a"}]
+R	[{"ts":86400.5,"te":86401,"x":"a"}]
+R	[{"ts":1.0005,"te":1.0015,"x":"ab","l":[{"c":"a","o":0},{"c":"b","o":0.0004}]}]
+R	[{"ts":1,"te":2,"x":"ab","l":[{"c":"a","o":0.5},{"c":"b","o":0.2}]}]
+R	[{"ts":2,"te":3,"x":"b"},{"ts":1,"te":2,"x":"a"}]
+R	[{"ts":1,"te":2,"x":"a","ts":1.5}]
+R	[{"ts":1,"te":2,"x":"a","extra":{"nested":[1,2,3]}}]
+R	[{"ts":1,"te":2}]
+R	[{"ts":1,"te":2,"x":null}]
+R	[{"ts":true,"te":2,"x":"a"}]
+R	[{"ts":1,"te":2,"x":"a"}] trailing
+R	[{"ts":1e0,"te":2E0,"x":"exp"}]
+R	[1,2]
+
+# ---------- Lyricsfile (LyricsfileParserTest) ----------
+L	version: "1.0"\nlines:\n  - text: No surprises\n    start_ms: 13440\n    end_ms: 16000\n    words:\n      - text: "No "\n        start_ms: 13440\n      - text: surprises\n        start_ms: 14000\n  - text: On\n    start_ms: 18000\n    words:\n      - text: On\n        start_ms: 18000
+L	version: "2.0"\nlines:\n  - text: No surprises\n    start_ms: 13440
+L	offset_ms: 200\nversion: "1.0"\nlines:\n  - text: a\n    start_ms: 1
+L	version: "1.0"\nlines:\n  - text: No surprises\n    start_ms: 13440\n    words:\n      - text: "No "\n        start_ms: 13440\n      - text: surprises\n        start_ms: 12000
+L	version: "1.0"\nlines:\n  - text: a\n    start_ms: -1
+L	version: "1.0"\nlines:\n  - text: a\n    start_ms: .nan
+L	!!java.lang.ProcessBuilder {}
+L	version: 2.0\nversion: "1.0"\nlines:\n  - text: a\n    start_ms: 1
+L	@../../Packages/PixlCore/Tests/PixlLyricsTests/Fixtures/parsing/lrclib-lyricsfile-structure.yaml
+L	
+L	
+L	just a string
+L	- a\n- b
+L	version: 1.0\nlines:\n  - text: Unquoted version\n    start_ms: 1000
+L	version: '1.0'\nlines:\n- text: Compact sequence\n  start_ms: 1000\n  words:\n  - text: 'Compact '\n    start_ms: 1000\n  - text: sequence\n    start_ms: 1500
+L	# comment\nversion: '1.0' # trailing\nmetadata:\n  title: 'It''s'\n  offset_ms: 0\nlines:\n  - text: "Escaped \\"quote\\" \\u00e9"\n    start_ms: '1000'
+L	version: '1.0'\noffset_ms: "0"\nlines:\n  - text: a\n    start_ms: 1
+L	version: '1.0'\noffset_ms: 0.0\nlines:\n  - text: a\n    start_ms: 1
+L	version: '1.0'\noffset_ms:\nlines:\n  - text: a\n    start_ms: 1
+L	version: '1.0'\nmetadata:\n  offset_ms: 5\nlines:\n  - text: a\n    start_ms: 1
+L	version: '1.0'\nlines:\n  - text: a\n    start_ms: 1e3\n  - text: b\n    start_ms: 0x10
+L	version: '1.0'\nlines:\n  - text: a\n    start_ms: 1_000
+L	version: '1.0'\nlines:\n  - text: a\n    start_ms: 12.5
+L	version: '1.0'\nlines:\n  - text: a\n    start_ms: 12.0
+L	version: '1.0'\nlines:\n  - text: a\n    start_ms: 86400001
+L	version: '1.0'\nlines:\n  - text: a\n    start_ms: ~
+L	version: '1.0'\nlines:\n  - text: a\n    start_ms: 1\n    words:\n      - text: ' '\n        start_ms: 1\n      - text: b\n        start_ms: 2
+L	version: '1.0'\nlines:\n  - text: a\n    start_ms: 1\n    words:\n      - text:\n          nested: map\n        start_ms: 1
+L	version: '1.0'\nlines:\n  - start_ms: 1
+L	version: '1.0'\nlines: not a list
+L	version: '1.0'\nlines: []
+L	version: '1.0'\nlines:\n  - just a string
+L	version: '1.0'\nlines:\n  - text: a\n    start_ms: 1\n    words: not a list
+L	version: '1.0'\nlines:\n  - text: a\n    start_ms: 1\n    words: []
+L	version: '1.0'\nlines:\n  - {text: Flow line, start_ms: 1000}\n  - text: Block\n    start_ms: 2000
+L	version: '1.0'\nlines:\n  - text: a\n    start_ms: 1\nplain: |\n  Line one\n  Line two\n\n  After blank
+L	version: '1.0'\nlines:\n  - text: a\n    start_ms: 1\nplain: >-\n  folded\n  text
+L	version: '1.0'\nlines:\n  - text: Plain multi\n      line scalar\n    start_ms: 1
+L	version: '1.0'\nlines:\n  - text: 'single\n\n    quoted multi'\n    start_ms: 1
+L	---\nversion: '1.0'\nlines:\n  - text: Document marker\n    start_ms: 1
+L	version: '1.0'\nlines:\n  - text: a\n    start_ms: 1\n---\nversion: '1.0'
+L	version: '1.0'\nlines:\n  - text: a\n    start_ms: 1\n...
+L	version: '1.0'\nlines:\n\t- text: tab indent\n\t  start_ms: 1
+L	version: &v '1.0'\nlines:\n  - text: *v\n    start_ms: 1
+L	version: !!str 1.0\nlines:\n  - text: tagged\n    start_ms: 1
+L	version: '1.0'\nlines:\n  - text: a\n    start_ms: 1\n    text: dup
+L	version: '1.0'\nlines:\n  - text: Yes\n    start_ms: 1\n  - text: null\n    start_ms: 2\n  - text: 123\n    start_ms: 3\n  - text: true\n    start_ms: 4
+L	version: '1.0'\nlines:\n  - text: "  padded  "\n    start_ms: 1\n    words:\n      - text: "  padded"\n        start_ms: 1\n      - text: "  "\n        start_ms: 2
+L	version: '1.0'\nlines:\n  - text: "unterminated\n    start_ms: 1
+L	version: '1.0'\nlines:\n  - text: a: b\n    start_ms: 1
+L	version: '1.0'\nlines:\n  - text: "colon: inside quotes"\n    start_ms: 1\n  - text: hash#notcomment\n    start_ms: 2\n  - text: hash #comment\n    start_ms: 3
+L	version: '1.0'\r\nlines:\r\n  - text: CRLF\r\n    start_ms: 1
+L	{version: '1.0', lines: [{text: All flow, start_ms: 5}]}
+L	version: '1.0'\nlines:\n  - text: a\n    start_ms: [1]
+L	version: '1.0'\nlines:\n  - text: "\\x41\\t\\U0001F600"\n    start_ms: 1
+
+# ---------- Import security (LyricsImportSecurityTest) ----------
+I	track.lrc	text/plain	\uFEFF[00:01.00]\u202eHello world
+I	track.txt	text/plain	[00:01.00]Hello
+I	track.lrc	text/plain	just plain text
+IH	track.lrc	<null>	89504E47
+IH	track.lrc	application/octet-stream	FFFE5B00300030003A00300031002E00300030005D0048006F006C00610020006D0075006E0064006F00
+IH	track.lrc	application/octet-stream	FEFF005B00300030003A00300031002E00300030005D00480069
+IH	track.lrc	text/plain	EFBBBF5B30303A30312E30305D4869
+IH	track.lrc	text/plain	5B30303A30312E30305DC328
+IH	track.lrc	text/plain	FFFE5B00
+IH	track.lrc	text/plain	
+I	track.ttml	application/ttml+xml	<tt xmlns="http://www.w3.org/ns/ttml">\n  <body>\n    <div>\n      <p begin="00:01.000" end="00:03.000">Hello world</p>\n      <p begin="00:04.000" end="00:06.000">Second line</p>\n    </div>\n  </body>\n</tt>
+I	track.ttml	application/xml	<tt xmlns="http://www.w3.org/ns/ttml">\n  <body>\n    <div>\n      <p begin="00:14.780" end="00:18.750">\n        <span begin="00:14.780" end="00:15.100">When </span>\n        <span begin="00:15.100" end="00:15.300">I </span>\n        <span begin="00:15.300" end="00:15.700">talk</span>\n      </p>\n    </div>\n  </body>\n</tt>
+I	track.ttml	application/ttml+xml	<?xml version='1.0' encoding='utf-8'?>\n<tt xmlns="http://www.w3.org/ns/ttml" xmlns:itunes="http://music.apple.com/lyric-ttml-internal" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" itunes:timing="Word" xml:lang="en">\n  <head>\n    <metadata>\n      <ttm:agent type="person" xml:id="v1">\n        <ttm:name type="full">Chase Atlantic</ttm:name>\n      </ttm:agent>\n    </metadata>\n  </head>\n  <body dur="0:15.000">\n    <div begin="7.531" end="12.005" itunes:songPart="Verse">\n      <p begin="7.531" end="12.005" itunes:key="L1" ttm:agent="v1"><span begin="7.531" end="7.782">Yeah,</span> <span begin="9.208" end="9.443">I</span> <span begin="9.443" end="9.675">bet</span></p>\n    </div>\n  </body>\n</tt>
+I	track.ttml	application/ttml+xml	<!DOCTYPE tt [\n  <!ENTITY xxe SYSTEM "file:///etc/passwd">\n]>\n<tt xmlns="http://www.w3.org/ns/ttml">\n  <body>\n    <div>\n      <p begin="00:01.000">&xxe;</p>\n    </div>\n  </body>\n</tt>
+I	track.ttml	text/plain	[00:01.00]v1: <00:01.00>Hello <00:01.50>world
+I	track.lrc	text/plain; charset=utf-8	[00:01.00]Params
+I	track.LRC	TEXT/PLAIN	[00:01.00]Upper case
+I	track.lrc	image/png	[00:01.00]Bad mime
+I	<null>	text/plain	[00:01.00]No name
+I	lrc	text/plain	[00:01.00]No dot
+I	track.lrc.bak	text/plain	[00:01.00]Wrong final extension
+I	track.lrc		[00:01.00]Empty mime
+I	track.lrc	   	[00:01.00]Blank mime
+I	track.lrc	text/plain	[00:01.00]Reported too big	262145
+I	track.lrc	text/plain	[00:01.00]Reported at limit	262144
+I	track.ttml	text/xml	[00:01.00]Reported ttml big	1048577
+I	track.lrc	text/plain	
+I	track.lrc	text/plain	   \n\t\n
+I	track.lrc	text/plain	\r\n[00:01.00]CRLF\r\n[00:02.00]lines\r\n
+I	track.lrc	application/x-subrip	[00:01.00]subrip mime
+I	track.json	application/json	{"format":"pixelplay-lyrics","version":1,"lines":[{"startMs":12000,"endMs":14500,"text":"Hello there","syllables":[{"startMs":12000,"durationMs":400,"text":"Hel"},{"startMs":12400,"durationMs":600,"text":"lo "},{"startMs":13500,"durationMs":1000,"text":"there"}]}]}
+I	track.json	text/xml	{"format":"pixelplay-lyrics","version":1,"lines":[{"startMs":1,"endMs":2,"text":"x"}]}
+I	track.yrc	text/plain	[12000,2500](12000,400,0)Hel(12400,600,0)lo (13500,1000,0)there
+I	track.yrc	application/json	[12000,2500](12000,400,0)Hel(12400,600,0)lo
+I	track.lrc	text/plain	<tt><body><p begin="1.0">TTML in an lrc file</p></body></tt>
+I	track.ttml	text/plain	<tt><body><p begin="1.0">Plain</p></body></tt>
+I	track.lrc	text/plain	[00:01.00]Hello\n[00:01.00]Bonjour
+IC	   [00:01.00]Direct content\u0000\u0007
+IC	\t\n
+IC	{"format":"pixelplay-lyrics","version":1,"lines":[{"startMs":1,"endMs":2,"text":"x"}]}
+IC	plain only text
+
+# ---------- Romanizers ----------
+RO	안녕하세요
+RO	한국어 노래를 불러요
+RO	값이 비싸요
+RO	맑은 하늘
+RO	각막 신라 국민 학교
+RO	Hello 세계!
+RO	नमस्ते दुनिया
+RO	क्षत्रिय ज्ञान श्री त्रिशूल
+RO	फ़िल्म क़लम ज़िंदगी
+RO	ॐ नमः शिवाय १२३
+RO	ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ
+RO	ਪੱਕਾ ਸੱਚ ਅੱਖ
+RO	ੴ ਸ਼ੇਰ ਖ਼ਾਲਸਾ ੧੨੩
+RO	Привет, мир! Его нет.
+RO	Ещё ель, ёлка; съел объект
+RO	день, ночь, жизнь, конь, мать
+RO	Привіт, як справи? Юля їсть
+RO	Ђорђе, Љубав и Њива
+RO	Щастие и любов
+RO	Беларусь, ўсё. е
+RO	Үй, Өмүр, Ңаа
+RO	Ѓорѓи, Ќе, Ѕвезда
+RO	е
+RO	Е
+RO	ее
+RO	Mixed Latin и кириллица 123
+RO	Hello world
+RO	
+RO	我爱你中国
+RO	音乐快乐欢乐娱乐
+RO	长大成长生长
+RO	一点儿哪儿玩儿
+RO	重复严重再重
+RO	你好，世界！
+RO	绿色的女儿
+RO	地方大地土地
+RO	Hello 中文 mix
+RO	儿
+RO	没有人知道我的心
+RO	🎵 emoji 노래 🎵
+RO	Тест\u0301 ударение
+
+# ---------- Romanisation inside parseLyrics ----------
+P	[00:01.00]안녕하세요\n[00:02.00]사랑해요
+P	[00:01.00]Привет мир\n[00:02.00]Hello
+P	[00:01.00]我爱你\n[00:02.00]你好\n[00:02.00]Translation
+P	[00:01.00]नमस्ते\n[00:02.00]ਸਤਿ ਸ੍ਰੀ
+P	[00:01.00]愛してる\n[00:02.00]世界\n[00:03.00]ひらがな
+P	[00:01.00]世界\n[00:02.00]中国
+P	안녕하세요\nПривет\n我爱你\nplain
+P	[00:01.00]ёлка\n[00:02.00]е
+P	[00:01.00]<00:01.00>사랑<00:01.50>해
+P	[1000,500]<0,500,0>사랑해
+
+# ---------- toLrcString round trips ----------
+Z	[00:10.00]Hello world\n[00:10.00]你好世界\n[00:20.00]Goodbye
+Z	[00:10.00]Hello world\n[00:10.00]你好世界\n[00:10.00]by: translator
+Z	[01:02.345]ms\n[00:00.009]tiny
+Z	Plain one\nPlain two
+Z	[00:01.00]안녕하세요
+Z	안녕하세요\nplain
+Z	
+Z	[99:59.99]max\n[00:00.00]zero
+
+# ---------- Normalisation helpers (LyricsRepositoryImpl) ----------
+NM	Café del Mar
+NM	Beyoncé & Jay-Z
+NM	Don't Stop Me Now
+NM	Don’t Stop `Me`
+NM	01. Song Title
+NM	01 - Song Title
+NM	1234. Song Title
+NM	 7_ Song
+NM	12.Song
+NM	Song (feat. Someone)
+NM	Song [Explicit]
+NM	Song – Radio Edit
+NM	Song: Live at Wembley
+NM	Song - Remastered 2011
+NM	Mash Up Mix
+NM	Artist vs Artist
+NM	Artist versus Artist
+NM	Song (Remix) - Extended Mix
+NM	ＦＵＬＬ　ＷＩＤＴＨ
+NM	Ελληνικά ΣΟΦΟΣ
+NM	İstanbul
+NM	Straße
+NM	日本語の歌
+NM	사랑해
+NM	東京 (Tokyo)
+NM	Song 【MV】
+NM	Song (Official Video)
+NM	Song（Live）
+NM	Song ((nested)) (Live
+NM	Song (Hi-Res)
+NM	Song (Official Audio)
+NM	Song - Hi-Res
+NM	Song (ft Guest)
+NM	Song (Feat.Guest)
+NM	Left Right
+NM	Song (OP Version)
+NM	Song - TV Size
+NM	Song・Short Ver.
+NM	Song · Intro
+NM	ー
+NM	
+NM	Taare Ginn - Envy
+NM	Song {Bonus}
+NM	Song 「Theme」
+NM	AC/DC
+NM	Sigur Rós
+NM	Hello  World   Again
+NM	Ⅻ Roman ²
+NM	mash  up
+
+# ---------- Title / artist scores ----------
+TS	AUTOMATIC	Song	Song
+TS	AUTOMATIC	Song (Live)	Song
+TS	AUTOMATIC	Hello World Again	Hello World
+TS	CANDIDATE	Hello World Again	Hello World
+TS	AUTOMATIC	Hello World	Hello World Again Tonight
+TS	AUTOMATIC	One Two Three Four Five Six Seven	One Two Three Four Five Six Eight
+TS	CANDIDATE	One Two Three Four	One Two Three Five
+TS	AUTOMATIC	사랑해	Saranghae
+TS	AUTOMATIC	東京	東京タワー
+TS	AUTOMATIC	Different	Song
+TS	AUTOMATIC	Unknown Artist	Someone
+TS	AUTOMATIC	Various Artists	Someone
+TS	AUTOMATIC	Beyoncé & Jay-Z	Beyonce and Jay Z
+TS	AUTOMATIC	The Weeknd	Weeknd
+TS	AUTOMATIC	Daft Punk feat. Pharrell Williams	Daft Punk
+TS	AUTOMATIC	A x B	B and C
+TS	AUTOMATIC	Alpha Beta Gamma	Gamma Delta Epsilon Zeta
+TS	AUTOMATIC	방탄소년단	Bangtansonyeondan
+TS	AUTOMATIC		Song
+TS	AUTOMATIC	!!!	!!!
+
+# ---------- Ranking (LyricsRepositoryImplTest) ----------
+M	AUTOMATIC	Actual Song	Actual Artist		180000	[{"id":1,"name":"Completely Different Song","artistName":"Different Artist","albumName":"Album","duration":180.0,"syncedLyrics":"[00:01.00]First line\n[00:05.00]Second line"}]
+M	AUTOMATIC	Midnight City (Remix)	M83	/music/Midnight City (Remix).mp3	242000	[{"id":2,"name":"Midnight City","artistName":"M83","albumName":"Album","duration":242.0,"syncedLyrics":"[00:01.00]First line\n[00:05.00]Second line"}]
+M	AUTOMATIC	Midnight City (Eric Prydz Remix)	M83	/music/Midnight City (Eric Prydz Remix).mp3	242000	[{"id":3,"name":"Midnight City (Eric Prydz Remix)","artistName":"M83","albumName":"Album","duration":242.0,"syncedLyrics":"[00:01.00]First line\n[00:05.00]Second line"}]
+M	AUTOMATIC	Black Magic	Little Mix	/music/Little Mix - Black Magic.mp3	211000	[{"id":4,"name":"Black Magic","artistName":"Little Mix","albumName":"Album","duration":211.0,"syncedLyrics":"[00:01.00]First line\n[00:05.00]Second line"}]
+M	CANDIDATE	Song	Artist		200000	[{"id":10,"name":"Song","artistName":"Artist","albumName":"A","duration":200.0,"plainLyrics":"plain"},{"id":11,"name":"Song","artistName":"Artist","albumName":"A","duration":201.0,"syncedLyrics":"[00:01.00]x"},{"id":12,"name":"Song","artistName":"Artist","albumName":"A","duration":200.5,"lyricsfile":"version: '1.0'\nlines:\n  - text: x\n    start_ms: 1000"},{"id":13,"name":"Song (Live)","artistName":"Artist","albumName":"A","duration":200.0,"syncedLyrics":"[00:01.00]x"},{"id":14,"name":"Song","artistName":"Artist","albumName":"A","duration":214.0,"syncedLyrics":"[00:01.00]x"},{"id":15,"name":"Song","artistName":"Artist","albumName":"A","duration":216.0,"syncedLyrics":"[00:01.00]x"},{"id":16,"name":"Song","artistName":"Other","albumName":"A","duration":200.0,"syncedLyrics":"[00:01.00]x"},{"id":17,"name":"Song","artistName":"Artist","albumName":"A","duration":0.0,"syncedLyrics":"[00:01.00]x"},{"id":18,"name":"Song","artistName":"Artist","albumName":"A","duration":200.0}]
+M	AUTOMATIC	Song	Artist		200000	[{"id":20,"name":"Song","artistName":"Artist","albumName":"A","duration":202.0,"syncedLyrics":"[00:01.00]x"},{"id":21,"name":"Song","artistName":"Artist","albumName":"A","duration":203.5,"syncedLyrics":"[00:01.00]x"},{"id":22,"name":"Song","artistName":"Artist","albumName":"A","duration":208.0,"plainLyrics":"p"},{"id":23,"name":"Song","artistName":"Artist","albumName":"A","duration":209.0,"plainLyrics":"p"},{"id":24,"name":"Song","artistName":"Artist","albumName":"A","duration":200.0,"syncedLyrics":"   ","plainLyrics":"p"}]
+M	AUTOMATIC	Song	Artist		600000	[{"id":30,"name":"Song","artistName":"Artist","albumName":"A","duration":603.0,"syncedLyrics":"[00:01.00]x"},{"id":31,"name":"Song","artistName":"Artist","albumName":"A","duration":615.0,"plainLyrics":"p"},{"id":32,"name":"Song","artistName":"Artist","albumName":"A","duration":616.0,"plainLyrics":"p"}]
+M	AUTOMATIC	Song	Artist		0	[{"id":40,"name":"Song","artistName":"Artist","albumName":"A","duration":200.0,"syncedLyrics":"[00:01.00]x"}]
+M	AUTOMATIC	Song	Unknown		200000	[{"id":50,"name":"Song","artistName":"Anyone","albumName":"A","duration":200.0,"syncedLyrics":"[00:01.00]x"}]
+M	AUTOMATIC	Song	Artist	/music/Song (Live).flac	200000	[{"id":60,"name":"Song","artistName":"Artist","albumName":"A","duration":200.0,"syncedLyrics":"[00:01.00]x"},{"id":61,"name":"Song (Live)","artistName":"Artist","albumName":"A","duration":200.0,"syncedLyrics":"[00:01.00]x"}]
+M	AUTOMATIC	Song	Artist	/music/Artist - Song - Acoustic.mp3	200000	[{"id":70,"name":"Song","artistName":"Artist","albumName":"A","duration":200.0,"syncedLyrics":"[00:01.00]x"},{"id":71,"name":"Song (Acoustic)","artistName":"Artist","albumName":"A","duration":200.0,"syncedLyrics":"[00:01.00]x"}]
+M	AUTOMATIC	Song	Artist	/music/Song Acoustic Version.mp3	200000	[{"id":72,"name":"Song","artistName":"Artist","albumName":"A","duration":200.0,"syncedLyrics":"[00:01.00]x"}]
+M	AUTOMATIC	Mashup Song	DJ		200000	[{"id":80,"name":"Mash Up Song","artistName":"DJ","albumName":"A","duration":200.0,"syncedLyrics":"[00:01.00]x"},{"id":81,"name":"Song vs Other","artistName":"DJ","albumName":"A","duration":200.0,"syncedLyrics":"[00:01.00]x"}]
+M	CANDIDATE	사랑해	아이유		200000	[{"id":90,"name":"Saranghae","artistName":"IU","albumName":"A","duration":200.0,"syncedLyrics":"[00:01.00]x"},{"id":91,"name":"사랑해","artistName":"아이유","albumName":"A","duration":200.0,"syncedLyrics":"[00:01.00]x"}]
+M	AUTOMATIC	Song	Artist		200000	[{"id":100,"name":"Song","artistName":"Artist","albumName":"A","duration":200.0,"syncedLyrics":"[00:01.00]x","lyricsfile":"version: '1.0'\nlines:\n  - text: Word\n    start_ms: 1000\n    words:\n      - text: Word\n        start_ms: 1000"},{"id":101,"name":"Song","artistName":"Artist","albumName":"A","duration":200.0,"syncedLyrics":"[00:01.00]x","lyricsfile":"version: '2.0'"}]
+
+# ---------- AMLL / NetEase matching ----------
+A	Song	Artist	Album	["SONG"]	["Artist"]	["Album"]
+A	Song	Artist	Album	["Song (Live)"]	["Artist"]	["Album"]
+A	Song	Artist	Album	["Song"]	["Another artist"]	["Album"]
+A	Song	Artist		["Song"]	["Artist"]	[""]
+A	Café	Sigur Rós	Ágætis byrjun	["CAFE"]	["sigur ros"]	["Agaetis Byrjun"]
+A	ﬁre	Ａｒｔｉｓｔ	Album!	["fire"]	["artist"]	["album"]
+A	Song	Artist	Album	["Other","Song"]	["X","Artist"]	["Y","Album"]
+A	Song	Artist	Album	[]	["Artist"]	["Album"]
+N	Example	Singer	Album	180000	{"name":"Example","artists":[{"name":"Singer"}],"album":{"name":"Album"},"duration":180000}
+N	Example	Singer	Album	180000	{"name":"Example (Live)","artists":[{"name":"Singer"}],"album":{"name":"Album"},"duration":180000}
+N	Example	Singer	Album	180000	{"name":"Example","artists":[{"name":"Cover Artist"}],"album":{"name":"Album"},"duration":180000}
+N	Example	Singer	Album	180000	{"name":"Example","artists":[{"name":"Singer"}],"album":{"name":"Other Recording"},"duration":180000}
+N	Example	Singer	Album	180000	{"name":"Example","artists":[{"name":"Singer"}],"album":{"name":"Album"},"duration":195000}
+N	Example (feat. Guest)	Singer, Guest	Album	180000	{"name":"Example","artists":[{"name":"Singer"},{"name":"Guest"}],"album":{"name":"Album"},"duration":180000}
+N	Example (feat. Guest)	Singer, Guest	Album	180000	{"name":"Example (Live)","artists":[{"name":"Singer"},{"name":"Guest"}],"album":{"name":"Album"},"duration":180000}
+N	Example (feat. Guest)	Singer, Guest	Album	180000	{"name":"Example","artists":[{"name":"Singer"}],"album":{"name":"Album"},"duration":180000}
+N	Example	Earth, Wind & Fire	Album	180000	{"name":"Example","artists":[{"name":"Earth, Wind & Fire"}],"album":{"name":"Album"},"duration":180000}
+N	Example	Singer feat. Guest	Album	180000	{"name":"Example","artists":[{"name":"Singer"},{"name":"Guest"}],"album":{"name":"Album"},"duration":181500}
+N	Example	Singer; Guest	Album	180000	{"name":"Example","artists":[{"name":"Singer"},{"name":"Guest"}],"album":{"name":"Album"},"duration":178500}
+N	Example	Singer		180000	{"name":"Example","artists":[{"name":"Singer"}],"album":{"name":"Anything"},"duration":180000}
+N	Example	Singer	Album	180000	{"name":"Example","artists":[{"name":"Singer"}],"album":{"name":"Album"},"duration":"180000"}
+N	Example	Singer	Album	180000	{"name":"Example","artists":[{"name":"Singer"}],"album":{"name":"Album"},"duration":180000.7}
+N	Example	Singer	Album	180000	{"name":"Example","artists":[{"name":"Singer"}],"duration":180000}
+N	Example	Singer	Album	180000	{"name":"Example","artists":[],"album":{"name":"Album"},"duration":180000}
+N	Example [with Friend]	Singer	Album	180000	{"name":"Example","artists":[{"name":"Singer"},{"name":"Friend"}],"album":{"name":"Album"},"duration":180000}
+N	Example (ft. A, B)	Singer	Album	180000	{"name":"Example","artists":[{"name":"Singer"},{"name":"A, B"}],"album":{"name":"Album"},"duration":180000}
+N	Example	Singer	Album	180000	{"name":123,"artists":[{"name":"Singer"}],"album":{"name":"Album"},"duration":180000}
+N	Example	Singer	Album	180000	{"name":["Example"],"artists":[{"name":"Singer"}],"album":{"name":"Album"},"duration":180000}
+
+# ---------- Embedded tag fields ----------
+E	{"LYRICS":["plain lyrics only"],"SYNCEDLYRICS":["[00:01.00]Synced lyrics"]}
+E	{"UNSYNCEDLYRICS":["first plain"],"LYRICS":["   ","second plain"]}
+E	{"TTML":["<tt><body><p begin=\\"1.0\\">From ttml</p></body></tt>"],"LYRICS":["plain"]}
+E	{}
+E	{"OTHER":["[00:01.00]ignored key"]}
+E	{"LYRICS":["[00:01.00]first synced","[00:02.00]second synced"]}
+
+# ---------- Raw content and flattened cache detection ----------
+RAW	[00:01.00]Hello\n[00:02.00]World
+RAW	[00:01.00]<00:01.00>Hel<00:01.20>lo <00:01.50>world
+RAW	Plain\nonly
+RAW	[00:01.00]Supercalifragilistic\n[00:02.00]Antidisestablishment
+RAW	[00:01.00]Supercalifragilistic\n[00:02.00]short
+RAW	[00:01.00]Hello\n[00:01.00]Bonjour
+RAW	{"format":"pixelplay-lyrics","version":1,"lines":[{"startMs":1000,"endMs":3000,"text":"Doc"}]}
+RAW	
+
+# ---------- More edge cases (second batch) ----------
+P	[00:01.00]<00:01.00>Hello <00:01.50>world\n[00:02.00]after
+P	[00:01.00]Line\u0085next\n[00:02.00]b
+P	[00:01.00]\nnext line\n[00:02.00]b
+P	[3000,500]<0,250,1>B<250,250,5>A\n[1000,500]<0,500,0>first\n[1000,500]<0,500,0>second
+P	[00:01.00]Mid﻿BOM
+P	こんにちは\n世界
+P	[00:01.00]Привет\n[00:01.00]Hello
+P	[00:01.00]Юрій їде\n[00:02.00]семья, подъезд
+P	[00:01.00]नमस्ते\nदुनिया
+P	[00:01.00]A\n[00:01.00]\n[00:01.00]B
+P	[00:01.00]<00:01.00>a <00:01.50>b\n[00:01.00]translation\n[00:01.00]by:someone\n[00:01.00]by: two
+P	[00:05.00]five\n[00:05.00]cinq\n[00:01.00]one\n[00:01.00]un
+P	[01:00.00]x\n[00:59.999]y
+P	   \n   [00:01.00]first after blank\n
+L	version: '1.0'\nlines:\n  - text: a\n    start_ms: 1\nplain: |+\n  keep\n\n
+L	version: '1.0'\nlines:\n  - text: >\n      folded\n      text\n    start_ms: 1
+L	version: '1.0'\nlines:\n  - text: |-\n      a\n      b\n    start_ms: 1
+L	version: '1.0'\nlines:\n  - text: "multi\n      line \\"double\\""\n    start_ms: 1
+L	version: '1.0'\nlines:\n  - text: "esc\\\n      continued"\n    start_ms: 1
+L	version: '1.0'\nlines:\n  - text: a\n   start_ms: 1
+L	version: '1.0'\nlines: [\n  {text: a, start_ms: 1},\n  {text: b, start_ms: 2}\n]
+L	version: '1.0'\n\n# comment\nlines:\n\n  # between\n  - text: a\n\n    start_ms: 1\n  # end\n
+L	"version": "1.0"\n'lines':\n  - "text": a\n    'start_ms': 1
+L	version:\t'1.0'\nlines:\n  - text:\ta\n    start_ms:\t1
+L	version: '1.0'\nlines:\n  - text: a\n    start_ms: '0016742'\n  - text: b\n    start_ms: +16800\n  - text: c\n    start_ms: 16.9e3
+L	version: '1.0'\nmetadata:\n  title: t\n  offset_ms: '0'\nlines:\n  - text: a\n    start_ms: 1
+L	version: '1.0'\nlines:\n  - text: a\n    start_ms: 1\n    words:\n      - text: a\n        start_ms: 1\n        start_ms: 2
+L	version: '1.0'\nx: &m {a: b}\ny: *m\nlines:\n  - text: a\n    start_ms: 1
+L	version: '1.0'\nlines:\n  - text: 日本語 🎵\n    start_ms: 1
+L	﻿version: '1.0'\nlines:\n  - text: bom\n    start_ms: 1
+L	version: '1.0'\nlines:\n  - text: - dash\n    start_ms: 1
+L	version: '1.0'\nlines:\n  - text: 'a' trailing\n    start_ms: 1
+L	version: '1.0'\nlines:\n  - text: "a": b\n    start_ms: 1
+L	version: '1.0'\nlines:\n  -\n    text: item on next line\n    start_ms: 1
+L	version: '1.0'\nlines:\n  - text: a\n    start_ms: 1\n    words:\n    - text: 'indentless '\n      start_ms: 1\n    - text: words\n      start_ms: 2
+L	version: '1.0'\nlines:\n  - text: a\n    start_ms: 1\n  -   text: b\n      start_ms: 2
+L	version: '1.0'\nlines:\n  - text: a\n    start_ms: 1\ntrailing: >\n\n  folded with leading blank\n
+T	<tt><body><p begin="1"><span begin="1">a</span>\n      <span begin="2">b</span></p></body></tt>
+T	<tt><body><p begin="1">  <span begin="1">a</span> </p><p begin="&#50;.0">ref begin</p></body></tt>
+T	<tt:tt xmlns:tt="urn:x"><tt:body><tt:div><tt:p begin="1"><tt:span begin="1">a<tt:br/>b</tt:span></tt:p></tt:div></tt:body></tt:tt>
+T	<tt><body><p begin="1"><span begin="1"><span begin="1.5">inner</span> outer</span></p></body></tt>
+T	<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata"><body><div><p begin="10.5" end="12" ttm:agent="v1"><span begin="10.5">Lead</span><span ttm:role="x-bg"><span begin="11">(echo)</span></span></p><p begin="11" ttm:agent="v2"><span begin="11">Duet</span> <span begin="11.5">part</span></p></div></body></tt>
+T	<tt><body><p begin="1">a<br/><br/>b</p><p begin="2"><br/>c<br/></p></body></tt>
+T	<tt><body><p begin="1">tab\there</p><p begin="2">nbsp  here</p></body></tt>
+Y	[100,300](100,100,0)(a)(200,100,0)b
+Y	[100,300](100,100,0)a\n\n\n[500,300](500,300,0)b\n
+Y	[0,1](0,1,0)z
+R	[{"ts":0,"te":0.001,"x":"z","l":[{"c":"z","o":0}]}]
+R	[{"ts":1,"te":2,"x":"a b","l":[{"c":"a ","o":0},{"c":"b","o":0.5}]},{"ts":2,"te":3,"x":"c"}]
+RO	Ь ъ
+RO	Подъезд и семья
+RO	Юрій та Євген
+RO	좋아 좋아요 많이
+RO	Тест-тест?Да!
+RO	ЁЖ ЁЛКА
+RO	Ўладзімір
+NM	Daft Punk - Get Lucky (feat. Pharrell Williams) [Radio Edit]
+NM	Song (Live) (Acoustic)
+NM	Song (Remix) [Explicit] - Live
+NM	Featuring Song
+NM	Song (feat)
+NM	Song ft. Other
+NM	Mashup
+NM	Song - Instrumental Version
+NM	Song – Edit
+NM	Song: The Movie
+NM	01_Song
+NM	001-  Song
+TS	AUTOMATIC	Get Lucky (feat. Pharrell Williams)	Get Lucky
+TS	CANDIDATE	Song Title Here Now	Song Title Here
+TS	AUTOMATIC	ＦＵＬＬ　ＷＩＤＴＨ	full width
+TS	AUTOMATIC	Various	Anyone
+TS	AUTOMATIC	AC/DC	ACDC
+M	AUTOMATIC	Get Lucky (feat. Pharrell Williams)	Daft Punk feat. Pharrell Williams	/m/Daft Punk - Get Lucky.flac	248000	[{"id":200,"name":"Get Lucky","artistName":"Daft Punk","albumName":"RAM","duration":248.4,"syncedLyrics":"[00:01.00]x"},{"id":201,"name":"Get Lucky (Radio Edit)","artistName":"Daft Punk","albumName":"RAM","duration":248.0,"syncedLyrics":"[00:01.00]x"}]
+M	CANDIDATE	こんにちは	歌手		200000	[{"id":210,"name":"Konnichiwa","artistName":"Kashu","albumName":"A","duration":200.0,"syncedLyrics":"[00:01.00]x"},{"id":211,"name":"こんにちは","artistName":"歌手","albumName":"A","duration":205.0,"plainLyrics":"p"}]
+
+# ---------- SnakeYAML tab rules ----------
+L	version: '1.0'\t\nlines:\n  - text: a\n    start_ms: 1
+L	version: '1.0'\nlines:\n  - text: a\t\n    start_ms: 1
+L	version: '1.0'\nlines:\n  - text: a\tb\n    start_ms: 1
+L	version: '1.0'\nlines:\n  - text: a\t# c\n    start_ms: 1
+L	version: '1.0'\nlines:\n  -\ttext: a\n    start_ms: 1
+L	version: '1.0'\nlines:\n  - text: a\n    start_ms: 1\t
+L	version: '1.0' \t# comment\nlines:\n  - text: a\n    start_ms: 1
+L	{version: '1.0',\tlines: [{text: a, start_ms: 1}]}
+L	version: '1.0'\nlines:\n  - text: "a"\t\n    start_ms: 1
+L	version: '1.0'\nlines:\n  - text: a \t \n    start_ms: 1
+L	version: '1.0'\nlines:\n  - text: a\n    \n    start_ms: 1
+L	version: '1.0'\nlines:\n  - text: a\n\t\n    start_ms: 1
+L	version : '1.0'\nlines:\n  - text: a\n    start_ms: 1
+L	version: '1.0'\nlines:\n  - text: a\n    start_ms: 1\n  -  text: b\n     start_ms: 2
