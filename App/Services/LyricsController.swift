@@ -226,6 +226,31 @@ final class LyricsController {
 
     // MARK: Translation
 
+    /// "Translate via AI" (Android `LyricsStateHolder.translateLyricsViaAi`, stage 13's `LyricsTranslating`): sends the
+    /// song's lyrics — its scanned text, else the LRC of what the screen shows — to the AI provider in the device
+    /// language; a valid reply is imported like a file, so each translation pairs with its line by timestamp.
+    func translateViaAI(song: Song, translator: any LyricsTranslating) {
+        if hasTranslatedLyrics {
+            message = LyricsTranslationOutcome.alreadyTranslated.message
+            return
+        }
+        let current = store.currentLyrics
+        let scanned = song.lyrics.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+        let raw = scanned ?? current.map { LyricsUtils.toLrcString($0) }
+        message = LyricsTranslationOutcome.progressMessage
+        let service = self.service
+        Task { [weak self] in
+            let outcome = await translator.translate(rawLyrics: raw, current: current,
+                                                     targetLanguage: AILyricsTranslator.deviceLanguageName)
+            if case .translated(let validated) = outcome, let service,
+               let saved = await service.save(song: song, rawContent: validated.sanitizedContent, source: "import"),
+               let self, self.loadedSongId == song.id {
+                self.apply(saved, songId: song.id)
+            }
+            self?.message = outcome.message
+        }
+    }
+
     /// Attaches translations (index into `synced` → text) to the current lyrics and keeps them: line-synced lyrics are
     /// stored as LRC with a duplicate timestamp per translation (how Android pairs translations); word-synced and
     /// document lyrics keep them for this session.

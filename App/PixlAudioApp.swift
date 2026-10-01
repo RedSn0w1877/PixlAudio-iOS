@@ -20,6 +20,7 @@ struct PixlAudioApp: App {
                 .environment(environment.youtube.downloads.badges)
                 .preferredColorScheme(environment.preferredColorScheme)
                 .task { await environment.start() }
+                .onOpenURL { url in environment.open(url) }
         }
         // Stage 12: Spotify library refresh in the background (BGAppRefreshTask, scheduled after sign-in / each run).
         .backgroundTask(.appRefresh(SpotifyService.backgroundTaskIdentifier)) {

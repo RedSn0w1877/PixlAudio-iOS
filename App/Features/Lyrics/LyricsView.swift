@@ -361,6 +361,9 @@ struct LyricsView: View {
                 onSyncYourself: syncYourselfAction,
                 onSave: { showSaveDialog = true },
                 onTranslate: { startTranslation() },
+                onTranslateViaAI: {
+                    if let song { controller.translateViaAI(song: song, translator: env.ai.lyricsTranslator) }
+                },
                 onReset: { if let song { controller.reset(song: song) } },
                 onToggleSyncControls: {
                     resetImmersive()

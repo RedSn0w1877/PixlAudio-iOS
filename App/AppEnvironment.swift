@@ -168,6 +168,21 @@ final class AppEnvironment {
         await updates.checkIfDue()
     }
 
+    /// A file opened in PixlAudio from Files or the share sheet (the declared document types; Android's external
+    /// intents): a `.pxpl` backup, or the Android app's legacy `.json.gz`, opens the restore flow on it.
+    func open(_ url: URL) {
+        guard !launch.isUITest, url.isFileURL else { return }
+        let name = url.lastPathComponent.lowercased()
+        guard name.hasSuffix(".pxpl") || name.hasSuffix(".gz") else { return }
+        if case .setup? = router.cover { return } // the setup has its own restore page
+        let backup = self.backup, router = self.router
+        Task {
+            guard let inspected = try? await backup.inspect(url: url) else { return }
+            backup.importStart = .inspected(inspected)
+            router.present(AppCover.backupImport)
+        }
+    }
+
     /// Call after music-library access was granted so its change notifications start.
     func libraryAccessChanged() {
         libraryAutoRefresh?.observeMediaLibraryIfAuthorized()

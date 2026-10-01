@@ -234,7 +234,7 @@ public actor SpotifySession {
             lastError = "Respuesta de login no válida"
             return .failure(SpotifyAuthError("state no coincide"))
         case .missingCode:
-            lastError = "Spotify no devolvió ningún código"
+            lastError = "Spotify returned no authorization code"
             return .failure(SpotifyAuthError("sin código de autorización"))
         case .code(let code):
             guard let verifier = pending?.codeVerifier else { return .failure(SpotifyAuthError("sin code_verifier guardado")) }

@@ -199,26 +199,6 @@ the design-system components (extend them rather than forking); put new tokens n
 `-screen` id per new screen state only through `DemoScreen` (one line each); every Apple API used for the first time
 goes into `docs/api-notes.md`.
 
-## Stage 13 notes (AI)
-
-- Providers: Gemini and every OpenAI-compatible provider through PixlNet's `AiOrchestrator` (provider chain,
-  cooldowns, 30-minute cache in `AICacheRecord`, model recovery, usage in `AIUsageRecord`); settings come from the
-  Android keys in UserDefaults and the Keychain (`AISettingsBridge`). Ollama / custom base URLs may be plain HTTP on the
-  LAN. The on-device provider is the system language model (`OnDeviceAiClient`), availability-gated, with guided
-  generation for playlist ids.
-- AI playlist sheet: Android's layout; the badge, size card, prompt field, error / success cards and the morphing
-  generate button are tinted glass; the min / max fields inside the size card are fills. A generated mix replaces
-  today's Daily Mix (`HomeStore.setDailyMix`), starts playing and opens the player once the sheet has gone.
-- AI Playlist Lab: Android's full-screen dialog as a cover; cards are glass, chips / segments / fields inside them are
-  fills; Generate saves an AI playlist (`LibraryEditor.createPlaylist(isAiGenerated:)`) and closes.
-- TAIS DJ chat: bubbles in Android's shapes as glass (user = `primary`, Taizo = `surfaceContainerHigh`, errors =
-  `errorContainer`), suggestion chips as glass capsules, the bulk buttons and song rows inside a bubble as fills. Taizo's
-  avatar keeps Android's `primary → tertiary` gradient (a mark, not a Material surface). Online (catalogue) results
-  import through `SearchProviding.importAndPlay` on tap. The sheet uses the large detent: Android caps the column at 620 dp, but the system's
-  partial-height sheet floats with clearer glass, and the Home content behind made the chat hard to read.
-- UI tests use the scripted provider (`DemoAiClient`): playlist prompts get every other candidate id, Taizo gets a
-  fixed intro and answer, a prompt containing `#demo-error` fails like a rejected key.
-
 ## Screenshot ids (UI tests)
 
 `-uiTest -screen <id> -appearance light|dark [-song n] [-paused] [-noSong]`. Every `AppRoute`, `AppSheet` and
@@ -247,39 +227,9 @@ playlist, Icon tab with a star), `playlistAddSongs`, `playlistOptions`, `playlis
 - Queue insertions (`playNext`, `addToQueue`) re-set the queue through the `PlaybackEngine` seam at the current
   position until stage 5 adds native inserts.
 
-Stage 13 ids: `aiPlaylist` (sheet over Home), `taisChat` (empty), `taisChatConversation` (a scripted genre request
-and question; ready `screen.taisChat`), `aiPlaylistLab` (cover). Shots: `UITests/AIScreenshotTests`.
-
 Stage 7c adds `-searchFilter all|songs|albums|artists|playlists`
 (with `-screen search -searchQuery <q>`) and the shots searchEmpty, searchTyping, searchAll, searchSongs, searchAlbums,
 searchArtists, searchPlaylists, searchNoResults (light + dark; `UITests/SearchScreenshotTests.swift`).
-
-## Stage 12 notes (Spotify)
-
-- **Screens:** `AccountsView` (Android `AccountsScreen`, on `SettingsScaffold`), `SpotifyDashboardView` and
-  `SpotifyBrowseView` (Android `SpotifyDashboardScreen` / `SpotifyBrowseScreen`, on `SpotifyScaffold` — the plain
-  64 pt `TopAppBar` with the glass back circle, glass filling in once content scrolls under it). Cards are glass in
-  Android's radii (30/28/24/20/16) tinted with their `surfaceContainer*` role (`GlassTint.surface`) or
-  `errorContainer`/`secondaryContainer` (`GlassTint.container`); tiles, chips and buttons sitting on a card are fills
-  (`SpotifyFilledButton`, `SpotifyOutlinedButton`); standalone buttons (Browse, Add whole album) are green glass
-  capsules. Spotify green `0xFF1DB954` and YouTube red stay as on Android.
-- **Seams:** `SpotifyService` (in `AppEnvironment.spotify`) owns the state and updates `AccountsStore.spotify`.
-  YouTube goes through `SpotifyYouTubeBridge` (search for the matcher, the URL for a matched video, a stream
-  resolution for "Test playback"); `PixlNetYouTubeBridge` works alone (anonymous InnerTube, pre-signed client chain)
-  until stage 11 passes its own. `SpotifyPlayableURLResolver` wraps the engine's resolver (keep it outermost): a
-  `spotify://<id>` song plays its matched video as a `yt:<videoId>` song (`pixlstream://<videoId>`) through the inner
-  resolver, else a direct pre-signed URL. Search's Spotify section is `SpotifyCatalogSearchProvider`.
-- **Data:** the Spotify tables are `SpotifySongRecord` / `SpotifyPlaylistRecord` (SchemaV1, unchanged);
-  `PersistenceActor` implements PixlNet's `SpotifyLibraryStore` and writes the unified rows (`sp:<id>` songs, albums /
-  artists in Android's negative id bands, `spotify_playlist:<id>` playlists with source `SPOTIFY`) after every sync
-  flush; local rescans never touch them.
-- **Background:** `.backgroundTask(.appRefresh("io.github.redsn0w1877.pixlaudio.spotify-sync"))` in `PixlAudioApp`:
-  a resumable sync slice when the last complete sync is > 12 h old, then a matching slice (~22 s in all).
-
-Stage 12 screenshot ids (signed out on the plain ids; demo data, no network): `accounts`, `accounts.signedIn`,
-`spotifyDashboard`, `spotifyDashboard.signedIn`, `spotifyDashboard.tested` (with a playback test report),
-`spotifyBrowse` (home: top artists and songs), `spotifyBrowse.results` (query "Luma"), `spotifyBrowse.artist`,
-`spotifyBrowse.album`. Shots: `UITests/SpotifyScreenshotTests`.
 
 ## Integration notes (run 3: stages 5, 6, 7a–7d merged)
 
@@ -422,6 +372,56 @@ lyricsCascade.f0…f7 (first-show cascade frames, live clock).
 - **Screenshot ids:** `youTubeLogin`, `youTubeLoginCode`, `youTubeLoginCookie`, `youTubeLoginSignedIn`, `playbackDiagnostics`
   (all steps green), `playbackDiagnosticsFailed` (audio step red) — `UITests/YouTubeScreenshotTests`, light + dark.
 
+## Stage 12 notes (Spotify)
+
+- **Screens:** `AccountsView` (Android `AccountsScreen`, on `SettingsScaffold`), `SpotifyDashboardView` and
+  `SpotifyBrowseView` (Android `SpotifyDashboardScreen` / `SpotifyBrowseScreen`, on `SpotifyScaffold` — the plain
+  64 pt `TopAppBar` with the glass back circle, glass filling in once content scrolls under it). Cards are glass in
+  Android's radii (30/28/24/20/16) tinted with their `surfaceContainer*` role (`GlassTint.surface`) or
+  `errorContainer`/`secondaryContainer` (`GlassTint.container`); tiles, chips and buttons sitting on a card are fills
+  (`SpotifyFilledButton`, `SpotifyOutlinedButton`); standalone buttons (Browse, Add whole album) are green glass
+  capsules. Spotify green `0xFF1DB954` and YouTube red stay as on Android.
+- **Seams:** `SpotifyService` (in `AppEnvironment.spotify`) owns the state and updates `AccountsStore.spotify`.
+  YouTube goes through `SpotifyYouTubeBridge` (search for the matcher, the URL for a matched video, a stream
+  resolution for "Test playback"); `PixlNetYouTubeBridge` works alone (anonymous InnerTube, pre-signed client chain);
+  since the wave-A merge the app passes stage 11's `InnerTubeSpotifyBridge` instead. `SpotifyPlayableURLResolver` wraps the engine's resolver (keep it outermost): a
+  `spotify://<id>` song plays its matched video as a `yt:<videoId>` song (`pixlstream://<videoId>`) through the inner
+  resolver, else a direct pre-signed URL. Search's Spotify section is `SpotifyCatalogSearchProvider`.
+- **Data:** the Spotify tables are `SpotifySongRecord` / `SpotifyPlaylistRecord` (SchemaV1, unchanged);
+  `PersistenceActor` implements PixlNet's `SpotifyLibraryStore` and writes the unified rows (`sp:<id>` songs, albums /
+  artists in Android's negative id bands, `spotify_playlist:<id>` playlists with source `SPOTIFY`) after every sync
+  flush; local rescans never touch them.
+- **Background:** `.backgroundTask(.appRefresh("io.github.redsn0w1877.pixlaudio.spotify-sync"))` in `PixlAudioApp`:
+  a resumable sync slice when the last complete sync is > 12 h old, then a matching slice (~22 s in all).
+
+Stage 12 screenshot ids (signed out on the plain ids; demo data, no network): `accounts`, `accounts.signedIn`,
+`spotifyDashboard`, `spotifyDashboard.signedIn`, `spotifyDashboard.tested` (with a playback test report),
+`spotifyBrowse` (home: top artists and songs), `spotifyBrowse.results` (query "Luma"), `spotifyBrowse.artist`,
+`spotifyBrowse.album`. Shots: `UITests/SpotifyScreenshotTests`.
+
+## Stage 13 notes (AI)
+
+- Providers: Gemini and every OpenAI-compatible provider through PixlNet's `AiOrchestrator` (provider chain,
+  cooldowns, 30-minute cache in `AICacheRecord`, model recovery, usage in `AIUsageRecord`); settings come from the
+  Android keys in UserDefaults and the Keychain (`AISettingsBridge`). Ollama / custom base URLs may be plain HTTP on the
+  LAN. The on-device provider is the system language model (`OnDeviceAiClient`), availability-gated, with guided
+  generation for playlist ids.
+- AI playlist sheet: Android's layout; the badge, size card, prompt field, error / success cards and the morphing
+  generate button are tinted glass; the min / max fields inside the size card are fills. A generated mix replaces
+  today's Daily Mix (`HomeStore.setDailyMix`), starts playing and opens the player once the sheet has gone.
+- AI Playlist Lab: Android's full-screen dialog as a cover; cards are glass, chips / segments / fields inside them are
+  fills; Generate saves an AI playlist (`LibraryEditor.createPlaylist(isAiGenerated:)`) and closes.
+- TAIS DJ chat: bubbles in Android's shapes as glass (user = `primary`, Taizo = `surfaceContainerHigh`, errors =
+  `errorContainer`), suggestion chips as glass capsules, the bulk buttons and song rows inside a bubble as fills. Taizo's
+  avatar keeps Android's `primary → tertiary` gradient (a mark, not a Material surface). Online (catalogue) results
+  import through `SearchProviding.importAndPlay` on tap. The sheet uses the large detent: Android caps the column at 620 dp, but the system's
+  partial-height sheet floats with clearer glass, and the Home content behind made the chat hard to read.
+- UI tests use the scripted provider (`DemoAiClient`): playlist prompts get every other candidate id, Taizo gets a
+  fixed intro and answer, a prompt containing `#demo-error` fails like a rejected key.
+
+Stage 13 ids: `aiPlaylist` (sheet over Home), `taisChat` (empty), `taisChatConversation` (a scripted genre request
+and question; ready `screen.taisChat`), `aiPlaylistLab` (cover). Shots: `UITests/AIScreenshotTests`.
+
 ## Stage 15 notes (backup, setup, updates, localisation)
 
 - **Backup** (`App/Services/Backup`, `Features/Backup`): `env.backup` (`BackupService`) exports, inspects and restores on
@@ -449,3 +449,30 @@ lyricsCascade.f0…f7 (first-show cascade frames, live clock).
   `setupSpotify`, `setupFinish` (ready `screen.setup`); `backupRestorePlan` (ready `screen.backupRestorePlan`) and
   `backupImportReport` (ready `screen.backupReport`), both on the `backupImport` cover. Class:
   `UITests/BackupOnboardingScreenshotTests`.
+
+## Integration notes (wave A: stages 8, 9, 11, 12, 13, 15 merged — tag `stage-13`)
+
+How the stages meet on `main`:
+
+- **Player ↔ lyrics ↔ AI DJ:** the full player's lyrics circle presents `AppCover.lyrics` (stage 9's `LyricsView`,
+  above the expanded player, which it returns to); the sparkles circle presents `AppSheet.taisChat` (stage 13's DJ
+  chat). Stage 8's `AIDJSheet` placeholder and its `AppSheet.aiDJ` route are gone.
+- **Lyrics ↔ AI translation:** the lyrics More sheet has Android's "Translate via AI" (after Save Lyrics):
+  `LyricsController.translateViaAI` sends the song's scanned lyrics, else the LRC of what the screen shows, through
+  `env.ai.lyricsTranslator` in the device language, and imports a valid reply like a file (each translation pairs with
+  its line by timestamp; the toast is Android's message). Stage 9's on-device "Translate lyrics" stays below it.
+- **Lyrics ↔ sync editor:** "Sync the words yourself" / the sync chip present `AppCover.lyricsSync(songId:)` — still
+  stage 10's placeholder (stage 10 is not in wave A).
+- **Spotify ↔ YouTube:** `AppEnvironment` builds `SpotifyService` after `YouTubeServices` and passes
+  `InnerTubeSpotifyBridge` (App/Services/Spotify): the matcher searches through stage 11's InnerTube session, matched
+  videos resolve through stage 11's `StreamingPlayableURLResolver` (download → complete cache file →
+  `pixlstream://`), and "Test playback" reports the same chain the player uses (remote client table, JavaScriptCore
+  cipher, Piped). Resolver order, inner to outer: the engine's file resolver → stage 11's streaming resolver →
+  `SpotifyPlayableURLResolver`.
+- **Launch order** (`AppEnvironment.start()`): first-run setup cover → playback → YouTube (account state, downloads,
+  cache trim) → Spotify attach → library load → queue restore → auto refresh → backup pending-playlist retry →
+  Spotify start (match counters, pending matches, BG refresh) → the update check.
+- **Opening files:** `.onOpenURL` → `AppEnvironment.open(_:)`: a `.pxpl` (or the Android app's legacy `.json.gz`)
+  opened from Files / the share sheet is inspected and opens the restore flow (`AppCover.backupImport` starting at the
+  module dialog); ignored while the first-run setup is showing (it has its own restore page).
+- **English only** (decision 12): see Stage 15 notes › Localisation.

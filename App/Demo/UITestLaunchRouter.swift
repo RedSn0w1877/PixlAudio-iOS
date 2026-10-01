@@ -146,7 +146,6 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
              .nowPlaying, .lyrics, .lyricsSync, .setup, .devices, .artistPicker, .editSong:
             return nil
         case .aiPlaylist, .taisChat, .taisChatConversation, .aiPlaylistLab: return nil
-
         case .setupPermission, .setupFolders, .setupBackup, .setupTheme, .setupLibraryLayout, .setupSpotify, .setupFinish:
             return nil
         // A full-screen cover: nothing needs to be pushed underneath (one destination per demo screen).
@@ -182,7 +181,6 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .jobs: return .jobs
         case .devices: return .devices
         case .artistPicker: return .artistPicker(songId: DemoLibrary.songs[DemoLibrary.featuredSongIndex].id)
-
         case .aiPlaylist: return .aiPlaylist
         case .taisChat, .taisChatConversation: return .taisChat
         default: return nil

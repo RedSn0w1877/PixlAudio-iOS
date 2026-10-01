@@ -7,6 +7,8 @@ struct LyricsMoreActions {
     var onSyncYourself: (() -> Void)?
     var onSave: (() -> Void)?
     var onTranslate: (() -> Void)?
+    /// Android's "Translate via AI" (stage 13's provider); `onTranslate` is the on-device translation.
+    var onTranslateViaAI: (() -> Void)?
     var onReset: () -> Void
     var onToggleSyncControls: (() -> Void)?
     var onShuffle: () -> Void
@@ -93,6 +95,12 @@ struct LyricsMoreSheet: View {
                     corners: actions.onSyncYourself != nil && song != nil ? (8, 8) : (18, 8)) {
                     dismiss()
                     onSave()
+                }
+            }
+            if lyrics != nil, let onTranslateViaAI = actions.onTranslateViaAI {
+                row("Translate via AI", systemImage: "translate", corners: (8, 8)) {
+                    dismiss()
+                    onTranslateViaAI()
                 }
             }
             if lyrics != nil, let onTranslate = actions.onTranslate {

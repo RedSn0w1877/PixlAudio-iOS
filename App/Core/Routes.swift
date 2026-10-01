@@ -213,7 +213,6 @@ nonisolated enum AppSheet: Hashable, Sendable, Identifiable {
         case .jobs: "jobs"
         case .devices: "devices"
         case .artistPicker(let id): "artistPicker.\(id)"
-
         case .aiPlaylist: "aiPlaylist"
         case .taisChat: "taisChat"
         }
@@ -244,9 +243,7 @@ nonisolated enum AppCover: Hashable, Sendable, Identifiable {
         case .lyricsSync(let id): "lyricsSync.\(id)"
         case .setup: "setup"
         case .editSong(let id): "editSong.\(id)"
-
         case .aiPlaylistLab: "aiPlaylistLab"
-
         case .backupImport: "backupImport"
         case .backupExport: "backupExport"
         }
