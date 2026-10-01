@@ -13,6 +13,10 @@ on:
         description: Run the screenshot job
         type: boolean
         default: true
+      shots_only:
+        description: "Comma-separated UI test classes to run (e.g. PlayerScreenshotTests,LyricsScreenshotTests); empty = all"
+        type: string
+        default: ''
       ipa:
         description: Build the unsigned IPA
         type: boolean
@@ -101,6 +105,7 @@ jobs:
     if: >-
       github.ref == 'refs/heads/main' ||
       contains(github.event.head_commit.message, '[shots]') ||
+      contains(github.event.head_commit.message, '[shots:') ||
       (github.event_name == 'workflow_dispatch' && inputs.shots)
     runs-on: xcode-27
     timeout-minutes: 90
@@ -125,14 +130,34 @@ jobs:
           # Suppress the first-run "slide to type" keyboard tip in search screenshots.
           xcrun simctl spawn "$SIM_UDID" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true || true
       - name: Screenshot tests
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          SHOTS_ONLY_INPUT: ${{ inputs.shots_only }}
         run: |
           set -o pipefail
           mkdir -p build
+          # Which UI test classes to run: the shots_only dispatch input, or "[shots:A,B]" in the commit message;
+          # otherwise every class (main always runs all of them).
+          FILTER="$SHOTS_ONLY_INPUT"
+          if [ -z "$FILTER" ]; then
+            FILTER="$(printf '%s' "$COMMIT_MSG" | grep -o '\[shots:[^]]*\]' | head -1 | sed 's/^\[shots://; s/\]$//' || true)"
+          fi
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then FILTER=""; fi
+          ONLY=()
+          if [ -n "$FILTER" ]; then
+            IFS=',' read -ra CLASSES <<< "$FILTER"
+            for c in "${CLASSES[@]}"; do
+              c="$(echo "$c" | tr -d '[:space:]')"
+              if [[ "$c" =~ ^[A-Za-z0-9_]+$ ]]; then ONLY+=("-only-testing:PixlAudioUITests/$c"); fi
+            done
+          fi
+          if [ ${#ONLY[@]} -eq 0 ]; then ONLY=("-only-testing:PixlAudioUITests"); fi
+          echo "Running UI tests: ${ONLY[*]}"
           xcodebuild test \
             -project PixlAudio.xcodeproj -scheme PixlAudio \
             -destination "id=$SIM_UDID" \
             -derivedDataPath build/DerivedData \
-            -only-testing:PixlAudioUITests \
+            "${ONLY[@]}" \
             -resultBundlePath build/Shots.xcresult \
             2>&1 | tee build/shots.log | xcbeautify --quieter
       - name: Export screenshots
