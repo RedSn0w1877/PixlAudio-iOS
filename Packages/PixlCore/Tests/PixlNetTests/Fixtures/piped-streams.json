@@ -1,0 +1,15 @@
+{
+  "title": "Northern Lights",
+  "audioStreams": [
+    {"url": "https://pipedproxy.example.org/videoplayback?itag=251&host=rr1.googlevideo.com", "format": "WEBMA_OPUS", "mimeType": "audio/webm", "codec": "opus", "bitrate": 160000, "quality": "160 kbps"},
+    {"url": "https://pipedproxy.example.org/videoplayback?itag=140&host=rr1.googlevideo.com", "format": "M4A", "mimeType": "audio/mp4", "codec": "mp4a.40.2", "bitrate": 130000, "quality": "128 kbps"},
+    {"url": "", "format": "M4A", "mimeType": "audio/mp4", "codec": "mp4a.40.2", "bitrate": 999000},
+    {"url": "https://pipedproxy.example.org/videoplayback?itag=139", "format": "M4A", "mimeType": "audio/mp4", "codec": "mp4a.40.5", "bitrate": 48000}
+  ],
+  "videoStreams": [
+    {"url": "https://pipedproxy.example.org/videoplayback?itag=22", "mimeType": "video/mp4", "quality": "720p", "videoOnly": false},
+    {"url": "https://pipedproxy.example.org/videoplayback?itag=18", "mimeType": "video/mp4", "quality": "360p", "videoOnly": false},
+    {"url": "https://pipedproxy.example.org/videoplayback?itag=160", "mimeType": "video/mp4", "quality": "144p", "videoOnly": true},
+    {"url": "https://pipedproxy.example.org/hls/manifest.m3u8", "mimeType": "video/mp4", "quality": "240p", "videoOnly": false}
+  ]
+}

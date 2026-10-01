@@ -1,0 +1,14 @@
+{
+  "total": 4,
+  "next": "https://api.spotify.com/v1/playlists/37i9dQZF1DXcBWIGoYBM5M/items?offset=100&limit=100",
+  "items": [
+    {"added_at": "2024-03-10T12:34:56Z", "item": {"id": "4uLU6hMCjMI75M1A2tKUQC", "name": "Never Gonna Give You Up", "duration_ms": 213573, "is_local": false, "type": "track",
+      "artists": [{"id": "0gxyHStUsqpMadRV0Di1Qt", "name": "Rick Astley"}, {"id": null, "name": " "}],
+      "album": {"id": "6N9PS4QXF1D0OWPk0Sxtb4", "name": "Whenever You Need Somebody", "images": [{"url": "https://i.scdn.co/image/large", "width": 640, "height": 640}, {"url": "https://i.scdn.co/image/small", "width": 64, "height": 64}]},
+      "external_ids": {"isrc": "GBARL9300135"}}},
+    {"added_at": "2024-03-11T00:00:00.123+02:00", "track": {"id": "legacyTrackField00001", "name": "", "duration_ms": "1000", "type": "track", "artists": [], "album": {"id": null, "name": null}}},
+    {"added_at": null, "item": {"id": null, "name": "Local file", "is_local": true}},
+    {"added_at": "not a date", "item": {"id": "episode00000000000001", "name": "Podcast", "type": "episode"}},
+    {"added_at": "2024-01-01T00:00:00Z", "item": null}
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "responseContext": {
+    "visitorData": "CgtWSVNJVE9SX0lEKI-test%3D%3D",
+    "serviceTrackingParams": [{"service": "GFEEDBACK", "params": [{"key": "is_viewed_live", "value": "False"}]}]
+  },
+  "playabilityStatus": {"status": "OK", "playableInEmbed": true, "reason": ""},
+  "streamingData": {
+    "expiresInSeconds": "21540",
+    "formats": [
+      {"itag": 18, "url": "https://rr1---sn-abc.googlevideo.com/videoplayback?expire=1&itag=18&n=muxedN", "mimeType": "video/mp4; codecs=\"avc1.42001E, mp4a.40.2\"", "bitrate": 503000, "contentLength": "3000000", "approxDurationMs": "180000"}
+    ],
+    "adaptiveFormats": [
+      {"itag": 137, "url": "https://rr1---sn-abc.googlevideo.com/videoplayback?itag=137", "mimeType": "video/mp4; codecs=\"avc1.640028\"", "bitrate": 4000000},
+      {"itag": 140, "url": "https://rr1---sn-abc.googlevideo.com/videoplayback?expire=1&itag=140&n=XYZ&mime=audio%2Fmp4", "mimeType": "audio/mp4; codecs=\"mp4a.40.2\"", "bitrate": 130000, "contentLength": "2900000", "approxDurationMs": "180001"},
+      {"itag": 251, "url": "https://rr1---sn-abc.googlevideo.com/videoplayback?itag=251", "mimeType": "audio/webm; codecs=\"opus\"", "bitrate": 160000, "contentLength": 3100000},
+      {"itag": 139, "signatureCipher": "s=ABCDEF&sp=sig&url=https%3A%2F%2Frr1.googlevideo.com%2Fvideoplayback%3Fitag%3D139%26n%3Dcipn", "mimeType": "audio/mp4; codecs=\"mp4a.40.5\"", "bitrate": "48000"},
+      {"itag": 141, "mimeType": "audio/mp4; codecs=\"mp4a.40.2\"", "bitrate": 256000, "initRange": {"start": "0", "end": "631"}, "indexRange": {"start": "632", "end": "1023"}, "contentLength": "5000000"}
+    ],
+    "hlsManifestUrl": "https://manifest.googlevideo.com/x"
+  }
+}
