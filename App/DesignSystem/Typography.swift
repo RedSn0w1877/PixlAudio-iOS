@@ -81,6 +81,23 @@ nonisolated enum DynamicTypeScale {
     }
 }
 
+/// SF Pro renders noticeably lighter than PixlAudio's rounded Google Sans at the same nominal weight. Hoa asked
+/// (2026-10-01) for the heavier Android look, so every PixlAudio text style is drawn one to two steps heavier than
+/// its Type.kt weight. Styles keep their Android weights as data; only rendering is boosted, in this one place.
+nonisolated enum PixlWeightBoost {
+    static func boosted(_ weight: Font.Weight) -> Font.Weight {
+        switch weight {
+        case .ultraLight, .thin: return .light
+        case .light: return .regular
+        case .regular: return .semibold
+        case .medium, .semibold: return .bold
+        case .bold: return .heavy
+        case .heavy, .black: return .black
+        default: return weight
+        }
+    }
+}
+
 private struct PixlFontModifier: ViewModifier {
     let style: PixlTextStyle
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -92,7 +109,7 @@ private struct PixlFontModifier: ViewModifier {
         let natural = size * 1.19
         let extra = max(0, (style.lineHeight.map { $0 * factor } ?? natural) - natural)
         content
-            .font(.system(size: size, weight: style.weight))
+            .font(.system(size: size, weight: PixlWeightBoost.boosted(style.weight)))
             .tracking(style.tracking)
             .lineSpacing(extra)
     }
