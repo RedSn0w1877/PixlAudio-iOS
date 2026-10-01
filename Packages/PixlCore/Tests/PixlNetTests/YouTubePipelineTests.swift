@@ -343,10 +343,10 @@ struct PipedTests {
 
         let down = PipedStreamResolver(http: FixtureHTTPClient { _ in HTTPResponse(statusCode: 500) }, nowMs: { now.value })
         #expect(await down.resolve(videoId: "v") == nil)
-        #expect(await down.lastDetail == "ninguna instancia de Piped resolvió v")
+        #expect(await down.lastDetail == "no Piped instance resolved v")
         now.value += 5_000
         #expect(await down.resolve(videoId: "v") == nil)
-        #expect(await down.lastDetail == "en enfriamiento tras fallos recientes, 15s restantes")
+        #expect(await down.lastDetail == "cooling down after recent failures, 15s left")
     }
 }
 

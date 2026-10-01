@@ -71,7 +71,7 @@ final class PlaybackDiagnosticsModel {
         .init(title: PlaybackDiagnostics.titleSearch, ok: true, detail: "5 candidates, top one: \"Neon Harbor\"."),
         .init(title: PlaybackDiagnostics.titleMatching, ok: true, detail: "Already linked to video dQw4w9WgXcQ (picked in YouTube Music search)."),
         .init(title: PlaybackDiagnostics.titleStream, ok: false,
-              detail: "Every YouTube client refused:\n• VISIONOS: LOGIN_REQUIRED — Sign in to confirm you're not a bot\n• IOS: OK but 0 usable formats\n• TVHTML5 (deciphered): could not run base.js\n• WEB_REMIX (deciphered): HTTP 403\n• Piped: ninguna instancia de Piped resolvió dQw4w9WgXcQ"),
+              detail: "Every YouTube client refused:\n• VISIONOS: LOGIN_REQUIRED — Sign in to confirm you're not a bot\n• IOS: OK but 0 usable formats\n• TVHTML5 (deciphered): could not run base.js\n• WEB_REMIX (deciphered): HTTP 403\n• Piped: no Piped instance resolved dQw4w9WgXcQ"),
     ], succeeded: false)
 }
 

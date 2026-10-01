@@ -172,7 +172,7 @@ public actor PipedStreamResolver {
     public func resolve(videoId: String) async -> ResolvedStream? {
         let now = nowMs()
         if now < unavailableUntilMs {
-            lastDetail = "en enfriamiento tras fallos recientes, \((unavailableUntilMs - now) / 1000)s restantes"
+            lastDetail = "cooling down after recent failures, \((unavailableUntilMs - now) / 1000)s left"
             return nil
         }
         for instance in await candidateInstances() {
@@ -181,7 +181,7 @@ public actor PipedStreamResolver {
                 return result
             }
         }
-        lastDetail = "ninguna instancia de Piped resolvió \(videoId)"
+        lastDetail = "no Piped instance resolved \(videoId)"
         unavailableUntilMs = nowMs() + Piped.cooldownMs
         return nil
     }
