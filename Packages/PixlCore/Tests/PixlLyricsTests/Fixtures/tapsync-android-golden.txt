@@ -1,0 +1,1109 @@
+R 0 -1934310868 1409199696 -649160781 10 1 11 384 27 2 2 0 338 -1998983480 1415 802 2561 416 50 691 2069826652 572569490871 2951109589354025374 5849849615929640784 0 0 0
+R 1 600123930 -1531902544 -527218591 7 9 1 70 17 0 0 4 479 -845605708 576 -184 617 748 768 2687 821469387 977504818863 -5260689105655014472 4934010901814509043 0 1 1
+R 3 -2124332895 -1205946586 -256771609 7 6 2 359 71 5 1 15 31 1856375291 1333 603 1029 216 282 3426 3969913194 39371068795 -4353326929400342020 3955860006237312480 0 1 0
+R 7 -182312124 11901178 -1941452650 2 5 13 127 94 0 0 7 494 -208714228 1813 523 1508 342 -58 1238 3674402215 239251844160 1785278913677517386 -5982617454600772993 0 1 0
+R 42 972016666 1740578880 -408207414 10 6 12 236 40 1 0 9 293 1264238559 794 64 1474 114 734 1168 1570977101 529644934498 -5543436166223098424 4724543196637803600 0 1 0
+R -1 -280203964 -1115932487 -2122700674 2 10 9 54 31 7 1 6 -303 667567539 -395 802 3063 86 210 2147 2676326951 417400491889 2023329283030089052 5475884996456008325 1 1 1
+R 499 -475255426 1373065039 -1508777496 11 13 11 220 87 4 0 10 -343 -125438805 1983 533 2299 48 696 1572 1152963089 351939805717 -6015129660226110100 -2688860574637390070 1 1 1
+R 2147483647 -1519020059 1146489314 755292399 11 6 10 80 33 5 1 5 -492 -1708485999 -99 459 2176 626 752 490 2029165577 767390905922 299850457666611697 9122898557248223186 1 0 1
+R -2147483648 -468773749 -303786953 2109491522 5 6 5 145 46 1 2 3 -141 993692132 1391 1048 2775 598 -32 2876 3050975860 476418339046 2362543898476827953 8956399412975336195 0 1 0
+T "Hello world" ["Hello ","world"]
+T "  spaced   out  " ["spaced ","out"]
+T "— lead" ["— lead"]
+T "trail —" ["trail —"]
+T "a - b — c … d & e" ["a - ","b — ","c … ","d & ","e"]
+T "君が好き" ["君","が","好","き"]
+T "「愛してる」、" ["「愛","し","て","る」、"]
+T "私はOK です。" ["私","は","OK ","で","す。"]
+T "사랑해 너를" ["사랑해 ","너를"]
+T "twenty-one rock'n'roll" ["twenty-one ","rock'n'roll"]
+T "👨‍👩‍👧 君と" ["👨‍👩‍👧 ","君","と"]
+T "ゃ小さい" ["ゃ","小","さ","い"]
+T "ーラ" ["ー","ラ"]
+T "(oh" ["(oh"]
+T "…" ["…"]
+T "  Hello   big\tworld  " ["Hello ","big ","world"]
+T "   \t " []
+T "Hi" ["Hi"]
+T "wait - what" ["wait - ","what"]
+T "— hey you" ["— hey ","you"]
+T "(oh yeah, baby)" ["(oh ","yeah, ","baby)"]
+T "rock & roll…" ["rock & ","roll…"]
+T "… …" ["… …"]
+T "so… — yes" ["so… — ","yes"]
+T "don't night-time" ["don't ","night-time"]
+T "東京ラーメン" ["東","京","ラー","メ","ン"]
+T "きょうは" ["きょ","う","は"]
+T "Loveしてる" ["Love","し","て","る"]
+T "あああああああああああああああああああああああああああああああああああああああああ" ["あああああああああああああああああああああああああああああああああああああああああ"]
+T "ああああああああああああああああああああああああああああああああああああああああ" ["あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ","あ"]
+T "君👨‍👩‍👧と" ["君","👨‍👩‍👧","と"]
+T "愛❤️" ["愛","❤️"]
+T "👍🏽 yes" ["👍🏽 ","yes"]
+T "Café ok" ["Café ","ok"]
+T "Café ok" ["Café ","ok"]
+T "君‍a" ["君‍a"]
+T "a‍b c" ["a‍b ","c"]
+T "x\u0001́y" ["x\u0001́y"]
+T "君́が" ["君́","が"]
+T "ァ君" ["ァ","君"]
+T "君ァ" ["君ァ"]
+T "ｶｧ" ["ｶｧ"]
+T "ㇰ君ㇱ" ["ㇰ","君ㇱ"]
+T "君️" ["君️"]
+T "　君　" ["君"]
+T "a b c" ["a ","b ","c"]
+T "next" ["next"]
+T "x\u001cy" ["x ","y"]
+T "１２３" ["１２３"]
+T "，、。" ["，、。"]
+T "「」" ["「」"]
+T "(君)" ["(君)"]
+T "君-が" ["君-","が"]
+T "- 君" ["- 君"]
+T "𠀋𡈽" ["𠀋","𡈽"]
+T "Ünïcödé wörds" ["Ünïcödé ","wörds"]
+T "a\r\nb" ["a ","b"]
+T "שלום עולם" ["שלום ","עולם"]
+T "مرحبا بالعالم" ["مرحبا ","بالعالم"]
+T "สวัสดีครับ" ["สวัสดีครับ"]
+T "नमस्ते दुनिया" ["नमस्ते ","दुनिया"]
+T " é" ["é"]
+T "…「" ["…「"]
+T "사랑)、love" ["사랑)、love"]
+T "。君사랑(…—ラー" ["。君","사랑(…—","ラー"]
+T "&が" ["&が"]
+T "。……  사랑사랑」…)OK　a-bOK" ["。…… 사랑사랑」…)OK ","a-bOK"]
+T "が사랑——OKょé(ラー  " ["が","사랑——OK","ょ","é(","ラー"]
+T "❤️()「&사랑a-b(é」사랑が" ["❤️()「&사랑a-b(é」사랑","が"]
+T "&。((君」君❤️(" ["&。((君」","君","❤️("]
+T "—ょ❤️、\t\t사랑é「—ラー사랑&" ["—ょ","❤️、 ","사랑é「—","ラー","사랑&"]
+T "👨‍👩「ラー　ょ" ["👨‍👩「","ラー ","ょ"]
+T "—" ["—"]
+T "(OK사랑」… it's" ["(OK사랑」… ","it's"]
+T "君「(❤️& 、&君é  」　" ["君","「(❤️& ","、&君","é 」"]
+T "&it's\t))it's" ["&it's ","))it's"]
+T "(❤️loveéé「OKラー👨‍👩❤️OKé" ["(❤️loveéé「OK","ラー","👨‍👩❤️OKé"]
+T "it's(it's…ラー👨‍👩❤️" ["it's(it's…","ラー","👨‍👩❤️"]
+T "君❤️」「&  &it'sラー」(君" ["君","❤️」「& ","&it's","ラー」(","君"]
+T "❤️君—it's(—)" ["❤️","君","—it's(—)"]
+T "ょが  「　が" ["ょ","が 「 ","が"]
+T "　éloveラー)、…" ["élove","ラー)、…"]
+T "。\t" ["。"]
+T "ょ" ["ょ"]
+T "君君—。　a-bょ。  it's❤️" ["君","君—。 ","a-b","ょ。 ","it's❤️"]
+T "「\t)" ["「 )"]
+T "loveit'sit's 「" ["loveit'sit's 「"]
+T "君(君—君❤️ラー" ["君(","君—","君","❤️","ラー"]
+T "ラー「「、OKょ君、 ❤️「❤️" ["ラー","「「、OK","ょ","君、 ","❤️「❤️"]
+T "love OK\t " ["love ","OK"]
+T " —君…、사랑OK、a-bit's" ["—君","…、사랑OK、a-bit's"]
+T "  " []
+T "…が👨‍👩\t👨‍👩love사랑 　love、　" ["…が","👨‍👩 ","👨‍👩love사랑 ","love、"]
+T "(ラーOK君が　ょOKラー　)OK👨‍👩" ["(ラー","OK","君","が ","ょ","OK","ラー ",")OK👨‍👩"]
+T "…❤️OK&&éé、  —" ["…❤️OK&&éé、 —"]
+T "がラー— 、「👨‍👩OK사랑&" ["が","ラー— ","、「👨‍👩OK사랑&"]
+T "「\tOKラーit'sが&love…君　" ["「 OK","ラー","it's","が","&love…","君"]
+T "👨‍👩「OK👨‍👩사랑\ta-blove　(a-b  " ["👨‍👩「OK👨‍👩사랑 ","a-blove ","(a-b"]
+T "a-b  )" ["a-b )"]
+T ")&& 사랑ょ ラー é" [")&& 사랑","ょ ","ラー ","é"]
+T ")a-b  　ラー\tが" [")a-b ","ラー ","が"]
+T "é사랑love」👨‍👩&it's\t「OK\t" ["é사랑love」👨‍👩&it's ","「OK"]
+T "éょ\t— love)it'sé" ["é","ょ — ","love)it'sé"]
+T "❤️君élove" ["❤️","君","élove"]
+T "  …(…사랑" ["…(…사랑"]
+T "사랑é it'sa-b👨‍👩君👨‍👩)「" ["사랑é ","it'sa-b👨‍👩","君","👨‍👩)「"]
+T "love—、…it'sOK」」—(👨‍👩(" ["love—、…it'sOK」」—(👨‍👩("]
+T "(" ["("]
+T "OKlove)ラー❤️…」)it's君  사랑" ["OKlove)","ラー","❤️…」)it's","君 ","사랑"]
+T "사랑、」、」。君love、" ["사랑、」、」。","君","love、"]
+T "사랑" ["사랑"]
+T "　君" ["君"]
+T ")" [")"]
+T "ラーょ" ["ラーょ"]
+T " …OK)。éé " ["…OK)。éé"]
+T ")  " [")"]
+T "(「OK」。君」。" ["(「OK」。","君」。"]
+T " a-b사랑❤️é  ラー  (、" ["a-b사랑❤️é ","ラー (、"]
+T "it's「" ["it's「"]
+T "ょ👨‍👩a-blove" ["ょ","👨‍👩a-blove"]
+T "❤️사랑love사랑" ["❤️사랑love사랑"]
+T "　( 　❤️。" ["( ❤️。"]
+T "—ょ" ["—ょ"]
+T "(" ["("]
+T "❤️" ["❤️"]
+T "é( …  love" ["é( … ","love"]
+T "❤️　「a-bOKa-ba-b　👨‍👩—)」&" ["❤️ ","「a-bOKa-ba-b ","👨‍👩—)」&"]
+T "」&—君—éa-b　" ["」&—君","—éa-b"]
+T " it'sOK❤️、&  …「\t君👨‍👩👨‍👩" ["it'sOK❤️、& …「 ","君","👨‍👩👨‍👩"]
+T ")(」❤️が사랑it's…(" [")(」❤️","が","사랑it's…("]
+T "「" ["「"]
+T "(love👨‍👩" ["(love👨‍👩"]
+T "ょ()OK\t" ["ょ","()OK"]
+T "…it'sょ사랑ラーょ(a-blove\t&。" ["…it's","ょ","사랑","ラーょ","(a-blove &。"]
+T "ラー  )(loveラー「　\t" ["ラー ",")(love","ラー「"]
+T "&it's사랑　❤️」。—(&　" ["&it's사랑 ","❤️」。—(&"]
+T "—ょ " ["—ょ"]
+T "it'sit's…a-bit'sが사랑(👨‍👩é(\t。" ["it'sit's…a-bit's","が","사랑(👨‍👩é( 。"]
+T "君ラー—👨‍👩—  …)" ["君","ラー","—👨‍👩— …)"]
+T "がラーょ…  " ["が","ラーょ…"]
+T "사랑a-b。" ["사랑a-b。"]
+T " 。ラー)ラーit's—é…ラー「it's" ["。ラー)","ラー","it's—é…","ラー","「it's"]
+T "사랑사랑　it's" ["사랑사랑 ","it's"]
+T "a-béa-b사랑OK사랑ょ사랑　「 「" ["a-béa-b사랑OK사랑","ょ","사랑 「 「"]
+T "❤️  …君)、" ["❤️ ","…君)、"]
+T " OK、OK" ["OK、OK"]
+T "loveょ)  ょ。　  …👨‍👩)「君" ["love","ょ) ","ょ。 ","…👨‍👩)「","君"]
+T "love、&" ["love、&"]
+T "ラーラー사랑ょit'sa-b」OK" ["ラー","ラー","사랑","ょ","it'sa-b」OK"]
+T "が(" ["が("]
+T "—" ["—"]
+T "사랑)—、\t)ょ   」「" ["사랑)—、 ",")ょ 」「"]
+T "ラーé。…사랑)OKit's" ["ラー","é。…사랑)OKit's"]
+T "「」が「é、、  ラー&&が" ["「」が","「é、、 ","ラー&&","が"]
+T "君、…OK👨‍👩éa-b。。ラー —…" ["君","、…OK👨‍👩éa-b。。","ラー —…"]
+T "…　君((ょ👨‍👩(" ["… 君((","ょ","👨‍👩("]
+T "、—" ["、—"]
+T "사랑 &" ["사랑 &"]
+T "OK。(❤️…loveラー\t—)" ["OK。(❤️…love","ラー —)"]
+T "it's사랑love) " ["it's사랑love)"]
+T "❤️」" ["❤️」"]
+T "éが)君\t君é  (「" ["é","が)","君 ","君","é (「"]
+T "&&" ["&&"]
+T "ょ" ["ょ"]
+T "—」、——" ["—」、——"]
+T "love…사랑」 」it'sloveょ\t❤️" ["love…사랑」 ","」it'slove","ょ ","❤️"]
+T "love👨‍👩love「」…、。。" ["love👨‍👩love「」…、。。"]
+T "a-blove「❤️(" ["a-blove「❤️("]
+T "　&君a-b(" ["&君","a-b("]
+T "\tlove❤️。君— —ラー" ["love❤️。","君— ","—ラー"]
+T "「—ラー사랑❤️」) " ["「—ラー","사랑❤️」)"]
+T "a-b❤️。&ラー" ["a-b❤️。&","ラー"]
+T ")a-b👨‍👩—👨‍👩。がラー( 、 " [")a-b👨‍👩—👨‍👩。","が","ラー( 、"]
+T "君" ["君"]
+T "　❤️」&👨‍👩(" ["❤️」&👨‍👩("]
+T "君a-b\t" ["君","a-b"]
+T "&❤️\tOK、)사랑)ラー)　OK「" ["&❤️ ","OK、)사랑)","ラー) ","OK「"]
+T "❤️   it's、a-b사랑👨‍👩)" ["❤️ ","it's、a-b사랑👨‍👩)"]
+T "love" ["love"]
+T "「が君ラー」。君 —" ["「が","君","ラー」。","君 —"]
+T "君é" ["君","é"]
+T "「👨‍👩「" ["「👨‍👩「"]
+T "—&\t사랑&\t" ["—& 사랑&"]
+T ")it's君が  \t" [")it's","君","が"]
+T "—OKょ「 👨‍👩" ["—OK","ょ「 ","👨‍👩"]
+T "」君「」 it'sがラー👨‍👩 " ["」君「」 ","it's","が","ラー","👨‍👩"]
+T "&。「" ["&。「"]
+T "a-b「が。。ががょé、)" ["a-b「","が。。","が","がょ","é、)"]
+T "—" ["—"]
+T "「love(é君" ["「love(é","君"]
+T "&OKOK" ["&OKOK"]
+T "　" []
+T ")" [")"]
+T "&\t" ["&"]
+T "、OK❤️が)éょ、がé。사랑" ["、OK❤️","が",")é","ょ、","が","é。사랑"]
+T "love❤️」…が" ["love❤️」…","が"]
+T ")、👨‍👩」、)" [")、👨‍👩」、)"]
+T "❤️it'sOK、OKloveが「&" ["❤️it'sOK、OKlove","が「&"]
+T "ょ" ["ょ"]
+T "loveit's&ラーit'sa-bょ…&" ["loveit's&","ラー","it'sa-b","ょ…&"]
+T "　love" ["love"]
+T "사랑" ["사랑"]
+T " (　「사랑)a-b　「(…" ["( 「사랑)a-b 「(…"]
+T "ょ사랑a-b &" ["ょ","사랑a-b &"]
+T ")é사랑  )" [")é사랑 )"]
+T "「。　" ["「。"]
+T "君君…OK" ["君","君","…OK"]
+T "👨‍👩" ["👨‍👩"]
+T "  、it's「❤️君(君\tOKlove" ["、it's「❤️","君(","君 ","OKlove"]
+T "&OK❤️ — &사랑 ❤️…" ["&OK❤️ — ","&사랑 ","❤️…"]
+T "が  —君" ["が ","—君"]
+T "「、 「OK👨‍👩it'sloveit's」" ["「、 「OK👨‍👩it'sloveit's」"]
+T "👨‍👩——" ["👨‍👩——"]
+T "ょé사랑 " ["ょ","é사랑"]
+T "(君\tit'sラー  a-b。—、\t)" ["(君 ","it's","ラー ","a-b。—、 )"]
+T "—it's  " ["—it's"]
+T "  、—)it's　" ["、—)it's"]
+T "é" ["é"]
+T "éit's君…ょ)é。&" ["éit's","君…","ょ",")é。&"]
+T "ょ사랑、&。❤️。" ["ょ","사랑、&。❤️。"]
+T "&「ょ「…—" ["&「ょ「…—"]
+T "&it'slove&…사랑、。" ["&it'slove&…사랑、。"]
+T "❤️…é❤️が 君　ラーa-b、사랑が" ["❤️…é❤️","が ","君 ","ラー","a-b、사랑","が"]
+T "👨‍👩」ょa-b" ["👨‍👩」","ょ","a-b"]
+T "…❤️사랑사랑ラーit's」é君사랑" ["…❤️사랑사랑","ラー","it's」é","君","사랑"]
+T "君…—(사랑)」。" ["君","…—(사랑)」。"]
+T "❤️ラー사랑…ょ" ["❤️","ラー","사랑…","ょ"]
+T "❤️a-b…사랑é a-b❤️　loveが  " ["❤️a-b…사랑é ","a-b❤️ ","love","が"]
+T " 。 ❤️　OK—it'sOK　👨‍👩é" ["。 ❤️ ","OK—it'sOK ","👨‍👩é"]
+T "  「OK「。👨‍👩ょ\t)  " ["「OK「。👨‍👩","ょ )"]
+T "…。が」、" ["…。が」、"]
+T "が \t(。、éょ「  )loveょ" ["が ","(。、é","ょ「 ",")love","ょ"]
+T "、사랑👨‍👩  …it's—、a-b" ["、사랑👨‍👩 ","…it's—、a-b"]
+T " 君、　" ["君、"]
+T "君君「ラーが\t—\t。…a-b\ta-b" ["君","君「","ラー","が — ","。…a-b ","a-b"]
+T "❤️❤️&、　사랑。ラーa-b、" ["❤️❤️&、 ","사랑。","ラー","a-b、"]
+T "OK  it'sa-b　—" ["OK ","it'sa-b —"]
+T "  OKラー。" ["OK","ラー。"]
+T "é「、é…" ["é「、é…"]
+T "、)「" ["、)「"]
+T "君—ょ👨‍👩" ["君—","ょ","👨‍👩"]
+T "(&사랑it's❤️」)OKOK" ["(&사랑it's❤️」)OKOK"]
+T "❤️a-b\t—)&a-b「" ["❤️a-b ","—)&a-b「"]
+T " )が❤️)  ょé love。" [")が","❤️) ","ょ","é ","love。"]
+T "it's…)love사랑&it's👨‍👩" ["it's…)love사랑&it's👨‍👩"]
+T "ラー❤️❤️a-b👨‍👩ょit's" ["ラー","❤️❤️a-b👨‍👩","ょ","it's"]
+T " ))&。é" ["))&。é"]
+T "&—…  👨‍👩a-bit's사랑lovelove" ["&—… 👨‍👩a-bit's사랑lovelove"]
+T "é👨‍👩。「&" ["é👨‍👩。「&"]
+T "が、、" ["が、、"]
+T "「。❤️)&ラーéa-b  👨‍👩—it'sé" ["「。❤️)&","ラー","éa-b ","👨‍👩—it'sé"]
+T "éOKょ君、(…&a-bOKit's君" ["éOK","ょ","君","、(…&a-bOKit's","君"]
+T "OKé" ["OKé"]
+T "—」&❤️。が「OKé👨‍👩love ❤️" ["—」&❤️。","が","「OKé👨‍👩love ","❤️"]
+T "　사랑君—ラーit's&a-b………" ["사랑","君—","ラー","it's&a-b………"]
+T "éit'sがlove「" ["éit's","が","love「"]
+T "\t\tが" ["が"]
+T "。　OK—a-b「👨‍👩ラーé" ["。 OK—a-b「👨‍👩","ラー","é"]
+T "—OK" ["—OK"]
+T "　&。loveéが👨‍👩「" ["&。loveé","が","👨‍👩「"]
+T "사랑❤️éょ👨‍👩が사랑　ラーOK)" ["사랑❤️é","ょ","👨‍👩","が","사랑 ","ラー","OK)"]
+T "éが—、…、　　ラー」사랑" ["é","が—、…、 ","ラー","」사랑"]
+T "사랑ラー\t  　」" ["사랑","ラー 」"]
+T ")\t—사랑　—  it'sit'sa-b君" [") —사랑 — ","it'sit'sa-b","君"]
+T "「、。👨‍👩が)é君が&" ["「、。👨‍👩","が",")é","君","が&"]
+T " ょょ君\t👨‍👩  " ["ょょ","君 ","👨‍👩"]
+T "love&\t)君" ["love& ",")君"]
+T ")(君ラー" [")(君","ラー"]
+T "a-bé&)\t사랑 " ["a-bé&) ","사랑"]
+T "ラー  )" ["ラー )"]
+T "\t👨‍👩\t" ["👨‍👩"]
+T ")love" [")love"]
+T "a-b 　ラー、사랑a-bit's　 \t　" ["a-b ","ラー","、사랑a-bit's"]
+T "&「" ["&「"]
+T " 、❤️)é)　君君\tがé" ["、❤️)é) ","君","君 ","が","é"]
+T "、&が\t)❤️사랑\t&" ["、&が ",")❤️사랑 &"]
+T "が(君、OK君  ❤️❤️ " ["が(","君","、OK","君 ","❤️❤️"]
+T "君、——が」loveが사랑)「👨‍👩" ["君、——","が","」love","が","사랑)「👨‍👩"]
+T "。OK)\t。it's…" ["。OK) ","。it's…"]
+T "it's「it's。&　」、it's" ["it's「it's。& ","」、it's"]
+T "」OK(사랑\t。" ["」OK(사랑 。"]
+T "…" ["…"]
+T "é👨‍👩)a-b 　ょょ　ラー。が" ["é👨‍👩)a-b ","ょょ ","ラー。","が"]
+T "(👨‍👩」……👨‍👩…it's" ["(👨‍👩」……👨‍👩…it's"]
+T "」" ["」"]
+T "、)が\tit'sit's「ラー" ["、)が ","it'sit's「","ラー"]
+T "❤️ラー……—&ラー" ["❤️","ラー……—&","ラー"]
+T "。ラー)(。ラー" ["。ラー)(。","ラー"]
+T " 。…ょ—、love(ょ)」" ["。…ょ","—、love(","ょ)」"]
+T "ょ" ["ょ"]
+T "loveé「…(\t」a-bょ" ["loveé「…( ","」a-b","ょ"]
+T "    「" ["「"]
+T "❤️君" ["❤️","君"]
+T "。" ["。"]
+T "OK君    " ["OK","君"]
+T "—。é　  " ["—。é"]
+T "がé사랑a-b" ["が","é사랑a-b"]
+T "。…" ["。…"]
+T "a-bit's(a-b" ["a-bit's(a-b"]
+T "é…👨‍👩—OKééé)👨‍👩「、が" ["é…👨‍👩—OKééé)👨‍👩「、","が"]
+T "(、👨‍👩 —❤️「\t、&君  " ["(、👨‍👩 ","—❤️「 ","、&君"]
+T "、it's사랑…ょ　\t" ["、it's사랑…","ょ"]
+T "君a-b👨‍👩(、👨‍👩&君「❤️love" ["君","a-b👨‍👩(、👨‍👩&","君","「❤️love"]
+T "—」  a-bOK" ["—」 a-bOK"]
+T "君ラーit'sが&" ["君","ラー","it's","が&"]
+T ")ょ❤️👨‍👩—(」  " [")ょ","❤️👨‍👩—(」"]
+T " love…ラー\t\tOK  ょ" ["love…","ラー ","OK ","ょ"]
+T "👨‍👩君&it's。、)👨‍👩ょ、love" ["👨‍👩","君","&it's。、)👨‍👩","ょ","、love"]
+T "  ょa-bがé" ["ょ","a-b","が","é"]
+T "ょラーがa-b" ["ょ","ラー","が","a-b"]
+T "—  " ["—"]
+T "…é(「、love)👨‍👩" ["…é(「、love)👨‍👩"]
+T "　사랑が👨‍👩사랑&사랑love👨‍👩、「\t\t" ["사랑","が","👨‍👩사랑&사랑love👨‍👩、「"]
+T "&" ["&"]
+T "ょ 　it's" ["ょ ","it's"]
+T ")love。—…君—  が」君사랑" [")love。—…","君— ","が」","君","사랑"]
+T "loveラー。)「a-béラー(❤️éょ" ["love","ラー","。)「a-bé","ラー","(❤️é","ょ"]
+T "(" ["("]
+T "&사랑…사랑)が❤️" ["&사랑…사랑)","が","❤️"]
+T "a-b　사랑OK❤️it'sit'sOK 　사랑" ["a-b ","사랑OK❤️it'sit'sOK ","사랑"]
+T ")" [")"]
+T "  、君—\t사랑" ["、君— ","사랑"]
+T "lovea-b」)—)a-b　  " ["lovea-b」)—)a-b"]
+T "👨‍👩" ["👨‍👩"]
+T "」　(love❤️사랑love👨‍👩ラー\t&" ["」 (love❤️사랑love👨‍👩","ラー &"]
+T "…loveラー  👨‍👩—ょ…\t" ["…love","ラー ","👨‍👩—","ょ…"]
+T "—OK。、(　がOK、❤️「" ["—OK。、( ","が","OK、❤️「"]
+T "　—君👨‍👩사랑OK" ["—君","👨‍👩사랑OK"]
+T "(loveit's　「「))、사랑élove" ["(loveit's ","「「))、사랑élove"]
+T "」ラー　ラー  & " ["」ラー ","ラー &"]
+T "がlove\t" ["が","love"]
+T "éloveラー   —が—" ["élove","ラー ","—が—"]
+T "  　❤️👨‍👩「a-b  —" ["❤️👨‍👩「a-b —"]
+T "ょ\tが…ラー—ょé。❤️、" ["ょ ","が…","ラー—","ょ","é。❤️、"]
+T "　。사랑、　(「" ["。사랑、 (「"]
+T "(사랑君" ["(사랑","君"]
+T "  éが がOK👨‍👩」" ["é","が ","が","OK👨‍👩」"]
+T "  é君「君 ❤️\t&👨‍👩」love" ["é","君「","君 ","❤️ ","&👨‍👩」love"]
+T "사랑❤️。が\tOKOK&君lovea-bラー" ["사랑❤️。","が ","OKOK&","君","lovea-b","ラー"]
+T "、ラー　" ["、ラー"]
+T " )  " [")"]
+T "、。OK\t&love」❤️— " ["、。OK ","&love」❤️—"]
+T "OK\t" ["OK"]
+T "　)」が &" [")」が &"]
+T "…。사랑👨‍👩」」。it's君、「a-b" ["…。사랑👨‍👩」」。it's","君","、「a-b"]
+T "it's&君ラー👨‍👩사랑❤️사랑)é \t…" ["it's&","君","ラー","👨‍👩사랑❤️사랑)é …"]
+T "a-b" ["a-b"]
+T "。ょ「 élove\tlove)　" ["。ょ「 ","élove ","love)"]
+T "사랑&" ["사랑&"]
+T "사랑が\t사랑。 、\t❤️" ["사랑","が ","사랑。 、 ","❤️"]
+T "👨‍👩。)」" ["👨‍👩。)」"]
+T "\tょOKlove君  ❤️é" ["ょ","OKlove","君 ","❤️é"]
+T "사랑「—、—a-b\t—OK」사랑" ["사랑「—、—a-b ","—OK」사랑"]
+T "it's사랑—が、\t—\t" ["it's사랑—","が、 —"]
+T " it's👨‍👩" ["it's👨‍👩"]
+T "」&。君—   love❤️" ["」&。君— ","love❤️"]
+T "」「\t사랑君  、" ["」「 사랑","君 、"]
+T "君君 " ["君","君"]
+T "が사랑君it'sOK" ["が","사랑","君","it'sOK"]
+T " 、—)(사랑」loveラー" ["、—)(사랑」love","ラー"]
+T "é👨‍👩OKOK君「「が" ["é👨‍👩OKOK","君「「","が"]
+T "(ょlove」사랑loveit's&  —" ["(ょ","love」사랑loveit's& —"]
+T "君👨‍👩。it's👨‍👩  ラー \t사랑(a-b" ["君","👨‍👩。it's👨‍👩 ","ラー ","사랑(a-b"]
+T "love。사랑ょ」&it's　ょ…。" ["love。사랑","ょ","」&it's ","ょ…。"]
+T "\tょ…❤️" ["ょ","…❤️"]
+T "(" ["("]
+T "사랑&「OK&" ["사랑&「OK&"]
+T " ❤️\t" ["❤️"]
+T "が " ["が"]
+T "&(ょit'sit'sラー" ["&(ょ","it'sit's","ラー"]
+T "(\ta-b君 ょ(" ["( a-b","君 ","ょ("]
+T ")(👨‍👩)、👨‍👩éOKが" [")(👨‍👩)、👨‍👩éOK","が"]
+T "❤️—loveéOK&a-b\t  사랑 " ["❤️—loveéOK&a-b ","사랑"]
+T "((。사랑ょ「「👨‍👩❤️—é、" ["((。사랑","ょ","「「👨‍👩❤️—é、"]
+T "a-b" ["a-b"]
+T "ょ　\t君  )ょ" ["ょ ","君 ",")ょ"]
+T "\t」……　。) 사랑" ["」…… 。) 사랑"]
+T "ょ」」君ééé" ["ょ」」","君","ééé"]
+T "\t" []
+T ")a-b    é" [")a-b ","é"]
+T "é(—　éa-b사랑\t" ["é(— ","éa-b사랑"]
+T "…it'sé👨‍👩」ラー" ["…it'sé👨‍👩」","ラー"]
+T ")a-b사랑」がょ—…" [")a-b사랑」","がょ—…"]
+T "❤️사랑ょ👨‍👩é—ラー「ょ👨‍👩it's」—" ["❤️사랑","ょ","👨‍👩é—","ラー「","ょ","👨‍👩it's」—"]
+T "ょ—」がa-b、がょ" ["ょ—」","が","a-b、","がょ"]
+T "it'sラーlove。" ["it's","ラー","love。"]
+T "—👨‍👩ょ君" ["—👨‍👩","ょ","君"]
+T "—、사랑(" ["—、사랑("]
+T ")　君  ❤️「　" [") 君 ","❤️「"]
+T "…👨‍👩」a-b" ["…👨‍👩」a-b"]
+T "👨‍👩" ["👨‍👩"]
+T "　  。(君 a-bOK「é" ["。(君 ","a-bOK「é"]
+T "   「\t　…" ["「 …"]
+T "が&—a-b" ["が","&—a-b"]
+T "君❤️it's」…&がa-b" ["君","❤️it's」…&","が","a-b"]
+T "OKé」it's❤️…love\t  it's—" ["OKé」it's❤️…love ","it's—"]
+T "사랑👨‍👩、。\tが  。君\t" ["사랑👨‍👩、。 ","が ","。君"]
+T "&—it's사랑a-b—   )" ["&—it's사랑a-b— )"]
+T "　OK、é" ["OK、é"]
+T "a-bé—(「(&—\t。it's…a-b" ["a-bé—(「(&— ","。it's…a-b"]
+T "it's。(  　❤️…(" ["it's。( ","❤️…("]
+T "❤️。「、사랑사랑が&　" ["❤️。「、사랑사랑","が&"]
+T "…。OK)" ["…。OK)"]
+T "  love\t」OK" ["love ","」OK"]
+T "—&ょょ」、、ょ❤️" ["—&ょょ」、、","ょ","❤️"]
+T "(…\t  OK&it's" ["(… OK&it's"]
+T "。\t君、❤️👨‍👩(—❤️—…사랑(" ["。 君","、❤️👨‍👩(—❤️—…사랑("]
+T "ラーラー❤️(ょ、が((a-b👨‍👩사랑" ["ラー","ラー","❤️(","ょ、","が","((a-b👨‍👩사랑"]
+T "ラー。👨‍👩　OK👨‍👩」「" ["ラー","。👨‍👩 ","OK👨‍👩」「"]
+T "「ラーit's👨‍👩ょ「OK  사랑、ラー" ["「ラー","it's👨‍👩","ょ","「OK ","사랑、","ラー"]
+T "ょ(君)love)。❤️❤️」" ["ょ(","君",")love)。❤️❤️」"]
+T "사랑())、a-b　❤️(OK…(。" ["사랑())、a-b ","❤️(OK…(。"]
+T "」。(ラー❤️사랑、사랑。" ["」。(ラー","❤️사랑、사랑。"]
+T "」(  사랑  、。\t\t&」ラー  " ["」( 사랑 、。 ","&」ラー"]
+T "　ラー" ["ラー"]
+T "&\t(、  」&a-bがa-b—" ["& (、 」&a-b","が","a-b—"]
+T "👨‍👩  。—it'sit'sOK、사랑&" ["👨‍👩 ","。—it'sit'sOK、사랑&"]
+T "。—a-b—ょOKlove…❤️ラー" ["。—a-b—","ょ","OKlove…❤️","ラー"]
+T "❤️\t…OKit'sょa-b(" ["❤️ ","…OKit's","ょ","a-b("]
+T "é👨‍👩君❤️」—、     。　" ["é👨‍👩","君","❤️」—、 。"]
+T "👨‍👩君が　が)　❤️love👨‍👩\t。が" ["👨‍👩","君","が ","が) ","❤️love👨‍👩 ","。が"]
+T "　OKが❤️OK  사랑\tラーloveOK\tが" ["OK","が","❤️OK ","사랑 ","ラー","loveOK ","が"]
+T "…é 」OKé" ["…é ","」OKé"]
+T "(it's、)君　OK" ["(it's、)","君 ","OK"]
+T "a-b…(love" ["a-b…(love"]
+T "(、が君" ["(、が","君"]
+T "ラー " ["ラー"]
+T "👨‍👩。君ょ❤️love👨‍👩…君 \t" ["👨‍👩。","君ょ","❤️love👨‍👩…","君"]
+T "「—」」が  👨‍👩)it's\t👨‍👩ラー" ["「—」」が ","👨‍👩)it's ","👨‍👩","ラー"]
+T " " []
+T "\tlove&ラー、　" ["love&","ラー、"]
+T "\tラー❤️ょ❤️「ょ " ["ラー","❤️","ょ","❤️「","ょ"]
+T " が「" ["が「"]
+T ")사랑「 (  ❤️사랑(」)" [")사랑「 ( ","❤️사랑(」)"]
+T "ょlovea-b👨‍👩love❤️사랑❤️" ["ょ","lovea-b👨‍👩love❤️사랑❤️"]
+T ")　…)がa-bOK(" [") …)が","a-bOK("]
+T "love" ["love"]
+T "がOK)—OK" ["が","OK)—OK"]
+T "　  がラーOKがラー" ["が","ラー","OK","が","ラー"]
+T "  (&❤️ょ\t。" ["(&❤️","ょ 。"]
+T "ラー」사랑」" ["ラー","」사랑」"]
+T "é。ょょ(👨‍👩❤️(「éit'sょa-b" ["é。","ょょ","(👨‍👩❤️(「éit's","ょ","a-b"]
+T "。\t　  君「love" ["。 君","「love"]
+T "「。love君" ["「。love","君"]
+T "」が&👨‍👩「" ["」が","&👨‍👩「"]
+T "。  사랑ががOK \té" ["。 사랑","が","が","OK ","é"]
+T "OK—ラー」　\t👨‍👩\t사랑ょ" ["OK—","ラー」 ","👨‍👩 ","사랑","ょ"]
+T "、OK\tが" ["、OK ","が"]
+T "—(OK君OK)" ["—(OK","君","OK)"]
+T "( が(。" ["( が(。"]
+T "❤️" ["❤️"]
+T "　「it's「love「" ["「it's「love「"]
+T "」。　love❤️。)" ["」。 love❤️。)"]
+T "…君loveラー\t)" ["…君","love","ラー )"]
+T "—OK　&…" ["—OK &…"]
+T ")OK" [")OK"]
+T "&love —君lovelove」  " ["&love ","—君","lovelove」"]
+T ") ラー👨‍👩a-b❤️ょ「—a-b　" [") ラー","👨‍👩a-b❤️","ょ","「—a-b"]
+T "…ょ—。ょ、…、" ["…ょ—。","ょ、…、"]
+T "a-b「)がa-bがloveé…사랑  —" ["a-b「)","が","a-b","が","loveé…사랑 —"]
+T ")が" [")が"]
+S 0 10 f35b08be3ef8036d
+S 1 66 3344526265f3957a
+S 2 90 20a85b2b341ed691
+S 3 23 efd55770d43f9065
+S 4 98 841895efd1a0a52f
+S 5 105 733ce8c36b6b59ab
+S 6 26 86bc7784cb0ab902
+S 7 64 fe82afbcdc74aff5
+S 8 54 c176268617a92883
+S 9 98 eef9c5c75434dc52
+S 10 5 c078bde730b26fd3
+S 11 72 f2f46319cfab9b64
+S 12 96 4a3ec67ab503faf5
+S 13 16 12c45946b0b045b0
+S 14 117 56674cb56e9eca5e
+S 15 86 da3e19b919d8fe89
+S 16 56 86739250fa2a0d69
+S 17 13 2ebe540d7d2ad8af
+S 18 27 0f1b855191db5859
+S 19 6 5ec42efcb2c14d9f
+S 20 87 bcce68710699770d
+S 21 38 2d4ccfed33b9ecc4
+S 22 11 e08d90e52254df9e
+S 23 80 39639c3b3595272f
+S 24 59 bb9aa552e0d58a18
+S 25 65 aaab74205f774a8b
+S 26 45 1c73977a37b166de
+S 27 19 7f8949f2b98a7830
+S 28 116 146c8f0e07cddb2b
+S 29 64 b05c008a3acd3c70
+S 30 35 e815f3f8d874c8bd
+S 31 63 5f25ac9275a2bf8a
+S 32 83 d4dd58e4fa1b9a1a
+S 33 95 39126fd471e7e6b6
+S 34 32 dcbfe74e464252d0
+S 35 77 f21dc2e58f7bacce
+S 36 88 dccbb6af59061558
+S 37 86 8f575e79d6fc5b34
+S 38 91 f60d70ee16995668
+S 39 10 1c169038005d25d0
+S 40 22 c53be124e89113eb
+S 41 102 7c2a08a8e8ccd6af
+S 42 109 d6ddfed4f726f110
+S 43 118 131880251483625f
+S 44 90 fd66ac605333e061
+S 45 113 c9888e8b5f452142
+S 46 83 5c917095eb84e43c
+S 47 84 756e581dfd23daa1
+S 48 99 9a3332041a926b10
+S 49 24 dcf219837c5b5331
+S 50 12 83b3931edf492104
+S 51 104 25fec0245a83b1d0
+S 52 63 e85bab580809cc50
+S 53 108 843e59ff82f86cca
+S 54 4 69d1ac3253e55f4e
+S 55 104 9caa08b3baae579a
+S 56 23 fa7d57754403abe1
+S 57 79 ef9a8768e4c12ee9
+S 58 40 362a9badc40b1f38
+S 59 68 f1d6af75d98eb9c1
+S 60 73 9492a837ad3563da
+S 61 105 7d913d6b4985cc55
+S 62 22 b597717e806d2ba5
+S 63 31 28052ca050234783
+S 64 106 13c2d294fa0f190e
+S 65 68 7f79570c99576dfe
+S 66 54 eccce269ab996a89
+S 67 15 9c4d2182b26913c6
+S 68 59 6fad72985b34686a
+S 69 15 9fbf15ae7727312b
+S 70 39 63efbc5400bd9fad
+S 71 101 ffa064d61fa00f48
+S 72 5 92be39b8da04dbb8
+S 73 114 d38f8cde08a54b9d
+S 74 92 120a2345c02a0414
+S 75 21 19119a96119d8077
+S 76 72 cb2cc0c9de8bdfa8
+S 77 41 200a5643e741f1ac
+S 78 55 2d59545093f8ffd0
+S 79 119 3adc1cd5b322cf62
+S 80 39 a750b538901682c4
+S 81 119 fffda274808b0efa
+S 82 40 0ca660425018fad9
+S 83 50 62da344dea0e6546
+S 84 87 abba75f73f51726a
+S 85 48 d0e2f258732b7f75
+S 86 50 0a17d492f727e90f
+S 87 40 a8a14310e8632a29
+S 88 110 bd4da3b6ea4febcf
+S 89 117 b6b20e4874f6554f
+S 90 116 1d8da13d9e44d74c
+S 91 7 31cd363805156b1a
+S 92 83 05637783f2393234
+S 93 32 83662405078557ec
+S 94 23 83dce1e7e1fa7b27
+S 95 64 9ef365524c4dfc9e
+S 96 17 a2b88db5d6cd249c
+S 97 79 b71f264162b2045f
+S 98 24 2cbfce0b4b0c895a
+S 99 40 e6df1148eb301c6d
+S 100 32 59f4f301be520151
+S 101 30 a850d43e1b06d937
+S 102 96 04a321aaa4f9fb0e
+S 103 95 07178c56765de028
+S 104 116 cdce23be33574118
+S 105 32 1b27bbbcaa63c659
+S 106 26 b5a9add0c4659e97
+S 107 69 ce59e5f5ce5fa38f
+S 108 8 0b296915d0aa4568
+S 109 52 fd372fce731005e1
+S 110 49 3b8107c66d80d1ca
+S 111 7 6f5ee5b3b67b75d5
+S 112 20 f3c503be059f87ca
+S 113 101 fda8b7419bb6f113
+S 114 113 da1f292dab45e786
+S 115 90 5186cc7a893122e7
+S 116 113 51aba93f6561ede4
+S 117 108 079a112cd50b7797
+S 118 95 06ea27715967d8e7
+S 119 12 5b2a9c765befc83d
+S 120 7 c9a211d51ee25d7b
+S 121 20 2dc7bbb0f7b84d4c
+S 122 72 756563e1cedbc04a
+S 123 112 06fa6d41cb023717
+S 124 55 8166b7f88153269f
+S 125 99 60102d0d78728eb9
+S 126 84 3b74d00e2ae81e93
+S 127 92 64a1eb68576aaf63
+S 128 24 ee6c879dc7cfbc83
+S 129 20 6ad60968ac4ef396
+S 130 57 72079397a7bad490
+S 131 81 5fdb54a659bac38d
+S 132 96 01495c3c2bba5980
+S 133 12 c2a77fbc81986f3f
+S 134 31 a7a7b828419b83fc
+S 135 48 dc6d0a1a287979e3
+S 136 52 e19d25564c6905ae
+S 137 109 d3dfc28c5e3b688f
+S 138 35 80ae4eb9f6721fca
+S 139 38 e87b3ce79cb0f2d8
+S 140 97 3d89446a0b601219
+S 141 83 f7317366bd36cf77
+S 142 96 e1d632038ff9b458
+S 143 38 ba24132c967e8494
+S 144 103 fc450bba56646d59
+S 145 4 3adc676f2da7acc8
+S 146 21 4076bd41477425f9
+S 147 110 92d2ebb6c61910aa
+S 148 5 e859f1ccf88f453f
+S 149 109 555f3df2541fe579
+S 150 38 7a98f2b8f56d5bfd
+S 151 56 8bf3046c080bcacb
+S 152 51 c14ca5619c04bf4d
+S 153 25 d4a9db641ded3118
+S 154 71 89fb92a13270e16c
+S 155 54 92311d88eac1d637
+S 156 81 7f1b4409207a50f5
+S 157 6 2475123872b6c6e1
+S 158 66 b972632d548c0c10
+S 159 62 074a07124551e17f
+S 160 64 2aff17a9502dbdae
+S 161 26 14a08f8eb83349ca
+S 162 93 8e256afc55b55747
+S 163 45 c268de6de634e848
+S 164 28 63fe7053eb77dc9f
+S 165 23 cca080000a7b0291
+S 166 34 6edb1a516d3ff61c
+S 167 109 7038ded3e9e3e0c9
+S 168 25 814f87b1eee1db04
+S 169 67 5c1dd47492e86dd4
+S 170 70 010dc8cd775348c9
+S 171 49 30a932b5d8614318
+S 172 114 ab157883d3d2adb5
+S 173 6 9ccc0ea3f088acac
+S 174 74 fc01fb58c6748be5
+S 175 48 26bab21bc826777e
+S 176 39 d1bbc09fc9821032
+S 177 1 da54e08cc46aabfa
+S 178 19 e3e2348aa13b5804
+S 179 96 394d832ef0190d9d
+S 180 18 1b37b041e3ff677b
+S 181 114 de7c6f76a69cc21e
+S 182 96 45141f6dc9e5dbb9
+S 183 97 c5baa26f4f6bbd1d
+S 184 84 307444548fb5600a
+S 185 112 7733972d18fb88bc
+S 186 1 f5c9fc3018f80d27
+S 187 37 69062a3700555c84
+S 188 74 f14aa0816badc27f
+S 189 114 df642c03d850b674
+S 190 17 291cb22c37e83fc3
+S 191 31 c6d86eeac82db5fc
+S 192 73 d6188075213947d2
+S 193 106 a585308edc2015ba
+S 194 15 e0f25ddcee905572
+S 195 2 7410852aa18261de
+S 196 1 b435ab92c2cf588f
+S 197 78 4cb3dd60ec45d307
+S 198 76 f4b41b47b4874dfd
+S 199 9 09080096bb75d6d2
+S 200 50 8ce81cfa3bbeacdb
+S 201 49 9b73ddeaaa869b7f
+S 202 16 f0201a4e964f6869
+S 203 113 efa3d0a561affe8b
+S 204 107 f21e2c7279817613
+S 205 96 bb0a67cfa2dac085
+S 206 53 63a2cad210e27f04
+S 207 33 41a91c05b1362f24
+S 208 28 921eaa8506a008e9
+S 209 36 9d0a7d6c5cf135a1
+S 210 16 b4ac3e7776a54949
+S 211 67 7970f1dfa92a8a38
+S 212 107 8e9d12c5fb6064fd
+S 213 111 794aa829d2a829a7
+S 214 91 1e5d0a317c2cce3c
+S 215 57 84434d1c1409d5c6
+S 216 92 7c6972117f9d3c6f
+S 217 11 b6fa47bdc14b3b88
+S 218 102 882841151520dae4
+S 219 71 ff7c782ce7523db9
+S 220 92 43f17d04476fdf21
+S 221 100 25ec849587aac9e0
+S 222 46 2895001b2978799f
+S 223 42 c53c13cdd10413ba
+S 224 85 4a2da58add4c5ec5
+S 225 20 de38b90de3996886
+S 226 102 075801764d5d7d8d
+S 227 53 bf8264536d5a87ad
+S 228 106 c6e9e9908dd3fc57
+S 229 100 22ce99e2569523e0
+S 230 74 1797ae4aa4545e3e
+S 231 27 44491102b429dc24
+S 232 45 9021baa24fd9cd47
+S 233 59 9836546891d05b6a
+S 234 53 142d4fc2be992844
+S 235 1 3b634a957d0a9b47
+S 236 88 2557439a601155b7
+S 237 48 d083cbe084d15ddb
+S 238 32 feb58c5cee34d900
+S 239 99 baf71e07d0f420e4
+S 240 72 b5e88295e762e063
+S 241 18 9cb8b8c4c8331be3
+S 242 10 433afaf839367f1f
+S 243 66 d9ffbafb81b68cc5
+S 244 72 8b88de4871c79c4e
+S 245 26 fb47fe7f90188c6c
+S 246 5 ad8045f5dea0ff0b
+S 247 14 f750182600b5dd49
+S 248 48 941c74a987664734
+S 249 50 866f27fb7a8d18a8
+S 250 26 fcb9db41b0e632d4
+S 251 77 7ca4ce588f5b6d0f
+S 252 23 2d61725eb79bf2c4
+S 253 58 5aae5416defb63c9
+S 254 93 fc49d3e2d23b5c65
+S 255 68 4d749f450c658d0a
+S 256 66 ca5dd397befadeea
+S 257 78 65e48463bfe33bdc
+S 258 12 d857fcc970c818fd
+S 259 40 756e5b716a5c1a48
+S 260 13 1c11fb94992ab387
+S 261 51 70cfa83f6665aa2c
+S 262 96 e7ad996524e4d540
+S 263 69 739fc9f2bd50e94d
+S 264 39 bab77a857adcffa4
+S 265 27 76fe3653d2c27db5
+S 266 83 beb4c18609821bac
+S 267 39 728a2438ac736c37
+S 268 102 5a09b5111c249460
+S 269 54 437d50ec63952d7f
+S 270 88 4aaa8fa3921c4f99
+S 271 75 2f1c0e0155c9c69d
+S 272 23 18b5d0871ea715a5
+S 273 10 d72f43ff0ea21980
+S 274 1 75d883ca4207b375
+S 275 34 677e8ae8e58f2a84
+S 276 96 8791f7fcb3516dc7
+S 277 68 b4c24bd5a815f932
+S 278 1 4758a6240971fb3a
+S 279 52 18257ff0cf16a889
+S 280 46 b2d1509fad91c185
+S 281 15 64047c12d312b811
+S 282 72 9f2c508e56fca6fd
+S 283 85 f55c0d8e4d3c8d33
+S 284 50 c28e5093f00d483d
+S 285 100 80239f1928848953
+S 286 55 c009a3bdcda238f8
+S 287 18 7582d8e72f15114d
+S 288 41 833a8928bdd7df56
+S 289 4 394d5ed8ca7206b9
+S 290 11 2063f75381c6a2ed
+S 291 51 798384e38796d3d0
+S 292 28 04793c2c1a309954
+S 293 88 9e650f0b90112eac
+S 294 10 2ff0d2e23d88bb59
+S 295 57 44bf280b1cd337f3
+S 296 72 6a620b7ca78a0db0
+S 297 76 89d2c11810aee61c
+S 298 102 b31a77d122171172
+S 299 15 2ebee76a9ecd90a3
+S 300 103 e63c91caea7a1501
+S 301 40 65e005a31243c6a9
+S 302 86 f063451e36483a69
+S 303 99 29a9a4b37ebb788b
+S 304 72 cb199880926e0f80
+S 305 49 19c3620aeef31910
+S 306 105 c955ed290fe469ed
+S 307 56 3c9ca8c75b1a0fa5
+S 308 35 0e75938e4f8caf3a
+S 309 34 ab8d9f5fd83ce268
+S 310 19 d7808b4edc226e73
+S 311 74 a90e92d419341a2c
+S 312 106 83be81c5bbbfe9d1
+S 313 53 50572412245465e0
+S 314 99 c0ae35101451eff7
+S 315 2 b79f5d46fa9733c8
+S 316 99 0e96b348da89d827
+S 317 3 05dbb99218d7b0d5
+S 318 108 275c646f655f4495
+S 319 24 175d93e232f7e0d5
+S 320 5 cda7470a2aab96a8
+S 321 99 f57360f9f4d1c40a
+S 322 62 07eacc2c4546b1bf
+S 323 17 8a506ba6582b798b
+S 324 45 93e0cc8578625f96
+S 325 44 593536c58c5e6eae
+S 326 114 29788647a108e47e
+S 327 82 379f7c136d0cd5d1
+S 328 6 7b9ff688a4261381
+S 329 11 d8ea55547a4c481b
+S 330 75 08ffbe34df5284f7
+S 331 60 a59018407e46be55
+S 332 112 031da6ba521ac107
+S 333 82 ae944926b7af1276
+S 334 91 41e9d5c00b026b0e
+S 335 20 3503b984145c40b3
+S 336 49 85884750bdc6b371
+S 337 96 f31b7b31c13d4388
+S 338 94 6909e2b2a65a9a59
+S 339 102 59f442f76b4c6310
+S 340 117 938524334254c6b7
+S 341 14 e8f662462cda3ace
+S 342 82 cbfb3db4e42db5af
+S 343 103 b6690bbf24717968
+S 344 3 6f2f080fc2c6def2
+S 345 86 fb111a19541a66e8
+S 346 76 799b91ea4001d9da
+S 347 102 e4643064e124df42
+S 348 18 9d3dfe83811d9cdb
+S 349 91 10fddf8de67c799d
+S 350 32 8027bc1a0b59baf9
+S 351 41 f54c3620433d5516
+S 352 67 85e385ac58849472
+S 353 73 160b52dc63868c95
+S 354 6 ff22968a3c488510
+S 355 25 e8d0bda5c9f967f2
+S 356 83 d4b611e6807223be
+S 357 101 4ee55c1dccc310b3
+S 358 85 e8eeb7b363f759d7
+S 359 12 c6252a2ae4ccc48c
+S 360 32 c2f341ffd88292de
+S 361 101 bf926d91b3c5dcdf
+S 362 47 41c56db1014f488e
+S 363 76 5c1641ba7bed63be
+S 364 30 9a222cb1d52101de
+S 365 40 5f5f638a2830c023
+S 366 19 302ddce4e0d4df9b
+S 367 22 84142fe7c238557a
+S 368 22 85802542b082625d
+S 369 25 aa0a97e7b716617a
+S 370 79 95590ffbdcb6b8ab
+S 371 53 484207b225ccbf3c
+S 372 98 d7f5c82191cee084
+S 373 71 0c579907d5a83892
+S 374 113 80289ff94eef6883
+S 375 50 18631805ffdf4b71
+S 376 113 6f6f81959e126479
+S 377 107 704c8580694daec3
+S 378 74 33b25fed216225c8
+S 379 83 59c9b10ce8297abd
+S 380 46 feba89ebce566093
+S 381 89 df7a64dc7588b91d
+S 382 114 4df1a8e466b0e36a
+S 383 64 98deab625aab52c2
+S 384 32 e9d1dd1d81b79529
+S 385 67 6ffc7e6859c70e91
+S 386 43 5f026277e8cb4bb3
+S 387 12 f7786caab9cf9000
+S 388 56 ccda06e2b2b12900
+S 389 110 ea50a39431026e9d
+S 390 35 f4182e4350a4fffc
+S 391 87 1ba10577c42c5255
+S 392 3 a52512af586bc34b
+S 393 21 33fbee35a83dce96
+S 394 27 080a9525967ceb55
+S 395 32 930fdec9cc2a3942
+S 396 56 910da4b629b6e2b7
+S 397 103 0199bfdcc3dae9e5
+S 398 16 e54001bf0a76157e
+S 399 93 1df16f98b8b85472
+S 400 98 248dec029cc6066c
+S 401 53 b1940448f463fb78
+S 402 110 cce470a1154cbce8
+S 403 63 4dcf987d62d87b8b
+S 404 29 366f768334a235bc
+S 405 90 5d4d220d24e67150
+S 406 63 cfe7a9ba47fcae02
+S 407 5 8380ed7344b5cd63
+S 408 84 c521bc9023213dc3
+S 409 22 a1ca190b093ec706
+S 410 109 600a256b8b3e63b8
+S 411 116 02d7950ce030f5d5
+S 412 55 27491d47c8f2ca72
+S 413 30 e732db6b98a7c27c
+S 414 16 20c6a9f6ee28397f
+S 415 110 a077cf2987ab8bd8
+S 416 86 5e0b0329d92ceeac
+S 417 79 b3bb4032739564c2
+S 418 9 d41609a78d45202b
+S 419 117 bd15b159a51648c4
+S 420 19 d1e1201bfccfd2a7
+S 421 25 9b2cc0c51e7a6606
+S 422 88 9e6ab55538b2b850
+S 423 47 d450d86cf49a54fb
+S 424 86 6aea6859f9ea6a25
+S 425 60 52f7106bd1f96659
+S 426 55 b56e89b294397050
+S 427 2 15fc23d34a282f4e
+S 428 89 950de3309a651035
+S 429 71 98f629fb5ea707e3
+S 430 22 2f8a8193cd95b151
+S 431 17 f55078187eef8d43
+S 432 51 63c33b442579c802
+S 433 4 e9b41602765a9d47
+S 434 2 a0afaff578debcbd
+S 435 25 8076186c05181eab
+S 436 41 496b81b11ba9d363
+S 437 8 b6221de9f36aed42
+S 438 119 89b1c41e237ba662
+S 439 56 b99e8583d71e5fa6
+S 440 48 ebe0c0c570d75f62
+S 441 108 3bf54dd394fd504c
+S 442 34 4983a0eca8b5f6d8
+S 443 43 bda4e90f75d5a60a
+S 444 59 b00c99821f20b1be
+S 445 65 f99f688933d8c5da
+S 446 94 85e139fc86f9c4a5
+S 447 77 65fc4d09ae3ad0e6
+S 448 51 2f2020ce32012c42
+S 449 47 91f457127852df13
+S 450 54 93f3e50ce5a8ecb3
+S 451 92 0926d3f6a035a7ed
+S 452 53 3cab9faf9dd3ba3a
+S 453 17 c4c2de248e701dc0
+S 454 68 4c8dcb0faaaf0d97
+S 455 15 408cf0f8d1573450
+S 456 34 f21b192754ffd31b
+S 457 27 aafddf602aa41526
+S 458 88 e6f369e090656413
+S 459 51 7d9199be853eca22
+S 460 20 01dbce0bab7d5ab1
+S 461 78 9d95087742035800
+S 462 106 0c484d63500ff8e8
+S 463 117 3dd4191af280624c
+S 464 91 86e7f7031eb3e58e
+S 465 82 a68b88c8bbd54f70
+S 466 101 7bdb79b2de6f8ec8
+S 467 99 289d1c323bb0514a
+S 468 84 477d3d9480aa3537
+S 469 55 66e19cc6d5913e80
+S 470 83 c09b846f85a8f71f
+S 471 89 35b648243d8afdd5
+S 472 21 baba352623e69ef6
+S 473 60 be6be5fa0e853fc4
+S 474 36 1a1a8b3dcd91c861
+S 475 55 fd65d1139b8895fa
+S 476 17 70ee7521dc1d4e17
+S 477 2 e9d8992193d9412a
+S 478 110 38d875ac4192b77f
+S 479 11 9449e3278f4bd995
+S 480 50 4773d91dfad62216
+S 481 75 0034c5e4f0708d27
+S 482 113 ad1ca1fec9a6916e
+S 483 117 8c9b0c3cb5d4031d
+S 484 77 58c916ae7178d001
+S 485 38 041626a1c8c468cb
+S 486 87 de571b34cd76b638
+S 487 6 eb82708f60bbed94
+S 488 43 1bd5e0f1764026d2
+S 489 69 e6d8cdb462c4e444
+S 490 3 3b0fbe21dd37019e
+S 491 42 1ec4881d13ea278d
+S 492 84 bf9da6e3b0919c48
+S 493 34 27f5dee9a6f35bc2
+S 494 69 9fa36dc13f4a6841
+S 495 28 a36adac4efeb942f
+S 496 17 11eba2092f28229a
+S 497 60 b33c48734acaeb59
+S 498 20 f0c041cca49c960a
+S 499 46 a9f30e95468a8ed1
+D "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"extra\":{\"a\":[1,2,{\"b\":null}]},\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":\"2\",\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":\"200000\",\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":2e5,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":-5,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":0,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":999,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":400,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-999,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-400,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":\"true\"},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":true},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":TRUE},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":true},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":\"False\"},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":null},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":1},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":\"yes\",\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":\" 0.75 \",\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":\"0.5f\",\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.5,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":7.5e-1,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":1,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.1,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.1,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":1.0E-4,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":1.0E-4,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":12345678,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":1.2345678E7,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":-1,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":\"NaN\",\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":\"Infinity\",\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":1e39,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":null,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":\"null\",\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":-3,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":-3,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":\"hola\",\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":\"hola\",\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":5,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":null,\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"x\",\"role\":\"choir\",\"name\":\"N\",\"z\":1}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"x\",\"role\":\"choir\",\"name\":\"N\"}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"other\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":2,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":null,\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":\"x\"}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}]}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Goodbye world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":99,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":-1,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2.0,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"cursor\":3,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":3,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":1,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":0,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":1,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"\",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123} "
+DOUT "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":0}"
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}x"
+DOUT null
+DIN "[{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}]"
+DOUT null
+DIN "{}"
+DOUT null
+DIN "not json"
+DOUT null
+DIN "{\"format\":\"pixelplay-lyrics-sync-draft\",\"formatVersion\":1,\"songId\":\"content://media/42\",\"title\":\"Title\",\"artist\":\"Artist\",\"album\":\"Album\",\"durationMs\":200000,\"cursor\":2,\"nudgeMs\":-20,\"version\":1,\"voices\":[{\"id\":\"lead\",\"role\":\"lead\",\"name\":null}],\"lines\":[],\"zz\":[{\"text\":\"Hello world\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":0,\"tokenCount\":2,\"locked\":false,\"skipped\":false},{\"text\":\"君が好き\",\"voiceId\":\"lead\",\"anchorMs\":null,\"translation\":null,\"firstToken\":2,\"tokenCount\":4,\"locked\":false,\"skipped\":false}],\"tokens\":[{\"line\":0,\"text\":\"Hello \",\"rawStartMs\":1000,\"startSpeed\":0.75,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":0,\"text\":\"world\",\"rawStartMs\":1400,\"startSpeed\":1.0,\"rawEndMs\":2600,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"君\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"が\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"好\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false},{\"line\":1,\"text\":\"き\",\"rawStartMs\":null,\"startSpeed\":1.0,\"rawEndMs\":null,\"endSpeed\":1.0,\"exact\":false}],\"savedAtMs\":1234567890123}"
+DOUT null
+H "abc" a9993e364706816aba3e25717850c26c9cd0d89d
+H "" da39a3ee5e6b4b0d3255bfef95601890afd80709
+H "content://media/42" 58b203d9a0310f1efd13d030a3993428f2be2a49
+H "keep" 1264bdfe5ff3215cf6abac2152fff607f7dc78dc
+H "old" c00dbbc9dadfbe1e232e93a729dd4752fade0abf
+H "君が好き" be75903ad60d9c5e9e6b58785436c80b844860d7
+H "yt:dQw4w9WgXcQ" a281d5abe0dfe935484a9e5db94dda88d53d4bc0
+H "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" 94218caae9904e93a3d7bf578bf4791926fc5e82
+L doc "[ti:Song]\n[ar:Artist]\n[al:Album]\n[length:03:20]\n[by:PixlAudio]\n[00:01.23]<00:01.23>Hello <00:01.63>there, <00:02.13>world<00:03.00>\n[00:04.01]<00:04.01>beau<00:04.31>ti<00:04.61>ful <00:05.01>day<00:06.00>\n"
+X doc "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<tt xmlns=\"http://www.w3.org/ns/ttml\" xmlns:ttm=\"http://www.w3.org/ns/ttml#metadata\" xmlns:itunes=\"http://music.apple.com/lyric-ttml-internal\" itunes:timing=\"Word\">\n  <head>\n    <metadata>\n      <ttm:agent type=\"person\" xml:id=\"v1\"/>\n    </metadata>\n  </head>\n  <body dur=\"0:03:20.000\">\n    <div begin=\"0:00:01.234\" end=\"0:00:06.000\">\n      <p begin=\"0:00:01.234\" end=\"0:00:03.000\" ttm:agent=\"v1\"><span begin=\"0:00:01.234\" end=\"0:00:01.634\">Hello</span> <span begin=\"0:00:01.634\" end=\"0:00:02.134\">there,</span> <span begin=\"0:00:02.134\" end=\"0:00:03.000\">world</span></p>\n      <p begin=\"0:00:04.005\" end=\"0:00:06.000\" ttm:agent=\"v1\"><span begin=\"0:00:04.005\" end=\"0:00:04.305\">beau</span><span begin=\"0:00:04.305\" end=\"0:00:04.605\">ti</span><span begin=\"0:00:04.605\" end=\"0:00:05.005\">ful</span> <span begin=\"0:00:05.005\" end=\"0:00:06.000\">day</span></p>\n    </div>\n  </body>\n</tt>\n"
+L duet "[ti:A & B]\n[length:03:20]\n[by:PixlAudio]\n[00:01.00]<00:01.00>R&B <00:01.50><3 <00:02.00>'yes\"<00:02.40>\n[00:01.20]<00:01.20>(ooh)<00:02.40>\n[00:03.00]<00:03.00>Hi <00:03.40>there<00:04.00>\n"
+X duet "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<tt xmlns=\"http://www.w3.org/ns/ttml\" xmlns:ttm=\"http://www.w3.org/ns/ttml#metadata\" xmlns:itunes=\"http://music.apple.com/lyric-ttml-internal\" itunes:timing=\"Word\">\n  <head>\n    <metadata>\n      <ttm:agent type=\"person\" xml:id=\"v1\"/>\n      <ttm:agent type=\"person\" xml:id=\"v2\"/>\n    </metadata>\n  </head>\n  <body dur=\"0:03:20.000\">\n    <div begin=\"0:00:01.000\" end=\"0:00:04.000\">\n      <p begin=\"0:00:01.000\" end=\"0:00:02.500\" ttm:agent=\"v1\"><span begin=\"0:00:01.000\" end=\"0:00:01.400\">R&amp;B</span> <span begin=\"0:00:01.500\" end=\"0:00:01.900\">&lt;3</span> <span begin=\"0:00:02.000\" end=\"0:00:02.400\">&apos;yes&quot;</span> <span ttm:role=\"x-bg\" begin=\"0:00:01.200\" end=\"0:00:02.400\"><span begin=\"0:00:01.200\" end=\"0:00:02.400\">(ooh)</span></span></p>\n      <p begin=\"0:00:03.000\" end=\"0:00:04.000\" ttm:agent=\"v2\"><span begin=\"0:00:03.000\" end=\"0:00:03.400\">Hi</span> <span begin=\"0:00:03.400\" end=\"0:00:04.000\">there</span></p>\n    </div>\n  </body>\n</tt>\n"
+L odd "[by:PixlAudio]\n[00:00.00]<00:00.00>a\u0001b<00:00.50>\n"
+X odd "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<tt xmlns=\"http://www.w3.org/ns/ttml\" xmlns:ttm=\"http://www.w3.org/ns/ttml#metadata\" xmlns:itunes=\"http://music.apple.com/lyric-ttml-internal\" itunes:timing=\"Word\">\n  <head>\n    <metadata>\n      <ttm:agent type=\"person\" xml:id=\"v1\"/>\n    </metadata>\n  </head>\n  <body>\n    <div begin=\"0:00:00.000\" end=\"0:00:00.500\">\n      <p begin=\"0:00:00.000\" end=\"0:00:00.500\" ttm:agent=\"v1\"><span begin=\"0:00:00.000\" end=\"0:00:00.500\">ab</span></p>\n    </div>\n  </body>\n</tt>\n"
+L bare "[ti:Two lines]\n[by:PixlAudio]\n[00:00.00]plain words\n"
+X bare "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<tt xmlns=\"http://www.w3.org/ns/ttml\" xmlns:ttm=\"http://www.w3.org/ns/ttml#metadata\" xmlns:itunes=\"http://music.apple.com/lyric-ttml-internal\" itunes:timing=\"Line\">\n  <head>\n    <metadata>\n      <ttm:agent type=\"person\" xml:id=\"v1\"/>\n    </metadata>\n  </head>\n  <body>\n    <div begin=\"0:00:00.000\" end=\"0:00:01.000\">\n      <p begin=\"0:00:00.000\" end=\"0:00:01.000\" ttm:agent=\"v1\">plain words</p>\n    </div>\n  </body>\n</tt>\n"
+L edge "[ti:Spaced Title]\n[al:Al bum]\n[length:00:59]\n[by:PixlAudio]\n[00:00.00]<00:00.00>(intro)<00:00.90>\n[00:00.10](also)\n[00:01.00]  line only  \n[00:02.00]<00:02.00> <00:02.30>ab <00:02.60>cd <00:03.00>\n[00:02.50]<00:02.50>(echo)<00:02.90>\n"
+X edge "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<tt xmlns=\"http://www.w3.org/ns/ttml\" xmlns:ttm=\"http://www.w3.org/ns/ttml#metadata\" xmlns:itunes=\"http://music.apple.com/lyric-ttml-internal\" itunes:timing=\"Word\">\n  <head>\n    <metadata>\n      <ttm:agent type=\"person\" xml:id=\"v1\"/>\n      <ttm:agent type=\"person\" xml:id=\"v2\"/>\n    </metadata>\n  </head>\n  <body dur=\"0:00:59.499\">\n    <div begin=\"0:00:00.000\" end=\"0:00:03.000\">\n      <p begin=\"0:00:00.000\" end=\"0:00:00.900\" ttm:agent=\"v1\"><span ttm:role=\"x-bg\" begin=\"0:00:00.000\" end=\"0:00:00.900\"><span begin=\"0:00:00.000\" end=\"0:00:00.900\">(intro)</span></span></p>\n      <p begin=\"0:00:00.100\" end=\"0:00:00.800\" ttm:agent=\"v1\"><span ttm:role=\"x-bg\" begin=\"0:00:00.100\" end=\"0:00:00.800\">(also)</span></p>\n      <p begin=\"0:00:01.000\" end=\"0:00:02.000\" ttm:agent=\"v2\">line only</p>\n      <p begin=\"0:00:02.000\" end=\"0:00:03.000\" ttm:agent=\"v1\"> <span begin=\"0:00:02.300\" end=\"0:00:02.600\">ab</span> <span begin=\"0:00:02.600\" end=\"0:00:03.000\">cd</span> <span ttm:role=\"x-bg\" begin=\"0:00:02.500\" end=\"0:00:02.900\"><span begin=\"0:00:02.500\" end=\"0:00:02.900\">(echo)</span></span></p>\n    </div>\n  </body>\n</tt>\n"
