@@ -241,7 +241,8 @@ How the stages meet now that they share one `main`:
 - **Pill row accessory:** `GlassPillRow(accessory:)` is the one trailing action capsule (Library's Edit tab, the
   equalizer's Edit presets).
 - **CI:** the shots job runs every `PixlAudioUITests` class (111 screenshots, ~42 min; timeout 90 min).
-  `ci/export-shots.sh` keeps `.png` on ids containing a dot (`settingsCategory.about-dark.png`).
+  `ci/export-shots.sh` keeps `.png` on ids containing a dot and strips Xcode's `_<n>_<UUID>` suffix wherever it
+  lands (`settingsCategory.about-dark.png`).
 
 ### Visual review (run 3, `int-stage07` shots vs `docs/design-refs`)
 Same layout, order and geometry as PixlAudio on Home, Library (all tabs), details, Search, Settings and its
