@@ -70,6 +70,14 @@ final class PlaybackStore {
         engine.setShuffleEnabled(enabled)
     }
 
+    // Queue editing (stage 5): the engine answers with `queueChanged`.
+    func playNext(_ songs: [Song]) { engine.playNext(songs) }
+    func addToQueue(_ songs: [Song]) { engine.addToQueue(songs) }
+    func moveQueueItem(from: Int, to: Int) { engine.moveQueueItem(from: from, to: to) }
+    func removeQueueItem(at index: Int) { engine.removeQueueItem(at: index) }
+    func skipToQueueItem(at index: Int) { engine.skipToQueueItem(at: index) }
+    func setPlaybackRate(_ rate: Float) { engine.setPlaybackRate(rate) }
+
     // MARK: Position (read on demand, never observed)
 
     func positionMs() -> Int64 { engine.currentPositionMs() }
@@ -89,6 +97,13 @@ final class PlaybackStore {
             if isPlaying { isPlaying = false }
         case .failed(let message):
             lastError = message
+        case .queueChanged(let songs, let index):
+            if queue != songs { queue = songs }
+            if currentIndex != index { currentIndex = index }
+        case .repeatModeChanged(let mode):
+            if repeatMode != mode { repeatMode = mode }
+        case .shuffleChanged(let enabled):
+            if isShuffleEnabled != enabled { isShuffleEnabled = enabled }
         }
     }
 }
