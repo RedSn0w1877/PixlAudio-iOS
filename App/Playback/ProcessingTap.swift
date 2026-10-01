@@ -55,8 +55,11 @@ nonisolated enum ProcessingTap {
                     numberFramesOut.pointee = 0
                     return
                 }
+                // Past the end the player keeps pulling (silent) buffers; they are not media.
+                let endFlag = MTAudioProcessingTapFlags(truncatingIfNeeded: kMTAudioProcessingTapFlag_EndOfStream)
                 Unmanaged<TapContext>.fromOpaque(MTAudioProcessingTapGetStorage(tap)).takeUnretainedValue()
-                    .process(bufferList, frames: Int(numberFramesOut.pointee), timeRange: timeRange)
+                    .process(bufferList, frames: Int(numberFramesOut.pointee), timeRange: timeRange,
+                             endOfStream: flagsOut.pointee & endFlag != 0)
             })
         var tap: MTAudioProcessingTap?
         let status = MTAudioProcessingTapCreate(kCFAllocatorDefault, &callbacks,
@@ -90,12 +93,12 @@ nonisolated final class TapContext: @unchecked Sendable {
     private var stride = 1
     private let dummy: UnsafeMutablePointer<Float>
 
-    // Equalizer.
-    private var biquad: vDSP_biquadm_Setup?
+    // Equalizer: one single-channel vDSP_biquadm setup per channel. A single-channel setup takes the mono block's
+    // layout as is (section → b0 b1 b2 a1 a2), which sidesteps the multichannel coefficient interleaving: Apple's
+    // documented order (section → coefficient → channel) produced unstable filters on CI.
+    private let biquads: UnsafeMutablePointer<vDSP_biquadm_Setup?>
     private var biquadChannels = 0
     private var loadedGeneration = -1
-    /// 5 × sections × channels, vDSP's per-section/per-coefficient/per-channel layout.
-    private let coefficientScratch: UnsafeMutablePointer<Double>
     /// Mono block redesigned for this tap's sample rate when it differs from the published design rate.
     private let localBlock: UnsafeMutablePointer<Double>
     private var preGain: Float = 1
@@ -122,18 +125,18 @@ nonisolated final class TapContext: @unchecked Sendable {
         inputPointers.initialize(repeating: UnsafePointer(dummy), count: Self.maxChannels)
         outputPointers.initialize(repeating: dummy, count: Self.maxChannels)
         channelStarts.initialize(repeating: dummy, count: Self.maxChannels)
-        coefficientScratch = .allocate(capacity: AudioEffectsParameters.sectionCount * 5 * Self.maxChannels)
-        coefficientScratch.initialize(repeating: 0, count: AudioEffectsParameters.sectionCount * 5 * Self.maxChannels)
+        biquads = .allocate(capacity: Self.maxChannels)
+        biquads.initialize(repeating: nil, count: Self.maxChannels)
         localBlock = .allocate(capacity: AudioEffectsParameters.blockSize)
         localBlock.initialize(repeating: 0, count: AudioEffectsParameters.blockSize)
     }
 
     deinit {
-        if let biquad { vDSP_biquadm_DestroySetup(biquad) }
+        destroyBiquads()
+        biquads.deallocate()
         inputPointers.deallocate()
         outputPointers.deallocate()
         channelStarts.deallocate()
-        coefficientScratch.deallocate()
         localBlock.deallocate()
         dummy.deallocate()
     }
@@ -154,24 +157,32 @@ nonisolated final class TapContext: @unchecked Sendable {
     }
 
     func unprepare() {
-        if let biquad { vDSP_biquadm_DestroySetup(biquad) }
-        biquad = nil
-        biquadChannels = 0
+        destroyBiquads()
         loadedGeneration = -1
     }
 
-    /// (Re)creates the vDSP setup for the current channel count from the latest coefficients.
-    private func rebuildBiquad() {
-        if let biquad { vDSP_biquadm_DestroySetup(biquad) }
-        biquad = nil
+    private func destroyBiquads() {
+        for c in 0..<Self.maxChannels {
+            if let setup = biquads[c] { vDSP_biquadm_DestroySetup(setup) }
+            biquads[c] = nil
+        }
         biquadChannels = 0
+    }
+
+    /// (Re)creates one single-channel setup per channel from the latest coefficients.
+    private func rebuildBiquad() {
+        destroyBiquads()
         guard channels > 0, isFloat32 else { return }
         let latest = effects.latestBlock()
         let block = blockForThisRate(latest.block)
-        expandCoefficients(block)
-        biquad = vDSP_biquadm_CreateSetup(coefficientScratch, vDSP_Length(AudioEffectsParameters.sectionCount),
-                                          vDSP_Length(channels))
-        biquadChannels = biquad == nil ? 0 : channels
+        var created = 0
+        for c in 0..<channels {
+            guard let setup = vDSP_biquadm_CreateSetup(block, vDSP_Length(AudioEffectsParameters.sectionCount), 1)
+            else { break }
+            biquads[c] = setup
+            created += 1
+        }
+        if created == channels { biquadChannels = channels } else { destroyBiquads() }
         loadTail(block)
         currentPreGain = preGain
         loadedGeneration = latest.generation
@@ -188,19 +199,6 @@ nonisolated final class TapContext: @unchecked Sendable {
         return UnsafePointer(localBlock)
     }
 
-    /// Writes the mono block's sections into vDSP's multichannel layout (section → coefficient → channel).
-    @inline(__always)
-    private func expandCoefficients(_ block: UnsafePointer<Double>) {
-        let n = max(channels, 1)
-        for s in 0..<AudioEffectsParameters.sectionCount {
-            for k in 0..<5 {
-                let value = block[s * 5 + k]
-                let base = (s * 5 + k) * n
-                for c in 0..<n { coefficientScratch[base + c] = value }
-            }
-        }
-    }
-
     @inline(__always)
     private func loadTail(_ block: UnsafePointer<Double>) {
         let tail = AudioEffectsParameters.sectionCount * 5
@@ -209,7 +207,9 @@ nonisolated final class TapContext: @unchecked Sendable {
         needsLimiter = block[tail + 2] != 0
         let nowBypass = block[tail + 3] != 0
         if nowBypass && !bypass { tailFrames = Int(sampleRate / 2) }
-        if !nowBypass && bypass, let biquad { vDSP_biquadm_ResetState(biquad) }
+        if !nowBypass && bypass {
+            for c in 0..<biquadChannels { if let setup = biquads[c] { vDSP_biquadm_ResetState(setup) } }
+        }
         bypass = nowBypass
     }
 
@@ -222,7 +222,8 @@ nonisolated final class TapContext: @unchecked Sendable {
 
     // MARK: Process (render thread — no allocation, locks or logging)
 
-    func process(_ bufferList: UnsafeMutablePointer<AudioBufferList>, frames: Int, timeRange: CMTimeRange) {
+    func process(_ bufferList: UnsafeMutablePointer<AudioBufferList>, frames: Int, timeRange: CMTimeRange,
+                 endOfStream: Bool = false) {
         guard frames > 0 else { return }
         let firstTime: Double
         if timeRange.start.isValid && timeRange.start.isNumeric {
@@ -231,8 +232,18 @@ nonisolated final class TapContext: @unchecked Sendable {
             firstTime = Double(framesSincePrepare) / sampleRate
         }
         framesSincePrepare += frames
-        item.processedMediaTime.store(firstTime + Double(frames) / sampleRate)
-        item.processedFrames.wrappingAdd(frames, ordering: .relaxed)
+        // Frames that are media: none beyond the item's duration (the player keeps pulling silent buffers after the
+        // last frame); without a known duration, none flagged past the end of stream.
+        let duration = item.mediaDuration.load()
+        var mediaFrames = endOfStream && duration <= 0 ? 0 : frames
+        if duration > 0 {
+            let remaining = Int(((duration - firstTime) * sampleRate).rounded())
+            mediaFrames = min(mediaFrames, max(remaining, 0))
+        }
+        if mediaFrames > 0 {
+            item.processedMediaTime.store(firstTime + Double(mediaFrames) / sampleRate)
+            item.processedFrames.wrappingAdd(mediaFrames, ordering: .relaxed)
+        }
         item.hasProcessed.store(true, ordering: .relaxed)
         guard isFloat32, channels > 0, bindChannels(bufferList, frames: frames) else { return }
 
@@ -251,11 +262,11 @@ nonisolated final class TapContext: @unchecked Sendable {
             let designRate = effects.designSampleRate.load()
             // A different rate keeps the coefficients designed in prepare (see blockForThisRate).
             if abs(designRate - sampleRate) <= 0.5 {
-                expandCoefficients(latest.block)
-                if let biquad {
-                    vDSP_biquadm_SetTargetsDouble(biquad, coefficientScratch, 0.25, 1e-6, 0, 0,
-                                                  vDSP_Length(AudioEffectsParameters.sectionCount),
-                                                  vDSP_Length(biquadChannels))
+                for c in 0..<biquadChannels {
+                    if let setup = biquads[c] {
+                        vDSP_biquadm_SetTargetsDouble(setup, latest.block, 0.25, 1e-6, 0, 0,
+                                                      vDSP_Length(AudioEffectsParameters.sectionCount), 1)
+                    }
                 }
             }
             loadTail(latest.block)
@@ -263,9 +274,13 @@ nonisolated final class TapContext: @unchecked Sendable {
         if !bypass || tailFrames > 0 || currentPreGain != preGain {
             applyGainRamp(from: currentPreGain, to: preGain, frames: frames)
             currentPreGain = preGain
-            if let biquad, biquadChannels == channels {
-                vDSP_biquadm(biquad, inputPointers, vDSP_Stride(stride), outputPointers, vDSP_Stride(stride),
-                             vDSP_Length(frames))
+            if biquadChannels == channels {
+                for c in 0..<channels {
+                    if let setup = biquads[c] {
+                        vDSP_biquadm(setup, inputPointers + c, vDSP_Stride(stride), outputPointers + c,
+                                     vDSP_Stride(stride), vDSP_Length(frames))
+                    }
+                }
             }
             if channels == 2 && width != 1 { applyWidth(frames: frames) }
             if needsLimiter { limit(frames: frames) }
@@ -287,8 +302,8 @@ nonisolated final class TapContext: @unchecked Sendable {
         currentFixedGain = fixed
 
         item.lastPeak.store(peak(frames: frames))
-        if let log = item.log {
-            log.append(.init(mediaTime: firstTime, frames: frames, rmsIn: rmsIn, rmsOut: rms(frames: frames),
+        if let log = item.log, mediaFrames > 0 {
+            log.append(.init(mediaTime: firstTime, frames: mediaFrames, rmsIn: rmsIn, rmsOut: rms(frames: frames),
                              hostTime: mach_absolute_time()))
         }
     }

@@ -148,11 +148,13 @@ nonisolated final class TapItemParameters: @unchecked Sendable {
     let ramp = ParameterRing<CrossfadeRamp?>(nil)
     /// A constant gain applied after everything (0 mutes a preparing deck; 1 normally).
     let fixedGain = AtomicFloat(1)
+    /// The item's duration in seconds (0 = unknown). Buffers past it are not counted as media by the meters.
+    let mediaDuration = AtomicDouble(0)
 
     // Meters, written by the render thread.
     /// Media time (s) just past the last processed frame.
     let processedMediaTime = AtomicDouble(0)
-    /// Frames processed since the tap was prepared.
+    /// Media frames processed (buffers past the end of the item are not counted).
     let processedFrames = Atomic<Int>(0)
     /// Peak absolute sample value of the last buffer, after processing.
     let lastPeak = AtomicFloat(0)

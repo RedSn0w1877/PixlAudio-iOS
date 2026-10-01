@@ -19,6 +19,10 @@ final class DeckItem {
     var replayGainVolume: Float?
     /// A seek requested before the item was ready to play (applied when it is).
     var pendingSeekSeconds: Double?
+    /// The target of a seek still in flight (the timebase only moves once it completes).
+    var seekTargetSeconds: Double?
+    /// Distinguishes seeks so an older completion never clears a newer target.
+    var seekGeneration = 0
 
     var song: Song { entry.song }
 
@@ -35,6 +39,7 @@ final class DeckItem {
     /// Position from the item's timebase (cheap; no observation).
     var positionSeconds: Double {
         if let pendingSeekSeconds { return pendingSeekSeconds }
+        if let seekTargetSeconds { return seekTargetSeconds }
         if let timebase = playerItem.timebase {
             let t = CMTimebaseGetTime(timebase)
             if t.isValid && t.isNumeric { return max(t.seconds, 0) }
@@ -81,6 +86,7 @@ final class DeckItemFactory {
         var seconds = duration.map { $0.isValid && $0.isNumeric ? $0.seconds : 0 } ?? 0
         if seconds <= 0 { seconds = Double(entry.song.duration) / 1000 }
         let parameters = TapItemParameters(logCapacity: tapLogCapacity)
+        parameters.mediaDuration.store(seconds)
         let item = AVPlayerItem(asset: asset)
         // Pitch-preserving rate changes (sync editor speeds 0.75 / 0.5).
         item.audioTimePitchAlgorithm = .spectral
@@ -215,7 +221,21 @@ final class Deck {
             return
         }
         let time = CMTime(seconds: max(seconds, 0), preferredTimescale: 600)
-        player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
+        guard let item = currentItem else {
+            player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
+            return
+        }
+        item.seekGeneration += 1
+        let generation = item.seekGeneration
+        item.seekTargetSeconds = max(seconds, 0)
+        player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { @Sendable [weak item] _ in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    guard let item, item.seekGeneration == generation else { return }
+                    item.seekTargetSeconds = nil
+                }
+            }
+        }
     }
 
     var positionSeconds: Double { currentItem?.positionSeconds ?? 0 }

@@ -1,3 +1,4 @@
+import Accelerate
 import AVFoundation
 import PixlAudioCore
 import PixlModel
@@ -33,6 +34,52 @@ final class ProcessingTapTests: XCTestCase {
         XCTAssertEqual(reference.count / 2, TestAudio.sampleRate, accuracy: 64, "whole file delivered")
         let rms = TapOfflineRenderer.rms(reference, channel: 0, frames: 0..<(reference.count / 2))
         XCTAssertEqual(rms, 0.5 / 2.0.squareRoot(), accuracy: 0.002)
+    }
+
+    /// The tap's vDSP usage on its own: one single-channel `vDSP_biquadm` setup per channel, run in place on
+    /// interleaved stereo (stride 2), must match PixlAudioCore's reference cascade sample for sample.
+    func testPerChannelBiquadmMatchesTheReferenceCascade() throws {
+        var settings = EqualizerSettings()
+        settings.setEnabled(true)
+        settings.setBandLevel(2, 9)
+        settings.setBandLevel(6, -7)
+        settings.setBassBoostEnabled(true)
+        settings.setBassBoostStrength(600)
+        let design = EqualizerDesigner.design(settings, sampleRate: rate)
+        let block = UnsafeMutablePointer<Double>.allocate(capacity: AudioEffectsParameters.blockSize)
+        defer { block.deallocate() }
+        AudioEffectsParameters.write(design, into: block)
+
+        let frames = 2048
+        var samples = [Float](repeating: 0, count: frames * 2)
+        var state: UInt64 = 7
+        for i in samples.indices {
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            samples[i] = Float(Double(state >> 11) / Double(1 << 53) * 0.2 - 0.1)
+        }
+        var reference = samples
+        var cascade = BiquadCascade(sectionCount: AudioEffectsParameters.sectionCount, channelCount: 2)
+        for (i, section) in design.sections.enumerated() { cascade.setCoefficients(section, at: i) }
+        reference.withUnsafeMutableBufferPointer { cascade.process($0.baseAddress!, frames: frames) }
+
+        let sections = vDSP_Length(AudioEffectsParameters.sectionCount)
+        let setups = try (0..<2).map { _ in try XCTUnwrap(vDSP_biquadm_CreateSetup(block, sections, 1)) }
+        defer { setups.forEach(vDSP_biquadm_DestroySetup) }
+        samples.withUnsafeMutableBufferPointer { buffer in
+            let base = buffer.baseAddress!
+            for c in 0..<2 {
+                var input = UnsafePointer(base + c)
+                var output = base + c
+                withUnsafeMutablePointer(to: &input) { x in
+                    withUnsafeMutablePointer(to: &output) { y in
+                        vDSP_biquadm(setups[c], x, 2, y, 2, vDSP_Length(frames))
+                    }
+                }
+            }
+        }
+        var worst: Float = 0
+        for i in samples.indices { worst = max(worst, abs(samples[i] - reference[i])) }
+        XCTAssertLessThan(worst, 1e-4, "vDSP_biquadm differs from the reference cascade")
     }
 
     func testEqualizerBoostMatchesDesignedResponse() async throws {
