@@ -32,7 +32,8 @@ final class GaplessDiagnosticsTests: XCTestCase {
         let item = AVPlayerItem(asset: asset)
         if spectral { item.audioTimePitchAlgorithm = .spectral }
         if tap {
-            let track = try XCTUnwrap(try await asset.loadTracks(withMediaType: .audio).first)
+            let tracks = try await asset.loadTracks(withMediaType: .audio)
+            let track = try XCTUnwrap(tracks.first)
             item.audioMix = ProcessingTap.makeAudioMix(for: track, effects: AudioEffectsParameters(),
                                                        item: TapItemParameters())
         }
