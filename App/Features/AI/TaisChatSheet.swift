@@ -294,10 +294,10 @@ struct TaisChatMessageRow: View {
         Button(action: action) {
             HStack(spacing: 4) {
                 Image(systemName: systemImage).font(.system(size: 15, weight: .semibold))
-                Text(title).pixlFont(.labelLarge).lineLimit(1)
+                Text(title).pixlFont(.labelLarge).lineLimit(1).minimumScaleFactor(0.8)
             }
             .foregroundStyle(theme.onSecondaryContainer)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 14)
             .frame(height: 40)
             .background(theme.secondaryContainer.opacity(0.9), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             .contentShape(.rect(cornerRadius: 20))
