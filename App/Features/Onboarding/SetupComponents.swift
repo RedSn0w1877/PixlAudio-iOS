@@ -17,7 +17,7 @@ struct SetupPermissionPage<Content: View>: View {
         VStack(spacing: 0) {
             SetupPageHeader(title: title, subtitle: description, topSpacing: 16)
             SetupIconCollage(icons: icons)
-                .frame(height: 220)
+                .frame(maxHeight: 220)
                 .frame(maxHeight: .infinity)
             VStack(spacing: 0) {
                 content()
@@ -54,11 +54,13 @@ struct SetupPageHeader: View {
                 .pixlFont(.custom(size: 32, weight: .bold, lineHeight: 44))
                 .foregroundStyle(theme.onSurface)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer().frame(height: 16)
             Text(subtitle)
                 .pixlFont(.bodyLarge)
                 .foregroundStyle(theme.onSurfaceVariant)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity)
     }
@@ -123,7 +125,8 @@ struct SetupTextButton: View {
 /// Android `PermissionIconCollage`: five icons on tiles scattered over the box — a large rounded tile in the centre
 /// (−15°), circles at the top-left (15°) and bottom-right (5°), a rounded tile at the top-right (−20°) and a small one
 /// at the bottom-left (10°), tinted `secondary`, `onSurface` 80 %, `primary`, `onSurface` 50 % and `tertiary`, each with
-/// 16 pt padding. The tiles are glass in one container; the star-shaped tile becomes a circle (no Material shapes).
+/// 16 pt padding. The tiles stay `surfaceContainerHigh` fills: it's an illustration whose tiles overlap, and
+/// overlapping glass melts into one blob and drops the rotations (CI shots); the star tile becomes a circle.
 struct SetupIconCollage: View {
     let icons: [String]
     @Environment(\.appTheme) private var theme
@@ -150,16 +153,14 @@ struct SetupIconCollage: View {
             ]
             let colors: [Color] = [theme.secondary, theme.onSurface.opacity(0.8), theme.primary,
                                    theme.onSurface.opacity(0.5), theme.tertiary]
-            GlassEffectContainer(spacing: 2) {
-                ZStack {
-                    ForEach(Array(icons.prefix(5).enumerated()), id: \.offset) { index, symbol in
-                        let slot = slots[index]
-                        let size = base * slot.scale
-                        tile(symbol, size: size, color: colors[index], isCircle: slot.isCircle)
-                            .rotationEffect(.degrees(slot.rotation))
-                            .offset(slot.offset(proxy.size.width, height))
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: slot.alignment)
-                    }
+            ZStack {
+                ForEach(Array(icons.prefix(5).enumerated()), id: \.offset) { index, symbol in
+                    let slot = slots[index]
+                    let size = base * slot.scale
+                    tile(symbol, size: size, color: colors[index], isCircle: slot.isCircle)
+                        .rotationEffect(.degrees(slot.rotation))
+                        .offset(slot.offset(proxy.size.width, height))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: slot.alignment)
                 }
             }
         }
@@ -173,13 +174,12 @@ struct SetupIconCollage: View {
             .scaledToFit()
             .fontWeight(.medium)
             .foregroundStyle(color)
-            .padding(16 + size * 0.06)
+            .padding(16)
             .frame(width: size, height: size)
         if isCircle {
-            icon.glassEffect(Glass.regular.tint(theme.surfaceContainerHigh.opacity(GlassTint.container)), in: Circle())
+            icon.background(theme.surfaceContainerHigh, in: Circle())
         } else {
-            icon.glassEffect(Glass.regular.tint(theme.surfaceContainerHigh.opacity(GlassTint.container)),
-                             in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            icon.background(theme.surfaceContainerHigh, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
     }
 }

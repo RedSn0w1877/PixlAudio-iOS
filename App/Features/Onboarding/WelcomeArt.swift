@@ -8,10 +8,12 @@ struct WelcomeArt: View {
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        Canvas { context, size in
-            let transform = CGAffineTransform(scaleX: size.width / WelcomeArtData.viewport.width,
-                                              y: size.height / WelcomeArtData.viewport.height)
-            for layer in WelcomeArtData.layers {
+        let layers = WelcomeArtData.layers
+        let theme = self.theme
+        let viewport = WelcomeArtData.viewport
+        return Canvas { context, size in
+            let transform = CGAffineTransform(scaleX: size.width / viewport.width, y: size.height / viewport.height)
+            for layer in layers {
                 context.fill(layer.path.applying(transform), with: .color(theme[dynamicMember: layer.role]))
             }
         }

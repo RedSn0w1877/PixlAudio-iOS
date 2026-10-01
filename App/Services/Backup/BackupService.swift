@@ -93,7 +93,7 @@ final class BackupService {
                                                            androidVersion: 0))
         let manager = self.manager
         let (stream, continuation) = AsyncStream<BackupTransferProgressUpdate>.makeStream()
-        let work = Task.detached(priority: .userInitiated) { () throws -> [UInt8] in
+        let work = Task.detached(priority: .userInitiated) { () async throws -> [UInt8] in
             defer { continuation.finish() }
             return try await manager.export(sections: ordered, handlers: handlers, appInfo: appInfo) {
                 continuation.yield($0)
@@ -117,7 +117,7 @@ final class BackupService {
         let events = sections.contains(.playbackHistory) ? history.events : []
         let persistence = self.persistence
 
-        return try await Task.detached(priority: .userInitiated) { () throws -> [BackupSection: String] in
+        return try await Task.detached(priority: .userInitiated) { () async throws -> [BackupSection: String] in
             var payloads: [BackupSection: String] = [:]
             var favorites: [FavoriteBackupEntry] = []
             var lyrics: [StoredLyricsRow] = []

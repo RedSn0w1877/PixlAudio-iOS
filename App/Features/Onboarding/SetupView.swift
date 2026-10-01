@@ -67,13 +67,6 @@ struct SetupView: View {
         }
         .background(theme.background.ignoresSafeArea())
         .accessibilityIdentifier("screen.setup")
-        .fileImporter(isPresented: $showsFolderPicker, allowedContentTypes: [.folder],
-                      allowsMultipleSelection: true) { result in
-            if case .success(let urls) = result { addFolders(urls) }
-        }
-        .fileImporter(isPresented: $showsBackupPicker, allowedContentTypes: UTType.backupImportTypes) { result in
-            if case .success(let url) = result { inspect(url) }
-        }
         .fullScreenCover(item: $restoreBackup) { backup in
             BackupImportFlowView(start: .inspected(backup)) { report in
                 restoreBackup = nil
@@ -97,12 +90,20 @@ struct SetupView: View {
         case .mediaPermission:
             SetupMediaPermissionPage(status: mediaStatus, onGrant: requestMediaAccess)
         case .musicFolders:
+            // Each picker sits on its own page: SwiftUI honours one `fileImporter` per view.
             SetupMusicFoldersPage(folders: folders, onChoose: { showsFolderPicker = true }, onSkip: next)
+                .fileImporter(isPresented: $showsFolderPicker, allowedContentTypes: [.folder],
+                              allowsMultipleSelection: true) { result in
+                    if case .success(let urls) = result { addFolders(urls) }
+                }
         case .backupRestore:
             SetupBackupPage(isInspecting: isInspecting, isRestoring: restoreBackup != nil && env.backup.isBusy,
                             isScanning: isScanning, scanProgress: library.lastImportProgress,
                             onImport: { showsBackupPicker = true }, onSkip: next)
                 .task { await scanBeforeRestore() }
+                .fileImporter(isPresented: $showsBackupPicker, allowedContentTypes: UTType.backupImportTypes) { result in
+                    if case .success(let url) = result { inspect(url) }
+                }
         case .theme:
             SetupThemePage(selected: settings.appearance.appThemeMode) { mode in
                 withAnimation(PixlMotion.state) { settings.appearance.appThemeMode = mode }

@@ -430,13 +430,14 @@ struct SetupSpotifyPage: View {
         VStack(spacing: 0) {
             SetupPageHeader(title: L10n.setupSpotifyTitle, subtitle: L10n.setupSpotifyDescription)
             SetupIconCollage(icons: ["music.note", "heart.fill", "music.note.list", "music.note.house", "opticaldisc"])
-                .frame(height: 200)
+                .frame(maxHeight: 200)
                 .frame(maxHeight: .infinity)
             VStack(spacing: 0) {
                 Text(L10n.setupSpotifyReachOut)
                     .pixlFont(.bodyMedium)
                     .foregroundStyle(theme.onSecondaryContainer)
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 14)
                     .frame(maxWidth: .infinity)

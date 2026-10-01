@@ -49,7 +49,7 @@ struct BackupSettingsSection: View {
                 .environment(\.appTheme, theme)
         }
         .settingsToast($toast)
-        .task { openDemoFlowIfNeeded() }
+        .task { await openDemoFlowIfNeeded() }
     }
 
     private var selectionSummary: String {
@@ -60,12 +60,16 @@ struct BackupSettingsSection: View {
     }
 
     /// UI tests open the module step or the report straight away (`-screen backupRestorePlan|backupImportReport`).
-    private func openDemoFlowIfNeeded() {
+    private func openDemoFlowIfNeeded() async {
+        let start: BackupImportFlowView.Start
         switch env.launch.screen {
-        case .backupRestorePlan: importStart = .inspected(.demo)
-        case .backupImportReport: importStart = .report(.demo)
+        case .backupRestorePlan: start = .inspected(.demo)
+        case .backupImportReport: start = .report(.demo)
         default: return
         }
+        // A cover requested while the launch path is still being pushed is dropped; wait for the push to settle.
+        try? await Task.sleep(for: .milliseconds(900))
+        importStart = start
         showsImport = true
     }
 }
