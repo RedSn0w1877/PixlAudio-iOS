@@ -158,6 +158,7 @@ jobs:
             -destination "id=$SIM_UDID" \
             -derivedDataPath build/DerivedData \
             "${ONLY[@]}" \
+            -retry-tests-on-failure -test-iterations 3 \
             -resultBundlePath build/Shots.xcresult \
             2>&1 | tee build/shots.log | xcbeautify --quieter
       - name: Export screenshots
