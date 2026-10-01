@@ -96,13 +96,15 @@ final class EqualizerModel {
     }
 
     func deleteCustomPreset(_ preset: EqualizerPreset) {
+        // Android checks the state from before the delete (its UI state still holds the deleted preset).
+        let wasCurrent = currentPreset.name == preset.name
         writePresets(customPresets.filter { $0.name != preset.name })
         var pinned = pinnedNames
         if let index = pinned.firstIndex(of: preset.name) {
             pinned.remove(at: index)
             writePinned(pinned)
         }
-        if currentPreset.name == preset.name { select(.flat) }
+        if wasCurrent { select(.flat) }
     }
 
     func renameCustomPreset(_ oldName: String, to newName: String) {

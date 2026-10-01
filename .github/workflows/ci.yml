@@ -133,6 +133,7 @@ jobs:
             -destination "id=$SIM_UDID" \
             -derivedDataPath build/DerivedData \
             -only-testing:PixlAudioUITests/ScreenshotTests \
+            -only-testing:PixlAudioUITests/SettingsScreenshotTests \
             -resultBundlePath build/Shots.xcresult \
             2>&1 | tee build/shots.log | xcbeautify --quieter
       - name: Export screenshots

@@ -177,7 +177,7 @@ struct SettingsCategoryRow: View {
                 Spacer().frame(width: 8)
             }
             .padding(16)
-            .frame(height: 88)
+            .frame(minHeight: 88)
         }
         .buttonStyle(.plain)
         .settingsRowGlass(interactive: true)

@@ -29,7 +29,9 @@ extension EnvironmentValues {
     @Entry var settingsRowCorners: SettingsRowCorners = .single
 }
 
-/// Rows stacked 2 pt apart, each told its corner radii (Android's 24 dp group clip around 10 dp rows).
+/// Rows stacked 2 pt apart (Android's group clipped to 24 dp around rows with 10 dp corners): every row in the group
+/// draws its glass with the inner radius, and the group clips its outer corners to the outer radius — exactly how
+/// the Compose `Column(Modifier.clip(RoundedCornerShape(24.dp)))` shapes its first and last rows.
 struct SettingsGroup<Content: View>: View {
     var spacing: CGFloat = SettingsMetrics.rowSpacing
     var outer: CGFloat = SettingsMetrics.groupRadius
@@ -38,14 +40,10 @@ struct SettingsGroup<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: spacing) {
-            Group(subviews: content) { subviews in
-                let count = subviews.count
-                ForEach(Array(subviews.enumerated()), id: \.element.id) { index, subview in
-                    subview.environment(\.settingsRowCorners,
-                                        .position(index, of: count, outer: outer, inner: inner))
-                }
-            }
+            content
         }
+        .environment(\.settingsRowCorners, SettingsRowCorners(top: inner, bottom: inner))
+        .clipShape(RoundedRectangle(cornerRadius: outer, style: .continuous))
     }
 }
 
