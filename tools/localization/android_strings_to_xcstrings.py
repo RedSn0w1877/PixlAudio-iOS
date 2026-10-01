@@ -2,7 +2,7 @@
 """Builds App/Resources/Localizable.xcstrings from the Android app's string resources.
 
 Usage (from the repo root):
-    python tools/localization/android_strings_to_xcstrings.py <android res dir>
+    python tools/localization/android_strings_to_xcstrings.py <android res dir> [--with-translations]
     e.g. python tools/localization/android_strings_to_xcstrings.py \
         "../PixelPlayer-master/beta2-release/app/src/main/res"
 
@@ -20,6 +20,9 @@ What it does
      non-positional placeholders become positional when the English is positional. Android escapes (`\\'`, `\\"`,
      `\\n`, `\\t`, `\\@`, `\\?`) are unescaped; a string wrapped in double quotes loses them.
   5. Writes the String Catalog (sorted keys, `extractionState: manual`), with the English value for every key.
+
+The app ships ENGLISH ONLY for now (owner decision 12, 2026-10-01): by default the catalog gets just the English
+source strings. Pass `--with-translations` to bring Android's 11 locales back in one step when languages return.
 
 Re-run it whenever iOS strings or the Android translations change; never hand-edit the catalog.
 """
@@ -145,12 +148,14 @@ def normalize(text):
 
 
 def main():
-    if len(sys.argv) != 2:
+    if len(sys.argv) < 2 or any(a != "--with-translations" for a in sys.argv[2:]):
         print(__doc__)
         sys.exit(2)
     res = sys.argv[1]
+    with_translations = "--with-translations" in sys.argv[2:]
     english = {k: normalize(v) for k, v in read_strings(os.path.join(res, "values")).items()}
-    translations = {code: read_strings(os.path.join(res, "values-" + folder)) for folder, code in LOCALES.items()}
+    translations = ({code: read_strings(os.path.join(res, "values-" + folder)) for folder, code in LOCALES.items()}
+                    if with_translations else {})
     localized, literals = collect_ios_strings()
 
     by_english = {}

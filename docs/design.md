@@ -439,9 +439,12 @@ lyricsCascade.f0…f7 (first-show cascade frames, live clock).
   drawable's paths filled with palette roles). Order: welcome, music library, music folders, backup, theme, library
   layout, Spotify, finish. `AppEnvironment.start()` presents it while `initial_setup_done` is false.
 - **Updates**: `env.updates` (`UpdateNotifier`) checks GitHub at most every 12 h; `RootView` shows the banner.
-- **Localisation**: `tools/localization/android_strings_to_xcstrings.py <android res>` regenerates the catalog.
-  New strings: use `String(localized: "<android key>", defaultValue: "<English>")` (Android's key when Android has the
-  string) and re-run the script.
+- **Localisation — English only for now (owner decision 12):** `App/Resources/Localizable.xcstrings` holds only the
+  English source strings (the 11 Android locales stage 15 converted were stripped when it merged; `project.yml`
+  declares no other regions). `tools/localization/android_strings_to_xcstrings.py <android res>` regenerates the
+  English catalog; adding `--with-translations` brings Android's 11 locales back in one step when languages return.
+  New strings: English only, `String(localized: "<android key>", defaultValue: "<English>")` (Android's key when
+  Android has the string).
 - Screenshot ids: `setup`, `setupPermission`, `setupFolders`, `setupBackup`, `setupTheme`, `setupLibraryLayout`,
   `setupSpotify`, `setupFinish` (ready `screen.setup`); `backupRestorePlan` (ready `screen.backupRestorePlan`) and
   `backupImportReport` (ready `screen.backupReport`), both on the `backupImport` cover. Class:
