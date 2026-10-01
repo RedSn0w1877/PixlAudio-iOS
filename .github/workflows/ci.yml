@@ -103,7 +103,7 @@ jobs:
       contains(github.event.head_commit.message, '[shots]') ||
       (github.event_name == 'workflow_dispatch' && inputs.shots)
     runs-on: xcode-27
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v5
       - name: Select Xcode

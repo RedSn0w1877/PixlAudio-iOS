@@ -28,7 +28,10 @@ for a in found:
     if not os.path.exists(src):
         continue
     name = a.get("suggestedHumanReadableName") or a["exportedFileName"]
+    # Only a real image extension counts: ids such as "settingsCategory.about-dark" contain a dot.
     stem, ext = os.path.splitext(name)
+    if ext.lower() not in (".png", ".jpg", ".jpeg", ".heic"):
+        stem, ext = name, ""
     # Xcode appends "_<index>_<UUID>" to the attachment name.
     stem = re.sub(r"_\d+_[0-9A-Fa-f-]{36}$", "", stem)
     stem = re.sub(r"[^A-Za-z0-9._-]+", "_", stem) or "attachment"

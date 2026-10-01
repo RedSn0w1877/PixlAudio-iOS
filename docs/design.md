@@ -172,11 +172,11 @@ Parallel stages **own and replace** only these:
 - **Stage 7a:** `Features/Library/**`, `Features/Detail/**`, `Features/Playlists/**`.
 - **Stage 7b:** `Features/Home/**`, `Features/Mixes/**`, `Features/Stats/**` (Home, mixes, recently played, stats, home
   sheets). `HomeStore` (in `AppEnvironment.home`) owns `ListeningHistoryStore` — the `playback_history.json` events
-  behind Recently Played, Stats, the greeting and the recommendations. **Stage 5 reports each finished listening span
-  with `env.home.history.record(songId:durationMs:)`** (Android `PlaybackStatsRepository.recordPlayback`); stage 15's
-  backup restore calls `importEvents(_:)`.
-- **Stage 7c:** `Features/Search/**` and a `SearchIndex`-backed `SearchProviding` (replace `LocalSearchProvider` in
-  `Core/SearchProviding.swift` with a new type in Features/Search and point `AppEnvironment` at it).
+  behind Recently Played, Stats, the greeting and the recommendations. Stage 5's `ListeningStatsTracker` reports each finished
+  listening span there through `PlaybackServices.recordHistory`, wired in `AppEnvironment` (Android
+  `PlaybackStatsRepository.recordPlayback`); stage 15's backup restore calls `importEvents(_:)`.
+- **Stage 7c:** `Features/Search/**` and `LibrarySearchProvider` (on `SearchIndex`; `SearchModel` re-indexes it on
+  every library snapshot).
 - **Stage 7d:** `Features/Settings/**`, `Features/Delimiters/**`, `Features/Equalizer/**`, `Features/Transitions/**`;
   extends the category objects in `Stores/SettingsStore.swift` (append keys to `PreferenceKeys`).
 - **Stage 8:** `Features/NowPlaying/**`, `Features/Queue/**`, `Features/SongInfo/**`.
@@ -203,7 +203,7 @@ Stage 7a ids (Library tab on screen, ready `screen.library` plus the page/sheet 
 (three songs selected), `librarySort`, `libraryReorderTabs`, `libraryMultiSelection`, `libraryCreatePlaylist`,
 `libraryAddToPlaylist`; `songOptionsInfo` (the ⋮ sheet on its Info page); `playlistEdit` (editor on the first demo
 playlist, Icon tab with a star), `playlistAddSongs`, `playlistOptions`, `playlistReorder` (reorder + remove modes),
-`genreSort`. Shots: `UITests/LibraryScreenshotTests` (CI runs it next to `ScreenshotTests`).
+`genreSort`. Shots: `UITests/LibraryScreenshotTests` (CI runs every `PixlAudioUITests` class).
 
 ## Stage 7a notes (Library, details, playlists)
 
@@ -220,3 +220,37 @@ playlist, Icon tab with a star), `playlistAddSongs`, `playlistOptions`, `playlis
 Stage 7c adds `-searchFilter all|songs|albums|artists|playlists`
 (with `-screen search -searchQuery <q>`) and the shots searchEmpty, searchTyping, searchAll, searchSongs, searchAlbums,
 searchArtists, searchPlaylists, searchNoResults (light + dark; `UITests/SearchScreenshotTests.swift`).
+
+## Integration notes (run 3: stages 5, 6, 7a–7d merged)
+
+How the stages meet now that they share one `main`:
+
+- **Queue inserts:** `PlaybackStore.playNext` / `addToQueue` call the engine's native inserts (stage 5) and start
+  playback when nothing is loaded; stage 7a's re-set-the-queue fallbacks were removed. `DemoPlaybackEngine` implements
+  the inserts too, so UI tests see the queue change.
+- **Listening history:** one owner of `playback_history.json` — Home's `ListeningHistoryStore`. The engine's sessions
+  reach it through `PlaybackServices.recordHistory` (its own `PlaybackHistoryStore` is only the fallback when nothing is
+  wired). The store reads the file before its first write, so a session recorded at launch never truncates history.
+- **Equalizer and transitions:** `PlaybackServices.applySettings` uses stage 7d's `EqualizerPreferences.engineSettings`
+  (saved custom presets, loudness) and the observed `globalTransitionSettingsJSON`; saving a playlist rule calls
+  `PlaybackServices.reloadTransitionRules()`.
+- **Music folders:** Settings › Music Management adds and removes folders through `LocalLibraryImporter` (unique
+  display names, security scope kept open). Library paths are `/<root display name>/<relative path>` with the
+  Documents root named `PixlAudio` (`FolderRoot.documentsDisplayName`), so `blocked_directories` entries written by
+  the folder screen match the scanner's paths.
+- **Pill row accessory:** `GlassPillRow(accessory:)` is the one trailing action capsule (Library's Edit tab, the
+  equalizer's Edit presets).
+- **CI:** the shots job runs every `PixlAudioUITests` class (111 screenshots, ~42 min; timeout 90 min).
+  `ci/export-shots.sh` keeps `.png` on ids containing a dot (`settingsCategory.about-dark.png`).
+
+### Visual review (run 3, `int-stage07` shots vs `docs/design-refs`)
+Same layout, order and geometry as PixlAudio on Home, Library (all tabs), details, Search, Settings and its
+categories, sheets; glass in place of Material; text legible in light and dark. Known differences, not bugs:
+- **Type weight:** the Android screenshots render Google Sans Flex (rounded) much heavier than SF Pro at the same
+  Type.kt weights, so iOS titles, tab labels and card text read lighter. Matching them would mean an optical weight
+  bump in `Typography.swift` — an owner decision (decision 3 says "SF Pro at PixlAudio's sizes and weights").
+- **Surface strength:** Material's solid containers (the orange "Comfort zone" mix card, the Play tile, the stats
+  card) are tinted glass, so they read paler and see-through; list content shows through the mini player and the
+  bottom bar while scrolling.
+- **Demo data:** the screenshots use the generated demo library (placeholder art, a lavender seed), not real covers.
+- **Now Playing** is still the stage-4 placeholder (stage 8).
