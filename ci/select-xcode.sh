@@ -21,3 +21,10 @@ xcrun swift --version
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
   { echo "**Xcode:** \`$path\` — $(xcodebuild -version | tr '\n' ' ')"; } >> "$GITHUB_STEP_SUMMARY"
 fi
+# Stage 9: the app has Metal shaders (the lyrics artwork background). Since Xcode 26 the Metal toolchain is a separate
+# download that hosted runners may not have installed; fetch it once per job when it is missing.
+if git ls-files '*.metal' 2>/dev/null | grep -q . && ! xcrun metal --version >/dev/null 2>&1; then
+  echo "Downloading the Metal toolchain…"
+  xcodebuild -downloadComponent MetalToolchain
+  xcrun metal --version
+fi

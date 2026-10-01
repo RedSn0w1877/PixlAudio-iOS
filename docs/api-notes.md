@@ -141,7 +141,7 @@ Deliberately **not** used in PixlCore sources:
 - `replacingOccurrences`/`components(separatedBy:)` on user text in PixlTags (canonical-equivalence matching differs
   from Kotlin's per-char replace).
 
-For the app (stage 9): the lyrics engine's intended driver is a `CADisplayLink`
+For the app (stage 9, done — see "Stage 9" below): the lyrics engine's intended driver is a `CADisplayLink`
 (/documentation/quartzcore/cadisplaylink) calling `LyricsEngine.step(frameNanos:positionMs:offsetMs:)`, pushing
 `changedRows` into per-row observable state, then `clearChanges()` and pausing the link while `needsFrame` is false.
 `rowBlurSigma` is meant for SwiftUI `View.blur(radius:opaque:)` (radius treated as σ in points; calibrate against
@@ -453,6 +453,35 @@ proven by the s08-player CI build. Paths are under https://developer.apple.com.
   scrubber shape with the wavy slider's geometry, redrawn at most 4×/s (performance rules).
 - **Audio waveform background** shows Android's idle bars: iOS offers no capture of the app's own output outside the
   processing tap.
+
+## Stage 9 — karaoke lyrics, lyrics services
+Signatures checked against the developer.apple.com documentation JSON (`/tutorials/data/documentation/...`) before use.
+
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `CADisplayLink(target:selector:)`, `preferredFrameRateRange`, `CAFrameRateRange(minimum:maximum:preferred:)`, `add(to:forMode:)`, `isPaused`, `targetTimestamp`, `invalidate()` | 3.1 / 15 | /documentation/quartzcore/cadisplaylink | `LyricsDriver` | Up to 120 Hz (`CADisableMinimumFrameDurationOnPhone`); paused while playback is paused and the engine is at rest; invalidated on disappear (the link retains its target). |
+| `OSSignposter(subsystem:category:)`, `beginInterval(_:)`, `endInterval(_:_:)` | 15 | /documentation/os/ossignposter | `LyricsDriver` | Interval "LyricsEngine.step" (target < 0.5 ms); Instruments › os_signpost. |
+| `Timer(timeInterval:repeats:block:)`, `RunLoop.main.add(_:forMode: .common)` | 10 | /documentation/foundation/timer/init(timeinterval:repeats:block:) | `LyricsDriver` | 150 ms poll only while visible, paused and settled (Android `IDLE_POLL_MS`). |
+| `TextRenderer` (`draw(layout:in:)`, `displayPadding`), `View.textRenderer(_:)` | 18 | /documentation/swiftui/textrenderer | `KaraokeTextRenderer` | `nonisolated struct` (Animatable with empty data). Only hot lines change renderer inputs per frame. |
+| `TextAttribute`, `Text.customAttribute(_:)`, `Text.Layout.Run[_:]` (attribute subscript) | 18 | /documentation/swiftui/textattribute | `KaraokePieceAttribute` | Each syllable / emphasis grapheme is its own tagged run, so the renderer finds its glyphs without character offsets. |
+| `Text.Layout`, `.Line`, `.Run`, `typographicBounds.rect` | 18 | /documentation/swiftui/text/layout | `KaraokeTextRenderer` | Sweep box = the syllable's runs on one visual line. |
+| `GraphicsContext.draw(_: Text.Layout.Line / Run, options:)`, `drawLayer(content:)`, `blendMode = .destinationIn`, `fill(_:with: .linearGradient(...))`, `addFilter(.shadow(color:radius:x:y:))`, `opacity`, `translateBy`, `scaleBy` | 15 / 18 | /documentation/swiftui/graphicscontext | `KaraokeTextRenderer` | Soft edge = destination-in ramp over the run; glow = white shadow, radius = CSS blur / 2. |
+| `LocalizedStringKey` interpolation of `Text` (`Text("\(a)\(b)")`) | 14 | /documentation/swiftui/localizedstringkey/stringinterpolation | `KaraokeModel` | Concatenates the tagged runs (`Text + Text` is deprecated in the iOS 26 SDK). |
+| `ShaderLibrary` dynamic member → `ShaderFunction`, `Shader.Argument.image(_:)` / `.float(_:)` / `.float2(_:_:)` / `.float4(_:_:_:_:)`, `Rectangle().fill(Shader)` | 17 | /documentation/swiftui/shader | `LyricsArtworkBackground`, `LyricsScene.metal` | Fill signature `[[ stitchable ]] half4 name(float2 position, args...)`; the image arrives as `texture2d<half>` (one 2×2 sprite atlas, so a single texture argument). Returns premultiplied colour in the destination's colour space. |
+| `TimelineView(.animation(minimumInterval:paused:))`, `TimelineView(.periodic(from:by:))` | 15 | /documentation/swiftui/timelineview | background (30 fps), spinning art, playing bars, seek bar (4 Hz) | Paused when hidden / Low Power Mode / frozen UI tests. |
+| `Glass.clear` | 26.0 | /documentation/swiftui/glass/clear | lyrics chrome | Clear glass over the artwork (HIG: media); black 35 % tint over bright art. |
+| `View.blur(radius:opaque:)` | 13 | /documentation/swiftui/view/blur(radius:opaque:) | karaoke rows | Radius = the engine's σ in points (`rowBlurSigma`), quantised to 0.3 pt so layers aren't re-rasterised every frame. |
+| `View.blendMode(.plusLighter)`, `compositingGroup()`, `mask(alignment:_:)` | 13 / 15 | /documentation/swiftui/blendmode/pluslighter | `KaraokeLyricsView` | One offscreen group for all lines; normal blending over bright art / increased contrast. |
+| `Animatable` on a `View` (`animatableData`) | 13 | /documentation/swiftui/animatable | edge-fade masks | The bottom fade follows the hiding control cluster. |
+| `DragGesture.Value.velocity`, `.time` | 17 / 13 | /documentation/swiftui/draggesture/value/velocity | `KaraokeLyricsView` | Fling velocity for the engine's decay. |
+| `View.accessibilityAction(named:_:)`, `accessibilityScrollAction(_:)`, `accessibilityAdjustableAction(_:)` | 13 | /documentation/swiftui/view/accessibilityaction(named:_:) | rows ("Play from here"), seek bar | |
+| `EnvironmentValues.colorSchemeContrast` (`.increased`), `accessibilityReduceMotion`, `scenePhase` | 13 / 14 | /documentation/swiftui/environmentvalues/colorschemecontrast | `LyricsView` | Increased contrast → §1.2 high-contrast lyrics. |
+| `UIApplication.isIdleTimerDisabled` | 2 | /documentation/uikit/uiapplication/isidletimerdisabled | `LyricsView` | "Keep screen on" (Android `keep_screen_on_lyrics`), reset when the app goes to the background. |
+| `FileDocument`, `View.fileExporter(isPresented:document:contentType:defaultFilename:onCompletion:)`, `View.fileImporter(isPresented:allowedContentTypes:onCompletion:)`, `UTType(filenameExtension:)` | 14 | /documentation/swiftui/view/fileexporter(ispresented:document:contenttype:defaultfilename:oncompletion:) | Save lyrics (.lrc), import lyrics | Imports go through PixlLyrics' `LyricsImportSecurity`. |
+| `TranslationSession.Configuration(source:target:)`, `invalidate()`, `View.translationTask(_:action:)`, `TranslationSession.translations(from:)`, `Request(sourceText:clientIdentifier:)`, `Response.targetText` / `.clientIdentifier` | 18 | /documentation/translation/translationsession | "Translate lyrics" in the More sheet | On-device; the system asks to download languages. The action closure is `(TranslationSession) async -> Void` (not Sendable) and main-actor isolated (formed in `body`); `TranslationSession` and `Request` are not Sendable, so the session is passed as a `nonisolated(unsafe)` local into the `@concurrent` `LyricsTranslator.translate`, which builds the requests itself. |
+| `CFStringTokenizerCreate`, `CFStringTokenizerAdvanceToNextToken`, `CFStringTokenizerCopyCurrentTokenAttribute(_:kCFStringTokenizerAttributeLatinTranscription)` | 3 | /documentation/corefoundation/cfstringtokenizer | `AppleCJKRomanization` | Japanese romaji for PixlLyrics' romaniser (Android kuromoji). |
+| `String.applyingTransform(.mandarinToLatin / .stripDiacritics, reverse:)` | 9 | /documentation/foundation/stringtransform/mandarintolatin | `AppleCJKRomanization` | Toneless pinyin, `ü` → `u:` (pinyin4j form). |
+| `UnevenRoundedRectangle`, `.contentTransition(.symbolEffect(.replace))`, `sensoryFeedback(_:trigger:)` | 16 / 17 | (see stage 4) | lyrics chrome | |
 
 ## Testing and tooling
 | API / tool | Docs | Notes |

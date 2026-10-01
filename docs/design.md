@@ -289,3 +289,48 @@ categories, sheets; glass in place of Material; text legible in light and dark. 
 Stage 8 screenshot ids (`UITests/PlayerScreenshotTests`): `miniPlayer` (collapsed), `nowPlaying` (expanded; `-paused`
 for pp_full), `queue`, `sleepTimer`, `songInfo`, `editSong`, `artistPicker` (song 16, two credits), `devices`, `aiDJ` —
 the player's sheets open over the expanded player. Gesture tests: drag up from the mini player, collapse circle.
+
+## Stage 9 notes (karaoke lyrics, lyrics services)
+
+Port of Android `presentation/lyrics/**` + `components/LyricsSheet.kt` (`AppCover.lyrics` → `LyricsView`). Files:
+`Features/Lyrics/` (screen, chrome, karaoke view, renderer, driver, background, More sheet, fetch dialog, demo content)
+and `Services/Lyrics*.swift` + `Services/CJKRomanization.swift`.
+
+- **Engine and driver:** PixlLyrics' ported `LyricsEngine` is stepped by `LyricsDriver`'s `CADisplayLink` (60–120 Hz)
+  with `t = player position + sync offset`; only changed per-row values are written into `LyricRowState`s (y, scale,
+  σ, alpha, activeness, hot, expand, culled). Hot rows (normally one or two) also read `LyricsHotClock.nowMs`, so a
+  tick re-renders just those. The link pauses while playback is paused and the engine is at rest (a 150 ms poll
+  notices outside seeks meanwhile). Signpost interval `LyricsEngine.step` (target < 0.5 ms).
+- **Rows:** one `ZStack` of every row placed by `.offset(y:)` from the engine (no scroll view), `.scaleEffect` about
+  the engine's pivot, `.blur(radius: σ)`, opacity = depth × presence (0 when culled). Heights come from
+  `onGeometryChange` once per song / width. Word fill: each syllable (or emphasis grapheme) is a `Text` run tagged
+  with `KaraokePieceAttribute`; `KaraokeTextRenderer` draws sung / unsung runs at their alphas, the active one through
+  a destination-in ramp half a line height wide, with lift × activeness and the emphasis scale/spread/hop/glow.
+  The whole layer is one compositing group blended `.plusLighter` (normal over bright art / increased contrast) and
+  masked by the 10 %/12 % edge fade (top below the header + 48 pt, bottom above the controls + 96 pt).
+  Only start-aligned lines give the renderer horizontal `displayPadding`: with it, trailing (duet) text drew ~20 pt
+  towards the end and ran off the screen.
+- **Background:** `ArtworkSpriteBaker` (actor, LRU 4) bakes the four blurred sprites from the 96 px art into one 2×2
+  atlas; `LyricsScene.metal` (twist, composite, grade, overlays, dither) fills the screen from a
+  `TimelineView(.animation(minimumInterval: 1/30, paused:))`; 1.7 s crossfade; paused when hidden, in Low Power Mode
+  or with a frozen UI-test clock. CI downloads the Metal toolchain when a runner lacks it (`ci/select-xcode.sh`).
+- **Chrome:** Android's Material-mode cluster, each Material element as glass over the scrim: track pill (clear glass
+  tinted `onPrimaryFixedVariant`, spinning 54 pt art, playing bars), play/pause (78 pt, squircle ↔ circle,
+  `tertiaryFixedDim` tinted glass), seek-bar pill (50 pt, wavy track), back · Synced · Static · more (40 pt circles,
+  50 pt segments: capsule when active, 8 pt corners when not), sync-offset capsule (fills inside, no glass on glass),
+  immersive "show controls" disc, sync chip. Over bright art the clear glass takes a 35 % black tint.
+- **Sheets:** the More sheet is a system sheet with PixlAudio's groups as fills (inside glass); the fetch dialog is a
+  centred glass card (32 pt) over a dim backdrop. Save Lyrics exports `.lrc` with `fileExporter`; import goes through
+  `LyricsImportSecurity`.
+- **Services:** `LyricsService` (actor): memory → stored row (`LyricsRecord.docJSON` holds Android's raw lyrics
+  content) → JSON cache (`Application Support/lyrics/<id>.json`, Android `LyricsData`) → the song's scanned text, then
+  the sources in the user's order (embedded tags incl. SYLT, AMLL + NetEase + LRCLIB in parallel, sidecar `.lrc`).
+  `LyricsController` (main actor, `env.lyricsController`) drives `LyricsStore`, builds `PreparedLyrics` off the main
+  thread, keeps per-song offsets (`lyrics_sync_offsets_json`) and runs the fetch dialog. UI tests never touch the
+  network: the current song gets `LyricsDemoContent`.
+
+Screenshot ids (`UITests/LyricsScreenshotTests`, `-screen lyrics` + `-lyricsDemo words|duet|lines|plain|none`,
+`-lyricsFreezeMs <ms>`, `-lyricsBrightArt`, `-lyricsHighContrast`, `-lyricsImmersive`): lyricsWordFill (42 300),
+lyricsEmphasis (47 600), lyricsInterlude (61 000), lyricsDuet, lyricsBrightArt, lyricsHighContrast, lyricsLineSynced,
+lyricsPlain, lyricsNone, lyricsImmersive, lyricsLight, lyricsMoreSheet, lyricsFetchDialog, lyricsOptions,
+lyricsCascade.f0…f7 (first-show cascade frames, live clock).
