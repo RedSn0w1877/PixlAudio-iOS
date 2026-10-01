@@ -252,6 +252,7 @@ Proven on the `xcode-27` lane by the stage-7c build (fallback lane: its next wee
 | `rotationEffect(_:anchor:)` | 13 | /documentation/swiftui/view/rotationeffect(_:anchor:) | category cards | Glyph at −14°. |
 | `Image(_:)` from an asset catalog with SVG + `preserves-vector-representation` + `template-rendering-intent` | 13 (SVG in catalogs: Xcode 12) | /documentation/xcode/asset-management | `GenreArt.xcassets` | Genre glyphs converted from the Android vector drawables (`renderingMode(.template)`). |
 | `XCUIElement.typeText(_:)`, `XCUIApplication.textFields` | — | /documentation/xctest/xcuielement/typetext(_:) | `UITests/SearchScreenshotTests` | Typing screenshot. |
+| `View.onReceive(_:perform:)`, `NotificationCenter.publisher(for:object:)`, `UIResponder.keyboardWillShowNotification` / `keyboardWillHideNotification` | 13 / 13 / 2 | /documentation/swiftui/view/onreceive(_:perform:), /documentation/uikit/uiresponder/keyboardwillshownotification | `RootView` (shared shell, small change) | Bars step aside while the keyboard is up instead of riding above it — on Android they stay under the IME. |
 
 ## Testing and tooling
 | API / tool | Docs | Notes |
