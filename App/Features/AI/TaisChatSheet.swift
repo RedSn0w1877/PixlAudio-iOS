@@ -14,8 +14,6 @@ struct TaisChatSheet: View {
 
     private var model: TaisChatModel { env.ai.chat }
 
-    /// Android caps the sheet's column at 620 dp; with the handle and insets the system sheet is this tall.
-    static let sheetHeight: CGFloat = 680
     /// The UI tests' scripted conversation (`-screen taisChatConversation`): a genre request answered from the
     /// demo library with the AI intro line, then a music question answered by the scripted provider.
     static let demoScript = ["Play some indie songs", "Who produced Random Access Memories?"]

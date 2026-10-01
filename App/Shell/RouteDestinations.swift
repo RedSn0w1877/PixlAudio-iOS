@@ -52,7 +52,7 @@ struct SheetDestination: View {
         case .lyricsOptions(let songId): LyricsOptionsSheet(songId: songId).pixlSheet()
         case .changelog, .betaInfo, .jobs: HomeInfoSheet(sheet: sheet).pixlSheet()
         case .aiPlaylist: AiPlaylistSheet().pixlSheet(detents: [.large])
-        case .taisChat: TaisChatSheet().pixlSheet(detents: [.height(TaisChatSheet.sheetHeight), .large])
+        case .taisChat: TaisChatSheet().pixlSheet(detents: [.large])
         }
     }
 }

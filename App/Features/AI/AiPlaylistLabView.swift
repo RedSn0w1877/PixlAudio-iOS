@@ -126,7 +126,8 @@ struct AiPlaylistLabView: View {
         }
         .frame(height: 64)
         .frame(maxWidth: .infinity)
-        .background(theme.surface.opacity(0.92).ignoresSafeArea(edges: .top))
+        // Android's top app bar is opaque: the form scrolls under it, not through it.
+        .background(theme.surface.ignoresSafeArea(edges: .top))
     }
 
     /// Android `BottomAppBar`: the tonal Reset pill and the extended Generate button (`tertiaryContainer`).
@@ -167,6 +168,9 @@ struct AiPlaylistLabView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
         }
+        .frame(maxWidth: .infinity)
+        // Android `BottomAppBar(containerColor = surfaceContainerLow)`: an opaque strip, the glass buttons on it.
+        .background(theme.surfaceContainerLow.ignoresSafeArea(edges: .bottom))
     }
 
     private func generate() {

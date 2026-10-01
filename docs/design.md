@@ -211,7 +211,8 @@ goes into `docs/api-notes.md`.
 - TAIS DJ chat: bubbles in Android's shapes as glass (user = `primary`, Taizo = `surfaceContainerHigh`, errors =
   `errorContainer`), suggestion chips as glass capsules, the bulk buttons and song rows inside a bubble as fills. Taizo's
   avatar keeps Android's `primary → tertiary` gradient (a mark, not a Material surface). Online (catalogue) results
-  import through `SearchProviding.importAndPlay` on tap.
+  import through `SearchProviding.importAndPlay` on tap. The sheet uses the large detent: Android caps the column at 620 dp, but the system's
+  partial-height sheet floats with clearer glass, and the Home content behind made the chat hard to read.
 - UI tests use the scripted provider (`DemoAiClient`): playlist prompts get every other candidate id, Taizo gets a
   fixed intro and answer, a prompt containing `#demo-error` fails like a rejected key.
 

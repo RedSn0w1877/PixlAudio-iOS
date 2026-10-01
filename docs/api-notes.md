@@ -421,7 +421,6 @@ Proven on the `xcode-27` lane by the stage-7c build (fallback lane: its next wee
 | `TimelineView(.animation)` | 15 | /documentation/swiftui/timelineschedule/animation | `ThinkingDots` | Only while a DJ prompt is in flight (the row exists only then). |
 | `View.defaultScrollAnchor(_:)` | 17 | /documentation/swiftui/view/defaultscrollanchor(_:) | DJ chat list | Opens at the latest message; `ScrollViewReader.scrollTo` follows new ones. |
 | `View.interactiveDismissDisabled(_:)` | 15 | /documentation/swiftui/view/interactivedismissdisabled(_:) | AI Playlist Lab | Android ignores dismiss while generating. |
-| `PresentationDetent.height(_:)` | 16 | /documentation/swiftui/presentationdetent/height(_:) | DJ chat sheet | Android caps the chat column at 620 dp. |
 | `TextField(_:text:prompt:axis:)`, `lineLimit(_:)` (range) | 16 | /documentation/swiftui/textfield/init(_:text:prompt:axis:) | AI playlist prompt | Android `minLines = 2, maxLines = 4`. |
 | `View.keyboardType(_:)` (`.numberPad`) | 13 | /documentation/swiftui/view/keyboardtype(_:) | min / max songs | Android `KeyboardType.Number`; input also filtered to digits. |
 | `Bindable(_:)` (wrapping an `@Observable` from the environment) | 17 | /documentation/swiftui/bindable | DJ chat field | Binding to `TaisChatModel.inputText`. |
