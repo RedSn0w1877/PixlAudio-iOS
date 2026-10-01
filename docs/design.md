@@ -185,4 +185,6 @@ goes into `docs/api-notes.md`.
 `settingsCategory.appearance`, `queue`, `nowPlaying`), plus `home`, `search`, `searchResults`, `library`,
 `miniPlayer` (library with a vivid song: album-tinted mini player) and `miniPlayerAlone` (pushed screen: bar
 hidden). The ready element of each is `screen.<id>`. Stage 4 shots: home, library, miniPlayer, miniPlayerAlone in
-light + dark; search, settings, nowPlaying, diagnostics.
+light + dark; search, settings, nowPlaying, diagnostics. Stage 7c adds `-searchFilter all|songs|albums|artists|playlists`
+(with `-screen search -searchQuery <q>`) and the shots searchEmpty, searchTyping, searchAll, searchSongs, searchAlbums,
+searchArtists, searchPlaylists, searchNoResults (light + dark; `UITests/SearchScreenshotTests.swift`).

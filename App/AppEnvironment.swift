@@ -19,7 +19,8 @@ final class AppEnvironment {
     let artwork: ArtworkPipeline
     let colorExtractor: ColorExtractor
     let persistence: PersistenceActor?
-    /// Search providers by source (stage 7c builds the library one on `SearchIndex`; 11/12 add the others).
+    /// Search providers by source: the library on `SearchIndex` (stage 7c); stages 11/12 replace the YouTube Music
+    /// and Spotify ones (UI tests get demo providers so Search's remote sections render).
     let searchProviders: [SearchSource: any SearchProviding]
 
     init(launch: LaunchConfiguration) {
@@ -43,9 +44,9 @@ final class AppEnvironment {
 
         if isUITest {
             library = LibraryStore(snapshot: DemoLibrary.snapshot)
-            searchProviders = [.library: LocalSearchProvider(snapshot: DemoLibrary.snapshot),
-                               .spotify: UnavailableSearchProvider(source: .spotify),
-                               .youtubeMusic: UnavailableSearchProvider(source: .youtubeMusic)]
+            searchProviders = [.library: LibrarySearchProvider(),
+                               .spotify: DemoCatalogSearchProvider(),
+                               .youtubeMusic: DemoYouTubeMusicSearchProvider()]
             if launch.hasSong {
                 let songs = DemoLibrary.songs
                 playback.play(songs, startIndex: min(launch.songIndex, songs.count - 1),
@@ -55,7 +56,7 @@ final class AppEnvironment {
             let loader = persistence.map { SnapshotLoader(persistence: $0, cacheURL: SnapshotLoader.defaultCacheURL()) }
             // Stage 6 provides the real importer (folders, Documents, the music library).
             library = LibraryStore(loader: loader, importer: nil)
-            searchProviders = [.library: LocalSearchProvider(snapshot: .empty),
+            searchProviders = [.library: LibrarySearchProvider(),
                                .spotify: UnavailableSearchProvider(source: .spotify),
                                .youtubeMusic: UnavailableSearchProvider(source: .youtubeMusic)]
         }
