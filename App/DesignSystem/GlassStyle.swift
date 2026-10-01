@@ -44,3 +44,17 @@ nonisolated enum PixlMotion {
     /// Showing / hiding bars (Android `tween(220, LinearOutSlowIn)`).
     static let bars = Animation.spring(response: 0.3, dampingFraction: 0.9)
 }
+
+/// Rounds only the top corners of a scroll area (Android clips its lists' top corners) and leaves the bottom open past
+/// the view's frame, so the content keeps scrolling under the tab bar, the mini player and the home indicator instead
+/// of stopping in a hard line at the safe area.
+nonisolated struct TopRoundedClip: Shape {
+    var radius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var open = rect
+        open.size.height += 2000
+        return UnevenRoundedRectangle(topLeadingRadius: radius, bottomLeadingRadius: 0, bottomTrailingRadius: 0,
+                                      topTrailingRadius: radius, style: .continuous).path(in: open)
+    }
+}

@@ -173,8 +173,7 @@ struct SearchView: View {
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
-        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 28, bottomLeadingRadius: 0, bottomTrailingRadius: 0,
-                                          topTrailingRadius: 28, style: .continuous))
+        .clipShape(TopRoundedClip(radius: 28))
         .accessibilityIdentifier("search.results")
     }
 
