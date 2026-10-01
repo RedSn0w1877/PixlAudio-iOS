@@ -193,8 +193,8 @@ final class LyricsController {
             case .success(let loaded):
                 if self.loadedSongId == song.id { self.apply(loaded, songId: song.id) }
                 self.searchState = .success
-            case .failure(let reason):
-                self.message = LyricsImportSecurity.message(for: reason)
+            case .failure(let error):
+                self.message = LyricsImportSecurity.message(for: error.reason)
             }
         }
     }

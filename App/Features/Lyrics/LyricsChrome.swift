@@ -228,7 +228,7 @@ private struct LyricsPlayPauseButton: View {
                 .contentShape(shape)
         }
         .buttonStyle(.plain)
-        .glassEffect(Glass.regular.tint(chrome.playPause.opacity(GlassTint.prominent)).interactive(), in: shape)
+        .glassEffect(Glass.clear.tint(chrome.playPause.opacity(GlassTint.prominent)).interactive(), in: shape)
         .animation(.spring(response: 0.6, dampingFraction: 0.8), value: isPlaying)
         .sensoryFeedback(.selection, trigger: isPlaying)
         .accessibilityLabel(isPlaying ? Text("Pause") : Text("Play"))
@@ -264,12 +264,12 @@ private struct LyricsSeekBar: View {
                     .gesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { value in
-                                let f = min(max((value.location.x - 8) / trackWidth, 0), 1)
+                                let f = min(max((value.location.x - inset) / trackWidth, 0), 1)
                                 dragFraction = f
                                 onPreview(Int64(f * Double(clock.durationMs)))
                             }
                             .onEnded { value in
-                                let f = min(max((value.location.x - 8) / trackWidth, 0), 1)
+                                let f = min(max((value.location.x - inset) / trackWidth, 0), 1)
                                 onSeek(Int64((f * Double(clock.durationMs)).rounded()))
                                 onPreview(nil)
                                 committedFraction = f
@@ -407,7 +407,7 @@ private struct LyricsToggleSegment: View {
         .buttonStyle(.plain)
         .disabled(!enabled)
         .glassEffect(active
-                     ? Glass.regular.tint(chrome.selected.opacity(enabled ? GlassTint.prominent : GlassTint.prominent / 2)).interactive()
+                     ? Glass.clear.tint(chrome.selected.opacity(enabled ? GlassTint.prominent : GlassTint.prominent / 2)).interactive()
                      : chrome.panelGlass(brightArt: brightArt, interactive: true),
                      in: shape)
         .opacity(enabled ? 1 : 0.5)
@@ -469,7 +469,7 @@ struct LyricsShowControlsButton: View {
                 .contentShape(.circle)
         }
         .buttonStyle(.plain)
-        .glassEffect(Glass.regular.tint(chrome.emphasis.opacity(GlassTint.prominent)).interactive(), in: Circle())
+        .glassEffect(Glass.clear.tint(chrome.emphasis.opacity(GlassTint.prominent)).interactive(), in: Circle())
         .accessibilityLabel(Text("Show Controls"))
     }
 }
@@ -526,7 +526,7 @@ struct LyricsSwipeIndicator: View {
             .font(.system(size: 40, weight: .bold))
             .foregroundStyle(chrome.onEmphasis)
             .frame(width: 94, height: 94)
-            .glassEffect(Glass.regular.tint(chrome.emphasis.opacity(GlassTint.prominent)), in: shape)
+            .glassEffect(Glass.clear.tint(chrome.emphasis.opacity(GlassTint.prominent)), in: shape)
             .scaleEffect(0.8 + progress * 0.2)
             .offset(x: (towardsNext ? 100 : -100) * (1 - progress))
             .accessibilityHidden(true)

@@ -17,6 +17,11 @@ nonisolated enum LyricsSearchFailure: Error, Sendable, Equatable {
     case network(String)
 }
 
+/// Why an import was refused (`LyricsImportSecurity`'s reason).
+nonisolated struct LyricsImportError: Error, Sendable, Equatable {
+    let reason: LyricsImportFailureReason
+}
+
 /// Port of Android's `LyricsRepositoryImpl` on iOS: stored lyrics (the `lyrics` table, then the JSON disk cache,
 /// then the song's own embedded text), then the sources in the user's order (embedded tags, online catalogs, a local
 /// `.lrc` next to the file), the JSON cache of online results, the user-synced protection, imports, resets and the
@@ -213,10 +218,10 @@ actor LyricsService {
     }
 
     /// Imports a lyrics file the user picked (`LyricsImportSecurity` checks size, type and content).
-    func importFile(_ url: URL, for song: Song) async -> Result<LoadedLyrics, LyricsImportFailureReason> {
+    func importFile(_ url: URL, for song: Song) async -> Result<LoadedLyrics, LyricsImportError> {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-        guard let data = try? Data(contentsOf: url, options: [.mappedIfSafe]) else { return .failure(.emptyContent) }
+        guard let data = try? Data(contentsOf: url, options: [.mappedIfSafe]) else { return .failure(LyricsImportError(reason: .emptyContent)) }
         let result = LyricsImportSecurity.validateImportedLyricsFile(fileName: url.lastPathComponent, mimeType: nil,
                                                                     bytes: [UInt8](data))
         switch result {
@@ -224,9 +229,9 @@ actor LyricsService {
             if let saved = await save(song: song, rawContent: validated.sanitizedContent, source: "import") {
                 return .success(saved)
             }
-            return .failure(.invalidLyricsContent)
+            return .failure(LyricsImportError(reason: .invalidLyricsContent))
         case .invalid(let reason):
-            return .failure(reason)
+            return .failure(LyricsImportError(reason: reason))
         }
     }
 
