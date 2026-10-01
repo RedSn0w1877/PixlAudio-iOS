@@ -6,9 +6,10 @@ audio, zero-mean / unit-variance normalised per window by the caller; output `lo
 (50 frames/s, 20 ms per frame, the 32-token character vocabulary; log-softmax is applied by the caller).
 
 Parity gate (on the runner's CPU and on `ALL` compute units): a macOS `say` speech fixture and a noise window run
-through PyTorch (fp32) and Core ML. Pass = frame argmax agreement >= 97 %, identical greedy transcripts, and the CTC
-forced alignment of the known text giving word starts within 2 frames (40 ms) of PyTorch's. fp16 is tried first;
-if it fails, the reductions/normalisations are kept in fp32 ("mixed"); the report records what shipped.
+through PyTorch (fp32) and Core ML. Pass = frame argmax agreement >= 98 %, identical greedy transcripts, and the CTC
+forced alignment of the known text giving word starts within 1 frame (20 ms) of PyTorch's. fp32, fp16, "mixed"
+(reductions and normalisations in fp32) and "mixed-conv" (also convolutions, softmax and GELU in fp32) are all
+converted and measured; the first passing of fp16, mixed, mixed-conv, fp32 ships and the report records it.
 
 Usage: python convert_wav2vec2.py --out out/
 """
@@ -183,11 +184,11 @@ def compare(reference: np.ndarray, candidate: np.ndarray, words=None) -> dict:
 
 def passes(speech: dict, noise: dict) -> bool:
     return (speech["finite"] and noise["finite"]
-            and speech["argmax_agreement"] >= 0.97
+            and speech["argmax_agreement"] >= 0.98
             and speech["transcript_reference"] == speech["transcript_candidate"]
             and speech["max_word_start_diff_frames"] is not None
-            and speech["max_word_start_diff_frames"] <= 2
-            and noise["argmax_agreement"] >= 0.90)
+            and speech["max_word_start_diff_frames"] <= 1
+            and noise["argmax_agreement"] >= 0.95)
 
 
 def main() -> int:
@@ -238,14 +239,18 @@ def main() -> int:
     report["pytorch_transcript"] = greedy(ref_speech)
     print("PyTorch transcript:", report["pytorch_transcript"])
 
-    def reductions_in_fp32(op):
-        return op.op_type not in {"reduce_mean", "reduce_sum", "reduce_sum_square", "reduce_l2_norm", "instance_norm",
-                                  "layer_norm", "batch_norm", "rsqrt", "sqrt", "pow", "real_div"}
-
-    precisions = [("fp16", ct.precision.FLOAT16),
-                  ("mixed", ct.transform.FP16ComputePrecision(op_selector=reductions_in_fp32))]
-    shipped = None
-    for name, precision in precisions:
+    reductions = {"reduce_mean", "reduce_sum", "reduce_sum_square", "reduce_l2_norm", "instance_norm", "layer_norm",
+                  "batch_norm", "rsqrt", "sqrt", "pow", "real_div"}
+    sensitive = reductions | {"conv", "softmax", "gelu"}
+    # Preference order for what ships (smallest / fastest first); fp32 is converted first as the fidelity baseline.
+    variants = [
+        ("fp32", ct.precision.FLOAT32),
+        ("fp16", ct.precision.FLOAT16),
+        ("mixed", ct.transform.FP16ComputePrecision(op_selector=lambda op: op.op_type not in reductions)),
+        ("mixed-conv", ct.transform.FP16ComputePrecision(op_selector=lambda op: op.op_type not in sensitive)),
+    ]
+    packages = {}
+    for name, precision in variants:
         started = time.time()
         mlmodel = ct.convert(
             traced,
@@ -263,10 +268,8 @@ def main() -> int:
         mlmodel.user_defined_metadata["pixl.strideSamples"] = str(STRIDE)
         mlmodel.user_defined_metadata["pixl.vocab"] = json.dumps(VOCAB, sort_keys=True)
         mlmodel.user_defined_metadata["pixl.precision"] = name
-        package = os.path.join(args.out, "Wav2Vec2Base960h.mlpackage")
-        if os.path.exists(package):
-            import shutil
-            shutil.rmtree(package)
+        package = os.path.join(args.out, name, "Wav2Vec2Base960h.mlpackage")
+        os.makedirs(os.path.dirname(package), exist_ok=True)
         mlmodel.save(package)
         attempt = {"precision": name, "convert_seconds": round(time.time() - started, 1), "units": {}}
         ok = True
@@ -277,15 +280,23 @@ def main() -> int:
             latency = time.time() - t0
             out_noise = loaded.predict({"input_values": noise_in})["logits"][0]
             s, n = compare(ref_speech, out_speech, words), compare(ref_noise, out_noise)
+            frame_err = np.abs(log_softmax(ref_speech) - log_softmax(out_speech)).max(axis=-1)
+            s["frames_logprob_diff_over_1"] = float((frame_err > 1).mean())
+            s["worst_frames"] = [int(i) for i in np.argsort(-frame_err)[:8]]
             unit_ok = passes(s, n)
             attempt["units"][unit_name] = {"speech": s, "noise": n, "latency_seconds": round(latency, 3),
                                            "passed": unit_ok}
             print(name, unit_name, json.dumps(attempt["units"][unit_name], indent=1))
             ok = ok and unit_ok
         attempt["passed"] = ok
+        attempt["bytes"] = sum(os.path.getsize(os.path.join(r, f)) for r, _, fs in os.walk(package) for f in fs)
         report["attempts"].append(attempt)
-        if ok:
-            shipped = (name, package)
+        packages[name] = package
+    shipped = None
+    for name in ["fp16", "mixed", "mixed-conv", "fp32"]:
+        attempt = next(a for a in report["attempts"] if a["precision"] == name)
+        if attempt["passed"]:
+            shipped = (name, packages[name])
             break
 
     if shipped is None:

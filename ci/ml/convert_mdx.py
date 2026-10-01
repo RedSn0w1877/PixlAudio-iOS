@@ -7,8 +7,9 @@ trace -> Core ML. Contract (Android `TaisStemSeparator`): input float32 [1, 4, 3
 predicted vocal spectrum in the same layout.
 
 Parity gate: a speech + chord fixture's STFT through ONNX Runtime (fp32 reference) and Core ML on CPU_ONLY and ALL.
-Pass = relative L2 error <= 3 % and the Android stereo-linked instrumental mask within 0.02 (mean abs) of the
-reference. fp16 first, fp32 as the fallback. Any failure (conversion or parity) exits non-zero with the reason in
+Pass = the instrumental rebuilt the Android way (stereo-linked mask x mix, inverse STFT) within 30 dB SNR of the
+ONNX Runtime one, and the masks within 0.005 (mean abs). The raw vocal-spectrum relative L2 error is reported too
+(it is not what the app plays: only the mask derived from it is). fp16 first, fp32 as the fallback. Any failure (conversion or parity) exits non-zero with the reason in
 mdx-report.json; the app then keeps its fallbacks (cloud separation, the mid/side tap).
 
 Usage: python convert_mdx.py --out out/
@@ -76,11 +77,41 @@ def fixture() -> np.ndarray:
     return stft_planes(left, right)
 
 
+def instrumental(mix: np.ndarray, vocals: np.ndarray) -> np.ndarray:
+    """Android's reconstruction for one chunk: linked mask x mix (mix phase), inverse FFT, Hann WOLA, trim FFT/2."""
+    window = (0.5 - 0.5 * np.cos(2 * np.pi * np.arange(FFT_SIZE) / FFT_SIZE))
+    mask = linked_mask(mix, vocals)
+    length = (FRAMES - 1) * HOP + FFT_SIZE
+    out = np.zeros((2, length))
+    weight = np.zeros(length)
+    for t in range(FRAMES):
+        start = t * HOP
+        weight[start:start + FFT_SIZE] += window * window
+        for c in range(2):
+            spectrum = np.zeros(FFT_SIZE // 2 + 1, dtype=np.complex128)
+            spectrum[:BINS] = (mix[0, 2 * c, :, t] + 1j * mix[0, 2 * c + 1, :, t]) * mask[:, t]
+            out[c, start:start + FFT_SIZE] += np.fft.irfft(spectrum, FFT_SIZE) * window
+    out /= np.maximum(weight, 1e-8)
+    return out[:, FFT_SIZE // 2:]
+
+
 def compare(reference: np.ndarray, candidate: np.ndarray, mix: np.ndarray) -> dict:
     rel = float(np.linalg.norm(candidate - reference) / max(np.linalg.norm(reference), 1e-12))
     mask_diff = np.abs(linked_mask(mix, candidate) - linked_mask(mix, reference))
+    ref_audio, cand_audio = instrumental(mix, reference), instrumental(mix, candidate)
+    core = slice(FFT_SIZE, ref_audio.shape[1] - FFT_SIZE)
+    noise = np.sum((ref_audio[:, core] - cand_audio[:, core]) ** 2)
+    snr = float(10 * np.log10(np.sum(ref_audio[:, core] ** 2) / max(noise, 1e-30)))
+    frame_err = np.linalg.norm((candidate - reference)[0], axis=(0, 1)) / np.maximum(
+        np.linalg.norm(reference[0], axis=(0, 1)), 1e-12)
+    bin_err = np.linalg.norm((candidate - reference)[0], axis=(0, 2)) / np.maximum(
+        np.linalg.norm(reference[0], axis=(0, 2)), 1e-12)
     return {"relative_l2": rel, "mask_mean_abs_diff": float(mask_diff.mean()),
-            "mask_max_abs_diff": float(mask_diff.max()), "finite": bool(np.isfinite(candidate).all())}
+            "mask_max_abs_diff": float(mask_diff.max()), "instrumental_snr_db": snr,
+            "worst_frames": [int(i) for i in np.argsort(-frame_err)[:6]],
+            "worst_frame_rel_err": float(frame_err.max()),
+            "worst_bins": [int(i) for i in np.argsort(-bin_err)[:6]],
+            "finite": bool(np.isfinite(candidate).all())}
 
 
 def main() -> int:
@@ -159,8 +190,8 @@ def main() -> int:
                 out = loaded.predict({"spectrum": mix})["vocals"]
                 metrics = compare(reference, out, mix)
                 metrics["latency_seconds"] = round(time.time() - t0, 3)
-                metrics["passed"] = (metrics["finite"] and metrics["relative_l2"] <= 0.03
-                                     and metrics["mask_mean_abs_diff"] <= 0.02)
+                metrics["passed"] = (metrics["finite"] and metrics["instrumental_snr_db"] >= 30
+                                     and metrics["mask_mean_abs_diff"] <= 0.005)
                 attempt["units"][unit_name] = metrics
                 print(name, unit_name, metrics)
                 ok = ok and metrics["passed"]
