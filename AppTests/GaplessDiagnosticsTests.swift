@@ -7,7 +7,8 @@ import XCTest
 /// Where an item join loses time, measured on the player clock (A's end and B's start extrapolated from
 /// (host time, timebase position) samples). Raw players, no engine: AVQueuePlayer with and without the processing tap
 /// and the spectral pitch algorithm, and two players handing over with `setRate(_:time:atHostTime:)`.
-/// Diagnostics: results are printed (`gap-diagnostic:` lines); only the scheduled hand-over is asserted.
+/// The queue numbers are printed (`gap-diagnostic:` lines); the scheduled hand-over, which the engine relies on, is
+/// asserted.
 @MainActor
 final class GaplessDiagnosticsTests: XCTestCase {
     private static let seconds = 1.5
@@ -86,8 +87,9 @@ final class GaplessDiagnosticsTests: XCTestCase {
             results.append("queue tap=\(tap) spectral=\(spectral): \(gap.map { String(format: "%.3f s", $0) } ?? "n/a")")
         }
         for line in results { print("gap-diagnostic: \(line)") }
-        // Temporary (diagnostic round): surface the numbers in the CI error summary.
-        XCTFail("gap-diagnostic: " + results.joined(separator: " | "))
+        // Recorded 2026-10-01 (iOS 27 simulator): 0.000 / 0.000 s without a tap, 0.441 / 0.505 s with one — why
+        // DualDeckEngine hands over between decks instead of pre-inserting. Informational: nothing to assert about
+        // AVQueuePlayer itself.
     }
 
     /// Two players with taps: B prerolls, then starts at A's end on the host clock.

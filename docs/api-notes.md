@@ -248,9 +248,10 @@ Signatures checked against developer.apple.com (the JSON behind each page) befor
 ### Players, items, taps
 | API | Min iOS | Docs | Used in | Notes |
 |---|---|---|---|---|
-| `AVQueuePlayer` `insert(_:after:)`, `canInsert(_:after:)`, `remove(_:)`, `removeAllItems()`, `advanceToNextItem()` | 4.1 | /documentation/avfoundation/avqueueplayer/insert(_:after:) | `Deck` | Gapless: the next item is pre-inserted on the active deck. |
+| `AVQueuePlayer` `insert(_:after:)`, `canInsert(_:after:)`, `remove(_:)`, `removeAllItems()`, `advanceToNextItem()` | 4.1 | /documentation/avfoundation/avqueueplayer/insert(_:after:) | `Deck` | Each deck holds its current item (and `advanceToNextItem` for skips). **Not used for gapless joins**: with a processing tap on the items, AVQueuePlayer leaves ~0.45–0.5 s of silence between them (measured, `GaplessDiagnosticsTests`); see the hand-over row. |
 | `AVPlayer` `playImmediately(atRate:)`, `defaultRate` (16), `rate`, `pause()`, `timeControlStatus`, `actionAtItemEnd`, `allowsExternalPlayback`, `automaticallyWaitsToMinimizeStalling`, `seek(to:toleranceBefore:toleranceAfter:)` | 6–16 | /documentation/avfoundation/avplayer/defaultrate | `Deck` | `allowsExternalPlayback = false` keeps the taps running on AirPlay. KVO on `currentItem` / `timeControlStatus` with `@Sendable` handlers hopping to the main queue. |
 | `AVPlayerItem(asset:)`, `audioMix`, `audioTimePitchAlgorithm` + `.spectral`, `status`, `error`, `timebase`, `currentTime()`, `didPlayToEndTimeNotification`, `failedToPlayToEndTimeNotification` | 4–7 | /documentation/avfoundation/avplayeritem/audiotimepitchalgorithm | `DeckItemFactory`, `Deck` | Spectral = pitch-preserving rate for the sync editor (0.75 / 0.5). Seeks before `readyToPlay` are deferred. |
+| `AVPlayer.preroll(atRate:) async -> Bool`, `setRate(_:time:atHostTime:)` (needs `automaticallyWaitsToMinimizeStalling = false`, else it raises), `CMClockGetHostTimeClock()`, `CMClockGetTime(_:)`, `CMTimeAdd(_:_:)` | 6 / 15 (async) | /documentation/avfoundation/avplayer/setrate(_:time:athosttime:) | `Deck.preroll` / `Deck.start`, `DualDeckEngine.fireHandOver` | **Gapless hand-over**: the next item is prerolled on the idle deck and started at the host time of the current item's last frame (`now + remaining / rate`); measured within 30 ms on the player clock. Stall waiting is restored when the deck is next loaded or the start is cancelled. preroll raises unless player and item are `readyToPlay` (checked first). |
 | `CMTimebaseGetTime(_:)` | 6 | /documentation/coremedia/cmtimebasegettime(_:) | `DeckItem.positionSeconds` | Position read on demand, never observed. |
 | `AVURLAsset(url:)`, `loadTracks(withMediaType:)` (async, 15), `load(.duration)` (15), `resourceLoader`, `AVAssetResourceLoader.setDelegate(_:queue:)` | 6–15 | /documentation/avfoundation/avasset/loadtracks(withmediatype:completionhandler:) | `DeckItemFactory`, `StreamingResourceLoaderRegistry` | The registry is stage 11's hook (custom schemes); no YouTube code here. |
 | `AVMutableAudioMixInputParameters(track:)`, `audioTapProcessor`, `AVMutableAudioMix.inputParameters` | 4 / 6 | /documentation/avfoundation/avmutableaudiomixinputparameters/audiotapprocessor | `ProcessingTap.makeAudioMix` | One new tap per item. |
@@ -274,6 +275,11 @@ Signatures checked against developer.apple.com (the JSON behind each page) befor
 | `withObservationTracking(_:onChange:)` | 17 | /documentation/observation/withobservationtracking(_:onchange:) | `PlaybackServices.observeSettings` | Re-arms itself on the main actor after each change. |
 
 ### Stage 5 decisions
+- **Gapless = host-clock hand-over, not an AVQueuePlayer pre-insert** (deviation from architecture §2): every item
+  carries an `MTAudioProcessingTap`, and with a tap AVQueuePlayer drains the old item's queue before starting the next
+  (~0.45–0.5 s of silence, measured on the player clock; 0 s without a tap). The engine prerolls the next item on the
+  idle deck and starts it with `setRate(_:time:atHostTime:)` at the current item's last frame, 1 s ahead; if it is not
+  ready in time, the item's end loads the next one (a short gap).
 - **ReplayGain duplication** (PixlAudioCore `ReplayGain` vs PixlTags `ReplayGainTags`): playback uses PixlAudioCore's
   `ReplayGain.values(fromTags:)` fed with PixlTags' property map (`AudioTagReader.read(_:).properties.dictionary`),
   in `ReplayGainReader`. PixlTags reads every container; PixlAudioCore owns the maths (incl. the R128 Q7.8

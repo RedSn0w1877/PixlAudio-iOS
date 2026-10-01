@@ -6,8 +6,9 @@ import PixlModel
 
 /// The real `PlaybackEngine` (architecture §2): two `AVQueuePlayer` decks with a processing tap on every item.
 ///
-/// - Transition NONE (and every case without a crossfade) is **gapless**: as soon as the current item is installed,
-///   the next one is built and pre-inserted on the active deck, so AVQueuePlayer joins them sample-accurately.
+/// - Transition NONE (and every case without a crossfade) is **gapless**: the next item is prerolled on the idle deck
+///   and started on the host clock at the current item's last frame (`DualDeckEngine+Crossfade.swift`). A pre-insert
+///   on the same AVQueuePlayer is not gapless once items carry a processing tap.
 /// - FADE_IN_OUT / OVERLAP / SMOOTH run Android's overlap crossfade (`DualDeckEngine+Crossfade.swift`): the next
 ///   item is prepared on the idle deck, started at `end − fade`, both taps apply their gain curves from their own media
 ///   time, and the decks swap.
@@ -52,7 +53,9 @@ final class DualDeckEngine: PlaybackEngine {
     var crossfadeTask: Task<Void, Never>?
     var preparedIncoming: DeckItem?
     var preparingIncomingTask: Task<Void, Never>?
-    var plannedCrossfade: CrossfadePlan?
+    var plannedTransition: CrossfadePlan?
+    /// A gapless hand-over waiting for its host time (the incoming deck is already scheduled).
+    var scheduledHandOver: ScheduledHandOver?
     var fade: FadeRun?
     var fadeMonitorTask: Task<Void, Never>?
     var nextPlanId = 0
@@ -65,7 +68,7 @@ final class DualDeckEngine: PlaybackEngine {
     /// The playlist the queue came from (per-playlist transition rules); nil for other sources.
     var queuePlaylistId: String? { didSet { if oldValue != queuePlaylistId { rescheduleNext() } } }
     private(set) var suspensions = TransitionSuspensions()
-    /// The sleep timer's end-of-track mode: don't pre-insert or crossfade into the next song.
+    /// The sleep timer's end-of-track mode: don't hand over or crossfade into the next song.
     var stopAfterCurrentItem = false { didSet { if oldValue != stopAfterCurrentItem { rescheduleNext() } } }
     var replayGainEnabled = false { didSet { if oldValue != replayGainEnabled { refreshReplayGain() } } }
     var replayGainUseAlbumGain = false { didSet { if oldValue != replayGainUseAlbumGain { refreshReplayGain() } } }
@@ -420,10 +423,10 @@ final class DualDeckEngine: PlaybackEngine {
         advance(to: index, automatic: false, previous: queue.current?.song)
     }
 
-    // MARK: - Gapless pre-insert
+    // MARK: - What comes next
 
-    /// Plans what follows the current item: a crossfade when the rules ask for one, otherwise the next item is built
-    /// and pre-inserted on the active deck (gapless).
+    /// Plans what follows the current item: a crossfade when the rules ask for one, otherwise a gapless hand-over to
+    /// the next entry (both prepared on the idle deck near the end).
     func scheduleNext() {
         nextTask?.cancel()
         nextTask = nil
@@ -435,16 +438,7 @@ final class DualDeckEngine: PlaybackEngine {
             return
         }
         guard let nextIndex = queue.nextIndexForAutoAdvance, let entry = queue.entry(at: nextIndex) else { return }
-        nextTask = Task { [weak self] in
-            guard let self else { return }
-            guard let item = try? await self.factory.makeItem(for: entry) else { return }
-            guard !Task.isCancelled, self.activeItem === current, self.active.upcoming.isEmpty else {
-                self.factory.discard(item)
-                return
-            }
-            self.prepareReplayGain(item)
-            if !self.active.append(item) { self.factory.discard(item) }
-        }
+        startCrossfade(handOverPlan(for: current, target: entry))
     }
 
     /// Re-plans after a queue, repeat, shuffle or settings change.
@@ -486,6 +480,8 @@ final class DualDeckEngine: PlaybackEngine {
             if let item {
                 if item !== activeItem { autoAdvanced(to: item) }
             } else if activeItem != nil {
+                // A hand-over scheduled for this very moment takes over instead of a reload.
+                if completeScheduledHandOver() { return }
                 activeItemEndedWithoutSuccessor()
             }
         case .statusChanged(let status):
@@ -493,6 +489,7 @@ final class DualDeckEngine: PlaybackEngine {
             setPreparing(loadTask != nil || (playWhenReady && status == .waitingToPlayAtSpecifiedRate))
         case .itemEnded(let item):
             guard deck === active, item === activeItem, deck.upcoming.isEmpty else { return }
+            if completeScheduledHandOver() { return }
             activeItemEndedWithoutSuccessor()
         case .itemFailed(let item, let message):
             if deck === active, item === activeItem {

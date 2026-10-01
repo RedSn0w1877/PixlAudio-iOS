@@ -48,10 +48,14 @@ final class DualDeckEngineTests: XCTestCase {
         engine.setQueue([songA, songB], startIndex: 0, startPositionMs: 0, playWhenReady: true)
         try await waitForAudio(engine)
         let first = try XCTUnwrap(engine.activeItem)
-        let preInserted = await waitUntil(timeout: 3) { engine.active.upcoming.count == 1 }
-        XCTAssertTrue(preInserted, "NONE mode pre-inserts the next item on the active deck")
-        let second = try XCTUnwrap(engine.active.upcoming.first)
+        XCTAssertNotNil(engine.plannedHandOver, "NONE mode plans a gapless hand-over")
+        XCTAssertNil(engine.plannedCrossfade)
+        let prepared = await waitUntil(timeout: 3) { engine.preparedIncoming != nil }
+        XCTAssertTrue(prepared, "the next item is prepared on the idle deck")
+        let second = try XCTUnwrap(engine.preparedIncoming)
         XCTAssertEqual(second.entry.song.id, "f:b")
+        XCTAssertTrue(engine.idle.items.first === second)
+        XCTAssertTrue(engine.active.upcoming.isEmpty, "no pre-insert on the active deck")
 
         // Sample (host time, item, timebase position) through the join. The timebase follows the audio clock, so
         // extrapolating A's end and B's start from these pairs measures the gap the listener hears.
@@ -70,7 +74,8 @@ final class DualDeckEngineTests: XCTestCase {
         XCTAssertEqual(transitions.last?.new, "f:b")
         XCTAssertEqual(transitions.last?.previous, "f:a")
         XCTAssertEqual(transitions.last?.automatic, true)
-        XCTAssertTrue(engine.idle.items.isEmpty, "no second deck involved")
+        let cleared = await waitUntil(timeout: 2) { engine.idle.items.isEmpty && !engine.isTransitionRunning }
+        XCTAssertTrue(cleared, "the outgoing deck is emptied after its last frame")
 
         func median(_ values: [Double]) -> Double? {
             guard !values.isEmpty else { return nil }
@@ -112,7 +117,7 @@ final class DualDeckEngineTests: XCTestCase {
                         startIndex: 0, startPositionMs: 0, playWhenReady: true)
         try await waitForAudio(engine)
         let outgoing = try XCTUnwrap(engine.activeItem)
-        XCTAssertNotNil(engine.plannedCrossfade, "a crossfade is planned instead of a gapless pre-insert")
+        XCTAssertNotNil(engine.plannedCrossfade, "a crossfade is planned instead of a gapless hand-over")
         XCTAssertTrue(engine.active.upcoming.isEmpty)
 
         let fired = await waitUntil(timeout: 8) { engine.queue.currentIndex == 1 }
@@ -164,8 +169,8 @@ final class DualDeckEngineTests: XCTestCase {
                         startIndex: 0, startPositionMs: 0, playWhenReady: false)
         let loaded = await waitUntil(timeout: 5) { engine.activeItem != nil }
         XCTAssertTrue(loaded)
-        let preInserted = await waitUntil(timeout: 3) { engine.active.upcoming.count == 1 }
-        XCTAssertTrue(preInserted, "the playlist's NONE rule wins: gapless")
+        let handOver = await waitUntil(timeout: 3) { engine.plannedHandOver != nil }
+        XCTAssertTrue(handOver, "the playlist's NONE rule wins: gapless hand-over")
         XCTAssertNil(engine.plannedCrossfade)
 
         engine.queuePlaylistId = nil   // global default → crossfade
@@ -173,6 +178,7 @@ final class DualDeckEngineTests: XCTestCase {
         XCTAssertTrue(engine.active.upcoming.isEmpty)
         engine.suspendTransitions(owner: "sync-editor")
         XCTAssertNil(engine.plannedCrossfade, "suspended transitions fall back to gapless")
+        XCTAssertNotNil(engine.plannedHandOver)
         engine.resumeTransitions(owner: "sync-editor")
         XCTAssertNotNil(engine.plannedCrossfade)
     }
@@ -201,7 +207,7 @@ final class DualDeckEngineTests: XCTestCase {
         defer { engine.stop() }
         engine.setQueue(songs, startIndex: 0, startPositionMs: 0, playWhenReady: true)
         try await waitForAudio(engine)
-        _ = await waitUntil(timeout: 3) { engine.active.upcoming.count == 1 }
+        _ = await waitUntil(timeout: 3) { engine.plannedHandOver != nil }
 
         engine.skipToNext()
         let onSecond = await waitUntil(timeout: 3) { engine.activeItem?.entry.song.id == "f:1" }

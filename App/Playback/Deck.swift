@@ -101,7 +101,8 @@ final class DeckItemFactory {
 }
 
 /// One `AVQueuePlayer` ("deck"). `DualDeckEngine` keeps two: the active one, and the idle one used for crossfades.
-/// Gapless playback pre-inserts the next item on the active deck. Events reach the engine on the main actor in order.
+/// Gapless joins are host-clock hand-overs between the two decks (`preroll` + `start(rate:atHostTime:)`). Events reach
+/// the engine on the main actor in order.
 @MainActor
 final class Deck {
     enum Event {
@@ -158,6 +159,7 @@ final class Deck {
     /// Replaces everything with `item`, positioned at `seconds`.
     func load(_ item: DeckItem, at seconds: Double = 0) {
         removeAll()
+        restoreStallWaiting()
         items = [item]
         observe(item)
         player.insert(item.playerItem, after: nil)
@@ -166,7 +168,7 @@ final class Deck {
         }
     }
 
-    /// Queues `item` after the last item (gapless pre-insert). Returns false when the player refuses it.
+    /// Queues `item` after the last item. Returns false when the player refuses it.
     @discardableResult
     func append(_ item: DeckItem) -> Bool {
         let after = items.last?.playerItem
@@ -208,6 +210,32 @@ final class Deck {
     }
 
     func pause() { player.pause() }
+
+    // MARK: Scheduled start (gapless hand-over)
+
+    /// True when `item` is this deck's current item and both it and the player are ready to play (preroll would
+    /// raise otherwise).
+    func isReadyToPreroll(_ item: DeckItem) -> Bool {
+        currentItem === item && item.playerItem.status == .readyToPlay && player.status == .readyToPlay
+    }
+
+    /// Loads the current item's audio from its current time so a scheduled start is instant.
+    func preroll(rate: Float) async -> Bool {
+        guard let item = currentItem, isReadyToPreroll(item), player.rate == 0 else { return false }
+        return await player.preroll(atRate: rate)
+    }
+
+    /// Starts the current item from its beginning at `hostTime` (host clock). Precise starts need stall waiting off.
+    func start(rate: Float, atHostTime hostTime: CMTime) {
+        player.automaticallyWaitsToMinimizeStalling = false
+        player.defaultRate = rate
+        player.setRate(rate, time: .zero, atHostTime: hostTime)
+    }
+
+    /// Back to the default stall handling (for streamed items) once no scheduled start is pending.
+    func restoreStallWaiting() {
+        if !player.automaticallyWaitsToMinimizeStalling { player.automaticallyWaitsToMinimizeStalling = true }
+    }
 
     func setRate(_ rate: Float) {
         player.defaultRate = rate
