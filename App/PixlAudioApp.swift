@@ -7,11 +7,17 @@ struct PixlAudioApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootTabView()
+            RootView()
                 .environment(environment)
-                .environment(environment.playback)
                 .environment(environment.router)
-                .preferredColorScheme(environment.launch.colorScheme)
+                .environment(environment.library)
+                .environment(environment.playback)
+                .environment(environment.settings)
+                .environment(environment.accounts)
+                .environment(environment.lyrics)
+                .environment(environment.theme)
+                .preferredColorScheme(environment.preferredColorScheme)
+                .task { await environment.start() }
         }
     }
 }

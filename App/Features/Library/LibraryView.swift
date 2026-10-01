@@ -1,60 +1,92 @@
+import PixlModel
 import SwiftUI
 
-/// Library (placeholder): the category list, then all songs.
+/// Library — placeholder until stage 7a ports PixlAudio's Library (`LibraryScreen.kt`). Trivially simple but in
+/// PixlAudio's layout: the "Library" header with its settings circle, the category tabs as glass capsules with
+/// the gliding selection, the action row (Shuffle + view/filter/sort circles), and the songs as glass cards.
 struct LibraryView: View {
-    @Environment(AppEnvironment.self) private var environment
+    @Environment(LibraryStore.self) private var library
+    @Environment(PlaybackStore.self) private var playback
+    @Environment(Router.self) private var router
+    @Environment(\.appTheme) private var theme
+    @State private var tab: LibraryTab = .songs
 
     var body: some View {
-        List {
-            Section {
-                ForEach(LibraryCategory.allCases) { category in
-                    NavigationLink(value: Route.category(category)) {
-                        Label(category.title, systemImage: category.systemImage)
+        VStack(spacing: 0) {
+            LargeHeader("Library") {
+                GlassCircleButton(systemImage: "gearshape", accessibilityLabel: "Open settings",
+                                  tint: theme.primaryContainer.opacity(GlassTint.container),
+                                  foreground: theme.onPrimaryContainer) {
+                    router.push(.settings)
+                }
+                .accessibilityIdentifier("library.settings")
+            }
+            GlassPillRow(items: LibraryTab.defaultOrder.map { GlassPillRow<LibraryTab>.Item(id: $0, title: $0.tabTitle) },
+                         selection: $tab, accessibilityIdentifierPrefix: "library.tab")
+                .padding(.top, Tokens.Spacing.s)
+                .padding(.bottom, 10)
+            ScrollView {
+                VStack(spacing: Tokens.SongCard.listSpacing) {
+                    actionRow
+                        .padding(.bottom, Tokens.Spacing.xs)
+                    LazyVStack(spacing: Tokens.SongCard.listSpacing) {
+                        ForEach(library.songs) { song in
+                            SongCard(song: song, isCurrent: playback.current?.id == song.id,
+                                     isPlaying: playback.isPlaying,
+                                     onTap: { playback.play(song, in: library.songs) },
+                                     onMore: { router.present(AppSheet.songInfo(songId: song.id)) })
+                        }
                     }
                 }
+                .padding(.horizontal, 10)
+                .padding(.top, 6)
+                .padding(.bottom, Tokens.Spacing.xxl)
             }
-
-            Section("Songs") {
-                ForEach(environment.library.songs) { song in
-                    SongRow(song: song)
-                }
-            }
+            .scrollIndicators(.hidden)
         }
-        .navigationTitle("Library")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button("Title", systemImage: "textformat") {}
-                    Button("Artist", systemImage: "music.mic") {}
-                    Button("Recently Added", systemImage: "clock") {}
-                } label: {
-                    Label("Sort", systemImage: "arrow.up.arrow.down")
-                }
-            }
-        }
+        .background(theme.background.ignoresSafeArea())
+        .toolbar(.hidden, for: .navigationBar)
         .accessibilityIdentifier("screen.library")
+    }
+
+    private var actionRow: some View {
+        GlassEffectContainer(spacing: 2) {
+            HStack(spacing: Tokens.Spacing.s) {
+                GlassPillButton(title: "Shuffle", systemImage: "shuffle",
+                                tint: theme.secondaryContainer.opacity(GlassTint.container),
+                                foreground: theme.onSecondaryContainer, style: .labelLarge.weight(.bold),
+                                horizontalPadding: 18, verticalPadding: 13) {
+                    playback.play(library.songs.shuffled())
+                }
+                Spacer()
+                GlassCircleButton(systemImage: "square.grid.2x2", accessibilityLabel: "Change view", size: 44) {}
+                GlassCircleButton(systemImage: "line.3.horizontal.decrease", accessibilityLabel: "Filter", size: 44) {}
+                GlassCircleButton(systemImage: "arrow.up.arrow.down", accessibilityLabel: "Sort", size: 44) {}
+            }
+        }
     }
 }
 
-/// A category page (placeholder until stage 7a).
-struct LibraryCategoryView: View {
-    let category: LibraryCategory
-    @Environment(AppEnvironment.self) private var environment
+extension LibraryTab {
+    /// English titles (Android `library_tab_*`); localised titles arrive with the String Catalog.
+    var tabTitle: String {
+        switch self {
+        case .songs: "Songs"
+        case .albums: "Albums"
+        case .artists: "Artists"
+        case .playlists: "Playlists"
+        case .folders: "Folders"
+        case .liked: "Liked"
+        }
+    }
+}
+
+/// Folder browser (Android `FolderExplorerScreen`) — stage 7a.
+struct FolderExplorerView: View {
+    let path: String?
 
     var body: some View {
-        Group {
-            if category == .songs {
-                List(environment.library.songs) { song in
-                    SongRow(song: song)
-                }
-            } else {
-                ContentUnavailableView(
-                    category.title,
-                    systemImage: category.systemImage,
-                    description: Text("Arrives with the library stage.")
-                )
-            }
-        }
-        .navigationTitle(category.title)
+        PlaceholderScreen(title: "Folders", systemImage: "folder", owner: "Stage 7a — Library & details",
+                          screenID: "folderExplorer")
     }
 }
