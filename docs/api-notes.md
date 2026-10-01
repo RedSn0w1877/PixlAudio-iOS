@@ -175,9 +175,9 @@ stage 11). PixlNet deviations from Android:
 - User-facing diagnostic strings keep Android's wording (some Spanish, e.g. "respondió HTTP 400", "Refresco de token
   fallido"); the UI stages decide what to show.
 
-For the app (stage 6), from PixlTags (stage 3d): MP4/M4A tag write-back is meant to go through AVFoundation
-(`AVAssetExportSession` passthrough with `metadata`), and reading normally through `AVURLAsset.load(.metadata)` with
-PixlTags as the fallback for FLAC, SYLT and ReplayGain; neither is used yet, add the rows when stage 6 does.
+For the app (stage 6), from PixlTags (stage 3d): MP4/M4A tag write-back goes through AVFoundation
+(`AVAssetExportSession` passthrough with `metadata`). Stage 6 reads tags with PixlTags first (over the file's tag
+region only) and uses `AVURLAsset` for duration, format and formats PixlTags can't read — see the Stage 6 section.
 
 ## Stage 4 — design system, shell, persistence, artwork
 Proven on the `xcode-27` lane by the stage-4 build (fallback lane: its next weekly run).
@@ -232,6 +232,32 @@ Proven on the `xcode-27` lane by the stage-4 build (fallback lane: its next week
 | `PropertyListEncoder` (`outputFormat = .binary`) / `PropertyListDecoder` | 8 | /documentation/foundation/propertylistencoder | `SnapshotLoader` | Launch reads the binary-plist snapshot before SwiftData. |
 | `UserDefaults(suiteName:)`, `removePersistentDomain(forName:)`, `object(forKey:)` | 7 | /documentation/foundation/userdefaults | `SettingsStore` | Android preference keys; isolated suite for UI tests. |
 | `AsyncStream.makeStream(of:bufferingPolicy:)` | 17 (Swift 5.9) | /documentation/swift/asyncstream/makestream(of:bufferingpolicy:) | `DemoPlaybackEngine` | Engine → store events. |
+
+## Stage 6 — library import
+Signatures checked against Apple's documentation JSON (developer.apple.com/tutorials/data/documentation/…); proven on
+CI by the stage-6 build. Paths are under https://developer.apple.com.
+
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `FileManager.enumerator(at:includingPropertiesForKeys:options:errorHandler:)`, `.skipsPackageDescendants`, `DirectoryEnumerator.nextObject()`, `.level`, `.skipDescendants()` | 8 / 4 | /documentation/foundation/filemanager/enumerator(at:includingpropertiesforkeys:options:errorhandler:) | `AudioFileEnumerator` | Synchronous (`makeIterator` is unavailable in async contexts, so the walk is a sync function). `level` gives the relative path without resolving symlinks. |
+| `URL.resourceValues(forKeys:)`, `URLResourceKey.isRegularFileKey / isDirectoryKey / contentModificationDateKey / fileSizeKey / isUbiquitousItemKey / ubiquitousItemDownloadingStatusKey`, `URLUbiquitousItemDownloadingStatus.current` | 4–8 | /documentation/foundation/urlresourcekey/ubiquitousitemdownloadingstatuskey | `AudioFileEnumerator` | Modification time + size are the rescan stamp. |
+| `FileManager.startDownloadingUbiquitousItem(at:)` | 5 | /documentation/foundation/filemanager/startdownloadingubiquitousitem(at:) | `AudioFileEnumerator` | iCloud placeholders (`.name.icloud`, or status not current): download requested, imported on a later scan. |
+| `FileHandle(forReadingFrom:)`, `read(upToCount:)`, `seek(toOffset:)`, `seekToEnd()`, `close()` | 4 / 13.4 | /documentation/foundation/filehandle/read(uptocount:) | `TagRegionReader`, `MPEGDuration` | Reads only the tag region (ID3v2, FLAC metadata blocks, MP4 `ftyp`+`moov`, WAV `id3 `, ID3v1). |
+| `FileManager.url(for: .itemReplacementDirectory, in:appropriateFor:create:)` | 4 | /documentation/foundation/filemanager/url(for:in:appropriatefor:create:) | `TagWriteBack.replace` | Falls back to `temporaryDirectory`; `replaceItemAt` (already in the ledger) then swaps the file in, with a plain atomic write if that fails. |
+| `URL(resolvingBookmarkData:options:relativeTo:bookmarkDataIsStale:)` stale refresh, `bookmarkData(options: .minimalBookmark, …)`, `start/stopAccessingSecurityScopedResource()` | 4 / 8 | /documentation/foundation/url/bookmarkdata(options:includingresourcevaluesforkeys:relativeto:) | `FolderBookmarks`, `FolderAccessRegistry` | Already ledgered for Diagnostics; stage 6 stores bookmarks in `FolderSourceRecord` and keeps each root's scope open for the process. |
+| `AVURLAsset(url:)`, `load(_:)` / `load(_:_:)` (`.duration`, `.commonMetadata`, `.metadata`) | 15 (async loading) | /documentation/avfoundation/avasynchronouskeyvalueloading/load(_:isolation:) | `AudioMetadataReader`, `EmbeddedArtworkReader`, `TagWriteBack` | |
+| `AVAsset.loadTracks(withMediaType:)`, `AVAssetTrack` `.estimatedDataRate`, `.formatDescriptions` | 15 | /documentation/avfoundation/avasset/loadtracks(withmediatype:completionhandler:) | `AudioMetadataReader` | Bitrate (bit/s) and sample rate. |
+| `CMAudioFormatDescriptionGetStreamBasicDescription(_:)` | 4 | /documentation/coremedia/cmaudioformatdescriptiongetstreambasicdescription(_:) | `AudioMetadataReader` | `mSampleRate`. |
+| `AVMetadataItem.metadataItems(from:filteredByIdentifier:)`, `load(.stringValue / .dataValue)`, `identifier` | 8 / 15 | /documentation/avfoundation/avmetadataitem/metadataitems(from:filteredbyidentifier:) | reader, artwork, write-back | |
+| `AVMetadataIdentifier.commonIdentifierTitle / Artist / AlbumName / Type / CreationDate / Artwork`, `.iTunesMetadataSongName / Artist / Album / AlbumArtist / UserGenre` | 8 | /documentation/avfoundation/avmetadataidentifier/commonidentifiertitle | reader, `TagWriteBack` | |
+| `AVMutableMetadataItem` (`identifier`, `value`) | 4 / 8 | /documentation/avfoundation/avmutablemetadataitem | `TagWriteBack` | |
+| `AVAssetExportSession(asset:presetName:)`, `AVAssetExportPresetPassthrough`, `metadata`, `export(to:as:isolation:)`, `AVFileType.m4a` | 4 / 13 (back-deployed) | /documentation/avfoundation/avassetexportsession/export(to:as:isolation:) | `TagWriteBack` | M4A write-back without re-encoding; the export's `metadata` replaces the file's, so existing items are carried over minus the edited ones. |
+| `MPMediaLibrary.authorizationStatus()`, `requestAuthorization() async`, `default().lastModifiedDate`, `beginGeneratingLibraryChangeNotifications()`, `Notification.Name.MPMediaLibraryDidChange` | 9.3 / 3 / 2 | /documentation/mediaplayer/mpmedialibrary/requestauthorization(_:) | `MediaLibraryImporter`, `LibraryAutoRefresh` | Access is requested only from the UI, never at launch. |
+| `MPMediaQuery.songs()`, `MPMediaItem` `assetURL`, `hasProtectedAsset`, `persistentID`, `albumPersistentID`, `playbackDuration`, `dateAdded`, `releaseDate`, `title` / `artist` / `albumTitle` / `albumArtist` / `genre` / `albumTrackNumber` / `discNumber` / `artwork` | 3–10 | /documentation/mediaplayer/mpmediaitem/hasprotectedasset | `MediaLibraryImporter` | Only `assetURL != nil && !hasProtectedAsset` items (DRM-free, on the device). |
+| `NotificationCenter.addObserver(forName:object:queue:using:)`, `UIApplication.willEnterForegroundNotification` | 4 | /documentation/foundation/notificationcenter/addobserver(forname:object:queue:using:) | `LibraryAutoRefresh` | Handlers on `.main`, bodies in `MainActor.assumeIsolated`. |
+| `Task.sleep(for:)` | 16 | /documentation/swift/task/sleep(for:tolerance:clock:) | `LibraryAutoRefresh` | Debounce of rescan requests. |
+| `AVAudioFile(forWriting:settings:commonFormat:interleaved:)`, `AVAudioPCMBuffer`, `kAudioFormatMPEG4AAC` | 8 | /documentation/avfaudio/avaudiofile/init(forwriting:settings:commonformat:interleaved:) | AppTests (`TestAudioFiles`) | Generates an AAC `.m4a` at test time. |
+| `FileManager.setAttributes([.modificationDate: …], ofItemAtPath:)` | 2 | /documentation/foundation/filemanager/setattributes(_:ofitematpath:) | AppTests | Marks a file as changed. |
 
 ## Testing and tooling
 | API / tool | Docs | Notes |
