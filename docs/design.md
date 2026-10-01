@@ -274,6 +274,8 @@ and `Services/Lyrics*.swift` + `Services/CJKRomanization.swift`.
   a destination-in ramp half a line height wide, with lift × activeness and the emphasis scale/spread/hop/glow.
   The whole layer is one compositing group blended `.plusLighter` (normal over bright art / increased contrast) and
   masked by the 10 %/12 % edge fade (top below the header + 48 pt, bottom above the controls + 96 pt).
+  Only start-aligned lines give the renderer horizontal `displayPadding`: with it, trailing (duet) text drew ~20 pt
+  towards the end and ran off the screen.
 - **Background:** `ArtworkSpriteBaker` (actor, LRU 4) bakes the four blurred sprites from the 96 px art into one 2×2
   atlas; `LyricsScene.metal` (twist, composite, grade, overlays, dither) fills the screen from a
   `TimelineView(.animation(minimumInterval: 1/30, paused:))`; 1.7 s crossfade; paused when hidden, in Low Power Mode

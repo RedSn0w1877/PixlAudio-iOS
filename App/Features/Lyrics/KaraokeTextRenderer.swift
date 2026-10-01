@@ -228,10 +228,15 @@ nonisolated struct KaraokeTextRenderer: TextRenderer {
     var background: Bool
     var reducedMotion: Bool
     var highContrast: Bool
+    /// The text is start-aligned (left-to-right, leading). Trailing / centred text drew shifted towards the end by
+    /// about the horizontal display padding (duet lines ran off the screen in the stage-9 screenshots), so only
+    /// start-aligned lines get horizontal room.
+    var startAligned: Bool = true
 
     var displayPadding: EdgeInsets {
         // Room for the lift, hop, emphasis scale and glow outside the text box.
-        EdgeInsets(top: em * 0.45, leading: em * 0.35, bottom: em * 0.3, trailing: em * 0.35)
+        let h = startAligned ? em * 0.35 : 0
+        return EdgeInsets(top: em * 0.45, leading: h, bottom: em * 0.3, trailing: h)
     }
 
     func draw(layout: Text.Layout, in context: inout GraphicsContext) {

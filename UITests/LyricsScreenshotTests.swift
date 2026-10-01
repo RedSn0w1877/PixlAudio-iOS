@@ -16,8 +16,10 @@ final class LyricsScreenshotTests: XCTestCase {
         try capture("lyricsHighContrast", demo: "words", freezeMs: 42_300, extra: ["-lyricsHighContrast"])
     }
     func testLineSynced() throws { try capture("lyricsLineSynced", demo: "lines", freezeMs: 42_300) }
-    func testPlainLyrics() throws { try capture("lyricsPlain", demo: "plain", ready: "lyrics.plain") }
-    func testNoLyrics() throws { try capture("lyricsNone", demo: "none", ready: "lyrics.status") }
+    // The screen's "screen.lyrics" identifier is inherited by the scroll views inside it, so the plain list and the
+    // status card are recognised by their content (the first plain line; the "Find or import lyrics" button).
+    func testPlainLyrics() throws { try capture("lyricsPlain", demo: "plain", readyText: "Under the glow of a paper moon") }
+    func testNoLyrics() throws { try capture("lyricsNone", demo: "none", ready: "lyrics.findLyrics") }
     func testImmersive() throws {
         try capture("lyricsImmersive", demo: "words", freezeMs: 42_300, extra: ["-lyricsImmersive"])
     }
@@ -30,7 +32,7 @@ final class LyricsScreenshotTests: XCTestCase {
     }
 
     func testFetchDialog() throws {
-        try capture("lyricsFetchDialog", demo: "none", ready: "lyrics.status", tap: "lyrics.findLyrics", settle: 1.5)
+        try capture("lyricsFetchDialog", demo: "none", ready: "lyrics.findLyrics", tap: "lyrics.findLyrics", settle: 1.5)
     }
 
     func testOptionsSheetRoute() throws {
@@ -58,7 +60,7 @@ final class LyricsScreenshotTests: XCTestCase {
     // MARK: - Helper
 
     private func capture(_ name: String, demo: String, freezeMs: Int? = nil, ready: String = "screen.lyrics",
-                         appearance: String = "dark", extra: [String] = [], tap: String? = nil,
+                         readyText: String? = nil, appearance: String = "dark", extra: [String] = [], tap: String? = nil,
                          settle: TimeInterval = 3.0) throws {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -67,8 +69,8 @@ final class LyricsScreenshotTests: XCTestCase {
         app.launchArguments = arguments + extra
         app.launch()
 
-        let element = app.descendants(matching: .any)[ready].firstMatch
-        XCTAssertTrue(element.waitForExistence(timeout: 20), "\(ready) did not appear for \(name)")
+        let element = readyText.map { app.staticTexts[$0].firstMatch } ?? app.descendants(matching: .any)[ready].firstMatch
+        XCTAssertTrue(element.waitForExistence(timeout: 20), "\(readyText ?? ready) did not appear for \(name)")
         if let tap {
             let target = app.buttons[tap].firstMatch
             XCTAssertTrue(target.waitForExistence(timeout: 10), "\(tap) is missing for \(name)")

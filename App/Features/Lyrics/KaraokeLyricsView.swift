@@ -373,7 +373,8 @@ private struct KaraokeLineRow: View {
             wholeAlpha: Double(alphas.wholeLine(hasWordTiming: line.hasWordTiming)),
             sung: Double(alphas.sung), unsung: Double(alphas.unsung), em: em,
             fade: CGFloat(EmphasisMath.fadeWidthPx(lineHeightPx: fontSize * LyricsRenderMetrics.lineHeightEm)),
-            background: isBackground, reducedMotion: metrics.reducedMotion, highContrast: metrics.highContrast)
+            background: isBackground, reducedMotion: metrics.reducedMotion, highContrast: metrics.highContrast,
+            startAligned: metrics.textAlign(role: role) == .start && !LyricsRenderMetrics.isRtlText(line.text))
 
         VStack(alignment: style.stackAlignment(role: role), spacing: CGFloat(metrics.extraGapPx)) {
             text
