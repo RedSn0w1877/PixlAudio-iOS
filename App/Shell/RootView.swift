@@ -13,6 +13,7 @@ struct RootView: View {
     @Environment(Router.self) private var router
     @Environment(PlaybackStore.self) private var playback
     @Environment(ThemeStore.self) private var themeStore
+    @Environment(AppEnvironment.self) private var environment
     @Environment(\.colorScheme) private var colorScheme
     @State private var isKeyboardVisible = false
 
@@ -28,6 +29,7 @@ struct RootView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             bottomBars
         }
+        .updateBanner(environment.updates)
         .environment(\.appTheme, colors.app)
         .environment(\.playerTheme, colors.player)
         .tint(colors.app.primary)

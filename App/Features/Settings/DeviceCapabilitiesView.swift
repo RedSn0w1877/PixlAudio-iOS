@@ -1,5 +1,6 @@
 import AudioToolbox
 import AVFoundation
+import Combine
 import os
 import PixlModel
 import SwiftUI
@@ -41,6 +42,12 @@ struct DeviceCapabilitiesView: View {
         .settingsToast($toast)
         .task(id: library.songs.count) {
             await model.load(songs: library.songs)
+        }
+        // Stage 15: follow the live output — plugging in headphones, AirPlay or Bluetooth changes the route and often
+        // the hardware sample rate (Android re-reads them on `AudioDeviceCallback`).
+        .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.routeChangeNotification)
+            .receive(on: RunLoop.main)) { _ in
+            Task { await model.load(songs: library.songs) }
         }
     }
 }

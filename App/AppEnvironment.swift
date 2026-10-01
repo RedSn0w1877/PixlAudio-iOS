@@ -29,6 +29,10 @@ final class AppEnvironment {
     /// Search providers by source: the library on `SearchIndex` (stage 7c); stages 11/12 replace the YouTube Music
     /// and Spotify ones (UI tests get demo providers so Search's remote sections render).
     let searchProviders: [SearchSource: any SearchProviding]
+    /// Stage 15: `.pxpl` export, inspection and restore (PixlBackup) and the pending playlist restore.
+    let backup: BackupService
+    /// Stage 15: the notify-only GitHub release check.
+    let updates: UpdateNotifier
 
     init(launch: LaunchConfiguration) {
         self.launch = launch
@@ -87,16 +91,25 @@ final class AppEnvironment {
                                .spotify: UnavailableSearchProvider(source: .spotify),
                                .youtubeMusic: UnavailableSearchProvider(source: .youtubeMusic)]
         }
+
+        let settingsDefaults = isUITest ? (UserDefaults(suiteName: "pixlaudio.uitest") ?? .standard) : .standard
+        backup = BackupService(persistence: persistence, library: library, settings: settings, defaults: settingsDefaults,
+                               history: home.history, playbackServices: playbackServices, isUITest: isUITest)
+        updates = UpdateNotifier(isEnabled: !isUITest)
     }
 
     /// Launch work, off the first frame: load the library snapshot (cache first, then the store), then start the
     /// automatic incremental rescans (launch, foreground, music-library changes).
     func start() async {
         guard !launch.isUITest else { return }
+        // First run: PixlAudio's setup (Android shows `SetupScreen` until `initial_setup_done`).
+        if !settings.behavior.initialSetupDone, router.cover == nil { router.present(AppCover.setup) }
         playbackServices?.start()
         await library.load()
         playbackServices?.restoreQueue(lookup: library.song(id:))
         libraryAutoRefresh?.start()
+        backup.start()
+        await updates.checkIfDue()
     }
 
     /// Call after music-library access was granted so its change notifications start.

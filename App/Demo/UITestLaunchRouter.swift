@@ -44,6 +44,10 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case libraryAddToPlaylist, songOptionsInfo
     case playlistEdit, playlistAddSongs, playlistOptions, playlistReorder, genreSort
 
+    // Stage 15: the setup pages (cover `setup` opened on a page) and the backup restore steps (Settings › Backup)
+    case setupPermission, setupFolders, setupBackup, setupTheme, setupLibraryLayout, setupSpotify, setupFinish
+    case backupRestorePlan, backupImportReport
+
     /// The accessibility identifier present once the screen is up (`screen.<id>`).
     var readyIdentifier: String {
         switch self {
@@ -118,6 +122,9 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .queue, .songInfo, .sleepTimer, .lyricsOptions, .changelog, .betaInfo, .jobs,
              .nowPlaying, .lyrics, .lyricsSync, .setup:
             return nil
+        case .setupPermission, .setupFolders, .setupBackup, .setupTheme, .setupLibraryLayout, .setupSpotify, .setupFinish:
+            return nil
+        case .backupRestorePlan, .backupImportReport: return .settingsCategory(.backupRestore)
         }
     }
 
@@ -156,7 +163,9 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .nowPlaying: .nowPlaying
         case .lyrics: .lyrics
         case .lyricsSync: .lyricsSync(songId: DemoLibrary.songs.first?.id ?? "")
-        case .setup: .setup
+        case .setup, .setupPermission, .setupFolders, .setupBackup, .setupTheme, .setupLibraryLayout, .setupSpotify,
+             .setupFinish:
+            .setup
         default: nil
         }
     }

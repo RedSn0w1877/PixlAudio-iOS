@@ -3,15 +3,17 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// Settings › Backup & Restore (Android `SettingsCategoryScreen` BACKUP_RESTORE): the "How backup works" notice, the
-/// export row (opens the section picker) and the restore row (opens the file step). UI only for now — stage 15 wires
-/// PixlBackup's `.pxpl` writer and reader behind `BackupFlow`.
+/// export row (opens the section picker, then builds and saves the `.pxpl`) and the restore row (file step, module
+/// step, restore, report). The flows live in `Features/Backup` on `BackupService` (stage 15).
 struct BackupSettingsSection: View {
     @Environment(SettingsStore.self) private var settings
+    @Environment(AppEnvironment.self) private var env
     @Environment(\.appTheme) private var theme
 
     @State private var exportSections: Set<BackupSection> = BackupSection.defaultSelection
     @State private var showsExport = false
     @State private var showsImport = false
+    @State private var importStart: BackupImportFlowView.Start = .pick
     @State private var toast: String?
 
     var body: some View {
@@ -29,24 +31,25 @@ struct BackupSettingsSection: View {
             SettingsSubsection(title: L10n.settingsRestoreBackupSection, addBottomSpace: false) {
                 ActionSettingRow(title: L10n.settingsImportBackupTitle, subtitle: L10n.settingsImportBackupSubtitle,
                                  systemImage: "clock.arrow.circlepath",
-                                 primaryLabel: L10n.settingsActionSelectRestore) { showsImport = true }
+                                 primaryLabel: L10n.settingsActionSelectRestore) {
+                    importStart = .pick
+                    showsImport = true
+                }
             }
         }
         .fullScreenCover(isPresented: $showsExport) {
-            BackupSectionPicker(selection: $exportSections) {
+            BackupExportFlowView(selection: $exportSections) { message in
                 showsExport = false
-                toast = BackupFlow.unavailableMessage
+                toast = message
             }
             .environment(\.appTheme, theme)
         }
         .fullScreenCover(isPresented: $showsImport) {
-            BackupImportPicker { _ in
-                showsImport = false
-                toast = BackupFlow.unavailableMessage
-            }
-            .environment(\.appTheme, theme)
+            BackupImportFlowView(start: importStart) { _ in showsImport = false }
+                .environment(\.appTheme, theme)
         }
         .settingsToast($toast)
+        .task { openDemoFlowIfNeeded() }
     }
 
     private var selectionSummary: String {
@@ -55,11 +58,16 @@ struct BackupSettingsSection: View {
         return exportSections.count == total ? L10n.settingsExportBackupAll
             : L10n.settingsExportBackupPartial(exportSections.count, total)
     }
-}
 
-/// Where stage 15 plugs in the `.pxpl` export / inspect / restore (PixlBackup).
-nonisolated enum BackupFlow {
-    static let unavailableMessage = "Backups aren't available in this build yet."
+    /// UI tests open the module step or the report straight away (`-screen backupRestorePlan|backupImportReport`).
+    private func openDemoFlowIfNeeded() {
+        switch env.launch.screen {
+        case .backupRestorePlan: importStart = .inspected(.demo)
+        case .backupImportReport: importStart = .report(.demo)
+        default: return
+        }
+        showsImport = true
+    }
 }
 
 /// Android `BackupInfoNoticeCard`: `primaryContainer` 55 % panel, 20 pt corners, upload icon, title, body, close.
@@ -280,7 +288,7 @@ struct BackupImportPicker: View {
             .padding(.vertical, 8)
         }
         .background(theme.surfaceContainerLowest.ignoresSafeArea())
-        .fileImporter(isPresented: $showsPicker, allowedContentTypes: [.data]) { result in
+        .fileImporter(isPresented: $showsPicker, allowedContentTypes: UTType.backupImportTypes) { result in
             if case .success(let url) = result { onPicked(url) }
         }
         .accessibilityIdentifier("screen.backupImport")
