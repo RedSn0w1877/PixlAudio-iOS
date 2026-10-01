@@ -15,6 +15,8 @@ final class AppEnvironment {
     let settings: SettingsStore
     let accounts: AccountsStore
     let lyrics: LyricsStore
+    /// Stage 9: loads lyrics into `lyrics` (`LyricsService`: providers, cache, embedded tags) and runs the search.
+    let lyricsController: LyricsController
     let theme: ThemeStore
     let artwork: ArtworkPipeline
     let colorExtractor: ColorExtractor
@@ -40,7 +42,9 @@ final class AppEnvironment {
         let settings = isUITest ? SettingsStore.ephemeral() : SettingsStore()
         self.settings = settings
         accounts = AccountsStore()
-        lyrics = LyricsStore()
+        let lyrics = LyricsStore()
+        self.lyrics = lyrics
+        lyricsController = LyricsController(store: lyrics, settings: settings, persistence: persistence, isUITest: isUITest)
         artwork = .shared
         let extractor = ColorExtractor(pipeline: .shared, persistence: persistence)
         colorExtractor = extractor
