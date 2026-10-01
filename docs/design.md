@@ -143,7 +143,9 @@ PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact ba
 | Queue / Song info / Sleep timer | `AppSheet.queue/.songInfo/.sleepTimer` | `QueueSheet`, `SongInfoSheet`, `SleepTimerSheet` | 8 |
 | Karaoke lyrics / lyrics options | `AppCover.lyrics`, `AppSheet.lyricsOptions` | `LyricsView`, `LyricsOptionsSheet` (Features/Lyrics) | 9 |
 | Lyrics sync editor | `AppCover.lyricsSync(songId:)` | `LyricsSyncEditorView` (Features/LyricsSync) | 10 |
-| YouTube login | `.youTubeLogin` | `YouTubeLoginView` (Features/YouTube) | 11 |
+| YouTube login (+ device-code dialog, cookie paste) | `.youTubeLogin` | `YouTubeLoginView` (Features/YouTube) | 11 |
+| Playback test ("Test playback" / "Deep probe", Android: Spotify dashboard cards) | `.playbackDiagnostics` | `PlaybackDiagnosticsView` (Features/YouTube) | 11 |
+| Offline download card (song sheet) | inside `SongOptionsSheet` | `OfflineDownloadCard` (Features/YouTube) | 11 |
 | Spotify dashboard / browse | `.spotifyDashboard`, `.spotifyBrowse(query:)` | Features/Spotify | 12 |
 | Accounts | `.accounts` | `AccountsView` (Features/Accounts) | 15 |
 | Setup | `AppCover.setup` | `SetupView` (Features/Onboarding) | 15 |
@@ -334,3 +336,30 @@ Screenshot ids (`UITests/LyricsScreenshotTests`, `-screen lyrics` + `-lyricsDemo
 lyricsEmphasis (47 600), lyricsInterlude (61 000), lyricsDuet, lyricsBrightArt, lyricsHighContrast, lyricsLineSynced,
 lyricsPlain, lyricsNone, lyricsImmersive, lyricsLight, lyricsMoreSheet, lyricsFetchDialog, lyricsOptions,
 lyricsCascade.f0…f7 (first-show cascade frames, live clock).
+
+## Stage 11 notes (YouTube playback)
+
+- **Services** live in `App/Services/YouTube/` and are built once as `AppEnvironment.youtube` (`YouTubeServices`; a demo
+  variant without any network object in UI tests). `InnerTubeService` resolves a video id: the remote client table
+  (`remote/config.json`, fetched ≤ every 6 h, parsed by PixlNet's `RemoteClientConfig` which keeps the no-cookie and host
+  invariants) drives PixlNet's `ChainedYouTubeStreamResolver` — VISIONOS first with a fresh visitorData and no cookie, the
+  other pre-signed clients, the deciphered ones (JavaScriptCore, base.js cached per player version) — then Piped. AAC only.
+- **Streaming:** songs whose item URL is `pixlstream://<videoId>` (YouTube Music `yt:` songs; stage 12 can point matched
+  Spotify songs there too) are served by `YouTubeResourceLoader`, registered with `StreamingResourceLoaderRegistry`. It answers
+  from `StreamCache` (sparse file + `ByteRangeSet`, `Library/Caches/YouTube/streams`, 1 GB LRU) and fetches gaps with
+  `StreamFetcher` (1 MiB ranged GETs, the client's User-Agent only, 403 → re-resolve without that strategy). The resolver
+  (`StreamingPlayableURLResolver`, wrapping the engine's default) plays downloaded files first, then fully cached files.
+  `YouTubePrefetcher` (fed by `PlaybackServices.onUpcomingChanged`) resolves the next song at once and caches its first MiB
+  30 s before the end.
+- **PoToken:** `PoTokenGenerator` runs `po_token.html` (copied from the Android assets) in a 1×1 `WKWebView` with
+  `callAsyncJavaScript`; PixlNet asks for a token only for the signed-in WEB_REMIX fallback (VISIONOS needs none).
+- **Sign-in:** the web page (Android's flow) with two glass-capsule fallbacks under it — the device-code flow (Android's
+  `YouTubeSignInDialog`, as a sheet; the token authenticates TVHTML5 through `GoogleBearerHTTPClient`) and a pasted cookie.
+  Signed in, the screen shows Android's `YouTubeAccountCard` (from the Spotify dashboard) + "Test playback". Until the
+  Accounts screen (stage 15) exists, Settings › Developer Options has rows for both screens.
+- **Downloads:** `DownloadManager` (background `URLSession`; foreground ranged fallback; complete cache files are copied),
+  files in `Application Support/Downloads/<videoId>.m4a`. UI: `OfflineDownloadCard` in the song sheet, the playlist sheet's
+  "Download all songs". Song rows (`SongCard`) show Android's `SongAvailabilityBadge` (downloaded / downloading / failed)
+  from `DownloadBadges`, injected at the root — kind only, so progress ticks never re-render the lists.
+- **Screenshot ids:** `youTubeLogin`, `youTubeLoginCode`, `youTubeLoginCookie`, `youTubeLoginSignedIn`, `playbackDiagnostics`
+  (all steps green), `playbackDiagnosticsFailed` (audio step red) — `UITests/YouTubeScreenshotTests`, light + dark.

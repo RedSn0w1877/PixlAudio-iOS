@@ -36,6 +36,8 @@ final class AppEnvironment {
     /// Stage 8: the sleep timer the queue's timer sheet drives — the engine's (`PlaybackServices`), or an engine-less
     /// one for UI tests.
     let sleepTimer: SleepTimerController
+    /// Stage 11: YouTube session, streaming loader, downloads, YouTube Music search (demo variant in UI tests).
+    let youtube: YouTubeServices
 
     init(launch: LaunchConfiguration) {
         self.launch = launch
@@ -46,7 +48,8 @@ final class AppEnvironment {
         self.persistence = persistence
         let settings = isUITest ? SettingsStore.ephemeral() : SettingsStore()
         self.settings = settings
-        accounts = AccountsStore()
+        let accounts = AccountsStore()
+        self.accounts = accounts
         let lyrics = LyricsStore()
         self.lyrics = lyrics
         lyricsController = LyricsController(store: lyrics, settings: settings, persistence: persistence, isUITest: isUITest)
@@ -58,6 +61,7 @@ final class AppEnvironment {
         self.home = home
 
         // Stage 5: the dual-deck AVPlayer engine for real launches; UI tests keep the demo engine.
+        var realPlayback: PlaybackServices?
         if isUITest {
             playbackServices = nil
             playback = PlaybackStore(engine: DemoPlaybackEngine())
@@ -70,12 +74,15 @@ final class AppEnvironment {
                 history.record(songId: songId, durationMs: durationMs, endTimestampMs: timestamp)
             }
             playbackServices = services
+            realPlayback = services
             playback = PlaybackStore(engine: services.engine)
             sleepTimer = services.sleepTimer
         }
 
         if isUITest {
-            library = LibraryStore(snapshot: DemoLibrary.snapshot)
+            let library = LibraryStore(snapshot: DemoLibrary.snapshot)
+            self.library = library
+            youtube = YouTubeServices(launch: launch, library: library, persistence: persistence, accounts: accounts)
             libraryImporter = nil
             libraryAutoRefresh = nil
             searchProviders = [.library: LibrarySearchProvider(),
@@ -95,9 +102,12 @@ final class AppEnvironment {
             self.library = library
             libraryImporter = importer
             libraryAutoRefresh = importer == nil ? nil : LibraryAutoRefresh(library: library)
+            let youtube = YouTubeServices(launch: launch, library: library, persistence: persistence, accounts: accounts)
+            self.youtube = youtube
+            youtube.install(on: realPlayback)
             searchProviders = [.library: LibrarySearchProvider(),
                                .spotify: UnavailableSearchProvider(source: .spotify),
-                               .youtubeMusic: UnavailableSearchProvider(source: .youtubeMusic)]
+                               .youtubeMusic: youtube.searchProvider ?? (UnavailableSearchProvider(source: .youtubeMusic) as any SearchProviding)]
         }
     }
 
@@ -106,6 +116,7 @@ final class AppEnvironment {
     func start() async {
         guard !launch.isUITest else { return }
         playbackServices?.start()
+        youtube.start()
         await library.load()
         playbackServices?.restoreQueue(lookup: library.song(id:))
         libraryAutoRefresh?.start()

@@ -32,6 +32,8 @@ struct SongCard: View {
     var onLongPress: (() -> Void)?
 
     @Environment(\.appTheme) private var theme
+    /// Stage 11: the offline badge of streamed songs (absent in previews / contexts without downloads).
+    @Environment(DownloadBadges.self) private var downloadBadges: DownloadBadges?
 
     var body: some View {
         let t = Tokens.SongCard.self
@@ -57,6 +59,9 @@ struct SongCard: View {
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            if !isSelectionMode, let badge = downloadBadges?.kind(for: song) {
+                SongAvailabilityBadge(kind: badge, tint: content)
+            }
             if showsIndicator {
                 PlayingIndicator(isPlaying: isPlaying, color: content)
                     .padding(.leading, Tokens.Spacing.s)

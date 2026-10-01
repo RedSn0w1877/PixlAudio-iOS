@@ -31,6 +31,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case paletteStyle, experimental, artistSettings, delimiterConfig, wordDelimiterConfig, equalizer, editTransition
     case deviceCapabilities, about, openSourceLicenses, easterEgg, quickFill, diagnostics
     case accounts, spotifyDashboard, spotifyBrowse, youTubeLogin
+    // Stage 11: YouTube sign-in states and the playback test
+    case youTubeLoginCode, youTubeLoginCookie, youTubeLoginSignedIn, playbackDiagnostics, playbackDiagnosticsFailed
 
     // Sheets
     case queue, songInfo, sleepTimer, lyricsOptions, changelog, betaInfo, jobs
@@ -117,7 +119,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .accounts: return .accounts
         case .spotifyDashboard: return .spotifyDashboard
         case .spotifyBrowse: return .spotifyBrowse(query: "")
-        case .youTubeLogin: return .youTubeLogin
+        case .youTubeLogin, .youTubeLoginCode, .youTubeLoginCookie, .youTubeLoginSignedIn: return .youTubeLogin
+        case .playbackDiagnostics, .playbackDiagnosticsFailed: return .playbackDiagnostics
         case .queue, .songInfo, .sleepTimer, .lyricsOptions, .changelog, .betaInfo, .jobs,
              .nowPlaying, .lyrics, .lyricsSync, .setup, .devices, .artistPicker, .aiDJ, .editSong:
             return nil
@@ -252,7 +255,7 @@ nonisolated enum UITestLaunchRouter {
         "editTransition", "deviceCapabilities", "about", "openSourceLicenses", "easterEgg", "quickFill",
         "diagnostics", "accounts",
     ]
-    private static let underAccounts: Set<String> = ["spotifyDashboard", "spotifyBrowse", "youTubeLogin"]
+    private static let underAccounts: Set<String> = ["spotifyDashboard", "spotifyBrowse", "youTubeLogin", "playbackDiagnostics"]
 
     static func initialState(for launch: LaunchConfiguration) -> InitialState {
         var state = InitialState()

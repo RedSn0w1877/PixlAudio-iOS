@@ -184,6 +184,8 @@ public actor ChainedYouTubeStreamResolver {
     private let policy: AudioFormatPolicy
     private let isSignedIn: @Sendable () async -> Bool
     private let maxBitrateKbps: @Sendable () async -> Int?
+    /// The strategies for a signed-in state (iOS passes the remote client config's chain; default: the built-in one).
+    private let strategies: @Sendable (Bool) async -> [YouTubeStreamStrategy]
 
     /// The strategy that last succeeded (diagnostics).
     public private(set) var lastSuccessfulStrategy: String?
@@ -193,13 +195,15 @@ public actor ChainedYouTubeStreamResolver {
     public init(player: any YouTubePlayerFetching, cipher: any CipherResolving, validator: (any StreamProbing)?,
                 policy: AudioFormatPolicy = .iOS,
                 isSignedIn: @escaping @Sendable () async -> Bool = { false },
-                maxBitrateKbps: @escaping @Sendable () async -> Int? = { nil }) {
+                maxBitrateKbps: @escaping @Sendable () async -> Int? = { nil },
+                strategies: @escaping @Sendable (Bool) async -> [YouTubeStreamStrategy] = { YouTubeStreamStrategy.chain(signedIn: $0) }) {
         self.player = player
         self.cipher = cipher
         self.validator = validator
         self.policy = policy
         self.isSignedIn = isSignedIn
         self.maxBitrateKbps = maxBitrateKbps
+        self.strategies = strategies
     }
 
     /// `lastDetail`.
@@ -211,7 +215,7 @@ public actor ChainedYouTubeStreamResolver {
         var attempts: [String] = []
         let cap = await maxBitrateKbps()
         let signedIn = await isSignedIn()
-        for strategy in YouTubeStreamStrategy.chain(signedIn: signedIn) where !excludedStrategies.contains(strategy.name) {
+        for strategy in await strategies(signedIn) where !excludedStrategies.contains(strategy.name) {
             let player = self.player, cipher = self.cipher, policy = self.policy
             let outcome: (url: String?, detail: String)?
             do {

@@ -24,6 +24,14 @@ earlier stages) is by the PixlAudio authors; contributions to the Android projec
 MIT-licensed — see the Android repository's `THIRD_PARTY_NOTICES.md`. The genre illustrations in
 `App/Features/Search/GenreArt.xcassets` are the Android app's own vector drawables converted to SVG.
 
+## BotGuard glue page (`App/Services/YouTube/po_token.html`)
+
+- Copied unchanged from the Android PixlAudio app's `app/src/main/assets/po_token.html`, which comes from NewPipe's
+  PoToken support (`util/potoken`, https://github.com/TeamNewPipe/NewPipe, GPL-3.0), whose BotGuard client functions follow
+  LuanRT's BgUtils (https://github.com/LuanRT/BgUtils, MIT). It is a small HTML/JavaScript file run in an off-screen web
+  view; the Swift around it (`PoTokenGenerator`, PixlNet's `PoTokenJS`) is a port of the Android app's Kotlin. The
+  licence status of this file should be reviewed before any public release.
+
 ---
 
 

@@ -149,7 +149,8 @@ public actor InnerTubeClient: YouTubeMusicSearching {
         let cookie = profile.supportsCookies ? sessionCookie : nil
         // WEB_REMIX is the only profile a real PoToken can be generated for; it is tied to its own visitorData.
         var poToken: PoTokenResult?
-        if cookie != nil && profile == InnerTubeContexts.webRemix {
+        // Compared by name so a remote-config version bump of WEB_REMIX keeps its PoToken.
+        if cookie != nil && profile.name == InnerTubeContexts.webRemix.name {
             poToken = await session.webClientPoToken(videoId: videoId)
         }
         var visitorData = poToken?.visitorData

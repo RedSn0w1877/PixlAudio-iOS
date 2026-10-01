@@ -36,6 +36,7 @@ struct RouteDestination: View {
         case .spotifyDashboard: SpotifyDashboardView()
         case .spotifyBrowse(let query): SpotifyBrowseView(query: query)
         case .youTubeLogin: YouTubeLoginView()
+        case .playbackDiagnostics: PlaybackDiagnosticsView()
         }
     }
 }

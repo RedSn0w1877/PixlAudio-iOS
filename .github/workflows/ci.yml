@@ -48,6 +48,14 @@ jobs:
           swift --version
       - name: swift test
         run: swift test --package-path Packages/PixlCore --parallel
+      # Stage 11: search + VISIONOS-first resolution + a ranged probe + BotGuard Create against the real services.
+      # Non-blocking: YouTube breaking a client must not turn the build red, but the step shows it.
+      - name: YouTube live smoke (non-blocking)
+        continue-on-error: true
+        timeout-minutes: 5
+        env:
+          PIXL_LIVE_YOUTUBE: '1'
+        run: swift test --package-path Packages/PixlCore --filter YouTubeLiveSmokeTests
 
   app:
     name: app (build + unit tests, Xcode 27)
