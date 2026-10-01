@@ -1,0 +1,42 @@
+{
+  "formatVersion": 1,
+  "exportedAtEpochMs": 1690000000000,
+  "availableSections": [
+    "playlists",
+    "global_settings",
+    "lyrics",
+    "transitions"
+  ],
+  "preferences": [
+    {
+      "key": "user_playlists_json_v1",
+      "type": "string",
+      "stringValue": "[]"
+    },
+    {
+      "key": "crossfade_duration",
+      "type": "int",
+      "intValue": 4000
+    }
+  ],
+  "lyrics": [
+    {
+      "songId": 101,
+      "content": "[00:00.50]Waiting in a car",
+      "isSynced": true,
+      "source": "remote"
+    }
+  ],
+  "transitions": [
+    {
+      "id": 3,
+      "playlistId": "legacy-1",
+      "settings": {
+        "mode": "OVERLAP",
+        "durationMs": 3000,
+        "curveIn": "EXP",
+        "curveOut": "LOG"
+      }
+    }
+  ]
+}
