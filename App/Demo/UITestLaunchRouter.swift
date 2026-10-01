@@ -44,6 +44,9 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case libraryAddToPlaylist, songOptionsInfo
     case playlistEdit, playlistAddSongs, playlistOptions, playlistReorder, genreSort
 
+    // Stage 8: the player's sheets (presented over the expanded player) and the song editor
+    case devices, artistPicker, aiDJ, editSong
+
     /// The accessibility identifier present once the screen is up (`screen.<id>`).
     var readyIdentifier: String {
         switch self {
@@ -116,7 +119,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .spotifyBrowse: return .spotifyBrowse(query: "")
         case .youTubeLogin: return .youTubeLogin
         case .queue, .songInfo, .sleepTimer, .lyricsOptions, .changelog, .betaInfo, .jobs,
-             .nowPlaying, .lyrics, .lyricsSync, .setup:
+             .nowPlaying, .lyrics, .lyricsSync, .setup, .devices, .artistPicker, .aiDJ, .editSong:
             return nil
         }
     }
@@ -147,13 +150,18 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .changelog: return .changelog
         case .betaInfo: return .betaInfo
         case .jobs: return .jobs
+        case .devices: return .devices
+        case .artistPicker: return .artistPicker(songId: DemoLibrary.songs[DemoLibrary.featuredSongIndex].id)
+        case .aiDJ: return .aiDJ
         default: return nil
         }
     }
 
     var cover: AppCover? {
         switch self {
-        case .nowPlaying: .nowPlaying
+        // The player's sheets open over the expanded player, as on Android.
+        case .nowPlaying, .queue, .sleepTimer, .devices, .artistPicker, .aiDJ: .nowPlaying
+        case .editSong: .editSong(songId: DemoLibrary.songs.first?.id ?? "")
         case .lyrics: .lyrics
         case .lyricsSync: .lyricsSync(songId: DemoLibrary.songs.first?.id ?? "")
         case .setup: .setup
@@ -196,7 +204,9 @@ nonisolated struct LaunchConfiguration: Equatable, Sendable {
         appearance = value(after: "-appearance").flatMap(Appearance.init(rawValue:)) ?? .system
         searchQuery = value(after: "-searchQuery")
         let vivid = screen == .miniPlayer || screen == .miniPlayerAlone
-        songIndex = value(after: "-song").flatMap(Int.init) ?? (vivid ? UITestLaunchRouter.vividSongIndex : 0)
+        let defaultSong = screen == .artistPicker ? DemoLibrary.featuredSongIndex
+            : (vivid ? UITestLaunchRouter.vividSongIndex : 0)
+        songIndex = value(after: "-song").flatMap(Int.init) ?? defaultSong
         startsPlaying = !arguments.contains("-paused")
         hasSong = !arguments.contains("-noSong")
     }

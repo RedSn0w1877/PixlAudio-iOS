@@ -46,11 +46,14 @@ struct SheetDestination: View {
 
     var body: some View {
         switch sheet {
-        case .queue: QueueSheet().pixlSheet()
+        case .queue: QueueSheet().pixlSheet(detents: [.large])
         case .songInfo(let songId): SongInfoSheet(songId: songId).pixlSheet(detents: [.large])
-        case .sleepTimer: SleepTimerSheet().pixlSheet(detents: [.medium])
+        case .sleepTimer: SleepTimerSheet().sleepTimerPresentation()
         case .lyricsOptions(let songId): LyricsOptionsSheet(songId: songId).pixlSheet()
         case .changelog, .betaInfo, .jobs: HomeInfoSheet(sheet: sheet).pixlSheet()
+        case .devices: DevicesSheet().pixlSheet(detents: [.large])
+        case .artistPicker(let songId): PlayerArtistPickerSheet(songId: songId).pixlSheet(detents: [.medium, .large])
+        case .aiDJ: AIDJSheet().pixlSheet()
         }
     }
 }
@@ -65,6 +68,7 @@ struct CoverDestination: View {
         case .lyrics: LyricsView()
         case .lyricsSync(let songId): LyricsSyncEditorView(songId: songId)
         case .setup: SetupView()
+        case .editSong(let songId): EditSongSheet(songId: songId)
         }
     }
 }

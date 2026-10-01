@@ -12,9 +12,12 @@ nonisolated struct TagOverrideFields: Sendable, Codable, Equatable {
     var trackNumber: Int?
     var discNumber: Int?
     var year: Int?
+    /// A replaced cover (stage 8's song editor): a `file://` URL of the saved image, or "" for "no cover".
+    var artworkUri: String?
 
     init(title: String? = nil, artist: String? = nil, album: String? = nil, albumArtist: String? = nil,
-         genre: String? = nil, trackNumber: Int? = nil, discNumber: Int? = nil, year: Int? = nil) {
+         genre: String? = nil, trackNumber: Int? = nil, discNumber: Int? = nil, year: Int? = nil,
+         artworkUri: String? = nil) {
         self.title = title
         self.artist = artist
         self.album = album
@@ -23,6 +26,7 @@ nonisolated struct TagOverrideFields: Sendable, Codable, Equatable {
         self.trackNumber = trackNumber
         self.discNumber = discNumber
         self.year = year
+        self.artworkUri = artworkUri
     }
 
     var isEmpty: Bool { self == TagOverrideFields() }
@@ -47,5 +51,6 @@ nonisolated struct TagOverrideFields: Sendable, Codable, Equatable {
         if let trackNumber { track.trackNumber = trackNumber }
         if let discNumber { track.discNumber = discNumber > 0 ? discNumber : nil }
         if let year { track.year = year }
+        if let artworkUri { track.artworkUri = artworkUri.isEmpty ? nil : artworkUri }
     }
 }

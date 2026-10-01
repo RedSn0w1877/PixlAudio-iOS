@@ -117,7 +117,7 @@ PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact ba
   `onSurfaceVariant`. Re-tapping the selected tab pops it to its root.
 - The bar shows only at a tab's root — every pushed screen hides it (Android `routesWithHiddenNavigationBar`); the
   mini player then sits alone with 32 pt corners.
-- Tapping the mini player presents `AppCover.nowPlaying` (stage 8 builds the player and its drag-up gesture).
+- The mini player is the collapsed player sheet (stage 8): tap or drag it up to expand (see Stage 8 notes).
 - Root screens draw their own PixlAudio headers (system navigation bar hidden); pushed placeholders use the
   system bar for now — stages replacing them with PixlAudio's top bars must keep the back swipe working.
 
@@ -255,3 +255,37 @@ categories, sheets; glass in place of Material; text legible in light and dark. 
   bottom bar while scrolling.
 - **Demo data:** the screenshots use the generated demo library (placeholder art, a lavender seed), not real covers.
 - **Now Playing** is still the stage-4 placeholder (stage 8).
+
+## Stage 8 notes (player sheet, full player, queue, timer, song editor, devices)
+
+- **One card, mini ↔ full** (Android `UnifiedPlayerSheetV2`): the shell keeps a `MiniPlayerSlot` where the mini player
+  sits and draws `PlayerSheetHost` as a sibling above everything. The card interpolates from the slot (16 pt insets,
+  64 pt, 32 / 10 pt corners) to the screen (no corners) with the expansion fraction in `PlayerSheetController`
+  (`env.playerSheet`). `PlayerSheetMorph` is `Animatable`, so the springs (Android's expressive spatial spec to expand;
+  stiffness 200 with fraction-dependent damping to collapse, plus the 0.97 squash) drive every derived value; the layers
+  read the fraction from `\.playerSheetMetrics` in tiny fade modifiers, so neither a drag nor a spring re-renders the
+  full player. Collapsed, the card is the album-tinted glass mini player; the glass fades out over the first 25 % and
+  `primaryContainer` fades in (Android's glass mode).
+- **Gestures:** drag the mini player up / the full player down (axis-locked, follows the finger, Android's 5 pt / 55 pt/s
+  release rules), tap the mini player, the collapse circle, VoiceOver escape, or swipe in from the leading edge
+  (predictive back). An upward flick on the expanded player opens the queue.
+- **`AppCover.nowPlaying` is a request** the sheet consumes (the shell's cover binding skips it): every existing
+  `router.present(AppCover.nowPlaying)` still opens the player. Lyrics (`AppCover.lyrics`) and the sync editor open
+  above the expanded player and return to it.
+- **Full player** (`NowPlayingView`, Android `FullPlayerContent`): top bar, carousel (`carousel_style` peek styles),
+  title/artist (+ artist picker for several credits), lyrics and AI DJ circles, `PlayerSeekBar` (≤ 4 Hz from
+  `PlaybackStore.clock`), `AnimatedPlaybackControls` (weighted glass pills), `PlayerToggleRow`, the
+  `player_ambient_style` background. Controls are clear glass tinted with the album roles (`playerGlass`).
+- **Sheets:** `AppSheet.queue` (large), `.sleepTimer`, `.devices`, `.artistPicker(songId:)`, `.aiDJ` (stage 13
+  placeholder in Features/AI); `AppCover.editSong(songId:)`. The queue presents the song sheet, the timer and Save as
+  playlist itself. The song sheet's edit button (`SongOptionsSheet(onEdit:)`) opens `EditSongSheet`.
+- **Shared-file changes (all additive):** `Shell/RootView.swift` (slot + host, cover binding), `Core/Routes.swift`
+  and `Shell/RouteDestinations.swift` (new cases, queue/timer detents), `AppEnvironment.swift` (`playerSheet`,
+  `sleepTimer`), `DesignSystem/Components/MiniPlayerBar.swift` (`drawsGlass`), `Demo/*` (screen ids, demo engine queue
+  edits, one featured credit on "Slow Burn"), `Features/Library/SongOptionsSheet.swift` (`onEdit`),
+  `Library/TagOverrides.swift` (`artworkUri`), `Library/TagWriteBack.swift` + `LocalLibraryImporter.editTags`
+  (`TagWriteExtras`: composer, lyrics, ReplayGain, cover).
+
+Stage 8 screenshot ids (`UITests/PlayerScreenshotTests`): `miniPlayer` (collapsed), `nowPlaying` (expanded; `-paused`
+for pp_full), `queue`, `sleepTimer`, `songInfo`, `editSong`, `artistPicker` (song 16, two credits), `devices`, `aiDJ` —
+the player's sheets open over the expanded player. Gesture tests: drag up from the mini player, collapse circle.
