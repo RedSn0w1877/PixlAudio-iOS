@@ -339,9 +339,15 @@ final class PlaybackSettings {
     var playerAmbientStyle: String {
         didSet { defaults.set(playerAmbientStyle, forKey: PreferenceKeys.playerAmbientStyle) }
     }
+    /// Stage 7d: Android `global_transition_settings_json` (TransitionSettings JSON; its duration comes from
+    /// `crossfade_duration`, clamped to 1…12 s — Android `globalTransitionSettingsFlow`).
+    var globalTransitionSettingsJSON: String? {
+        didSet { defaults.set(globalTransitionSettingsJSON, forKey: PreferenceKeys.globalTransitionSettings) }
+    }
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
+        globalTransitionSettingsJSON = defaults.string(forKey: PreferenceKeys.globalTransitionSettings)
         hiFiModeEnabled = defaults.bool(PreferenceKeys.hiFiModeEnabled, default: false)
         audioQuality = defaults.string(PreferenceKeys.audioQuality, default: "ULTRASOUND")
         playerAmbientStyle = defaults.string(PreferenceKeys.playerAmbientStyle, default: "BLENDED_COVER")
