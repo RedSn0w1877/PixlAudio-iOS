@@ -409,6 +409,44 @@ Proven on the `xcode-27` lane by the stage-7c build (fallback lane: its next wee
 | `UIImpactFeedbackGenerator(style:)`, `impactOccurred()` | 10 | /documentation/uikit/uiimpactfeedbackgenerator | Brick Breaker | Respects the haptics setting. |
 | `DateFormatter.setLocalizedDateFormatFromTemplate(_:)`, `ISO8601DateFormatter` | 8 / 10 | /documentation/foundation/dateformatter/setlocalizeddateformatfromtemplate(_:) | diagnostics expiry, report | |
 
+## Stage 11 — YouTube playback
+Signatures checked against the developer.apple.com documentation JSON (2026-10-01).
+
+### Streaming (resource loader, cache, transport)
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `AVAssetResourceLoaderDelegate.resourceLoader(_:shouldWaitForLoadingOfRequestedResource:)`, `resourceLoader(_:didCancel:)` | 6 / 7 | /documentation/avfoundation/avassetresourceloaderdelegate | `YouTubeResourceLoader` | Registered for `pixlstream` through stage 5's `StreamingResourceLoaderRegistry` (callbacks on its serial queue); one task per loading request, cancelled on `didCancel`. |
+| `AVAssetResourceLoadingRequest.request`, `contentInformationRequest`, `dataRequest`, `finishLoading()`, `finishLoading(with:)` | 6–7 | /documentation/avfoundation/avassetresourceloadingrequest | `YouTubeResourceLoader` | Answered from a detached task (the request objects are wrapped `@unchecked Sendable`). |
+| `AVAssetResourceLoadingContentInformationRequest.contentType` / `contentLength` / `isByteRangeAccessSupported` | 7 | /documentation/avfoundation/avassetresourceloadingcontentinformationrequest | `YouTubeResourceLoader` | Type = `AVFileType.m4a` (AAC) or `AVFileType.mp4` (muxed itag 18). |
+| `AVAssetResourceLoadingDataRequest.requestedOffset` / `requestedLength` / `currentOffset` / `requestsAllDataToEndOfResource` (9) / `respond(with:)` | 7 | /documentation/avfoundation/avassetresourceloadingdatarequest | `YouTubeResourceLoader` | Answered in ≤ 1 MiB pieces (cache or network). |
+| `AVFileType.m4a`, `.mp4` | 4 | /documentation/avfoundation/avfiletype | `StreamFetcher.Info` | |
+| `URLSessionConfiguration.ephemeral`, `httpCookieStorage = nil`, `httpShouldSetCookies`, `httpCookieAcceptPolicy`, `urlCache`, `requestCachePolicy`, `httpMaximumConnectionsPerHost` | 7 | /documentation/foundation/urlsessionconfiguration | `YouTubeNetwork.makeSession` | No cookie jar: a cookie must never reach the native InnerTube clients (HTTP 400). |
+| `URLSession.data(for:delegate:)` | 15 | /documentation/foundation/urlsession/data(for:delegate:) | `StreamFetcher` | Ranged GETs with the client's User-Agent. |
+| `FileHandle(forUpdating:)`, `seek(toOffset:)` (13), `write(contentsOf:)` (13.4), `read(upToCount:)` (13.4), `close()` (13) | 4–13.4 | /documentation/foundation/filehandle | `StreamCache` | Sparse file written at the requested offsets. |
+
+### Downloads
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `URLSessionConfiguration.background(withIdentifier:)`, `isDiscretionary`, `sessionSendsLaunchEvents` | 8 / 7 | /documentation/foundation/urlsessionconfiguration/background(withidentifier:) | `DownloadManager` | Identifier `io.github.redsn0w1877.pixlaudio.downloads`; recreated at launch to collect finished transfers. |
+| `URLSession.downloadTask(with:)` (URLRequest), `URLSessionTask.taskDescription`, `URLSession.allTasks` (async, 15), `getAllTasks(completionHandler:)` | 7 / 9 / 15 | /documentation/foundation/urlsession/getalltasks(completionhandler:) | `DownloadManager` | The video id travels in `taskDescription`. |
+| `URLSessionDownloadDelegate.urlSession(_:downloadTask:didFinishDownloadingTo:)`, `…didWriteData:totalBytesWritten:totalBytesExpectedToWrite:`, `URLSessionTaskDelegate.urlSession(_:task:didCompleteWithError:)` | 7 | /documentation/foundation/urlsessiondownloaddelegate | `DownloadManager.DownloadDelegate` | The file is moved before `didFinishDownloadingTo` returns; state hops to the main actor. |
+
+### JavaScript, BotGuard, sign-in
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `JSVirtualMachine()`, `JSContext(virtualMachine:)`, `evaluateScript(_:)`, `JSContext.exception`, `JSValue.toString()` / `isUndefined` / `isNull` | 7 | /documentation/javascriptcore/jscontext | `JavaScriptCoreEvaluator` | Signature / `n` functions from base.js (Android `JsEvaluator`). One VM, a fresh context per call, serialised by an actor. |
+| `WKWebView(frame:configuration:)`, `WKWebViewConfiguration.websiteDataStore`, `WKWebsiteDataStore.nonPersistent()`, `customUserAgent` | 8–9 | /documentation/webkit/wkwebview | `PoTokenGenerator`, `YouTubeSignInWebView` | Private data store per use. |
+| `WKWebView.loadHTMLString(_:baseURL:)`, `WKNavigationDelegate.webView(_:didFinish:)` / `didFail` / `didFailProvisionalNavigation` | 8 | /documentation/webkit/wkwebview/loadhtmlstring(_:baseurl:) | `PoTokenGenerator.PageLoader` | `po_token.html` with the www.youtube.com origin (Android `loadDataWithBaseURL`). |
+| `WKWebView.callAsyncJavaScript(_:arguments:in:contentWorld:) async throws -> Any?`, `WKContentWorld.page` | 15 | /documentation/webkit/wkwebview/callasyncjavascript(_:arguments:in:contentworld:) | `PoTokenGenerator` | `runBotGuard` (awaits its promise), the integrity token as `[Int]` → `Uint8Array`, `obtainPoToken` → `Array.from(token)` (`[NSNumber]`). Replaces Android's `@JavascriptInterface` callbacks. |
+| `WKWebView.evaluateJavaScript(_:in:contentWorld:) async throws -> Any?` | 15 | /documentation/webkit/wkwebview/evaluatejavascript(_:in:contentworld:) | `YouTubeSignInWebView` | Reads `window.yt.config_.VISITOR_DATA`. |
+| `WKHTTPCookieStore.allCookies() async` (`getAllCookies(_:)`) | 11 | /documentation/webkit/wkhttpcookiestore/getallcookies(_:) | `YouTubeSignInWebView` | Android `CookieManager.getCookie`; accepted only once `SAPISID` is present. |
+| `WKWebView.allowsBackForwardNavigationGestures`, `load(_:)` | 8 | /documentation/webkit/wkwebview | `YouTubeSignInWebView` | |
+| `UIWindowScene.keyWindow` (15), `UIView.addSubview(_:)` | 15 | /documentation/uikit/uiwindowscene/keywindow | `PoTokenGenerator.hostWindow` | The 1×1 BotGuard web view sits in the window (alpha 0.01) so its page is not treated as hidden. |
+| `UIPasteboard.general.string` (get/set) | 3 | /documentation/uikit/uipasteboard/string | device-code sheet, cookie sheet, playback test | Copy code / paste cookie / copy report. |
+| `TextEditor(text:)`, `scrollContentBackground(.hidden)`, `textInputAutocapitalization(.never)`, `autocorrectionDisabled()` | 14–16 | /documentation/swiftui/texteditor | `CookiePasteSheet` | |
+| `ProgressView(value:total:)`, `.progressViewStyle(.linear)`, `controlSize(.small)` | 14 | /documentation/swiftui/progressview | `OfflineDownloadCard`, playback test | Android `LinearProgressIndicator` / `CircularProgressIndicator`. |
+| `UIViewRepresentable` (`makeCoordinator`, `makeUIView`, `updateUIView`) | 13 | /documentation/swiftui/uiviewrepresentable | `YouTubeSignInWebView` | |
+
 ## Testing and tooling
 | API / tool | Docs | Notes |
 |---|---|---|

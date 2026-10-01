@@ -12,7 +12,7 @@ import PixlNet
 /// when AVPlayer cancels the request.
 nonisolated final class YouTubeResourceLoader: NSObject, AVAssetResourceLoaderDelegate, @unchecked Sendable {
     /// AVFoundation request objects are not Sendable; they are documented to be answered from any thread.
-    private final class RequestBox: @unchecked Sendable {
+    nonisolated private final class RequestBox: @unchecked Sendable {
         let request: AVAssetResourceLoadingRequest
         init(_ request: AVAssetResourceLoadingRequest) { self.request = request }
     }

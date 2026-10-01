@@ -138,17 +138,18 @@ final class DownloadManager {
         }
         // googlevideo refused the single transfer: ranged fetch through the streaming cache, then copy.
         fallbackTasks[videoId] = Task { [weak self] in
+            guard let manager = self else { return }
             do {
                 try await fetcher.fillCache(videoId: videoId) { written, total in
-                    await self?.progress(videoId, written: written, expected: total)
+                    await manager.progress(videoId, written: written, expected: total)
                 }
                 let copied = await fetcher.cache.copyComplete(videoId, to: DownloadFiles.fileURL(videoId: videoId))
-                self?.states[videoId] = copied ? .downloaded : .failed("Couldn't save the song.")
+                manager.states[videoId] = copied ? .downloaded : .failed("Couldn't save the song.")
             } catch is CancellationError {
             } catch {
-                self?.states[videoId] = .failed(error.localizedDescription)
+                manager.states[videoId] = .failed(error.localizedDescription)
             }
-            self?.fallbackTasks[videoId] = nil
+            manager.fallbackTasks[videoId] = nil
         }
     }
 

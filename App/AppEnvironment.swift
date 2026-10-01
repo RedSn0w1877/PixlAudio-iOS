@@ -95,7 +95,7 @@ final class AppEnvironment {
             youtube.install(on: realPlayback)
             searchProviders = [.library: LibrarySearchProvider(),
                                .spotify: UnavailableSearchProvider(source: .spotify),
-                               .youtubeMusic: youtube.searchProvider ?? UnavailableSearchProvider(source: .youtubeMusic)]
+                               .youtubeMusic: youtube.searchProvider ?? (UnavailableSearchProvider(source: .youtubeMusic) as any SearchProviding)]
         }
     }
 

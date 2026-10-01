@@ -75,11 +75,11 @@ final class YouTubeLibraryImporter {
         if !snapshot.artists.contains(where: { $0.id == artist.id }) { snapshot.artists.append(artist) }
         library.apply(snapshot)
         if let persistence {
-            let song = built, writesCache = self.writesCache, final = snapshot
+            let song = built, writesCache = self.writesCache, latest = snapshot
             try? await persistence.upsertStreamSong(song, album: album, artist: artist, favoriteAt: favorite ? now : nil)
             if writesCache {
                 Task.detached(priority: .utility) {
-                    SnapshotLoader(persistence: persistence, cacheURL: SnapshotLoader.defaultCacheURL()).writeCache(final)
+                    SnapshotLoader(persistence: persistence, cacheURL: SnapshotLoader.defaultCacheURL()).writeCache(latest)
                 }
             }
         }

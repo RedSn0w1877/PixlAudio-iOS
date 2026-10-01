@@ -543,6 +543,21 @@ run the real importer over generated files (see the App tests table). Behaviour 
 | `ui/theme/GenreThemeUtilsTest` | 3 | `LibraryScreensTests.testGenreDetailScheme…` / `testUnknownGenreUsesTheMonochromeScheme` (+ Java `hashCode` index case) | App (`GenreTheme`) | ported | Compares all 48 roles through `ColorRoles` equality instead of a role list. |
 | `presentation/viewmodel/PlayerViewModelTest` | — | — | — | n/a | Covers PlayerViewModel playback plumbing, not the Library screens; stage 5/8 territory. |
 
+## Stage 11 — YouTube playback
+
+Android has no unit tests for these classes; the Swift tests are their specification. PixlNet (Windows + macOS, no
+network): `YouTubeStreamingTests.swift`; app (XCTest): `AppTests/YouTubeServicesTests.swift`.
+
+| Android source | Swift test | Module | Status | Notes |
+|---|---|---|---|---|
+| `potoken/JavaScriptUtil.kt` + `PoTokenWebView` requests | `PoTokenJSTests` (8) | PixlNet | new | Scrambled / plain challenges, missing fields → null, URL-safe base64 both ways, integrity token, BotGuard headers, 10-minute expiry margin. |
+| _iOS sparse stream cache (Android: ExoPlayer SimpleCache)_ | `ByteRangeSetTests` (6) | PixlNet | new | Merging, containment, gaps, completeness, Codable normalisation, Content-Range. |
+| _iOS remote client table_ | `RemoteClientConfigTests` (5) | PixlNet | new | Built-in chain equals the resolver default; overrides and order; cookie / host invariants; malformed files; the repo's `remote/config.json` parses. |
+| `YouTubeStreamResolver` (strategy source) | `ResolverStrategyProviderTests` | PixlNet | new | The resolver follows an injected (remote) chain and versions. |
+| `PlaybackDiagnostics.kt` | `PlaybackDiagnosticsTests` (10) | PixlNet | new | Every step's pass/fail text; YouTube songs skip matching; Kotlin `%.2f` formatting. |
+| _live services_ | `YouTubeLiveSmokeTests` (2) | PixlNet | new | Off unless `PIXL_LIVE_YOUTUBE=1`; CI runs them in a non-blocking step (search → VISIONOS → probe; BotGuard `Create`). Passed locally on Windows 2026-10-01 (VISIONOS, audio/mp4). |
+| `YouTubeAuthManager` / login cookie handling, `SpotifyStreamProxy` ids | `YouTubeServicesTests` (11) | app | new | Bearer only for TVHTML5 `player` without cookie (key dropped), base.js disk cache, cookie normalisation / SAPISID / web-view cookie header, song identity, `yt:` song rows, URL expiry, sparse cache on disk (itag change resets), resolver order download → cache → stream. |
+
 ## Priority list (from architecture §4, must pass on Windows before UI work)
 - ~~`LyricsEngineTest`, `LyricsClockTest`, `LyricsMotionMathTest`, `PreparedLyricsBuilderTest`,
   `LyricsBackgroundGradeTest` → PixlLyrics / PixlFoundation (stages 2b/2c).~~ Done (integration A).
