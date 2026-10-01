@@ -31,6 +31,10 @@ nonisolated enum DemoLibrary {
         ("Afterglow", "Pixel Parade", "Drift", 199, "Ambient"),
     ]
 
+    /// "Slow Burn" by Juniper Rae, featuring Mira Okafor.
+    static let featuredSongIndex = 16
+    private static let featuredArtist = "Mira Okafor"
+
     /// The demo library as a snapshot (built once).
     static let snapshot: LibrarySnapshot = build()
 
@@ -48,8 +52,13 @@ nonisolated enum DemoLibrary {
         let songs = raw.enumerated().map { index, item -> Song in
             let albumId = albumIds[item.album]!
             let artistId = artistIds[item.artist]!
+            var credits = [ArtistRef(id: artistId, name: item.artist, isPrimary: true)]
+            // One featured credit, so the player's artist picker has two artists to offer (stage 8).
+            if index == featuredSongIndex, let featured = artistIds[featuredArtist] {
+                credits.append(ArtistRef(id: featured, name: featuredArtist, isPrimary: false))
+            }
             return Song(id: "demo:\(index)", title: item.title, artist: item.artist, artistId: artistId,
-                        artists: [ArtistRef(id: artistId, name: item.artist, isPrimary: true)],
+                        artists: credits,
                         album: item.album, albumId: albumId, albumArtist: item.artist,
                         path: "/Demo/\(item.artist)/\(item.album)/\(item.title).m4a",
                         contentUriString: "demo://song/\(index)", albumArtUriString: "demo-art://\(albumId * 3)",

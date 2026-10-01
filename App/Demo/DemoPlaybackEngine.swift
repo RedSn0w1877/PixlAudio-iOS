@@ -84,6 +84,30 @@ final class DemoPlaybackEngine: PlaybackEngine {
         continuation.yield(.queueChanged(queue, currentIndex: index))
     }
 
+    // Stage 8: queue edits from the queue sheet and the album carousel.
+    func moveQueueItem(from: Int, to: Int) {
+        guard queue.indices.contains(from), queue.indices.contains(to), from != to else { return }
+        let song = queue.remove(at: from)
+        queue.insert(song, at: to)
+        if let index {
+            if index == from { self.index = to } else if from < index, to >= index { self.index = index - 1 }
+            else if from > index, to <= index { self.index = index + 1 }
+        }
+        continuation.yield(.queueChanged(queue, currentIndex: self.index))
+    }
+
+    func removeQueueItem(at removed: Int) {
+        guard queue.indices.contains(removed), removed != index else { return }
+        queue.remove(at: removed)
+        if let index, removed < index { self.index = index - 1 }
+        continuation.yield(.queueChanged(queue, currentIndex: index))
+    }
+
+    func skipToQueueItem(at target: Int) {
+        guard queue.indices.contains(target) else { return }
+        move(to: target)
+    }
+
     func currentPositionMs() -> Int64 {
         let running = startedAt.map { Int64(Date().timeIntervalSince($0) * 1000) } ?? 0
         return min(accumulatedMs + running, currentDurationMs())

@@ -189,6 +189,12 @@ nonisolated enum AppSheet: Hashable, Sendable, Identifiable {
     case changelog
     case betaInfo
     case jobs
+    /// Stage 8: "AirPlay & devices" from the player's output pill (Android `CastBottomSheet`).
+    case devices
+    /// Stage 8: "Pick an Artist" from the player's artist line (Android `PlayerArtistPickerBottomSheet`).
+    case artistPicker(songId: String)
+    /// Stage 8 adds the player's AI DJ entry; stage 13 builds the sheet (Android `TaisChatSheet`).
+    case aiDJ
 
     var id: String {
         switch self {
@@ -199,16 +205,22 @@ nonisolated enum AppSheet: Hashable, Sendable, Identifiable {
         case .changelog: "changelog"
         case .betaInfo: "betaInfo"
         case .jobs: "jobs"
+        case .devices: "devices"
+        case .artistPicker(let id): "artistPicker.\(id)"
+        case .aiDJ: "aiDJ"
         }
     }
 }
 
 /// A full-screen presentation (the expanded player sheet, the karaoke lyrics, the sync editor, first-run setup).
+/// `.nowPlaying` is a request: the player sheet (stage 8, `PlayerSheetHost`) takes it and expands in place.
 nonisolated enum AppCover: Hashable, Sendable, Identifiable {
     case nowPlaying
     case lyrics
     case lyricsSync(songId: String)
     case setup
+    /// Stage 8: "Edit song" (Android `EditSongSheet`, a full-screen dialog).
+    case editSong(songId: String)
 
     var id: String {
         switch self {
@@ -216,6 +228,7 @@ nonisolated enum AppCover: Hashable, Sendable, Identifiable {
         case .lyrics: "lyrics"
         case .lyricsSync(let id): "lyricsSync.\(id)"
         case .setup: "setup"
+        case .editSong(let id): "editSong.\(id)"
         }
     }
 }

@@ -14,6 +14,8 @@ import SwiftUI
 /// shown.
 struct SongOptionsSheet: View {
     let songId: String
+    /// Stage 8: the header's edit button (Android `FilledTonalIconButton` → `EditSongSheet`), shown when set.
+    var onEdit: (() -> Void)?
 
     @Environment(AppEnvironment.self) private var env
     @Environment(LibraryStore.self) private var library
@@ -82,6 +84,21 @@ struct SongOptionsSheet: View {
                 .minimumScaleFactor(0.4)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                 .padding(.trailing, 4)
+            if let onEdit {
+                Button(action: onEdit) {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(theme.onSurface)
+                        .padding(.horizontal, 8)
+                        .frame(minWidth: 48, maxHeight: .infinity)
+                        .contentShape(.capsule)
+                }
+                .buttonStyle(.plain)
+                .pixlGlass(in: Capsule(), tint: theme.surfaceBright.opacity(GlassTint.container), interactive: true)
+                .padding(.vertical, 6)
+                .accessibilityLabel("Edit song metadata")
+                .accessibilityIdentifier("songInfo.edit")
+            }
         }
         .frame(height: 80)
     }

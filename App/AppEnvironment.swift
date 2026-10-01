@@ -29,6 +29,11 @@ final class AppEnvironment {
     /// Search providers by source: the library on `SearchIndex` (stage 7c); stages 11/12 replace the YouTube Music
     /// and Spotify ones (UI tests get demo providers so Search's remote sections render).
     let searchProviders: [SearchSource: any SearchProviding]
+    /// Stage 8: the player sheet (mini player ↔ full player) state.
+    let playerSheet = PlayerSheetController()
+    /// Stage 8: the sleep timer the queue's timer sheet drives — the engine's (`PlaybackServices`), or an engine-less
+    /// one for UI tests.
+    let sleepTimer: SleepTimerController
 
     init(launch: LaunchConfiguration) {
         self.launch = launch
@@ -52,6 +57,7 @@ final class AppEnvironment {
         if isUITest {
             playbackServices = nil
             playback = PlaybackStore(engine: DemoPlaybackEngine())
+            sleepTimer = SleepTimerController(engine: nil)
         } else {
             let services = PlaybackServices(settings: settings, persistence: persistence)
             // Listening sessions feed Home's history (Recently Played, Stats, mixes) — one owner of the file.
@@ -61,6 +67,7 @@ final class AppEnvironment {
             }
             playbackServices = services
             playback = PlaybackStore(engine: services.engine)
+            sleepTimer = services.sleepTimer
         }
 
         if isUITest {
@@ -75,6 +82,7 @@ final class AppEnvironment {
                 playback.play(songs, startIndex: min(launch.songIndex, songs.count - 1),
                               playWhenReady: launch.startsPlaying)
             }
+            if launch.hasSong, launch.screen?.opensOverPlayer == true { playerSheet.expand(animated: false) }
         } else {
             let loader = persistence.map { SnapshotLoader(persistence: $0, cacheURL: SnapshotLoader.defaultCacheURL()) }
             let importer = persistence.map { LocalLibraryImporter(persistence: $0) }

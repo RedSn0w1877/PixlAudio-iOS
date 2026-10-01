@@ -14,6 +14,8 @@ struct MiniPlayerBar: View {
     let isPlaying: Bool
     var isPreparing = false
     var bottomCornerRadius: CGFloat = Tokens.Shell.joinCornerRadius
+    /// False when the bar is drawn inside the player sheet's card, which supplies the glass (stage 8).
+    var drawsGlass = true
     let onOpen: () -> Void
     let onPrevious: () -> Void
     let onPlayPause: () -> Void
@@ -62,7 +64,8 @@ struct MiniPlayerBar: View {
         .frame(height: Tokens.Shell.miniPlayerHeight)
         .contentShape(shape)
         .onTapGesture(perform: onOpen)
-        .pixlGlass(in: shape, tint: theme.primaryContainer.opacity(GlassTint.container), interactive: true)
+        .modifier(MiniPlayerGlass(enabled: drawsGlass, shape: shape,
+                                  tint: theme.primaryContainer.opacity(GlassTint.container)))
         .sensoryFeedback(.impact(weight: .light), trigger: isPlaying)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("miniPlayer")
@@ -83,5 +86,20 @@ struct MiniPlayerBar: View {
         .buttonStyle(PressScaleButtonStyle())
         .disabled(isPreparing)
         .accessibilityLabel(label)
+    }
+}
+
+/// The mini player's own glass, skipped when the player sheet's card draws it.
+private struct MiniPlayerGlass: ViewModifier {
+    let enabled: Bool
+    let shape: UnevenRoundedRectangle
+    let tint: Color
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content.pixlGlass(in: shape, tint: tint, interactive: true)
+        } else {
+            content
+        }
     }
 }

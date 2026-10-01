@@ -409,6 +409,51 @@ Proven on the `xcode-27` lane by the stage-7c build (fallback lane: its next wee
 | `UIImpactFeedbackGenerator(style:)`, `impactOccurred()` | 10 | /documentation/uikit/uiimpactfeedbackgenerator | Brick Breaker | Respects the haptics setting. |
 | `DateFormatter.setLocalizedDateFormatFromTemplate(_:)`, `ISO8601DateFormatter` | 8 / 10 | /documentation/foundation/dateformatter/setlocalizeddateformatfromtemplate(_:) | diagnostics expiry, report | |
 
+## Stage 8 — player sheet, full player, queue, timer, song editor, devices
+Signatures checked against Apple's documentation JSON (developer.apple.com/tutorials/data/documentation/…) before use;
+proven by the s08-player CI build. Paths are under https://developer.apple.com.
+
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `Animatable` (`animatableData`) on a `ViewModifier` | 13 | /documentation/swiftui/animatable | `PlayerSheetMorph` | The sheet's springs interpolate the expansion fraction; frame, corners, glass/fill fades and the layers' fades (published through `playerSheetMetrics`) follow Android's curves every frame. `animatableData` is a `nonisolated` stored property (SE-0434) so the MainActor modifier satisfies the nonisolated protocol. |
+| `Animation.interpolatingSpring(mass:stiffness:damping:initialVelocity:)` | 13 | /documentation/swiftui/animation/interpolatingspring(mass:stiffness:damping:initialvelocity:) | `PlayerSheetMotion`, playback controls, carousel | Compose `spring(dampingRatio, stiffness)` maps 1:1 with unit mass (`damping = 2ζ√k`); the drag's release velocity carries over. |
+| `Transaction.disablesAnimations`, `withTransaction(_:_:)` | 13 | /documentation/swiftui/transaction/disablesanimations | `PlayerSheetController` | Drag frames set the fraction without animation. |
+| `DragGesture(minimumDistance:coordinateSpace:)`, `Value.translation` / `.velocity` / `.location` | 13 (velocity 17) | /documentation/swiftui/draggesture/value/velocity | sheet drag, edge swipe, seek bar, queue handle and swipe-to-remove, crop | `velocity` in points per second feeds Android's 150 px/s (≈ 55 pt/s) threshold. |
+| `View.simultaneousGesture(_:including:)`, `View.gesture(_:including:)`, `Optional: Gesture` | 13 | /documentation/swiftui/view/simultaneousgesture(_:including:) | sheet card, queue rows | The sheet's vertical drag runs alongside the carousel and buttons; it locks to an axis on its first movement and stands aside while the seek bar scrubs. |
+| `MagnifyGesture`, `Gesture.simultaneously(with:)` | 17 / 13 | /documentation/swiftui/magnifygesture | `CoverArtCropperSheet` | Pinch (1–4×) + pan, clamped like Android's `clampOffset`. |
+| `ScrollTargetBehavior.viewAligned` (`ViewAlignedScrollTargetBehavior`) | 17 | /documentation/swiftui/scrolltargetbehavior/viewaligned | `AlbumCarousel` | One cover per swipe for all three peek styles. |
+| `View.contentMargins(_:_:for:)` (`CGFloat?` length, `.scrollContent`) | 17 | /documentation/swiftui/view/contentmargins(_:_:for:) | `AlbumCarousel` | Focused cover at the start (one peek) or centred (two peeks). |
+| `View.onScrollPhaseChange(_:)`, `ScrollPhase` (`.interacting`, `.idle`) | 18 | /documentation/swiftui/view/onscrollphasechange(_:) | `AlbumCarousel` | Only a settle after a real user drag plays the entry (Android `userDragSettlePending`). |
+| `View.scrollDisabled(_:)` | 16 | /documentation/swiftui/view/scrolldisabled(_:) | queue | No scrolling while a row is dragged. |
+| `TimelineView(.animation(minimumInterval: 0.25, paused:))` | 15 | /documentation/swiftui/animationtimelineschedule | `PlayerSeekBar`, ambient backgrounds | The seek bar samples `PlaybackStore.clock` at most 4×/s while playing; paused = no ticks. Ambient styles at 30 fps only while playing and visible. |
+| `Canvas`, `GraphicsContext.fill/stroke`, `.radialGradient` | 15 | /documentation/swiftui/canvas | seek bar, ambient backgrounds, crop grid | |
+| `Glass.clear` | 26.0 | /documentation/swiftui/glass/clear | `playerGlass(in:tint:)`, transport | The player sits over media (orchestrator notes: clear only over media). |
+| `PrimitiveButtonStyle.glass` / `.glassProminent` | 26.0 | /documentation/swiftui/primitivebuttonstyle/glass | timer custom duration, crop dialog | Dialog actions. |
+| `View.accessibilityAction(_:_:)` (`.escape`), `accessibilityAction(named:_:)`, `accessibilityAdjustableAction(_:)` | 13 | /documentation/swiftui/view/accessibilityaction(_:_:) | full player (escape collapses), queue rows, seek bar | |
+| `AVRouteDetector` (`isRouteDetectionEnabled`, `multipleRoutesDetected`), `.AVRouteDetectorMultipleRoutesDetectedDidChange` | 11 | /documentation/avfoundation/avroutedetector | `AudioRouteMonitor` | "Available" outputs in the devices sheet; detection runs only while the sheet is open. |
+| `AVAudioSession.Port` `.builtInSpeaker/.builtInReceiver/.headphones/.usbAudio/.lineOut/.bluetoothA2DP/.bluetoothLE/.bluetoothHFP/.airPlay/.carAudio` | 7 | /documentation/avfaudio/avaudiosession/port | `AudioRouteMonitor` | Output kind and name for the player's output pill and the devices hero (with `routeChangeNotification`, already ledgered). |
+| `AVRoutePickerView` (stage 5's `AirPlayRoutePicker`) | 11 | /documentation/avkit/avroutepickerview | `DevicesSheet` | Placed visibly (the picker circles) and invisibly over the tiles/rows (tint `.clear`) so they open the system picker. |
+| `MPVolumeView(frame:)` | 2 | /documentation/mediaplayer/mpvolumeview | devices hero | The phone-volume slider (apps can't set the volume). |
+| `CIImage(cgImage:)`, `clampedToExtent()`, `applyingGaussianBlur(sigma:)`, `cropped(to:)`, `CIContext(options:)` + `.cacheIntermediates`, `createCGImage(_:from:)` | 8–10 | /documentation/coreimage/ciimage/applyinggaussianblur(sigma:) | `BlurredArtworkCache` | The blended-cover background is blurred once off the main thread (128 px, σ 14) — no live blur while the sheet moves. |
+| `Picker` + `.pickerStyle(.wheel)` | 13 | /documentation/swiftui/wheelpickerstyle | custom timer duration | Android's `TimePicker` used as a duration. |
+| `Slider(value:in:step:onEditingChanged:)`, `Toggle` | 13 | /documentation/swiftui/slider | `SleepTimerSheet` | Discrete stops; commits on release like Android's `onValueChangeFinished`. |
+| `PresentationDetent.height(_:)` | 16 | /documentation/swiftui/presentationdetent/height(_:) | timer sheet, custom duration | |
+| `View.fullScreenCover(isPresented:onDismiss:content:)` | 14 | /documentation/swiftui/view/fullscreencover(ispresented:ondismiss:content:) | song editor, save queue as playlist | Android full-screen dialogs. |
+| `TextEditor`, `View.scrollContentBackground(_:)`, `View.keyboardType(_:)` | 14 / 16 / 13 | /documentation/swiftui/texteditor | song editor lyrics / numeric fields | |
+| `UIGraphicsImageRenderer(size:format:)`, `UIGraphicsImageRendererFormat.scale`, `UIImage.draw(in:)`, `UIImage.jpegData(compressionQuality:)`, `UIImage(data:)` | 10 / 2 | /documentation/uikit/uigraphicsimagerenderer | `CoverArtCropperSheet` | The crop renders at 1000 px, JPEG 95 % (orientation handled by `UIImage.draw`). |
+| `Data(contentsOf:options: .mappedIfSafe)` | 7 | /documentation/foundation/data/init(contentsof:options:) | `SongEditForm.embeddedMetadata` | Composer, ReplayGain and embedded lyrics (PixlTags `AudioMetadataMapper.read`) for the editor, read off the main thread. |
+
+### Stage 8 decisions
+- **The player is not a full-screen cover.** `AppCover.nowPlaying` is a request the sheet consumes (the shell's cover
+  binding skips it), so the mini player morphs into the full player in place, the drag follows the finger, and other
+  covers (lyrics, the sync editor) open above the expanded player and return to it.
+- **Edge swipe = predictive back.** iOS has no back gesture for an overlay: a 20 pt leading strip collapses the
+  expanded player interactively (Android's `PlayerSheetPredictiveBackHandler`).
+- **Seek bar without the wave.** Android's wavy slider animates every frame; the port uses Android's glass-mode
+  scrubber shape with the wavy slider's geometry, redrawn at most 4×/s (performance rules).
+- **Audio waveform background** shows Android's idle bars: iOS offers no capture of the app's own output outside the
+  processing tap.
+
 ## Testing and tooling
 | API / tool | Docs | Notes |
 |---|---|---|

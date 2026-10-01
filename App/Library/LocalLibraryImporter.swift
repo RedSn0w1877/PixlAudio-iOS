@@ -132,13 +132,14 @@ actor LocalLibraryImporter: LibraryImporting {
 
     /// Saves a tag edit as an override (nil clears it); with `writeToFile`, also rewrites a folder song's file
     /// (MP3/FLAC/M4A) and keeps only what the format couldn't store as the override. Takes effect on the next scan.
-    func editTags(songId: String, fields: TagOverrideFields?, writeToFile: Bool = false) async throws {
+    func editTags(songId: String, fields: TagOverrideFields?, writeToFile: Bool = false,
+                  extras: TagWriteExtras = TagWriteExtras()) async throws {
         var remaining = fields
         if writeToFile, let fields, !fields.isEmpty, songId.hasPrefix(LibraryIdentity.filePrefix) {
             let snapshot = try await persistence.loadLibrarySnapshot()
             guard let song = snapshot.songs.first(where: { $0.id == songId }),
                   let url = URL(string: song.contentUriString) else { throw LibraryImportError.songNotFound }
-            remaining = try await TagWriteBack.write(fields, to: url, current: song)
+            remaining = try await TagWriteBack.write(fields, to: url, current: song, extras: extras)
         }
         try await persistence.setTagOverride(songId: songId, fields: remaining, updatedAt: Self.nowMs())
         invalidate(songId)

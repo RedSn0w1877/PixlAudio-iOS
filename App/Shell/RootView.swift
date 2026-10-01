@@ -20,13 +20,17 @@ struct RootView: View {
         @Bindable var router = router
         let colors = themeStore.colors(for: colorScheme)
         ZStack {
-            colors.app.background.ignoresSafeArea()
-            tab(.home, path: $router.homePath) { HomeView() }
-            tab(.search, path: $router.searchPath) { SearchView() }
-            tab(.library, path: $router.libraryPath) { LibraryView() }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            bottomBars
+            ZStack {
+                colors.app.background.ignoresSafeArea()
+                tab(.home, path: $router.homePath) { HomeView() }
+                tab(.search, path: $router.searchPath) { SearchView() }
+                tab(.library, path: $router.libraryPath) { LibraryView() }
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                bottomBars
+            }
+            // Stage 8: the player sheet — the mini player resting in `MiniPlayerSlot` and expanding over everything.
+            PlayerSheetHost()
         }
         .environment(\.appTheme, colors.app)
         .environment(\.playerTheme, colors.player)
@@ -37,7 +41,9 @@ struct RootView: View {
                 .environment(\.appTheme, colors.app)
                 .environment(\.playerTheme, colors.player)
         }
-        .fullScreenCover(item: $router.cover) { cover in
+        // `.nowPlaying` is not a cover: the player sheet takes it and expands in place.
+        .fullScreenCover(item: Binding(get: { router.cover == .nowPlaying ? nil : router.cover },
+                                       set: { router.cover = $0 })) { cover in
             CoverDestination(cover: cover)
                 .environment(\.appTheme, colors.app)
                 .environment(\.playerTheme, colors.player)
@@ -68,13 +74,10 @@ struct RootView: View {
     private var bottomBars: some View {
         let showsBar = router.isNavigationBarVisible && !isKeyboardVisible
         VStack(spacing: Tokens.Shell.miniPlayerSpacing) {
-            if let song = playback.current, !isKeyboardVisible {
-                MiniPlayerBar(song: song, isPlaying: playback.isPlaying, isPreparing: playback.isPreparing,
-                              bottomCornerRadius: showsBar ? Tokens.Shell.joinCornerRadius : Tokens.Shell.navBarCornerRadius,
-                              onOpen: { router.present(AppCover.nowPlaying) },
-                              onPrevious: { playback.skipToPrevious() },
-                              onPlayPause: { playback.togglePlayPause() },
-                              onNext: { playback.skipToNext() })
+            if playback.current != nil, !isKeyboardVisible {
+                // Stage 8: the player sheet draws the mini player here (and expands it from here).
+                MiniPlayerSlot(bottomCornerRadius: showsBar ? Tokens.Shell.joinCornerRadius
+                                   : Tokens.Shell.navBarCornerRadius)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             if showsBar {
