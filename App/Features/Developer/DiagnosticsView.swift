@@ -71,6 +71,15 @@ struct DiagnosticsView: View {
                 Text("Saves a security-scoped bookmark. Relaunch the app and resolve it to confirm access persists.")
             }
 
+            Section("Library") {
+                NavigationLink {
+                    LibraryImportDebugView()
+                } label: {
+                    Label("Library Import", systemImage: "music.note.house")
+                }
+                .accessibilityIdentifier("diagnostics.libraryImport")
+            }
+
             Section("Device") {
                 LabeledContent("Maximum refresh rate", value: model.maxRefreshRate.map { "\($0) Hz" } ?? "—")
                 LabeledContent("ProMotion enabled", value: model.proMotionKeyPresent ? "Yes" : "No")

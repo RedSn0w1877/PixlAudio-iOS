@@ -21,6 +21,9 @@ final class AppEnvironment {
     let persistence: PersistenceActor?
     /// The real playback stack (stage 5); nil for UI tests, which use `DemoPlaybackEngine`.
     let playbackServices: PlaybackServices?
+    /// Stage 6: builds the library from folders, Documents and the music library (nil in UI tests).
+    let libraryImporter: LocalLibraryImporter?
+    private let libraryAutoRefresh: LibraryAutoRefresh?
     /// Search providers by source (stage 7c builds the library one on `SearchIndex`; 11/12 add the others).
     let searchProviders: [SearchSource: any SearchProviding]
 
@@ -52,6 +55,8 @@ final class AppEnvironment {
 
         if isUITest {
             library = LibraryStore(snapshot: DemoLibrary.snapshot)
+            libraryImporter = nil
+            libraryAutoRefresh = nil
             searchProviders = [.library: LocalSearchProvider(snapshot: DemoLibrary.snapshot),
                                .spotify: UnavailableSearchProvider(source: .spotify),
                                .youtubeMusic: UnavailableSearchProvider(source: .youtubeMusic)]
@@ -62,20 +67,31 @@ final class AppEnvironment {
             }
         } else {
             let loader = persistence.map { SnapshotLoader(persistence: $0, cacheURL: SnapshotLoader.defaultCacheURL()) }
-            // Stage 6 provides the real importer (folders, Documents, the music library).
-            library = LibraryStore(loader: loader, importer: nil)
+            let importer = persistence.map { LocalLibraryImporter(persistence: $0) }
+            LocalLibraryImporter.installArtworkLoader()
+            let library = LibraryStore(loader: loader, importer: importer)
+            self.library = library
+            libraryImporter = importer
+            libraryAutoRefresh = importer == nil ? nil : LibraryAutoRefresh(library: library)
             searchProviders = [.library: LocalSearchProvider(snapshot: .empty),
                                .spotify: UnavailableSearchProvider(source: .spotify),
                                .youtubeMusic: UnavailableSearchProvider(source: .youtubeMusic)]
         }
     }
 
-    /// Launch work, off the first frame: load the library snapshot (cache first, then the store).
+    /// Launch work, off the first frame: load the library snapshot (cache first, then the store), then start the
+    /// automatic incremental rescans (launch, foreground, music-library changes).
     func start() async {
         guard !launch.isUITest else { return }
         playbackServices?.start()
         await library.load()
         playbackServices?.restoreQueue(lookup: library.song(id:))
+        libraryAutoRefresh?.start()
+    }
+
+    /// Call after music-library access was granted so its change notifications start.
+    func libraryAccessChanged() {
+        libraryAutoRefresh?.observeMediaLibraryIfAuthorized()
     }
 
     /// The colour scheme forced by UI tests, else the user's `app_theme_mode`.
