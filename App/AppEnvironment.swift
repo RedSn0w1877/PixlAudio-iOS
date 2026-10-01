@@ -19,6 +19,8 @@ final class AppEnvironment {
     let artwork: ArtworkPipeline
     let colorExtractor: ColorExtractor
     let persistence: PersistenceActor?
+    /// Home's state holder: playback history, mixes, recommendations, stats overview (stage 7b).
+    let home: HomeStore
     /// Search providers by source (stage 7c builds the library one on `SearchIndex`; 11/12 add the others).
     let searchProviders: [SearchSource: any SearchProviding]
 
@@ -37,6 +39,7 @@ final class AppEnvironment {
         let extractor = ColorExtractor(pipeline: .shared, persistence: persistence)
         colorExtractor = extractor
         theme = ThemeStore(extractor: extractor, appearance: settings.appearance)
+        home = HomeStore.make(launch: launch)
 
         // Stage 5 replaces the demo engine with the dual-deck AVPlayer engine for real launches.
         playback = PlaybackStore(engine: DemoPlaybackEngine())
