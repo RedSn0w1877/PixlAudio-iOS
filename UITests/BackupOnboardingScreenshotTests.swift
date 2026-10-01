@@ -2,7 +2,7 @@ import XCTest
 
 /// Stage 15 screenshots: every setup page (Android `SetupScreen`) and the backup restore steps — the module dialog
 /// for an Android backup and the restore report. Setup pages open the `setup` cover on a page
-/// (`-screen setupTheme` …); the backup steps open from Settings › Backup & Restore.
+/// (`-screen setupTheme` …); the backup steps open the `backupImport` cover on a step.
 @MainActor
 final class BackupOnboardingScreenshotTests: XCTestCase {
     // MARK: Setup

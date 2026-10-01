@@ -44,7 +44,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case libraryAddToPlaylist, songOptionsInfo
     case playlistEdit, playlistAddSongs, playlistOptions, playlistReorder, genreSort
 
-    // Stage 15: the setup pages (cover `setup` opened on a page) and the backup restore steps (Settings › Backup)
+    // Stage 15: the setup pages (cover `setup` opened on a page) and the backup restore steps (cover `backupImport`)
     case setupPermission, setupFolders, setupBackup, setupTheme, setupLibraryLayout, setupSpotify, setupFinish
     case backupRestorePlan, backupImportReport
 
@@ -124,7 +124,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
             return nil
         case .setupPermission, .setupFolders, .setupBackup, .setupTheme, .setupLibraryLayout, .setupSpotify, .setupFinish:
             return nil
-        case .backupRestorePlan, .backupImportReport: return .settingsCategory(.backupRestore)
+        // A full-screen cover: nothing needs to be pushed underneath (one destination per demo screen).
+        case .backupRestorePlan, .backupImportReport: return nil
         }
     }
 

@@ -279,5 +279,5 @@ categories, sheets; glass in place of Material; text legible in light and dark. 
   string) and re-run the script.
 - Screenshot ids: `setup`, `setupPermission`, `setupFolders`, `setupBackup`, `setupTheme`, `setupLibraryLayout`,
   `setupSpotify`, `setupFinish` (ready `screen.setup`); `backupRestorePlan` (ready `screen.backupRestorePlan`) and
-  `backupImportReport` (ready `screen.backupReport`), both over Settings › Backup & Restore. Class:
+  `backupImportReport` (ready `screen.backupReport`), both on the `backupImport` cover. Class:
   `UITests/BackupOnboardingScreenshotTests`.
