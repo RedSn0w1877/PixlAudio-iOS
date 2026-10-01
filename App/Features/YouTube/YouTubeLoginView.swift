@@ -35,6 +35,7 @@ struct YouTubeLoginView: View {
         }
         .background(theme.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("screen.youTubeLogin")
         .sheet(isPresented: $model.showsCodeSheet, onDismiss: { if !env.launch.isUITest { model.cancelDeviceCode() } }) {
             DeviceCodeSheet(prompt: model.prompt ?? YouTubeLoginModel.demoPrompt) { model.cancelDeviceCode() }
@@ -114,6 +115,7 @@ struct YouTubeLoginView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(theme.surfaceContainerLowest)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("youtube.signInPage")
     }
 
@@ -240,6 +242,7 @@ struct DeviceCodeSheet: View {
             .padding(.horizontal, Tokens.Spacing.xxl)
             .padding(.bottom, Tokens.Spacing.xxl)
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("youtube.codeSheet")
     }
 }
@@ -286,6 +289,7 @@ struct CookiePasteSheet: View {
             .padding(.horizontal, Tokens.Spacing.xxl)
             .padding(.bottom, Tokens.Spacing.xxl)
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("youtube.cookieSheet")
     }
 }

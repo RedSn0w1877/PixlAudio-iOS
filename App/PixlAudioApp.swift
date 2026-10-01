@@ -16,6 +16,7 @@ struct PixlAudioApp: App {
                 .environment(environment.accounts)
                 .environment(environment.lyrics)
                 .environment(environment.theme)
+                .environment(environment.youtube.downloads.badges)
                 .preferredColorScheme(environment.preferredColorScheme)
                 .task { await environment.start() }
         }

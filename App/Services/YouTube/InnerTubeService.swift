@@ -156,8 +156,9 @@ nonisolated enum YouTubeSongIdentity {
     /// The id of a `pixlstream://<id>` URL, read from the URL text (video ids are case-sensitive; hosts are not).
     static func videoId(from url: URL) -> String? {
         let text = url.absoluteString
-        guard text.lowercased().hasPrefix("(scheme)://") else { return nil }
-        let id = String(text.dropFirst("(scheme)://".count).prefix { $0 != "/" && $0 != "?" && $0 != "#" })
+        let prefix = "\(scheme)://"
+        guard text.lowercased().hasPrefix(prefix) else { return nil }
+        let id = String(text.dropFirst(prefix.count).prefix { $0 != "/" && $0 != "?" && $0 != "#" })
         return CloudStreamSecurity.validateYouTubeVideoId(id) ? id : nil
     }
 

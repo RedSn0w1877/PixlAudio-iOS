@@ -280,6 +280,7 @@ categories, sheets; glass in place of Material; text legible in light and dark. 
   Accounts screen (stage 15) exists, Settings › Developer Options has rows for both screens.
 - **Downloads:** `DownloadManager` (background `URLSession`; foreground ranged fallback; complete cache files are copied),
   files in `Application Support/Downloads/<videoId>.m4a`. UI: `OfflineDownloadCard` in the song sheet, the playlist sheet's
-  "Download all songs".
+  "Download all songs". Song rows (`SongCard`) show Android's `SongAvailabilityBadge` (downloaded / downloading / failed)
+  from `DownloadBadges`, injected at the root — kind only, so progress ticks never re-render the lists.
 - **Screenshot ids:** `youTubeLogin`, `youTubeLoginCode`, `youTubeLoginCookie`, `youTubeLoginSignedIn`, `playbackDiagnostics`
   (all steps green), `playbackDiagnosticsFailed` (audio step red) — `UITests/YouTubeScreenshotTests`, light + dark.

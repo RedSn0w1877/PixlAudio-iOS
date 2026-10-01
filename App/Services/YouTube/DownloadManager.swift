@@ -29,6 +29,9 @@ final class DownloadManager {
     @ObservationIgnored private let delegate = DownloadDelegate()
     @ObservationIgnored private var fallbackTasks: [String: Task<Void, Never>] = [:]
     @ObservationIgnored private var started = false
+    /// The song-row badges (kind only, no percentage): rows re-render when a download starts, ends or fails,
+    /// never on progress ticks.
+    @ObservationIgnored let badges = DownloadBadges()
 
     /// `service`/`fetcher` nil = UI tests (no network; states set by the demo).
     init(service: InnerTubeService?, fetcher: StreamFetcher?) {
@@ -40,7 +43,7 @@ final class DownloadManager {
     func start() {
         guard !started, service != nil else { return }
         started = true
-        for id in DownloadFiles.downloadedIds() { states[id] = .downloaded }
+        for id in DownloadFiles.downloadedIds() { setState(id, .downloaded) }
         delegate.owner = self
         let configuration = URLSessionConfiguration.background(withIdentifier: Self.sessionIdentifier)
         configuration.isDiscretionary = false
@@ -51,7 +54,7 @@ final class DownloadManager {
         self.session = session
         Task {
             for task in await session.allTasks where task.state == .running || task.state == .suspended {
-                if let id = task.taskDescription, states[id] != .downloaded { states[id] = .downloading(percent: nil) }
+                if let id = task.taskDescription, states[id] != .downloaded { setState(id, .downloading(percent: nil)) }
             }
         }
     }
@@ -61,7 +64,13 @@ final class DownloadManager {
     }
 
     /// Sets a state directly (UI-test demo data).
-    func setDemoState(_ state: State?, videoId: String) { states[videoId] = state }
+    func setDemoState(_ state: State?, videoId: String) { setState(videoId, state) }
+
+    /// Every state change goes through here, so the row badges follow.
+    private func setState(_ videoId: String, _ state: State?) {
+        states[videoId] = state
+        badges.update(videoId, state)
+    }
 
     // MARK: Actions
 
@@ -72,18 +81,18 @@ final class DownloadManager {
         case .downloaded, .downloading: return
         default: break
         }
-        states[videoId] = .downloading(percent: nil)
+        setState(videoId, .downloading(percent: nil))
         guard let service, let fetcher else { return }
         Task {
             let destination = DownloadFiles.fileURL(videoId: videoId)
             if await fetcher.cache.copyComplete(videoId, to: destination) {
-                states[videoId] = .downloaded
+                setState(videoId, .downloaded)
                 return
             }
             guard let stream = await service.resolve(videoId: videoId, validate: true), let url = URL(string: stream.url),
                   CloudStreamSecurity.isSafeRemoteStreamURL(stream.url, allowedHostSuffixes: await service.allowedHosts()),
                   let session else {
-                states[videoId] = .failed("No YouTube client could provide this song's audio.")
+                setState(videoId, .failed("No YouTube client could provide this song's audio."))
                 return
             }
             var request = URLRequest(url: url)
@@ -116,7 +125,7 @@ final class DownloadManager {
             for task in tasks where task.taskDescription == videoId { task.cancel() }
         }
         try? FileManager.default.removeItem(at: DownloadFiles.fileURL(videoId: videoId))
-        states[videoId] = nil
+        setState(videoId, nil)
     }
 
     // MARK: Delegate events
@@ -124,16 +133,16 @@ final class DownloadManager {
     fileprivate func progress(_ videoId: String, written: Int64, expected: Int64) {
         guard expected > 0 else { return }
         let percent = Int(min(100, max(0, written * 100 / expected)))
-        if states[videoId] != .downloading(percent: percent) { states[videoId] = .downloading(percent: percent) }
+        if states[videoId] != .downloading(percent: percent) { setState(videoId, .downloading(percent: percent)) }
     }
 
     fileprivate func finished(_ videoId: String, failure: String?, retryInForeground: Bool) {
         if failure == nil {
-            states[videoId] = .downloaded
+            setState(videoId, .downloaded)
             return
         }
         guard retryInForeground, let fetcher else {
-            states[videoId] = .failed(failure ?? "Download failed")
+            setState(videoId, .failed(failure ?? "Download failed"))
             return
         }
         // googlevideo refused the single transfer: ranged fetch through the streaming cache, then copy.
@@ -144,10 +153,10 @@ final class DownloadManager {
                     await manager.progress(videoId, written: written, expected: total)
                 }
                 let copied = await fetcher.cache.copyComplete(videoId, to: DownloadFiles.fileURL(videoId: videoId))
-                manager.states[videoId] = copied ? .downloaded : .failed("Couldn't save the song.")
+                manager.setState(videoId, copied ? .downloaded : .failed("Couldn't save the song."))
             } catch is CancellationError {
             } catch {
-                manager.states[videoId] = .failed(error.localizedDescription)
+                manager.setState(videoId, .failed(error.localizedDescription))
             }
             manager.fallbackTasks[videoId] = nil
         }
@@ -210,5 +219,34 @@ final class DownloadManager {
             failures[id] = (reason, retry)
             lock.unlock()
         }
+    }
+}
+
+/// The song-row offline badge (Android `EnhancedSongListItem.SongAvailabilityBadge` fed by `SongCacheStateCache`):
+/// downloading, downloaded or failed, per video id. Kept apart from `DownloadManager.states` so the percentage
+/// ticks of a running download never invalidate the song lists.
+@MainActor
+@Observable
+final class DownloadBadges {
+    nonisolated enum Kind: Sendable, Equatable {
+        case downloading, downloaded, failed
+    }
+
+    private(set) var kinds: [String: Kind] = [:]
+
+    func update(_ videoId: String, _ state: DownloadManager.State?) {
+        let kind: Kind? = switch state {
+        case .downloading: .downloading
+        case .downloaded: .downloaded
+        case .failed: .failed
+        case nil: nil
+        }
+        if kinds[videoId] != kind { kinds[videoId] = kind }
+    }
+
+    /// Local files have no badge (they already play offline).
+    func kind(for song: Song) -> Kind? {
+        guard !kinds.isEmpty, let videoId = YouTubeSongIdentity.videoId(for: song) else { return nil }
+        return kinds[videoId]
     }
 }

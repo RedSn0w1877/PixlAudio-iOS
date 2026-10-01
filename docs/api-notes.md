@@ -446,6 +446,7 @@ Signatures checked against the developer.apple.com documentation JSON (2026-10-0
 | `TextEditor(text:)`, `scrollContentBackground(.hidden)`, `textInputAutocapitalization(.never)`, `autocorrectionDisabled()` | 14–16 | /documentation/swiftui/texteditor | `CookiePasteSheet` | |
 | `ProgressView(value:total:)`, `.progressViewStyle(.linear)`, `controlSize(.small)` | 14 | /documentation/swiftui/progressview | `OfflineDownloadCard`, playback test | Android `LinearProgressIndicator` / `CircularProgressIndicator`. |
 | `UIViewRepresentable` (`makeCoordinator`, `makeUIView`, `updateUIView`) | 13 | /documentation/swiftui/uiviewrepresentable | `YouTubeSignInWebView` | |
+| `Environment.init(_:)` for an optional `Observable` object (`@Environment(T.self) var x: T?`) | 17 | /documentation/swiftui/environment/init(_:)-8slkf | `SongCard` (`DownloadBadges`) | nil where no badge model is injected (previews). |
 
 ## Testing and tooling
 | API / tool | Docs | Notes |

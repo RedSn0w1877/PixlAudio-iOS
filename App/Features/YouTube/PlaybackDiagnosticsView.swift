@@ -115,6 +115,7 @@ struct PlaybackDiagnosticsView: View {
         }
         .background(theme.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("screen.playbackDiagnostics")
         .onAppear(perform: applyDemoState)
     }
@@ -203,6 +204,7 @@ struct DiagnosticsCard: View {
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("diagnostics.card")
     }
 }
