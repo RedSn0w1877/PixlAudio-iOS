@@ -55,8 +55,7 @@ struct GenreBrowseView: View {
         }
         .scrollIndicators(.hidden)
         .padding(.horizontal, 18)
-        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0,
-                                          topTrailingRadius: 24, style: .continuous))
+        .clipShape(TopRoundedClip(radius: 24))
         .accessibilityIdentifier("search.genreGrid")
     }
 

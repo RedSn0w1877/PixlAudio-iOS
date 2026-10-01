@@ -74,7 +74,6 @@ struct HomeView: View {
                        onChangelog: { router.present(AppSheet.changelog) },
                        onSettings: { router.push(.settings) })
         }
-        .overlay(alignment: .bottom) { bottomGradient }
         .background(theme.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .task(id: HomeRefreshKey(snapshot: library.snapshot, revision: home.history.revision)) {
@@ -126,18 +125,6 @@ struct HomeView: View {
         playback.play(songs.shuffled())
     }
 
-    /// Android draws a gradient behind the bottom bar (`resolveMainScreenBottomGradientHeight`: bar 64 + mini player
-    /// 64 + 8 + 8 pt) fading into `surfaceContainerLowest`, so content dims as it passes under the bars.
-    private var bottomGradient: some View {
-        LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .clear, location: 0.2),
-                               .init(color: theme.surfaceContainerLowest, location: 0.8),
-                               .init(color: theme.surfaceContainerLowest, location: 1)],
-                       startPoint: .top, endPoint: .bottom)
-            .frame(height: HomeMetrics.bottomGradientHeight)
-            .ignoresSafeArea(edges: .bottom)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-    }
 }
 
 /// What Home's data depends on (the task re-runs when either changes).
@@ -152,7 +139,6 @@ nonisolated enum HomeMetrics {
     static let greetingInset: CGFloat = 16
     /// `isScrolledPastThreshold`: the greeting card has scrolled away.
     static let scrolledThreshold: CGFloat = 110
-    static let bottomGradientHeight: CGFloat = 144
     /// Home top bar (`HomeGradientTopBar`): 64 pt; Beta pill starts 20 pt in (12 + 4 + 4), actions end 18 pt in.
     static let topBarHeight: CGFloat = 64
     static let topBarLeading: CGFloat = 20

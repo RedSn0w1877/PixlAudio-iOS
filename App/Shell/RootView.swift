@@ -5,7 +5,8 @@ import UIKit
 
 /// The shell, in PixlAudio's layout (Android MainActivity `MainUI`): the selected tab's content full screen, and at
 /// the bottom — inset 16 pt from the sides, above the home indicator — the mini player floating 8 pt above the
-/// bottom bar. The bar shows only at a tab's root (pushed screens hide it, as on Android); the mini player stays.
+/// iOS-style glass tab bar (`GlassNavBar`), each its own capsule. The bar shows only at a tab's root (pushed screens
+/// hide it, as on Android); the mini player stays.
 /// Each tab keeps its own `NavigationStack` alive so switching tabs keeps scroll positions.
 /// While the keyboard is up the bars step aside: on Android they stay at the bottom under the keyboard (edge to edge,
 /// only the content gets the IME inset), so they must not ride up above it here (stage 7c, Search's field).
@@ -14,6 +15,7 @@ struct RootView: View {
     @Environment(PlaybackStore.self) private var playback
     @Environment(ThemeStore.self) private var themeStore
     @Environment(AppEnvironment.self) private var environment
+    @Environment(SettingsStore.self) private var settings
     @Environment(\.colorScheme) private var colorScheme
     @State private var isKeyboardVisible = false
 
@@ -27,7 +29,9 @@ struct RootView: View {
                 tab(.search, path: $router.searchPath) { SearchView() }
                 tab(.library, path: $router.libraryPath) { LibraryView() }
             }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
+            // A bar, not a plain inset: scroll views under it get the system's soft scroll edge effect, the way
+            // content fades under the system tab bar (this replaces Android's gradients behind its bar).
+            .safeAreaBar(edge: .bottom, spacing: 0) {
                 bottomBars
             }
             // Stage 8: the player sheet — the mini player resting in `MiniPlayerSlot` and expanding over everything.
@@ -78,13 +82,12 @@ struct RootView: View {
         VStack(spacing: Tokens.Shell.miniPlayerSpacing) {
             if playback.current != nil, !isKeyboardVisible {
                 // Stage 8: the player sheet draws the mini player here (and expands it from here).
-                MiniPlayerSlot(bottomCornerRadius: showsBar ? Tokens.Shell.joinCornerRadius
-                                   : Tokens.Shell.navBarCornerRadius)
+                MiniPlayerSlot(bottomCornerRadius: Tokens.Shell.navBarCornerRadius)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             if showsBar {
                 GlassNavBar(selection: router.selection,
-                            topCornerRadius: playback.hasItem ? Tokens.Shell.joinCornerRadius : Tokens.Shell.navBarCornerRadius,
+                            compact: settings.appearance.navBarCompactMode,
                             onSelect: { tab in withAnimation(PixlMotion.selection) { router.select(tab) } })
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }

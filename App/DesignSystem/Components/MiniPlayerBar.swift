@@ -4,8 +4,8 @@ import SwiftUI
 /// PixlAudio's mini player (Android `MiniPlayerContentInternal`): 64 pt tall, 44 pt circular art, title
 /// (15 pt semibold, −0.2 tracking) over artist (13 pt, 70 %) in `onPrimaryContainer`, then previous / play-pause /
 /// next as 36 pt circles with 22 pt icons — previous and next `onPrimary` with a `primary` icon, play `primary` with
-/// an `onPrimary` icon. The bar itself is glass tinted with the album's `primaryContainer`; its top corners are
-/// 32 pt and its bottom corners 10 pt where it sits on the bottom bar (32 pt when the bar is hidden).
+/// an `onPrimary` icon. The bar itself is glass tinted with the album's `primaryContainer`, a 32 pt-cornered capsule
+/// floating above the tab bar.
 ///
 /// The transport circles sit on the glass, so they are fills (`PressScaleButtonStyle`), not glass-on-glass.
 /// Nothing here updates per second.
@@ -13,7 +13,7 @@ struct MiniPlayerBar: View {
     let song: Song
     let isPlaying: Bool
     var isPreparing = false
-    var bottomCornerRadius: CGFloat = Tokens.Shell.joinCornerRadius
+    var bottomCornerRadius: CGFloat = Tokens.Shell.navBarCornerRadius
     /// False when the bar is drawn inside the player sheet's card, which supplies the glass (stage 8).
     var drawsGlass = true
     let onOpen: () -> Void

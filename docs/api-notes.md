@@ -188,8 +188,8 @@ Proven on the `xcode-27` lane by the stage-4 build (fallback lane: its next week
 | `Glass` `.regular`, `.tint(_:)` (`Color?`), `.interactive(_:)` | 26.0 | /documentation/swiftui/glass | `GlassStyle.swift` | Tint = the PixlAudio role Android filled with (`GlassTint` strengths). |
 | `GlassEffectContainer(spacing:content:)` | 26.0 | /documentation/swiftui/glasseffectcontainer | `GlassPillRow`, Home quick actions, Library action row | Spacing below the visual gap so capsules never blend at rest. |
 | `View.glassEffectID(_:in:)` (`(some Hashable & Sendable)?`) | 26.0 | /documentation/swiftui/view/glasseffectid(_:in:) | `GlassPillRow` | One shared id for the selected capsule → its tinted glass morphs to the new selection. The id enum is `nonisolated` (Sendable under default MainActor isolation). |
-| `@Namespace`, `View.matchedGeometryEffect(id:in:properties:anchor:isSource:)` | 14 | /documentation/swiftui/view/matchedgeometryeffect(id:in:properties:anchor:issource:) | `GlassNavBar` | Glides the glass selection bubble between bar items. |
-| `UnevenRoundedRectangle(topLeadingRadius:bottomLeadingRadius:bottomTrailingRadius:topTrailingRadius:style:)` | 16 | /documentation/swiftui/unevenroundedrectangle | `GlassNavBar`, `MiniPlayerBar` | PixlAudio's 32 / 10 pt corners where the mini player meets the bar. |
+| `@Namespace`, `View.matchedGeometryEffect(id:in:properties:anchor:isSource:)` | 14 | /documentation/swiftui/view/matchedgeometryeffect(id:in:properties:anchor:issource:) | (formerly `GlassNavBar`) | The iOS-style tab bar (2026-10-01) moves one pill with `offset` instead. |
+| `UnevenRoundedRectangle(topLeadingRadius:bottomLeadingRadius:bottomTrailingRadius:topTrailingRadius:style:)` | 16 | /documentation/swiftui/unevenroundedrectangle | `MiniPlayerBar`, player sheet morph | Per-corner radii of the mini player card while it morphs into the full player. |
 | `RoundedRectangle(cornerRadius:style: .continuous)`, `Capsule`, `Circle`, `contentShape(_:)` | 13 | /documentation/swiftui/roundedrectangle | components | |
 | `@Entry` (custom `EnvironmentValues`), `View.environment(_:_:)` (key path) | 13 (macro back-deploys; Xcode 16+) | /documentation/swiftui/entry() | `\.appTheme`, `\.playerTheme` | Change only on song / scheme change. |
 | `View.safeAreaInset(edge:alignment:spacing:content:)` | 15 | /documentation/swiftui/view/safeareainset(edge:alignment:spacing:content:)-6gwby | `RootView` | Mini player + bar float over content; scroll views inset automatically. |
@@ -589,3 +589,11 @@ Signatures checked against the developer.apple.com documentation JSON (2026-10-0
 | API | Min iOS | Docs | Used in | Notes |
 |---|---|---|---|---|
 | `View.onOpenURL(perform:)` | 14 | /documentation/swiftui/view/onopenurl(perform:) | `PixlAudioApp` → `AppEnvironment.open(_:)` | Files opened in PixlAudio (declared document types, `LSSupportsOpeningDocumentsInPlace`): `.pxpl` / `.json.gz` backups open the restore flow; the URL is security-scoped (`BackupService.inspect` brackets the read). |
+
+## iOS-style tab bar (2026-10-01)
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `DragGesture(minimumDistance: 0)` with `onChanged` / `onEnded` | 13 | /documentation/swiftui/draggesture | `GlassNavBar` | One gesture handles taps and press-and-drag along the bar; tab items are plain views with `accessibilityAction` + `.isButton`. |
+| `Animation.interactiveSpring(response:dampingFraction:blendDuration:)` | 13 | /documentation/swiftui/animation/interactivespring(response:dampingfraction:blendduration:) | `GlassNavBar` | The pill trails the finger; retargets smoothly on every drag update. |
+| `glassEffect(_:in:)` with `Glass.regular.tint(_:)` on a `Capsule` | 26.0 | /documentation/swiftui/view/glasseffect(_:in:) | `GlassNavBar` | Bar = untinted regular glass; pill = accent-tinted glass drawn on it (owner-requested exception to "no glass on glass"). |
+| `View.safeAreaBar(edge:alignment:spacing:content:)` (`VerticalEdge`) | 26.0 | /documentation/swiftui/view/safeareabar(edge:alignment:spacing:content:) | `RootView` | Like `safeAreaInset`, and it extends the scroll edge effect of scroll views under the bar — content softly fades beneath the tab bar and mini player (replaces Home's and Search's Android gradients). |

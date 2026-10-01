@@ -28,7 +28,54 @@ final class ScreenshotTests: XCTestCase {
     func testNowPlayingDark() throws { try capture("nowPlaying", "dark", ready: "screen.nowPlaying") }
     func testDiagnosticsLight() throws { try capture("diagnostics", "light", ready: "screen.diagnostics") }
 
+    // MARK: Tab bar (owner change 2026-10-01: iOS-style glass bar, accent pill gliding between tabs)
+
+    /// A tap switches tabs and marks the tab selected; the shot shows the pill under Library.
+    func testTabBarTapLight() throws {
+        let app = launchHome("light")
+        let library = app.descendants(matching: .any)["navBar.library"].firstMatch
+        XCTAssertTrue(library.waitForExistence(timeout: 10), "the Library tab is missing")
+        library.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["screen.library"].firstMatch.waitForExistence(timeout: 5),
+                      "tapping Library did not switch tabs")
+        XCTAssertTrue(library.isSelected, "the Library tab is not marked selected")
+        attachScreenshot(app, "tabBarTap-light")
+    }
+
+    /// Press and drag from Home to Search: the pill follows the finger and Search is selected on release.
+    func testTabBarDragDark() throws {
+        let app = launchHome("dark")
+        let home = app.descendants(matching: .any)["navBar.home"].firstMatch
+        let search = app.descendants(matching: .any)["navBar.search"].firstMatch
+        XCTAssertTrue(home.waitForExistence(timeout: 10) && search.exists, "the tab bar items are missing")
+        home.press(forDuration: 0.2, thenDragTo: search)
+        XCTAssertTrue(app.descendants(matching: .any)["screen.search"].firstMatch.waitForExistence(timeout: 5),
+                      "dragging to Search did not switch tabs")
+        XCTAssertTrue(search.isSelected, "the Search tab is not marked selected")
+        attachScreenshot(app, "tabBarDrag-dark")
+    }
+
     // MARK: - Helpers
+
+    private func launchHome(_ appearance: String) -> XCUIApplication {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTest", "-screen", "home", "-appearance", appearance]
+        app.launch()
+        XCTAssertTrue(app.descendants(matching: .any)["screen.home"].firstMatch.waitForExistence(timeout: 20),
+                      "screen.home did not appear")
+        return app
+    }
+
+    private func attachScreenshot(_ app: XCUIApplication, _ name: String) {
+        // Let the pill settle and the next tab's artwork and glass render.
+        Thread.sleep(forTimeInterval: 1.5)
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        app.terminate()
+    }
 
     private static let readyIdentifiers: [String: String] = [
         "home": "screen.home",
