@@ -26,7 +26,8 @@ final class AppEnvironment {
     private let libraryAutoRefresh: LibraryAutoRefresh?
     /// Home's state holder: playback history, mixes, recommendations, stats overview (stage 7b).
     let home: HomeStore
-    /// Search providers by source (stage 7c builds the library one on `SearchIndex`; 11/12 add the others).
+    /// Search providers by source: the library on `SearchIndex` (stage 7c); stages 11/12 replace the YouTube Music
+    /// and Spotify ones (UI tests get demo providers so Search's remote sections render).
     let searchProviders: [SearchSource: any SearchProviding]
 
     init(launch: LaunchConfiguration) {
@@ -60,9 +61,9 @@ final class AppEnvironment {
             library = LibraryStore(snapshot: DemoLibrary.snapshot)
             libraryImporter = nil
             libraryAutoRefresh = nil
-            searchProviders = [.library: LocalSearchProvider(snapshot: DemoLibrary.snapshot),
-                               .spotify: UnavailableSearchProvider(source: .spotify),
-                               .youtubeMusic: UnavailableSearchProvider(source: .youtubeMusic)]
+            searchProviders = [.library: LibrarySearchProvider(),
+                               .spotify: DemoCatalogSearchProvider(),
+                               .youtubeMusic: DemoYouTubeMusicSearchProvider()]
             if launch.hasSong {
                 let songs = DemoLibrary.songs
                 playback.play(songs, startIndex: min(launch.songIndex, songs.count - 1),
@@ -76,7 +77,7 @@ final class AppEnvironment {
             self.library = library
             libraryImporter = importer
             libraryAutoRefresh = importer == nil ? nil : LibraryAutoRefresh(library: library)
-            searchProviders = [.library: LocalSearchProvider(snapshot: .empty),
+            searchProviders = [.library: LibrarySearchProvider(),
                                .spotify: UnavailableSearchProvider(source: .spotify),
                                .youtubeMusic: UnavailableSearchProvider(source: .youtubeMusic)]
         }

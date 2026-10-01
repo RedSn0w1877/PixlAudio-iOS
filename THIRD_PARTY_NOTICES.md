@@ -21,7 +21,8 @@ own Swift. Some of that Swift is a port of open-source code, listed here with it
 
 The Android app's own Kotlin (album-art seed selection in `ui/theme/ColorRoles.kt`, and the logic ported in
 earlier stages) is by the PixlAudio authors; contributions to the Android project before 2026-05-12 were
-MIT-licensed — see the Android repository's `THIRD_PARTY_NOTICES.md`.
+MIT-licensed — see the Android repository's `THIRD_PARTY_NOTICES.md`. The genre illustrations in
+`App/Features/Search/GenreArt.xcassets` are the Android app's own vector drawables converted to SVG.
 
 ---
 

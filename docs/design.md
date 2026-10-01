@@ -209,3 +209,7 @@ playlist, Icon tab with a star), `playlistAddSongs`, `playlistOptions`, `playlis
   other stages can present it the same way.
 - Queue insertions (`playNext`, `addToQueue`) re-set the queue through the `PlaybackEngine` seam at the current
   position until stage 5 adds native inserts.
+
+Stage 7c adds `-searchFilter all|songs|albums|artists|playlists`
+(with `-screen search -searchQuery <q>`) and the shots searchEmpty, searchTyping, searchAll, searchSongs, searchAlbums,
+searchArtists, searchPlaylists, searchNoResults (light + dark; `UITests/SearchScreenshotTests.swift`).

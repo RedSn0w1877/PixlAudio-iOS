@@ -334,6 +334,27 @@ CI by the stage-6 build. Paths are under https://developer.apple.com.
 | `View.scrollDismissesKeyboard(_:)`, `submitLabel(_:)`, `monospacedDigit()` | 16 / 15 / 15 | /documentation/swiftui/view/scrolldismisseskeyboard(_:) | song picker, editor | |
 | `View.onLongPressGesture(minimumDuration:perform:)` | 13 | /documentation/swiftui/view/onlongpressgesture(minimumduration:maximumdistance:perform:onpressingchanged:) | song cards, album cards, playlist rows | Android long press → multi-selection. |
 
+## Stage 7c — Search
+Proven on the `xcode-27` lane by the stage-7c build (fallback lane: its next weekly run).
+
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `TextField(_:text:prompt:)`, `@FocusState`, `View.focused(_:)`, `submitLabel(.search)`, `onSubmit(of:_:)` | 15 | /documentation/swiftui/textfield | `SearchView` field | Prompt styled with `foregroundStyle` (Android `primary` placeholder). |
+| `autocorrectionDisabled(_:)`, `textInputAutocapitalization(_:)` | 13 / 15 | /documentation/swiftui/view/textinputautocapitalization(_:) | `SearchView` field | Android `KeyboardOptions` default (no capitalisation). |
+| `Layout` (`sizeThatFits(proposal:subviews:cache:)`, `placeSubviews(in:proposal:subviews:cache:)`), `LayoutSubview.sizeThatFits(_:)` / `place(at:anchor:proposal:)` | 16 | /documentation/swiftui/layout | `SearchFlowLayout` | Compose `FlowRow` for the filter chips. `Layout` is `Sendable`, so the type is `nonisolated`. |
+| `LazyVGrid`, `GridItem(.flexible(), spacing:)` | 14 | /documentation/swiftui/lazyvgrid | `GenreBrowseView` | 2 / 1 columns (grid / list toggle). |
+| `View.onGeometryChange(for:of:action:)` | 16 | /documentation/swiftui/view/ongeometrychange(for:of:action:) | `GenreCard` | Card width → title typography, once per width. |
+| `Font.width(_:)`, `Font.Width` (`.compressed/.condensed/.standard/.expanded`), `View.fontWidth(_:)`, `italic(_:)`, `tracking(_:)` | 16 | /documentation/swiftui/font/width | genre titles | SF Pro stand-ins for Google Sans Flex's width / slant axes. |
+| `UIFont.systemFont(ofSize:weight:width:)`, `UIFont.Width`, `UIFontDescriptor.withSymbolicTraits(.traitItalic)`, `UIFont(descriptor:size:)`, `lineHeight` | 16 / 7 | /documentation/uikit/uifont/systemfont(ofsize:weight:width:) | `GenreTitleTypography` | Measuring only. |
+| `NSString.size(withAttributes:)` (`.font`, `.kern`) | 7 | /documentation/foundation/nsstring/size(withattributes:) | `GenreTitleTypography` | Port of Compose's `TextMeasurer` checks. |
+| `LinearGradient(stops:startPoint:endPoint:)`, `Gradient.Stop` | 13 | /documentation/swiftui/lineargradient | Search bottom scrim | Android's bottom gradient. Not glass — a scrim like Android's. |
+| `ProgressView()`, `controlSize(_:)` | 14 / 15 | /documentation/swiftui/progressview | catalogue / YouTube Music rows | Android `CircularProgressIndicator` while importing. |
+| `AnyTransition.asymmetric(insertion:removal:)`, `.offset(x:y:)`, `.opacity`, `.scale`, `.combined(with:)` | 13 | /documentation/swiftui/anytransition | browse ↔ results, clear button | Android `AnimatedContent` fade + 1/10 slide. |
+| `rotationEffect(_:anchor:)` | 13 | /documentation/swiftui/view/rotationeffect(_:anchor:) | category cards | Glyph at −14°. |
+| `Image(_:)` from an asset catalog with SVG + `preserves-vector-representation` + `template-rendering-intent` | 13 (SVG in catalogs: Xcode 12) | /documentation/xcode/asset-management | `GenreArt.xcassets` | Genre glyphs converted from the Android vector drawables (`renderingMode(.template)`). |
+| `XCUIElement.typeText(_:)`, `XCUIApplication.textFields` | — | /documentation/xctest/xcuielement/typetext(_:) | `UITests/SearchScreenshotTests` | Typing screenshot. |
+| `View.onReceive(_:perform:)`, `NotificationCenter.publisher(for:object:)`, `UIResponder.keyboardWillShowNotification` / `keyboardWillHideNotification` | 13 / 13 / 2 | /documentation/swiftui/view/onreceive(_:perform:), /documentation/uikit/uiresponder/keyboardwillshownotification | `RootView` (shared shell, small change) | Bars step aside while the keyboard is up instead of riding above it — on Android they stay under the IME. |
+
 ## Testing and tooling
 | API / tool | Docs | Notes |
 |---|---|---|
