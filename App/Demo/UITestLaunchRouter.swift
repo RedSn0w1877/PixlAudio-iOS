@@ -44,6 +44,15 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case libraryAddToPlaylist, songOptionsInfo
     case playlistEdit, playlistAddSongs, playlistOptions, playlistReorder, genreSort
 
+    // Stage 12: account screens signed in with demo data (plain ids are signed out), dashboard with a playback test
+    // report, browse drill-downs (search results, an artist, an album)
+    case accountsSignedIn = "accounts.signedIn"
+    case spotifyDashboardSignedIn = "spotifyDashboard.signedIn"
+    case spotifyDashboardTested = "spotifyDashboard.tested"
+    case spotifyBrowseResults = "spotifyBrowse.results"
+    case spotifyBrowseArtist = "spotifyBrowse.artist"
+    case spotifyBrowseAlbum = "spotifyBrowse.album"
+
     /// The accessibility identifier present once the screen is up (`screen.<id>`).
     var readyIdentifier: String {
         switch self {
@@ -111,8 +120,10 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .easterEgg: return .easterEgg
         case .quickFill: return .quickFill
         case .diagnostics: return .diagnostics
-        case .accounts: return .accounts
-        case .spotifyDashboard: return .spotifyDashboard
+        case .accounts, .accountsSignedIn: return .accounts
+        case .spotifyDashboard, .spotifyDashboardSignedIn, .spotifyDashboardTested: return .spotifyDashboard
+        case .spotifyBrowseResults: return .spotifyBrowse(query: "Luma")
+        case .spotifyBrowseArtist, .spotifyBrowseAlbum: return .spotifyBrowse(query: "")
         case .spotifyBrowse: return .spotifyBrowse(query: "")
         case .youTubeLogin: return .youTubeLogin
         case .queue, .songInfo, .sleepTimer, .lyricsOptions, .changelog, .betaInfo, .jobs,

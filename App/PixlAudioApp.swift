@@ -6,6 +6,7 @@ struct PixlAudioApp: App {
     @State private var environment = AppEnvironment(launch: .current)
 
     var body: some Scene {
+        let spotify = environment.spotify
         WindowGroup {
             RootView()
                 .environment(environment)
@@ -18,6 +19,10 @@ struct PixlAudioApp: App {
                 .environment(environment.theme)
                 .preferredColorScheme(environment.preferredColorScheme)
                 .task { await environment.start() }
+        }
+        // Stage 12: Spotify library refresh in the background (BGAppRefreshTask, scheduled after sign-in / each run).
+        .backgroundTask(.appRefresh(SpotifyService.backgroundTaskIdentifier)) {
+            await spotify.backgroundRefresh()
         }
     }
 }

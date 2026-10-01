@@ -29,6 +29,8 @@ final class AppEnvironment {
     /// Search providers by source: the library on `SearchIndex` (stage 7c); stages 11/12 replace the YouTube Music
     /// and Spotify ones (UI tests get demo providers so Search's remote sections render).
     let searchProviders: [SearchSource: any SearchProviding]
+    /// Spotify account, library sync, YouTube matching and catalogue (stage 12).
+    let spotify: SpotifyService
 
     init(launch: LaunchConfiguration) {
         self.launch = launch
@@ -39,7 +41,10 @@ final class AppEnvironment {
         self.persistence = persistence
         let settings = isUITest ? SettingsStore.ephemeral() : SettingsStore()
         self.settings = settings
-        accounts = AccountsStore()
+        let accounts = AccountsStore()
+        self.accounts = accounts
+        let spotify = SpotifyService(launch: launch, accounts: accounts, persistence: persistence)
+        self.spotify = spotify
         lyrics = LyricsStore()
         artwork = .shared
         let extractor = ColorExtractor(pipeline: .shared, persistence: persistence)
@@ -59,6 +64,9 @@ final class AppEnvironment {
             services.recordHistory = { songId, durationMs, timestamp in
                 history.record(songId: songId, durationMs: durationMs, endTimestampMs: timestamp)
             }
+            // Stage 12: Spotify songs (`spotify://<id>`) play through their YouTube match; keep this the outermost
+            // resolver (after any other stage's) so other songs reach the inner ones unchanged.
+            services.engine.factory.resolver = spotify.playableURLResolver(base: services.engine.factory.resolver)
             playbackServices = services
             playback = PlaybackStore(engine: services.engine)
         }
@@ -84,7 +92,7 @@ final class AppEnvironment {
             libraryImporter = importer
             libraryAutoRefresh = importer == nil ? nil : LibraryAutoRefresh(library: library)
             searchProviders = [.library: LibrarySearchProvider(),
-                               .spotify: UnavailableSearchProvider(source: .spotify),
+                               .spotify: SpotifyCatalogSearchProvider(service: spotify),
                                .youtubeMusic: UnavailableSearchProvider(source: .youtubeMusic)]
         }
     }
@@ -94,9 +102,13 @@ final class AppEnvironment {
     func start() async {
         guard !launch.isUITest else { return }
         playbackServices?.start()
+        let library = self.library, playback = self.playback
+        spotify.attach(reloadLibrary: { await library.reloadFromStore() }, isPlaybackActive: { playback.isPlaying })
+        spotify.songLookup = { library.song(id: $0) }
         await library.load()
         playbackServices?.restoreQueue(lookup: library.song(id:))
         libraryAutoRefresh?.start()
+        await spotify.start()
     }
 
     /// Call after music-library access was granted so its change notifications start.
