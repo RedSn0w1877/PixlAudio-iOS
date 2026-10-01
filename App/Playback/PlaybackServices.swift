@@ -20,6 +20,8 @@ final class PlaybackServices {
     /// Where finished listening sessions go. `AppEnvironment` points this at Home's `ListeningHistoryStore`, so one
     /// object owns `playback_history.json`; without it the sessions are written through `history`.
     var recordHistory: ((_ songId: String, _ durationMs: Int64, _ timestamp: Int64) -> Void)?
+    /// The current item or the queue changed (stage 11's prefetcher resolves the next streamed song).
+    var onUpcomingChanged: (() -> Void)?
 
     private let settings: SettingsStore
     private let defaults: UserDefaults
@@ -81,6 +83,7 @@ final class PlaybackServices {
                                       isPlaying: self.engine.playWhenReady)
             self.nowPlaying.update()
             self.snapshots.scheduleSave()
+            self.onUpcomingChanged?()
         }
         engine.onRepeatLoop = { [weak self] in
             guard let self else { return }
@@ -105,6 +108,7 @@ final class PlaybackServices {
         engine.onQueueChanged = { [weak self] in
             self?.nowPlaying.update()
             self?.snapshots.scheduleSave()
+            self?.onUpcomingChanged?()
         }
         engine.onTimingChanged = { [weak self] in
             guard let self else { return }

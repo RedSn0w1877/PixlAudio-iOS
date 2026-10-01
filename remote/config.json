@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "innertube": {
+    "note": "Built-in table as of 2026-10-01 (checked against yt-dlp on Android 2026-09-07). Edit profiles here to fix clients without a release.",
+    "profiles": {
+      "VISIONOS": { "clientVersion": "1.02" },
+      "IOS": { "clientVersion": "21.26.4" },
+      "TVHTML5": { "clientVersion": "5.20260707" },
+      "WEB_REMIX": { "clientVersion": "1.20260707.12.00" }
+    },
+    "preSignedOrder": ["VISIONOS", "IOS"],
+    "cipheredOrder": ["TVHTML5", "WEB", "WEB_REMIX"]
+  }
+}

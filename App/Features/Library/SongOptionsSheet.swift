@@ -150,6 +150,8 @@ struct SongOptionsSheet: View {
                     confirmsDelete = true
                 }
             }
+            // Stage 11: streamed songs only (Android `OfflineDownloadCard`).
+            OfflineDownloadCard(song: song)
         }
     }
 

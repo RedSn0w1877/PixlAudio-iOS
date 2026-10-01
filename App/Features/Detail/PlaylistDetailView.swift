@@ -284,7 +284,10 @@ struct PlaylistDetailView: View {
                              },
                              onDownloadAll: {
                                  showsOptions = false
-                                 LibraryToast.shared.show("No streamed songs in this playlist to download.")
+                                 // Stage 11: queue every streamed song (Android `requestDownload` per song).
+                                 let queued = env.youtube.downloads.downloadAll(songs)
+                                 LibraryToast.shared.show(queued == 0 ? "No streamed songs in this playlist to download."
+                                                                      : "Downloading (queued) songs")
                              },
                              onSyncLyricsAll: {
                                  showsOptions = false

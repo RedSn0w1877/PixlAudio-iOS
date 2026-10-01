@@ -56,6 +56,14 @@ struct DeveloperSettingsSection: View {
                                 subtitle: "Engine, library and playback self-checks for this iPhone.",
                                 systemImage: "stethoscope", showsChevron: true,
                                 identifier: "settings.diagnostics") { router.push(.diagnostics) }
+                // Stage 11 (Android: the Spotify dashboard's YouTube card and "Test playback"; until the Accounts
+                // screen lands, they are reachable here too).
+                SettingsItemRow(title: "YouTube account", subtitle: "Sign in so streamed songs play reliably.",
+                                systemImage: "play.circle", showsChevron: true,
+                                identifier: "settings.youTubeLogin") { router.push(.youTubeLogin) }
+                SettingsItemRow(title: "Test playback", subtitle: "Walk one streamed song through every step.",
+                                systemImage: "ladybug", showsChevron: true,
+                                identifier: "settings.playbackDiagnostics") { router.push(.playbackDiagnostics) }
                 SettingsItemRow(title: L10n.settingsTriggerCrashTitle, subtitle: L10n.settingsTriggerCrashSubtitle,
                                 systemImage: "exclamationmark.triangle", iconColor: theme.error) { showsCrash = true }
             }

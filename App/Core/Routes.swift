@@ -139,6 +139,8 @@ nonisolated enum AppRoute: Hashable, Sendable {
     case spotifyDashboard
     case spotifyBrowse(query: String)
     case youTubeLogin
+    /// The YouTube playback test (Android: the Spotify dashboard's "Test playback" card).
+    case playbackDiagnostics
 
     /// Android hides the bottom bar on almost every pushed screen (`routesWithHiddenNavigationBar` in
     /// MainActivity); the iOS shell does the same for every pushed route. The mini player stays.
@@ -176,6 +178,7 @@ nonisolated enum AppRoute: Hashable, Sendable {
         case .spotifyDashboard: "spotifyDashboard"
         case .spotifyBrowse: "spotifyBrowse"
         case .youTubeLogin: "youTubeLogin"
+        case .playbackDiagnostics: "playbackDiagnostics"
         }
     }
 }
