@@ -70,7 +70,7 @@ struct MetadataEditorTests {
         #expect(KotlinText.formatFixed2(9.995) == "9.99")
         #expect(KotlinText.formatFixed2(99.995) == "100.00")
         #expect(KotlinText.formatFixed2(1e-30) == "0.00")
-        #expect(KotlinText.formatFixed2(123456789) == "123456792.00")
+        #expect(KotlinText.formatFixed2(123_456_792) == "123456792.00")  // 123456789f widens to this
         #expect(KotlinText.formatFixed(0.5, precision: 0) == "1")
         #expect(KotlinText.removingTrailingDbUnit("1 d B ") == "1")
         #expect(KotlinText.removingTrailingDbUnit("dB 1") == "dB 1")
