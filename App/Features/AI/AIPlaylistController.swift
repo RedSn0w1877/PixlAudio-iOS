@@ -229,7 +229,7 @@ final class AIPlaylistController {
 
     // MARK: Messages (`resolveAiErrorMessage` / `extractAiErrorDetail`)
 
-    static let apiKeyMessage = "Please configure a valid API key for the selected AI provider in Settings."
+    nonisolated static let apiKeyMessage = "Please configure a valid API key for the selected AI provider in Settings."
 
     /// The message without a leading "AI Error:" (Android strips it before classifying).
     nonisolated static func errorDetail(_ message: String) -> String {

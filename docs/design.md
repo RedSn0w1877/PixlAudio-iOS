@@ -146,6 +146,9 @@ PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact ba
 | YouTube login | `.youTubeLogin` | `YouTubeLoginView` (Features/YouTube) | 11 |
 | Spotify dashboard / browse | `.spotifyDashboard`, `.spotifyBrowse(query:)` | Features/Spotify | 12 |
 | Accounts | `.accounts` | `AccountsView` (Features/Accounts) | 15 |
+| AI playlist sheet (Daily Mix sparkle button) | `AppSheet.aiPlaylist` | `AiPlaylistSheet` (Features/AI) | 13 |
+| AI Playlist Lab (Library › Create playlist › With AI) | `AppCover.aiPlaylistLab` | `AiPlaylistLabView` (Features/AI) | 13 |
+| TAIS DJ chat (Experimental › TAIS DJ; player's Taizo button) | `AppSheet.taisChat` | `TaisChatSheet` (Features/AI) | 13 |
 | Setup | `AppCover.setup` | `SetupView` (Features/Onboarding) | 15 |
 | Plus / license debug, nav-bar corner radius | — (dropped: everything unlocked; Material-only setting) | — | — |
 
@@ -183,11 +186,34 @@ Parallel stages **own and replace** only these:
 - **Stage 9:** `Features/Lyrics/**`, drives `LyricsStore`. **Stage 10:** `Features/LyricsSync/**`.
 - **Stages 11 / 12 / 15:** `Features/YouTube/**`, `Features/Spotify/**`, `Features/Accounts/**` +
   `Features/Onboarding/**`; they update `AccountsStore`.
+- **Stage 13 (AI):** `Services/AI/**`, `Features/AI/**`; `env.ai` (`AIService`, built on first use) holds the
+  orchestrator, the AI playlist state (`AIPlaylistController`) and the DJ chat (`TaisChatModel`). Lyric translation is
+  the `LyricsTranslating` seam (`Core/LyricsTranslating.swift`, `env.ai.lyricsTranslator`) for stage 9's lyrics
+  options. The DJ's catalogue fallback uses the Search seam's Spotify / YouTube Music providers (stages 11/12).
 
 Rules for stages: keep each placeholder view's **type name and initialiser** (the router calls them); build from
 the design-system components (extend them rather than forking); put new tokens next to their screen; add a
 `-screen` id per new screen state only through `DemoScreen` (one line each); every Apple API used for the first time
 goes into `docs/api-notes.md`.
+
+## Stage 13 notes (AI)
+
+- Providers: Gemini and every OpenAI-compatible provider through PixlNet's `AiOrchestrator` (provider chain,
+  cooldowns, 30-minute cache in `AICacheRecord`, model recovery, usage in `AIUsageRecord`); settings come from the
+  Android keys in UserDefaults and the Keychain (`AISettingsBridge`). Ollama / custom base URLs may be plain HTTP on the
+  LAN. The on-device provider is the system language model (`OnDeviceAiClient`), availability-gated, with guided
+  generation for playlist ids.
+- AI playlist sheet: Android's layout; the badge, size card, prompt field, error / success cards and the morphing
+  generate button are tinted glass; the min / max fields inside the size card are fills. A generated mix replaces
+  today's Daily Mix (`HomeStore.setDailyMix`), starts playing and opens the player once the sheet has gone.
+- AI Playlist Lab: Android's full-screen dialog as a cover; cards are glass, chips / segments / fields inside them are
+  fills; Generate saves an AI playlist (`LibraryEditor.createPlaylist(isAiGenerated:)`) and closes.
+- TAIS DJ chat: bubbles in Android's shapes as glass (user = `primary`, Taizo = `surfaceContainerHigh`, errors =
+  `errorContainer`), suggestion chips as glass capsules, the bulk buttons and song rows inside a bubble as fills. Taizo's
+  avatar keeps Android's `primary → tertiary` gradient (a mark, not a Material surface). Online (catalogue) results
+  import through `SearchProviding.importAndPlay` on tap.
+- UI tests use the scripted provider (`DemoAiClient`): playlist prompts get every other candidate id, Taizo gets a
+  fixed intro and answer, a prompt containing `#demo-error` fails like a rejected key.
 
 ## Screenshot ids (UI tests)
 
@@ -216,6 +242,9 @@ playlist, Icon tab with a star), `playlistAddSongs`, `playlistOptions`, `playlis
   other stages can present it the same way.
 - Queue insertions (`playNext`, `addToQueue`) re-set the queue through the `PlaybackEngine` seam at the current
   position until stage 5 adds native inserts.
+
+Stage 13 ids: `aiPlaylist` (sheet over Home), `taisChat` (empty), `taisChatConversation` (a scripted genre request
+and question; ready `screen.taisChat`), `aiPlaylistLab` (cover). Shots: `UITests/AIScreenshotTests`.
 
 Stage 7c adds `-searchFilter all|songs|albums|artists|playlists`
 (with `-screen search -searchQuery <q>`) and the shots searchEmpty, searchTyping, searchAll, searchSongs, searchAlbums,

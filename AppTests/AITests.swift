@@ -18,7 +18,7 @@ final class AITests: XCTestCase {
 
     private func demoOrchestrator() -> AiOrchestrator {
         AiOrchestrator(http: NoNetwork(), settings: DemoAiSettings(), sha256: AIService.sha256,
-                       onDeviceClient: DemoAiClient(), clientFactory: { _, _, _ in DemoAiClient() })
+                       onDeviceClient: DemoAiClient(), clientFactory: { @Sendable _, _, _ in DemoAiClient() })
     }
 
     private func song(_ id: String, title: String, artist: String = "A", genre: String?) -> Song {

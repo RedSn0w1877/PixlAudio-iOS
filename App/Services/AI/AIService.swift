@@ -45,9 +45,8 @@ final class AIService {
         let cache: (any AiResponseCaching)? = isDemo ? nil : persistence.map { AICacheStore(persistence: $0) }
         let usage: (any AiUsageRecording)? = isDemo ? nil : persistence.map { AIUsageStore(persistence: $0) }
         let onDevice: any AiClient = isDemo ? DemoAiClient() : OnDeviceAiClient()
-        let factory: (@Sendable (AiProvider, String, String) throws -> any AiClient)? = isDemo
-            ? { _, _, _ in DemoAiClient() }
-            : nil
+        var factory: (@Sendable (AiProvider, String, String) throws -> any AiClient)?
+        if isDemo { factory = { @Sendable _, _, _ in DemoAiClient() } }
         let orchestrator = AiOrchestrator(http: http, settings: bridge, cache: cache, usage: usage,
                                           sha256: AIService.sha256, onDeviceClient: onDevice,
                                           clientFactory: factory)
