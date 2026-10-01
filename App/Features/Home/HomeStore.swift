@@ -63,7 +63,7 @@ final class HomeStore {
     private(set) var demoJobs: [HomeJob] = []
 
     let history: ListeningHistoryStore
-    @ObservationIgnored private let defaults: UserDefaults?
+    private let defaults: UserDefaults?
     @ObservationIgnored private var lastKey: Key?
     @ObservationIgnored private var computeTask: Task<Void, Never>?
 

@@ -102,8 +102,11 @@ final class HomeLogicTests: XCTestCase {
         XCTAssertEqual(HomeLogic.pillRowTargets(10), [4, 3, 3])
         XCTAssertEqual(HomeLogic.pillRowTargets(4), [2, 1, 1])
         let rows = HomeLogic.pillRows(Array(0..<5), width: { _ in 100 }, startPadding: 8, endPadding: 24)
-        XCTAssertEqual(rows.map { $0.cells.map(\.item) }, [[0, 3], [1, 4], [2]])
-        XCTAssertEqual(rows.map(\.contentWidth), [8 + 100 + 8 + 100 + 24, 8 + 100 + 8 + 100 + 24, 8 + 100 + 24])
+        let items: [[Int]] = rows.map { row in row.cells.map { $0.item } }
+        XCTAssertEqual(items, [[0, 3], [1, 4], [2]])
+        let twoCells: CGFloat = 240 // 8 + 100 + 8 + 100 + 24
+        let oneCell: CGFloat = 132 // 8 + 100 + 24
+        XCTAssertEqual(rows.map(\.contentWidth), [twoCells, twoCells, oneCell])
     }
 
     // MARK: Recently played mapping
