@@ -30,6 +30,15 @@ struct GlassPillRow<ID: Hashable & Sendable>: View {
     /// Tint of the selected capsule (defaults to the theme's `primary`).
     var selectedTint: Color?
     var accessibilityIdentifierPrefix = "pill"
+    /// A trailing action capsule after the items (Library's "Edit" tab that opens the reorder sheet).
+    var accessory: Accessory?
+
+    /// An icon-only capsule at the end of the row, never selected.
+    struct Accessory {
+        let systemImage: String
+        let accessibilityLabel: String
+        let action: () -> Void
+    }
 
     @Environment(\.appTheme) private var theme
     @Namespace private var glassNamespace
@@ -37,23 +46,50 @@ struct GlassPillRow<ID: Hashable & Sendable>: View {
     nonisolated private enum GlassID: Hashable, Sendable {
         case selection
         case item(ID)
+        case accessory
     }
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            // Container spacing below the gap: capsules never blend at rest, yet the selection still morphs.
-            GlassEffectContainer(spacing: spacing * 0.4) {
-                HStack(spacing: spacing) {
-                    ForEach(items) { item in
-                        pill(item)
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                // Container spacing below the gap: capsules never blend at rest, yet the selection still morphs.
+                GlassEffectContainer(spacing: spacing * 0.4) {
+                    HStack(spacing: spacing) {
+                        ForEach(items) { item in
+                            pill(item)
+                                .id(item.id)
+                        }
+                        if let accessory {
+                            accessoryPill(accessory)
+                        }
                     }
+                    .padding(.horizontal, edgePadding)
+                    .padding(.vertical, Tokens.Tabs.outerPadding)
                 }
-                .padding(.horizontal, edgePadding)
-                .padding(.vertical, Tokens.Tabs.outerPadding)
+            }
+            .scrollClipDisabled()
+            // Like Android's scrollable tab row: the selected tab scrolls into view.
+            .onChange(of: selection) { _, newValue in
+                withAnimation(PixlMotion.selection) { proxy.scrollTo(newValue, anchor: .center) }
             }
         }
-        .scrollClipDisabled()
         .sensoryFeedback(.selection, trigger: selection)
+    }
+
+    private func accessoryPill(_ accessory: Accessory) -> some View {
+        Button(action: accessory.action) {
+            Image(systemName: accessory.systemImage)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(theme.onSurface.opacity(0.9))
+                .padding(.horizontal, textPadding)
+                .frame(height: height)
+                .contentShape(.capsule)
+        }
+        .buttonStyle(.plain)
+        .glassEffect(Glass.regular.interactive(), in: Capsule())
+        .glassEffectID(GlassID.accessory, in: glassNamespace)
+        .accessibilityLabel(accessory.accessibilityLabel)
+        .accessibilityIdentifier("\(accessibilityIdentifierPrefix).accessory")
     }
 
     private func pill(_ item: Item) -> some View {

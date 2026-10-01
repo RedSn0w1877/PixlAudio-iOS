@@ -537,6 +537,11 @@ run the real importer over generated files (see the App tests table). Behaviour 
 - Not ported here: Android's "preserve user-edited fields" merge in the processing phase (iOS keeps edits as
   `TagOverrideRecord`s that are re-applied on every scan) and the LRC auto-scan phase (it writes the lyrics table,
   stage 9's `LyricsService`).
+## Stage 7a — Library and detail screens
+| Android test (class) | Cases | Swift test | Module | Status | Notes |
+|---|---|---|---|---|---|
+| `ui/theme/GenreThemeUtilsTest` | 3 | `LibraryScreensTests.testGenreDetailScheme…` / `testUnknownGenreUsesTheMonochromeScheme` (+ Java `hashCode` index case) | App (`GenreTheme`) | ported | Compares all 48 roles through `ColorRoles` equality instead of a role list. |
+| `presentation/viewmodel/PlayerViewModelTest` | — | — | — | n/a | Covers PlayerViewModel playback plumbing, not the Library screens; stage 5/8 territory. |
 
 ## Priority list (from architecture §4, must pass on Windows before UI work)
 - ~~`LyricsEngineTest`, `LyricsClockTest`, `LyricsMotionMathTest`, `PreparedLyricsBuilderTest`,
@@ -563,6 +568,8 @@ run the real importer over generated files (see the App tests table). Behaviour 
 | `LibraryImportTests` (stage 6) | the import on files generated at test time (MP3 with ID3v2 + APIC + SYLT, FLAC with Vorbis comments + STREAMINFO, untagged WAV, AAC M4A via `AVAudioFile`): tags, MediaStore-style defaults (file-name title, folder-name album, "Unknown Artist"), Android's genre placeholders, 10 s minimum, `.nomedia` / hidden / blocked folders, artist splitting with the delimiter settings, album grouping by folder, incremental rescan (unchanged files kept, changed + new read), deleted files and their orphan artists removed, favourites and date added kept, stable artist ids, rejected files re-read when the filters change, tag overrides set and cleared, write-back to MP3 / FLAC (PixlTags) and M4A (passthrough export), ReplayGain and embedded artwork read back, `LibraryStore.refresh` + snapshot cache |
 | `LibraryScanLogicTests` (stage 6) | scan-plan diff by relative path + stamp (unchanged / changed / new / still rejected / iCloud placeholder, full rescan), id and library-path helpers, Android `normalizeGenre`, `LibraryScanOptions` from the Android keys (legacy delimiter list normalised, JSON string arrays), override JSON round trip |
 | `UITests/ScreenshotTests` | shell: home, library, miniPlayer (album-tinted), miniPlayerAlone (bar hidden) × light/dark; search, settings, nowPlaying, diagnostics |
+| `LibraryScreensTests` (stage 7a) | genre colours/schemes; `OrderedSelection` order and select-all; `LibraryPreferences` per-playlist song order (`playlist_song_order_modes`, `"manual"`), sort keys, storage-filter cycle; playlist cover form (saved fields per tab, edit-mode tab choice); `LibraryModel.compute` sorting/filtering/folder tree on the demo library; folder-playlist ids; artist album sections; genre list grouping; M3U file names |
+| `UITests/LibraryScreenshotTests` (stage 7a) | Library tabs (playlists, albums grid/list, artists, folders, liked), selection, sort, reorder tabs, song multi-selection, creation chooser, add to playlist; song options (options + info pages); album, artist, genre (+ sort sheet), folder explorer; playlist detail (+ reorder/remove modes, options, add songs), playlist editor (create, edit with the Icon tab) |
 
 ### Stage 5 notes
 Android has no unit tests for `DualPlayerEngine`, `TransitionController`, `MusicService`, `ListeningStatsTracker` or

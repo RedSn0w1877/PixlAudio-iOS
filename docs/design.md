@@ -186,3 +186,22 @@ goes into `docs/api-notes.md`.
 `miniPlayer` (library with a vivid song: album-tinted mini player) and `miniPlayerAlone` (pushed screen: bar
 hidden). The ready element of each is `screen.<id>`. Stage 4 shots: home, library, miniPlayer, miniPlayerAlone in
 light + dark; search, settings, nowPlaying, diagnostics.
+
+Stage 7a ids (Library tab on screen, ready `screen.library` plus the page/sheet id): `libraryPlaylists`,
+`libraryAlbums` (grid), `libraryAlbumsList`, `libraryArtists`, `libraryFolders`, `libraryLiked`, `librarySelection`
+(three songs selected), `librarySort`, `libraryReorderTabs`, `libraryMultiSelection`, `libraryCreatePlaylist`,
+`libraryAddToPlaylist`; `songOptionsInfo` (the ⋮ sheet on its Info page); `playlistEdit` (editor on the first demo
+playlist, Icon tab with a star), `playlistAddSongs`, `playlistOptions`, `playlistReorder` (reorder + remove modes),
+`genreSort`. Shots: `UITests/LibraryScreenshotTests` (CI runs it next to `ScreenshotTests`).
+
+## Stage 7a notes (Library, details, playlists)
+
+- Library state lives in the screen: `LibraryModel` (sorted lists, recomputed off the main thread for large
+  libraries), `LibraryPreferences` (Android keys: `library_tabs_order`, `*_sort_option`, `last_storage_filter`,
+  `is_folders_playlist_view`, `playlist_song_order_modes`), `OrderedSelection` (multi-selection in selection order).
+- Edits go through `LibraryEditor` (`env.libraryEditor`): the snapshot updates at once, then `PersistenceActor`
+  writes and the launch cache is refreshed.
+- Every song ⋮ opens `AppSheet.songInfo`, whose body is the ported `SongOptionsSheet` (Android `SongInfoBottomSheet`);
+  other stages can present it the same way.
+- Queue insertions (`playNext`, `addToQueue`) re-set the queue through the `PlaybackEngine` seam at the current
+  position until stage 5 adds native inserts.
