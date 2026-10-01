@@ -10,12 +10,20 @@ extension ScreenshotTests {
         app.launch()
         XCTAssertTrue(app.descendants(matching: .any)["screen.diagnostics"].firstMatch.waitForExistence(timeout: 20))
 
+        // The row must sit well clear of the bottom: on pushed screens the mini player floats over the last
+        // ~100 pt, and a tap there opens Now Playing instead of following the link.
         let link = app.descendants(matching: .any)["diagnostics.libraryImport"].firstMatch
+        let safeMaxY = app.windows.firstMatch.frame.height * 0.6
         var swipes = 0
-        while !link.isHittable && swipes < 6 {
-            app.swipeUp()
+        // Short drags (~30 % of the screen each) so the row cannot overshoot past the top.
+        let window = app.windows.firstMatch
+        while (!link.exists || link.frame.maxY > safeMaxY) && swipes < 10 {
+            let start = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7))
+            let end = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4))
+            start.press(forDuration: 0.05, thenDragTo: end)
             swipes += 1
         }
+        XCTAssertTrue(link.isHittable, "diagnostics.libraryImport is not reachable")
         link.tap()
         XCTAssertTrue(app.descendants(matching: .any)["screen.libraryImportDebug"].firstMatch.waitForExistence(timeout: 10))
         Thread.sleep(forTimeInterval: 1.0)

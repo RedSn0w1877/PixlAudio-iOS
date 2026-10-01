@@ -264,5 +264,6 @@ CI by the stage-6 build. Paths are under https://developer.apple.com.
 |---|---|---|
 | Swift Testing (`@Test`, `@Suite`, `#expect`, `#require`) | /documentation/testing | PixlCore (Windows + macOS). |
 | `XCUIApplication.launchArguments`, `XCTAttachment(screenshot:)`, `.lifetime = .keepAlways`, `swipeUp(velocity:)` | /documentation/xctest/xctattachment | `UITests/ScreenshotTests`. |
+| `XCUIElement.coordinate(withNormalizedOffset:)`, `XCUICoordinate.press(forDuration:thenDragTo:)`, `XCUIElement.frame` | /documentation/xctest/xcuicoordinate/press(forduration:thendragto:) | `UITests/LibraryImportScreenshotTests`: short drags that bring a row clear of the floating mini player before tapping it. |
 | `xcrun xcresulttool export attachments` / `get test-results summary` | `man xcresulttool` (Xcode 16+) | `ci/export-shots.sh`, `ci/xcerrors.sh`. |
 | `xcrun simctl list -j`, `boot`, `bootstatus -b`, `status_bar … override` | `xcrun simctl help` | `ci/pick-sim.sh`, shots job. |
