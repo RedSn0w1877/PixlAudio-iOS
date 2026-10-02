@@ -694,10 +694,11 @@ final class LyricsSyncSession {
         phase = .preview
         rebuildPreview()
         let offset = offsetMs
+        let snapshot = current
         previewSeekTask?.cancel()
         previewSeekTask = Task { [weak self] in
             let target = await Task.detached(priority: .userInitiated) {
-                Self.previewStartMs(current, offsetMs: offset, focusLine: focusLine)
+                Self.previewStartMs(snapshot, offsetMs: offset, focusLine: focusLine)
             }.value
             guard !Task.isCancelled, let self, self.phase == .preview else { return }
             self.seekTo(max(0, target))
