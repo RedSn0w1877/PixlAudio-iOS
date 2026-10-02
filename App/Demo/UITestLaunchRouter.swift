@@ -65,12 +65,6 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case setupPermission, setupFolders, setupBackup, setupTheme, setupLibraryLayout, setupSpotify, setupFinish
     case backupRestorePlan, backupImportReport
 
-    // Stage 14: TAIS Studio — Experimental's Remaster Song card and on-device models panel, the song sheet's card,
-    // and the lyrics screen's instrumental UI (`TaisDemo` sets the job / model states)
-    case taisStudio = "tais.studio", taisModels = "tais.models", taisSongSheet = "tais.songSheet"
-    case taisInstrumental = "tais.instrumental", taisInstrumentalRendering = "tais.instrumentalRendering"
-    case taisInstrumentalActive = "tais.instrumentalActive"
-
     /// The accessibility identifier present once the screen is up (`screen.<id>`).
     var readyIdentifier: String {
         switch self {
@@ -156,8 +150,6 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
             return nil
         // A full-screen cover: nothing needs to be pushed underneath (one destination per demo screen).
         case .backupRestorePlan, .backupImportReport: return nil
-        case .taisStudio, .taisModels: return .experimental
-        case .taisSongSheet, .taisInstrumental, .taisInstrumentalRendering, .taisInstrumentalActive: return nil
         }
     }
 
@@ -181,7 +173,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         let songId = DemoLibrary.songs.first?.id ?? ""
         switch self {
         case .queue: return .queue
-        case .songInfo, .songOptionsInfo, .taisSongSheet: return .songInfo(songId: songId)
+        case .songInfo, .songOptionsInfo: return .songInfo(songId: songId)
         case .sleepTimer: return .sleepTimer
         case .lyricsOptions: return .lyricsOptions(songId: songId)
         case .changelog: return .changelog
@@ -207,7 +199,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         switch self {
         case .nowPlaying: .nowPlaying
         case .editSong: .editSong(songId: DemoLibrary.songs.first?.id ?? "")
-        case .lyrics, .taisInstrumental, .taisInstrumentalRendering, .taisInstrumentalActive: .lyrics
+        case .lyrics: .lyrics
         case .lyricsSync: .lyricsSync(songId: DemoLibrary.songs.first?.id ?? "")
         case .setup, .setupPermission, .setupFolders, .setupBackup, .setupTheme, .setupLibraryLayout, .setupSpotify,
              .setupFinish:
@@ -228,6 +220,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
 ///     -song <index>                the demo song that is current (default 0; miniPlayer uses a vivid one)
 ///     -paused                      start paused (default: playing)
 ///     -noSong                      nothing playing (no mini player)
+///     -demoScale <n>               repeat the demo library n times (performance tests: a library of real size)
 nonisolated struct LaunchConfiguration: Equatable, Sendable {
     nonisolated enum Appearance: String, Sendable {
         case system, light, dark
@@ -240,6 +233,8 @@ nonisolated struct LaunchConfiguration: Equatable, Sendable {
     var songIndex: Int
     var startsPlaying: Bool
     var hasSong: Bool
+    /// How many copies of the demo library to load (1 = the screenshot library).
+    var demoScale: Int
 
     init(arguments: [String]) {
         func value(after flag: String) -> String? {
@@ -258,6 +253,7 @@ nonisolated struct LaunchConfiguration: Equatable, Sendable {
         songIndex = value(after: "-song").flatMap(Int.init) ?? defaultSong
         startsPlaying = !arguments.contains("-paused")
         hasSong = !arguments.contains("-noSong")
+        demoScale = min(max(value(after: "-demoScale").flatMap(Int.init) ?? 1, 1), 400)
     }
 
     /// The configuration of this process.

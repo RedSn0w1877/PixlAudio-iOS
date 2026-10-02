@@ -38,6 +38,15 @@ final class SettingsScreenshotTests: XCTestCase {
     func testEditTransitionLight() throws { try capture("editTransition", "light") }
     func testEditTransitionDark() throws { try capture("editTransition", "dark") }
     func testOpenSourceLicensesLight() throws { try capture("openSourceLicenses", "light") }
+    /// The third-party notices sheet (laid out by paragraph; spacing as one text).
+    func testThirdPartyNoticesLight() throws {
+        try capture("openSourceLicenses", "light") { app in
+            let predicate = NSPredicate(format: "identifier == %@ OR label CONTAINS[c] %@", "licenses.notices", "notices")
+            let button = app.buttons.matching(predicate).firstMatch
+            if button.waitForExistence(timeout: 5) { button.tap() }
+            _ = app.descendants(matching: .any)["licenses.noticesSheet"].firstMatch.waitForExistence(timeout: 5)
+        }
+    }
     func testEasterEggDark() throws { try capture("easterEgg", "dark") }
 
     /// The equalizer in its other view modes and the brick game in play.

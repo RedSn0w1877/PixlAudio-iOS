@@ -71,11 +71,8 @@ final class DeckItemFactory {
         self.streaming = streaming
     }
 
-    /// `overrideURL` plays other audio for the same queue entry (stage 14: a rendered instrumental).
-    func makeItem(for entry: QueueEntry, overrideURL: URL? = nil) async throws -> DeckItem {
-        var resolved = overrideURL
-        if resolved == nil { resolved = await resolver.playableURL(for: entry.song) }
-        guard let url = resolved else {
+    func makeItem(for entry: QueueEntry) async throws -> DeckItem {
+        guard let url = await resolver.playableURL(for: entry.song) else {
             throw DeckItemError.unresolvable(songId: entry.song.id)
         }
         let asset = AVURLAsset(url: url)
@@ -233,14 +230,6 @@ final class Deck {
         player.automaticallyWaitsToMinimizeStalling = false
         player.defaultRate = rate
         player.setRate(rate, time: .zero, atHostTime: hostTime)
-    }
-
-    /// Starts the current item at `itemSeconds` (item time) at `hostTime` — stage 14's in-sync switch between a song
-    /// and its instrumental. Call after `preroll`.
-    func start(rate: Float, at itemSeconds: Double, atHostTime hostTime: CMTime) {
-        player.automaticallyWaitsToMinimizeStalling = false
-        player.defaultRate = rate
-        player.setRate(rate, time: CMTime(seconds: itemSeconds, preferredTimescale: 1_000_000_000), atHostTime: hostTime)
     }
 
     /// Back to the default stall handling (for streamed items) once no scheduled start is pending.

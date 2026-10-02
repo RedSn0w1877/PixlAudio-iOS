@@ -29,8 +29,7 @@ struct PlaylistDetailView: View {
     @State private var showsSort = false
     @State private var showsOptions = false
     @State private var confirmsDelete = false
-    /// Stage 14: the playlist's lyric-sync run, from TAIS Studio's job states.
-    private var lyricSync: PlaylistLyricSyncState { env.tais.studio.lyricSyncState(playlistId: playlistId) }
+    @State private var lyricSync = PlaylistLyricSyncState.idle
     @State private var didApplyLaunchState = false
 
     private var prefs: LibraryPreferences { LibraryPreferences.shared(isUITest: env.launch.isUITest) }
@@ -46,7 +45,8 @@ struct PlaylistDetailView: View {
 
     private func resolveFolder() {
         guard let folderPath else { return }
-        let folder = LibraryModel.folder(at: folderPath, in: LibraryModel.folderTree(library.songs))
+        // The library's folder tree is built off the main actor with the detail index.
+        let folder = LibraryModel.folder(at: folderPath, in: library.folderTree)
         folderPlaylist = folder.map { Playlist(id: playlistId, name: $0.name, songIds: LibraryModel.allSongs($0).map(\.id)) }
         didResolveFolder = true
     }
@@ -81,9 +81,7 @@ struct PlaylistDetailView: View {
             } else {
                 playRow
                 if !isFolder { editRow }
-                PlaylistLyricSyncCard(state: lyricSync,
-                                      onCancel: { env.tais.studio.cancelLyricBatch(playlistId: playlistId) },
-                                      onRetry: { env.tais.studio.retryLyricBatch(playlistId: playlistId, songs: songs) })
+                PlaylistLyricSyncCard(state: lyricSync, onCancel: { lyricSync = .idle }, onRetry: {})
                     .padding(.horizontal, 16)
                     .padding(.vertical, lyricSync.total > 0 ? 8 : 0)
                 if songs.isEmpty {
@@ -233,15 +231,17 @@ struct PlaylistDetailView: View {
         return ScrollView {
             LazyVStack(spacing: 8) {
                 ForEach(songs) { song in
-                    let isCurrent = playback.current?.id == song.id
-                    PlaylistSongRow(song: song, isCurrent: isCurrent, isPlaying: isCurrent && playback.isPlaying,
-                                    showsDragHandle: isReorderMode && !isFolder, showsRemove: isRemoveMode && !isFolder,
-                                    onTap: { playback.play(song, in: songs) },
-                                    onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
-                                    onRemove: { env.libraryEditor.removeSong(song.id, fromPlaylist: playlistId) })
-                        .dropDestination(for: String.self) { items, _ in
-                            move(items.first, onto: song.id)
-                        }
+                    PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
+                        PlaylistSongRow(song: song, isCurrent: isCurrent, isPlaying: isPlaying,
+                                        showsDragHandle: isReorderMode && !isFolder,
+                                        showsRemove: isRemoveMode && !isFolder,
+                                        onTap: { playback.play(song, in: songs) },
+                                        onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
+                                        onRemove: { env.libraryEditor.removeSong(song.id, fromPlaylist: playlistId) })
+                    }
+                    .dropDestination(for: String.self) { items, _ in
+                        move(items.first, onto: song.id)
+                    }
                 }
             }
             .padding(.top, 12)
@@ -294,14 +294,11 @@ struct PlaylistDetailView: View {
                              },
                              onSyncLyricsAll: {
                                  showsOptions = false
-                                 // Stage 14: one lyric-sync job per song through TAIS Studio's lane.
-                                 env.tais.studio.syncLyrics(playlistId: playlistId, songs: songs)
+                                 LibraryToast.shared.show("Word-level lyric sync arrives in a later update.")
                              },
                              onInstrumentalizeAll: {
                                  showsOptions = false
-                                 let queued = env.tais.studio.renderInstrumentals(songs)
-                                 LibraryToast.shared.show(queued == 0 ? "Every song here already has an instrumental."
-                                                                      : "Rendering instrumentals for \(queued) songs")
+                                 LibraryToast.shared.show("Instrumentals arrive in a later update.")
                              })
     }
 
@@ -373,7 +370,8 @@ private struct PlaylistOptionsSheet: View {
         }
         .task(id: playlist?.id) {
             guard let playlist else { return }
-            exportURL = PlaylistExport.writeTemporaryM3U(playlist, library: library)
+            let url = await PlaylistExport.writeTemporaryM3U(playlist, library: library)
+            if !Task.isCancelled { exportURL = url }
         }
         .accessibilityIdentifier("sheet.playlistOptions")
     }

@@ -167,12 +167,6 @@ struct SongOptionsSheet: View {
                     confirmsDelete = true
                 }
             }
-            // Stage 14: Android's Remaster Song card (BS-RoFormer stays in Experimental, as on Android).
-            TaisStudioProgressCard(song: song,
-                                   onInstrumentalReady: {
-                                       LibraryToast.shared.show("Instrumental ready for \(song.title) — play it from the lyrics screen.")
-                                   },
-                                   onLyricsReady: { LibraryToast.shared.show("Lyrics synced for \(song.title).") })
             // Stage 11: streamed songs only (Android `OfflineDownloadCard`).
             OfflineDownloadCard(song: song)
         }

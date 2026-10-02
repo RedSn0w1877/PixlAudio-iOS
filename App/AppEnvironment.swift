@@ -33,6 +33,8 @@ final class AppEnvironment {
     let searchProviders: [SearchSource: any SearchProviding]
     /// Stage 8: the player sheet (mini player ↔ full player) state.
     let playerSheet = PlayerSheetController()
+    /// Play counts for "Most played" on artist pages, warmed after launch (see `PlayCountStore`).
+    let playCounts = PlayCountStore()
     /// Stage 8: the sleep timer the queue's timer sheet drives — the engine's (`PlaybackServices`), or an engine-less
     /// one for UI tests.
     let sleepTimer: SleepTimerController
@@ -55,8 +57,6 @@ final class AppEnvironment {
         return service
     }
 
-    /// Stage 14: on-device models, the TAIS Studio jobs (lyric sync, instrumentals) and the instrumental switch.
-    let tais: TaisServices
     /// Stage 15: `.pxpl` export, inspection and restore (PixlBackup) and the pending playlist restore.
     let backup: BackupService
     /// Stage 15: the notify-only GitHub release check.
@@ -145,9 +145,6 @@ final class AppEnvironment {
                                .youtubeMusic: youtube.searchProvider ?? (UnavailableSearchProvider(source: .youtubeMusic) as any SearchProviding)]
         }
 
-        tais = TaisServices(launch: launch, settings: settings, lyricsController: lyricsController, playback: playback,
-                            playbackServices: playbackServices, youtube: youtube)
-
         let settingsDefaults = isUITest ? (UserDefaults(suiteName: "pixlaudio.uitest") ?? .standard) : .standard
         backup = BackupService(persistence: persistence, library: library, settings: settings, defaults: settingsDefaults,
                                history: home.history, playbackServices: playbackServices, isUITest: isUITest)
@@ -162,13 +159,17 @@ final class AppEnvironment {
         if !settings.behavior.initialSetupDone, router.cover == nil { router.present(AppCover.setup) }
         playbackServices?.start()
         youtube.start()
-        tais.start()
         let library = self.library, playback = self.playback
         spotify.attach(reloadLibrary: { await library.reloadFromStore() }, isPlaybackActive: { playback.isPlaying })
         spotify.songLookup = { library.song(id: $0) }
         await library.load()
-        playbackServices?.restoreQueue(lookup: library.song(id:))
+        await playbackServices?.restoreQueue(lookup: library.song(id:))
         libraryAutoRefresh?.start()
+        let home = self.home, playCounts = self.playCounts, editor = libraryEditor
+        Task {
+            await home.history.ensureLoaded()
+            await playCounts.refresh(editor: editor, revision: home.history.revision)
+        }
         backup.start()
         await spotify.start()
         await updates.checkIfDue()

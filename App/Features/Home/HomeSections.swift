@@ -634,16 +634,29 @@ struct HomeAlbumThemed<Content: View>: View {
     @State private var pair: ColorRolesPair?
 
     var body: some View {
-        let colors = pair.map { ThemeColors(roles: $0.roles(dark: colorScheme == .dark), isDark: colorScheme == .dark) }
+        // A scheme already in memory is used from the first frame (no brand-tint flash, no tint animation).
+        let resolved = cachedPair ?? pair
+        let colors = resolved.map { ThemeColors(roles: $0.roles(dark: colorScheme == .dark), isDark: colorScheme == .dark) }
             ?? theme
         content(colors)
             .task(id: song.albumArtUriString) {
                 guard let source = ArtworkSource(song: song) else { pair = nil; return }
                 let appearance = env.settings.appearance
+                if let hit = env.colorExtractor.peek(source, style: appearance.paletteStyle,
+                                                     accuracyLevel: appearance.colorAccuracy) {
+                    if pair != hit { pair = hit }
+                    return
+                }
                 let loaded = await env.colorExtractor.schemePair(for: source, style: appearance.paletteStyle,
                                                                  accuracyLevel: appearance.colorAccuracy)
                 if !Task.isCancelled, loaded != pair { pair = loaded }
             }
+    }
+
+    private var cachedPair: ColorRolesPair? {
+        guard let source = ArtworkSource(song: song) else { return nil }
+        let appearance = env.settings.appearance
+        return env.colorExtractor.peek(source, style: appearance.paletteStyle, accuracyLevel: appearance.colorAccuracy)
     }
 }
 

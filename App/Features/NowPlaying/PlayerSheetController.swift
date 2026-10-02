@@ -26,6 +26,9 @@ final class PlayerSheetController {
     @ObservationIgnored var isScrubbing = false
     /// Android `visualOvershootScaleY`: the squash on collapse (0.96 → 1, bouncy) and the bump on expand.
     var overshootScaleY: CGFloat = 1
+    /// The keyboard is up and the shell's bars have stepped aside: the collapsed card slides down with the tab bar
+    /// (set by the shell in the same animation), keeping its slot so it comes back without a rebuild.
+    var hiddenForKeyboard = false
 
     // MARK: Slot
 
@@ -35,6 +38,8 @@ final class PlayerSheetController {
     }
 
     func removeSlot() {
+        // The slot leaves while the keyboard is up; the card keeps its frame and slides out with the bar instead.
+        guard !hiddenForKeyboard else { return }
         collapsedFrame = nil
     }
 

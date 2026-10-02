@@ -5,14 +5,13 @@ import SwiftUI
 /// (delay, placeholders, trigger mode, thresholds) — then "Visual Quality" with the album-art resolution list. Rows
 /// are 10 pt glass panels 4 pt apart.
 ///
-/// Remaster Song is stage 14's `TaisStudioProgressCard` (followed by the iOS-only on-device models panel); the
-/// BS-RoFormer fields feed its cloud render. TAIS DJ opens the DJ chat (stage 13). Dropped: the visual-style switch (Liquid Glass / Material — iOS is glass only) and
+/// TAIS tools are UI shells here: the controls store their Android keys, but rendering and word sync arrive with
+/// the TAIS stages. TAIS DJ opens the DJ chat (stage 13). Dropped: the visual-style switch (Liquid Glass / Material — iOS is glass only) and
 /// the Plus licence debug tools (everything is unlocked).
 struct ExperimentalSettingsView: View {
     @Environment(SettingsStore.self) private var settings
     @Environment(PlaybackStore.self) private var playback
     @Environment(Router.self) private var router
-    @Environment(AppEnvironment.self) private var env
     @Environment(\.appTheme) private var theme
     @State private var toast: String?
 
@@ -38,11 +37,7 @@ struct ExperimentalSettingsView: View {
                                                          defaultValue: "TAIS Engine 2's zero-latency vocal reducer — attenuates the center-panned mix instantly. This is separate from the real AI separation model (see \"Remaster Song\" below), which separates vocal and instrumental tracks. The active processor and benchmark are shown in Music Intelligence settings."),
                                         value: $experimental.vocalAttenuation, range: 0...1, steps: 19)
                 RoformerBackendPanel(experimental: experimental)
-                // Stage 14: the real Remaster Song card (Android `TaisStudioProgressCard(showRoformerTools = true)`);
-                // a finished render plays at once, like Android's `switchToStudioInstrumental`.
-                TaisStudioProgressCard(song: playback.current, showRoformerTools: true, tintStrength: SettingsTint.row,
-                                       onInstrumentalReady: { env.tais.instrumental.playInstrumental() })
-                OnDeviceModelsPanel(tintStrength: SettingsTint.row)
+                RemasterSongPanel(hasSong: playback.current != nil)
                 Button {
                     router.present(AppSheet.taisChat)
                 } label: {
@@ -356,5 +351,40 @@ private struct RoformerBackendPanel: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .experimentalPanelGlass()
+    }
+}
+
+/// Android `TaisStudioProgressCard` (shell): Remaster Song with its three jobs; each button waits for the TAIS
+/// stage (and for a song to play, as on Android).
+private struct RemasterSongPanel: View {
+    let hasSong: Bool
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                SettingsIcon(systemImage: "sparkles")
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(verbatim: "Remaster Song").pixlFont(.titleMedium).foregroundStyle(theme.onSurface)
+                    Text(String(localized: "settings_exp_remaster_body",
+                                defaultValue: "Render an instrumental or sync the lyrics word-by-word for this track — each runs on its own, so you don't have to wait on one to get the other."))
+                        .pixlFont(.bodyMedium).foregroundStyle(theme.onSurfaceVariant)
+                }
+            }
+            job("Render Instrumental")
+            Rectangle().fill(theme.outlineVariant).frame(height: 1)
+            job("Sync Lyrics (word by word)")
+            Rectangle().fill(theme.outlineVariant).frame(height: 1)
+            job("Render Studio Master (BS-RoFormer)")
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .experimentalPanelGlass()
+    }
+
+    private func job(_ label: String) -> some View {
+        SettingsFillButton(title: hasSong ? label : String(localized: "settings_exp_play_song_first",
+                                                           defaultValue: "Play a song first"),
+                           style: .tonal, enabled: false) {}
     }
 }

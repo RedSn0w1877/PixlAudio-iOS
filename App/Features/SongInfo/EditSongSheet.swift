@@ -194,8 +194,8 @@ struct EditSongSheet: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 HStack(spacing: 8) {
-                    syncButton("Change the words", systemImage: nil) { openSyncEditor(song, entry: .words) }
-                    syncButton("Fix timing", systemImage: "hand.tap") { openSyncEditor(song, entry: .fixTiming) }
+                    syncButton("Change the words", systemImage: nil) { openSyncEditor(song) }
+                    syncButton("Fix timing", systemImage: "hand.tap") { openSyncEditor(song) }
                 }
             } else {
                 HStack(spacing: 8) {
@@ -253,9 +253,9 @@ struct EditSongSheet: View {
         return doc.lines.map { $0.text.trimmingCharacters(in: .whitespaces) }.joined(separator: "\n")
     }
 
-    private func openSyncEditor(_ song: Song, entry: SyncEntry) {
+    private func openSyncEditor(_ song: Song) {
         dismiss()
-        LyricsSyncEditorView.open(songId: song.id, router: router, entry: entry)
+        router.present(AppCover.lyricsSync(songId: song.id))
     }
 
     /// Android opens lrclib.net's search for the title and artist.

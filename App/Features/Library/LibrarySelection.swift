@@ -29,10 +29,12 @@ final class OrderedSelection<ID: Hashable> {
         reindex()
     }
 
-    /// Adds the ids that are not selected yet, keeping the current order first (Android `selectAll`).
+    /// Adds the ids that are not selected yet, keeping the current order first (Android `selectAll`). A set tracks
+    /// what is already in (a linear `contains` per id made selecting 5,000 songs quadratic on the main actor).
     func selectAll(_ newIds: [ID]) {
+        var seen = Set(ids)
         var next = ids
-        for id in newIds where positions[id] == nil && !next.contains(id) { next.append(id) }
+        for id in newIds where seen.insert(id).inserted { next.append(id) }
         ids = next
         reindex()
     }

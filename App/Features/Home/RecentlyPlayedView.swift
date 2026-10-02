@@ -73,11 +73,12 @@ struct RecentlyPlayedView: View {
                         TimestampDivider(label: group.label, isHourBucket: group.isHourBucket)
                             .padding(.horizontal, 16)
                         ForEach(group.items) { item in
-                            SongCard(song: item.song, isCurrent: playback.current?.id == item.song.id,
-                                     isPlaying: playback.current?.id == item.song.id && playback.isPlaying,
-                                     onTap: { playback.play(item.song, in: queue) },
-                                     onMore: { router.present(AppSheet.songInfo(songId: item.song.id)) })
-                                .padding(.horizontal, 16)
+                            PlaybackRowState(songId: item.song.id) { isCurrent, isPlaying in
+                                SongCard(song: item.song, isCurrent: isCurrent, isPlaying: isPlaying,
+                                         onTap: { playback.play(item.song, in: queue) },
+                                         onMore: { router.present(AppSheet.songInfo(songId: item.song.id)) })
+                            }
+                            .padding(.horizontal, 16)
                         }
                     }
                 }

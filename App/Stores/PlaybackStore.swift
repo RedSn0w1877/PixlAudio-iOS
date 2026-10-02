@@ -4,10 +4,20 @@ import PixlModel
 
 /// What is playing — never *where* in the song. Position is read on demand (`positionMs()`) from the engine's
 /// timebase; the scrubber samples it ≤ 4 Hz with `TimelineView`, lyrics per display-link tick (stage 9).
+///
+/// `current`, `currentSongId` and `hasItem` are stored (kept in step with `queue` and `currentIndex`), so views that
+/// only need the current song — the shell, tab roots, every row's "is this the current song?" — don't observe the
+/// whole queue: queue edits no longer re-render them, and a song change re-renders only what shows the current song.
 @Observable
 final class PlaybackStore {
     private(set) var queue: [Song] = []
     private(set) var currentIndex: Int?
+    /// The current song (`queue[currentIndex]`), stored.
+    private(set) var current: Song?
+    /// `current?.id`, stored: what rows compare against.
+    private(set) var currentSongId: String?
+    /// Bumped whenever `queue` is replaced (the queue sheet reacts to it instead of comparing every id).
+    private(set) var queueRevision = 0
     private(set) var isPlaying = false
     private(set) var isPreparing = false
     private(set) var repeatMode: RepeatMode = .off
@@ -27,12 +37,14 @@ final class PlaybackStore {
         }
     }
 
-    var current: Song? {
-        guard let currentIndex, queue.indices.contains(currentIndex) else { return nil }
-        return queue[currentIndex]
-    }
+    var hasItem: Bool { currentSongId != nil }
 
-    var hasItem: Bool { current != nil }
+    /// Recomputes the stored current song from the queue and index; assigns only what changed.
+    private func syncCurrent() {
+        let song: Song? = currentIndex.flatMap { queue.indices.contains($0) ? queue[$0] : nil }
+        if current != song { current = song }
+        if currentSongId != song?.id { currentSongId = song?.id }
+    }
 
     // MARK: Commands
 
@@ -40,7 +52,9 @@ final class PlaybackStore {
     func play(_ songs: [Song], startIndex: Int = 0, startPositionMs: Int64 = 0, playWhenReady: Bool = true) {
         guard !songs.isEmpty else { return }
         queue = songs
+        queueRevision &+= 1
         currentIndex = min(max(startIndex, 0), songs.count - 1)
+        syncCurrent()
         engine.setQueue(songs, startIndex: currentIndex ?? 0, startPositionMs: startPositionMs,
                         playWhenReady: playWhenReady)
     }
@@ -55,14 +69,6 @@ final class PlaybackStore {
         guard hasItem else { return }
         isPlaying ? engine.pause() : engine.play()
     }
-
-    /// Explicit play / pause (stage 10's sync editor: two quick calls never cancel out the way two toggles could).
-    func resume() {
-        guard hasItem else { return }
-        engine.play()
-    }
-
-    func pause() { engine.pause() }
 
     func skipToNext() { engine.skipToNext() }
     func skipToPrevious() { engine.skipToPrevious() }
@@ -111,6 +117,7 @@ final class PlaybackStore {
         switch event {
         case .currentIndexChanged(let index):
             if currentIndex != index { currentIndex = index }
+            syncCurrent()
         case .playingChanged(let playing):
             if isPlaying != playing { isPlaying = playing }
         case .preparingChanged(let preparing):
@@ -120,8 +127,15 @@ final class PlaybackStore {
         case .failed(let message):
             lastError = message
         case .queueChanged(let songs, let index):
-            if queue != songs { queue = songs }
+            // The engine's queue holds the songs it was given (it never edits metadata), so the order of ids says
+            // whether anything changed. Equal Strings compare by storage: the usual case (the engine echoing the
+            // queue `play` just set) is a cheap pass, not a field-by-field compare of thousands of songs.
+            if queue.count != songs.count || !queue.elementsEqual(songs, by: { $0.id == $1.id }) {
+                queue = songs
+                queueRevision &+= 1
+            }
             if currentIndex != index { currentIndex = index }
+            syncCurrent()
         case .repeatModeChanged(let mode):
             if repeatMode != mode { repeatMode = mode }
         case .shuffleChanged(let enabled):
