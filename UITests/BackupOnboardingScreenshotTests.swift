@@ -48,7 +48,11 @@ final class BackupOnboardingScreenshotTests: XCTestCase {
     /// tap present it? Recorded as a screenshot, never fails the run.
     func testLibraryFoldersCoverProbeLight() throws {
         try capture("settingsCategory.library", "light", ready: "screen.settingsCategory.library") { app in
-            let row = app.descendants(matching: .any)["settings.library.folders"].firstMatch
+            // By identifier or label: settings rows share a glass container, whose children keep only their labels.
+            let row = app.descendants(matching: .any)
+                .matching(NSPredicate(format: "identifier == %@ OR label BEGINSWITH[c] %@", "settings.library.folders",
+                                      "Excluded Directories"))
+                .firstMatch
             guard row.waitForExistence(timeout: 5) else { return }
             row.tap()
             let shown = app.descendants(matching: .any)["screen.musicFolders"].firstMatch.waitForExistence(timeout: 8)

@@ -40,7 +40,23 @@ nonisolated enum DemoLibrary {
 
     static var songs: [Song] { snapshot.songs }
 
+    /// The raw list repeated `-demoScale` times (performance tests: a library of realistic size). Copy 0 is the
+    /// original list with its original ids, so every screenshot is unchanged; later copies get their own songs,
+    /// albums, artists and folders ("City of Glass 2", …).
+    private static var scaledRaw: [(title: String, artist: String, album: String, seconds: Int, genre: String)] {
+        let copies = max(LaunchConfiguration.current.demoScale, 1)
+        guard copies > 1 else { return raw }
+        return (0..<copies).flatMap { copy in
+            raw.map { item in
+                copy == 0 ? item : (title: "\(item.title) \(copy + 1)", artist: "\(item.artist) \(copy + 1)",
+                                    album: "\(item.album) \(copy + 1)", seconds: item.seconds + copy % 7,
+                                    genre: item.genre)
+            }
+        }
+    }
+
     private static func build() -> LibrarySnapshot {
+        let raw = scaledRaw
         var albumIds: [String: Int64] = [:]
         var artistIds: [String: Int64] = [:]
         for item in raw {
@@ -67,14 +83,16 @@ nonisolated enum DemoLibrary {
                         dateAdded: base - Int64(index) * 86_400_000, dateModified: base - Int64(index) * 86_400_000,
                         mimeType: "audio/mp4", bitrate: 256_000, sampleRate: 44_100)
         }
+        let songsByAlbum = Dictionary(grouping: songs, by: \.albumId)
+        let songsByArtist = Dictionary(grouping: songs, by: \.artistId)
         let albums = albumIds.sorted { $0.value < $1.value }.map { name, id -> Album in
-            let tracks = songs.filter { $0.albumId == id }
+            let tracks = songsByAlbum[id] ?? []
             return Album(id: id, title: name, artist: tracks.first?.artist ?? "", year: tracks.first?.year ?? 0,
                          dateAdded: tracks.map(\.dateAdded).max() ?? 0, albumArtUriString: "demo-art://\(id * 3)",
                          songCount: tracks.count, albumArtist: tracks.first?.artist)
         }
         let artists = artistIds.sorted { $0.value < $1.value }.map { name, id in
-            Artist(id: id, name: name, songCount: songs.filter { $0.artistId == id }.count)
+            Artist(id: id, name: name, songCount: songsByArtist[id]?.count ?? 0)
         }
         let electronic = songs.filter { $0.genre == "Electronic" }.map(\.id)
         let calm = songs.filter { ["Folk", "Soul", "Ambient"].contains($0.genre ?? "") }.map(\.id)
