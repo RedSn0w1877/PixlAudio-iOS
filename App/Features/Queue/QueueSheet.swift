@@ -23,6 +23,8 @@ struct QueueSheet: View {
     @State private var confirmsClear = false
     @State private var showsSaveAsPlaylist = false
     @State private var songInfo: QueueSongRef?
+    /// The drag's state lives in its own observable model: a drag event re-runs the visible rows' offset modifiers,
+    /// not this sheet's body.
     @State private var reorder = QueueReorderState()
     @State private var rowPitch: CGFloat = 84
     @State private var undo: QueueUndo?
@@ -32,15 +34,16 @@ struct QueueSheet: View {
         let queue = playback.queue
         let current = playback.currentIndex ?? -1
         let offset = settings.playback.showQueueHistory || current < 0 ? 0 : current
-        let display = offset < queue.count ? Array(queue[offset...]) : []
+        // The shown rows are the queue from `offset` on, addressed by index (no copy of the queue per pass).
+        let displayCount = max(queue.count - offset, 0)
         let currentDisplay = current - offset
         ZStack(alignment: .bottom) {
             VStack(spacing: 0) {
-                header(count: display.count)
+                header(count: displayCount)
                     .padding(.horizontal, 16)
                     .padding(.top, 24)
                     .padding(.bottom, 12)
-                if display.isEmpty {
+                if displayCount == 0 {
                     Text("Queue is empty.")
                         .pixlFont(.bodyLarge)
                         .foregroundStyle(theme.onSurface)
@@ -48,13 +51,13 @@ struct QueueSheet: View {
                         .padding(32)
                     Spacer(minLength: 0)
                 } else {
-                    list(display: display, offset: offset, currentDisplay: currentDisplay)
+                    list(queue: queue, count: displayCount, offset: offset, currentDisplay: currentDisplay)
                 }
             }
             toolbar
                 .padding(.bottom, 16)
             if isMenuExpanded {
-                menuOverlay(canLocate: currentDisplay >= 0 && currentDisplay < display.count)
+                menuOverlay(canLocate: currentDisplay >= 0 && currentDisplay < displayCount)
             }
             if let undo {
                 undoBar(undo)
@@ -80,9 +83,10 @@ struct QueueSheet: View {
         } message: {
             Text("Are you sure you want to clear all songs from the queue except the current one?")
         }
-        .onChange(of: queue.map(\.id)) { _, ids in
+        // The store bumps the revision whenever it replaces the queue (comparing every id per pass cost O(queue)).
+        .onChange(of: playback.queueRevision) { _, _ in
             reorder.queueDidChange()
-            completeUndoIfNeeded(ids)
+            completeUndoIfNeeded(playback.queue.map(\.id))
         }
         .accessibilityIdentifier("screen.queue")
     }
@@ -128,22 +132,25 @@ struct QueueSheet: View {
 
     // MARK: List
 
-    private func list(display: [Song], offset: Int, currentDisplay: Int) -> some View {
+    private func list(queue: [Song], count: Int, offset: Int, currentDisplay: Int) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 8) {
                     Spacer().frame(height: 6)
-                    ForEach(Array(display.enumerated()), id: \.offset) { index, song in
+                    // Display positions as ids, as before (a row's slot is reused when the queue shifts).
+                    ForEach(0..<count, id: \.self) { index in
+                        let song = queue[index + offset]
                         let canReorder = index > currentDisplay
-                        QueueSongRow(song: song, isCurrent: index == currentDisplay,
-                                     isPlaying: playback.isPlaying, canReorder: canReorder,
+                        let isCurrent = index == currentDisplay
+                        QueueSongRow(song: song, isCurrent: isCurrent,
+                                     isPlaying: isCurrent && playback.isPlaying, canReorder: canReorder,
                                      isDragging: reorder.draggingIndex == index,
                                      onTap: { playback.skipToQueueItem(at: index + offset) },
                                      onMore: { songInfo = QueueSongRef(id: song.id) },
                                      onDismiss: { remove(song, at: index + offset) },
                                      handle: handleGesture(index: index, minIndex: currentDisplay + 1,
-                                                           maxIndex: display.count - 1, offset: offset))
-                            .offset(y: reorder.offset(for: index, pitch: rowPitch))
+                                                           maxIndex: count - 1, offset: offset))
+                            .modifier(QueueRowReorderOffset(reorder: reorder, index: index, pitch: rowPitch))
                             .zIndex(reorder.draggingIndex == index ? 1 : 0)
                             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
                                 if index == 0 { rowPitch = height + 8 }
@@ -373,8 +380,21 @@ private struct QueueUndo {
     var isRestoring = false
 }
 
+/// A row's drag-reorder offset, read here — in this modifier only — so a drag event re-evaluates the visible rows'
+/// offsets and nothing else.
+private struct QueueRowReorderOffset: ViewModifier {
+    let reorder: QueueReorderState
+    let index: Int
+    let pitch: CGFloat
+
+    func body(content: Content) -> some View {
+        content.offset(y: reorder.offset(for: index, pitch: pitch))
+    }
+}
+
 /// Drag-reorder state: the dragged row follows the finger, the rows it passes slide one pitch the other way.
-struct QueueReorderState {
+@Observable
+final class QueueReorderState {
     struct Move: Equatable {
         var from: Int
         var to: Int
@@ -382,12 +402,12 @@ struct QueueReorderState {
 
     private(set) var draggingIndex: Int?
     var translation: CGFloat = 0
-    private var minIndex = 0
-    private var maxIndex = 0
+    @ObservationIgnored private var minIndex = 0
+    @ObservationIgnored private var maxIndex = 0
     /// After a drop, the rows keep their preview offsets until the engine reports the reordered queue.
     private var pending: Move?
 
-    mutating func begin(index: Int, minIndex: Int, maxIndex: Int) {
+    func begin(index: Int, minIndex: Int, maxIndex: Int) {
         draggingIndex = index
         translation = 0
         self.minIndex = minIndex
@@ -418,7 +438,7 @@ struct QueueReorderState {
     }
 
     /// Ends the drag; returns the move (display indices).
-    mutating func end(pitch: CGFloat) -> Move? {
+    func end(pitch: CGFloat) -> Move? {
         guard let draggingIndex, let target = target(pitch: pitch) else { return nil }
         let move = Move(from: draggingIndex, to: target)
         pending = move
@@ -427,12 +447,12 @@ struct QueueReorderState {
         return move
     }
 
-    mutating func queueDidChange() { reset() }
+    func queueDidChange() { reset() }
 
-    mutating func reset() {
-        draggingIndex = nil
-        translation = 0
-        pending = nil
+    func reset() {
+        if draggingIndex != nil { draggingIndex = nil }
+        if translation != 0 { translation = 0 }
+        if pending != nil { pending = nil }
     }
 }
 

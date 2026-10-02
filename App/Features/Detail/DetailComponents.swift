@@ -89,13 +89,17 @@ struct CollapsingArtworkHeader<Actions: View>: View {
                            startPoint: .top, endPoint: .bottom)
                 .frame(height: 80)
             titleBlock(fraction: fraction, height: height)
-            HStack(spacing: Tokens.TopBar.actionSpacing) {
-                GlassCircleButton(systemImage: "arrow.left", accessibilityLabel: "Back",
-                                  tint: theme.surfaceContainerLow.opacity(GlassTint.container),
-                                  foreground: theme.onSurface, action: onBack)
-                    .accessibilityIdentifier("detail.back")
-                Spacer()
-                actions
+            // The back and action circles render together (spacing below their 6 pt gap); the shuffle circle stays
+            // apart, it rides up next to them.
+            GlassEffectContainer(spacing: 3) {
+                HStack(spacing: Tokens.TopBar.actionSpacing) {
+                    GlassCircleButton(systemImage: "arrow.left", accessibilityLabel: "Back",
+                                      tint: theme.surfaceContainerLow.opacity(GlassTint.container),
+                                      foreground: theme.onSurface, action: onBack)
+                        .accessibilityIdentifier("detail.back")
+                    Spacer()
+                    actions
+                }
             }
             .padding(.leading, 12)
             .padding(.trailing, 12)
@@ -172,13 +176,15 @@ struct DetailTopBar<Actions: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: Tokens.TopBar.actionSpacing) {
-                GlassCircleButton(systemImage: "arrow.left", accessibilityLabel: "Back",
-                                  tint: theme.surfaceContainerHigh.opacity(GlassTint.container),
-                                  foreground: theme.onSurface, action: onBack)
-                    .accessibilityIdentifier("detail.back")
-                Spacer()
-                actions
+            GlassEffectContainer(spacing: 3) {
+                HStack(spacing: Tokens.TopBar.actionSpacing) {
+                    GlassCircleButton(systemImage: "arrow.left", accessibilityLabel: "Back",
+                                      tint: theme.surfaceContainerHigh.opacity(GlassTint.container),
+                                      foreground: theme.onSurface, action: onBack)
+                        .accessibilityIdentifier("detail.back")
+                    Spacer()
+                    actions
+                }
             }
             .padding(.horizontal, 10)
             .frame(height: Tokens.TopBar.height)

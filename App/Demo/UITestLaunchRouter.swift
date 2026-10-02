@@ -228,6 +228,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
 ///     -song <index>                the demo song that is current (default 0; miniPlayer uses a vivid one)
 ///     -paused                      start paused (default: playing)
 ///     -noSong                      nothing playing (no mini player)
+///     -demoScale <n>               repeat the demo library n times (performance tests: a library of real size)
 nonisolated struct LaunchConfiguration: Equatable, Sendable {
     nonisolated enum Appearance: String, Sendable {
         case system, light, dark
@@ -240,6 +241,8 @@ nonisolated struct LaunchConfiguration: Equatable, Sendable {
     var songIndex: Int
     var startsPlaying: Bool
     var hasSong: Bool
+    /// How many copies of the demo library to load (1 = the screenshot library).
+    var demoScale: Int
 
     init(arguments: [String]) {
         func value(after flag: String) -> String? {
@@ -258,6 +261,7 @@ nonisolated struct LaunchConfiguration: Equatable, Sendable {
         songIndex = value(after: "-song").flatMap(Int.init) ?? defaultSong
         startsPlaying = !arguments.contains("-paused")
         hasSong = !arguments.contains("-noSong")
+        demoScale = min(max(value(after: "-demoScale").flatMap(Int.init) ?? 1, 1), 400)
     }
 
     /// The configuration of this process.

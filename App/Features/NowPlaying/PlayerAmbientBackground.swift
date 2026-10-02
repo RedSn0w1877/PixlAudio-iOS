@@ -96,7 +96,9 @@ private struct BlendedCoverBackground: View {
 actor BlurredArtworkCache {
     static let shared = BlurredArtworkCache()
 
-    private let context = CIContext(options: [.cacheIntermediates: false])
+    /// Created on the actor at the first blur, not on the main thread when `shared` is first touched (setting up a
+    /// Core Image context prepares Metal). One context for the cache's lifetime, as Core Image recommends.
+    private lazy var context = CIContext(options: [.cacheIntermediates: false])
     private var cache: [ArtworkSource: ArtworkImage] = [:]
     private var order: [ArtworkSource] = []
 

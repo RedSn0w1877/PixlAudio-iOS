@@ -232,7 +232,19 @@ final class DownloadBadges {
         case downloading, downloaded, failed
     }
 
-    private(set) var kinds: [String: Kind] = [:]
+    /// Not observed as a whole: each row observes only its own video id's box, so a download starting, finishing or
+    /// failing re-renders that song's rows, not every song row of every tab.
+    @ObservationIgnored private(set) var kinds: [String: Kind] = [:]
+    @ObservationIgnored private var boxes: [String: Box] = [:]
+
+    /// One video id's badge, observed by the rows showing that song.
+    @MainActor
+    @Observable
+    final class Box {
+        var kind: Kind?
+
+        init(kind: Kind?) { self.kind = kind }
+    }
 
     func update(_ videoId: String, _ state: DownloadManager.State?) {
         let kind: Kind? = switch state {
@@ -241,12 +253,21 @@ final class DownloadBadges {
         case .failed: .failed
         case nil: nil
         }
-        if kinds[videoId] != kind { kinds[videoId] = kind }
+        guard kinds[videoId] != kind else { return }
+        kinds[videoId] = kind
+        if let box = boxes[videoId], box.kind != kind { box.kind = kind }
     }
 
-    /// Local files have no badge (they already play offline).
+    /// Local files have no badge (they already play offline) and observe nothing.
     func kind(for song: Song) -> Kind? {
-        guard !kinds.isEmpty, let videoId = YouTubeSongIdentity.videoId(for: song) else { return nil }
-        return kinds[videoId]
+        guard let videoId = YouTubeSongIdentity.videoId(for: song) else { return nil }
+        return box(for: videoId).kind
+    }
+
+    private func box(for videoId: String) -> Box {
+        if let box = boxes[videoId] { return box }
+        let box = Box(kind: kinds[videoId])
+        boxes[videoId] = box
+        return box
     }
 }

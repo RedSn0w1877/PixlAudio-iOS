@@ -12,7 +12,7 @@ struct PlaybackSettingsSection: View {
 
     var body: some View {
         @Bindable var playback = settings.playback
-        VStack(alignment: .leading, spacing: 0) {
+        SettingsCategoryScaffold(category: .playback) {
             SettingsSubsection(title: L10n.settingsBackgroundPlaybackSection) {
                 ThemeSelectorRow(label: L10n.settingsKeepPlayingTitle, description: L10n.settingsKeepPlayingSubtitle,
                                  options: [SettingsOption(key: "true", label: L10n.settingsLabelOn),
@@ -96,7 +96,7 @@ struct BehaviorSettingsSection: View {
 
     var body: some View {
         @Bindable var behavior = settings.behavior
-        VStack(alignment: .leading, spacing: 0) {
+        SettingsCategoryScaffold(category: .behavior) {
             SettingsSubsection(title: L10n.settingsFoldersSection) {
                 SwitchSettingRow(title: L10n.settingsFolderBackGestureTitle,
                                  subtitle: L10n.settingsFolderBackGestureSubtitle,

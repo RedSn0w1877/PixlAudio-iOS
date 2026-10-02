@@ -33,8 +33,9 @@ struct LibraryView: View {
     @State private var showsM3UImporter = false
     @State private var mergeName = ""
     @State private var showsMergeDialog = false
-    @State private var locateRequest = 0
-    @State private var currentSongVisible = false
+    /// Locate taps per page (only the tapped page scrolls).
+    @State private var locateRequests: [LibraryTab: Int] = [:]
+    @State private var actions = LibraryActions()
     @State private var didApplyLaunchState = false
 
     private var prefs: LibraryPreferences { LibraryPreferences.shared(isUITest: env.launch.isUITest) }
@@ -56,11 +57,15 @@ struct LibraryView: View {
         }
         .background(background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
-        .onAppear { applyLaunchState(prefs) }
+        .onAppear {
+            configureActions()
+            applyLaunchState(prefs)
+            actions.visibleTab = tab
+        }
         .onChange(of: inputs(prefs), initial: true) { _, new in model.update(new) }
         .onChange(of: tab) { _, newTab in
             settings.library.lastLibraryTabIndex = prefs.tabOrder.firstIndex(of: newTab) ?? 0
-            currentSongVisible = false
+            actions.pageChanged(to: newTab)
             clearSelections()
         }
         .task { likedAt = await env.libraryEditor.favoriteTimestamps() }
@@ -158,38 +163,32 @@ struct LibraryView: View {
                                           onOptions: openSelectionSheet)
                     .transition(.move(edge: .leading).combined(with: .opacity))
             } else {
-                LibraryActionRow(tab: tab,
-                                 isFoldersBreadcrumbs: tab == .folders && (!prefs.isFoldersPlaylistView || folderPath != nil),
-                                 folderPath: folderPath,
-                                 folderRoots: model.lists.folders.map(\.path),
-                                 showsLocate: showsLocate,
-                                 storageFilter: prefs.storageFilter,
-                                 isInstrumentalizedOnly: instrumentalizedOnly,
-                                 onMainAction: mainAction,
-                                 onImport: { showsM3UImporter = true },
-                                 onLocate: { locateRequest += 1 },
-                                 onStorageFilter: { withAnimation(PixlMotion.state) { prefs.cycleStorageFilter() } },
-                                 onInstrumentalFilter: { instrumentalizedOnly.toggle() },
-                                 onSort: { sheet = .sort },
-                                 onFolder: { path in withAnimation(PixlMotion.state) { folderPath = path } },
-                                 onFolderBack: navigateFolderBack)
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                let tab = self.tab
+                LibraryLocateState(tab: tab, isInstrumentalizedOnly: instrumentalizedOnly, folderPath: folderPath,
+                                   model: model, actions: actions) { showsLocate in
+                    LibraryActionRow(tab: tab,
+                                     isFoldersBreadcrumbs: tab == .folders
+                                         && (!prefs.isFoldersPlaylistView || folderPath != nil),
+                                     folderPath: folderPath,
+                                     folderRoots: model.lists.folderRoots,
+                                     showsLocate: showsLocate,
+                                     storageFilter: prefs.storageFilter,
+                                     isInstrumentalizedOnly: instrumentalizedOnly,
+                                     onMainAction: mainAction,
+                                     onImport: { showsM3UImporter = true },
+                                     onLocate: { locateRequests[tab, default: 0] += 1 },
+                                     onStorageFilter: { withAnimation(PixlMotion.state) { prefs.cycleStorageFilter() } },
+                                     onInstrumentalFilter: { instrumentalizedOnly.toggle() },
+                                     onSort: { sheet = .sort },
+                                     onFolder: { path in withAnimation(PixlMotion.state) { folderPath = path } },
+                                     onFolderBack: navigateFolderBack)
+                }
+                .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.86), value: isSelecting)
     }
 
-    private var showsLocate: Bool {
-        guard let current = playback.current, !currentSongVisible else { return false }
-        switch tab {
-        case .songs: return !instrumentalizedOnly && model.lists.songs.contains { $0.id == current.id }
-        case .liked: return model.lists.liked.contains { $0.id == current.id }
-        case .folders:
-            guard let folderPath, let folder = LibraryModel.folder(at: folderPath, in: model.lists.folders) else { return false }
-            return folder.songs.contains { $0.id == current.id }
-        default: return false
-        }
-    }
 
     // MARK: Pager
 
@@ -218,52 +217,61 @@ struct LibraryView: View {
         }
     }
 
+    /// One page. Its inputs are plain values plus stable references (`selection`, `actions`): a page whose lists
+    /// did not change skips its body when LibraryView re-renders.
     @ViewBuilder
     private func page(_ pageTab: LibraryTab, prefs: LibraryPreferences) -> some View {
-        let isVisibleTab = pageTab == tab
-        let context = LibraryPageContext(
-            currentSongId: playback.current?.id, isPlaying: playback.isPlaying,
-            showsScrollbarGap: settings.appearance.showScrollbar,
-            locateRequest: isVisibleTab ? locateRequest : 0,
-            onCurrentVisible: { visible in if isVisibleTab { currentSongVisible = visible } },
-            onSongMore: { song in router.present(AppSheet.songInfo(songId: song.id)) })
+        let context = LibraryPageContext(page: pageTab, showsScrollbarGap: settings.appearance.showScrollbar,
+                                         locateRequest: locateRequests[pageTab] ?? 0)
         switch pageTab {
         case .songs:
             LibrarySongsPage(songs: instrumentalizedOnly ? [] : model.lists.songs, context: context,
                              selection: songSelection, emptyFilter: prefs.storageFilter, isLiked: false,
-                             isLoading: library.isLoading,
-                             onPlay: { song, list in playback.play(song, in: list) })
+                             isLoading: library.isLoading, actions: actions)
         case .liked:
             LibrarySongsPage(songs: model.lists.liked, context: context, selection: songSelection,
                              emptyFilter: prefs.storageFilter, isLiked: true, isLoading: library.isLoading,
-                             onPlay: { song, list in playback.play(song, in: list) })
+                             actions: actions)
         case .albums:
             LibraryAlbumsPage(albums: model.lists.albums, isListView: settings.library.isAlbumsListView,
                               selection: albumSelection, emptyFilter: prefs.storageFilter,
-                              showsScrollbarGap: settings.appearance.showScrollbar,
-                              onOpen: { album in router.push(.albumDetail(albumId: album.id)) },
-                              onToggle: toggleAlbum)
+                              showsScrollbarGap: settings.appearance.showScrollbar, actions: actions)
         case .artists:
             LibraryArtistsPage(artists: model.lists.artists, emptyFilter: prefs.storageFilter,
-                               showsScrollbarGap: settings.appearance.showScrollbar,
-                               onOpen: { artist in router.push(.artistDetail(artistId: artist.id)) })
+                               showsScrollbarGap: settings.appearance.showScrollbar, actions: actions)
         case .playlists:
             LibraryPlaylistsPage(playlists: model.lists.playlists, selection: playlistSelection,
-                                 showsScrollbarGap: settings.appearance.showScrollbar,
-                                 onOpen: { playlist in router.push(.playlistDetail(playlistId: playlist.id)) },
-                                 onReorder: { ids in
-                                     env.libraryEditor.savePlaylistOrder(ids)
-                                     prefs.playlistSort = .playlistCustomOrder
-                                 })
+                                 showsScrollbarGap: settings.appearance.showScrollbar, actions: actions)
         case .folders:
             LibraryFoldersPage(folders: model.lists.folders, folderPlaylists: model.lists.folderPlaylists,
-                               folderPath: folderPath, isPlaylistView: prefs.isFoldersPlaylistView,
-                               sort: prefs.folderSort, context: context, selection: songSelection,
-                               onOpenFolder: { path in withAnimation(PixlMotion.state) { folderPath = path } },
-                               onOpenFolderPlaylist: { folder in
-                                   router.push(.playlistDetail(playlistId: FolderPlaylist.id(for: folder.path)))
-                               },
-                               onPlay: { song, list in playback.play(song, in: list) })
+                               folderContents: model.lists.folderContents, folderPath: folderPath,
+                               isPlaylistView: prefs.isFoldersPlaylistView, context: context,
+                               selection: songSelection, actions: actions)
+        }
+    }
+
+    /// The pages' actions, set once (they capture this view's stores and state, which live as long as it does).
+    private func configureActions() {
+        let prefs = self.prefs
+        actions.play = { song, list in playback.play(song, in: list) }
+        actions.showSongOptions = { song in router.present(AppSheet.songInfo(songId: song.id)) }
+        actions.openAlbum = { album in
+            // Start decoding the header's cover now, so the page's first frames have it.
+            if let source = ArtworkSource(uriString: album.albumArtUriString) {
+                ArtworkPipeline.shared.prefetch(source, pixelSize: ArtworkPipeline.displayBuckets.last ?? 1320)
+            }
+            router.push(.albumDetail(albumId: album.id))
+        }
+        actions.toggleAlbum = { album in toggleAlbum(album) }
+        actions.openArtist = { artist in router.push(.artistDetail(artistId: artist.id)) }
+        actions.openPlaylist = { playlist in router.push(.playlistDetail(playlistId: playlist.id)) }
+        actions.reorderPlaylists = { ids in
+            env.libraryEditor.savePlaylistOrder(ids)
+            prefs.playlistSort = .playlistCustomOrder
+        }
+        actions.openFolder = { path in withAnimation(PixlMotion.state) { folderPath = path } }
+        actions.openFolderPlaylist = { folder in
+            router.push(.playlistDetail(playlistId: FolderPlaylist.id(for: folder.path)))
         }
     }
 
@@ -271,7 +279,7 @@ struct LibraryView: View {
         LibraryModel.Inputs(snapshot: library.snapshot, songSort: prefs.songSort, albumSort: prefs.albumSort,
                             artistSort: prefs.artistSort, playlistSort: prefs.playlistSort,
                             folderSort: prefs.folderSort, likedSort: prefs.likedSort,
-                            storageFilter: prefs.storageFilter, likedAt: likedAt)
+                            storageFilter: prefs.storageFilter, likedAt: likedAt, revision: library.revision)
     }
 
     // MARK: Actions
@@ -315,8 +323,8 @@ struct LibraryView: View {
             albumSelection.selectAll(Array(candidates.prefix(remaining)))
         case .liked: songSelection.selectAll(model.lists.liked.map(\.id))
         case .folders:
-            if let folderPath, let folder = LibraryModel.folder(at: folderPath, in: model.lists.folders) {
-                songSelection.selectAll(folder.songs.map(\.id))
+            if let folderPath, let contents = model.lists.folderContents[folderPath] {
+                songSelection.selectAll(contents.songs.map(\.id))
             }
         case .songs: songSelection.selectAll(model.lists.songs.map(\.id))
         case .artists: break
@@ -438,7 +446,7 @@ struct LibraryView: View {
             }, onSetupAI: {
                 self.sheet = nil
                 router.push(.settingsCategory(.ai))
-            }, isAIEnabled: env.ai.isProviderConfigured, onAI: {
+            }, isAIEnabled: AIProviderStatus.isConfigured(env), onAI: {
                 self.sheet = nil
                 // The Lab is full screen (Android `CreateAiPlaylistDialog`); present it once this sheet has gone.
                 Task {
@@ -495,6 +503,35 @@ extension LibraryTab {
         case .playlists: "Playlists"
         case .folders: "Folders"
         case .liked: "Liked"
+        }
+    }
+}
+
+/// Whether the action row's locate button shows: the current song is in the visible list and its row is off screen.
+/// Computed here rather than in LibraryView, so the current song and its row's visibility re-run only the action row.
+private struct LibraryLocateState<Content: View>: View {
+    let tab: LibraryTab
+    let isInstrumentalizedOnly: Bool
+    let folderPath: String?
+    let model: LibraryModel
+    let actions: LibraryActions
+    @ViewBuilder let content: (Bool) -> Content
+
+    @Environment(PlaybackStore.self) private var playback
+
+    var body: some View {
+        content(showsLocate)
+    }
+
+    private var showsLocate: Bool {
+        guard let current = playback.currentSongId, !actions.currentSongVisible else { return false }
+        switch tab {
+        case .songs: return !isInstrumentalizedOnly && model.lists.songIds.contains(current)
+        case .liked: return model.lists.likedIds.contains(current)
+        case .folders:
+            guard let folderPath, let contents = model.lists.folderContents[folderPath] else { return false }
+            return contents.songs.contains { $0.id == current }
+        default: return false
         }
     }
 }

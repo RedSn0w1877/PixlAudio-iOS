@@ -309,13 +309,20 @@ struct YouTubeSignInWebView: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(onSession: onSession) }
 
     func makeUIView(context: Context) -> WKWebView {
+        // A web view prepared while nothing animated (see `YouTubeSignInWebViewWarmup`), else a new one, as before.
+        let view = YouTubeSignInWebViewWarmup.take()
+        view.navigationDelegate = context.coordinator
+        if let url = URL(string: Self.signInURL) { view.load(URLRequest(url: url)) }
+        return view
+    }
+
+    /// A configured web view with its own private data store (one per visit).
+    static func makeWebView() -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
         let view = WKWebView(frame: .zero, configuration: configuration)
-        view.customUserAgent = Self.userAgent
+        view.customUserAgent = userAgent
         view.allowsBackForwardNavigationGestures = true
-        view.navigationDelegate = context.coordinator
-        if let url = URL(string: Self.signInURL) { view.load(URLRequest(url: url)) }
         return view
     }
 
@@ -346,4 +353,23 @@ struct YouTubeSignInWebView: UIViewRepresentable {
             onSession(header, visitorData)
         }
     }
+}
+
+/// Creating the first WKWebView of the process (WebKit's helper processes, a private data store) cost tens of
+/// milliseconds on the main thread in the first frame of the sign-in push. The Spotify dashboard prepares one while
+/// YouTube is signed out, after its own push has settled; the sign-in page takes it (still a fresh view and data store
+/// per visit, loaded when the page appears). Without a spare, the page creates one as before.
+enum YouTubeSignInWebViewWarmup {
+    private static var spare: WKWebView?
+
+    static func prepare() {
+        if spare == nil { spare = YouTubeSignInWebView.makeWebView() }
+    }
+
+    static func take() -> WKWebView {
+        defer { spare = nil }
+        return spare ?? YouTubeSignInWebView.makeWebView()
+    }
+
+    static func discard() { spare = nil }
 }

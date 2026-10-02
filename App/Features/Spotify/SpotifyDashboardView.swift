@@ -68,6 +68,16 @@ struct SpotifyDashboardView: View {
             spotify.clearMessage()
         }
         .task { await spotify.refreshLibraryState() }
+        // Signed out of YouTube: prepare the sign-in page's web view once this push has settled.
+        .task(id: youTubeSignedIn) {
+            guard !youTubeSignedIn, !env.youtube.isDemo else {
+                YouTubeSignInWebViewWarmup.discard()
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(800))
+            guard !Task.isCancelled else { return }
+            YouTubeSignInWebViewWarmup.prepare()
+        }
         .alert("Spotify client ID", isPresented: $isEditingClientId) {
             TextField("Client ID", text: $clientIdDraft)
                 .autocorrectionDisabled()

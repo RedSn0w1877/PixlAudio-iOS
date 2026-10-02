@@ -115,10 +115,12 @@ struct LibraryEditor {
         guard !songIds.isEmpty else { return }
         let ids = Set(songIds)
         var snapshot = store.snapshot
+        var changed: [Song] = []
         for index in snapshot.songs.indices where ids.contains(snapshot.songs[index].id) {
             snapshot.songs[index].isFavorite = isFavorite
+            changed.append(snapshot.songs[index])
         }
-        commit(snapshot) { persistence in
+        commit(snapshot, changedSongs: changed) { persistence in
             try await persistence.setFavorites(songIds, isFavorite: isFavorite, timestamp: currentTimeMillis())
         }
     }
@@ -209,17 +211,19 @@ struct LibraryEditor {
         var snapshot = store.snapshot
         snapshot.songs.removeAll { set.contains($0.id) }
         for index in snapshot.playlists.indices { snapshot.playlists[index].songIds.removeAll { set.contains($0) } }
-        commit(snapshot) { try await $0.deleteSongs(songIds) }
+        commit(snapshot, removedSongIds: set) { try await $0.deleteSongs(songIds) }
     }
 
     /// Android `batchEditGenre`: gives every song the genre (Quick Fill).
     func setGenre(_ songIds: [String], genre: String) {
         let set = Set(songIds)
         var snapshot = store.snapshot
+        var changed: [Song] = []
         for index in snapshot.songs.indices where set.contains(snapshot.songs[index].id) {
             snapshot.songs[index].genre = genre
+            changed.append(snapshot.songs[index])
         }
-        commit(snapshot) { try await $0.setGenre(songIds, genre: genre) }
+        commit(snapshot, changedSongs: changed) { try await $0.setGenre(songIds, genre: genre) }
     }
 
     // MARK: Reads
@@ -236,9 +240,11 @@ struct LibraryEditor {
 
     // MARK: -
 
-    private func commit(_ snapshot: LibrarySnapshot,
+    /// Applies an edit in memory at once (patching the store's lookups for the songs that changed — no comparison
+    /// of the whole library) and writes it through `PersistenceActor` off the main thread.
+    private func commit(_ snapshot: LibrarySnapshot, changedSongs: [Song] = [], removedSongIds: Set<String> = [],
                         write: @escaping @Sendable (PersistenceActor) async throws -> Void) {
-        store.apply(snapshot)
+        store.applyEdit(snapshot, changedSongs: changedSongs, removedSongIds: removedSongIds)
         guard let persistence else { return }
         let writesCache = self.writesCache
         Task.detached(priority: .utility) {

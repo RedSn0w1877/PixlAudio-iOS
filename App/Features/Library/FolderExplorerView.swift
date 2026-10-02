@@ -13,7 +13,7 @@ struct FolderExplorerView: View {
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        let tree = LibraryModel.folderTree(library.songs)
+        let tree = library.folderTree
         let folder = path.flatMap { LibraryModel.folder(at: $0, in: tree) }
         let subfolders = folder?.subFolders ?? tree
         let songs = LibraryModel.folderSongs(folder?.songs ?? [], sort: .folderNameAZ)
@@ -26,10 +26,11 @@ struct FolderExplorerView: View {
                         FolderRow(folder: sub, asPlaylist: false) { router.push(.folderExplorer(path: sub.path)) }
                     }
                     ForEach(songs) { song in
-                        SongCard(song: song, isCurrent: playback.current?.id == song.id,
-                                 isPlaying: playback.current?.id == song.id && playback.isPlaying,
-                                 onTap: { playback.play(song, in: songs) },
-                                 onMore: { router.present(AppSheet.songInfo(songId: song.id)) })
+                        PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
+                            SongCard(song: song, isCurrent: isCurrent, isPlaying: isPlaying,
+                                     onTap: { playback.play(song, in: songs) },
+                                     onMore: { router.present(AppSheet.songInfo(songId: song.id)) })
+                        }
                     }
                 }
                 .padding(.horizontal, 12)

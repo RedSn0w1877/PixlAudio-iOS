@@ -34,7 +34,7 @@ struct PlayerSheetHost: View {
             if let song = playback.current,
                let slot = sheet.collapsedFrame ?? (sheet.isExpanded ? fallbackSlot(in: screen, insets: insets) : nil) {
                 let collapsed = slot.offsetBy(dx: -screenOrigin.x, dy: -screenOrigin.y)
-                card(song: song, screen: screen, safeArea: insets)
+                card(song: song, screen: screen, safeArea: insets, collapsedMinX: collapsed.minX)
                     .modifier(PlayerSheetMorph(progress: sheet.expansion, collapsed: collapsed, screen: screen,
                                                collapsedBottomRadius: sheet.collapsedBottomRadius,
                                                glassTint: theme.primaryContainer.opacity(GlassTint.container),
@@ -44,6 +44,8 @@ struct PlayerSheetHost: View {
                     .overlay(alignment: .leading) {
                         if sheet.isExpanded { edgeBackStrip(width: screen.width) }
                     }
+                    .modifier(KeyboardStepAside(isHidden: sheet.hiddenForKeyboard && !sheet.isExpanded
+                                                    && !sheet.isDragging))
                     .offset(x: -insets.leading, y: -insets.top)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
@@ -53,14 +55,17 @@ struct PlayerSheetHost: View {
         .onAppear { consumeCoverRequest() }
         .onChange(of: router.cover) { _, _ in consumeCoverRequest() }
         .onChange(of: playback.hasItem) { _, hasItem in
-            if !hasItem { sheet.collapse(animated: false) }
+            if !hasItem {
+                sheet.collapse(animated: false)
+                sheet.resetFullPlayer()
+            }
         }
     }
 
     /// The mini and full layers, both laid out once at their own sizes; only the morph modifier moves.
-    private func card(song: Song, screen: CGRect, safeArea: EdgeInsets) -> some View {
+    private func card(song: Song, screen: CGRect, safeArea: EdgeInsets, collapsedMinX: CGFloat) -> some View {
         ZStack(alignment: .topLeading) {
-            FullPlayerLayer(screenSize: screen.size, safeArea: safeArea)
+            FullPlayerLayer(screenSize: screen.size, safeArea: safeArea, collapsedMinX: collapsedMinX)
             MiniPlayerLayer(song: song)
         }
     }
@@ -146,8 +151,10 @@ struct PlayerSheetHost: View {
 }
 
 /// The card's geometry and background for an expansion fraction (Android `SheetVisualState`): frame, corners,
-/// glass and fill. `Animatable`, so a spring interpolates `progress` and everything derived from it — including the
-/// layers' fades, published to them through `playerSheetMetrics` — follows Android's curves frame by frame.
+/// glass and fill. `Animatable`, so a spring interpolates `progress` and everything derived from it follows Android's
+/// curves frame by frame. The layers' fades are their own `Animatable` modifiers on the same spring (this modifier
+/// no longer writes the progress into the environment every frame, which made every environment reader in the
+/// full player check its value 120 times a second).
 struct PlayerSheetMorph: ViewModifier, Animatable {
     nonisolated var animatableData: CGFloat
     let collapsed: CGRect
@@ -180,7 +187,6 @@ struct PlayerSheetMorph: ViewModifier, Animatable {
                                            bottomTrailingRadius: bottom, topTrailingRadius: top, style: .continuous)
         let glassAlpha = min(max(1 - f * 4, 0), 1)
         content
-            .environment(\.playerSheetMetrics, PlayerSheetMetrics(progress: f, cardMinX: x))
             .frame(width: width, height: height, alignment: .topLeading)
             .clipShape(shape)
             .background {
@@ -190,9 +196,8 @@ struct PlayerSheetMorph: ViewModifier, Animatable {
                             .pixlGlass(in: shape, tint: glassTint, interactive: f < 0.01)
                             .opacity(glassAlpha)
                     }
-                    if f > 0 {
-                        shape.fill(fill).opacity(min(f * 4, 1))
-                    }
+                    // Always mounted (transparent at rest): no view inserted when an expand starts.
+                    shape.fill(fill).opacity(min(f * 4, 1))
                 }
             }
             .contentShape(shape)
@@ -202,6 +207,19 @@ struct PlayerSheetMorph: ViewModifier, Animatable {
     }
 
     private func lerp(_ a: CGFloat, _ b: CGFloat, _ t: CGFloat) -> CGFloat { a + (b - a) * t }
+}
+
+/// While the keyboard is up the collapsed card steps aside with the tab bar: what the shell's slot declares for a
+/// 64 pt view (`.move(edge: .bottom).combined(with: .opacity)`), driven by the shell's `PixlMotion.bars` transaction.
+private struct KeyboardStepAside: ViewModifier {
+    let isHidden: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .offset(y: isHidden ? Tokens.Shell.miniPlayerHeight : 0)
+            .opacity(isHidden ? 0 : 1)
+            .allowsHitTesting(!isHidden)
+    }
 }
 
 /// The mini player inside the card (Android `MiniPlayerContentInternal`): drawn without its own glass (the card is
@@ -220,13 +238,31 @@ private struct MiniPlayerLayer: View {
                       onPlayPause: { playback.togglePlayPause() },
                       onNext: { playback.skipToNext() })
             .modifier(MiniLayerFade())
+            // Build the full player while nothing moves, a second after the mini player appears (not inside its own
+            // appear animation): the first expand then only animates.
+            .task {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { return }
+                env.playerSheet.prewarm()
+            }
     }
 }
 
 private struct MiniLayerFade: ViewModifier {
-    @Environment(\.playerSheetMetrics) private var metrics
+    @Environment(AppEnvironment.self) private var env
 
     func body(content: Content) -> some View {
+        content.modifier(MiniLayerFadeEffect(progress: env.playerSheet.expansion))
+    }
+}
+
+private struct MiniLayerFadeEffect: ViewModifier, Animatable {
+    nonisolated var animatableData: CGFloat
+
+    init(progress: CGFloat) { animatableData = progress }
+
+    func body(content: Content) -> some View {
+        let metrics = PlayerSheetMetrics(progress: min(max(animatableData, 0), 1))
         let alpha = metrics.miniPlayerAlpha
         content
             .frame(height: Tokens.Shell.miniPlayerHeight)
@@ -237,28 +273,62 @@ private struct MiniLayerFade: ViewModifier {
 }
 
 /// The full player inside the card, laid out at screen size and kept horizontally in place while the card grows
-/// around it; it fades in from 25 % with Android's 24 pt slide (`FullPlayerVisualState`). Built only while the sheet
-/// is (or is becoming) expanded, so the collapsed mini player costs nothing extra.
+/// around it; it fades in from 25 % with Android's 24 pt slide (`FullPlayerVisualState`).
+///
+/// Built once (pre-warmed, or by the first expand or drag) and kept: rebuilding the whole player — carousel, seek
+/// bar, controls, background, about nine glass shapes, measured widths — inside the first frames of every expand
+/// cost frames. While collapsed it stays hidden exactly where it used to be removed (on the collapse's first frame,
+/// without animation), out of hit testing and accessibility, its timelines paused.
 private struct FullPlayerLayer: View {
     let screenSize: CGSize
     let safeArea: EdgeInsets
+    let collapsedMinX: CGFloat
 
     @Environment(AppEnvironment.self) private var env
 
     var body: some View {
         let sheet = env.playerSheet
-        if sheet.isExpanded || sheet.isDragging || sheet.expansion > 0.001 {
-            NowPlayingView(safeArea: safeArea)
+        let isShown = sheet.isExpanded || sheet.isDragging || sheet.expansion > 0.001
+        if sheet.hasBuiltFullPlayer || isShown {
+            NowPlayingView(safeArea: safeArea, width: screenSize.width)
                 .frame(width: screenSize.width, height: screenSize.height)
-                .modifier(FullLayerPlacement())
+                .modifier(FullLayerPlacement(collapsedMinX: collapsedMinX))
+                .animation(nil) { content in
+                    // While hidden it also takes no room in the card's ZStack, as when it was removed: a screen-sized
+                    // child widened the ZStack, and the mini player beside it was laid out at the screen's width
+                    // (its trailing controls ran past the card). The zero frame anchors it top-leading, unchanged.
+                    content
+                        .opacity(isShown ? 1 : 0)
+                        .frame(width: isShown ? nil : 0, height: isShown ? nil : 0, alignment: .topLeading)
+                }
+                .onAppear { sheet.fullPlayerDidAppear() }
         }
     }
 }
 
 private struct FullLayerPlacement: ViewModifier {
-    @Environment(\.playerSheetMetrics) private var metrics
+    let collapsedMinX: CGFloat
+
+    @Environment(AppEnvironment.self) private var env
 
     func body(content: Content) -> some View {
+        content.modifier(FullLayerPlacementEffect(progress: env.playerSheet.expansion, collapsedMinX: collapsedMinX))
+    }
+}
+
+/// `PlayerSheetMorph`'s geometry for the full layer: the card's leading edge moves from the slot's to 0.
+private struct FullLayerPlacementEffect: ViewModifier, Animatable {
+    nonisolated var animatableData: CGFloat
+    let collapsedMinX: CGFloat
+
+    init(progress: CGFloat, collapsedMinX: CGFloat) {
+        animatableData = progress
+        self.collapsedMinX = collapsedMinX
+    }
+
+    func body(content: Content) -> some View {
+        let f = min(max(animatableData, 0), 1)
+        let metrics = PlayerSheetMetrics(progress: f, cardMinX: collapsedMinX + (0 - collapsedMinX) * f)
         let alpha = metrics.fullPlayerAlpha
         content
             .opacity(alpha)

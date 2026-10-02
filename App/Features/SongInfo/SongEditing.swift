@@ -68,7 +68,16 @@ struct SongTagEditor {
         LibraryIdentity.isManaged(song.id) || song.id.hasPrefix("demo:")
     }
 
-    func save(_ form: SongEditForm, for song: Song) {
+    /// Writes a replaced cover's JPEG off the main thread (nil for no new cover, or when the write failed).
+    static func writeCover(_ cover: SongEditForm.Cover, songId: String, temporary: Bool) async -> URL? {
+        guard case .replaced(let data) = cover else { return nil }
+        return await Task.detached(priority: .userInitiated) {
+            SongCoverStore.save(data, songId: songId, temporary: temporary)
+        }.value
+    }
+
+    /// `coverURL`: the replaced cover's file, already written by `writeCover` (nil writes it here).
+    func save(_ form: SongEditForm, for song: Song, coverURL: URL? = nil) {
         let artworkUri: String?
         var coverUpdate: CoverArtUpdate?
         switch form.cover {
@@ -78,7 +87,8 @@ struct SongTagEditor {
             artworkUri = ""
             coverUpdate = CoverArtUpdate(isDeletion: true)
         case .replaced(let data):
-            artworkUri = SongCoverStore.save(data, songId: song.id, temporary: env.launch.isUITest)?.absoluteString
+            artworkUri = (coverURL ?? SongCoverStore.save(data, songId: song.id, temporary: env.launch.isUITest))?
+                .absoluteString
             coverUpdate = CoverArtUpdate(bytes: data, mimeType: "image/jpeg")
         }
         let trimmed = { (value: String) in value.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -125,7 +135,8 @@ struct SongTagEditor {
         if let artwork = fields.artworkUri { song.albumArtUriString = artwork.isEmpty ? nil : artwork }
         if let lyrics { song.lyrics = lyrics.isEmpty ? nil : lyrics }
         snapshot.songs[index] = song
-        env.library.apply(snapshot)
+        // One song changed: patch the store's lookups instead of comparing and re-indexing the whole library.
+        env.library.applyEdit(snapshot, changedSongs: [song])
     }
 }
 

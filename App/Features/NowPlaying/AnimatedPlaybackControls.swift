@@ -21,7 +21,18 @@ struct AnimatedPlaybackControls: View {
 
     @State private var lastClicked: Control?
     @State private var clickCount = 0
-    @State private var width: CGFloat = 0
+    /// Seeded with the laid-out width when known (one layout pass instead of a measuring one first).
+    @State private var width: CGFloat
+
+    init(isPlaying: Bool, onPrevious: @escaping () -> Void, onPlayPause: @escaping () -> Void,
+         onNext: @escaping () -> Void, height: CGFloat = 80, initialWidth: CGFloat = 0) {
+        self.isPlaying = isPlaying
+        self.onPrevious = onPrevious
+        self.onPlayPause = onPlayPause
+        self.onNext = onNext
+        self.height = height
+        _width = State(initialValue: initialWidth)
+    }
 
     private static let spacing: CGFloat = 6
     /// `MotionScheme.expressive().fastSpatialSpec` (damping 0.6, stiffness 800).

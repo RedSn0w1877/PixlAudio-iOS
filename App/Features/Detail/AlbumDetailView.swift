@@ -28,9 +28,16 @@ private struct AlbumDetailContent: View {
     @Environment(Router.self) private var router
     @Environment(\.appTheme) private var theme
     @State private var scroll = HeaderScrollState()
-    @State private var songs: [Song] = []
+    /// The album's songs in play order, derived in `body` once per library revision: the push's first frame has them
+    /// (the subtitle no longer reads "0 Songs" for a frame, and there is no second pass).
+    @State private var memo = ViewMemo<Int, [Song]>()
+
+    private var songs: [Song] {
+        memo.value(for: library.revision) { LibrarySorting.albumPlaybackOrder(library.songs(ofAlbum: albumId)) }
+    }
 
     var body: some View {
+        let songs = self.songs
         GeometryReader { proxy in
             let safeTop = proxy.safeAreaInsets.top
             let metrics = CollapseMetrics(maxHeight: 300, minHeight: 64 + safeTop)
@@ -50,12 +57,10 @@ private struct AlbumDetailContent: View {
                 }
             }
         }
-        .onChange(of: library.songs, initial: true) { _, all in
-            songs = LibrarySorting.albumPlaybackOrder(all.filter { $0.albumId == albumId })
-        }
     }
 
     private func list(topPadding: CGFloat) -> some View {
+        let songs = self.songs
         let byDisc = Dictionary(grouping: songs) { $0.discNumber ?? 1 }
         let discs = byDisc.keys.sorted()
         return ScrollView {
@@ -70,11 +75,12 @@ private struct AlbumDetailContent: View {
                             .padding(.leading, 8)
                     }
                     ForEach(byDisc[disc] ?? []) { song in
-                        let isCurrent = playback.current?.id == song.id
-                        SongCard(song: song, isCurrent: isCurrent, isPlaying: isCurrent && playback.isPlaying,
-                                 onTap: { playback.play(song, in: songs) },
-                                 onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
-                                 showsArtwork: false)
+                        PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
+                            SongCard(song: song, isCurrent: isCurrent, isPlaying: isPlaying,
+                                     onTap: { playback.play(song, in: songs) },
+                                     onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
+                                     showsArtwork: false)
+                        }
                     }
                 }
             }

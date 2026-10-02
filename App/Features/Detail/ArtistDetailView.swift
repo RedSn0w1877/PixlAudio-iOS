@@ -16,7 +16,7 @@ struct ArtistDetailView: View {
 
     var body: some View {
         let artist = library.artist(id: artistId)
-        let firstArt = library.songs.first { $0.artistId == artistId }?.albumArtUriString
+        let firstArt = library.firstArtwork(ofArtist: artistId)
         ArtworkThemed(artUri: artist?.effectiveImageUrl ?? firstArt) {
             ArtistDetailContent(artistId: artistId)
         }
@@ -89,10 +89,23 @@ private struct ArtistDetailContent: View {
     @Environment(Router.self) private var router
     @Environment(\.appTheme) private var theme
     @State private var scroll = HeaderScrollState()
-    @State private var sections: [ArtistAlbumSection] = []
-    @State private var topSongs: [Song] = []
     @State private var collapsed: Set<String> = []
-    @State private var engagements: [EngagementEntry] = []
+    /// The album sections and "Most played", derived in `body` once per (library revision, play counts): the push's
+    /// first frame has them. Play counts come from a long-lived cache (`PlayCountStore`), so "Most played" is there
+    /// from the first frame on later visits instead of being inserted above the albums mid-push.
+    @State private var memo = ViewMemo<ArtistContentKey, ArtistContent>()
+
+    private var content: ArtistContent {
+        let counts = env.playCounts
+        return memo.value(for: ArtistContentKey(revision: library.revision, playCounts: counts.version)) {
+            let sections = ArtistDetailGrouping.albumSections(library.songs(ofArtist: artistId))
+            let topSongs = ArtistDetailGrouping.topSongs(sections.flatMap(\.songs), engagements: counts.entries ?? [])
+            return ArtistContent(sections: sections, topSongs: topSongs)
+        }
+    }
+
+    private var sections: [ArtistAlbumSection] { content.sections }
+    private var topSongs: [Song] { content.topSongs }
 
     var body: some View {
         GeometryReader { proxy in
@@ -121,15 +134,9 @@ private struct ArtistDetailContent: View {
                 }
             }
         }
-        .task { engagements = await env.libraryEditor.engagementEntries() }
-        .onChange(of: library.songs, initial: true) { _, all in rebuild(all) }
-        .onChange(of: engagements) { _, _ in rebuild(library.songs) }
-    }
-
-    private func rebuild(_ all: [Song]) {
-        let mine = all.filter { song in song.artistId == artistId || song.artists.contains { $0.id == artistId } }
-        sections = ArtistDetailGrouping.albumSections(mine)
-        topSongs = ArtistDetailGrouping.topSongs(sections.flatMap(\.songs), engagements: engagements)
+        .task(id: env.home.history.revision) {
+            await env.playCounts.refresh(editor: env.libraryEditor, revision: env.home.history.revision)
+        }
     }
 
     private func list(topPadding: CGFloat) -> some View {
@@ -191,13 +198,14 @@ private struct ArtistDetailContent: View {
     /// rows, the last one closing the group with 24 pt corners).
     private func groupedRow(_ song: Song, index: Int, count: Int, context: [Song]) -> some View {
         let isLast = index == count - 1
-        let isCurrent = playback.current?.id == song.id
         return VStack(spacing: 0) {
             if index > 0 { Spacer().frame(height: 2) }
-            SongCard(song: song, isCurrent: isCurrent, isPlaying: isCurrent && playback.isPlaying,
-                     onTap: { playback.play(song, in: context) },
-                     onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
-                     showsArtwork: false, corners: .grouped(index: index, count: count))
+            PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
+                SongCard(song: song, isCurrent: isCurrent, isPlaying: isPlaying,
+                         onTap: { playback.play(song, in: context) },
+                         onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
+                         showsArtwork: false, corners: .grouped(index: index, count: count))
+            }
             if isLast { Spacer().frame(height: 8) }
         }
         .padding(.horizontal, 8)
@@ -206,6 +214,16 @@ private struct ArtistDetailContent: View {
                                            style: .continuous)
             .fill(theme.surfaceContainerLow.opacity(0.5)))
     }
+}
+
+private struct ArtistContentKey: Equatable {
+    let revision: Int
+    let playCounts: Int
+}
+
+private struct ArtistContent {
+    let sections: [ArtistAlbumSection]
+    let topSongs: [Song]
 }
 
 /// Android `CollapsibleAlbumSectionHeader`.

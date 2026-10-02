@@ -34,6 +34,10 @@ struct PlaylistDetailView: View {
     @State private var didApplyLaunchState = false
 
     private var prefs: LibraryPreferences { LibraryPreferences.shared(isUITest: env.launch.isUITest) }
+    /// The song picker's starting storage filter (Android: offline when the library has cloud songs, else all).
+    private var songPickerFilter: StorageFilter {
+        library.songs.contains(where: LibrarySorting.isOnline) ? .offline : .all
+    }
     private var folderPath: String? { FolderPlaylist.path(from: playlistId) }
     private var isFolder: Bool { folderPath != nil }
 
@@ -46,7 +50,8 @@ struct PlaylistDetailView: View {
 
     private func resolveFolder() {
         guard let folderPath else { return }
-        let folder = LibraryModel.folder(at: folderPath, in: LibraryModel.folderTree(library.songs))
+        // The library's folder tree is built off the main actor with the detail index.
+        let folder = LibraryModel.folder(at: folderPath, in: library.folderTree)
         folderPlaylist = folder.map { Playlist(id: playlistId, name: $0.name, songIds: LibraryModel.allSongs($0).map(\.id)) }
         didResolveFolder = true
     }
@@ -99,10 +104,14 @@ struct PlaylistDetailView: View {
                   initial: true) { _, inputs in
             songs = orderedSongs(inputs)
         }
-        .onAppear(perform: applyLaunchState)
+        .onAppear {
+            applyLaunchState()
+            if !isFolder { SongPickerDefaults.warm(library: library, filter: songPickerFilter) }
+        }
         .onChange(of: library.songs.count, initial: true) { _, _ in resolveFolder() }
         .sheet(isPresented: $showsAddSongs) {
-            SongPickerSheet(initiallySelected: Set(playlist?.songIds ?? [])) { selected in
+            SongPickerSheet(initiallySelected: Set(playlist?.songIds ?? []),
+                            initialStorageFilter: songPickerFilter) { selected in
                 env.libraryEditor.addSongs(Array(selected), toPlaylist: playlistId)
                 showsAddSongs = false
             }
@@ -149,25 +158,28 @@ struct PlaylistDetailView: View {
     /// Android: a 62 pt row (20 pt sides, 6 pt bottom; 8 pt for folders) of two 76 pt buttons clipped to it.
     private var playRow: some View {
         let enabled = !songs.isEmpty
-        return HStack(spacing: 8) {
-            SegmentedGlassButton(title: "Play it", systemImage: "play.fill", accessibilityLabel: "Play",
-                                 leading: 60, trailing: 14, height: 56, horizontalPadding: 10,
-                                 tint: theme.primary.opacity(GlassTint.prominent), foreground: theme.onPrimary,
-                                 fillsWidth: true) {
-                guard let first = songs.first else { return }
-                if playback.isShuffleEnabled { playback.setShuffleEnabled(false) }
-                playback.play(first, in: songs)
+        // The two buttons render together (spacing below their 8 pt gap).
+        return GlassEffectContainer(spacing: 4) {
+            HStack(spacing: 8) {
+                SegmentedGlassButton(title: "Play it", systemImage: "play.fill", accessibilityLabel: "Play",
+                                     leading: 60, trailing: 14, height: 56, horizontalPadding: 10,
+                                     tint: theme.primary.opacity(GlassTint.prominent), foreground: theme.onPrimary,
+                                     fillsWidth: true) {
+                    guard let first = songs.first else { return }
+                    if playback.isShuffleEnabled { playback.setShuffleEnabled(false) }
+                    playback.play(first, in: songs)
+                }
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("playlist.play")
+                SegmentedGlassButton(title: "Shuffle", systemImage: "shuffle", accessibilityLabel: "Shuffle",
+                                     leading: 14, trailing: 60, height: 56, horizontalPadding: 10,
+                                     tint: theme.secondaryContainer.opacity(GlassTint.prominent),
+                                     foreground: theme.onSecondaryContainer, fillsWidth: true) {
+                    playback.playShuffled(songs)
+                }
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("playlist.shuffle")
             }
-            .frame(maxWidth: .infinity)
-            .accessibilityIdentifier("playlist.play")
-            SegmentedGlassButton(title: "Shuffle", systemImage: "shuffle", accessibilityLabel: "Shuffle",
-                                 leading: 14, trailing: 60, height: 56, horizontalPadding: 10,
-                                 tint: theme.secondaryContainer.opacity(GlassTint.prominent),
-                                 foreground: theme.onSecondaryContainer, fillsWidth: true) {
-                playback.playShuffled(songs)
-            }
-            .frame(maxWidth: .infinity)
-            .accessibilityIdentifier("playlist.shuffle")
         }
         .disabled(!enabled)
         .opacity(enabled ? 1 : 0.5)
@@ -177,20 +189,23 @@ struct PlaylistDetailView: View {
 
     /// Android: Add (capsule, `tertiaryContainer`), then Remove and Reorder stretched over the rest.
     private var editRow: some View {
-        HStack(spacing: 8) {
-            SegmentedGlassButton(title: "Add", systemImage: "plus", accessibilityLabel: "Add songs", leading: 21,
-                                 trailing: 21, height: 42, horizontalPadding: 12,
-                                 tint: theme.tertiaryContainer.opacity(GlassTint.prominent),
-                                 foreground: theme.onTertiaryContainer) { showsAddSongs = true }
-                .accessibilityIdentifier("playlist.add")
-            modeButton("Remove", systemImage: "minus.circle", isOn: isRemoveMode) {
-                withAnimation(PixlMotion.state) { isRemoveMode.toggle() }
+        // The three buttons render together (spacing below their 8 pt gaps).
+        GlassEffectContainer(spacing: 4) {
+            HStack(spacing: 8) {
+                SegmentedGlassButton(title: "Add", systemImage: "plus", accessibilityLabel: "Add songs", leading: 21,
+                                     trailing: 21, height: 42, horizontalPadding: 12,
+                                     tint: theme.tertiaryContainer.opacity(GlassTint.prominent),
+                                     foreground: theme.onTertiaryContainer) { showsAddSongs = true }
+                    .accessibilityIdentifier("playlist.add")
+                modeButton("Remove", systemImage: "minus.circle", isOn: isRemoveMode) {
+                    withAnimation(PixlMotion.state) { isRemoveMode.toggle() }
+                }
+                .accessibilityIdentifier("playlist.remove")
+                modeButton("Reorder", systemImage: "arrow.up.arrow.down", isOn: isReorderMode) {
+                    withAnimation(PixlMotion.state) { isReorderMode.toggle() }
+                }
+                .accessibilityIdentifier("playlist.reorder")
             }
-            .accessibilityIdentifier("playlist.remove")
-            modeButton("Reorder", systemImage: "arrow.up.arrow.down", isOn: isReorderMode) {
-                withAnimation(PixlMotion.state) { isReorderMode.toggle() }
-            }
-            .accessibilityIdentifier("playlist.reorder")
         }
         .padding(.horizontal, 20)
         .padding(.top, 2)
@@ -233,15 +248,17 @@ struct PlaylistDetailView: View {
         return ScrollView {
             LazyVStack(spacing: 8) {
                 ForEach(songs) { song in
-                    let isCurrent = playback.current?.id == song.id
-                    PlaylistSongRow(song: song, isCurrent: isCurrent, isPlaying: isCurrent && playback.isPlaying,
-                                    showsDragHandle: isReorderMode && !isFolder, showsRemove: isRemoveMode && !isFolder,
-                                    onTap: { playback.play(song, in: songs) },
-                                    onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
-                                    onRemove: { env.libraryEditor.removeSong(song.id, fromPlaylist: playlistId) })
-                        .dropDestination(for: String.self) { items, _ in
-                            move(items.first, onto: song.id)
-                        }
+                    PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
+                        PlaylistSongRow(song: song, isCurrent: isCurrent, isPlaying: isPlaying,
+                                        showsDragHandle: isReorderMode && !isFolder,
+                                        showsRemove: isRemoveMode && !isFolder,
+                                        onTap: { playback.play(song, in: songs) },
+                                        onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
+                                        onRemove: { env.libraryEditor.removeSong(song.id, fromPlaylist: playlistId) })
+                    }
+                    .dropDestination(for: String.self) { items, _ in
+                        move(items.first, onto: song.id)
+                    }
                 }
             }
             .padding(.top, 12)
@@ -373,7 +390,8 @@ private struct PlaylistOptionsSheet: View {
         }
         .task(id: playlist?.id) {
             guard let playlist else { return }
-            exportURL = PlaylistExport.writeTemporaryM3U(playlist, library: library)
+            let url = await PlaylistExport.writeTemporaryM3U(playlist, library: library)
+            if !Task.isCancelled { exportURL = url }
         }
         .accessibilityIdentifier("sheet.playlistOptions")
     }

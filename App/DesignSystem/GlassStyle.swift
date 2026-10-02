@@ -43,6 +43,9 @@ nonisolated enum PixlMotion {
     static let state = Animation.spring(response: 0.4, dampingFraction: 0.86)
     /// Showing / hiding bars (Android `tween(220, LinearOutSlowIn)`).
     static let bars = Animation.spring(response: 0.3, dampingFraction: 0.9)
+    /// The tab cross-fade: a cubic fit of `selection`'s visible curve (within 0.74 % opacity over 0–0.21 s) that ends
+    /// at 0.21 s, where the clamped spring is already at 100 % but keeps both tabs composited until about 0.6 s.
+    static let tabFade = Animation.timingCurve(0.25, 0.05, 0.45, 0.85, duration: 0.21)
 }
 
 /// Rounds only the top corners of a scroll area (Android clips its lists' top corners) and leaves the bottom open past

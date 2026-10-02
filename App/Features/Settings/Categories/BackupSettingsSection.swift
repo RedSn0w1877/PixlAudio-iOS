@@ -13,7 +13,7 @@ struct BackupSettingsSection: View {
     @State private var toast: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        SettingsCategoryScaffold(category: .backupRestore, toast: $toast) {
             if !settings.experimental.backupInfoDismissed {
                 BackupInfoNotice { withAnimation(PixlMotion.state) { settings.experimental.backupInfoDismissed = true } }
                 Spacer().frame(height: 10)
@@ -39,7 +39,6 @@ struct BackupSettingsSection: View {
             toast = message
             env.backup.exportMessage = nil
         }
-        .settingsToast($toast)
     }
 
     private var selectionSummary: String {

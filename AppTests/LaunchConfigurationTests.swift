@@ -39,6 +39,15 @@ final class LaunchConfigurationTests: XCTestCase {
         XCTAssertEqual(LaunchConfiguration(arguments: ["-screen", "miniPlayer", "-song", "5"]).songIndex, 5)
     }
 
+    /// `-demoScale` repeats the demo library for the transition performance tests (clamped to 1…400).
+    func testParsesDemoScale() {
+        XCTAssertEqual(LaunchConfiguration(arguments: ["-uiTest"]).demoScale, 1)
+        XCTAssertEqual(LaunchConfiguration(arguments: ["-uiTest", "-demoScale", "100"]).demoScale, 100)
+        XCTAssertEqual(LaunchConfiguration(arguments: ["-uiTest", "-demoScale", "0"]).demoScale, 1)
+        XCTAssertEqual(LaunchConfiguration(arguments: ["-uiTest", "-demoScale", "9999"]).demoScale, 400)
+        XCTAssertEqual(LaunchConfiguration(arguments: ["-uiTest", "-demoScale", "x"]).demoScale, 1)
+    }
+
     /// Every DemoScreen resolves to at most one destination and has a ready identifier.
     func testEveryDemoScreenRoutes() {
         for screen in DemoScreen.allCases {

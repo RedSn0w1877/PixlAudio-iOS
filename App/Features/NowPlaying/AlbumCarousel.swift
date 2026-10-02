@@ -45,7 +45,20 @@ struct AlbumCarousel: View {
     let onSelect: (Int) -> Void
     let onAlbumTap: (Song) -> Void
 
-    @State private var width: CGFloat = 0
+    /// Starts at the width the player lays it out at (when known), so the covers are there on the first pass instead
+    /// of after a measuring pass; measuring still follows later changes.
+    @State private var width: CGFloat
+
+    init(queue: [Song], currentIndex: Int?, style: PlayerCarouselStyle, isPlaying: Bool, initialWidth: CGFloat = 0,
+         onSelect: @escaping (Int) -> Void, onAlbumTap: @escaping (Song) -> Void) {
+        self.queue = queue
+        self.currentIndex = currentIndex
+        self.style = style
+        self.isPlaying = isPlaying
+        self.onSelect = onSelect
+        self.onAlbumTap = onAlbumTap
+        _width = State(initialValue: initialWidth)
+    }
     @State private var position: Int?
     @State private var userDragged = false
     @State private var settleHaptic = 0

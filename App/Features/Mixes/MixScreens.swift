@@ -78,11 +78,12 @@ struct MixScreen: View {
                         if playsFromLibrary { playback.play(library.songs.shuffled()) } else { playback.play(songs.shuffled()) }
                     })
                 ForEach(songs) { song in
-                    SongCard(song: song, isCurrent: playback.current?.id == song.id,
-                             isPlaying: playback.current?.id == song.id && playback.isPlaying,
-                             onTap: { play(from: song) },
-                             onMore: { router.present(AppSheet.songInfo(songId: song.id)) })
-                        .padding(.horizontal, 16)
+                    PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
+                        SongCard(song: song, isCurrent: isCurrent, isPlaying: isPlaying,
+                                 onTap: { play(from: song) },
+                                 onMore: { router.present(AppSheet.songInfo(songId: song.id)) })
+                    }
+                    .padding(.horizontal, 16)
                 }
             }
             .padding(.bottom, 16)

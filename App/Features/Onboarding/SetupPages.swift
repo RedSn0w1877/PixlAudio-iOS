@@ -123,12 +123,14 @@ struct SetupBackupPage: View {
     let isInspecting: Bool
     let isRestoring: Bool
     let isScanning: Bool
-    let scanProgress: LibraryImportProgress?
     let onImport: () -> Void
     let onSkip: () -> Void
+    @Environment(LibraryStore.self) private var library
     @Environment(\.appTheme) private var theme
 
     var body: some View {
+        // The scan's progress is read here, not by SetupView: each tick re-runs this page only, not the pager.
+        let scanProgress = library.lastImportProgress
         let isBusy = isInspecting || isRestoring || isScanning
         SetupPermissionPage(title: L10n.setupBackupHaveTitle, description: L10n.setupBackupHaveDescription,
                             buttonText: isInspecting ? L10n.setupInspectingBackup

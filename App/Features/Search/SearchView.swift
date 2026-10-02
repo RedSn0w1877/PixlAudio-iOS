@@ -181,9 +181,11 @@ struct SearchView: View {
     private func resultRow(_ item: SearchResultItem) -> some View {
         switch item {
         case .song(let song):
-            SongCard(song: song, isCurrent: playback.current?.id == song.id, isPlaying: playback.isPlaying,
-                     onTap: { playSong(song) },
-                     onMore: { router.present(AppSheet.songInfo(songId: song.id)) })
+            PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
+                SongCard(song: song, isCurrent: isCurrent, isPlaying: isPlaying,
+                         onTap: { playSong(song) },
+                         onMore: { router.present(AppSheet.songInfo(songId: song.id)) })
+            }
         case .album(let album):
             SearchResultAlbumRow(album: album,
                                  onOpen: { router.push(.albumDetail(albumId: album.id)); itemSelected() },
@@ -265,9 +267,9 @@ private struct LibraryIndexFeeder: View {
 
     var body: some View {
         Color.clear
-            .onChange(of: library.snapshot, initial: true) { _, snapshot in
+            .onChange(of: library.revision, initial: true) { _, _ in
                 prepare()
-                model.libraryChanged(snapshot, minTracksPerAlbum: settings.library.minTracksPerAlbum)
+                model.libraryChanged(library.snapshot, minTracksPerAlbum: settings.library.minTracksPerAlbum)
             }
     }
 }
