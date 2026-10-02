@@ -605,3 +605,21 @@ an image).
 - **Song sheet:** the Remaster Song card (stage 14) now fills the space wave A's review noted under the buttons.
 - **Playlist:** "Sync lyrics for all songs" / "Instrumentalize all" and `PlaylistLyricSyncCard` run on TAIS Studio's lane.
 
+
+### Visual review (Integrate B, `main` 1d22211, CI run 37008732905: 235 shots, every class green)
+Compared side by side with the Compose code (`presentation/lyrics/sync/**`, `components/tais/**`) and `pp_card` /
+`pp_sheet`. Same layout as PixlAudio, glass in place of Material, legible in light and dark, coloured blocks keep the
+light tint (decision 11):
+- **Sync editor** (syncIntro … syncLiveTapped): `SyncCardScreen`'s top bar (✕ circle, title, speed pill), centred
+  30 pt title / 16 pt body, the three numbered step rows with 44 pt accent circles, the Normal / Slower / Slowest
+  capsules, Start + "Got it" at the bottom; the tap screen's progress line, context lines, boxed sung word, NEXT word,
+  36 pt pad and Undo / Pause / Back 5 s; the preview's karaoke view under the 32 pt panel (Earlier · offset · Later, Fix a
+  line, Keep tapping, share, Save); the words screen's title, body and field (Android repeats the body as the field's
+  placeholder too); manage; the system glass alerts and speed menu (documented deviations). Light appearance stays dark,
+  as Android's editor does.
+- **TAIS** (tais.*): Remaster Song card in the song sheet matches `pp_card` (sparkles, title, description, Render
+  Instrumental, divider, Sync / resync lyrics; progress bar + Cancel while running) and fills the space wave A noted
+  under the buttons; Experimental's card with the BS-RoFormer row, the models panel; the lyrics screen's instrumental
+  card and floating Instrumental pill.
+Nothing needed fixing. Known differences, not bugs: no Offline card under Remaster on the demo song (it is a local file;
+Android shows it for streamable songs), no "Set as sound" (iOS can't set ringtones).
