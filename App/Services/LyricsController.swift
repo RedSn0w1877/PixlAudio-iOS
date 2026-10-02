@@ -30,8 +30,6 @@ final class LyricsController {
     var message: String?
 
     @ObservationIgnored private let service: LyricsService?
-    /// The service behind this controller (stage 14's lyric sync reads and saves through it).
-    var lyricsService: LyricsService? { service }
     @ObservationIgnored private let settings: SettingsStore
     @ObservationIgnored private let isUITest: Bool
     @ObservationIgnored private var loadTask: Task<Void, Never>?
@@ -46,9 +44,9 @@ final class LyricsController {
         service = isUITest ? nil : LyricsService(persistence: persistence)
     }
 
-    /// The lyrics service for stage 10's sync editor (stored lyrics, saving the user's timing as source "user", the
-    /// online search of its words screen); nil in UI tests.
-    var syncService: LyricsService? { service }
+    /// The service behind this controller, for stage 10's sync editor (stored lyrics, saving the user's timing as source
+    /// "user", the online search of its words screen) and stage 14's TAIS lyric sync; nil in UI tests.
+    var lyricsService: LyricsService? { service }
 
     // MARK: Loading
 

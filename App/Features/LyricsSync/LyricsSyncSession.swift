@@ -255,7 +255,7 @@ final class LyricsSyncSession {
     private func currentLyrics(for song: Song) async -> Lyrics? {
         if case .loaded(let id, let lyrics, _) = lyricsStore.state, id == song.id { return lyrics }
         if isUITest { return LyricsDemoContent.lyrics(LyricsLaunchOptions.current.demo) }
-        return await lyricsController.syncService?.storedLyricsAsync(for: song)?.lyrics
+        return await lyricsController.lyricsService?.storedLyricsAsync(for: song)?.lyrics
     }
 
     private func startFromSeed(_ seedDraft: SyncDraft?, origin: SyncDraftOrigin) {
@@ -408,7 +408,7 @@ final class LyricsSyncSession {
         searchTask?.cancel()
         searching = true
         searchHits = nil
-        let service = lyricsController.syncService
+        let service = lyricsController.lyricsService
         searchTask = Task { [weak self] in
             var hits: [SyncSearchHit] = []
             if let service, case .success(let results) = await service.searchCandidates(song: song) {
@@ -773,7 +773,7 @@ final class LyricsSyncSession {
         isSaving = true
         pause()
         let offset = offsetMs
-        let service = lyricsController.syncService
+        let service = lyricsController.lyricsService
         let isUITest = self.isUITest
         Task { [weak self] in
             // Built and serialised off the main thread: the JSON is tens of KB.

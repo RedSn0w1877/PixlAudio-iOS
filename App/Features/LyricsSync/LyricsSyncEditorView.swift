@@ -171,7 +171,8 @@ struct LyricsSyncEditorView: View {
         }
         let library = env.library
         let created = LyricsSyncSession(
-            player: LyricsSyncPlayer(playback: playback, engine: env.playbackServices?.engine),
+            player: LyricsSyncPlayer(playback: playback, engine: env.playbackServices?.engine,
+                                     instrumental: env.tais.instrumental),
             settings: env.settings, lyricsStore: env.lyrics, lyricsController: env.lyricsController,
             draftStore: LyricsSyncDraftStore(directory: draftsDirectory),
             preferences: LyricsSyncPreferences(isUITest: isUITest), isUITest: isUITest,

@@ -159,6 +159,8 @@ PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact ba
 | AI Playlist Lab (Library › Create playlist › With AI) | `AppCover.aiPlaylistLab` | `AiPlaylistLabView` (Features/AI) | 13 |
 | TAIS DJ chat (Experimental › TAIS DJ; player's Taizo button) | `AppSheet.taisChat` | `TaisChatSheet` (Features/AI) | 13 |
 | Setup | `AppCover.setup` | `SetupView` (Features/Onboarding) | 15 |
+| TAIS Studio "Remaster Song" card (Experimental, song sheet), on-device models panel (iOS only) | inside `ExperimentalSettingsView` / `SongOptionsSheet` | `TaisStudioProgressCard`, `OnDeviceModelsPanel` (Features/Tais) | 14 |
+| Lyrics screen instrumental card + floating instrumental toggle | inside `LyricsView` | `InstrumentalRenderAction`, `InstrumentalLyricsToggle` (Features/Tais) | 14 |
 | Backup export / restore | `AppCover.backupExport`, `.backupImport` | `BackupExportCover`, `BackupImportCover` (Features/Backup) | 15 |
 | Plus / license debug, nav-bar corner radius | — (dropped: everything unlocked; Material-only setting) | — | — |
 
@@ -384,7 +386,7 @@ Port of Android `presentation/lyrics/sync/**` + `LyricsSyncEditorStateHolder` (`
   (`LyricsSyncEditorView.open(…, fromLyrics: true)` — the editor returns to the lyrics screen); Edit song's "Change the
   words" (`.words`) and "Fix timing" (`.fixTiming`), which start the song paused if another one is playing.
 - **Shared-file changes (additive):** `Playback/DualDeckEngine.swift` (exact-timing session), `Stores/PlaybackStore.swift`
-  (explicit `resume()` / `pause()`), `Services/LyricsController.swift` (`syncService`), `Features/Lyrics/LyricsView.swift`
+  (explicit `resume()` / `pause()`), `Services/LyricsController.swift` (`lyricsService`, shared with stage 14), `Features/Lyrics/LyricsView.swift`
   and `Features/SongInfo/EditSongSheet.swift` (open through `LyricsSyncEditorView.open`).
 
 Screenshot ids (`UITests/LyricsSyncScreenshotTests`, `-screen lyricsSync -syncStep <step>`; ready `screen.lyricsSync`):
@@ -586,3 +588,20 @@ queue, timer, lyrics, Spotify, AI, setup, backup, YouTube and devices screens al
 their owners: Settings › Library › Music folders (stage 7d) draws its "Excluded Directories" title under the `+`
 button; `ci/export-shots.sh` names the backup probe's text attachment `public.plain-text.txt.png` (it is text, not
 an image).
+
+## Integration notes (Integrate B: stages 10 and 14 merged — tag `stage-15`)
+
+- **Lyrics ↔ sync editor:** the lyrics More sheet's first row, the empty-state button and the line-synced chip open
+  stage 10's editor (`LyricsSyncEditorView.open(…, fromLyrics: true)`, which returns to the lyrics screen); Edit song's
+  "Change the words" / "Fix timing" open it at the words / fix-timing entries. The placeholder is gone.
+- **Sync editor ↔ instrumental:** `LyricsSyncPlayer` suspends stage 14's `InstrumentalController` for the session
+  (owner `lyrics_sync`, Android `InstrumentalCrossfadeController.suspend`): an instrumental that was playing switches back
+  to the song's own audio so the person hears the vocals they are timing, and returns when the editor closes. Crossfades
+  and the hand-over stay suspended through the engine's exact-timing session as before.
+- **One lyrics service accessor:** both stages had added one (`syncService`, `lyricsService`) to `LyricsController`;
+  they are now the single `lyricsService`, used by the editor (stored lyrics, Save as source `user`, Find lyrics online)
+  and TAIS Studio (catalog check, Save as source `tais`, "Replace" for a user sync). A TAIS save reloads the lyrics
+  screen when it shows that song.
+- **Song sheet:** the Remaster Song card (stage 14) now fills the space wave A's review noted under the buttons.
+- **Playlist:** "Sync lyrics for all songs" / "Instrumentalize all" and `PlaylistLyricSyncCard` run on TAIS Studio's lane.
+

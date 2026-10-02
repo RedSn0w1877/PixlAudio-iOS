@@ -13,15 +13,18 @@ final class LyricsSyncPlayer {
 
     let playback: PlaybackStore
     private let engine: DualDeckEngine?
+    /// Stage 14's instrumental switch: suspended for the session so the person hears the vocals they are timing.
+    private let instrumental: InstrumentalController?
     /// What we asked for last (the store only learns the engine's state through its event stream).
     private(set) var playWhenReady: Bool
     /// The song reached its end during the session (the engine paused on it).
     var onSongEnded: (() -> Void)?
     private var sessionOpen = false
 
-    init(playback: PlaybackStore, engine: DualDeckEngine?) {
+    init(playback: PlaybackStore, engine: DualDeckEngine?, instrumental: InstrumentalController? = nil) {
         self.playback = playback
         self.engine = engine
+        self.instrumental = instrumental
         playWhenReady = playback.isPlaying
     }
 
@@ -54,6 +57,7 @@ final class LyricsSyncPlayer {
     func beginSession() {
         guard !sessionOpen else { return }
         sessionOpen = true
+        instrumental?.suspend(owner: Self.owner)
         guard let engine else { return }
         engine.beginExactTimingSession()
         engine.suspendTransitions(owner: Self.owner)
@@ -69,6 +73,7 @@ final class LyricsSyncPlayer {
         sessionOpen = false
         // Always, not only when it differs (Android: a speed change may still be in flight).
         playback.setPlaybackRate(restoreRate)
+        instrumental?.resume(owner: Self.owner)
         guard let engine else { return }
         engine.onExactTimingItemEnded = nil
         engine.endExactTimingSession()
