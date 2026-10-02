@@ -85,8 +85,9 @@ actor ArtworkPipeline {
             try? FileManager.default.createDirectory(at: diskDirectory, withIntermediateDirectories: true)
         }
         let memory = self.memory
-        _ = NotificationCenter.default.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification,
-                                                   object: nil, queue: nil) { @Sendable _ in
+        // `UIApplication.didReceiveMemoryWarningNotification`, by name (this initialiser is not on the main actor).
+        let memoryWarning = Notification.Name("UIApplicationDidReceiveMemoryWarningNotification")
+        _ = NotificationCenter.default.addObserver(forName: memoryWarning, object: nil, queue: nil) { @Sendable _ in
             memory.removeAll()
         }
     }

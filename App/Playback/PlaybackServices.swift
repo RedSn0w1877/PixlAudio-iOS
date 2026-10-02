@@ -189,9 +189,10 @@ final class PlaybackServices {
             MainActor.assumeIsolated {
                 // Encoded off the main actor; a background task keeps the app running until it is written.
                 let application = UIApplication.shared
-                let taskId = application.beginBackgroundTask(withName: "QueueSnapshot", expirationHandler: nil)
+                let taskId = application.beginBackgroundTask(withName: "QueueSnapshot", expirationHandler: nil).rawValue
                 self?.snapshots.saveInBackground {
-                    if taskId != .invalid { UIApplication.shared.endBackgroundTask(taskId) }
+                    let identifier = UIBackgroundTaskIdentifier(rawValue: taskId)
+                    if identifier != .invalid { UIApplication.shared.endBackgroundTask(identifier) }
                 }
             }
         })

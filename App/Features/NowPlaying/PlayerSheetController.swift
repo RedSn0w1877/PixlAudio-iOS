@@ -103,7 +103,7 @@ final class PlayerSheetController {
     /// Collapses, then runs `action` once the sheet has collapsed to `threshold` (Android
     /// `triggerAlbumNavigationFromPlayer`: navigate after the collapse, not in the same frame, so the push and the
     /// collapse don't compete for the same frames). Taps while it waits are dropped.
-    func collapse(thenAfterReaching threshold: CGFloat = 0.1, _ action: @escaping () -> Void) {
+    func collapse(thenAfterReaching threshold: CGFloat = 0.1, _ action: @escaping @MainActor @Sendable () -> Void) {
         guard !isNavigatingAfterCollapse else { return }
         let delay = PlayerSheetMotion.collapseTime(toReach: threshold, fromFraction: expansion)
         collapse()

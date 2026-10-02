@@ -115,6 +115,8 @@ final class DualDeckEngine: PlaybackEngine {
         hasEnded = false
         consecutiveFailures = 0
         self.playWhenReady = playWhenReady && !queue.isEmpty
+        // Activate the audio session off the main actor while the item loads.
+        if self.playWhenReady { session.prepareActivation() }
         emit(.queueChanged(queue.songs, currentIndex: queue.currentIndex))
         onQueueChanged?()
         emit(.currentIndexChanged(queue.currentIndex))

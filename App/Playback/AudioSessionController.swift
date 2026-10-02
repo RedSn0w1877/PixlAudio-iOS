@@ -85,8 +85,40 @@ final class AudioSessionController {
         return isActive
     }
 
+    /// An activation started off the main actor, while the item loads (`prepareActivation`).
+    private var preparing: Task<Void, Never>?
+    /// `deactivate()` came while that activation was under way.
+    private var deactivateAfterPreparing = false
+
+    /// Starts activating the session off the main actor (`setActive(true)` is a call to the audio server), so the
+    /// first play after launch doesn't make it on the main thread while the mini player appears: `activate()` then
+    /// usually finds the session active. If it runs first, it activates as before (activating twice is harmless).
+    func prepareActivation() {
+        guard !isActive, preparing == nil else { return }
+        deactivateAfterPreparing = false
+        preparing = Task { [weak self] in
+            let activated = await Self.activateSharedSession()
+            guard let self else { return }
+            self.preparing = nil
+            if self.deactivateAfterPreparing {
+                self.deactivateAfterPreparing = false
+                if activated { try? self.session.setActive(false, options: .notifyOthersOnDeactivation) }
+                self.isActive = false
+                return
+            }
+            if activated { self.isActive = true }
+        }
+    }
+
+    /// Under approachable concurrency a plain `nonisolated async` function would run on the caller's actor.
+    @concurrent
+    nonisolated private static func activateSharedSession() async -> Bool {
+        (try? AVAudioSession.sharedInstance().setActive(true)) != nil
+    }
+
     /// Deactivates after a permanent stop so other apps can resume.
     func deactivate() {
+        if preparing != nil { deactivateAfterPreparing = true }
         guard isActive else { return }
         try? session.setActive(false, options: .notifyOthersOnDeactivation)
         isActive = false

@@ -14,29 +14,29 @@ enum ScreenDataCache {
         var songCount: Int
     }
 
-    private static var stats: [StatsTimeRange: (stamp: Stamp, summary: PlaybackStatsSummary)] = [:]
-    private static var recentlyPlayed: [StatsTimeRange: (stamp: Stamp, groups: [HomeLogic.TimestampGroup],
-                                                         queue: [Song])] = [:]
+    private static var statsEntries: [StatsTimeRange: (stamp: Stamp, summary: PlaybackStatsSummary)] = [:]
+    private static var recentEntries: [StatsTimeRange: (stamp: Stamp, groups: [HomeLogic.TimestampGroup],
+                                                        queue: [Song])] = [:]
     /// The last measured device capabilities (it re-measures on every visit and route change).
     static var deviceCapabilities: DeviceCapabilitiesState?
 
     static func stats(_ range: StatsTimeRange, stamp: Stamp) -> PlaybackStatsSummary? {
-        guard let entry = stats[range], entry.stamp == stamp else { return nil }
+        guard let entry = statsEntries[range], entry.stamp == stamp else { return nil }
         return entry.summary
     }
 
     static func storeStats(_ summary: PlaybackStatsSummary, stamp: Stamp) {
-        stats[summary.range] = (stamp, summary)
+        statsEntries[summary.range] = (stamp, summary)
     }
 
     static func recentlyPlayed(_ range: StatsTimeRange,
                                stamp: Stamp) -> (groups: [HomeLogic.TimestampGroup], queue: [Song])? {
-        guard let entry = recentlyPlayed[range], entry.stamp == stamp else { return nil }
+        guard let entry = recentEntries[range], entry.stamp == stamp else { return nil }
         return (entry.groups, entry.queue)
     }
 
     static func storeRecentlyPlayed(_ range: StatsTimeRange, groups: [HomeLogic.TimestampGroup], queue: [Song],
                                     stamp: Stamp) {
-        recentlyPlayed[range] = (stamp, groups, queue)
+        recentEntries[range] = (stamp, groups, queue)
     }
 }
