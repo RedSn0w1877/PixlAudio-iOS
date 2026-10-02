@@ -25,7 +25,7 @@ final class PlayerScreenshotTests: XCTestCase {
         let start = mini.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.5))
         let end = start.withOffset(CGVector(dx: 0, dy: -420))
         start.press(forDuration: 0.05, thenDragTo: end)
-        let player = app.descendants(matching: .any)["player.collapse"].firstMatch
+        let player = collapseButton(app)
         XCTAssertTrue(player.waitForExistence(timeout: 10), "the drag did not expand the player")
         snapshot(app, "playerDragExpanded-light")
     }
@@ -33,7 +33,7 @@ final class PlayerScreenshotTests: XCTestCase {
     /// The collapse circle brings the mini player back.
     func testCollapseButtonDark() throws {
         let app = launch("nowPlaying", "dark")
-        let collapse = app.descendants(matching: .any)["player.collapse"].firstMatch
+        let collapse = collapseButton(app)
         XCTAssertTrue(collapse.waitForExistence(timeout: 20), "the full player did not appear")
         collapse.tap()
         let mini = app.descendants(matching: .any)["miniPlayer.title"].firstMatch
@@ -63,6 +63,14 @@ final class PlayerScreenshotTests: XCTestCase {
     }
 
     // MARK: - Helpers
+
+    /// The collapse circle, by identifier or label (it sits in the top bar's glass container, whose children keep
+    /// only their labels).
+    private func collapseButton(_ app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier == %@ OR label == %@", "player.collapse", "Collapse player"))
+            .firstMatch
+    }
 
     private func launch(_ screen: String, _ appearance: String, extra: [String] = []) -> XCUIApplication {
         continueAfterFailure = false

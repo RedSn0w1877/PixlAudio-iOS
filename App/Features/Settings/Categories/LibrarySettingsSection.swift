@@ -26,7 +26,7 @@ struct LibrarySettingsSection: View {
 
     var body: some View {
         @Bindable var lyrics = settings.lyrics
-        VStack(alignment: .leading, spacing: 0) {
+        SettingsCategoryScaffold(category: .library, toast: $toast) {
         SettingsSubsection(title: L10n.settingsLibraryStructureSection) {
             SettingsItemRow(title: L10n.settingsExcludedDirectoriesTitle,
                             subtitle: L10n.settingsExcludedDirectoriesSubtitle, systemImage: "folder",
@@ -47,7 +47,7 @@ struct LibrarySettingsSection: View {
                              valueText: { "\(Int($0)) MB" })
         }
         SettingsSubsection(title: L10n.settingsSyncScanningSection) {
-            RefreshLibraryRow(isSyncing: isSyncing, label: syncLabel, progress: library.lastImportProgress,
+            RefreshLibraryRow(isSyncing: isSyncing, label: syncLabel,
                               onFullSync: startFullRescan, onRebuild: { showsRebuild = true })
             SwitchSettingRow(title: L10n.settingsAutoScanLrcTitle, subtitle: L10n.settingsAutoScanLrcSubtitle,
                              isOn: $lyrics.autoScanLrcFiles, systemImage: "folder")
@@ -109,7 +109,6 @@ struct LibrarySettingsSection: View {
         } message: {
             Text(L10n.settingsDialogRebuildDatabaseBody)
         }
-        .settingsToast($toast)
     }
 
     private func startFullRescan() {
@@ -155,13 +154,15 @@ struct LibrarySettingsSection: View {
 struct RefreshLibraryRow: View {
     let isSyncing: Bool
     let label: String?
-    let progress: LibraryImportProgress?
     let onFullSync: () -> Void
     let onRebuild: () -> Void
 
+    @Environment(LibraryStore.self) private var library
     @Environment(\.appTheme) private var theme
 
     var body: some View {
+        // Read here, not by the section: each progress tick of a scan re-runs this row only.
+        let progress = library.lastImportProgress
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 0) {
                 SettingsIcon(systemImage: "arrow.triangle.2.circlepath").padding(.trailing, 16)

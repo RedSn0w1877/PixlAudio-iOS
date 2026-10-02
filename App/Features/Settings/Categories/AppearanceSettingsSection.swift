@@ -14,7 +14,7 @@ struct AppearanceSettingsSection: View {
         @Bindable var appearance = settings.appearance
         @Bindable var lyrics = settings.lyrics
         @Bindable var behavior = settings.behavior
-        VStack(alignment: .leading, spacing: 0) {
+        SettingsCategoryScaffold(category: .appearance) {
             SettingsSubsection(title: L10n.settingsGlobalThemeSection) {
                 SettingsItemRow(title: L10n.settingsAppLanguageTitle, subtitle: L10n.settingsAppLanguageSubtitle,
                                 systemImage: "globe", showsChevron: true, identifier: "settings.appearance.language") {

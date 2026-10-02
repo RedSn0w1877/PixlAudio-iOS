@@ -75,6 +75,7 @@ final class AudioSessionController {
     /// Activates the session before playback starts. Returns false when the system refused (e.g. a call is active).
     @discardableResult
     func activate() -> Bool {
+        decide(deactivating: false)
         if isActive { return true }
         do {
             try session.setActive(true)
@@ -85,8 +86,56 @@ final class AudioSessionController {
         return isActive
     }
 
+    /// An activation started off the main actor, while the item loads (`prepareActivation`).
+    private var preparing: Task<Void, Never>?
+    /// Counts the main-actor decisions about the session (`prepareActivation`, `activate`, `deactivate`, an
+    /// interruption, a media-services reset). An activation finishing off the main actor records its result only if
+    /// nothing was decided meanwhile. Process-wide, like the shared `AVAudioSession` the activation goes to: a late
+    /// result from one controller never undoes what a newer one decided (tests create a controller per engine).
+    private static var decisions = 0
+    /// The last decision was `deactivate()`: an activation that finishes after it is undone.
+    private static var lastDecisionDeactivated = false
+
+    /// An off-main activation is still under way (tests wait for it).
+    var isPreparingActivation: Bool { preparing != nil }
+
+    private func decide(deactivating: Bool) {
+        Self.decisions &+= 1
+        Self.lastDecisionDeactivated = deactivating
+    }
+
+    /// Starts activating the session off the main actor (`setActive(true)` is a call to the audio server), so the
+    /// first play after launch doesn't make it on the main thread while the mini player appears: `activate()` then
+    /// usually finds the session active. If it runs first, it activates as before (activating twice is harmless).
+    ///
+    /// The result lands later, so it never overrides a newer decision: after `activate()` the session is already
+    /// active and recorded; after `deactivate()` (with nothing asking for it since) the activation is undone; after an
+    /// interruption or a reset the system's state stands and `activate()` re-activates when playback resumes.
+    func prepareActivation() {
+        guard !isActive, preparing == nil else { return }
+        decide(deactivating: false)
+        let decision = Self.decisions
+        preparing = Task { [weak self] in
+            let activated = await Self.activateSharedSession()
+            self?.preparing = nil
+            guard activated else { return }
+            if decision == Self.decisions {
+                self?.isActive = true
+            } else if Self.lastDecisionDeactivated, self?.isActive != true {
+                try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            }
+        }
+    }
+
+    /// Under approachable concurrency a plain `nonisolated async` function would run on the caller's actor.
+    @concurrent
+    nonisolated private static func activateSharedSession() async -> Bool {
+        (try? AVAudioSession.sharedInstance().setActive(true)) != nil
+    }
+
     /// Deactivates after a permanent stop so other apps can resume.
     func deactivate() {
+        decide(deactivating: true)
         guard isActive else { return }
         try? session.setActive(false, options: .notifyOthersOnDeactivation)
         isActive = false
@@ -106,6 +155,7 @@ final class AudioSessionController {
         if began {
             // iOS has already paused us; record whether to resume (AUDIOFOCUS_LOSS_TRANSIENT).
             let actions = focus.transientLoss(deckSnapshot())
+            decide(deactivating: false)
             isActive = false
             onCommand?(.focus(actions))
         } else {
@@ -139,6 +189,7 @@ final class AudioSessionController {
     func clearRouteLossPause() { pausedByRouteLoss = false }
 
     func handleMediaServicesReset() {
+        decide(deactivating: false)
         isActive = false
         focus = AudioFocusResumeState()
         configure()

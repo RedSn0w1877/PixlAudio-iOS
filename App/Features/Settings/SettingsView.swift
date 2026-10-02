@@ -198,12 +198,33 @@ struct SettingsCategoryView: View {
         case .deviceCapabilities: DeviceCapabilitiesView(screenID: "settingsCategory.device_capabilities")
         case .about: AboutView(screenID: "settingsCategory.about")
         default:
-            let isLong = category.localizedTitle.count > 13
-            SettingsScaffold(title: category.localizedTitle, screenID: "settingsCategory.\(category.rawValue)",
-                             expandedHeight: isLong ? SettingsMetrics.headerExpandedLong : SettingsMetrics.headerExpanded,
-                             titleMaxLines: isLong ? 2 : 1) {
-                SettingsCategoryContent(category: category)
-            }
+            // Each category's section builds its own scaffold (`SettingsCategoryScaffold`), so its subsections are
+            // the lazy stack's children rather than one VStack built whole in the push's first frame.
+            SettingsCategoryContent(category: category)
+        }
+    }
+}
+
+/// A settings category's screen: the collapsing header and the category's subsections as direct children of the
+/// scaffold's lazy stack, so only the visible ones are built when the screen is pushed. The section's toast overlays
+/// the content as before (the same rect: the bottom of the content).
+struct SettingsCategoryScaffold<Content: View>: View {
+    let category: SettingsCategory
+    var toast: Binding<String?>?
+    @ViewBuilder let content: Content
+
+    init(category: SettingsCategory, toast: Binding<String?>? = nil, @ViewBuilder content: () -> Content) {
+        self.category = category
+        self.toast = toast
+        self.content = content()
+    }
+
+    var body: some View {
+        let isLong = category.localizedTitle.count > 13
+        SettingsScaffold(title: category.localizedTitle, screenID: "settingsCategory.\(category.rawValue)",
+                         expandedHeight: isLong ? SettingsMetrics.headerExpandedLong : SettingsMetrics.headerExpanded,
+                         titleMaxLines: isLong ? 2 : 1, contentToast: toast) {
+            content
         }
     }
 }

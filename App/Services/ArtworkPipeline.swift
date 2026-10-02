@@ -5,6 +5,7 @@ import ImageIO
 import PixlLibrary
 import PixlModel
 import Synchronization
+import UIKit
 import UniformTypeIdentifiers
 
 /// Where a piece of artwork comes from. Parsed from a song's / album's `albumArtUriString`.
@@ -61,13 +62,20 @@ nonisolated final class ArtworkImage: @unchecked Sendable {
 
 /// Decodes artwork off the main thread with ImageIO thumbnails at the size it is displayed, with a memory cache
 /// (synchronous hits for list cells) and a disk cache of the decoded thumbnails (Caches/Artwork).
+///
+/// Views ask for a display size bucket (`displayPixelSize(forPoints:)`), not their exact size, so the same cover
+/// shown at nearby sizes (a grid card, a list row, the mini player; the album header and the player's carousel) is
+/// one cache entry instead of a miss per size; a bucket is never more than 1.6× the request, and the image is drawn
+/// downscaled. The memory cache is a real LRU bounded by bytes and emptied on memory warnings; a view whose exact
+/// size is missing starts from the largest decoded size of the same cover instead of the placeholder.
 actor ArtworkPipeline {
     static let shared = ArtworkPipeline()
 
     /// Reads embedded artwork bytes of an audio file. Stage 6 (library import) installs the AVAsset-based loader.
     nonisolated(unsafe) static var embeddedArtworkLoader: (@Sendable (URL) async -> Data?)?
 
-    private let memory = MemoryCache(limit: 400)
+    /// 80 MB of decoded bitmaps (a 540 px cover is 1.1 MB; the previous 400-entry limit could reach several hundred).
+    private let memory = MemoryCache(budgetBytes: 80 * 1024 * 1024)
     private var inFlight: [String: Task<ArtworkImage?, Never>] = [:]
     private let diskDirectory: URL?
 
@@ -75,6 +83,12 @@ actor ArtworkPipeline {
         self.diskDirectory = diskDirectory
         if let diskDirectory {
             try? FileManager.default.createDirectory(at: diskDirectory, withIntermediateDirectories: true)
+        }
+        let memory = self.memory
+        // `UIApplication.didReceiveMemoryWarningNotification`, by name (this initialiser is not on the main actor).
+        let memoryWarning = Notification.Name("UIApplicationDidReceiveMemoryWarningNotification")
+        _ = NotificationCenter.default.addObserver(forName: memoryWarning, object: nil, queue: nil) { @Sendable _ in
+            memory.removeAll()
         }
     }
 
@@ -86,25 +100,54 @@ actor ArtworkPipeline {
     /// Pixel size to request for a view `points` wide (3× covers every current iPhone).
     nonisolated static func pixelSize(forPoints points: CGFloat) -> Int { Int((points * 3).rounded(.up)) }
 
+    /// The display buckets: every size views ask for (rows, mini player, Home cards, grid cards, mixes) rounds up to
+    /// one of these; 1320 px is the widest iPhone, shared by the album header and the full player's cover.
+    nonisolated static let displayBuckets = [180, 270, 408, 540, 720, 1320]
+
+    /// The pixel size a view `points` wide decodes at: its bucket, or its exact size when the bucket would be more
+    /// than 1.6× larger (tiny icons) or it is larger than every bucket.
+    nonisolated static func displayPixelSize(forPoints points: CGFloat) -> Int {
+        bucket(forPixels: pixelSize(forPoints: points))
+    }
+
+    nonisolated static func bucket(forPixels pixels: Int) -> Int {
+        guard let bucket = displayBuckets.first(where: { $0 >= pixels }),
+              Double(bucket) <= Double(pixels) * 1.6 else { return pixels }
+        return bucket
+    }
+
     /// A memory-cache hit, synchronously (for the first frame of a cell).
     nonisolated func cachedImage(_ source: ArtworkSource, pixelSize: Int) -> ArtworkImage? {
-        memory.value(for: Self.key(source, pixelSize))
+        memory.value(source: source.cacheKey, pixelSize: pixelSize)
+    }
+
+    /// The exact size if cached, else the largest decoded size of the same cover (a view's first frame shows the
+    /// art, slightly softer for a moment, rather than the placeholder).
+    nonisolated func cachedImageOrVariant(_ source: ArtworkSource, pixelSize: Int) -> ArtworkImage? {
+        memory.value(source: source.cacheKey, pixelSize: pixelSize) ?? memory.largest(source: source.cacheKey)
     }
 
     /// The image at `pixelSize` (longest side), decoded off the main thread; nil if the source has no image.
-    func image(_ source: ArtworkSource, pixelSize: Int) async -> ArtworkImage? {
+    /// `priority`: `.userInitiated` for what is on screen, `.utility` for prefetches.
+    func image(_ source: ArtworkSource, pixelSize: Int, priority: TaskPriority = .userInitiated) async -> ArtworkImage? {
         let key = Self.key(source, pixelSize)
-        if let hit = memory.value(for: key) { return hit }
+        if let hit = memory.value(source: source.cacheKey, pixelSize: pixelSize) { return hit }
         if let task = inFlight[key] { return await task.value }
         let disk = diskDirectory
-        let task = Task.detached(priority: .userInitiated) { () -> ArtworkImage? in
+        let task = Task.detached(priority: priority) { () -> ArtworkImage? in
             await Self.load(source, pixelSize: pixelSize, key: key, diskDirectory: disk)
         }
         inFlight[key] = task
         let result = await task.value
         inFlight[key] = nil
-        if let result { memory.insert(result, for: key) }
+        if let result { memory.insert(result, source: source.cacheKey, pixelSize: pixelSize) }
         return result
+    }
+
+    /// Decodes a cover at the size a screen is about to show it (e.g. the album header before its push).
+    nonisolated func prefetch(_ source: ArtworkSource, pixelSize: Int) {
+        guard cachedImage(source, pixelSize: pixelSize) == nil else { return }
+        Task(priority: .utility) { _ = await self.image(source, pixelSize: pixelSize, priority: .utility) }
     }
 
     /// The artwork as ARGB pixels at most `maxDimension` per side (Android decodes 128×128 for colour extraction).
@@ -191,29 +234,63 @@ actor ArtworkPipeline {
 
     // MARK: - Memory cache
 
-    /// A small LRU guarded by a `Mutex`, readable synchronously from any thread.
+    /// An LRU of decoded covers guarded by a `Mutex`, readable synchronously from any thread: per cover, its decoded
+    /// sizes. Recency is a counter per entry (a hit costs a lookup, not a reorder); eviction drops the least recently
+    /// used until the bitmaps fit the byte budget again.
     nonisolated final class MemoryCache: Sendable {
+        private struct Entry {
+            var image: ArtworkImage
+            var tick: UInt64
+            var cost: Int
+        }
+
         private struct State {
-            var entries: [String: ArtworkImage] = [:]
-            var order: [String] = []
+            var covers: [String: [Int: Entry]] = [:]
+            var tick: UInt64 = 0
+            var cost = 0
         }
 
         private let state = Mutex(State())
-        private let limit: Int
+        private let budget: Int
 
-        init(limit: Int) { self.limit = limit }
+        init(budgetBytes: Int) { budget = budgetBytes }
 
-        func value(for key: String) -> ArtworkImage? {
-            state.withLock { $0.entries[key] }
+        func value(source: String, pixelSize: Int) -> ArtworkImage? {
+            state.withLock { s in
+                guard var entry = s.covers[source]?[pixelSize] else { return nil }
+                s.tick &+= 1
+                entry.tick = s.tick
+                s.covers[source]?[pixelSize] = entry
+                return entry.image
+            }
         }
 
-        func insert(_ image: ArtworkImage, for key: String) {
+        /// The largest decoded size of a cover (no recency change: it stands in until the exact size arrives).
+        func largest(source: String) -> ArtworkImage? {
             state.withLock { s in
-                if s.entries.updateValue(image, forKey: key) == nil { s.order.append(key) }
-                if s.order.count > limit {
-                    let overflow = s.order.count - limit
-                    for old in s.order.prefix(overflow) { s.entries[old] = nil }
-                    s.order.removeFirst(overflow)
+                s.covers[source]?.max { $0.key < $1.key }?.value.image
+            }
+        }
+
+        func insert(_ image: ArtworkImage, source: String, pixelSize: Int) {
+            let cost = image.cgImage.width * image.cgImage.height * 4
+            state.withLock { s in
+                s.tick &+= 1
+                if let old = s.covers[source]?[pixelSize] { s.cost -= old.cost }
+                s.covers[source, default: [:]][pixelSize] = Entry(image: image, tick: s.tick, cost: cost)
+                s.cost += cost
+                guard s.cost > budget else { return }
+                // Evict down to 90 % of the budget in one pass, least recently used first.
+                var all: [(source: String, size: Int, tick: UInt64, cost: Int)] = []
+                for (key, sizes) in s.covers {
+                    for (size, entry) in sizes { all.append((key, size, entry.tick, entry.cost)) }
+                }
+                all.sort { $0.tick < $1.tick }
+                let target = budget / 10 * 9
+                for victim in all where s.cost > target {
+                    s.covers[victim.source]?[victim.size] = nil
+                    if s.covers[victim.source]?.isEmpty == true { s.covers[victim.source] = nil }
+                    s.cost -= victim.cost
                 }
             }
         }

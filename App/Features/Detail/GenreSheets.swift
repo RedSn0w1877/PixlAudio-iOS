@@ -105,15 +105,44 @@ struct QuickFillSheet: View {
     @State private var customGenres: [String] = QuickFillSheet.loadCustomGenres()
     @State private var showsNewGenre = false
     @State private var newGenre = ""
+    /// The songs matching the search, computed when the query changes (off the main actor for long lists) — not in
+    /// `body`, where every row toggle re-filtered them. Nil: no query, every song.
+    @State private var matches: [Song]?
+    @State private var filterTask: Task<Void, Never>?
+    /// The library's genres (trimmed, distinct), collected off the main actor when the cover appears.
+    @State private var libraryGenres: [String]?
 
-    private var filtered: [Song] {
-        guard !query.isEmpty else { return songs }
-        return songs.filter { $0.title.localizedCaseInsensitiveContains(query) || $0.displayArtist.localizedCaseInsensitiveContains(query) }
-    }
+    private var filtered: [Song] { matches ?? songs }
 
     private var allGenres: [String] {
-        let fromLibrary = library.songs.compactMap { $0.genre?.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let fromLibrary = libraryGenres ?? Self.genres(in: library.songs)
         return Array(Set(fromLibrary + customGenres)).sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+    }
+
+    nonisolated private static func genres(in songs: [Song]) -> [String] {
+        Array(Set(songs.compactMap { $0.genre?.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }))
+    }
+
+    nonisolated private static func filter(_ songs: [Song], query: String) -> [Song] {
+        songs.filter { $0.title.localizedCaseInsensitiveContains(query) || $0.displayArtist.localizedCaseInsensitiveContains(query) }
+    }
+
+    private func applyQuery(_ query: String) {
+        filterTask?.cancel()
+        guard !query.isEmpty else {
+            matches = nil
+            return
+        }
+        let all = songs
+        guard all.count > 300 else {
+            matches = Self.filter(all, query: query)
+            return
+        }
+        filterTask = Task {
+            let result = await Task.detached(priority: .userInitiated) { Self.filter(all, query: query) }.value
+            guard !Task.isCancelled, query == self.query else { return }
+            matches = result
+        }
     }
 
     var body: some View {
@@ -154,6 +183,11 @@ struct QuickFillSheet: View {
             Button("Cancel", role: .cancel) { newGenre = "" }
         }
         .environment(\.colorScheme, theme.isDark ? .dark : .light)
+        .onChange(of: query) { _, query in applyQuery(query) }
+        .task {
+            let songs = library.songs
+            libraryGenres = await Task.detached(priority: .userInitiated) { Self.genres(in: songs) }.value
+        }
         .accessibilityIdentifier("screen.quickFill.genre")
     }
 

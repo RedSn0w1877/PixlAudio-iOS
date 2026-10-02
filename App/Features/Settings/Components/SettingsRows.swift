@@ -32,6 +32,10 @@ extension EnvironmentValues {
 /// Rows stacked 2 pt apart (Android's group clipped to 24 dp around rows with 10 dp corners): every row in the group
 /// draws its glass with the inner radius, and the group clips its outer corners to the outer radius — exactly how
 /// the Compose `Column(Modifier.clip(RoundedCornerShape(24.dp)))` shapes its first and last rows.
+///
+/// The rows' glass shapes share one `GlassEffectContainer` (rendered together — Apple's documented way to keep many
+/// glass shapes cheap, here while a settings page slides in or out). Spacing 0 is below the 2 pt gap: nothing
+/// blends at rest. The clip stays outside the container, so the outer corners are cut exactly as before.
 struct SettingsGroup<Content: View>: View {
     var spacing: CGFloat = SettingsMetrics.rowSpacing
     var outer: CGFloat = SettingsMetrics.groupRadius
@@ -39,8 +43,10 @@ struct SettingsGroup<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: spacing) {
-            content
+        GlassEffectContainer(spacing: 0) {
+            VStack(alignment: .leading, spacing: spacing) {
+                content
+            }
         }
         .environment(\.settingsRowCorners, SettingsRowCorners(top: inner, bottom: inner))
         .clipShape(RoundedRectangle(cornerRadius: outer, style: .continuous))

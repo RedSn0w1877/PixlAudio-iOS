@@ -110,9 +110,10 @@ private struct SpinningArtwork: View {
     @State private var spin = SpinClock()
 
     var body: some View {
+        // Built once per body, not on every tick of the timeline.
+        let art = ArtworkView(song: song, size: 54, cornerRadius: 27)
         TimelineView(.animation(minimumInterval: 1.0 / 60, paused: !isPlaying)) { timeline in
-            ArtworkView(song: song, size: 54, cornerRadius: 27)
-                .rotationEffect(.degrees(spin.angle(at: timeline.date, playing: isPlaying)))
+            art.rotationEffect(.degrees(spin.angle(at: timeline.date, playing: isPlaying)))
         }
         .frame(width: 54, height: 54)
     }
@@ -258,7 +259,7 @@ private struct LyricsSeekBar: View {
                 let inset: CGFloat = 16 + 8
                 let trackWidth = max(geometry.size.width - 2 * inset, 1)
                 WavyTrack(fraction: fraction, waving: isPlaying && dragFraction == nil, accent: chrome.accent,
-                          track: chrome.accentTrack, phase: timeline.date.timeIntervalSinceReferenceDate)
+                          track: chrome.accentTrack)
                     .padding(.horizontal, inset - 8)
                     .contentShape(Rectangle())
                     .gesture(
@@ -299,15 +300,22 @@ private struct LyricsSeekBar: View {
     }
 }
 
-/// The wavy active track and thumb of the seek bar.
+/// The wavy active track and thumb of the seek bar. The wave moves continuously on its own display-rate timeline
+/// (≤ 60 Hz, paused while not waving) — on the position's 4 Hz timeline it jumped a quarter wavelength four times a
+/// second — at Android `WavySliderExpressive`'s speed, half a wavelength per second.
 private struct WavyTrack: View {
     let fraction: Double
     let waving: Bool
     let accent: Color
     let track: Color
-    let phase: Double
 
     var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 60, paused: !waving)) { timeline in
+            wave(phase: timeline.date.timeIntervalSinceReferenceDate * 0.5)
+        }
+    }
+
+    private func wave(phase: Double) -> some View {
         Canvas { context, size in
             let midY = size.height / 2
             let thumbR: CGFloat = 8

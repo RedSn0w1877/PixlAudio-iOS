@@ -19,7 +19,8 @@ struct DeviceCapabilitiesView: View {
 
     @Environment(LibraryStore.self) private var library
     @Environment(SettingsStore.self) private var settings
-    @State private var model = DeviceCapabilitiesModel()
+    /// Starts from the last measurement (shown at once; `load` re-measures in the background, as before).
+    @State private var model = DeviceCapabilitiesModel(state: ScreenDataCache.deviceCapabilities)
     @State private var toast: String?
 
     var body: some View {
@@ -110,6 +111,10 @@ nonisolated struct DeviceCapabilitiesState: Sendable {
 final class DeviceCapabilitiesModel {
     private(set) var state: DeviceCapabilitiesState?
     private(set) var report: String?
+
+    init(state: DeviceCapabilitiesState? = nil) {
+        self.state = state
+    }
     private(set) var isGeneratingReport = false
     @ObservationIgnored private var lagMarks: [Date] = []
 
@@ -136,6 +141,7 @@ final class DeviceCapabilitiesModel {
             Self.measure(songs: songs, sampleRate: sampleRate, ioBuffer: ioBuffer, routes: routes, info: info)
         }.value
         state = measured
+        ScreenDataCache.deviceCapabilities = measured
     }
 
     func markLag() { lagMarks.append(Date()) }

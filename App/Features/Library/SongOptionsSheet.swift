@@ -193,24 +193,27 @@ struct SongOptionsSheet: View {
     // MARK: Info page
 
     private func info(_ song: Song) -> some View {
-        VStack(spacing: 4) {
-            infoRow("Duration", LibraryFormat.duration(song.duration), systemImage: "clock")
-            if let genre = song.genre, !genre.isEmpty {
-                infoRow("Genre", genre, systemImage: "music.note") {
-                    navigate(.genreDetail(genreId: genre))
+        // The rows render together (spacing 0, below their 4 pt gap), inside the same 20 pt clip.
+        GlassEffectContainer(spacing: 0) {
+            VStack(spacing: 4) {
+                infoRow("Duration", LibraryFormat.duration(song.duration), systemImage: "clock")
+                if let genre = song.genre, !genre.isEmpty {
+                    infoRow("Genre", genre, systemImage: "music.note") {
+                        navigate(.genreDetail(genreId: genre))
+                    }
                 }
+                infoRow("Album", song.album, systemImage: "opticaldisc") {
+                    navigate(.albumDetail(albumId: song.albumId))
+                }
+                infoRow("Artist", song.displayArtist, systemImage: "person.fill") {
+                    navigate(.artistDetail(artistId: song.artistId))
+                }
+                if let format = audioFormat(song) {
+                    infoRow("Song info", format, systemImage: "info.circle")
+                }
+                infoRow(LibrarySorting.isOnline(song) ? "Provider" : "File", song.path.isEmpty ? song.contentUriString : song.path,
+                        systemImage: LibrarySorting.isOnline(song) ? "cloud.fill" : "doc.fill")
             }
-            infoRow("Album", song.album, systemImage: "opticaldisc") {
-                navigate(.albumDetail(albumId: song.albumId))
-            }
-            infoRow("Artist", song.displayArtist, systemImage: "person.fill") {
-                navigate(.artistDetail(artistId: song.artistId))
-            }
-            if let format = audioFormat(song) {
-                infoRow("Song info", format, systemImage: "info.circle")
-            }
-            infoRow(LibrarySorting.isOnline(song) ? "Provider" : "File", song.path.isEmpty ? song.contentUriString : song.path,
-                    systemImage: LibrarySorting.isOnline(song) ? "cloud.fill" : "doc.fill")
         }
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }

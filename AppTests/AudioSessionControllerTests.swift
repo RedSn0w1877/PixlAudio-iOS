@@ -111,4 +111,26 @@ final class AudioSessionControllerTests: XCTestCase {
         XCTAssertTrue(received)
         XCTAssertEqual(commands.first, .focus([.pauseMaster, .pauseAuxiliary]))
     }
+
+    // MARK: Off-main activation (whatever order the activation finishes in, the latest decision stands)
+
+    func testDeactivateDuringTheOffMainActivationWins() async {
+        let controller = AudioSessionController()
+        controller.prepareActivation()
+        controller.deactivate()
+        let settled = await waitUntil(timeout: 5) { !controller.isPreparingActivation }
+        XCTAssertTrue(settled)
+        XCTAssertFalse(controller.isActive)
+    }
+
+    func testActivateAfterADeactivateDuringTheOffMainActivationStaysActive() async {
+        let controller = AudioSessionController()
+        defer { controller.deactivate() }
+        controller.prepareActivation()
+        controller.deactivate()
+        let activated = controller.activate()
+        let settled = await waitUntil(timeout: 5) { !controller.isPreparingActivation }
+        XCTAssertTrue(settled)
+        XCTAssertEqual(controller.isActive, activated, "the late activation result must not undo the newer activate()")
+    }
 }

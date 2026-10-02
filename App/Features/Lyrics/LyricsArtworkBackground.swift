@@ -143,3 +143,36 @@ struct LyricsArtworkBackground: View {
         onBrightArtChange(set?.isBright ?? false)
     }
 }
+
+/// Compiles the lyrics background shader ahead of the first lyrics open (Apple: a shader compiled on first use may
+/// delay that frame — here, a frame of the lyrics cover's slide-up). Started when the full player is first built
+/// (lyrics open only from it); runs once per launch, at utility priority, in a detached task: the shader is built and
+/// compiled off the main actor (a `Task {}` started from a view would inherit it), so no part of the compile shares
+/// the main thread with the player's own first frames. The arguments match `lyricsScene`'s real call: an image, a
+/// float2, five float4 and five floats.
+enum LyricsShaderWarmup {
+    private static var started = false
+
+    static func prepare() {
+        guard !started else { return }
+        started = true
+        Task.detached(priority: .utility) {
+            guard let pixel = onePixel() else { return }
+            let shader = ShaderLibrary.lyricsScene(
+                .image(Image(decorative: pixel, scale: 1)),
+                .float2(1, 1),
+                .float4(0, 0, 0, 0), .float4(0, 0, 0, 0), .float4(0, 0, 0, 0), .float4(0, 0, 0, 0),
+                .float4(0, 0, 0, 0),
+                .float(0), .float(0), .float(0), .float(0), .float(0)
+            )
+            try? await shader.compile(as: .shapeStyle)
+        }
+    }
+
+    nonisolated private static func onePixel() -> CGImage? {
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        return context.makeImage()
+    }
+}

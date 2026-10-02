@@ -10,6 +10,10 @@ import UIKit
 /// Each tab keeps its own `NavigationStack` alive so switching tabs keeps scroll positions.
 /// While the keyboard is up the bars step aside: on Android they stay at the bottom under the keyboard (edge to edge,
 /// only the content gets the IME inset), so they must not ride up above it here (stage 7c, Search's field).
+///
+/// Transition performance (docs/performance.md): the bars are an overlay that takes no layout space, so a push, a
+/// pop or the mini player's first appearance doesn't touch the three stacks' layout; the selected tab fades in on its
+/// own short curve; hidden tabs don't animate album-colour changes.
 struct RootView: View {
     @Environment(Router.self) private var router
     @Environment(PlaybackStore.self) private var playback
@@ -29,9 +33,12 @@ struct RootView: View {
                 tab(.search, path: $router.searchPath) { SearchView() }
                 tab(.library, path: $router.libraryPath) { LibraryView() }
             }
-            // A bar, not a plain inset: scroll views under it get the system's soft scroll edge effect, the way
-            // content fades under the system tab bar (this replaces Android's gradients behind its bar).
-            .safeAreaBar(edge: .bottom, spacing: 0) {
+            // The bars float over the tabs and take no layout space. They used to be a `safeAreaBar` around the
+            // three stacks, whose inset never reached the pages (each `NavigationStack` laid its pages out without it:
+            // content scrolls under the bars, and pages that need room above the mini player reserve it themselves)
+            // but whose every change — a push or pop showing or hiding the tab bar, the mini player appearing —
+            // re-ran the safe-area layout of all three stacks. An overlay places the bars exactly where the bar did.
+            .overlay(alignment: .bottom) {
                 bottomBars
             }
             // Stage 8: the player sheet — the mini player resting in `MiniPlayerSlot` and expanding over everything.
@@ -57,11 +64,19 @@ struct RootView: View {
         .task(id: playback.current?.id) {
             await themeStore.update(for: playback.current)
         }
+        // The mini player steps aside with the tab bar, in the same transaction: the sheet keeps its slot and slides
+        // the card down instead of dropping it and rebuilding it when the keyboard goes.
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
-            withAnimation(PixlMotion.bars) { isKeyboardVisible = true }
+            withAnimation(PixlMotion.bars) {
+                isKeyboardVisible = true
+                environment.playerSheet.hiddenForKeyboard = true
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-            withAnimation(PixlMotion.bars) { isKeyboardVisible = false }
+            withAnimation(PixlMotion.bars) {
+                isKeyboardVisible = false
+                environment.playerSheet.hiddenForKeyboard = false
+            }
         }
     }
 
@@ -71,7 +86,17 @@ struct RootView: View {
         return NavigationStack(path: path) {
             root().withAppRoutes()
         }
-        .opacity(isSelected ? 1 : 0)
+        // A song change animates the album colours over 0.45 s (the root `.animation` below): only on the tab that
+        // is on screen. A hidden tab is at opacity 0, so snapping its colours shows nothing and costs no frames.
+        .transaction(value: themeStore.albumPair) { transaction in
+            if !isSelected { transaction.animation = nil }
+        }
+        // The cross-fade runs on its own curve — the visible part of the selection spring, ending at 0.21 s —
+        // instead of the spring's 0.6 s tail, during which both full-screen, glass-heavy stacks stayed composited.
+        // The tab bar's pill keeps the spring (`withAnimation(PixlMotion.selection)` below).
+        .animation(PixlMotion.tabFade) { content in
+            content.opacity(isSelected ? 1 : 0)
+        }
         .allowsHitTesting(isSelected)
         .accessibilityHidden(!isSelected)
     }

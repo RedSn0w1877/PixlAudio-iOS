@@ -68,8 +68,9 @@ final class HomeStore {
     @ObservationIgnored private var computeTask: Task<Void, Never>?
 
     /// What a computation depends on; a refresh with the same key is skipped (Android throttles repeat passes).
+    /// The library by its revision (comparing two snapshots walked the whole library on the main actor).
     private struct Key: Equatable {
-        var snapshot: LibrarySnapshot
+        var libraryRevision: Int
         var revision: Int
         var epochDay: Int64
     }
@@ -109,13 +110,14 @@ final class HomeStore {
 
     // MARK: Refresh
 
-    /// Recomputes when the library, the history or the day changed (`force` = the refresh button).
-    func refresh(snapshot: LibrarySnapshot, force: Bool = false) async {
+    /// Recomputes when the library (`libraryRevision`), the history or the day changed (`force` = the refresh
+    /// button).
+    func refresh(snapshot: LibrarySnapshot, libraryRevision: Int, force: Bool = false) async {
         await history.ensureLoaded()
         let clock = history.clock
         let now = clock.nowMs()
         let epochDay = ZoneClock(clock.timeZone).localDate(at: now).epochDay
-        let key = Key(snapshot: snapshot, revision: history.revision, epochDay: epochDay)
+        let key = Key(libraryRevision: libraryRevision, revision: history.revision, epochDay: epochDay)
         if !force, key == lastKey { return }
         lastKey = key
         computeTask?.cancel()
@@ -127,9 +129,14 @@ final class HomeStore {
             HomeStore.compute(snapshot: snapshot, events: events, nowMs: now, timeZone: clock.timeZone,
                               savedDaily: saved.daily, savedYourMix: saved.yourMix)
         }
+        let stamp = ScreenDataCache.Stamp(historyRevision: history.revision, songCount: snapshot.songs.count)
         let computation = Task { [weak self] in
             let result = await task.value
             guard let self, !Task.isCancelled else { return }
+            // The overview card's week summary seeds Stats' default range.
+            if let overview = result.content.statsOverview, overview.range == .week {
+                ScreenDataCache.storeStats(overview, stamp: stamp)
+            }
             if result.content != self.content { self.content = result.content }
             if result.generatedMixes { self.saveMixes(result.content, nowMs: now) }
             self.isPreparing = false

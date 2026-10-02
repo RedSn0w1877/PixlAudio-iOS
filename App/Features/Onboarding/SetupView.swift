@@ -98,7 +98,7 @@ struct SetupView: View {
                 }
         case .backupRestore:
             SetupBackupPage(isInspecting: isInspecting, isRestoring: restoreBackup != nil && env.backup.isBusy,
-                            isScanning: isScanning, scanProgress: library.lastImportProgress,
+                            isScanning: isScanning,
                             onImport: { showsBackupPicker = true }, onSkip: next)
                 .task { await scanBeforeRestore() }
                 .fileImporter(isPresented: $showsBackupPicker, allowedContentTypes: UTType.backupImportTypes) { result in

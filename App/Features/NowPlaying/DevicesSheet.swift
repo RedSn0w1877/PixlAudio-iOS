@@ -15,6 +15,7 @@ import SwiftUI
 struct DevicesSheet: View {
     @Environment(PlaybackStore.self) private var playback
     @Environment(\.appTheme) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var page = 0
     @State private var volume = SystemVolumeObserver()
@@ -27,6 +28,11 @@ struct DevicesSheet: View {
     private var route: AudioRouteMonitor { AudioRouteMonitor.shared }
 
     var body: some View {
+        // Heights measured on an earlier open (same Dynamic Type size and "Scanning nearby" badge): the sheet starts
+        // at its final size instead of the 320 pt placeholder and two re-targets of its detent.
+        let keySuffix = "\(dynamicTypeSize)|\(route.hasOtherRoutes)"
+        let pageHeight = page == 0 ? (controlsHeight ?? FittedSheetHeights.values["devices.controls|\(keySuffix)"])
+            : (devicesHeight ?? FittedSheetHeights.values["devices.list|\(keySuffix)"])
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Connect device")
@@ -43,20 +49,24 @@ struct DevicesSheet: View {
             Spacer().frame(height: 8)
             ZStack(alignment: .top) {
                 if page == 0 {
-                    ScrollView { controlsPage.measuringHeight($controlsHeight) }
+                    ScrollView {
+                        controlsPage.measuringHeight($controlsHeight, rememberedAs: "devices.controls|\(keySuffix)")
+                    }
                         .transition(.move(edge: .leading).combined(with: .opacity))
                 } else {
-                    ScrollView { devicesPage.measuringHeight($devicesHeight) }
+                    ScrollView {
+                        devicesPage.measuringHeight($devicesHeight, rememberedAs: "devices.list|\(keySuffix)")
+                    }
                         .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
             .animation(.spring(response: 0.38, dampingFraction: 0.86), value: page)
-            .frame(height: (page == 0 ? controlsHeight : devicesHeight) ?? 320, alignment: .top)
+            .frame(height: pageHeight ?? 320, alignment: .top)
             tabBar
         }
-        .measuringHeight($sheetHeight)
+        .measuringHeight($sheetHeight, rememberedAs: "devices.sheet|\(page)|\(keySuffix)")
         .frame(maxHeight: .infinity, alignment: .top)
-        .fittedSheetDetent(sheetHeight)
+        .fittedSheetDetent(sheetHeight ?? FittedSheetHeights.values["devices.sheet|\(page)|\(keySuffix)"])
         .onAppear {
             volume.start()
             route.setDetecting(true)

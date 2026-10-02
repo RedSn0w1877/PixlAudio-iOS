@@ -33,6 +33,8 @@ final class AppEnvironment {
     let searchProviders: [SearchSource: any SearchProviding]
     /// Stage 8: the player sheet (mini player ↔ full player) state.
     let playerSheet = PlayerSheetController()
+    /// Play counts for "Most played" on artist pages, warmed after launch (see `PlayCountStore`).
+    let playCounts = PlayCountStore()
     /// Stage 8: the sleep timer the queue's timer sheet drives — the engine's (`PlaybackServices`), or an engine-less
     /// one for UI tests.
     let sleepTimer: SleepTimerController
@@ -167,9 +169,18 @@ final class AppEnvironment {
         spotify.attach(reloadLibrary: { await library.reloadFromStore() }, isPlaybackActive: { playback.isPlaying })
         spotify.songLookup = { library.song(id: $0) }
         await library.load()
-        playbackServices?.restoreQueue(lookup: library.song(id:))
+        await playbackServices?.restoreQueue(lookup: library.song(id:))
         libraryAutoRefresh?.start()
+        let home = self.home, playCounts = self.playCounts, editor = libraryEditor
+        Task {
+            await home.history.ensureLoaded()
+            await playCounts.refresh(editor: editor, revision: home.history.revision)
+        }
         backup.start()
+        // The output-route monitor queries the audio session when first touched: do it now, while nothing animates,
+        // not in the full player's first frame.
+        _ = AudioRouteMonitor.shared
+        await AIProviderStatus.refresh(self)
         await spotify.start()
         await updates.checkIfDue()
     }

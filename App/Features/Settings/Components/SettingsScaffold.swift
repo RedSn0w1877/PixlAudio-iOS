@@ -23,6 +23,8 @@ struct SettingsScaffold<Content: View, Actions: View>: View {
     var horizontalPadding: CGFloat = 16
     var spacing: CGFloat = 0
     var onBack: (() -> Void)?
+    /// A toast over the content (`settingsToast`), for screens whose rows are the stack's own children.
+    var contentToast: Binding<String?>?
     @ViewBuilder var actions: Actions
     @ViewBuilder var content: Content
 
@@ -33,7 +35,9 @@ struct SettingsScaffold<Content: View, Actions: View>: View {
     init(title: String, screenID: String, expandedHeight: CGFloat = SettingsMetrics.headerExpanded,
          titleMaxLines: Int = 1, expandedTitleLeading: CGFloat = 20, collapsedTitleLeading: CGFloat = 68,
          horizontalPadding: CGFloat = 16, spacing: CGFloat = 0, onBack: (() -> Void)? = nil,
+         contentToast: Binding<String?>? = nil,
          @ViewBuilder actions: () -> Actions, @ViewBuilder content: () -> Content) {
+        self.contentToast = contentToast
         self.title = title
         self.screenID = screenID
         self.expandedHeight = expandedHeight
@@ -54,6 +58,7 @@ struct SettingsScaffold<Content: View, Actions: View>: View {
                 LazyVStack(alignment: .leading, spacing: spacing) {
                     content
                 }
+                .modifier(OptionalSettingsToast(message: contentToast))
                 .padding(.horizontal, horizontalPadding)
                 .padding(.top, expandedHeight + 8)
                 .padding(.bottom, 16)
@@ -86,10 +91,10 @@ extension SettingsScaffold where Actions == EmptyView {
     init(title: String, screenID: String, expandedHeight: CGFloat = SettingsMetrics.headerExpanded,
          titleMaxLines: Int = 1, expandedTitleLeading: CGFloat = 20, collapsedTitleLeading: CGFloat = 68,
          horizontalPadding: CGFloat = 16, spacing: CGFloat = 0, onBack: (() -> Void)? = nil,
-         @ViewBuilder content: () -> Content) {
+         contentToast: Binding<String?>? = nil, @ViewBuilder content: () -> Content) {
         self.init(title: title, screenID: screenID, expandedHeight: expandedHeight, titleMaxLines: titleMaxLines,
                   expandedTitleLeading: expandedTitleLeading, collapsedTitleLeading: collapsedTitleLeading,
-                  horizontalPadding: horizontalPadding, spacing: spacing, onBack: onBack,
+                  horizontalPadding: horizontalPadding, spacing: spacing, onBack: onBack, contentToast: contentToast,
                   actions: { EmptyView() }, content: content)
     }
 }
@@ -263,5 +268,19 @@ struct SettingsToastModifier: ViewModifier {
 extension View {
     func settingsToast(_ message: Binding<String?>) -> some View {
         modifier(SettingsToastModifier(message: message))
+    }
+}
+
+/// `settingsToast` when a binding is given.
+struct OptionalSettingsToast: ViewModifier {
+    let message: Binding<String?>?
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let message {
+            content.settingsToast(message)
+        } else {
+            content
+        }
     }
 }

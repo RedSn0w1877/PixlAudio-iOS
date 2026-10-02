@@ -157,6 +157,8 @@ struct PlaylistEditorView: View {
             form.shape = .star
         }
         storageFilter = library.songs.contains(where: LibrarySorting.isOnline) ? .offline : .all
+        // The song step's list, computed off the main actor while the cover step is on screen.
+        SongPickerDefaults.warm(library: library, filter: storageFilter)
     }
 
     private func save() {
@@ -184,9 +186,13 @@ struct PlaylistEditorView: View {
             let songs = library.songs
             Task {
                 let engagements = await editor.engagementEntries().map { (songId: $0.songId, stats: $0.stats) }
-                let favorites = Set(songs.filter(\.isFavorite).map(\.id))
-                let ids = SmartPlaylistBuilder.songIds(for: rule, allSongs: songs, engagements: engagements,
-                                                       favoriteIds: favorites, nowMs: currentTimeMillis())
+                let now = currentTimeMillis()
+                // The rule runs over the whole library: off the main actor (the glass press keeps animating);
+                // creating it, the toast and the pop stay together on the main actor, as before.
+                let ids = await Task.detached(priority: .userInitiated) {
+                    SmartPlaylistBuilder.songIds(for: rule, allSongs: songs, engagements: engagements,
+                                                 favoriteIds: Set(songs.filter(\.isFavorite).map(\.id)), nowMs: now)
+                }.value
                 editor.createPlaylist(name: name, songIds: ids, coverImageUri: cover.imageUri,
                                       coverColorArgb: cover.colorArgb, coverIconName: cover.iconName,
                                       coverShapeType: cover.shapeType, shapeDetails: cover.details,
@@ -196,12 +202,17 @@ struct PlaylistEditorView: View {
             }
             return
         }
-        let ordered = LibrarySorting.sortSongs(library.songs.filter { selectedSongs.contains($0.id) }, by: .songTitleAZ)
-        editor.createPlaylist(name: name, songIds: ordered.map(\.id), coverImageUri: cover.imageUri,
-                              coverColorArgb: cover.colorArgb, coverIconName: cover.iconName,
-                              coverShapeType: cover.shapeType, shapeDetails: cover.details)
-        LibraryToast.shared.show("Playlist created")
-        router.pop()
+        let all = library.songs, picked = selectedSongs
+        Task {
+            let ids = await Task.detached(priority: .userInitiated) {
+                LibrarySorting.sortSongs(all.filter { picked.contains($0.id) }, by: .songTitleAZ).map(\.id)
+            }.value
+            editor.createPlaylist(name: name, songIds: ids, coverImageUri: cover.imageUri,
+                                  coverColorArgb: cover.colorArgb, coverIconName: cover.iconName,
+                                  coverShapeType: cover.shapeType, shapeDetails: cover.details)
+            LibraryToast.shared.show("Playlist created")
+            router.pop()
+        }
     }
 
     /// Copies the picked photo into Application Support (Android keeps the cropped copy in app storage).

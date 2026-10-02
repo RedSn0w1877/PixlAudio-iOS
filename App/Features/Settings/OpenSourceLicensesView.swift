@@ -116,6 +116,7 @@ private struct LicenseRow: View {
 private struct ThirdPartyNoticesSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appTheme) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         VStack(spacing: 0) {
@@ -130,13 +131,21 @@ private struct ThirdPartyNoticesSheet: View {
             .padding(.trailing, 12)
             .padding(.vertical, 12)
             Rectangle().fill(theme.outlineVariant).frame(height: 0.5)
+            // One Text per paragraph in a lazy stack: only the visible ones are laid out (the whole 30 KB text was laid
+            // out on the main thread before the sheet could present). The spacing reproduces the single text: the
+            // stack adds one line spacing and each later paragraph starts with the blank line of its "\n\n".
             ScrollView {
-                Text(ThirdPartyNotices.text)
-                    .pixlFont(.bodyMedium)
-                    .foregroundStyle(theme.onSurface)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(20)
+                LazyVStack(alignment: .leading, spacing: PixlTextStyle.bodyMedium.lineSpacing(dynamicTypeSize)) {
+                    ForEach(ThirdPartyNotices.paragraphs.indices, id: \.self) { index in
+                        Text(verbatim: index == 0 ? ThirdPartyNotices.paragraphs[index]
+                             : "\n" + ThirdPartyNotices.paragraphs[index])
+                    }
+                }
+                .pixlFont(.bodyMedium)
+                .foregroundStyle(theme.onSurface)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(20)
             }
         }
         .accessibilityIdentifier("licenses.noticesSheet")

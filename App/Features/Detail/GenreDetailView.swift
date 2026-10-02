@@ -14,7 +14,8 @@ struct GenreDetailView: View {
     @Environment(\.appTheme) private var appTheme
 
     var body: some View {
-        let scheme = GenreTheme.scheme(genreId: genreId, isDark: appTheme.isDark, style: settings.appearance.paletteStyle)
+        let scheme = GenreTheme.cachedScheme(genreId: genreId, isDark: appTheme.isDark,
+                                             style: settings.appearance.paletteStyle)
         GenreDetailContent(genreId: genreId, headerColor: GenreTheme.color(genreId: genreId, isDark: appTheme.isDark))
             .environment(\.appTheme, scheme)
             .toolbar(.hidden, for: .navigationBar)
@@ -45,6 +46,11 @@ nonisolated enum GenreListItem: Identifiable, Sendable {
 }
 
 nonisolated enum GenreGrouping {
+    /// The genre key of `LibraryDetailIndex.songsByGenre` for a genre id ("" for unknown).
+    static func indexKey(of genreId: String) -> String {
+        GenreTheme.isUnknown(genreId) ? "" : genreId.trimmingCharacters(in: .whitespaces).lowercased()
+    }
+
     /// Songs of a genre: matching name (trimmed, case-insensitive); "unknown" collects songs without a genre.
     static func songs(of genreId: String, in library: [Song]) -> [Song] {
         let target = genreId.trimmingCharacters(in: .whitespaces).lowercased()
@@ -136,8 +142,9 @@ private struct GenreDetailContent: View {
 
     @State private var scroll = HeaderScrollState()
     @State private var sort: GenreSort = .artist
-    @State private var songs: [Song] = []
-    @State private var items: [GenreListItem] = []
+    /// The genre's songs, list rows and play order, derived in `body` once per (library revision, sort): the first
+    /// frame of the push already has them (no second pass), and nothing is sorted again on later passes.
+    @State private var memo = ViewMemo<GenreContentKey, GenreContent>()
     @State private var selection = OrderedSelection<String>()
     @State private var showsSortSheet = false
     @State private var showsQuickFill = false
@@ -150,12 +157,14 @@ private struct GenreDetailContent: View {
     }
 
     var body: some View {
+        let content = self.content
+        let songs = content.songs
         GeometryReader { proxy in
             let safeTop = proxy.safeAreaInsets.top
             let metrics = CollapseMetrics(maxHeight: 200, minHeight: 58 + safeTop)
             ZStack(alignment: .top) {
                 theme.background.ignoresSafeArea()
-                list(topPadding: metrics.maxHeight - safeTop + 8)
+                list(content, topPadding: metrics.maxHeight - safeTop + 8)
                 GenreHeader(title: displayName, scroll: scroll, metrics: metrics, safeTop: safeTop,
                             startColor: Color(argb: headerColor.container), contentColor: Color(argb: headerColor.onContainer),
                             onBack: { router.pop() })
@@ -167,15 +176,16 @@ private struct GenreDetailContent: View {
                 }
             }
         }
-        .overlay(alignment: selection.isActive ? .bottom : .bottomTrailing) { bottomControl }
+        .overlay(alignment: selection.isActive ? .bottom : .bottomTrailing) {
+            GenreBottomControl(selection: selection, songs: songs,
+                               onOptions: { showsSortSheet = true }, onSelectionOptions: { showsSelectionSheet = true })
+        }
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: selection.isActive)
-        .onChange(of: library.songs, initial: true) { _, all in rebuild(all) }
-        .onChange(of: sort) { _, _ in rebuild(library.songs) }
         .sheet(isPresented: $showsSortSheet) {
             GenreSortSheet(sort: sort, showsQuickFill: GenreTheme.isUnknown(genreId),
                            onSort: { sort = $0; showsSortSheet = false },
                            onShuffle: {
-                               let ordered = GenreGrouping.sorted(songs, by: sort)
+                               let ordered = self.content.playOrder
                                if let start = ordered.randomElement() { playback.play(start, in: ordered) }
                                showsSortSheet = false
                            },
@@ -206,16 +216,20 @@ private struct GenreDetailContent: View {
         .libraryToast()
     }
 
-    private func rebuild(_ all: [Song]) {
-        songs = GenreGrouping.songs(of: genreId, in: all)
-        items = GenreGrouping.items(songs, sort: sort)
+    private var content: GenreContent {
+        memo.value(for: GenreContentKey(revision: library.revision, sort: sort)) {
+            let songs = library.detailIndexIfCurrent.map { $0.songsByGenre[GenreGrouping.indexKey(of: genreId)] ?? [] }
+                ?? GenreGrouping.songs(of: genreId, in: library.songs)
+            return GenreContent(songs: songs, items: GenreGrouping.items(songs, sort: sort),
+                                playOrder: GenreGrouping.sorted(songs, by: sort))
+        }
     }
 
-    private func list(topPadding: CGFloat) -> some View {
-        let playOrder = GenreGrouping.sorted(songs, by: sort)
+    private func list(_ content: GenreContent, topPadding: CGFloat) -> some View {
+        let playOrder = content.playOrder
         return ScrollView {
             LazyVStack(spacing: 0) {
-                ForEach(items) { item in
+                ForEach(content.items) { item in
                     row(item, playOrder: playOrder)
                 }
             }
@@ -282,15 +296,16 @@ private struct GenreDetailContent: View {
             let closes = isLast && isLastAlbum
             VStack(spacing: 0) {
                 if !isFirst { Spacer().frame(height: 2) }
-                let isCurrent = playback.current?.id == song.id
-                SongCard(song: song, isCurrent: isCurrent, isPlaying: isCurrent && playback.isPlaying,
-                         onTap: { playback.play(song, in: playOrder) },
-                         onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
-                         showsArtwork: false,
-                         corners: corners(isFirst: isFirst, isLast: isLast),
-                         isSelectionMode: selection.isActive, isSelected: selection.contains(song.id),
-                         selectionIndex: selection.index(of: song.id),
-                         onLongPress: { selection.toggle(song.id) })
+                PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
+                    SongCard(song: song, isCurrent: isCurrent, isPlaying: isPlaying,
+                             onTap: { playback.play(song, in: playOrder) },
+                             onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
+                             showsArtwork: false,
+                             corners: corners(isFirst: isFirst, isLast: isLast),
+                             isSelectionMode: selection.isActive, isSelected: selection.contains(song.id),
+                             selectionIndex: selection.index(of: song.id),
+                             onLongPress: { selection.toggle(song.id) })
+                }
                 if isLast { Spacer().frame(height: 8) }
             }
             .padding(.horizontal, 8)
@@ -319,17 +334,40 @@ private struct GenreDetailContent: View {
         case (false, false): SongCardCorners(top: 4, bottom: 4)
         }
     }
+}
+
+/// What GenreDetailContent derives from the library (once per key).
+private struct GenreContentKey: Equatable {
+    let revision: Int
+    let sort: GenreSort
+}
+
+private struct GenreContent {
+    let songs: [Song]
+    let items: [GenreListItem]
+    let playOrder: [Song]
+}
+
+/// The floating ⋮ button, or the selection bar while selecting. Its own view: it reads whether a song is loaded
+/// (the mini player's clearance), so a track change re-runs this control, not the genre's whole list.
+private struct GenreBottomControl: View {
+    let selection: OrderedSelection<String>
+    let songs: [Song]
+    let onOptions: () -> Void
+    let onSelectionOptions: () -> Void
+
+    @Environment(PlaybackStore.self) private var playback
+    @Environment(\.appTheme) private var theme
 
     /// The shell's mini player floats over pushed screens; the floating controls sit above it (Android pads by
     /// `MiniPlayerHeight` while a song is loaded).
     private var miniPlayerClearance: CGFloat { playback.miniPlayerClearance }
 
-    @ViewBuilder
-    private var bottomControl: some View {
+    var body: some View {
         if selection.isActive {
             LibrarySelectionActionRow(onSelectAll: { selection.selectAll(songs.map(\.id)) },
                                       onDeselect: { selection.clear() },
-                                      onOptions: { showsSelectionSheet = true })
+                                      onOptions: onSelectionOptions)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
                 .pixlGlass(in: RoundedRectangle(cornerRadius: 28, style: .continuous),
@@ -338,7 +376,7 @@ private struct GenreDetailContent: View {
                 .padding(.bottom, 16 + miniPlayerClearance)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
         } else {
-            Button { showsSortSheet = true } label: {
+            Button(action: onOptions) {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 24, weight: .bold))
                     .rotationEffect(.degrees(90))
@@ -472,6 +510,26 @@ nonisolated enum GenreTheme {
         let index = abs(hash) % dark.count
         return isDark ? dark[index] : light[index]
     }
+
+    /// `scheme(genreId:isDark:style:)` memoised: building a scheme pair (two full dynamic schemes) cost a few
+    /// milliseconds on every body pass of the genre page. Same output.
+    @MainActor
+    static func cachedScheme(genreId: String, isDark: Bool, style: ArtworkPaletteStyle) -> ThemeColors {
+        let key = SchemeKey(seed: isUnknown(genreId) ? nil : color(genreId: genreId, isDark: isDark).container,
+                            isDark: isDark, style: style)
+        if let hit = schemeCache[key] { return hit }
+        let scheme = scheme(genreId: genreId, isDark: isDark, style: style)
+        schemeCache[key] = scheme
+        return scheme
+    }
+
+    private struct SchemeKey: Hashable {
+        let seed: UInt32?
+        let isDark: Bool
+        let style: ArtworkPaletteStyle
+    }
+
+    @MainActor private static var schemeCache: [SchemeKey: ThemeColors] = [:]
 
     /// `getGenreDetailColorScheme`: a scheme from the genre colour (monochrome for unknown).
     static func scheme(genreId: String, isDark: Bool, style: ArtworkPaletteStyle) -> ThemeColors {

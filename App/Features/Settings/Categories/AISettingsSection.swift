@@ -27,7 +27,7 @@ struct AISettingsSection: View {
 
     var body: some View {
         @Bindable var ai = settings.ai
-        VStack(alignment: .leading, spacing: 0) {
+        SettingsCategoryScaffold(category: .ai) {
             AutomaticStudioCard()
             Spacer().frame(height: 20)
             MusicIntelligenceCard()
@@ -89,7 +89,11 @@ struct AISettingsSection: View {
             }
         }
         .animation(PixlMotion.state, value: showsAdvanced)
-        .task(id: provider) { apiKey = loadKey() }
+        // The Keychain read runs off the main actor (it ran synchronously during the push, and on every return).
+        .task(id: provider) {
+            apiKey = await Self.loadStoredKey(provider, isUITest: environment.launch.isUITest)
+            await AIProviderStatus.refresh(environment)
+        }
         .task(id: modelsKey) { await loadModels() }
         .task(id: showsAdvanced) {
             guard showsAdvanced, let persistence = environment.persistence else { return }
@@ -247,8 +251,11 @@ struct AISettingsSection: View {
         }
     }
 
-    private func loadKey() -> String {
-        guard !environment.launch.isUITest,
+    /// The provider's stored API key, read off the main actor (`@concurrent`: a plain nonisolated async function
+    /// would run on the caller's actor under approachable concurrency).
+    @concurrent
+    nonisolated private static func loadStoredKey(_ provider: AiProvider, isUITest: Bool) async -> String {
+        guard !isUITest,
               let data = try? KeychainStore.data(for: PreferenceKeys.aiApiKeyAccount(provider.rawValue)) else { return "" }
         return String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -263,6 +270,8 @@ struct AISettingsSection: View {
         // Android `clearModelsState`: removing the key forgets the chosen model.
         if trimmed.isEmpty { settings.ai.setModel("", for: provider.rawValue) }
         apiKey = trimmed
+        let environment = self.environment
+        Task { await AIProviderStatus.refresh(environment) }
     }
 }
 
