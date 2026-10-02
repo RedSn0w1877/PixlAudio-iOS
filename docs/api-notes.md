@@ -648,3 +648,21 @@ Signatures checked against the developer.apple.com documentation JSON (2026-10-0
 | `UIGraphicsImageRenderer`, `UIGraphicsImageRendererFormat`, `UIImage` (all `Sendable`) off the main actor | 10 | /documentation/uikit/uigraphicsimagerenderer | `CoverArtCropperSheet.render` | The 1000 px crop and its JPEG are made in a detached task. |
 | `UIApplication.beginBackgroundTask(withName:expirationHandler:)`, `endBackgroundTask(_:)` | 4 | /documentation/uikit/uiapplication/beginbackgroundtask(withname:expirationhandler:) | `PlaybackServices` | Backgrounding encodes the queue snapshot off the main actor inside a background task. |
 | `UIApplication.didReceiveMemoryWarningNotification` | 2 | /documentation/uikit/uiapplication/didreceivememorywarningnotification | `ArtworkPipeline` | Empties the decoded-artwork cache. |
+
+## Liquid-lens tab bar (2026-10-02)
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `UISegmentedControl` (`init(items:)`, `selectedSegmentTintColor`, `selectedSegmentIndex`, `sendActions(for:)`) | 13 | /documentation/uikit/uisegmentedcontrol | `LiquidTabBar` | On iOS 26+ its selection is the system liquid lens (clear, swelling, magnifying on touch). Touches overridden so the lens moves on touch down (FabBar technique). |
+| `UIGlassEffect` (`isInteractive`), `UIVisualEffectView` | 26.0 | /documentation/uikit/uiglasseffect | `LiquidTabBarView` | The bar's capsule of interactive glass. |
+| `UIView.cornerConfiguration` (`.capsule()`) | 26.0 | /documentation/uikit/uiview/cornerconfiguration | `LiquidTabBarView` | Capsule shape of the glass view. |
+| `CADisplayLink`, `CAShapeLayer` masks, `CALayer.presentation()` | 3.1 | /documentation/quartzcore/cadisplaylink | `LiquidTabSegmentedControl` | Masks the accent glyph copies to the lens' animated frame; paused when the lens is still. |
+| `UIViewRepresentable` | 13 | /documentation/swiftui/uiviewrepresentable | `LiquidTabBar` | Hosts the UIKit bar in SwiftUI. |
+
+## Small system menus (2026-10-02)
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `Menu(content:label:)`, `.menuStyle(.button)` | 14 / 16 | /documentation/swiftui/menu | `GlassCircleMenu`, `ShapedGlassMenu` | On iOS 26+ the menu morphs out of its button (Liquid Glass). |
+| `ButtonStyle.glass` / `.glassProminent`, `.buttonBorderShape(.circle)` | 26.0 / 15 | /documentation/swiftui/primitivebuttonstyle/glass | `GlassCircleMenu` | Apple's glass button, so the morph starts from the system glass. |
+| `Picker` with `.pickerStyle(.inline)` inside a `Menu`, `Section(_:)` | 14 | /documentation/swiftui/inlinepickerstyle | `SortMenuSections`, genre Sort By | Options with a checkmark on the current one. |
+| `ShareLink(item:label:)` in a menu | 16 | /documentation/swiftui/sharelink | playlist options | Export Playlist (M3U written in a `.task`). |
+| `Button(_:systemImage:role:action:)` (`.destructive`) | 17 | /documentation/swiftui/button/init(_:systemimage:role:action:) | menus | Delete playlist in red. |

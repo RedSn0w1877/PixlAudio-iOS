@@ -9,7 +9,7 @@
 #     whenever every class runs, unless the filter names them explicitly.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-opt_in_classes=(TransitionPerformanceTests)
+opt_in_classes=(TransitionPerformanceTests MenuRecordingTests)
 
 filter="${SHOTS_ONLY_INPUT:-}"
 if [ -z "$filter" ]; then

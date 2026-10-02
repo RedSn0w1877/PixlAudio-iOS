@@ -177,8 +177,10 @@ private struct GenreDetailContent: View {
             }
         }
         .overlay(alignment: selection.isActive ? .bottom : .bottomTrailing) {
-            GenreBottomControl(selection: selection, songs: songs,
-                               onOptions: { showsSortSheet = true }, onSelectionOptions: { showsSelectionSheet = true })
+            GenreBottomControl(selection: selection, songs: songs, playOrder: content.playOrder, sort: $sort,
+                               isUnknownGenre: GenreTheme.isUnknown(genreId),
+                               onQuickFill: { showsQuickFill = true },
+                               onSelectionOptions: { showsSelectionSheet = true })
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: selection.isActive)
         .sheet(isPresented: $showsSortSheet) {
@@ -353,7 +355,11 @@ private struct GenreContent {
 private struct GenreBottomControl: View {
     let selection: OrderedSelection<String>
     let songs: [Song]
-    let onOptions: () -> Void
+    /// The songs in the current sort (`GenreGrouping.sorted(songs, by: sort)`, memoised by the page).
+    let playOrder: [Song]
+    @Binding var sort: GenreSort
+    let isUnknownGenre: Bool
+    let onQuickFill: () -> Void
     let onSelectionOptions: () -> Void
 
     @Environment(PlaybackStore.self) private var playback
@@ -376,22 +382,39 @@ private struct GenreBottomControl: View {
                 .padding(.bottom, 16 + miniPlayerClearance)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
         } else {
-            Button(action: onOptions) {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 24, weight: .bold))
-                    .rotationEffect(.degrees(90))
-                    .foregroundStyle(theme.onTertiaryContainer)
-                    .frame(width: 80, height: 80)
-                    .contentShape(.rect)
+            // Sort & Play is a small system menu that morphs out of the button (owner change 2026-10-02).
+            ShapedGlassMenu(systemImage: "ellipsis", accessibilityLabel: "Options",
+                            shape: RoundedRectangle(cornerRadius: 24, style: .continuous), width: 80, height: 80,
+                            iconSize: 24, iconWeight: .bold, iconRotation: 90,
+                            tint: theme.tertiaryContainer.opacity(GlassTint.prominent),
+                            foreground: theme.onTertiaryContainer) {
+                sortAndPlayMenu
             }
-            .buttonStyle(.plain)
-            .pixlGlass(in: RoundedRectangle(cornerRadius: 24, style: .continuous),
-                       tint: theme.tertiaryContainer.opacity(GlassTint.prominent), interactive: true)
             .padding(.trailing, 16)
             .padding(.bottom, 26 + miniPlayerClearance)
-            .accessibilityLabel("Options")
             .accessibilityIdentifier("genre.options")
             .transition(.scale.combined(with: .opacity))
+        }
+    }
+
+    /// Android's "Sort & Play" sheet as a menu: Shuffle, Quick Fill (Unknown genre only), then Sort By.
+    @ViewBuilder
+    private var sortAndPlayMenu: some View {
+        Section {
+            Button("Shuffle", systemImage: "shuffle") {
+                if let start = playOrder.randomElement() { playback.play(start, in: playOrder) }
+            }
+            if isUnknownGenre {
+                Button("Quick Fill Genre", systemImage: "wand.and.stars", action: onQuickFill)
+            }
+        }
+        Section("Sort By") {
+            Picker("Sort By", selection: $sort) {
+                Label("Artist", systemImage: "person.fill").tag(GenreSort.artist)
+                Label("Album", systemImage: "opticaldisc").tag(GenreSort.album)
+                Label("Title", systemImage: "textformat.abc").tag(GenreSort.title)
+            }
+            .pickerStyle(.inline)
         }
     }
 }

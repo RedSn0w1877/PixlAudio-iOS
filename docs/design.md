@@ -24,7 +24,7 @@ Beta 2: `pp_*.png`; current Library › Songs: `owner-library-songs-2026-09-30.p
 | Song list item (`EnhancedSongListItem`) | Glass rounded card, same geometry; playing = capsule + brighter `primaryContainer` glass | `SongCard` |
 | `TopAppBar` with large title + actions | Same title in SF Pro + glass action circles | `LargeHeader` |
 | Section title + subtitle (+ refresh button) | Same text styles, optional glass circle | `SectionHeader` |
-| Bottom `NavigationBar` (custom compact bar, 3 icons) | **Owner change 2026-10-01:** an iOS-style floating glass tab bar (symbol + label, icons only in compact mode) with an accent-tinted glass pill that glides between tabs and follows a dragging finger | `GlassNavBar` |
+| Bottom `NavigationBar` (custom compact bar, 3 icons) | **Owner change 2026-10-01/02:** the iOS tab bar — floating interactive-glass capsule (symbol + label, icons only in compact mode) whose selection is the system liquid lens (accent-tinted pill at rest; clear, swelling, magnifying lens under the finger) | `GlassNavBar` + `LiquidTabBar` |
 | Mini player (player sheet, collapsed) | Glass bar tinted with the album's `primaryContainer`, same layout | `MiniPlayerBar` |
 | `ModalBottomSheet` | System sheet (glass by itself) + PixlAudio's sheet layout inside | `SheetScaffold` + `.pixlSheet()` |
 | Ripple, state layers | Glass `.interactive()` highlight; `PressScaleButtonStyle` for fills sitting on glass | `GlassStyle.swift` |
@@ -123,6 +123,20 @@ PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact ba
   Re-tapping the selected tab pops it to its root. Android's NavBar Style (default / full width) setting is gone;
   compact mode remains. Not the system `TabView` bar: its selection platter can't take the accent colour and the
   player sheet expands from the mini player slot above the bar.
+- **2026-10-02 (owner: "the pill doesnt go clear or expand, and it doesnt refract text underneath. use like a demo
+  thing online"):** the bar is now built on the system's liquid lens, following the open-source FabBar (MIT,
+  github.com/ryanashcraft/FabBar). Outside UITabBar, only UISegmentedControl has that lens, so `LiquidTabBar` puts a
+  segmented control in a capsule of interactive `UIGlassEffect` (2 pt padding).
+  - **Glyphs:** the segments' labels and background images are hidden. PixlAudio's glyphs (18 pt semibold symbol over
+    a 10 pt semibold label; 21 pt symbol alone in compact mode) are drawn inside each segment view, so the lens
+    magnifies them.
+  - **Pill and lens colour:** `selectedSegmentTintColor` is the accent (`primary` at `GlassTint.prominent`), the
+    resting pill. A filled, accent-tinted copy of each glyph is masked to the lens' presentation frame by a display
+    link that pauses after three still frames. That copy is `onPrimary` at rest and `primary` while the finger is
+    down, when the lens is clear.
+  - **Touch:** the lens moves on touch down and the selection changes on touch up; a re-tap pops the tab to its root.
+  - **Fragility:** segments and lens are found by class name (`UISegment`, `_UILiquidLensView`). If iOS changes
+    that hierarchy, the glyphs aren't injected and the control falls back to its own segment titles.
 - The bars are attached with `safeAreaBar`, so content scrolls all the way down under them with the system's soft
   scroll edge effect; Android's bottom gradients behind its bar (Home, Search) are gone.
 - The bar shows only at a tab's root — every pushed screen hides it (Android `routesWithHiddenNavigationBar`); the
@@ -626,3 +640,23 @@ light tint (decision 11):
   card and floating Instrumental pill.
 Nothing needed fixing. Known differences, not bugs: no Offline card under Remaster on the demo song (it is a local file;
 Android shows it for streamable songs), no "Set as sound" (iOS can't set ringtones).
+
+## Small menus (owner change 2026-10-02)
+
+Hoa asked for "the exploding liquid menus that pop out from [the button's] original position", meaning the system's
+own menu morph, checked against a recording of Messages' Edit menu:
+- the glass swells and bursts into a lens-like blob, with the menu inside it magnified and blurred;
+- the blob settles into the panel, and the text shrinks and sharpens (about 0.3 s).
+
+Hoa wants it "on things that don't need the entire screen like small menus, filter songs, etc" — not on full-screen
+surfaces such as the queue. So small menus are SwiftUI `Menu`s, and the system draws the morph:
+- `GlassCircleMenu`: Apple's `.glass` / `.glassProminent` button style in a circle. Used by the playlist's Sort Songs
+  and ⋯ options.
+- `ShapedGlassMenu`: a `Menu` on PixlAudio's own glass shape. Used by Library › Sort by (a segment of the action row)
+  and the genre page's Sort & Play.
+- Content: `SortMenuSections` (Sort by and Order as inline pickers) and `LibrarySortMenuContent` (plus View / Playlist
+  View / Cloud Only), the playlist options (edit, transition, export, batch actions, delete), and Sort & Play
+  (Shuffle, Quick Fill, Sort By).
+- The queue keeps its own menu. The Android sort and options sheets stay, for UI-test launch states.
+- `[record:Class]` in a commit message films that UI test class on CI (`MenuRecordingTests` opens these menus slowly),
+  so the morph can be compared frame by frame with the reference recording.

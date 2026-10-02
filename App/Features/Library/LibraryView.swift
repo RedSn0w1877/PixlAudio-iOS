@@ -179,7 +179,7 @@ struct LibraryView: View {
                                      onLocate: { locateRequests[tab, default: 0] += 1 },
                                      onStorageFilter: { withAnimation(PixlMotion.state) { prefs.cycleStorageFilter() } },
                                      onInstrumentalFilter: { instrumentalizedOnly.toggle() },
-                                     onSort: { sheet = .sort },
+                                     prefs: prefs,
                                      onFolder: { path in withAnimation(PixlMotion.state) { folderPath = path } },
                                      onFolderBack: navigateFolderBack)
                 }

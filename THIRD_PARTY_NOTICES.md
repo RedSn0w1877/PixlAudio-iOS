@@ -17,6 +17,32 @@ own Swift. Some of that Swift is a port of open-source code, listed here with it
   constants unchanged (verified bit-exact against the Android classes, see `tools/android-reference/ThemeGen.java`).
 - Copyright 2021–2024 Google LLC. Licensed under the Apache License, Version 2.0 (full text below).
 
+## FabBar (technique for the bottom tab bar)
+
+- Upstream: https://github.com/ryanashcraft/FabBar (Swift, MIT).
+- Followed in `App/DesignSystem/Components/LiquidTabBar.swift`: hosting the tab bar on a `UISegmentedControl`
+  inside interactive UIKit glass so the selection is the system's liquid lens; injecting the tab glyphs into the
+  segment views; masking accent-coloured copies of the glyphs to the lens' animated frame; moving the lens on
+  touch down. Rewritten for PixlAudio (its own glyph view, accent-tinted resting pill, compact mode); no FabBar
+  source file is included.
+
+MIT License
+
+Copyright (c) 2025 Ryan Ashcraft
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 ## Android PixlAudio code ported in this repository
 
 The Android app's own Kotlin (album-art seed selection in `ui/theme/ColorRoles.kt`, and the logic ported in

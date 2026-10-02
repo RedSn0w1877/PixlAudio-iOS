@@ -30,8 +30,8 @@ nonisolated enum Tokens {
         /// the system tab bar with labels, shorter in compact mode (icons only).
         static let navBarHeight: CGFloat = 62
         static let navBarCompactHeight: CGFloat = 54
-        /// Gap between the tab bar's edge and its accent selection pill.
-        static let navPillInset: CGFloat = 4
+        /// Padding between the tab bar's glass capsule and the segmented control holding the lens (as FabBar).
+        static let navGlassPadding: CGFloat = 2
         /// `nav_bar_corner_radius` default (`NAV_BAR_CORNER_RADIUS ?: 32`): the mini player's corners (a capsule at
         /// 64 pt) and PixlAudio's large glass cards.
         static let navBarCornerRadius: CGFloat = 32
