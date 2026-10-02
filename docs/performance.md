@@ -44,8 +44,12 @@ drops use Instruments on the phone (Hitches + Core Animation + SwiftUI templates
 
 ## Things to remember
 
-- Under approachable concurrency a plain `nonisolated async` function runs on its caller's actor. Off-main work is
-  `@concurrent` or `Task.detached`.
+- Under approachable concurrency a plain `nonisolated async` function runs on its caller's actor, and a `Task {}`
+  started from a view inherits the main actor. Off-main work is `@concurrent` or `Task.detached` (the lyrics shader
+  warm-up builds and compiles its `Shader` in a detached task).
+- The audio session is one per process: an activation that finishes off the main actor checks a process-wide record
+  of decisions, so a late result never undoes a newer activate / deactivate — not even one made by another
+  `AudioSessionController` (tests create one per engine).
 - Glass shapes that sit together go in one `GlassEffectContainer` with spacing below their gap. Children of a
   container (and of any non-element view with its own identifier) keep only their accessibility labels: UI tests look
   such controls up by identifier **or** label.
