@@ -44,6 +44,8 @@ struct PlayerSheetHost: View {
                     .overlay(alignment: .leading) {
                         if sheet.isExpanded { edgeBackStrip(width: screen.width) }
                     }
+                    .modifier(KeyboardStepAside(isHidden: sheet.hiddenForKeyboard && !sheet.isExpanded
+                                                    && !sheet.isDragging))
                     .offset(x: -insets.leading, y: -insets.top)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
@@ -202,6 +204,19 @@ struct PlayerSheetMorph: ViewModifier, Animatable {
     }
 
     private func lerp(_ a: CGFloat, _ b: CGFloat, _ t: CGFloat) -> CGFloat { a + (b - a) * t }
+}
+
+/// While the keyboard is up the collapsed card steps aside with the tab bar: what the shell's slot declares for a
+/// 64 pt view (`.move(edge: .bottom).combined(with: .opacity)`), driven by the shell's `PixlMotion.bars` transaction.
+private struct KeyboardStepAside: ViewModifier {
+    let isHidden: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .offset(y: isHidden ? Tokens.Shell.miniPlayerHeight : 0)
+            .opacity(isHidden ? 0 : 1)
+            .allowsHitTesting(!isHidden)
+    }
 }
 
 /// The mini player inside the card (Android `MiniPlayerContentInternal`): drawn without its own glass (the card is

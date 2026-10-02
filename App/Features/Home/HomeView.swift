@@ -68,7 +68,6 @@ struct HomeView: View {
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             HomeTopBar(isScrolled: isScrolled,
-                       jobCount: home.jobs(libraryProgress: library.lastImportProgress).count,
                        onBeta: { router.present(AppSheet.betaInfo) },
                        onJobs: { router.present(AppSheet.jobs) },
                        onChangelog: { router.present(AppSheet.changelog) },
@@ -151,15 +150,20 @@ nonisolated enum HomeMetrics {
 /// behind it (solid to 55 %, 72 % at 80 %, clear at the bottom) reaching the top of the screen.
 private struct HomeTopBar: View {
     let isScrolled: Bool
-    let jobCount: Int
     let onBeta: () -> Void
     let onJobs: () -> Void
     let onChangelog: () -> Void
     let onSettings: () -> Void
 
+    @Environment(AppEnvironment.self) private var env
+    @Environment(LibraryStore.self) private var library
     @Environment(\.appTheme) private var theme
 
     var body: some View {
+        // The import progress is read here, not in HomeView: a library scan reports progress several times (at
+        // launch and on every return to the foreground), and each tick should re-run only this bar, not Home's
+        // shelves — Home stays alive under the other tabs.
+        let jobCount = env.home.jobs(libraryProgress: library.lastImportProgress).count
         GlassEffectContainer(spacing: 2) {
             HStack(spacing: 0) {
                 Button(action: onBeta) {
