@@ -127,6 +127,28 @@ jobs:
             -collect-test-diagnostics never \
             -resultBundlePath build/UnitTests.xcresult \
             2>&1 | bash ci/timestamp.sh | tee build/test.log | cut -c14- | xcbeautify --quieter
+      - name: TEMP enumerate the main-branch UI test selection
+        if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
+        timeout-minutes: 15
+        run: |
+          set -o pipefail
+          for variant in main main-plus-skip-search; do
+            SELECTION=()
+            while IFS= read -r arg; do SELECTION+=("$arg"); done < <(GITHUB_REF=refs/heads/main COMMIT_MSG='' SHOTS_ONLY_INPUT='' bash ci/ui-test-args.sh)
+            if [ "$variant" = main-plus-skip-search ]; then SELECTION+=("-skip-testing:PixlAudioUITests/SearchScreenshotTests"); fi
+            echo "=== $variant: ${SELECTION[*]}"
+            xcodebuild test-without-building \
+              -project PixlAudio.xcodeproj -scheme PixlAudio \
+              -destination "id=$SIM_UDID" \
+              -derivedDataPath build/DerivedData \
+              "${SELECTION[@]}" \
+              -collect-test-diagnostics never \
+              -enumerate-tests -test-enumeration-style flat -test-enumeration-format text \
+              -test-enumeration-output-path "build/enum-$variant.txt" \
+              2>&1 | bash ci/timestamp.sh | tail -15
+            echo "--- $variant: $(grep -c . "build/enum-$variant.txt") lines; per class:"
+            grep -oE '(PixlAudioTests|PixlAudioUITests)/[A-Za-z0-9_]+' "build/enum-$variant.txt" | sort | uniq -c
+          done
       # Screenshots still run when a unit test failed (the same signal two separate jobs gave), not after a failed
       # build or boot.
       - name: Prepare the simulator for screenshots
