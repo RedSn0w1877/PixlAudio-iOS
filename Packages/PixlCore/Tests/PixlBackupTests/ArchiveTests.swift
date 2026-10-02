@@ -219,6 +219,24 @@ import Testing
         for (a, b) in zip(walked.entries, full.entries) { #expect(try walked.data(for: a) == full.data(for: b)) }
     }
 
+    /// Without a central directory the walk inflates data-descriptor entries just to find their end, before any
+    /// caller limit applies: a small crafted file must not expand into a gigabyte there.
+    @Test func fallbackWalkBoundsDataDescriptorEntries() throws {
+        let cases = try goldenLines("inflate-cases.jsonl")
+        let bomb = try #require(cases.first { $0["size"]!.i64 == 300_000 && $0["level"]!.i64 == 9 })
+        let stream = Array(Data(base64Encoded: bomb["deflate"]!.str)!)
+        let name = Array("bomb.json".utf8)
+        // Local header: signature, version 20, flags 0x8 (sizes in a data descriptor), DEFLATE, no time / date.
+        var bytes: [UInt8] = [0x50, 0x4B, 0x03, 0x04, 20, 0, 0x08, 0, 8, 0, 0, 0, 0, 0]
+        bytes += [UInt8](repeating: 0, count: 12) // CRC and sizes: in the (missing) descriptor
+        bytes += [UInt8(name.count), 0, 0, 0] + name + stream
+        #expect(throws: ZipError.entryTooLarge(name: "bomb.json", limit: 1000)) {
+            try ZipArchive(bytes: bytes, maxWalkEntryOutput: 1000)
+        }
+        // Within the default bound the entry inflates; the walk then stops at the missing descriptor.
+        #expect(throws: ZipError.truncated) { try ZipArchive(bytes: bytes) }
+    }
+
     @Test func writerRoundTripsAndIsReadLikeZipInputStream() throws {
         var writer = ZipWriter()
         writer.addStored(name: "manifest.json", data: Array("{}".utf8))

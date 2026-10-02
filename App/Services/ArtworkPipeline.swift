@@ -107,7 +107,45 @@ actor ArtworkPipeline {
     /// The pixel size a view `points` wide decodes at: its bucket, or its exact size when the bucket would be more
     /// than 1.6× larger (tiny icons) or it is larger than every bucket.
     nonisolated static func displayPixelSize(forPoints points: CGFloat) -> Int {
-        bucket(forPixels: pixelSize(forPoints: points))
+        let size = bucket(forPixels: pixelSize(forPoints: points))
+        if let cap = maxPixelSize, size > cap { return cap }
+        return size
+    }
+
+    /// Developer › Experimental › Album art quality (Android `AlbumArtQuality.maxSize`: 256 / 512 / 800 px, or the
+    /// original): the largest size a cover is decoded at, Android's size taken at the iOS 3× scale — so Medium and
+    /// High change nothing on an iPhone, and Low keeps big covers (the full player, album headers) at 768 px.
+    /// nil = no cap. Written on the main actor at launch and when the setting changes.
+    nonisolated(unsafe) static var maxPixelSize: Int?
+
+    nonisolated static func applyAlbumArtQuality(_ storageName: String) {
+        switch storageName {
+        case "LOW": maxPixelSize = 256 * 3
+        case "MEDIUM": maxPixelSize = 512 * 3
+        case "HIGH": maxPixelSize = 800 * 3
+        default: maxPixelSize = nil
+        }
+    }
+
+    /// Settings › Library › Album Art Cache Limit (Android `album_art_cache_limit_mb`, the disk cache size): deletes
+    /// the least recently written thumbnails until the disk cache fits. Runs off the main thread, at launch and when
+    /// the limit changes.
+    nonisolated static func trimDiskCache(limitBytes: Int64, directory: URL? = defaultDiskDirectory()) {
+        let keys: [URLResourceKey] = [.fileSizeKey, .contentModificationDateKey]
+        guard let directory,
+              let files = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: keys)
+        else { return }
+        var entries: [(url: URL, size: Int64, date: Date)] = files.compactMap { url in
+            guard let values = try? url.resourceValues(forKeys: Set(keys)), let size = values.fileSize else { return nil }
+            return (url, Int64(size), values.contentModificationDate ?? .distantPast)
+        }
+        var total = entries.reduce(Int64(0)) { $0 + $1.size }
+        guard total > limitBytes else { return }
+        entries.sort { $0.date < $1.date }
+        for entry in entries {
+            guard total > limitBytes else { break }
+            if (try? FileManager.default.removeItem(at: entry.url)) != nil { total -= entry.size }
+        }
     }
 
     nonisolated static func bucket(forPixels pixels: Int) -> Int {

@@ -52,6 +52,9 @@ nonisolated enum Tokens {
         static let buttonSize: CGFloat = 36
         static let buttonIconSize: CGFloat = 22
         static let buttonSpacing: CGFloat = 8
+        /// The transport buttons' touch area (Compose extends small clickables to 48 dp; iOS asks for 44 pt): the
+        /// 36 pt circles sit centred in it, so the 8 pt gaps between them are now part of the buttons.
+        static let buttonHitSize: CGFloat = 44
     }
 
     /// Song list item (`EnhancedSongListItem`).

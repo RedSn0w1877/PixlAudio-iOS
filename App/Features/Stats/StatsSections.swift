@@ -249,7 +249,7 @@ private struct StatsChipRow<ID: Hashable & Sendable>: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .sensoryFeedback(.selection, trigger: selection)
+        .pixlHaptic(.selection, trigger: selection)
     }
 }
 

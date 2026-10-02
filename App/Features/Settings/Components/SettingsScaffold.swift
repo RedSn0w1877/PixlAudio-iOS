@@ -255,6 +255,7 @@ struct SettingsToastModifier: ViewModifier {
                     .padding(.bottom, 12)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .task(id: message) {
+                        PixlAccessibility.announce(message)
                         try? await Task.sleep(for: .seconds(2))
                         withAnimation(PixlMotion.bars) { self.message = nil }
                     }

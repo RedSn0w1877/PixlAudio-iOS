@@ -82,6 +82,8 @@ final class LibraryToast {
     func show(_ text: String) {
         hideTask?.cancel()
         withAnimation(PixlMotion.bars) { message = text }
+        // VoiceOver never focuses the capsule before it goes: read it out instead.
+        PixlAccessibility.announce(text)
         hideTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(2))
             guard !Task.isCancelled else { return }

@@ -54,6 +54,7 @@ struct QueueSheet: View {
                     list(queue: queue, count: displayCount, offset: offset, currentDisplay: currentDisplay)
                 }
             }
+            .accessibilityHidden(isMenuExpanded)
             toolbar
                 .padding(.bottom, 16)
             if isMenuExpanded {
@@ -67,7 +68,7 @@ struct QueueSheet: View {
         }
         .animation(.easeOut(duration: 0.2), value: isMenuExpanded)
         .animation(PixlMotion.bars, value: undo?.id)
-        .sensoryFeedback(.selection, trigger: isMenuExpanded)
+        .pixlHaptic(.selection, trigger: isMenuExpanded)
         .sheet(item: $songInfo) { ref in
             SongInfoSheet(songId: ref.id).pixlSheet(detents: [.large])
         }
@@ -148,6 +149,11 @@ struct QueueSheet: View {
                                      onTap: { playback.skipToQueueItem(at: index + offset) },
                                      onMore: { songInfo = QueueSongRef(id: song.id) },
                                      onDismiss: { remove(song, at: index + offset) },
+                                     canMoveUp: index - 1 > currentDisplay,
+                                     canMoveDown: canReorder && index + 1 < count,
+                                     onMove: { delta in
+                                         playback.moveQueueItem(from: index + offset, to: index + delta + offset)
+                                     },
                                      handle: handleGesture(index: index, minIndex: currentDisplay + 1,
                                                            maxIndex: count - 1, offset: offset))
                             .modifier(QueueRowReorderOffset(reorder: reorder, index: index, pitch: rowPitch))
@@ -285,6 +291,11 @@ struct QueueSheet: View {
             .padding(.bottom, 36)
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
+        // Modal for VoiceOver: the queue under the scrim is out of reach, and the escape gesture closes the menu
+        // (instead of bubbling up and dismissing the whole queue).
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isModal)
+        .accessibilityAction(.escape) { isMenuExpanded = false }
         .accessibilityIdentifier("queue.menu")
     }
 
@@ -467,6 +478,11 @@ private struct QueueSongRow<Handle: Gesture>: View {
     let onTap: () -> Void
     let onMore: () -> Void
     let onDismiss: () -> Void
+    /// VoiceOver's way to reorder (the drag handle's gesture can't be driven by it): one place up or down, offered
+    /// only where the row can go (never above the current song, never past the end).
+    let canMoveUp: Bool
+    let canMoveDown: Bool
+    let onMove: (_ delta: Int) -> Void
     let handle: Handle
 
     @Environment(\.appTheme) private var theme
@@ -496,7 +512,7 @@ private struct QueueSongRow<Handle: Gesture>: View {
                 .offset(x: swipe)
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = max($0, 1) }
-        .sensoryFeedback(.impact(weight: .light), trigger: inZone)
+        .pixlHaptic(.impact(weight: .light), trigger: inZone)
     }
 
     private func row(shape: RoundedRectangle) -> some View {
@@ -538,7 +554,7 @@ private struct QueueSongRow<Handle: Gesture>: View {
                     .foregroundStyle(isCurrent ? theme.onTertiaryContainer : theme.onSurface)
                     .frame(width: 36, height: 36)
                     .background(Circle().fill(isCurrent ? theme.tertiaryContainer : theme.surfaceContainerHigh))
-                    .contentShape(.circle)
+                    .contentShape(Rectangle().inset(by: -4))
             }
             .buttonStyle(PressScaleButtonStyle())
             .accessibilityLabel("More options for \(song.title)")
@@ -558,7 +574,18 @@ private struct QueueSongRow<Handle: Gesture>: View {
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityAction(named: "More options") { onMore() }
-        .accessibilityAction(named: "Remove from queue") { if canReorder { onDismiss() } }
+        // Only the upcoming songs can be removed or moved: the current song and the history offer neither.
+        .accessibilityActions {
+            if canReorder {
+                Button("Remove from queue", action: onDismiss)
+            }
+            if canMoveUp {
+                Button("Move up") { onMove(-1) }
+            }
+            if canMoveDown {
+                Button("Move down") { onMove(1) }
+            }
+        }
     }
 
     /// Android `QueueItemDismissGestureHandler`: left only; up to 60 pt the row moves at most 20 pt (tension), then

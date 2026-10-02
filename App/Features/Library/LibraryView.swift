@@ -102,24 +102,46 @@ struct LibraryView: View {
         }
     }
 
+    /// Settings › Library Navigation (Android `LibraryNavigationMode`): the "Library" title over the tab row, or
+    /// (`compact_pill`) the current tab's pill — which opens the tab menu — over the pager dots.
     private func header(_ prefs: LibraryPreferences) -> some View {
-        VStack(spacing: 0) {
-            LargeHeader("Library") {
-                GlassCircleButton(systemImage: "gearshape.fill", accessibilityLabel: "Settings",
-                                  tint: theme.primaryContainer.opacity(GlassTint.prominent),
-                                  foreground: theme.onPrimaryContainer) {
-                    router.push(.settings)
+        let isCompact = settings.appearance.libraryNavigationMode == LibraryNavigationMode.compactPill
+        return VStack(spacing: 0) {
+            if isCompact {
+                HStack(spacing: 0) {
+                    LibraryNavigationPill(tab: tab, tabs: prefs.tabOrder,
+                                          onSelect: { newTab in withAnimation(PixlMotion.state) { selectedTab = newTab } },
+                                          onReorder: { sheet = .reorderTabs })
+                    Spacer(minLength: Tokens.Spacing.s)
+                    settingsButton
                 }
-                .accessibilityIdentifier("library.settings")
+                .padding(.leading, LibraryNavigationPill.leadingInset)
+                .padding(.trailing, Tokens.TopBar.actionTrailing)
+                .frame(height: Tokens.TopBar.height)
+                CompactLibraryPagerIndicator(currentIndex: prefs.tabOrder.firstIndex(of: tab) ?? 0,
+                                             pageCount: prefs.tabOrder.count)
+                    .padding(.top, 2)
+                    .padding(.bottom, 10)
+            } else {
+                LargeHeader("Library") { settingsButton }
+                GlassPillRow(items: prefs.tabOrder.map { GlassPillRow<LibraryTab>.Item(id: $0, title: $0.tabTitle) },
+                             selection: Binding(get: { tab }, set: { newTab in selectedTab = newTab }),
+                             accessibilityIdentifierPrefix: "library.tab",
+                             accessory: GlassPillRow<LibraryTab>.Accessory(systemImage: "pencil",
+                                                                           accessibilityLabel: "Reorder tabs",
+                                                                           action: { sheet = .reorderTabs }))
             }
-            GlassPillRow(items: prefs.tabOrder.map { GlassPillRow<LibraryTab>.Item(id: $0, title: $0.tabTitle) },
-                         selection: Binding(get: { tab }, set: { newTab in selectedTab = newTab }),
-                         accessibilityIdentifierPrefix: "library.tab",
-                         accessory: GlassPillRow<LibraryTab>.Accessory(systemImage: "pencil",
-                                                                       accessibilityLabel: "Reorder tabs",
-                                                                       action: { sheet = .reorderTabs }))
         }
         .background(theme.primaryContainer.opacity(0.4).ignoresSafeArea(edges: .top))
+    }
+
+    private var settingsButton: some View {
+        GlassCircleButton(systemImage: "gearshape.fill", accessibilityLabel: "Settings",
+                          tint: theme.primaryContainer.opacity(GlassTint.prominent),
+                          foreground: theme.onPrimaryContainer) {
+            router.push(.settings)
+        }
+        .accessibilityIdentifier("library.settings")
     }
 
     // MARK: Content panel
@@ -140,11 +162,34 @@ struct LibraryView: View {
                         .transition(.move(edge: .top).combined(with: .opacity).combined(with: .scale(scale: 0.8)))
                 }
             }
+            .overlay(alignment: .leading) { folderBackEdge }
             .padding(.top, 8)
             .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isSelecting)
         }
         .background(panelShape.fill(theme.surface).ignoresSafeArea(edges: .bottom))
         .background(theme.primaryContainer.opacity(0.4).ignoresSafeArea(edges: .bottom))
+    }
+
+    /// Settings › Behavior › Back gesture controls folders (Android `folderBackGestureNavigation`: the system back
+    /// gesture goes up one folder in the Folders tab): a swipe in from the leading edge, while a folder is open. With
+    /// the setting off the edge belongs to the pager, as before.
+    @ViewBuilder
+    private var folderBackEdge: some View {
+        if settings.behavior.folderBackGestureNavigation, tab == .folders, folderPath != nil {
+            Color.clear
+                .frame(width: 20)
+                .frame(maxHeight: .infinity)
+                .contentShape(.rect)
+                .gesture(
+                    DragGesture(minimumDistance: 10)
+                        .onEnded { value in
+                            if value.translation.width > 60 || value.predictedEndTranslation.width > 120 {
+                                navigateFolderBack()
+                            }
+                        }
+                )
+                .accessibilityHidden(true)
+        }
     }
 
     private var selectionCount: Int {
@@ -275,11 +320,14 @@ struct LibraryView: View {
         }
     }
 
+    /// "Cloud Only" (`hide_local_media`) forces the online filter, as Android's `effectiveStorageFilter` does.
     private func inputs(_ prefs: LibraryPreferences) -> LibraryModel.Inputs {
         LibraryModel.Inputs(snapshot: library.snapshot, songSort: prefs.songSort, albumSort: prefs.albumSort,
                             artistSort: prefs.artistSort, playlistSort: prefs.playlistSort,
                             folderSort: prefs.folderSort, likedSort: prefs.likedSort,
-                            storageFilter: prefs.storageFilter, likedAt: likedAt, revision: library.revision)
+                            storageFilter: settings.library.hideLocalMedia ? .online : prefs.storageFilter,
+                            likedAt: likedAt, revision: library.revision,
+                            minTracksPerAlbum: settings.library.minTracksPerAlbum)
     }
 
     // MARK: Actions

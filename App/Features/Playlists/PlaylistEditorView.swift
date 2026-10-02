@@ -18,7 +18,6 @@ struct PlaylistEditorView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(LibraryStore.self) private var library
     @Environment(Router.self) private var router
-    @Environment(PlaybackStore.self) private var playback
     @Environment(\.appTheme) private var theme
 
     @State private var form = PlaylistCoverForm()
@@ -104,14 +103,13 @@ struct PlaylistEditorView: View {
             SongPickerBottomBar(storageFilter: $storageFilter,
                                 showsCloudFilter: library.songs.contains(where: LibrarySorting.isOnline),
                                 title: "Create", confirmLabel: "Create") { save() }
-                .padding(.bottom, playback.miniPlayerClearance)
         } else {
             HStack {
                 Spacer()
                 floatingAction
             }
             .padding(.trailing, 24)
-            .padding(.bottom, 24 + playback.miniPlayerClearance)
+            .padding(.bottom, 24)
         }
     }
 
@@ -568,8 +566,8 @@ private struct PlaylistCoverFormView: View {
             sectionTitle("Background Color")
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 52, maximum: 52), spacing: 12)], alignment: .leading,
                       spacing: 12) {
-                ForEach(colorChoices, id: \.self) { argb in
-                    colorCell(argb)
+                ForEach(Array(colorChoices.enumerated()), id: \.offset) { index, argb in
+                    colorCell(argb, name: Self.colorNames[index])
                 }
             }
             .padding(.horizontal, 18)
@@ -604,6 +602,36 @@ private struct PlaylistCoverFormView: View {
          \.error, \.errorContainer, \.surfaceContainerHigh, \.inverseSurface].map { theme.argb($0) }
     }
 
+    /// VoiceOver names of `colorChoices`, in the same order.
+    private static let colorNames = ["Primary colour", "Primary container colour", "Secondary colour",
+                                     "Secondary container colour", "Tertiary colour", "Tertiary container colour",
+                                     "Error colour", "Error container colour", "Surface colour", "Inverse surface colour"]
+
+    /// VoiceOver names of the icon choices (`PlaylistIcons.names` are storage keys).
+    private static func iconName(_ key: String) -> String {
+        switch key {
+        case "MusicNote": "Music note"
+        case "Headphones": "Headphones"
+        case "Album": "Album"
+        case "Mic": "Microphone"
+        case "Speaker": "Speaker"
+        case "Favorite": "Heart"
+        case "Piano": "Piano"
+        case "Queue": "Queue"
+        default: key
+        }
+    }
+
+    /// VoiceOver names of the cover shapes (the raw values are storage keys).
+    private static func shapeName(_ shape: PlaylistShapeType) -> String {
+        switch shape {
+        case .circle: "Circle"
+        case .smoothRect: "Rounded square"
+        case .rotatedPill: "Tilted pill"
+        case .star: "Star"
+        }
+    }
+
     private func sectionTitle(_ text: String) -> some View {
         Text(text)
             .pixlFont(.titleSmall)
@@ -612,7 +640,7 @@ private struct PlaylistCoverFormView: View {
     }
 
     /// Android: a 52 pt cell; selected = 12 pt corners with a 3 pt ring of the colour around a 42 pt swatch.
-    private func colorCell(_ argb: UInt32) -> some View {
+    private func colorCell(_ argb: UInt32, name: String) -> some View {
         let selected = form.colorArgb == argb
         let radius: CGFloat = selected ? 12 : 24
         return Button { withAnimation(PixlMotion.state) { form.colorArgb = argb } } label: {
@@ -629,7 +657,7 @@ private struct PlaylistCoverFormView: View {
                 .contentShape(.rect)
         }
         .buttonStyle(PressScaleButtonStyle())
-        .accessibilityLabel("Colour")
+        .accessibilityLabel(name)
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 
@@ -647,7 +675,7 @@ private struct PlaylistCoverFormView: View {
                    tint: (selected ? theme.primaryContainer : theme.surfaceContainer)
                        .opacity(selected ? GlassTint.prominent : GlassTint.surface),
                    interactive: true)
-        .accessibilityLabel(name)
+        .accessibilityLabel(Self.iconName(name))
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 
@@ -669,7 +697,7 @@ private struct PlaylistCoverFormView: View {
                    tint: (selected ? theme.primaryContainer : theme.surfaceContainer)
                        .opacity(selected ? GlassTint.prominent : GlassTint.surface),
                    interactive: true)
-        .accessibilityLabel(shape.rawValue)
+        .accessibilityLabel(Self.shapeName(shape))
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
         .accessibilityIdentifier("editor.shape.\(shape.rawValue)")
     }

@@ -31,6 +31,9 @@ final class ListeningStatsTracker {
         let timestamp: Int64
         let totalDurationMs: Int64
         let isVoluntary: Bool
+        /// The session ended because another song started (Android's `trackChanged`: an early skip counts as one
+        /// for music intelligence).
+        var changedTrack = false
     }
 
     private(set) var session: Session?
@@ -47,7 +50,7 @@ final class ListeningStatsTracker {
     func onVoluntarySelection(songId: String) { pendingVoluntarySongId = songId }
 
     func onTrackChanged(songId: String?, positionMs: Int64, durationMs: Int64, isPlaying: Bool) {
-        finalizeCurrentSession()
+        finalizeCurrentSession(changedTrack: songId != nil && songId != session?.songId)
         guard let songId, !songId.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         let now = epochMs()
         session = Session(songId: songId, totalDurationMs: max(durationMs, 0), startedAtEpochMs: now,
@@ -74,7 +77,7 @@ final class ListeningStatsTracker {
     }
 
     /// Records the session if long enough and clears it (`finalizeCurrentSession`).
-    func finalizeCurrentSession() {
+    func finalizeCurrentSession(changedTrack: Bool = false) {
         guard var current = session else { return }
         let nowEpoch = epochMs()
         accumulate(&current, now: realtimeMs())
@@ -90,7 +93,8 @@ final class ListeningStatsTracker {
             }
             let timestamp = min(max(rawEnd, max(current.startedAtEpochMs, 0)), nowEpoch)
             onRecord?(Record(songId: current.songId, listenedMs: listened, timestamp: timestamp,
-                             totalDurationMs: current.totalDurationMs, isVoluntary: current.isVoluntary))
+                             totalDurationMs: current.totalDurationMs, isVoluntary: current.isVoluntary,
+                             changedTrack: changedTrack))
         }
         session = nil
         if pendingVoluntarySongId == current.songId { pendingVoluntarySongId = nil }

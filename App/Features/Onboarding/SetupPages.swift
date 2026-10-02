@@ -423,10 +423,18 @@ struct SetupSpotifyPage: View {
     let onSkip: () -> Void
     @Environment(\.appTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.colorScheme) private var colorScheme
     @State private var arrowDown = false
 
     /// Android `SpotifyBrandGreen`.
     static let spotifyGreen = Color(argb: 0xFF1DB954)
+    /// The hint's green under Increase Contrast in light mode: Spotify green is about 2.5:1 on the light background.
+    static let spotifyGreenHighContrast = Color(argb: 0xFF117A3D)
+
+    private var hintGreen: Color {
+        contrast == .increased && colorScheme == .light ? Self.spotifyGreenHighContrast : Self.spotifyGreen
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -449,7 +457,7 @@ struct SetupSpotifyPage: View {
                 if !isLoggedIn {
                     Text(L10n.setupSpotifyArrowHint)
                         .pixlFont(.labelLarge)
-                        .foregroundStyle(Self.spotifyGreen)
+                        .foregroundStyle(hintGreen)
                     Image(systemName: "chevron.down")
                         .font(.system(size: 28, weight: .bold))
                         .foregroundStyle(Self.spotifyGreen)

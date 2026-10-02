@@ -1,4 +1,5 @@
 import Observation
+import PixlLibrary
 import PixlModel
 import SwiftData
 import SwiftUI
@@ -26,8 +27,14 @@ final class AppEnvironment {
     /// Stage 6: builds the library from folders, Documents and the music library (nil in UI tests).
     let libraryImporter: LocalLibraryImporter?
     private let libraryAutoRefresh: LibraryAutoRefresh?
+    /// Artist pictures from Deezer after each load / rescan (nil in UI tests).
+    let artistImages: ArtistImageService?
     /// Home's state holder: playback history, mixes, recommendations, stats overview (stage 7b).
     let home: HomeStore
+    /// Settings › AI › Music intelligence: what listening teaches the recommendations.
+    let musicTaste: MusicTasteStore
+    /// Settings › AI › "Ready when you play": automatic lyric sync and instrumentals while the app is open.
+    let automaticStudio: AutomaticStudioRunner
     /// Search providers by source: the library on `SearchIndex` (stage 7c); stages 11/12 replace the YouTube Music
     /// and Spotify ones (UI tests get demo providers so Search's remote sections render).
     let searchProviders: [SearchSource: any SearchProviding]
@@ -67,12 +74,16 @@ final class AppEnvironment {
     init(launch: LaunchConfiguration) {
         self.launch = launch
         let isUITest = launch.isUITest
-        router = Router(launch: launch)
+        let router = Router(launch: launch)
+        self.router = router
         let container = try? PersistenceActor.makeContainer(inMemory: isUITest)
         let persistence = container.map { PersistenceActor(modelContainer: $0) }
         self.persistence = persistence
         let settings = isUITest ? SettingsStore.ephemeral() : SettingsStore()
         self.settings = settings
+        // Settings › Default tab (Android `launchTabFlow`): set before the first frame so Home never flashes first.
+        // UI tests open the tab their screen asks for.
+        if !isUITest, launch.screen == nil { router.selection = settings.behavior.launchTab }
         let accounts = AccountsStore()
         self.accounts = accounts
         let lyrics = LyricsStore()
@@ -84,6 +95,10 @@ final class AppEnvironment {
         theme = ThemeStore(extractor: extractor, appearance: settings.appearance)
         let home = HomeStore.make(launch: launch)
         self.home = home
+        let musicTaste = MusicTasteStore(settings: settings.ai, file: isUITest ? nil : MusicTasteStore.defaultURL())
+        self.musicTaste = musicTaste
+        home.taste = musicTaste
+        home.explorationFraction = { Float(settings.ai.musicExploration) }
 
         // Stage 5: the dual-deck AVPlayer engine for real launches; UI tests keep the demo engine.
         var realPlayback: PlaybackServices?
@@ -97,6 +112,11 @@ final class AppEnvironment {
             let history = home.history
             services.recordHistory = { songId, durationMs, timestamp in
                 history.record(songId: songId, durationMs: durationMs, endTimestampMs: timestamp)
+            }
+            services.recordTaste = { record in
+                musicTaste.record(songId: record.songId, listenedMs: record.listenedMs,
+                                  durationMs: record.totalDurationMs, voluntary: record.isVoluntary,
+                                  changedTrack: record.changedTrack, timestamp: record.timestamp)
             }
             playbackServices = services
             realPlayback = services
@@ -112,6 +132,7 @@ final class AppEnvironment {
             self.spotify = spotify
             libraryImporter = nil
             libraryAutoRefresh = nil
+            artistImages = nil
             searchProviders = [.library: LibrarySearchProvider(),
                                .spotify: DemoCatalogSearchProvider(),
                                .youtubeMusic: DemoYouTubeMusicSearchProvider()]
@@ -128,7 +149,11 @@ final class AppEnvironment {
             let library = LibraryStore(loader: loader, importer: importer)
             self.library = library
             libraryImporter = importer
-            libraryAutoRefresh = importer == nil ? nil : LibraryAutoRefresh(library: library)
+            let artistImages = ArtistImageService(library: library, persistence: persistence)
+            self.artistImages = artistImages
+            let autoRefresh = importer == nil ? nil : LibraryAutoRefresh(library: library)
+            autoRefresh?.onRefreshed = { artistImages.prefetchMissing() }
+            libraryAutoRefresh = autoRefresh
             let youtube = YouTubeServices(launch: launch, library: library, persistence: persistence, accounts: accounts)
             self.youtube = youtube
             youtube.install(on: realPlayback)
@@ -149,6 +174,10 @@ final class AppEnvironment {
 
         tais = TaisServices(launch: launch, settings: settings, lyricsController: lyricsController, playback: playback,
                             playbackServices: playbackServices, youtube: youtube)
+        automaticStudio = AutomaticStudioRunner(studio: tais.studio, models: tais.models, settings: settings,
+                                                library: library, playback: playback, history: home.history,
+                                                lyricsService: lyricsController.lyricsService,
+                                                isEnabled: !isUITest)
 
         let settingsDefaults = isUITest ? (UserDefaults(suiteName: "pixlaudio.uitest") ?? .standard) : .standard
         backup = BackupService(persistence: persistence, library: library, settings: settings, defaults: settingsDefaults,
@@ -165,10 +194,16 @@ final class AppEnvironment {
         playbackServices?.start()
         youtube.start()
         tais.start()
+        automaticStudio.start()
         let library = self.library, playback = self.playback
-        spotify.attach(reloadLibrary: { await library.reloadFromStore() }, isPlaybackActive: { playback.isPlaying })
+        let artistImages = self.artistImages
+        spotify.attach(reloadLibrary: {
+            await library.reloadFromStore()
+            artistImages?.prefetchMissing()
+        }, isPlaybackActive: { playback.isPlaying })
         spotify.songLookup = { library.song(id: $0) }
         await library.load()
+        artistImages?.prefetchMissing()
         await playbackServices?.restoreQueue(lookup: library.song(id:))
         libraryAutoRefresh?.start()
         let home = self.home, playCounts = self.playCounts, editor = libraryEditor
@@ -183,6 +218,9 @@ final class AppEnvironment {
         playbackServices?.onEngagementRecorded = reloadPlayCounts
         backup.onRestored = reloadPlayCounts
         backup.start()
+        // Settings › Library › Album Art Cache Limit: the thumbnail disk cache is kept under it.
+        let artCacheLimit = Int64(settings.library.albumArtCacheLimitMb) * 1_048_576
+        Task.detached(priority: .background) { ArtworkPipeline.trimDiskCache(limitBytes: artCacheLimit) }
         // The output-route monitor queries the audio session when first touched: do it now, while nothing animates,
         // not in the full player's first frame.
         _ = AudioRouteMonitor.shared
@@ -192,18 +230,83 @@ final class AppEnvironment {
     }
 
     /// A file opened in PixlAudio from Files or the share sheet (the declared document types; Android's external
-    /// intents): a `.pxpl` backup, or the Android app's legacy `.json.gz`, opens the restore flow on it.
+    /// intents): a `.pxpl` backup, or the Android app's legacy `.json.gz`, opens the restore flow on it; an M3U
+    /// playlist becomes a playlist; LRC / TTML lyrics are imported for the playing song; an audio file joins the
+    /// library and plays.
     func open(_ url: URL) {
         guard !launch.isUITest, url.isFileURL else { return }
-        let name = url.lastPathComponent.lowercased()
-        guard name.hasSuffix(".pxpl") || name.hasSuffix(".gz") else { return }
-        if case .setup? = router.cover { return } // the setup has its own restore page
+        if case .setup? = router.cover { return } // the setup comes first (it has its own restore page)
+        switch ExternalFiles.kind(of: url) {
+        case .backup: openBackup(url)
+        case .playlist: openPlaylist(url)
+        case .lyrics: openLyrics(url)
+        case .audio: openAudio(url)
+        case .unsupported: return
+        }
+    }
+
+    private func openBackup(_ url: URL) {
         let backup = self.backup, router = self.router
         Task {
             guard let inspected = try? await backup.inspect(url: url) else { return }
             backup.importStart = .inspected(inspected)
             router.present(AppCover.backupImport)
         }
+    }
+
+    /// Android's M3U import (Library › Import), from a file handed to the app: the playlist is created and Library
+    /// opens, where it shows up and the toast confirms it.
+    private func openPlaylist(_ url: URL) {
+        showLibraryRoot()
+        guard let data = ExternalFiles.read(url) else {
+            LibraryToast.shared.show("Couldn't read this playlist")
+            return
+        }
+        let parsed = M3U.parse(utf8: Array(data), fileName: url.lastPathComponent, library: library.songs)
+        libraryEditor.createPlaylist(name: parsed.name, songIds: parsed.songIds)
+        LibraryToast.shared.show("Playlist created")
+    }
+
+    /// Lyrics for the song that is playing (the lyrics screen's Import, `LyricsImportSecurity`), shown on the lyrics
+    /// screen; with nothing playing there is no song to attach them to.
+    private func openLyrics(_ url: URL) {
+        guard let song = playback.current else {
+            showLibraryRoot()
+            LibraryToast.shared.show("Play a song first, then open the lyrics file again")
+            return
+        }
+        lyricsController.importFile(url, song: song)
+        if router.cover == nil { router.present(AppCover.lyrics) }
+    }
+
+    /// An audio file: copied into Documents (unless it is already there), scanned into the library and played.
+    private func openAudio(_ url: URL) {
+        let library = self.library, playback = self.playback
+        Task {
+            guard let relativePath = await ExternalFiles.importAudio(url) else {
+                self.showLibraryRoot()
+                LibraryToast.shared.show("Couldn't open this file")
+                return
+            }
+            let id = LibraryIdentity.fileSongID(rootID: FolderRoot.documentsID, relativePath: relativePath)
+            // An incremental refresh joins a scan that is already running (the foreground rescan), which may have
+            // listed the folder before the copy: scan once more if the song isn't there yet.
+            for _ in 0..<2 where library.song(id: id) == nil {
+                try? await library.refresh(mode: .incremental)
+            }
+            if let song = library.song(id: id) {
+                playback.play([song], startIndex: 0)
+            } else {
+                self.showLibraryRoot()
+                LibraryToast.shared.show("This file couldn't be added to the library")
+            }
+        }
+    }
+
+    /// Library at its root, where the toast of an opened file shows.
+    private func showLibraryRoot() {
+        router.libraryPath.removeAll()
+        router.selection = .library
     }
 
     /// Call after music-library access was granted so its change notifications start.

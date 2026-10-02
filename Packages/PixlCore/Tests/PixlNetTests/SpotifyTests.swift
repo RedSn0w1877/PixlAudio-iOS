@@ -124,7 +124,7 @@ struct SpotifyAuthTests {
         let session = SpotifySession(http: FixtureHTTPClient { _ in HTTPResponse(statusCode: 400, text: #"{"error":"invalid_grant"}"#) },
                                      store: store, clientId: { "cid" }, sha256: sha256, randomBytes: { Array(repeating: 0, count: $0) })
         let result = await session.forceRefresh()
-        #expect(result == .failure(SpotifyAuthError("Refresco de token fallido (HTTP 400)", statusCode: 400)))
+        #expect(result == .failure(SpotifyAuthError("Token refresh failed (HTTP 400)", statusCode: 400)))
         #expect(await store.tokens == nil)
         #expect(!(await session.isLoggedIn()))
         #expect(await session.validAccessToken() == nil)
@@ -134,12 +134,12 @@ struct SpotifyAuthTests {
         let http = FixtureHTTPClient { _ in HTTPResponse(statusCode: 200, text: #"{"access_token":"A2","refresh_token":"R2"}"#) }
         let session2 = SpotifySession(http: http, store: failing, clientId: { "cid" }, sha256: sha256, randomBytes: { Array(repeating: 0, count: $0) })
         #expect(await session2.validAccessToken() == nil)
-        #expect(await session2.lastError == "No se pudo guardar el refresh token rotado")
+        #expect(await session2.lastError == "Couldn't save the rotated refresh token")
         // The rotated token is still remembered in memory for the next attempt.
         _ = await session2.forceRefresh()
         #expect(http.requests[1].bodyText!.contains("refresh_token=R2"))
         #expect(await SpotifySession(http: http, store: MemoryStore(nil), clientId: { "c" }, sha256: sha256, randomBytes: { Array(repeating: 0, count: $0) })
-            .forceRefresh() == .failure(SpotifyAuthError("sin refresh token")))
+            .forceRefresh() == .failure(SpotifyAuthError("No refresh token")))
     }
 
     @Test func fullSignInFlow() async throws {
@@ -150,23 +150,27 @@ struct SpotifyAuthTests {
         #expect(pending.codeVerifier.count == 86 && pending.state.count == 24)
         #expect(pending.url.contains("code_challenge=\(SpotifyAuth.codeChallenge(verifier: pending.codeVerifier, sha256: sha256))"))
         let bad = await session.handleCallback("pixlaudio://spotify-callback?code=c&state=wrong")
-        #expect(bad == .failure(SpotifyAuthError("state no coincide")))
-        #expect(await session.lastError == "Respuesta de login no válida")
+        #expect(bad == .failure(SpotifyAuthError("Sign-in response didn't match (state mismatch)")))
+        #expect(await session.lastError == "Sign-in response didn't match")
         let ok = await session.handleCallback("pixlaudio://spotify-callback?code=CODE&state=\(pending.state)")
         #expect(try ok.get() == SpotifyTokens(accessToken: "A", refreshToken: "R", expiresAtMs: 3_600_000, scope: "user-top-read"))
         #expect(http.requests[0].bodyText!.contains("code=CODE") && http.requests[0].bodyText!.contains("code_verifier=\(pending.codeVerifier)"))
         #expect(await store.tokens?.refreshToken == "R")
         #expect(await session.isLoggedIn())
-        #expect(await session.handleCallback("pixlaudio://spotify-callback?code=x&state=\(pending.state)") == .failure(SpotifyAuthError("state no coincide")))
+        #expect(await session.handleCallback("pixlaudio://spotify-callback?code=x&state=\(pending.state)") == .failure(SpotifyAuthError("Sign-in response didn't match (state mismatch)")))
+
+        let cancelled = await session.handleCallback("pixlaudio://spotify-callback?error=access_denied&state=\(pending.state)")
+        #expect(cancelled == .failure(SpotifyAuthError("Sign-in was cancelled")))
+        #expect(SpotifySession.providerErrorMessage("server_error") == "Spotify returned: server_error")
 
         let noClient = SpotifySession(http: http, store: store, clientId: { " " }, sha256: sha256, randomBytes: { Array(repeating: 0, count: $0) })
         #expect(await noClient.beginAuthorization() == nil)
-        #expect(await noClient.lastError == "Falta el client ID de Spotify")
+        #expect(await noClient.lastError == "Spotify client ID is missing")
         let rejecting = SpotifySession(http: FixtureHTTPClient { _ in HTTPResponse(statusCode: 400, text: "{}") }, store: MemoryStore(nil),
                                        clientId: { "cid" }, sha256: sha256, randomBytes: { Array(repeating: 0, count: $0) })
         let p = try #require(await rejecting.beginAuthorization())
         #expect(await rejecting.handleCallback("pixlaudio://spotify-callback?code=c&state=\(p.state)")
-                == .failure(SpotifyAuthError("Canje de código fallido (HTTP 400)", statusCode: 400)))
+                == .failure(SpotifyAuthError("Code exchange failed (HTTP 400)", statusCode: 400)))
     }
 }
 

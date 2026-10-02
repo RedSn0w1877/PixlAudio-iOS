@@ -430,6 +430,8 @@ struct AiLabLevelSelector: View {
                                 .font(.system(size: 16))
                                 .foregroundStyle(showsDescription ? theme.primary : theme.onSurfaceVariant.opacity(0.6))
                                 .frame(width: 28, height: 28)
+                                // A 44 pt touch area around the 28 pt glyph, without moving it.
+                                .contentShape(Rectangle().inset(by: -8))
                         }
                         .buttonStyle(PressScaleButtonStyle())
                         .accessibilityLabel("More info")

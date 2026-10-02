@@ -56,14 +56,20 @@ public struct ZipArchive: Sendable {
     /// Upper bound on the number of entries (a `.pxpl` has at most 13).
     public static let maxEntries = 10_000
 
-    public init(bytes: [UInt8]) throws(ZipError) {
+    /// How far the local-header walk may inflate one data-descriptor entry just to find where it ends: above every
+    /// `.pxpl` limit (a module is at most 16 M characters, up to 48 MB of UTF-8), far below what a zip bomb asks for.
+    public static let defaultMaxWalkEntryOutput = 64 * 1024 * 1024
+
+    /// - Parameter maxWalkEntryOutput: the inflate bound for an entry whose sizes follow its data, used only when
+    ///   the archive has no central directory (the fallback walk runs before any caller-side limit applies).
+    public init(bytes: [UInt8], maxWalkEntryOutput: Int = ZipArchive.defaultMaxWalkEntryOutput) throws(ZipError) {
         self.bytes = bytes
         if let eocd = Self.findEndOfCentralDirectory(bytes) {
             self.entries = try Self.readCentralDirectory(bytes, eocd: eocd)
             self.hasCentralDirectory = true
         } else {
             guard bytes.count >= 4, Self.u32(bytes, 0) == 0x0403_4B50 else { throw .notZip }
-            self.entries = try Self.walkLocalHeaders(bytes)
+            self.entries = try Self.walkLocalHeaders(bytes, maxEntryOutput: maxWalkEntryOutput)
             self.hasCentralDirectory = false
         }
     }
@@ -164,7 +170,8 @@ public struct ZipArchive: Sendable {
 
     // MARK: Local-header walk (ZipInputStream-style)
 
-    static func walkLocalHeaders(_ b: [UInt8]) throws(ZipError) -> [ZipEntry] {
+    static func walkLocalHeaders(_ b: [UInt8],
+                                 maxEntryOutput: Int = ZipArchive.defaultMaxWalkEntryOutput) throws(ZipError) -> [ZipEntry] {
         var entries: [ZipEntry] = []
         var p = 0
         while p + 4 <= b.count, u32(b, p) == 0x0403_4B50 {
@@ -186,7 +193,9 @@ public struct ZipArchive: Sendable {
                 guard method == 8 else { throw .unsupported("only DEFLATED entries can have EXT descriptor") }
                 let result: Inflate.Result
                 do {
-                    result = try Inflate.inflate(b, from: dataStart, maxOutput: 1 << 30)
+                    result = try Inflate.inflate(b, from: dataStart, maxOutput: maxEntryOutput)
+                } catch .outputLimitExceeded {
+                    throw .entryTooLarge(name: name, limit: maxEntryOutput)
                 } catch {
                     throw .inflate(name: name, error: error)
                 }

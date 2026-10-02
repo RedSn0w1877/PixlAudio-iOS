@@ -77,6 +77,8 @@ struct BackupInfoNotice: View {
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(theme.onPrimaryContainer)
                     .frame(width: 28, height: 28)
+                    // A 44 pt touch area around the 28 pt glyph, without moving it.
+                    .contentShape(Rectangle().inset(by: -8))
             }
             .buttonStyle(PressScaleButtonStyle())
             .accessibilityLabel(L10n.settingsCdCloseNotice)

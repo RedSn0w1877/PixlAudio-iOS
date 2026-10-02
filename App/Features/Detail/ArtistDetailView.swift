@@ -1,3 +1,4 @@
+import PhotosUI
 import PixlLibrary
 import PixlModel
 import SwiftUI
@@ -94,6 +95,10 @@ private struct ArtistDetailContent: View {
     /// first frame has them. Play counts come from a long-lived cache (`PlayCountStore`), so "Most played" is there
     /// from the first frame on later visits instead of being inserted above the albums mid-push.
     @State private var memo = ViewMemo<ArtistContentKey, ArtistContent>()
+    /// The edit-image circle (Android: the pencil opens the photo picker; "clear custom image" once one is set).
+    @State private var showsPhotoPicker = false
+    @State private var showsImageOptions = false
+    @State private var photoItem: PhotosPickerItem?
 
     private var content: ArtistContent {
         let counts = env.playCounts
@@ -124,9 +129,10 @@ private struct ArtistDetailContent: View {
                                             onShuffle: { playback.playShuffled(allSongs) }) {
                         GlassCircleButton(systemImage: "pencil", accessibilityLabel: "Edit artist image",
                                           tint: theme.surfaceContainerLow.opacity(GlassTint.container),
-                                          foreground: theme.onSurface) {}
-                            .disabled(true)
-                            .opacity(0.6)
+                                          foreground: theme.onSurface) {
+                            if (artist.customImageUri ?? "").isEmpty { showsPhotoPicker = true } else { showsImageOptions = true }
+                        }
+                        .accessibilityIdentifier("artist.editImage")
                     }
                     .ignoresSafeArea(edges: .top)
                 } else {
@@ -137,6 +143,41 @@ private struct ArtistDetailContent: View {
         .task(id: env.home.history.revision) {
             await env.playCounts.refresh(editor: env.libraryEditor, revision: env.home.history.revision)
         }
+        .photosPicker(isPresented: $showsPhotoPicker, selection: $photoItem, matching: .images)
+        .onChange(of: photoItem) { _, item in
+            guard let item else { return }
+            photoItem = nil
+            Task { await setCustomImage(from: item) }
+        }
+        .confirmationDialog("Artist image", isPresented: $showsImageOptions, titleVisibility: .visible) {
+            Button("Choose a new image") { showsPhotoPicker = true }
+            Button("Remove custom image", role: .destructive) { setCustomImageURI(nil) }
+            Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    /// Android `setCustomArtistImage`: the picked photo is copied into the app's storage (the picker's item does not
+    /// outlive it) and becomes the artist's `customImageUri`, which wins over the Deezer picture.
+    private func setCustomImage(from item: PhotosPickerItem) async {
+        guard let data = try? await item.loadTransferable(type: Data.self) else { return }
+        let isUITest = env.launch.isUITest
+        let url = await Task.detached(priority: .userInitiated) { ArtistImageStore.save(data, temporary: isUITest) }.value
+        guard let url else { return }
+        setCustomImageURI(url.absoluteString)
+    }
+
+    private func setCustomImageURI(_ uri: String?) {
+        guard var artist = library.artist(id: artistId) else { return }
+        let previous = artist.customImageUri
+        artist.customImageUri = uri
+        library.updateArtists([artist])
+        library.writeSnapshotCache()
+        if let persistence = env.persistence {
+            let saved = artist
+            Task.detached(priority: .utility) { try? await persistence.setArtistImages([saved]) }
+        }
+        // The replaced copy is ours (Application Support/ArtistImages): remove it.
+        if let previous, previous != uri { ArtistImageStore.removeIfOwned(previous) }
     }
 
     private func list(topPadding: CGFloat) -> some View {
@@ -171,7 +212,9 @@ private struct ArtistDetailContent: View {
             }
             .padding(.horizontal, 16)
             .padding(.top, topPadding)
-            .padding(.bottom, 96)
+            // Android pads `MiniPlayerHeight + 16` while a song is loaded: the mini player's room now comes from the
+            // route's safe area (`BottomBarsClearance`), so only the 16 pt (and a little air) stay here.
+            .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
         .trackingHeaderScroll(scroll)
@@ -239,18 +282,26 @@ private struct AlbumSectionHeader: View {
                                            bottomTrailingRadius: isExpanded ? 0 : 24, topTrailingRadius: 24,
                                            style: .continuous)
         HStack(spacing: 12) {
-            ArtworkView(source: ArtworkSource(uriString: section.albumArtUriString), size: 52, cornerRadius: 10)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(section.title)
-                    .pixlFont(.titleMedium, weight: .semibold)
-                    .foregroundStyle(theme.onSurface)
-                    .lineLimit(1)
-                Text(subtitle)
-                    .pixlFont(.bodySmall)
-                    .foregroundStyle(theme.onSurfaceVariant)
-                    .lineLimit(1)
+            // The art and the two lines are the section's expand / collapse button for VoiceOver (with its state);
+            // Play stays its own button and the chevron is decoration.
+            HStack(spacing: 12) {
+                ArtworkView(source: ArtworkSource(uriString: section.albumArtUriString), size: 52, cornerRadius: 10)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(section.title)
+                        .pixlFont(.titleMedium, weight: .semibold)
+                        .foregroundStyle(theme.onSurface)
+                        .lineLimit(1)
+                    Text(subtitle)
+                        .pixlFont(.bodySmall)
+                        .foregroundStyle(theme.onSurfaceVariant)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+            .accessibilityAction(.default, onToggle)
             Button(action: onPlay) {
                 Image(systemName: "play.fill")
                     .font(.system(size: 16, weight: .semibold))
@@ -265,7 +316,7 @@ private struct AlbumSectionHeader: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(theme.onSurfaceVariant)
                 .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                .accessibilityLabel(isExpanded ? "Collapse \(section.title)" : "Expand \(section.title)")
+                .accessibilityHidden(true)
         }
         .padding(14)
         .contentShape(shape)
@@ -278,5 +329,28 @@ private struct AlbumSectionHeader: View {
         if let year = section.year, year > 0 { parts.append("\(year)") }
         parts.append(LibraryFormat.songCount(section.songs.count))
         return parts.joined(separator: " • ")
+    }
+}
+
+/// Custom artist images (Android writes `artist_art_<id>.jpg` to its files dir): copies in Application Support.
+nonisolated enum ArtistImageStore {
+    static func directory(temporary: Bool) -> URL? {
+        let base = temporary ? FileManager.default.temporaryDirectory
+            : FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        return base?.appendingPathComponent("ArtistImages", isDirectory: true)
+    }
+
+    static func save(_ data: Data, temporary: Bool) -> URL? {
+        guard let directory = directory(temporary: temporary) else { return nil }
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent(UUID().uuidString + ".img")
+        return (try? data.write(to: url, options: .atomic)) != nil ? url : nil
+    }
+
+    /// Deletes a custom image this store wrote (never a file elsewhere, such as one restored from a backup).
+    static func removeIfOwned(_ uri: String) {
+        guard let url = URL(string: uri), url.isFileURL,
+              url.deletingLastPathComponent().lastPathComponent == "ArtistImages" else { return }
+        try? FileManager.default.removeItem(at: url)
     }
 }

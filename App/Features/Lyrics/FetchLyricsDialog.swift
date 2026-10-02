@@ -43,6 +43,10 @@ struct FetchLyricsDialog: View {
             let a = song?.displayArtist ?? ""
             artist = a.lowercased() == "<unknown>" ? "" : a
         }
+        // A modal dialog for VoiceOver (the lyrics behind stay out of reach); escape cancels it.
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isModal)
+        .accessibilityAction(.escape, onDismiss)
         .accessibilityIdentifier("dialog.fetchLyrics")
     }
 

@@ -124,7 +124,7 @@ private struct EqualizerPowerButton: View {
         .accessibilityLabel(isOn ? L10n.equalizerDisableCd : L10n.equalizerEnableCd)
         .accessibilityAddTraits(isOn ? .isSelected : [])
         .accessibilityIdentifier("eq.power")
-        .sensoryFeedback(.impact(weight: .medium), trigger: isOn)
+        .pixlHaptic(.impact(weight: .medium), trigger: isOn)
     }
 }
 

@@ -178,9 +178,10 @@ nonisolated enum SettingsBackup {
         return AndroidPreferenceCatalog.kind(of: key) == .portable ? .string : nil
     }
 
-    /// API keys stored in the Keychain rather than `UserDefaults` (`AISettingsSection`).
+    /// API keys stored in the Keychain rather than `UserDefaults` (`AISettingsSection`, and the BS-RoFormer key of
+    /// Developer › Experimental).
     static func isKeychainKey(_ key: String) -> Bool {
-        androidTypes[key] == nil && key.hasSuffix("_api_key")
+        key == PreferenceKeys.taisRoformerApiKey || (androidTypes[key] == nil && key.hasSuffix("_api_key"))
     }
 
     // MARK: Export
@@ -201,6 +202,8 @@ nonisolated enum SettingsBackup {
             let account = PreferenceKeys.aiApiKeyAccount(provider.rawValue)
             if let secret = keychain(account), !secret.isEmpty { out.append((account, .string(secret))) }
         }
+        let roformer = PreferenceKeys.taisRoformerApiKey
+        if let secret = keychain(roformer), !secret.isEmpty { out.append((roformer, .string(secret))) }
         return out
     }
 

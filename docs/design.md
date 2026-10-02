@@ -137,8 +137,11 @@ PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact ba
   - **Touch:** the lens moves on touch down and the selection changes on touch up; a re-tap pops the tab to its root.
   - **Fragility:** segments and lens are found by class name (`UISegment`, `_UILiquidLensView`). If iOS changes
     that hierarchy, the glyphs aren't injected and the control falls back to its own segment titles.
-- The bars are attached with `safeAreaBar`, so content scrolls all the way down under them with the system's soft
-  scroll edge effect; Android's bottom gradients behind its bar (Home, Search) are gone.
+- The bars float over the tabs as an overlay (no layout space, docs/performance.md); content scrolls under the
+  see-through glass, and every tab root and route reserves the bars' room inside its own stack
+  (`BottomBarsClearance`: tab bar + mini player + 8 pt on a root, the mini player + 8 pt on a pushed screen, as
+  Android pads by `bottomBarHeight + MiniPlayerHeight`), so the last rows scroll up above the bars. Android's bottom
+  gradients behind its bar (Home, Search) are gone.
 - The bar shows only at a tab's root — every pushed screen hides it (Android `routesWithHiddenNavigationBar`); the
   mini player then sits alone with 32 pt corners.
 - The mini player is the collapsed player sheet (stage 8): tap or drag it up to expand (see Stage 8 notes).
@@ -187,6 +190,16 @@ group), 2 pt apart (`Features/Settings/Components/SettingsRows.swift`); every se
 its view: album-art palette style, nav-bar corner radius, smooth corners, the visual-style switch, the Plus card and
 licence debug tools, battery optimisation, Chromecast autoplay, Hi-Fi float output, offload-ready formats and the
 ExoPlayer tile. TAIS tools in Experimental are UI shells until the TAIS stages.
+
+Dropped settings (final review, 2026-10-03), because iOS can't honour them:
+- Playback › "Keep playing after closing": iOS ends the app — and its playback — when it is swiped away from the app
+  switcher, so neither choice could be kept; background audio plays on otherwise. The key stays for backups.
+- AI › Music intelligence › "Discover beyond my library": on Android it adds online catalog songs to Home's
+  discovery shelves; the iOS Home has no catalog source. The key stays for backups.
+- Appearance › App Language shows only when the app has more than one localisation (English only for now).
+Kept as on Android although unused there too: the Home collage pattern and auto-rotate rows; the Experimental
+full-player loading steps. "Auto-scan .lrc files" stays as it is (sidecar lyrics are always read at play time, as
+on Android).
 
 ## Seams — who owns what
 
@@ -602,8 +615,8 @@ no "Set as sound" (iOS apps can't set ringtones), so the large sheet shows empty
 hero's `MPVolumeView` is empty in the Simulator; screenshots use the demo library's placeholder art.
 Final check on `main` 3a376e8 (CI run 36934265005, all classes, 208 shots green), re-reviewed side by side: player,
 queue, timer, lyrics, Spotify, AI, setup, backup, YouTube and devices screens all match the review above. Left for
-their owners: Settings › Library › Music folders (stage 7d) draws its "Excluded Directories" title under the `+`
-button; `ci/export-shots.sh` names the backup probe's text attachment `public.plain-text.txt.png` (it is text, not
+their owners: Settings › Library › Music folders (stage 7d) drew its "Excluded Directories" title under the `+`
+button (fixed in the final review: the title is centred between the buttons); `ci/export-shots.sh` names the backup probe's text attachment `public.plain-text.txt.png` (it is text, not
 an image).
 
 ## Integration notes (Integrate B: stages 10 and 14 merged — tag `stage-15`)

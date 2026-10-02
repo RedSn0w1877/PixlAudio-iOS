@@ -209,7 +209,7 @@ public actor SpotifySession {
     public func beginAuthorization() async -> SpotifyPendingAuthorization? {
         let id = await clientId()
         if NetText.isBlank(id) {
-            lastError = "Falta el client ID de Spotify"
+            lastError = "Spotify client ID is missing"
             return nil
         }
         let verifier = SpotifyAuth.codeVerifier(randomBytes: randomBytes(SpotifyAuth.verifierByteCount))
@@ -221,6 +221,12 @@ public actor SpotifySession {
         return auth
     }
 
+    /// What the user sees when Spotify's consent page answers with an error (English only): Cancel on that page
+    /// comes back as `access_denied`.
+    public static func providerErrorMessage(_ error: String) -> String {
+        error == "access_denied" ? "Sign-in was cancelled" : "Spotify returned: \(error)"
+    }
+
     /// Restores a pending authorization the app persisted (e.g. across a relaunch).
     public func restorePending(_ auth: SpotifyPendingAuthorization?) { pending = auth }
 
@@ -229,15 +235,15 @@ public actor SpotifySession {
         switch SpotifyAuth.validateCallback(url, expectedState: pending?.state) {
         case .providerError(let error):
             lastError = error
-            return .failure(SpotifyAuthError("Spotify devolvió: \(error)"))
+            return .failure(SpotifyAuthError(Self.providerErrorMessage(error)))
         case .stateMismatch:
-            lastError = "Respuesta de login no válida"
-            return .failure(SpotifyAuthError("state no coincide"))
+            lastError = "Sign-in response didn't match"
+            return .failure(SpotifyAuthError("Sign-in response didn't match (state mismatch)"))
         case .missingCode:
             lastError = "Spotify returned no authorization code"
-            return .failure(SpotifyAuthError("sin código de autorización"))
+            return .failure(SpotifyAuthError("No authorization code"))
         case .code(let code):
-            guard let verifier = pending?.codeVerifier else { return .failure(SpotifyAuthError("sin code_verifier guardado")) }
+            guard let verifier = pending?.codeVerifier else { return .failure(SpotifyAuthError("No saved code verifier")) }
             let request = SpotifyAuth.exchangeCodeRequest(code: code, clientId: await clientId(), codeVerifier: verifier, redirectURI: redirectURI)
             let response: HTTPResponse
             do {
@@ -249,7 +255,7 @@ public actor SpotifySession {
             let body = OrgJSON.parse(response.body).flatMap(SpotifyTokenResponse.init(json:))
             guard response.isSuccessful, let body,
                   let tokens = SpotifyAuth.tokens(from: body, previousRefreshToken: nil, nowMs: nowMs()) else {
-                let message = "Canje de código fallido (HTTP \(response.statusCode))"
+                let message = "Code exchange failed (HTTP \(response.statusCode))"
                 lastError = message
                 return .failure(SpotifyAuthError(message, statusCode: response.statusCode))
             }
@@ -257,8 +263,8 @@ public actor SpotifySession {
             do {
                 try await store.save(tokens)
             } catch {
-                lastError = "No se pudieron guardar los tokens de Spotify"
-                return .failure(SpotifyAuthError("No se pudieron guardar los tokens de Spotify"))
+                lastError = "Couldn't save the Spotify tokens"
+                return .failure(SpotifyAuthError("Couldn't save the Spotify tokens"))
             }
             pending = nil
             lastError = nil
@@ -296,7 +302,7 @@ public actor SpotifySession {
 
     private func performRefresh() async -> Result<String, SpotifyAuthError> {
         guard let refreshToken = await currentTokens()?.refreshToken, !NetText.isBlank(refreshToken) else {
-            return .failure(SpotifyAuthError("sin refresh token"))
+            return .failure(SpotifyAuthError("No refresh token"))
         }
         let response: HTTPResponse
         do {
@@ -310,7 +316,7 @@ public actor SpotifySession {
               let tokens = SpotifyAuth.tokens(from: body, previousRefreshToken: refreshToken, nowMs: nowMs()) else {
             // 400 (invalid_grant): the refresh token is dead — sign in again.
             if response.statusCode == 400 { await clearSession() }
-            let message = "Refresco de token fallido (HTTP \(response.statusCode))"
+            let message = "Token refresh failed (HTTP \(response.statusCode))"
             lastError = message
             return .failure(SpotifyAuthError(message, statusCode: response.statusCode))
         }
@@ -319,8 +325,8 @@ public actor SpotifySession {
         do {
             try await store.save(tokens)
         } catch {
-            lastError = "No se pudo guardar el refresh token rotado"
-            return .failure(SpotifyAuthError("No se pudo guardar el refresh token rotado"))
+            lastError = "Couldn't save the rotated refresh token"
+            return .failure(SpotifyAuthError("Couldn't save the rotated refresh token"))
         }
         return .success(tokens.accessToken)
     }

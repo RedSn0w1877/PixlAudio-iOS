@@ -398,6 +398,7 @@ final class TaisStudio {
 
     static func roformerSettings(_ settings: SettingsStore) -> StemBackendSettings {
         let experimental = settings.experimental
+        experimental.loadSecretsIfNeeded()
         let key = experimental.roformerApiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let extra = experimental.roformerExtraArg.trimmingCharacters(in: .whitespacesAndNewlines)
         return StemBackendSettings(type: StemBackendType(rawValue: experimental.roformerBackendType) ?? .gradioSpace,

@@ -89,6 +89,8 @@ struct NowPlayingView: View {
         .onAppear { LyricsShaderWarmup.prepare() }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("screen.nowPlaying")
+        // A modal screen for VoiceOver: swipes stay inside the player (the shell under it is hidden as well).
+        .accessibilityAddTraits(.isModal)
         .accessibilityAction(.escape) { env.playerSheet.collapse() }
     }
 

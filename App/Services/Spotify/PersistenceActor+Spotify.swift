@@ -371,7 +371,10 @@ extension PersistenceActor: SpotifyLibraryStore {
 
     /// Rebuilds the unified Spotify rows from the Spotify tables (the sync's flush).
     func rebuildSpotifyUnifiedLibrary() throws {
-        let built = SpotifyUnifiedLibrary.build(rows: try allSongs(), playlists: try allPlaylists(), existing: try spotifyUnifiedSongs())
+        // Spotify songs the user deleted from the library stay deleted (`HiddenSongs`).
+        let hidden = HiddenSongs.ids()
+        let rows = try allSongs().filter { !hidden.contains(SpotifyUnifiedLibrary.songId($0.spotifyId)) }
+        let built = SpotifyUnifiedLibrary.build(rows: rows, playlists: try allPlaylists(), existing: try spotifyUnifiedSongs())
         try applySpotifyUnifiedLibrary(built)
     }
 }

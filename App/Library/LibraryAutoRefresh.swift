@@ -11,6 +11,8 @@ final class LibraryAutoRefresh {
     private var observers: [any NSObjectProtocol] = []
     private var isObservingMediaLibrary = false
     private var pending: Task<Void, Never>?
+    /// Called after each automatic rescan finished (the artist pictures look for new artists).
+    var onRefreshed: (() -> Void)?
 
     init(library: LibraryStore) {
         self.library = library
@@ -41,10 +43,11 @@ final class LibraryAutoRefresh {
 
     func schedule(after delay: Duration) {
         pending?.cancel()
-        pending = Task { [library] in
+        pending = Task { [library, weak self] in
             try? await Task.sleep(for: delay)
             guard !Task.isCancelled else { return }
             try? await library.refresh(mode: .incremental)
+            self?.onRefreshed?()
         }
     }
 }

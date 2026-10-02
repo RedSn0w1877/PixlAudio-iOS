@@ -628,3 +628,18 @@ behind `SpotifyLibraryStore` (Android `SpotifyDao`), so they run on Windows:
   diffed unified write (in-memory container), resolver id parsing, the RFC 7636 vector through CryptoKit and the
   Keychain token round trip, demo states.
 
+
+## Final review fixes (2026-10-03)
+
+- `AutomaticStudioPolicyTests` (PixlLibrary) — Android `AutomaticStudioPolicyTest`, 10 of 10: features blocked
+  independently, priority order, battery / charging, thermal and free space, duration limits, offline lyrics, the
+  40-id candidate order, local audio for instrumentals, the persistent cooldown ledger and its bound.
+- `DeezerArtistImagesTests` (PixlNet, Swift-only; `ArtistImageRepository` has no Android test of its lookup): the
+  Retrofit-encoded search request, `picture_xl → big → medium → picture`, no match vs. error answers, the 1000×1000
+  upgrade of Deezer artist URLs only.
+- `MP4Tests.hugeSixtyFourBitSizesDoNotTrap` (PixlTags, Swift-only): a forged 64-bit box size after `ftyp`, inside
+  `moov` and inside `ilst` fails or stops cleanly instead of overflowing.
+- `ZipTests.fallbackWalkBoundsDataDescriptorEntries` (PixlBackup, Swift-only): without a central directory a
+  data-descriptor entry inflates under a bound (64 MB by default) and reports `entryTooLarge` past it.
+- `SpotifyTests.fullSignInFlow` now checks the English sign-in messages, including Cancel on Spotify's consent page
+  ("Sign-in was cancelled").

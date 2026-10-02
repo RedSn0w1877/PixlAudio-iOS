@@ -314,7 +314,7 @@ struct DevicesSheet: View {
         .pixlGlass(in: Capsule(), tint: theme.surfaceContainerHigh.opacity(GlassTint.container))
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .sensoryFeedback(.selection, trigger: page)
+        .pixlHaptic(.selection, trigger: page)
     }
 
     private func tab(_ index: Int, title: LocalizedStringKey, systemImage: String) -> some View {

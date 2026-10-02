@@ -205,13 +205,26 @@ struct LibraryEditor {
 
     // MARK: Songs
 
-    /// Removes songs from the library (Android "Delete" — on iOS the file itself is the import stage's job).
+    /// Deletes songs (Android "Delete", which deletes the file through MediaStore): the rows go at once; a scanned
+    /// file is deleted from Documents or its folder; songs without a file of their own (music-library items, Spotify)
+    /// — and files that couldn't be deleted — are remembered in `HiddenSongs`, so the next scan doesn't bring them
+    /// back. UI tests only drop the rows.
     func removeSongs(_ songIds: [String]) {
         let set = Set(songIds)
         var snapshot = store.snapshot
+        let removed = snapshot.songs.filter { set.contains($0.id) }
         snapshot.songs.removeAll { set.contains($0.id) }
         for index in snapshot.playlists.indices { snapshot.playlists[index].songIds.removeAll { set.contains($0) } }
         commit(snapshot, removedSongIds: set) { try await $0.deleteSongs(songIds) }
+        guard writesCache else { return }
+        let files = removed.filter(SongFileRemoval.deletesFile)
+        let fileIds = Set(files.map(\.id))
+        HiddenSongs.hide(songIds.filter { !fileIds.contains($0) })
+        guard !files.isEmpty else { return }
+        Task.detached(priority: .utility) {
+            let failed = await SongFileRemoval.deleteFiles(of: files)
+            HiddenSongs.hide(failed)
+        }
     }
 
     /// Android `batchEditGenre`: gives every song the genre (Quick Fill).

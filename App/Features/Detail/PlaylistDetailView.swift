@@ -315,7 +315,7 @@ struct PlaylistDetailView: View {
             Button("Download all songs", systemImage: "arrow.down.circle") {
                 let queued = env.youtube.downloads.downloadAll(songs)
                 LibraryToast.shared.show(queued == 0 ? "No streamed songs in this playlist to download."
-                                                     : "Downloading (queued) songs")
+                                                     : "Downloading \(queued) songs")
             }
             Button("Sync lyrics for all songs", systemImage: "text.quote") {
                 env.tais.studio.syncLyrics(playlistId: playlistId, songs: songs)
@@ -350,7 +350,7 @@ struct PlaylistDetailView: View {
                                  // Stage 11: queue every streamed song (Android `requestDownload` per song).
                                  let queued = env.youtube.downloads.downloadAll(songs)
                                  LibraryToast.shared.show(queued == 0 ? "No streamed songs in this playlist to download."
-                                                                      : "Downloading (queued) songs")
+                                                                      : "Downloading \(queued) songs")
                              },
                              onSyncLyricsAll: {
                                  showsOptions = false

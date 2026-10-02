@@ -5,21 +5,17 @@ import SwiftUI
 ///
 /// Dropped (Android-only): battery optimisation (iOS background audio needs no exemption), Chromecast autoplay
 /// (iOS casts with AirPlay, which has no autoplay), Hi-Fi mode (float PCM output — iOS's audio pipeline is already
-/// float end to end).
+/// float end to end), and "Keep playing after closing" (iOS ends the app, and its playback, when it is swiped away
+/// from the app switcher, so neither choice could be honoured; background audio keeps playing otherwise).
+/// "Pause when volume reaches zero" is honoured by `VolumeZeroPauser`.
 struct PlaybackSettingsSection: View {
     @Environment(SettingsStore.self) private var settings
+    @Environment(AppEnvironment.self) private var env
     @State private var crossfadeSeconds: Double = 2
 
     var body: some View {
         @Bindable var playback = settings.playback
         SettingsCategoryScaffold(category: .playback) {
-            SettingsSubsection(title: L10n.settingsBackgroundPlaybackSection) {
-                ThemeSelectorRow(label: L10n.settingsKeepPlayingTitle, description: L10n.settingsKeepPlayingSubtitle,
-                                 options: [SettingsOption(key: "true", label: L10n.settingsLabelOn),
-                                           SettingsOption(key: "false", label: L10n.settingsLabelOff)],
-                                 selectedKey: playback.keepPlayingInBackground ? "true" : "false",
-                                 systemImage: "music.note") { playback.keepPlayingInBackground = $0 == "true" }
-            }
             SettingsSubsection(title: L10n.settingsReplaygainSection) {
                 SwitchSettingRow(title: L10n.settingsReplaygainEnableTitle,
                                  subtitle: L10n.settingsReplaygainEnableSubtitle,
@@ -48,7 +44,11 @@ struct PlaybackSettingsSection: View {
                                            SettingsOption(key: "STANDARD", label: L10n.settingsAudioQualityStandard),
                                            SettingsOption(key: "HIGH", label: L10n.settingsAudioQualityHigh),
                                            SettingsOption(key: "ULTRASOUND", label: L10n.settingsAudioQualityUltrasound)],
-                                 selectedKey: playback.audioQuality, systemImage: "4k.tv") { playback.audioQuality = $0 }
+                                 selectedKey: playback.audioQuality, systemImage: "4k.tv") { quality in
+                    playback.audioQuality = quality
+                    // Cached stream URLs were picked under the old cap.
+                    if let service = env.youtube.service { Task { await service.invalidateAll() } }
+                }
             }
             SettingsSubsection(title: L10n.settingsQueueTransitionsSection, addBottomSpace: false) {
                 ThemeSelectorRow(label: L10n.settingsCrossfadeTitle, description: L10n.settingsCrossfadeSubtitle,

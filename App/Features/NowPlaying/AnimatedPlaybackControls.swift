@@ -16,6 +16,7 @@ struct AnimatedPlaybackControls: View {
     var height: CGFloat = 80
 
     @Environment(\.playerTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private nonisolated enum Control: Hashable, Sendable { case previous, playPause, next }
 
@@ -61,7 +62,7 @@ struct AnimatedPlaybackControls: View {
         .frame(height: height)
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isPlaying)
-        .sensoryFeedback(.selection, trigger: clickCount)
+        .pixlHaptic(.selection, trigger: clickCount)
         .task(id: clickCount) {
             guard let control = lastClicked else { return }
             let delay: Duration = control == .playPause ? .milliseconds(220) : .milliseconds(600)
@@ -75,7 +76,8 @@ struct AnimatedPlaybackControls: View {
                         tint: Color, icon: Color, shape: AnyShape, width: CGFloat,
                         action: @escaping () -> Void) -> some View {
         Button {
-            withAnimation(Self.pressSpring) { lastClicked = control }
+            // Reduce Motion: the pills keep their widths (no bouncy grow / shrink); the haptic and action stay.
+            if !reduceMotion { withAnimation(Self.pressSpring) { lastClicked = control } }
             clickCount += 1
             action()
         } label: {

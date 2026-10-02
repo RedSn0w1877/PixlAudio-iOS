@@ -45,6 +45,7 @@ actor InnerTubeService {
         resolver = ChainedYouTubeStreamResolver(
             player: client, cipher: cipher, validator: StreamUrlValidator(http: plainHTTP), policy: .iOS,
             isSignedIn: { await account.hasCookie },
+            maxBitrateKbps: { StreamingAudioQuality.maxBitrateKbps() },
             strategies: { signedIn in await remote.current().chain(signedIn: signedIn) })
     }
 
@@ -138,6 +139,20 @@ actor InnerTubeService {
 
 /// The YouTube video id behind a library song: `yt:<id>` songs and anything whose item URL is `pixlstream://<id>`
 /// (Spotify songs matched by stage 12 use the same URL).
+/// Settings › Playback › Streaming audio quality (Android `AudioQuality.maxBitrateKbps`): the cap the stream
+/// resolvers pick under (the highest AAC stream at or below it; above every stream, the lowest), read whenever a
+/// stream is resolved. Changing it drops the cached URLs (`InnerTubeService.invalidateAll`).
+nonisolated enum StreamingAudioQuality {
+    static func maxBitrateKbps(_ defaults: UserDefaults = .standard) -> Int? {
+        switch defaults.string(forKey: PreferenceKeys.audioQuality) ?? "ULTRASOUND" {
+        case "LOW": 96
+        case "STANDARD": 160
+        case "HIGH": 256
+        default: nil
+        }
+    }
+}
+
 nonisolated enum YouTubeSongIdentity {
     static let scheme = "pixlstream"
 

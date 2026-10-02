@@ -41,6 +41,9 @@ struct RootView: View {
             .overlay(alignment: .bottom) {
                 bottomBars
             }
+            // While the full player is up it is a modal screen for VoiceOver: the tabs and bars it covers leave the
+            // accessibility tree (the update banner stays reachable).
+            .modifier(HiddenWhilePlayerExpanded())
             // Stage 8: the player sheet — the mini player resting in `MiniPlayerSlot` and expanding over everything.
             PlayerSheetHost()
         }
@@ -84,8 +87,13 @@ struct RootView: View {
                                     @ViewBuilder root: () -> Content) -> some View {
         let isSelected = router.selection == tab
         return NavigationStack(path: path) {
-            root().withAppRoutes()
+            root()
+                .bottomBarsClearance(.tabRoot)
+                .withAppRoutes()
         }
+        // Room for the floating bars, per page (`BottomBarsClearance`): equal values don't propagate, so only the
+        // mini player appearing, compact mode or the keyboard on this tab change a page's inset.
+        .environment(\.bottomBarsClearance, clearance(isSelected: isSelected))
         // A song change animates the album colours over 0.45 s (the root `.animation` below): only on the tab that
         // is on screen. A hidden tab is at opacity 0, so snapping its colours shows nothing and costs no frames.
         .transaction(value: themeStore.albumPair) { transaction in
@@ -99,6 +107,17 @@ struct RootView: View {
         }
         .allowsHitTesting(isSelected)
         .accessibilityHidden(!isSelected)
+    }
+
+    /// The bars' height over a tab root and over a pushed page. The keyboard hides both bars, but only the selected
+    /// tab changes for it (the hidden tabs keep their layout).
+    private func clearance(isSelected: Bool) -> BottomBarsClearance {
+        let keyboard = isKeyboardVisible && isSelected
+        let miniPlayer: CGFloat = playback.current != nil && !keyboard
+            ? Tokens.Shell.miniPlayerHeight + Tokens.Shell.miniPlayerSpacing : 0
+        let bar: CGFloat = keyboard ? 0
+            : settings.appearance.navBarCompactMode ? Tokens.Shell.navBarCompactHeight : Tokens.Shell.navBarHeight
+        return BottomBarsClearance(tabRoot: bar + miniPlayer, pushed: miniPlayer)
     }
 
     @ViewBuilder
@@ -120,5 +139,15 @@ struct RootView: View {
         .padding(.horizontal, Tokens.Shell.horizontalInset)
         .animation(PixlMotion.bars, value: showsBar)
         .animation(PixlMotion.bars, value: playback.hasItem)
+    }
+}
+
+/// Hides the shell from VoiceOver while the full player covers it. Its own small view, so the expand / collapse
+/// flips re-run this modifier and not the shell's body.
+private struct HiddenWhilePlayerExpanded: ViewModifier {
+    @Environment(AppEnvironment.self) private var environment
+
+    func body(content: Content) -> some View {
+        content.accessibilityHidden(environment.playerSheet.isExpanded)
     }
 }

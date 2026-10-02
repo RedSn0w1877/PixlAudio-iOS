@@ -152,7 +152,7 @@ extension ExperimentalSettings {
         sync(\.vocalAttenuation, self, f)
         sync(\.roformerBaseUrl, self, f)
         sync(\.roformerApiName, self, f)
-        sync(\.roformerApiKey, self, f)
+        if usesKeychain { reloadSecrets() } else { sync(\.roformerApiKey, self, f) }
         sync(\.roformerExtraArg, self, f)
         sync(\.roformerBackendType, self, f)
     }

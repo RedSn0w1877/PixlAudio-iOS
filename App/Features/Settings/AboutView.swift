@@ -72,7 +72,7 @@ private struct AboutHeroCard: View {
                     longPressed.toggle()
                     onVersionLongPress()
                 }
-                .sensoryFeedback(.impact(weight: .heavy), trigger: longPressed)
+                .pixlHaptic(.impact(weight: .heavy), trigger: longPressed)
                 .accessibilityAddTraits(.isButton)
                 .accessibilityAction(named: Text(L10n.brickTitle)) { onVersionLongPress() }
                 .accessibilityIdentifier("about.version")

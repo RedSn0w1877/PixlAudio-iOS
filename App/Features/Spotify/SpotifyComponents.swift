@@ -56,7 +56,7 @@ struct SpotifyScaffold<Content: View>: View {
                 }
                 .padding(.horizontal, horizontalPadding)
                 .padding(.vertical, verticalPadding)
-                .padding(.bottom, Tokens.Shell.miniPlayerHeight + 16)
+                .padding(.bottom, 16) // the mini player's room comes from the route (`BottomBarsClearance`)
             }
             .scrollIndicators(.hidden)
             .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { _, value in
