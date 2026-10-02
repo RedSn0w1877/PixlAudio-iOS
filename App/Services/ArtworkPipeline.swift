@@ -173,6 +173,9 @@ actor ArtworkPipeline {
         if let diskURL, let cached = thumbnail(CGImageSourceCreateWithURL(diskURL as CFURL, nil), pixelSize) {
             return ArtworkImage(cgImage: cached)
         }
+        if let diskDirectory, let derived = largerDiskThumbnail(source, pixelSize: pixelSize, in: diskDirectory) {
+            return ArtworkImage(cgImage: derived)
+        }
         var imageSource: CGImageSource?
         switch source {
         case .file(let url):
@@ -192,6 +195,22 @@ actor ArtworkPipeline {
         guard let image = thumbnail(imageSource, pixelSize) else { return nil }
         if let diskURL { writeJPEG(image, to: diskURL) }
         return ArtworkImage(cgImage: image)
+    }
+
+    /// The second disk tier: a display size not decoded yet comes from the smallest larger display size already on
+    /// disk (ImageIO downsamples a cached JPEG in a few milliseconds) before the audio file's embedded art (an AVAsset
+    /// metadata read), the file or the network. Only display buckets use it — colour extraction (128 px) and exact
+    /// sizes keep decoding from the original — and the result is not written back, so every file on disk is one
+    /// generation from the original.
+    private nonisolated static func largerDiskThumbnail(_ source: ArtworkSource, pixelSize: Int,
+                                                        in directory: URL) -> CGImage? {
+        guard displayBuckets.contains(pixelSize) else { return nil }
+        for larger in displayBuckets where larger > pixelSize {
+            let url = directory.appendingPathComponent(diskName(key(source, larger)))
+            guard FileManager.default.fileExists(atPath: url.path) else { continue }
+            if let image = thumbnail(CGImageSourceCreateWithURL(url as CFURL, nil), pixelSize) { return image }
+        }
+        return nil
     }
 
     private nonisolated static func thumbnail(_ source: CGImageSource?, _ pixelSize: Int) -> CGImage? {
