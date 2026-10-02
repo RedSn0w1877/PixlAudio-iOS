@@ -26,6 +26,10 @@ struct EditSongSheet: View {
     @State private var cropSource: CropSource?
     @State private var coverPreview: UIImage?
     @State private var isKeyboardVisible = false
+    /// The words of timed lyrics (nil for plain lyrics), decoded when the lyrics text is set — not on every body
+    /// pass (each keystroke in any field and each keyboard show / hide re-runs the form).
+    @State private var timedWords: String?
+    @State private var isApplyingCrop = false
 
     var body: some View {
         Group {
@@ -70,10 +74,24 @@ struct EditSongSheet: View {
             if !isKeyboardVisible { bottomToolbar(song).transition(.move(edge: .bottom).combined(with: .opacity)) }
         }
         .animation(PixlMotion.bars, value: isKeyboardVisible)
+        // The form exists before the first frame, so the cover slides up with its fields instead of inserting the
+        // card and eleven glass fields mid-presentation.
+        .onAppear {
+            if form == nil {
+                form = SongEditForm(song: song)
+                timedWords = Self.timedLyrics(form?.lyrics ?? "")
+            }
+        }
         .task(id: song.id) {
-            if form == nil { form = SongEditForm(song: song) }
+            if form == nil {
+                form = SongEditForm(song: song)
+                timedWords = Self.timedLyrics(form?.lyrics ?? "")
+            }
             guard let tags = await SongEditForm.embeddedMetadata(for: song) else { return }
-            if form?.lyrics.isEmpty == true, let lyrics = tags.lyrics, !lyrics.isEmpty { form?.lyrics = lyrics }
+            if form?.lyrics.isEmpty == true, let lyrics = tags.lyrics, !lyrics.isEmpty {
+                form?.lyrics = lyrics
+                timedWords = Self.timedLyrics(lyrics)
+            }
             if let composer = tags.composer, !composer.isEmpty { form?.composer = composer }
             form?.replayGainTrack = SongEditForm.replayGainText(tags.replayGainTrackGainDb)
             form?.replayGainAlbum = SongEditForm.replayGainText(tags.replayGainAlbumGainDb)
@@ -82,12 +100,14 @@ struct EditSongSheet: View {
         .onChange(of: photoItem) { _, item in
             guard let item else { return }
             Task {
+                // Decoded off the main thread before the crop sheet presents (a 12–48 MP photo decoded on its first
+                // draw stalled the presentation); full resolution, so the crop is the same.
                 guard let data = try? await item.loadTransferable(type: Data.self),
                       let image = UIImage(data: data) else {
                     LibraryToast.shared.show(String(localized: "Unable to load the selected image"))
                     return
                 }
-                cropSource = CropSource(image: image)
+                cropSource = CropSource(image: await image.byPreparingForDisplay() ?? image)
                 photoItem = nil
             }
         }
@@ -180,7 +200,7 @@ struct EditSongSheet: View {
 
     @ViewBuilder
     private func lyricsField(_ song: Song, form: Binding<SongEditForm>) -> some View {
-        let timed = Self.timedLyrics(form.wrappedValue.lyrics)
+        let timed = timedWords
         VStack(alignment: .leading, spacing: 4) {
             Text("Lyrics")
                 .pixlFont(.labelLarge)
@@ -201,7 +221,15 @@ struct EditSongSheet: View {
                 HStack(spacing: 8) {
                     lyricsBox {
                         TextEditor(text: Binding(get: { form.wrappedValue.lyrics },
-                                                 set: { form.wrappedValue.lyrics = $0; form.wrappedValue.lyricsEdited = true }))
+                                                 set: { text in
+                                                     form.wrappedValue.lyrics = text
+                                                     form.wrappedValue.lyricsEdited = true
+                                                     // A pasted timed document turns into its words, as before.
+                                                     if text.trimmingCharacters(in: .whitespacesAndNewlines)
+                                                         .hasPrefix("{") {
+                                                         timedWords = Self.timedLyrics(text)
+                                                     }
+                                                 }))
                             .pixlFont(.bodyLarge)
                             .foregroundStyle(theme.onSurface)
                             .scrollContentBackground(.hidden)
@@ -280,8 +308,15 @@ struct EditSongSheet: View {
             }
             .buttonStyle(PressScaleButtonStyle(pressedScale: 0.95))
             Button {
-                if let form { SongTagEditor(env: env).save(form, for: song) }
-                dismiss()
+                guard let form else { dismiss(); return }
+                // The new cover's JPEG is written off the main thread; the edit is applied and the cover dismissed
+                // together right after, as before.
+                Task {
+                    let coverURL = await SongTagEditor.writeCover(form.cover, songId: song.id,
+                                                                  temporary: env.launch.isUITest)
+                    SongTagEditor(env: env).save(form, for: song, coverURL: coverURL)
+                    dismiss()
+                }
             } label: {
                 Text("Save")
                     .pixlFont(.labelLarge)
@@ -384,7 +419,7 @@ private struct CoverArtEditorCard: View {
 }
 
 /// The crop result: a preview and the JPEG written into the tags.
-struct CoverArtCrop {
+nonisolated struct CoverArtCrop: Sendable {
     let preview: UIImage
     let jpeg: Data
 }
@@ -403,6 +438,7 @@ struct CoverArtCropperSheet: View {
     @State private var offset: CGSize = .zero
     @State private var baseOffset: CGSize = .zero
     @State private var side: CGFloat = 320
+    @State private var isRendering = false
 
     var body: some View {
         VStack(spacing: 18) {
@@ -463,10 +499,21 @@ struct CoverArtCropperSheet: View {
                 Button("Cancel") { dismiss() }
                     .buttonStyle(.glass)
                 Button("Apply cover art") {
-                    if let crop = render() { onConfirm(crop) }
+                    // Drawn and encoded off the main thread; then preview and dismiss, in the same order as before.
+                    isRendering = true
+                    let image = self.image, side = self.side, offset = self.offset
+                    let display = displaySize(side: side)
+                    Task {
+                        let crop = await Task.detached(priority: .userInitiated) {
+                            Self.render(image: image, side: side, offset: offset, display: display)
+                        }.value
+                        isRendering = false
+                        if let crop { onConfirm(crop) }
+                    }
                 }
                 .buttonStyle(.glassProminent)
                 .tint(theme.primary)
+                .disabled(isRendering)
             }
         }
         .padding(.horizontal, 24)
@@ -492,10 +539,10 @@ struct CoverArtCropperSheet: View {
         return CGSize(width: min(max(value.width, -maxX), maxX), height: min(max(value.height, -maxY), maxY))
     }
 
-    private func render() -> CoverArtCrop? {
+    nonisolated private static func render(image: UIImage, side: CGFloat, offset: CGSize,
+                                           display: CGSize) -> CoverArtCrop? {
         let output: CGFloat = 1000
         let k = output / max(side, 1)
-        let display = displaySize(side: side)
         let origin = CGPoint(x: ((side - display.width) / 2 + offset.width) * k,
                              y: ((side - display.height) / 2 + offset.height) * k)
         let format = UIGraphicsImageRendererFormat()

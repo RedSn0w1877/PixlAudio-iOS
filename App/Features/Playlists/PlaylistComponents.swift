@@ -12,6 +12,11 @@ import SwiftUI
 /// Android `SongPickerSelectionPane`: the search field (capsule, "Search or filter songs…"), the Liked filter chip and
 /// the songs as check rows (`SongPickerRow`: capsule, check box, 36 pt round art). Filtering runs when an input
 /// changes, never in `body`.
+///
+/// The whole library is filtered and sorted for it: the default list (no query, Liked off) is precomputed off the
+/// main actor when the editor or the playlist page appears (`SongPickerDefaults`) and seeds the first frame; later
+/// inputs (typing, the Liked chip, the storage filter) filter off the main actor while the current rows stay. Only a
+/// cold first open still computes synchronously, as before.
 struct SongPickerPane: View {
     @Binding var selection: Set<String>
     @Binding var storageFilter: StorageFilter
@@ -22,13 +27,29 @@ struct SongPickerPane: View {
 
     @State private var query = ""
     @State private var favoritesOnly = false
-    @State private var displayed: [Song] = []
+    @State private var displayed: [Song]
+    /// The library revision the seeded rows were computed for (nil: not seeded).
+    @State private var seededRevision: Int?
+    @State private var hasComputed = false
+    @State private var generation = 0
+    @State private var filterTask: Task<Void, Never>?
 
-    nonisolated private struct Inputs: Equatable {
+    init(selection: Binding<Set<String>>, storageFilter: Binding<StorageFilter>, bottomPadding: CGFloat = 120) {
+        _selection = selection
+        _storageFilter = storageFilter
+        self.bottomPadding = bottomPadding
+        let seed = SongPickerDefaults.latest(filter: storageFilter.wrappedValue)
+        _displayed = State(initialValue: seed?.songs ?? [])
+        _seededRevision = State(initialValue: seed?.revision)
+    }
+
+    nonisolated fileprivate struct Inputs: Equatable, Sendable {
         var count: Int
         var query: String
         var favoritesOnly: Bool
         var filter: StorageFilter
+
+        var isDefault: Bool { query.trimmingCharacters(in: .whitespaces).isEmpty && !favoritesOnly }
     }
 
     var body: some View {
@@ -66,13 +87,46 @@ struct SongPickerPane: View {
             }
         }
         .onChange(of: Inputs(count: library.songs.count, query: query, favoritesOnly: favoritesOnly, filter: storageFilter),
-                  initial: true) { _, inputs in
-            displayed = Self.filter(library.songs, inputs: inputs)
+                  initial: true) { old, inputs in
+            update(from: old, to: inputs)
         }
         .accessibilityIdentifier("songPicker")
     }
 
-    private static func filter(_ songs: [Song], inputs: Inputs) -> [Song] {
+    private func update(from old: Inputs, to inputs: Inputs) {
+        let isFirst = !hasComputed
+        hasComputed = true
+        if isFirst {
+            // Seeded with this library's default list: nothing to compute.
+            if inputs.isDefault, seededRevision == library.revision { return }
+            // Cold first open: compute now, as before, so the first frame has its rows.
+            if displayed.isEmpty {
+                displayed = Self.filter(library.songs, inputs: inputs)
+                if inputs.isDefault {
+                    SongPickerDefaults.store(displayed, revision: library.revision, filter: inputs.filter)
+                }
+                return
+            }
+        }
+        // Off the main actor; the current rows stay until the result lands (no empty-state flash, no debounce).
+        filterTask?.cancel()
+        generation += 1
+        let token = generation
+        let songs = library.songs
+        // The Liked chip toggles inside an animation; its list change animated with it before, and still does.
+        let animates = old.favoritesOnly != inputs.favoritesOnly
+        filterTask = Task {
+            let result = await Task.detached(priority: .userInitiated) { Self.filter(songs, inputs: inputs) }.value
+            guard !Task.isCancelled, token == generation else { return }
+            if animates {
+                withAnimation(PixlMotion.state) { displayed = result }
+            } else {
+                displayed = result
+            }
+        }
+    }
+
+    fileprivate nonisolated static func filter(_ songs: [Song], inputs: Inputs) -> [Song] {
         let trimmed = inputs.query.trimmingCharacters(in: .whitespaces)
         var result = songs.filter { LibrarySorting.matches($0, filter: inputs.filter) }
         if inputs.favoritesOnly { result = result.filter(\.isFavorite) }
@@ -206,7 +260,9 @@ struct SongPickerBottomBar: View {
 }
 
 /// Android `SongPickerBottomSheet`: "Add songs" (`displaySmall`, 26 pt sides), the picker pane, the bottom bar.
-/// Starts with the playlist's songs checked; confirming adds the newly checked ones.
+/// Starts with the playlist's songs checked; confirming adds the newly checked ones. The storage filter starts at the
+/// presenter's value (offline when the library has cloud songs, else all), not reassigned after the first frame
+/// (which refiltered the whole library a second time while the sheet rose).
 struct SongPickerSheet: View {
     let initiallySelected: Set<String>
     let onConfirm: (Set<String>) -> Void
@@ -214,8 +270,15 @@ struct SongPickerSheet: View {
     @Environment(LibraryStore.self) private var library
     @Environment(\.appTheme) private var theme
     @State private var selection: Set<String> = []
-    @State private var storageFilter: StorageFilter = .offline
+    @State private var storageFilter: StorageFilter
     @State private var didLoad = false
+
+    init(initiallySelected: Set<String>, initialStorageFilter: StorageFilter,
+         onConfirm: @escaping (Set<String>) -> Void) {
+        self.initiallySelected = initiallySelected
+        self.onConfirm = onConfirm
+        _storageFilter = State(initialValue: initialStorageFilter)
+    }
 
     var body: some View {
         let hasCloud = library.songs.contains(where: LibrarySorting.isOnline)
@@ -235,9 +298,37 @@ struct SongPickerSheet: View {
             guard !didLoad else { return }
             didLoad = true
             selection = initiallySelected
-            storageFilter = hasCloud ? .offline : .all
         }
         .accessibilityIdentifier("sheet.songPicker")
+    }
+}
+
+/// The song picker's default list (no query, Liked off) per storage filter, for one library revision: computed off
+/// the main actor before the picker opens (the playlist editor's first step, the playlist page) so the picker's first
+/// frame has its rows without filtering and sorting the whole library inside its transition.
+enum SongPickerDefaults {
+    private static var lists: [StorageFilter: (revision: Int, songs: [Song])] = [:]
+    private static var warming: Set<StorageFilter> = []
+
+    /// The latest default list for `filter` (it may be for an older revision: the picker checks).
+    static func latest(filter: StorageFilter) -> (revision: Int, songs: [Song])? { lists[filter] }
+
+    static func store(_ songs: [Song], revision: Int, filter: StorageFilter) {
+        lists[filter] = (revision, songs)
+    }
+
+    /// Computes the default list for the library's current revision, unless it is there or under way.
+    static func warm(library: LibraryStore, filter: StorageFilter) {
+        let revision = library.revision
+        guard lists[filter]?.revision != revision, !warming.contains(filter) else { return }
+        warming.insert(filter)
+        let songs = library.songs
+        let inputs = SongPickerPane.Inputs(count: songs.count, query: "", favoritesOnly: false, filter: filter)
+        Task {
+            let result = await Task.detached(priority: .utility) { SongPickerPane.filter(songs, inputs: inputs) }.value
+            warming.remove(filter)
+            store(result, revision: revision, filter: filter)
+        }
     }
 }
 

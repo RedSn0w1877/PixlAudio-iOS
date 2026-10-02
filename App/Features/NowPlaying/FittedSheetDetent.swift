@@ -19,4 +19,21 @@ extension View {
             if height.wrappedValue != rounded { height.wrappedValue = rounded }
         }
     }
+
+    /// `measuringHeight`, also remembering the height under `key` (`FittedSheetHeights`).
+    func measuringHeight(_ height: Binding<CGFloat?>, rememberedAs key: String) -> some View {
+        onGeometryChange(for: CGFloat.self) { $0.size.height } action: { newValue in
+            let rounded = newValue.rounded(.up)
+            if height.wrappedValue != rounded { height.wrappedValue = rounded }
+            FittedSheetHeights.values[key] = rounded
+        }
+    }
+}
+
+/// The wrap-content sheets' measured heights, kept for the session. A sheet's first open measures itself (it opens
+/// at `.medium` and resizes to its height, as before); every later open with the same content (key: the sheet, the
+/// Dynamic Type size and whatever changes its height) starts at its final `.height` detent instead of re-targeting
+/// mid-presentation.
+enum FittedSheetHeights {
+    static var values: [String: CGFloat] = [:]
 }

@@ -15,6 +15,7 @@ struct PlayerArtistPickerSheet: View {
     @Environment(PlaybackStore.self) private var playback
     @Environment(Router.self) private var router
     @Environment(\.appTheme) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var contentHeight: CGFloat?
 
     private struct Item: Identifiable {
@@ -43,9 +44,9 @@ struct PlayerArtistPickerSheet: View {
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
             .padding(.top, 8)
-            .measuringHeight($contentHeight)
+            .measuringHeight($contentHeight, rememberedAs: "artistPicker|\(dynamicTypeSize)|\(items.count)")
         }
-        .fittedSheetDetent(contentHeight)
+        .fittedSheetDetent(contentHeight ?? FittedSheetHeights.values["artistPicker|\(dynamicTypeSize)|\(items.count)"])
         .accessibilityIdentifier("screen.artistPicker")
     }
 

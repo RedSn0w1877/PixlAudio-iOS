@@ -14,6 +14,7 @@ struct SleepTimerSheet: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(\.appTheme) private var theme
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var timerPosition: Double = 0
     @State private var counterPosition: Double = 1
@@ -22,6 +23,9 @@ struct SleepTimerSheet: View {
     @State private var contentHeight: CGFloat?
 
     private static let stops = SleepTimer.predefinedMinutes
+
+    /// The sheet's height only changes with Dynamic Type ("Cancel timer" is always laid out, only disabled).
+    private var heightKey: String { "sleepTimer|\(dynamicTypeSize)" }
 
     private var timer: SleepTimerController { env.sleepTimer }
 
@@ -63,9 +67,9 @@ struct SleepTimerSheet: View {
             }
             .padding(.horizontal, 18)
             .padding(.top, 28)
-            .measuringHeight($contentHeight)
+            .measuringHeight($contentHeight, rememberedAs: heightKey)
         }
-        .fittedSheetDetent(contentHeight)
+        .fittedSheetDetent(contentHeight ?? FittedSheetHeights.values[heightKey])
         .tint(theme.primary)
         .onAppear(perform: syncFromState)
         .onChange(of: timer.toastMessage) { _, message in
