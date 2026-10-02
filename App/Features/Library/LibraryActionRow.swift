@@ -119,6 +119,7 @@ struct LibraryActionRow: View {
                                      leading: (showsLocate || showsStorageFilter || showsInstrumentalFilter) ? Self.inner : Self.outer,
                                      trailing: Self.outer, height: Self.height, tint: tonal, foreground: onTonal,
                                      action: onSort)
+                    .glassMenuAnchor("library.sort", cornerRadius: Self.height / 2)
                     .accessibilityIdentifier("library.sort")
             }
             .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showsLocate)

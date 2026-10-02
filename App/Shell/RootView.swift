@@ -38,6 +38,8 @@ struct RootView: View {
             PlayerSheetHost()
         }
         .updateBanner(environment.updates)
+        // Glass menus opened from the shell (and the player) pop out above everything here.
+        .glassMenuHost()
         .environment(\.appTheme, colors.app)
         .environment(\.playerTheme, colors.player)
         .tint(colors.app.primary)

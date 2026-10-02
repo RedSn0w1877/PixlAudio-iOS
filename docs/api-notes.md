@@ -638,3 +638,11 @@ Signatures checked against the developer.apple.com documentation JSON (2026-10-0
 | `UIView.cornerConfiguration` (`.capsule()`) | 26.0 | /documentation/uikit/uiview/cornerconfiguration | `LiquidTabBarView` | Capsule shape of the glass view. |
 | `CADisplayLink`, `CAShapeLayer` masks, `CALayer.presentation()` | 3.1 | /documentation/quartzcore/cadisplaylink | `LiquidTabSegmentedControl` | Masks the accent glyph copies to the lens' animated frame; paused when the lens is still. |
 | `UIViewRepresentable` | 13 | /documentation/swiftui/uiviewrepresentable | `LiquidTabBar` | Hosts the UIKit bar in SwiftUI. |
+
+## Glass menus (2026-10-02)
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `Animatable` view modifier (`animatableData`) | 13 | /documentation/swiftui/animatable | `GlassMenuMorph` | Interpolates the glass frame and corner radius from the button to the panel every frame of the spring (overshoot included). |
+| `@Environment(T.self) var x: T?` (optional `@Observable` environment object) | 17 | /documentation/swiftui/environment | `GlassMenuAnchorModifier` | Anchors work without a host. |
+| `View.accessibilityAction(.escape)`, `accessibilityAddTraits(.isModal)` | 13 | /documentation/swiftui/view/accessibilityaction(_:_:) | `GlassMenuPanel` | VoiceOver escape closes the menu. |
+| `Task.sleep(for:)` | 16 | /documentation/swift/task/sleep(for:tolerance:clock:) | `GlassMenuPresenter.dismiss` | Removes the panel once the close spring has settled. |

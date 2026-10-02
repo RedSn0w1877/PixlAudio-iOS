@@ -637,3 +637,26 @@ light tint (decision 11):
   card and floating Instrumental pill.
 Nothing needed fixing. Known differences, not bugs: no Offline card under Remaster on the demo song (it is a local file;
 Android shows it for streamable songs), no "Set as sound" (iOS can't set ringtones).
+
+## Glass menus (owner change 2026-10-02)
+
+Hoa: "add the exploding liquid menus that like pop out from its like original position in a floating jelly-like
+menu/panel". `App/DesignSystem/Components/GlassMenu.swift`:
+- The button is marked with `.glassMenuAnchor(id, cornerRadius:)`, and its action calls
+  `GlassMenuPresenter.present(from:width:tint:) { content }`.
+- The menu's glass starts as the button, with the same frame and corner radius; the button hides. Under the
+  `GlassMenuMotion.open` spring (response 0.46, damping 0.64) the glass stretches into a floating panel beside the
+  button. The panel's corner that sits on the button stays put. The spring overshoots, so the panel swells past its
+  size and settles — the jelly. The content scales up from 86 % and fades in over 35–75 % of the morph.
+- Placement: the panel opens downwards when it fits (covering the button), otherwise upwards. It aligns to the
+  button's edge nearest the screen edge, is clamped to the safe area, and is at most the space available (taller
+  content scrolls).
+- Tapping outside, choosing a row or VoiceOver escape closes it: `GlassMenuMotion.close`, back into the button, then
+  the button shows again. Reduce Motion drops the overshoot.
+- Hosts: the shell (`RootView`) and every `pixlSheet` install `.glassMenuHost()`, so a menu opened in a sheet floats
+  above that sheet.
+- Content: `GlassMenuItem` rows (title leading, symbol trailing, optional checkmark, destructive in `error`),
+  `GlassMenuDivider`, `GlassMenuHeader` — or PixlAudio's own panels. A panel closes itself through
+  `\.glassMenuDismiss` when shown in a menu, and `dismiss` when it is a sheet.
+- Where: queue ⋯ (Locate current song · Save as playlist · Clear queue — this replaces the scrim menu),
+  Library › Sort by, playlist Sort Songs and playlist options.

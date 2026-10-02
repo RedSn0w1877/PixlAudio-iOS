@@ -20,6 +20,7 @@ struct LibrarySortSheet: View {
     @Environment(SettingsStore.self) private var settings
     @Environment(\.appTheme) private var theme
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.glassMenuDismiss) private var dismissMenu
 
     var body: some View {
         let options = tab.menuSortOptions
@@ -45,7 +46,7 @@ struct LibrarySortSheet: View {
                         let isSelected = method.methodKey == selected.methodKey
                         Button {
                             prefs.setSort(method.resolveForDirection(selected.direction), for: tab)
-                            dismiss()
+                            if let dismissMenu { dismissMenu() } else { dismiss() }
                         } label: {
                             HStack {
                                 Text(method.methodLabel)
