@@ -9,13 +9,13 @@ final class MenuRecordingTests: XCTestCase {
     /// Library › Sort by: a system menu on PixlAudio's own segmented glass (`ShapedGlassMenu`).
     func testLibrarySortMenu() throws {
         let app = launch("library", ready: "screen.library")
-        openAndClose(app, button: "library.sort", shot: "menuLibrarySort-light")
+        openAndClose(app, button: "Sort options", shot: "menuLibrarySort-light")
     }
 
     /// Playlist › Sort Songs and ⋯: system menus on Apple's glass button style (`GlassCircleMenu`).
     func testPlaylistMenus() throws {
-        let app = launch("playlistDetail", ready: "playlist.sort")
-        openAndClose(app, button: "playlist.sort", shot: "menuPlaylistSort-light")
+        let app = launch("playlistDetail", ready: "Sort Songs")
+        openAndClose(app, button: "Sort Songs", shot: "menuPlaylistSort-light")
         openAndClose(app, button: "More options", shot: "menuPlaylistMore-light")
     }
 
@@ -32,7 +32,7 @@ final class MenuRecordingTests: XCTestCase {
         return app
     }
 
-    /// Taps the button (identifier or label), holds the open menu on screen, screenshots it, then closes it by tapping
+    /// Taps the button by its label (screen containers hide inner identifiers), holds the open menu on screen, screenshots it, then closes it by tapping
     /// outside and lets the close animation play.
     private func openAndClose(_ app: XCUIApplication, button: String, shot: String) {
         let element = app.descendants(matching: .any)[button].firstMatch
