@@ -101,6 +101,10 @@ scale (0.95) in shots taken right after launch (`playerExpanded`, `artistPicker`
   the first item loads (`prepareActivation`); if nothing plays after all — every item failed, or a pause came first
   — `releasePreparedActivation()` gives it back (with `.notifyOthersOnDeactivation`), as before the session was only
   activated by a successful start.
+- System menus on Apple's glass button style (`GlassCircleMenu`, the playlist's Sort Songs and More options) stay
+  outside any `GlassEffectContainer` added for performance: their morph out of the button is the one Hoa approved
+  on main, so `DetailTopBar` leaves its circles ungrouped (the collapsing album / artist header, which has no menus,
+  keeps its container; Library's action row had its container before the menus came).
 - Grouped glass keeps its accessibility: `UITests/GlassAccessibilityTests` checks that controls inside the new
   containers are still buttons, sliders and switches with their labels (settings groups, the player's top bar, the
   album header).
