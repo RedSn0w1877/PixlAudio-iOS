@@ -54,9 +54,9 @@ final class PlaybackServices {
         Task { await reloadTransitionRules() }
     }
 
-    /// Restores the saved queue (paused) once the library is loaded.
-    func restoreQueue(lookup: (String) -> Song?) {
-        guard let snapshot = snapshots.load(), !snapshot.items.isEmpty else { return }
+    /// Restores the saved queue (paused) once the library is loaded. The JSON is decoded off the main actor.
+    func restoreQueue(lookup: (String) -> Song?) async {
+        guard let snapshot = await snapshots.loadInBackground(), !snapshot.items.isEmpty else { return }
         let songs = QueueSnapshotStore.songs(for: snapshot, lookup: lookup)
         engine.restore(snapshot, songs: songs)
     }
@@ -72,6 +72,7 @@ final class PlaybackServices {
 
     private func wireEngine() {
         snapshots.makeSnapshot = { [weak self] in self?.engine.makeSnapshot() }
+        snapshots.makeCapture = { [weak self] in self?.engine.makeSnapshotCapture() }
         sleepTimer.titleForSongId = { [weak self] id in
             self?.engine.queue.entries.first { $0.song.id == id }?.song.title
         }
@@ -103,7 +104,8 @@ final class PlaybackServices {
             guard let self else { return }
             self.stats.onPlayStateChanged(isPlaying: playing, positionMs: self.engine.currentPositionMs())
             self.nowPlaying.update()
-            if !playing { self.snapshots.saveNow() }
+            // Coalesced and encoded off the main actor (the pause position is the same a second later).
+            if !playing { self.snapshots.scheduleSave() }
         }
         engine.onQueueChanged = { [weak self] in
             self?.nowPlaying.update()
@@ -184,7 +186,14 @@ final class PlaybackServices {
         let center = NotificationCenter.default
         lifecycleObservers.append(center.addObserver(forName: UIApplication.didEnterBackgroundNotification,
                                                      object: nil, queue: .main) { @Sendable [weak self] _ in
-            MainActor.assumeIsolated { self?.snapshots.saveNow() }
+            MainActor.assumeIsolated {
+                // Encoded off the main actor; a background task keeps the app running until it is written.
+                let application = UIApplication.shared
+                let taskId = application.beginBackgroundTask(withName: "QueueSnapshot", expirationHandler: nil)
+                self?.snapshots.saveInBackground {
+                    if taskId != .invalid { UIApplication.shared.endBackgroundTask(taskId) }
+                }
+            }
         })
         lifecycleObservers.append(center.addObserver(forName: UIApplication.willEnterForegroundNotification,
                                                      object: nil, queue: .main) { @Sendable [weak self] _ in

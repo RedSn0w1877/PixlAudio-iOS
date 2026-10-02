@@ -282,17 +282,15 @@ final class DualDeckEngine: PlaybackEngine {
 
     /// The queue as Android persists it (`PlaybackQueueSnapshot`).
     func makeSnapshot(nowMs: Int64 = Int64(Date().timeIntervalSince1970 * 1000)) -> PlaybackQueueSnapshot? {
+        makeSnapshotCapture(nowMs: nowMs)?.makeSnapshot()
+    }
+
+    /// What a snapshot needs, without building it: the queue value and the position (cheap on the main actor;
+    /// `QueueSnapshotStore` maps and encodes it off the main actor).
+    func makeSnapshotCapture(nowMs: Int64 = Int64(Date().timeIntervalSince1970 * 1000)) -> QueueSnapshotCapture? {
         guard !queue.isEmpty else { return nil }
-        let items = queue.entries.map { entry in
-            PlaybackQueueItemSnapshot(mediaId: entry.song.id, uri: entry.song.contentUriString,
-                                      title: entry.song.title, artist: entry.song.displayArtist,
-                                      albumTitle: entry.song.album, artworkUri: entry.song.albumArtUriString,
-                                      durationMs: entry.song.duration)
-        }
-        return PlaybackQueueSnapshot(items: items, currentMediaId: queue.current?.song.id,
-                                     currentIndex: queue.currentIndex ?? 0, currentPositionMs: currentPositionMs(),
-                                     playWhenReady: playWhenReady, repeatMode: queue.repeatMode.rawValue,
-                                     shuffleEnabled: shuffleEnabled, savedAtEpochMs: nowMs)
+        return QueueSnapshotCapture(queue: queue, positionMs: currentPositionMs(), playWhenReady: playWhenReady,
+                                    shuffleEnabled: shuffleEnabled, nowMs: nowMs)
     }
 
     /// Restores a saved queue paused at its position (only into an empty engine). `songs` are the snapshot's items

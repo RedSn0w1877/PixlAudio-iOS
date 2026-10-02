@@ -161,7 +161,7 @@ final class AppEnvironment {
         spotify.attach(reloadLibrary: { await library.reloadFromStore() }, isPlaybackActive: { playback.isPlaying })
         spotify.songLookup = { library.song(id: $0) }
         await library.load()
-        playbackServices?.restoreQueue(lookup: library.song(id:))
+        await playbackServices?.restoreQueue(lookup: library.song(id:))
         libraryAutoRefresh?.start()
         backup.start()
         await spotify.start()
