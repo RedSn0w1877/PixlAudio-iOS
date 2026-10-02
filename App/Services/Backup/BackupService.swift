@@ -36,6 +36,8 @@ final class BackupService {
     var exportMessage: String?
     /// Where the next `AppCover.backupImport` starts (the file step unless a caller has a backup already).
     @ObservationIgnored var importStart: BackupImportFlowView.Start = .pick
+    /// A restore finished (whatever it restored): `AppEnvironment` re-reads caches the restored tables feed.
+    @ObservationIgnored var onRestored: (() -> Void)?
 
     @ObservationIgnored private let persistence: PersistenceActor?
     @ObservationIgnored private let library: LibraryStore
@@ -285,6 +287,7 @@ final class BackupService {
             AIProviderStatus.invalidate()
         }
         if selected.contains(.transitions) { await playbackServices?.reloadTransitionRules() }
+        onRestored?()
 
         if result.entries.isEmpty, let first = result.failures.first {
             result.outcome = .failed(L10n.settingsRestoreFailedFormat("\(first.section.label): \(first.message)"))

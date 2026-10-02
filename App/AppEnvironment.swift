@@ -176,6 +176,12 @@ final class AppEnvironment {
             await home.history.ensureLoaded()
             await playCounts.refresh(editor: editor, revision: home.history.revision)
         }
+        // "Most played" follows the engagement table when it changes after the history revision did.
+        let reloadPlayCounts: () -> Void = {
+            Task { await playCounts.reload(editor: editor, revision: home.history.revision) }
+        }
+        playbackServices?.onEngagementRecorded = reloadPlayCounts
+        backup.onRestored = reloadPlayCounts
         backup.start()
         // The output-route monitor queries the audio session when first touched: do it now, while nothing animates,
         // not in the full player's first frame.

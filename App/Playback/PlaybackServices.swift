@@ -22,6 +22,9 @@ final class PlaybackServices {
     var recordHistory: ((_ songId: String, _ durationMs: Int64, _ timestamp: Int64) -> Void)?
     /// The current item or the queue changed (stage 11's prefetcher resolves the next streamed song).
     var onUpcomingChanged: (() -> Void)?
+    /// A finished listening session's engagement row (its play count) has been written. `recordHistory` bumps the
+    /// history revision before that write lands, so `AppEnvironment` re-reads the play counts from here.
+    var onEngagementRecorded: (() -> Void)?
 
     private let settings: SettingsStore
     private let defaults: UserDefaults
@@ -137,13 +140,18 @@ final class PlaybackServices {
             let history = self.recordHistory == nil ? self.history : nil
             self.recordHistory?(record.songId, record.listenedMs, record.timestamp)
             let persistence = self.persistence
-            Task.detached(priority: .utility) {
+            Task.detached(priority: .utility) { [weak self] in
                 await history?.recordPlayback(songId: record.songId, durationMs: record.listenedMs,
                                               timestamp: record.timestamp)
                 try? await persistence?.recordEngagement(songId: record.songId, durationMs: record.listenedMs,
                                                          timestamp: record.timestamp)
+                await self?.engagementRecorded()
             }
         }
+    }
+
+    private func engagementRecorded() {
+        onEngagementRecorded?()
     }
 
     // MARK: Settings
