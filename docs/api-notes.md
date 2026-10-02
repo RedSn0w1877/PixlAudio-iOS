@@ -483,6 +483,20 @@ Signatures checked against the developer.apple.com documentation JSON (`/tutoria
 | `String.applyingTransform(.mandarinToLatin / .stripDiacritics, reverse:)` | 9 | /documentation/foundation/stringtransform/mandarintolatin | `AppleCJKRomanization` | Toneless pinyin, `ü` → `u:` (pinyin4j form). |
 | `UnevenRoundedRectangle`, `.contentTransition(.symbolEffect(.replace))`, `sensoryFeedback(_:trigger:)` | 16 / 17 | (see stage 4) | lyrics chrome | |
 
+## Stage 10 — lyrics sync editor
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `UIResponder.touchesBegan(_:with:)` / `touchesEnded` / `touchesCancelled`, `UIView.isMultipleTouchEnabled` | 2 | /documentation/uikit/uiresponder/touchesbegan(_:with:) | `TapPadTouchView` (in a `UIViewRepresentable`) | The tap pad stamps on touch *down*; extra fingers during a hold are taps too (Android `awaitEachGesture`). SwiftUI gestures carry neither the touch timestamp nor extra fingers. |
+| `UITouch.timestamp`, `ProcessInfo.systemUptime` | 2 / 4 | /documentation/uikit/uitouch/timestamp | `LyricsSyncSession.onTapDown` | Same clock (seconds since boot): `now − timestamp` is the touch's latency, removed from the player position like Android's `uptimeMillis` (`LyricsTapSync.rawTapPositionMs`). |
+| `Layout` (`sizeThatFits`, `placeSubviews`), `LayoutValueKey`, `View.layoutValue(key:value:)` | 16 | /documentation/swiftui/layoutvaluekey | `SyncWeightedColumn`, `SyncFlowLayout` | Compose `Modifier.weight` (context 1, pad 1.25 with a 200 pt minimum) and `FlowRow`. |
+| `View.scrollBounceBehavior(_:axes:)`, `.basedOnSize` | 16.4 | /documentation/swiftui/view/scrollbouncebehavior(_:axes:) | `SyncCardScreen` | Short screens only scroll when their content is taller than the screen. |
+| `Animation.timingCurve(_:_:_:_:duration:)` | 13 | /documentation/swiftui/animation/timingcurve(_:_:_:_:duration:) | `SyncWordChip` | Compose `FastOutSlowInEasing` = cubic-bézier(0.4, 0, 0.2, 1), 260 ms word fill sweep. |
+| `Animation.snappy(duration:extraBounce:)`, `contentTransition(.numericText(value:))` | 17 | /documentation/swiftui/contenttransition/numerictext(value:) | nudge value | |
+| `Shape.trim(from:to:)`, `StrokeStyle(lineWidth:lineCap:)` | 13 | /documentation/swiftui/shape/trim(from:to:) | music-break ring | Ring redrawn from a `TimelineView(.animation(minimumInterval:paused:))` only while the break shows. |
+| `Menu(content:label:)` with `Label(_:systemImage:)` items | 14 | /documentation/swiftui/menu | speed pill | Android `DropdownMenu` with a check on the current speed. |
+| `UTType(filenameExtension:conformingTo:)` | 14 | /documentation/uniformtypeidentifiers/uttype-swift.struct/init(filenameextension:conformingto:) | share `.ttml` | `.lrc` goes out as `.plainText`, like stage 9's Save Lyrics. |
+| `DualDeckEngine.beginExactTimingSession()` / `endExactTimingSession()` (ours) | — | — | `LyricsSyncPlayer` | No hand-over or crossfade into the next song; at the end the engine reloads the song paused at its end and calls `onExactTimingItemEnded` (Android `beginExactTimingSession`). |
+
 ## Stage 11 — YouTube playback
 Signatures checked against the developer.apple.com documentation JSON (2026-10-01).
 
