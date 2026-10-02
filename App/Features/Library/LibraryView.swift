@@ -255,7 +255,13 @@ struct LibraryView: View {
         let prefs = self.prefs
         actions.play = { song, list in playback.play(song, in: list) }
         actions.showSongOptions = { song in router.present(AppSheet.songInfo(songId: song.id)) }
-        actions.openAlbum = { album in router.push(.albumDetail(albumId: album.id)) }
+        actions.openAlbum = { album in
+            // Start decoding the header's cover now, so the page's first frames have it.
+            if let source = ArtworkSource(uriString: album.albumArtUriString) {
+                ArtworkPipeline.shared.prefetch(source, pixelSize: ArtworkPipeline.displayBuckets.last ?? 1320)
+            }
+            router.push(.albumDetail(albumId: album.id))
+        }
         actions.toggleAlbum = { album in toggleAlbum(album) }
         actions.openArtist = { artist in router.push(.artistDetail(artistId: artist.id)) }
         actions.openPlaylist = { playlist in router.push(.playlistDetail(playlistId: playlist.id)) }

@@ -1,8 +1,10 @@
 import PixlModel
 import SwiftUI
 
-/// Album art at a fixed size: decoded off the main thread at display resolution by `ArtworkPipeline`, shown from
-/// the memory cache on the first frame when it's there, a tonal placeholder otherwise (Android `SmartImage`).
+/// Album art at a fixed size: decoded off the main thread at display resolution by `ArtworkPipeline` (in its size
+/// bucket), shown from the memory cache on the first frame when it's there — or, when only another size of the same
+/// cover is decoded, that one until the exact size arrives (swapped without a fade) — a tonal placeholder otherwise
+/// (Android `SmartImage`).
 struct ArtworkView: View {
     let source: ArtworkSource?
     let size: CGFloat
@@ -18,8 +20,8 @@ struct ArtworkView: View {
         self.size = size
         self.cornerRadius = cornerRadius
         self.pipeline = pipeline
-        let pixels = ArtworkPipeline.pixelSize(forPoints: size)
-        _image = State(initialValue: source.flatMap { pipeline.cachedImage($0, pixelSize: pixels) })
+        let pixels = ArtworkPipeline.displayPixelSize(forPoints: size)
+        _image = State(initialValue: source.flatMap { pipeline.cachedImageOrVariant($0, pixelSize: pixels) })
     }
 
     init(song: Song?, size: CGFloat, cornerRadius: CGFloat = Tokens.Artwork.rowCornerRadius) {
@@ -46,11 +48,12 @@ struct ArtworkView: View {
         .clipShape(shape)
         .task(id: source) {
             guard let source else { image = nil; return }
-            let pixels = ArtworkPipeline.pixelSize(forPoints: size)
+            let pixels = ArtworkPipeline.displayPixelSize(forPoints: size)
             if let hit = pipeline.cachedImage(source, pixelSize: pixels) {
                 image = hit
                 return
             }
+            // A stand-in already showing is replaced in place (same branch: no fade); the placeholder fades out.
             let loaded = await pipeline.image(source, pixelSize: pixels)
             if !Task.isCancelled {
                 withAnimation(.easeOut(duration: 0.18)) { image = loaded }
