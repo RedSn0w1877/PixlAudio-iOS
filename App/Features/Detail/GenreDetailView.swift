@@ -338,22 +338,40 @@ private struct GenreDetailContent: View {
                 .padding(.bottom, 16 + miniPlayerClearance)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
         } else {
-            Button { showsSortSheet = true } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 24, weight: .bold))
-                    .rotationEffect(.degrees(90))
-                    .foregroundStyle(theme.onTertiaryContainer)
-                    .frame(width: 80, height: 80)
-                    .contentShape(.rect)
+            // Sort & Play is a small system menu that morphs out of the button (owner change 2026-10-02).
+            ShapedGlassMenu(systemImage: "ellipsis", accessibilityLabel: "Options",
+                            shape: RoundedRectangle(cornerRadius: 24, style: .continuous), width: 80, height: 80,
+                            iconSize: 24, iconWeight: .bold, iconRotation: 90,
+                            tint: theme.tertiaryContainer.opacity(GlassTint.prominent),
+                            foreground: theme.onTertiaryContainer) {
+                sortAndPlayMenu
             }
-            .buttonStyle(.plain)
-            .pixlGlass(in: RoundedRectangle(cornerRadius: 24, style: .continuous),
-                       tint: theme.tertiaryContainer.opacity(GlassTint.prominent), interactive: true)
             .padding(.trailing, 16)
             .padding(.bottom, 26 + miniPlayerClearance)
-            .accessibilityLabel("Options")
             .accessibilityIdentifier("genre.options")
             .transition(.scale.combined(with: .opacity))
+        }
+    }
+
+    /// Android's "Sort & Play" sheet as a menu: Shuffle, Quick Fill (Unknown genre only), then Sort By.
+    @ViewBuilder
+    private var sortAndPlayMenu: some View {
+        Section {
+            Button("Shuffle", systemImage: "shuffle") {
+                let ordered = GenreGrouping.sorted(songs, by: sort)
+                if let start = ordered.randomElement() { playback.play(start, in: ordered) }
+            }
+            if GenreTheme.isUnknown(genreId) {
+                Button("Quick Fill Genre", systemImage: "wand.and.stars") { showsQuickFill = true }
+            }
+        }
+        Section("Sort By") {
+            Picker("Sort By", selection: $sort) {
+                Label("Artist", systemImage: "person.fill").tag(GenreSort.artist)
+                Label("Album", systemImage: "opticaldisc").tag(GenreSort.album)
+                Label("Title", systemImage: "textformat.abc").tag(GenreSort.title)
+            }
+            .pickerStyle(.inline)
         }
     }
 }

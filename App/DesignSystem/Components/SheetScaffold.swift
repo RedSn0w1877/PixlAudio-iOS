@@ -32,11 +32,9 @@ struct SheetScaffold<Content: View>: View {
 }
 
 extension View {
-    /// System sheet presentation for a `SheetScaffold`: detents and the visible drag handle (Android's handle). The
-    /// sheet gets its own glass-menu host, so menus opened inside it float above it.
+    /// System sheet presentation for a `SheetScaffold`: detents and the visible drag handle (Android's handle).
     func pixlSheet(detents: Set<PresentationDetent> = [.medium, .large]) -> some View {
-        glassMenuHost()
-            .presentationDetents(detents)
+        presentationDetents(detents)
             .presentationDragIndicator(.visible)
     }
 }

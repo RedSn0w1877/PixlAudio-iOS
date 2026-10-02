@@ -55,24 +55,6 @@ final class ScreenshotTests: XCTestCase {
         attachScreenshot(app, "tabBarDrag-dark")
     }
 
-    // MARK: Glass menus (owner change 2026-10-02: menus pop out of their button as floating jelly panels)
-
-    /// Library › Sort by grows out of the sort button as a floating glass panel.
-    func testLibrarySortMenuLight() throws {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchArguments = ["-uiTest", "-screen", "library", "-appearance", "light"]
-        app.launch()
-        XCTAssertTrue(app.descendants(matching: .any)["screen.library"].firstMatch.waitForExistence(timeout: 20),
-                      "screen.library did not appear")
-        let sort = app.descendants(matching: .any)["library.sort"].firstMatch
-        XCTAssertTrue(sort.waitForExistence(timeout: 10), "the sort button is missing")
-        sort.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["glassMenu"].firstMatch.waitForExistence(timeout: 5),
-                      "the sort menu did not open")
-        attachScreenshot(app, "librarySortMenu-light")
-    }
-
     // MARK: - Helpers
 
     private func launchHome(_ appearance: String) -> XCUIApplication {

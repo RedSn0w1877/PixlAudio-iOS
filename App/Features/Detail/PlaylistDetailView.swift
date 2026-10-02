@@ -19,7 +19,6 @@ struct PlaylistDetailView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(PlaybackStore.self) private var playback
     @Environment(Router.self) private var router
-    @Environment(GlassMenuPresenter.self) private var menus
     @Environment(\.appTheme) private var theme
 
     @State private var songs: [Song] = []
@@ -30,6 +29,8 @@ struct PlaylistDetailView: View {
     @State private var showsSort = false
     @State private var showsOptions = false
     @State private var confirmsDelete = false
+    /// The playlist written as M3U for the options menu's Export (rewritten when the playlist changes).
+    @State private var exportURL: URL?
     /// Stage 14: the playlist's lyric-sync run, from TAIS Studio's job states.
     private var lyricSync: PlaylistLyricSyncState { env.tais.studio.lyricSyncState(playlistId: playlistId) }
     @State private var didApplyLaunchState = false
@@ -64,16 +65,18 @@ struct PlaylistDetailView: View {
             DetailTopBar(title: playlist?.name ?? "Playlist",
                          subtitle: "\(LibraryFormat.songCount(songs.count)) • \(LibraryFormat.totalDuration(songs))",
                          onBack: { router.pop() }) {
-                GlassCircleButton(systemImage: "line.3.horizontal.decrease", accessibilityLabel: "Sort Songs",
-                                  tint: theme.surfaceContainerHigh.opacity(GlassTint.surface),
-                                  foreground: theme.onSurface) { openSortMenu() }
-                    .glassMenuAnchor("playlist.sort", cornerRadius: Tokens.TopBar.circleButtonSize / 2)
-                    .accessibilityIdentifier("playlist.sort")
+                // Small menus morph out of their buttons (owner change 2026-10-02).
+                GlassCircleMenu(systemImage: "line.3.horizontal.decrease", accessibilityLabel: "Sort Songs") {
+                    SortMenuSections(options: SortOption.songs, selected: sortOption) { option in
+                        withAnimation(PixlMotion.state) { sortOption = option }
+                        prefs.setSongOrder(option, forPlaylist: playlistId)
+                    }
+                }
+                .accessibilityIdentifier("playlist.sort")
                 if !isFolder {
-                    GlassCircleButton(systemImage: "ellipsis", accessibilityLabel: "More options",
-                                      tint: theme.surfaceContainerHigh.opacity(GlassTint.container),
-                                      foreground: theme.onSurface) { openOptionsMenu(playlist) }
-                        .glassMenuAnchor("playlist.more", cornerRadius: Tokens.TopBar.circleButtonSize / 2)
+                    GlassCircleMenu(systemImage: "ellipsis", accessibilityLabel: "More options") {
+                        optionsMenu
+                    }
                         .accessibilityIdentifier("playlist.more")
                 }
             }
@@ -103,6 +106,10 @@ struct PlaylistDetailView: View {
             songs = orderedSongs(inputs)
         }
         .onAppear(perform: applyLaunchState)
+        .task(id: playlist?.songIds) {
+            guard let playlist, !isFolder else { return }
+            exportURL = PlaylistExport.writeTemporaryM3U(playlist, library: library)
+        }
         .onChange(of: library.songs.count, initial: true) { _, _ in resolveFolder() }
         .sheet(isPresented: $showsAddSongs) {
             SongPickerSheet(initiallySelected: Set(playlist?.songIds ?? [])) { selected in
@@ -272,60 +279,68 @@ struct PlaylistDetailView: View {
         return true
     }
 
-    // MARK: Glass menus (sort, options)
+    // MARK: Options menu
 
-    /// Sort Songs, popping out of the sort circle (the same panel as the sort sheet).
-    private func openSortMenu() {
-        let selected = sortOption
-        menus.present(from: "playlist.sort", width: 340) {
-            PlaylistSongSortSheet(selected: selected) { option in
-                withAnimation(PixlMotion.state) { sortOption = option }
-                prefs.setSongOrder(option, forPlaylist: playlistId)
+    /// Android's playlist options as a menu: edit, transition, export, batch actions, then delete.
+    @ViewBuilder
+    private var optionsMenu: some View {
+        Section {
+            Button("Edit playlist", systemImage: "pencil") { router.push(.playlistEditor(playlistId: playlistId)) }
+            Button("Set default transition", systemImage: "point.topleft.down.to.point.bottomright.curvepath") {
+                router.push(.editTransition(playlistId: playlistId))
+            }
+            if let exportURL {
+                ShareLink(item: exportURL) { Label("Export Playlist", systemImage: "paperclip") }
             }
         }
+        Section {
+            Button("Download all songs", systemImage: "arrow.down.circle") {
+                let queued = env.youtube.downloads.downloadAll(songs)
+                LibraryToast.shared.show(queued == 0 ? "No streamed songs in this playlist to download."
+                                                     : "Downloading (queued) songs")
+            }
+            Button("Sync lyrics for all songs", systemImage: "text.quote") {
+                env.tais.studio.syncLyrics(playlistId: playlistId, songs: songs)
+            }
+            Button("Instrumentalize all songs", systemImage: "sparkles") {
+                let queued = env.tais.studio.renderInstrumentals(songs)
+                LibraryToast.shared.show(queued == 0 ? "Every song here already has an instrumental."
+                                                     : "Rendering instrumentals for \(queued) songs")
+            }
+        }
+        Button("Delete playlist", systemImage: "trash", role: .destructive) { confirmsDelete = true }
     }
 
-    /// Playlist options, popping out of the ⋯ circle.
-    private func openOptionsMenu(_ playlist: Playlist?) {
-        menus.present(from: "playlist.more", width: 330) { optionsSheet(playlist) }
-    }
-
-    /// Closes the options panel (glass menu) or sheet (UI-test launch state).
-    private func closeOptions() {
-        showsOptions = false
-        menus.dismiss()
-    }
-
-    // MARK: Options sheet
+    // MARK: Options sheet (UI-test launch state)
 
     private func optionsSheet(_ playlist: Playlist?) -> some View {
         PlaylistOptionsSheet(playlist: playlist,
                              onEdit: {
-                                 closeOptions()
+                                 showsOptions = false
                                  router.push(.playlistEditor(playlistId: playlistId))
                              },
                              onDelete: {
-                                 closeOptions()
+                                 showsOptions = false
                                  confirmsDelete = true
                              },
                              onTransition: {
-                                 closeOptions()
+                                 showsOptions = false
                                  router.push(.editTransition(playlistId: playlistId))
                              },
                              onDownloadAll: {
-                                 closeOptions()
+                                 showsOptions = false
                                  // Stage 11: queue every streamed song (Android `requestDownload` per song).
                                  let queued = env.youtube.downloads.downloadAll(songs)
                                  LibraryToast.shared.show(queued == 0 ? "No streamed songs in this playlist to download."
                                                                       : "Downloading (queued) songs")
                              },
                              onSyncLyricsAll: {
-                                 closeOptions()
+                                 showsOptions = false
                                  // Stage 14: one lyric-sync job per song through TAIS Studio's lane.
                                  env.tais.studio.syncLyrics(playlistId: playlistId, songs: songs)
                              },
                              onInstrumentalizeAll: {
-                                 closeOptions()
+                                 showsOptions = false
                                  let queued = env.tais.studio.renderInstrumentals(songs)
                                  LibraryToast.shared.show(queued == 0 ? "Every song here already has an instrumental."
                                                                       : "Rendering instrumentals for \(queued) songs")

@@ -18,7 +18,6 @@ struct LibraryView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(PlaybackStore.self) private var playback
     @Environment(Router.self) private var router
-    @Environment(GlassMenuPresenter.self) private var menus
     @Environment(SettingsStore.self) private var settings
     @Environment(\.appTheme) private var theme
 
@@ -171,12 +170,7 @@ struct LibraryView: View {
                                  onLocate: { locateRequest += 1 },
                                  onStorageFilter: { withAnimation(PixlMotion.state) { prefs.cycleStorageFilter() } },
                                  onInstrumentalFilter: { instrumentalizedOnly.toggle() },
-                                 onSort: {
-                                     // Sort by pops out of the sort button as a glass panel.
-                                     menus.present(from: "library.sort", width: 340) {
-                                         LibrarySortSheet(tab: tab, prefs: prefs)
-                                     }
-                                 },
+                                 prefs: prefs,
                                  onFolder: { path in withAnimation(PixlMotion.state) { folderPath = path } },
                                  onFolderBack: navigateFolderBack)
                     .transition(.move(edge: .trailing).combined(with: .opacity))

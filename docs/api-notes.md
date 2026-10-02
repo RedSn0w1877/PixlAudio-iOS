@@ -639,10 +639,11 @@ Signatures checked against the developer.apple.com documentation JSON (2026-10-0
 | `CADisplayLink`, `CAShapeLayer` masks, `CALayer.presentation()` | 3.1 | /documentation/quartzcore/cadisplaylink | `LiquidTabSegmentedControl` | Masks the accent glyph copies to the lens' animated frame; paused when the lens is still. |
 | `UIViewRepresentable` | 13 | /documentation/swiftui/uiviewrepresentable | `LiquidTabBar` | Hosts the UIKit bar in SwiftUI. |
 
-## Glass menus (2026-10-02)
+## Small system menus (2026-10-02)
 | API | Min iOS | Docs | Used in | Notes |
 |---|---|---|---|---|
-| `Animatable` view modifier (`animatableData`) | 13 | /documentation/swiftui/animatable | `GlassMenuMorph` | Interpolates the glass frame and corner radius from the button to the panel every frame of the spring (overshoot included). |
-| `@Environment(T.self) var x: T?` (optional `@Observable` environment object) | 17 | /documentation/swiftui/environment | `GlassMenuAnchorModifier` | Anchors work without a host. |
-| `View.accessibilityAction(.escape)`, `accessibilityAddTraits(.isModal)` | 13 | /documentation/swiftui/view/accessibilityaction(_:_:) | `GlassMenuPanel` | VoiceOver escape closes the menu. |
-| `Task.sleep(for:)` | 16 | /documentation/swift/task/sleep(for:tolerance:clock:) | `GlassMenuPresenter.dismiss` | Removes the panel once the close spring has settled. |
+| `Menu(content:label:)`, `.menuStyle(.button)` | 14 / 16 | /documentation/swiftui/menu | `GlassCircleMenu`, `ShapedGlassMenu` | On iOS 26+ the menu morphs out of its button (Liquid Glass). |
+| `ButtonStyle.glass` / `.glassProminent`, `.buttonBorderShape(.circle)` | 26.0 / 15 | /documentation/swiftui/primitivebuttonstyle/glass | `GlassCircleMenu` | Apple's glass button, so the morph starts from the system glass. |
+| `Picker` with `.pickerStyle(.inline)` inside a `Menu`, `Section(_:)` | 14 | /documentation/swiftui/inlinepickerstyle | `SortMenuSections`, genre Sort By | Options with a checkmark on the current one. |
+| `ShareLink(item:label:)` in a menu | 16 | /documentation/swiftui/sharelink | playlist options | Export Playlist (M3U written in a `.task`). |
+| `Button(_:systemImage:role:action:)` (`.destructive`) | 17 | /documentation/swiftui/button/init(_:systemimage:role:action:) | menus | Delete playlist in red. |

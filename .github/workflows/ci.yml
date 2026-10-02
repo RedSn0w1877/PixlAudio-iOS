@@ -157,6 +157,35 @@ jobs:
             -resultBundlePath build/Shots.xcresult \
             2>&1 | bash ci/timestamp.sh | tee build/shots.log | cut -c14- | xcbeautify --quieter
           bash ci/check-ui-tests-ran.sh build/shots.log
+      # "[record:Class]" in the commit message films one UI test class on the simulator (simctl io recordVideo), so
+      # animations can be checked frame by frame (e.g. the system menu morph against a device recording). The video
+      # and that class's screenshots (build/record) go into the shots artifact.
+      - name: Record UI video
+        id: record
+        if: ${{ !cancelled() && env.RUN_SHOTS == 'true' && steps.prepare.outcome == 'success' && contains(github.event.head_commit.message, '[record:') }}
+        timeout-minutes: 20
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          set -o pipefail
+          CLASS="$(printf '%s' "$COMMIT_MSG" | grep -oE '\[record:[A-Za-z0-9_]+\]' | head -1 | sed -E 's/^\[record:([A-Za-z0-9_]+)\]$/\1/' || true)"
+          if [ -z "$CLASS" ]; then echo "no valid [record:Class]"; exit 0; fi
+          mkdir -p build/record
+          xcrun simctl io "$SIM_UDID" recordVideo --codec=h264 --force "build/record/record-$CLASS.mp4" &
+          REC=$!
+          sleep 3
+          xcodebuild test-without-building \
+            -project PixlAudio.xcodeproj -scheme PixlAudio \
+            -destination "id=$SIM_UDID" \
+            -derivedDataPath build/DerivedData \
+            "-only-testing:PixlAudioUITests/$CLASS" \
+            -collect-test-diagnostics never \
+            -resultBundlePath build/Record.xcresult \
+            2>&1 | bash ci/timestamp.sh | tee build/record.log | cut -c14- | xcbeautify --quieter || true
+          kill -INT "$REC" || true
+          wait "$REC" || true
+          ls -la "build/record/record-$CLASS.mp4" || true
+          if [ -d build/Record.xcresult ]; then bash ci/export-shots.sh build/Record.xcresult build/record/shots; fi
       - name: Export screenshots
         if: ${{ always() && env.RUN_SHOTS == 'true' }}
         run: |
@@ -171,7 +200,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: shots-${{ github.sha }}
-          path: build/shots
+          path: |
+            build/shots
+            build/record
           retention-days: 14
           if-no-files-found: warn
       - name: Upload test results

@@ -8,8 +8,8 @@ import SwiftUI
 ///   22 pt corners — the current one a capsule with circular art, bold `primary` title and the playing indicator.
 ///   Songs after the current one have a drag handle (reorder) and swipe left to remove (60 pt of tension, then free;
 ///   past 40 % of the width it goes), with an undo bar;
-/// - the bottom toolbar: shuffle / repeat / sleep timer circles in a capsule and the ⋯ circle, whose glass menu
-///   (Locate current song · Save as playlist · Clear queue) pops out of it (`GlassMenu`).
+/// - the bottom toolbar: shuffle / repeat / sleep timer circles in a capsule and the ⋯ circle, which opens Locate
+///   current song · Clear queue · Save as playlist over a scrim.
 /// Every row's ⋮ opens the song sheet; the timer opens `SleepTimerSheet`; Save as playlist opens
 /// `SaveQueueAsPlaylistSheet`.
 struct QueueSheet: View {
@@ -17,8 +17,8 @@ struct QueueSheet: View {
     @Environment(PlaybackStore.self) private var playback
     @Environment(SettingsStore.self) private var settings
     @Environment(\.appTheme) private var theme
-    @Environment(GlassMenuPresenter.self) private var menus
 
+    @State private var isMenuExpanded = false
     @State private var showsTimer = false
     @State private var confirmsClear = false
     @State private var showsSaveAsPlaylist = false
@@ -53,13 +53,18 @@ struct QueueSheet: View {
             }
             toolbar
                 .padding(.bottom, 16)
+            if isMenuExpanded {
+                menuOverlay(canLocate: currentDisplay >= 0 && currentDisplay < display.count)
+            }
             if let undo {
                 undoBar(undo)
                     .padding(.bottom, 96)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        .animation(.easeOut(duration: 0.2), value: isMenuExpanded)
         .animation(PixlMotion.bars, value: undo?.id)
+        .sensoryFeedback(.selection, trigger: isMenuExpanded)
         .sheet(item: $songInfo) { ref in
             SongInfoSheet(songId: ref.id).pixlSheet(detents: [.large])
         }
@@ -208,17 +213,17 @@ struct QueueSheet: View {
                 .frame(maxHeight: .infinity)
                 .pixlGlass(in: Capsule(), tint: theme.surfaceContainerHighest.opacity(GlassTint.container))
                 Button {
-                    openMenu()
+                    isMenuExpanded.toggle()
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 22, weight: .bold))
                         .foregroundStyle(theme.onTertiaryContainer)
+                        .rotationEffect(.degrees(isMenuExpanded ? 90 : 0))
                         .frame(width: 70, height: 70)
                         .contentShape(.circle)
                 }
                 .buttonStyle(.plain)
                 .pixlGlass(in: Circle(), tint: theme.tertiaryContainer.opacity(GlassTint.prominent), interactive: true)
-                .glassMenuAnchor("queue.more", cornerRadius: 35)
                 .accessibilityLabel("More actions")
                 .accessibilityIdentifier("queue.more")
             }
@@ -243,31 +248,55 @@ struct QueueSheet: View {
 
     // MARK: Menu (the ⋯ circle)
 
-    /// The ⋯ menu, popping out of the circle: Locate current song (when it's in the list) · Save as playlist ·
-    /// Clear queue (destructive, confirmed).
-    private func openMenu() {
-        let canLocate = canLocateCurrent
-        menus.present(from: "queue.more", width: 260) {
-            VStack(spacing: 0) {
-                if canLocate {
-                    GlassMenuItem("Locate current song", systemImage: "location.fill") { locateRequest += 1 }
-                    GlassMenuDivider()
-                }
-                GlassMenuItem("Save as playlist", systemImage: "text.badge.plus") { showsSaveAsPlaylist = true }
-                GlassMenuDivider()
-                GlassMenuItem("Clear queue", systemImage: "clear.fill", isDestructive: true) { confirmsClear = true }
+    private func menuOverlay(canLocate: Bool) -> some View {
+        ZStack(alignment: .bottom) {
+            ZStack {
+                theme.scrim.opacity(0.55)
+                LinearGradient(colors: [.clear, theme.surfaceContainerLowest], startPoint: .top, endPoint: .bottom)
             }
-            .padding(.vertical, 6)
-            .accessibilityElement(children: .contain)
-            .accessibilityIdentifier("queue.menu")
+            .ignoresSafeArea()
+            .onTapGesture { isMenuExpanded = false }
+            VStack(spacing: 10) {
+                if canLocate {
+                    menuButton("Locate current song", systemImage: "location.fill", tint: theme.tertiaryContainer,
+                               foreground: theme.onTertiaryContainer) {
+                        isMenuExpanded = false
+                        locateRequest += 1
+                    }
+                }
+                menuButton("Clear queue", systemImage: "clear.fill", tint: theme.errorContainer,
+                           foreground: theme.onErrorContainer) {
+                    isMenuExpanded = false
+                    confirmsClear = true
+                }
+                menuButton("Save as playlist", systemImage: "text.badge.plus", tint: theme.primaryContainer,
+                           foreground: theme.onPrimaryContainer) {
+                    isMenuExpanded = false
+                    showsSaveAsPlaylist = true
+                }
+            }
+            .padding(.bottom, 36)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
         }
+        .accessibilityIdentifier("queue.menu")
     }
 
-    /// Whether the current song is among the listed rows (the list starts at it unless history is shown).
-    private var canLocateCurrent: Bool {
-        guard let current = playback.currentIndex else { return false }
-        let offset = settings.playback.showQueueHistory ? 0 : current
-        return current - offset >= 0 && current - offset < playback.queue.count - offset
+    private func menuButton(_ title: LocalizedStringKey, systemImage: String, tint: Color, foreground: Color,
+                            action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                Image(systemName: systemImage).font(.system(size: 18, weight: .semibold))
+                Text(title).pixlFont(.titleMedium, weight: .semibold)
+            }
+            .foregroundStyle(foreground)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .frame(minWidth: 184, maxWidth: 260, minHeight: 48)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .pixlGlass(in: RoundedRectangle(cornerRadius: 18, style: .continuous), tint: tint.opacity(GlassTint.prominent),
+                   interactive: true)
     }
 
     // MARK: Removing, undo, clearing

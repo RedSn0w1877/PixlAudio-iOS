@@ -19,7 +19,8 @@ struct LibraryActionRow: View {
     let onLocate: () -> Void
     let onStorageFilter: () -> Void
     let onInstrumentalFilter: () -> Void
-    let onSort: () -> Void
+    /// The tab's sort preferences, for the Sort by menu.
+    let prefs: LibraryPreferences
     let onFolder: (String?) -> Void
     let onFolderBack: () -> Void
 
@@ -115,12 +116,16 @@ struct LibraryActionRow: View {
                         .padding(.trailing, 4)
                         .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
-                SegmentedGlassButton(systemImage: "line.3.horizontal.decrease", accessibilityLabel: "Sort options",
-                                     leading: (showsLocate || showsStorageFilter || showsInstrumentalFilter) ? Self.inner : Self.outer,
-                                     trailing: Self.outer, height: Self.height, tint: tonal, foreground: onTonal,
-                                     action: onSort)
-                    .glassMenuAnchor("library.sort", cornerRadius: Self.height / 2)
-                    .accessibilityIdentifier("library.sort")
+                // Sort by is a small system menu that morphs out of this segment (owner change 2026-10-02).
+                let sortLeading = (showsLocate || showsStorageFilter || showsInstrumentalFilter) ? Self.inner : Self.outer
+                ShapedGlassMenu(systemImage: "line.3.horizontal.decrease", accessibilityLabel: "Sort options",
+                                shape: UnevenRoundedRectangle(topLeadingRadius: sortLeading, bottomLeadingRadius: sortLeading,
+                                                              bottomTrailingRadius: Self.outer, topTrailingRadius: Self.outer,
+                                                              style: .continuous),
+                                width: Self.height, height: Self.height, tint: tonal, foreground: onTonal) {
+                    LibrarySortMenuContent(tab: tab, prefs: prefs)
+                }
+                .accessibilityIdentifier("library.sort")
             }
             .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showsLocate)
             .animation(.spring(response: 0.35, dampingFraction: 0.8), value: tab)

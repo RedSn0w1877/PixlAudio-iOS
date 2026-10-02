@@ -406,18 +406,11 @@ struct PlaylistLyricSyncCard: View {
 /// Android `LibrarySortBottomSheet` for a playlist's songs ("Sort Songs", no view toggle): the Order card, then the
 /// sort methods as 8 pt tiles in a 20 pt group. "Default Order" is the playlist's own (manual) order.
 struct PlaylistSongSortSheet: View {
+    let selected: SortOption
     let onSelect: (SortOption) -> Void
-    /// Local copy, so flipping the order updates the panel while it stays open.
-    @State private var selected: SortOption
 
     @Environment(\.appTheme) private var theme
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.glassMenuDismiss) private var dismissMenu
-
-    init(selected: SortOption, onSelect: @escaping (SortOption) -> Void) {
-        self._selected = State(initialValue: selected)
-        self.onSelect = onSelect
-    }
 
     var body: some View {
         let methods = SortOption.songs.map { $0.methodOption() }.reduce(into: [SortOption]()) { result, option in
@@ -430,17 +423,14 @@ struct PlaylistSongSortSheet: View {
                     .foregroundStyle(theme.onSurface)
                     .padding(.leading, 2)
                     .padding(.bottom, 16)
-                SortDirectionCard(option: selected) {
-                    selected = selected.flipDirection()
-                    onSelect(selected)
-                }
+                SortDirectionCard(option: selected) { onSelect(selected.flipDirection()) }
                     .padding(.bottom, 12)
                 VStack(spacing: 4) {
                     ForEach(methods, id: \.self) { method in
                         let isSelected = method.methodKey == selected.methodKey
                         Button {
                             onSelect(method.resolveForDirection(selected.direction))
-                            if let dismissMenu { dismissMenu() } else { dismiss() }
+                            dismiss()
                         } label: {
                             HStack {
                                 Text(method.methodLabel)
