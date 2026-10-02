@@ -16,7 +16,11 @@ public enum LibrarySorting {
     private enum Term {
         case none
         case int(Int64)
-        case text(String)
+        /// Text under SQLite `NOCASE`, stored as its folded UTF-8 bytes (`noCaseKey`).
+        case folded([UInt8])
+
+        /// A text term, folded once (comparing the folded bytes is `KotlinText.compareNoCase`).
+        static func text(_ s: String) -> Term { .folded(noCaseKey(s)) }
 
         static func compare(_ a: Term, _ b: Term) -> Int {
             switch (a, b) {
@@ -24,10 +28,44 @@ public enum LibrarySorting {
             case (.none, _): return -1
             case (_, .none): return 1
             case let (.int(x), .int(y)): return cmp(x, y)
-            case let (.text(x), .text(y)): return KotlinText.compareNoCase(x, y)
-            case (.int, .text): return -1
-            case (.text, .int): return 1
+            case let (.folded(x), .folded(y)): return compareBytes(x, y)
+            case (.int, .folded): return -1
+            case (.folded, .int): return 1
             }
+        }
+    }
+
+    /// SQLite `NOCASE`'s sort key: the UTF-8 bytes with ASCII capitals folded to lower case. Comparing two keys
+    /// byte by byte (shorter first on a common prefix) is exactly `KotlinText.compareNoCase` of the strings.
+    static func noCaseKey(_ s: String) -> [UInt8] {
+        s.utf8.map { ($0 >= 0x41 && $0 <= 0x5A) ? $0 + 0x20 : $0 }
+    }
+
+    /// memcmp order, a shorter key first when it is a prefix of the other.
+    static func compareBytes(_ a: [UInt8], _ b: [UInt8]) -> Int {
+        let count = min(a.count, b.count)
+        var i = 0
+        while i < count {
+            let x = a[i], y = b[i]
+            if x != y { return x < y ? -1 : 1 }
+            i += 1
+        }
+        return cmp(a.count, b.count)
+    }
+
+    /// A song id for `compareIds`, parsed once.
+    private struct IdKey {
+        let raw: String
+        let number: Int64?
+
+        init(_ id: String) {
+            raw = id
+            number = Int64(id)
+        }
+
+        static func compare(_ a: IdKey, _ b: IdKey) -> Int {
+            if let x = a.number, let y = b.number { return cmp(x, y) }
+            return KotlinText.compareBinary(a.raw, b.raw)
         }
     }
 
@@ -72,14 +110,20 @@ public enum LibrarySorting {
         }
     }
 
+    /// Keys are computed once per song — the terms, the folded title and the parsed id — instead of per comparison
+    /// (a 5,000-song sort makes ~60,000 comparisons); the order is the same.
     private static func sqlSort(_ songs: [Song], terms: [(term: (Song) -> Term, descending: Bool)]) -> [Song] {
-        songs.kotlinSorted { a, b in
-            for t in terms {
-                let c = Term.compare(t.term(a), t.term(b))
-                if c != 0 { return t.descending ? -c : c }
-            }
-            return chain(KotlinText.compareNoCase(a.title, b.title), compareIds(a.id, b.id))
+        let keyed = songs.map { song in
+            (song: song, terms: terms.map { $0.term(song) }, title: noCaseKey(song.title), id: IdKey(song.id))
         }
+        return keyed.kotlinSorted { a, b in
+            for index in terms.indices {
+                let c = Term.compare(a.terms[index], b.terms[index])
+                if c != 0 { return terms[index].descending ? -c : c }
+            }
+            let title = compareBytes(a.title, b.title)
+            return title != 0 ? title : IdKey.compare(a.id, b.id)
+        }.map(\.song)
     }
 
     /// `id ASC`: Android ids are integers; iOS ids are strings, compared numerically when both are integers.

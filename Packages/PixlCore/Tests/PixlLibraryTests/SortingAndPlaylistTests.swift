@@ -36,6 +36,66 @@ import Testing
         #expect(LibrarySorting.sortSongs(songs, by: .songDefaultOrder).map(\.id) == ["3", "2", "1"])
     }
 
+    /// The Songs and Liked sorts compute their keys once per song (folded NOCASE bytes, parsed ids); the order must
+    /// be exactly the per-comparison comparator's, ties and stability included.
+    @Test func songsTabPrecomputedKeysKeepTheComparatorsOrder() {
+        let words = ["alpha", "Alpha", "ALPHA", "alphA", "beta", "Beta", "Émile", "émile", "zed", "Zed", "a", "A", "ab",
+                     "aB", "", "10", "9", "a b", "a-b", "über", "Über", "ß"]
+        let rawIds = ["7", "007", "-5", "abc", "a1", "A1", "10", "9", "99999999999999999999", "x"]
+        var state: UInt64 = 0x9E37_79B9_7F4A_7C15
+        func next(_ bound: Int) -> Int {
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            return Int((state >> 33) % UInt64(bound))
+        }
+        var songs: [Song] = []
+        for index in 0..<400 {
+            // Unique ids: the fixed odd ones, then "s<index>" or a number in the index's own block of 1,000.
+            let generated = next(3) == 0 ? "s\(index)" : "\(index * 1000 + next(1000))"
+            let id = index < rawIds.count ? rawIds[index] : generated
+            songs.append(song(id, title: words[next(words.count)], artist: words[next(words.count)],
+                              album: words[next(words.count)], dateAdded: Int64(next(5)), duration: Int64(next(4)),
+                              track: next(3)))
+        }
+        func reference(_ term: ((Song, Song) -> Int)?, descending: Bool = false) -> [String] {
+            songs.kotlinSorted { a, b in
+                if let term { let c = term(a, b); if c != 0 { return descending ? -c : c } }
+                return chain(KotlinText.compareNoCase(a.title, b.title), LibrarySorting.compareIds(a.id, b.id))
+            }.map(\.id)
+        }
+        let text: (KeyPath<Song, String>) -> (Song, Song) -> Int = { key in
+            { KotlinText.compareNoCase($0[keyPath: key], $1[keyPath: key]) }
+        }
+        let expected: [(SortOption, [String])] = [
+            (.songTitleAZ, reference(text(\.title))),
+            (.songTitleZA, reference(text(\.title), descending: true)),
+            (.songArtist, reference(text(\.artist))),
+            (.songArtistDesc, reference(text(\.artist), descending: true)),
+            (.songAlbum, reference(text(\.album))),
+            (.songAlbumDesc, reference(text(\.album), descending: true)),
+            (.songDateAdded, reference({ cmp($0.dateAdded, $1.dateAdded) }, descending: true)),
+            (.songDurationAsc, reference({ cmp($0.duration, $1.duration) })),
+            (.songDefaultOrder, reference({ cmp($0.trackNumber, $1.trackNumber) })),
+            (.albumTitleAZ, reference(nil)),
+        ]
+        for (option, order) in expected {
+            #expect(LibrarySorting.sortSongs(songs, by: option).map(\.id) == order, "\(option)")
+        }
+        let likedAt = Dictionary(uniqueKeysWithValues: songs.enumerated().filter { $0.offset % 3 != 0 }
+            .map { ($0.element.id, Int64($0.offset % 7)) })
+        let likedTerm: (Song, Song) -> Int = { a, b in
+            switch (likedAt[a.id], likedAt[b.id]) {
+            case (nil, nil): return 0
+            case (nil, _): return -1
+            case (_, nil): return 1
+            case let (x?, y?): return cmp(x, y)
+            }
+        }
+        #expect(LibrarySorting.sortLikedSongs(songs, by: .likedSongDateLiked, likedAt: likedAt).map(\.id)
+            == reference(likedTerm, descending: true))
+        #expect(LibrarySorting.sortLikedSongs(songs, by: .likedSongArtist, likedAt: likedAt).map(\.id)
+            == reference(text(\.artist)))
+    }
+
     @Test func songsTabDatesAndDurations() {
         let songs = [song("1", title: "a", dateAdded: 5, duration: 300), song("2", title: "b", dateAdded: 9, duration: 100),
                      song("3", title: "c", dateAdded: 5, duration: 300)]
