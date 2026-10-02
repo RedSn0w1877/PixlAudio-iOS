@@ -6,18 +6,78 @@ import SwiftUI
 // `LibraryPlaylistsTab` → `PlaylistContainer`, `LibraryFoldersTab`) and their rows. Lists are lazy; every row is one
 // glass layer. Content scrolls under the shell's glass bars and ends 30 pt past them (`ListExtraBottomGap`).
 
-/// What every song page needs from the screen.
-struct LibraryPageContext {
-    let currentSongId: String?
-    let isPlaying: Bool
+/// What every song page needs from the screen: plain values only, so a page whose inputs did not change skips its
+/// body when LibraryView re-renders (actions go through `LibraryActions`, the current song is read per row).
+struct LibraryPageContext: Equatable {
+    /// The page's own tab.
+    let page: LibraryTab
     /// Android reserves 22 pt on the trailing side for its scrollbar when "show scrollbar" is on.
     let showsScrollbarGap: Bool
-    /// Changes when the locate button is tapped (scroll the current song into view).
+    /// Counts the locate taps on this page (scroll the current song into view); other pages' taps don't change it.
     let locateRequest: Int
-    let onCurrentVisible: (Bool) -> Void
-    let onSongMore: (Song) -> Void
 
     var trailingPadding: CGFloat { showsScrollbarGap ? 22 : 12 }
+}
+
+/// The Library pages' actions, and the bit of state the current song's row reports back. One object kept by
+/// LibraryView for its lifetime: pages hold it by reference instead of taking fresh closures on every LibraryView
+/// pass (closures never compare equal, so every page and every visible row used to re-run on each pass — a pill tap,
+/// play/pause, a track change, even with Library hidden under another tab). LibraryView sets the actions once.
+@Observable
+final class LibraryActions {
+    /// The current song's row is on screen on the visible page (hides the locate button). Read only by the action
+    /// row, not by LibraryView.
+    private(set) var currentSongVisible = false
+    /// The page on screen: only its rows report visibility.
+    @ObservationIgnored var visibleTab: LibraryTab = .songs
+
+    @ObservationIgnored var play: (Song, [Song]) -> Void = { _, _ in }
+    @ObservationIgnored var showSongOptions: (Song) -> Void = { _ in }
+    @ObservationIgnored var openAlbum: (Album) -> Void = { _ in }
+    @ObservationIgnored var toggleAlbum: (Album) -> Void = { _ in }
+    @ObservationIgnored var openArtist: (Artist) -> Void = { _ in }
+    @ObservationIgnored var openPlaylist: (Playlist) -> Void = { _ in }
+    @ObservationIgnored var reorderPlaylists: ([String]) -> Void = { _ in }
+    @ObservationIgnored var openFolder: (String) -> Void = { _ in }
+    @ObservationIgnored var openFolderPlaylist: (MusicFolder) -> Void = { _ in }
+
+    func reportCurrentVisible(_ visible: Bool, page: LibraryTab) {
+        guard page == visibleTab, currentSongVisible != visible else { return }
+        currentSongVisible = visible
+    }
+
+    /// A new page is on screen: its current row (if any) reports again.
+    func pageChanged(to tab: LibraryTab) {
+        visibleTab = tab
+        if currentSongVisible { currentSongVisible = false }
+    }
+}
+
+/// A song row of a Library page. It reads which song is current (and, for that row only, whether it plays), so the
+/// page around it doesn't; the current row keeps reporting its visibility for the locate button.
+private struct LibrarySongRow: View {
+    let song: Song
+    let songs: [Song]
+    let page: LibraryTab
+    let reportsVisibility: Bool
+    let selection: OrderedSelection<String>
+    let actions: LibraryActions
+
+    @Environment(PlaybackStore.self) private var playback
+
+    var body: some View {
+        let isCurrent = playback.currentSongId == song.id
+        let card = SongCard(song: song, isCurrent: isCurrent, isPlaying: isCurrent && playback.isPlaying,
+                            onTap: { actions.play(song, songs) }, onMore: { actions.showSongOptions(song) },
+                            isSelectionMode: selection.isActive, isSelected: selection.contains(song.id),
+                            selectionIndex: selection.index(of: song.id),
+                            onLongPress: { selection.toggle(song.id) })
+        if isCurrent && reportsVisibility {
+            card.onScrollVisibilityChange(threshold: 0.5) { visible in actions.reportCurrentVisible(visible, page: page) }
+        } else {
+            card
+        }
+    }
 }
 
 /// Android `ListExtraBottomGap`.
@@ -32,9 +92,10 @@ struct LibrarySongsPage: View {
     let emptyFilter: StorageFilter
     let isLiked: Bool
     let isLoading: Bool
-    let onPlay: (Song, [Song]) -> Void
+    let actions: LibraryActions
 
     @Environment(LibraryStore.self) private var library
+    @Environment(PlaybackStore.self) private var playback
 
     var body: some View {
         if songs.isEmpty && !isLoading {
@@ -47,7 +108,8 @@ struct LibrarySongsPage: View {
                 ScrollView {
                     LazyVStack(spacing: Tokens.SongCard.listSpacing) {
                         ForEach(songs) { song in
-                            songRow(song)
+                            LibrarySongRow(song: song, songs: songs, page: context.page, reportsVisibility: true,
+                                           selection: selection, actions: actions)
                                 .id(song.id)
                         }
                     }
@@ -58,26 +120,11 @@ struct LibrarySongsPage: View {
                 .scrollIndicators(context.showsScrollbarGap ? .visible : .hidden)
                 .refreshable { try? await library.refresh() }
                 .onChange(of: context.locateRequest) { _, _ in
-                    guard let id = context.currentSongId else { return }
+                    guard let id = playback.currentSongId else { return }
                     withAnimation(PixlMotion.state) { proxy.scrollTo(id, anchor: .center) }
                 }
             }
             .accessibilityIdentifier(isLiked ? "library.page.liked" : "library.page.songs")
-        }
-    }
-
-    @ViewBuilder
-    private func songRow(_ song: Song) -> some View {
-        let isCurrent = song.id == context.currentSongId
-        let card = SongCard(song: song, isCurrent: isCurrent, isPlaying: isCurrent && context.isPlaying,
-                            onTap: { onPlay(song, songs) }, onMore: { context.onSongMore(song) },
-                            isSelectionMode: selection.isActive, isSelected: selection.contains(song.id),
-                            selectionIndex: selection.index(of: song.id),
-                            onLongPress: { selection.toggle(song.id) })
-        if isCurrent {
-            card.onScrollVisibilityChange(threshold: 0.5) { visible in context.onCurrentVisible(visible) }
-        } else {
-            card
         }
     }
 }
@@ -90,8 +137,7 @@ struct LibraryAlbumsPage: View {
     let selection: OrderedSelection<Int64>
     let emptyFilter: StorageFilter
     let showsScrollbarGap: Bool
-    let onOpen: (Album) -> Void
-    let onToggle: (Album) -> Void
+    let actions: LibraryActions
 
     @Environment(LibraryStore.self) private var library
 
@@ -127,8 +173,8 @@ struct LibraryAlbumsPage: View {
         let isSelected = selection.contains(album.id)
         return AlbumCard(album: album, isList: list, isSelected: isSelected,
                          selectionIndex: selection.index(of: album.id))
-            .onTapGesture { selection.isActive ? onToggle(album) : onOpen(album) }
-            .onLongPressGesture(minimumDuration: 0.45) { onToggle(album) }
+            .onTapGesture { selection.isActive ? actions.toggleAlbum(album) : actions.openAlbum(album) }
+            .onLongPressGesture(minimumDuration: 0.45) { actions.toggleAlbum(album) }
             .accessibilityAddTraits(.isButton)
             .accessibilityIdentifier("albumCard.\(album.id)")
     }
@@ -276,7 +322,7 @@ struct LibraryArtistsPage: View {
     let artists: [Artist]
     let emptyFilter: StorageFilter
     let showsScrollbarGap: Bool
-    let onOpen: (Artist) -> Void
+    let actions: LibraryActions
 
     @Environment(LibraryStore.self) private var library
 
@@ -288,7 +334,7 @@ struct LibraryArtistsPage: View {
             ScrollView {
                 LazyVStack(spacing: 8) {
                     ForEach(artists) { artist in
-                        ArtistRow(artist: artist) { onOpen(artist) }
+                        ArtistRow(artist: artist) { actions.openArtist(artist) }
                     }
                 }
                 .padding(.leading, 12)
@@ -350,8 +396,7 @@ struct LibraryPlaylistsPage: View {
     let playlists: [Playlist]
     let selection: OrderedSelection<String>
     let showsScrollbarGap: Bool
-    let onOpen: (Playlist) -> Void
-    let onReorder: ([String]) -> Void
+    let actions: LibraryActions
 
     @Environment(LibraryStore.self) private var library
     @Environment(\.appTheme) private var theme
@@ -388,7 +433,7 @@ struct LibraryPlaylistsPage: View {
         return PlaylistRow(playlist: playlist, songs: playlist.songIds.prefix(4).compactMap { library.song(id: $0) },
                            isSelectionMode: selection.isActive, isSelected: selection.contains(playlist.id),
                            selectionIndex: selection.index(of: playlist.id), showsDragHandle: reorderable,
-                           onTap: { selection.isActive ? selection.toggle(playlist.id) : onOpen(playlist) },
+                           onTap: { selection.isActive ? selection.toggle(playlist.id) : actions.openPlaylist(playlist) },
                            onLongPress: { selection.toggle(playlist.id) },
                            dragPayload: playlist.id)
             .dropDestination(for: String.self) { items, _ in
@@ -397,7 +442,7 @@ struct LibraryPlaylistsPage: View {
                 guard let from = ids.firstIndex(of: source), let to = ids.firstIndex(of: playlist.id) else { return false }
                 ids.remove(at: from)
                 ids.insert(source, at: to)
-                onReorder(ids)
+                actions.reorderPlaylists(ids)
                 return true
             }
     }
@@ -513,23 +558,23 @@ struct OptionalLongPress: ViewModifier {
 struct LibraryFoldersPage: View {
     let folders: [MusicFolder]
     let folderPlaylists: [MusicFolder]
+    /// Each folder's sorted subfolders and songs (`LibraryModel`, computed off the main actor).
+    let folderContents: [String: LibraryModel.FolderContents]
     let folderPath: String?
     let isPlaylistView: Bool
-    let sort: SortOption
     let context: LibraryPageContext
     let selection: OrderedSelection<String>
-    let onOpenFolder: (String) -> Void
-    let onOpenFolderPlaylist: (MusicFolder) -> Void
-    let onPlay: (Song, [Song]) -> Void
+    let actions: LibraryActions
 
     @Environment(LibraryStore.self) private var library
+    @Environment(PlaybackStore.self) private var playback
 
     var body: some View {
-        let active = folderPath.flatMap { LibraryModel.folder(at: $0, in: folders) }
+        // Precomputed: no tree walk or sort here.
+        let active = folderPath.flatMap { folderContents[$0] }
         let showsPlaylistCards = isPlaylistView && active == nil
-        let items: [MusicFolder] = showsPlaylistCards ? folderPlaylists
-            : (active.map { LibrarySorting.sortFolders($0.subFolders, by: sort) } ?? folders)
-        let songs = LibraryModel.folderSongs(active?.songs ?? [], sort: sort)
+        let items: [MusicFolder] = showsPlaylistCards ? folderPlaylists : (active?.subFolders ?? folders)
+        let songs = active?.songs ?? []
         Group {
             if items.isEmpty && songs.isEmpty {
                 LibraryEmptyState(systemImage: "folder.fill", title: "No folders found",
@@ -540,18 +585,14 @@ struct LibraryFoldersPage: View {
                         LazyVStack(spacing: 8) {
                             ForEach(items, id: \.path) { folder in
                                 if showsPlaylistCards {
-                                    FolderRow(folder: folder, asPlaylist: true) { onOpenFolderPlaylist(folder) }
+                                    FolderRow(folder: folder, asPlaylist: true) { actions.openFolderPlaylist(folder) }
                                 } else {
-                                    FolderRow(folder: folder, asPlaylist: false) { onOpenFolder(folder.path) }
+                                    FolderRow(folder: folder, asPlaylist: false) { actions.openFolder(folder.path) }
                                 }
                             }
                             ForEach(songs) { song in
-                                let isCurrent = song.id == context.currentSongId
-                                SongCard(song: song, isCurrent: isCurrent, isPlaying: isCurrent && context.isPlaying,
-                                         onTap: { onPlay(song, songs) }, onMore: { context.onSongMore(song) },
-                                         isSelectionMode: selection.isActive, isSelected: selection.contains(song.id),
-                                         selectionIndex: selection.index(of: song.id),
-                                         onLongPress: { selection.toggle(song.id) })
+                                LibrarySongRow(song: song, songs: songs, page: context.page, reportsVisibility: false,
+                                               selection: selection, actions: actions)
                                     .id(song.id)
                             }
                         }
@@ -562,7 +603,7 @@ struct LibraryFoldersPage: View {
                     .scrollIndicators(context.showsScrollbarGap ? .visible : .hidden)
                     .refreshable { try? await library.refresh() }
                     .onChange(of: context.locateRequest) { _, _ in
-                        guard let id = context.currentSongId else { return }
+                        guard let id = playback.currentSongId else { return }
                         withAnimation(PixlMotion.state) { proxy.scrollTo(id, anchor: .center) }
                     }
                 }
@@ -588,7 +629,7 @@ struct FolderRow: View {
         Button(action: onTap) {
             HStack(spacing: 16) {
                 if asPlaylist {
-                    ArtCollage(songs: Array(LibraryModel.allSongs(folder).prefix(9)), size: 48)
+                    ArtCollage(songs: LibraryModel.firstSongs(folder, limit: 9), size: 48)
                 } else {
                     Image(systemName: "folder.fill")
                         .font(.system(size: 22, weight: .semibold))

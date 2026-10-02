@@ -395,13 +395,18 @@ struct SongMultiSelectionSheet: View {
     @Environment(\.appTheme) private var theme
     @Environment(\.dismiss) private var dismiss
     @State private var confirmsDelete = false
+    /// The local files to share, resolved off the main actor once the sheet is up (a URL parse per song).
+    @State private var shareURLs: [URL] = []
 
     var body: some View {
         let allLiked = !songs.isEmpty && songs.allSatisfy(\.isFavorite)
-        let shareURLs = songs.compactMap(SongFiles.shareURL)
+        // Enabled from the first frame: stops at the first local file.
+        let canShare = songs.contains { SongFiles.shareURL($0) != nil }
         ScrollView {
             VStack(spacing: 0) {
-                SelectionSheetHeader(sources: songs.map(ArtworkSource.init(song:)), countText: "\(songs.count) SONGS")
+                // The header stacks four covers: only those are resolved.
+                SelectionSheetHeader(sources: songs.prefix(4).map(ArtworkSource.init(song:)),
+                                     countText: "\(songs.count) SONGS")
                 Spacer().frame(height: 16)
                 VStack(spacing: 10) {
                     HStack(spacing: 10) {
@@ -428,7 +433,7 @@ struct SongMultiSelectionSheet: View {
                                 .frame(maxWidth: .infinity, minHeight: 80)
                                 .contentShape(.circle)
                         }
-                        .disabled(shareURLs.isEmpty)
+                        .disabled(!canShare)
                         .pixlGlass(in: Capsule(), tint: theme.secondary.opacity(GlassTint.prominent), interactive: true)
                         .accessibilityLabel("Share all")
                         }
@@ -471,6 +476,7 @@ struct SongMultiSelectionSheet: View {
                 finish()
             }
         }
+        .task { shareURLs = await SongFiles.shareURLs(contentUris: songs.map(\.contentUriString)) }
         .accessibilityIdentifier("sheet.songSelection")
     }
 
@@ -594,7 +600,11 @@ struct PlaylistMultiSelectionSheet: View {
         .padding(.horizontal, 16)
         .padding(.top, 24)
         .task(id: playlists.map(\.id)) {
-            exportURLs = playlists.compactMap { PlaylistExport.writeTemporaryM3U($0, library: library) }
+            var urls: [URL] = []
+            for playlist in playlists {
+                if let url = await PlaylistExport.writeTemporaryM3U(playlist, library: library) { urls.append(url) }
+            }
+            if !Task.isCancelled { exportURLs = urls }
         }
         .accessibilityIdentifier("sheet.playlistSelection")
     }
@@ -621,11 +631,19 @@ nonisolated enum PlaylistExport {
         return cleaned.isEmpty ? "playlist" : cleaned
     }
 
+    /// Writes the playlist's M3U to a temporary file for sharing. The song lookups are dictionary reads on the main
+    /// actor; building the text and the atomic file write happen off it (the sheets call this while presenting).
     @MainActor
-    static func writeTemporaryM3U(_ playlist: Playlist, library: LibraryStore) -> URL? {
+    static func writeTemporaryM3U(_ playlist: Playlist, library: LibraryStore) async -> URL? {
         let songs = playlist.songIds.compactMap { library.song(id: $0) }
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(sanitizeFileName(playlist.name)).m3u")
-        guard (try? m3u(playlist, songs: songs).write(to: url, atomically: true, encoding: .utf8)) != nil else { return nil }
+        return await writeM3U(songs: songs, name: sanitizeFileName(playlist.name))
+    }
+
+    /// Under approachable concurrency a plain `nonisolated async` function would run on its caller's actor.
+    @concurrent
+    static func writeM3U(songs: [Song], name: String) async -> URL? {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(name).m3u")
+        guard (try? M3U.generate(songs: songs).write(to: url, atomically: true, encoding: .utf8)) != nil else { return nil }
         return url
     }
 }
@@ -634,8 +652,18 @@ nonisolated enum PlaylistExport {
 nonisolated enum SongFiles {
     /// The song's file URL when it is a local file (streamed / demo songs have none).
     static func shareURL(_ song: Song) -> URL? {
-        guard let url = URL(string: song.contentUriString), url.isFileURL else { return nil }
+        shareURL(contentUri: song.contentUriString)
+    }
+
+    static func shareURL(contentUri: String) -> URL? {
+        guard let url = URL(string: contentUri), url.isFileURL else { return nil }
         return url
+    }
+
+    /// Every local file among the content URIs, resolved off the main actor (a selection can hold thousands).
+    @concurrent
+    static func shareURLs(contentUris: [String]) async -> [URL] {
+        contentUris.compactMap { shareURL(contentUri: $0) }
     }
 }
 
