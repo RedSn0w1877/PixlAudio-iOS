@@ -294,7 +294,12 @@ private struct FullPlayerLayer: View {
                 .frame(width: screenSize.width, height: screenSize.height)
                 .modifier(FullLayerPlacement(collapsedMinX: collapsedMinX))
                 .animation(nil) { content in
-                    content.opacity(isShown ? 1 : 0)
+                    // While hidden it also takes no room in the card's ZStack, as when it was removed: a screen-sized
+                    // child widened the ZStack, and the mini player beside it was laid out at the screen's width
+                    // (its trailing controls ran past the card). The zero frame anchors it top-leading, unchanged.
+                    content
+                        .opacity(isShown ? 1 : 0)
+                        .frame(width: isShown ? nil : 0, height: isShown ? nil : 0, alignment: .topLeading)
                 }
                 .onAppear { sheet.fullPlayerDidAppear() }
         }
