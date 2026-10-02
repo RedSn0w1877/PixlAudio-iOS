@@ -83,7 +83,6 @@ extension View {
     func withAppRoutes() -> some View {
         navigationDestination(for: AppRoute.self) { route in
             RouteDestination(route: route)
-                .modifier(ShellBarSpace(rootOf: nil))
         }
     }
 }

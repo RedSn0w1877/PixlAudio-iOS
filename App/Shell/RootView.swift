@@ -11,9 +11,9 @@ import UIKit
 /// While the keyboard is up the bars step aside: on Android they stay at the bottom under the keyboard (edge to edge,
 /// only the content gets the IME inset), so they must not ride up above it here (stage 7c, Search's field).
 ///
-/// Transition performance (docs/performance.md): the bars are an overlay and every page reserves their room itself
-/// (`ShellBarSpace`), so a push, a pop or the mini player's first appearance re-lays out only the page on screen;
-/// the selected tab fades in on its own short curve; hidden tabs don't animate album-colour changes.
+/// Transition performance (docs/performance.md): the bars are an overlay that takes no layout space, so a push, a
+/// pop or the mini player's first appearance doesn't touch the three stacks' layout; the selected tab fades in on its
+/// own short curve; hidden tabs don't animate album-colour changes.
 struct RootView: View {
     @Environment(Router.self) private var router
     @Environment(PlaybackStore.self) private var playback
@@ -21,7 +21,7 @@ struct RootView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(SettingsStore.self) private var settings
     @Environment(\.colorScheme) private var colorScheme
-    @State private var chrome = ShellChrome()
+    @State private var isKeyboardVisible = false
 
     var body: some View {
         @Bindable var router = router
@@ -33,16 +33,17 @@ struct RootView: View {
                 tab(.search, path: $router.searchPath) { SearchView() }
                 tab(.library, path: $router.libraryPath) { LibraryView() }
             }
-            // The bars float over the tabs and take no layout space: each page reserves their room with its own
-            // clear `safeAreaBar` (`ShellBarSpace`), which also gives its scroll views the system's soft scroll edge
-            // effect under the bars (this replaces Android's gradients behind its bar).
+            // The bars float over the tabs and take no layout space. They used to be a `safeAreaBar` around the
+            // three stacks, whose inset never reached the pages (each `NavigationStack` laid its pages out without it:
+            // content scrolls under the bars, and pages that need room above the mini player reserve it themselves)
+            // but whose every change — a push or pop showing or hiding the tab bar, the mini player appearing —
+            // re-ran the safe-area layout of all three stacks. An overlay places the bars exactly where the bar did.
             .overlay(alignment: .bottom) {
                 bottomBars
             }
             // Stage 8: the player sheet — the mini player resting in `MiniPlayerSlot` and expanding over everything.
             PlayerSheetHost()
         }
-        .environment(chrome)
         .updateBanner(environment.updates)
         .environment(\.appTheme, colors.app)
         .environment(\.playerTheme, colors.player)
@@ -67,13 +68,13 @@ struct RootView: View {
         // the card down instead of dropping it and rebuilding it when the keyboard goes.
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             withAnimation(PixlMotion.bars) {
-                chrome.isKeyboardVisible = true
+                isKeyboardVisible = true
                 environment.playerSheet.hiddenForKeyboard = true
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
             withAnimation(PixlMotion.bars) {
-                chrome.isKeyboardVisible = false
+                isKeyboardVisible = false
                 environment.playerSheet.hiddenForKeyboard = false
             }
         }
@@ -83,11 +84,8 @@ struct RootView: View {
                                     @ViewBuilder root: () -> Content) -> some View {
         let isSelected = router.selection == tab
         return NavigationStack(path: path) {
-            root()
-                .modifier(ShellBarSpace(rootOf: tab))
-                .withAppRoutes()
+            root().withAppRoutes()
         }
-        .environment(\.shellTab, tab)
         // A song change animates the album colours over 0.45 s (the root `.animation` below): only on the tab that
         // is on screen. A hidden tab is at opacity 0, so snapping its colours shows nothing and costs no frames.
         .transaction(value: themeStore.albumPair) { transaction in
@@ -105,9 +103,9 @@ struct RootView: View {
 
     @ViewBuilder
     private var bottomBars: some View {
-        let showsBar = router.isNavigationBarVisible && !chrome.isKeyboardVisible
+        let showsBar = router.isNavigationBarVisible && !isKeyboardVisible
         VStack(spacing: Tokens.Shell.miniPlayerSpacing) {
-            if playback.current != nil, !chrome.isKeyboardVisible {
+            if playback.current != nil, !isKeyboardVisible {
                 // Stage 8: the player sheet draws the mini player here (and expands it from here).
                 MiniPlayerSlot(bottomCornerRadius: Tokens.Shell.navBarCornerRadius)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
