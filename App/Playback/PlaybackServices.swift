@@ -163,6 +163,8 @@ final class PlaybackServices {
         engine.replayGainEnabled = playback.replayGainEnabled
         engine.replayGainUseAlbumGain = playback.replayGainUseAlbumGain
         session.resumeOnHeadsetReconnect = playback.resumeOnHeadsetReconnect
+        // Stage 14: Magic Instrumentalize (Experimental), the tap's mid/side vocal reducer.
+        engine.setVocalAttenuation(Float(settings.experimental.vocalAttenuation))
         // Stage 7d's mapping: observed preferences, saved custom presets and loudness included.
         engine.applyEqualizer(settings.equalizer.engineSettings)
     }

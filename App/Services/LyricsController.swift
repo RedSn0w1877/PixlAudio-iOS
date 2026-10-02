@@ -30,6 +30,8 @@ final class LyricsController {
     var message: String?
 
     @ObservationIgnored private let service: LyricsService?
+    /// The service behind this controller (stage 14's lyric sync reads and saves through it).
+    var lyricsService: LyricsService? { service }
     @ObservationIgnored private let settings: SettingsStore
     @ObservationIgnored private let isUITest: Bool
     @ObservationIgnored private var loadTask: Task<Void, Never>?
