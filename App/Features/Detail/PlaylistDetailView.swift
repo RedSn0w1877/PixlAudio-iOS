@@ -157,26 +157,26 @@ struct PlaylistDetailView: View {
         let enabled = !songs.isEmpty
         // The two buttons render together (spacing below their 8 pt gap).
         return GlassEffectContainer(spacing: 4) {
-        HStack(spacing: 8) {
-            SegmentedGlassButton(title: "Play it", systemImage: "play.fill", accessibilityLabel: "Play",
-                                 leading: 60, trailing: 14, height: 56, horizontalPadding: 10,
-                                 tint: theme.primary.opacity(GlassTint.prominent), foreground: theme.onPrimary,
-                                 fillsWidth: true) {
-                guard let first = songs.first else { return }
-                if playback.isShuffleEnabled { playback.setShuffleEnabled(false) }
-                playback.play(first, in: songs)
+            HStack(spacing: 8) {
+                SegmentedGlassButton(title: "Play it", systemImage: "play.fill", accessibilityLabel: "Play",
+                                     leading: 60, trailing: 14, height: 56, horizontalPadding: 10,
+                                     tint: theme.primary.opacity(GlassTint.prominent), foreground: theme.onPrimary,
+                                     fillsWidth: true) {
+                    guard let first = songs.first else { return }
+                    if playback.isShuffleEnabled { playback.setShuffleEnabled(false) }
+                    playback.play(first, in: songs)
+                }
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("playlist.play")
+                SegmentedGlassButton(title: "Shuffle", systemImage: "shuffle", accessibilityLabel: "Shuffle",
+                                     leading: 14, trailing: 60, height: 56, horizontalPadding: 10,
+                                     tint: theme.secondaryContainer.opacity(GlassTint.prominent),
+                                     foreground: theme.onSecondaryContainer, fillsWidth: true) {
+                    playback.playShuffled(songs)
+                }
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("playlist.shuffle")
             }
-            .frame(maxWidth: .infinity)
-            .accessibilityIdentifier("playlist.play")
-            SegmentedGlassButton(title: "Shuffle", systemImage: "shuffle", accessibilityLabel: "Shuffle",
-                                 leading: 14, trailing: 60, height: 56, horizontalPadding: 10,
-                                 tint: theme.secondaryContainer.opacity(GlassTint.prominent),
-                                 foreground: theme.onSecondaryContainer, fillsWidth: true) {
-                playback.playShuffled(songs)
-            }
-            .frame(maxWidth: .infinity)
-            .accessibilityIdentifier("playlist.shuffle")
-        }
         }
         .disabled(!enabled)
         .opacity(enabled ? 1 : 0.5)
@@ -188,21 +188,21 @@ struct PlaylistDetailView: View {
     private var editRow: some View {
         // The three buttons render together (spacing below their 8 pt gaps).
         GlassEffectContainer(spacing: 4) {
-        HStack(spacing: 8) {
-            SegmentedGlassButton(title: "Add", systemImage: "plus", accessibilityLabel: "Add songs", leading: 21,
-                                 trailing: 21, height: 42, horizontalPadding: 12,
-                                 tint: theme.tertiaryContainer.opacity(GlassTint.prominent),
-                                 foreground: theme.onTertiaryContainer) { showsAddSongs = true }
-                .accessibilityIdentifier("playlist.add")
-            modeButton("Remove", systemImage: "minus.circle", isOn: isRemoveMode) {
-                withAnimation(PixlMotion.state) { isRemoveMode.toggle() }
+            HStack(spacing: 8) {
+                SegmentedGlassButton(title: "Add", systemImage: "plus", accessibilityLabel: "Add songs", leading: 21,
+                                     trailing: 21, height: 42, horizontalPadding: 12,
+                                     tint: theme.tertiaryContainer.opacity(GlassTint.prominent),
+                                     foreground: theme.onTertiaryContainer) { showsAddSongs = true }
+                    .accessibilityIdentifier("playlist.add")
+                modeButton("Remove", systemImage: "minus.circle", isOn: isRemoveMode) {
+                    withAnimation(PixlMotion.state) { isRemoveMode.toggle() }
+                }
+                .accessibilityIdentifier("playlist.remove")
+                modeButton("Reorder", systemImage: "arrow.up.arrow.down", isOn: isReorderMode) {
+                    withAnimation(PixlMotion.state) { isReorderMode.toggle() }
+                }
+                .accessibilityIdentifier("playlist.reorder")
             }
-            .accessibilityIdentifier("playlist.remove")
-            modeButton("Reorder", systemImage: "arrow.up.arrow.down", isOn: isReorderMode) {
-                withAnimation(PixlMotion.state) { isReorderMode.toggle() }
-            }
-            .accessibilityIdentifier("playlist.reorder")
-        }
         }
         .padding(.horizontal, 20)
         .padding(.top, 2)

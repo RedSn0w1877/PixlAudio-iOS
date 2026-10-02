@@ -42,36 +42,36 @@ struct LibrarySortSheet: View {
                 }
                 // The method rows render together (spacing 0, below their 4 pt gap), inside the same 20 pt clip.
                 GlassEffectContainer(spacing: 0) {
-                VStack(spacing: 4) {
-                    ForEach(methods, id: \.self) { method in
-                        let isSelected = method.methodKey == selected.methodKey
-                        Button {
-                            prefs.setSort(method.resolveForDirection(selected.direction), for: tab)
-                            dismiss()
-                        } label: {
-                            HStack {
-                                Text(method.methodLabel)
-                                    .pixlFont(.bodyLarge)
-                                    .foregroundStyle(isSelected ? theme.onSecondaryContainer : theme.onSurface)
-                                Spacer()
-                                Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
-                                    .font(.system(size: 20, weight: .regular))
-                                    .foregroundStyle(isSelected ? theme.primary : theme.onSurfaceVariant)
+                    VStack(spacing: 4) {
+                        ForEach(methods, id: \.self) { method in
+                            let isSelected = method.methodKey == selected.methodKey
+                            Button {
+                                prefs.setSort(method.resolveForDirection(selected.direction), for: tab)
+                                dismiss()
+                            } label: {
+                                HStack {
+                                    Text(method.methodLabel)
+                                        .pixlFont(.bodyLarge)
+                                        .foregroundStyle(isSelected ? theme.onSecondaryContainer : theme.onSurface)
+                                    Spacer()
+                                    Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+                                        .font(.system(size: 20, weight: .regular))
+                                        .foregroundStyle(isSelected ? theme.primary : theme.onSurfaceVariant)
+                                }
+                                .padding(.leading, 20)
+                                .padding(.trailing, 14)
+                                .padding(.vertical, 14)
+                                .contentShape(.rect)
                             }
-                            .padding(.leading, 20)
-                            .padding(.trailing, 14)
-                            .padding(.vertical, 14)
-                            .contentShape(.rect)
+                            .buttonStyle(.plain)
+                            .pixlGlass(in: RoundedRectangle(cornerRadius: 8, style: .continuous),
+                                       tint: (isSelected ? theme.secondaryContainer : theme.surfaceContainerLow)
+                                           .opacity(isSelected ? GlassTint.prominent : GlassTint.surface),
+                                       interactive: true)
+                            .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+                            .accessibilityIdentifier("sort.\(method.methodKey)")
                         }
-                        .buttonStyle(.plain)
-                        .pixlGlass(in: RoundedRectangle(cornerRadius: 8, style: .continuous),
-                                   tint: (isSelected ? theme.secondaryContainer : theme.surfaceContainerLow)
-                                       .opacity(isSelected ? GlassTint.prominent : GlassTint.surface),
-                                   interactive: true)
-                        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
-                        .accessibilityIdentifier("sort.\(method.methodKey)")
                     }
-                }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 if tab == .albums {

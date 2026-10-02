@@ -60,7 +60,7 @@ struct LibraryView: View {
         .onAppear {
             configureActions()
             applyLaunchState(prefs)
-            actions.pageChanged(to: tab)
+            actions.visibleTab = tab
         }
         .onChange(of: inputs(prefs), initial: true) { _, new in model.update(new) }
         .onChange(of: tab) { _, newTab in
