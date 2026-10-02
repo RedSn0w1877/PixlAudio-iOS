@@ -17,21 +17,21 @@ struct SaveQueueAsPlaylistSheet: View {
     @State private var name = ""
     @State private var query = ""
     @State private var selected: Set<String> = []
+    /// Every song id of the queue (built once; `selected` is always a subset of it).
+    @State private var allIds: Set<String> = []
+    /// Every row, and the rows the search shows — built once and on query changes, never in `body` (the queue
+    /// can be the whole library: a Set of it was built seven times per pass, the filter ran twice).
+    @State private var allRows: [QueueSaveRow] = []
+    @State private var rows: [QueueSaveRow]?
+    @State private var filterTask: Task<Void, Never>?
     @FocusState private var nameFocused: Bool
 
-    private var filtered: [Song] {
-        let trimmed = query.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return songs }
-        return songs.filter {
-            $0.title.localizedCaseInsensitiveContains(trimmed) || $0.artist.localizedCaseInsensitiveContains(trimmed)
-        }
-    }
-
-    private var allSelected: Bool { !songs.isEmpty && Set(songs.map(\.id)).isSubset(of: selected) }
-
     var body: some View {
+        // Until onAppear has built the rows (the first frame), every song shows, as before.
+        let visible = rows ?? QueueSaveRow.rows(songs)
+        let allSelected = !allIds.isEmpty && selected.count == allIds.count
         VStack(spacing: 0) {
-            topBar
+            topBar(allSelected: allSelected)
             VStack(spacing: 12) {
                 fieldBox {
                     TextField("Playlist name", text: $name)
@@ -63,7 +63,7 @@ struct SaveQueueAsPlaylistSheet: View {
             Rectangle().fill(theme.outlineVariant.opacity(0.4)).frame(height: 1)
             ScrollView {
                 LazyVStack(spacing: 8) {
-                    if filtered.isEmpty {
+                    if visible.isEmpty {
                         VStack(spacing: 12) {
                             Image(systemName: "magnifyingglass")
                                 .font(.system(size: 40, weight: .semibold))
@@ -74,8 +74,8 @@ struct SaveQueueAsPlaylistSheet: View {
                         }
                         .padding(.vertical, 48)
                     } else {
-                        ForEach(Array(filtered.enumerated()), id: \.offset) { _, song in
-                            row(song)
+                        ForEach(visible) { item in
+                            row(item.song)
                         }
                     }
                 }
@@ -89,16 +89,47 @@ struct SaveQueueAsPlaylistSheet: View {
         .background(theme.surface.ignoresSafeArea())
         .onAppear {
             name = defaultName
-            selected = Set(songs.map(\.id))
+            allRows = QueueSaveRow.rows(songs)
+            rows = allRows
+            allIds = Set(songs.map(\.id))
+            selected = allIds
             Task {
                 try? await Task.sleep(for: .milliseconds(250))
                 nameFocused = true
             }
         }
+        .onChange(of: songs.count) { _, _ in
+            allRows = QueueSaveRow.rows(songs)
+            allIds = Set(songs.map(\.id))
+            selected.formIntersection(allIds)
+            applyQuery()
+        }
+        .onChange(of: query) { _, _ in applyQuery() }
         .accessibilityIdentifier("sheet.saveQueue")
     }
 
-    private var topBar: some View {
+    /// Shows the rows matching the search: at once for short queues, off the main actor for long ones (the result
+    /// lands only if the query is still current; the previous rows stay until then).
+    private func applyQuery() {
+        filterTask?.cancel()
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        let all = allRows
+        guard !trimmed.isEmpty else {
+            rows = all
+            return
+        }
+        guard all.count > 300 else {
+            rows = QueueSaveRow.filter(all, query: trimmed)
+            return
+        }
+        filterTask = Task {
+            let result = await Task.detached(priority: .userInitiated) { QueueSaveRow.filter(all, query: trimmed) }.value
+            guard !Task.isCancelled, trimmed == query.trimmingCharacters(in: .whitespaces) else { return }
+            rows = result
+        }
+    }
+
+    private func topBar(allSelected: Bool) -> some View {
         HStack(spacing: 12) {
             GlassCircleButton(systemImage: "xmark", accessibilityLabel: "Close",
                               tint: theme.surfaceContainerHigh.opacity(GlassTint.container)) { dismiss() }
@@ -109,7 +140,7 @@ struct SaveQueueAsPlaylistSheet: View {
                 .lineLimit(1)
             Spacer(minLength: 8)
             Button {
-                selected = allSelected ? [] : Set(songs.map(\.id))
+                selected = allSelected ? [] : allIds
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: allSelected ? "checklist.unchecked" : "checklist.checked")
@@ -210,5 +241,26 @@ struct SaveQueueAsPlaylistSheet: View {
         env.libraryEditor.createPlaylist(name: finalName, songIds: ordered)
         LibraryToast.shared.show(String(localized: "Playlist created"))
         dismiss()
+    }
+}
+
+/// A queue entry in the save sheet. The queue can hold a song twice, so the id is the song id plus its occurrence.
+nonisolated struct QueueSaveRow: Identifiable, Sendable {
+    let id: String
+    let song: Song
+
+    static func rows(_ songs: [Song]) -> [QueueSaveRow] {
+        var seen: [String: Int] = [:]
+        return songs.map { song in
+            let occurrence = seen[song.id, default: 0]
+            seen[song.id] = occurrence + 1
+            return QueueSaveRow(id: "\(song.id)#\(occurrence)", song: song)
+        }
+    }
+
+    static func filter(_ rows: [QueueSaveRow], query: String) -> [QueueSaveRow] {
+        rows.filter {
+            $0.song.title.localizedCaseInsensitiveContains(query) || $0.song.artist.localizedCaseInsensitiveContains(query)
+        }
     }
 }
