@@ -224,11 +224,18 @@ actor ArtworkPipeline {
         return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
     }
 
+    /// Encodes in memory, then writes atomically (a temporary file renamed into place): a reader never sees a
+    /// half-written thumbnail. The second disk tier reads other sizes' files while their loads may still be writing
+    /// them (an album header's 1320 px and its grid card's 540 px on a first visit), and a kill mid-write used to
+    /// leave a truncated file that every later launch decoded. Same encoder and quality, so the same bytes.
     private nonisolated static func writeJPEG(_ image: CGImage, to url: URL) {
-        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.jpeg.identifier as CFString, 1, nil)
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(data as CFMutableData, UTType.jpeg.identifier as CFString,
+                                                                 1, nil)
         else { return }
         CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: 0.88] as CFDictionary)
-        CGImageDestinationFinalize(destination)
+        guard CGImageDestinationFinalize(destination) else { return }
+        try? (data as Data).write(to: url, options: .atomic)
     }
 
     private nonisolated static func diskName(_ key: String) -> String {
