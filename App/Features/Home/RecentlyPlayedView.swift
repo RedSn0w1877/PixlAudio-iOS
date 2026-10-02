@@ -17,20 +17,29 @@ struct RecentlyPlayedView: View {
     @State private var queue: [Song] = []
     @State private var isLoaded = false
 
+    private var stamp: ScreenDataCache.Stamp {
+        ScreenDataCache.Stamp(historyRevision: env.home.history.revision, songCount: library.songs.count)
+    }
+
     var body: some View {
+        // Until this visit has loaded, the last result computed from the same inputs (a revisit opens on its
+        // content, not a spinner swapped for the list mid-push).
+        let cached = isLoaded ? nil : ScreenDataCache.recentlyPlayed(range, stamp: stamp)
         ZStack(alignment: .topLeading) {
             LinearGradient(colors: [theme.secondary.opacity(0.24), theme.surface.opacity(0.55), theme.surface],
                            startPoint: .top, endPoint: UnitPoint(x: 0.5, y: 0.6))
                 .background(theme.surface)
                 .ignoresSafeArea()
 
-            if !isLoaded {
+            if let cached {
+                list(groups: cached.groups, queue: cached.queue)
+            } else if !isLoaded {
                 ProgressView()
                     .controlSize(.large)
                     .tint(theme.primary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                list
+                list(groups: groups, queue: queue)
             }
 
             GlassCircleButton(systemImage: "arrow.backward", accessibilityLabel: "Back",
@@ -52,7 +61,7 @@ struct RecentlyPlayedView: View {
         var songCount: Int
     }
 
-    private var list: some View {
+    private func list(groups: [HomeLogic.TimestampGroup], queue: [Song]) -> some View {
         ScrollView {
             LazyVStack(spacing: 8) {
                 RecentlyPlayedHeader()
@@ -112,6 +121,7 @@ struct RecentlyPlayedView: View {
         let events = home.history.events
         let songsById = library.songsById
         let range = self.range
+        let stamp = self.stamp
         let use24Hour = HomeLogic.uses24HourClock
         let result = await Task.detached(priority: .userInitiated) { () -> ([HomeLogic.TimestampGroup], [Song]) in
             let now = clock.nowMs()
@@ -122,6 +132,7 @@ struct RecentlyPlayedView: View {
             return (groups, items.map(\.song))
         }.value
         guard !Task.isCancelled else { return }
+        ScreenDataCache.storeRecentlyPlayed(range, groups: result.0, queue: result.1, stamp: stamp)
         groups = result.0
         queue = result.1
         isLoaded = true

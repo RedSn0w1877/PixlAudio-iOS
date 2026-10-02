@@ -174,6 +174,7 @@ final class AppEnvironment {
         // The output-route monitor queries the audio session when first touched: do it now, while nothing animates,
         // not in the full player's first frame.
         _ = AudioRouteMonitor.shared
+        await AIProviderStatus.refresh(self)
         await spotify.start()
         await updates.checkIfDue()
     }

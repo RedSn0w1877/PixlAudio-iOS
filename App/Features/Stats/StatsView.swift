@@ -22,18 +22,25 @@ struct StatsView: View {
     @State private var dimension: CategoryDimension = .song
     @State private var collapse = StatsCollapseState()
 
+    private var stamp: ScreenDataCache.Stamp {
+        ScreenDataCache.Stamp(historyRevision: env.home.history.revision, songCount: library.songs.count)
+    }
+
     var body: some View {
+        // The summary for this range: computed on this visit, else the last one computed from the same inputs (a
+        // revisit opens on its content, not a spinner swapped for the whole page mid-push).
+        let shown = (summary?.range == range ? summary : nil) ?? ScreenDataCache.stats(range, stamp: stamp) ?? summary
         GeometryReader { proxy in
             let topInset = proxy.safeAreaInsets.top
             ZStack(alignment: .top) {
                 theme.surface.ignoresSafeArea()
-                if isLoading && summary == nil {
+                if isLoading && shown == nil {
                     ProgressView()
                         .controlSize(.large)
                         .tint(theme.primary)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    list(topInset: topInset)
+                    list(topInset: topInset, summary: shown)
                 }
                 StatsHeader(collapse: collapse, topInset: topInset, range: $range, isBusy: isLoading,
                             onBack: { router.pop() }, onRefresh: { refreshToken += 1 })
@@ -57,7 +64,7 @@ struct StatsView: View {
         var token: Int
     }
 
-    private func list(topInset: CGFloat) -> some View {
+    private func list(topInset: CGFloat, summary: PlaybackStatsSummary?) -> some View {
         ScrollView {
             LazyVStack(spacing: 24) {
                 Spacer().frame(height: topInset + StatsMetrics.expandedBarHeight + StatsMetrics.tabsHeight
@@ -93,12 +100,14 @@ struct StatsView: View {
         let events = home.history.events
         let songs = library.songs
         let range = self.range
+        let stamp = self.stamp
         if summary?.range != range { isLoading = true }
         let result = await Task.detached(priority: .userInitiated) {
             PlaybackStats.buildSummary(range: range, songs: songs, nowMillis: clock.nowMs(), events: events,
                                        timeZone: clock.timeZone)
         }.value
         guard !Task.isCancelled else { return }
+        ScreenDataCache.storeStats(result, stamp: stamp)
         summary = result
         isLoading = false
     }

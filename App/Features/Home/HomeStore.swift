@@ -129,9 +129,14 @@ final class HomeStore {
             HomeStore.compute(snapshot: snapshot, events: events, nowMs: now, timeZone: clock.timeZone,
                               savedDaily: saved.daily, savedYourMix: saved.yourMix)
         }
+        let stamp = ScreenDataCache.Stamp(historyRevision: history.revision, songCount: snapshot.songs.count)
         let computation = Task { [weak self] in
             let result = await task.value
             guard let self, !Task.isCancelled else { return }
+            // The overview card's week summary seeds Stats' default range.
+            if let overview = result.content.statsOverview, overview.range == .week {
+                ScreenDataCache.storeStats(overview, stamp: stamp)
+            }
             if result.content != self.content { self.content = result.content }
             if result.generatedMixes { self.saveMixes(result.content, nowMs: now) }
             self.isPreparing = false
