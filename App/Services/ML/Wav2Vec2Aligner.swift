@@ -70,7 +70,7 @@ actor Wav2Vec2Aligner {
             try Task.checkCancellation()
             Self.fillNormalised(input, from: samples, range: window.inputStartSample..<window.inputEndSample)
             let provider = try MLDictionaryFeatureProvider(dictionary: [ModelCatalog.Wav2Vec2.input: MLFeatureValue(multiArray: input)])
-            let result = try model.prediction(from: provider)
+            let result = try Self.predict(model, provider)
             guard let logits = result.featureValue(for: ModelCatalog.Wav2Vec2.output)?.multiArrayValue,
                   logits.shape.count == 3, logits.shape[2].intValue == vocabulary,
                   logits.shape[1].intValue >= window.localFirstFrame + window.keptFrames else {
@@ -81,6 +81,12 @@ actor Wav2Vec2Aligner {
             await progress(index + 1, windows.count)
         }
         return emissions
+    }
+
+    /// The synchronous prediction (inside an async function the SDK's async overload would be picked; the model is
+    /// confined to this actor, so it never crosses into another isolation domain).
+    private static func predict(_ model: MLModel, _ provider: any MLFeatureProvider) throws -> any MLFeatureProvider {
+        try model.prediction(from: provider)
     }
 
     /// Android `normalize` (double-precision mean and population variance, `std = sqrt(var + 1e-7)`) over the real
