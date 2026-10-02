@@ -68,6 +68,10 @@ final class DualDeckEngine: PlaybackEngine {
     /// The playlist the queue came from (per-playlist transition rules); nil for other sources.
     var queuePlaylistId: String? { didSet { if oldValue != queuePlaylistId { rescheduleNext() } } }
     private(set) var suspensions = TransitionSuspensions()
+    /// Open exact-timing sessions (the lyrics sync editor): no hand-over, pause at the end of the song.
+    private(set) var exactTimingSessions = 0
+    /// The current song reached its end during an exact-timing session (playback paused on it).
+    var onExactTimingItemEnded: (() -> Void)?
     /// The sleep timer's end-of-track mode: don't hand over or crossfade into the next song.
     var stopAfterCurrentItem = false { didSet { if oldValue != stopAfterCurrentItem { rescheduleNext() } } }
     var replayGainEnabled = false { didSet { if oldValue != replayGainEnabled { refreshReplayGain() } } }
@@ -256,6 +260,20 @@ final class DualDeckEngine: PlaybackEngine {
         if suspensions.resume(owner) { rescheduleNext() }
     }
 
+    /// The lyrics sync editor's session (Android `DualPlayerEngine.beginExactTimingSession`): nothing is handed over
+    /// or crossfaded into the next song, and when the song ends playback pauses at its end instead of advancing, so
+    /// the editor can offer "Keep going" / "Time the rest roughly". Counted, like the transition suspensions.
+    func beginExactTimingSession() {
+        exactTimingSessions += 1
+        if exactTimingSessions == 1 { rescheduleNext() }
+    }
+
+    func endExactTimingSession() {
+        guard exactTimingSessions > 0 else { return }
+        exactTimingSessions -= 1
+        if exactTimingSessions == 0 { rescheduleNext() }
+    }
+
     /// Stops playback and empties both decks (the queue is kept).
     func stop() {
         pause()
@@ -432,7 +450,7 @@ final class DualDeckEngine: PlaybackEngine {
         nextTask = nil
         cancelCrossfadePlan()
         discard(active.removeUpcoming())
-        guard let current = activeItem, !stopAfterCurrentItem else { return }
+        guard let current = activeItem, !stopAfterCurrentItem, exactTimingSessions == 0 else { return }
         if let plan = crossfadePlan(for: current) {
             startCrossfade(plan)
             return
@@ -530,6 +548,14 @@ final class DualDeckEngine: PlaybackEngine {
     private func activeItemEndedWithoutSuccessor() {
         guard let ended = activeItem else { return }
         activeItem = nil
+        if exactTimingSessions > 0 {
+            // The sync editor: stay on this song, paused at its end.
+            playWhenReady = false
+            emitPlaying()
+            loadCurrent(at: max(0, ended.durationSeconds - 0.05))
+            onExactTimingItemEnded?()
+            return
+        }
         if let next = queue.nextIndexForAutoAdvance {
             if stopAfterCurrentItem {
                 // End-of-track sleep timer: move on, paused.

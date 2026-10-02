@@ -342,7 +342,7 @@ struct LyricsView: View {
     private var syncYourselfAction: (() -> Void)? {
         guard let song else { return nil }
         let router = self.router
-        return { router.present(.lyricsSync(songId: song.id)) }
+        return { LyricsSyncEditorView.open(songId: song.id, router: router, fromLyrics: true) }
     }
 
     // MARK: More sheet

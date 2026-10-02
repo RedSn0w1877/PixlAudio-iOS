@@ -44,6 +44,10 @@ final class LyricsController {
         service = isUITest ? nil : LyricsService(persistence: persistence)
     }
 
+    /// The lyrics service for stage 10's sync editor (stored lyrics, saving the user's timing as source "user", the
+    /// online search of its words screen); nil in UI tests.
+    var syncService: LyricsService? { service }
+
     // MARK: Loading
 
     /// Loads `song`'s lyrics unless they are already loaded (call on every song change while lyrics matter).

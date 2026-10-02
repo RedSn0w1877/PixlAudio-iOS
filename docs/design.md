@@ -352,6 +352,46 @@ lyricsEmphasis (47 600), lyricsInterlude (61 000), lyricsDuet, lyricsBrightArt, 
 lyricsPlain, lyricsNone, lyricsImmersive, lyricsLight, lyricsMoreSheet, lyricsFetchDialog, lyricsOptions,
 lyricsCascade.f0…f7 (first-show cascade frames, live clock).
 
+## Stage 10 notes (lyrics sync editor)
+
+Port of Android `presentation/lyrics/sync/**` + `LyricsSyncEditorStateHolder` (`AppCover.lyricsSync` →
+`LyricsSyncEditorView`), on PixlLyrics' `LyricsTapSync` / `LyricsExport` / `LyricsSyncDraftStore`.
+
+- **Session** (`LyricsSyncSession`, created by the cover, closed on dismiss): phases Loading → Resume / Words / Intro /
+  Manage → Tap (and Fix a line) → Preview, Android's dialogs as system alerts, notices as a glass pill. While open it
+  pauses, suspends crossfades (`DualDeckEngine.suspendTransitions(owner: "lyrics_sync")`) and opens an exact-timing
+  session (`beginExactTimingSession`: no hand-over; at the end of the song the engine pauses on it → "The song ended
+  before the last N words"); `close()` restores the rate and both. Drafts autosave 1 s after a change to
+  `Application Support/lyrics_sync_drafts` (Android's files), are flushed on close / background / song change and
+  deleted after Save. Save stores `LyricsDocCodec.encode(doc)` with source `"user"` through `LyricsService.save`
+  (user-synced lyrics win over every fetcher), learns the reaction offset from the nudge, and returns to the lyrics
+  screen with Android's toast. Reaction offsets: Settings › Lyrics (100 ms speaker / 180 ms Bluetooth, chosen by the
+  route at open).
+- **Tap pad:** a UIKit touch surface under the SwiftUI pad stamps on touch *down* with `UITouch.timestamp` (latency
+  removed from the player position); a hold ≥ 350 ms marks the word's end; extra fingers are taps; scale 0.97 + glow +
+  `sensoryFeedback(.impact(weight: .light))` (the haptics setting). Speeds 1 / 0.75 / 0.5 use the engine's
+  pitch-preserving rate.
+- **Word marks** (Android's latest): the word being sung has a white 1.5 pt box with a spring pop (1.06 → 1, damping
+  0.6 / stiffness 900); tapped words fill with the accent from the first to the last letter in 260 ms (right to left
+  for RTL words, `TextScripts.isRtlWord`); the next word white; later words 40 %. Music breaks (> 5 s to the next
+  anchor) swap the context for a countdown ring that reads the position per frame only while shown.
+- **Glass:** Android's Liquid Glass palette as clear glass over the artwork — chips / ✕ / secondary buttons white 12 %,
+  the pad white 16 % (36 pt corners), the preview panel black 32 % (32 pt corners), the accent (album `primary` when
+  luminous enough, else `inversePrimary`) at `GlassTint.prominent` for Start / Save / the selected speed / the intro
+  icons; 35 % black over bright art. Buttons inside the panel are fills. Preview uses the real `KaraokeLyricsView` with
+  its own `LyricsDriver` on the editor's clock and the lyrics screen's appearance preferences.
+- **Entry points:** the lyrics More sheet's first row, the empty-state button and the sync chip
+  (`LyricsSyncEditorView.open(…, fromLyrics: true)` — the editor returns to the lyrics screen); Edit song's "Change the
+  words" (`.words`) and "Fix timing" (`.fixTiming`), which start the song paused if another one is playing.
+- **Shared-file changes (additive):** `Playback/DualDeckEngine.swift` (exact-timing session), `Stores/PlaybackStore.swift`
+  (explicit `resume()` / `pause()`), `Services/LyricsController.swift` (`syncService`), `Features/Lyrics/LyricsView.swift`
+  and `Features/SongInfo/EditSongSheet.swift` (open through `LyricsSyncEditorView.open`).
+
+Screenshot ids (`UITests/LyricsSyncScreenshotTests`, `-screen lyricsSync -syncStep <step>`; ready `screen.lyricsSync`):
+syncIntro, syncWords, syncResume, syncManage, syncTap, syncTapReady, syncTapBreak, syncTapNotice, syncTapEnded,
+syncFixLine, syncPreview, syncPreviewFixLine, syncTapLight, syncSpeedMenu, syncLiveIntro / syncLiveTapped (a live run
+on the demo engine).
+
 ## Stage 11 notes (YouTube playback)
 
 - **Services** live in `App/Services/YouTube/` and are built once as `AppEnvironment.youtube` (`YouTubeServices`; a demo
@@ -468,8 +508,8 @@ How the stages meet on `main`:
   `LyricsController.translateViaAI` sends the song's scanned lyrics, else the LRC of what the screen shows, through
   `env.ai.lyricsTranslator` in the device language, and imports a valid reply like a file (each translation pairs with
   its line by timestamp; the toast is Android's message). Stage 9's on-device translation stays below it, renamed "Translate on device" (character-bubble icon) so the two rows read apart.
-- **Lyrics ↔ sync editor:** "Sync the words yourself" / the sync chip present `AppCover.lyricsSync(songId:)` — still
-  stage 10's placeholder (stage 10 is not in wave A).
+- **Lyrics ↔ sync editor:** "Sync the words yourself" / the sync chip present `AppCover.lyricsSync(songId:)` — stage
+  10's editor (see Stage 10 notes).
 - **Spotify ↔ YouTube:** `AppEnvironment` builds `SpotifyService` after `YouTubeServices` and passes
   `InnerTubeSpotifyBridge` (App/Services/Spotify): the matcher searches through stage 11's InnerTube session, matched
   videos resolve through stage 11's `StreamingPlayableURLResolver` (download → complete cache file →
