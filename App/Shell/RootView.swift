@@ -38,7 +38,7 @@ struct RootView: View {
             // content scrolls under the bars, and pages that need room above the mini player reserve it themselves)
             // but whose every change — a push or pop showing or hiding the tab bar, the mini player appearing —
             // re-ran the safe-area layout of all three stacks. An overlay places the bars exactly where the bar did.
-            .overlay(alignment: .bottom) {
+            .safeAreaBar(edge: .bottom, spacing: 0) {
                 bottomBars
             }
             // Stage 8: the player sheet — the mini player resting in `MiniPlayerSlot` and expanding over everything.
