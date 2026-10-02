@@ -577,7 +577,7 @@ final class TapPadTouchView: UIView {
 
 /// A column that gives its children their ideal heights and splits the rest between the weighted ones (Compose
 /// `Modifier.weight`), honouring a minimum height — the tap screen's context (weight 1) and pad (1.25, ≥ 200 pt).
-struct SyncWeightedColumn: Layout {
+nonisolated struct SyncWeightedColumn: Layout {
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let width = proposal.width ?? 0
         let height = proposal.height ?? heights(width: width, total: nil, subviews: subviews).reduce(0, +)
@@ -629,11 +629,11 @@ struct SyncWeightedColumn: Layout {
     }
 }
 
-private struct SyncLayoutWeightKey: LayoutValueKey {
+nonisolated private struct SyncLayoutWeightKey: LayoutValueKey {
     static let defaultValue: CGFloat = 0
 }
 
-private struct SyncLayoutMinHeightKey: LayoutValueKey {
+nonisolated private struct SyncLayoutMinHeightKey: LayoutValueKey {
     static let defaultValue: CGFloat = 0
 }
 
@@ -646,7 +646,7 @@ extension View {
 }
 
 /// Words left to right, wrapping (Compose `FlowRow` with 4 pt between rows).
-struct SyncFlowLayout: Layout {
+nonisolated struct SyncFlowLayout: Layout {
     var lineSpacing: CGFloat = 4
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {

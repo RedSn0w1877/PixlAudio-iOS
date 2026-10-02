@@ -42,40 +42,38 @@ struct LyricsSyncEditorView: View {
 
     var body: some View {
         let palette = SyncEditorPalette(theme: theme, brightArt: brightArt)
-        GeometryReader { geometry in
-            ZStack {
-                LyricsArtworkBackground(
-                    artSource: (session?.song ?? playback.current).flatMap(ArtworkSource.init(song:)),
-                    fallbackTheme: theme,
-                    paused: scenePhase != .active || ProcessInfo.processInfo.isLowPowerModeEnabled
-                        || (isUITest && session?.frozenPositionMs != nil),
-                    deterministic: isUITest,
-                    onBrightArtChange: { brightArt = $0 })
-                // A light scrim keeps white controls legible over any artwork.
-                Color.black.opacity(shownPhase == .preview ? 0.08 : 0.24)
-                    .allowsHitTesting(false)
+        ZStack {
+            LyricsArtworkBackground(
+                artSource: (session?.song ?? playback.current).flatMap(ArtworkSource.init(song:)),
+                fallbackTheme: theme,
+                paused: scenePhase != .active || ProcessInfo.processInfo.isLowPowerModeEnabled
+                    || (isUITest && session?.frozenPositionMs != nil),
+                deterministic: isUITest,
+                onBrightArtChange: { brightArt = $0 })
+                .ignoresSafeArea()
+            // A light scrim keeps white controls legible over any artwork.
+            Color.black.opacity(shownPhase == .preview ? 0.08 : 0.24)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
 
-                if let session {
-                    screen(for: shownPhase, session: session, palette: palette)
-                        .padding(.top, geometry.safeAreaInsets.top)
-                        .padding(.bottom, geometry.safeAreaInsets.bottom)
-                        .id(Self.screenKey(shownPhase))
-                        .transition(.asymmetric(insertion: .opacity.animation(.easeOut(duration: 0.22).delay(0.06)),
-                                                removal: .opacity.animation(.easeIn(duration: 0.14))))
+            // The screens keep to the safe area (status bar, home indicator and the keyboard on the words screen).
+            if let session {
+                screen(for: shownPhase, session: session, palette: palette)
+                    .id(Self.screenKey(shownPhase))
+                    .transition(.asymmetric(insertion: .opacity.animation(.easeOut(duration: 0.22).delay(0.06)),
+                                            removal: .opacity.animation(.easeIn(duration: 0.14))))
 
-                    if let notice = session.notice {
-                        SyncNoticePill(notice: notice, palette: palette, onUndo: session.undoRemoval,
-                                       onTimeout: { session.dismissNotice(id: $0) })
-                            .padding(.horizontal, 24)
-                            .padding(.bottom, geometry.safeAreaInsets.bottom + 92)
-                            .frame(maxHeight: .infinity, alignment: .bottom)
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
-                    }
+                if let notice = session.notice {
+                    SyncNoticePill(notice: notice, palette: palette, onUndo: session.undoRemoval,
+                                   onTimeout: { session.dismissNotice(id: $0) })
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 92)
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-            .ignoresSafeArea()
-            .animation(.spring(response: 0.35, dampingFraction: 0.9), value: session?.notice)
         }
+        .animation(.spring(response: 0.35, dampingFraction: 0.9), value: session?.notice)
         .background(Color.black.ignoresSafeArea())
         .preferredColorScheme(.dark)
         .accessibilityIdentifier("screen.lyricsSync")
