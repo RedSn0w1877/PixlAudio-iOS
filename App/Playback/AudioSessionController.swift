@@ -88,18 +88,20 @@ final class AudioSessionController {
 
     /// An activation started off the main actor, while the item loads (`prepareActivation`).
     private var preparing: Task<Void, Never>?
-    /// Counts the main-actor decisions about the session (`activate`, `deactivate`, an interruption, a media-services
-    /// reset). An activation finishing off the main actor records its result only if nothing was decided meanwhile.
-    private var decisions = 0
+    /// Counts the main-actor decisions about the session (`prepareActivation`, `activate`, `deactivate`, an
+    /// interruption, a media-services reset). An activation finishing off the main actor records its result only if
+    /// nothing was decided meanwhile. Process-wide, like the shared `AVAudioSession` the activation goes to: a late
+    /// result from one controller never undoes what a newer one decided (tests create a controller per engine).
+    private static var decisions = 0
     /// The last decision was `deactivate()`: an activation that finishes after it is undone.
-    private var lastDecisionDeactivated = false
+    private static var lastDecisionDeactivated = false
 
     /// An off-main activation is still under way (tests wait for it).
     var isPreparingActivation: Bool { preparing != nil }
 
     private func decide(deactivating: Bool) {
-        decisions &+= 1
-        lastDecisionDeactivated = deactivating
+        Self.decisions &+= 1
+        Self.lastDecisionDeactivated = deactivating
     }
 
     /// Starts activating the session off the main actor (`setActive(true)` is a call to the audio server), so the
@@ -111,16 +113,16 @@ final class AudioSessionController {
     /// interruption or a reset the system's state stands and `activate()` re-activates when playback resumes.
     func prepareActivation() {
         guard !isActive, preparing == nil else { return }
-        let decision = decisions
+        decide(deactivating: false)
+        let decision = Self.decisions
         preparing = Task { [weak self] in
             let activated = await Self.activateSharedSession()
-            guard let self else { return }
-            self.preparing = nil
+            self?.preparing = nil
             guard activated else { return }
-            if decision == self.decisions {
-                self.isActive = true
-            } else if self.lastDecisionDeactivated, !self.isActive {
-                try? self.session.setActive(false, options: .notifyOthersOnDeactivation)
+            if decision == Self.decisions {
+                self?.isActive = true
+            } else if Self.lastDecisionDeactivated, self?.isActive != true {
+                try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             }
         }
     }
