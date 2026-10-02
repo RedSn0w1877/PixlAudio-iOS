@@ -133,4 +133,38 @@ final class AudioSessionControllerTests: XCTestCase {
         XCTAssertTrue(settled)
         XCTAssertEqual(controller.isActive, activated, "the late activation result must not undo the newer activate()")
     }
+
+    // MARK: Giving back a prepared session nothing played on
+
+    func testReleaseAfterAPreparedActivationDeactivates() async {
+        let controller = AudioSessionController()
+        defer { controller.deactivate() }
+        controller.prepareActivation()
+        let settled = await waitUntil(timeout: 5) { !controller.isPreparingActivation }
+        XCTAssertTrue(settled)
+        XCTAssertEqual(controller.isPreparedOnly, controller.isActive)
+        controller.releasePreparedActivation()
+        XCTAssertFalse(controller.isActive)
+        XCTAssertFalse(controller.isPreparedOnly)
+    }
+
+    func testReleaseWhileThePreparedActivationIsInFlightEndsInactive() async {
+        let controller = AudioSessionController()
+        controller.prepareActivation()
+        controller.releasePreparedActivation()
+        let settled = await waitUntil(timeout: 5) { !controller.isPreparingActivation }
+        XCTAssertTrue(settled)
+        XCTAssertFalse(controller.isActive)
+    }
+
+    func testReleaseAfterActivateKeepsTheSession() async {
+        let controller = AudioSessionController()
+        defer { controller.deactivate() }
+        controller.prepareActivation()
+        let activated = controller.activate()
+        let settled = await waitUntil(timeout: 5) { !controller.isPreparingActivation }
+        XCTAssertTrue(settled)
+        controller.releasePreparedActivation()
+        XCTAssertEqual(controller.isActive, activated, "a session something played on is not given back")
+    }
 }

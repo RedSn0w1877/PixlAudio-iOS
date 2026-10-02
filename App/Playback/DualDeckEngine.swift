@@ -148,6 +148,8 @@ final class DualDeckEngine: PlaybackEngine {
 
     func pause() {
         playWhenReady = false
+        // Paused before the first item started: give back a session that `setQueue` activated ahead of the load.
+        if activeItem == nil { session.releasePreparedActivation() }
         emitPlaying()
         active.pause()
         fade?.deck.pause()
@@ -400,6 +402,8 @@ final class DualDeckEngine: PlaybackEngine {
         } else {
             playWhenReady = false
             emitPlaying()
+            // Nothing played: give back a session that `setQueue` activated ahead of the load.
+            session.releasePreparedActivation()
         }
     }
 

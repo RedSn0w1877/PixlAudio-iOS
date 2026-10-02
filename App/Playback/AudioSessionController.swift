@@ -76,6 +76,7 @@ final class AudioSessionController {
     @discardableResult
     func activate() -> Bool {
         decide(deactivating: false)
+        isPreparedOnly = false
         if isActive { return true }
         do {
             try session.setActive(true)
@@ -98,6 +99,9 @@ final class AudioSessionController {
 
     /// An off-main activation is still under way (tests wait for it).
     var isPreparingActivation: Bool { preparing != nil }
+    /// The session is active only because `prepareActivation` ran: nothing has called `activate()` (nothing played)
+    /// since. `releasePreparedActivation()` undoes exactly that.
+    private(set) var isPreparedOnly = false
 
     private func decide(deactivating: Bool) {
         Self.decisions &+= 1
@@ -121,6 +125,7 @@ final class AudioSessionController {
             guard activated else { return }
             if decision == Self.decisions {
                 self?.isActive = true
+                self?.isPreparedOnly = true
             } else if Self.lastDecisionDeactivated, self?.isActive != true {
                 try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             }
@@ -133,9 +138,19 @@ final class AudioSessionController {
         (try? AVAudioSession.sharedInstance().setActive(true)) != nil
     }
 
+    /// Undoes `prepareActivation()` when nothing played after it — the queue's items all failed to load, or playback
+    /// was paused before the first one loaded — so another app's audio isn't left interrupted by a session PixlAudio
+    /// never used. Before the activation moved ahead of the load, the session was only activated by `activate()`, at
+    /// the first successful start. Does nothing once `activate()` has run.
+    func releasePreparedActivation() {
+        guard isPreparedOnly || preparing != nil else { return }
+        deactivate()
+    }
+
     /// Deactivates after a permanent stop so other apps can resume.
     func deactivate() {
         decide(deactivating: true)
+        isPreparedOnly = false
         guard isActive else { return }
         try? session.setActive(false, options: .notifyOthersOnDeactivation)
         isActive = false
@@ -157,6 +172,7 @@ final class AudioSessionController {
             let actions = focus.transientLoss(deckSnapshot())
             decide(deactivating: false)
             isActive = false
+            isPreparedOnly = false
             onCommand?(.focus(actions))
         } else {
             let actions = focus.interruptionEnded(shouldResume: shouldResume, transitionRunning: isTransitionRunning())
@@ -191,6 +207,7 @@ final class AudioSessionController {
     func handleMediaServicesReset() {
         decide(deactivating: false)
         isActive = false
+        isPreparedOnly = false
         focus = AudioFocusResumeState()
         configure()
         onCommand?(.rebuildAfterReset)
