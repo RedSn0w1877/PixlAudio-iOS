@@ -629,3 +629,12 @@ Signatures checked against the developer.apple.com documentation JSON (2026-10-0
 | `UIApplication.beginBackgroundTask(withName:expirationHandler:)`, `endBackgroundTask(_:)` | 4 | /documentation/uikit/uiapplication/beginbackgroundtask(withname:expirationhandler:) | `TaisBackgroundRun` | Fallback when the continued-processing request can't be submitted. |
 | `AVPlayer.setRate(_:time:atHostTime:)` with an item time | 6 | /documentation/avfoundation/avplayer/setrate(_:time:athosttime:) | `Deck.start(rate:at:atHostTime:)` | The in-sync switch between a song and its instrumental: the idle deck starts at the playing deck's future media time on the host clock. |
 
+
+## Liquid-lens tab bar (2026-10-02)
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `UISegmentedControl` (`init(items:)`, `selectedSegmentTintColor`, `selectedSegmentIndex`, `sendActions(for:)`) | 13 | /documentation/uikit/uisegmentedcontrol | `LiquidTabBar` | On iOS 26+ its selection is the system liquid lens (clear, swelling, magnifying on touch). Touches overridden so the lens moves on touch down (FabBar technique). |
+| `UIGlassEffect` (`isInteractive`), `UIVisualEffectView` | 26.0 | /documentation/uikit/uiglasseffect | `LiquidTabBarView` | The bar's capsule of interactive glass. |
+| `UIView.cornerConfiguration` (`.capsule()`) | 26.0 | /documentation/uikit/uiview/cornerconfiguration | `LiquidTabBarView` | Capsule shape of the glass view. |
+| `CADisplayLink`, `CAShapeLayer` masks, `CALayer.presentation()` | 3.1 | /documentation/quartzcore/cadisplaylink | `LiquidTabSegmentedControl` | Masks the accent glyph copies to the lens' animated frame; paused when the lens is still. |
+| `UIViewRepresentable` | 13 | /documentation/swiftui/uiviewrepresentable | `LiquidTabBar` | Hosts the UIKit bar in SwiftUI. |

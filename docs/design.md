@@ -24,7 +24,7 @@ Beta 2: `pp_*.png`; current Library › Songs: `owner-library-songs-2026-09-30.p
 | Song list item (`EnhancedSongListItem`) | Glass rounded card, same geometry; playing = capsule + brighter `primaryContainer` glass | `SongCard` |
 | `TopAppBar` with large title + actions | Same title in SF Pro + glass action circles | `LargeHeader` |
 | Section title + subtitle (+ refresh button) | Same text styles, optional glass circle | `SectionHeader` |
-| Bottom `NavigationBar` (custom compact bar, 3 icons) | **Owner change 2026-10-01:** an iOS-style floating glass tab bar (symbol + label, icons only in compact mode) with an accent-tinted glass pill that glides between tabs and follows a dragging finger | `GlassNavBar` |
+| Bottom `NavigationBar` (custom compact bar, 3 icons) | **Owner change 2026-10-01/02:** the iOS tab bar — floating interactive-glass capsule (symbol + label, icons only in compact mode) whose selection is the system liquid lens (accent-tinted pill at rest; clear, swelling, magnifying lens under the finger) | `GlassNavBar` + `LiquidTabBar` |
 | Mini player (player sheet, collapsed) | Glass bar tinted with the album's `primaryContainer`, same layout | `MiniPlayerBar` |
 | `ModalBottomSheet` | System sheet (glass by itself) + PixlAudio's sheet layout inside | `SheetScaffold` + `.pixlSheet()` |
 | Ripple, state layers | Glass `.interactive()` highlight; `PressScaleButtonStyle` for fills sitting on glass | `GlassStyle.swift` |
@@ -120,6 +120,20 @@ PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact ba
   Re-tapping the selected tab pops it to its root. Android's NavBar Style (default / full width) setting is gone;
   compact mode remains. Not the system `TabView` bar: its selection platter can't take the accent colour and the
   player sheet expands from the mini player slot above the bar.
+- **2026-10-02 (owner: "the pill doesnt go clear or expand, and it doesnt refract text underneath. use like a demo
+  thing online"):** the bar is now built on the system's liquid lens, following the open-source FabBar (MIT,
+  github.com/ryanashcraft/FabBar). Outside UITabBar, only UISegmentedControl has that lens, so `LiquidTabBar` puts a
+  segmented control in a capsule of interactive `UIGlassEffect` (2 pt padding).
+  - **Glyphs:** the segments' labels and background images are hidden. PixlAudio's glyphs (18 pt semibold symbol over
+    a 10 pt semibold label; 21 pt symbol alone in compact mode) are drawn inside each segment view, so the lens
+    magnifies them.
+  - **Pill and lens colour:** `selectedSegmentTintColor` is the accent (`primary` at `GlassTint.prominent`), the
+    resting pill. A filled, accent-tinted copy of each glyph is masked to the lens' presentation frame by a display
+    link that pauses after three still frames. That copy is `onPrimary` at rest and `primary` while the finger is
+    down, when the lens is clear.
+  - **Touch:** the lens moves on touch down and the selection changes on touch up; a re-tap pops the tab to its root.
+  - **Fragility:** segments and lens are found by class name (`UISegment`, `_UILiquidLensView`). If iOS changes
+    that hierarchy, the glyphs aren't injected and the control falls back to its own segment titles.
 - The bars are attached with `safeAreaBar`, so content scrolls all the way down under them with the system's soft
   scroll edge effect; Android's bottom gradients behind its bar (Home, Search) are gone.
 - The bar shows only at a tab's root — every pushed screen hides it (Android `routesWithHiddenNavigationBar`); the

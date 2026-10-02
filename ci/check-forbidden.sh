@@ -61,6 +61,8 @@ fi
 #      Material3, "Material" types) — PixlAudio palette role names (primaryContainer, …) are fine.
 #    - Fake glass: blur materials (.ultraThinMaterial, .thinMaterial, .regularMaterial, .thickMaterial,
 #      .ultraThickMaterial, .bar, Material.*), UIBlurEffect / UIVisualEffectView. Use glassEffect / .glass styles.
+#      A UIVisualEffectView holding a UIGlassEffect is real Liquid Glass (UIKit's API for it): such lines name
+#      UIGlassEffect (code or trailing comment) and are allowed — the tab bar's lens needs UIKit glass (LiquidTabBar).
 #    Comment lines are ignored, so docs may name what they replace.
 material_pattern="\b(Ripple[A-Za-z]*|FloatingActionButton|FAB[A-Z][A-Za-z]*|[A-Za-z]*TonalElevation|tonalElevation|MaterialTheme|Material3|Material[A-Z][A-Za-z]*|Material\.)"
 fake_glass_pattern="[(:,][[:space:]]*\.(ultraThinMaterial|thinMaterial|regularMaterial|thickMaterial|ultraThickMaterial|bar)\b|\bUIBlurEffect\b|\bUIVisualEffectView\b"
@@ -69,7 +71,7 @@ while IFS= read -r hit; do
 done < <(grep -rnE --include="*.swift" "$material_pattern" App 2>/dev/null | grep -vE "^[^:]+:[0-9]+:[[:space:]]*//")
 while IFS= read -r hit; do
   err "$hit: fake glass (blur material) — use glassEffect / .buttonStyle(.glass) (orchestrator notes, Liquid Glass rules)"
-done < <(grep -rnE --include="*.swift" "$fake_glass_pattern" App 2>/dev/null | grep -vE "^[^:]+:[0-9]+:[[:space:]]*//")
+done < <(grep -rnE --include="*.swift" "$fake_glass_pattern" App 2>/dev/null | grep -vE "^[^:]+:[0-9]+:[[:space:]]*//" | grep -vE "UIVisualEffectView.*UIGlassEffect|UIGlassEffect.*UIVisualEffectView")
 
 # 5. No "Apple" / "Apple Music" in UI strings (string literals in app sources, the string catalog, Info.plist values).
 while IFS= read -r hit; do
