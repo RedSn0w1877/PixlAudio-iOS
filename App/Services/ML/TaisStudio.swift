@@ -307,9 +307,8 @@ final class TaisStudio {
         let modelURL = try await model(.wav2vec2, for: key)
         try Task.checkCancellation()
         report(key, 5, "Syncing \(song.title) word-by-word…")
-        let samples = try await Task.detached(priority: .userInitiated) {
-            try await AudioPCMReader.read(url: source, sampleRate: Double(Wav2Vec2Vocabulary.sampleRate), channels: 1)[0]
-        }.value
+        let samples = try await AudioPCMReader.read(url: source, sampleRate: Double(Wav2Vec2Vocabulary.sampleRate),
+                                                    channels: 1)[0]
         try Task.checkCancellation()
         let totalDurationMs = Int(Int64(samples.count) * 1000 / Int64(Wav2Vec2Vocabulary.sampleRate))
         let targetWords = TaisLyricsAlignment.targetWords(lines: lines)

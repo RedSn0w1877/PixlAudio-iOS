@@ -13,6 +13,9 @@ nonisolated enum AudioPCMReader {
     }
 
     /// Deinterleaved channels (`channels` arrays of equal length). Checks for cancellation between buffers.
+    /// `@concurrent`: decoding a whole song never runs on the caller's actor (approachable concurrency would put a
+    /// main-actor caller's call on the main thread).
+    @concurrent
     static func read(url: URL, sampleRate: Double, channels: Int,
                      maximumSeconds: Double = 20 * 60) async throws -> [[Float]] {
         let asset = AVURLAsset(url: url)

@@ -245,6 +245,7 @@ final class ModelManager {
     }
 
     /// Verify → extract → compile → move into place (off the main actor).
+    @concurrent
     nonisolated static func install(_ model: ModelDescriptor, archive: URL) async throws -> URL {
         let fm = FileManager.default
         defer { try? fm.removeItem(at: archive) }
