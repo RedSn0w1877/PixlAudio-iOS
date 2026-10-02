@@ -181,7 +181,7 @@ jobs:
           mkdir -p build/shots
           if [ -f build/shots.log ] && grep -q 'measured \[' build/shots.log; then
             grep 'measured \[' build/shots.log \
-              | sed -E "s/^Test Case '-\[PixlAudioUITests\.([A-Za-z]+) ([A-Za-z0-9_]+)\]' measured /\1.\2 /; s/, performanceMetricID.*//" \
+              | sed -E "s/^.*Test Case '-\[PixlAudioUITests\.([A-Za-z]+) ([A-Za-z0-9_]+)\]' measured /\1.\2 /; s/, performanceMetricID.*//" \
               > build/shots/perf-metrics.txt
             { echo "### Performance metrics"; echo '```'; cat build/shots/perf-metrics.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           fi

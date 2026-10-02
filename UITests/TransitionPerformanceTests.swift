@@ -41,28 +41,27 @@ final class TransitionPerformanceTests: XCTestCase {
     /// Library › Albums → album detail → back.
     func testAlbumPushPop() {
         let app = launch("libraryAlbums", ready: "library.page.albums")
-        let card = first(app, prefix: "albumCard.")
-        XCTAssertTrue(card.waitForExistence(timeout: 15), "no album card")
-        measureTransitions(app, navigation: true) {
-            card.tap()
-            let back = app.descendants(matching: .any)["detail.back"].firstMatch
-            XCTAssertTrue(back.waitForExistence(timeout: 10), "the album page did not open")
-            back.tap()
-            XCTAssertTrue(card.waitForExistence(timeout: 10), "the album grid did not come back")
-        }
+        pushAndPop(app, from: first(app, prefix: "albumCard."), page: "screen.albumDetail")
     }
 
     /// Library › Artists → artist detail → back.
     func testArtistPushPop() {
         let app = launch("libraryArtists", ready: "library.page.artists")
-        let row = first(app, prefix: "artistRow.")
-        XCTAssertTrue(row.waitForExistence(timeout: 15), "no artist row")
+        pushAndPop(app, from: first(app, prefix: "artistRow."), page: "screen.artistDetail")
+    }
+
+    /// Taps `origin`, waits for `page`, goes back and waits until `origin` can be tapped again.
+    private func pushAndPop(_ app: XCUIApplication, from origin: XCUIElement, page: String) {
+        XCTAssertTrue(origin.waitForExistence(timeout: 15), "nothing to open")
         measureTransitions(app, navigation: true) {
-            row.tap()
-            let back = app.descendants(matching: .any)["detail.back"].firstMatch
-            XCTAssertTrue(back.waitForExistence(timeout: 10), "the artist page did not open")
+            origin.tap()
+            XCTAssertTrue(app.descendants(matching: .any)[page].firstMatch.waitForExistence(timeout: 10),
+                          "\(page) did not open")
+            // The page's own identifier covers its header's controls: find Back by label too.
+            let back = control(app, "detail.back", label: "Back")
+            XCTAssertTrue(back.waitForExistence(timeout: 10), "no Back on \(page)")
             back.tap()
-            XCTAssertTrue(row.waitForExistence(timeout: 10), "the artist list did not come back")
+            XCTAssertTrue(origin.wait(for: \.isHittable, toEqual: true, timeout: 10), "\(page) did not close")
         }
     }
 
@@ -82,10 +81,11 @@ final class TransitionPerformanceTests: XCTestCase {
 
     // MARK: Library
 
-    /// The Library category pills: Songs → Albums → Artists → Playlists → Songs.
+    /// The Library category pills: Songs → Albums → Artists → Albums → Songs (pills that stay on screen as the row
+    /// scrolls the selected one into view).
     func testLibraryPillSwitches() {
         let app = launch("library", ready: "screen.library")
-        let pills = ["Albums", "Artists", "Playlists", "Songs"].map {
+        let pills = ["Albums", "Artists", "Albums", "Songs"].map {
             control(app, "library.tab.\($0)", label: $0)
         }
         XCTAssertTrue(pills[0].waitForExistence(timeout: 15), "no Albums pill")
