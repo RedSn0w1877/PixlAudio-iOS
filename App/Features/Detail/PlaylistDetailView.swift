@@ -33,6 +33,10 @@ struct PlaylistDetailView: View {
     @State private var didApplyLaunchState = false
 
     private var prefs: LibraryPreferences { LibraryPreferences.shared(isUITest: env.launch.isUITest) }
+    /// The song picker's starting storage filter (Android: offline when the library has cloud songs, else all).
+    private var songPickerFilter: StorageFilter {
+        library.songs.contains(where: LibrarySorting.isOnline) ? .offline : .all
+    }
     private var folderPath: String? { FolderPlaylist.path(from: playlistId) }
     private var isFolder: Bool { folderPath != nil }
 
@@ -97,10 +101,14 @@ struct PlaylistDetailView: View {
                   initial: true) { _, inputs in
             songs = orderedSongs(inputs)
         }
-        .onAppear(perform: applyLaunchState)
+        .onAppear {
+            applyLaunchState()
+            if !isFolder { SongPickerDefaults.warm(library: library, filter: songPickerFilter) }
+        }
         .onChange(of: library.songs.count, initial: true) { _, _ in resolveFolder() }
         .sheet(isPresented: $showsAddSongs) {
-            SongPickerSheet(initiallySelected: Set(playlist?.songIds ?? [])) { selected in
+            SongPickerSheet(initiallySelected: Set(playlist?.songIds ?? []),
+                            initialStorageFilter: songPickerFilter) { selected in
                 env.libraryEditor.addSongs(Array(selected), toPlaylist: playlistId)
                 showsAddSongs = false
             }
@@ -147,7 +155,9 @@ struct PlaylistDetailView: View {
     /// Android: a 62 pt row (20 pt sides, 6 pt bottom; 8 pt for folders) of two 76 pt buttons clipped to it.
     private var playRow: some View {
         let enabled = !songs.isEmpty
-        return HStack(spacing: 8) {
+        // The two buttons render together (spacing below their 8 pt gap).
+        return GlassEffectContainer(spacing: 4) {
+        HStack(spacing: 8) {
             SegmentedGlassButton(title: "Play it", systemImage: "play.fill", accessibilityLabel: "Play",
                                  leading: 60, trailing: 14, height: 56, horizontalPadding: 10,
                                  tint: theme.primary.opacity(GlassTint.prominent), foreground: theme.onPrimary,
@@ -167,6 +177,7 @@ struct PlaylistDetailView: View {
             .frame(maxWidth: .infinity)
             .accessibilityIdentifier("playlist.shuffle")
         }
+        }
         .disabled(!enabled)
         .opacity(enabled ? 1 : 0.5)
         .padding(.horizontal, 20)
@@ -175,6 +186,8 @@ struct PlaylistDetailView: View {
 
     /// Android: Add (capsule, `tertiaryContainer`), then Remove and Reorder stretched over the rest.
     private var editRow: some View {
+        // The three buttons render together (spacing below their 8 pt gaps).
+        GlassEffectContainer(spacing: 4) {
         HStack(spacing: 8) {
             SegmentedGlassButton(title: "Add", systemImage: "plus", accessibilityLabel: "Add songs", leading: 21,
                                  trailing: 21, height: 42, horizontalPadding: 12,
@@ -189,6 +202,7 @@ struct PlaylistDetailView: View {
                 withAnimation(PixlMotion.state) { isReorderMode.toggle() }
             }
             .accessibilityIdentifier("playlist.reorder")
+        }
         }
         .padding(.horizontal, 20)
         .padding(.top, 2)

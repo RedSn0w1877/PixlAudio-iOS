@@ -3,6 +3,9 @@ import Foundation
 // Generated from the repository's THIRD_PARTY_NOTICES.md and the Android app's THIRD_PARTY_NOTICES.md (the MIT
 // notice preserved for contributions made before 2026-05-12). Regenerate when either file changes.
 nonisolated enum ThirdPartyNotices {
+    /// `text` split at blank lines (the notices sheet lays them out lazily).
+    static let paragraphs: [String] = text.components(separatedBy: "\n\n")
+
     static let text = #"""
 # Third-party notices
 

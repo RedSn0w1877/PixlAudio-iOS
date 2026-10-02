@@ -105,13 +105,20 @@ private struct PixlFontModifier: ViewModifier {
     func body(content: Content) -> some View {
         let factor = DynamicTypeScale.factor(dynamicTypeSize)
         let size = style.size * factor
-        // SwiftUI line spacing is added between lines; Compose line height is the full line box.
-        let natural = size * 1.19
-        let extra = max(0, (style.lineHeight.map { $0 * factor } ?? natural) - natural)
         content
             .font(.system(size: size, weight: PixlWeightBoost.boosted(style.weight)))
             .tracking(style.tracking)
-            .lineSpacing(extra)
+            .lineSpacing(style.lineSpacing(dynamicTypeSize))
+    }
+}
+
+extension PixlTextStyle {
+    /// The line spacing `pixlFont` applies at a Dynamic Type size: SwiftUI adds line spacing between lines, while
+    /// Compose's line height is the full line box.
+    func lineSpacing(_ dynamicTypeSize: DynamicTypeSize) -> CGFloat {
+        let factor = DynamicTypeScale.factor(dynamicTypeSize)
+        let natural = size * factor * 1.19
+        return max(0, (lineHeight.map { $0 * factor } ?? natural) - natural)
     }
 }
 

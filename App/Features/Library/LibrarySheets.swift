@@ -40,6 +40,8 @@ struct LibrarySortSheet: View {
                     }
                     .padding(.bottom, 12)
                 }
+                // The method rows render together (spacing 0, below their 4 pt gap), inside the same 20 pt clip.
+                GlassEffectContainer(spacing: 0) {
                 VStack(spacing: 4) {
                     ForEach(methods, id: \.self) { method in
                         let isSelected = method.methodKey == selected.methodKey
@@ -69,6 +71,7 @@ struct LibrarySortSheet: View {
                         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
                         .accessibilityIdentifier("sort.\(method.methodKey)")
                     }
+                }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 if tab == .albums {

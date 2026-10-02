@@ -23,7 +23,9 @@ struct DeveloperSettingsSection: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        // Stops at the first song with artwork (the full filter, a URL parse per song, ran twice per body pass).
+        let hasPaletteTargets = library.songs.contains { ArtworkSource(song: $0) != nil }
+        SettingsCategoryScaffold(category: .developer, toast: $toast) {
             SettingsSubsection(title: L10n.settingsExperimentsSection) {
                 SettingsItemRow(title: L10n.settingsExperimentalTitle, subtitle: L10n.settingsExperimentalSubtitle,
                                 systemImage: "flask", showsChevron: true,
@@ -42,14 +44,14 @@ struct DeveloperSettingsSection: View {
                                  systemImage: "chart.line.uptrend.xyaxis",
                                  primaryLabel: L10n.settingsActionRegenerateStats) { showsStats = true }
                 ActionSettingRow(title: L10n.settingsForcePaletteTitle,
-                                 subtitle: paletteTargets.isEmpty ? L10n.settingsForcePaletteEmpty
-                                                                  : L10n.settingsForcePaletteSubtitle,
+                                 subtitle: hasPaletteTargets ? L10n.settingsForcePaletteSubtitle
+                                                             : L10n.settingsForcePaletteEmpty,
                                  systemImage: "paintbrush",
                                  primaryLabel: bulk != nil ? L10n.settingsRegenerating : L10n.settingsActionRegenerateAll,
                                  onPrimary: { showsAllPalettes = true },
                                  secondaryLabel: L10n.settingsActionChooseSong,
                                  onSecondary: { showsPaletteSheet = true },
-                                 enabled: !paletteTargets.isEmpty && bulk == nil)
+                                 enabled: hasPaletteTargets && bulk == nil)
             }
             SettingsSubsection(title: L10n.settingsDiagnosticsSection, addBottomSpace: false) {
                 SettingsItemRow(title: L10n.settingsDiagnosticsSection,
@@ -108,7 +110,6 @@ struct DeveloperSettingsSection: View {
                     .pixlGlass(in: Capsule(), tint: theme.surfaceContainerHigh.opacity(GlassTint.bar))
             }
         }
-        .settingsToast($toast)
     }
 
     private func regenerate(_ song: Song) async -> Bool {

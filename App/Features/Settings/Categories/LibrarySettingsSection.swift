@@ -26,7 +26,7 @@ struct LibrarySettingsSection: View {
 
     var body: some View {
         @Bindable var lyrics = settings.lyrics
-        VStack(alignment: .leading, spacing: 0) {
+        SettingsCategoryScaffold(category: .library, toast: $toast) {
         SettingsSubsection(title: L10n.settingsLibraryStructureSection) {
             SettingsItemRow(title: L10n.settingsExcludedDirectoriesTitle,
                             subtitle: L10n.settingsExcludedDirectoriesSubtitle, systemImage: "folder",
@@ -109,7 +109,6 @@ struct LibrarySettingsSection: View {
         } message: {
             Text(L10n.settingsDialogRebuildDatabaseBody)
         }
-        .settingsToast($toast)
     }
 
     private func startFullRescan() {

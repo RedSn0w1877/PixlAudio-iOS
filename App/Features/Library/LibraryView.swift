@@ -446,7 +446,7 @@ struct LibraryView: View {
             }, onSetupAI: {
                 self.sheet = nil
                 router.push(.settingsCategory(.ai))
-            }, isAIEnabled: env.ai.isProviderConfigured, onAI: {
+            }, isAIEnabled: AIProviderStatus.isConfigured(env), onAI: {
                 self.sheet = nil
                 // The Lab is full screen (Android `CreateAiPlaylistDialog`); present it once this sheet has gone.
                 Task {
