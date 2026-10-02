@@ -430,8 +430,8 @@ struct PlaylistSongRow: View {
 
 // MARK: - Lyric sync card
 
-/// Progress of a "sync lyrics for all songs" run (Android `PlaylistLyricSyncState`). The forced-alignment worker
-/// arrives with stage 14; until then the state stays empty and the card is hidden, as on Android with no run.
+/// Progress of a "sync lyrics for all songs" run (Android `PlaylistLyricSyncState`), from stage 14's TAIS Studio lane
+/// (`TaisStudio.lyricSyncState(playlistId:)`). Empty — and the card hidden — while no run exists, as on Android.
 nonisolated struct PlaylistLyricSyncState: Sendable, Equatable {
     var total = 0
     var completed = 0

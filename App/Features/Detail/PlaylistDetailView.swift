@@ -29,7 +29,8 @@ struct PlaylistDetailView: View {
     @State private var showsSort = false
     @State private var showsOptions = false
     @State private var confirmsDelete = false
-    @State private var lyricSync = PlaylistLyricSyncState.idle
+    /// Stage 14: the playlist's lyric-sync run, from TAIS Studio's job states.
+    private var lyricSync: PlaylistLyricSyncState { env.tais.studio.lyricSyncState(playlistId: playlistId) }
     @State private var didApplyLaunchState = false
 
     private var prefs: LibraryPreferences { LibraryPreferences.shared(isUITest: env.launch.isUITest) }
@@ -85,7 +86,9 @@ struct PlaylistDetailView: View {
             } else {
                 playRow
                 if !isFolder { editRow }
-                PlaylistLyricSyncCard(state: lyricSync, onCancel: { lyricSync = .idle }, onRetry: {})
+                PlaylistLyricSyncCard(state: lyricSync,
+                                      onCancel: { env.tais.studio.cancelLyricBatch(playlistId: playlistId) },
+                                      onRetry: { env.tais.studio.retryLyricBatch(playlistId: playlistId, songs: songs) })
                     .padding(.horizontal, 16)
                     .padding(.vertical, lyricSync.total > 0 ? 8 : 0)
                 if songs.isEmpty {
@@ -308,11 +311,14 @@ struct PlaylistDetailView: View {
                              },
                              onSyncLyricsAll: {
                                  showsOptions = false
-                                 LibraryToast.shared.show("Word-level lyric sync arrives in a later update.")
+                                 // Stage 14: one lyric-sync job per song through TAIS Studio's lane.
+                                 env.tais.studio.syncLyrics(playlistId: playlistId, songs: songs)
                              },
                              onInstrumentalizeAll: {
                                  showsOptions = false
-                                 LibraryToast.shared.show("Instrumentals arrive in a later update.")
+                                 let queued = env.tais.studio.renderInstrumentals(songs)
+                                 LibraryToast.shared.show(queued == 0 ? "Every song here already has an instrumental."
+                                                                      : "Rendering instrumentals for \(queued) songs")
                              })
     }
 

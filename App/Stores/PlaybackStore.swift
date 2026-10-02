@@ -70,6 +70,14 @@ final class PlaybackStore {
         isPlaying ? engine.pause() : engine.play()
     }
 
+    /// Explicit play / pause (stage 10's sync editor: two quick calls never cancel out the way two toggles could).
+    func resume() {
+        guard hasItem else { return }
+        engine.play()
+    }
+
+    func pause() { engine.pause() }
+
     func skipToNext() { engine.skipToNext() }
     func skipToPrevious() { engine.skipToPrevious() }
     func seek(toMs positionMs: Int64) { engine.seek(toMs: positionMs) }

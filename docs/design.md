@@ -162,6 +162,8 @@ PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact ba
 | AI Playlist Lab (Library › Create playlist › With AI) | `AppCover.aiPlaylistLab` | `AiPlaylistLabView` (Features/AI) | 13 |
 | TAIS DJ chat (Experimental › TAIS DJ; player's Taizo button) | `AppSheet.taisChat` | `TaisChatSheet` (Features/AI) | 13 |
 | Setup | `AppCover.setup` | `SetupView` (Features/Onboarding) | 15 |
+| TAIS Studio "Remaster Song" card (Experimental, song sheet), on-device models panel (iOS only) | inside `ExperimentalSettingsView` / `SongOptionsSheet` | `TaisStudioProgressCard`, `OnDeviceModelsPanel` (Features/Tais) | 14 |
+| Lyrics screen instrumental card + floating instrumental toggle | inside `LyricsView` | `InstrumentalRenderAction`, `InstrumentalLyricsToggle` (Features/Tais) | 14 |
 | Backup export / restore | `AppCover.backupExport`, `.backupImport` | `BackupExportCover`, `BackupImportCover` (Features/Backup) | 15 |
 | Plus / license debug, nav-bar corner radius | — (dropped: everything unlocked; Material-only setting) | — | — |
 
@@ -355,6 +357,46 @@ lyricsEmphasis (47 600), lyricsInterlude (61 000), lyricsDuet, lyricsBrightArt, 
 lyricsPlain, lyricsNone, lyricsImmersive, lyricsLight, lyricsMoreSheet, lyricsFetchDialog, lyricsOptions,
 lyricsCascade.f0…f7 (first-show cascade frames, live clock).
 
+## Stage 10 notes (lyrics sync editor)
+
+Port of Android `presentation/lyrics/sync/**` + `LyricsSyncEditorStateHolder` (`AppCover.lyricsSync` →
+`LyricsSyncEditorView`), on PixlLyrics' `LyricsTapSync` / `LyricsExport` / `LyricsSyncDraftStore`.
+
+- **Session** (`LyricsSyncSession`, created by the cover, closed on dismiss): phases Loading → Resume / Words / Intro /
+  Manage → Tap (and Fix a line) → Preview, Android's dialogs as system alerts, notices as a glass pill. While open it
+  pauses, suspends crossfades (`DualDeckEngine.suspendTransitions(owner: "lyrics_sync")`) and opens an exact-timing
+  session (`beginExactTimingSession`: no hand-over; at the end of the song the engine pauses on it → "The song ended
+  before the last N words"); `close()` restores the rate and both. Drafts autosave 1 s after a change to
+  `Application Support/lyrics_sync_drafts` (Android's files), are flushed on close / background / song change and
+  deleted after Save. Save stores `LyricsDocCodec.encode(doc)` with source `"user"` through `LyricsService.save`
+  (user-synced lyrics win over every fetcher), learns the reaction offset from the nudge, and returns to the lyrics
+  screen with Android's toast. Reaction offsets: Settings › Lyrics (100 ms speaker / 180 ms Bluetooth, chosen by the
+  route at open).
+- **Tap pad:** a UIKit touch surface under the SwiftUI pad stamps on touch *down* with `UITouch.timestamp` (latency
+  removed from the player position); a hold ≥ 350 ms marks the word's end; extra fingers are taps; scale 0.97 + glow +
+  `sensoryFeedback(.impact(weight: .light))` (the haptics setting). Speeds 1 / 0.75 / 0.5 use the engine's
+  pitch-preserving rate.
+- **Word marks** (Android's latest): the word being sung has a white 1.5 pt box with a spring pop (1.06 → 1, damping
+  0.6 / stiffness 900); tapped words fill with the accent from the first to the last letter in 260 ms (right to left
+  for RTL words, `TextScripts.isRtlWord`); the next word white; later words 40 %. Music breaks (> 5 s to the next
+  anchor) swap the context for a countdown ring that reads the position per frame only while shown.
+- **Glass:** Android's Liquid Glass palette as clear glass over the artwork — chips / ✕ / secondary buttons white 12 %,
+  the pad white 16 % (36 pt corners), the preview panel black 32 % (32 pt corners), the accent (album `primary` when
+  luminous enough, else `inversePrimary`) at `GlassTint.prominent` for Start / Save / the selected speed / the intro
+  icons; 35 % black over bright art. Buttons inside the panel are fills. Preview uses the real `KaraokeLyricsView` with
+  its own `LyricsDriver` on the editor's clock and the lyrics screen's appearance preferences.
+- **Entry points:** the lyrics More sheet's first row, the empty-state button and the sync chip
+  (`LyricsSyncEditorView.open(…, fromLyrics: true)` — the editor returns to the lyrics screen); Edit song's "Change the
+  words" (`.words`) and "Fix timing" (`.fixTiming`), which start the song paused if another one is playing.
+- **Shared-file changes (additive):** `Playback/DualDeckEngine.swift` (exact-timing session), `Stores/PlaybackStore.swift`
+  (explicit `resume()` / `pause()`), `Services/LyricsController.swift` (`lyricsService`, shared with stage 14), `Features/Lyrics/LyricsView.swift`
+  and `Features/SongInfo/EditSongSheet.swift` (open through `LyricsSyncEditorView.open`).
+
+Screenshot ids (`UITests/LyricsSyncScreenshotTests`, `-screen lyricsSync -syncStep <step>`; ready `screen.lyricsSync`):
+syncIntro, syncWords, syncResume, syncManage, syncTap, syncTapReady, syncTapBreak, syncTapNotice, syncTapEnded,
+syncFixLine, syncPreview, syncPreviewFixLine, syncTapLight, syncSpeedMenu, syncLiveIntro / syncLiveTapped (a live run
+on the demo engine).
+
 ## Stage 11 notes (YouTube playback)
 
 - **Services** live in `App/Services/YouTube/` and are built once as `AppEnvironment.youtube` (`YouTubeServices`; a demo
@@ -460,6 +502,48 @@ and question; ready `screen.taisChat`), `aiPlaylistLab` (cover). Shots: `UITests
   `backupImportReport` (ready `screen.backupReport`), both on the `backupImport` cover. Class:
   `UITests/BackupOnboardingScreenshotTests`.
 
+## Stage 14 notes (on-device ML: lyric sync, instrumentals)
+
+- **Models** (`App/Services/ML/`): `.github/workflows/ml-convert.yml` (manual, macOS runner, build-time Python only)
+  converts facebook/wav2vec2-base-960h from PyTorch to a Core ML ML Program — fp16 weights with fp32 reductions
+  ("mixed"), fixed 10 s input — and gates it against PyTorch (frame agreement ≥ 97 %, identical greedy transcript, CTC
+  word starts within one frame); it also converts UVR-MDX-NET-Voc_FT (ONNX → onnx2torch → Core ML fp16) gated against
+  ONNX Runtime (instrumental SNR ≥ 30 dB). Both passed and are assets of the prerelease `models-v1` (tars of the
+  `.mlpackage`s + `models-v1.json` + reports). `ModelCatalog` pins each tar's size and SHA-256 — re-running the
+  workflow never replaces an asset unless `replace` is ticked, and then the catalog must change too.
+  `ModelManager` downloads on demand (background `URLSession`, whole-percent progress), verifies, extracts with
+  PixlFoundation's `UstarExtractor`, `MLModel.compileModel`s, and stores `Application Support/Models/<id>/` (excluded
+  from backups). Both models run `.cpuOnly` (what the gate measured; works in the background).
+- **TAIS Studio** (`TaisStudio`, `env.tais.studio`): one serial job lane, like Android's shared engine lane — lyric
+  sync (`TaisStudioWorker`: catalogs first, user sync kept unless "Replace", then `Wav2Vec2Aligner` →
+  `TaisLyricsAlignment.assemble` → a `LyricsDoc` with source `tais` saved through `LyricsService`), the on-device
+  instrumental (`StemSeparatorWorker` → `MdxStemSeparator`), the BS-RoFormer render (`BsRoformerRenderWorker` → PixlNet's
+  Gradio / direct-POST clients; also the instrumental job's fallback when the model can't be had). Streamed songs are
+  downloaded first (`DownloadManager`). A run is a `BGContinuedProcessingTask` (iOS 26): it keeps going in the
+  background with the system's progress Live Activity, which can cancel it; every row can cancel too.
+- **Instrumental switch** (`InstrumentalController`, `env.tais.instrumental`; `DualDeckEngine+Instrumental.swift`): the
+  render is loaded on the idle deck 0.5 s ahead of the playhead, prerolled, started on the host clock at that exact
+  media time (`Deck.start(rate:at:atHostTime:)`), both taps run a 700 ms linear crossfade, the decks swap — same queue
+  entry, so Now Playing, the queue and the lyrics don't change. A new song starts with its own audio. Magic
+  Instrumentalize (Experimental slider) drives the tap's mid/side reducer (`PlaybackServices.applySettings`).
+- **UI** (`App/Features/Tais/`): `TaisStudioProgressCard` (Android's, a 10 pt `surfaceContainer` glass panel; bars,
+  buttons and dividers are fills) in Experimental (with the BS-RoFormer row) and in the song sheet above the offline
+  card; `OnDeviceModelsPanel` (iOS only, under it in Experimental): each model's state, size, Download / Cancel /
+  Remove, and the rendered instrumentals' size with Delete; the lyrics screen's `InstrumentalRenderAction` (no lyrics:
+  Render → Rendering… → Play instrumental → Play original, on the 28 pt clear-glass card) and Android's
+  `FloatingInstrumentalToggle` (44 pt clear-glass circle growing to a 172 pt "Instrumental" pill) above the controls.
+- **Shared-file changes (additive):** `AppEnvironment` (`tais`, started after YouTube), `Playback/Deck.swift`
+  (`makeItem(for:overrideURL:)`, `start(rate:at:atHostTime:)`), `Playback/PlaybackServices.swift` (vocal attenuation),
+  `Services/LyricsController.swift` (`lyricsService`), `Features/Lyrics/LyricsStaticContent.swift` + `LyricsView.swift`
+  (the real card and the toggle), `Features/Settings/ExperimentalSettingsView.swift` (the shell panel replaced),
+  `Features/Library/SongOptionsSheet.swift` (the card), `Demo/UITestLaunchRouter.swift` + `Demo/TaisDemo.swift`,
+  `project.yml` (`BGTaskSchedulerPermittedIdentifiers` += `io.github.redsn0w1877.pixlaudio.tais-studio`).
+
+Stage 14 screenshot ids (`UITests/TaisScreenshotTests`; demo states, no network or Core ML): `tais.studio`
+(Experimental scrolled to Remaster Song: lyric sync running, instrumental ready, BS-RoFormer failed), `tais.models`
+(the models panel with wav2vec2 downloading), `tais.songSheet` (the song sheet's card mid-render),
+`tais.instrumental`, `tais.instrumentalRendering`, `tais.instrumentalActive` (the lyrics screen with `-lyricsDemo none`).
+
 ## Integration notes (wave A: stages 8, 9, 11, 12, 13, 15 merged — tag `stage-13`)
 
 How the stages meet on `main`:
@@ -471,8 +555,8 @@ How the stages meet on `main`:
   `LyricsController.translateViaAI` sends the song's scanned lyrics, else the LRC of what the screen shows, through
   `env.ai.lyricsTranslator` in the device language, and imports a valid reply like a file (each translation pairs with
   its line by timestamp; the toast is Android's message). Stage 9's on-device translation stays below it, renamed "Translate on device" (character-bubble icon) so the two rows read apart.
-- **Lyrics ↔ sync editor:** "Sync the words yourself" / the sync chip present `AppCover.lyricsSync(songId:)` — still
-  stage 10's placeholder (stage 10 is not in wave A).
+- **Lyrics ↔ sync editor:** "Sync the words yourself" / the sync chip present `AppCover.lyricsSync(songId:)` — stage
+  10's editor (see Stage 10 notes).
 - **Spotify ↔ YouTube:** `AppEnvironment` builds `SpotifyService` after `YouTubeServices` and passes
   `InnerTubeSpotifyBridge` (App/Services/Spotify): the matcher searches through stage 11's InnerTube session, matched
   videos resolve through stage 11's `StreamingPlayableURLResolver` (download → complete cache file →
@@ -507,3 +591,38 @@ queue, timer, lyrics, Spotify, AI, setup, backup, YouTube and devices screens al
 their owners: Settings › Library › Music folders (stage 7d) draws its "Excluded Directories" title under the `+`
 button; `ci/export-shots.sh` names the backup probe's text attachment `public.plain-text.txt.png` (it is text, not
 an image).
+
+## Integration notes (Integrate B: stages 10 and 14 merged — tag `stage-15`)
+
+- **Lyrics ↔ sync editor:** the lyrics More sheet's first row, the empty-state button and the line-synced chip open
+  stage 10's editor (`LyricsSyncEditorView.open(…, fromLyrics: true)`, which returns to the lyrics screen); Edit song's
+  "Change the words" / "Fix timing" open it at the words / fix-timing entries. The placeholder is gone.
+- **Sync editor ↔ instrumental:** `LyricsSyncPlayer` suspends stage 14's `InstrumentalController` for the session
+  (owner `lyrics_sync`, Android `InstrumentalCrossfadeController.suspend`): an instrumental that was playing switches back
+  to the song's own audio so the person hears the vocals they are timing, and returns when the editor closes. Crossfades
+  and the hand-over stay suspended through the engine's exact-timing session as before.
+- **One lyrics service accessor:** both stages had added one (`syncService`, `lyricsService`) to `LyricsController`;
+  they are now the single `lyricsService`, used by the editor (stored lyrics, Save as source `user`, Find lyrics online)
+  and TAIS Studio (catalog check, Save as source `tais`, "Replace" for a user sync). A TAIS save reloads the lyrics
+  screen when it shows that song.
+- **Song sheet:** the Remaster Song card (stage 14) now fills the space wave A's review noted under the buttons.
+- **Playlist:** "Sync lyrics for all songs" / "Instrumentalize all" and `PlaylistLyricSyncCard` run on TAIS Studio's lane.
+
+
+### Visual review (Integrate B, `main` 1d22211, CI run 37008732905: 235 shots, every class green)
+Compared side by side with the Compose code (`presentation/lyrics/sync/**`, `components/tais/**`) and `pp_card` /
+`pp_sheet`. Same layout as PixlAudio, glass in place of Material, legible in light and dark, coloured blocks keep the
+light tint (decision 11):
+- **Sync editor** (syncIntro … syncLiveTapped): `SyncCardScreen`'s top bar (✕ circle, title, speed pill), centred
+  30 pt title / 16 pt body, the three numbered step rows with 44 pt accent circles, the Normal / Slower / Slowest
+  capsules, Start + "Got it" at the bottom; the tap screen's progress line, context lines, boxed sung word, NEXT word,
+  36 pt pad and Undo / Pause / Back 5 s; the preview's karaoke view under the 32 pt panel (Earlier · offset · Later, Fix a
+  line, Keep tapping, share, Save); the words screen's title, body and field (Android repeats the body as the field's
+  placeholder too); manage; the system glass alerts and speed menu (documented deviations). Light appearance stays dark,
+  as Android's editor does.
+- **TAIS** (tais.*): Remaster Song card in the song sheet matches `pp_card` (sparkles, title, description, Render
+  Instrumental, divider, Sync / resync lyrics; progress bar + Cancel while running) and fills the space wave A noted
+  under the buttons; Experimental's card with the BS-RoFormer row, the models panel; the lyrics screen's instrumental
+  card and floating Instrumental pill.
+Nothing needed fixing. Known differences, not bugs: no Offline card under Remaster on the demo song (it is a local file;
+Android shows it for streamable songs), no "Set as sound" (iOS can't set ringtones).

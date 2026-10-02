@@ -27,12 +27,17 @@ swift_dirs=()
 for d in App AppTests UITests Packages; do [ -d "$d" ] && swift_dirs+=("$d"); done
 
 # 1. Imports limited to Apple frameworks + our modules.
+#    Pure bash per line (no subshell + sed per import): forking for each of the ~1000 import lines made this step
+#    take 4 minutes on a CI runner busy booting a simulator.
+import_re='^[[:space:]]*(@[A-Za-z_]+([(][^)]*[)])?[[:space:]]+)*(public |internal |package |private |fileprivate )?import[[:space:]]+(typealias |struct |class |enum |protocol |let |var |func )?([A-Za-z0-9_]+)'
+allowed_list=" ${allowed_imports[*]} "
 while IFS= read -r line; do
   file="${line%%:*}"; rest="${line#*:}"; lineno="${rest%%:*}"; code="${rest#*:}"
-  module="$(echo "$code" | sed -E 's/^[[:space:]]*(@[A-Za-z_]+([(][^)]*[)])?[[:space:]]+)*(public |internal |package |private |fileprivate )?import[[:space:]]+(typealias |struct |class |enum |protocol |let |var |func )?([A-Za-z0-9_]+).*/\5/')"
-  ok=0
-  for a in "${allowed_imports[@]}"; do [ "$module" = "$a" ] && { ok=1; break; }; done
-  [ $ok -eq 1 ] || err "$file:$lineno: import of '$module' is not an allowed Apple framework or PixlCore module"
+  if [[ "$code" =~ $import_re ]]; then module="${BASH_REMATCH[5]}"; else module="$code"; fi
+  case "$allowed_list" in
+    *" $module "*) ;;
+    *) err "$file:$lineno: import of '$module' is not an allowed Apple framework or PixlCore module" ;;
+  esac
 done < <(grep -rnE --include='*.swift' --exclude-dir=.build '^[[:space:]]*(@[A-Za-z_]+([(][^)]*[)])?[[:space:]]+)*((public|internal|package|private|fileprivate)[[:space:]]+)?import[[:space:]]+' "${swift_dirs[@]}" 2>/dev/null)
 
 # 2. Local packages only.

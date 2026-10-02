@@ -302,6 +302,9 @@ struct LyricsView: View {
     // MARK: Controls
 
     private func controls(chrome: LyricsChromeColors, safeBottom: CGFloat, visible: Bool) -> some View {
+        VStack(spacing: 0) {
+        // Stage 14: Android's floating instrumental toggle sits above the cluster when the song has a render.
+        InstrumentalLyricsToggle(chrome: chrome, brightArt: brightArt)
         LyricsControlCluster(
             chrome: chrome, brightArt: brightArt, isPlaying: playback.isPlaying,
             showSyncControls: showSyncedLyrics == true && lyrics?.synced != nil && showSyncControls,
@@ -330,6 +333,7 @@ struct LyricsView: View {
             },
             onBack: { router.dismissCover() },
             onMore: { showMoreSheet = true })
+        }
             .padding(.horizontal, 16)
             .padding(.bottom, safeBottom + 10)
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { controlsHeight = $0 }
@@ -342,7 +346,7 @@ struct LyricsView: View {
     private var syncYourselfAction: (() -> Void)? {
         guard let song else { return nil }
         let router = self.router
-        return { router.present(.lyricsSync(songId: song.id)) }
+        return { LyricsSyncEditorView.open(songId: song.id, router: router, fromLyrics: true) }
     }
 
     // MARK: More sheet

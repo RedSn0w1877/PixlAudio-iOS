@@ -197,42 +197,8 @@ struct LyricsStatusContent: View {
     /// Android's `InstrumentalRenderAction` card plus "Add lyrics and sync them".
     private func noLyricsCard(_ song: Song) -> some View {
         VStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 16) {
-                Image(systemName: "waveform")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(theme.primaryFixedDim)
-                Text("No lyrics for this song yet")
-                    .pixlFont(.headlineSmall)
-                    .foregroundStyle(.white)
-                Text("You can still listen without vocals. Render an instrumental once and keep it on this device for offline listening.")
-                    .pixlFont(.bodyLarge)
-                    .foregroundStyle(.white.opacity(0.72))
-                    .fixedSize(horizontal: false, vertical: true)
-                Button {} label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "waveform")
-                        Text("Render instrumental").pixlFont(.labelLarge)
-                    }
-                    .foregroundStyle(theme.onPrimaryFixed)
-                    .frame(maxWidth: .infinity, minHeight: 56)
-                    .background(theme.primaryFixedDim, in: Capsule())
-                }
-                .buttonStyle(PressScaleButtonStyle(pressedScale: 0.97))
-                .disabled(true)
-                .opacity(0.5)
-                .accessibilityHint(Text("Available once the instrumental renderer is installed"))
-                Button(action: onFindLyrics) {
-                    Text("Find or import lyrics")
-                        .pixlFont(.labelLarge)
-                        .foregroundStyle(theme.primaryFixedDim)
-                        .frame(maxWidth: .infinity, minHeight: 48)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(PressScaleButtonStyle(pressedScale: 0.97))
-                .accessibilityIdentifier("lyrics.findLyrics")
-            }
-            .padding(24)
-            .glassEffect(Glass.clear.tint(Color.black.opacity(0.22)), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+            // Stage 14: the real card (render / play the instrumental through TAIS Studio).
+            InstrumentalRenderAction(song: song, onFindLyrics: onFindLyrics)
             if let onSyncYourself {
                 Button(action: onSyncYourself) {
                     HStack(spacing: 8) {
