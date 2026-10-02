@@ -112,6 +112,7 @@ struct SyncIntroScreen: View {
             SpeedSegments(speed: session.speed, palette: palette, onSpeedChange: session.setSpeed)
             SyncBody(text: SyncStrings.speedHelp).padding(.top, 10)
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("sync.intro")
     }
 }
@@ -159,6 +160,7 @@ struct SyncResumeScreen: View {
             Spacer().frame(height: 12)
             SyncBody(text: SyncStrings.resumeBody(tapped, total))
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("sync.resume")
     }
 }
@@ -185,6 +187,7 @@ struct SyncManageScreen: View {
             Spacer().frame(height: 12)
             SyncBody(text: session.title)
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("sync.manage")
         .alert(SyncStrings.remove, isPresented: $confirmRemove) {
             Button(SyncStrings.commonRemove, role: .destructive) { session.removeMyTiming() }

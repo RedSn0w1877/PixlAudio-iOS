@@ -84,6 +84,7 @@ struct SyncWordsEntryScreen: View {
             Button(SyncStrings.useAnyway) { session.submitWords(text) }
             Button(SyncStrings.edit, role: .cancel) {}
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("sync.words")
     }
 

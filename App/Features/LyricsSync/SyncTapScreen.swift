@@ -86,6 +86,7 @@ struct SyncTapScreen: View {
         }
         .padding(.horizontal, 16)
         .animation(.easeInOut(duration: 0.2), value: view.canSkip && !finished && !inFixLine)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("sync.tap")
     }
 }
@@ -294,6 +295,7 @@ private struct SyncWordChip: View {
                         .mask(alignment: rtl ? .trailing : .leading) {
                             Rectangle().scaleEffect(x: fill, anchor: rtl ? .trailing : .leading)
                         }
+                        .accessibilityHidden(true)
                 }
             }
             .padding(.horizontal, 6)

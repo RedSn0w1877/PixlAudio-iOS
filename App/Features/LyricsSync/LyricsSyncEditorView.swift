@@ -76,6 +76,7 @@ struct LyricsSyncEditorView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.9), value: session?.notice)
         .background(Color.black.ignoresSafeArea())
         .preferredColorScheme(.dark)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("screen.lyricsSync")
         .onAppear(perform: start)
         .onDisappear {

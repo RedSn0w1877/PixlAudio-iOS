@@ -95,6 +95,7 @@ struct SyncPreviewScreen: View {
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.9), value: fileMessage)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("sync.preview")
         .onAppear(perform: startDriver)
         .onDisappear { driver.stop() }
