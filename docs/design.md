@@ -497,6 +497,48 @@ and question; ready `screen.taisChat`), `aiPlaylistLab` (cover). Shots: `UITests
   `backupImportReport` (ready `screen.backupReport`), both on the `backupImport` cover. Class:
   `UITests/BackupOnboardingScreenshotTests`.
 
+## Stage 14 notes (on-device ML: lyric sync, instrumentals)
+
+- **Models** (`App/Services/ML/`): `.github/workflows/ml-convert.yml` (manual, macOS runner, build-time Python only)
+  converts facebook/wav2vec2-base-960h from PyTorch to a Core ML ML Program — fp16 weights with fp32 reductions
+  ("mixed"), fixed 10 s input — and gates it against PyTorch (frame agreement ≥ 97 %, identical greedy transcript, CTC
+  word starts within one frame); it also converts UVR-MDX-NET-Voc_FT (ONNX → onnx2torch → Core ML fp16) gated against
+  ONNX Runtime (instrumental SNR ≥ 30 dB). Both passed and are assets of the prerelease `models-v1` (tars of the
+  `.mlpackage`s + `models-v1.json` + reports). `ModelCatalog` pins each tar's size and SHA-256 — re-running the
+  workflow never replaces an asset unless `replace` is ticked, and then the catalog must change too.
+  `ModelManager` downloads on demand (background `URLSession`, whole-percent progress), verifies, extracts with
+  PixlFoundation's `UstarExtractor`, `MLModel.compileModel`s, and stores `Application Support/Models/<id>/` (excluded
+  from backups). Both models run `.cpuOnly` (what the gate measured; works in the background).
+- **TAIS Studio** (`TaisStudio`, `env.tais.studio`): one serial job lane, like Android's shared engine lane — lyric
+  sync (`TaisStudioWorker`: catalogs first, user sync kept unless "Replace", then `Wav2Vec2Aligner` →
+  `TaisLyricsAlignment.assemble` → a `LyricsDoc` with source `tais` saved through `LyricsService`), the on-device
+  instrumental (`StemSeparatorWorker` → `MdxStemSeparator`), the BS-RoFormer render (`BsRoformerRenderWorker` → PixlNet's
+  Gradio / direct-POST clients; also the instrumental job's fallback when the model can't be had). Streamed songs are
+  downloaded first (`DownloadManager`). A run is a `BGContinuedProcessingTask` (iOS 26): it keeps going in the
+  background with the system's progress Live Activity, which can cancel it; every row can cancel too.
+- **Instrumental switch** (`InstrumentalController`, `env.tais.instrumental`; `DualDeckEngine+Instrumental.swift`): the
+  render is loaded on the idle deck 0.5 s ahead of the playhead, prerolled, started on the host clock at that exact
+  media time (`Deck.start(rate:at:atHostTime:)`), both taps run a 700 ms linear crossfade, the decks swap — same queue
+  entry, so Now Playing, the queue and the lyrics don't change. A new song starts with its own audio. Magic
+  Instrumentalize (Experimental slider) drives the tap's mid/side reducer (`PlaybackServices.applySettings`).
+- **UI** (`App/Features/Tais/`): `TaisStudioProgressCard` (Android's, a 10 pt `surfaceContainer` glass panel; bars,
+  buttons and dividers are fills) in Experimental (with the BS-RoFormer row) and in the song sheet above the offline
+  card; `OnDeviceModelsPanel` (iOS only, under it in Experimental): each model's state, size, Download / Cancel /
+  Remove, and the rendered instrumentals' size with Delete; the lyrics screen's `InstrumentalRenderAction` (no lyrics:
+  Render → Rendering… → Play instrumental → Play original, on the 28 pt clear-glass card) and Android's
+  `FloatingInstrumentalToggle` (44 pt clear-glass circle growing to a 172 pt "Instrumental" pill) above the controls.
+- **Shared-file changes (additive):** `AppEnvironment` (`tais`, started after YouTube), `Playback/Deck.swift`
+  (`makeItem(for:overrideURL:)`, `start(rate:at:atHostTime:)`), `Playback/PlaybackServices.swift` (vocal attenuation),
+  `Services/LyricsController.swift` (`lyricsService`), `Features/Lyrics/LyricsStaticContent.swift` + `LyricsView.swift`
+  (the real card and the toggle), `Features/Settings/ExperimentalSettingsView.swift` (the shell panel replaced),
+  `Features/Library/SongOptionsSheet.swift` (the card), `Demo/UITestLaunchRouter.swift` + `Demo/TaisDemo.swift`,
+  `project.yml` (`BGTaskSchedulerPermittedIdentifiers` += `io.github.redsn0w1877.pixlaudio.tais-studio`).
+
+Stage 14 screenshot ids (`UITests/TaisScreenshotTests`; demo states, no network or Core ML): `tais.studio`
+(Experimental scrolled to Remaster Song: lyric sync running, instrumental ready, BS-RoFormer failed), `tais.models`
+(the models panel with wav2vec2 downloading), `tais.songSheet` (the song sheet's card mid-render),
+`tais.instrumental`, `tais.instrumentalRendering`, `tais.instrumentalActive` (the lyrics screen with `-lyricsDemo none`).
+
 ## Integration notes (wave A: stages 8, 9, 11, 12, 13, 15 merged — tag `stage-13`)
 
 How the stages meet on `main`:

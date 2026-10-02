@@ -86,6 +86,7 @@ targets:
           - io.github.redsn0w1877.pixlaudio.refresh
           - io.github.redsn0w1877.pixlaudio.library-sync
           - io.github.redsn0w1877.pixlaudio.spotify-sync
+          - io.github.redsn0w1877.pixlaudio.tais-studio
         NSAppleMusicUsageDescription: PixlAudio plays the DRM-free songs in your music library.
         NSLocalNetworkUsageDescription: PixlAudio connects to AI servers you run on your local network.
         # Only NSAllowsArbitraryLoads: iOS ignores it when NSAllowsLocalNetworking is also present
