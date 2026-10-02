@@ -22,6 +22,37 @@ Run it with `[shots:TransitionPerformanceTests]` in a commit message; CI copies 
 `perf-metrics.txt` in the `shots-<sha>` artifact and the job summary. Simulator numbers are indicative; for frame
 drops use Instruments on the phone (Hitches + Core Animation + SwiftUI templates).
 
+### What the CI simulator showed (2026-10-02)
+
+Matched runs — same CI, same test code, only `TransitionPerformanceTests`: **baseline** = main's app without these
+fixes plus the demo scaling the test needs (branch `perf-baseline`, run 37043124411); **after** = this branch at
+`545aa45` (branch `perf-after`, run 37043122500). Two more runs of the same app code (the full rounds 37033768416
+and 37043079129, where the measurements run after every screenshot class) show the spread. Average app CPU time per
+iteration, seconds:
+
+| Transition (one iteration) | Baseline | After | Same code, other runs |
+|---|---|---|---|
+| Tab switches Home → Search → Library → Home | 1.33 | 1.69 | 1.66 · 2.79 |
+| Library › Albums → album → back | 3.24 | 3.40 | 3.67 · 2.71 |
+| Library › Artists → artist → back | 2.98 | 3.45 | 3.91 · 2.79 |
+| Library pills ×4 | 3.45 | 3.78 | 4.77 · 3.31 |
+| Settings → Appearance → back | 1.03 | 1.33 | 1.47 · 2.09 |
+| Song options sheet open → drag closed | 3.91 | 4.60 | 4.70 · 5.57 |
+| Mini player → full player → collapse | 1.32 | 1.28 | 2.14 · 1.29 |
+
+The same code varies by up to ~70 % from run to run (a fifth run without the full player's pre-warm, 37045873142,
+measured 30–75 % more than "after" in every test, settings and tab switches included, which never build the full
+player). The CPU time is dominated by XCUITest's own queries (each one snapshots the app's accessibility tree), the
+navigation-transition durations stay at 0.54–0.72 s either way (the push animation itself), and the hitch metric
+reports nothing on the simulator. So the simulator can't resolve these fixes in either direction: they stand on the
+code-level findings below, and the on-device check is Instruments' Hitches template on Hoa's phone.
+
+CI screenshot flakes that show up in any comparison with main and are not changes (main's own runs show them too):
+swipe-scrolled shots land at slightly different offsets (`home7b-shelves`, `stats-scrolled`, `aiPlaylistLab-scrolled`,
+`spotifyDashboard.tested`); About and the Equalizer are caught at different points of their appear fade; the
+lyrics cascade frames and animated backgrounds move; the full player's cover is sometimes caught at its paused
+scale (0.95) in shots taken right after launch (`playerExpanded`, `artistPicker`, `sleepTimer`, `devices`).
+
 ## What was slow, and the rule now
 
 | Transition | What cost frames | Rule |
