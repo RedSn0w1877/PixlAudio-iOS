@@ -25,3 +25,7 @@ xcuserdata/
 .swiftbuild.lock
 .DS_Store
 Thumbs.db
+
+# Python bytecode (ci/ml)
+__pycache__/
+*.pyc

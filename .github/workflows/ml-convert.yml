@@ -21,12 +21,6 @@ on:
         description: Replace assets that already exist on models-v1 (update ModelCatalog.swift's pins too!)
         type: boolean
         default: false
-  push:
-    # Development trigger for the stage-14 branch only (workflow_dispatch needs the file on the default branch).
-    branches: [s14-ml]
-    paths:
-      - .github/workflows/ml-convert.yml
-      - ci/ml/**
 
 permissions:
   contents: write
@@ -41,7 +35,7 @@ env:
 
 jobs:
   wav2vec2:
-    if: github.event_name == 'push' || inputs.models == 'all' || inputs.models == 'wav2vec2'
+    if: inputs.models == 'all' || inputs.models == 'wav2vec2'
     runs-on: macos-26
     timeout-minutes: 60
     steps:
@@ -81,7 +75,7 @@ jobs:
           if-no-files-found: warn
 
   mdx:
-    if: github.event_name == 'push' || inputs.models == 'all' || inputs.models == 'mdx'
+    if: inputs.models == 'all' || inputs.models == 'mdx'
     runs-on: macos-26
     timeout-minutes: 60
     continue-on-error: true
@@ -133,8 +127,8 @@ jobs:
       - name: Publish to the models-v1 release
         env:
           GH_TOKEN: ${{ github.token }}
-          # Push runs only happen on the development branch, before the app pins any checksum.
-          REPLACE: ${{ (github.event_name == 'push' || inputs.replace) && 'true' || 'false' }}
+          # The app pins every asset's SHA-256 (ModelCatalog.swift): never replace one unless asked.
+          REPLACE: ${{ inputs.replace && 'true' || 'false' }}
         run: |
           set -euo pipefail
           ls -la dist
