@@ -176,15 +176,15 @@ struct DetailTopBar<Actions: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            GlassEffectContainer(spacing: 3) {
-                HStack(spacing: Tokens.TopBar.actionSpacing) {
-                    GlassCircleButton(systemImage: "arrow.left", accessibilityLabel: "Back",
-                                      tint: theme.surfaceContainerHigh.opacity(GlassTint.container),
-                                      foreground: theme.onSurface, action: onBack)
-                        .accessibilityIdentifier("detail.back")
-                    Spacer()
-                    actions
-                }
+            // Not in a GlassEffectContainer: the playlist's actions are system menus on the glass button style,
+            // whose morph out of the button Hoa approved as it is (2026-10-02); leave their glass ungrouped.
+            HStack(spacing: Tokens.TopBar.actionSpacing) {
+                GlassCircleButton(systemImage: "arrow.left", accessibilityLabel: "Back",
+                                  tint: theme.surfaceContainerHigh.opacity(GlassTint.container),
+                                  foreground: theme.onSurface, action: onBack)
+                    .accessibilityIdentifier("detail.back")
+                Spacer()
+                actions
             }
             .padding(.horizontal, 10)
             .frame(height: Tokens.TopBar.height)
