@@ -15,6 +15,8 @@ final class LibraryScreenshotTests: XCTestCase {
     func testLibraryArtistsLight() throws { try capture("libraryArtists", "light", ready: "library.page.artists") }
     func testLibraryFoldersLight() throws { try capture("libraryFolders", "light", ready: "library.page.folders") }
     func testLibraryLikedDark() throws { try capture("libraryLiked", "dark", ready: "library.page.liked") }
+    func testLibraryCompactNavLight() throws { try capture("libraryCompactNav", "light", ready: "library.page.albums") }
+    func testLibraryCompactNavDark() throws { try capture("libraryCompactNav", "dark", ready: "library.page.albums") }
 
     // MARK: Library sheets and selection
 

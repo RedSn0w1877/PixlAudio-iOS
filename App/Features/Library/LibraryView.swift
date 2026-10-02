@@ -449,6 +449,9 @@ struct LibraryView: View {
             case .libraryAddToPlaylist:
                 selectedTab = .songs
                 sheet = .addToPlaylist(songIds: demo.songs.prefix(2).map(\.id))
+            case .libraryCompactNav:
+                selectedTab = .albums
+                settings.appearance.libraryNavigationMode = LibraryNavigationMode.compactPill
             default: break
             }
         }

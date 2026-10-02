@@ -273,8 +273,9 @@ final class AppearanceSettings {
         collageAutoRotate = defaults.bool(PreferenceKeys.collageAutoRotate, default: false)
         libraryNavigationMode = defaults.string(PreferenceKeys.libraryNavigationMode, default: "tab_row")
         fullPlayerShowFileInfo = defaults.bool(PreferenceKeys.fullPlayerShowFileInfo, default: true)
-        albumArtQuality = defaults.string(PreferenceKeys.albumArtQuality, default: "MEDIUM")
-        ArtworkPipeline.applyAlbumArtQuality(albumArtQuality)
+        let quality = defaults.string(PreferenceKeys.albumArtQuality, default: "MEDIUM")
+        albumArtQuality = quality
+        ArtworkPipeline.applyAlbumArtQuality(quality)
         appThemeMode = AppThemeMode(rawValue: defaults.string(PreferenceKeys.appThemeMode, default: "")) ?? .followSystem
         playerTheme = PlayerThemePreference(rawValue: defaults.string(PreferenceKeys.playerThemePreference, default: ""))
             ?? .albumArt
@@ -308,8 +309,9 @@ final class BehaviorSettings {
     init(defaults: UserDefaults) {
         self.defaults = defaults
         folderBackGestureNavigation = defaults.bool(PreferenceKeys.folderBackGestureNavigationKey, default: true)
-        hapticsEnabled = defaults.bool(PreferenceKeys.hapticsEnabled, default: true)
-        HapticsPreference.isEnabled = hapticsEnabled
+        let haptics = defaults.bool(PreferenceKeys.hapticsEnabled, default: true)
+        hapticsEnabled = haptics
+        HapticsPreference.isEnabled = haptics
         tapBackgroundClosesPlayer = defaults.bool(PreferenceKeys.tapBackgroundClosesPlayer, default: false)
         let tab = defaults.string(PreferenceKeys.launchTab, default: "Home")
         launchTab = RootTab.allCases.first { $0.launchTabKey.caseInsensitiveCompare(tab) == .orderedSame } ?? .home
@@ -725,8 +727,9 @@ final class ExperimentalSettings {
         vocalAttenuation = min(max(defaults.double(PreferenceKeys.taisVocalAttenuation, default: 0), 0), 1)
         roformerBaseUrl = defaults.string(PreferenceKeys.taisRoformerBaseUrl, default: "")
         roformerApiName = defaults.string(PreferenceKeys.taisRoformerApiName, default: "")
-        usesKeychain = defaults === UserDefaults.standard
-        roformerApiKey = usesKeychain ? "" : defaults.string(PreferenceKeys.taisRoformerApiKey, default: "")
+        let keychain = defaults === UserDefaults.standard
+        usesKeychain = keychain
+        roformerApiKey = keychain ? "" : defaults.string(PreferenceKeys.taisRoformerApiKey, default: "")
         roformerExtraArg = defaults.string(PreferenceKeys.taisRoformerExtraArg, default: "")
         roformerBackendType = defaults.string(PreferenceKeys.taisRoformerBackendType, default: "GRADIO_SPACE")
         backupInfoDismissed = defaults.bool(PreferenceKeys.backupInfoDismissed, default: false)
