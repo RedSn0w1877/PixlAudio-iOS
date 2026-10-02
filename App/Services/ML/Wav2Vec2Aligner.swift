@@ -37,29 +37,8 @@ actor Wav2Vec2Aligner {
         guard !words.isEmpty else { return [] }
         let target = CtcTarget(words: words)
         guard target.tokenIds.count > 1 else { return [] }
-        let inputSamples = ModelCatalog.Wav2Vec2.inputSamples
-        let windows = CtcAlignmentCore.fixedWindows(sampleCount: samples.count, inputSamples: inputSamples)
-        guard let last = windows.last else { return [] }
-        let model = try loadModel(at: modelURL)
+        let emissions = try await logProbabilities(samples: samples, modelURL: modelURL, progress: progress)
         let vocabulary = Wav2Vec2Vocabulary.size
-        var emissions = [Float](repeating: 0, count: last.endFrame * vocabulary)
-        let input = try MLMultiArray(shape: [1, NSNumber(value: inputSamples)], dataType: .float32)
-
-        for (index, window) in windows.enumerated() {
-            try Task.checkCancellation()
-            Self.fillNormalised(input, from: samples, range: window.inputStartSample..<window.inputEndSample)
-            let provider = try MLDictionaryFeatureProvider(dictionary: [ModelCatalog.Wav2Vec2.input: MLFeatureValue(multiArray: input)])
-            let result = try model.prediction(from: provider)
-            guard let logits = result.featureValue(for: ModelCatalog.Wav2Vec2.output)?.multiArrayValue,
-                  logits.shape.count == 3, logits.shape[2].intValue == vocabulary,
-                  logits.shape[1].intValue >= window.localFirstFrame + window.keptFrames else {
-                throw TaisLyricsAlignment.Failure.incompleteFrames
-            }
-            Self.appendLogSoftmax(logits, frames: window.localFirstFrame..<(window.localFirstFrame + window.keptFrames),
-                                  into: &emissions, at: window.firstFrame, vocabulary: vocabulary)
-            await progress(index + 1, windows.count)
-        }
-
         let path: [Int]?
         do {
             path = try emissions.withUnsafeBufferPointer { buffer in
@@ -75,6 +54,33 @@ actor Wav2Vec2Aligner {
         }
         guard CtcAlignmentCore.acceptsWordEvidence(evidence) else { throw TaisLyricsAlignment.Failure.notConfident }
         return CtcWordTimings.timings(path: path, target: target, words: words)
+    }
+
+    /// The log-probability timeline (row-major `frames × 32`, Android's `emissions`) of `samples`, window by window.
+    func logProbabilities(samples: [Float], modelURL: URL,
+                          progress: @Sendable (Int, Int) async -> Void = { _, _ in }) async throws -> [Float] {
+        let inputSamples = ModelCatalog.Wav2Vec2.inputSamples
+        let windows = CtcAlignmentCore.fixedWindows(sampleCount: samples.count, inputSamples: inputSamples)
+        guard let last = windows.last else { return [] }
+        let model = try loadModel(at: modelURL)
+        let vocabulary = Wav2Vec2Vocabulary.size
+        var emissions = [Float](repeating: 0, count: last.endFrame * vocabulary)
+        let input = try MLMultiArray(shape: [1, NSNumber(value: inputSamples)], dataType: .float32)
+        for (index, window) in windows.enumerated() {
+            try Task.checkCancellation()
+            Self.fillNormalised(input, from: samples, range: window.inputStartSample..<window.inputEndSample)
+            let provider = try MLDictionaryFeatureProvider(dictionary: [ModelCatalog.Wav2Vec2.input: MLFeatureValue(multiArray: input)])
+            let result = try model.prediction(from: provider)
+            guard let logits = result.featureValue(for: ModelCatalog.Wav2Vec2.output)?.multiArrayValue,
+                  logits.shape.count == 3, logits.shape[2].intValue == vocabulary,
+                  logits.shape[1].intValue >= window.localFirstFrame + window.keptFrames else {
+                throw TaisLyricsAlignment.Failure.incompleteFrames
+            }
+            Self.appendLogSoftmax(logits, frames: window.localFirstFrame..<(window.localFirstFrame + window.keptFrames),
+                                  into: &emissions, at: window.firstFrame, vocabulary: vocabulary)
+            await progress(index + 1, windows.count)
+        }
+        return emissions
     }
 
     /// Android `normalize` (double-precision mean and population variance, `std = sqrt(var + 1e-7)`) over the real
