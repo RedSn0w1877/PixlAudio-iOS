@@ -63,12 +63,12 @@ scale (0.95) in shots taken right after launch (`playerExpanded`, `artistPicker`
 | Song change, play/pause | `PlaybackStore.current` was computed from the queue, and rows took closures: every live tab (hidden ones too) re-rendered its whole body. | `current` / `currentSongId` are stored; rows read playback in `PlaybackRowState`; screens don't read playback in `body`. |
 | Album / artist push, album cards | Colour schemes came only from an actor: every page and card started in the brand theme and re-themed (0.25 s) mid-push. | `ColorExtractor.peek` reads a synchronous mirror in `body`; only real misses fade. |
 | Pause, a second after any song change | The whole queue (often the library) was JSON-encoded on the main thread. | `QueueSnapshotStore` captures on the main actor and encodes in a `@concurrent` function. |
-| Library pills, sort, rescans | Six eager pages re-ran on every LibraryView pass (fresh closures); sorts ran on the main actor below 1,500 songs; one monolithic `lists`. | Pages take plain values + `LibraryActions`; `LibraryModel` memoises each list by its inputs, computes off the main actor after the first frame, lands without animation; inputs compare the library by `LibraryStore.revision`. |
+| Library pills, sort, rescans | Six eager pages re-ran on every LibraryView pass (fresh closures); sorts ran on the main actor below 1,500 songs; one monolithic `lists`; the Songs / Liked sort folded every title (NOCASE) and parsed both ids on every comparison (~60,000 for 5,000 songs). | Pages take plain values + `LibraryActions`; `LibraryModel` memoises each list by its inputs, computes off the main actor after the first frame, lands without animation; inputs compare the library by `LibraryStore.revision`. Sorts compute their keys once per element (`LibrarySorting.noCaseKey`, parsed ids; same order, checked against the old comparator in `LibrarySortingTests`). |
 | Any library edit or rescan | Whole-snapshot comparisons in Home, Search, Library and detail pages; lookups rebuilt on the main actor; `SnapshotLoader` ran on its caller's actor. | Key on `library.revision`; snapshots arrive with lookups built off the main actor (`@concurrent`); edits patch lookups (`applyEdit`). |
 | Detail pages | Album / artist / genre / folder pages filtered and sorted the whole library in their first frames, then re-rendered. | `library.detailIndex` (per revision, built off the main actor) + a `ViewMemo` in `body`: content in the first frame, no second pass. |
 | Player sheet | The full player was rebuilt on every expand and drag; the morph wrote its progress into the environment every frame. | The full player is built once (pre-warmed) and kept hidden at a zero frame (a hidden screen-sized layer would widen the card's `ZStack`, and the mini player with it); fades are their own `Animatable` modifiers. Never write fast-changing values into the environment. |
 | Player → album / artist | Collapse and push shared their frames. | Collapse first, push at 10 % (`collapse(thenAfterReaching:)`), as Android. |
-| First visits, revisits | Artwork keyed by exact pixel size, FIFO, unbounded: placeholders and fade-ins mid-push. | Size buckets, byte-bounded LRU, purge on memory warning, stand-in from another size. |
+| First visits, revisits | Artwork keyed by exact pixel size, FIFO, unbounded: placeholders and fade-ins mid-push; every new size re-read the source (embedded art is an AVAsset metadata read). | Size buckets, byte-bounded LRU, purge on memory warning, stand-in from another size. A display bucket missing on disk is downsampled from the smallest larger bucket already on disk before the source is touched (not written back, so every cached file is one generation from the original; colour extraction's 128 px always reads the source). |
 | Sheets | Wrap-content sheets opened at `.medium` and re-targeted; the queue sheet copied the queue per pass and re-ran its body per drag event; pickers filtered the library on the main actor. | Remembered heights; per-row reorder model; index-addressed rows; precomputed / off-main filtering without debounce. |
 | Settings, notices, stats | Whole category bodies built in one frame; ungrouped row glass; a 30 KB `Text`; Stats / Recently Played swapped a spinner for their content mid-push. | Sections are lazy-stack children; groups share a `GlassEffectContainer`; notices by paragraph; `ScreenDataCache` opens on the last result. |
 | First use of a service | CIContext, route monitor, AI service + Keychain, lyrics shader, first WKWebView, audio session — all on the main thread inside a transition. | Create them on their actor, at idle, or off the main actor (`@concurrent`), never in a transition's first frame. |
@@ -89,5 +89,37 @@ scale (0.95) in shots taken right after launch (`playerExpanded`, `artistPicker`
   sign-in, the brick game, floating Save buttons) are the screenshots that show a changed inset.
 - A view that should start with data has it on its first frame (a synchronous cache, a memo in `body`, or a value
   seeded in `init`), not in `onChange(initial:)` / `task`, which costs a second pass or a pop-in.
-- Pending on-device checks (Instruments): grouped settings rows while pressed (2 pt gaps), the cost of the hidden
-  pre-built full player, and whether zero-opacity glass costs anything (the card's glass is still removed above 25 %).
+- A cache that replaces a synchronous answer must be right whenever the old answer was: key it on **every** input
+  the old computation read and fall back to the old computation on a mismatch, and drop it when something changes
+  its inputs behind its back. `AIProviderStatus` is keyed on the provider **and** its base URL and is invalidated
+  after a settings restore (which writes the Keychain); `PlayCountStore.reload` re-reads play counts once a play's
+  engagement row is written (the history revision is bumped before that write lands) and after a restore.
+- Work moved off the main actor lands later, outside the transaction that triggered it: replay that transaction's
+  animation when the result lands (the song picker's Liked chip and storage filter), or the change snaps where it
+  used to animate. And guard the button that started it against a second tap (Edit song › Save).
+- Moving a side effect earlier changes what happens when the rest fails. The audio session is now activated while
+  the first item loads (`prepareActivation`); if nothing plays after all — every item failed, or a pause came first
+  — `releasePreparedActivation()` gives it back (with `.notifyOthersOnDeactivation`), as before the session was only
+  activated by a successful start.
+- Grouped glass keeps its accessibility: `UITests/GlassAccessibilityTests` checks that controls inside the new
+  containers are still buttons, sliders and switches with their labels (settings groups, the player's top bar, the
+  album header).
+
+## Pending on-device checks (Hoa's phone, before merging)
+
+1. **Instruments › Hitches** (plus Core Animation and SwiftUI) over the transitions in scope — the real frame check.
+2. **Pressed settings rows**: rows in a group are 2 pt apart in one `GlassEffectContainer(spacing: 0)`; press and
+   hold a row, a row hosting a Toggle and one hosting a Slider, and check the interactive highlight stays inside the
+   row (no blending into its neighbour) and looks as on main.
+3. **VoiceOver / Accessibility Inspector** over the player's top bar, an album / artist header and a settings group:
+   every control announces its label and its button / switch / adjustable trait as on main (CI checks the element
+   types; the spoken result is the device's).
+4. **Tap-to-expand fade**: record main's and this branch's tap on the mini player (screen recording, slowed down) and
+   compare the full player's fade-in. The full player is now pre-built and never inserted on expand, so it fades
+   with `fullPlayerAlpha(p)` alone. On main it was inserted in the same tap: `isExpanded = true` is set outside the
+   expand's `withAnimation`, and SwiftUI applies each transaction's changes as their own update, so the insertion was
+   most likely unanimated and the curves match; if main's recording shows an extra fade (the default opacity
+   insertion, roughly `spring(p) · fullPlayerAlpha(p)`), multiply `FullLayerPlacement`'s opacity by the expand
+   spring's progress during non-drag expands to reproduce it.
+5. **Idle cost of the hidden pre-built full player**, and whether zero-opacity glass costs anything (the card's glass
+   is still removed above 25 %).
