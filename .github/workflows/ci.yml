@@ -80,7 +80,7 @@ jobs:
       contains(github.event.head_commit.message, '[shots:') ||
       (github.event_name == 'workflow_dispatch' && inputs.shots)) && ' + UI screenshots' || '' }}, Xcode 27)
     runs-on: xcode-27
-    timeout-minutes: 100
+    timeout-minutes: 130
     env:
       RUN_SHOTS: >-
         ${{ github.ref == 'refs/heads/main' ||
@@ -133,9 +133,11 @@ jobs:
         id: prepare
         if: ${{ !cancelled() && env.RUN_SHOTS == 'true' && steps.boot.outcome == 'success' }}
         run: bash ci/sim.sh prepare-shots
+      # A full run (main) costs ~16 s per UI test: 202 tests took 55 min (run 36941876010), and the suite keeps
+      # growing (226 after wave B). Raise this limit, and the job's, as classes are added.
       - name: Screenshot tests
         if: ${{ !cancelled() && env.RUN_SHOTS == 'true' && steps.prepare.outcome == 'success' }}
-        timeout-minutes: 75
+        timeout-minutes: 100
         env:
           COMMIT_MSG: ${{ github.event.head_commit.message }}
           SHOTS_ONLY_INPUT: ${{ inputs.shots_only }}
