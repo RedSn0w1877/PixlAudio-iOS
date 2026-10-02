@@ -30,6 +30,9 @@ struct EditSongSheet: View {
     /// pass (each keystroke in any field and each keyboard show / hide re-runs the form).
     @State private var timedWords: String?
     @State private var isApplyingCrop = false
+    /// Set while Save writes the cover and applies the edit: a second tap is ignored (Save ran once, synchronously,
+    /// before the cover write moved off the main thread).
+    @State private var isSaving = false
 
     var body: some View {
         Group {
@@ -308,9 +311,11 @@ struct EditSongSheet: View {
             }
             .buttonStyle(PressScaleButtonStyle(pressedScale: 0.95))
             Button {
+                guard !isSaving else { return }
                 guard let form else { dismiss(); return }
                 // The new cover's JPEG is written off the main thread; the edit is applied and the cover dismissed
                 // together right after, as before.
+                isSaving = true
                 Task {
                     let coverURL = await SongTagEditor.writeCover(form.cover, songId: song.id,
                                                                   temporary: env.launch.isUITest)

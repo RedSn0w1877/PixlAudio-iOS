@@ -113,13 +113,20 @@ struct SongPickerPane: View {
         generation += 1
         let token = generation
         let songs = library.songs
-        // The Liked chip toggles inside an animation; its list change animated with it before, and still does.
-        let animates = old.favoritesOnly != inputs.favoritesOnly
+        // The Liked chip and the storage filter change inside their own animations, and the list change used to land
+        // in that same transaction and animate with it; the late result replays the animation that triggered it.
+        let animation: Animation? = if old.favoritesOnly != inputs.favoritesOnly {
+            PixlMotion.state
+        } else if old.filter != inputs.filter {
+            PixlMotion.selection
+        } else {
+            nil
+        }
         filterTask = Task {
             let result = await Task.detached(priority: .userInitiated) { Self.filter(songs, inputs: inputs) }.value
             guard !Task.isCancelled, token == generation else { return }
-            if animates {
-                withAnimation(PixlMotion.state) { displayed = result }
+            if let animation {
+                withAnimation(animation) { displayed = result }
             } else {
                 displayed = result
             }
