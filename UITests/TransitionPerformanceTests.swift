@@ -50,18 +50,19 @@ final class TransitionPerformanceTests: XCTestCase {
         pushAndPop(app, from: first(app, prefix: "artistRow."), page: "screen.artistDetail")
     }
 
-    /// Taps `origin`, waits for `page`, goes back and waits until `origin` can be tapped again.
+    /// Taps `origin`, waits for `page`, goes back and waits until the page has gone.
     private func pushAndPop(_ app: XCUIApplication, from origin: XCUIElement, page: String) {
         XCTAssertTrue(origin.waitForExistence(timeout: 15), "nothing to open")
+        let pageElement = app.descendants(matching: .any)[page].firstMatch
         measureTransitions(app, navigation: true) {
-            origin.tap()
-            XCTAssertTrue(app.descendants(matching: .any)[page].firstMatch.waitForExistence(timeout: 10),
-                          "\(page) did not open")
+            // By coordinate: XCUITest reports album cards (tap gesture + mask) as not hittable.
+            origin.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            XCTAssertTrue(pageElement.waitForExistence(timeout: 10), "\(page) did not open")
             // The page's own identifier covers its header's controls: find Back by label too.
             let back = control(app, "detail.back", label: "Back")
             XCTAssertTrue(back.waitForExistence(timeout: 10), "no Back on \(page)")
             back.tap()
-            XCTAssertTrue(origin.wait(for: \.isHittable, toEqual: true, timeout: 10), "\(page) did not close")
+            XCTAssertTrue(pageElement.waitForNonExistence(timeout: 10), "\(page) did not close")
         }
     }
 
