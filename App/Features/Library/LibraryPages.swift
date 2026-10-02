@@ -233,6 +233,11 @@ struct AlbumCard: View {
 
 /// Resolves an artwork's colour scheme (Android `getAlbumColorSchemeFlow`) and hands it to the content; the app
 /// scheme until it is ready. Extraction runs off the main thread and is cached by `ColorExtractor`.
+///
+/// A scheme already in memory is used from the first frame (`ColorExtractor.peek`, Android `peekCachedColorScheme`):
+/// album and artist pages no longer start in the brand theme and re-theme the whole page mid-push, and album cards
+/// no longer flash the brand tint and animate their glass when they are (re)created. Only a real cache miss fades
+/// the colours in, as before.
 struct AlbumSchemeReader<Content: View>: View {
     let artUri: String?
     @ViewBuilder let content: (ThemeColors) -> Content
@@ -243,13 +248,25 @@ struct AlbumSchemeReader<Content: View>: View {
     @State private var pair: ColorRolesPair?
 
     var body: some View {
-        content(pair.map { ThemeColors(roles: $0.roles(dark: theme.isDark), isDark: theme.isDark) } ?? theme)
+        let resolved = cachedPair ?? pair
+        content(resolved.map { ThemeColors(roles: $0.roles(dark: theme.isDark), isDark: theme.isDark) } ?? theme)
             .task(id: artUri) {
                 guard let source = ArtworkSource(uriString: artUri) else { pair = nil; return }
-                let loaded = await env.colorExtractor.schemePair(for: source, style: settings.appearance.paletteStyle,
-                                                                 accuracyLevel: settings.appearance.colorAccuracy)
+                let style = settings.appearance.paletteStyle
+                let accuracy = settings.appearance.colorAccuracy
+                if let hit = env.colorExtractor.peek(source, style: style, accuracyLevel: accuracy) {
+                    if pair != hit { pair = hit }
+                    return
+                }
+                let loaded = await env.colorExtractor.schemePair(for: source, style: style, accuracyLevel: accuracy)
                 if !Task.isCancelled { withAnimation(.easeOut(duration: 0.25)) { pair = loaded } }
             }
+    }
+
+    private var cachedPair: ColorRolesPair? {
+        guard let source = ArtworkSource(uriString: artUri) else { return nil }
+        return env.colorExtractor.peek(source, style: settings.appearance.paletteStyle,
+                                       accuracyLevel: settings.appearance.colorAccuracy)
     }
 }
 
