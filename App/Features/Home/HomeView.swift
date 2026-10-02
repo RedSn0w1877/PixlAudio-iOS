@@ -31,15 +31,22 @@ struct HomeView: View {
 
                 if !content.mixes.isEmpty {
                     HomeDiscoveryMixes(mixes: content.mixes, isRefreshing: home.isRefreshing,
-                                       onRefresh: { Task { await home.refresh(snapshot: library.snapshot, force: true) } },
+                                       onRefresh: {
+                                           Task {
+                                               await home.refresh(snapshot: library.snapshot,
+                                                                  libraryRevision: library.revision, force: true)
+                                           }
+                                       },
                                        onPlay: { section, song in playback.play(song, in: section.songs) })
                 }
 
                 yourMix(content: content, isPreparing: home.isPreparing)
 
                 ForEach(content.shelves) { section in
-                    HomeDiscoveryShelf(section: section, currentSongId: playback.current?.id,
-                                       onPlay: { song in playback.play(song, in: section.songs) })
+                    CurrentSongState { currentSongId in
+                        HomeDiscoveryShelf(section: section, currentSongId: currentSongId,
+                                           onPlay: { song in playback.play(song, in: section.songs) })
+                    }
                 }
 
                 if !content.recentlyAdded.isEmpty {
@@ -48,10 +55,12 @@ struct HomeView: View {
                 }
 
                 if content.recentlyPlayed.count >= HomeLogic.recentlyPlayedMinSongs {
-                    let queue = content.recentlyPlayed.map(\.song)
-                    RecentlyPlayedSection(items: content.recentlyPlayed, currentSongId: playback.current?.id,
-                                          onSongTap: { song in playback.play(song, in: queue) },
-                                          onOpenAll: { router.push(.recentlyPlayed) })
+                    let items = content.recentlyPlayed
+                    CurrentSongState { currentSongId in
+                        RecentlyPlayedSection(items: items, currentSongId: currentSongId,
+                                              onSongTap: { song in playback.play(song, in: items.map(\.song)) },
+                                              onOpenAll: { router.push(.recentlyPlayed) })
+                    }
                 }
 
                 if let overview = content.statsOverview {
@@ -75,8 +84,8 @@ struct HomeView: View {
         }
         .background(theme.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
-        .task(id: HomeRefreshKey(snapshot: library.snapshot, revision: home.history.revision)) {
-            await home.refresh(snapshot: library.snapshot)
+        .task(id: HomeRefreshKey(libraryRevision: library.revision, revision: home.history.revision)) {
+            await home.refresh(snapshot: library.snapshot, libraryRevision: library.revision)
         }
         .accessibilityIdentifier("screen.home")
     }
@@ -97,23 +106,26 @@ struct HomeView: View {
                 YourMixEmptyPlaceholder(onRefresh: {
                     Task {
                         try? await library.refresh()
-                        await env.home.refresh(snapshot: library.snapshot, force: true)
+                        await env.home.refresh(snapshot: library.snapshot, libraryRevision: library.revision,
+                                               force: true)
                     }
                 })
             }
         } else {
             let fallback = content.usesFallbackYourMix
-            YourMixShelfSection(
-                songs: songs,
-                currentSongId: playback.current?.id,
-                isPlaying: playback.isPlaying,
-                isShuffleEnabled: playback.isShuffleEnabled,
-                onPlayShuffled: {
-                    if fallback { shuffleAll() } else { playback.play(songs.shuffled()) }
-                },
-                onSongTap: { song in playback.play(song, in: fallback ? library.songs : songs) },
-                onMore: { song in router.present(AppSheet.songInfo(songId: song.id)) },
-                onCheckOut: { router.push(.yourMix) })
+            PlaybackState { currentSongId, isPlaying, isShuffleEnabled in
+                YourMixShelfSection(
+                    songs: songs,
+                    currentSongId: currentSongId,
+                    isPlaying: isPlaying,
+                    isShuffleEnabled: isShuffleEnabled,
+                    onPlayShuffled: {
+                        if fallback { shuffleAll() } else { playback.play(songs.shuffled()) }
+                    },
+                    onSongTap: { song in playback.play(song, in: fallback ? library.songs : songs) },
+                    onMore: { song in router.present(AppSheet.songInfo(songId: song.id)) },
+                    onCheckOut: { router.push(.yourMix) })
+            }
         }
     }
 
@@ -126,9 +138,10 @@ struct HomeView: View {
 
 }
 
-/// What Home's data depends on (the task re-runs when either changes).
+/// What Home's data depends on (the task re-runs when either changes): the library by its revision, not the whole
+/// snapshot (comparing two snapshots walked every song on the main actor after each edit or rescan).
 private struct HomeRefreshKey: Equatable {
-    var snapshot: LibrarySnapshot
+    var libraryRevision: Int
     var revision: Int
 }
 

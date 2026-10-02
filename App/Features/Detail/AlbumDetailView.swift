@@ -70,11 +70,12 @@ private struct AlbumDetailContent: View {
                             .padding(.leading, 8)
                     }
                     ForEach(byDisc[disc] ?? []) { song in
-                        let isCurrent = playback.current?.id == song.id
-                        SongCard(song: song, isCurrent: isCurrent, isPlaying: isCurrent && playback.isPlaying,
-                                 onTap: { playback.play(song, in: songs) },
-                                 onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
-                                 showsArtwork: false)
+                        PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
+                            SongCard(song: song, isCurrent: isCurrent, isPlaying: isPlaying,
+                                     onTap: { playback.play(song, in: songs) },
+                                     onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
+                                     showsArtwork: false)
+                        }
                     }
                 }
             }

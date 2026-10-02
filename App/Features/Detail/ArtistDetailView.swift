@@ -191,13 +191,14 @@ private struct ArtistDetailContent: View {
     /// rows, the last one closing the group with 24 pt corners).
     private func groupedRow(_ song: Song, index: Int, count: Int, context: [Song]) -> some View {
         let isLast = index == count - 1
-        let isCurrent = playback.current?.id == song.id
         return VStack(spacing: 0) {
             if index > 0 { Spacer().frame(height: 2) }
-            SongCard(song: song, isCurrent: isCurrent, isPlaying: isCurrent && playback.isPlaying,
-                     onTap: { playback.play(song, in: context) },
-                     onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
-                     showsArtwork: false, corners: .grouped(index: index, count: count))
+            PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
+                SongCard(song: song, isCurrent: isCurrent, isPlaying: isPlaying,
+                         onTap: { playback.play(song, in: context) },
+                         onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
+                         showsArtwork: false, corners: .grouped(index: index, count: count))
+            }
             if isLast { Spacer().frame(height: 8) }
         }
         .padding(.horizontal, 8)

@@ -282,15 +282,16 @@ private struct GenreDetailContent: View {
             let closes = isLast && isLastAlbum
             VStack(spacing: 0) {
                 if !isFirst { Spacer().frame(height: 2) }
-                let isCurrent = playback.current?.id == song.id
-                SongCard(song: song, isCurrent: isCurrent, isPlaying: isCurrent && playback.isPlaying,
-                         onTap: { playback.play(song, in: playOrder) },
-                         onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
-                         showsArtwork: false,
-                         corners: corners(isFirst: isFirst, isLast: isLast),
-                         isSelectionMode: selection.isActive, isSelected: selection.contains(song.id),
-                         selectionIndex: selection.index(of: song.id),
-                         onLongPress: { selection.toggle(song.id) })
+                PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
+                    SongCard(song: song, isCurrent: isCurrent, isPlaying: isPlaying,
+                             onTap: { playback.play(song, in: playOrder) },
+                             onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
+                             showsArtwork: false,
+                             corners: corners(isFirst: isFirst, isLast: isLast),
+                             isSelectionMode: selection.isActive, isSelected: selection.contains(song.id),
+                             selectionIndex: selection.index(of: song.id),
+                             onLongPress: { selection.toggle(song.id) })
+                }
                 if isLast { Spacer().frame(height: 8) }
             }
             .padding(.horizontal, 8)

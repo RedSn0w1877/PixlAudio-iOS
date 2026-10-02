@@ -33,9 +33,25 @@ nonisolated struct SnapshotLoader: Sendable {
 
     /// The authoritative snapshot from SwiftData; refreshes the cache when it changed.
     func loadFromStore(previous: LibrarySnapshot?) async throws -> LibrarySnapshot {
+        try await loadFromStoreInBackground(previous: previous).snapshot
+    }
+
+    /// `loadFromStore` with everything after the fetch off the main actor too: the comparison with `previous`, the
+    /// cache write (a binary plist of the whole library) and the store's by-id lookups. Under approachable
+    /// concurrency a plain `nonisolated async` method runs on its caller's actor, so this one is `@concurrent`.
+    @concurrent
+    func loadFromStoreInBackground(previous: LibrarySnapshot?) async throws -> LoadedLibrary {
         let snapshot = try await persistence.loadLibrarySnapshot()
-        if snapshot != previous { writeCache(snapshot) }
-        return snapshot
+        let changed = snapshot != previous
+        if changed { writeCache(snapshot) }
+        return LoadedLibrary(snapshot: snapshot, lookups: LibraryLookups(snapshot), changed: changed)
+    }
+
+    /// The cached snapshot and its lookups, built off the main actor.
+    @concurrent
+    func loadCachedInBackground() async -> LoadedLibrary? {
+        guard let cached = loadCached() else { return nil }
+        return LoadedLibrary(snapshot: cached, lookups: LibraryLookups(cached), changed: true)
     }
 
     func writeCache(_ snapshot: LibrarySnapshot) {
@@ -46,4 +62,11 @@ nonisolated struct SnapshotLoader: Sendable {
         try? FileManager.default.createDirectory(at: cacheURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? data.write(to: cacheURL, options: .atomic)
     }
+}
+
+/// A snapshot loaded off the main actor with its lookups, and whether it differs from the one it was compared with.
+nonisolated struct LoadedLibrary: Sendable {
+    let snapshot: LibrarySnapshot
+    let lookups: LibraryLookups
+    let changed: Bool
 }

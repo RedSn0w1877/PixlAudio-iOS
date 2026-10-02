@@ -230,15 +230,17 @@ struct PlaylistDetailView: View {
         return ScrollView {
             LazyVStack(spacing: 8) {
                 ForEach(songs) { song in
-                    let isCurrent = playback.current?.id == song.id
-                    PlaylistSongRow(song: song, isCurrent: isCurrent, isPlaying: isCurrent && playback.isPlaying,
-                                    showsDragHandle: isReorderMode && !isFolder, showsRemove: isRemoveMode && !isFolder,
-                                    onTap: { playback.play(song, in: songs) },
-                                    onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
-                                    onRemove: { env.libraryEditor.removeSong(song.id, fromPlaylist: playlistId) })
-                        .dropDestination(for: String.self) { items, _ in
-                            move(items.first, onto: song.id)
-                        }
+                    PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
+                        PlaylistSongRow(song: song, isCurrent: isCurrent, isPlaying: isPlaying,
+                                        showsDragHandle: isReorderMode && !isFolder,
+                                        showsRemove: isRemoveMode && !isFolder,
+                                        onTap: { playback.play(song, in: songs) },
+                                        onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
+                                        onRemove: { env.libraryEditor.removeSong(song.id, fromPlaylist: playlistId) })
+                    }
+                    .dropDestination(for: String.self) { items, _ in
+                        move(items.first, onto: song.id)
+                    }
                 }
             }
             .padding(.top, 12)
@@ -367,7 +369,8 @@ private struct PlaylistOptionsSheet: View {
         }
         .task(id: playlist?.id) {
             guard let playlist else { return }
-            exportURL = PlaylistExport.writeTemporaryM3U(playlist, library: library)
+            let url = await PlaylistExport.writeTemporaryM3U(playlist, library: library)
+            if !Task.isCancelled { exportURL = url }
         }
         .accessibilityIdentifier("sheet.playlistOptions")
     }
