@@ -173,6 +173,18 @@ jobs:
         if: always()
         run: |
           if [ -d build/Shots.xcresult ]; then bash ci/export-shots.sh build/Shots.xcresult build/shots; fi
+      - name: Performance metrics
+        if: always()
+        run: |
+          # Performance tests (TransitionPerformanceTests) print "measured [<metric>] average: …" lines; keep them
+          # with the screenshots and in the job summary.
+          mkdir -p build/shots
+          if [ -f build/shots.log ] && grep -q 'measured \[' build/shots.log; then
+            grep 'measured \[' build/shots.log \
+              | sed -E "s/^Test Case '-\[PixlAudioUITests\.([A-Za-z]+) ([A-Za-z0-9_]+)\]' measured /\1.\2 /; s/, performanceMetricID.*//" \
+              > build/shots/perf-metrics.txt
+            { echo "### Performance metrics"; echo '```'; cat build/shots/perf-metrics.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Summarise errors
         if: failure()
         run: bash ci/xcerrors.sh build/shots.log build/Shots.xcresult

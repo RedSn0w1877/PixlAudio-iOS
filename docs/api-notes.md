@@ -597,3 +597,12 @@ Signatures checked against the developer.apple.com documentation JSON (2026-10-0
 | `Animation.interactiveSpring(response:dampingFraction:blendDuration:)` | 13 | /documentation/swiftui/animation/interactivespring(response:dampingfraction:blendduration:) | `GlassNavBar` | The pill trails the finger; retargets smoothly on every drag update. |
 | `glassEffect(_:in:)` with `Glass.regular.tint(_:)` on a `Capsule` | 26.0 | /documentation/swiftui/view/glasseffect(_:in:) | `GlassNavBar` | Bar = untinted regular glass; pill = accent-tinted glass drawn on it (owner-requested exception to "no glass on glass"). |
 | `View.safeAreaBar(edge:alignment:spacing:content:)` (`VerticalEdge`) | 26.0 | /documentation/swiftui/view/safeareabar(edge:alignment:spacing:content:) | `RootView` | Like `safeAreaInset`, and it extends the scroll edge effect of scroll views under the bar — content softly fades beneath the tab bar and mini player (replaces Home's and Search's Android gradients). |
+
+## Transition performance (2026-10-02, branch perf-transitions)
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `XCTestCase.measure(metrics:options:block:)`, `XCTMeasureOptions.iterationCount` | 13 | /documentation/xctest/xctestcase/measure(metrics:options:block:) | `UITests/TransitionPerformanceTests` | Five iterations per transition; each iteration returns to its start state. |
+| `XCTHitchMetric(application:)` | **26.0** | /documentation/xctest/xcthitchmetric | `TransitionPerformanceTests` | Hitches in the app during the block ("Understanding hitches in your app"). Simulator numbers are indicative only. |
+| `XCTOSSignpostMetric.navigationTransitionMetric` | 14 | /documentation/xctest/xctossignpostmetric/navigationtransitionmetric | `TransitionPerformanceTests` (push/pop) | The system's navigation-transition signposts (NavigationStack pushes). |
+| `XCTClockMetric()`, `XCTCPUMetric(application:)` | 13 | /documentation/xctest/xctcpumetric | `TransitionPerformanceTests` | Wall clock; the app's CPU time, cycles and instructions. |
+| `XCUIElement.waitForNonExistence(timeout:)` | Xcode 16 | /documentation/xcuiautomation/xcuielement/waitfornonexistence(timeout:) | `TransitionPerformanceTests` | The song options sheet has closed. |
