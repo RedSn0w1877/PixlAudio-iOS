@@ -148,7 +148,21 @@ jobs:
               2>&1 | bash ci/timestamp.sh | tail -15
             echo "--- $variant: $(grep -c . "build/enum-$variant.txt") lines; per class:"
             grep -oE '(PixlAudioTests|PixlAudioUITests)/[A-Za-z0-9_]+' "build/enum-$variant.txt" | sort | uniq -c
+            echo "--- $variant raw (first 30 lines, then every line naming YouTube or not starting with a test id):"
+            head -30 "build/enum-$variant.txt"
+            grep -nE 'YouTube|^[^P]' "build/enum-$variant.txt" | head -40 || true
           done
+          echo "=== JSON, skip YouTube"
+          xcodebuild test-without-building \
+            -project PixlAudio.xcodeproj -scheme PixlAudio \
+            -destination "id=$SIM_UDID" \
+            -derivedDataPath build/DerivedData \
+            -skip-testing:PixlAudioTests -skip-testing:PixlAudioUITests/YouTubeScreenshotTests \
+            -collect-test-diagnostics never \
+            -enumerate-tests -test-enumeration-style hierarchical -test-enumeration-format json \
+            -test-enumeration-output-path build/enum.json \
+            2>&1 | bash ci/timestamp.sh | tail -5
+          python3 -c 'import json; print(json.dumps(json.load(open("build/enum.json")), indent=1)[:6000])' || head -c 6000 build/enum.json
       # Screenshots still run when a unit test failed (the same signal two separate jobs gave), not after a failed
       # build or boot.
       - name: Prepare the simulator for screenshots
