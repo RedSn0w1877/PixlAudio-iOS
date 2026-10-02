@@ -42,9 +42,9 @@ final class TaisScreenshotTests: XCTestCase {
         Thread.sleep(forTimeInterval: 1.0)
         let target = app.descendants(matching: .any)[identifier].firstMatch
         let height = app.windows.firstMatch.frame.height
-        for _ in 0..<12 {
+        for _ in 0..<14 {
             if target.exists, target.isHittable, target.frame.minY < height * 0.62 { break }
-            app.swipeUp(velocity: .slow)
+            scroll(app)
         }
         XCTAssertTrue(target.exists, "\(identifier) is missing")
         Thread.sleep(forTimeInterval: 1.5)
@@ -60,7 +60,7 @@ final class TaisScreenshotTests: XCTestCase {
         let height = app.windows.firstMatch.frame.height
         for _ in 0..<4 {
             if card.exists, card.isHittable, card.frame.maxY < height * 0.95 { break }
-            app.swipeUp(velocity: .slow)
+            scroll(app)
         }
         Thread.sleep(forTimeInterval: 1.5)
         attach(app, "tais.songSheet-\(appearance)")
@@ -73,6 +73,15 @@ final class TaisScreenshotTests: XCTestCase {
         // Let the artwork bake and the background crossfade settle.
         Thread.sleep(forTimeInterval: 3.0)
         attach(app, "\(screen)-dark")
+    }
+
+    /// A slow drag along the leading margin, so it never starts on a slider or a text field (a centre swipe would
+    /// move Magic Instrumentalize's slider instead of scrolling).
+    private func scroll(_ app: XCUIApplication) {
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.03, dy: 0.72))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.03, dy: 0.38))
+        start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.2)
+        Thread.sleep(forTimeInterval: 0.4)
     }
 
     private func attach(_ app: XCUIApplication, _ name: String) {

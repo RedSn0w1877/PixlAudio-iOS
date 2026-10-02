@@ -76,6 +76,8 @@ struct TaisStudioProgressCard: View {
         .onChange(of: song.flatMap { studio.state(.lyrics, songId: $0.id)?.phase }) { _, phase in
             if phase == .succeeded(updated: true) { onLyricsReady?() }
         }
+        // `.contain` keeps the rows' own identifiers (an identifier on a plain stack would replace them).
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("tais.studio")
     }
 
@@ -174,13 +176,15 @@ private struct TaisJobRow: View {
 /// Android `LinearProgressIndicator` (6 pt, 3 pt corners): `primary` over a `secondaryContainer` track.
 struct TaisProgressBar: View {
     let fraction: Double
+    /// Indicator and track (default: the app scheme's `primary` over `secondaryContainer`).
+    var colors: (indicator: Color, track: Color)?
     @Environment(\.appTheme) private var theme
 
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .leading) {
-                Capsule().fill(theme.secondaryContainer)
-                Capsule().fill(theme.primary)
+                Capsule().fill(colors?.track ?? theme.secondaryContainer)
+                Capsule().fill(colors?.indicator ?? theme.primary)
                     .frame(width: max(proxy.size.width * min(max(fraction, 0), 1), 6))
             }
         }

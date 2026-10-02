@@ -31,7 +31,9 @@ struct InstrumentalRenderAction: View {
                 .foregroundStyle(.white.opacity(0.72))
                 .fixedSize(horizontal: false, vertical: true)
             if isRunning {
-                TaisProgressBar(fraction: Double(job?.percent ?? 0) / 100)
+                // Android's indicator in the lyrics sheet takes the song's scheme (the chrome accent here).
+                TaisProgressBar(fraction: Double(job?.percent ?? 0) / 100,
+                                colors: (theme.primaryFixedDim, theme.primaryFixedDim.opacity(0.26)))
                 Text(job?.detail ?? "Instrumental queued…")
                     .pixlFont(.bodyMedium)
                     .foregroundStyle(.white.opacity(0.85))

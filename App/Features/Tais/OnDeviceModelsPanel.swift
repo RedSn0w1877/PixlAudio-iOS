@@ -65,6 +65,7 @@ struct OnDeviceModelsPanel: View {
             Text("They can be rendered again from the song sheet.")
         }
         .animation(PixlMotion.state, value: models.states)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("tais.models")
     }
 
