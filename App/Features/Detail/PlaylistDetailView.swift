@@ -169,8 +169,7 @@ struct PlaylistDetailView: View {
     /// Android: a 62 pt row (20 pt sides, 6 pt bottom; 8 pt for folders) of two 76 pt buttons clipped to it.
     private var playRow: some View {
         let enabled = !songs.isEmpty
-        // The two buttons render together (spacing below their 8 pt gap).
-        return GlassEffectContainer(spacing: 4) {
+        return Group {
             HStack(spacing: 8) {
                 SegmentedGlassButton(title: "Play it", systemImage: "play.fill", accessibilityLabel: "Play",
                                      leading: 60, trailing: 14, height: 56, horizontalPadding: 10,
@@ -200,8 +199,7 @@ struct PlaylistDetailView: View {
 
     /// Android: Add (capsule, `tertiaryContainer`), then Remove and Reorder stretched over the rest.
     private var editRow: some View {
-        // The three buttons render together (spacing below their 8 pt gaps).
-        GlassEffectContainer(spacing: 4) {
+        Group {
             HStack(spacing: 8) {
                 SegmentedGlassButton(title: "Add", systemImage: "plus", accessibilityLabel: "Add songs", leading: 21,
                                      trailing: 21, height: 42, horizontalPadding: 12,
