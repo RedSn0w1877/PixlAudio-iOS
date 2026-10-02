@@ -6,8 +6,13 @@ import SwiftUI
 ///
 /// `expansion` is the sheet's expansion fraction (0 = mini player, 1 = full player). While a finger drags it is set
 /// directly, every touch event, with animations disabled; on release it springs to 0 or 1. Only the host and the
-/// small fade modifiers read it (through `PlayerSheetMetrics` in the environment), never the player's content, so a
-/// drag never re-renders the full player.
+/// small fade modifiers read it (each its own `Animatable` modifier, interpolated by the same spring — nothing is
+/// written into the environment every frame), never the player's content, so a drag never re-renders the full
+/// player.
+///
+/// The full player is built once — ahead of time (`prewarm`, a second after the mini player appears), or by the
+/// first expand / drag — and then kept, hidden while collapsed, so later expands don't rebuild it inside their first
+/// frames.
 @Observable
 final class PlayerSheetController {
     /// Android `PlayerSheetState.EXPANDED` (the target the sheet rests at).
@@ -29,6 +34,12 @@ final class PlayerSheetController {
     /// The keyboard is up and the shell's bars have stepped aside: the collapsed card slides down with the tab bar
     /// (set by the shell in the same animation), keeping its slot so it comes back without a rebuild.
     var hiddenForKeyboard = false
+    /// The full player has been built and stays mounted (hidden while collapsed).
+    private(set) var hasBuiltFullPlayer = false
+    /// The first expand waits one frame for the full player to mount at progress 0 (its fades must interpolate).
+    @ObservationIgnored private var pendingExpandVelocity: Double?
+    /// A collapse that navigates afterwards is under way (repeat taps are dropped, like Android's job check).
+    @ObservationIgnored private var isNavigatingAfterCollapse = false
 
     // MARK: Slot
 
@@ -45,22 +56,69 @@ final class PlayerSheetController {
 
     // MARK: Commands
 
+    /// Builds the full player ahead of its first expand (hidden; see `FullPlayerLayer`).
+    func prewarm() {
+        if !hasBuiltFullPlayer { hasBuiltFullPlayer = true }
+    }
+
+    /// Nothing is loaded any more: the card goes, and so does the built full player (the next song pre-warms again).
+    func resetFullPlayer() {
+        pendingExpandVelocity = nil
+        if hasBuiltFullPlayer { hasBuiltFullPlayer = false }
+    }
+
     /// Expands to the full player (Android `expandPlayerSheet`). `animated: false` for launch states.
     func expand(animated: Bool = true, initialVelocity: Double = 0) {
         isExpanded = true
         guard animated else {
+            if !hasBuiltFullPlayer { hasBuiltFullPlayer = true }
             withoutAnimation { expansion = 1 }
             return
         }
+        guard hasBuiltFullPlayer else {
+            // Not pre-warmed yet: mount the full player first (in the expand's transaction, as its insertion used to
+            // be) and start the spring when it appears, so its fades start from 0.
+            pendingExpandVelocity = initialVelocity
+            withAnimation(PlayerSheetMotion.expand(initialVelocity: initialVelocity)) { hasBuiltFullPlayer = true }
+            return
+        }
+        startExpand(initialVelocity: initialVelocity)
+    }
+
+    /// The full player is on screen: starts an expand that waited for it.
+    func fullPlayerDidAppear() {
+        guard let velocity = pendingExpandVelocity else { return }
+        pendingExpandVelocity = nil
+        guard isExpanded else { return }
+        startExpand(initialVelocity: velocity)
+    }
+
+    private func startExpand(initialVelocity: Double) {
         withAnimation(PlayerSheetMotion.expand(initialVelocity: initialVelocity)) { expansion = 1 }
         // Android's expand bump: scaleY 1 → 1.05 → 1 over 250 ms.
         withAnimation(.easeOut(duration: 0.125)) { overshootScaleY = 1.05 }
         withAnimation(.easeIn(duration: 0.125).delay(0.125)) { overshootScaleY = 1 }
     }
 
+    /// Collapses, then runs `action` once the sheet has collapsed to `threshold` (Android
+    /// `triggerAlbumNavigationFromPlayer`: navigate after the collapse, not in the same frame, so the push and the
+    /// collapse don't compete for the same frames). Taps while it waits are dropped.
+    func collapse(thenAfterReaching threshold: CGFloat = 0.1, _ action: @escaping () -> Void) {
+        guard !isNavigatingAfterCollapse else { return }
+        let delay = PlayerSheetMotion.collapseTime(toReach: threshold, fromFraction: expansion)
+        collapse()
+        isNavigatingAfterCollapse = true
+        Task { [weak self] in
+            if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
+            self?.isNavigatingAfterCollapse = false
+            action()
+        }
+    }
+
     /// Collapses to the mini player (Android `collapsePlayerSheet`), with the bouncy squash.
     func collapse(animated: Bool = true, initialVelocity: Double = 0) {
         let from = expansion
+        pendingExpandVelocity = nil
         isExpanded = false
         guard animated else {
             withoutAnimation { expansion = 0 }
@@ -86,6 +144,7 @@ final class PlayerSheetController {
     func beginDrag() {
         dragStartExpansion = expansion
         dragAccumulatedY = 0
+        if !hasBuiltFullPlayer { hasBuiltFullPlayer = true }
         if !isDragging { isDragging = true }
     }
 
@@ -140,6 +199,33 @@ nonisolated enum PlayerSheetMotion {
     /// `spring(DampingRatioMediumBouncy, StiffnessVeryLow)`.
     static let squashRelease = spring(stiffness: 50, dampingRatio: 0.5, initialVelocity: 0)
 
+    /// Seconds until the collapse spring started at rest from `fromFraction` first reaches `threshold` (the closed
+    /// form of the spring's step response, stiffness 200, damping ratio from the start fraction), capped at 0.8 s
+    /// (Android waits for `expansion <= 0.1` with an 800 ms timeout). 0 when already there.
+    static func collapseTime(toReach threshold: CGFloat, fromFraction fraction: CGFloat) -> Double {
+        let from = Double(min(max(fraction, 0), 1))
+        let target = Double(threshold)
+        guard from > target, from > 0 else { return 0 }
+        let omega = 200.0.squareRoot()
+        let zeta = 1.0 + (0.75 - 1.0) * from
+        // y(t): remaining share of the travel, 1 at t = 0; the sheet is at `from * y(t)`.
+        let goal = target / from
+        let step = 0.001
+        var t = 0.0
+        while t < 0.8 {
+            t += step
+            let y: Double
+            if zeta < 1 {
+                let damped = omega * (1 - zeta * zeta).squareRoot()
+                y = exp(-zeta * omega * t) * (cos(damped * t) + (zeta * omega / damped) * sin(damped * t))
+            } else {
+                y = exp(-omega * t) * (1 + omega * t)
+            }
+            if y <= goal { return t }
+        }
+        return 0.8
+    }
+
     private static func spring(stiffness: Double, dampingRatio: Double, initialVelocity: Double) -> Animation {
         .interpolatingSpring(mass: 1, stiffness: stiffness, damping: 2 * dampingRatio * stiffness.squareRoot(),
                              initialVelocity: initialVelocity)
@@ -168,7 +254,7 @@ nonisolated enum PlayerSheetDragMath {
     }
 }
 
-/// What the sheet's layers read while it moves (set by `PlayerSheetMorph`, interpolated every animation frame).
+/// What the sheet's layers derive from the expansion fraction (each fade modifier interpolates its own copy).
 nonisolated struct PlayerSheetMetrics: Equatable, Sendable {
     /// Expansion fraction, 0…1.
     var progress: CGFloat = 1
@@ -186,23 +272,35 @@ nonisolated struct PlayerSheetMetrics: Equatable, Sendable {
     }
 }
 
-extension EnvironmentValues {
-    /// The player sheet's live metrics (only the sheet's fade/offset modifiers read it).
-    @Entry var playerSheetMetrics = PlayerSheetMetrics()
-}
-
 /// Fades a full-player section in like Android's `DelayedContent` (`normalStartThreshold`), reading the sheet's
-/// progress in this small modifier only — the section itself is not re-evaluated while the sheet moves.
+/// progress in this small modifier only — the section itself is not re-evaluated while the sheet moves. The value is
+/// interpolated by `PlayerSectionFadeEffect` with the same spring as the card, frame by frame.
 struct PlayerSectionFade: ViewModifier {
     let start: CGFloat
     var slide: CGFloat = 0
 
-    @Environment(\.playerSheetMetrics) private var metrics
+    @Environment(AppEnvironment.self) private var env
 
     func body(content: Content) -> some View {
-        let alpha = metrics.sectionAlpha(start: start)
+        content.modifier(PlayerSectionFadeEffect(progress: env.playerSheet.expansion, start: start, slide: slide))
+    }
+}
+
+struct PlayerSectionFadeEffect: ViewModifier, Animatable {
+    nonisolated var animatableData: CGFloat
+    let start: CGFloat
+    let slide: CGFloat
+
+    init(progress: CGFloat, start: CGFloat, slide: CGFloat) {
+        animatableData = progress
+        self.start = start
+        self.slide = slide
+    }
+
+    func body(content: Content) -> some View {
+        let metrics = PlayerSheetMetrics(progress: min(max(animatableData, 0), 1))
         content
-            .opacity(alpha)
+            .opacity(metrics.sectionAlpha(start: start))
             .offset(y: slide * (1 - metrics.progress))
     }
 }

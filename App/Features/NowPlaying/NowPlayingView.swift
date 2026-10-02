@@ -14,9 +14,13 @@ import SwiftUI
 /// player sits over media); colours are the album palette (`playerTheme`).
 struct NowPlayingView: View {
     var safeArea: EdgeInsets
+    /// The screen width the player is laid out at (0 = unknown): seeds the carousel and the transport with their
+    /// final widths, so a fresh build lays out once instead of measuring first.
+    var width: CGFloat
 
-    init(safeArea: EdgeInsets = EdgeInsets()) {
+    init(safeArea: EdgeInsets = EdgeInsets(), width: CGFloat = 0) {
         self.safeArea = safeArea
+        self.width = width
     }
 
     @Environment(AppEnvironment.self) private var env
@@ -47,6 +51,7 @@ struct NowPlayingView: View {
                     AlbumCarousel(queue: playback.queue, currentIndex: playback.currentIndex,
                                   style: PlayerCarouselStyle(storageKey: settings.appearance.carouselStyle),
                                   isPlaying: playback.isPlaying,
+                                  initialWidth: max(width - 48, 0),
                                   onSelect: { index in playback.skipToQueueItem(at: index) },
                                   onAlbumTap: { tapped in openAlbum(tapped) })
                         .padding(.vertical, 8)
@@ -80,6 +85,8 @@ struct NowPlayingView: View {
                 }
         }
         .environment(\.appTheme, theme)
+        // The full player is built ahead of its first expand: compile the lyrics shader then, while nothing moves.
+        .onAppear { LyricsShaderWarmup.prepare() }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("screen.nowPlaying")
         .accessibilityAction(.escape) { env.playerSheet.collapse() }
@@ -91,7 +98,8 @@ struct NowPlayingView: View {
             AnimatedPlaybackControls(isPlaying: playback.isPlaying,
                                      onPrevious: { playback.skipToPrevious() },
                                      onPlayPause: { playback.togglePlayPause() },
-                                     onNext: { playback.skipToNext() })
+                                     onNext: { playback.skipToNext() },
+                                     initialWidth: max(width - 72, 0))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
             Spacer().frame(height: 14)
@@ -114,10 +122,11 @@ struct NowPlayingView: View {
         }
     }
 
-    /// Android `triggerAlbumNavigationFromPlayer`: collapse the sheet, then open the album.
+    /// Android `triggerAlbumNavigationFromPlayer`: collapse the sheet, then open the album (once the collapse is
+    /// nearly done, so the push and the collapse don't share their frames).
     private func openAlbum(_ song: Song) {
-        env.playerSheet.collapse()
-        router.push(.albumDetail(albumId: song.albumId))
+        let router = self.router
+        env.playerSheet.collapse { router.push(.albumDetail(albumId: song.albumId)) }
     }
 }
 
@@ -132,6 +141,13 @@ private struct PlayerTopBar: View {
     private var route: AudioRouteMonitor { AudioRouteMonitor.shared }
 
     var body: some View {
+        // The three glass shapes render together (spacing below the pills' 6 pt gap: nothing blends at rest).
+        GlassEffectContainer(spacing: 3) {
+            topBar
+        }
+    }
+
+    private var topBar: some View {
         HStack(spacing: 0) {
             // Navigation slot: 56 pt wide, the 42 pt circle at its end (after TopAppBar's 4 pt inset).
             ZStack(alignment: .trailing) {
@@ -261,11 +277,16 @@ private struct PlayerMetadataRow: View {
                     .padding(.trailing, 8)
                     .transition(.scale(scale: 0.85).combined(with: .opacity))
             }
-            circle(systemImage: "quote.bubble", label: "Lyrics", identifier: "player.lyrics") {
-                router.present(AppCover.lyrics)
-            }
-            circle(systemImage: "sparkles", label: "Ask the AI DJ", identifier: "player.aiDJ", iconSize: 20) {
-                router.present(AppSheet.taisChat)
+            // The two circles render together (spacing below their 12 pt gap: they never blend at rest).
+            GlassEffectContainer(spacing: 6) {
+                HStack(spacing: 12) {
+                    circle(systemImage: "quote.bubble", label: "Lyrics", identifier: "player.lyrics") {
+                        router.present(AppCover.lyrics)
+                    }
+                    circle(systemImage: "sparkles", label: "Ask the AI DJ", identifier: "player.aiDJ", iconSize: 20) {
+                        router.present(AppSheet.taisChat)
+                    }
+                }
             }
         }
         .frame(minHeight: 70)
@@ -296,9 +317,10 @@ private struct PlayerMetadataRow: View {
         }
     }
 
+    /// Android `triggerArtistNavigationFromPlayer`: collapse, then push once the collapse is nearly done.
     private func navigateToArtist(_ artistId: Int64) {
-        env.playerSheet.collapse()
-        router.push(.artistDetail(artistId: artistId))
+        let router = self.router
+        env.playerSheet.collapse { router.push(.artistDetail(artistId: artistId)) }
     }
 }
 

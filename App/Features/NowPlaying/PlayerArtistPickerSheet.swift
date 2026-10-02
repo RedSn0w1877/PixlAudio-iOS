@@ -84,9 +84,10 @@ struct PlayerArtistPickerSheet: View {
         let container = item.isPrimary ? theme.secondaryContainer : theme.surfaceContainerLow
         let artist = library.artist(id: item.ref.id)
         return Button {
+            // Android: dismiss and collapse now, open the artist once the collapse is nearly done.
             router.dismissSheet()
-            env.playerSheet.collapse()
-            router.push(.artistDetail(artistId: item.ref.id))
+            let router = self.router, artistId = item.ref.id
+            env.playerSheet.collapse { router.push(.artistDetail(artistId: artistId)) }
         } label: {
             HStack(spacing: 14) {
                 ArtistAvatar(imageURL: artist?.effectiveImageUrl, size: 52,
