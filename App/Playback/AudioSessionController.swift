@@ -75,6 +75,7 @@ final class AudioSessionController {
     /// Activates the session before playback starts. Returns false when the system refused (e.g. a call is active).
     @discardableResult
     func activate() -> Bool {
+        decide(deactivating: false)
         if isActive { return true }
         do {
             try session.setActive(true)
@@ -87,26 +88,40 @@ final class AudioSessionController {
 
     /// An activation started off the main actor, while the item loads (`prepareActivation`).
     private var preparing: Task<Void, Never>?
-    /// `deactivate()` came while that activation was under way.
-    private var deactivateAfterPreparing = false
+    /// Counts the main-actor decisions about the session (`activate`, `deactivate`, an interruption, a media-services
+    /// reset). An activation finishing off the main actor records its result only if nothing was decided meanwhile.
+    private var decisions = 0
+    /// The last decision was `deactivate()`: an activation that finishes after it is undone.
+    private var lastDecisionDeactivated = false
+
+    /// An off-main activation is still under way (tests wait for it).
+    var isPreparingActivation: Bool { preparing != nil }
+
+    private func decide(deactivating: Bool) {
+        decisions &+= 1
+        lastDecisionDeactivated = deactivating
+    }
 
     /// Starts activating the session off the main actor (`setActive(true)` is a call to the audio server), so the
     /// first play after launch doesn't make it on the main thread while the mini player appears: `activate()` then
     /// usually finds the session active. If it runs first, it activates as before (activating twice is harmless).
+    ///
+    /// The result lands later, so it never overrides a newer decision: after `activate()` the session is already
+    /// active and recorded; after `deactivate()` (with nothing asking for it since) the activation is undone; after an
+    /// interruption or a reset the system's state stands and `activate()` re-activates when playback resumes.
     func prepareActivation() {
         guard !isActive, preparing == nil else { return }
-        deactivateAfterPreparing = false
+        let decision = decisions
         preparing = Task { [weak self] in
             let activated = await Self.activateSharedSession()
             guard let self else { return }
             self.preparing = nil
-            if self.deactivateAfterPreparing {
-                self.deactivateAfterPreparing = false
-                if activated { try? self.session.setActive(false, options: .notifyOthersOnDeactivation) }
-                self.isActive = false
-                return
+            guard activated else { return }
+            if decision == self.decisions {
+                self.isActive = true
+            } else if self.lastDecisionDeactivated, !self.isActive {
+                try? self.session.setActive(false, options: .notifyOthersOnDeactivation)
             }
-            if activated { self.isActive = true }
         }
     }
 
@@ -118,7 +133,7 @@ final class AudioSessionController {
 
     /// Deactivates after a permanent stop so other apps can resume.
     func deactivate() {
-        if preparing != nil { deactivateAfterPreparing = true }
+        decide(deactivating: true)
         guard isActive else { return }
         try? session.setActive(false, options: .notifyOthersOnDeactivation)
         isActive = false
@@ -138,6 +153,7 @@ final class AudioSessionController {
         if began {
             // iOS has already paused us; record whether to resume (AUDIOFOCUS_LOSS_TRANSIENT).
             let actions = focus.transientLoss(deckSnapshot())
+            decide(deactivating: false)
             isActive = false
             onCommand?(.focus(actions))
         } else {
@@ -171,6 +187,7 @@ final class AudioSessionController {
     func clearRouteLossPause() { pausedByRouteLoss = false }
 
     func handleMediaServicesReset() {
+        decide(deactivating: false)
         isActive = false
         focus = AudioFocusResumeState()
         configure()
