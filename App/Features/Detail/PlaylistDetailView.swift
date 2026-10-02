@@ -117,7 +117,10 @@ struct PlaylistDetailView: View {
         // The M3U is built and written off the main actor (`PlaylistExport.writeM3U`).
         .task(id: playlist?.songIds) {
             guard let playlist, !isFolder else { return }
-            exportURL = await PlaylistExport.writeTemporaryM3U(playlist, library: library)
+            let songs = playlist.songIds.compactMap { library.song(id: $0) }
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("\(PlaylistExport.sanitizeFileName(playlist.name)).m3u")
+            exportURL = (try? PlaylistExport.m3u(playlist, songs: songs).write(to: url, atomically: true, encoding: .utf8)) != nil ? url : nil
         }
         .onChange(of: library.songs.count, initial: true) { _, _ in resolveFolder() }
         .sheet(isPresented: $showsAddSongs) {
