@@ -127,23 +127,6 @@ jobs:
             -collect-test-diagnostics never \
             -resultBundlePath build/UnitTests.xcresult \
             2>&1 | bash ci/timestamp.sh | tee build/test.log | cut -c14- | xcbeautify --quieter
-      - name: TEMP run main's UI selection with 9 of 10 classes skipped (only AIScreenshotTests may run)
-        if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
-        timeout-minutes: 20
-        run: |
-          set -o pipefail
-          bash ci/sim.sh prepare-shots
-          SELECTION=()
-          while IFS= read -r arg; do SELECTION+=("$arg"); done < <(GITHUB_REF=refs/heads/main COMMIT_MSG='' SHOTS_ONLY_INPUT='' bash ci/ui-test-args.sh)
-          for c in BackupOnboardingScreenshotTests HomeStatsScreenshotTests LibraryScreenshotTests LyricsScreenshotTests                    PlayerScreenshotTests ScreenshotTests SettingsScreenshotTests SpotifyScreenshotTests YouTubeScreenshotTests; do
-            SELECTION+=("-skip-testing:PixlAudioUITests/$c")
-          done
-          echo "=== ${SELECTION[*]}"
-          xcodebuild test-without-building             -project PixlAudio.xcodeproj -scheme PixlAudio             -destination "id=$SIM_UDID"             -derivedDataPath build/DerivedData             "${SELECTION[@]}"             -collect-test-diagnostics never             -resultBundlePath build/SkipProof.xcresult             2>&1 | bash ci/timestamp.sh | tee build/skipproof.log | cut -c14- | xcbeautify --quieter || true
-          echo "--- suites that started:"
-          grep -oE "Test Suite '[A-Za-z0-9_.]+' started" build/skipproof.log | sort | uniq -c
-          echo "--- test cases that started, per class:"
-          grep -oE "Test Case '-\[[A-Za-z0-9_]+\.[A-Za-z0-9_]+ " build/skipproof.log | sort | uniq -c
       # Screenshots still run when a unit test failed (the same signal two separate jobs gave), not after a failed
       # build or boot.
       - name: Prepare the simulator for screenshots
