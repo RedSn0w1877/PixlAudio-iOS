@@ -132,10 +132,10 @@ jobs:
         timeout-minutes: 15
         run: |
           set -o pipefail
-          for variant in main main-plus-skip-search; do
+          for variant in main main-plus-skip-youtube; do
             SELECTION=()
             while IFS= read -r arg; do SELECTION+=("$arg"); done < <(GITHUB_REF=refs/heads/main COMMIT_MSG='' SHOTS_ONLY_INPUT='' bash ci/ui-test-args.sh)
-            if [ "$variant" = main-plus-skip-search ]; then SELECTION+=("-skip-testing:PixlAudioUITests/SearchScreenshotTests"); fi
+            if [ "$variant" = main-plus-skip-youtube ]; then SELECTION+=("-skip-testing:PixlAudioUITests/YouTubeScreenshotTests"); fi
             echo "=== $variant: ${SELECTION[*]}"
             xcodebuild test-without-building \
               -project PixlAudio.xcodeproj -scheme PixlAudio \
