@@ -127,42 +127,23 @@ jobs:
             -collect-test-diagnostics never \
             -resultBundlePath build/UnitTests.xcresult \
             2>&1 | bash ci/timestamp.sh | tee build/test.log | cut -c14- | xcbeautify --quieter
-      - name: TEMP enumerate the main-branch UI test selection
+      - name: TEMP run main's UI selection with 9 of 10 classes skipped (only AIScreenshotTests may run)
         if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
-        timeout-minutes: 15
+        timeout-minutes: 20
         run: |
           set -o pipefail
-          for variant in main main-plus-skip-youtube; do
-            SELECTION=()
-            while IFS= read -r arg; do SELECTION+=("$arg"); done < <(GITHUB_REF=refs/heads/main COMMIT_MSG='' SHOTS_ONLY_INPUT='' bash ci/ui-test-args.sh)
-            if [ "$variant" = main-plus-skip-youtube ]; then SELECTION+=("-skip-testing:PixlAudioUITests/YouTubeScreenshotTests"); fi
-            echo "=== $variant: ${SELECTION[*]}"
-            xcodebuild test-without-building \
-              -project PixlAudio.xcodeproj -scheme PixlAudio \
-              -destination "id=$SIM_UDID" \
-              -derivedDataPath build/DerivedData \
-              "${SELECTION[@]}" \
-              -collect-test-diagnostics never \
-              -enumerate-tests -test-enumeration-style flat -test-enumeration-format text \
-              -test-enumeration-output-path "build/enum-$variant.txt" \
-              2>&1 | bash ci/timestamp.sh | tail -15
-            echo "--- $variant: $(grep -c . "build/enum-$variant.txt") lines; per class:"
-            grep -oE '(PixlAudioTests|PixlAudioUITests)/[A-Za-z0-9_]+' "build/enum-$variant.txt" | sort | uniq -c
-            echo "--- $variant raw (first 30 lines, then every line naming YouTube or not starting with a test id):"
-            head -30 "build/enum-$variant.txt"
-            grep -nE 'YouTube|^[^P]' "build/enum-$variant.txt" | head -40 || true
+          bash ci/sim.sh prepare-shots
+          SELECTION=()
+          while IFS= read -r arg; do SELECTION+=("$arg"); done < <(GITHUB_REF=refs/heads/main COMMIT_MSG='' SHOTS_ONLY_INPUT='' bash ci/ui-test-args.sh)
+          for c in BackupOnboardingScreenshotTests HomeStatsScreenshotTests LibraryScreenshotTests LyricsScreenshotTests                    PlayerScreenshotTests ScreenshotTests SettingsScreenshotTests SpotifyScreenshotTests YouTubeScreenshotTests; do
+            SELECTION+=("-skip-testing:PixlAudioUITests/$c")
           done
-          echo "=== JSON, skip YouTube"
-          xcodebuild test-without-building \
-            -project PixlAudio.xcodeproj -scheme PixlAudio \
-            -destination "id=$SIM_UDID" \
-            -derivedDataPath build/DerivedData \
-            -skip-testing:PixlAudioTests -skip-testing:PixlAudioUITests/YouTubeScreenshotTests \
-            -collect-test-diagnostics never \
-            -enumerate-tests -test-enumeration-style hierarchical -test-enumeration-format json \
-            -test-enumeration-output-path build/enum.json \
-            2>&1 | bash ci/timestamp.sh | tail -5
-          python3 -c 'import json; print(json.dumps(json.load(open("build/enum.json")), indent=1)[:6000])' || head -c 6000 build/enum.json
+          echo "=== ${SELECTION[*]}"
+          xcodebuild test-without-building             -project PixlAudio.xcodeproj -scheme PixlAudio             -destination "id=$SIM_UDID"             -derivedDataPath build/DerivedData             "${SELECTION[@]}"             -collect-test-diagnostics never             -resultBundlePath build/SkipProof.xcresult             2>&1 | bash ci/timestamp.sh | tee build/skipproof.log | cut -c14- | xcbeautify --quieter || true
+          echo "--- suites that started:"
+          grep -oE "Test Suite '[A-Za-z0-9_.]+' started" build/skipproof.log | sort | uniq -c
+          echo "--- test cases that started, per class:"
+          grep -oE "Test Case '-\[[A-Za-z0-9_]+\.[A-Za-z0-9_]+ " build/skipproof.log | sort | uniq -c
       # Screenshots still run when a unit test failed (the same signal two separate jobs gave), not after a failed
       # build or boot.
       - name: Prepare the simulator for screenshots
