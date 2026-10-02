@@ -103,6 +103,9 @@ container per row, art decoded off the main thread at display size (`ArtworkView
 on the first frame), no per-frame state in rows (playing indicator = system symbol effect), no sorting/formatting
 in `body`. Playback position is never observable (`PlaybackStore.positionMs()` on demand).
 
+Transitions (tab switches, pushes, sheets, the player sheet) have their own rules — what was slow on the first
+install and what prevents it now: [`docs/performance.md`](performance.md).
+
 ## Shell (stage 4)
 
 PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact bar), `Shell/RootView.swift`:
