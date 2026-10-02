@@ -98,6 +98,9 @@ struct EditorButtonText: View {
             .pixlFont(.custom(size: 16, weight: bold ? .semibold : .medium))
             .foregroundStyle(color)
             .lineLimit(1)
+            // SF Pro at the boosted weight runs wider than Roboto: shrink a little before truncating ("Find lyrics
+            // online" in a half-width button).
+            .minimumScaleFactor(0.8)
     }
 }
 

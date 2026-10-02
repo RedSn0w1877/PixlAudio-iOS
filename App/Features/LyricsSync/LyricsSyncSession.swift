@@ -144,6 +144,8 @@ final class LyricsSyncSession {
     @ObservationIgnored private var seedDraft: SyncDraft?
     @ObservationIgnored private var undoSnapshot: (draft: SyncDraft, positionMs: Int64)?
     @ObservationIgnored private var noticeCounter = 0
+    /// Screenshot states (`-syncStep tapNotice`): the notice stays up instead of timing out before the shot.
+    @ObservationIgnored private var holdsDemoNotice = false
 
     @ObservationIgnored private var loadTask: Task<Void, Never>?
     @ObservationIgnored private var draftSaveTask: Task<Void, Never>?
@@ -838,6 +840,7 @@ final class LyricsSyncSession {
     }
 
     func dismissNotice(id: Int? = nil) {
+        if id != nil && holdsDemoNotice { return }
         if id == nil || notice?.id == id { notice = nil }
     }
 
@@ -999,6 +1002,7 @@ extension LyricsSyncSession {
         lineSelectMode = state.lineSelectMode
         if case .fixLine(let line) = state.phase { fixLine = line } else { fixLine = nil }
         notice = state.notice
+        holdsDemoNotice = state.notice != nil
         dialog = state.dialog
         endedEarlyWords = state.draft?.remainingCount ?? 0
         dirty = state.draft.map { $0.tappedCount > 0 } ?? false
