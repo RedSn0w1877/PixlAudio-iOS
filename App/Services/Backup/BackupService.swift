@@ -279,7 +279,11 @@ final class BackupService {
                 SnapshotLoader(persistence: persistence, cacheURL: SnapshotLoader.defaultCacheURL()).writeCache(cached)
             }
         }
-        if result.restoredSettings { settings.reload(from: defaults) }
+        if result.restoredSettings {
+            settings.reload(from: defaults)
+            // The restore wrote AI keys (Keychain) and base URLs: the cached "is AI set up" answer is stale.
+            AIProviderStatus.invalidate()
+        }
         if selected.contains(.transitions) { await playbackServices?.reloadTransitionRules() }
 
         if result.entries.isEmpty, let first = result.failures.first {

@@ -70,6 +70,9 @@ struct AISettingsSection: View {
                                       : "e.g. https://api.example.com/v1",
                                   placeholder: "https://", secure: false) {
                         ai.setBaseUrl($0, for: provider.rawValue)
+                        // Ollama counts as set up with a base URL alone ("New playlist" › With AI reads this).
+                        let environment = self.environment
+                        Task { await AIProviderStatus.refresh(environment) }
                     }
                 }
             }
