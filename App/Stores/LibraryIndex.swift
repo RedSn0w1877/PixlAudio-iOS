@@ -31,6 +31,8 @@ nonisolated struct LibraryDetailIndex: Sendable {
     /// The artwork of the first song whose primary artist is the key (the artist page's theme fallback); no entry
     /// when that song has none, like `library.songs.first { $0.artistId == id }?.albumArtUriString`.
     let firstArtworkByArtist: [Int64: String]
+    /// `LibraryModel.folderTree(songs)` (folder playlists and the folder explorer resolve their folder in it).
+    let folderTree: [MusicFolder]
 
     static func build(_ songs: [Song], revision: Int) -> LibraryDetailIndex {
         var byAlbum: [Int64: [Song]] = [:]
@@ -51,7 +53,8 @@ nonisolated struct LibraryDetailIndex: Sendable {
             }
         }
         return LibraryDetailIndex(revision: revision, songsByAlbum: byAlbum, songsByArtist: byArtist,
-                                  songsByGenre: byGenre, firstArtworkByArtist: firstArtwork)
+                                  songsByGenre: byGenre, firstArtworkByArtist: firstArtwork,
+                                  folderTree: LibraryModel.folderTree(songs))
     }
 
     @concurrent
@@ -64,5 +67,43 @@ nonisolated struct LibraryDetailIndex: Sendable {
 nonisolated enum GenreDetailIndexKey {
     static func key(_ genre: String?) -> String {
         (genre ?? "").trimmingCharacters(in: .whitespaces).lowercased()
+    }
+}
+
+extension LibraryStore {
+    /// `songs.filter { $0.albumId == id }`, from the detail index when it is current.
+    func songs(ofAlbum id: Int64) -> [Song] {
+        if let index = detailIndexIfCurrent { return index.songsByAlbum[id] ?? [] }
+        return songs.filter { $0.albumId == id }
+    }
+
+    /// The songs whose primary or credited artist is `id`, in library order.
+    func songs(ofArtist id: Int64) -> [Song] {
+        if let index = detailIndexIfCurrent { return index.songsByArtist[id] ?? [] }
+        return songs.filter { song in song.artistId == id || song.artists.contains { $0.id == id } }
+    }
+
+    /// The artwork of the artist's first song (primary artist), the artist page's theme fallback.
+    func firstArtwork(ofArtist id: Int64) -> String? {
+        if let index = detailIndexIfCurrent { return index.firstArtworkByArtist[id] }
+        return songs.first { $0.artistId == id }?.albumArtUriString
+    }
+
+    /// The folder tree of the library (`LibraryModel.folderTree`), from the detail index when it is current.
+    var folderTree: [MusicFolder] {
+        detailIndexIfCurrent?.folderTree ?? LibraryModel.folderTree(songs)
+    }
+}
+
+/// A value a view derives in `body` and keeps until its key changes — no SwiftUI state change, no second pass.
+/// Keep it in `@State` (a reference that lives as long as the view).
+final class ViewMemo<Key: Equatable, Value> {
+    private var entry: (key: Key, value: Value)?
+
+    func value(for key: Key, _ make: () -> Value) -> Value {
+        if let entry, entry.key == key { return entry.value }
+        let value = make()
+        entry = (key, value)
+        return value
     }
 }

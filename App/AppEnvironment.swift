@@ -33,6 +33,8 @@ final class AppEnvironment {
     let searchProviders: [SearchSource: any SearchProviding]
     /// Stage 8: the player sheet (mini player ↔ full player) state.
     let playerSheet = PlayerSheetController()
+    /// Play counts for "Most played" on artist pages, warmed after launch (see `PlayCountStore`).
+    let playCounts = PlayCountStore()
     /// Stage 8: the sleep timer the queue's timer sheet drives — the engine's (`PlaybackServices`), or an engine-less
     /// one for UI tests.
     let sleepTimer: SleepTimerController
@@ -163,6 +165,11 @@ final class AppEnvironment {
         await library.load()
         await playbackServices?.restoreQueue(lookup: library.song(id:))
         libraryAutoRefresh?.start()
+        let home = self.home, playCounts = self.playCounts, editor = libraryEditor
+        Task {
+            await home.history.ensureLoaded()
+            await playCounts.refresh(editor: editor, revision: home.history.revision)
+        }
         backup.start()
         await spotify.start()
         await updates.checkIfDue()

@@ -45,7 +45,8 @@ struct PlaylistDetailView: View {
 
     private func resolveFolder() {
         guard let folderPath else { return }
-        let folder = LibraryModel.folder(at: folderPath, in: LibraryModel.folderTree(library.songs))
+        // The library's folder tree is built off the main actor with the detail index.
+        let folder = LibraryModel.folder(at: folderPath, in: library.folderTree)
         folderPlaylist = folder.map { Playlist(id: playlistId, name: $0.name, songIds: LibraryModel.allSongs($0).map(\.id)) }
         didResolveFolder = true
     }

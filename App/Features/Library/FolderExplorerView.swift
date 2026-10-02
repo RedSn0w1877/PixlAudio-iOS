@@ -13,7 +13,7 @@ struct FolderExplorerView: View {
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        let tree = LibraryModel.folderTree(library.songs)
+        let tree = library.folderTree
         let folder = path.flatMap { LibraryModel.folder(at: $0, in: tree) }
         let subfolders = folder?.subFolders ?? tree
         let songs = LibraryModel.folderSongs(folder?.songs ?? [], sort: .folderNameAZ)
