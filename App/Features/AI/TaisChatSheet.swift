@@ -1,16 +1,36 @@
+import PixlLibrary
 import PixlModel
+import PixlNet
 import SwiftUI
 
-/// Taizo — TAIS Engine 3's chat (Android `TaisChatSheet`): the gradient avatar with "Taizo / Your on-device AI DJ",
-/// the empty state (big avatar, welcome text, suggestion chips) or the conversation, and the prompt field with the
-/// send button. A play/queue/find prompt answers with song rows (tap one to play it) plus Play Queue / Add to Queue;
-/// anything else is answered by the configured AI provider. Bubbles and chips are glass in Android's shapes; the
-/// buttons and rows inside a bubble are fills (no glass on glass).
+/// Taizo — TAIS Engine 3's chat (Android `TaisChatSheet`), redesigned for iOS at the owner's request (2026-10-03:
+/// "make taizo up much better and more beautiful"; the port rule is relaxed for this sheet only).
+///
+/// - **Empty:** a living orb (`TaizoOrb`, the app's accent palette drifting in a mesh gradient), a greeting for the
+///   time of day, a one-line subtitle and the suggestion chips (glass, each with a symbol and a mood tint, centred
+///   in a flow layout; the listener's top artist / genre lead when Home's stats know them).
+/// - **Conversation:** the orb flies into the header (one identity, `matchedGeometryEffect`) and stirs while Taizo is
+///   thinking; bubbles slide in; a play/queue/find prompt answers with a queue card (artwork mosaic, count, Play / Add
+///   to Queue, the songs — tap one to play it); anything else is answered by the configured AI provider.
+/// - **Composer:** one glass capsule with the send button inside it (accent when there is text, dimmed otherwise), in
+///   a bottom `safeAreaBar` so it rides the keyboard and the scroll edge effect softens what scrolls under it.
+///
+/// Glass: the composer, chips, bubbles and the queue card are each one glass shape; buttons and rows on them are fills
+/// (no glass on glass). Performance: the orb is the only thing that animates continuously (≤ 24 fps, paused off
+/// screen, when the sheet is gone, in the background and with Reduce Motion); typing re-renders only the composer.
 struct TaisChatSheet: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(\.appTheme) private var theme
     @Environment(\.dismiss) private var dismiss
-    @FocusState private var inputFocused: Bool
+    @Environment(\.scenePhase) private var scenePhase
+    @Namespace private var orbSpace
+
+    @State private var sheetVisible = false
+    @State private var heroVisible = true
+    @State private var greeting = TaizoGreeting.make(isUITest: LaunchConfiguration.current.isUITest)
+    @State private var personalSuggestions: [TaizoSuggestion] = []
+    /// The visible height of the empty state's scroll view (between the bars), to centre the hero in it.
+    @State private var emptyHeight: CGFloat = 0
 
     private var model: TaisChatModel { env.ai.chat }
 
@@ -19,51 +39,117 @@ struct TaisChatSheet: View {
     static let demoScript = ["Play some indie songs", "Who produced Random Access Memories?"]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            header
-            Spacer().frame(height: 12)
-            if model.messages.isEmpty {
-                TaizoEmptyState { suggestion in
-                    model.send("Play some \(suggestion) songs")
-                }
-                .frame(maxHeight: .infinity)
+        let isEmpty = model.messages.isEmpty
+        let thinking = model.isThinking
+        Group {
+            if isEmpty {
+                emptyState
             } else {
                 messageList
             }
-            Spacer().frame(height: 10)
-            inputRow
-            Spacer().frame(height: 12)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // On the content, not around the bars: an identifier set outside the `safeAreaBar`s reached the composer's
+        // field too and replaced its own `taisChat.input` (CI run 37130222151).
+        .accessibilityIdentifier("screen.taisChat")
+        .safeAreaBar(edge: .top) {
+            if !isEmpty { header(thinking: thinking) }
+        }
+        .safeAreaBar(edge: .bottom) {
+            TaizoComposer(model: model, onSend: { send(nil) })
+        }
+        .animation(.spring(response: 0.55, dampingFraction: 0.86), value: isEmpty)
+        .onAppear {
+            sheetVisible = true
+            if personalSuggestions.isEmpty {
+                personalSuggestions = TaizoSuggestion.personal(from: env.home.content.statsOverview)
+            }
+        }
+        .onDisappear { sheetVisible = false }
         .task {
             guard env.launch.screen == .taisChatConversation, model.messages.isEmpty else { return }
             await model.runScript(Self.demoScript)
         }
-        .accessibilityIdentifier("screen.taisChat")
     }
 
-    private var header: some View {
+    private var orbAnimates: Bool { sheetVisible && scenePhase == .active }
+
+    // MARK: Header (conversation)
+
+    /// The orb the hero collapsed into, "Taizo" and a status line ("Thinking…" while a prompt is in flight).
+    private func header(thinking: Bool) -> some View {
         HStack(spacing: 12) {
-            TaizoAvatar(size: 40, iconSize: 18)
+            TaizoOrb(energy: thinking ? 1 : 0, animated: thinking && orbAnimates, sparkleSize: 0.42)
+                .matchedGeometryEffect(id: "taizo.orb", in: orbSpace)
+                .frame(width: 38, height: 38)
             VStack(alignment: .leading, spacing: 0) {
                 Text(verbatim: "Taizo")
-                    .pixlFont(.titleLarge, weight: .bold)
+                    .pixlFont(.titleMedium, weight: .bold)
                     .foregroundStyle(theme.onSurface)
-                Text("Your on-device AI DJ")
+                Text(thinking ? LocalizedStringKey("Thinking…") : LocalizedStringKey("Your on-device AI DJ"))
                     .pixlFont(.bodySmall)
-                    .foregroundStyle(theme.onSurfaceVariant)
+                    .foregroundStyle(thinking ? theme.primary : theme.onSurfaceVariant)
+                    .contentTransition(.opacity)
+                    .animation(.easeInOut(duration: 0.25), value: thinking)
             }
+            .transition(.opacity.combined(with: .offset(x: -8)))
+            Spacer(minLength: 0)
         }
+        .padding(.horizontal, 20)
+        .padding(.top, 22)
+        .padding(.bottom, 8)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
     }
 
+    // MARK: Empty state
+
+    private var emptyState: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                TaizoOrb(energy: 0, animated: heroVisible && orbAnimates, glow: true, sparkleSize: 0.36)
+                    .matchedGeometryEffect(id: "taizo.orb", in: orbSpace)
+                    .frame(width: 128, height: 128)
+                    .onScrollVisibilityChange(threshold: 0.05) { heroVisible = $0 }
+                Spacer().frame(height: 34)
+                VStack(spacing: 6) {
+                    Text(greeting)
+                        .pixlFont(.headlineMedium, weight: .bold)
+                        .foregroundStyle(theme.onSurface)
+                    Text("I'm Taizo, your on-device AI DJ.\nPick a vibe, or ask me anything.")
+                        .pixlFont(.bodyLarge)
+                        .foregroundStyle(theme.onSurfaceVariant)
+                        .multilineTextAlignment(.center)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isHeader)
+                Spacer().frame(height: 28)
+                TaizoSuggestionCloud(suggestions: personalSuggestions + TaizoSuggestion.moods) { suggestion in
+                    send(suggestion.prompt)
+                }
+            }
+            .padding(.horizontal, 20)
+            // More room above than below: centred optically between the grabber and the composer.
+            .padding(.top, 72)
+            .padding(.bottom, 16)
+            .frame(maxWidth: .infinity, minHeight: emptyHeight, alignment: .center)
+        }
+        .scrollIndicators(.hidden)
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollDismissesKeyboard(.interactively)
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.height - proxy.safeAreaInsets.top - proxy.safeAreaInsets.bottom
+        } action: { height in
+            emptyHeight = max(height, 0)
+        }
+    }
+
+    // MARK: Conversation
+
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 10) {
+                LazyVStack(alignment: .leading, spacing: 14) {
                     ForEach(model.messages) { message in
                         TaisChatMessageRow(message: message, isResolvingOnlineTracks: model.isResolvingOnlineTracks,
                                            onPlay: { songs in
@@ -75,359 +161,96 @@ struct TaisChatSheet: View {
                                                model.resolveOnlineTracks(items, source: source, thenPlay: play) { dismiss() }
                                            })
                             .id(message.id)
+                            .transition(message.insertionTransition)
                     }
                 }
-                .padding(.vertical, 4)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
             }
             .scrollIndicators(.hidden)
             .scrollDismissesKeyboard(.interactively)
             .defaultScrollAnchor(.bottom)
-            .onChange(of: model.messages.count) { _, _ in
+            .onChange(of: model.messages.last?.id) { _, _ in
                 guard let last = model.messages.last else { return }
                 withAnimation(PixlMotion.state) { proxy.scrollTo(last.id, anchor: .bottom) }
             }
         }
-        .frame(maxHeight: .infinity)
+        .animation(.spring(response: 0.45, dampingFraction: 0.84), value: model.messages.last?.id)
     }
 
-    /// The 28 pt outlined field (primary outline when focused) and the filled send button.
-    private var inputRow: some View {
-        GlassEffectContainer(spacing: 4) {
-            HStack(spacing: 8) {
-                TextField("", text: Bindable(model).inputText,
-                          prompt: Text("Ask Taizo anything, or a mood/genre to play…").foregroundStyle(theme.onSurfaceVariant))
-                    .pixlFont(.bodyLarge)
-                    .foregroundStyle(theme.onSurface)
-                    .tint(theme.primary)
-                    .focused($inputFocused)
-                    .submitLabel(.send)
-                    .onSubmit { model.sendPrompt() }
-                    .padding(.horizontal, 16)
-                    .frame(height: 56)
-                    .pixlGlass(in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .strokeBorder(inputFocused ? theme.primary : theme.outlineVariant, lineWidth: inputFocused ? 2 : 1))
-                    .accessibilityIdentifier("taisChat.input")
-                GlassCircleButton(systemImage: "paperplane.fill", accessibilityLabel: "Send", size: 40, iconSize: 18,
-                                  tint: theme.primary.opacity(GlassTint.prominent), foreground: theme.onPrimary) {
-                    model.sendPrompt()
-                }
-                .accessibilityIdentifier("taisChat.send")
+    // MARK: Sending
+
+    /// Sends the typed prompt (`nil`) or a suggestion, animating the hero into the header on the first one.
+    private func send(_ prompt: String?) {
+        withAnimation(.spring(response: 0.55, dampingFraction: 0.86)) {
+            if let prompt {
+                model.send(prompt)
+            } else {
+                model.sendPrompt()
             }
         }
     }
 }
 
-/// The gradient avatar (`primary` → `tertiary`, white sparkles). Not a Material surface — Taizo's mark.
-struct TaizoAvatar: View {
-    let size: CGFloat
-    let iconSize: CGFloat
-    @Environment(\.appTheme) private var theme
-
-    var body: some View {
-        Image(systemName: "sparkles")
-            .font(.system(size: iconSize, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(width: size, height: size)
-            .background(LinearGradient(colors: [theme.primary, theme.tertiary], startPoint: .topLeading,
-                                       endPoint: .bottomTrailing), in: Circle())
-            .accessibilityHidden(true)
-    }
-}
-
-/// Fills the sheet before the first prompt: a big avatar, a welcome line and tappable suggestions.
-struct TaizoEmptyState: View {
-    let onSuggestion: (String) -> Void
-    @Environment(\.appTheme) private var theme
-
-    var body: some View {
-        VStack(spacing: 0) {
-            TaizoAvatar(size: 72, iconSize: 30)
-            Spacer().frame(height: 16)
-            Text("Hey, I'm Taizo")
-                .pixlFont(.titleLarge, weight: .bold)
-                .foregroundStyle(theme.onSurface)
-            Spacer().frame(height: 6)
-            Text("Tell me a mood or genre and I'll build you a queue, or just ask me anything about music — an artist, a song, recommendations, whatever's on your mind.")
-                .pixlFont(.bodyMedium)
-                .foregroundStyle(theme.onSurfaceVariant)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 28)
-            Spacer().frame(height: 24)
-            GlassEffectContainer(spacing: 4) {
-                AIFlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
-                    ForEach(TaisChatModel.suggestions, id: \.self) { suggestion in
-                        GlassPillButton(title: LocalizedStringKey(suggestion),
-                                        tint: theme.surfaceContainerHigh.opacity(GlassTint.surface),
-                                        foreground: theme.onSurfaceVariant, style: .labelLarge,
-                                        horizontalPadding: 16, verticalPadding: 8) {
-                            onSuggestion(suggestion)
-                        }
-                        .accessibilityIdentifier("taisChat.suggestion.\(suggestion)")
-                    }
-                }
-            }
-            .padding(.horizontal, 12)
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
-/// One chat row (Android `TaisChatMessageRow`).
-struct TaisChatMessageRow: View {
-    let message: TaisChatMessage
-    let isResolvingOnlineTracks: Bool
-    let onPlay: ([Song]) -> Void
-    let onQueue: ([Song]) -> Void
-    let onResolve: ([SearchResultItem], SearchSource, Bool) -> Void
+/// The prompt field: one glass capsule holding the text field and the send button (a fill on the capsule, like the
+/// system's message composers — accent when there is something to send, dimmed and disabled otherwise). Its own view,
+/// so a keystroke re-renders only this.
+struct TaizoComposer: View {
+    @Bindable var model: TaisChatModel
+    let onSend: () -> Void
 
     @Environment(\.appTheme) private var theme
-
-    /// Taizo's bubbles: a 4 pt top-leading corner, 20 elsewhere; the user's: a 4 pt bottom-trailing corner.
-    private static let taizoShape = UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 20,
-                                                           bottomTrailingRadius: 20, topTrailingRadius: 20, style: .continuous)
-    private static let userShape = UnevenRoundedRectangle(topLeadingRadius: 20, bottomLeadingRadius: 20,
-                                                          bottomTrailingRadius: 4, topTrailingRadius: 20, style: .continuous)
+    @FocusState private var focused: Bool
 
     var body: some View {
-        switch message {
-        case .user(_, let text):
-            HStack {
-                Spacer(minLength: 0)
-                Text(text)
-                    .pixlFont(.bodyMedium)
-                    .foregroundStyle(theme.onPrimary)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .pixlGlass(in: Self.userShape, tint: theme.primary.opacity(GlassTint.prominent))
-                    .frame(maxWidth: 280, alignment: .trailing)
-            }
-        case .thinking:
-            HStack(spacing: 8) {
-                TaizoAvatar(size: 28, iconSize: 13)
-                ThinkingDots(color: theme.primary)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .pixlGlass(in: Self.taizoShape, tint: theme.surfaceContainerHigh.opacity(GlassTint.surface))
-                Spacer(minLength: 0)
-            }
-            .accessibilityLabel("Taizo is thinking")
-        case .textReply(_, let text, let isError):
-            HStack(alignment: .top, spacing: 8) {
-                TaizoAvatar(size: 28, iconSize: 13)
-                Text(text)
-                    .pixlFont(.bodyMedium)
-                    .foregroundStyle(isError ? theme.onErrorContainer : theme.onSurface)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .pixlGlass(in: Self.taizoShape,
-                               tint: isError ? theme.errorContainer.opacity(GlassTint.container)
-                                             : theme.surfaceContainerHigh.opacity(GlassTint.surface))
-                    .frame(maxWidth: 300, alignment: .leading)
-                Spacer(minLength: 0)
-            }
-        case .djReply(_, _, let result, let intro):
-            HStack(alignment: .top, spacing: 8) {
-                TaizoAvatar(size: 28, iconSize: 13)
-                djContent(result: result, intro: intro)
-                    .padding(14)
-                    .pixlGlass(in: Self.taizoShape, tint: theme.surfaceContainerHigh.opacity(GlassTint.surface))
-                Spacer(minLength: 0)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func djContent(result: DjRouteResult, intro: String?) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            switch result {
-            case .offline(let songs):
-                Text(intro ?? "Found \(songs.count) songs in your library.")
-                    .pixlFont(.bodyMedium)
-                    .foregroundStyle(theme.onSurface)
-                Spacer().frame(height: 10)
-                bulkButtons(enabled: true, play: { onPlay(songs) }, queue: { onQueue(songs) })
-                Spacer().frame(height: 10)
-                VStack(spacing: 4) {
-                    ForEach(songs.prefix(8)) { song in
-                        TaizoTrackRow(title: song.title, subtitle: song.displayArtist,
-                                      artwork: ArtworkSource(song: song), enabled: true) {
-                            onPlay([song])
-                        }
-                    }
-                }
-            case .online(let items, let source):
-                Text(intro ?? "Found \(items.count) tracks on \(source == .spotify ? "Spotify" : "YouTube Music").")
-                    .pixlFont(.bodyMedium)
-                    .foregroundStyle(theme.onSurface)
-                Spacer().frame(height: 10)
-                bulkButtons(enabled: !isResolvingOnlineTracks, play: { onResolve(items, source, true) },
-                            queue: { onResolve(items, source, false) })
-                Spacer().frame(height: 10)
-                VStack(spacing: 4) {
-                    ForEach(Array(items.prefix(8).enumerated()), id: \.offset) { _, item in
-                        let info = Self.trackInfo(item)
-                        TaizoTrackRow(title: info.title, subtitle: info.artist, artwork: ArtworkSource(uriString: info.art),
-                                      enabled: !isResolvingOnlineTracks) {
-                            onResolve([item], source, true)
-                        }
-                    }
-                }
-            case .noResults:
-                Text("Couldn't find anything for that — try a different genre or mood.")
-                    .pixlFont(.bodyMedium)
-                    .foregroundStyle(theme.onSurface)
-            }
-        }
-    }
-
-    /// Two `FilledTonalButton`s (20 pt corners, 18 pt icons): fills on the bubble's glass.
-    private func bulkButtons(enabled: Bool, play: @escaping () -> Void, queue: @escaping () -> Void) -> some View {
+        let canSend = !model.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         HStack(spacing: 8) {
-            tonalButton("Play Queue", systemImage: "play.fill", enabled: enabled, action: play)
-            tonalButton("Add to Queue", systemImage: "text.badge.plus", enabled: enabled, action: queue)
-        }
-    }
-
-    private func tonalButton(_ title: LocalizedStringKey, systemImage: String, enabled: Bool,
-                             action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 4) {
-                Image(systemName: systemImage).font(.system(size: 15, weight: .semibold))
-                Text(title).pixlFont(.labelLarge).lineLimit(1).minimumScaleFactor(0.8)
+            TextField("", text: $model.inputText,
+                      prompt: Text("Ask Taizo anything").foregroundStyle(theme.onSurfaceVariant))
+                .pixlFont(.bodyLarge)
+                .foregroundStyle(theme.onSurface)
+                .tint(theme.primary)
+                .lineLimit(1)
+                .focused($focused)
+                .submitLabel(.send)
+                .onSubmit(onSend)
+                .padding(.leading, 20)
+                .frame(maxHeight: .infinity)
+                .accessibilityIdentifier("taisChat.input")
+            Button(action: onSend) {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(canSend ? theme.onPrimary : theme.onSurface.opacity(0.38))
+                    .frame(width: 40, height: 40)
+                    .background(canSend ? theme.primary : theme.onSurface.opacity(0.08), in: Circle())
+                    .scaleEffect(canSend ? 1 : 0.92)
+                    .contentShape(Circle().inset(by: -4))
             }
-            .foregroundStyle(theme.onSecondaryContainer)
-            .padding(.horizontal, 14)
-            .frame(height: 40)
-            .background(theme.secondaryContainer.opacity(0.9), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .contentShape(.rect(cornerRadius: 20))
+            .buttonStyle(PressScaleButtonStyle(pressedScale: 0.88))
+            .disabled(!canSend)
+            .animation(.spring(response: 0.3, dampingFraction: 0.75), value: canSend)
+            .accessibilityLabel("Send")
+            .accessibilityIdentifier("taisChat.send")
+            .padding(.trailing, 8)
         }
-        .buttonStyle(PressScaleButtonStyle(pressedScale: 0.95))
-        .disabled(!enabled)
-        .opacity(enabled ? 1 : 0.5)
-    }
-
-    private static func trackInfo(_ item: SearchResultItem) -> (title: String, artist: String, art: String?) {
-        switch item {
-        case .catalog(let track): (track.title, track.artist, track.albumArtUrl)
-        case .youtubeMusic(let track): (track.title, track.artist, track.thumbnailUrl)
-        case .song(let song): (song.title, song.displayArtist, song.albumArtUriString)
-        case .album(let album): (album.title, album.artist, album.albumArtUriString)
-        case .artist(let artist): (artist.name, "", nil)
-        case .playlist(let playlist): (playlist.name, "", nil)
-        }
+        .frame(height: 56)
+        // A neutral tint keeps the field legible over the bubbles scrolling under it (like the tab bar's).
+        .pixlGlass(in: Capsule(), tint: theme.surfaceContainerHigh.opacity(0.45))
+        .padding(.horizontal, 16)
+        .padding(.top, 6)
+        .padding(.bottom, 10)
     }
 }
 
-/// One result row (Android `TaizoSongRow` / `TaizoOnlineTrackRow`): 44 pt art (8 pt corners), title / artist,
-/// a play icon; tap anywhere to play it.
-struct TaizoTrackRow: View {
-    let title: String
-    let subtitle: String
-    let artwork: ArtworkSource?
-    let enabled: Bool
-    let action: () -> Void
-
-    @Environment(\.appTheme) private var theme
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 0) {
-                ArtworkView(source: artwork, size: 44, cornerRadius: 8)
-                Spacer().frame(width: 10)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(title)
-                        .pixlFont(.bodyMedium, weight: .semibold)
-                        .foregroundStyle(theme.onSurface)
-                        .lineLimit(1)
-                    Text(subtitle)
-                        .pixlFont(.bodySmall)
-                        .foregroundStyle(theme.onSurfaceVariant)
-                        .lineLimit(1)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Spacer().frame(width: 8)
-                Image(systemName: "play.fill")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(theme.primary)
-                    .accessibilityLabel("Play \(title)")
-            }
-            .padding(.vertical, 6)
-            .padding(.horizontal, 4)
-            .contentShape(.rect(cornerRadius: 12))
+/// "Good morning" … by the hour (Home's day phases); a fixed evening in UI tests so screenshots are stable.
+enum TaizoGreeting {
+    static func make(isUITest: Bool, now: Date = Date()) -> String {
+        let hour = isUITest ? 18 : Calendar.current.component(.hour, from: now)
+        switch HomeLogic.dayPhase(hour: hour) {
+        case "morning": return "Good morning"
+        case "afternoon": return "Good afternoon"
+        case "evening": return "Good evening"
+        default: return "Hey, night owl"
         }
-        .buttonStyle(PressScaleButtonStyle(pressedScale: 0.97))
-        .disabled(!enabled)
-    }
-}
-
-/// Three dots pulsing out of phase (900 ms, linear; alpha 0.3 + 0.7·sin) — Taizo's typing indicator. Ticks only
-/// while a prompt is in flight (the row exists only then).
-struct ThinkingDots: View {
-    let color: Color
-
-    var body: some View {
-        TimelineView(.animation) { context in
-            let phase = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 0.9) / 0.9
-            HStack(spacing: 4) {
-                ForEach(0..<3, id: \.self) { index in
-                    let local = (phase + Double(index) * 0.33).truncatingRemainder(dividingBy: 1)
-                    Circle()
-                        .fill(color.opacity(0.3 + 0.7 * min(max(sin(local * .pi), 0), 1)))
-                        .frame(width: 7, height: 7)
-                }
-            }
-        }
-        .accessibilityHidden(true)
-    }
-}
-
-/// Compose `FlowRow` for the suggestion chips: rows of chips, start-aligned, wrapped at the proposed width.
-nonisolated struct AIFlowLayout: Layout {
-    var horizontalSpacing: CGFloat
-    var verticalSpacing: CGFloat
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let rows = arrange(width: proposal.width ?? .infinity, subviews: subviews)
-        let width = rows.map(\.width).max() ?? 0
-        let height = rows.reduce(0) { $0 + $1.height } + verticalSpacing * CGFloat(max(rows.count - 1, 0))
-        return CGSize(width: proposal.width ?? width, height: height)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var y = bounds.minY
-        for row in arrange(width: bounds.width, subviews: subviews) {
-            var x = bounds.minX
-            for index in row.indices {
-                let size = subviews[index].sizeThatFits(.unspecified)
-                subviews[index].place(at: CGPoint(x: x, y: y), anchor: .topLeading, proposal: ProposedViewSize(size))
-                x += size.width + horizontalSpacing
-            }
-            y += row.height + verticalSpacing
-        }
-    }
-
-    private struct Row {
-        var indices: [Int] = []
-        var width: CGFloat = 0
-        var height: CGFloat = 0
-    }
-
-    private func arrange(width: CGFloat, subviews: Subviews) -> [Row] {
-        var rows: [Row] = []
-        var current = Row()
-        for index in subviews.indices {
-            let size = subviews[index].sizeThatFits(.unspecified)
-            let extra = current.indices.isEmpty ? size.width : current.width + horizontalSpacing + size.width
-            if !current.indices.isEmpty, extra > width {
-                rows.append(current)
-                current = Row()
-            }
-            current.width = current.indices.isEmpty ? size.width : current.width + horizontalSpacing + size.width
-            current.height = max(current.height, size.height)
-            current.indices.append(index)
-        }
-        if !current.indices.isEmpty { rows.append(current) }
-        return rows
     }
 }

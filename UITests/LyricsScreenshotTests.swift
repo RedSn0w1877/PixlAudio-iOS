@@ -31,6 +31,25 @@ final class LyricsScreenshotTests: XCTestCase {
         try capture("lyricsMoreSheet", demo: "words", freezeMs: 42_300, tap: "Lyrics options", settle: 2.5)
     }
 
+    /// The lyrics screen is always dark, and so is its More sheet — also when the app is light. Until 2026-10-03 the
+    /// sheet kept the light palette there (near-black rows on the dark sheet); these shots guard the fix.
+    func testMoreSheetInLightApp() throws {
+        try capture("lyricsMoreSheet.lightApp", demo: "words", freezeMs: 42_300, appearance: "light", tap: "Lyrics options",
+                    settle: 2.5)
+    }
+
+    /// The end of the sheet: Controls and the shuffle / repeat / favourite row (part of the sheet, Android
+    /// `BottomToggleRow`), light app.
+    func testMoreSheetBottomInLightApp() throws {
+        try capture("lyricsMoreSheet.lightAppBottom", demo: "words", freezeMs: 42_300, appearance: "light",
+                    tap: "Lyrics options", settle: 2.0, swipeUp: true)
+    }
+
+    func testFetchDialogInLightApp() throws {
+        try capture("lyricsFetchDialog.lightApp", demo: "none", ready: "lyrics.findLyrics", appearance: "light",
+                    tap: "lyrics.findLyrics", settle: 1.5)
+    }
+
     func testFetchDialog() throws {
         try capture("lyricsFetchDialog", demo: "none", ready: "lyrics.findLyrics", tap: "lyrics.findLyrics", settle: 1.5)
     }
@@ -61,7 +80,7 @@ final class LyricsScreenshotTests: XCTestCase {
 
     private func capture(_ name: String, demo: String, freezeMs: Int? = nil, ready: String = "screen.lyrics",
                          readyText: String? = nil, appearance: String = "dark", extra: [String] = [], tap: String? = nil,
-                         settle: TimeInterval = 3.0) throws {
+                         settle: TimeInterval = 3.0, swipeUp: Bool = false) throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         var arguments = ["-uiTest", "-screen", "lyrics", "-appearance", appearance, "-lyricsDemo", demo]
@@ -78,6 +97,10 @@ final class LyricsScreenshotTests: XCTestCase {
         }
         // Let the cascade, the artwork bake and the background crossfade settle.
         Thread.sleep(forTimeInterval: settle)
+        if swipeUp {
+            app.swipeUp(velocity: .fast)
+            Thread.sleep(forTimeInterval: 1.5)
+        }
         attach(app, name: "\(name)-\(appearance)")
     }
 
