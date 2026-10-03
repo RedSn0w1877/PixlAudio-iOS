@@ -1,7 +1,8 @@
 import SwiftUI
 import UIKit
 
-// The bottom tab bar's UIKit core. On iOS 26 and later the system's "liquid lens" selection is offered by just two
+// The UIKit core of PixlAudio's liquid-lens controls: the bottom tab bar and segmented pickers such as the song
+// picker's LOCAL / CLOUD switch. On iOS 26 and later the system offers the "liquid lens" selection in only two
 // controls, UITabBar and UISegmentedControl. When touched, the selection lifts off as clear glass, swells past the
 // bar, follows the finger and magnifies the content under it, then settles back into the tinted pill.
 // This file follows the technique of the open-source FabBar (Ryan Ashcraft, MIT,
@@ -16,10 +17,37 @@ import UIKit
 // called. If a future iOS changes that hierarchy, the glyphs are not injected and the control falls back to its
 // own segment titles, so it stays usable.
 
+/// One segment of a liquid-lens control.
+nonisolated struct LiquidSegmentItem: Hashable, Sendable {
+    let title: String
+    /// Outline symbol, shown outside the lens.
+    let systemImage: String
+    /// Filled symbol, shown inside the lens.
+    let selectedSystemImage: String
+    /// The segment view's accessibility identifier (UI tests).
+    let identifier: String
+}
+
+/// How a glyph arranges its symbol and label.
+nonisolated enum LiquidGlyphLayout: Sendable {
+    /// Symbol over a 10 pt label (the tab bar).
+    case stacked
+    /// Symbol beside a 14 pt bold label (pickers).
+    case inline
+}
+
+// MARK: - Tab bar
+
 /// PixlAudio's tab bar as a SwiftUI view: Home, Search, Library on the system liquid lens.
+/// `minimized` is the scroll state (Hoa, 2026-10-03: "an auto compact version that removes the labels and shrinks the
+/// distance between the icons and makes it smaller and … a bit shorter as well when the user scrolls"): the capsule
+/// narrows around the symbols and lowers, animated in UIKit so the lens and its masks follow every frame.
 struct LiquidTabBar: UIViewRepresentable {
     let selection: RootTab
+    /// Settings › Appearance compact mode: symbols only, full width.
     let compact: Bool
+    /// Scrolled: symbols only, narrow and shorter.
+    let minimized: Bool
     /// Tint of the resting selection pill (the accent).
     let pillColor: UIColor
     /// Glyph colour on the resting pill (`onPrimary`).
@@ -28,30 +56,50 @@ struct LiquidTabBar: UIViewRepresentable {
     let liftedGlyphColor: UIColor
     let onSelect: (RootTab) -> Void
 
+    static func items() -> [LiquidSegmentItem] {
+        RootTab.allCases.map {
+            LiquidSegmentItem(title: $0.title, systemImage: $0.systemImage,
+                              selectedSystemImage: $0.selectedSystemImage, identifier: "navBar.\($0.rawValue)")
+        }
+    }
+
+    /// The glass capsule's height in each state; the SwiftUI frame around the bar uses the same values.
+    static func height(compact: Bool, minimized: Bool) -> CGFloat {
+        minimized ? Tokens.Shell.navBarMinimizedHeight
+            : compact ? Tokens.Shell.navBarCompactHeight : Tokens.Shell.navBarHeight
+    }
+
     func makeCoordinator() -> Coordinator {
         Coordinator(onSelect: onSelect)
     }
 
-    func makeUIView(context: Context) -> LiquidTabBarView {
-        let view = LiquidTabBarView(tabs: RootTab.allCases, compact: compact)
+    func makeUIView(context: Context) -> LiquidLensBarView {
+        let control = LiquidLensSegmentedControl(items: Self.items(), layout: .stacked, showsTitles: !compact && !minimized)
+        control.accessibilityTraits = .tabBar
+        let view = LiquidLensBarView(control: control)
         let coordinator = context.coordinator
-        view.control.addTarget(coordinator, action: #selector(Coordinator.valueChanged(_:)), for: .valueChanged)
-        view.control.onReselect = { [weak coordinator] index in coordinator?.reselect(index: index) }
-        apply(to: view, coordinator: coordinator)
+        control.addTarget(coordinator, action: #selector(Coordinator.valueChanged(_:)), for: .valueChanged)
+        control.onReselect = { [weak coordinator] index in coordinator?.reselect(index: index) }
+        apply(to: view, coordinator: coordinator, animated: false)
         return view
     }
 
-    func updateUIView(_ view: LiquidTabBarView, context: Context) {
+    func updateUIView(_ view: LiquidLensBarView, context: Context) {
         context.coordinator.onSelect = onSelect
-        apply(to: view, coordinator: context.coordinator)
+        apply(to: view, coordinator: context.coordinator, animated: true)
     }
 
-    private func apply(to view: LiquidTabBarView, coordinator: Coordinator) {
+    private func apply(to view: LiquidLensBarView, coordinator: Coordinator, animated: Bool) {
         let control = view.control
-        control.setCompact(compact)
         control.pillColor = pillColor
         control.restingGlyphColor = restingGlyphColor
         control.liftedGlyphColor = liftedGlyphColor
+        control.baseGlyphColor = .label
+        let width: CGFloat? = minimized
+            ? CGFloat(RootTab.allCases.count) * Tokens.Shell.navBarMinimizedSegmentWidth + 2 * Tokens.Shell.navGlassPadding
+            : nil
+        view.setShape(height: Self.height(compact: compact, minimized: minimized), width: width, animated: animated)
+        control.setShowsTitles(!compact && !minimized, animated: animated)
         let index = RootTab.allCases.firstIndex(of: selection) ?? 0
         coordinator.currentIndex = index
         // While a finger is on the bar the control owns the selection (the lens follows the finger).
@@ -83,18 +131,85 @@ struct LiquidTabBar: UIViewRepresentable {
     }
 }
 
-/// The capsule of interactive glass holding the segmented control.
-final class LiquidTabBarView: UIView {
-    let glassView: UIVisualEffectView // holds a UIGlassEffect (real Liquid Glass)
-    let control: LiquidTabSegmentedControl
+// MARK: - Segmented picker
 
-    init(tabs: [RootTab], compact: Bool) {
+/// A segmented picker on the liquid lens (the song picker's LOCAL / CLOUD switch). Hoa, 2026-10-03: "the local/cloud
+/// like buttons need to implement the same liquid magnifying mechanism as the main home screen implementation".
+struct LiquidSegmentedPicker<Value: Hashable>: UIViewRepresentable {
+    let options: [Value]
+    let items: [LiquidSegmentItem]
+    @Binding var selection: Value
+    /// The SwiftUI animation a change of `selection` runs in (the lens animates itself).
+    var animation: Animation?
+    let pillColor: UIColor
+    let restingGlyphColor: UIColor
+    let liftedGlyphColor: UIColor
+    let baseGlyphColor: UIColor
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+
+    func makeUIView(context: Context) -> LiquidLensBarView {
+        let control = LiquidLensSegmentedControl(items: items, layout: .inline, showsTitles: true)
+        let view = LiquidLensBarView(control: control)
+        control.addTarget(context.coordinator, action: #selector(Coordinator.valueChanged(_:)), for: .valueChanged)
+        apply(to: view)
+        return view
+    }
+
+    func updateUIView(_ view: LiquidLensBarView, context: Context) {
+        context.coordinator.parent = self
+        apply(to: view)
+    }
+
+    private func apply(to view: LiquidLensBarView) {
+        let control = view.control
+        control.pillColor = pillColor
+        control.restingGlyphColor = restingGlyphColor
+        control.liftedGlyphColor = liftedGlyphColor
+        control.baseGlyphColor = baseGlyphColor
+        let index = options.firstIndex(of: selection) ?? 0
+        if !control.isTracking, control.selectedSegmentIndex != index {
+            control.selectedSegmentIndex = index
+        }
+    }
+
+    final class Coordinator: NSObject {
+        var parent: LiquidSegmentedPicker
+
+        init(parent: LiquidSegmentedPicker) {
+            self.parent = parent
+        }
+
+        @objc func valueChanged(_ control: UISegmentedControl) {
+            let index = control.selectedSegmentIndex
+            guard parent.options.indices.contains(index), parent.options[index] != parent.selection else { return }
+            let value = parent.options[index]
+            withAnimation(parent.animation) { parent.selection = value }
+        }
+    }
+}
+
+// MARK: - Glass capsule
+
+/// The capsule of interactive glass holding a liquid-lens segmented control. Its shape (height, and a fixed width or
+/// the full width) animates in UIKit, so the segments, the lens and the accent masks follow on every frame. The glass
+/// sits at the bottom centre of the view; touches outside it fall through.
+final class LiquidLensBarView: UIView {
+    let glassView: UIVisualEffectView // holds a UIGlassEffect (real Liquid Glass)
+    let control: LiquidLensSegmentedControl
+
+    private var heightConstraint: NSLayoutConstraint!
+    private var fullWidthConstraint: NSLayoutConstraint!
+    private var fixedWidthConstraint: NSLayoutConstraint!
+
+    init(control: LiquidLensSegmentedControl) {
         let glass = UIGlassEffect()
         glass.isInteractive = true
         glassView = UIVisualEffectView(effect: glass) // UIGlassEffect, interactive
-        control = LiquidTabSegmentedControl(items: tabs.map(\.title))
+        self.control = control
         super.init(frame: .zero)
-        control.configure(tabs: tabs, compact: compact)
         backgroundColor = .clear
 
         addSubview(glassView)
@@ -102,11 +217,19 @@ final class LiquidTabBarView: UIView {
         glassView.contentView.addSubview(control)
         control.translatesAutoresizingMaskIntoConstraints = false
         let padding = Tokens.Shell.navGlassPadding
+        heightConstraint = glassView.heightAnchor.constraint(equalToConstant: 0)
+        heightConstraint.priority = .defaultHigh
+        fullWidthConstraint = glassView.widthAnchor.constraint(equalTo: widthAnchor)
+        fixedWidthConstraint = glassView.widthAnchor.constraint(equalToConstant: 0)
+        // Before the first `setShape`, the glass fills the view.
+        let fillHeight = glassView.heightAnchor.constraint(equalTo: heightAnchor)
+        fillHeight.priority = .defaultLow
         NSLayoutConstraint.activate([
-            glassView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            glassView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            glassView.topAnchor.constraint(equalTo: topAnchor),
+            glassView.centerXAnchor.constraint(equalTo: centerXAnchor),
             glassView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            glassView.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor),
+            fullWidthConstraint,
+            fillHeight,
             control.leadingAnchor.constraint(equalTo: glassView.contentView.leadingAnchor, constant: padding),
             control.trailingAnchor.constraint(equalTo: glassView.contentView.trailingAnchor, constant: -padding),
             control.topAnchor.constraint(equalTo: glassView.contentView.topAnchor, constant: padding),
@@ -120,15 +243,47 @@ final class LiquidTabBarView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    /// The capsule's height, and its width (`nil`: the view's full width).
+    func setShape(height: CGFloat, width: CGFloat?, animated: Bool) {
+        let changed = heightConstraint.constant != height || !heightConstraint.isActive
+            || (width == nil) != fullWidthConstraint.isActive
+            || (width.map { $0 != fixedWidthConstraint.constant } ?? false)
+        guard changed else { return }
+        heightConstraint.constant = height
+        heightConstraint.isActive = true
+        if let width {
+            fixedWidthConstraint.constant = width
+            fullWidthConstraint.isActive = false
+            fixedWidthConstraint.isActive = true
+        } else {
+            fixedWidthConstraint.isActive = false
+            fullWidthConstraint.isActive = true
+        }
+        guard animated, window != nil, !UIAccessibility.isReduceMotionEnabled else {
+            setNeedsLayout()
+            return
+        }
+        UIView.animate(springDuration: 0.5, bounce: 0.2, initialSpringVelocity: 0, delay: 0,
+                       options: [.allowUserInteraction, .beginFromCurrentState]) {
+            self.layoutIfNeeded()
+        }
+    }
+
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        glassView.frame.contains(point)
+    }
+
     override func layoutSubviews() {
         super.layoutSubviews()
         glassView.cornerConfiguration = .capsule()
     }
 }
 
-/// A UISegmentedControl working as the tab bar: PixlAudio's glyphs inside the segments, the lens moving on touch
-/// down, the selection changing on touch up, and a re-tap reported separately.
-final class LiquidTabSegmentedControl: UISegmentedControl {
+// MARK: - Segmented control
+
+/// A UISegmentedControl with PixlAudio's glyphs inside the segments, the lens moving on touch down, the selection
+/// changing on touch up, and a re-tap reported separately.
+final class LiquidLensSegmentedControl: UISegmentedControl {
     var onReselect: ((Int) -> Void)?
 
     var pillColor: UIColor = .tintColor {
@@ -140,15 +295,18 @@ final class LiquidTabSegmentedControl: UISegmentedControl {
     var liftedGlyphColor: UIColor = .tintColor {
         didSet { if liftedGlyphColor != oldValue { updateGlyphColors(animated: false) } }
     }
+    /// Colour of the glyphs outside the lens.
+    var baseGlyphColor: UIColor = .label {
+        didSet { if baseGlyphColor != oldValue { updateGlyphColors(animated: false) } }
+    }
 
-    private var tabs: [RootTab] = []
-    private var compact = false
-    /// Outline glyphs in the label colour, cut out where the lens is.
-    private var baseGlyphs: [TabGlyphView] = []
+    private let items: [LiquidSegmentItem]
+    /// Outline glyphs in the base colour, cut out where the lens is.
+    private let baseGlyphs: [TabGlyphView]
     /// Filled glyphs in the selection colour, shown only inside the lens.
-    private var accentGlyphs: [TabGlyphView] = []
+    private let accentGlyphs: [TabGlyphView]
     private var injected = false
-    /// A finger is down: the lens is lifted (clear glass), so glyphs under it take the accent colour.
+    /// A finger is down: the lens is lifted (clear glass), so glyphs under it take the lifted colour.
     private var isLifted = false
     /// The selection before the touch began, to restore on cancel and to detect a re-tap.
     private var originalIndex: Int?
@@ -164,10 +322,15 @@ final class LiquidTabSegmentedControl: UISegmentedControl {
     private static let segmentClassName = "UISegment"
     private static let lensClassName = "_UILiquidLensView"
 
-    override init(items: [Any]?) {
-        super.init(items: items)
-        accessibilityTraits = .tabBar
+    init(items: [LiquidSegmentItem], layout: LiquidGlyphLayout, showsTitles: Bool) {
+        self.items = items
+        baseGlyphs = items.map { TabGlyphView(symbolName: $0.systemImage, title: $0.title, layout: layout, showsTitle: showsTitles) }
+        accentGlyphs = items.map {
+            TabGlyphView(symbolName: $0.selectedSystemImage, title: $0.title, layout: layout, showsTitle: showsTitles)
+        }
+        super.init(items: items.map(\.title))
         showsLargeContentViewer = false
+        updateGlyphColors(animated: false)
     }
 
     @available(*, unavailable)
@@ -175,16 +338,18 @@ final class LiquidTabSegmentedControl: UISegmentedControl {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func configure(tabs: [RootTab], compact: Bool) {
-        self.tabs = tabs
-        self.compact = compact
-        rebuildGlyphs()
-    }
-
-    func setCompact(_ compact: Bool) {
-        guard compact != self.compact else { return }
-        self.compact = compact
-        rebuildGlyphs()
+    /// Shows or hides the glyphs' labels, cross-fading (the glyphs keep their size, so nothing re-lays out).
+    func setShowsTitles(_ showsTitles: Bool, animated: Bool) {
+        for glyph in baseGlyphs + accentGlyphs where glyph.showsTitle != showsTitles {
+            if animated, window != nil {
+                UIView.transition(with: glyph, duration: 0.22,
+                                  options: [.transitionCrossDissolve, .allowUserInteraction, .beginFromCurrentState]) {
+                    glyph.showsTitle = showsTitles
+                }
+            } else {
+                glyph.showsTitle = showsTitles
+            }
+        }
     }
 
     // MARK: Layout
@@ -209,24 +374,11 @@ final class LiquidTabSegmentedControl: UISegmentedControl {
 
     // MARK: Glyphs
 
-    private func rebuildGlyphs() {
-        for segment in segmentViews() {
-            segment.viewWithTag(Self.baseTag)?.removeFromSuperview()
-            segment.viewWithTag(Self.accentTag)?.removeFromSuperview()
-        }
-        baseGlyphs = tabs.map { TabGlyphView(symbolName: $0.systemImage, title: $0.title, showsTitle: !compact) }
-        accentGlyphs = tabs.map { TabGlyphView(symbolName: $0.selectedSystemImage, title: $0.title, showsTitle: !compact) }
-        injected = false
-        cachedLens = nil
-        updateGlyphColors(animated: false)
-        setNeedsLayout()
-    }
-
     private func injectGlyphsIfNeeded() {
         let segments = segmentViews()
-        guard !tabs.isEmpty, segments.count == tabs.count else { return }
+        guard !items.isEmpty, segments.count == items.count else { return }
         for (index, segment) in segments.enumerated() {
-            segment.accessibilityIdentifier = "navBar.\(tabs[index].rawValue)"
+            segment.accessibilityIdentifier = items[index].identifier
             if segment.viewWithTag(Self.baseTag) == nil {
                 attach(baseGlyphs[index], tag: Self.baseTag, to: segment)
             }
@@ -258,7 +410,7 @@ final class LiquidTabSegmentedControl: UISegmentedControl {
     }
 
     private func updateGlyphColors(animated: Bool) {
-        for glyph in baseGlyphs { glyph.tintColor = .label }
+        for glyph in baseGlyphs { glyph.tintColor = baseGlyphColor }
         let accentColor = isLifted ? liftedGlyphColor : restingGlyphColor
         for glyph in accentGlyphs {
             if animated {
@@ -325,7 +477,9 @@ final class LiquidTabSegmentedControl: UISegmentedControl {
         }
         let segments = segmentViews()
         guard segments.indices.contains(selectedSegmentIndex) else { return .zero }
-        return segments[selectedSegmentIndex].frame
+        let segment = segments[selectedSegmentIndex]
+        let segmentLayer = segment.layer.presentation() ?? segment.layer
+        return selfLayer.convert(segmentLayer.bounds, from: segmentLayer)
     }
 
     // MARK: Accent masking (per frame while the lens moves)
@@ -355,7 +509,8 @@ final class LiquidTabSegmentedControl: UISegmentedControl {
         let rect = lensRect()
         if rect == lastLensRect {
             stableFrames += 1
-            // Pause once the lens has rested for a few frames; any touch or layout wakes it again.
+            // Pause once the lens has rested for a few frames; any touch or layout wakes it again. A resize of the
+            // capsule (the tab bar minimizing) is a layout, and its segments move with the lens, so the masks follow.
             if stableFrames >= 3 {
                 displayLink?.isPaused = true
                 return
@@ -461,9 +616,9 @@ final class LiquidTabSegmentedControl: UISegmentedControl {
 
 /// Weak proxy so the display link doesn't retain the control.
 private final class LiquidTabDisplayLinkProxy: NSObject {
-    weak var control: LiquidTabSegmentedControl?
+    weak var control: LiquidLensSegmentedControl?
 
-    init(control: LiquidTabSegmentedControl) {
+    init(control: LiquidLensSegmentedControl) {
         self.control = control
     }
 
@@ -476,21 +631,32 @@ private final class LiquidTabDisplayLinkProxy: NSObject {
     }
 }
 
-/// One tab glyph — SF Symbol over a 10 pt semibold label (symbol only in compact mode) — drawn in `draw(_:)` in its
-/// tint colour. It supports archiving because the system's large-content popover archives segment content; an
-/// unarchived copy hides itself so the popover shows the segment's own title.
+// MARK: - Glyph
+
+/// One segment glyph, drawn in `draw(_:)` in its tint colour:
+/// - stacked: an SF Symbol over a 10 pt semibold label, or a larger symbol alone (compact / minimized);
+/// - inline: a symbol beside a 14 pt bold label.
+/// Its size is the largest of its forms, so hiding the label only redraws (no layout). It supports archiving because
+/// the system's large-content popover archives segment content; an unarchived copy hides itself so the popover shows
+/// the segment's own title.
 @objc(PixlTabGlyphView)
 final class TabGlyphView: UIView {
     private var symbolName = ""
     private var title = ""
-    private var showsTitle = true
+    private var layout: LiquidGlyphLayout = .stacked
+    var showsTitle = true {
+        didSet { if showsTitle != oldValue { setNeedsDisplay() } }
+    }
 
-    private static let titleFont = UIFont.systemFont(ofSize: 10, weight: .semibold)
+    private static let stackedTitleFont = UIFont.systemFont(ofSize: 10, weight: .semibold)
+    private static let inlineTitleFont = UIFont.systemFont(ofSize: 14, weight: .bold)
     private static let iconAreaHeight: CGFloat = 28
+    private static let inlineSpacing: CGFloat = 8
 
-    init(symbolName: String, title: String, showsTitle: Bool) {
+    init(symbolName: String, title: String, layout: LiquidGlyphLayout, showsTitle: Bool) {
         self.symbolName = symbolName
         self.title = title
+        self.layout = layout
         self.showsTitle = showsTitle
         super.init(frame: .zero)
         isOpaque = false
@@ -519,33 +685,72 @@ final class TabGlyphView: UIView {
         setNeedsDisplay()
     }
 
-    private var icon: UIImage? {
-        let config = UIImage.SymbolConfiguration(pointSize: showsTitle ? 18 : 21, weight: .semibold, scale: .large)
+    private func icon(titled: Bool) -> UIImage? {
+        let pointSize: CGFloat = switch layout {
+        case .stacked: titled ? 18 : 21
+        case .inline: 16
+        }
+        let config = UIImage.SymbolConfiguration(pointSize: pointSize, weight: .semibold,
+                                                 scale: layout == .stacked ? .large : .medium)
         return UIImage(systemName: symbolName, withConfiguration: config)
     }
 
+    private var titleFont: UIFont {
+        layout == .stacked ? Self.stackedTitleFont : Self.inlineTitleFont
+    }
+
+    private var titleSize: CGSize {
+        (title as NSString).size(withAttributes: [.font: titleFont])
+    }
+
     override var intrinsicContentSize: CGSize {
-        let iconSize = icon?.size ?? .zero
-        guard showsTitle else { return iconSize }
-        let textSize = (title as NSString).size(withAttributes: [.font: Self.titleFont])
-        return CGSize(width: ceil(max(iconSize.width, textSize.width)), height: ceil(Self.iconAreaHeight + textSize.height))
+        let titledIcon = icon(titled: true)?.size ?? .zero
+        let bareIcon = icon(titled: false)?.size ?? .zero
+        let text = titleSize
+        switch layout {
+        case .stacked:
+            return CGSize(width: ceil(max(titledIcon.width, bareIcon.width, text.width)),
+                          height: ceil(max(Self.iconAreaHeight + text.height, bareIcon.height)))
+        case .inline:
+            return CGSize(width: ceil(titledIcon.width + Self.inlineSpacing + text.width),
+                          height: ceil(max(titledIcon.height, text.height)))
+        }
     }
 
     override func draw(_ rect: CGRect) {
         let color = tintColor ?? .label
-        if let icon {
-            let iconSize = icon.size
-            let areaHeight = showsTitle ? Self.iconAreaHeight : bounds.height
-            let iconRect = CGRect(x: (bounds.width - iconSize.width) / 2,
-                                  y: (areaHeight - iconSize.height) / 2 - (showsTitle ? 1 : 0),
-                                  width: iconSize.width, height: iconSize.height)
-            color.setFill()
-            icon.withRenderingMode(.alwaysTemplate).withTintColor(color).draw(in: iconRect)
+        let attributes: [NSAttributedString.Key: Any] = [.font: titleFont, .foregroundColor: color]
+        switch layout {
+        case .stacked:
+            if let icon = icon(titled: showsTitle) {
+                let size = icon.size
+                let iconRect: CGRect
+                if showsTitle {
+                    iconRect = CGRect(x: (bounds.width - size.width) / 2, y: (Self.iconAreaHeight - size.height) / 2 - 1,
+                                      width: size.width, height: size.height)
+                } else {
+                    iconRect = CGRect(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2,
+                                      width: size.width, height: size.height)
+                }
+                icon.withRenderingMode(.alwaysTemplate).withTintColor(color).draw(in: iconRect)
+            }
+            guard showsTitle else { return }
+            let text = titleSize
+            (title as NSString).draw(at: CGPoint(x: (bounds.width - text.width) / 2, y: Self.iconAreaHeight),
+                                     withAttributes: attributes)
+        case .inline:
+            let text = titleSize
+            let iconSize = icon(titled: true)?.size ?? .zero
+            let contentWidth = showsTitle ? iconSize.width + Self.inlineSpacing + text.width : iconSize.width
+            var x = (bounds.width - contentWidth) / 2
+            if let icon = icon(titled: true) {
+                icon.withRenderingMode(.alwaysTemplate).withTintColor(color)
+                    .draw(in: CGRect(x: x, y: (bounds.height - iconSize.height) / 2,
+                                     width: iconSize.width, height: iconSize.height))
+                x += iconSize.width + Self.inlineSpacing
+            }
+            guard showsTitle else { return }
+            (title as NSString).draw(at: CGPoint(x: x, y: (bounds.height - text.height) / 2), withAttributes: attributes)
         }
-        guard showsTitle else { return }
-        let attributes: [NSAttributedString.Key: Any] = [.font: Self.titleFont, .foregroundColor: color]
-        let textSize = (title as NSString).size(withAttributes: attributes)
-        (title as NSString).draw(at: CGPoint(x: (bounds.width - textSize.width) / 2, y: Self.iconAreaHeight),
-                                 withAttributes: attributes)
     }
 }

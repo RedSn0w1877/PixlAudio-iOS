@@ -11,12 +11,15 @@ import SwiftUI
 ///   it, which turn the accent colour.
 /// - On release it settles on the tab under the finger and fills with the accent again.
 /// Re-tapping the selected tab pops it to its root.
+/// - While a tab root scrolls down it minimizes (2026-10-03): labels fade out and the capsule narrows around the
+///   symbols and lowers; scrolling back up, or reaching the top, restores it (`TabBarMinimizer`).
 ///
 /// It is not the system `TabView` bar because that bar's selection platter can't take the accent colour, and the
 /// player sheet expands from the mini player slot that floats above this bar (stage 8).
 struct GlassNavBar: View {
     let selection: RootTab
     var compact = false
+    var minimized = false
     let onSelect: (RootTab) -> Void
 
     @Environment(\.appTheme) private var theme
@@ -24,11 +27,12 @@ struct GlassNavBar: View {
     var body: some View {
         LiquidTabBar(selection: selection,
                      compact: compact,
+                     minimized: minimized,
                      pillColor: UIColor(theme.primary.opacity(GlassTint.prominent)),
                      restingGlyphColor: UIColor(theme.onPrimary),
                      liftedGlyphColor: UIColor(theme.primary),
                      onSelect: onSelect)
-            .frame(height: compact ? Tokens.Shell.navBarCompactHeight : Tokens.Shell.navBarHeight)
+            .frame(height: LiquidTabBar.height(compact: compact, minimized: minimized))
             .frame(maxWidth: .infinity)
             .pixlHaptic(.selection, trigger: selection)
             .accessibilityElement(children: .contain)

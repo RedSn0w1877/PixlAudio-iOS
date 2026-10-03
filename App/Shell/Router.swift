@@ -13,6 +13,15 @@ final class Router {
     var cover: AppCover?
     /// The Search screen's query (stage 7c owns the field; kept here so deep links and UI tests can prefill it).
     var searchText: String
+    /// The tab bar is minimized because the selected tab's root scrolled down (`MinimizesTabBarOnScroll`). The shell
+    /// clears it when the tab or the selected tab's stack changes.
+    private(set) var isTabBarMinimized = false
+
+    /// Sets `isTabBarMinimized`, writing only on a change (each write re-runs the shell's bottom bars).
+    func setTabBarMinimized(_ minimized: Bool) {
+        guard minimized != isTabBarMinimized else { return }
+        isTabBarMinimized = minimized
+    }
 
     init(launch: LaunchConfiguration) {
         let start = UITestLaunchRouter.initialState(for: launch)

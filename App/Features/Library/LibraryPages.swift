@@ -118,6 +118,7 @@ struct LibrarySongsPage: View {
                     .padding(.bottom, libraryListExtraBottomGap)
                 }
                 .scrollIndicators(context.showsScrollbarGap ? .visible : .hidden)
+                .minimizesTabBarOnScroll()
                 .refreshable { try? await library.refresh() }
                 .onChange(of: context.locateRequest) { _, _ in
                     guard let id = playback.currentSongId else { return }
@@ -164,6 +165,7 @@ struct LibraryAlbumsPage: View {
                 .padding(.bottom, libraryListExtraBottomGap + 4)
             }
             .scrollIndicators(showsScrollbarGap ? .visible : .hidden)
+            .minimizesTabBarOnScroll()
             .refreshable { try? await library.refresh() }
             .accessibilityIdentifier("library.page.albums")
         }
@@ -349,6 +351,7 @@ struct LibraryArtistsPage: View {
                 .padding(.bottom, libraryListExtraBottomGap)
             }
             .scrollIndicators(showsScrollbarGap ? .visible : .hidden)
+            .minimizesTabBarOnScroll()
             .refreshable { try? await library.refresh() }
             .accessibilityIdentifier("library.page.artists")
         }
@@ -424,6 +427,7 @@ struct LibraryPlaylistsPage: View {
                 .padding(.bottom, libraryListExtraBottomGap)
             }
             .scrollIndicators(showsScrollbarGap ? .visible : .hidden)
+            .minimizesTabBarOnScroll()
             .overlay(alignment: .top) {
                 // PlaylistContainer's 10 pt fade from the panel colour.
                 LinearGradient(colors: [theme.surface, theme.surface.opacity(0)], startPoint: .top, endPoint: .bottom)
@@ -608,6 +612,7 @@ struct LibraryFoldersPage: View {
                         .padding(.bottom, libraryListExtraBottomGap)
                     }
                     .scrollIndicators(context.showsScrollbarGap ? .visible : .hidden)
+                    .minimizesTabBarOnScroll()
                     .refreshable { try? await library.refresh() }
                     .onChange(of: context.locateRequest) { _, _ in
                         guard let id = playback.currentSongId else { return }

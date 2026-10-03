@@ -54,6 +54,7 @@ struct GenreBrowseView: View {
             .padding(.bottom, 28)
         }
         .scrollIndicators(.hidden)
+        .minimizesTabBarOnScroll()
         .padding(.horizontal, 18)
         .clipShape(TopRoundedClip(radius: 24))
         .accessibilityIdentifier("search.genreGrid")

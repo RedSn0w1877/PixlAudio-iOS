@@ -653,10 +653,13 @@ Signatures checked against the developer.apple.com documentation JSON (2026-10-0
 | API | Min iOS | Docs | Used in | Notes |
 |---|---|---|---|---|
 | `UISegmentedControl` (`init(items:)`, `selectedSegmentTintColor`, `selectedSegmentIndex`, `sendActions(for:)`) | 13 | /documentation/uikit/uisegmentedcontrol | `LiquidTabBar` | On iOS 26+ its selection is the system liquid lens (clear, swelling, magnifying on touch). Touches overridden so the lens moves on touch down (FabBar technique). |
-| `UIGlassEffect` (`isInteractive`), `UIVisualEffectView` | 26.0 | /documentation/uikit/uiglasseffect | `LiquidTabBarView` | The bar's capsule of interactive glass. |
-| `UIView.cornerConfiguration` (`.capsule()`) | 26.0 | /documentation/uikit/uiview/cornerconfiguration | `LiquidTabBarView` | Capsule shape of the glass view. |
-| `CADisplayLink`, `CAShapeLayer` masks, `CALayer.presentation()` | 3.1 | /documentation/quartzcore/cadisplaylink | `LiquidTabSegmentedControl` | Masks the accent glyph copies to the lens' animated frame; paused when the lens is still. |
+| `UIGlassEffect` (`isInteractive`), `UIVisualEffectView` | 26.0 | /documentation/uikit/uiglasseffect | `LiquidLensBarView` | The bar's capsule of interactive glass. |
+| `UIView.cornerConfiguration` (`.capsule()`) | 26.0 | /documentation/uikit/uiview/cornerconfiguration | `LiquidLensBarView` | Capsule shape of the glass view. |
+| `CADisplayLink`, `CAShapeLayer` masks, `CALayer.presentation()` | 3.1 | /documentation/quartzcore/cadisplaylink | `LiquidLensSegmentedControl` | Masks the accent glyph copies to the lens' animated frame; paused when the lens is still. |
 | `UIViewRepresentable` | 13 | /documentation/swiftui/uiviewrepresentable | `LiquidTabBar` | Hosts the UIKit bar in SwiftUI. |
+| `UIView.animate(springDuration:bounce:initialSpringVelocity:delay:options:animations:completion:)` | 17 | /documentation/uikit/uiview/animate(springduration:bounce:initialspringvelocity:delay:options:animations:completion:) | `LiquidLensBarView.setShape` | Minimizing / restoring the tab bar (2026-10-03): the capsule's width and height constraints animate in UIKit, so the segments, the lens and the accent masks (read from presentation layers) follow every frame. Skipped under Reduce Motion. |
+| `View.onScrollGeometryChange(for:of:action:)` | 18 | /documentation/swiftui/view/onscrollgeometrychange(for:of:action:) | `MinimizesTabBarOnScroll` | The clamped offset of each tab root page; the action keeps its anchor in a reference (no view invalidation) and writes `Router.isTabBarMinimized` only when it flips. |
+| `UISegmentedControl` as a picker | 13 | /documentation/uikit/uisegmentedcontrol | `LiquidSegmentedPicker` | The song picker's LOCAL / CLOUD switch on the same liquid lens (inline glyphs). |
 
 ## Small system menus (2026-10-02)
 | API | Min iOS | Docs | Used in | Notes |

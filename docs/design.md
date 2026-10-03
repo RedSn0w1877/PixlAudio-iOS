@@ -137,6 +137,22 @@ PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact ba
   - **Touch:** the lens moves on touch down and the selection changes on touch up; a re-tap pops the tab to its root.
   - **Fragility:** segments and lens are found by class name (`UISegment`, `_UILiquidLensView`). If iOS changes
     that hierarchy, the glyphs aren't injected and the control falls back to its own segment titles.
+- **2026-10-03 (owner: "an auto compact version that removes the labels and shrinks the distance between the icons
+  and makes it smaller and … a bit shorter as well when the user scrolls"):** scrolling a tab root down 36 pt
+  minimizes the bar. The labels cross-fade out (21 pt symbols alone) and the capsule narrows to 58 pt per tab and
+  lowers to 48 pt, centred, on a UIKit spring (0.5 s, bounce 0.2). The mini player follows it down. Scrolling 36 pt back
+  up, coming within 24 pt of the top, switching tabs, pushing or popping restores it. The minimized bar
+  stays fully interactive (lens and all). Reduce Motion: the shape changes without the spring.
+  (`MinimizesTabBarOnScroll`, `Router.isTabBarMinimized`, `LiquidLensBarView.setShape`.)
+- **Song picker LOCAL / CLOUD (2026-10-03, owner: "the same liquid magnifying mechanism as the main home screen"):**
+  `LiquidSegmentedPicker` puts the same lens in a 56 pt glass capsule, with inline glyphs (16 pt symbol beside a 14 pt
+  bold label) in `onSurface`, and the accent pill with `onPrimary` glyphs.
+- **Full player chrome (2026-10-03, owner: "make the 2 buttons at the top like liquid transparent buttons and the …
+  shuffle repeat etc buttons … be liquidified"):**
+  - The collapse, output, queue, lyrics and AI DJ buttons are clear glass with `onPrimary` at
+    `GlassTint.playerChrome` (0.14), down from 70–80 %, which read as solid.
+  - The toggle row lost its cream capsule. Each segment is its own interactive clear-glass shape in one
+    `GlassEffectContainer`: off is lightly tinted with an 18 pt corner radius; on is filled with its fixed role and becomes a pill.
 - The bars float over the tabs as an overlay (no layout space, docs/performance.md); content scrolls under the
   see-through glass, and every tab root and route reserves the bars' room inside its own stack
   (`BottomBarsClearance`: tab bar + mini player + 8 pt on a root, the mini player + 8 pt on a pushed screen, as

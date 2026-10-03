@@ -70,6 +70,7 @@ struct HomeView: View {
             .padding(.bottom, 38)
         }
         .scrollIndicators(.hidden)
+        .minimizesTabBarOnScroll()
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top > HomeMetrics.scrolledThreshold
         } action: { _, scrolled in

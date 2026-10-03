@@ -30,6 +30,10 @@ nonisolated enum Tokens {
         /// the system tab bar with labels, shorter in compact mode (icons only).
         static let navBarHeight: CGFloat = 62
         static let navBarCompactHeight: CGFloat = 54
+        /// The tab bar while a tab root scrolls down (2026-10-03): symbols only, the capsule narrowed to
+        /// `navBarMinimizedSegmentWidth` per tab and lowered to this height. Scrolling up or reaching the top restores it.
+        static let navBarMinimizedHeight: CGFloat = 48
+        static let navBarMinimizedSegmentWidth: CGFloat = 58
         /// Padding between the tab bar's glass capsule and the segmented control holding the lens (as FabBar).
         static let navGlassPadding: CGFloat = 2
         /// `nav_bar_corner_radius` default (`NAV_BAR_CORNER_RADIUS ?: 32`): the mini player's corners (a capsule at

@@ -55,6 +55,22 @@ final class ScreenshotTests: XCTestCase {
         attachScreenshot(app, "tabBarDrag-dark")
     }
 
+    /// Scrolling Home down minimizes the bar (symbols only, narrow, lower); scrolling back up restores it.
+    func testTabBarMinimizesOnScrollLight() throws {
+        let app = launchHome("light")
+        let screen = app.descendants(matching: .any)["screen.home"].firstMatch
+        screen.swipeUp(velocity: .slow)
+        Thread.sleep(forTimeInterval: 1.0)
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "tabBarMinimized-light"
+        shot.lifetime = .keepAlways
+        add(shot)
+        let library = app.descendants(matching: .any)["navBar.library"].firstMatch
+        XCTAssertTrue(library.isHittable, "the minimized bar's Library tab is not tappable")
+        screen.swipeDown(velocity: .slow)
+        attachScreenshot(app, "tabBarRestored-light")
+    }
+
     // MARK: - Helpers
 
     private func launchHome(_ appearance: String) -> XCUIApplication {
