@@ -11,10 +11,14 @@ import PixlModel
 public struct OnlineSyncedLyrics: Sendable, Hashable {
     public var lyrics: Lyrics
     public var source: String
+    /// The catalog's own text, when it should be stored instead of `lyricsToRawContent(lyrics)` (a BiniLyrics TTML
+    /// keeps translations and romanisations the lyrics JSON format has no place for).
+    public var rawContent: String?
 
-    public init(lyrics: Lyrics, source: String) {
+    public init(lyrics: Lyrics, source: String, rawContent: String? = nil) {
         self.lyrics = lyrics
         self.source = source
+        self.rawContent = rawContent
     }
 }
 
@@ -34,6 +38,7 @@ public enum LyricsRepositoryLogic {
     public static let amllSourceName = "AMLL TTML"
     public static let neteaseSourceName = "NetEase YRC"
     public static let lrclibSourceName = "LRCLIB"
+    public static let biniLyricsSourceName = BiniLyricsMatching.sourceName
 
     /// Lyrics with synced or plain lines (`Lyrics.isValid()`).
     public static func isUsable(_ lyrics: Lyrics) -> Bool {
@@ -50,16 +55,37 @@ public enum LyricsRepositoryLogic {
     }
 
     /// `findCatalogLyrics`: keeps results with timed non-blank lines (or, when `syncedOnly` is false, any plain
-    /// text) and prefers word-synced, then line-synced, then anything — in catalog order (AMLL, NetEase, LRCLIB).
+    /// text) and prefers word-synced, then line-synced, then anything — in catalog order (BiniLyrics, AMLL, NetEase,
+    /// LRCLIB), so word timing from any catalog beats line timing and BiniLyrics wins a tie.
     public static func chooseCatalogResult(_ candidates: [OnlineSyncedLyrics], syncedOnly: Bool) -> OnlineSyncedLyrics? {
-        let usable = candidates.filter { result in
-            let synced = result.lyrics.synced ?? []
-            return (synced.contains { !ParseKit.isBlank($0.line) } && synced.contains { $0.time > 0 })
-                || (!syncedOnly && (result.lyrics.plain ?? []).contains { !ParseKit.isBlank($0) })
-        }
-        return usable.first { ($0.lyrics.synced ?? []).contains { !($0.words ?? []).isEmpty } }
+        let usable = candidates.filter { isUsableCatalogResult($0, syncedOnly: syncedOnly) }
+        return usable.first(where: isWordSynced)
             ?? usable.first { !($0.lyrics.synced ?? []).isEmpty }
             ?? usable.first
+    }
+
+    /// The race's early answer. `slots` are the catalogs in `chooseCatalogResult` order: nil while a catalog is still
+    /// running, `.some(nil)` when it found nothing. Returns `chooseCatalogResult`'s final answer as soon as no
+    /// running catalog can change it (a usable word-synced result with every catalog before it finished), else nil.
+    public static func decidedCatalogResult(_ slots: [OnlineSyncedLyrics??], syncedOnly: Bool) -> OnlineSyncedLyrics?? {
+        for slot in slots {
+            guard let finished = slot else { return nil }
+            if let result = finished, isUsableCatalogResult(result, syncedOnly: syncedOnly), isWordSynced(result) {
+                return .some(result)
+            }
+        }
+        return .some(chooseCatalogResult(slots.compactMap { $0 ?? nil }, syncedOnly: syncedOnly))
+    }
+
+    /// Timed non-blank lines, or (unless `syncedOnly`) non-blank plain text.
+    static func isUsableCatalogResult(_ result: OnlineSyncedLyrics, syncedOnly: Bool) -> Bool {
+        let synced = result.lyrics.synced ?? []
+        return (synced.contains { !ParseKit.isBlank($0.line) } && synced.contains { $0.time > 0 })
+            || (!syncedOnly && (result.lyrics.plain ?? []).contains { !ParseKit.isBlank($0) })
+    }
+
+    static func isWordSynced(_ result: OnlineSyncedLyrics) -> Bool {
+        (result.lyrics.synced ?? []).contains { !($0.words ?? []).isEmpty }
     }
 
     /// `parseBestEmbeddedLyricsField`: the first field (in `embeddedLyricsKeys` order) that parses into synced

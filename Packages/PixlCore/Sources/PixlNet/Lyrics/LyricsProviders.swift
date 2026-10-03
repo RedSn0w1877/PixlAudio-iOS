@@ -264,34 +264,67 @@ public struct NeteaseLyricsClient: Sendable {
     }
 }
 
-/// `findCatalogLyrics`: AMLL (10 s), NetEase and LRCLIB (12 s) concurrently, then PixlLyrics' choice
-/// (word-synced, then line-synced, then anything, in that catalog order).
+/// `findCatalogLyrics`: BiniLyrics (10 s), AMLL (10 s), NetEase and LRCLIB (12 s) concurrently, then PixlLyrics'
+/// choice (word-synced, then line-synced, then anything, in that catalog order: word timing from any catalog beats
+/// line timing, and BiniLyrics wins a tie). The race ends as soon as the answer can no longer change — a word-synced
+/// BiniLyrics result ends it at once — and the catalogs still running are cancelled.
 public struct LyricsCatalogSearch: Sendable {
+    public static let biniLyricsTimeoutSeconds: Double = 10
     public static let amllTimeoutSeconds: Double = 10
     public static let lrclibTimeoutSeconds: Double = 12
 
+    public let bini: BiniLyricsClient?
     public let amll: AmllLyricsClient
     public let netease: NeteaseLyricsClient
     public let lrclib: LrcLibClient
 
-    public init(amll: AmllLyricsClient, netease: NeteaseLyricsClient, lrclib: LrcLibClient) {
+    public init(bini: BiniLyricsClient? = nil, amll: AmllLyricsClient, netease: NeteaseLyricsClient, lrclib: LrcLibClient) {
+        self.bini = bini
         self.amll = amll
         self.netease = netease
         self.lrclib = lrclib
     }
 
-    public func find(song: Song, syncedOnly: Bool) async -> OnlineSyncedLyrics? {
-        let amll = self.amll, netease = self.netease, lrclib = self.lrclib
-        async let a: Lyrics?? = try? withTimeout(seconds: Self.amllTimeoutSeconds) { await amll.find(song: song) }
-        async let n: Lyrics? = netease.find(song: song)
-        async let l: LyricsSearchResult?? = try? withTimeout(seconds: Self.lrclibTimeoutSeconds) { try await lrclib.fetchAutomatic(song: song) }
-        let amllLyrics = (await a) ?? nil
-        let neteaseLyrics = await n
-        let lrcResult = (await l) ?? nil
-        var candidates: [OnlineSyncedLyrics] = []
-        if let amllLyrics { candidates.append(OnlineSyncedLyrics(lyrics: amllLyrics, source: LyricsRepositoryLogic.amllSourceName)) }
-        if let neteaseLyrics { candidates.append(OnlineSyncedLyrics(lyrics: neteaseLyrics, source: LyricsRepositoryLogic.neteaseSourceName)) }
-        if let lrcResult { candidates.append(OnlineSyncedLyrics(lyrics: lrcResult.lyrics, source: LyricsRepositoryLogic.lrclibSourceName)) }
-        return LyricsRepositoryLogic.chooseCatalogResult(candidates, syncedOnly: syncedOnly)
+    /// `isrc` (the song's, when known) lets BiniLyrics look the recording up directly.
+    public func find(song: Song, isrc: String? = nil, syncedOnly: Bool) async -> OnlineSyncedLyrics? {
+        let bini = self.bini, amll = self.amll, netease = self.netease, lrclib = self.lrclib
+        return await withTaskGroup(of: (Int, OnlineSyncedLyrics?).self) { group in
+            var slots: [OnlineSyncedLyrics??] = [nil, nil, nil, nil]
+            if let bini {
+                group.addTask {
+                    let match = (try? await withTimeout(seconds: Self.biniLyricsTimeoutSeconds) {
+                        await bini.find(song: song, isrc: isrc)
+                    }) ?? nil
+                    return (0, match.map { found in
+                        // The TTML is stored as is when it can be read back the same way (translations included).
+                        OnlineSyncedLyrics(lyrics: found.lyrics, source: LyricsRepositoryLogic.biniLyricsSourceName,
+                                           rawContent: BiniLyricsMatching.isBiniLyricsDocument(found.document) ? found.document : nil)
+                    })
+                }
+            } else {
+                slots[0] = .some(nil)
+            }
+            group.addTask {
+                let lyrics = (try? await withTimeout(seconds: Self.amllTimeoutSeconds) { await amll.find(song: song) }) ?? nil
+                return (1, lyrics.map { OnlineSyncedLyrics(lyrics: $0, source: LyricsRepositoryLogic.amllSourceName) })
+            }
+            group.addTask {
+                (2, await netease.find(song: song).map { OnlineSyncedLyrics(lyrics: $0, source: LyricsRepositoryLogic.neteaseSourceName) })
+            }
+            group.addTask {
+                let result = (try? await withTimeout(seconds: Self.lrclibTimeoutSeconds) {
+                    try await lrclib.fetchAutomatic(song: song)
+                }) ?? nil
+                return (3, result.map { OnlineSyncedLyrics(lyrics: $0.lyrics, source: LyricsRepositoryLogic.lrclibSourceName) })
+            }
+            for await (index, result) in group {
+                slots[index] = .some(result)
+                if let decided = LyricsRepositoryLogic.decidedCatalogResult(slots, syncedOnly: syncedOnly) {
+                    group.cancelAll()
+                    return decided
+                }
+            }
+            return LyricsRepositoryLogic.chooseCatalogResult(slots.compactMap { $0 ?? nil }, syncedOnly: syncedOnly)
+        }
     }
 }
