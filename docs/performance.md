@@ -51,9 +51,10 @@ CI screenshot flakes that show up in any comparison with main and are not change
 swipe-scrolled shots land at slightly different offsets (`home7b-shelves`, `stats-scrolled`, `aiPlaylistLab-scrolled`,
 `spotifyDashboard.tested`); About and the Equalizer are caught at different points of their appear fade; the
 lyrics cascade frames and animated backgrounds move; the full player's cover is sometimes caught at its paused
-scale (0.95) in shots taken right after launch (`playerExpanded`, `artistPicker`, `sleepTimer`, `devices`); the
-playlist's More options menu (`MenuRecordingTests`, `menuPlaylistMore`) is caught at slightly different points of its
-settle — main's two runs of `9e5ac90` differ from each other the same way, and a rerun of this branch's `73bc9d8`
+scale (0.95) in shots taken right after launch (`playerExpanded`, `artistPicker`, `sleepTimer`, `devices` — a missed
+first play-state change, measured below); the Equalizer's content slides 40 pt up as it appears (0.4 s), so its
+shots land at different heights; the playlist's More options menu (`MenuRecordingTests`, `menuPlaylistMore`) is
+caught at slightly different points of its settle — main's two runs of `9e5ac90` differ from each other the same way, and a rerun of this branch's `73bc9d8`
 (run 37074696142) matched main's latest run pixel for pixel in all three menu shots.
 
 ### A stuck full player, found by a probe (2026-10-03)
@@ -72,6 +73,15 @@ full layer's fade takes its progress from `FullPlayerLayer`'s body, and an expan
 starts its spring on the next main-actor turn. With the fix: 0 of 50 launches, 0 of 25 taps and 0 of 25 drags
 before the pre-warm (`-probeNoPrewarm`); the unfixed tree in the same run: 1 of 50, 0 of 25, 0 of 25. Only the
 launch-into-expanded path (UI tests and launch states) showed it; the app's own tap and drag paths never did.
+
+A second probe (`StaleProbeTests`, `perf-x-stale*`) measured an older flake, the full player caught with the Play
+icon and the paused cover scale (0.95) while music plays (`playerExpanded`, `devices`, `sleepTimer`, `artistPicker`
+shots): a full player built at launch sometimes misses the first play-state change after it, and shows it until the
+next one. It is main's as much as this branch's (launching into the expanded player: main 5 of 45, this branch 7 of
+45; final run 37096729627 caught it again in `playerExpanded-dark` and `devices-light`), it doesn't heal by waiting,
+and the next play / pause corrects it. It never happened when the player was pre-built and expanded later (0 of 30
+on each), and the pre-built player, kept hidden while collapsed, missed none of 160 play / pause changes made from
+the mini player (run 37103669582) — so keeping the player between expands doesn't make it stick.
 
 ## What was slow, and the rule now
 
