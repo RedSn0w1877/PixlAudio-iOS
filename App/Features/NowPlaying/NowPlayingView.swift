@@ -87,7 +87,6 @@ struct NowPlayingView: View {
         }
         .environment(\.appTheme, theme)
         // The full player is built ahead of its first expand: compile the lyrics shader then, while nothing moves.
-        .onAppear { LyricsShaderWarmup.prepare() }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("screen.nowPlaying")
         .accessibilityAction(.escape) { env.playerSheet.collapse() }
