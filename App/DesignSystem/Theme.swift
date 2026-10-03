@@ -52,3 +52,21 @@ nonisolated func relativeLuminance(argb: UInt32) -> Double {
     }
     return 0.2126 * lin((argb >> 16) & 0xFF) + 0.7152 * lin((argb >> 8) & 0xFF) + 0.0722 * lin(argb & 0xFF)
 }
+
+extension View {
+    /// For screens that are always dark (the lyrics screen, the lyrics sync editor): forces `.dark` for the
+    /// presentation **and** re-resolves `appTheme` / `playerTheme` for dark.
+    ///
+    /// The shell resolves both palettes once, for the system's colour scheme, and hands them to every sheet and cover.
+    /// `preferredColorScheme(.dark)` alone made the presentation (and every system sheet / alert presented from it)
+    /// dark while the palette stayed the light one, so anything drawn with scheme roles — the lyrics More sheet's
+    /// `onSurface` rows, its `surfaceContainer*` fills, the fetch dialog — came out near-black on a near-black sheet
+    /// whenever the phone was in light mode. Sheets presented from below this modifier inherit the dark palette.
+    func alwaysDarkTheme(_ store: ThemeStore) -> some View {
+        let colors = store.colors(for: .dark)
+        return environment(\.appTheme, colors.app)
+            .environment(\.playerTheme, colors.player)
+            .environment(\.colorScheme, .dark)
+            .preferredColorScheme(.dark)
+    }
+}

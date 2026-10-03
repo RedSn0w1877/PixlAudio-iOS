@@ -45,6 +45,24 @@ final class AIScreenshotTests: XCTestCase {
         try capture("taisChatConversation", "dark", name: "taisChat-conversation", wait: "Daft Punk")
     }
 
+    /// The conversation scrolled back to Taizo's queue card (artwork stack, count, Play / Add to Queue, the songs).
+    func testTaisChatQueueCardLight() throws {
+        try capture("taisChatConversation", "light", name: "taisChat-queueCard", wait: "Daft Punk", swipesDown: 1)
+    }
+
+    func testTaisChatQueueCardDark() throws {
+        try capture("taisChatConversation", "dark", name: "taisChat-queueCard", wait: "Daft Punk", swipesDown: 1)
+    }
+
+    /// A prompt being typed: the composer's send button lights up in the accent.
+    func testTaisChatTypingDark() throws {
+        try capture("taisChat", "dark", name: "taisChat-typing") { app in
+            let field = app.descendants(matching: .any)["taisChat.input"].firstMatch
+            field.tap()
+            field.typeText("Something mellow for a rainy night")
+        }
+    }
+
     // MARK: AI Playlist Lab
 
     func testAiPlaylistLabLight() throws { try capture("aiPlaylistLab", "light") }
@@ -52,8 +70,8 @@ final class AIScreenshotTests: XCTestCase {
 
     // MARK: - Helper
 
-    private func capture(_ screen: String, _ appearance: String, name: String? = nil, swipes: Int = 0, wait text: String? = nil,
-                         action: ((XCUIApplication) -> Void)? = nil) throws {
+    private func capture(_ screen: String, _ appearance: String, name: String? = nil, swipes: Int = 0, swipesDown: Int = 0,
+                         wait text: String? = nil, action: ((XCUIApplication) -> Void)? = nil) throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = ["-uiTest", "-screen", screen, "-appearance", appearance, "-noSong"]
@@ -77,7 +95,10 @@ final class AIScreenshotTests: XCTestCase {
         for _ in 0..<swipes {
             app.swipeUp(velocity: .slow)
         }
-        Thread.sleep(forTimeInterval: swipes > 0 ? 1.5 : 0.5)
+        for _ in 0..<swipesDown {
+            app.swipeDown(velocity: .slow)
+        }
+        Thread.sleep(forTimeInterval: swipes + swipesDown > 0 ? 1.5 : 0.5)
 
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = "\(name ?? screen)-\(appearance)"

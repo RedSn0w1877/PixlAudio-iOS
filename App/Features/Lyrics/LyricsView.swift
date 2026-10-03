@@ -15,7 +15,7 @@ struct LyricsView: View {
     @Environment(PlaybackStore.self) private var playback
     @Environment(LyricsStore.self) private var lyricsStore
     @Environment(SettingsStore.self) private var settings
-    @Environment(\.playerTheme) private var theme
+    @Environment(ThemeStore.self) private var themeStore
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
@@ -42,6 +42,10 @@ struct LyricsView: View {
     @State private var translationSongId: String?
     @State private var shownPrepared: PreparedLyrics?
     @State private var shownPreparedSong: String?
+
+    /// The album scheme's *dark* roles whatever the system appearance: the screen is always dark, and so is
+    /// everything it presents (`alwaysDarkTheme`). The environment's `playerTheme` follows the system scheme.
+    private var theme: ThemeColors { themeStore.colors(for: .dark).player }
 
     private var launch: LyricsLaunchOptions { LyricsLaunchOptions.current }
     private var isUITest: Bool { LaunchConfiguration.current.isUITest }
@@ -166,7 +170,7 @@ struct LyricsView: View {
             .simultaneousGesture(swipeGesture)
         }
         .background(Color.black.ignoresSafeArea())
-        .preferredColorScheme(.dark)
+        .alwaysDarkTheme(themeStore)
         .accessibilityIdentifier("screen.lyrics")
         .onAppear(perform: startDriver)
         .onDisappear(perform: stopDriver)
@@ -378,6 +382,8 @@ struct LyricsView: View {
                 onRepeat: { playback.setRepeatMode(LyricsView.nextRepeatMode(playback.repeatMode)) },
                 onFavorite: { if let song { env.libraryEditor.toggleFavorite(song.id) } }))
             .environment(\.appTheme, theme)
+            .environment(\.playerTheme, theme)
+            .preferredColorScheme(.dark)
             .pixlSheet(detents: [.large])
     }
 

@@ -13,13 +13,16 @@ struct LyricsSyncEditorView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(Router.self) private var router
     @Environment(PlaybackStore.self) private var playback
-    @Environment(\.playerTheme) private var theme
+    @Environment(ThemeStore.self) private var themeStore
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var session: LyricsSyncSession?
     @State private var brightArt = false
     /// The last screen shown, kept while the cover animates away after the session closed.
     @State private var shownPhase: SyncPhase = .loading
+
+    /// Always dark, like the lyrics screen: the album scheme's dark roles whatever the system appearance.
+    private var theme: ThemeColors { themeStore.colors(for: .dark).player }
 
     private var isUITest: Bool { LaunchConfiguration.current.isUITest }
 
@@ -75,7 +78,7 @@ struct LyricsSyncEditorView: View {
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.9), value: session?.notice)
         .background(Color.black.ignoresSafeArea())
-        .preferredColorScheme(.dark)
+        .alwaysDarkTheme(themeStore)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("screen.lyricsSync")
         .onAppear(perform: start)

@@ -24,6 +24,10 @@ nonisolated enum TaisChatMessage: Identifiable, Sendable, Equatable {
 final class TaisChatModel {
     private(set) var messages: [TaisChatMessage] = []
     var inputText = ""
+    /// A prompt is in flight (its thinking row is showing): the header orb stirs and says "Thinking…".
+    var isThinking: Bool {
+        messages.contains { if case .thinking = $0 { true } else { false } }
+    }
     /// A catalogue import is running (rows and bulk buttons are disabled meanwhile).
     private(set) var isResolvingOnlineTracks = false
 
@@ -31,7 +35,7 @@ final class TaisChatModel {
     @ObservationIgnored private let engine: TaisDjEngine
     @ObservationIgnored private let playback: PlaybackStore
 
-    /// Android `TAIZO_SUGGESTIONS` (sent as "Play some <x> songs").
+    /// Android `TAIZO_SUGGESTIONS` (sent as "Play some <x> songs"; the chips are `TaizoSuggestion.moods`).
     static let suggestions = ["Chill acoustic", "Energetic rock", "Sad indie", "Party anthems", "Focus beats", "Feel-good pop"]
 
     init(engine: TaisDjEngine, playback: PlaybackStore) {
