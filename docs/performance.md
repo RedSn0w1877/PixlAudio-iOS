@@ -23,8 +23,9 @@ Run it with `[shots:TransitionPerformanceTests]` in a commit message; CI copies 
 drops use Instruments on the phone (Hitches + Core Animation + SwiftUI templates).
 
 For motion, `UITests/TransitionRecordingTests` (opt-in) runs the player sheet's expand and collapse (twice, then a
-collapse interrupted at once by a tap on the mini player) and held-down settings rows slowly; with
-`[shots:TransitionRecordingTests] [record:TransitionRecordingTests]` CI films it
+collapse interrupted 0.12 s in by an expand — the UI-test launch flag `-reexpandAfterCollapse`, since XCUITest waits
+for the app to idle before every tap, so a tap from the test lands only after the fade) and held-down settings rows
+slowly; with `[shots:TransitionRecordingTests] [record:TransitionRecordingTests]` CI films it
 (`record-TransitionRecordingTests.mp4` in the shots artifact), so a branch's frames can be compared with main's
 (`ffmpeg -fps_mode passthrough` keeps the recorder's own frames; it captures roughly 10–30 a second, too few for a
 spring's curve but enough to see what is on screen).
@@ -130,7 +131,11 @@ by frame:
   after a collapse and never jumped. Fixed in `53b7e56`: two gates. The zero frame follows `occupiesLayout`
   (expanded, dragging or expansion above 0), the opacity follows `isShown` (that, or fading out). The zero frame
   is anchored top-leading and doesn't clip, so the fading player still draws in the same place, and the mini player
-  gets the card's width from the collapse's first frame, as on main.
+  gets the card's width from the collapse's first frame, as on main. Re-filmed in run 37120024541: in both collapses
+  the mini player's controls (previous / play / next, the strip's right 147 pt) match their resting frame within 1
+  grey level (of 255) from the first frame the card has arrived, about 0.3 s after the tap, and stay there — where
+  run 37113795352 showed them 32 levels off for 0.4–0.5 s and then jumped. The only later change, a sub-pixel move
+  of the whole card about 0.4 s on (2.5–2.9 levels, two frames), is in main's recording too (run 37106597201).
 - **An expand during the fade** (a tap on the mini player within about half a second of a collapse) cleared the
   fade in a separate non-animated update and only then set the expansion inside `withAnimation`; depending on how
   SwiftUI combined the two, the player could pop to full opacity in a still-small card or restart its fade. Since
