@@ -114,11 +114,15 @@ final class AudioSessionControllerTests: XCTestCase {
 
     // MARK: Off-main activation (whatever order the activation finishes in, the latest decision stands)
 
+    /// How long an off-main `setActive(true)` may take. The first activation in a fresh simulator process starts the
+    /// audio server and has taken over 5 s on a loaded CI runner; the waits return as soon as it lands.
+    private static let activationTimeout: TimeInterval = 30
+
     func testDeactivateDuringTheOffMainActivationWins() async {
         let controller = AudioSessionController()
         controller.prepareActivation()
         controller.deactivate()
-        let settled = await waitUntil(timeout: 5) { !controller.isPreparingActivation }
+        let settled = await waitUntil(timeout: Self.activationTimeout) { !controller.isPreparingActivation }
         XCTAssertTrue(settled)
         XCTAssertFalse(controller.isActive)
     }
@@ -129,7 +133,7 @@ final class AudioSessionControllerTests: XCTestCase {
         controller.prepareActivation()
         controller.deactivate()
         let activated = controller.activate()
-        let settled = await waitUntil(timeout: 5) { !controller.isPreparingActivation }
+        let settled = await waitUntil(timeout: Self.activationTimeout) { !controller.isPreparingActivation }
         XCTAssertTrue(settled)
         XCTAssertEqual(controller.isActive, activated, "the late activation result must not undo the newer activate()")
     }
@@ -140,7 +144,7 @@ final class AudioSessionControllerTests: XCTestCase {
         let controller = AudioSessionController()
         defer { controller.deactivate() }
         controller.prepareActivation()
-        let settled = await waitUntil(timeout: 5) { !controller.isPreparingActivation }
+        let settled = await waitUntil(timeout: Self.activationTimeout) { !controller.isPreparingActivation }
         XCTAssertTrue(settled)
         XCTAssertEqual(controller.isPreparedOnly, controller.isActive)
         controller.releasePreparedActivation()
@@ -152,7 +156,7 @@ final class AudioSessionControllerTests: XCTestCase {
         let controller = AudioSessionController()
         controller.prepareActivation()
         controller.releasePreparedActivation()
-        let settled = await waitUntil(timeout: 5) { !controller.isPreparingActivation }
+        let settled = await waitUntil(timeout: Self.activationTimeout) { !controller.isPreparingActivation }
         XCTAssertTrue(settled)
         XCTAssertFalse(controller.isActive)
     }
@@ -162,7 +166,7 @@ final class AudioSessionControllerTests: XCTestCase {
         defer { controller.deactivate() }
         controller.prepareActivation()
         let activated = controller.activate()
-        let settled = await waitUntil(timeout: 5) { !controller.isPreparingActivation }
+        let settled = await waitUntil(timeout: Self.activationTimeout) { !controller.isPreparingActivation }
         XCTAssertTrue(settled)
         controller.releasePreparedActivation()
         XCTAssertEqual(controller.isActive, activated, "a session something played on is not given back")
