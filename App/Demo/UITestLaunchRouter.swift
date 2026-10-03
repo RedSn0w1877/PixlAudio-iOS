@@ -51,6 +51,15 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     // Stage 8: the player's sheets (presented over the expanded player) and the song editor
     case devices, artistPicker, editSong
 
+    // Spotify Connect output: the devices sheet on its DEVICES page with demo devices (idle, playing on the Echo,
+    // linked before Connect's scopes, no devices), and the "Playing on" chip in the full and the mini player
+    case devicesSpotifyConnect = "devices.spotifyConnect"
+    case devicesSpotifyPlaying = "devices.spotifyPlaying"
+    case devicesSpotifyReconnect = "devices.spotifyReconnect"
+    case devicesSpotifyEmpty = "devices.spotifyEmpty"
+    case nowPlayingSpotifyConnect = "nowPlaying.spotifyConnect"
+    case miniPlayerSpotifyConnect = "miniPlayer.spotifyConnect"
+
     // Stage 12: account screens signed in with demo data (plain ids are signed out), dashboard with a playback test
     // report, browse drill-downs (search results, an artist, an album)
     case accountsSignedIn = "accounts.signedIn"
@@ -78,7 +87,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         switch self {
         case .home: return "screen.home"
         case .search, .searchResults: return "screen.search"
-        case .library, .miniPlayer: return "screen.library"
+        case .library, .miniPlayer, .miniPlayerSpotifyConnect: return "screen.library"
         case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryFolders, .libraryLiked,
              .librarySelection, .librarySort, .libraryReorderTabs, .libraryMultiSelection, .libraryCreatePlaylist,
              .libraryAddToPlaylist, .libraryCompactNav:
@@ -100,7 +109,10 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     var route: AppRoute? {
         let demo = DemoLibrary.snapshot
         switch self {
-        case .home, .search, .searchResults, .library, .miniPlayer: return nil
+        case .home, .search, .searchResults, .library, .miniPlayer, .miniPlayerSpotifyConnect: return nil
+        case .devicesSpotifyConnect, .devicesSpotifyPlaying, .devicesSpotifyReconnect, .devicesSpotifyEmpty,
+             .nowPlayingSpotifyConnect:
+            return nil
         case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryFolders, .libraryLiked,
              .librarySelection, .librarySort, .libraryReorderTabs, .libraryMultiSelection, .libraryCreatePlaylist,
              .libraryAddToPlaylist, .songOptionsInfo, .libraryCompactNav:
@@ -168,7 +180,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         switch self {
         case .search, .searchResults: .search
         case .library, .miniPlayer, .miniPlayerAlone, .albumDetail, .artistDetail, .genreDetail, .playlistDetail,
-             .playlistEditor, .folderExplorer:
+             .playlistEditor, .folderExplorer, .miniPlayerSpotifyConnect:
             .library
         case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryFolders, .libraryLiked,
              .librarySelection, .librarySort, .libraryReorderTabs, .libraryMultiSelection, .libraryCreatePlaylist,
@@ -189,7 +201,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .changelog: return .changelog
         case .betaInfo: return .betaInfo
         case .jobs: return .jobs
-        case .devices: return .devices
+        case .devices, .devicesSpotifyConnect, .devicesSpotifyPlaying, .devicesSpotifyReconnect, .devicesSpotifyEmpty:
+            return .devices
         case .artistPicker: return .artistPicker(songId: DemoLibrary.songs[DemoLibrary.featuredSongIndex].id)
         case .aiPlaylist: return .aiPlaylist
         case .taisChat, .taisChatConversation: return .taisChat
@@ -201,13 +214,30 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     var opensOverPlayer: Bool {
         switch self {
         case .queue, .sleepTimer, .devices, .artistPicker: true
+        case .devicesSpotifyConnect, .devicesSpotifyPlaying, .devicesSpotifyReconnect, .devicesSpotifyEmpty: true
+        default: false
+        }
+    }
+
+    /// The devices sheet opens on its DEVICES page (where the Spotify Connect section is).
+    var opensDevicesList: Bool {
+        switch self {
+        case .devicesSpotifyConnect, .devicesSpotifyPlaying, .devicesSpotifyReconnect, .devicesSpotifyEmpty: true
+        default: false
+        }
+    }
+
+    /// A demo Spotify Connect session plays on the Echo ("Playing on Kitchen Echo Show").
+    var startsSpotifyConnectSession: Bool {
+        switch self {
+        case .devicesSpotifyPlaying, .nowPlayingSpotifyConnect, .miniPlayerSpotifyConnect: true
         default: false
         }
     }
 
     var cover: AppCover? {
         switch self {
-        case .nowPlaying: .nowPlaying
+        case .nowPlaying, .nowPlayingSpotifyConnect: .nowPlaying
         case .editSong: .editSong(songId: DemoLibrary.songs.first?.id ?? "")
         case .lyrics, .taisInstrumental, .taisInstrumentalRendering, .taisInstrumentalActive: .lyrics
         case .lyricsSync: .lyricsSync(songId: DemoLibrary.songs.first?.id ?? "")
@@ -257,7 +287,7 @@ nonisolated struct LaunchConfiguration: Equatable, Sendable {
         screen = value(after: "-screen").flatMap(DemoScreen.init(rawValue:))
         appearance = value(after: "-appearance").flatMap(Appearance.init(rawValue:)) ?? .system
         searchQuery = value(after: "-searchQuery")
-        let vivid = screen == .miniPlayer || screen == .miniPlayerAlone
+        let vivid = screen == .miniPlayer || screen == .miniPlayerAlone || screen == .miniPlayerSpotifyConnect
         let defaultSong = screen == .artistPicker ? DemoLibrary.featuredSongIndex
             : (vivid ? UITestLaunchRouter.vividSongIndex : 0)
         songIndex = value(after: "-song").flatMap(Int.init) ?? defaultSong

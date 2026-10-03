@@ -12,12 +12,16 @@ import SwiftUI
 /// - DEVICES: "Nearby devices", the current output (selected, `primaryContainer`) and "AirPlay & Bluetooth" rows, or
 ///   the searching state when no other output is around;
 /// - the CONTROLS / DEVICES tab capsule at the bottom (as in the song sheet).
+/// - Spotify Connect (shared spec with Android): below the AirPlay rows on DEVICES, the account's Connect devices
+///   (`SpotifyConnectSection`); while one plays, the hero shows it and its volume.
 struct DevicesSheet: View {
     @Environment(PlaybackStore.self) private var playback
+    @Environment(AppEnvironment.self) private var env
     @Environment(\.appTheme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    @State private var page = 0
+    /// UI tests open the Spotify Connect states on DEVICES.
+    @State private var page = LaunchConfiguration.current.screen?.opensDevicesList == true ? 1 : 0
     @State private var volume = SystemVolumeObserver()
     /// Natural heights of the two pages and of the whole sheet: Android's sheet wraps its content and animates
     /// between the pages' heights (`animateContentSize`), so the detent follows the visible page.
@@ -57,6 +61,7 @@ struct DevicesSheet: View {
                     ScrollView {
                         devicesPage.measuringHeight($devicesHeight, rememberedAs: "devices.list|\(keySuffix)")
                     }
+                        .refreshable { await env.spotifyConnect.refreshDevices() }
                         .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
@@ -75,6 +80,9 @@ struct DevicesSheet: View {
             volume.stop()
             route.setDetecting(false)
         }
+        // Spotify Connect: the device list is fetched again every time the sheet opens.
+        .task { await env.spotifyConnect.refreshDevices() }
+        .libraryToast(env.spotifyConnect.toast)
         .accessibilityIdentifier("screen.devices")
     }
 
@@ -110,42 +118,47 @@ struct DevicesSheet: View {
         .padding(.horizontal, 20)
     }
 
-    /// Android `ActiveDeviceHero`.
+    /// Android `ActiveDeviceHero` (the Spotify Connect device while one plays).
     private var hero: some View {
         let shape = UnevenRoundedRectangle(topLeadingRadius: 42, bottomLeadingRadius: 20, bottomTrailingRadius: 42,
                                            topTrailingRadius: 20, style: .continuous)
         let on = theme.onTertiaryContainer
+        let connect = env.spotifyConnect.active
         return VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 14) {
-                Image(systemName: route.systemImage)
+                Image(systemName: connect?.symbolName ?? route.systemImage)
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(on)
                     .frame(width: 62, height: 62)
                     .background(Circle().fill(on.opacity(0.12)))
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(outputTitle)
+                    Text(connect?.name ?? outputTitle)
                         .pixlFont(.titleLarge, weight: .bold)
                         .foregroundStyle(on)
                         .lineLimit(2)
-                    Text("\(outputSubtitle) \u{2022} \(playback.isPlaying ? "Playing" : "Paused")")
+                    Text("\(connect == nil ? outputSubtitle : String(localized: "Spotify Connect")) \u{2022} \(playback.isPlaying ? "Playing" : "Paused")")
                         .pixlFont(.bodyMedium)
                         .foregroundStyle(on)
                         .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("Phone volume")
-                        .pixlFont(.titleSmall)
-                    Spacer()
-                    Text("\(Int((volume.level * 100).rounded()))%")
-                        .pixlFont(.labelMedium)
-                        .monospacedDigit()
+            if let connect {
+                SpotifyConnectVolume(device: connect, tint: on)
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Phone volume")
+                            .pixlFont(.titleSmall)
+                        Spacer()
+                        Text("\(Int((volume.level * 100).rounded()))%")
+                            .pixlFont(.labelMedium)
+                            .monospacedDigit()
+                    }
+                    .foregroundStyle(on)
+                    DeviceVolumeSlider(tint: on)
+                        .frame(height: 34)
                 }
-                .foregroundStyle(on)
-                DeviceVolumeSlider(tint: on)
-                    .frame(height: 34)
             }
         }
         .padding(20)
@@ -230,13 +243,18 @@ struct DevicesSheet: View {
                 Spacer()
                 pickerCircle
             }
-            deviceRow(name: outputTitle, status: "Connected", systemImage: route.systemImage, selected: true)
+            deviceRow(name: outputTitle, status: env.spotifyConnect.active == nil ? "Connected" : "This phone",
+                      systemImage: route.systemImage, selected: env.spotifyConnect.active == nil)
             if route.hasOtherRoutes {
                 deviceRow(name: String(localized: "AirPlay & Bluetooth"), status: "Available",
                           systemImage: "airplayaudio", selected: false)
                     .overlay { AirPlayRoutePicker(tint: .clear, activeTint: .clear) }
             } else {
                 emptyState
+            }
+            if env.spotify.isLoggedIn {
+                SpotifyConnectSection(connect: env.spotifyConnect)
+                    .padding(.top, 8)
             }
         }
         .padding(.horizontal, 20)
@@ -245,27 +263,7 @@ struct DevicesSheet: View {
 
     /// Android `CastDeviceRow`: a capsule with a 52 pt icon circle, the name and a status badge.
     private func deviceRow(name: String, status: LocalizedStringKey, systemImage: String, selected: Bool) -> some View {
-        let container = selected ? theme.primaryContainer : theme.surfaceVariant
-        let on = selected ? theme.onPrimaryContainer : theme.onSurface
-        return HStack(spacing: 16) {
-            Image(systemName: systemImage)
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(on)
-                .frame(width: 48, height: 48)
-                .background(Circle().fill(on.opacity(0.12)))
-                .padding(.leading, 4)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(name)
-                    .pixlFont(.titleMedium, weight: .semibold)
-                    .foregroundStyle(on)
-                    .lineLimit(1)
-                badge(status, systemImage: selected ? "checkmark.circle.fill" : "wifi", color: on)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(12)
-        .pixlGlass(in: Capsule(), tint: container.opacity(selected ? GlassTint.prominent : GlassTint.container),
-                   interactive: !selected)
+        DeviceRow(name: name, status: status, systemImage: systemImage, selected: selected)
     }
 
     /// Android `EmptyDeviceState`.
@@ -291,14 +289,7 @@ struct DevicesSheet: View {
 
     /// Android `BadgeChip`.
     private func badge(_ text: LocalizedStringKey, systemImage: String, color: Color) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: systemImage).font(.system(size: 13, weight: .semibold))
-            Text(text).pixlFont(.labelMedium).lineLimit(1)
-        }
-        .foregroundStyle(color)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(Capsule().fill(color.opacity(0.08)))
+        DeviceBadge(text: text, systemImage: systemImage, color: color)
     }
 
     // MARK: Tabs
@@ -336,6 +327,62 @@ struct DevicesSheet: View {
         }
         .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityIdentifier("devices.tab.\(index)")
+    }
+}
+
+/// Android `CastDeviceRow`: a capsule with a 48 pt icon circle, the name and a status badge (the AirPlay rows and
+/// the Spotify Connect devices share it). One glass layer per row.
+struct DeviceRow: View {
+    let name: String
+    let status: LocalizedStringKey
+    let systemImage: String
+    let selected: Bool
+    var badgeImage: String?
+    var dimmed = false
+
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        let container = selected ? theme.primaryContainer : theme.surfaceVariant
+        let on = selected ? theme.onPrimaryContainer : theme.onSurface
+        HStack(spacing: 16) {
+            Image(systemName: systemImage)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(on)
+                .frame(width: 48, height: 48)
+                .background(Circle().fill(on.opacity(0.12)))
+                .padding(.leading, 4)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(name)
+                    .pixlFont(.titleMedium, weight: .semibold)
+                    .foregroundStyle(on)
+                    .lineLimit(1)
+                DeviceBadge(text: status, systemImage: badgeImage ?? (selected ? "checkmark.circle.fill" : "wifi"), color: on)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(12)
+        .opacity(dimmed ? 0.55 : 1)
+        .pixlGlass(in: Capsule(), tint: container.opacity(selected ? GlassTint.prominent : GlassTint.container),
+                   interactive: !selected)
+    }
+}
+
+/// Android `BadgeChip`.
+struct DeviceBadge: View {
+    let text: LocalizedStringKey
+    let systemImage: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: systemImage).font(.system(size: 13, weight: .semibold))
+            Text(text).pixlFont(.labelMedium).lineLimit(1)
+        }
+        .foregroundStyle(color)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Capsule().fill(color.opacity(0.08)))
     }
 }
 

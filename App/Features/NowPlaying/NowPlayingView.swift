@@ -215,16 +215,20 @@ private struct PlayerTopBar: View {
         .frame(height: 64)
     }
 
-    /// The output pill (Android's cast button): the current output's icon, with its name while playing over AirPlay.
+    /// The output pill (Android's cast button): the current output's icon, with its name while playing over AirPlay —
+    /// or "Playing on <device>" while Spotify Connect plays (long press: stop playing there).
     private var outputPill: some View {
-        let showsLabel = route.isRemote && !route.name.isEmpty
+        let connect = env.spotifyConnect.active
+        let label: String? = connect.map { String(localized: "Playing on \($0.name)") }
+            ?? (route.isRemote && !route.name.isEmpty ? route.name : nil)
+        let showsLabel = label != nil
         let trailing: CGFloat = showsLabel ? 21 : 6
         return Button { router.present(AppSheet.devices) } label: {
             HStack(spacing: 8) {
-                Image(systemName: route.systemImage)
+                Image(systemName: connect?.symbolName ?? route.systemImage)
                     .font(.system(size: 18, weight: .semibold))
-                if showsLabel {
-                    Text(route.name)
+                if let label {
+                    Text(label)
                         .pixlFont(.labelMedium)
                         .lineLimit(1)
                     Circle().fill(theme.onTertiaryContainer).frame(width: 8, height: 8)
@@ -233,7 +237,8 @@ private struct PlayerTopBar: View {
             .foregroundStyle(theme.primary)
             .padding(.leading, 14)
             .padding(.trailing, showsLabel ? 16 : 14)
-            .frame(minWidth: 50, maxWidth: showsLabel ? 190 : 58, minHeight: 42, maxHeight: 42, alignment: .leading)
+            .frame(minWidth: 50, maxWidth: showsLabel ? (connect == nil ? 190 : 230) : 58, minHeight: 42, maxHeight: 42,
+                   alignment: .leading)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
@@ -241,8 +246,16 @@ private struct PlayerTopBar: View {
                                                 bottomTrailingRadius: trailing, topTrailingRadius: trailing,
                                                 style: .continuous),
                      tint: theme.onPrimary.opacity(0.7))
+        .contextMenu {
+            if let connect {
+                Button(String(localized: "Stop playing on \(connect.name)"), systemImage: "stop.circle") {
+                    env.spotifyConnect.disconnect()
+                }
+            }
+        }
         .animation(.spring(response: 0.5, dampingFraction: 0.6), value: showsLabel)
-        .accessibilityLabel(route.kind == .airPlay ? "AirPlay" : (route.kind == .bluetooth ? "Bluetooth" : "Local playback"))
+        .accessibilityLabel(connect.map { String(localized: "Playing on \($0.name)") }
+                            ?? (route.kind == .airPlay ? "AirPlay" : (route.kind == .bluetooth ? "Bluetooth" : "Local playback")))
         .accessibilityIdentifier("player.devices")
     }
 
