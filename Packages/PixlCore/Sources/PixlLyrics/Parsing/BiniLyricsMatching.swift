@@ -307,6 +307,21 @@ public enum BiniLyricsMatching {
         LrcLibMatching.normalizeForMatch(value).split(separator: " ").contains { $0.hasPrefix("remaster") }
     }
 
+    // MARK: The fetch dialog
+
+    /// The fetch dialog's entry for a BiniLyrics match (listed before LRCLIB's candidates): the candidate's names, a
+    /// synced-lyrics marker when timed, and the document itself as the text to store. Its record id (-1) never
+    /// collides with LRCLIB's.
+    public static func searchResult(candidate: BiniLyricsCandidate, lyrics: Lyrics, document: String) -> LyricsSearchResult? {
+        guard LyricsRepositoryLogic.isUsable(lyrics) else { return nil }
+        let synced = (lyrics.synced ?? []).isEmpty ? nil : LyricsUtils.syncedToLrcString(lyrics.synced ?? [])
+        let record = LrcLibResponse(id: -1, name: candidate.trackName, artistName: candidate.artistName,
+                                    albumName: candidate.albumName, duration: candidate.durationSeconds,
+                                    plainLyrics: lyrics.plain?.joined(separator: "\n"), syncedLyrics: synced)
+        let raw = isBiniLyricsDocument(document) ? document : (LyricsRepositoryLogic.lyricsToRawContent(lyrics) ?? document)
+        return LyricsSearchResult(record: record, lyrics: lyrics, rawLyrics: raw, source: sourceName)
+    }
+
     // MARK: Parsed lyrics
 
     /// AMLL's post-parse checks, for word- and line-timed lyrics alike: something is timed after 0, and nothing

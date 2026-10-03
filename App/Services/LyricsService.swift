@@ -179,7 +179,7 @@ actor LyricsService {
         return Self.loaded(found)
     }
 
-    private static func loaded(_ found: OnlineSyncedLyrics) -> LoadedLyrics {
+    nonisolated private static func loaded(_ found: OnlineSyncedLyrics) -> LoadedLyrics {
         var lyrics = found.lyrics
         lyrics.areFromRemote = true
         return LoadedLyrics(lyrics: lyrics, source: found.source, rawContent: found.rawContent)
@@ -199,10 +199,28 @@ actor LyricsService {
 
     // MARK: Manual search (the fetch dialog)
 
-    /// `searchRemote`: candidate-ranked LRCLIB results for the song.
+    /// `searchRemote`: BiniLyrics' strict match (when there is one) first, then candidate-ranked LRCLIB results.
     func searchCandidates(song: Song) async -> Result<[LyricsSearchResult], LyricsSearchFailure> {
-        let (query, results) = await lrclib.searchCandidates(song: song)
+        let bini = catalogs.bini
+        let isrc = await songISRC(for: song)
+        async let biniMatch: BiniLyricsClient.Match? = Self.biniLyricsMatch(bini, song: song, isrc: isrc)
+        let (query, lrclibResults) = await lrclib.searchCandidates(song: song)
+        var results = lrclibResults
+        if let match = await biniMatch,
+           let first = BiniLyricsMatching.searchResult(candidate: match.candidate, lyrics: match.lyrics,
+                                                       document: match.document) {
+            results.insert(first, at: 0)
+        }
         return results.isEmpty ? .failure(.notFound(query: query)) : .success(results)
+    }
+
+    nonisolated private static func biniLyricsMatch(_ client: BiniLyricsClient?, song: Song,
+                                                    isrc: String?) async -> BiniLyricsClient.Match? {
+        guard let client else { return nil }
+        let found = try? await withTimeout(seconds: LyricsCatalogSearch.biniLyricsTimeoutSeconds) {
+            await client.find(song: song, isrc: isrc)
+        }
+        return found ?? nil
     }
 
     /// `searchRemoteByQuery`.

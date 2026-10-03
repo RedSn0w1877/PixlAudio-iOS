@@ -171,7 +171,7 @@ final class LyricsController {
     func pick(_ result: LyricsSearchResult, song: Song) {
         guard let service else { return }
         Task { [weak self] in
-            let saved = await service.save(song: song, rawContent: result.rawLyrics, source: LyricsRepositoryLogic.lrclibSourceName,
+            let saved = await service.save(song: song, rawContent: result.rawLyrics, source: result.source,
                                            areFromRemote: true)
             guard let self else { return }
             if let saved, self.loadedSongId == song.id { self.apply(saved, songId: song.id) }

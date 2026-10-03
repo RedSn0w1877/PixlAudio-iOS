@@ -117,6 +117,13 @@ struct FetchLyricsDialog: View {
         .padding(.vertical, 48)
     }
 
+    /// The catalogs behind the results, in order of first appearance.
+    private static func providers(of results: [LyricsSearchResult]) -> [String] {
+        var seen: [String] = []
+        for result in results where !seen.contains(result.source) { seen.append(result.source) }
+        return seen
+    }
+
     private func pick(_ results: [LyricsSearchResult]) -> some View {
         VStack(spacing: 0) {
             Text("Found \(results.count) match(es)")
@@ -129,11 +136,16 @@ struct FetchLyricsDialog: View {
                     ForEach(results, id: \.record.id) { result in
                         resultCard(result)
                     }
-                    Text("Lyrics provided by LRCLIB")
-                        .pixlFont(.bodySmall)
-                        .foregroundStyle(theme.onSurfaceVariant)
-                        .padding(.top, 16)
-                        .padding(.bottom, 8)
+                    // One credit per catalog that contributed a result (BiniLyrics, LRCLIB).
+                    VStack(spacing: 2) {
+                        ForEach(Self.providers(of: results), id: \.self) { source in
+                            Text("Lyrics provided by \(source)")
+                                .pixlFont(.bodySmall)
+                                .foregroundStyle(theme.onSurfaceVariant)
+                        }
+                    }
+                    .padding(.top, 16)
+                    .padding(.bottom, 8)
                 }
             }
             .frame(maxHeight: 350)

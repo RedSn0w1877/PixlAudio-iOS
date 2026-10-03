@@ -277,6 +277,19 @@ struct ParsingBiniLyricsTests {
     }
 }
 
+extension ParsingBiniLyricsTests {
+    @Test func fetchDialogEntry() throws {
+        let lyrics = try #require(TtmlDocumentParser.parse(Self.wordTimed))
+        let entry = try #require(BiniLyricsMatching.searchResult(candidate: Self.candidate(), lyrics: lyrics,
+                                                                 document: Self.wordTimed))
+        #expect(entry.source == "BiniLyrics" && entry.record.id == -1 && entry.rawLyrics == Self.wordTimed)
+        #expect(entry.record.name == "Glass Harbor" && entry.record.duration == 200)
+        #expect(entry.record.syncedLyrics?.hasPrefix("[00:10.00]Paper lanterns drift") == true)
+        #expect(LyricsSearchResult(record: entry.record, lyrics: lyrics, rawLyrics: "").source == "LRCLIB")
+        #expect(BiniLyricsMatching.searchResult(candidate: Self.candidate(), lyrics: Lyrics(), document: "") == nil)
+    }
+}
+
 extension BiniLyricsCandidate {
     func with(isrc: String) -> BiniLyricsCandidate {
         var copy = self
