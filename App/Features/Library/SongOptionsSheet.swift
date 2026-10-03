@@ -271,41 +271,15 @@ struct SongOptionsSheet: View {
     // MARK: Bottom tabs
 
     /// Android `PrimaryTabRow` in a `surfaceContainerHighest` capsule (5 pt inset) with `TabAnimation` tabs.
+    /// On the tab bar's liquid lens (`LiquidTabCapsule`, Hoa 2026-10-03).
     private var tabBar: some View {
-        GlassEffectContainer(spacing: 2) {
-            HStack(spacing: 0) {
-                tab(0, title: "OPTIONS", systemImage: "line.3.horizontal")
-                tab(1, title: "INFO", systemImage: "info.circle.fill")
-            }
-            .padding(5)
-        }
-        .pixlGlass(in: Capsule(), tint: theme.surfaceContainerHighest.opacity(GlassTint.container))
+        LiquidTabCapsule(tabs: [
+            .init(value: 0, title: "OPTIONS", systemImage: "line.3.horizontal", identifier: "songInfo.tab.0"),
+            .init(value: 1, title: "INFO", systemImage: "info.circle", selectedSystemImage: "info.circle.fill",
+                  identifier: "songInfo.tab.1"),
+        ], selection: $page)
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .pixlHaptic(.selection, trigger: page)
-    }
-
-    private func tab(_ index: Int, title: String, systemImage: String) -> some View {
-        let selected = page == index
-        return Button {
-            withAnimation(PixlMotion.selection) { page = index }
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: systemImage).font(.system(size: 18, weight: .semibold))
-                Text(title).pixlFont(.labelLarge, weight: .bold)
-            }
-            .foregroundStyle(selected ? theme.onPrimary : theme.onSurface.opacity(0.9))
-            .frame(maxWidth: .infinity, minHeight: 48)
-            .contentShape(.capsule)
-        }
-        .buttonStyle(.plain)
-        .background {
-            if selected {
-                Capsule().fill(theme.primary)
-            }
-        }
-        .accessibilityAddTraits(selected ? .isSelected : [])
-        .accessibilityIdentifier("songInfo.tab.\(index)")
     }
 }
 

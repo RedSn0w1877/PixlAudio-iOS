@@ -147,6 +147,9 @@ PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact ba
 - **Song picker LOCAL / CLOUD (2026-10-03, owner: "the same liquid magnifying mechanism as the main home screen"):**
   `LiquidSegmentedPicker` puts the same lens in a 56 pt glass capsule, with inline glyphs (16 pt symbol beside a 14 pt
   bold label) in `onSurface`, and the accent pill with `onPrimary` glyphs.
+- **Sheet tab capsules on the lens (2026-10-03, owner: "the navbar here isn't Liquid Glass sliding implemented"):**
+  the song options OPTIONS / INFO, devices CONTROLS / DEVICES and song picker LOCAL / CLOUD capsules are one
+  `LiquidTabCapsule` (56 pt, accent pill, `onSurface` glyphs, filled symbol inside the lens, selection haptic).
 - **Full player chrome (2026-10-03, owner: "make the 2 buttons at the top like liquid transparent buttons and the …
   shuffle repeat etc buttons … be liquidified"):**
   - The collapse, output, queue, lyrics and AI DJ buttons are clear glass with `onPrimary` at

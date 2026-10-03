@@ -306,39 +306,15 @@ struct DevicesSheet: View {
 
     // MARK: Tabs
 
+    /// On the tab bar's liquid lens (`LiquidTabCapsule`, Hoa 2026-10-03).
     private var tabBar: some View {
-        GlassEffectContainer(spacing: 2) {
-            HStack(spacing: 0) {
-                tab(0, title: "CONTROLS", systemImage: "hifispeaker.fill")
-                tab(1, title: "DEVICES", systemImage: "laptopcomputer.and.iphone")
-            }
-            .padding(5)
-        }
-        .pixlGlass(in: Capsule(), tint: theme.surfaceContainerHigh.opacity(GlassTint.container))
+        LiquidTabCapsule(tabs: [
+            .init(value: 0, title: "CONTROLS", systemImage: "hifispeaker", selectedSystemImage: "hifispeaker.fill",
+                  identifier: "devices.tab.0"),
+            .init(value: 1, title: "DEVICES", systemImage: "laptopcomputer.and.iphone", identifier: "devices.tab.1"),
+        ], selection: $page)
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .pixlHaptic(.selection, trigger: page)
-    }
-
-    private func tab(_ index: Int, title: LocalizedStringKey, systemImage: String) -> some View {
-        let selected = page == index
-        return Button {
-            withAnimation(PixlMotion.selection) { page = index }
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: systemImage).font(.system(size: 16, weight: .semibold))
-                Text(title).pixlFont(.labelLarge, weight: .bold).lineLimit(1)
-            }
-            .foregroundStyle(selected ? theme.onPrimary : theme.onSurface.opacity(0.9))
-            .frame(maxWidth: .infinity, minHeight: 48)
-            .contentShape(.capsule)
-        }
-        .buttonStyle(.plain)
-        .background {
-            if selected { Capsule().fill(theme.primary) }
-        }
-        .accessibilityAddTraits(selected ? .isSelected : [])
-        .accessibilityIdentifier("devices.tab.\(index)")
     }
 }
 

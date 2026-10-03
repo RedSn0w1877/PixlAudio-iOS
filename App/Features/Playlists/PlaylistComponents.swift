@@ -207,23 +207,11 @@ struct SongPickerBottomBar: View {
             if showsCloudFilter {
                 // The tab bar's liquid lens (Hoa, 2026-10-03): the selection lifts off as clear glass, follows the
                 // finger and magnifies LOCAL / CLOUD under it.
-                LiquidSegmentedPicker(
-                    options: [StorageFilter.offline, .online],
-                    items: [
-                        LiquidSegmentItem(title: "LOCAL", systemImage: "iphone", selectedSystemImage: "iphone",
-                                          identifier: "songPicker.local"),
-                        LiquidSegmentItem(title: "CLOUD", systemImage: "cloud", selectedSystemImage: "cloud.fill",
-                                          identifier: "songPicker.cloud"),
-                    ],
-                    selection: $storageFilter,
-                    animation: PixlMotion.selection,
-                    pillColor: UIColor(theme.primary.opacity(GlassTint.prominent)),
-                    restingGlyphColor: UIColor(theme.onPrimary),
-                    liftedGlyphColor: UIColor(theme.primary),
-                    baseGlyphColor: UIColor(theme.onSurface))
-                    .frame(height: 56)
-                    .frame(maxWidth: .infinity)
-                    .pixlHaptic(.selection, trigger: storageFilter)
+                LiquidTabCapsule(tabs: [
+                    .init(value: StorageFilter.offline, title: "LOCAL", systemImage: "iphone", identifier: "songPicker.local"),
+                    .init(value: StorageFilter.online, title: "CLOUD", systemImage: "cloud", selectedSystemImage: "cloud.fill",
+                          identifier: "songPicker.cloud"),
+                ], selection: $storageFilter)
                 Button(action: onConfirm) {
                     Image(systemName: "checkmark")
                         .font(.system(size: 24, weight: .semibold))
