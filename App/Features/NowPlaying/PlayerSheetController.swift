@@ -58,7 +58,7 @@ final class PlayerSheetController {
 
     /// Builds the full player ahead of its first expand (hidden; see `FullPlayerLayer`).
     func prewarm() {
-        if !hasBuiltFullPlayer { hasBuiltFullPlayer = true }
+        // Experiment: no pre-warm.
     }
 
     /// Nothing is loaded any more: the card goes, and so does the built full player (the next song pre-warms again).
