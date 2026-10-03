@@ -71,7 +71,20 @@ struct SettingsScaffold<Content: View, Actions: View>: View {
                 if header.insetTop != metrics.insetTop { header.insetTop = metrics.insetTop }
                 header.offset = metrics.offset
             }
-            .scrollTargetBehavior(SettingsHeaderSnap(distance: distance, insetTop: header.insetTop))
+            // The snap is for the user's release (Android animates the header after the fling). The system also asks
+            // a scroll target behaviour when the scroll view's size changes, and there a stale `insetTop` (from an
+            // earlier layout pass) could read a list at rest as half-collapsed and move it (docs/performance.md).
+            .onScrollPhaseChange { _, phase in
+                let snaps: Bool
+                switch phase {
+                case .idle: snaps = false
+                case .animating: return
+                default: snaps = true // tracking, interacting, decelerating: the user's scroll
+                }
+                if header.snapsOnRelease != snaps { header.snapsOnRelease = snaps }
+            }
+            .scrollTargetBehavior(SettingsHeaderSnap(distance: distance, insetTop: header.insetTop,
+                                                     isEnabled: header.snapsOnRelease || SnapProbe.oldSnap))
             .accessibilityIdentifier("screen.\(screenID)")
 
             SettingsCollapsingTopBar(title: title, header: header, expandedHeight: expandedHeight,
@@ -119,19 +132,24 @@ nonisolated struct SettingsScrollMetrics: Equatable {
 }
 
 /// The header's scroll state. `offset` changes every frame and is read only by the header; `insetTop` (the scroll
-/// view's top inset) changes once after the first layout and feeds the snap behaviour.
+/// view's top inset) changes once after the first layout and feeds the snap behaviour; `snapsOnRelease` is true
+/// from the moment the user touches the list until it comes to rest (two changes per scroll gesture).
 @Observable
 final class SettingsHeaderState {
     var offset: CGFloat = 0
     var insetTop: CGFloat = 0
+    var snapsOnRelease = false
 }
 
-/// Snaps a release in the middle of the collapse to fully expanded or collapsed.
+/// Snaps a release in the middle of the collapse to fully expanded or collapsed. Only while the user scrolls: the
+/// system also asks the behaviour when the scroll view's size changes, and a list at rest must stay where it is.
 nonisolated struct SettingsHeaderSnap: ScrollTargetBehavior {
     let distance: CGFloat
     let insetTop: CGFloat
+    var isEnabled = true
 
     func updateTarget(_ target: inout ScrollTarget, context: TargetContext) {
+        guard isEnabled else { return }
         let inset = insetTop
         let resting = target.rect.minY + inset
         guard resting > 0, resting < distance else { return }
@@ -283,4 +301,9 @@ struct OptionalSettingsToast: ViewModifier {
             content
         }
     }
+}
+
+/// EXPERIMENT: `-probeOldSnap` restores the old behaviour (the snap also acts on size changes).
+nonisolated enum SnapProbe {
+    static let oldSnap = ProcessInfo.processInfo.arguments.contains("-probeOldSnap")
 }
