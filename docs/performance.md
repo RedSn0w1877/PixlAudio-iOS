@@ -58,14 +58,18 @@ code-level findings below. Read plainly, though, the matched pair leans the othe
 re-renders on song changes, play / pause and queue edits). So nothing here counts as a measured gain: Instruments'
 Hitches template on Hoa's phone is a hard gate before merging (see "Merge gate" below). The two runs of the review
 round (37106537754 and 37113795352, on a busier CI) measured above both columns everywhere — tab switches 3.60 /
-3.04, the settings subpage 2.10 / 1.45, the song options sheet 6.51 / 4.55 — which is the noise again.
+3.04, the settings subpage 2.10 / 1.45, the song options sheet 6.51 / 4.55 — which is the noise again. So did the
+second review round's run (37120024541, whose code changes touch only the player sheet's collapse): tab switches
+2.81, album 4.73, artist 5.32, pills 4.76, settings 1.67, song options 4.67, player 2.26; navigation transitions
+0.70 / 0.69 / 0.56 s.
 
 CI screenshot flakes that show up in any comparison with main and are not changes (main's own runs show them too):
 swipe-scrolled shots land at slightly different offsets (`home7b-shelves`, `stats-scrolled`, `aiPlaylistLab-scrolled`,
 `spotifyDashboard.tested`); the lyrics cascade frames and animated backgrounds move; the full player's cover is
 sometimes caught at its paused scale (0.95) in shots taken right after launch (`playerExpanded`, `artistPicker`,
 `sleepTimer`, `devices`, `nowPlaying` — a missed first play-state change, measured below; main's run 37108962548
-caught it in `nowPlaying-dark` and `sleepTimer-light`); the playlist's More options menu
+caught it in `nowPlaying-dark` and `sleepTimer-light`, this branch's run 37120024541 in `devices-light`); the
+playlist's More options menu
 (`MenuRecordingTests`, `menuPlaylistMore`) is caught at slightly different points of its settle — main's two runs of
 `9e5ac90` differ from each other the same way, and a rerun of this branch's `73bc9d8` (run 37074696142) matched
 main's latest run pixel for pixel in all three menu shots. About and the Equalizer are not a timing flake of that
@@ -144,7 +148,12 @@ by frame:
   had got to. A drag still clears it without animation, as the drag itself sets the expansion. Known limit: a
   collapse while an expand's spring is still running freezes at the model value (1), not the fraction on screen
   (the controller can't see the presentation value), so a collapse tapped before an expand has settled fades the
-  player from its resting placement. `TransitionRecordingTests` films the interrupted collapse.
+  player from its resting placement. `TransitionRecordingTests.testCollapseInterruptedByAnExpand` films it (a
+  UI-test launch flag expands 0.12 s after the collapse; a tap from the test would land only after the fade). Run
+  37123472457's recording caught one frame early in the collapse, the player still in the shrinking card, then the
+  card springing back with the player in place and visible in every frame: no pop, no restarted fade. The
+  recorder's 10–30 frames a second can't show the curve, which stays on-device check 4. The same run's three plain
+  collapses again kept the mini player's controls within 1 grey level of rest from the card's arrival.
 
 ### Settings pages opened scrolled (2026-10-03)
 
