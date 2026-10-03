@@ -216,7 +216,12 @@ final class AppEnvironment {
             Task { await playCounts.reload(editor: editor, revision: home.history.revision) }
         }
         playbackServices?.onEngagementRecorded = reloadPlayCounts
-        backup.onRestored = reloadPlayCounts
+        backup.onRestored = { [weak self] in
+            reloadPlayCounts()
+            // A restore may write AI keys and base URLs (it dropped the cached answer): re-check off the main actor.
+            guard let self else { return }
+            Task { await AIProviderStatus.refresh(self) }
+        }
         backup.start()
         // Settings › Library › Album Art Cache Limit: the thumbnail disk cache is kept under it.
         let artCacheLimit = Int64(settings.library.albumArtCacheLimitMb) * 1_048_576

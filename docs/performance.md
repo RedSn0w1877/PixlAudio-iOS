@@ -51,7 +51,27 @@ CI screenshot flakes that show up in any comparison with main and are not change
 swipe-scrolled shots land at slightly different offsets (`home7b-shelves`, `stats-scrolled`, `aiPlaylistLab-scrolled`,
 `spotifyDashboard.tested`); About and the Equalizer are caught at different points of their appear fade; the
 lyrics cascade frames and animated backgrounds move; the full player's cover is sometimes caught at its paused
-scale (0.95) in shots taken right after launch (`playerExpanded`, `artistPicker`, `sleepTimer`, `devices`).
+scale (0.95) in shots taken right after launch (`playerExpanded`, `artistPicker`, `sleepTimer`, `devices`); the
+playlist's More options menu (`MenuRecordingTests`, `menuPlaylistMore`) is caught at slightly different points of its
+settle — main's two runs of `9e5ac90` differ from each other the same way, and a rerun of this branch's `73bc9d8`
+(run 37074696142) matched main's latest run pixel for pixel in all three menu shots.
+
+### A stuck full player, found by a probe (2026-10-03)
+
+One full-suite run (37066421213) caught `playerExpanded-dark` as an empty screen in the album's `primaryContainer`:
+the expanded card with no full player on it. A throwaway probe (`BlankPlayerProbeTests` on the experiment branches
+`perf-x-blank*`, never merged) launched straight into the expanded player (`-screen nowPlaying`) and checked each
+screen two seconds later: this branch showed it in 15 of 230 launches (2/40, 4/70, 8/70 without the lyrics shader
+warm-up, 1/50) and never recovered; main showed it in 0 of 40. The probe's state dump named the cause: the full
+layer's fade modifier (`FullLayerPlacement`, a modifier reading `playerSheet.expansion` itself) was evaluated once,
+read 0, and was never evaluated again although the expansion was 1 and `FullPlayerLayer` around it re-ran. It had
+been inserted by an update that `expand(animated: false)` forced: `isExpanded` and the build were set first, then
+`withoutAnimation { expansion = 1 }` applied them as their own update before setting the expansion, and the new
+modifier missed that change. Fixed in `da5d221`: the non-animated expand sets all three in one transaction, the
+full layer's fade takes its progress from `FullPlayerLayer`'s body, and an expand that had to build the player
+starts its spring on the next main-actor turn. With the fix: 0 of 50 launches, 0 of 25 taps and 0 of 25 drags
+before the pre-warm (`-probeNoPrewarm`); the unfixed tree in the same run: 1 of 50, 0 of 25, 0 of 25. Only the
+launch-into-expanded path (UI tests and launch states) showed it; the app's own tap and drag paths never did.
 
 ## What was slow, and the rule now
 
@@ -95,9 +115,16 @@ scale (0.95) in shots taken right after launch (`playerExpanded`, `artistPicker`
   seeded in `init`), not in `onChange(initial:)` / `task`, which costs a second pass or a pop-in.
 - A cache that replaces a synchronous answer must be right whenever the old answer was: key it on **every** input
   the old computation read and fall back to the old computation on a mismatch, and drop it when something changes
-  its inputs behind its back. `AIProviderStatus` is keyed on the provider **and** its base URL and is invalidated
+  its inputs behind its back. `AIProviderStatus` is keyed on the provider **and** its base URL, drops its entry
+  while a refresh's own check runs (a key saved a moment ago is never answered from the old entry), discards a check
+  that finishes after a newer refresh or invalidation (a generation counter), and is invalidated and re-checked
   after a settings restore (which writes the Keychain); `PlayCountStore.reload` re-reads play counts once a play's
   engagement row is written (the history revision is bumped before that write lands) and after a restore.
+- A view inserted by an update that `withAnimation` / `withTransaction` forces (they first apply the changes still
+  pending, as an update of their own) can miss a change made inside the block: its first read of an `@Observable`
+  value was never refreshed (the stuck full player above). Set the state that inserts a view and the values it
+  reads in one transaction, make follow-up changes on a later main-actor turn, and feed an `Animatable` effect from
+  a parent body that already follows the value rather than from a modifier inserted with it.
 - Work moved off the main actor lands later, outside the transaction that triggered it: replay that transaction's
   animation when the result lands (the song picker's Liked chip and storage filter), or the change snaps where it
   used to animate. And guard the button that started it against a second tap (Edit song › Save).
@@ -127,7 +154,7 @@ scale (0.95) in shots taken right after launch (`playerExpanded`, `artistPicker`
    with `fullPlayerAlpha(p)` alone. On main it was inserted in the same tap: `isExpanded = true` is set outside the
    expand's `withAnimation`, and SwiftUI applies each transaction's changes as their own update, so the insertion was
    most likely unanimated and the curves match; if main's recording shows an extra fade (the default opacity
-   insertion, roughly `spring(p) · fullPlayerAlpha(p)`), multiply `FullLayerPlacement`'s opacity by the expand
+   insertion, roughly `spring(p) · fullPlayerAlpha(p)`), multiply `FullLayerPlacementEffect`'s opacity by the expand
    spring's progress during non-drag expands to reproduce it.
 5. **Idle cost of the hidden pre-built full player**, and whether zero-opacity glass costs anything (the card's glass
    is still removed above 25 %).

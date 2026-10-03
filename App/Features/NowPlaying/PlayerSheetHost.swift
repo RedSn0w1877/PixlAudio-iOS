@@ -292,7 +292,10 @@ private struct FullPlayerLayer: View {
         if sheet.hasBuiltFullPlayer || isShown {
             NowPlayingView(safeArea: safeArea, width: screenSize.width)
                 .frame(width: screenSize.width, height: screenSize.height)
-                .modifier(FullLayerPlacement(collapsedMinX: collapsedMinX))
+                // The progress comes from this body, which already follows the expansion: a modifier inserted with
+                // the player and reading the expansion itself could keep a stale first read (the player stayed
+                // invisible); this value is always the current one.
+                .modifier(FullLayerPlacementEffect(progress: sheet.expansion, collapsedMinX: collapsedMinX))
                 .animation(nil) { content in
                     // While hidden it also takes no room in the card's ZStack, as when it was removed: a screen-sized
                     // child widened the ZStack, and the mini player beside it was laid out at the screen's width
@@ -303,16 +306,6 @@ private struct FullPlayerLayer: View {
                 }
                 .onAppear { sheet.fullPlayerDidAppear() }
         }
-    }
-}
-
-private struct FullLayerPlacement: ViewModifier {
-    let collapsedMinX: CGFloat
-
-    @Environment(AppEnvironment.self) private var env
-
-    func body(content: Content) -> some View {
-        content.modifier(FullLayerPlacementEffect(progress: env.playerSheet.expansion, collapsedMinX: collapsedMinX))
     }
 }
 

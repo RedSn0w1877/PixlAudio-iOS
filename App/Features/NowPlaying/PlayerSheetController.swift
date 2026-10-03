@@ -70,16 +70,23 @@ final class PlayerSheetController {
 
     /// Expands to the full player (Android `expandPlayerSheet`). `animated: false` for launch states.
     func expand(animated: Bool = true, initialVelocity: Double = 0) {
-        let wasExpanded = isExpanded
-        isExpanded = true
         // VoiceOver: once the full player is past half way (it stays hidden from accessibility below 0.5), move
         // focus to it — the mini player that had focus is gone.
-        if !wasExpanded { postScreenChanged(after: animated ? 0.45 : 0.05) }
+        if !isExpanded { postScreenChanged(after: animated ? 0.45 : 0.05) }
         guard animated else {
-            if !hasBuiltFullPlayer { hasBuiltFullPlayer = true }
-            withoutAnimation { expansion = 1 }
+            // One transaction: a full player built here is inserted by the same update that sets the expansion, so
+            // its fades read 1 on their first pass. Set in steps, `withoutAnimation` first applied the pending build
+            // as an update of its own, and the fades of the player it inserted sometimes missed the expansion set
+            // right after: the full player stayed invisible over its background (5–11 % of launches straight into
+            // the expanded player on CI, never on main; docs/performance.md).
+            withoutAnimation {
+                isExpanded = true
+                if !hasBuiltFullPlayer { hasBuiltFullPlayer = true }
+                expansion = 1
+            }
             return
         }
+        isExpanded = true
         guard hasBuiltFullPlayer else {
             // Not pre-warmed yet: mount the full player first (in the expand's transaction, as its insertion used to
             // be) and start the spring when it appears, so its fades start from 0.
@@ -90,12 +97,16 @@ final class PlayerSheetController {
         startExpand(initialVelocity: initialVelocity)
     }
 
-    /// The full player is on screen: starts an expand that waited for it.
+    /// The full player is on screen: starts an expand that waited for it — on the next main-actor turn, once the
+    /// update that inserted the player has been applied in full (an expansion changed while that update is still
+    /// under way can be missed by the new player's fades; see `expand(animated: false)`).
     func fullPlayerDidAppear() {
         guard let velocity = pendingExpandVelocity else { return }
         pendingExpandVelocity = nil
-        guard isExpanded else { return }
-        startExpand(initialVelocity: velocity)
+        Task { [weak self] in
+            guard let self, self.isExpanded, self.expansion < 1 else { return }
+            self.startExpand(initialVelocity: velocity)
+        }
     }
 
     private func startExpand(initialVelocity: Double) {
