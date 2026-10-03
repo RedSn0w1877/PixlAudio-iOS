@@ -368,6 +368,12 @@ and `Services/Lyrics*.swift` + `Services/CJKRomanization.swift`.
   `tertiaryFixedDim` tinted glass), seek-bar pill (50 pt, wavy track), back · Synced · Static · more (40 pt circles,
   50 pt segments: capsule when active, 8 pt corners when not), sync-offset capsule (fills inside, no glass on glass),
   immersive "show controls" disc, sync chip. Over bright art the clear glass takes a 35 % black tint.
+- **Always dark, palette included:** the lyrics screen and the sync editor apply `alwaysDarkTheme(_:)` (Theme.swift),
+  which forces `.dark` *and* re-resolves `appTheme` / `playerTheme` for dark. `preferredColorScheme(.dark)` alone left
+  the palette the shell resolved for the system scheme, so with the phone in light mode the More sheet (and the fetch
+  dialog) drew light-scheme roles — near-black `onSurface` rows, cream fills — on the dark system sheet (fixed
+  2026-10-03; shots `lyricsMoreSheet.lightApp`, `lyricsMoreSheet.lightAppBottom`, `lyricsFetchDialog.lightApp`). The
+  shuffle / repeat / favourite row at the sheet's end is the sheet's own (Android `BottomToggleRow`), not the screen's.
 - **Sheets:** the More sheet is a system sheet with PixlAudio's groups as fills (inside glass); the fetch dialog is a
   centred glass card (32 pt) over a dim backdrop. Save Lyrics exports `.lrc` with `fileExporter`; import goes through
   `LyricsImportSecurity`.
@@ -495,6 +501,17 @@ Stage 12 screenshot ids (signed out on the plain ids; demo data, no network): `a
   avatar keeps Android's `primary → tertiary` gradient (a mark, not a Material surface). Online (catalogue) results
   import through `SearchProviding.importAndPlay` on tap. The sheet uses the large detent: Android caps the column at 620 dp, but the system's
   partial-height sheet floats with clearer glass, and the Home content behind made the chat hard to read.
+- **Taizo redesign (owner request 2026-10-03, "make taizo up much better and more beautiful"; the port rule is relaxed
+  for this sheet only).** Empty: `TaizoOrb` — a 3×3 `MeshGradient` of the theme's fixed roles (same in light and dark)
+  with a specular highlight, rim and glow, drifting at ≤ 24 fps (paused off screen / sheet gone / background / Reduce
+  Motion / UI tests) — over a time-of-day greeting, a one-line subtitle and the suggestion chips: glass capsules with a
+  faint mood tint and a mood-coloured symbol disc, centred in `AIFlowLayout`, led by the listener's top artist and genre
+  from Home's stats overview when known. Conversation: the orb flies into the header (`matchedGeometryEffect`; one
+  identity) and stirs while a prompt is in flight ("Thinking…"); bubbles grow in from their corner; a media answer is
+  `TaizoQueueCard` (cover mosaic on a fanned stack, mix name from the prompt, count · duration, Play / Add to Queue fills,
+  the songs, "Show all" past five). The composer is one glass capsule in a bottom `safeAreaBar` with the send button
+  inside it as a fill (accent with text, dimmed and disabled when empty) — a glass button inside the glass capsule would
+  be glass on glass. Shots: `taisChat`, `taisChat-typing`, `taisChat-conversation`, `taisChat-queueCard`.
 - UI tests use the scripted provider (`DemoAiClient`): playlist prompts get every other candidate id, Taizo gets a
   fixed intro and answer, a prompt containing `#demo-error` fails like a rejected key.
 

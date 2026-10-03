@@ -47,11 +47,11 @@ final class AIScreenshotTests: XCTestCase {
 
     /// The conversation scrolled back to Taizo's queue card (artwork stack, count, Play / Add to Queue, the songs).
     func testTaisChatQueueCardLight() throws {
-        try capture("taisChatConversation", "light", name: "taisChat-queueCard", wait: "Daft Punk", swipesDown: 1)
+        try capture("taisChatConversation", "light", name: "taisChat-queueCard", swipesDown: 1, wait: "Daft Punk")
     }
 
     func testTaisChatQueueCardDark() throws {
-        try capture("taisChatConversation", "dark", name: "taisChat-queueCard", wait: "Daft Punk", swipesDown: 1)
+        try capture("taisChatConversation", "dark", name: "taisChat-queueCard", swipesDown: 1, wait: "Daft Punk")
     }
 
     /// A prompt being typed: the composer's send button lights up in the accent.
