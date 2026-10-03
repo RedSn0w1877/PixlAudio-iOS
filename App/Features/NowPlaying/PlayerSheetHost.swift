@@ -288,9 +288,13 @@ private struct FullPlayerLayer: View {
 
     var body: some View {
         let sheet = env.playerSheet
-        // A collapse fades the player out first (`collapseFadeFrom`), as main's removal transition did.
+        // Takes room in the card's ZStack only while the sheet is open or opening, as the removed player did: from a
+        // collapse's first frame it takes none, so the mini player is laid out at the card's width at once.
+        let occupiesLayout = sheet.isExpanded || sheet.isDragging || sheet.expansion > 0.001
+        // A collapse fades the player out first (`collapseFadeFrom`), as main's removal transition did: still drawn,
+        // from the zero frame's top-leading corner (the same place), but out of the layout.
         let isFadingOut = sheet.collapseFadeFrom != nil
-        let isShown = sheet.isExpanded || sheet.isDragging || sheet.expansion > 0.001 || isFadingOut
+        let isShown = occupiesLayout || isFadingOut
         if sheet.hasBuiltFullPlayer || isShown {
             NowPlayingView(safeArea: safeArea, width: screenSize.width)
                 .frame(width: screenSize.width, height: screenSize.height)
@@ -301,12 +305,14 @@ private struct FullPlayerLayer: View {
                 .modifier(FullLayerPlacementEffect(progress: sheet.collapseFadeFrom ?? sheet.expansion,
                                                    collapsedMinX: collapsedMinX, isFadingOut: isFadingOut))
                 .animation(nil) { content in
-                    // While hidden it also takes no room in the card's ZStack, as when it was removed: a screen-sized
-                    // child widened the ZStack, and the mini player beside it was laid out at the screen's width
-                    // (its trailing controls ran past the card). The zero frame anchors it top-leading, unchanged.
+                    // While collapsed or fading out it takes no room in the card's ZStack, as when it was removed: a
+                    // screen-sized child widened the ZStack, and the mini player beside it was laid out at the
+                    // screen's width (its trailing controls ran past the card, and jumped back when a fade ended).
+                    // The zero frame anchors it top-leading and doesn't clip, so a fading player draws where it was.
                     content
                         .opacity(isShown ? 1 : 0)
-                        .frame(width: isShown ? nil : 0, height: isShown ? nil : 0, alignment: .topLeading)
+                        .frame(width: occupiesLayout ? nil : 0, height: occupiesLayout ? nil : 0,
+                               alignment: .topLeading)
                 }
                 // Animated by the collapse's spring (1 → 0), like the removal transition's opacity.
                 .opacity(sheet.fullLayerFade)

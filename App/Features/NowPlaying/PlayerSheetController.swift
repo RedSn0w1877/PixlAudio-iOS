@@ -40,7 +40,10 @@ final class PlayerSheetController {
     /// An animated collapse is fading the full player out, as main's removal of it did: SwiftUI faded the removed
     /// player with the default opacity transition on the collapse's spring, frozen where the collapse began. While
     /// set, the full layer keeps its placement at this fraction and `fullLayerFade` runs from 1 to 0 on the same
-    /// spring; once the spring has finished the layer is hidden as usual.
+    /// spring; once the spring has finished the layer is hidden as usual. Known limit: a collapse while an expand's
+    /// spring is still running freezes at the model value (1), not the fraction on screen (the model can't see the
+    /// presentation value), so a collapse tapped before the expand has settled fades the player from its resting
+    /// placement (docs/performance.md).
     private(set) var collapseFadeFrom: CGFloat?
     /// The full layer's opacity on top of its placement fade (1 except during a collapse's fade).
     private(set) var fullLayerFade: CGFloat = 1
@@ -82,9 +85,9 @@ final class PlayerSheetController {
         // VoiceOver: once the full player is past half way (it stays hidden from accessibility below 0.5), move
         // focus to it — the mini player that had focus is gone.
         if !isExpanded { postScreenChanged(after: animated ? 0.45 : 0.05) }
-        // Main inserted a new full player here while a collapsing one faded out; the kept player follows the
-        // expansion again at once.
-        endCollapseFade()
+        // An expand during a collapse's fade (a tap on the mini player within half a second of a collapse): main
+        // inserted a new full player while the old one faded out; the kept player follows the expansion again. The
+        // fade is cleared in the expand's own transaction (`clearCollapseFade`), never in a separate update before it.
         guard animated else {
             // One transaction: a full player built here is inserted by the same update that sets the expansion, so
             // its fades read 1 on their first pass. Set in steps, `withoutAnimation` first applied the pending build
@@ -92,6 +95,7 @@ final class PlayerSheetController {
             // right after: the full player stayed invisible over its background (5–11 % of launches straight into
             // the expanded player on CI, never on main; docs/performance.md).
             withoutAnimation {
+                clearCollapseFade()
                 isExpanded = true
                 if !hasBuiltFullPlayer { hasBuiltFullPlayer = true }
                 expansion = 1
@@ -103,7 +107,10 @@ final class PlayerSheetController {
             // Not pre-warmed yet: mount the full player first (in the expand's transaction, as its insertion used to
             // be) and start the spring when it appears, so its fades start from 0.
             pendingExpandVelocity = initialVelocity
-            withAnimation(PlayerSheetMotion.expand(initialVelocity: initialVelocity)) { hasBuiltFullPlayer = true }
+            withAnimation(PlayerSheetMotion.expand(initialVelocity: initialVelocity)) {
+                clearCollapseFade()
+                hasBuiltFullPlayer = true
+            }
             return
         }
         startExpand(initialVelocity: initialVelocity)
@@ -122,12 +129,21 @@ final class PlayerSheetController {
     }
 
     private func startExpand(initialVelocity: Double) {
+        // A collapse's fade that is still running ends in this transaction, with the expansion: the layer's
+        // placement springs on from where the collapse froze it and its opacity from where the fade has got to,
+        // both on the expand's curve — no reset frame in between (docs/performance.md, "one transaction").
         // Reduce Motion: a short ease, without the spring's travel or the scale bump.
         if PixlAccessibility.reducesMotion {
-            withAnimation(PlayerSheetMotion.reducedMotion) { expansion = 1 }
+            withAnimation(PlayerSheetMotion.reducedMotion) {
+                clearCollapseFade()
+                expansion = 1
+            }
             return
         }
-        withAnimation(PlayerSheetMotion.expand(initialVelocity: initialVelocity)) { expansion = 1 }
+        withAnimation(PlayerSheetMotion.expand(initialVelocity: initialVelocity)) {
+            clearCollapseFade()
+            expansion = 1
+        }
         // Android's expand bump: scaleY 1 → 1.05 → 1 over 250 ms.
         withAnimation(.easeOut(duration: 0.125)) { overshootScaleY = 1.05 }
         withAnimation(.easeIn(duration: 0.125).delay(0.125)) { overshootScaleY = 1 }
@@ -205,6 +221,8 @@ final class PlayerSheetController {
     @ObservationIgnored private var dragAccumulatedY: CGFloat = 0
 
     func beginDrag() {
+        // Like the drag itself (`drag(translationY:distance:)`, called in the same gesture callback), without
+        // animation: the sheet follows the finger from its first event, so there is no animated update to mix with.
         endCollapseFade()
         dragStartExpansion = expansion
         dragAccumulatedY = 0
@@ -235,14 +253,19 @@ final class PlayerSheetController {
         }
     }
 
-    /// Ends a collapse's fade: the full layer follows the expansion again (hidden while collapsed).
+    /// Ends a collapse's fade without animation: the full layer follows the expansion again (hidden while collapsed).
     private func endCollapseFade() {
         guard collapseFadeFrom != nil || fullLayerFade != 1 else { return }
+        withoutAnimation { clearCollapseFade() }
+    }
+
+    /// Ends a collapse's fade in the caller's transaction (an expand's animation, or `withoutAnimation`). The
+    /// collapse's completion is told to stand down; nothing is written when no fade is running.
+    private func clearCollapseFade() {
+        guard collapseFadeFrom != nil || fullLayerFade != 1 else { return }
         collapseFadeGeneration += 1
-        withoutAnimation {
-            collapseFadeFrom = nil
-            fullLayerFade = 1
-        }
+        collapseFadeFrom = nil
+        fullLayerFade = 1
     }
 
     private func withoutAnimation(_ body: () -> Void) {
