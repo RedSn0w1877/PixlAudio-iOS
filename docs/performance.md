@@ -54,13 +54,16 @@ reports nothing on the simulator. So the simulator can't resolve these fixes in 
 code-level findings below. Read plainly, though, the matched pair leans the other way — the branch is higher in 6 of
 7 transitions — and the branch adds some steady main-thread work of its own (the hidden pre-built full player
 re-renders on song changes, play / pause and queue edits). So nothing here counts as a measured gain: Instruments'
-Hitches template on Hoa's phone is a hard gate before merging (see "Merge gate" below).
+Hitches template on Hoa's phone is a hard gate before merging (see "Merge gate" below). The two runs of the review
+round (37106537754 and 37113795352, on a busier CI) measured above both columns everywhere — tab switches 3.60 /
+3.04, the settings subpage 2.10 / 1.45, the song options sheet 6.51 / 4.55 — which is the noise again.
 
 CI screenshot flakes that show up in any comparison with main and are not changes (main's own runs show them too):
 swipe-scrolled shots land at slightly different offsets (`home7b-shelves`, `stats-scrolled`, `aiPlaylistLab-scrolled`,
 `spotifyDashboard.tested`); the lyrics cascade frames and animated backgrounds move; the full player's cover is
 sometimes caught at its paused scale (0.95) in shots taken right after launch (`playerExpanded`, `artistPicker`,
-`sleepTimer`, `devices` — a missed first play-state change, measured below); the playlist's More options menu
+`sleepTimer`, `devices`, `nowPlaying` — a missed first play-state change, measured below; main's run 37108962548
+caught it in `nowPlaying-dark` and `sleepTimer-light`); the playlist's More options menu
 (`MenuRecordingTests`, `menuPlaylistMore`) is caught at slightly different points of its settle — main's two runs of
 `9e5ac90` differ from each other the same way, and a rerun of this branch's `73bc9d8` (run 37074696142) matched
 main's latest run pixel for pixel in all three menu shots. About and the Equalizer are not a timing flake of that
@@ -112,9 +115,10 @@ by frame:
   the kept player's placement where it began (`collapseFadeFrom`) and fades it from 1 to 0 on the collapse's own
   animation (the Reduce Motion ease too), and hides it as before once that animation is done
   (`withAnimation(_:completionCriteria:_:completion:)`, `.removed`). While it fades it takes no touches and is hidden
-  from VoiceOver, as a removed view was. The fixed build's recording (run 37111666646) shows the full player in the
-  card where the unfixed one showed it empty; the recorder catches too few frames of the 0.4 s spring to compare
-  the fade's curve, which stays on-device check 4.
+  from VoiceOver, as a removed view was. The fixed build's recordings (runs 37111666646 and 37113795352) show the
+  full player in the card where the unfixed one showed it empty, and the second caught a frame a quarter of the way
+  down with the player part-faded in the shrinking card, as main's recording shows it. The recorder catches too few
+  frames of the 0.4 s spring to compare the fade's curve, which stays on-device check 4.
 
 ### Settings pages opened scrolled (2026-10-03)
 
