@@ -86,7 +86,7 @@ struct SpotifyConnectSection: View {
                 .contentShape(.capsule)
         }
         .buttonStyle(.plain)
-        .disabled(!device.isControllable || isPlayingHere || connect.connectingDeviceId != nil)
+        .disabled(!device.isControllable || connect.connectingDeviceId != nil)
         .accessibilityHint(device.isControllable ? "Plays your queue on this device" : "")
         .accessibilityIdentifier("spotifyConnect.device.\(device.deviceId ?? device.name)")
     }

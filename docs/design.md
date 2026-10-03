@@ -688,7 +688,7 @@ docs/api-notes.md › Spotify Connect output.
   Alexa app." Hidden while Spotify isn't linked; a pre-Connect login shows only "Reconnect Spotify to use Connect".
   While a device plays, "Stop playing on <device>" heads the list and the CONTROLS hero shows the device (icon, name,
   "Spotify Connect • Playing") with its volume slider when `supports_volume` (else a note) instead of the phone's.
-- **Chip:** the full player's output pill reads "Playing on <device>" with the device's symbol (long press: Stop
+- **Chip:** the full player's output pill shows the device's symbol and name, like AirPlay's route name (VoiceOver: "Playing on <device>"; long press: Stop
   playing on <device>); the mini player's artist line becomes "Playing on <device>" with a small speaker icon.
 - **Toasts:** Connect has its own `LibraryToast` instance, shown by `RootView` above the bars and inside the devices
   sheet (skipped songs once per resolution pass, takeovers, errors).

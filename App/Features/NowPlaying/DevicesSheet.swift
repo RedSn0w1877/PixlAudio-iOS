@@ -28,8 +28,18 @@ struct DevicesSheet: View {
     @State private var controlsHeight: CGFloat?
     @State private var devicesHeight: CGFloat?
     @State private var sheetHeight: CGFloat?
+    /// The title block and the tab capsule, which always stay on screen.
+    @State private var headerHeight: CGFloat?
+    @State private var tabBarHeight: CGFloat?
 
     private var route: AudioRouteMonitor { AudioRouteMonitor.shared }
+
+    /// A page never grows past the tallest sheet the screen allows (about the large detent): a long device list
+    /// (Spotify Connect) scrolls inside it and the CONTROLS / DEVICES capsule stays on screen.
+    private var maxPageHeight: CGFloat {
+        let screen = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.screen.bounds.height ?? 800
+        return max(screen - 120 - (headerHeight ?? 90) - (tabBarHeight ?? 74), 200)
+    }
 
     var body: some View {
         // Heights measured on an earlier open (same Dynamic Type size and "Scanning nearby" badge): the sheet starts
@@ -50,6 +60,7 @@ struct DevicesSheet: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 28)
+            .measuringHeight($headerHeight)
             Spacer().frame(height: 8)
             ZStack(alignment: .top) {
                 if page == 0 {
@@ -66,8 +77,9 @@ struct DevicesSheet: View {
                 }
             }
             .animation(.spring(response: 0.38, dampingFraction: 0.86), value: page)
-            .frame(height: pageHeight ?? 320, alignment: .top)
+            .frame(height: min(pageHeight ?? 320, maxPageHeight), alignment: .top)
             tabBar
+                .measuringHeight($tabBarHeight)
         }
         .measuringHeight($sheetHeight, rememberedAs: "devices.sheet|\(page)|\(keySuffix)")
         .frame(maxHeight: .infinity, alignment: .top)
@@ -243,7 +255,7 @@ struct DevicesSheet: View {
                 Spacer()
                 pickerCircle
             }
-            deviceRow(name: outputTitle, status: env.spotifyConnect.active == nil ? "Connected" : "This phone",
+            deviceRow(name: outputTitle, status: env.spotifyConnect.active == nil ? "Connected" : "Available",
                       systemImage: route.systemImage, selected: env.spotifyConnect.active == nil)
             if route.hasOtherRoutes {
                 deviceRow(name: String(localized: "AirPlay & Bluetooth"), status: "Available",

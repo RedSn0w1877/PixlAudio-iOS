@@ -219,8 +219,9 @@ private struct PlayerTopBar: View {
     /// or "Playing on <device>" while Spotify Connect plays (long press: stop playing there).
     private var outputPill: some View {
         let connect = env.spotifyConnect.active
-        let label: String? = connect.map { String(localized: "Playing on \($0.name)") }
-            ?? (route.isRemote && !route.name.isEmpty ? route.name : nil)
+        // The device's name, as AirPlay's route name (the pill shares the top bar with "Now Playing"); VoiceOver
+        // says "Playing on <device>".
+        let label: String? = connect?.name ?? (route.isRemote && !route.name.isEmpty ? route.name : nil)
         let showsLabel = label != nil
         let trailing: CGFloat = showsLabel ? 21 : 6
         return Button { router.present(AppSheet.devices) } label: {
@@ -237,7 +238,7 @@ private struct PlayerTopBar: View {
             .foregroundStyle(theme.primary)
             .padding(.leading, 14)
             .padding(.trailing, showsLabel ? 16 : 14)
-            .frame(minWidth: 50, maxWidth: showsLabel ? (connect == nil ? 190 : 230) : 58, minHeight: 42, maxHeight: 42,
+            .frame(minWidth: 50, maxWidth: showsLabel ? 190 : 58, minHeight: 42, maxHeight: 42,
                    alignment: .leading)
             .contentShape(.rect)
         }
