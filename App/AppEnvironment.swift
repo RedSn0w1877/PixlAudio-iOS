@@ -181,7 +181,12 @@ final class AppEnvironment {
             Task { await playCounts.reload(editor: editor, revision: home.history.revision) }
         }
         playbackServices?.onEngagementRecorded = reloadPlayCounts
-        backup.onRestored = reloadPlayCounts
+        backup.onRestored = { [weak self] in
+            reloadPlayCounts()
+            // A restore may write AI keys and base URLs (it dropped the cached answer): re-check off the main actor.
+            guard let self else { return }
+            Task { await AIProviderStatus.refresh(self) }
+        }
         backup.start()
         // The output-route monitor queries the audio session when first touched: do it now, while nothing animates,
         // not in the full player's first frame.

@@ -8,7 +8,9 @@ import PixlNet
 ///
 /// The answer is only reused for the provider and base URL it was computed for (both cheap `UserDefaults` reads), so
 /// a change that skipped `refresh` — or a check still in flight — falls back to the old synchronous check, which is
-/// always right. `invalidate()` drops it when the Keychain changed behind its back (a restore writes the keys).
+/// always right. `invalidate()` drops it when the Keychain changed behind its back (a restore writes the keys), and
+/// every `refresh` drops it while its own check runs, so a key just saved or deleted is never answered from the old
+/// entry. A check that finishes after a newer `refresh` or `invalidate()` is discarded (`generation`).
 enum AIProviderStatus {
     private struct Entry {
         let provider: String
@@ -17,6 +19,8 @@ enum AIProviderStatus {
     }
 
     private static var cached: Entry?
+    /// Bumped by every `refresh` and `invalidate()`; a check stores its answer only if it is still the latest.
+    private static var generation = 0
 
     static func isConfigured(_ env: AppEnvironment) -> Bool {
         let providerName = env.settings.ai.provider
@@ -29,10 +33,14 @@ enum AIProviderStatus {
 
     /// Forgets the cached answer; the next question is answered synchronously until a `refresh` lands.
     static func invalidate() {
+        generation &+= 1
         cached = nil
     }
 
     static func refresh(_ env: AppEnvironment) async {
+        // Until this check lands, the synchronous check answers (the key or URL may just have changed).
+        invalidate()
+        let started = generation
         let providerName = env.settings.ai.provider
         let provider = AiProvider.fromString(providerName)
         let baseUrl = env.settings.ai.baseUrl(for: provider.rawValue)
@@ -41,8 +49,9 @@ enum AIProviderStatus {
             return
         }
         let configured = await check(provider, baseUrl: baseUrl)
-        // A newer change (provider or base URL) while the check ran: its own refresh, or the fallback, answers.
-        guard providerName == env.settings.ai.provider,
+        // A newer refresh or invalidation, or a provider or base URL change, while the check ran: its own refresh, or
+        // the fallback, answers.
+        guard started == generation, providerName == env.settings.ai.provider,
               baseUrl == env.settings.ai.baseUrl(for: provider.rawValue) else { return }
         cached = Entry(provider: providerName, baseUrl: baseUrl, isConfigured: configured)
     }
