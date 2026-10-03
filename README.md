@@ -5,18 +5,13 @@ A native iPhone music player — the iOS port of the PixlAudio Android app. Swif
 Plays your own music (folders, Files, the DRM-free part of your music library), streams matched
 tracks, and has the karaoke lyrics view from the Android app.
 
-Status: under construction (stage 0 — bootstrap). See [`docs/parity.md`](docs/parity.md).
+Version 1.0. Feature parity with Android is tracked in [`docs/parity.md`](docs/parity.md).
 
-## Install (Windows, free Apple ID, Sideloadly)
+## Install
 
-1. Download the latest `PixlAudio-unsigned.ipa` from **Releases** (or the `PixlAudio-unsigned-ipa`
-   artifact of the latest green `ci` run on `main`).
-2. Install **iTunes** and **iCloud** from Apple's website (not the Microsoft Store versions), then
-   [Sideloadly](https://sideloadly.io/).
-3. Connect the iPhone by USB, drag the `.ipa` into Sideloadly, enter your Apple ID, press **Start**.
-4. On the iPhone: Settings › Privacy & Security › **Developer Mode** on (reboot), then
-   Settings › General › VPN & Device Management › trust your Apple ID.
-5. Free-account apps expire after 7 days — re-sign with Sideloadly (or enable its auto-refresh).
+Download `PixlAudio-unsigned.ipa` from **Releases** and follow [`docs/INSTALL.md`](docs/INSTALL.md): an IPA
+installer app on the iPhone or Sideloadly on Windows (free Apple ID), first-run setup, Spotify and what differs from
+Android.
 
 Requires iOS 26.1 or later (tuned for iOS 27).
 
