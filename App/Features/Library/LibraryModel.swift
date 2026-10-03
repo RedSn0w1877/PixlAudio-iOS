@@ -241,6 +241,13 @@ final class LibraryModel {
         return nil
     }
 
+    /// What Select all adds in an open folder: the folder's own songs in the tree's order (Android
+    /// `currentFolder?.songs`), whatever the folder sort — not `folderContents`, the order the page shows them in.
+    /// Selection order is play / queue order and the rows' badge numbers.
+    nonisolated static func selectAllSongIds(inFolder path: String, of folders: [MusicFolder]) -> [String]? {
+        folder(at: path, in: folders)?.songs.map(\.id)
+    }
+
     /// Android `sortSongsForFolderView`: title (lower case), artist, id; Z-A only for "Name (Z-A)". Each song's
     /// lower-cased title and artist are computed once (not twice per comparison); the order is the same.
     nonisolated static func folderSongs(_ songs: [Song], sort: SortOption) -> [Song] {

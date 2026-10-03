@@ -323,8 +323,10 @@ struct LibraryView: View {
             albumSelection.selectAll(Array(candidates.prefix(remaining)))
         case .liked: songSelection.selectAll(model.lists.liked.map(\.id))
         case .folders:
-            if let folderPath, let contents = model.lists.folderContents[folderPath] {
-                songSelection.selectAll(contents.songs.map(\.id))
+            // The tree folder's own songs in the tree's order, as Android (`currentFolder?.songs`) — not
+            // `folderContents`, which is sorted for display. One tree walk, on a tap.
+            if let folderPath, let ids = LibraryModel.selectAllSongIds(inFolder: folderPath, of: model.lists.folders) {
+                songSelection.selectAll(ids)
             }
         case .songs: songSelection.selectAll(model.lists.songs.map(\.id))
         case .artists: break

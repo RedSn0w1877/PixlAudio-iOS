@@ -141,6 +141,21 @@ final class LibraryScreensTests: XCTestCase {
         XCTAssertNil(FolderPlaylist.path(from: "demo-playlist-1"))
     }
 
+    /// Select all in an open folder adds the folder's songs in the tree's order (Android `currentFolder?.songs`), not
+    /// in the order the page shows them: with Name (Z-A) the page lists the folder backwards, the selection does not.
+    func testFolderSelectAllKeepsTheTreeOrder() throws {
+        let tree = LibraryModel.folderTree(DemoLibrary.songs)
+        let folder = try XCTUnwrap(LibraryModel.flatten(tree).first { Set($0.songs.map(\.title)).count > 1 },
+                                   "a demo folder with two differently named songs")
+        let treeOrder = folder.songs.map(\.id)
+        let shown = LibraryModel.folderContents(tree, sort: .folderNameZA)[folder.path]?.songs.map(\.id)
+        XCTAssertNotNil(shown)
+        XCTAssertNotEqual(shown, treeOrder, "Name (Z-A) shows the folder's songs in another order")
+        let sorted = LibrarySorting.sortFolders(tree, by: .folderNameZA)
+        XCTAssertEqual(LibraryModel.selectAllSongIds(inFolder: folder.path, of: sorted), treeOrder)
+        XCTAssertNil(LibraryModel.selectAllSongIds(inFolder: "/Demo/No such folder", of: sorted))
+    }
+
     func testArtistAlbumSectionsNewestFirst() {
         let songs = DemoLibrary.songs.filter { $0.artist == "Luma Vale" }
         let sections = ArtistDetailGrouping.albumSections(songs)
