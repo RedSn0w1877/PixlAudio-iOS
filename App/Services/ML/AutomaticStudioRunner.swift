@@ -59,7 +59,6 @@ final class AutomaticStudioRunner {
         self.isEnabled = isEnabled
         let saved = UserDefaults.standard.dictionary(forKey: Self.ledgerKey) as? [String: Double] ?? [:]
         cooldowns = AutomaticStudioCooldowns(saved.mapValues { Int64($0) })
-        if !isEnabled { status = "Off" }
     }
 
     /// Launch: follow the app's foreground state; the loop only runs while a switch is on and the app is open.
@@ -97,9 +96,16 @@ final class AutomaticStudioRunner {
 
     private var isSwitchedOn: Bool { settings.lyrics.automaticLyrics || settings.playback.automaticInstrumentals }
 
-    /// No timer while it has nothing to do: the loop lives only while the app is open and a switch is on.
+    /// Whether a switched-on kind could ever run now: its model is on the phone (automatic work never downloads).
+    private var canEverRun: Bool {
+        (settings.lyrics.automaticLyrics && isModelInstalled(for: .lyrics))
+            || (settings.playback.automaticInstrumentals && isModelInstalled(for: .instrumental))
+    }
+
+    /// No timer while it has nothing to do: the loop lives only while the app is open, a switch is on and its model
+    /// is installed (otherwise each activation, switch change or "Check queue now" scans once).
     private func updateLoop() {
-        if isAppActive, isSwitchedOn {
+        if isAppActive, isSwitchedOn, canEverRun {
             guard loop == nil else { return }
             loop = Task { [weak self] in
                 while !Task.isCancelled {
@@ -123,9 +129,9 @@ final class AutomaticStudioRunner {
         let now = Self.nowMs()
         accountForFinishedJobs(now: now)
         let lyricsOn = settings.lyrics.automaticLyrics, stemsOn = settings.playback.automaticInstrumentals
+        updateLoop()
         guard lyricsOn || stemsOn else {
             status = "Off"
-            updateLoop()
             return
         }
         guard isAppActive else {

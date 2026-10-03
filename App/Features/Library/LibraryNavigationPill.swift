@@ -27,33 +27,50 @@ struct LibraryNavigationPill: View {
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        Menu {
-            Picker("Library tab", selection: Binding(get: { tab }, set: onSelect)) {
-                ForEach(tabs, id: \.self) { item in
-                    Label(item.tabTitle, systemImage: item.systemImage).tag(item)
-                }
-            }
-            Divider()
-            Button("Reorder tabs", systemImage: "pencil", action: onReorder)
-        } label: {
-            HStack(spacing: 4) {
-                titleHalf
-                arrowHalf
-            }
-            .frame(height: Self.height)
+        // Two menus, one per half, each with its own glass on the menu itself (as `ShapedGlassMenu`): glass drawn
+        // inside one menu label renders as a single shape.
+        HStack(spacing: 4) {
+            Menu { menuContent } label: { titleLabel }
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .pixlGlass(in: titleShape, tint: theme.primaryContainer.opacity(GlassTint.prominent), interactive: true)
+                .accessibilityLabel(tab.tabTitle)
+                .accessibilityHint("Shows the Library tabs")
+                .accessibilityIdentifier("library.navigationPill")
+            Menu { menuContent } label: { arrowLabel }
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .pixlGlass(in: arrowShape, tint: theme.primaryContainer.opacity(GlassTint.prominent), interactive: true)
+                .accessibilityLabel("Library tabs")
         }
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .accessibilityLabel(tab.tabTitle)
-        .accessibilityHint("Shows the Library tabs")
-        .accessibilityIdentifier("library.navigationPill")
+        .frame(height: Self.height)
     }
 
-    private var titleHalf: some View {
-        let shape = UnevenRoundedRectangle(topLeadingRadius: Self.outerRadius, bottomLeadingRadius: Self.outerRadius,
-                                           bottomTrailingRadius: Self.innerRadius, topTrailingRadius: Self.innerRadius,
-                                           style: .continuous)
-        return HStack(spacing: 10) {
+    @ViewBuilder
+    private var menuContent: some View {
+        Picker("Library tab", selection: Binding(get: { tab }, set: onSelect)) {
+            ForEach(tabs, id: \.self) { item in
+                Label(item.tabTitle, systemImage: item.systemImage).tag(item)
+            }
+        }
+        Divider()
+        Button("Reorder tabs", systemImage: "pencil", action: onReorder)
+    }
+
+    private var titleShape: UnevenRoundedRectangle {
+        UnevenRoundedRectangle(topLeadingRadius: Self.outerRadius, bottomLeadingRadius: Self.outerRadius,
+                               bottomTrailingRadius: Self.innerRadius, topTrailingRadius: Self.innerRadius,
+                               style: .continuous)
+    }
+
+    private var arrowShape: UnevenRoundedRectangle {
+        UnevenRoundedRectangle(topLeadingRadius: Self.innerRadius, bottomLeadingRadius: Self.innerRadius,
+                               bottomTrailingRadius: Self.outerRadius, topTrailingRadius: Self.outerRadius,
+                               style: .continuous)
+    }
+
+    private var titleLabel: some View {
+        HStack(spacing: 10) {
             Image(systemName: tab.systemImage)
                 .font(.system(size: 20, weight: .medium))
                 .frame(width: 22, height: 22)
@@ -64,23 +81,18 @@ struct LibraryNavigationPill: View {
         }
         .foregroundStyle(theme.onPrimaryContainer)
         .padding(.horizontal, 14)
-        .frame(maxHeight: .infinity)
-        .contentShape(shape)
-        .pixlGlass(in: shape, tint: theme.primaryContainer.opacity(GlassTint.prominent), interactive: true)
+        .frame(height: Self.height)
+        .contentShape(titleShape)
     }
 
-    private var arrowHalf: some View {
-        let shape = UnevenRoundedRectangle(topLeadingRadius: Self.innerRadius, bottomLeadingRadius: Self.innerRadius,
-                                           bottomTrailingRadius: Self.outerRadius, topTrailingRadius: Self.outerRadius,
-                                           style: .continuous)
-        return Image(systemName: "chevron.down")
+    private var arrowLabel: some View {
+        Image(systemName: "chevron.down")
             .font(.system(size: 18, weight: .semibold))
             .foregroundStyle(theme.onPrimaryContainer)
             .frame(width: 36)
             .padding(.horizontal, 10)
-            .frame(maxHeight: .infinity)
-            .contentShape(shape)
-            .pixlGlass(in: shape, tint: theme.primaryContainer.opacity(GlassTint.prominent), interactive: true)
+            .frame(height: Self.height)
+            .contentShape(arrowShape)
     }
 }
 

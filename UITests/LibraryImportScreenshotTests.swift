@@ -23,6 +23,21 @@ extension ScreenshotTests {
             start.press(forDuration: 0.05, thenDragTo: end)
             swipes += 1
         }
+        // Since pushed pages reserve the mini player's room (`BottomBarsClearance`), the list scrolls further, and a
+        // drag's fling can carry the row up under the navigation bar: bring it back down in small steps.
+        var nudges = 0
+        while link.exists && !link.isHittable && nudges < 4 {
+            let start = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
+            let end = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
+            start.press(forDuration: 0.05, thenDragTo: end)
+            nudges += 1
+        }
+        if !link.isHittable {
+            let failure = XCTAttachment(screenshot: app.screenshot())
+            failure.name = "libraryImport-unreachable-light"
+            failure.lifetime = .keepAlways
+            add(failure)
+        }
         XCTAssertTrue(link.isHittable, "diagnostics.libraryImport is not reachable")
         link.tap()
         XCTAssertTrue(app.descendants(matching: .any)["screen.libraryImportDebug"].firstMatch.waitForExistence(timeout: 10))
