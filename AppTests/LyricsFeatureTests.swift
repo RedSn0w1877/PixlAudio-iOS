@@ -99,6 +99,26 @@ final class LyricsFeatureTests: XCTestCase {
         XCTAssertNil(stored)
     }
 
+    /// `AutomaticStudioRunner` probes up to 40 songs per check: those loads must not fill (and evict) the memory
+    /// cache that holds what the person opened.
+    func testProbeLoadsLeaveTheMemoryCacheAlone() async throws {
+        let container = try PersistenceActor.makeContainer(inMemory: true)
+        let persistence = PersistenceActor(modelContainer: container)
+        let cache = FileManager.default.temporaryDirectory.appendingPathComponent("lyrics-tests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: cache) }
+        let service = LyricsService(persistence: persistence, cacheDirectory: cache)
+        var song = try XCTUnwrap(DemoLibrary.songs.first)
+        song.lyrics = "[00:01.00]First\n[00:03.00]Words"
+        let probed = await service.lyrics(for: song, preference: .embeddedFirst, allowOnline: false, remember: false)
+        XCTAssertEqual(probed?.lyrics.synced?.map(\.line), ["First", "Words"])
+        song.lyrics = "[00:01.00]Second\n[00:03.00]Words"
+        let loaded = await service.lyrics(for: song, preference: .embeddedFirst, allowOnline: false)
+        XCTAssertEqual(loaded?.lyrics.synced?.map(\.line), ["Second", "Words"], "the probe cached its result")
+        song.lyrics = "[00:01.00]Third\n[00:03.00]Words"
+        let remembered = await service.lyrics(for: song, preference: .embeddedFirst, allowOnline: false)
+        XCTAssertEqual(remembered?.lyrics.synced?.map(\.line), ["Second", "Words"], "a normal load is remembered")
+    }
+
     func testJapaneseRomanizationUsesTheTokenizer() {
         let romaji = AppleCJKRomanization().romanizeJapanese("こんにちは")
         XCTAssertNotNil(romaji)

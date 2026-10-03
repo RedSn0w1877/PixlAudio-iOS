@@ -173,11 +173,16 @@ struct LibraryView: View {
     /// Settings › Behavior › Back gesture controls folders (Android `folderBackGestureNavigation`: the system back
     /// gesture goes up one folder in the Folders tab): a swipe in from the leading edge, while a folder is open. With
     /// the setting off the edge belongs to the pager, as before.
+    ///
+    /// The strip has to own its touches: the pages sit in a horizontal paging scroll view, so a gesture the pager
+    /// also sees would page to the previous tab instead (or be cancelled by it). It is therefore only as wide as the
+    /// folder list's leading inset (`LibraryFoldersPage` pads its rows by 12 pt): it never covers a row, so every tap
+    /// on a folder or song reaches it.
     @ViewBuilder
     private var folderBackEdge: some View {
         if settings.behavior.folderBackGestureNavigation, tab == .folders, folderPath != nil {
             Color.clear
-                .frame(width: 20)
+                .frame(width: 12)
                 .frame(maxHeight: .infinity)
                 .contentShape(.rect)
                 .gesture(

@@ -648,3 +648,8 @@ behind `SpotifyLibraryStore` (Android `SpotifyDao`), so they run on Windows:
   `testForgedSixtyFourBitBoxSizeStopsTheMP4Walk` (the launch rescan's `TagRegionReader` stops at a forged 64-bit box
   size instead of trapping), `testOpenedFilesAreSortedByKind` (files opened from Files: backup, playlist, lyrics,
   audio, unsupported).
+- `LyricsFeatureTests.testProbeLoadsLeaveTheMemoryCacheAlone` (app, Swift-only): the automatic runner's offline
+  probe (`remember: false`) adds nothing to the lyrics memory cache; a normal load is still remembered.
+- `TaisStudioTests.testUnattendedJobsAreTrackedAndCancelCleanly` (app, Swift-only; Android's WorkManager tags have
+  no unit test): unattended jobs are tracked while running or queued, cancel cleanly from either state, and a second
+  request keeps the existing job.

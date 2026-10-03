@@ -209,7 +209,9 @@ private struct BetaInfoSheetContent: View {
                 Text(HomeProjectLinks.isPreRelease ? "Welcome to PixlAudio \(version)-beta" : "Welcome to PixlAudio \(version)")
                     .pixlFont(.titleMedium)
                     .foregroundStyle(theme.onSurface)
-                Text("You're using a beta build that may contain bugs, crashes, or experimental features. Help us improve by reporting issues.")
+                Text(HomeProjectLinks.isPreRelease
+                     ? "You're using a beta build that may contain bugs, crashes, or experimental features. Help us improve by reporting issues."
+                     : "Thanks for using PixlAudio. If something breaks or doesn't work as expected, help us improve by reporting it.")
                     .pixlFont(.bodyMedium)
                     .foregroundStyle(theme.onSurfaceVariant)
                     .fixedSize(horizontal: false, vertical: true)

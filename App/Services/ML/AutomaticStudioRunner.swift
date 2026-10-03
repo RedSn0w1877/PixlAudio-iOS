@@ -11,10 +11,14 @@ import UIKit
 ///
 /// iOS gives an app no background processing time it could rely on (and a free Apple ID has no extensions), so this
 /// runs while PixlAudio is open, with Android's limits (`AutomaticStudioPolicy`): never during playback (a job is
-/// cancelled when playback starts), 15 s after the app opens or the song changes, at most 8 jobs per 6 hours, only
-/// on charge or at 40 % battery and up, never while the phone is hot or short of storage, songs up to 6 minutes, and a
-/// persistent per-song retry ledger. Unlike a manual job it never downloads a model: automatic work starts once the
-/// model is on the phone (the first manual sync or instrumental downloads it).
+/// cancelled the moment playback starts), 15 s after the app opens or the song changes, at most 8 jobs per 6 hours,
+/// only on charge or at 40 % battery and up, never while the phone is hot or short of storage, songs up to 6 minutes,
+/// and a persistent per-song retry ledger. Unlike a manual job it never downloads a model: automatic work starts once
+/// the model is on the phone (the first manual sync or instrumental downloads it).
+///
+/// Its jobs are `unattended`: they never start the system's continued-processing task (that UI is for work the person
+/// started, and the card promises no automatic notifications), and the job is cancelled — and retried a little later —
+/// as soon as the app leaves the foreground, so it never runs behind the lock screen during playback.
 @MainActor
 @Observable
 final class AutomaticStudioRunner {
@@ -75,13 +79,38 @@ final class AutomaticStudioRunner {
             MainActor.assumeIsolated { self?.setAppActive(false) }
         })
         setAppActive(UIApplication.shared.applicationState == .active)
+        observePlayback()
+    }
+
+    /// Playback comes first, at once rather than on the next 30 s check (Android: `onIsPlayingChanged` →
+    /// `onSongChanged` → `scanNow`, whose scan cancels automatic work while playback is active).
+    private func observePlayback() {
+        let isPlaying = withObservationTracking {
+            playback.isPlaying
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.observePlayback() }
+        }
+        if isPlaying, deferActiveJob() { status = "Waiting until playback is idle" }
     }
 
     /// A switch changed, or "Check queue now": re-evaluate at once (never bypasses the limits).
     func scanNow() {
         guard isEnabled else { return }
+        cancelSwitchedOffJobs()
         updateLoop()
         Task { await scan() }
+    }
+
+    /// A switch turned off cancels that kind's automatic work (Android `cancelAllWorkByTag`).
+    private func cancelSwitchedOffJobs() {
+        let lyricsOn = settings.lyrics.automaticLyrics, stemsOn = settings.playback.automaticInstrumentals
+        for (kind, songId) in observed where (kind == .lyrics ? !lyricsOn : !stemsOn) {
+            let jobKind: TaisStudio.JobKind = kind == .lyrics ? .lyrics : .instrumental
+            guard studio.state(jobKind, songId: songId)?.isActive == true,
+                  studio.isUnattended(jobKind, songId: songId) else { continue }
+            studio.cancel(jobKind, songId: songId)
+            observed[kind] = nil
+        }
     }
 
     private func setAppActive(_ active: Bool) {
@@ -89,6 +118,9 @@ final class AutomaticStudioRunner {
         if active {
             UIDevice.current.isBatteryMonitoringEnabled = true
             readyAfterMs = Self.nowMs() + AutomaticStudioPolicy.settleMs
+        } else {
+            // Unattended work stays in the foreground: the job stops now and is retried a little later.
+            deferActiveJob()
         }
         updateLoop()
         Task { await scan() }
@@ -129,6 +161,7 @@ final class AutomaticStudioRunner {
         let now = Self.nowMs()
         accountForFinishedJobs(now: now)
         let lyricsOn = settings.lyrics.automaticLyrics, stemsOn = settings.playback.automaticInstrumentals
+        cancelSwitchedOffJobs()
         updateLoop()
         guard lyricsOn || stemsOn else {
             status = "Off"
@@ -139,15 +172,12 @@ final class AutomaticStudioRunner {
             return
         }
         if let job = activeObservedJob() {
-            let kind = job.kind, songId = job.songId
             if playback.isPlaying {
                 // Playback comes first: the unattended job stops and is retried a little later.
-                studio.cancel(kind == .lyrics ? .lyrics : .instrumental, songId: songId)
-                record(AutomaticStudioPolicy.ledgerKey(kind, songId: songId), now + AutomaticStudioPolicy.deferredCooldownMs)
-                observed[kind] = nil
+                deferActiveJob()
                 status = "Waiting until playback is idle"
             } else {
-                let state = studio.state(kind == .lyrics ? .lyrics : .instrumental, songId: songId)
+                let state = studio.state(job.kind == .lyrics ? .lyrics : .instrumental, songId: job.songId)
                 status = state?.detail ?? "Preparing the next song quietly"
             }
             return
@@ -216,7 +246,8 @@ final class AutomaticStudioRunner {
                                                         cooldownUntil: cooldowns.until(key), now: now) else { continue }
                 // Conditions may have changed while lyrics were read.
                 guard isAppActive, !playback.isPlaying, isSwitchedOn else { return }
-                studio.start(kind == .lyrics ? .lyrics : .instrumental, song: song, forceResync: false)
+                studio.start(kind == .lyrics ? .lyrics : .instrumental, song: song, forceResync: false,
+                             unattended: true)
                 observed[kind] = song.id
                 defaults.set(jobsInWindow + 1, forKey: Self.windowCountKey)
                 record(key, now + AutomaticStudioPolicy.scheduledCooldownMs) // no retry loop after a crash
@@ -248,12 +279,28 @@ final class AutomaticStudioRunner {
         }
     }
 
+    /// The running or queued job this runner started — unless the person has since asked for that song themselves
+    /// (`TaisStudio.start` then makes it theirs, and it is no longer the runner's to cancel).
     private func activeObservedJob() -> (kind: AutomaticStudioKind, songId: String)? {
-        for (kind, songId) in observed
-        where studio.state(kind == .lyrics ? .lyrics : .instrumental, songId: songId)?.isActive == true {
-            return (kind: kind, songId: songId)
+        for (kind, songId) in observed {
+            let jobKind: TaisStudio.JobKind = kind == .lyrics ? .lyrics : .instrumental
+            if studio.state(jobKind, songId: songId)?.isActive == true, studio.isUnattended(jobKind, songId: songId) {
+                return (kind: kind, songId: songId)
+            }
         }
         return nil
+    }
+
+    /// Stops the runner's active job and retries it after `deferredCooldownMs` (playback started, or the app left
+    /// the foreground). Returns whether there was one.
+    @discardableResult
+    private func deferActiveJob() -> Bool {
+        guard let job = activeObservedJob() else { return false }
+        studio.cancel(job.kind == .lyrics ? .lyrics : .instrumental, songId: job.songId)
+        record(AutomaticStudioPolicy.ledgerKey(job.kind, songId: job.songId),
+               Self.nowMs() + AutomaticStudioPolicy.deferredCooldownMs)
+        observed[job.kind] = nil
+        return true
     }
 
     private func record(_ key: String, _ deadline: Int64) {
@@ -287,8 +334,9 @@ final class AutomaticStudioRunner {
         case .lyrics:
             guard let lyricsService else { return true }
             let preference = LyricsSourcePreference(rawValue: settings.lyrics.sourcePreference) ?? .embeddedFirst
+            // A probe: it never fills the lyrics memory cache (which holds what the person opened).
             let loaded = await lyricsService.lyrics(for: song, preference: preference, allowOnline: false,
-                                                    forceRefresh: false)
+                                                    forceRefresh: false, remember: false)
             return TaisLyricsAlignment.alignmentState(for: loaded?.lyrics) == .wordSynced
         }
     }
