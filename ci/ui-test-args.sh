@@ -5,11 +5,12 @@
 #   Entries are UI test classes (or Class/testMethod) of PixlAudioUITests.
 #   - On branches a filter runs just those classes; no filter runs every class.
 #   - main always runs every class (the filter is ignored there, except as below).
-#   - Opt-in classes (TransitionPerformanceTests: slow performance measurements, not screenshots) are skipped
-#     whenever every class runs, unless the filter names them explicitly.
+#   - Opt-in classes (TransitionPerformanceTests: slow performance measurements, not screenshots; the recording
+#     classes, made to be filmed with [record:Class]) are skipped whenever every class runs, unless the filter
+#     names them explicitly.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-opt_in_classes=(TransitionPerformanceTests MenuRecordingTests)
+opt_in_classes=(TransitionPerformanceTests MenuRecordingTests TransitionRecordingTests)
 
 filter="${SHOTS_ONLY_INPUT:-}"
 if [ -z "$filter" ]; then
