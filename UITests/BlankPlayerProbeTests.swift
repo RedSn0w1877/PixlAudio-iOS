@@ -9,22 +9,10 @@ import XCTest
 final class BlankPlayerProbeTests: XCTestCase {
     /// `-screen nowPlaying`: the player is built at launch, already expanded (the shot's path).
     func testLaunchExpanded() {
-        probe(runs: 40, name: "launch") { app in
+        probe(runs: 70, name: "launch") { app in
             app.launchArguments = ["-uiTest", "-screen", "nowPlaying", "-appearance", "dark"]
             app.launch()
             XCTAssertTrue(app.descendants(matching: .any)["screen.nowPlaying"].firstMatch.waitForExistence(timeout: 20))
-        }
-    }
-
-    /// The user's path: the mini player appears, the full player is pre-built a second later, then a tap expands it.
-    func testTapExpandAfterPrewarm() {
-        probe(runs: 30, name: "tap") { app in
-            app.launchArguments = ["-uiTest", "-screen", "miniPlayer", "-appearance", "dark"]
-            app.launch()
-            let mini = app.descendants(matching: .any)["miniPlayer"].firstMatch
-            XCTAssertTrue(mini.waitForExistence(timeout: 20))
-            Thread.sleep(forTimeInterval: 1.5)
-            mini.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.5)).tap()
         }
     }
 
@@ -39,6 +27,7 @@ final class BlankPlayerProbeTests: XCTestCase {
             if Self.isBlank(shot.image) {
                 blanks += 1
                 attach(shot, "probe-\(name)-\(index)-blank")
+                attachText(probeState(app), "probe-\(name)-\(index)-state.txt")
                 let tree = XCTAttachment(string: app.debugDescription)
                 tree.name = "probe-\(name)-\(index)-tree.txt"
                 tree.lifetime = .keepAlways
@@ -47,14 +36,30 @@ final class BlankPlayerProbeTests: XCTestCase {
                 let later = app.screenshot()
                 if !Self.isBlank(later.image) { recovered += 1 }
                 attach(later, "probe-\(name)-\(index)-after3s")
+                attachText(probeState(app), "probe-\(name)-\(index)-state-after3s.txt")
             }
-            if index == 0 { attach(shot, "probe-\(name)-first") }
+            if index == 0 {
+                attach(shot, "probe-\(name)-first")
+                attachText(probeState(app), "probe-\(name)-first-state.txt")
+            }
             app.terminate()
         }
         let summary = XCTAttachment(string: "\(name): \(blanks) blank of \(runs), \(recovered) recovered after 3 s")
         summary.name = "probe-\(name)-summary-\(blanks)-of-\(runs)-recovered-\(recovered).txt"
         summary.lifetime = .keepAlways
         add(summary)
+    }
+
+    private func probeState(_ app: XCUIApplication) -> String {
+        let label = app.descendants(matching: .any)["debug.sheet"].firstMatch
+        return label.waitForExistence(timeout: 2) ? label.label : "debug.sheet missing"
+    }
+
+    private func attachText(_ text: String, _ name: String) {
+        let attachment = XCTAttachment(string: text)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     private func attach(_ shot: XCUIScreenshot, _ name: String) {

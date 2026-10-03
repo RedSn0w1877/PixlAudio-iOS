@@ -58,17 +58,20 @@ final class PlayerSheetController {
 
     /// Builds the full player ahead of its first expand (hidden; see `FullPlayerLayer`).
     func prewarm() {
+        SheetProbe.log("prewarm built=\(hasBuiltFullPlayer)")
         if !hasBuiltFullPlayer { hasBuiltFullPlayer = true }
     }
 
     /// Nothing is loaded any more: the card goes, and so does the built full player (the next song pre-warms again).
     func resetFullPlayer() {
+        SheetProbe.log("resetFullPlayer")
         pendingExpandVelocity = nil
         if hasBuiltFullPlayer { hasBuiltFullPlayer = false }
     }
 
     /// Expands to the full player (Android `expandPlayerSheet`). `animated: false` for launch states.
     func expand(animated: Bool = true, initialVelocity: Double = 0) {
+        SheetProbe.log("expand animated=\(animated) built=\(hasBuiltFullPlayer) exp=\(expansion)")
         isExpanded = true
         guard animated else {
             if !hasBuiltFullPlayer { hasBuiltFullPlayer = true }
@@ -87,6 +90,7 @@ final class PlayerSheetController {
 
     /// The full player is on screen: starts an expand that waited for it.
     func fullPlayerDidAppear() {
+        SheetProbe.log("fullPlayerDidAppear pending=\(pendingExpandVelocity != nil)")
         guard let velocity = pendingExpandVelocity else { return }
         pendingExpandVelocity = nil
         guard isExpanded else { return }
@@ -117,6 +121,7 @@ final class PlayerSheetController {
 
     /// Collapses to the mini player (Android `collapsePlayerSheet`), with the bouncy squash.
     func collapse(animated: Bool = true, initialVelocity: Double = 0) {
+        SheetProbe.log("collapse animated=\(animated) exp=\(expansion)")
         let from = expansion
         pendingExpandVelocity = nil
         isExpanded = false
@@ -142,6 +147,7 @@ final class PlayerSheetController {
     @ObservationIgnored private var dragAccumulatedY: CGFloat = 0
 
     func beginDrag() {
+        SheetProbe.log("beginDrag")
         dragStartExpansion = expansion
         dragAccumulatedY = 0
         if !hasBuiltFullPlayer { hasBuiltFullPlayer = true }

@@ -51,6 +51,7 @@ struct PlayerSheetHost: View {
             }
         }
         .ignoresSafeArea(.keyboard)
+        .overlay(alignment: .topLeading) { SheetProbeLabel() }
         .animation(PixlMotion.bars, value: playback.hasItem)
         .onAppear { consumeCoverRequest() }
         .onChange(of: router.cover) { _, _ in consumeCoverRequest() }
@@ -177,6 +178,7 @@ struct PlayerSheetMorph: ViewModifier, Animatable {
 
     func body(content: Content) -> some View {
         let f = min(max(animatableData, 0), 1)
+        let _ = SheetProbe.markMorph(animatableData)
         let x = lerp(collapsed.minX, screen.minX, f)
         let y = lerp(collapsed.minY, screen.minY, f)
         let width = lerp(collapsed.width, screen.width, f)
@@ -252,7 +254,8 @@ private struct MiniLayerFade: ViewModifier {
     @Environment(AppEnvironment.self) private var env
 
     func body(content: Content) -> some View {
-        content.modifier(MiniLayerFadeEffect(progress: env.playerSheet.expansion))
+        SheetProbe.markMiniRead(env.playerSheet.expansion)
+        return content.modifier(MiniLayerFadeEffect(progress: env.playerSheet.expansion))
     }
 }
 
@@ -263,6 +266,7 @@ private struct MiniLayerFadeEffect: ViewModifier, Animatable {
 
     func body(content: Content) -> some View {
         let metrics = PlayerSheetMetrics(progress: min(max(animatableData, 0), 1))
+        let _ = SheetProbe.markMiniEffect(animatableData)
         let alpha = metrics.miniPlayerAlpha
         content
             .frame(height: Tokens.Shell.miniPlayerHeight)
@@ -289,6 +293,7 @@ private struct FullPlayerLayer: View {
     var body: some View {
         let sheet = env.playerSheet
         let isShown = sheet.isExpanded || sheet.isDragging || sheet.expansion > 0.001
+        let _ = SheetProbe.markFullLayer(isShown)
         if sheet.hasBuiltFullPlayer || isShown {
             NowPlayingView(safeArea: safeArea, width: screenSize.width)
                 .frame(width: screenSize.width, height: screenSize.height)
@@ -312,7 +317,9 @@ private struct FullLayerPlacement: ViewModifier {
     @Environment(AppEnvironment.self) private var env
 
     func body(content: Content) -> some View {
-        content.modifier(FullLayerPlacementEffect(progress: env.playerSheet.expansion, collapsedMinX: collapsedMinX))
+        SheetProbe.markFullRead(env.playerSheet.expansion)
+        return content.modifier(FullLayerPlacementEffect(progress: env.playerSheet.expansion,
+                                                         collapsedMinX: collapsedMinX))
     }
 }
 
@@ -328,6 +335,7 @@ private struct FullLayerPlacementEffect: ViewModifier, Animatable {
 
     func body(content: Content) -> some View {
         let f = min(max(animatableData, 0), 1)
+        let _ = SheetProbe.markFullEffect(animatableData)
         let metrics = PlayerSheetMetrics(progress: f, cardMinX: collapsedMinX + (0 - collapsedMinX) * f)
         let alpha = metrics.fullPlayerAlpha
         content
