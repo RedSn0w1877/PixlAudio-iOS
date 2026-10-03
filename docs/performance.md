@@ -22,6 +22,12 @@ Run it with `[shots:TransitionPerformanceTests]` in a commit message; CI copies 
 `perf-metrics.txt` in the `shots-<sha>` artifact and the job summary. Simulator numbers are indicative; for frame
 drops use Instruments on the phone (Hitches + Core Animation + SwiftUI templates).
 
+For motion, `UITests/TransitionRecordingTests` (opt-in) runs the player sheet's expand and collapse and held-down
+settings rows slowly; with `[shots:TransitionRecordingTests] [record:TransitionRecordingTests]` CI films it
+(`record-TransitionRecordingTests.mp4` in the shots artifact), so a branch's frames can be compared with main's
+(`ffmpeg -fps_mode passthrough` keeps the recorder's own frames; it captures roughly 10–30 a second, too few for a
+spring's curve but enough to see what is on screen).
+
 ### What the CI simulator showed (2026-10-02)
 
 Matched runs — same CI, same test code, only `TransitionPerformanceTests`: **baseline** = main's app without these
@@ -45,17 +51,20 @@ measured 30–75 % more than "after" in every test, settings and tab switches in
 player). The CPU time is dominated by XCUITest's own queries (each one snapshots the app's accessibility tree), the
 navigation-transition durations stay at 0.54–0.72 s either way (the push animation itself), and the hitch metric
 reports nothing on the simulator. So the simulator can't resolve these fixes in either direction: they stand on the
-code-level findings below, and the on-device check is Instruments' Hitches template on Hoa's phone.
+code-level findings below. Read plainly, though, the matched pair leans the other way — the branch is higher in 6 of
+7 transitions — and the branch adds some steady main-thread work of its own (the hidden pre-built full player
+re-renders on song changes, play / pause and queue edits). So nothing here counts as a measured gain: Instruments'
+Hitches template on Hoa's phone is a hard gate before merging (see "Merge gate" below).
 
 CI screenshot flakes that show up in any comparison with main and are not changes (main's own runs show them too):
 swipe-scrolled shots land at slightly different offsets (`home7b-shelves`, `stats-scrolled`, `aiPlaylistLab-scrolled`,
-`spotifyDashboard.tested`); About and the Equalizer are caught at different points of their appear fade; the
-lyrics cascade frames and animated backgrounds move; the full player's cover is sometimes caught at its paused
-scale (0.95) in shots taken right after launch (`playerExpanded`, `artistPicker`, `sleepTimer`, `devices` — a missed
-first play-state change, measured below); the Equalizer's content slides 40 pt up as it appears (0.4 s), so its
-shots land at different heights; the playlist's More options menu (`MenuRecordingTests`, `menuPlaylistMore`) is
-caught at slightly different points of its settle — main's two runs of `9e5ac90` differ from each other the same way, and a rerun of this branch's `73bc9d8`
-(run 37074696142) matched main's latest run pixel for pixel in all three menu shots.
+`spotifyDashboard.tested`); the lyrics cascade frames and animated backgrounds move; the full player's cover is
+sometimes caught at its paused scale (0.95) in shots taken right after launch (`playerExpanded`, `artistPicker`,
+`sleepTimer`, `devices` — a missed first play-state change, measured below); the playlist's More options menu
+(`MenuRecordingTests`, `menuPlaylistMore`) is caught at slightly different points of its settle — main's two runs of
+`9e5ac90` differ from each other the same way, and a rerun of this branch's `73bc9d8` (run 37074696142) matched
+main's latest run pixel for pixel in all three menu shots. About and the Equalizer are not a timing flake of that
+kind: see below.
 
 ### A stuck full player, found by a probe (2026-10-03)
 
@@ -83,6 +92,70 @@ and the next play / pause corrects it. It never happened when the player was pre
 on each), and the pre-built player, kept hidden while collapsed, missed none of 160 play / pause changes made from
 the mini player (run 37103669582) — so keeping the player between expands doesn't make it stick.
 
+### The collapse lost its fade; pressed rows didn't change (2026-10-03, CI recordings)
+
+The review asked for the checks that need eyes on motion. CI can film a UI test (`[record:Class]`), so a throwaway
+class (`PressFadeRecordingTests` on `perf-x-hdr` and `perf-x-hdr-main`, now `UITests/TransitionRecordingTests`) ran
+the same slow steps on main and on this branch (runs 37106597201 and 37106594140), and the videos were compared frame
+by frame:
+
+- **Pressed settings rows** (two interactive rows of one group; a choice row between an item row and a switch row,
+  held down for 2.5 s): where the recorder caught the highlight (the first and the third row) it is the same on
+  both — the row's own shape brightens, the 2 pt gap and the neighbours' corners stay intact, nothing blends in the
+  branch's `GlassEffectContainer(spacing: 0)`. Matching frames are identical or differ by a few thousand pixels of
+  the press animation's phase.
+- **Expand from a tap**: the same; the recorder catches only one or two frames of the 0.4 s spring, and those agree.
+- **Collapse from the button**: different. On main the full player was removed by the collapse's update, so SwiftUI
+  faded it out with the default opacity transition on the collapse's spring, frozen where the collapse began, while
+  the card shrank around it. The branch kept the player built and hid it on the collapse's first frame: the card
+  collapsed empty, a plain album-colour shape, until the mini player faded in. Fixed in `c9a81ee`: a collapse keeps
+  the kept player's placement where it began (`collapseFadeFrom`) and fades it from 1 to 0 on the collapse's own
+  animation (the Reduce Motion ease too), and hides it as before once that animation is done
+  (`withAnimation(_:completionCriteria:_:completion:)`, `.removed`). While it fades it takes no touches and is hidden
+  from VoiceOver, as a removed view was. The fixed build's recording (run 37111666646) shows the full player in the
+  card where the unfixed one showed it empty; the recorder catches too few frames of the 0.4 s spring to compare
+  the fade's curve, which stays on-device check 4.
+
+### Settings pages opened scrolled (2026-10-03)
+
+The review noticed that About and the Equalizer screenshots were not caught mid-fade, as this page said before:
+they were scrolled a few points, the content fully opaque and the collapsing header part-collapsed — on main in 3
+of 6 About samples (up to about 10 pt), on this branch in 8 of 8 (6–20 pt) and in 2 of 4 Equalizer-light samples
+(about 20 pt). The cause is `SettingsHeaderSnap`, the scroll target behaviour that snaps a release in the middle of
+the header's collapse. SwiftUI asks a scroll target behaviour for a target not only when a scroll gesture ends but
+also "when a scrollable view's size changes" (developer.apple.com), and the size changes while a page is at rest:
+the first layouts after a launch, the mini player's first appearance, main's per-page bars clearance. Asked then,
+the snap read the resting list as part-collapsed and moved it. The numbers below fit a target whose top is
+already 0 at rest, to which the snap adds the 62 pt top inset: a resting page moves to `distance − 62 pt` when its
+collapse distance lies between 62 and 124 pt (about 2 pt on the 128 pt headers, 22 pt on the 148 pt headers of
+two-line titles), and About (54 pt) only by varying amounts while its inset is still settling after a launch.
+
+A probe (`HeaderSnapProbeTests` on `perf-x-hdr2` / `perf-x-hdr3`, never merged) ran the old snap
+(`-probeOldSnap`) and the fix in the same build, reading the header title's position two seconds after a page
+opened (title minY: About at rest 115.8, Equalizer 125.8, Music Management 145.8):
+
+| Opened by | Old snap | Fix |
+|---|---|---|
+| Launch straight into About | 9 of 10 scrolled (97.3–114.3; the tenth at 115.4) | 0 of 10 (once 115.4, 0.4 pt) |
+| Launch straight into the Equalizer | 10 of 10 scrolled (101.4–123.3) | 0 of 10 |
+| Launch straight into Music Management | 4 of 4 at 117.7 (22 pt) | 0 of 4 |
+| A tap in Settings, the Equalizer | 2 of 9 before the main merge, 6 of 6 after it (123.3) | 0 of 15 |
+| A tap in Settings, Music Management | 6 of 6 at 117.7 | 0 of 6 |
+| A tap in Settings, About | 0 of 9 | 0 of 9 |
+
+So on today's main a tapped settings category opens part-scrolled every time; the branch's launch timing made the
+launch-into screenshots worse before, and main's per-page clearance made the real path worse since. Fixed in
+`07961f6`: the snap acts only while the user scrolls — `onScrollPhaseChange` opens a gate on `.tracking`,
+`.interacting` or `.decelerating` and closes it on `.idle`, and the behaviour reads the gate when it is asked
+(`SettingsSnapGate`, not observed: the behaviour value never changes during a gesture). The screenshots of settings
+pages launched straight into a page now show the header fully expanded, as a tap shows it on Android.
+
+Not fixed here, and the same on main: the snap's arithmetic itself. A slow drag released mid-way on Music
+Management ends 22 pt down (part-collapsed) instead of open, and a longer one may stay where it is — the probe's
+drags of 12–46 pt landed at 22 pt, fully collapsed or in between, old and fixed alike. Dropping the inset from
+`SettingsHeaderSnap` (`resting = target.rect.minY`, targets `0` and `distance`) should give Android's snap; it is a
+behaviour change of main's, so it needs its own check on the phone.
+
 ## What was slow, and the rule now
 
 | Transition | What cost frames | Rule |
@@ -96,7 +169,7 @@ the mini player (run 37103669582) — so keeping the player between expands does
 | Library pills, sort, rescans | Six eager pages re-ran on every LibraryView pass (fresh closures); sorts ran on the main actor below 1,500 songs; one monolithic `lists`; the Songs / Liked sort folded every title (NOCASE) and parsed both ids on every comparison (~60,000 for 5,000 songs). | Pages take plain values + `LibraryActions`; `LibraryModel` memoises each list by its inputs, computes off the main actor after the first frame, lands without animation; inputs compare the library by `LibraryStore.revision`. Sorts compute their keys once per element (`LibrarySorting.noCaseKey`, parsed ids; same order, checked against the old comparator in `LibrarySortingTests`). |
 | Any library edit or rescan | Whole-snapshot comparisons in Home, Search, Library and detail pages; lookups rebuilt on the main actor; `SnapshotLoader` ran on its caller's actor. | Key on `library.revision`; snapshots arrive with lookups built off the main actor (`@concurrent`); edits patch lookups (`applyEdit`). |
 | Detail pages | Album / artist / genre / folder pages filtered and sorted the whole library in their first frames, then re-rendered. | `library.detailIndex` (per revision, built off the main actor) + a `ViewMemo` in `body`: content in the first frame, no second pass. |
-| Player sheet | The full player was rebuilt on every expand and drag; the morph wrote its progress into the environment every frame. | The full player is built once (pre-warmed) and kept hidden at a zero frame (a hidden screen-sized layer would widen the card's `ZStack`, and the mini player with it); fades are their own `Animatable` modifiers. Never write fast-changing values into the environment. |
+| Player sheet | The full player was rebuilt on every expand and drag; the morph wrote its progress into the environment every frame. | The full player is built once (pre-warmed) and kept hidden at a zero frame (a hidden screen-sized layer would widen the card's `ZStack`, and the mini player with it); fades are their own `Animatable` modifiers; a collapse fades it out frozen where it began, as its removal did, before hiding it. Never write fast-changing values into the environment. |
 | Player → album / artist | Collapse and push shared their frames. | Collapse first, push at 10 % (`collapse(thenAfterReaching:)`), as Android. |
 | First visits, revisits | Artwork keyed by exact pixel size, FIFO, unbounded: placeholders and fade-ins mid-push; every new size re-read the source (embedded art is an AVAsset metadata read). | Size buckets, byte-bounded LRU, purge on memory warning, stand-in from another size. A display bucket missing on disk is downsampled from the smallest larger bucket already on disk before the source is touched (not written back, so every cached file is one generation from the original; colour extraction's 128 px always reads the source). Disk thumbnails are written atomically, so no reader sees a half-written file. |
 | Sheets | Wrap-content sheets opened at `.medium` and re-targeted; the queue sheet copied the queue per pass and re-ran its body per drag event; pickers filtered the library on the main actor. | Remembered heights; per-row reorder model; index-addressed rows; precomputed / off-main filtering without debounce. |
@@ -149,22 +222,54 @@ the mini player (run 37103669582) — so keeping the player between expands does
 - Grouped glass keeps its accessibility: `UITests/GlassAccessibilityTests` checks that controls inside the new
   containers are still buttons, sliders and switches with their labels (settings groups, the player's top bar, the
   album header).
+- Keeping a view instead of removing it also drops its removal transition. When a view that used to come and go is
+  kept for speed, find out what its insertion and removal looked like (film both on CI with `[record:Class]` and
+  compare frames) and reproduce what showed: the kept full player fades out on collapse as the removed one did.
+- A `ScrollTargetBehavior` is asked for a target when a gesture ends **and** when the scroll view's size changes.
+  Logic meant for the user's release must check that the user is scrolling (`onScrollPhaseChange`), or a page at
+  rest moves whenever its size or insets change.
 
-## Pending on-device checks (Hoa's phone, before merging)
+## Merge gate: on-device checks (Hoa's phone)
 
-1. **Instruments › Hitches** (plus Core Animation and SwiftUI) over the transitions in scope — the real frame check.
+The branch is not merged until these pass on the phone. The simulator can't settle them: its CPU numbers lean the
+wrong way in the matched pair (above) and it reports no hitches. Each check compares main and this branch on the same
+phone, the same library and the same steps; record the screen for both and put the recordings side by side.
+
+1. **Hard gate — Instruments › Hitches** (plus Core Animation and SwiftUI) over the transitions in scope, main and
+   this branch, with a library of real size. Merge only if this branch has no more hitches or hitch time than main
+   in any transition, and fewer in the ones it targets (tab switches, album / artist pushes, Library pills, settings
+   pages, sheets, the player sheet). If it is worse anywhere, find that commit before merging.
 2. **Pressed settings rows**: rows in a group are 2 pt apart in one `GlassEffectContainer(spacing: 0)`; press and
-   hold a row, a row hosting a Toggle and one hosting a Slider, and check the interactive highlight stays inside the
-   row (no blending into its neighbour) and looks as on main.
+   hold a row, a row next to a Toggle row and one next to a Slider row, and check the interactive highlight stays
+   inside the row (no blending into its neighbour) and looks as on main. The simulator recordings showed no
+   difference (above); the phone renders glass on its own GPU. If a group's pressed rows blend, drop that group's
+   container (`SettingsGroup`) — the look comes first.
 3. **VoiceOver / Accessibility Inspector** over the player's top bar, an album / artist header and a settings group:
    every control announces its label and its button / switch / adjustable trait as on main (CI checks the element
    types; the spoken result is the device's).
-4. **Tap-to-expand fade**: record main's and this branch's tap on the mini player (screen recording, slowed down) and
-   compare the full player's fade-in. The full player is now pre-built and never inserted on expand, so it fades
-   with `fullPlayerAlpha(p)` alone. On main it was inserted in the same tap: `isExpanded = true` is set outside the
-   expand's `withAnimation`, and SwiftUI applies each transaction's changes as their own update, so the insertion was
-   most likely unanimated and the curves match; if main's recording shows an extra fade (the default opacity
-   insertion, roughly `spring(p) · fullPlayerAlpha(p)`), multiply `FullLayerPlacementEffect`'s opacity by the expand
-   spring's progress during non-drag expands to reproduce it.
-5. **Idle cost of the hidden pre-built full player**, and whether zero-opacity glass costs anything (the card's glass
-   is still removed above 25 %).
+4. **Expand and collapse fades**: record main's and this branch's tap on the mini player and the collapse (slowed
+   down) and compare the full player's fade in and out. Expand: the full player is pre-built and never inserted, so
+   it fades with `fullPlayerAlpha(p)` alone; on main its insertion was unanimated (`isExpanded = true` outside the
+   expand's `withAnimation`), and the CI recordings agree. Collapse: main's removal faded the player out on the
+   collapse's spring, frozen where it began; the branch now does the same with `collapseFadeFrom` /
+   `fullLayerFade` (above) — check that the curves match. `[record:TransitionRecordingTests]` films both on CI.
+5. **Steady cost of the hidden pre-built full player**: with the player collapsed and a large queue (a few thousand
+   songs), skip through ten songs, play / pause and edit the queue, under Instruments' SwiftUI and Time Profiler
+   templates, main against this branch. The hidden `NowPlayingView` re-renders on each of these (its seek bar and
+   ambient background timelines already pause while it is hidden). If it shows up (main-thread time or dropped
+   frames that main doesn't have), gate its playback-driven sections while collapsed (cover, titles, play state,
+   queue-driven parts) so they read playback only while expanded or being dragged. Also check
+   whether zero-opacity glass costs anything (the card's glass is still removed above 25 %, P13).
+6. **Settings pages open at rest**: push Settings › About, Settings › Equalizer and Settings › Music Management by
+   tapping, several times (right after launch and later, before and after the mini player first appears), and check
+   each opens with its header fully expanded and the list at the top (see "Settings pages opened scrolled" above;
+   main opens the last two part-scrolled). Then scroll each list a little, a lot, and fling it, and check the header
+   ends where it does on main.
+
+## Needs Hoa's OK
+
+- **Open-source notices, long-press Copy** (P41): the notices sheet now lays its text out by paragraph, so only the
+  visible paragraphs are laid out when it opens (the single 30 KB `Text` was laid out on the main thread before the
+  sheet could present). A side effect: long-press › Copy copies one paragraph instead of the whole notices text. The
+  look is unchanged. If whole-text copy matters, the choices are a "Copy all" button (a visible addition) or the
+  single `Text` again (and its slow open).
