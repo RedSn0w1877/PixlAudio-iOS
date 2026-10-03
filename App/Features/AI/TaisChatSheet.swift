@@ -109,9 +109,9 @@ struct TaisChatSheet: View {
             VStack(spacing: 0) {
                 TaizoOrb(energy: 0, animated: heroVisible && orbAnimates, glow: true, sparkleSize: 0.36)
                     .matchedGeometryEffect(id: "taizo.orb", in: orbSpace)
-                    .frame(width: 112, height: 112)
+                    .frame(width: 128, height: 128)
                     .onScrollVisibilityChange(threshold: 0.05) { heroVisible = $0 }
-                Spacer().frame(height: 30)
+                Spacer().frame(height: 34)
                 VStack(spacing: 6) {
                     Text(greeting)
                         .pixlFont(.headlineMedium, weight: .bold)

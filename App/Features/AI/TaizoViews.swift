@@ -47,15 +47,15 @@ struct TaizoOrb: View {
 }
 
 /// The orb's colours. Fixed roles, which are the same in the light and dark schemes, so the orb reads alike on
-/// both sheets: pale accents top-left, the deep variants bottom-right.
+/// both sheets: a deep core (the white sparkles sit on it) under lighter accent swirls, deepest bottom-trailing.
 nonisolated struct TaizoOrbPalette: Sendable {
     let mesh: [Color]
     let glow: Color
 
     init(theme: ThemeColors) {
-        mesh = [theme.primaryFixed, theme.tertiaryFixed, theme.primaryFixedDim,
-                theme.tertiaryFixedDim, theme.primaryFixedDim, theme.onPrimaryFixedVariant,
-                theme.secondaryFixedDim, theme.onTertiaryFixedVariant, theme.onPrimaryFixedVariant]
+        mesh = [theme.primaryFixedDim, theme.tertiaryFixedDim, theme.primaryFixed,
+                theme.tertiaryFixedDim, theme.onPrimaryFixedVariant, theme.primaryFixedDim,
+                theme.onTertiaryFixedVariant, theme.primaryFixedDim, theme.onPrimaryFixedVariant]
         glow = theme.primaryFixedDim
     }
 }
@@ -82,9 +82,9 @@ private struct TaizoOrbFace: View, Animatable {
         ZStack {
             MeshGradient(width: 3, height: 3, points: Self.points(t: t, swirl: swirl), colors: palette.mesh)
             // Specular highlight (top-leading) and a soft shade toward the far edge: a sphere, not a disc.
-            EllipticalGradient(colors: [.white.opacity(0.55), .white.opacity(0)], center: UnitPoint(x: 0.32, y: 0.22),
-                               startRadiusFraction: 0, endRadiusFraction: 0.42)
-            EllipticalGradient(colors: [.black.opacity(0), .black.opacity(0.22)], center: UnitPoint(x: 0.42, y: 0.36),
+            EllipticalGradient(colors: [.white.opacity(0.42), .white.opacity(0)], center: UnitPoint(x: 0.3, y: 0.2),
+                               startRadiusFraction: 0, endRadiusFraction: 0.36)
+            EllipticalGradient(colors: [.black.opacity(0), .black.opacity(0.26)], center: UnitPoint(x: 0.42, y: 0.36),
                                startRadiusFraction: 0.42, endRadiusFraction: 0.78)
         }
         .clipShape(Circle())
@@ -319,7 +319,7 @@ struct TaisChatMessageRow: View {
             TaizoOrb(sparkleSize: 0.44)
                 .frame(width: 28, height: 28)
             content()
-            Spacer(minLength: 24)
+            Spacer(minLength: 12)
         }
     }
 }
@@ -425,7 +425,8 @@ struct TaizoQueueCard: View {
                     Text("Play").pixlFont(.labelLarge, weight: .semibold).lineLimit(1)
                 }
                 .foregroundStyle(theme.onPrimary)
-                .frame(maxWidth: .infinity, minHeight: 44)
+                .padding(.horizontal, 22)
+                .frame(minHeight: 44)
                 .background(theme.primary, in: Capsule())
                 .contentShape(.capsule)
             }
@@ -437,6 +438,7 @@ struct TaizoQueueCard: View {
                     Text("Add to Queue").pixlFont(.labelLarge, weight: .semibold).lineLimit(1).minimumScaleFactor(0.8)
                 }
                 .foregroundStyle(theme.onSecondaryContainer)
+                .padding(.horizontal, 14)
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .background(theme.secondaryContainer, in: Capsule())
                 .contentShape(.capsule)
