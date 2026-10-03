@@ -706,3 +706,39 @@ surfaces such as the queue. So small menus are SwiftUI `Menu`s, and the system d
 - The queue keeps its own menu. The Android sort and options sheets stay, for UI-test launch states.
 - `[record:Class]` in a commit message films that UI test class on CI (`MenuRecordingTests` opens these menus slowly),
   so the morph can be compared frame by frame with the reference recording.
+
+## Spotify Connect output (2026-10-03, branch `spotify-connect`; shared spec with Android)
+
+Hoa wants to "beam music" to Spotify Connect speakers (an Echo Show) instead of Bluetooth. The device streams from
+Spotify; PixlAudio sends what to play through the Web API's Player endpoints and stays the remote. Facts and limits:
+docs/api-notes.md › Spotify Connect output.
+
+- **Where:** the devices sheet's DEVICES page, below the AirPlay rows — header "Spotify Connect" + a refresh glass
+  circle (as the route-picker circle), then one `DeviceRow` per device (the sheet's own glass capsule rows, now a
+  shared view: SF Symbol for `type`, status badge "Playing here" / "Active in Spotify" / "Available" /
+  "Can't be controlled"). Pull to refresh; the list is fetched again whenever the sheet opens. Empty: the sheet's
+  empty card with "Devices appear when they're online and signed in to your Spotify. For an Echo, link Spotify in the
+  Alexa app." Hidden while Spotify isn't linked; a pre-Connect login shows only "Reconnect Spotify to use Connect".
+  While a device plays, "Stop playing on <device>" heads the list and the CONTROLS hero shows the device (icon, name,
+  "Spotify Connect • Playing") with its volume slider when `supports_volume` (else a note) instead of the phone's.
+- **Chip:** the full player's output pill shows the device's symbol and name, like AirPlay's route name (VoiceOver: "Playing on <device>"; long press: Stop
+  playing on <device>); the mini player's artist line becomes "Playing on <device>" with a small speaker icon.
+- **Toasts:** Connect has its own `LibraryToast` instance, shown by `RootView` above the bars and inside the devices
+  sheet (skipped songs once per resolution pass, takeovers, errors).
+- **Seam:** `RemotePlaybackOutput` (`App/Core`). While attached, `PlaybackStore` sends play / pause / next / previous /
+  seek / pick-an-entry / repeat there and reports queue edits; the engine stays paused with its queue (no teardown);
+  `isPlaying`, `positionMs()` and `PlaybackClock` read the remote. `remoteMoved(toQueueIndex:)` moves the local model
+  when the device advances (loaded paused); `resumeLocally` hands back at the device's song and position.
+  `NowPlayingController.remote` routes the lock-screen commands and publishes the device's position/rate.
+- **Order and windows:** PixlAudio's queue is the order. Up to 100 URIs from the current entry per `play`; the next
+  window is sent when the device reaches the window's last entry, or (after background resolution found more) at the
+  next track change so nothing jumps mid-song. Shuffle reorders PixlAudio's queue and re-sends (Spotify's shuffle is
+  set off); repeat-one is Spotify's `track`; repeat-all wraps in PixlAudio. Picking another song or editing/reordering
+  the queue re-sends `play` from the current entry at the current position — except when the device's remaining list
+  is unchanged or only grew at the end ("Add to queue"), which just re-indexes.
+- **Performance:** networking, JSON and search in PixlNet actors; the main actor runs the reducer only. Polling exists
+  only during a session (1 s foreground, 5 s background, Retry-After honoured); the reducer interpolates progress and
+  reports "no change" when a poll matches, so nothing observable is written; the device list assigns only on change.
+- **Screenshot ids** (`UITests/SpotifyConnectScreenshotTests`, demo devices, no network): `devices.spotifyConnect`,
+  `devices.spotifyPlaying`, `devices.spotifyReconnect`, `devices.spotifyEmpty` (the sheet opens on DEVICES),
+  `nowPlaying.spotifyConnect`, `miniPlayer.spotifyConnect`.

@@ -44,6 +44,8 @@ struct RootView: View {
             // Stage 8: the player sheet — the mini player resting in `MiniPlayerSlot` and expanding over everything.
             PlayerSheetHost()
         }
+        // Spotify Connect's messages (skipped songs, takeovers, errors) over whatever is on screen, above the bars.
+        .libraryToast(environment.spotifyConnect.toast, bottomPadding: Tokens.Shell.miniPlayerHeight + 96)
         .updateBanner(environment.updates)
         .environment(\.appTheme, colors.app)
         .environment(\.playerTheme, colors.player)

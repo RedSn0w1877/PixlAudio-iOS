@@ -654,3 +654,28 @@ behind `SpotifyLibraryStore` (Android `SpotifyDao`), so they run on Windows:
 - `TaisStudioTests.testUnattendedJobsAreTrackedAndCancelCleanly` (app, Swift-only; Android's WorkManager tags have
   no unit test): unattended jobs are tracked while running or queued, cancel cleanly from either state, and a second
   request keeps the existing job.
+
+## Spotify Connect output (branch `spotify-connect`, Swift-only)
+Android builds the same feature from the same spec in parallel; there is no Kotlin to port yet, so these are
+Swift-only and define the behaviour both apps share.
+- `PixlNetTests/SpotifyConnectTests` — scopes and old-login detection (scope kept across refreshes without one);
+  every Player request byte for byte (method, URL, JSON body, empty body for bodiless commands); device and playback
+  state decoding, display order and type → SF Symbol; error mapping (403 Premium by reason or message → "Spotify
+  Connect needs Spotify Premium", 404 `NO_ACTIVE_DEVICE`, insufficient scope, restricted device, volume, 429
+  Retry-After clamped, 5xx, other); real vs synthetic (YouTube Music) track ids; URI windows (skips, stop at an
+  unresolved entry, the 100 cap, "has more", skipped count, duplicate URIs) and the skipped-songs toast text; the
+  strict match (remaster/feat suffixes, live/remix mismatch, ±3 s, artists, accents, local files, ISRC hits) and
+  queries; the resolver (direct ids skip search, ISRC before text, misses cached until the retry age, failed searches
+  not cached, a tag change invalidates, persistence round trip, clear); the reducer (interpolation and no-write when
+  nothing changed, scrubs/pauses/volume, track changes → queue indices, takeovers by another device / other content /
+  204, grace after commands, end of queue incl. autoplay, next window once, next/previous decisions, optimistic
+  commands); the client (401 → one refresh with the rotated token saved, 429 gate fails fast, transfer for inactive
+  devices + one wake-up retry on `NO_ACTIVE_DEVICE`, Premium surfaced, 204 state, transport errors, search results).
+- `PixlNetTests/SpotifyTests.authorizationURLUsesAndroidEncodingAndForcesTheDialog` now expects the two Connect
+  scopes at the end of `scope` (Android must append them in the same order).
+- `AppTests/SpotifyConnectStoreTests` — `PlaybackStore` with a fake `RemotePlaybackOutput`: transport forwarded,
+  engine paused but `isPlaying`/position/duration from the remote, the model follows `remoteMoved`, queue edits and a
+  new queue reported, `resumeLocally` hands back at the given entry and position.
+- `UITests/SpotifyConnectScreenshotTests` — the section (light/dark), connect → stop on a demo device, playing state
+  (light/dark), the hero with the device volume, reconnect row, empty hint, "Playing on" chip in the full (light/dark)
+  and mini player.

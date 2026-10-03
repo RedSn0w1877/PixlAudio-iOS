@@ -16,6 +16,8 @@ struct MiniPlayerBar: View {
     var bottomCornerRadius: CGFloat = Tokens.Shell.navBarCornerRadius
     /// False when the bar is drawn inside the player sheet's card, which supplies the glass (stage 8).
     var drawsGlass = true
+    /// Spotify Connect: the device playing the queue ("Playing on <device>" in place of the artist line).
+    var remoteDeviceName: String?
     let onOpen: () -> Void
     let onPrevious: () -> Void
     let onPlayPause: () -> Void
@@ -38,10 +40,19 @@ struct MiniPlayerBar: View {
                     .pixlFont(.custom(size: 15, weight: .semibold, tracking: -0.2))
                     .foregroundStyle(theme.onPrimaryContainer)
                     .lineLimit(1)
-                Text(isPreparing ? "Loading audio…" : song.displayArtist)
-                    .pixlFont(.custom(size: 13))
-                    .foregroundStyle(theme.onPrimaryContainer.opacity(0.7))
-                    .lineLimit(1)
+                if let remoteDeviceName, !isPreparing {
+                    Label(String(localized: "Playing on \(remoteDeviceName)"), systemImage: "hifispeaker.fill")
+                        .labelStyle(MiniPlayerChipLabelStyle())
+                        .pixlFont(.custom(size: 13, weight: .semibold))
+                        .foregroundStyle(theme.onPrimaryContainer.opacity(0.85))
+                        .lineLimit(1)
+                        .accessibilityIdentifier("miniPlayer.remoteDevice")
+                } else {
+                    Text(isPreparing ? "Loading audio…" : song.displayArtist)
+                        .pixlFont(.custom(size: 13))
+                        .foregroundStyle(theme.onPrimaryContainer.opacity(0.7))
+                        .lineLimit(1)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .combine)
@@ -90,6 +101,16 @@ struct MiniPlayerBar: View {
         .buttonStyle(PressScaleButtonStyle())
         .disabled(isPreparing)
         .accessibilityLabel(label)
+    }
+}
+
+/// The "Playing on <device>" line: a small icon before the text.
+private struct MiniPlayerChipLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 4) {
+            configuration.icon.font(.system(size: 11, weight: .semibold))
+            configuration.title
+        }
     }
 }
 

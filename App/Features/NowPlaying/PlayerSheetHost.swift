@@ -232,7 +232,7 @@ private struct MiniPlayerLayer: View {
 
     var body: some View {
         MiniPlayerBar(song: song, isPlaying: playback.isPlaying, isPreparing: playback.isPreparing,
-                      drawsGlass: false,
+                      drawsGlass: false, remoteDeviceName: playback.remoteOutputName,
                       onOpen: { env.playerSheet.expand() },
                       onPrevious: { playback.skipToPrevious() },
                       onPlayPause: { playback.togglePlayPause() },

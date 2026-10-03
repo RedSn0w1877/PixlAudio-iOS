@@ -49,6 +49,8 @@ final class AppEnvironment {
     let youtube: YouTubeServices
     /// Spotify account, library sync, YouTube matching and catalogue (stage 12).
     let spotify: SpotifyService
+    /// Spotify Connect output: plays the queue on a Connect device and drives it (the devices sheet's section).
+    let spotifyConnect: SpotifyConnectController
 
     @ObservationIgnored private var aiStorage: AIService?
 
@@ -124,12 +126,14 @@ final class AppEnvironment {
             sleepTimer = services.sleepTimer
         }
 
+        let spotifyConnect: SpotifyConnectController
         if isUITest {
             let library = LibraryStore(snapshot: DemoLibrary.snapshot)
             self.library = library
             youtube = YouTubeServices(launch: launch, library: library, persistence: persistence, accounts: accounts)
             let spotify = SpotifyService(launch: launch, accounts: accounts, persistence: persistence)
             self.spotify = spotify
+            spotifyConnect = SpotifyConnectController(launch: launch, spotify: spotify, playback: playback)
             libraryImporter = nil
             libraryAutoRefresh = nil
             artistImages = nil
@@ -142,6 +146,7 @@ final class AppEnvironment {
                               playWhenReady: launch.startsPlaying)
             }
             if launch.hasSong, launch.screen?.opensOverPlayer == true { playerSheet.expand(animated: false) }
+            if launch.hasSong { spotifyConnect.startDemoSessionIfNeeded(launch.screen) }
         } else {
             let loader = persistence.map { SnapshotLoader(persistence: $0, cacheURL: SnapshotLoader.defaultCacheURL()) }
             let importer = persistence.map { LocalLibraryImporter(persistence: $0) }
@@ -162,6 +167,16 @@ final class AppEnvironment {
             let spotify = SpotifyService(launch: launch, accounts: accounts, persistence: persistence,
                                          bridge: youtube.service.map { InnerTubeSpotifyBridge(service: $0) })
             self.spotify = spotify
+            spotifyConnect = SpotifyConnectController(launch: launch, spotify: spotify, playback: playback)
+            if let realPlayback {
+                // Lock screen and remote commands follow the Connect device while a session runs.
+                let nowPlaying = realPlayback.nowPlaying
+                spotifyConnect.onSessionChanged = { [weak spotifyConnect] active in
+                    nowPlaying.remote = active ? spotifyConnect : nil
+                    nowPlaying.update()
+                }
+                spotifyConnect.onRemoteStateChanged = { nowPlaying.update() }
+            }
             // Spotify songs (`spotify://<id>`) play their YouTube match; this stays the outermost resolver (after
             // stage 11's streaming resolver) so other songs reach the inner ones unchanged.
             if let realPlayback {
@@ -172,6 +187,7 @@ final class AppEnvironment {
                                .youtubeMusic: youtube.searchProvider ?? (UnavailableSearchProvider(source: .youtubeMusic) as any SearchProviding)]
         }
 
+        self.spotifyConnect = spotifyConnect
         tais = TaisServices(launch: launch, settings: settings, lyricsController: lyricsController, playback: playback,
                             playbackServices: playbackServices, youtube: youtube)
         automaticStudio = AutomaticStudioRunner(studio: tais.studio, models: tais.models, settings: settings,

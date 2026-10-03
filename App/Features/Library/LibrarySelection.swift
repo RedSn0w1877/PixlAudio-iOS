@@ -94,20 +94,22 @@ final class LibraryToast {
     static let shared = LibraryToast()
 }
 
-/// Shows `LibraryToast.shared` over the content.
+/// Shows `LibraryToast.shared` (or another toast, e.g. Spotify Connect's) over the content.
 struct LibraryToastOverlay: ViewModifier {
+    var toast: LibraryToast = .shared
+    var bottomPadding: CGFloat = 24
     @Environment(\.appTheme) private var theme
 
     func body(content: Content) -> some View {
         content.overlay(alignment: .bottom) {
-            if let message = LibraryToast.shared.message {
+            if let message = toast.message {
                 Text(message)
                     .pixlFont(.labelLarge)
                     .foregroundStyle(theme.inverseOnSurface)
                     .padding(.horizontal, 18)
                     .padding(.vertical, 12)
                     .pixlGlass(in: Capsule(), tint: theme.inverseSurface.opacity(GlassTint.prominent))
-                    .padding(.bottom, 24)
+                    .padding(.bottom, bottomPadding)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .allowsHitTesting(false)
                     .accessibilityIdentifier("toast")
@@ -118,4 +120,7 @@ struct LibraryToastOverlay: ViewModifier {
 
 extension View {
     func libraryToast() -> some View { modifier(LibraryToastOverlay()) }
+    func libraryToast(_ toast: LibraryToast, bottomPadding: CGFloat = 24) -> some View {
+        modifier(LibraryToastOverlay(toast: toast, bottomPadding: bottomPadding))
+    }
 }

@@ -30,7 +30,8 @@ struct SpotifyAuthTests {
         let url = SpotifyAuth.authorizationURL(clientId: "cid", codeChallenge: "ch_-", state: "st")
         #expect(url == "https://accounts.spotify.com/authorize?client_id=cid&response_type=code&redirect_uri=pixlaudio%3A%2F%2Fspotify-callback"
                 + "&code_challenge_method=S256&code_challenge=ch_-&scope=user-library-read%20playlist-read-private%20playlist-read-collaborative"
-                + "%20user-read-private%20user-top-read&state=st&show_dialog=true")
+                + "%20user-read-private%20user-top-read%20user-read-playback-state%20user-modify-playback-state"
+                + "&state=st&show_dialog=true")
         #expect(SpotifyAuth.scopes.contains("user-top-read"))
     }
 

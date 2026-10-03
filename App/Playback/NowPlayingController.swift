@@ -20,6 +20,9 @@ final class NowPlayingController {
     var onLike: ((Song) -> Void)?
     /// Whether a song is a favourite (for the like command's state).
     var isFavorite: ((Song) -> Bool)?
+    /// Spotify Connect while it drives playback: the transport commands go there and the published position, rate
+    /// and duration are the remote device's.
+    weak var remote: (any RemotePlaybackOutput)?
 
     init(engine: DualDeckEngine, artwork: ArtworkPipeline = .shared) {
         self.engine = engine
@@ -30,15 +33,28 @@ final class NowPlayingController {
     func install() {
         uninstall()
         let center = MPRemoteCommandCenter.shared()
-        add(center.playCommand) { engine, _ in engine.play() }
-        add(center.pauseCommand) { engine, _ in engine.pause() }
-        add(center.togglePlayPauseCommand) { engine, _ in
-            engine.playWhenReady ? engine.pause() : engine.play()
+        add(center.playCommand) { [weak self] engine, _ in
+            if let remote = self?.remote { remote.remotePlay() } else { engine.play() }
         }
-        add(center.nextTrackCommand) { engine, _ in engine.skipToNext() }
-        add(center.previousTrackCommand) { engine, _ in engine.skipToPrevious() }
-        add(center.changePlaybackPositionCommand) { engine, value in
-            if case .position(let seconds) = value { engine.seek(toMs: Int64(seconds * 1000)) }
+        add(center.pauseCommand) { [weak self] engine, _ in
+            if let remote = self?.remote { remote.remotePause() } else { engine.pause() }
+        }
+        add(center.togglePlayPauseCommand) { [weak self] engine, _ in
+            if let remote = self?.remote {
+                remote.remoteIsPlaying ? remote.remotePause() : remote.remotePlay()
+            } else {
+                engine.playWhenReady ? engine.pause() : engine.play()
+            }
+        }
+        add(center.nextTrackCommand) { [weak self] engine, _ in
+            if let remote = self?.remote { remote.remoteSkipToNext() } else { engine.skipToNext() }
+        }
+        add(center.previousTrackCommand) { [weak self] engine, _ in
+            if let remote = self?.remote { remote.remoteSkipToPrevious() } else { engine.skipToPrevious() }
+        }
+        add(center.changePlaybackPositionCommand) { [weak self] engine, value in
+            guard case .position(let seconds) = value else { return }
+            if let remote = self?.remote { remote.remoteSeek(toMs: Int64(seconds * 1000)) } else { engine.seek(toMs: Int64(seconds * 1000)) }
         }
         add(center.changeShuffleModeCommand) { engine, value in
             if case .shuffle(let type) = value { engine.setShuffleEnabled(type != .off) }
@@ -114,13 +130,22 @@ final class NowPlayingController {
             return
         }
         let song = entry.song
+        var durationMs = engine.currentDurationMs()
+        var positionMs = engine.currentPositionMs()
+        var rate = engine.playWhenReady ? Double(engine.rate) : 0.0
+        if let remote {
+            let remoteDuration = remote.remoteDurationMs()
+            durationMs = remoteDuration > 0 ? remoteDuration : song.duration
+            positionMs = remote.remotePositionMs()
+            rate = remote.remoteIsPlaying ? 1.0 : 0.0
+        }
         var info: [String: Any] = [
             MPMediaItemPropertyTitle: song.title,
             MPMediaItemPropertyArtist: song.displayArtist,
             MPMediaItemPropertyAlbumTitle: song.album,
-            MPMediaItemPropertyPlaybackDuration: Double(engine.currentDurationMs()) / 1000,
-            MPNowPlayingInfoPropertyElapsedPlaybackTime: Double(engine.currentPositionMs()) / 1000,
-            MPNowPlayingInfoPropertyPlaybackRate: engine.playWhenReady ? Double(engine.rate) : 0.0,
+            MPMediaItemPropertyPlaybackDuration: Double(durationMs) / 1000,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: Double(positionMs) / 1000,
+            MPNowPlayingInfoPropertyPlaybackRate: rate,
             MPNowPlayingInfoPropertyDefaultPlaybackRate: 1.0,
             MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.audio.rawValue,
             MPNowPlayingInfoPropertyPlaybackQueueIndex: engine.queue.currentIndex ?? 0,
