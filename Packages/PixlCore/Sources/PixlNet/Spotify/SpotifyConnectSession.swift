@@ -260,7 +260,8 @@ public enum SpotifyConnectReducer {
         return .restart
     }
 
-    static func firstPlayable(_ slots: [SpotifyConnectSlot], after index: Int) -> Int? {
+    /// The first entry after `index` that is on Spotify or not looked up yet.
+    public static func firstPlayable(_ slots: [SpotifyConnectSlot], after index: Int) -> Int? {
         var i = index + 1
         while i < slots.count {
             if slots[i] != .skipped { return i }
