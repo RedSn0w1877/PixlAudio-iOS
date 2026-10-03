@@ -289,6 +289,8 @@ final class AppEnvironment {
                 return
             }
             let id = LibraryIdentity.fileSongID(rootID: FolderRoot.documentsID, relativePath: relativePath)
+            // Opening a file the user once deleted (whose file couldn't be removed) asks for it back.
+            HiddenSongs.unhide([id])
             // An incremental refresh joins a scan that is already running (the foreground rescan), which may have
             // listed the folder before the copy: scan once more if the song isn't there yet.
             for _ in 0..<2 where library.song(id: id) == nil {

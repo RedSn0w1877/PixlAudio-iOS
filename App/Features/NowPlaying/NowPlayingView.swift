@@ -89,8 +89,10 @@ struct NowPlayingView: View {
         .onAppear { LyricsShaderWarmup.prepare() }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("screen.nowPlaying")
-        // A modal screen for VoiceOver: swipes stay inside the player (the shell under it is hidden as well).
-        .accessibilityAddTraits(.isModal)
+        // A modal screen for VoiceOver while it is up: swipes stay inside the player (the shell under it is hidden as
+        // well). Only while expanded — the pre-warmed player stays in the hierarchy while collapsed, and a modal
+        // element there shut VoiceOver (and UI-test hit testing) out of every screen behind it.
+        .modifier(ModalWhileExpanded())
         .accessibilityAction(.escape) { env.playerSheet.collapse() }
     }
 
@@ -129,6 +131,16 @@ struct NowPlayingView: View {
     private func openAlbum(_ song: Song) {
         let router = self.router
         env.playerSheet.collapse { router.push(.albumDetail(albumId: song.albumId)) }
+    }
+}
+
+/// `.isModal` for the full player only while the sheet is expanded. Its own small view, so the expand / collapse
+/// flips re-run this modifier and not the player's body.
+private struct ModalWhileExpanded: ViewModifier {
+    @Environment(AppEnvironment.self) private var env
+
+    func body(content: Content) -> some View {
+        content.accessibilityAddTraits(env.playerSheet.isExpanded ? .isModal : [])
     }
 }
 
