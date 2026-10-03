@@ -6,7 +6,8 @@ import UIKit
 ///
 /// Dropped (Material-only, not meaningful with Liquid Glass): album-art palette style (iOS keeps the default
 /// TonalSpot scheme), NavBar corner radius, smooth corners (every iOS corner is already continuous).
-/// App language opens the system's per-app language setting (iOS apps can't switch language in-app).
+/// App language opens the system's per-app language setting (iOS apps can't switch language in-app); it shows only
+/// when the app has more than one localisation.
 struct AppearanceSettingsSection: View {
     @Environment(SettingsStore.self) private var settings
 
@@ -16,9 +17,13 @@ struct AppearanceSettingsSection: View {
         @Bindable var behavior = settings.behavior
         SettingsCategoryScaffold(category: .appearance) {
             SettingsSubsection(title: L10n.settingsGlobalThemeSection) {
-                SettingsItemRow(title: L10n.settingsAppLanguageTitle, subtitle: L10n.settingsAppLanguageSubtitle,
-                                systemImage: "globe", showsChevron: true, identifier: "settings.appearance.language") {
-                    if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                // iOS lists a per-app Language choice only for apps with more than one localisation; while the app
+                // ships English only (owner decision 12) the row would open a page with nothing to pick.
+                if AppLocalizations.offersLanguageChoice {
+                    SettingsItemRow(title: L10n.settingsAppLanguageTitle, subtitle: L10n.settingsAppLanguageSubtitle,
+                                    systemImage: "globe", showsChevron: true, identifier: "settings.appearance.language") {
+                        if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                    }
                 }
                 ThemeSelectorRow(label: L10n.settingsAppThemeTitle, description: L10n.settingsAppThemeSubtitle,
                                  options: [SettingsOption(key: AppThemeMode.light.rawValue, label: L10n.settingsThemeLight),
@@ -103,6 +108,11 @@ struct AppearanceSettingsSection: View {
         }
         .animation(PixlMotion.state, value: lyrics.immersiveLyricsEnabled)
     }
+}
+
+/// The app's localisations (`Bundle.localizations`, Base excluded).
+nonisolated enum AppLocalizations {
+    static let offersLanguageChoice: Bool = Bundle.main.localizations.filter { $0 != "Base" }.count > 1
 }
 
 /// Android `CollagePattern` (storage key, label).

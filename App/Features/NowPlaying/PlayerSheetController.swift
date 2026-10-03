@@ -1,5 +1,6 @@
 import Observation
 import SwiftUI
+import UIKit
 
 /// The player sheet's state (Android `PlayerSheetState` + `SheetMotionController` + the drag handler of
 /// `UnifiedPlayerSheetV2`): one card that morphs from the mini player into the full player.
@@ -69,6 +70,9 @@ final class PlayerSheetController {
 
     /// Expands to the full player (Android `expandPlayerSheet`). `animated: false` for launch states.
     func expand(animated: Bool = true, initialVelocity: Double = 0) {
+        // VoiceOver: once the full player is past half way (it stays hidden from accessibility below 0.5), move
+        // focus to it — the mini player that had focus is gone.
+        if !isExpanded { postScreenChanged(after: animated ? 0.45 : 0.05) }
         guard animated else {
             // One transaction: a full player built here is inserted by the same update that sets the expansion, so
             // its fades read 1 on their first pass. Set in steps, `withoutAnimation` first applied the pending build
@@ -106,6 +110,11 @@ final class PlayerSheetController {
     }
 
     private func startExpand(initialVelocity: Double) {
+        // Reduce Motion: a short ease, without the spring's travel or the scale bump.
+        if PixlAccessibility.reducesMotion {
+            withAnimation(PlayerSheetMotion.reducedMotion) { expansion = 1 }
+            return
+        }
         withAnimation(PlayerSheetMotion.expand(initialVelocity: initialVelocity)) { expansion = 1 }
         // Android's expand bump: scaleY 1 → 1.05 → 1 over 250 ms.
         withAnimation(.easeOut(duration: 0.125)) { overshootScaleY = 1.05 }
@@ -130,10 +139,18 @@ final class PlayerSheetController {
     /// Collapses to the mini player (Android `collapsePlayerSheet`), with the bouncy squash.
     func collapse(animated: Bool = true, initialVelocity: Double = 0) {
         let from = expansion
+        let wasExpanded = isExpanded
         pendingExpandVelocity = nil
         isExpanded = false
+        if wasExpanded { postScreenChanged(after: animated ? 0.35 : 0.05) }
         guard animated else {
             withoutAnimation { expansion = 0 }
+            return
+        }
+        // Reduce Motion: a short ease back, without the squash and its slow wobble.
+        if PixlAccessibility.reducesMotion {
+            withoutAnimation { overshootScaleY = 1 }
+            withAnimation(PlayerSheetMotion.reducedMotion) { expansion = 0 }
             return
         }
         withAnimation(PlayerSheetMotion.collapse(fromFraction: from, initialVelocity: initialVelocity)) {
@@ -146,6 +163,15 @@ final class PlayerSheetController {
 
     func toggle() {
         isExpanded ? collapse() : expand()
+    }
+
+    /// Tells VoiceOver the screen changed once the sheet has (nearly) settled; nothing when VoiceOver is off.
+    private func postScreenChanged(after delay: Double) {
+        guard UIAccessibility.isVoiceOverRunning else { return }
+        Task {
+            try? await Task.sleep(for: .seconds(delay))
+            PixlAccessibility.screenChanged()
+        }
     }
 
     // MARK: Drag (Android `SheetVerticalDragGestureHandler`)
@@ -194,6 +220,10 @@ final class PlayerSheetController {
 /// on collapse a low-stiffness spring whose damping goes from no-bounce to low-bouncy with the fraction it starts
 /// from (`collapseSpringDampingForFraction`). Stiffness/damping map 1:1 (unit mass), so the motion is the same.
 nonisolated enum PlayerSheetMotion {
+    /// Expand and collapse under Reduce Motion: no overshoot, no squash, no wobble (docs/design.md: "no swell,
+    /// short ease").
+    static var reducedMotion: Animation { .easeInOut(duration: 0.25) }
+
     static func expand(initialVelocity: Double) -> Animation {
         spring(stiffness: 380, dampingRatio: 0.8, initialVelocity: initialVelocity)
     }

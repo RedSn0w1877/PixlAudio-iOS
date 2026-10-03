@@ -119,6 +119,29 @@ final class LibraryStore {
         rebuildDetailIndex()
     }
 
+    /// Replaces artists by id — their pictures (Deezer, a custom image) — patching the snapshot and the artist lookup
+    /// without rebuilding the others.
+    func updateArtists(_ updated: [Artist]) {
+        guard !updated.isEmpty else { return }
+        let byId = Dictionary(updated.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
+        var newSnapshot = snapshot
+        for index in newSnapshot.artists.indices {
+            if let artist = byId[newSnapshot.artists[index].id] { newSnapshot.artists[index] = artist }
+        }
+        for artist in updated { artistsById[artist.id] = artist }
+        snapshot = newSnapshot
+        revision &+= 1
+        rebuildDetailIndex()
+    }
+
+    /// Rewrites the launch cache with the current snapshot, off the main actor (after an edit made outside
+    /// `LibraryEditor`).
+    func writeSnapshotCache() {
+        guard let loader else { return }
+        let snapshot = self.snapshot
+        Task.detached(priority: .utility) { loader.writeCache(snapshot) }
+    }
+
     private func install(_ newSnapshot: LibrarySnapshot, lookups: LibraryLookups) {
         songsById = lookups.songsById
         albumsById = lookups.albumsById

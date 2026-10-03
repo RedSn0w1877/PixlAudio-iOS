@@ -114,6 +114,10 @@ the mini player (run 37103669582) — so keeping the player between expands does
 - Glass shapes that sit together go in one `GlassEffectContainer` with spacing below their gap. Children of a
   container (and of any non-element view with its own identifier) keep only their accessibility labels: UI tests look
   such controls up by identifier **or** label.
+- The bars' room is reserved per page (`BottomBarsClearance`: `safeAreaPadding` on each tab root and route, from an
+  environment value set on each stack). A push or pop never changes a page's inset (a page is a root or a route for
+  life); only the mini player's first appearance / last disappearance, compact mode, and the keyboard on the
+  selected tab do. Equal values don't invalidate the pages.
 - A `safeAreaBar` (or `safeAreaInset`) around a `NavigationStack` does not reach its pages here: the old shell bar
   never inset them. Screens that scroll to their end or pin content to the bottom (Home scrolled down, YouTube
   sign-in, the brick game, floating Save buttons) are the screenshots that show a changed inset.

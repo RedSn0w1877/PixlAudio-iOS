@@ -63,6 +63,11 @@ struct SetupView: View {
                     go(to: page.rawValue - 1)
                 }
             })
+            // VoiceOver can't drive the swipe: its escape gesture (two-finger Z) steps back a page.
+            .accessibilityElement(children: .contain)
+            .accessibilityAction(.escape) {
+                if page.rawValue > 0 { go(to: page.rawValue - 1) }
+            }
             SetupBottomBar(page: page.rawValue, pageCount: Page.allCases.count, onNext: next, onFinish: finish)
         }
         .background(theme.background.ignoresSafeArea())

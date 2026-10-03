@@ -27,11 +27,15 @@ final class LibraryModel {
         var likedAt: [String: Int64]
         /// `LibraryStore.revision` of `snapshot`: what `==` compares instead of the snapshot itself.
         var revision: Int = 0
+        /// Settings › Library › Min tracks per album (Android `getPaginatedAlbums(minTracks)`): smaller albums are
+        /// left out of the Albums tab.
+        var minTracksPerAlbum: Int = 1
 
         static func == (a: Inputs, b: Inputs) -> Bool {
             a.revision == b.revision && a.songSort == b.songSort && a.albumSort == b.albumSort
                 && a.artistSort == b.artistSort && a.playlistSort == b.playlistSort && a.folderSort == b.folderSort
                 && a.likedSort == b.likedSort && a.storageFilter == b.storageFilter && a.likedAt == b.likedAt
+                && a.minTracksPerAlbum == b.minTracksPerAlbum
         }
     }
 
@@ -136,11 +140,14 @@ final class LibraryModel {
             lists.songIds = Set(lists.songs.map(\.id))
         }
 
-        if let old, sameFilter, old.inputs.albumSort == inputs.albumSort {
+        if let old, sameFilter, old.inputs.albumSort == inputs.albumSort,
+           old.inputs.minTracksPerAlbum == inputs.minTracksPerAlbum {
             lists.albums = old.lists.albums
         } else {
             let albumIds = Set(visibleSongs().map(\.albumId))
-            let albums = filter == .all ? snapshot.albums : snapshot.albums.filter { albumIds.contains($0.id) }
+            var albums = filter == .all ? snapshot.albums : snapshot.albums.filter { albumIds.contains($0.id) }
+            let minTracks = inputs.minTracksPerAlbum
+            if minTracks > 1 { albums = albums.filter { $0.songCount >= minTracks } }
             lists.albums = LibrarySorting.sortAlbums(albums, by: inputs.albumSort)
         }
 

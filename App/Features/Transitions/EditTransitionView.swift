@@ -285,7 +285,7 @@ private struct TransitionDurationCard: View {
             Slider(value: $value, in: 0...12000, step: 1000)
                 .tint(theme.primary)
                 .onChange(of: value) { _, new in if Int(new) != durationMs { onChange(Int(new)) } }
-                .sensoryFeedback(.selection, trigger: Int(value))
+                .pixlHaptic(.selection, trigger: Int(value))
         }
         .padding(24)
         .pixlGlass(in: RoundedRectangle(cornerRadius: 24, style: .continuous),

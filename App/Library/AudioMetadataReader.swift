@@ -225,7 +225,9 @@ nonisolated enum TagRegionReader {
             } else if size == 0 {
                 size = fileSize - offset
             }
-            guard size >= 8 else { break }
+            // A box can't run past the end of the file; checked as a subtraction (the loop condition keeps
+            // `fileSize - offset` from underflowing) so a forged 64-bit size can't overflow `offset += size`.
+            guard size >= 8, size <= fileSize - offset else { break }
             if type == "ftyp" || type == "moov" {
                 guard size <= UInt64(maxTagBytes), let box = readRange(handle, from: offset, count: Int(size)),
                       UInt64(box.count) == size else { break }

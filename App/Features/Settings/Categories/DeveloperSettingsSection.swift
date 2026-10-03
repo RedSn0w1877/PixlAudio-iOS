@@ -73,14 +73,19 @@ struct DeveloperSettingsSection: View {
         .alert(L10n.settingsDialogRegenerateDailyMixTitle, isPresented: $showsDailyMix) {
             Button(L10n.commonCancel, role: .cancel) {}
             Button(L10n.settingsActionRegenerate) {
-                NotificationCenter.default.post(name: .settingsRegenerateDailyMix, object: nil)
+                // Android `regenerateDailyMix`: today's saved mixes are dropped and drawn again.
+                let home = environment.home, library = self.library
+                Task { await home.regenerateDailyMix(snapshot: library.snapshot, libraryRevision: library.revision) }
                 toast = L10n.settingsToastDailyMixRegenerationStarted
             }
         } message: { Text(L10n.settingsDialogRegenerateDailyMixBody) }
         .alert(L10n.settingsDialogRegenerateStatsTitle, isPresented: $showsStats) {
             Button(L10n.commonCancel, role: .cancel) {}
             Button(L10n.settingsActionRegenerate) {
-                NotificationCenter.default.post(name: .settingsRegenerateStats, object: nil)
+                // Stats are computed from the listening history: drop the cached summaries and recompute Home's.
+                ScreenDataCache.clearStats()
+                let home = environment.home, library = self.library
+                Task { await home.refresh(snapshot: library.snapshot, libraryRevision: library.revision, force: true) }
                 toast = L10n.settingsToastStatsRegenerationStarted
             }
         } message: { Text(L10n.settingsDialogRegenerateStatsBody) }
@@ -135,13 +140,6 @@ struct DeveloperSettingsSection: View {
                                              : L10n.settingsToastRegeneratedPalettesPartial(success, targets.count)
         }
     }
-}
-
-extension Notification.Name {
-    /// Developer › Maintenance asks Home (stage 7b) to rebuild the Daily Mix now.
-    static let settingsRegenerateDailyMix = Notification.Name("PixlAudio.settings.regenerateDailyMix")
-    /// Developer › Maintenance asks Stats (stage 7b) to drop its cache and recompute.
-    static let settingsRegenerateStats = Notification.Name("PixlAudio.settings.regenerateStats")
 }
 
 /// Android `PaletteRegenerateSongSheetContent`: title, hint, search field, and the matching songs (12 pt cards).

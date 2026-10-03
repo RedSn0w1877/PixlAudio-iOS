@@ -486,7 +486,7 @@ private struct SyncTapPad: View {
         }
         .glassEffect(palette.padGlass, in: SyncShapes.pad)
         .scaleEffect(pressed ? Self.pressedScale : 1)
-        .sensoryFeedback(.impact(weight: .light), trigger: session.haptics ? session.pressCount : 0)
+        .pixlHaptic(.impact(weight: .light), trigger: session.haptics ? session.pressCount : 0)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
         .accessibilityAddTraits(.isButton)

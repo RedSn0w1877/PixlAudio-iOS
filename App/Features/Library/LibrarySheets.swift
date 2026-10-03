@@ -290,7 +290,7 @@ struct ReorderTabsSheet: View {
             }
             return true
         }
-        .sensoryFeedback(.selection, trigger: tabs)
+        .pixlHaptic(.selection, trigger: tabs)
         .accessibilityIdentifier("reorder.\(tab.rawValue)")
     }
 
@@ -478,6 +478,8 @@ struct SongMultiSelectionSheet: View {
                 env.libraryEditor.removeSongs(songs.map(\.id))
                 finish()
             }
+        } message: {
+            Text("Song files on this iPhone are deleted; other songs are removed from the library and won't come back when it is scanned again.")
         }
         .task { shareURLs = await SongFiles.shareURLs(contentUris: songs.map(\.contentUriString)) }
         .accessibilityIdentifier("sheet.songSelection")

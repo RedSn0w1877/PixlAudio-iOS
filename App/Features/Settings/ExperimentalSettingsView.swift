@@ -356,5 +356,7 @@ private struct RoformerBackendPanel: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .experimentalPanelGlass()
+        // The API key comes from the Keychain, read the first time this panel shows.
+        .onAppear { experimental.loadSecretsIfNeeded() }
     }
 }

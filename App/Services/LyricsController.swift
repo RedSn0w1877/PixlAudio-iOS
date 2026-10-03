@@ -79,9 +79,10 @@ final class LyricsController {
         store.set(.loading(songId: song.id))
         guard let service else { return }
         let preference = LyricsSourcePreference(rawValue: settings.lyrics.sourcePreference) ?? .embeddedFirst
-        let online = settings.lyrics.automaticLyrics
+        // The catalogs (LRCLIB, AMLL, NetEase) are always asked, as Android's `LyricsRepositoryImpl` does: the
+        // "Automatic lyric sync" switch only drives the automatic studio (word timings in the background).
         loadTask = Task { [weak self] in
-            let loaded = await service.lyrics(for: song, preference: preference, allowOnline: online,
+            let loaded = await service.lyrics(for: song, preference: preference, allowOnline: true,
                                               forceRefresh: forceRefresh)
             guard !Task.isCancelled, let self, self.loadedSongId == song.id else { return }
             if let loaded {

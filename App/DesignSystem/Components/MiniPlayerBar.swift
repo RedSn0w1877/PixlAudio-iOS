@@ -48,28 +48,31 @@ struct MiniPlayerBar: View {
             .accessibilityAddTraits(.isButton)
             .accessibilityHint("Opens the player")
             .accessibilityIdentifier("miniPlayer.title")
-            Spacer().frame(width: m.buttonSpacing)
+            // The circles keep Android's 8 pt gaps and 12 pt end padding; each button's 44 pt touch area takes half
+            // of the gap on either side (a tap between two circles used to open the full player).
+            Spacer().frame(width: m.buttonSpacing - Self.hitInset)
             transportButton("backward.end.fill", label: "Previous", fill: theme.onPrimary, icon: theme.primary,
                             action: onPrevious)
-            Spacer().frame(width: m.buttonSpacing)
             transportButton(isPlaying ? "pause.fill" : "play.fill", label: isPlaying ? "Pause" : "Play",
                             fill: theme.primary, icon: theme.onPrimary, action: onPlayPause)
                 .accessibilityIdentifier("miniPlayer.playPause")
-            Spacer().frame(width: m.buttonSpacing)
             transportButton("forward.end.fill", label: "Next", fill: theme.onPrimary, icon: theme.primary,
                             action: onNext)
         }
         .padding(.leading, m.leadingPadding)
-        .padding(.trailing, m.trailingPadding)
+        .padding(.trailing, m.trailingPadding - Self.hitInset)
         .frame(height: Tokens.Shell.miniPlayerHeight)
         .contentShape(shape)
         .onTapGesture(perform: onOpen)
         .modifier(MiniPlayerGlass(enabled: drawsGlass, shape: shape,
                                   tint: theme.primaryContainer.opacity(GlassTint.container)))
-        .sensoryFeedback(.impact(weight: .light), trigger: isPlaying)
+        .pixlHaptic(.impact(weight: .light), trigger: isPlaying)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("miniPlayer")
     }
+
+    /// How far a button's touch area reaches past its circle on each side.
+    private static let hitInset = (Tokens.MiniPlayer.buttonHitSize - Tokens.MiniPlayer.buttonSize) / 2
 
     private func transportButton(_ symbol: String, label: LocalizedStringKey, fill: Color, icon: Color,
                                  action: @escaping () -> Void) -> some View {
@@ -81,7 +84,8 @@ struct MiniPlayerBar: View {
                 .contentTransition(.symbolEffect(.replace))
                 .frame(width: m.buttonSize, height: m.buttonSize)
                 .background(Circle().fill(fill))
-                .contentShape(.circle)
+                .frame(width: m.buttonHitSize, height: m.buttonHitSize)
+                .contentShape(.rect)
         }
         .buttonStyle(PressScaleButtonStyle())
         .disabled(isPreparing)

@@ -73,7 +73,7 @@ struct GlassPillRow<ID: Hashable & Sendable>: View {
                 withAnimation(PixlMotion.selection) { proxy.scrollTo(newValue, anchor: .center) }
             }
         }
-        .sensoryFeedback(.selection, trigger: selection)
+        .pixlHaptic(.selection, trigger: selection)
     }
 
     private func accessoryPill(_ accessory: Accessory) -> some View {

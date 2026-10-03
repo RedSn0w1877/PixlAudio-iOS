@@ -114,6 +114,6 @@ struct AlbumCarousel: View {
         .onChange(of: queue.count) { _, _ in
             if position != currentIndex { position = currentIndex }
         }
-        .sensoryFeedback(.impact(weight: .medium), trigger: settleHaptic)
+        .pixlHaptic(.impact(weight: .medium), trigger: settleHaptic)
     }
 }

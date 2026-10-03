@@ -40,7 +40,7 @@ struct SearchFilterChips: View {
                 }
             }
         }
-        .sensoryFeedback(.selection, trigger: selection)
+        .pixlHaptic(.selection, trigger: selection)
     }
 
     private func chip(_ filter: SearchFilterType, title: String) -> some View {

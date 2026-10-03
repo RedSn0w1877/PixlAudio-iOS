@@ -175,7 +175,14 @@ struct LibraryAlbumsPage: View {
                          selectionIndex: selection.index(of: album.id))
             .onTapGesture { selection.isActive ? actions.toggleAlbum(album) : actions.openAlbum(album) }
             .onLongPressGesture(minimumDuration: 0.45) { actions.toggleAlbum(album) }
-            .accessibilityAddTraits(.isButton)
+            // One VoiceOver button per album (the trait used to spread to each line of text), selected in
+            // multi-selection, with the long press as its Select action.
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+            .accessibilityAction { selection.isActive ? actions.toggleAlbum(album) : actions.openAlbum(album) }
+            .accessibilityActions {
+                Button(isSelected ? "Deselect" : "Select") { actions.toggleAlbum(album) }
+            }
             .accessibilityIdentifier("albumCard.\(album.id)")
     }
 }

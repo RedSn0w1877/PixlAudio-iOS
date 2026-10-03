@@ -62,19 +62,25 @@ private struct ResultCard<Leading: View>: View {
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: SearchMetrics.resultCardRadius, style: .continuous)
         HStack(spacing: 0) {
-            leading
-            Spacer().frame(width: 12)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(title)
-                    .pixlFont(.titleMedium, weight: .bold)
-                    .foregroundStyle(theme.onSurface)
-                    .lineLimit(1)
-                Text(subtitle)
-                    .pixlFont(.bodySmall)
-                    .foregroundStyle(theme.onSurfaceVariant)
-                    .lineLimit(1)
+            // The artwork and the two lines read as one button that opens the result; Play stays its own button.
+            HStack(spacing: 0) {
+                leading
+                Spacer().frame(width: 12)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(title)
+                        .pixlFont(.titleMedium, weight: .bold)
+                        .foregroundStyle(theme.onSurface)
+                        .lineLimit(1)
+                    Text(subtitle)
+                        .pixlFont(.bodySmall)
+                        .foregroundStyle(theme.onSurfaceVariant)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction(.default, onOpen)
             RowPlayButton(fill: playFill, foreground: playForeground, label: playLabel, action: onPlay)
         }
         .padding(12)
@@ -82,7 +88,6 @@ private struct ResultCard<Leading: View>: View {
         .onTapGesture(perform: onOpen)
         .pixlGlass(in: shape, tint: theme.surfaceContainerLow.opacity(GlassTint.surface), interactive: true)
         .accessibilityElement(children: .contain)
-        .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier(identifier)
     }
 }
@@ -160,19 +165,25 @@ private struct RemoteResultCard<Trailing: View>: View {
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
         HStack(spacing: 0) {
-            ArtworkView(source: ArtworkSource(uriString: artURL), size: 50, cornerRadius: 10)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(title)
-                    .pixlFont(.bodyLarge, weight: .medium)
-                    .foregroundStyle(theme.onSurface)
-                    .lineLimit(1)
-                Text(artist)
-                    .pixlFont(.bodyMedium)
-                    .foregroundStyle(theme.onSurfaceVariant)
-                    .lineLimit(1)
+            // The artwork and the two lines read as one button; the trailing control stays its own element.
+            HStack(spacing: 0) {
+                ArtworkView(source: ArtworkSource(uriString: artURL), size: 50, cornerRadius: 10)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(title)
+                        .pixlFont(.bodyLarge, weight: .medium)
+                        .foregroundStyle(theme.onSurface)
+                        .lineLimit(1)
+                    Text(artist)
+                        .pixlFont(.bodyMedium)
+                        .foregroundStyle(theme.onSurfaceVariant)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 12)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction(.default, onTap)
             trailing
         }
         .padding(10)
@@ -180,7 +191,6 @@ private struct RemoteResultCard<Trailing: View>: View {
         .onTapGesture(perform: onTap)
         .pixlGlass(in: shape, tint: theme.surfaceContainerLow.opacity(GlassTint.surface), interactive: true)
         .accessibilityElement(children: .contain)
-        .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier(identifier)
     }
 }

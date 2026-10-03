@@ -51,18 +51,21 @@ struct MusicFoldersView: View {
         .accessibilityIdentifier("screen.musicFolders")
     }
 
+    /// Close on the leading side, the two actions on the trailing side, and the title centred in the space between
+    /// them (centring it over the whole bar ran its end under the + circle: the trailing side is twice as wide).
     private var topBar: some View {
-        ZStack {
+        HStack {
+            GlassCircleButton(systemImage: "xmark", accessibilityLabel: LocalizedStringKey(L10n.commonClose)) {
+                finish()
+            }
             Text(L10n.settingsExcludedDirectoriesTitle)
                 .pixlFont(.custom(size: 22, weight: .medium))
                 .foregroundStyle(theme.onSurface)
                 .lineLimit(1)
-                .padding(.horizontal, 64)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity)
+                .accessibilityAddTraits(.isHeader)
             HStack {
-                GlassCircleButton(systemImage: "xmark", accessibilityLabel: LocalizedStringKey(L10n.commonClose)) {
-                    finish()
-                }
-                Spacer()
                 GlassCircleButton(systemImage: "plus", accessibilityLabel: "Add folder",
                                   tint: theme.primaryContainer.opacity(GlassTint.container),
                                   foreground: theme.onPrimaryContainer) { showsPicker = true }
@@ -74,8 +77,8 @@ struct MusicFoldersView: View {
                     Task { await model.reload() }
                 }
             }
-            .padding(.horizontal, 10)
         }
+        .padding(.horizontal, 10)
         .frame(height: 64)
     }
 

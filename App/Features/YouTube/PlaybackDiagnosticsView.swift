@@ -110,7 +110,7 @@ struct PlaybackDiagnosticsView: View {
                 }
                 .padding(.horizontal, YouTubeMetrics.screenPadding)
                 .padding(.top, 12)
-                .padding(.bottom, 12 + playback.miniPlayerClearance)
+                .padding(.bottom, 12)
             }
             .scrollIndicators(.hidden)
         }

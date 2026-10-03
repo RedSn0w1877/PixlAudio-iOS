@@ -156,6 +156,7 @@ struct LyricsView: View {
                         .padding(.top, safeTop + 90)
                         .transition(.move(edge: .top).combined(with: .opacity))
                         .task(id: message) {
+                            PixlAccessibility.announce(message)
                             try? await Task.sleep(for: .seconds(2.5))
                             withAnimation { controller.message = nil }
                         }
@@ -542,7 +543,7 @@ private struct LyricsSwipeOverlay: View {
             }
         }
         .allowsHitTesting(false)
-        .sensoryFeedback(.impact(weight: .heavy), trigger: swipe.commits)
+        .pixlHaptic(.impact(weight: .heavy), trigger: swipe.commits)
     }
 }
 

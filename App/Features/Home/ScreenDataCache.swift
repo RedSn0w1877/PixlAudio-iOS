@@ -39,4 +39,10 @@ enum ScreenDataCache {
                                     stamp: Stamp) {
         recentEntries[range] = (stamp, groups, queue)
     }
+
+    /// Settings › Developer › Regenerate stats: the next Stats and Recently Played visits compute from scratch.
+    static func clearStats() {
+        statsEntries = [:]
+        recentEntries = [:]
+    }
 }

@@ -44,6 +44,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case libraryAlbums, libraryAlbumsList, libraryArtists, libraryPlaylists, libraryFolders, libraryLiked
     case librarySelection, librarySort, libraryReorderTabs, libraryMultiSelection, libraryCreatePlaylist
     case libraryAddToPlaylist, songOptionsInfo
+    /// Library Navigation › Compact pill & grid (final review).
+    case libraryCompactNav
     case playlistEdit, playlistAddSongs, playlistOptions, playlistReorder, genreSort
 
     // Stage 8: the player's sheets (presented over the expanded player) and the song editor
@@ -79,7 +81,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .library, .miniPlayer: return "screen.library"
         case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryFolders, .libraryLiked,
              .librarySelection, .librarySort, .libraryReorderTabs, .libraryMultiSelection, .libraryCreatePlaylist,
-             .libraryAddToPlaylist:
+             .libraryAddToPlaylist, .libraryCompactNav:
             return "screen.library"
         case .songOptionsInfo: return "screen.songInfo"
         case .miniPlayerAlone: return "screen.albumDetail"
@@ -101,7 +103,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .home, .search, .searchResults, .library, .miniPlayer: return nil
         case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryFolders, .libraryLiked,
              .librarySelection, .librarySort, .libraryReorderTabs, .libraryMultiSelection, .libraryCreatePlaylist,
-             .libraryAddToPlaylist, .songOptionsInfo:
+             .libraryAddToPlaylist, .songOptionsInfo, .libraryCompactNav:
             return nil
         case .playlistEdit: return .playlistEditor(playlistId: demo.playlists.first?.id)
         case .playlistAddSongs, .playlistOptions, .playlistReorder:
@@ -171,7 +173,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryFolders, .libraryLiked,
              .librarySelection, .librarySort, .libraryReorderTabs, .libraryMultiSelection, .libraryCreatePlaylist,
              .libraryAddToPlaylist, .songOptionsInfo, .playlistEdit, .playlistAddSongs, .playlistOptions,
-             .playlistReorder, .genreSort:
+             .playlistReorder, .genreSort, .libraryCompactNav:
             .library
         default: .home
         }

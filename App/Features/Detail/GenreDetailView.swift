@@ -365,9 +365,8 @@ private struct GenreBottomControl: View {
     @Environment(PlaybackStore.self) private var playback
     @Environment(\.appTheme) private var theme
 
-    /// The shell's mini player floats over pushed screens; the floating controls sit above it (Android pads by
-    /// `MiniPlayerHeight` while a song is loaded).
-    private var miniPlayerClearance: CGFloat { playback.miniPlayerClearance }
+    // The shell's mini player floats over pushed screens; the route's safe area already ends above it
+    // (`BottomBarsClearance`), so the floating controls sit above it as on Android (`MiniPlayerHeight` padding).
 
     var body: some View {
         if selection.isActive {
@@ -379,7 +378,7 @@ private struct GenreBottomControl: View {
                 .pixlGlass(in: RoundedRectangle(cornerRadius: 28, style: .continuous),
                            tint: theme.surfaceContainer.opacity(GlassTint.container))
                 .padding(.horizontal, 16)
-                .padding(.bottom, 16 + miniPlayerClearance)
+                .padding(.bottom, 16)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
         } else {
             // Sort & Play is a small system menu that morphs out of the button (owner change 2026-10-02).
@@ -391,7 +390,7 @@ private struct GenreBottomControl: View {
                 sortAndPlayMenu
             }
             .padding(.trailing, 16)
-            .padding(.bottom, 26 + miniPlayerClearance)
+            .padding(.bottom, 26)
             .accessibilityIdentifier("genre.options")
             .transition(.scale.combined(with: .opacity))
         }

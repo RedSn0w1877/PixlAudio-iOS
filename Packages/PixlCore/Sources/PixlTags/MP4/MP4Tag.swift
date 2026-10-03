@@ -87,7 +87,9 @@ public struct MP4Tag: Sendable, Hashable {
             } else if size == 0 {
                 size = bytes.count - pos
             }
-            guard size >= headerSize, pos + size <= bytes.count else { break }
+            // `size <= count - pos`, not `pos + size <= count`: a 64-bit size clamps to Int.max, and the addition
+            // would trap.
+            guard size >= headerSize, size <= bytes.count - pos else { break }
             let name = atomName(bytes, pos + 4)
             let body = Array(bytes[(pos + headerSize)..<(pos + size)])
             // TagLib `MP4::Tag::addItem`: a repeated item name is ignored (the first one wins).
@@ -126,7 +128,8 @@ public struct MP4Tag: Sendable, Hashable {
             } else if size == 0 {
                 size = range.upperBound - pos
             }
-            guard size >= headerSize, pos + size <= range.upperBound else {
+            // Compared as `size <= upperBound - pos` so a clamped 64-bit size (Int.max) can't overflow `pos + size`.
+            guard size >= headerSize, size <= range.upperBound - pos else {
                 throw TagError.invalid("MP4: atom size out of range")
             }
             if atomName(header, 4) == wanted {

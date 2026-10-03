@@ -20,6 +20,8 @@ final class PlaybackServices {
     /// Where finished listening sessions go. `AppEnvironment` points this at Home's `ListeningHistoryStore`, so one
     /// object owns `playback_history.json`; without it the sessions are written through `history`.
     var recordHistory: ((_ songId: String, _ durationMs: Int64, _ timestamp: Int64) -> Void)?
+    /// Every finished listening session, for music intelligence's feedback (Android `tasteRepository.record`).
+    var recordTaste: ((ListeningStatsTracker.Record) -> Void)?
     /// The current item or the queue changed (stage 11's prefetcher resolves the next streamed song).
     var onUpcomingChanged: (() -> Void)?
     /// A finished listening session's engagement row (its play count) has been written. `recordHistory` bumps the
@@ -31,6 +33,9 @@ final class PlaybackServices {
     private let persistence: PersistenceActor?
     private var lifecycleObservers: [any NSObjectProtocol] = []
     private var started = false
+
+    /// Settings › Playback › Pause when volume reaches zero.
+    private let volumeZero = VolumeZeroPauser()
 
     init(settings: SettingsStore, persistence: PersistenceActor?, defaults: UserDefaults = .standard) {
         self.settings = settings
@@ -54,6 +59,12 @@ final class PlaybackServices {
         nowPlaying.install()
         observeSettings()
         observeLifecycle()
+        let settings = self.settings
+        volumeZero.start(isEnabled: { settings.playback.pauseOnVolumeZero },
+                         pauseIfPlaying: { [weak self] in
+                             guard let self, self.engine.active.isPlaying else { return }
+                             self.engine.pause()
+                         })
         Task { await reloadTransitionRules() }
     }
 
@@ -139,6 +150,7 @@ final class PlaybackServices {
             guard let self else { return }
             let history = self.recordHistory == nil ? self.history : nil
             self.recordHistory?(record.songId, record.listenedMs, record.timestamp)
+            self.recordTaste?(record)
             let persistence = self.persistence
             Task.detached(priority: .utility) { [weak self] in
                 await history?.recordPlayback(songId: record.songId, durationMs: record.listenedMs,

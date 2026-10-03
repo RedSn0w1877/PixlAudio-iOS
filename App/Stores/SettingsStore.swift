@@ -256,7 +256,12 @@ final class AppearanceSettings {
         didSet { defaults.set(fullPlayerShowFileInfo, forKey: PreferenceKeys.fullPlayerShowFileInfo) }
     }
     /// Android `AlbumArtQuality.name` (`MEDIUM` default).
-    var albumArtQuality: String { didSet { defaults.set(albumArtQuality, forKey: PreferenceKeys.albumArtQuality) } }
+    var albumArtQuality: String {
+        didSet {
+            defaults.set(albumArtQuality, forKey: PreferenceKeys.albumArtQuality)
+            ArtworkPipeline.applyAlbumArtQuality(albumArtQuality)
+        }
+    }
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
@@ -268,7 +273,9 @@ final class AppearanceSettings {
         collageAutoRotate = defaults.bool(PreferenceKeys.collageAutoRotate, default: false)
         libraryNavigationMode = defaults.string(PreferenceKeys.libraryNavigationMode, default: "tab_row")
         fullPlayerShowFileInfo = defaults.bool(PreferenceKeys.fullPlayerShowFileInfo, default: true)
-        albumArtQuality = defaults.string(PreferenceKeys.albumArtQuality, default: "MEDIUM")
+        let quality = defaults.string(PreferenceKeys.albumArtQuality, default: "MEDIUM")
+        albumArtQuality = quality
+        ArtworkPipeline.applyAlbumArtQuality(quality)
         appThemeMode = AppThemeMode(rawValue: defaults.string(PreferenceKeys.appThemeMode, default: "")) ?? .followSystem
         playerTheme = PlayerThemePreference(rawValue: defaults.string(PreferenceKeys.playerThemePreference, default: ""))
             ?? .albumArt
@@ -283,7 +290,12 @@ final class AppearanceSettings {
 final class BehaviorSettings {
     private let defaults: UserDefaults
 
-    var hapticsEnabled: Bool { didSet { defaults.set(hapticsEnabled, forKey: PreferenceKeys.hapticsEnabled) } }
+    var hapticsEnabled: Bool {
+        didSet {
+            defaults.set(hapticsEnabled, forKey: PreferenceKeys.hapticsEnabled)
+            HapticsPreference.isEnabled = hapticsEnabled
+        }
+    }
     var tapBackgroundClosesPlayer: Bool {
         didSet { defaults.set(tapBackgroundClosesPlayer, forKey: PreferenceKeys.tapBackgroundClosesPlayer) }
     }
@@ -297,7 +309,9 @@ final class BehaviorSettings {
     init(defaults: UserDefaults) {
         self.defaults = defaults
         folderBackGestureNavigation = defaults.bool(PreferenceKeys.folderBackGestureNavigationKey, default: true)
-        hapticsEnabled = defaults.bool(PreferenceKeys.hapticsEnabled, default: true)
+        let haptics = defaults.bool(PreferenceKeys.hapticsEnabled, default: true)
+        hapticsEnabled = haptics
+        HapticsPreference.isEnabled = haptics
         tapBackgroundClosesPlayer = defaults.bool(PreferenceKeys.tapBackgroundClosesPlayer, default: false)
         let tab = defaults.string(PreferenceKeys.launchTab, default: "Home")
         launchTab = RootTab.allCases.first { $0.launchTabKey.caseInsensitiveCompare(tab) == .orderedSame } ?? .home
@@ -385,7 +399,11 @@ final class LibrarySettings {
     var hideLocalMedia: Bool { didSet { defaults.set(hideLocalMedia, forKey: PreferenceKeys.hideLocalMedia) } }
     /// Android `album_art_cache_limit_mb` (default 200, 50…1500).
     var albumArtCacheLimitMb: Int {
-        didSet { defaults.set(albumArtCacheLimitMb, forKey: PreferenceKeys.albumArtCacheLimitMb) }
+        didSet {
+            defaults.set(albumArtCacheLimitMb, forKey: PreferenceKeys.albumArtCacheLimitMb)
+            let limit = Int64(albumArtCacheLimitMb) * 1_048_576
+            Task.detached(priority: .background) { ArtworkPipeline.trimDiskCache(limitBytes: limit) }
+        }
     }
     /// Character delimiters, stored as Android does: a JSON string array (`json.encodeToString`).
     var artistDelimiters: [String] {
@@ -665,7 +683,23 @@ final class ExperimentalSettings {
     var vocalAttenuation: Double { didSet { defaults.set(vocalAttenuation, forKey: PreferenceKeys.taisVocalAttenuation) } }
     var roformerBaseUrl: String { didSet { defaults.set(roformerBaseUrl, forKey: PreferenceKeys.taisRoformerBaseUrl) } }
     var roformerApiName: String { didSet { defaults.set(roformerApiName, forKey: PreferenceKeys.taisRoformerApiName) } }
-    var roformerApiKey: String { didSet { defaults.set(roformerApiKey, forKey: PreferenceKeys.taisRoformerApiKey) } }
+    /// The BS-RoFormer backend's API key: a secret, so it lives in the Keychain (account `tais_roformer_api_key`),
+    /// like the AI providers' keys. It is read on first use (`loadSecretsIfNeeded`), not at launch. Stores on another
+    /// defaults suite (tests, UI tests) keep it in that suite instead.
+    var roformerApiKey: String {
+        didSet {
+            guard !isLoadingSecrets else { return }
+            if usesKeychain {
+                _ = SettingsBackup.setKeychainString(PreferenceKeys.taisRoformerApiKey, roformerApiKey)
+            } else {
+                defaults.set(roformerApiKey, forKey: PreferenceKeys.taisRoformerApiKey)
+            }
+        }
+    }
+    /// Secrets go to the Keychain only for the app's own settings (`UserDefaults.standard`).
+    let usesKeychain: Bool
+    @ObservationIgnored private var secretsLoaded = false
+    @ObservationIgnored private var isLoadingSecrets = false
     var roformerExtraArg: String { didSet { defaults.set(roformerExtraArg, forKey: PreferenceKeys.taisRoformerExtraArg) } }
     /// `GRADIO_SPACE` (default) or `DIRECT_POST`.
     var roformerBackendType: String {
@@ -693,13 +727,37 @@ final class ExperimentalSettings {
         vocalAttenuation = min(max(defaults.double(PreferenceKeys.taisVocalAttenuation, default: 0), 0), 1)
         roformerBaseUrl = defaults.string(PreferenceKeys.taisRoformerBaseUrl, default: "")
         roformerApiName = defaults.string(PreferenceKeys.taisRoformerApiName, default: "")
-        roformerApiKey = defaults.string(PreferenceKeys.taisRoformerApiKey, default: "")
+        let keychain = defaults === UserDefaults.standard
+        usesKeychain = keychain
+        roformerApiKey = keychain ? "" : defaults.string(PreferenceKeys.taisRoformerApiKey, default: "")
         roformerExtraArg = defaults.string(PreferenceKeys.taisRoformerExtraArg, default: "")
         roformerBackendType = defaults.string(PreferenceKeys.taisRoformerBackendType, default: "GRADIO_SPACE")
         backupInfoDismissed = defaults.bool(PreferenceKeys.backupInfoDismissed, default: false)
         advancedDiagnosticsEnabled = defaults.bool(PreferenceKeys.advancedPerformanceDiagnosticsEnabled, default: false)
         advancedDiagnosticsExpiresAtMs = (defaults.object(forKey: PreferenceKeys.advancedPerformanceDiagnosticsExpiresAt)
             as? NSNumber)?.int64Value
+    }
+
+    /// Reads the Keychain secrets once (the Experimental screen and the BS-RoFormer job call it before using the
+    /// key). A key an older build left in `UserDefaults` moves into the Keychain here.
+    func loadSecretsIfNeeded() {
+        guard usesKeychain, !secretsLoaded else { return }
+        secretsLoaded = true
+        let account = PreferenceKeys.taisRoformerApiKey
+        var key = SettingsBackup.keychainString(account) ?? ""
+        if let legacy = defaults.string(forKey: account) {
+            if key.isEmpty, !legacy.isEmpty, SettingsBackup.setKeychainString(account, legacy) { key = legacy }
+            defaults.removeObject(forKey: account)
+        }
+        isLoadingSecrets = true
+        roformerApiKey = key
+        isLoadingSecrets = false
+    }
+
+    /// After a settings restore: the Keychain may hold a new key.
+    func reloadSecrets() {
+        secretsLoaded = false
+        loadSecretsIfNeeded()
     }
 
     /// Android `setDelayAllFullPlayerContent`.

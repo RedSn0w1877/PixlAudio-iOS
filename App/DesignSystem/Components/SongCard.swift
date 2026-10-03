@@ -32,6 +32,7 @@ struct SongCard: View {
     var onLongPress: (() -> Void)?
 
     @Environment(\.appTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Stage 11: the offline badge of streamed songs (absent in previews / contexts without downloads).
     @Environment(DownloadBadges.self) private var downloadBadges: DownloadBadges?
 
@@ -43,28 +44,41 @@ struct SongCard: View {
         let showsIndicator = isCurrent && !isSelectionMode
         let showsTrailing = showsMoreButton && !isSelectionMode
         HStack(spacing: 0) {
-            if showsArtwork {
-                artwork
-                Spacer().frame(width: t.artSpacing)
-            } else {
-                Spacer().frame(width: 4)
+            // Art, title, artist, badge and indicator are one VoiceOver element — a button (selected in
+            // multi-selection) whose activation does what the tap does; the long press is its Select action. The ⋮
+            // button stays its own element.
+            HStack(spacing: 0) {
+                if showsArtwork {
+                    artwork
+                    Spacer().frame(width: t.artSpacing)
+                } else {
+                    Spacer().frame(width: 4)
+                }
+                VStack(alignment: .leading, spacing: t.titleArtistSpacing) {
+                    Text(song.title)
+                        .pixlFont(.bodyLarge, weight: .semibold)
+                        .lineLimit(1)
+                    Text(song.displayArtist)
+                        .pixlFont(.bodyMedium)
+                        .opacity(0.7)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if !isSelectionMode, let badge = downloadBadges?.kind(for: song) {
+                    SongAvailabilityBadge(kind: badge, tint: content)
+                }
+                if showsIndicator {
+                    PlayingIndicator(isPlaying: isPlaying, color: content)
+                        .padding(.leading, Tokens.Spacing.s)
+                }
             }
-            VStack(alignment: .leading, spacing: t.titleArtistSpacing) {
-                Text(song.title)
-                    .pixlFont(.bodyLarge, weight: .semibold)
-                    .lineLimit(1)
-                Text(song.displayArtist)
-                    .pixlFont(.bodyMedium)
-                    .opacity(0.7)
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            if !isSelectionMode, let badge = downloadBadges?.kind(for: song) {
-                SongAvailabilityBadge(kind: badge, tint: content)
-            }
-            if showsIndicator {
-                PlayingIndicator(isPlaying: isPlaying, color: content)
-                    .padding(.leading, Tokens.Spacing.s)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+            .accessibilityAction { activate() }
+            .accessibilityActions {
+                if let onLongPress {
+                    Button(isSelected ? "Deselect" : "Select", action: onLongPress)
+                }
             }
             if showsIndicator || showsTrailing {
                 Spacer().frame(width: t.trailingSpacing)
@@ -78,7 +92,8 @@ struct SongCard: View {
                         .frame(width: t.moreButtonSize - t.moreButtonEndPadding,
                                height: t.moreButtonSize - t.moreButtonEndPadding)
                         .background(Circle().fill(isCurrent ? theme.onPrimaryContainer : theme.surfaceContainerHigh.opacity(0.85)))
-                        .contentShape(.circle)
+                        // A 44 pt touch area around the 32 pt circle (a near miss used to play the song instead).
+                        .contentShape(Rectangle().inset(by: -6))
                 }
                 .buttonStyle(PressScaleButtonStyle())
                 .padding(.trailing, t.moreButtonEndPadding)
@@ -90,9 +105,7 @@ struct SongCard: View {
         .padding(.horizontal, t.horizontalPadding)
         .padding(.vertical, t.verticalPadding)
         .contentShape(shape)
-        .onTapGesture {
-            if isSelectionMode, let onLongPress { onLongPress() } else { onTap() }
-        }
+        .onTapGesture { activate() }
         .modifier(SongCardLongPress(action: onLongPress))
         .pixlGlass(in: shape, tint: tint(highlighted: highlighted), interactive: true)
         .overlay {
@@ -102,10 +115,15 @@ struct SongCard: View {
         }
         .scaleEffect(isSelected ? 0.98 : 1)
         .animation(PixlMotion.state, value: isCurrent)
-        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
+        // Reduce Motion: the selection shrink eases instead of bouncing.
+        .animation(reduceMotion ? PixlMotion.state : .spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
         .accessibilityElement(children: .contain)
-        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
         .accessibilityIdentifier("songCard.\(song.id)")
+    }
+
+    /// A tap: in selection mode it toggles the selection (when the card can be selected), else it plays.
+    private func activate() {
+        if isSelectionMode, let onLongPress { onLongPress() } else { onTap() }
     }
 
     @ViewBuilder

@@ -24,10 +24,13 @@ nonisolated enum HomeProjectLinks {
     static let newIssue = URL(string: "https://github.com/RedSn0w1877/PixlAudio-iOS/issues/new")!
     static let commits = URL(string: "https://github.com/RedSn0w1877/PixlAudio-iOS/commits/main")!
 
-    /// "0.1.0" from `CFBundleShortVersionString`.
+    /// "1.0.0" from `CFBundleShortVersionString`.
     static var shortVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
     }
+
+    /// Builds before 1.0 were betas; from 1.0 on the version is shown as it is.
+    static var isPreRelease: Bool { shortVersion.hasPrefix("0.") }
 }
 
 // MARK: - Sine wave (Android HomeSineWaveLine)
@@ -203,10 +206,12 @@ private struct BetaInfoSheetContent: View {
                 .background(Circle().fill(LinearGradient(colors: [theme.primary, theme.primary.opacity(0.65)],
                                                          startPoint: .topLeading, endPoint: .bottomTrailing)))
             VStack(alignment: .leading, spacing: 4) {
-                Text("Welcome to PixlAudio \(version)-beta")
+                Text(HomeProjectLinks.isPreRelease ? "Welcome to PixlAudio \(version)-beta" : "Welcome to PixlAudio \(version)")
                     .pixlFont(.titleMedium)
                     .foregroundStyle(theme.onSurface)
-                Text("You're using a beta build that may contain bugs, crashes, or experimental features. Help us improve by reporting issues.")
+                Text(HomeProjectLinks.isPreRelease
+                     ? "You're using a beta build that may contain bugs, crashes, or experimental features. Help us improve by reporting issues."
+                     : "Thanks for using PixlAudio. If something breaks or doesn't work as expected, help us improve by reporting it.")
                     .pixlFont(.bodyMedium)
                     .foregroundStyle(theme.onSurfaceVariant)
                     .fixedSize(horizontal: false, vertical: true)
@@ -412,6 +417,20 @@ nonisolated struct HomeChangelogVersion: Sendable, Identifiable {
 /// its own versions).
 nonisolated enum HomeChangelog {
     static let versions: [HomeChangelogVersion] = [
+        HomeChangelogVersion(version: "1.0.0", date: "2026-10-03", sections: [
+            ("What's New", [
+                "The whole PixlAudio app on iOS: Library, Search, the player and karaoke lyrics, the lyric sync editor, AI features, Spotify and YouTube Music, backups and setup.",
+                "The tab bar sits on the system's liquid lens, and small menus open right out of their buttons.",
+                "Library Navigation's compact pill, artist photos and custom artist images.",
+                "Open audio files, playlists and lyrics in PixlAudio from the Files app.",
+                "Music intelligence learns from the songs you finish and skip.",
+            ]),
+            ("Improvements", [
+                "Lists scroll all the way up above the mini player and the tab bar.",
+                "Deleted songs stay deleted, and settings that did nothing now work or are gone.",
+                "Better VoiceOver support: the full player is a modal screen, rows read as buttons, and toasts are announced.",
+            ]),
+        ]),
         HomeChangelogVersion(version: "0.1.0-beta", date: "2026-10-01", sections: [
             ("What's New", [
                 "PixlAudio on iOS: the Android app's screens rebuilt natively in Liquid Glass.",

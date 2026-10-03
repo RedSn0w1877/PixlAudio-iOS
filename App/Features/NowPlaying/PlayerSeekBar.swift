@@ -44,7 +44,7 @@ struct PlayerSeekBar: View {
             scrubFraction = nil
             heldTarget = nil
         }
-        .sensoryFeedback(.selection, trigger: hapticStep)
+        .pixlHaptic(.selection, trigger: hapticStep)
     }
 
     private func displayedFraction(durationMs: Int64, now: Date) -> Double {

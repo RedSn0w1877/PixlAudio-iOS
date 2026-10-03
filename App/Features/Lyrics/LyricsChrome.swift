@@ -231,7 +231,7 @@ private struct LyricsPlayPauseButton: View {
         .buttonStyle(.plain)
         .glassEffect(Glass.clear.tint(chrome.playPause.opacity(GlassTint.prominent)).interactive(), in: shape)
         .animation(.spring(response: 0.6, dampingFraction: 0.8), value: isPlaying)
-        .sensoryFeedback(.selection, trigger: isPlaying)
+        .pixlHaptic(.selection, trigger: isPlaying)
         .accessibilityLabel(isPlaying ? Text("Pause") : Text("Play"))
     }
 }
@@ -281,7 +281,7 @@ private struct LyricsSeekBar: View {
             }
         }
         .glassEffect(chrome.panelGlass(brightArt: brightArt), in: Capsule())
-        .sensoryFeedback(.selection, trigger: dragFraction.map { Int($0 * 20) })
+        .pixlHaptic(.selection, trigger: dragFraction.map { Int($0 * 20) })
         .accessibilityElement()
         .accessibilityLabel(Text("Playback position"))
         .accessibilityValue(Text("\(Int(clock.fraction * 100)) %"))

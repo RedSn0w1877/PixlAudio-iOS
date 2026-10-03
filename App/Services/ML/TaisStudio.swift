@@ -9,9 +9,11 @@ import PixlNet
 /// TAIS Studio — the "Remaster Song" jobs (Android `TaisStudioWorker`, `StemSeparatorWorker`,
 /// `BsRoformerRenderWorker` on WorkManager): word-by-word lyric sync, the on-device instrumental and the cloud
 /// BS-RoFormer render. Jobs run one at a time in a single lane (Android shares one process-wide lane between lyric
-/// sync and separation), each reporting `(percent, detail)` for `TaisStudioProgressCard`; a run keeps going in the
-/// background through `TaisBackgroundRun` (the system's continued-processing Live Activity, cancellable there) and
-/// any job can be cancelled from the card.
+/// sync and separation), each reporting `(percent, detail)` for `TaisStudioProgressCard`; a run the person started
+/// keeps going in the background through `TaisBackgroundRun` (the system's continued-processing Live Activity,
+/// cancellable there) and any job can be cancelled from the card. Unattended jobs (`AutomaticStudioRunner`) never
+/// start, show in or keep alive that background run, and give way to anything the person starts (Android cancels
+/// `AUTO_STUDIO_WORK_TAG` work while manual work is present).
 @MainActor
 @Observable
 final class TaisStudio {
@@ -58,7 +60,7 @@ final class TaisStudio {
     @ObservationIgnored private let separator = MdxStemSeparator()
     @ObservationIgnored private let background = TaisBackgroundRun()
     @ObservationIgnored private var pending: [Job] = []
-    @ObservationIgnored private var running: (key: JobKey, task: Task<Void, Never>)?
+    @ObservationIgnored private var running: (key: JobKey, unattended: Bool, task: Task<Void, Never>)?
 
     /// What the jobs need from the rest of the app. nil = UI tests (states are set by the demo).
     struct Dependencies {
@@ -74,6 +76,8 @@ final class TaisStudio {
         let song: Song
         let overrideUser: Bool
         let forceResync: Bool
+        /// Started by `AutomaticStudioRunner`, not by the person.
+        var unattended: Bool
     }
 
     nonisolated struct JobFailure: LocalizedError, Sendable {
@@ -97,15 +101,64 @@ final class TaisStudio {
     // MARK: Starting and cancelling
 
     /// Enqueues a job (`ExistingWorkPolicy.KEEP`: a job already queued or running for that song is kept).
-    func start(_ kind: JobKind, song: Song, overrideUser: Bool = false, forceResync: Bool = true) {
+    ///
+    /// `unattended` jobs come from `AutomaticStudioRunner`: they run only in the foreground lane, with no system
+    /// progress UI. A job the person starts cancels any unattended one first, and asking for the song an unattended
+    /// job is already working on makes that job the person's own.
+    func start(_ kind: JobKind, song: Song, overrideUser: Bool = false, forceResync: Bool = true,
+               unattended: Bool = false) {
         let key = JobKey(kind: kind, songId: song.id)
-        if jobs[key]?.isActive == true { return }
+        if jobs[key]?.isActive == true {
+            if !unattended { adopt(key, song: song) }
+            return
+        }
         let waiting = kind == .lyrics ? "Waiting for the lyric sync engine…" : "Queued…"
         jobs[key] = JobState(phase: .queued, percent: 0, detail: waiting, indeterminate: true)
         guard dependencies != nil else { return }
-        pending.append(Job(key: key, song: song, overrideUser: overrideUser, forceResync: forceResync))
-        background.begin(title: "Remaster Song", subtitle: "\(Self.title(kind)) · \(song.title)")
+        if !unattended { cancelUnattended() }
+        pending.append(Job(key: key, song: song, overrideUser: overrideUser, forceResync: forceResync,
+                           unattended: unattended))
+        if !unattended { background.begin(title: "Remaster Song", subtitle: "\(Self.title(kind)) · \(song.title)") }
         runNextIfIdle()
+    }
+
+    /// Whether this song's active job was started by `AutomaticStudioRunner` and nobody has asked for it since.
+    func isUnattended(_ kind: JobKind, songId: String) -> Bool {
+        let key = JobKey(kind: kind, songId: songId)
+        if let running, running.key == key { return running.unattended }
+        return pending.first { $0.key == key }?.unattended ?? false
+    }
+
+    /// The person asked for a song an unattended job already has: it becomes theirs (system progress UI, keeps going
+    /// in the background, no longer cancelled by the automatic runner).
+    private func adopt(_ key: JobKey, song: Song) {
+        if let index = pending.firstIndex(where: { $0.key == key && $0.unattended }) {
+            pending[index].unattended = false
+        } else if let current = running, current.key == key, current.unattended {
+            running = (current.key, false, current.task)
+        } else {
+            return
+        }
+        background.begin(title: "Remaster Song", subtitle: "\(Self.title(key.kind)) · \(song.title)")
+        if let state = jobs[key] {
+            background.update(subtitle: state.detail ?? Self.title(key.kind), fraction: Double(state.percent) / 100)
+        }
+    }
+
+    /// Manual work comes first: unattended jobs stop (the runner retries them later).
+    private func cancelUnattended() {
+        for job in pending where job.unattended {
+            jobs[job.key] = JobState(phase: .cancelled, percent: 0, detail: nil, indeterminate: false)
+        }
+        pending.removeAll { $0.unattended }
+        if let running, running.unattended { running.task.cancel() }
+    }
+
+    /// The continued-processing run covers only the jobs the person started: it ends once none of them is queued or
+    /// running, even while an unattended job carries on in the lane.
+    private func endBackgroundRunIfNoAttendedWork(success: Bool) {
+        let attended = pending.contains { !$0.unattended } || running?.unattended == false
+        if !attended { background.end(success: success) }
     }
 
     // MARK: Playlist batches (Android `playlistWorkName` + `PlaylistLyricSyncState`)
@@ -173,7 +226,7 @@ final class TaisStudio {
         if let index = pending.firstIndex(where: { $0.key == key }) {
             pending.remove(at: index)
             jobs[key] = JobState(phase: .cancelled, percent: 0, detail: nil, indeterminate: false)
-            if running == nil && pending.isEmpty { background.end(success: false) }
+            endBackgroundRunIfNoAttendedWork(success: false)
             return
         }
         if running?.key == key { running?.task.cancel() }
@@ -199,7 +252,8 @@ final class TaisStudio {
             self.running = nil
             self.runNextIfIdle()
         }
-        running = (job.key, task)
+        running = (job.key, job.unattended, task)
+        endBackgroundRunIfNoAttendedWork(success: true)
     }
 
     private func run(_ job: Job) async {
@@ -227,7 +281,10 @@ final class TaisStudio {
         // Late progress (a chunk finishing after a cancel) never revives a finished job.
         guard jobs[key]?.isActive == true, running?.key == key else { return }
         jobs[key] = JobState(phase: .running, percent: min(max(percent, 0), 100), detail: detail, indeterminate: indeterminate)
-        background.update(subtitle: detail ?? Self.title(key.kind), fraction: Double(percent) / 100)
+        // Unattended work never shows in the system's progress UI.
+        if running?.unattended == false {
+            background.update(subtitle: detail ?? Self.title(key.kind), fraction: Double(percent) / 100)
+        }
     }
 
     static func title(_ kind: JobKind) -> String {
@@ -398,6 +455,7 @@ final class TaisStudio {
 
     static func roformerSettings(_ settings: SettingsStore) -> StemBackendSettings {
         let experimental = settings.experimental
+        experimental.loadSecretsIfNeeded()
         let key = experimental.roformerApiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let extra = experimental.roformerExtraArg.trimmingCharacters(in: .whitespacesAndNewlines)
         return StemBackendSettings(type: StemBackendType(rawValue: experimental.roformerBackendType) ?? .gradioSpace,

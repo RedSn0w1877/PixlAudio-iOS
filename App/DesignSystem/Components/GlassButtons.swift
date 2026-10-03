@@ -60,7 +60,8 @@ struct GlassCircleButton: View {
                 .font(.system(size: iconSize, weight: .medium))
                 .foregroundStyle(foreground ?? theme.onSurface)
                 .frame(width: size, height: size)
-                .contentShape(.circle)
+                // At least a 44 pt touch area around the 40 pt circle, without changing the layout.
+                .contentShape(Circle().inset(by: -max(0, (44 - size) / 2)))
         }
         .buttonStyle(.plain)
         .pixlGlass(in: Circle(), tint: tint, interactive: true)

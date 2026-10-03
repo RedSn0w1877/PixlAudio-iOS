@@ -84,8 +84,13 @@ struct RootView: View {
                                     @ViewBuilder root: () -> Content) -> some View {
         let isSelected = router.selection == tab
         return NavigationStack(path: path) {
-            root().withAppRoutes()
+            root()
+                .bottomBarsClearance(.tabRoot)
+                .withAppRoutes()
         }
+        // Room for the floating bars, per page (`BottomBarsClearance`): equal values don't propagate, so only the
+        // mini player appearing, compact mode or the keyboard on this tab change a page's inset.
+        .environment(\.bottomBarsClearance, clearance(isSelected: isSelected))
         // A song change animates the album colours over 0.45 s (the root `.animation` below): only on the tab that
         // is on screen. A hidden tab is at opacity 0, so snapping its colours shows nothing and costs no frames.
         .transaction(value: themeStore.albumPair) { transaction in
@@ -98,7 +103,22 @@ struct RootView: View {
             content.opacity(isSelected ? 1 : 0)
         }
         .allowsHitTesting(isSelected)
-        .accessibilityHidden(!isSelected)
+        // Hidden tabs are out of the accessibility tree, and so is the selected one while the full player covers it
+        // (a modal screen for VoiceOver). One `accessibilityHidden` per stack: an `accessibilityHidden(false)` around
+        // the three stacks overrode the hidden tabs' `true`, so their invisible rows answered accessibility hit
+        // tests over the visible tab's (UI tests found nothing hittable).
+        .modifier(TabAccessibilityHidden(isSelected: isSelected))
+    }
+
+    /// The bars' height over a tab root and over a pushed page. The keyboard hides both bars, but only the selected
+    /// tab changes for it (the hidden tabs keep their layout).
+    private func clearance(isSelected: Bool) -> BottomBarsClearance {
+        let keyboard = isKeyboardVisible && isSelected
+        let miniPlayer: CGFloat = playback.current != nil && !keyboard
+            ? Tokens.Shell.miniPlayerHeight + Tokens.Shell.miniPlayerSpacing : 0
+        let bar: CGFloat = keyboard ? 0
+            : settings.appearance.navBarCompactMode ? Tokens.Shell.navBarCompactHeight : Tokens.Shell.navBarHeight
+        return BottomBarsClearance(tabRoot: bar + miniPlayer, pushed: miniPlayer)
     }
 
     @ViewBuilder
@@ -114,11 +134,32 @@ struct RootView: View {
                 GlassNavBar(selection: router.selection,
                             compact: settings.appearance.navBarCompactMode,
                             onSelect: { tab in withAnimation(PixlMotion.selection) { router.select(tab) } })
+                    .modifier(HiddenWhilePlayerExpanded())
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .padding(.horizontal, Tokens.Shell.horizontalInset)
         .animation(PixlMotion.bars, value: showsBar)
         .animation(PixlMotion.bars, value: playback.hasItem)
+    }
+}
+
+/// A tab's stack leaves the accessibility tree when it isn't the selected tab, or while the full player covers it.
+/// Its own small view, so the expand / collapse flips re-run this modifier and not the shell's body.
+private struct TabAccessibilityHidden: ViewModifier {
+    let isSelected: Bool
+    @Environment(AppEnvironment.self) private var environment
+
+    func body(content: Content) -> some View {
+        content.accessibilityHidden(!isSelected || environment.playerSheet.isExpanded)
+    }
+}
+
+/// Hides the tab bar from VoiceOver while the full player covers it (the mini player's own layer hides itself).
+private struct HiddenWhilePlayerExpanded: ViewModifier {
+    @Environment(AppEnvironment.self) private var environment
+
+    func body(content: Content) -> some View {
+        content.accessibilityHidden(environment.playerSheet.isExpanded)
     }
 }

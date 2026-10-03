@@ -180,6 +180,52 @@ final class LibraryImportTests: XCTestCase {
         XCTAssertEqual(library.artists.first { $0.name == "Alice" }?.songCount, 1)
     }
 
+    /// Final review: a deleted song without a file of its own to delete (or whose file couldn't be deleted) is
+    /// remembered in `HiddenSongs`, and no rescan brings it back until it is un-hidden (opened again from Files).
+    func testHiddenSongsStayOutOfRescans() async throws {
+        try writeFixture()
+        let importer = makeImporter()
+        _ = try await scan(importer)
+        let id = try song("Song One", in: try await snapshot()).id
+        HiddenSongs.hide([id])
+        defer { HiddenSongs.unhide([id]) }
+        _ = try await scan(importer)
+        var library = try await snapshot()
+        XCTAssertNil(library.songs.first { $0.id == id }, "an incremental rescan brought a deleted song back")
+        _ = try await scan(importer, .full)
+        library = try await snapshot()
+        XCTAssertNil(library.songs.first { $0.id == id }, "a full rescan brought a deleted song back")
+        HiddenSongs.unhide([id])
+        _ = try await scan(importer)
+        library = try await snapshot()
+        XCTAssertNotNil(library.songs.first { $0.id == id }, "an un-hidden song comes back on the next scan")
+    }
+
+    /// Final review (security): an MP4 box after `ftyp` with a forged 64-bit size (largesize 0xFFFF_FFFF_FFFF_FFFF)
+    /// overflowed the walk's offset and trapped, on every launch's rescan. It must just stop.
+    func testForgedSixtyFourBitBoxSizeStopsTheMP4Walk() throws {
+        var bytes: [UInt8] = [0, 0, 0, 16] + Array("ftyp".utf8) + Array("M4A ".utf8) + [0, 0, 0, 0]
+        bytes += [0, 0, 0, 1] + Array("free".utf8) + [UInt8](repeating: 0xFF, count: 8)
+        bytes += [UInt8](repeating: 0, count: 32)
+        let url = workDirectory.appendingPathComponent("forged.m4a")
+        try Data(bytes).write(to: url)
+        XCTAssertNil(TagRegionReader.read(url: url))
+    }
+
+    /// Files opened in PixlAudio from Files or the share sheet go where their type belongs.
+    func testOpenedFilesAreSortedByKind() {
+        func kind(_ name: String) -> ExternalFiles.Kind { ExternalFiles.kind(of: URL(fileURLWithPath: "/x/" + name)) }
+        XCTAssertEqual(kind("PixlAudio.pxpl"), .backup)
+        XCTAssertEqual(kind("pixelplay_backup.json.gz"), .backup)
+        XCTAssertEqual(kind("Road Trip.M3U8"), .playlist)
+        XCTAssertEqual(kind("Road Trip.m3u"), .playlist)
+        XCTAssertEqual(kind("Song.lrc"), .lyrics)
+        XCTAssertEqual(kind("Song.ttml"), .lyrics)
+        XCTAssertEqual(kind("Song.flac"), .audio)
+        XCTAssertEqual(kind("Song.M4A"), .audio)
+        XCTAssertEqual(kind("notes.txt"), .unsupported)
+    }
+
     func testFavouritesSurviveRescans() async throws {
         try writeFixture()
         let importer = makeImporter()

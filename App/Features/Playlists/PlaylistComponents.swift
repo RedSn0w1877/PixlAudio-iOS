@@ -371,22 +371,30 @@ struct PlaylistSongRow: View {
                     .transition(.move(edge: .leading).combined(with: .opacity))
             }
             Spacer().frame(width: showsDragHandle ? 6 : 12)
-            ArtworkView(song: song, size: 42, cornerRadius: isCurrent ? 21 : 8)
-            Spacer().frame(width: 16)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(song.title)
-                    .pixlFont(.bodyLarge, weight: isCurrent ? .bold : .regular)
-                    .foregroundStyle(isCurrent ? theme.primary : theme.onSurface)
-                    .lineLimit(1)
-                Text(song.displayArtist)
-                    .pixlFont(.bodyMedium)
-                    .foregroundStyle(isCurrent ? theme.primary.opacity(0.8) : theme.onSurfaceVariant)
-                    .lineLimit(1)
+            // Art, title, artist and indicator read as one button that plays the song.
+            HStack(spacing: 0) {
+                ArtworkView(song: song, size: 42, cornerRadius: isCurrent ? 21 : 8)
+                Spacer().frame(width: 16)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(song.title)
+                        .pixlFont(.bodyLarge, weight: isCurrent ? .bold : .regular)
+                        .foregroundStyle(isCurrent ? theme.primary : theme.onSurface)
+                        .lineLimit(1)
+                    Text(song.displayArtist)
+                        .pixlFont(.bodyMedium)
+                        .foregroundStyle(isCurrent ? theme.primary.opacity(0.8) : theme.onSurfaceVariant)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if isCurrent {
+                    PlayingIndicator(isPlaying: isPlaying, color: theme.secondary)
+                        .padding(.leading, 8)
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction(.default, onTap)
             if isCurrent {
-                PlayingIndicator(isPlaying: isPlaying, color: theme.secondary)
-                    .padding(.leading, 8)
                 Spacer().frame(width: showsRemove ? 4 : 12)
             } else {
                 Spacer().frame(width: 8)
@@ -399,7 +407,7 @@ struct PlaylistSongRow: View {
                     .frame(width: 26, height: 26)
                     .background(Circle().fill(isCurrent ? theme.tertiaryContainer : theme.surfaceContainerHigh))
                     .frame(width: 36, height: 36)
-                    .contentShape(.circle)
+                    .contentShape(Rectangle().inset(by: -4))
             }
             .buttonStyle(PressScaleButtonStyle())
             .padding(.trailing, 10)

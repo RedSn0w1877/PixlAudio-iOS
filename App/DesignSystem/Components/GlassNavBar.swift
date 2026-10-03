@@ -30,7 +30,7 @@ struct GlassNavBar: View {
                      onSelect: onSelect)
             .frame(height: compact ? Tokens.Shell.navBarCompactHeight : Tokens.Shell.navBarHeight)
             .frame(maxWidth: .infinity)
-            .sensoryFeedback(.selection, trigger: selection)
+            .pixlHaptic(.selection, trigger: selection)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("navBar")
     }

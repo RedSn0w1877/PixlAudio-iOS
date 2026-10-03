@@ -64,7 +64,7 @@ struct EqualizerVerticalSlider: View {
                 }
                 .onEnded { _ in dragValue = nil },
             including: enabled ? .all : .none)
-        .sensoryFeedback(.selection, trigger: Int(value.rounded()))
+        .pixlHaptic(.selection, trigger: Int(value.rounded()))
         .accessibilityElement()
         .accessibilityValue("\(level) dB")
         .accessibilityAdjustableAction { direction in
@@ -300,7 +300,7 @@ struct EqualizerHorizontalBandSlider: View {
                     let rounded = Int(new.rounded())
                     if rounded != level { onChange(rounded) }
                 }
-                .sensoryFeedback(.selection, trigger: Int(value))
+                .pixlHaptic(.selection, trigger: Int(value))
             Text((level > 0 ? "+\(level)" : "\(level)") + "dB")
                 .pixlFont(.titleMedium, weight: .bold)
                 .foregroundStyle(level != 0 ? theme.primary : theme.onSurface)
@@ -447,7 +447,7 @@ struct WavyArcSlider: View {
                 }
                 .onEnded { _ in dragValue = nil },
             including: enabled ? .all : .none)
-        .sensoryFeedback(.selection, trigger: Int(shown / 50))
+        .pixlHaptic(.selection, trigger: Int(shown / 50))
     }
 
     private func valueFor(_ point: CGPoint) -> Double {

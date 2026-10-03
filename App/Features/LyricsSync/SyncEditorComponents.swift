@@ -355,5 +355,9 @@ struct SyncDialogCard<Content: View>: View {
             .glassEffect(Glass.regular.tint(Color.black.opacity(0.3)), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
             .padding(.horizontal, 24)
         }
+        // A modal dialog for VoiceOver; escape dismisses it.
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isModal)
+        .accessibilityAction(.escape, onDismiss)
     }
 }

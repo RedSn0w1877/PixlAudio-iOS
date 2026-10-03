@@ -79,10 +79,12 @@ struct CoverDestination: View {
 }
 
 extension View {
-    /// Registers every `AppRoute` destination. Apply once at the root of each tab's `NavigationStack`.
+    /// Registers every `AppRoute` destination. Apply once at the root of each tab's `NavigationStack`. Every route
+    /// gets the room the mini player covers (`BottomBarsClearance.pushed`).
     func withAppRoutes() -> some View {
         navigationDestination(for: AppRoute.self) { route in
             RouteDestination(route: route)
+                .bottomBarsClearance(.pushed)
         }
     }
 }

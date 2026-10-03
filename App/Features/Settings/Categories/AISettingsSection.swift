@@ -551,8 +551,10 @@ struct AIUsageItem: View {
     }
 }
 
-/// Android `AutomaticStudioSettingsCard` (tertiary-container card): automatic lyric sync and instrumentals.
+/// Android `AutomaticStudioSettingsCard` (tertiary-container card): automatic lyric sync and instrumentals, run by
+/// `AutomaticStudioRunner` while PixlAudio is open (iOS gives apps no dependable background processing time).
 struct AutomaticStudioCard: View {
+    @Environment(AppEnvironment.self) private var env
     @Environment(SettingsStore.self) private var settings
     @Environment(\.appTheme) private var theme
     @State private var showsDetails = false
@@ -570,7 +572,7 @@ struct AutomaticStudioCard: View {
                            $playback.automaticInstrumentals)
                 Text("No automatic notifications. Manual sync and instrumental buttons remain available.")
                     .pixlFont(.bodySmall).foregroundStyle(theme.onTertiaryContainer)
-                Text(lyrics.automaticLyrics || playback.automaticInstrumentals ? "Waiting for songs to prepare" : "Off")
+                Text(lyrics.automaticLyrics || playback.automaticInstrumentals ? env.automaticStudio.status : "Off")
                     .pixlFont(.bodyMedium)
                     .foregroundStyle(theme.onSurface)
                     .padding(.horizontal, 14)
@@ -578,19 +580,24 @@ struct AutomaticStudioCard: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(theme.surfaceContainerHighest.opacity(0.8),
                                 in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .accessibilityIdentifier("ai.automaticStudio.status")
                 SettingsFillButton(title: showsDetails ? "Hide queue details" : "Queue and diagnostics", style: .tonal) {
                     showsDetails.toggle()
                 }
                 if showsDetails {
-                    Text("Runs quietly in the background when the phone is idle. It pauses during playback, low battery, heat, storage pressure, or manual processing; longer tracks remain available through the manual controls.")
+                    Text("Runs while PixlAudio is open and nothing is playing, one song at a time, at most 8 songs every 6 hours. It waits during playback, below 40% battery unless charging, while the phone is hot or short of storage, and while you process songs by hand; songs over 6 minutes stay manual. It starts once the lyric sync or instrumental model is on this iPhone.")
                         .pixlFont(.bodySmall).foregroundStyle(theme.onTertiaryContainer)
                     SettingsFillButton(title: "Check queue now", style: .outlined,
-                                       enabled: lyrics.automaticLyrics || playback.automaticInstrumentals) {}
+                                       enabled: lyrics.automaticLyrics || playback.automaticInstrumentals) {
+                        env.automaticStudio.scanNow()
+                    }
                 }
             }
             .padding(20)
         }
         .animation(PixlMotion.state, value: showsDetails)
+        .onChange(of: lyrics.automaticLyrics) { _, _ in env.automaticStudio.scanNow() }
+        .onChange(of: playback.automaticInstrumentals) { _, _ in env.automaticStudio.scanNow() }
     }
 
     private func cardToggle(_ title: String, _ detail: String, _ isOn: Binding<Bool>) -> some View {
@@ -606,37 +613,61 @@ struct AutomaticStudioCard: View {
     }
 }
 
-/// Android `MusicIntelligenceSettingsCard` (secondary-container card): learning, discovery, exploration.
+/// Android `MusicIntelligenceSettingsCard` (secondary-container card): learning, exploration and the debug tools,
+/// on `MusicTasteStore` and Home's recommendations.
+///
+/// Dropped: "Discover beyond my library" — on Android it adds online catalog songs to Home's discovery shelves;
+/// the iOS Home has no catalog source, so the switch would do nothing (docs/design.md › Dropped settings). The
+/// instrumental-engine benchmark (Android's model status and timing) is not part of the iOS card either.
 struct MusicIntelligenceCard: View {
+    @Environment(AppEnvironment.self) private var env
     @Environment(SettingsStore.self) private var settings
     @Environment(\.appTheme) private var theme
     @State private var expanded = false
     @State private var exploration = 0.25
     @State private var showsReset = false
+    @State private var isBusy = false
+    @State private var message: String?
 
     var body: some View {
         @Bindable var ai = settings.ai
+        let taste = env.musicTaste
         GlassCard(cornerRadius: 28, tint: theme.secondaryContainer) {
             VStack(alignment: .leading, spacing: 12) {
                 Text(L10n.musicIntelligenceTitle).pixlFont(.headlineSmall).foregroundStyle(theme.onSecondaryContainer)
                 Text(L10n.musicIntelligenceDescription).pixlFont(.bodyMedium).foregroundStyle(theme.onSecondaryContainer)
                 toggle(L10n.musicIntelligenceLearning, $ai.musicLearningEnabled)
-                toggle(L10n.musicIntelligenceDiscovery, $ai.musicDiscoveryEnabled)
                 Text(L10n.musicIntelligenceExploration(Int(exploration * 100)))
                     .pixlFont(.titleSmall).foregroundStyle(theme.onSecondaryContainer)
                 Slider(value: $exploration, in: 0...0.6, step: 0.05) { editing in
                     if !editing { ai.musicExploration = exploration }
                 }
                 .tint(theme.primary)
-                Text(L10n.musicIntelligenceLearningCount(0, 0, 0))
+                Text(L10n.musicIntelligenceLearningCount(taste.learnedSongs, taste.completions, taste.skips))
                     .pixlFont(.bodySmall).foregroundStyle(theme.onSecondaryContainer)
+                    .accessibilityIdentifier("ai.musicIntelligence.count")
                 SettingsFillButton(title: expanded ? L10n.musicIntelligenceHideTools : L10n.musicIntelligenceTools,
                                    style: .filled) { expanded.toggle() }
                 if expanded {
                     Text(L10n.musicIntelligenceToolsDescription)
                         .pixlFont(.bodySmall).foregroundStyle(theme.onSecondaryContainer)
-                    SettingsFillButton(title: L10n.musicIntelligencePreview, style: .filled) {}
-                    SettingsFillButton(title: L10n.musicIntelligenceRefresh, style: .outlined) {}
+                    SettingsFillButton(title: L10n.musicIntelligencePreview, style: .filled, enabled: !isBusy) {
+                        preview()
+                    }
+                    SettingsFillButton(title: L10n.musicIntelligenceRefresh, style: .outlined, enabled: !isBusy) {
+                        refresh()
+                    }
+                    if let message {
+                        Text(message).pixlFont(.bodySmall).foregroundStyle(theme.onSecondaryContainer)
+                    }
+                    Text(taste.lastReport)
+                        .pixlFont(.bodySmall)
+                        .foregroundStyle(theme.onSecondaryContainer)
+                        .textSelection(.enabled)
+                    SettingsFillButton(title: L10n.musicIntelligenceCopyReport, style: .outlined) {
+                        UIPasteboard.general.string = taste.lastReport
+                        message = "Report copied."
+                    }
                     SettingsFillButton(title: L10n.musicIntelligenceReset, style: .outlined) { showsReset = true }
                 }
             }
@@ -646,9 +677,34 @@ struct MusicIntelligenceCard: View {
         .onAppear { exploration = ai.musicExploration }
         .alert(L10n.musicIntelligenceReset, isPresented: $showsReset) {
             Button(L10n.commonCancel, role: .cancel) {}
-            Button(L10n.musicIntelligenceResetConfirm, role: .destructive) {}
+            Button(L10n.musicIntelligenceResetConfirm, role: .destructive) {
+                taste.reset()
+                message = nil
+            }
         } message: {
             Text(L10n.musicIntelligenceResetDescription)
+        }
+    }
+
+    /// Android `preview`: ranks the real library with the real inputs; playback and the queue are untouched.
+    private func preview() {
+        isBusy = true
+        let home = env.home, snapshot = env.library.snapshot
+        Task {
+            await home.previewRecommendations(snapshot: snapshot)
+            message = "Preview complete. Playback is unchanged."
+            isBusy = false
+        }
+    }
+
+    /// Android `refreshDiscovery` (it queues the Daily Mix refresh): today's mixes are drawn again.
+    private func refresh() {
+        isBusy = true
+        let home = env.home, library = env.library
+        Task {
+            await home.regenerateDailyMix(snapshot: library.snapshot, libraryRevision: library.revision)
+            message = "Daily Mix and Your Mix were drawn again."
+            isBusy = false
         }
     }
 

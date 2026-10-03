@@ -37,7 +37,8 @@ struct HomeGreetingCard: View {
                         .foregroundStyle(theme.onSurface)
                         .rotationEffect(.degrees(isExpanded ? 180 : 0))
                         .frame(width: 32, height: 32)
-                        .contentShape(.circle)
+                        // A 44 pt touch area around the 32 pt glyph, without moving it.
+                        .contentShape(Rectangle().inset(by: -6))
                 }
                 .buttonStyle(PressScaleButtonStyle(pressedScale: 0.85))
                 .padding(.leading, 8)
@@ -403,15 +404,21 @@ private struct YourMixRow: View {
         let t = Tokens.SongCard.self
         let content = isCurrent ? theme.onPrimaryContainer : theme.onSurface
         HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: t.titleArtistSpacing) {
-                Text(song.title).pixlFont(.bodyLarge, weight: .semibold).lineLimit(1)
-                Text(song.displayArtist).pixlFont(.bodyMedium).opacity(0.7).lineLimit(1)
+            // Title, artist and indicator read as one button (the ⋮ stays its own element).
+            HStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: t.titleArtistSpacing) {
+                    Text(song.title).pixlFont(.bodyLarge, weight: .semibold).lineLimit(1)
+                    Text(song.displayArtist).pixlFont(.bodyMedium).opacity(0.7).lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if isCurrent {
+                    PlayingIndicator(isPlaying: isPlaying, color: content)
+                        .padding(.leading, Tokens.Spacing.s)
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            if isCurrent {
-                PlayingIndicator(isPlaying: isPlaying, color: content)
-                    .padding(.leading, Tokens.Spacing.s)
-            }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction(.default, onTap)
             Spacer().frame(width: t.trailingSpacing)
             Button(action: onMore) {
                 Image(systemName: "ellipsis")
@@ -420,7 +427,7 @@ private struct YourMixRow: View {
                     .foregroundStyle(isCurrent ? theme.primaryContainer : theme.onSurface)
                     .frame(width: t.moreButtonSize - t.moreButtonEndPadding, height: t.moreButtonSize - t.moreButtonEndPadding)
                     .background(Circle().fill(isCurrent ? theme.onPrimaryContainer : theme.surfaceContainerHigh.opacity(0.85)))
-                    .contentShape(.circle)
+                    .contentShape(Rectangle().inset(by: -6))
             }
             .buttonStyle(PressScaleButtonStyle())
             .padding(.trailing, t.moreButtonEndPadding)
@@ -435,7 +442,6 @@ private struct YourMixRow: View {
         .onTapGesture(perform: onTap)
         .animation(PixlMotion.state, value: isCurrent)
         .accessibilityElement(children: .contain)
-        .accessibilityAddTraits(.isButton)
     }
 }
 

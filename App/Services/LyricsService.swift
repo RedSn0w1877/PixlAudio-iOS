@@ -61,12 +61,14 @@ actor LyricsService {
     // MARK: Loading
 
     /// `getLyrics`: memory, stored, then the sources in `preference` order. `allowOnline` false skips the catalogs
-    /// (the "automatic lyrics" setting is off).
+    /// (the "automatic lyrics" setting is off). `remember` false is a probe (`AutomaticStudioRunner` checking songs):
+    /// it reads the memory cache but never adds to it, so it neither evicts the lyrics the person opened nor leaves an
+    /// offline-only result there for a later online load to return.
     func lyrics(for song: Song, preference: LyricsSourcePreference, allowOnline: Bool,
-                forceRefresh: Bool = false) async -> LoadedLyrics? {
+                forceRefresh: Bool = false, remember shouldRemember: Bool = true) async -> LoadedLyrics? {
         if !forceRefresh, let hit = memory[song.id] { return hit }
         if !forceRefresh, let stored = await storedLyricsAsync(for: song) {
-            remember(stored, for: song.id)
+            if shouldRemember { remember(stored, for: song.id) }
             return stored
         }
         let order: [LyricsSourceKind] = LyricsRepositoryLogic.sourceOrder(for: preference)
@@ -79,7 +81,7 @@ actor LyricsService {
             case .api: found = allowOnline ? await onlineLyrics(for: song) : nil
             }
             if let found, LyricsRepositoryLogic.isUsable(found.lyrics) {
-                remember(found, for: song.id)
+                if shouldRemember { remember(found, for: song.id) }
                 if kind == .api && !isUserSynced(song) { writeJSONCache(found.lyrics, songId: song.id) }
                 return found
             }

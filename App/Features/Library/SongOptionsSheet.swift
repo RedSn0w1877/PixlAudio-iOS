@@ -60,12 +60,17 @@ struct SongOptionsSheet: View {
             AddToPlaylistSheet(songIds: [song.id])
                 .pixlSheet(detents: [.large])
         }
-        .confirmationDialog("Delete \(song.title) from your library?", isPresented: $confirmsDelete,
-                            titleVisibility: .visible) {
-            Button("Delete", role: .destructive) {
+        // A scanned file is deleted from the device; anything else (music library, Spotify) leaves the library.
+        .confirmationDialog(SongFileRemoval.deletesFile(song) ? "Delete \(song.title)?"
+                                : "Remove \(song.title) from your library?",
+                            isPresented: $confirmsDelete, titleVisibility: .visible) {
+            Button(SongFileRemoval.deletesFile(song) ? "Delete file" : "Remove from library", role: .destructive) {
                 env.libraryEditor.removeSongs([song.id])
                 dismiss()
             }
+        } message: {
+            Text(SongFileRemoval.deletesFile(song) ? "The audio file is deleted from this iPhone."
+                     : "It won't come back when the library is scanned again.")
         }
         .onAppear {
             // UI tests open the Info page straight away.
@@ -237,7 +242,10 @@ struct SongOptionsSheet: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .disabled(action == nil)
+        // Rows without an action (Duration, Song info, File) only stop taking taps: `.disabled` drew them faded,
+        // as if the data were unavailable (Android shows every INFO row at full contrast).
+        .allowsHitTesting(action != nil)
+        .accessibilityRemoveTraits(action == nil ? .isButton : [])
         .pixlGlass(in: RoundedRectangle(cornerRadius: 8, style: .continuous),
                    tint: theme.surfaceContainerHigh.opacity(GlassTint.surface), interactive: action != nil)
     }
@@ -274,7 +282,7 @@ struct SongOptionsSheet: View {
         .pixlGlass(in: Capsule(), tint: theme.surfaceContainerHighest.opacity(GlassTint.container))
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .sensoryFeedback(.selection, trigger: page)
+        .pixlHaptic(.selection, trigger: page)
     }
 
     private func tab(_ index: Int, title: String, systemImage: String) -> some View {

@@ -86,7 +86,9 @@ private struct AlbumDetailContent: View {
             }
             .padding(.horizontal, 16)
             .padding(.top, topPadding)
-            .padding(.bottom, 96)
+            // Android pads `MiniPlayerHeight + 16` while a song is loaded: the mini player's room now comes from the
+            // route's safe area (`BottomBarsClearance`), so only the 16 pt (and a little air) stay here.
+            .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
         .trackingHeaderScroll(scroll)

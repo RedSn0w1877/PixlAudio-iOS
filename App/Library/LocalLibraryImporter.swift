@@ -235,6 +235,11 @@ actor LocalLibraryImporter: LibraryImporting {
             tracks += MediaLibraryImporter.tracks().filter { $0.durationMs >= minDuration }
         }
 
+        // Songs the user deleted that have no file to delete (music-library items) or whose file couldn't be
+        // deleted stay out of the library (`HiddenSongs`).
+        let hidden = HiddenSongs.ids()
+        if !hidden.isEmpty { tracks.removeAll { hidden.contains($0.id) } }
+
         for index in tracks.indices {
             let id = tracks[index].id
             if let override = overrides[id] { override.apply(to: &tracks[index]) }

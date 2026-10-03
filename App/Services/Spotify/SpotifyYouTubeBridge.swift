@@ -47,7 +47,9 @@ nonisolated final class PixlNetYouTubeBridge: SpotifyYouTubeBridge {
     init(http: any HTTPClient = URLSessionHTTPClient()) {
         let session = AnonymousYouTubeSession(visitorData: VisitorDataProvider(http: http))
         client = InnerTubeClient(http: http, session: session)
-        resolver = ChainedYouTubeStreamResolver(player: client, cipher: PassThroughCipher(), validator: StreamUrlValidator(http: http))
+        resolver = ChainedYouTubeStreamResolver(player: client, cipher: PassThroughCipher(),
+                                                validator: StreamUrlValidator(http: http),
+                                                maxBitrateKbps: { StreamingAudioQuality.maxBitrateKbps() })
     }
 
     func lastSearchFailure() async -> String? { await client.lastFailureReason }

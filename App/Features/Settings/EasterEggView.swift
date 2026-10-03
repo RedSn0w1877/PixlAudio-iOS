@@ -212,11 +212,11 @@ struct EasterEggView: View {
         }
     }
 
+    /// While a song plays the mini player takes this place (Android's `MiniPlayerHeight + 8` spacer); the route's
+    /// safe area already ends above it (`BottomBarsClearance`).
     @ViewBuilder
     private var bottom: some View {
-        if playback.current != nil {
-            Spacer().frame(height: Tokens.Shell.miniPlayerHeight + 8)
-        } else {
+        if playback.current == nil {
             Button {
                 let songs = library.songs.shuffled()
                 if !songs.isEmpty { playback.play(songs, startIndex: 0) }

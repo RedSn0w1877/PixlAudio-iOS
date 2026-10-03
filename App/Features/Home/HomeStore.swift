@@ -66,6 +66,10 @@ final class HomeStore {
     private let defaults: UserDefaults?
     @ObservationIgnored private var lastKey: Key?
     @ObservationIgnored private var computeTask: Task<Void, Never>?
+    /// Music intelligence: the learned signals (Android `tasteRepository.signals()`) and the exploration setting,
+    /// set by `AppEnvironment` (nil / 0.25 for previews).
+    @ObservationIgnored var taste: MusicTasteStore?
+    @ObservationIgnored var explorationFraction: () -> Float = { 0.25 }
 
     /// What a computation depends on; a refresh with the same key is skipped (Android throttles repeat passes).
     /// The library by its revision (comparing two snapshots walked the whole library on the main actor).
@@ -73,6 +77,9 @@ final class HomeStore {
         var libraryRevision: Int
         var revision: Int
         var epochDay: Int64
+        var tasteRevision: Int
+        var exploration: Float
+        var learning: Bool
     }
 
     init(history: ListeningHistoryStore, defaults: UserDefaults?, demoJobs: [HomeJob] = []) {
@@ -114,10 +121,14 @@ final class HomeStore {
     /// button).
     func refresh(snapshot: LibrarySnapshot, libraryRevision: Int, force: Bool = false) async {
         await history.ensureLoaded()
+        await taste?.ensureLoaded()
         let clock = history.clock
         let now = clock.nowMs()
         let epochDay = ZoneClock(clock.timeZone).localDate(at: now).epochDay
-        let key = Key(libraryRevision: libraryRevision, revision: history.revision, epochDay: epochDay)
+        let signals = taste?.learnedSignals ?? [:]
+        let exploration = explorationFraction()
+        let key = Key(libraryRevision: libraryRevision, revision: history.revision, epochDay: epochDay,
+                      tasteRevision: taste?.revision ?? 0, exploration: exploration, learning: !signals.isEmpty)
         if !force, key == lastKey { return }
         lastKey = key
         computeTask?.cancel()
@@ -127,7 +138,8 @@ final class HomeStore {
         let saved = savedMixes(epochDay: epochDay, zone: clock.timeZone)
         let task = Task.detached(priority: .userInitiated) {
             HomeStore.compute(snapshot: snapshot, events: events, nowMs: now, timeZone: clock.timeZone,
-                              savedDaily: saved.daily, savedYourMix: saved.yourMix)
+                              savedDaily: saved.daily, savedYourMix: saved.yourMix, storedSignals: signals,
+                              exploration: exploration)
         }
         let stamp = ScreenDataCache.Stamp(historyRevision: history.revision, songCount: snapshot.songs.count)
         let computation = Task { [weak self] in
@@ -151,20 +163,59 @@ final class HomeStore {
     /// Android `regenerateYourMix`: a fresh, non-day-seeded draw, so repeated taps give a different mix.
     func regenerateYourMix(snapshot: LibrarySnapshot) async {
         await history.ensureLoaded()
+        await taste?.ensureLoaded()
         let events = history.events
         let now = history.clock.nowMs()
         let seed = Int64.random(in: Int64.min...Int64.max)
+        let signals = taste?.learnedSignals ?? [:]
+        let exploration = explorationFraction()
         let mix = await Task.detached(priority: .userInitiated) { () -> [Song] in
             let songs = snapshot.songs
             guard !songs.isEmpty else { return [] }
             return DailyMix.personalizedPicks(
                 allSongs: songs, favoriteSongIds: Set(songs.filter(\.isFavorite).map(\.id)),
-                engagements: HomeStore.engagementStats(events), storedSignals: [:], nowMs: now, limit: 60,
-                seed: seed).map(\.song)
+                engagements: HomeStore.engagementStats(events), storedSignals: signals, exploration: exploration,
+                nowMs: now, limit: 60, seed: seed).map(\.song)
         }.value
         guard !mix.isEmpty else { return }
         content.curatedYourMix = mix
         defaults?.set(mix.map(\.id), forKey: PreferenceKeys.yourMixSongIds)
+    }
+
+    /// Settings › Developer › Regenerate Daily Mix and Music intelligence › Refresh (Android `regenerateDailyMix` /
+    /// `enqueueDailyMixRefresh`): today's saved picks are dropped and the mixes are drawn again.
+    func regenerateDailyMix(snapshot: LibrarySnapshot, libraryRevision: Int) async {
+        defaults?.removeObject(forKey: PreferenceKeys.dailyMixSongIds)
+        defaults?.removeObject(forKey: PreferenceKeys.yourMixSongIds)
+        defaults?.removeObject(forKey: PreferenceKeys.lastDailyMixUpdate)
+        await refresh(snapshot: snapshot, libraryRevision: libraryRevision, force: true)
+    }
+
+    /// Music intelligence › Preview recommendations (Android `MusicIntelligenceViewModel.preview`): ranks the real
+    /// library with the real inputs — playback and the queue are untouched — and saves the report.
+    func previewRecommendations(snapshot: LibrarySnapshot) async {
+        await history.ensureLoaded()
+        await taste?.ensureLoaded()
+        let events = history.events
+        let now = history.clock.nowMs()
+        let signals = taste?.learnedSignals ?? [:]
+        let exploration = explorationFraction()
+        let epochDay = ZoneClock(history.clock.timeZone).localDate(at: now).epochDay
+        let report = await Task.detached(priority: .userInitiated) { () -> String in
+            let songs = snapshot.songs
+            let start = Date()
+            let picks = DailyMix.personalizedPicks(
+                allSongs: songs, favoriteSongIds: Set(songs.filter(\.isFavorite).map(\.id)),
+                engagements: HomeStore.engagementStats(events), storedSignals: signals, exploration: exploration,
+                nowMs: now, limit: 30, seed: DailyMix.dailySeed(epochDay: epochDay))
+            let elapsed = Int(Date().timeIntervalSince(start) * 1000)
+            let artists = Set(picks.map(\.song.artist)).count
+            let unheard = picks.filter(\.unheard).count
+            let lines = picks.prefix(15).map { "\($0.song.title) — \($0.reason)" }.joined(separator: "\n")
+            return "Local preview · \(elapsed) ms · \(songs.count) candidates\n"
+                + "\(picks.count) picks · \(artists) artists · \(unheard) unheard\n\n" + lines
+        }.value
+        taste?.saveReport(report)
     }
 
     /// Stage 13: an AI-curated mix replaces today's Daily Mix (Android `DailyMixStateHolder.setDailyMixSongs`):
@@ -212,7 +263,9 @@ final class HomeStore {
     nonisolated static let overviewRanges: [StatsTimeRange] = [.week, .month, .year, .all]
 
     nonisolated static func compute(snapshot: LibrarySnapshot, events: [PlaybackEvent], nowMs: Int64,
-                                    timeZone: TimeZone, savedDaily: [String], savedYourMix: [String])
+                                    timeZone: TimeZone, savedDaily: [String], savedYourMix: [String],
+                                    storedSignals: [String: MusicRecommendationEngine.Signal] = [:],
+                                    exploration: Float = 0.25)
         -> (content: HomeContent, generatedMixes: Bool)
     {
         let songs = snapshot.songs
@@ -269,17 +322,19 @@ final class HomeStore {
             content.curatedYourMix = savedYourMix.compactMap { songsById[$0] }
         } else {
             content.dailyMix = DailyMix.personalizedPicks(
-                allSongs: songs, favoriteSongIds: favorites, engagements: engagements, storedSignals: [:],
-                nowMs: nowMs, limit: 30, seed: DailyMix.dailySeed(epochDay: epochDay)).map(\.song)
+                allSongs: songs, favoriteSongIds: favorites, engagements: engagements, storedSignals: storedSignals,
+                exploration: exploration, nowMs: nowMs, limit: 30,
+                seed: DailyMix.dailySeed(epochDay: epochDay)).map(\.song)
             let dayOfYear = Int(epochDay - LocalDate(year: today.year, month: 1, day: 1).epochDay) + 1
             content.curatedYourMix = DailyMix.personalizedPicks(
-                allSongs: songs, favoriteSongIds: favorites, engagements: engagements, storedSignals: [:],
-                nowMs: nowMs, limit: 60, seed: DailyMix.yourMixSeed(year: today.year, dayOfYear: dayOfYear)).map(\.song)
+                allSongs: songs, favoriteSongIds: favorites, engagements: engagements, storedSignals: storedSignals,
+                exploration: exploration, nowMs: nowMs, limit: 60,
+                seed: DailyMix.yourMixSeed(year: today.year, dayOfYear: dayOfYear)).map(\.song)
             generated = true
         }
 
         // "Made for your listening" + shelves (`HomeRecommendationPlanner.plan`, seed = today's epoch day).
-        let inputs = RecommendationInputs.resolve(library: songs, storedSignals: [:],
+        let inputs = RecommendationInputs.resolve(library: songs, storedSignals: storedSignals,
                                                   storedHistory: engagements.mapValues(\.history))
         let plan = HomeRecommendationPlanner.plan(library: songs, favorites: favorites, signals: inputs.signals,
                                                   history: inputs.history, nowMs: nowMs, seed: epochDay,

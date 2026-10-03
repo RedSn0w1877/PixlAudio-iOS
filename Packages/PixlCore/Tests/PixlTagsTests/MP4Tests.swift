@@ -111,6 +111,21 @@ struct MP4Tests {
         #expect(throws: TagError.self) { try AudioTagWriter.write(TagChanges(properties: ["TITLE": ["x"]]), to: Data(B.m4a([]))) }
     }
 
+    /// A forged 64-bit box size (`size == 1`, largesize 0xFFFF_FFFF_FFFF_FFFF) used to overflow `pos + size` and
+    /// trap: after `ftyp`, inside `moov` and inside `ilst`. Each must fail or stop cleanly instead.
+    @Test func hugeSixtyFourBitSizesDoNotTrap() throws {
+        let ftyp = B.atom("ftyp", B.latin1("M4A ") + B.be32(0))
+        let max64 = [UInt8](repeating: 0xFF, count: 8)
+        let hugeFree: [UInt8] = B.be32(1) + B.latin1("free") + max64
+        #expect(throws: TagError.self) { try MP4Tag.parse(Data(ftyp + hugeFree)) }
+        let hugeChild = B.atom("moov", B.be32(1) + B.latin1("udta") + max64 + [UInt8](repeating: 0, count: 8))
+        #expect(throws: TagError.self) { try MP4Tag.parse(Data(ftyp + hugeChild)) }
+        let hugeItem: [UInt8] = B.be32(1) + B.latin1("\u{A9}nam") + max64
+        let tag = try MP4Tag.parse(Data(B.m4a(B.textItem("\u{A9}ART", "Artist") + hugeItem)))
+        #expect(tag.properties["ARTIST"] == ["Artist"])
+        #expect(tag.properties["TITLE"] == nil)
+    }
+
     @Test func propertyKeyTable() {
         #expect(MP4Tag.propertyKey(forItem: "----:com.apple.iTunes:REPLAYGAIN_TRACK_GAIN") == "REPLAYGAIN_TRACK_GAIN")
         #expect(MP4Tag.propertyKey(forItem: "----:com.apple.iTunes:MusicBrainz Track Id") == "MUSICBRAINZ_TRACKID")
