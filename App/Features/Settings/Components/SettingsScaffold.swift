@@ -1,4 +1,5 @@
 import SwiftUI
+import Synchronization
 import UIKit
 
 /// The collapsing header every settings screen uses (Android `CollapsibleCommonTopBar` driven by the screen's
@@ -71,7 +72,20 @@ struct SettingsScaffold<Content: View, Actions: View>: View {
                 if header.insetTop != metrics.insetTop { header.insetTop = metrics.insetTop }
                 header.offset = metrics.offset
             }
-            .scrollTargetBehavior(SettingsHeaderSnap(distance: distance, insetTop: header.insetTop))
+            // The snap is for the user's release (Android animates the header after the fling). The system also asks
+            // a scroll target behaviour when the scroll view's size changes (the mini player's first appearance, the
+            // bars' clearance, a launch's first layouts), and there the snap read a list at rest as part-collapsed
+            // and moved it: settings pages opened scrolled (docs/performance.md). The gate is read when the system
+            // asks, so the behaviour value itself never changes during a gesture.
+            .onScrollPhaseChange { _, phase in
+                switch phase {
+                case .idle: header.snapGate.isUserScrolling = false
+                case .animating: break
+                default: header.snapGate.isUserScrolling = true // tracking, interacting, decelerating
+                }
+            }
+            .scrollTargetBehavior(SettingsHeaderSnap(distance: distance, insetTop: header.insetTop,
+                                                     gate: header.snapGate))
             .accessibilityIdentifier("screen.\(screenID)")
 
             SettingsCollapsingTopBar(title: title, header: header, expandedHeight: expandedHeight,
@@ -119,19 +133,35 @@ nonisolated struct SettingsScrollMetrics: Equatable {
 }
 
 /// The header's scroll state. `offset` changes every frame and is read only by the header; `insetTop` (the scroll
-/// view's top inset) changes once after the first layout and feeds the snap behaviour.
+/// view's top inset) changes once after the first layout and feeds the snap behaviour; `snapGate` says whether the
+/// user is scrolling (not observed: nothing re-renders for it).
 @Observable
 final class SettingsHeaderState {
     var offset: CGFloat = 0
     var insetTop: CGFloat = 0
+    let snapGate = SettingsSnapGate()
 }
 
-/// Snaps a release in the middle of the collapse to fully expanded or collapsed.
+/// Whether the user is scrolling a settings list, from the touch until the list comes to rest
+/// (`onScrollPhaseChange`), read by `SettingsHeaderSnap` when the system asks it for a target.
+nonisolated final class SettingsSnapGate: Sendable {
+    private let state = Mutex(false)
+
+    var isUserScrolling: Bool {
+        get { state.withLock { $0 } }
+        set { state.withLock { $0 = newValue } }
+    }
+}
+
+/// Snaps a release in the middle of the collapse to fully expanded or collapsed. Only while the user scrolls: the
+/// system also asks the behaviour when the scroll view's size changes, and a list at rest must stay where it is.
 nonisolated struct SettingsHeaderSnap: ScrollTargetBehavior {
     let distance: CGFloat
     let insetTop: CGFloat
+    let gate: SettingsSnapGate
 
     func updateTarget(_ target: inout ScrollTarget, context: TargetContext) {
+        guard gate.isUserScrolling else { return }
         let inset = insetTop
         let resting = target.rect.minY + inset
         guard resting > 0, resting < distance else { return }
