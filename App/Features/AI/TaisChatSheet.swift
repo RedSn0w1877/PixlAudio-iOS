@@ -129,7 +129,8 @@ struct TaisChatSheet: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 24)
+            // More room above than below: centred optically between the grabber and the composer.
+            .padding(.top, 72)
             .padding(.bottom, 16)
             .frame(maxWidth: .infinity, minHeight: emptyHeight, alignment: .center)
         }
@@ -233,7 +234,8 @@ struct TaizoComposer: View {
             .padding(.trailing, 8)
         }
         .frame(height: 56)
-        .pixlGlass(in: Capsule())
+        // A neutral tint keeps the field legible over the bubbles scrolling under it (like the tab bar's).
+        .pixlGlass(in: Capsule(), tint: theme.surfaceContainerHigh.opacity(0.45))
         .padding(.horizontal, 16)
         .padding(.top, 6)
         .padding(.bottom, 10)
