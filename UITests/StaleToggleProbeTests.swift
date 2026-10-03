@@ -18,11 +18,11 @@ final class StaleToggleProbeTests: XCTestCase {
             for toggle in 0..<10 {
                 button.tap()
                 Thread.sleep(forTimeInterval: Double(toggle % 3) * 0.3 + 0.4)
-                let state = state(app)
+                let current = state(app)
                 checks += 1
-                if state.hasPrefix("STALE") {
+                if current.hasPrefix("STALE") {
                     stale += 1
-                    note(state, "\(index)-\(toggle)-stale")
+                    note(current, "\(index)-\(toggle)-stale")
                     Thread.sleep(forTimeInterval: 1.5)
                     let later = state(app)
                     note(later, "\(index)-\(toggle)-after1.5s")
