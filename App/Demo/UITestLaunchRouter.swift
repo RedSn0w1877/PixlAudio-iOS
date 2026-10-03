@@ -231,6 +231,9 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
 ///     -paused                      start paused (default: playing)
 ///     -noSong                      nothing playing (no mini player)
 ///     -demoScale <n>               repeat the demo library n times (performance tests: a library of real size)
+///     -reexpandAfterCollapse <s>   (with -uiTest) the first collapse of the player sheet is followed, s seconds
+///                                  later, by an expand: a tap on the mini player while the full player is still
+///                                  fading out, which a UI test can't time (XCUITest waits for the app to idle)
 nonisolated struct LaunchConfiguration: Equatable, Sendable {
     nonisolated enum Appearance: String, Sendable {
         case system, light, dark
@@ -245,6 +248,8 @@ nonisolated struct LaunchConfiguration: Equatable, Sendable {
     var hasSong: Bool
     /// How many copies of the demo library to load (1 = the screenshot library).
     var demoScale: Int
+    /// UI tests only: seconds from the first collapse to an expand that interrupts its fade (nil: off).
+    var reexpandAfterCollapse: Double?
 
     init(arguments: [String]) {
         func value(after flag: String) -> String? {
@@ -264,6 +269,8 @@ nonisolated struct LaunchConfiguration: Equatable, Sendable {
         startsPlaying = !arguments.contains("-paused")
         hasSong = !arguments.contains("-noSong")
         demoScale = min(max(value(after: "-demoScale").flatMap(Int.init) ?? 1, 1), 400)
+        reexpandAfterCollapse = isUITest
+            ? value(after: "-reexpandAfterCollapse").flatMap(Double.init).map { min(max($0, 0), 2) } : nil
     }
 
     /// The configuration of this process.

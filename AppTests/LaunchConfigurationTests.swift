@@ -48,6 +48,16 @@ final class LaunchConfigurationTests: XCTestCase {
         XCTAssertEqual(LaunchConfiguration(arguments: ["-uiTest", "-demoScale", "x"]).demoScale, 1)
     }
 
+    /// `-reexpandAfterCollapse` (the recording test's interrupted collapse) only takes effect in UI tests.
+    func testParsesReexpandAfterCollapse() {
+        XCTAssertNil(LaunchConfiguration(arguments: ["-uiTest"]).reexpandAfterCollapse)
+        XCTAssertEqual(LaunchConfiguration(arguments: ["-uiTest", "-reexpandAfterCollapse", "0.12"])
+            .reexpandAfterCollapse, 0.12)
+        XCTAssertEqual(LaunchConfiguration(arguments: ["-uiTest", "-reexpandAfterCollapse", "9"])
+            .reexpandAfterCollapse, 2)
+        XCTAssertNil(LaunchConfiguration(arguments: ["-reexpandAfterCollapse", "0.12"]).reexpandAfterCollapse)
+    }
+
     /// Every DemoScreen resolves to at most one destination and has a ready identifier.
     func testEveryDemoScreenRoutes() {
         for screen in DemoScreen.allCases {

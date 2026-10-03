@@ -60,6 +60,7 @@ struct PlayerSheetHost: View {
                 sheet.resetFullPlayer()
             }
         }
+        .modifier(UITestReexpandAfterCollapse(delay: env.launch.reexpandAfterCollapse))
     }
 
     /// The mini and full layers, both laid out once at their own sizes; only the morph modifier moves.
@@ -207,6 +208,33 @@ struct PlayerSheetMorph: ViewModifier, Animatable {
     }
 
     private func lerp(_ a: CGFloat, _ b: CGFloat, _ t: CGFloat) -> CGFloat { a + (b - a) * t }
+}
+
+/// UI tests only (`-reexpandAfterCollapse`): the first collapse is followed, `delay` seconds later, by the expand a tap
+/// on the mini player makes while the full player is still fading out — a UI test can't time that tap (XCUITest
+/// waits for the app to idle first), and `TransitionRecordingTests` films it. Without the flag it adds nothing.
+private struct UITestReexpandAfterCollapse: ViewModifier {
+    let delay: Double?
+
+    @Environment(AppEnvironment.self) private var env
+    @State private var hasFired = false
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let delay {
+            content.onChange(of: env.playerSheet.isExpanded) { wasExpanded, isExpanded in
+                guard wasExpanded, !isExpanded, !hasFired else { return }
+                hasFired = true
+                let sheet = env.playerSheet
+                Task {
+                    try? await Task.sleep(for: .seconds(delay))
+                    sheet.expand()
+                }
+            }
+        } else {
+            content
+        }
+    }
 }
 
 /// While the keyboard is up the collapsed card steps aside with the tab bar: what the shell's slot declares for a
