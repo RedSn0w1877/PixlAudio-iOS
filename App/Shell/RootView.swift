@@ -133,6 +133,7 @@ struct RootView: View {
             if showsBar {
                 GlassNavBar(selection: router.selection,
                             compact: settings.appearance.navBarCompactMode,
+                            minimized: router.isTabBarMinimized,
                             onSelect: { tab in withAnimation(PixlMotion.selection) { router.select(tab) } })
                     .modifier(HiddenWhilePlayerExpanded())
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -141,6 +142,12 @@ struct RootView: View {
         .padding(.horizontal, Tokens.Shell.horizontalInset)
         .animation(PixlMotion.bars, value: showsBar)
         .animation(PixlMotion.bars, value: playback.hasItem)
+        // The minimized bar is lower: the mini player follows it down on the bars' curve (the capsule itself
+        // animates in UIKit, `LiquidLensBarView.setShape`).
+        .animation(PixlMotion.bars, value: router.isTabBarMinimized)
+        // A tab switch, a push or a pop restores the full bar.
+        .onChange(of: router.selection) { router.setTabBarMinimized(false) }
+        .onChange(of: router.currentPath.count) { router.setTabBarMinimized(false) }
     }
 }
 

@@ -173,7 +173,7 @@ private struct PlayerTopBar: View {
                         .contentShape(.circle)
                 }
                 .buttonStyle(.plain)
-                .playerGlass(in: Circle(), tint: theme.onPrimary.opacity(0.7))
+                .playerGlass(in: Circle(), tint: theme.onPrimary.opacity(GlassTint.playerChrome))
                 .accessibilityLabel("Collapse player")
                 .accessibilityIdentifier("player.collapse")
             }
@@ -206,7 +206,7 @@ private struct PlayerTopBar: View {
                 .playerGlass(in: UnevenRoundedRectangle(topLeadingRadius: 6, bottomLeadingRadius: 6,
                                                         bottomTrailingRadius: 21, topTrailingRadius: 21,
                                                         style: .continuous),
-                             tint: theme.onPrimary.opacity(0.7))
+                             tint: theme.onPrimary.opacity(GlassTint.playerChrome))
                 .accessibilityLabel("Open Queue")
                 .accessibilityIdentifier("player.queue")
             }
@@ -240,7 +240,7 @@ private struct PlayerTopBar: View {
         .playerGlass(in: UnevenRoundedRectangle(topLeadingRadius: 21, bottomLeadingRadius: 21,
                                                 bottomTrailingRadius: trailing, topTrailingRadius: trailing,
                                                 style: .continuous),
-                     tint: theme.onPrimary.opacity(0.7))
+                     tint: theme.onPrimary.opacity(GlassTint.playerChrome))
         .animation(.spring(response: 0.5, dampingFraction: 0.6), value: showsLabel)
         .accessibilityLabel(route.kind == .airPlay ? "AirPlay" : (route.kind == .bluetooth ? "Bluetooth" : "Local playback"))
         .accessibilityIdentifier("player.devices")
@@ -317,7 +317,7 @@ private struct PlayerMetadataRow: View {
                 .contentShape(.circle)
         }
         .buttonStyle(.plain)
-        .playerGlass(in: Circle(), tint: theme.onPrimary.opacity(0.8))
+        .playerGlass(in: Circle(), tint: theme.onPrimary.opacity(GlassTint.playerChrome))
         .accessibilityLabel(label)
         .accessibilityIdentifier(identifier)
     }

@@ -205,14 +205,25 @@ struct SongPickerBottomBar: View {
     var body: some View {
         HStack(spacing: 12) {
             if showsCloudFilter {
-                GlassEffectContainer(spacing: 2) {
-                    HStack(spacing: 0) {
-                        tab(.offline, title: "LOCAL", systemImage: "iphone")
-                        tab(.online, title: "CLOUD", systemImage: "cloud.fill")
-                    }
-                    .padding(5)
-                }
-                .pixlGlass(in: Capsule(), tint: theme.surfaceContainerHigh.opacity(GlassTint.container))
+                // The tab bar's liquid lens (Hoa, 2026-10-03): the selection lifts off as clear glass, follows the
+                // finger and magnifies LOCAL / CLOUD under it.
+                LiquidSegmentedPicker(
+                    options: [StorageFilter.offline, .online],
+                    items: [
+                        LiquidSegmentItem(title: "LOCAL", systemImage: "iphone", selectedSystemImage: "iphone",
+                                          identifier: "songPicker.local"),
+                        LiquidSegmentItem(title: "CLOUD", systemImage: "cloud", selectedSystemImage: "cloud.fill",
+                                          identifier: "songPicker.cloud"),
+                    ],
+                    selection: $storageFilter,
+                    animation: PixlMotion.selection,
+                    pillColor: UIColor(theme.primary.opacity(GlassTint.prominent)),
+                    restingGlyphColor: UIColor(theme.onPrimary),
+                    liftedGlyphColor: UIColor(theme.primary),
+                    baseGlyphColor: UIColor(theme.onSurface))
+                    .frame(height: 56)
+                    .frame(maxWidth: .infinity)
+                    .pixlHaptic(.selection, trigger: storageFilter)
                 Button(action: onConfirm) {
                     Image(systemName: "checkmark")
                         .font(.system(size: 24, weight: .semibold))
@@ -246,24 +257,6 @@ struct SongPickerBottomBar: View {
         }
         .padding(16)
     }
-
-    private func tab(_ filter: StorageFilter, title: String, systemImage: String) -> some View {
-        let selected = storageFilter == filter
-        return Button {
-            withAnimation(PixlMotion.selection) { storageFilter = filter }
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: systemImage).font(.system(size: 16, weight: .semibold))
-                Text(title).pixlFont(.labelLarge, weight: .bold)
-            }
-            .foregroundStyle(selected ? theme.onPrimary : theme.onSurface)
-            .frame(maxWidth: .infinity, minHeight: 46)
-            .contentShape(.capsule)
-        }
-        .buttonStyle(.plain)
-        .background { if selected { Capsule().fill(theme.primary) } }
-        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
-    }
 }
 
 /// Android `SongPickerBottomSheet`: "Add songs" (`displaySmall`, 26 pt sides), the picker pane, the bottom bar.
@@ -288,7 +281,7 @@ struct SongPickerSheet: View {
     }
 
     var body: some View {
-        let hasCloud = library.songs.contains(where: LibrarySorting.isOnline)
+        let hasCloud = library.songs.contains(where: LibrarySorting.isOnline) || LaunchConfiguration.current.forcesCloudFilter
         VStack(alignment: .leading, spacing: 0) {
             Text("Add songs")
                 .pixlFont(.displaySmall)

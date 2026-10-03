@@ -245,6 +245,8 @@ nonisolated struct LaunchConfiguration: Equatable, Sendable {
     var hasSong: Bool
     /// How many copies of the demo library to load (1 = the screenshot library).
     var demoScale: Int
+    /// `-cloudFilter`: the song picker shows its LOCAL / CLOUD switch although the demo library has no streamed songs.
+    var forcesCloudFilter: Bool
 
     init(arguments: [String]) {
         func value(after flag: String) -> String? {
@@ -264,6 +266,7 @@ nonisolated struct LaunchConfiguration: Equatable, Sendable {
         startsPlaying = !arguments.contains("-paused")
         hasSong = !arguments.contains("-noSong")
         demoScale = min(max(value(after: "-demoScale").flatMap(Int.init) ?? 1, 1), 400)
+        forcesCloudFilter = isUITest && arguments.contains("-cloudFilter")
     }
 
     /// The configuration of this process.

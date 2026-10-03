@@ -12,6 +12,10 @@ nonisolated enum GlassTint {
     static let surface: Double = 0.28
     /// The bottom bar: content scrolls under it, so it stays legible (Android draws it opaque).
     static let bar: Double = 0.6
+    /// The full player's chrome buttons (collapse, output, queue, lyrics, AI DJ) and its toggle row's off segments:
+    /// clear glass with a breath of `onPrimary`, so the ambient background reads through (Hoa, 2026-10-03: "make
+    /// the 2 buttons at the top like liquid transparent buttons"; they were 70–80 % and looked solid).
+    static let playerChrome: Double = 0.14
 }
 
 extension View {

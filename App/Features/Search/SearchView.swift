@@ -173,6 +173,7 @@ struct SearchView: View {
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
+        .minimizesTabBarOnScroll()
         .clipShape(TopRoundedClip(radius: 28))
         .accessibilityIdentifier("search.results")
     }

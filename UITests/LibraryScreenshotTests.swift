@@ -52,6 +52,32 @@ final class LibraryScreenshotTests: XCTestCase {
     func testPlaylistReorderLight() throws { try capture("playlistReorder", "light", ready: "screen.playlistDetail") }
     func testPlaylistOptionsLight() throws { try capture("playlistOptions", "light", ready: "sheet.playlistOptions") }
     func testPlaylistAddSongsDark() throws { try capture("playlistAddSongs", "dark", ready: "sheet.songPicker") }
+
+    /// The song picker's LOCAL / CLOUD switch on the liquid lens (2026-10-03), forced on with `-cloudFilter`
+    /// (the demo library has no streamed songs): LOCAL selected, then CLOUD after a tap.
+    func testSongPickerCloudSwitchLight() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTest", "-screen", "playlistAddSongs", "-appearance", "light", "-cloudFilter"]
+        app.launch()
+        XCTAssertTrue(app.descendants(matching: .any)["sheet.songPicker"].firstMatch.waitForExistence(timeout: 20),
+                      "the song picker did not appear")
+        Thread.sleep(forTimeInterval: 1.5)
+        let local = XCTAttachment(screenshot: app.screenshot())
+        local.name = "songPickerLocal-light"
+        local.lifetime = .keepAlways
+        add(local)
+        let cloud = app.descendants(matching: .any)["songPicker.cloud"].firstMatch
+        XCTAssertTrue(cloud.waitForExistence(timeout: 5), "the CLOUD segment is missing")
+        cloud.tap()
+        Thread.sleep(forTimeInterval: 1.5)
+        XCTAssertTrue(cloud.isSelected, "CLOUD is not selected after a tap")
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "songPickerCloud-light"
+        shot.lifetime = .keepAlways
+        add(shot)
+        app.terminate()
+    }
     func testPlaylistEditorLight() throws { try capture("playlistEditor", "light", ready: "screen.playlistEditor") }
     func testPlaylistEditorDark() throws { try capture("playlistEditor", "dark", ready: "screen.playlistEditor") }
     func testPlaylistEditDark() throws { try capture("playlistEdit", "dark", ready: "screen.playlistEditor") }
