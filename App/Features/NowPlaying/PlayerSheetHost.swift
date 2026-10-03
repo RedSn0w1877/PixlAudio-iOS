@@ -49,6 +49,7 @@ struct PlayerSheetHost: View {
             }
         }
         .ignoresSafeArea(.keyboard)
+        .overlay(alignment: .topLeading) { SheetProbeLabel() }
         .animation(PixlMotion.bars, value: playback.hasItem)
         .onAppear { consumeCoverRequest() }
         .onChange(of: router.cover) { _, _ in consumeCoverRequest() }

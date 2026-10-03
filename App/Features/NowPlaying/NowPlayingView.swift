@@ -27,6 +27,7 @@ struct NowPlayingView: View {
     @Environment(\.playerTheme) private var theme
 
     var body: some View {
+        let _ = SheetProbe.markNowPlaying(playback.isPlaying)
         if let song = playback.current {
             content(song)
         } else {
