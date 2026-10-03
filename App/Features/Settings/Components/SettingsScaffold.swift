@@ -161,7 +161,7 @@ nonisolated struct SettingsHeaderSnap: ScrollTargetBehavior {
     let gate: SettingsSnapGate
 
     func updateTarget(_ target: inout ScrollTarget, context: TargetContext) {
-        guard gate.isUserScrolling else { return }
+        guard gate.isUserScrolling || SnapProbe.oldSnap else { return }
         let inset = insetTop
         let resting = target.rect.minY + inset
         guard resting > 0, resting < distance else { return }
@@ -314,4 +314,9 @@ struct OptionalSettingsToast: ViewModifier {
             content
         }
     }
+}
+
+/// EXPERIMENT: `-probeOldSnap` restores the old behaviour (the snap also acts on size changes).
+nonisolated enum SnapProbe {
+    static let oldSnap = ProcessInfo.processInfo.arguments.contains("-probeOldSnap")
 }
