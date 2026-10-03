@@ -37,6 +37,14 @@ final class PlayerSheetController {
     var hiddenForKeyboard = false
     /// The full player has been built and stays mounted (hidden while collapsed).
     private(set) var hasBuiltFullPlayer = false
+    /// An animated collapse is fading the full player out, as main's removal of it did: SwiftUI faded the removed
+    /// player with the default opacity transition on the collapse's spring, frozen where the collapse began. While
+    /// set, the full layer keeps its placement at this fraction and `fullLayerFade` runs from 1 to 0 on the same
+    /// spring; once the spring has finished the layer is hidden as usual.
+    private(set) var collapseFadeFrom: CGFloat?
+    /// The full layer's opacity on top of its placement fade (1 except during a collapse's fade).
+    private(set) var fullLayerFade: CGFloat = 1
+    @ObservationIgnored private var collapseFadeGeneration = 0
     /// The first expand waits one frame for the full player to mount at progress 0 (its fades must interpolate).
     @ObservationIgnored private var pendingExpandVelocity: Double?
     /// A collapse that navigates afterwards is under way (repeat taps are dropped, like Android's job check).
@@ -65,6 +73,7 @@ final class PlayerSheetController {
     /// Nothing is loaded any more: the card goes, and so does the built full player (the next song pre-warms again).
     func resetFullPlayer() {
         pendingExpandVelocity = nil
+        endCollapseFade()
         if hasBuiltFullPlayer { hasBuiltFullPlayer = false }
     }
 
@@ -73,6 +82,9 @@ final class PlayerSheetController {
         // VoiceOver: once the full player is past half way (it stays hidden from accessibility below 0.5), move
         // focus to it — the mini player that had focus is gone.
         if !isExpanded { postScreenChanged(after: animated ? 0.45 : 0.05) }
+        // Main inserted a new full player here while a collapsing one faded out; the kept player follows the
+        // expansion again at once.
+        endCollapseFade()
         guard animated else {
             // One transaction: a full player built here is inserted by the same update that sets the expansion, so
             // its fades read 1 on their first pass. Set in steps, `withoutAnimation` first applied the pending build
@@ -144,18 +156,31 @@ final class PlayerSheetController {
         isExpanded = false
         if wasExpanded { postScreenChanged(after: animated ? 0.35 : 0.05) }
         guard animated else {
+            endCollapseFade()
             withoutAnimation { expansion = 0 }
             return
         }
+        // The full player fades out on the collapse's animation, frozen where it was (see `collapseFadeFrom`).
+        collapseFadeGeneration += 1
+        let generation = collapseFadeGeneration
+        let fades = hasBuiltFullPlayer && from > 0.001
+        withoutAnimation {
+            collapseFadeFrom = fades ? from : nil
+            fullLayerFade = 1
+        }
         // Reduce Motion: a short ease back, without the squash and its slow wobble.
-        if PixlAccessibility.reducesMotion {
-            withoutAnimation { overshootScaleY = 1 }
-            withAnimation(PlayerSheetMotion.reducedMotion) { expansion = 0 }
-            return
-        }
-        withAnimation(PlayerSheetMotion.collapse(fromFraction: from, initialVelocity: initialVelocity)) {
+        let reducesMotion = PixlAccessibility.reducesMotion
+        if reducesMotion { withoutAnimation { overshootScaleY = 1 } }
+        let animation = reducesMotion ? PlayerSheetMotion.reducedMotion
+            : PlayerSheetMotion.collapse(fromFraction: from, initialVelocity: initialVelocity)
+        withAnimation(animation, completionCriteria: .removed) {
             expansion = 0
+            if fades { fullLayerFade = 0 }
+        } completion: { [weak self] in
+            guard let self, self.collapseFadeGeneration == generation else { return }
+            self.endCollapseFade()
         }
+        guard !reducesMotion else { return }
         // Android `collapseInitialSquashForFraction` then a medium-bouncy, very-low-stiffness spring back to 1.
         withoutAnimation { overshootScaleY = PlayerSheetMotion.collapseSquash(fromFraction: from) }
         withAnimation(PlayerSheetMotion.squashRelease) { overshootScaleY = 1 }
@@ -180,6 +205,7 @@ final class PlayerSheetController {
     @ObservationIgnored private var dragAccumulatedY: CGFloat = 0
 
     func beginDrag() {
+        endCollapseFade()
         dragStartExpansion = expansion
         dragAccumulatedY = 0
         if !hasBuiltFullPlayer { hasBuiltFullPlayer = true }
@@ -206,6 +232,16 @@ final class PlayerSheetController {
             self.expand(initialVelocity: fractionVelocity)
         } else {
             collapse(initialVelocity: fractionVelocity)
+        }
+    }
+
+    /// Ends a collapse's fade: the full layer follows the expansion again (hidden while collapsed).
+    private func endCollapseFade() {
+        guard collapseFadeFrom != nil || fullLayerFade != 1 else { return }
+        collapseFadeGeneration += 1
+        withoutAnimation {
+            collapseFadeFrom = nil
+            fullLayerFade = 1
         }
     }
 

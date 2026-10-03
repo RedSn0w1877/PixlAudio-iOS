@@ -288,14 +288,18 @@ private struct FullPlayerLayer: View {
 
     var body: some View {
         let sheet = env.playerSheet
-        let isShown = sheet.isExpanded || sheet.isDragging || sheet.expansion > 0.001
+        // A collapse fades the player out first (`collapseFadeFrom`), as main's removal transition did.
+        let isFadingOut = sheet.collapseFadeFrom != nil
+        let isShown = sheet.isExpanded || sheet.isDragging || sheet.expansion > 0.001 || isFadingOut
         if sheet.hasBuiltFullPlayer || isShown {
             NowPlayingView(safeArea: safeArea, width: screenSize.width)
                 .frame(width: screenSize.width, height: screenSize.height)
                 // The progress comes from this body, which already follows the expansion: a modifier inserted with
                 // the player and reading the expansion itself could keep a stale first read (the player stayed
-                // invisible); this value is always the current one.
-                .modifier(FullLayerPlacementEffect(progress: sheet.expansion, collapsedMinX: collapsedMinX))
+                // invisible); this value is always the current one. During a collapse's fade it stays where the
+                // collapse began, as the removed player did.
+                .modifier(FullLayerPlacementEffect(progress: sheet.collapseFadeFrom ?? sheet.expansion,
+                                                   collapsedMinX: collapsedMinX, isFadingOut: isFadingOut))
                 .animation(nil) { content in
                     // While hidden it also takes no room in the card's ZStack, as when it was removed: a screen-sized
                     // child widened the ZStack, and the mini player beside it was laid out at the screen's width
@@ -304,6 +308,8 @@ private struct FullPlayerLayer: View {
                         .opacity(isShown ? 1 : 0)
                         .frame(width: isShown ? nil : 0, height: isShown ? nil : 0, alignment: .topLeading)
                 }
+                // Animated by the collapse's spring (1 → 0), like the removal transition's opacity.
+                .opacity(sheet.fullLayerFade)
                 .onAppear { sheet.fullPlayerDidAppear() }
         }
     }
@@ -313,10 +319,13 @@ private struct FullPlayerLayer: View {
 private struct FullLayerPlacementEffect: ViewModifier, Animatable {
     nonisolated var animatableData: CGFloat
     let collapsedMinX: CGFloat
+    /// A collapse is fading the layer out: it no longer takes touches or VoiceOver (a removed view didn't).
+    let isFadingOut: Bool
 
-    init(progress: CGFloat, collapsedMinX: CGFloat) {
+    init(progress: CGFloat, collapsedMinX: CGFloat, isFadingOut: Bool = false) {
         animatableData = progress
         self.collapsedMinX = collapsedMinX
+        self.isFadingOut = isFadingOut
     }
 
     func body(content: Content) -> some View {
@@ -326,8 +335,8 @@ private struct FullLayerPlacementEffect: ViewModifier, Animatable {
         content
             .opacity(alpha)
             .offset(x: -metrics.cardMinX, y: 24 * (1 - alpha))
-            .allowsHitTesting(metrics.progress > 0.5)
-            .accessibilityHidden(metrics.progress < 0.5)
+            .allowsHitTesting(!isFadingOut && metrics.progress > 0.5)
+            .accessibilityHidden(isFadingOut || metrics.progress < 0.5)
     }
 }
 
