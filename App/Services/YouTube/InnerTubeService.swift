@@ -137,8 +137,6 @@ actor InnerTubeService {
     }
 }
 
-/// The YouTube video id behind a library song: `yt:<id>` songs and anything whose item URL is `pixlstream://<id>`
-/// (Spotify songs matched by stage 12 use the same URL).
 /// Settings › Playback › Streaming audio quality (Android `AudioQuality.maxBitrateKbps`): the cap the stream
 /// resolvers pick under (the highest AAC stream at or below it; above every stream, the lowest), read whenever a
 /// stream is resolved. Changing it drops the cached URLs (`InnerTubeService.invalidateAll`).
@@ -153,6 +151,8 @@ nonisolated enum StreamingAudioQuality {
     }
 }
 
+/// The YouTube video id behind a library song: `yt:<id>` songs and anything whose item URL is `pixlstream://<id>`
+/// (Spotify songs matched by stage 12 use the same URL).
 nonisolated enum YouTubeSongIdentity {
     static let scheme = "pixlstream"
 

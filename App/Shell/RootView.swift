@@ -41,9 +41,6 @@ struct RootView: View {
             .overlay(alignment: .bottom) {
                 bottomBars
             }
-            // While the full player is up it is a modal screen for VoiceOver: the tabs and bars it covers leave the
-            // accessibility tree (the update banner stays reachable).
-            .modifier(HiddenWhilePlayerExpanded())
             // Stage 8: the player sheet — the mini player resting in `MiniPlayerSlot` and expanding over everything.
             PlayerSheetHost()
         }
@@ -106,7 +103,11 @@ struct RootView: View {
             content.opacity(isSelected ? 1 : 0)
         }
         .allowsHitTesting(isSelected)
-        .accessibilityHidden(!isSelected)
+        // Hidden tabs are out of the accessibility tree, and so is the selected one while the full player covers it
+        // (a modal screen for VoiceOver). One `accessibilityHidden` per stack: an `accessibilityHidden(false)` around
+        // the three stacks overrode the hidden tabs' `true`, so their invisible rows answered accessibility hit
+        // tests over the visible tab's (UI tests found nothing hittable).
+        .modifier(TabAccessibilityHidden(isSelected: isSelected))
     }
 
     /// The bars' height over a tab root and over a pushed page. The keyboard hides both bars, but only the selected
@@ -133,6 +134,7 @@ struct RootView: View {
                 GlassNavBar(selection: router.selection,
                             compact: settings.appearance.navBarCompactMode,
                             onSelect: { tab in withAnimation(PixlMotion.selection) { router.select(tab) } })
+                    .modifier(HiddenWhilePlayerExpanded())
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
@@ -142,8 +144,18 @@ struct RootView: View {
     }
 }
 
-/// Hides the shell from VoiceOver while the full player covers it. Its own small view, so the expand / collapse
-/// flips re-run this modifier and not the shell's body.
+/// A tab's stack leaves the accessibility tree when it isn't the selected tab, or while the full player covers it.
+/// Its own small view, so the expand / collapse flips re-run this modifier and not the shell's body.
+private struct TabAccessibilityHidden: ViewModifier {
+    let isSelected: Bool
+    @Environment(AppEnvironment.self) private var environment
+
+    func body(content: Content) -> some View {
+        content.accessibilityHidden(!isSelected || environment.playerSheet.isExpanded)
+    }
+}
+
+/// Hides the tab bar from VoiceOver while the full player covers it (the mini player's own layer hides itself).
 private struct HiddenWhilePlayerExpanded: ViewModifier {
     @Environment(AppEnvironment.self) private var environment
 

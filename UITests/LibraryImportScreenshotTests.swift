@@ -37,6 +37,11 @@ extension ScreenshotTests {
             failure.name = "libraryImport-unreachable-light"
             failure.lifetime = .keepAlways
             add(failure)
+            // The element tree with frames: what answers the hit test over the row.
+            let tree = XCTAttachment(string: app.debugDescription)
+            tree.name = "libraryImport-unreachable-tree"
+            tree.lifetime = .keepAlways
+            add(tree)
         }
         XCTAssertTrue(link.isHittable, "diagnostics.libraryImport is not reachable")
         link.tap()

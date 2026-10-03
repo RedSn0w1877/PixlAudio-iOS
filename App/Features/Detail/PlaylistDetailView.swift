@@ -29,6 +29,9 @@ struct PlaylistDetailView: View {
     @State private var showsSort = false
     @State private var showsOptions = false
     @State private var confirmsDelete = false
+    /// The page's bottom safe area: the home indicator plus the floating mini player's room (`BottomBarsClearance`).
+    /// The song list ignores the bottom safe area (its panel runs to the screen's edge), so it pads by this itself.
+    @State private var bottomInset: CGFloat = 0
     /// The playlist written as M3U for the options menu's Export (rewritten when the playlist changes).
     @State private var exportURL: URL?
     /// Stage 14: the playlist's lyric-sync run, from TAIS Studio's job states.
@@ -105,6 +108,7 @@ struct PlaylistDetailView: View {
             }
         }
         .background(theme.background.ignoresSafeArea())
+        .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { bottomInset = $0 }
         .toolbar(.hidden, for: .navigationBar)
         .onChange(of: Inputs(songIds: playlist?.songIds ?? [], librarySongCount: library.songs.count, sort: sortOption),
                   initial: true) { _, inputs in
@@ -273,7 +277,9 @@ struct PlaylistDetailView: View {
                 }
             }
             .padding(.top, 12)
-            .padding(.bottom, 16 + playback.miniPlayerClearance)
+            // Ends above the mini player: the list ignores the bottom safe area, so the room comes from the page's
+            // (never less than the mini player's own, should the measured inset not be in yet).
+            .padding(.bottom, 16 + max(bottomInset, playback.miniPlayerClearance))
         }
         .scrollIndicators(.hidden)
         .background(panel.fill(theme.surfaceContainerHigh))

@@ -643,3 +643,8 @@ behind `SpotifyLibraryStore` (Android `SpotifyDao`), so they run on Windows:
   data-descriptor entry inflates under a bound (64 MB by default) and reports `entryTooLarge` past it.
 - `SpotifyTests.fullSignInFlow` now checks the English sign-in messages, including Cancel on Spotify's consent page
   ("Sign-in was cancelled").
+- `LibraryImportTests` (app, Swift-only): `testHiddenSongsStayOutOfRescans` (a deleted song kept in `HiddenSongs`
+  doesn't come back on an incremental or full rescan, and returns once un-hidden),
+  `testForgedSixtyFourBitBoxSizeStopsTheMP4Walk` (the launch rescan's `TagRegionReader` stops at a forged 64-bit box
+  size instead of trapping), `testOpenedFilesAreSortedByKind` (files opened from Files: backup, playlist, lyrics,
+  audio, unsupported).

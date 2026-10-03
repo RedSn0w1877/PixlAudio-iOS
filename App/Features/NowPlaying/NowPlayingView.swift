@@ -90,8 +90,8 @@ struct NowPlayingView: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("screen.nowPlaying")
         // A modal screen for VoiceOver while it is up: swipes stay inside the player (the shell under it is hidden as
-        // well). Only while expanded — the pre-warmed player stays in the hierarchy while collapsed, and a modal
-        // element there shut VoiceOver (and UI-test hit testing) out of every screen behind it.
+        // well). Only while expanded — the pre-warmed player stays in the hierarchy, hidden, while collapsed, and a
+        // modal element must not linger there.
         .modifier(ModalWhileExpanded())
         .accessibilityAction(.escape) { env.playerSheet.collapse() }
     }
