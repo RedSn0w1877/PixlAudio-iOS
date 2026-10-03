@@ -22,8 +22,9 @@ public enum SpotifyAuth {
     /// Android's redirect, for reference.
     public static let androidRedirectURI = "pixelplay://spotify-callback"
 
-    /// `user-top-read` (most-played) was added after the first release: accounts linked before must reconnect once.
-    public static let scopes = "user-library-read playlist-read-private playlist-read-collaborative user-read-private user-top-read"
+    /// `user-top-read` (most-played) was added after the first release, `user-read-playback-state` and
+    /// `user-modify-playback-state` (Spotify Connect output) after 1.0.0: accounts linked before must reconnect once.
+    public static let scopes = "user-library-read playlist-read-private playlist-read-collaborative user-read-private user-top-read user-read-playback-state user-modify-playback-state"
 
     public static let expiryMarginMs: Int64 = 300_000
     public static let defaultExpiresInSeconds: Int64 = 3600
@@ -98,13 +99,16 @@ public enum SpotifyAuth {
     }
 
     /// `saveTokens`: the new access token, expiry, and the refresh token — **the rotated one whenever Spotify sent
-    /// one**, else the previous. nil when the response has no access token.
-    public static func tokens(from response: SpotifyTokenResponse, previousRefreshToken: String?, nowMs: Int64) -> SpotifyTokens? {
+    /// one**, else the previous. nil when the response has no access token. A refresh answer without `scope` keeps
+    /// the previous grant (a refresh never widens it).
+    public static func tokens(from response: SpotifyTokenResponse, previousRefreshToken: String?, nowMs: Int64,
+                              previousScope: String? = nil) -> SpotifyTokens? {
         guard let access = response.accessToken, !NetText.isBlank(access) else { return nil }
         let rotated = response.refreshToken.flatMap { NetText.isBlank($0) ? nil : $0 }
+        let scope = response.scope.flatMap { NetText.isBlank($0) ? nil : $0 } ?? previousScope
         return SpotifyTokens(accessToken: access, refreshToken: rotated ?? previousRefreshToken,
                              expiresAtMs: nowMs + (response.expiresIn ?? defaultExpiresInSeconds) * 1000,
-                             scope: response.scope)
+                             scope: scope)
     }
 
     /// `ensureValidToken`'s freshness check (refresh 5 minutes early).
@@ -202,6 +206,10 @@ public actor SpotifySession {
 
     /// Whether a refresh token exists (`isLoggedIn`).
     public func isLoggedIn() async -> Bool { await currentTokens()?.refreshToken != nil }
+
+    /// The scope Spotify granted the stored tokens (nil when unknown or signed out). Spotify Connect compares it with
+    /// the scopes it needs to tell a pre-Connect login (reconnect once) from one that has them.
+    public func grantedScope() async -> String? { await currentTokens()?.scope }
 
     // MARK: Sign-in
 
@@ -301,7 +309,8 @@ public actor SpotifySession {
     }
 
     private func performRefresh() async -> Result<String, SpotifyAuthError> {
-        guard let refreshToken = await currentTokens()?.refreshToken, !NetText.isBlank(refreshToken) else {
+        let previous = await currentTokens()
+        guard let refreshToken = previous?.refreshToken, !NetText.isBlank(refreshToken) else {
             return .failure(SpotifyAuthError("No refresh token"))
         }
         let response: HTTPResponse
@@ -313,7 +322,8 @@ public actor SpotifySession {
         }
         let body = OrgJSON.parse(response.body).flatMap(SpotifyTokenResponse.init(json:))
         guard response.isSuccessful, let body,
-              let tokens = SpotifyAuth.tokens(from: body, previousRefreshToken: refreshToken, nowMs: nowMs()) else {
+              let tokens = SpotifyAuth.tokens(from: body, previousRefreshToken: refreshToken, nowMs: nowMs(),
+                                              previousScope: previous?.scope) else {
             // 400 (invalid_grant): the refresh token is dead — sign in again.
             if response.statusCode == 400 { await clearSession() }
             let message = "Token refresh failed (HTTP \(response.statusCode))"
