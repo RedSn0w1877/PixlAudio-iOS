@@ -49,6 +49,9 @@ struct TaisChatSheet: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // On the content, not around the bars: an identifier set outside the `safeAreaBar`s reached the composer's
+        // field too and replaced its own `taisChat.input` (CI run 37130222151).
+        .accessibilityIdentifier("screen.taisChat")
         .safeAreaBar(edge: .top) {
             if !isEmpty { header(thinking: thinking) }
         }
@@ -67,7 +70,6 @@ struct TaisChatSheet: View {
             guard env.launch.screen == .taisChatConversation, model.messages.isEmpty else { return }
             await model.runScript(Self.demoScript)
         }
-        .accessibilityIdentifier("screen.taisChat")
     }
 
     private var orbAnimates: Bool { sheetVisible && scenePhase == .active }

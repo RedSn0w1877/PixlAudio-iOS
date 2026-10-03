@@ -57,7 +57,8 @@ final class AIScreenshotTests: XCTestCase {
     /// A prompt being typed: the composer's send button lights up in the accent.
     func testTaisChatTypingDark() throws {
         try capture("taisChat", "dark", name: "taisChat-typing") { app in
-            let field = app.descendants(matching: .any)["taisChat.input"].firstMatch
+            let field = app.textFields["taisChat.input"].firstMatch
+            XCTAssertTrue(field.waitForExistence(timeout: 5), "the composer's field (taisChat.input) is missing")
             field.tap()
             field.typeText("Something mellow for a rainy night")
         }
