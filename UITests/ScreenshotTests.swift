@@ -58,8 +58,11 @@ final class ScreenshotTests: XCTestCase {
     /// Scrolling Home down minimizes the bar (symbols only, narrow, lower); scrolling back up restores it.
     func testTabBarMinimizesOnScrollLight() throws {
         let app = launchHome("light")
-        let screen = app.descendants(matching: .any)["screen.home"].firstMatch
-        screen.swipeUp(velocity: .slow)
+        // Drag the page by coordinates, clear of the top bar (a swipe from the screen element's centre can land on
+        // the Beta pill and open its sheet).
+        let lower = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7))
+        let upper = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4))
+        lower.press(forDuration: 0.05, thenDragTo: upper)
         Thread.sleep(forTimeInterval: 1.0)
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = "tabBarMinimized-light"
@@ -67,7 +70,7 @@ final class ScreenshotTests: XCTestCase {
         add(shot)
         let library = app.descendants(matching: .any)["navBar.library"].firstMatch
         XCTAssertTrue(library.isHittable, "the minimized bar's Library tab is not tappable")
-        screen.swipeDown(velocity: .slow)
+        upper.press(forDuration: 0.05, thenDragTo: lower)
         attachScreenshot(app, "tabBarRestored-light")
     }
 

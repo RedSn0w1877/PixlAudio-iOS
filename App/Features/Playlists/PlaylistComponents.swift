@@ -281,7 +281,7 @@ struct SongPickerSheet: View {
     }
 
     var body: some View {
-        let hasCloud = library.songs.contains(where: LibrarySorting.isOnline)
+        let hasCloud = library.songs.contains(where: LibrarySorting.isOnline) || LaunchConfiguration.current.forcesCloudFilter
         VStack(alignment: .leading, spacing: 0) {
             Text("Add songs")
                 .pixlFont(.displaySmall)
