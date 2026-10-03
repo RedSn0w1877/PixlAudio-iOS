@@ -119,6 +119,30 @@ final class LyricsFeatureTests: XCTestCase {
         XCTAssertEqual(remembered?.lyrics.synced?.map(\.line), ["Second", "Words"], "a normal load is remembered")
     }
 
+    /// A BiniLyrics TTML is stored as is and read back with its background vocals, duet voice and translation, under
+    /// its own source name (invented lyrics).
+    func testBiniLyricsDocumentsAreStoredAndReadBackRichly() async throws {
+        let container = try PersistenceActor.makeContainer(inMemory: true)
+        let persistence = PersistenceActor(modelContainer: container)
+        let cache = FileManager.default.temporaryDirectory.appendingPathComponent("lyrics-tests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: cache) }
+        let service = LyricsService(persistence: persistence, cacheDirectory: cache, preferredLanguages: ["en"])
+        let song = try XCTUnwrap(DemoLibrary.songs.first)
+        let ttml = #"<tt xmlns="http://www.w3.org/ns/ttml" xmlns:lrc="http://lrc.red/lyric-ttml-internal" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" lrc:timing="Word" xml:lang="es"><head><metadata><ttm:agent type="person" xml:id="v1"/><ttm:agent type="person" xml:id="v2"/><sourceMetadata xmlns="http://lrc.red/lyric-ttml-internal"><translations><translation type="subtitle" xml:lang="en"><text for="L1">Blue sky</text></translation></translations></sourceMetadata></metadata></head><body><div><p begin="1.000" end="3.000" lrc:key="L1" ttm:agent="v1"><span begin="1.000" end="1.800">Cie</span><span begin="1.800" end="2.200">lo</span> <span begin="2.200" end="3.000">azul</span><span ttm:role="x-bg"><span begin="2.600" end="3.200">(azul)</span></span></p><p begin="4.000" end="5.000" lrc:key="L2" ttm:agent="v2"><span begin="4.000" end="5.000">mar</span></p></div></body></tt>"#
+        let saved = await service.saveOnline(song: song, lyrics: Lyrics(), source: "BiniLyrics", rawContent: ttml)
+        XCTAssertEqual(saved?.source, "BiniLyrics")
+        let storedValue = await service.storedLyricsAsync(for: song)
+        let stored = try XCTUnwrap(storedValue)
+        XCTAssertEqual(stored.source, "BiniLyrics")
+        XCTAssertEqual(stored.rawContent, ttml)
+        let doc = try XCTUnwrap(stored.lyrics.document)
+        XCTAssertEqual(doc.lines.map(\.text), ["Cielo azul", "azul", "mar"])
+        XCTAssertEqual(stored.lyrics.synced?.map(\.voiceRole), ["lead", "background", "duet"])
+        XCTAssertEqual(stored.lyrics.synced?.first?.translation, "Blue sky")
+        XCTAssertEqual(stored.lyrics.synced?.first?.words?.map(\.startsNewWord), [true, false, true])
+        XCTAssertNotNil(PreparedLyricsBuilder.build(stored.lyrics))
+    }
+
     func testJapaneseRomanizationUsesTheTokenizer() {
         let romaji = AppleCJKRomanization().romanizeJapanese("こんにちは")
         XCTAssertNotNil(romaji)

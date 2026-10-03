@@ -121,11 +121,14 @@ public struct LyricsSearchResult: Sendable, Hashable {
     public var record: LrcLibResponse
     public var lyrics: Lyrics
     public var rawLyrics: String
+    /// The catalog it came from ("LRCLIB", or "BiniLyrics" for its strict match offered first in the picker).
+    public var source: String
 
-    public init(record: LrcLibResponse, lyrics: Lyrics, rawLyrics: String) {
+    public init(record: LrcLibResponse, lyrics: Lyrics, rawLyrics: String, source: String = LyricsRepositoryLogic.lrclibSourceName) {
         self.record = record
         self.lyrics = lyrics
         self.rawLyrics = rawLyrics
+        self.source = source
     }
 }
 

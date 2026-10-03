@@ -58,6 +58,15 @@ The Android app's own Kotlin (album-art seed selection in `ui/theme/ColorRoles.k
 earlier stages) is by the PixlAudio authors; contributions to the Android project before 2026-05-12 were
 MIT-licensed — see the Android repository's `THIRD_PARTY_NOTICES.md`.
 
+## BiniLyrics (lyrics data source)
+
+- Source: https://lyrics.binimum.org (API `https://lyrics-api.binimum.org`, documents served from `lrc.red`).
+- PixlAudio looks lyrics up in BiniLyrics' free, keyless public API by ISRC or by title and artist, and reads the
+  TTML documents it serves (word timing, background vocals, duets, translations). No BiniLyrics code is included;
+  the client and the TTML reader are PixlAudio's own Swift (`BiniLyricsClient`, `BiniLyricsMatching`,
+  `TtmlDocumentParser`). Lyrics shown from this source are labelled "BiniLyrics". This notice does not grant rights
+  to lyric content, which belongs to its rights holders.
+
 ---
 
 

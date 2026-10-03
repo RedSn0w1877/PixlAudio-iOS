@@ -344,7 +344,7 @@ final class TaisStudio {
             let vocalLines = (found.lyrics.synced ?? []).filter { !$0.line.isKotlinBlank }
             let wordLines = vocalLines.filter { !($0.words ?? []).isEmpty }.count
             guard await service.saveOnline(song: song, lyrics: found.lyrics, source: found.source,
-                                           overrideUser: job.overrideUser) != nil else {
+                                           rawContent: found.rawContent, overrideUser: job.overrideUser) != nil else {
                 return (false, kept)
             }
             reloadLyricsIfShowing(song)
