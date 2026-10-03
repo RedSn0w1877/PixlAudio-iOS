@@ -51,6 +51,7 @@ struct PlayerSheetHost: View {
             }
         }
         .ignoresSafeArea(.keyboard)
+        .overlay(alignment: .topLeading) { SheetProbeLabel() }
         .animation(PixlMotion.bars, value: playback.hasItem)
         .onAppear { consumeCoverRequest() }
         .onChange(of: router.cover) { _, _ in consumeCoverRequest() }
@@ -242,7 +243,7 @@ private struct MiniPlayerLayer: View {
             // appear animation): the first expand then only animates.
             .task {
                 try? await Task.sleep(for: .seconds(1))
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled, !SheetProbe.noPrewarm else { return }
                 env.playerSheet.prewarm()
             }
     }
@@ -328,6 +329,7 @@ private struct FullLayerPlacementEffect: ViewModifier, Animatable {
 
     func body(content: Content) -> some View {
         let f = min(max(animatableData, 0), 1)
+        let _ = SheetProbe.markFullEffect(animatableData)
         let metrics = PlayerSheetMetrics(progress: f, cardMinX: collapsedMinX + (0 - collapsedMinX) * f)
         let alpha = metrics.fullPlayerAlpha
         content

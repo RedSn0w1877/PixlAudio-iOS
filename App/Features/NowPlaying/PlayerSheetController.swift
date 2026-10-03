@@ -69,6 +69,7 @@ final class PlayerSheetController {
 
     /// Expands to the full player (Android `expandPlayerSheet`). `animated: false` for launch states.
     func expand(animated: Bool = true, initialVelocity: Double = 0) {
+        SheetProbe.note("expand animated=\(animated) built=\(hasBuiltFullPlayer)")
         isExpanded = true
         guard animated else {
             if !hasBuiltFullPlayer { hasBuiltFullPlayer = true }
@@ -142,6 +143,7 @@ final class PlayerSheetController {
     @ObservationIgnored private var dragAccumulatedY: CGFloat = 0
 
     func beginDrag() {
+        SheetProbe.note("beginDrag built=\(hasBuiltFullPlayer)")
         dragStartExpansion = expansion
         dragAccumulatedY = 0
         if !hasBuiltFullPlayer { hasBuiltFullPlayer = true }
@@ -299,6 +301,7 @@ struct PlayerSectionFadeEffect: ViewModifier, Animatable {
 
     func body(content: Content) -> some View {
         let metrics = PlayerSheetMetrics(progress: min(max(animatableData, 0), 1))
+        let _ = SheetProbe.markSection(start, animatableData)
         content
             .opacity(metrics.sectionAlpha(start: start))
             .offset(y: slide * (1 - metrics.progress))
