@@ -22,8 +22,9 @@ Run it with `[shots:TransitionPerformanceTests]` in a commit message; CI copies 
 `perf-metrics.txt` in the `shots-<sha>` artifact and the job summary. Simulator numbers are indicative; for frame
 drops use Instruments on the phone (Hitches + Core Animation + SwiftUI templates).
 
-For motion, `UITests/TransitionRecordingTests` (opt-in) runs the player sheet's expand and collapse and held-down
-settings rows slowly; with `[shots:TransitionRecordingTests] [record:TransitionRecordingTests]` CI films it
+For motion, `UITests/TransitionRecordingTests` (opt-in) runs the player sheet's expand and collapse (twice, then a
+collapse interrupted at once by a tap on the mini player) and held-down settings rows slowly; with
+`[shots:TransitionRecordingTests] [record:TransitionRecordingTests]` CI films it
 (`record-TransitionRecordingTests.mp4` in the shots artifact), so a branch's frames can be compared with main's
 (`ffmpeg -fps_mode passthrough` keeps the recorder's own frames; it captures roughly 10–30 a second, too few for a
 spring's curve but enough to see what is on screen).
@@ -119,6 +120,26 @@ by frame:
   full player in the card where the unfixed one showed it empty, and the second caught a frame a quarter of the way
   down with the player part-faded in the shrinking card, as main's recording shows it. The recorder catches too few
   frames of the 0.4 s spring to compare the fade's curve, which stays on-device check 4.
+- **But `c9a81ee` brought back a layout jump** (found by the review in run 37113795352's recording, on both
+  collapses; it was missed when that recording was first checked). The fade used one flag for the full layer's
+  visibility and for its zero frame (`767ba66`: a hidden screen-sized layer must take no room in the card's
+  `ZStack`). So for the whole fade, about 0.5 s, the layer took room again, the mini player was laid out at the
+  screen's width (402 pt instead of the card's 370: its controls 32 pt to the right, Next clipped by the card), and
+  the controls jumped back when the fade ended. Main zeroes the frame on the collapse's first frame (its player is
+  removed there), so its mini player never moves; pre-perf main (`perf-x-hdr-main` on `9e5ac90`) stayed clipped
+  after a collapse and never jumped. Fixed in `53b7e56`: two gates. The zero frame follows `occupiesLayout`
+  (expanded, dragging or expansion above 0), the opacity follows `isShown` (that, or fading out). The zero frame
+  is anchored top-leading and doesn't clip, so the fading player still draws in the same place, and the mini player
+  gets the card's width from the collapse's first frame, as on main.
+- **An expand during the fade** (a tap on the mini player within about half a second of a collapse) cleared the
+  fade in a separate non-animated update and only then set the expansion inside `withAnimation`; depending on how
+  SwiftUI combined the two, the player could pop to full opacity in a still-small card or restart its fade. Since
+  `53b7e56` the expand clears the fade inside its own `withAnimation`, with the expansion (one transaction, as the
+  rule below says): the placement springs on from where the collapse froze it and the opacity from where the fade
+  had got to. A drag still clears it without animation, as the drag itself sets the expansion. Known limit: a
+  collapse while an expand's spring is still running freezes at the model value (1), not the fraction on screen
+  (the controller can't see the presentation value), so a collapse tapped before an expand has settled fades the
+  player from its resting placement. `TransitionRecordingTests` films the interrupted collapse.
 
 ### Settings pages opened scrolled (2026-10-03)
 
@@ -154,6 +175,13 @@ launch-into screenshots worse before, and main's per-page clearance made the rea
 (`SettingsSnapGate`, not observed: the behaviour value never changes during a gesture). The screenshots of settings
 pages launched straight into a page now show the header fully expanded, as a tap shows it on Android.
 
+This is older than the perf work, so it is a change Hoa will see, not only the undoing of a regression: pre-perf
+main (`9e5ac90`, run 37062681023) already opened Music Management, the other two-line-title pages and the Settings
+root a few points scrolled (about 22 pt on two-line titles), while About and the Equalizer opened at rest there and
+do again now. Opening at rest is Android's resting state; it is listed under "Needs Hoa's OK" below. Whether the
+snap still acts on a real finger lift depends on the order of the phase callbacks and `updateTarget` at lift-off,
+which only the phone can show (check 6).
+
 Not fixed here, and the same on main: the snap's arithmetic itself. A slow drag released mid-way on Music
 Management ends 22 pt down (part-collapsed) instead of open, and a longer one may stay where it is — the probe's
 drags of 12–46 pt landed at 22 pt, fully collapsed or in between, old and fixed alike. Dropping the inset from
@@ -173,7 +201,7 @@ behaviour change of main's, so it needs its own check on the phone.
 | Library pills, sort, rescans | Six eager pages re-ran on every LibraryView pass (fresh closures); sorts ran on the main actor below 1,500 songs; one monolithic `lists`; the Songs / Liked sort folded every title (NOCASE) and parsed both ids on every comparison (~60,000 for 5,000 songs). | Pages take plain values + `LibraryActions`; `LibraryModel` memoises each list by its inputs, computes off the main actor after the first frame, lands without animation; inputs compare the library by `LibraryStore.revision`. Sorts compute their keys once per element (`LibrarySorting.noCaseKey`, parsed ids; same order, checked against the old comparator in `LibrarySortingTests`). |
 | Any library edit or rescan | Whole-snapshot comparisons in Home, Search, Library and detail pages; lookups rebuilt on the main actor; `SnapshotLoader` ran on its caller's actor. | Key on `library.revision`; snapshots arrive with lookups built off the main actor (`@concurrent`); edits patch lookups (`applyEdit`). |
 | Detail pages | Album / artist / genre / folder pages filtered and sorted the whole library in their first frames, then re-rendered. | `library.detailIndex` (per revision, built off the main actor) + a `ViewMemo` in `body`: content in the first frame, no second pass. |
-| Player sheet | The full player was rebuilt on every expand and drag; the morph wrote its progress into the environment every frame. | The full player is built once (pre-warmed) and kept hidden at a zero frame (a hidden screen-sized layer would widen the card's `ZStack`, and the mini player with it); fades are their own `Animatable` modifiers; a collapse fades it out frozen where it began, as its removal did, before hiding it. Never write fast-changing values into the environment. |
+| Player sheet | The full player was rebuilt on every expand and drag; the morph wrote its progress into the environment every frame. | The full player is built once (pre-warmed) and kept hidden at a zero frame (a screen-sized layer in the layout would widen the card's `ZStack`, and the mini player with it); fades are their own `Animatable` modifiers; a collapse fades it out frozen where it began, as its removal did, before hiding it — at the zero frame from the collapse's first frame (it still draws there), so only its opacity outlives the open state. Never write fast-changing values into the environment. |
 | Player → album / artist | Collapse and push shared their frames. | Collapse first, push at 10 % (`collapse(thenAfterReaching:)`), as Android. |
 | First visits, revisits | Artwork keyed by exact pixel size, FIFO, unbounded: placeholders and fade-ins mid-push; every new size re-read the source (embedded art is an AVAsset metadata read). | Size buckets, byte-bounded LRU, purge on memory warning, stand-in from another size. A display bucket missing on disk is downsampled from the smallest larger bucket already on disk before the source is touched (not written back, so every cached file is one generation from the original; colour extraction's 128 px always reads the source). Disk thumbnails are written atomically, so no reader sees a half-written file. |
 | Sheets | Wrap-content sheets opened at `.medium` and re-targeted; the queue sheet copied the queue per pass and re-ran its body per drag event; pickers filtered the library on the main actor. | Remembered heights; per-row reorder model; index-addressed rows; precomputed / off-main filtering without debounce. |
@@ -229,6 +257,10 @@ behaviour change of main's, so it needs its own check on the phone.
 - Keeping a view instead of removing it also drops its removal transition. When a view that used to come and go is
   kept for speed, find out what its insertion and removal looked like (film both on CI with `[record:Class]` and
   compare frames) and reproduce what showed: the kept full player fades out on collapse as the removed one did.
+  Keep its layout and its visibility on separate gates: a removed view left the layout at once even while its
+  removal transition still drew it, so the kept one takes its zero frame on the first frame and only its opacity
+  follows the fade. Changes that end such a fade go in the transaction that interrupts it (the expand's
+  `withAnimation`), never in a separate update before it.
 - A `ScrollTargetBehavior` is asked for a target when a gesture ends **and** when the scroll view's size changes.
   Logic meant for the user's release must check that the user is scrolling (`onScrollPhaseChange`), or a page at
   rest moves whenever its size or insets change.
@@ -256,7 +288,11 @@ phone, the same library and the same steps; record the screen for both and put t
    it fades with `fullPlayerAlpha(p)` alone; on main its insertion was unanimated (`isExpanded = true` outside the
    expand's `withAnimation`), and the CI recordings agree. Collapse: main's removal faded the player out on the
    collapse's spring, frozen where it began; the branch now does the same with `collapseFadeFrom` /
-   `fullLayerFade` (above) — check that the curves match. `[record:TransitionRecordingTests]` films both on CI.
+   `fullLayerFade` (above) — check that the curves match, and that the mini player's previous / play / next stay in
+   place in every frame of the collapse (no shift to the right while the player fades, no jump when it ends). Also
+   tap the mini player right after a collapse: the player must spring back from where it was, without popping to
+   full opacity in a small card or restarting its fade. A collapse tapped before an expand has settled fades from
+   the resting placement (the known limit above). `[record:TransitionRecordingTests]` films all of it on CI.
 5. **Steady cost of the hidden pre-built full player**: with the player collapsed and a large queue (a few thousand
    songs), skip through ten songs, play / pause and edit the queue, under Instruments' SwiftUI and Time Profiler
    templates, main against this branch. The hidden `NowPlayingView` re-renders on each of these (its seek bar and
@@ -267,11 +303,22 @@ phone, the same library and the same steps; record the screen for both and put t
 6. **Settings pages open at rest**: push Settings › About, Settings › Equalizer and Settings › Music Management by
    tapping, several times (right after launch and later, before and after the mini player first appears), and check
    each opens with its header fully expanded and the list at the top (see "Settings pages opened scrolled" above;
-   main opens the last two part-scrolled). Then scroll each list a little, a lot, and fling it, and check the header
-   ends where it does on main.
+   main opens the last two part-scrolled; pre-perf builds already opened two-line-title pages about 22 pt
+   scrolled). Then scroll each list a little, a lot, and fling it, and check the header ends where it does on main.
+   Binding: include a slow drag released mid-way through the header's collapse with the finger at rest (no fling)
+   on Music Management and on About. The snap must still act on that release as it does on main: the gate is
+   opened by `onScrollPhaseChange` and must still be open when SwiftUI asks the behaviour at lift-off. If a slow
+   mid-way release stays put on the branch where main moves it, the phase callback closes the gate too early on the
+   device; then close it a main-actor turn after `.idle` instead of at once (a size change at rest must still find
+   it closed).
 
 ## Needs Hoa's OK
 
+- **Settings pages open at rest**: every settings page built on `SettingsScaffold` now opens with its header fully
+  expanded and the list at the top, as on Android. Pre-perf builds opened Music Management, the other two-line-title
+  pages and the Settings root a few points scrolled (about 22 pt on two-line titles), and today's main opens tapped
+  categories part-scrolled too ("Settings pages opened scrolled" above). The screenshots of those pages differ from
+  main's for this reason only. It is a visible change on pages Hoa has already seen.
 - **Open-source notices, long-press Copy** (P41): the notices sheet now lays its text out by paragraph, so only the
   visible paragraphs are laid out when it opens (the single 30 KB `Text` was laid out on the main thread before the
   sheet could present). A side effect: long-press › Copy copies one paragraph instead of the whole notices text. The
