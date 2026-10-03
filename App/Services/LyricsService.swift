@@ -7,8 +7,11 @@ import PixlTags
 /// Where a song's lyrics came from (the More sheet's debug info and the "Lyrics: …" footer).
 nonisolated struct LoadedLyrics: Sendable, Equatable {
     var lyrics: Lyrics
-    /// "user", "AMLL TTML", "NetEase YRC", "LRCLIB", "embedded", "local", "cache", …
+    /// "user", "BiniLyrics", "AMLL TTML", "NetEase YRC", "LRCLIB", "embedded", "local", "cache", …
     var source: String
+    /// The catalog's own text, stored instead of the parsed lyrics: a BiniLyrics TTML keeps the translations and
+    /// romanisations the lyrics JSON has no place for.
+    var rawContent: String? = nil
 }
 
 /// Why an online search failed (Android `LyricsSearchUiState.NotFound/Error` messages).
@@ -32,19 +35,27 @@ actor LyricsService {
     private let lrclib: LrcLibClient
     private let cacheDirectory: URL?
     private let romanization: any CJKRomanizationProvider
+    /// Picks among a BiniLyrics document's translations.
+    private let preferredLanguages: [String]
     /// Android keeps an in-memory `LruCache` of parsed lyrics.
     private var memory: [String: LoadedLyrics] = [:]
     private var memoryOrder: [String] = []
     private static let memoryLimit = 64
 
+    /// `biniLyricsHTTP` must not follow redirects by itself (`BiniLyricsClient` checks every hop).
     init(persistence: PersistenceActor?, http: any HTTPClient = URLSessionHTTPClient(),
+         biniLyricsHTTP: any HTTPClient = LyricsNetwork.biniLyricsHTTPClient(),
          cacheDirectory: URL? = LyricsService.defaultCacheDirectory(),
-         romanization: any CJKRomanizationProvider = AppleCJKRomanization()) {
+         romanization: any CJKRomanizationProvider = AppleCJKRomanization(),
+         preferredLanguages: [String] = Locale.preferredLanguages) {
         self.persistence = persistence
         self.romanization = romanization
+        self.preferredLanguages = preferredLanguages
         let lrclib = LrcLibClient(http: http, romanization: romanization)
         self.lrclib = lrclib
-        catalogs = LyricsCatalogSearch(amll: AmllLyricsClient(http: http, romanization: romanization),
+        catalogs = LyricsCatalogSearch(bini: BiniLyricsClient(http: biniLyricsHTTP, romanization: romanization,
+                                                              preferredLanguages: preferredLanguages),
+                                       amll: AmllLyricsClient(http: http, romanization: romanization),
                                        netease: NeteaseLyricsClient(http: http), lrclib: lrclib)
         self.cacheDirectory = cacheDirectory
         if let cacheDirectory {
@@ -82,7 +93,9 @@ actor LyricsService {
             }
             if let found, LyricsRepositoryLogic.isUsable(found.lyrics) {
                 if shouldRemember { remember(found, for: song.id) }
-                if kind == .api && !isUserSynced(song) { writeJSONCache(found.lyrics, songId: song.id) }
+                if kind == .api && !isUserSynced(song) {
+                    writeJSONCache(found.lyrics, rawContent: found.rawContent, songId: song.id)
+                }
                 return found
             }
         }
@@ -91,11 +104,25 @@ actor LyricsService {
 
     // MARK: Sources
 
+    /// Stored text → lyrics. A BiniLyrics TTML is read with `TtmlDocumentParser` (background vocals, duets,
+    /// translations); everything else with `LyricsUtils.parseLyrics`, as on Android.
+    private func parse(_ raw: String) -> (lyrics: Lyrics, isBiniLyrics: Bool) {
+        if BiniLyricsMatching.isBiniLyricsDocument(raw),
+           let rich = TtmlDocumentParser.parse(raw, metadata: LyricsMetadata(source: BiniLyricsMatching.sourceName),
+                                               preferredLanguages: preferredLanguages, romanization: romanization) {
+            return (rich, true)
+        }
+        return (LyricsUtils.parseLyrics(raw, romanization: romanization), false)
+    }
+
     private func parseStored(_ raw: String, source: String) -> LoadedLyrics? {
-        var parsed = LyricsUtils.parseLyrics(raw, romanization: romanization)
+        let read = parse(raw), isBiniLyrics = read.isBiniLyrics
+        var parsed = read.lyrics
         guard LyricsRepositoryLogic.isUsable(parsed) else { return nil }
         parsed.areFromRemote = false
-        return LoadedLyrics(lyrics: parsed, source: parsed.document?.metadata.source ?? source)
+        let fallback = isBiniLyrics ? BiniLyricsMatching.sourceName : source
+        return LoadedLyrics(lyrics: parsed, source: parsed.document?.metadata.source ?? fallback,
+                            rawContent: isBiniLyrics ? raw : nil)
     }
 
     private func embeddedLyrics(for song: Song) -> LoadedLyrics? {
@@ -143,13 +170,31 @@ actor LyricsService {
         return nil
     }
 
-    /// `fetchLyricsFromAPI`: the JSON disk cache, then AMLL, NetEase and LRCLIB in parallel (word-synced first).
+    /// `fetchLyricsFromAPI`: the JSON disk cache, then BiniLyrics, AMLL, NetEase and LRCLIB in parallel (word-synced
+    /// first, BiniLyrics first among equals).
     private func onlineLyrics(for song: Song) async -> LoadedLyrics? {
         if let cached = readJSONCache(songId: song.id) { return cached }
-        guard let found = await catalogs.find(song: song, syncedOnly: false) else { return nil }
+        let isrc = await songISRC(for: song)
+        guard let found = await catalogs.find(song: song, isrc: isrc, syncedOnly: false) else { return nil }
+        return Self.loaded(found)
+    }
+
+    private static func loaded(_ found: OnlineSyncedLyrics) -> LoadedLyrics {
         var lyrics = found.lyrics
         lyrics.areFromRemote = true
-        return LoadedLyrics(lyrics: lyrics, source: found.source)
+        return LoadedLyrics(lyrics: lyrics, source: found.source, rawContent: found.rawContent)
+    }
+
+    /// The song's ISRC, for BiniLyrics' direct lookup: a Spotify track's (from its synced record), else a local
+    /// file's tag (ID3 `TSRC`, MP4 `----:com.apple.iTunes:ISRC` or Vorbis `ISRC`, all mapped to `ISRC`).
+    private func songISRC(for song: Song) async -> String? {
+        if let spotifyId = song.spotifyId, let record = try? await persistence?.spotifySong(spotifyId: spotifyId),
+           let isrc = BiniLyricsMatching.normalizedISRC(record.isrc) {
+            return isrc
+        }
+        guard let url = Self.fileURL(for: song), let region = TagRegionReader.read(url: url),
+              let tags = try? AudioTagReader.read(region) else { return nil }
+        return tags.properties.dictionary["ISRC"]?.lazy.compactMap(BiniLyricsMatching.normalizedISRC).first
     }
 
     // MARK: Manual search (the fetch dialog)
@@ -168,10 +213,8 @@ actor LyricsService {
 
     /// `fetchFromRemote` (the dialog's "Search" with auto-apply): catalogs first, then the best LRCLIB candidate.
     func fetchFromRemote(song: Song) async -> Result<LoadedLyrics, LyricsSearchFailure> {
-        if let found = await catalogs.find(song: song, syncedOnly: false) {
-            var lyrics = found.lyrics
-            lyrics.areFromRemote = true
-            return .success(LoadedLyrics(lyrics: lyrics, source: found.source))
+        if let found = await catalogs.find(song: song, isrc: await songISRC(for: song), syncedOnly: false) {
+            return .success(Self.loaded(found))
         }
         do {
             if let result = try await lrclib.fetchFromRemote(song: song) {
@@ -191,23 +234,27 @@ actor LyricsService {
     /// when the content holds nothing usable.
     @discardableResult
     func save(song: Song, rawContent: String, source: String, areFromRemote: Bool = false) async -> LoadedLyrics? {
-        var parsed = LyricsUtils.parseLyrics(rawContent, romanization: romanization)
+        let read = parse(rawContent), isBiniLyrics = read.isBiniLyrics
+        var parsed = read.lyrics
         guard LyricsRepositoryLogic.isUsable(parsed) else { return nil }
         parsed.areFromRemote = areFromRemote
         let isSynced = !(parsed.synced ?? []).isEmpty
         try? await persistence?.saveLyrics(songId: song.id, content: rawContent, isSynced: isSynced, source: source,
                                            updatedAt: Int64(Date().timeIntervalSince1970 * 1000))
-        writeJSONCache(parsed, songId: song.id)
-        let loaded = LoadedLyrics(lyrics: parsed, source: parsed.document?.metadata.source ?? source)
+        writeJSONCache(parsed, rawContent: isBiniLyrics ? rawContent : nil, songId: song.id)
+        let loaded = LoadedLyrics(lyrics: parsed, source: parsed.document?.metadata.source ?? source,
+                                  rawContent: isBiniLyrics ? rawContent : nil)
         remember(loaded, for: song.id)
         return loaded
     }
 
     /// Saves lyrics chosen from a search result or the catalogs (never over the user's own sync unless asked).
+    /// `rawContent` (a catalog's own text, e.g. a BiniLyrics TTML) is stored instead of the parsed lyrics.
     @discardableResult
-    func saveOnline(song: Song, lyrics: Lyrics, source: String, overrideUser: Bool = true) async -> LoadedLyrics? {
+    func saveOnline(song: Song, lyrics: Lyrics, source: String, rawContent: String? = nil,
+                    overrideUser: Bool = true) async -> LoadedLyrics? {
         if !overrideUser, await isUserSyncedStored(song) { return nil }
-        guard let raw = LyricsRepositoryLogic.lyricsToRawContent(lyrics) else { return nil }
+        guard let raw = rawContent ?? LyricsRepositoryLogic.lyricsToRawContent(lyrics) else { return nil }
         return await save(song: song, rawContent: raw, source: source, areFromRemote: true)
     }
 
@@ -294,9 +341,13 @@ actor LyricsService {
         return loaded
     }
 
-    private func writeJSONCache(_ lyrics: Lyrics, songId: String) {
+    /// `rawContent` (a BiniLyrics TTML) takes the record's richest slot, so a reload reads it back with its
+    /// translations; the plain and LRC slots still hold the parsed text.
+    private func writeJSONCache(_ lyrics: Lyrics, rawContent: String? = nil, songId: String) {
         guard let url = jsonCacheURL(songId: songId) else { return }
-        let json = LyricsCacheData(lyrics: lyrics).encodedJSON()
+        var record = LyricsCacheData(lyrics: lyrics)
+        if let rawContent { record.lyricsDocument = rawContent }
+        let json = record.encodedJSON()
         try? Data(json.utf8).write(to: url, options: [.atomic])
     }
 

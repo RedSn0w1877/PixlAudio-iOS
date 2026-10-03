@@ -79,8 +79,8 @@ final class LyricsController {
         store.set(.loading(songId: song.id))
         guard let service else { return }
         let preference = LyricsSourcePreference(rawValue: settings.lyrics.sourcePreference) ?? .embeddedFirst
-        // The catalogs (LRCLIB, AMLL, NetEase) are always asked, as Android's `LyricsRepositoryImpl` does: the
-        // "Automatic lyric sync" switch only drives the automatic studio (word timings in the background).
+        // The catalogs (BiniLyrics, AMLL, NetEase, LRCLIB) are always asked, as Android's `LyricsRepositoryImpl`
+        // does: the "Automatic lyric sync" switch only drives the automatic studio (word timings in the background).
         loadTask = Task { [weak self] in
             let loaded = await service.lyrics(for: song, preference: preference, allowOnline: true,
                                               forceRefresh: forceRefresh)
@@ -144,7 +144,8 @@ final class LyricsController {
                 guard let self else { return }
                 switch result {
                 case .success(let loaded):
-                    let saved = await service.saveOnline(song: song, lyrics: loaded.lyrics, source: loaded.source)
+                    let saved = await service.saveOnline(song: song, lyrics: loaded.lyrics, source: loaded.source,
+                                                        rawContent: loaded.rawContent)
                     self.apply(saved ?? loaded, songId: song.id)
                     self.searchState = .success
                 case .failure(let failure):

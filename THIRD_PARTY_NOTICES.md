@@ -50,6 +50,15 @@ earlier stages) is by the PixlAudio authors; contributions to the Android projec
 MIT-licensed — see the Android repository's `THIRD_PARTY_NOTICES.md`. The genre illustrations in
 `App/Features/Search/GenreArt.xcassets` are the Android app's own vector drawables converted to SVG.
 
+## BiniLyrics (lyrics data source)
+
+- Source: https://lyrics.binimum.org (API `https://lyrics-api.binimum.org`, documents served from `lrc.red`).
+- PixlAudio looks lyrics up in BiniLyrics' free, keyless public API by ISRC or by title and artist, and reads the
+  TTML documents it serves (word timing, background vocals, duets, translations). No BiniLyrics code is included;
+  the client and the TTML reader are PixlAudio's own Swift (`BiniLyricsClient`, `BiniLyricsMatching`,
+  `TtmlDocumentParser`). Lyrics shown from this source are labelled "BiniLyrics". This notice does not grant rights
+  to lyric content, which belongs to its rights holders.
+
 ## BotGuard glue page (`App/Services/YouTube/po_token.html`)
 
 - Copied unchanged from the Android PixlAudio app's `app/src/main/assets/po_token.html`, which comes from NewPipe's

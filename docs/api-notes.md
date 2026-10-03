@@ -483,6 +483,18 @@ Signatures checked against the developer.apple.com documentation JSON (`/tutoria
 | `String.applyingTransform(.mandarinToLatin / .stripDiacritics, reverse:)` | 9 | /documentation/foundation/stringtransform/mandarintolatin | `AppleCJKRomanization` | Toneless pinyin, `ü` → `u:` (pinyin4j form). |
 | `UnevenRoundedRectangle`, `.contentTransition(.symbolEffect(.replace))`, `sensoryFeedback(_:trigger:)` | 16 / 17 | (see stage 4) | lyrics chrome | |
 
+### BiniLyrics source
+BiniLyrics (https://lyrics.binimum.org) is reached over HTTPS only (`lyrics-api.binimum.org` → 307 → `lrc.red`), so
+App Transport Security needs no change. Signatures checked against the developer.apple.com documentation JSON.
+
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `URLSessionTaskDelegate.urlSession(_:task:willPerformHTTPRedirection:newRequest:completionHandler:)` (`completionHandler: @escaping @Sendable (URLRequest?) -> Void`) | 7 | /documentation/foundation/urlsessiontaskdelegate/urlsession(_:task:willperformhttpredirection:newrequest:completionhandler:) | `RedirectRefusingDelegate` (`LyricsNetwork`) | Answers `nil`, so the 3xx itself is delivered; `BiniLyricsClient` follows a hop only to an allowlisted HTTPS host. Session delegates get this callback for completion-handler tasks too. |
+| `URLSession(configuration:delegate:delegateQueue:)`, `URLSessionConfiguration.ephemeral`, `timeoutIntervalForRequest`, `timeoutIntervalForResource` | 7 | /documentation/foundation/urlsession/init(configuration:delegate:delegatequeue:) | `LyricsNetwork.noRedirectSession` | No cookie storage; 6 s request / 15 s resource timeouts. |
+| `Locale.preferredLanguages` | 2 | /documentation/foundation/locale/preferredlanguages | `LyricsService` | Picks among a BiniLyrics document's translations. |
+| `URL(string:relativeTo:)`, `URL.absoluteURL`, `scheme`, `host`, `port`, `user`, `password` (PixlCore) | 2 | /documentation/foundation/url/init(string:relativeto:) | `BiniLyricsMatching.isAllowedURL` / `redirectTarget` (PixlLyrics) | The host allowlist; corelibs on Windows behave the same in the tests. |
+| `String.range(of:options: .caseInsensitive / .backwards)`, `components(separatedBy:)` (PixlCore) | 2 | /documentation/foundation/stringprotocol/range(of:options:range:locale:) | `BiniLyricsMatching.credits` / `searchQuery` | |
+
 ## Stage 10 — lyrics sync editor
 | API | Min iOS | Docs | Used in | Notes |
 |---|---|---|---|---|
