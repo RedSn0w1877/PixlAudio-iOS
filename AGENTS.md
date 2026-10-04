@@ -3,6 +3,8 @@
 PixlAudio for iOS is a native Swift 6 / SwiftUI port of the PixlAudio Android app. These rules are binding.
 The full architecture is in [`docs/research/architecture.md`](docs/research/architecture.md); the UI rules in
 [`docs/design.md`](docs/design.md). Where this file and the research docs disagree, this file wins.
+New here? After this file, read [`docs/handoff/2026-10-04-start-here.md`](docs/handoff/2026-10-04-start-here.md)
+for the current state: what's merged, what's waiting on the owner's phone, and which branches matter.
 
 ## Product rules (owner decisions)
 1. **Liquid Glass only. No Material anywhere** — no Material components, ripples, FABs, tonal elevation, Material
