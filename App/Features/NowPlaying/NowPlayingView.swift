@@ -1,10 +1,12 @@
 import PixlModel
+import PixlNet
 import SwiftUI
 
 /// The full player (Android `FullPlayerContent`, portrait), drawn inside the player sheet's card
 /// (`PlayerSheetHost`) over the album's `primaryContainer`:
-/// - top bar (64 pt): the collapse circle (42 pt), "Now Playing" (+ a cloud for streamed songs), and on the right
-///   the output pill (left-rounded) and the queue pill (right-rounded), 50×42, 6 pt apart;
+/// - top bar (64 pt): the collapse circle (42 pt), and on the right the output pill (left-rounded; the output's icon,
+///   plus the device's name for any output other than this phone) and the queue pill (right-rounded, 50×42), 6 pt
+///   apart;
 /// - 24 pt side margins, then — spread like Compose's `SpaceAround` — the album carousel with title / artist, the
 ///   lyrics and AI DJ circles (48 pt), the seek bar with times and the format chip; then the transport (80 pt) and
 ///   the shuffle / repeat / favourite row;
@@ -41,7 +43,7 @@ struct NowPlayingView: View {
         let isVisible = env.playerSheet.isExpanded || env.playerSheet.isDragging
         // The background never takes part in layout (a filled cover is wider than the screen).
         return VStack(spacing: 0) {
-            PlayerTopBar(song: song)
+            PlayerTopBar()
                 .padding(.top, safeArea.top)
                 .playerSectionFade(start: 0)
             VStack(spacing: 0) {
@@ -138,10 +140,10 @@ private struct ModalWhileExpanded: ViewModifier {
     }
 }
 
-/// The player's top bar (Android `FullPlayerContent` `TopAppBar`).
+/// The player's top bar (Android `FullPlayerContent` `TopAppBar`), without Android's "Now Playing" title and its cloud
+/// for streamed songs (Hoa, 2026-10-07): the collapse circle on the left; on the right the output pill, which names
+/// the output and may grow into the freed width, joined to the queue pill.
 private struct PlayerTopBar: View {
-    let song: Song
-
     @Environment(AppEnvironment.self) private var env
     @Environment(Router.self) private var router
     @Environment(\.playerTheme) private var theme
@@ -173,20 +175,7 @@ private struct PlayerTopBar: View {
             }
             .frame(width: 56, height: 42)
             .padding(.leading, 4)
-            HStack(spacing: 8) {
-                Text("Now Playing")
-                    .pixlFont(.labelLarge, weight: .semibold)
-                    .foregroundStyle(theme.onPrimaryContainer)
-                    .lineLimit(1)
-                if Self.isStreamed(song) {
-                    Image(systemName: "cloud.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(theme.onPrimaryContainer.opacity(0.6))
-                        .accessibilityLabel("Cloud stream")
-                }
-            }
-            .padding(.leading, 18)
-            Spacer(minLength: 8)
+            Spacer(minLength: 12)
             HStack(spacing: 6) {
                 outputPill
                 Button { router.present(AppSheet.queue) } label: {
@@ -205,35 +194,58 @@ private struct PlayerTopBar: View {
                 .accessibilityIdentifier("player.queue")
             }
             .padding(.trailing, 18)
+            // Ahead of the Spacer, so a long name can use all the width the collapse circle leaves (about width −
+            // 146 pt) instead of splitting the free width with the Spacer and truncating at half of it.
+            .layoutPriority(1)
         }
         .frame(height: 64)
     }
 
-    /// The output pill (Android's cast button): the current output's icon, with its name while playing over AirPlay —
-    /// or "Playing on <device>" while Spotify Connect plays (long press: stop playing there).
+    /// The output pill (Android's cast button): the output's icon, plus its name for any output other than this
+    /// phone's speaker — a Spotify Connect device, AirPlay, Bluetooth, wired headphones, a car (Hoa, 2026-10-07; Android
+    /// names only a cast device). It hugs its content (icon only: 50 pt, like the queue pill) and grows with the name
+    /// up to the collapse circle, truncating at the tail. A dot marks an output that plays elsewhere (Connect,
+    /// AirPlay), as Android's does while casting; "Connecting…" and a spinner while a Connect session starts. Long
+    /// press while Connect plays: stop playing there.
     private var outputPill: some View {
         let connect = env.spotifyConnect.active
-        // The device's name, as AirPlay's route name (the pill shares the top bar with "Now Playing"); VoiceOver
-        // says "Playing on <device>".
-        let label: String? = connect?.name ?? (route.isRemote && !route.name.isEmpty ? route.name : nil)
-        let showsLabel = label != nil
-        let trailing: CGFloat = showsLabel ? 21 : 6
+        let connectingId = connect == nil ? env.spotifyConnect.connectingDeviceId : nil
+        let connecting = connectingId.flatMap { id in env.spotifyConnect.devices.first { $0.deviceId == id } }
+        let name: String? = connect?.name ?? route.deviceName
+        let label: String? = connectingId != nil ? String(localized: "Connecting…") : name
+        let isRemote = connect != nil || route.isRemote
+        let trailing: CGFloat = label != nil ? 21 : 6
+        let spoken: String = if connectingId != nil {
+            String(localized: "Connecting to a Spotify Connect device")
+        } else if let name {
+            String(localized: "Playing on \(name)")
+        } else {
+            String(localized: "Playing on this phone")
+        }
         return Button { router.present(AppSheet.devices) } label: {
             HStack(spacing: 8) {
-                Image(systemName: connect?.symbolName ?? route.systemImage)
+                Image(systemName: connect?.symbolName ?? connecting?.symbolName ?? route.systemImage)
                     .font(.system(size: 18, weight: .semibold))
                 if let label {
                     Text(label)
                         .pixlFont(.labelMedium)
                         .lineLimit(1)
-                    Circle().fill(theme.onTertiaryContainer).frame(width: 8, height: 8)
+                        .truncationMode(.tail)
+                        .contentTransition(.opacity)
+                    if connectingId != nil {
+                        ProgressView()
+                            .controlSize(.mini)
+                            .tint(theme.primary)
+                    } else if isRemote {
+                        Circle().fill(theme.onTertiaryContainer).frame(width: 8, height: 8)
+                    }
                 }
             }
             .foregroundStyle(theme.primary)
             .padding(.leading, 14)
-            .padding(.trailing, showsLabel ? 16 : 14)
-            .frame(minWidth: 50, maxWidth: showsLabel ? 190 : 58, minHeight: 42, maxHeight: 42,
-                   alignment: .leading)
+            .padding(.trailing, label != nil ? 16 : 14)
+            // Only a minimum: the pill hugs its content instead of taking the offered width.
+            .frame(minWidth: 50, minHeight: 42, maxHeight: 42, alignment: .leading)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
@@ -248,15 +260,11 @@ private struct PlayerTopBar: View {
                 }
             }
         }
-        .animation(.spring(response: 0.5, dampingFraction: 0.6), value: showsLabel)
-        .accessibilityLabel(connect.map { String(localized: "Playing on \($0.name)") }
-                            ?? (route.kind == .airPlay ? "AirPlay" : (route.kind == .bluetooth ? "Bluetooth" : "Local playback")))
+        // On the name itself, so a switch from one device to another re-sizes smoothly too.
+        .animation(.spring(response: 0.5, dampingFraction: 0.6), value: label)
+        .accessibilityLabel(spoken)
+        .accessibilityHint("Opens the devices sheet")
         .accessibilityIdentifier("player.devices")
-    }
-
-    /// Spotify / YouTube songs stream (Android: `contentUriString` starting with `spotify:`).
-    static func isStreamed(_ song: Song) -> Bool {
-        song.spotifyId != nil || song.id.hasPrefix("yt:") || song.id.hasPrefix("sp:")
     }
 }
 

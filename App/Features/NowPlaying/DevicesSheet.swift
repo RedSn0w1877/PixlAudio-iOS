@@ -148,7 +148,7 @@ struct DevicesSheet: View {
                         .pixlFont(.titleLarge, weight: .bold)
                         .foregroundStyle(on)
                         .lineLimit(2)
-                    Text("\(connect == nil ? outputSubtitle : String(localized: "Spotify Connect")) \u{2022} \(playback.isPlaying ? "Playing" : "Paused")")
+                    Text("\(connect == nil ? route.kindLabel : String(localized: "Spotify Connect")) \u{2022} \(playback.isPlaying ? "Playing" : "Paused")")
                         .pixlFont(.bodyMedium)
                         .foregroundStyle(on)
                         .lineLimit(1)
@@ -183,17 +183,6 @@ struct DevicesSheet: View {
         switch route.kind {
         case .phone: String(localized: "This phone")
         default: route.name.isEmpty ? String(localized: "This phone") : route.name
-        }
-    }
-
-    private var outputSubtitle: String {
-        switch route.kind {
-        case .phone: String(localized: "Local playback")
-        case .headphones: String(localized: "Headphones")
-        case .bluetooth: String(localized: "Bluetooth audio")
-        case .airPlay: String(localized: "AirPlay")
-        case .carAudio: String(localized: "Car audio")
-        case .other: String(localized: "Audio output")
         }
     }
 
