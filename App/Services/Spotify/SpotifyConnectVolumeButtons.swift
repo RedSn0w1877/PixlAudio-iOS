@@ -10,7 +10,7 @@ import UIKit
 ///
 /// - the audio session stays active (`AudioSessionController.holdForVolumeButtons`), so the buttons change the media
 ///   volume and `outputVolume` reports it;
-/// - a 1×1 pt, almost transparent `MPVolumeView` off-screen in the key window keeps the system volume pop-up away
+/// - a 1×1 pt, almost transparent `MPVolumeView` in a corner of the key window keeps the system volume pop-up away
 ///   (undocumented; PixlAudio shows its own glass pop-up instead);
 /// - each one-step `outputVolume` change is ±1 press (`SpotifyConnectVolumeKeys.classify`);
 /// - **re-centre:** the phone's volume is set back to a centre value through the hidden view's slider, so presses
@@ -119,10 +119,13 @@ final class SpotifyConnectVolumeButtons {
         endReachedShown = false
         slider = nil
         session.holdForVolumeButtons()
-        // Off-screen, almost transparent, never touchable or spoken: it only keeps the system pop-up away and holds
-        // the slider used to set the volume back.
-        let view = MPVolumeView(frame: CGRect(x: -2000, y: -2000, width: 1, height: 1))
+        // 1×1 pt in the screen's top-left corner (rounded off on the display), clipped, 1 % opaque, never touchable or
+        // spoken: it only keeps the system pop-up away and holds the slider used to set the volume back. On screen
+        // rather than off it, and not hidden or at alpha 0: reports differ on whether the pop-up stays away for a
+        // volume view outside the window's bounds, and a hidden one never keeps it away.
+        let view = MPVolumeView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
         view.alpha = 0.01
+        view.clipsToBounds = true
         view.isUserInteractionEnabled = false
         view.accessibilityElementsHidden = true
         window.addSubview(view)

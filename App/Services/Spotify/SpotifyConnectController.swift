@@ -764,25 +764,35 @@ final class SpotifyConnectController: RemotePlaybackOutput {
                 case .wait(let ms):
                     try? await Task.sleep(for: .milliseconds(ms))
                 case .send(let percent):
+                    var failure: (any Error)?
                     do {
                         try await self.client.setVolume(deviceId: deviceId, percent: percent)
-                        guard !Task.isCancelled else { return }
+                    } catch {
+                        failure = error
+                    }
+                    // Cancelled: the lane was reset (a new session, the session ended) and isn't this task's any
+                    // more. Neither the answer nor a cancelled request's error (URLSession reports it as a network
+                    // failure) may touch it or show a toast.
+                    guard !Task.isCancelled else { return }
+                    guard let failure else {
                         self.volumeLane.completed()
                         if generation == self.sessionGeneration, var state = self.session {
                             SpotifyConnectReducer.volumeSent(&state, nowMs: self.now(), settleMs: Self.volumeSettleMs)
                             self.session = state
                         }
-                    } catch is CancellationError {
-                        return
-                    } catch SpotifyConnectError.rateLimited(let ms) {
+                        continue
+                    }
+                    if failure is CancellationError { return }
+                    switch failure as? SpotifyConnectError {
+                    case .rateLimited(let ms)?:
                         self.volumeLane.rateLimited(retryAfterMs: ms, nowMs: self.now())
                         self.volumeBusy(waitMs: ms)
-                    } catch SpotifyConnectError.volumeNotSupported {
+                    case .volumeNotSupported?:
                         self.volumeLane.failed()
                         self.volumeNotSupported()
-                    } catch {
+                    default:
                         self.volumeLane.failed()
-                        self.report(error)
+                        self.report(failure)
                     }
                 }
             }
