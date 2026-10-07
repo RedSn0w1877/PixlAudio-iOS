@@ -82,21 +82,36 @@ final class TaisChatModel {
 
     private func respond(to pending: (prompt: String, thinkingId: Int)) async {
         let turn = await engine.respond(pending.prompt)
-        finish(thinkingId: pending.thinkingId, prompt: pending.prompt, turn: turn)
+        let replyId = finish(thinkingId: pending.thinkingId, prompt: pending.prompt, turn: turn)
+        // On-device, the card is already up; its intro line follows when the model has written it.
+        if case .media(_, let result, nil) = turn, let intro = await engine.deferredIntro(prompt: pending.prompt, result: result) {
+            setIntro(id: replyId, text: intro)
+        }
     }
 
-    private func finish(thinkingId: Int, prompt: String, turn: TaizoTurn) {
+    /// Replaces the thinking row with Taizo's turn; returns the reply's id.
+    @discardableResult
+    private func finish(thinkingId: Int, prompt: String, turn: TaizoTurn) -> Int {
+        let id = makeId()
         let reply: TaisChatMessage
         switch turn {
-        case .media(_, let result, let intro): reply = .djReply(id: makeId(), prompt: prompt, result: result, aiIntro: intro)
-        case .conversation(let text): reply = .textReply(id: makeId(), text: text, isError: false)
-        case .error(let message): reply = .textReply(id: makeId(), text: message, isError: true)
+        case .media(_, let result, let intro): reply = .djReply(id: id, prompt: prompt, result: result, aiIntro: intro)
+        case .conversation(let text): reply = .textReply(id: id, text: text, isError: false)
+        case .error(let message): reply = .textReply(id: id, text: message, isError: true)
         }
         if let index = messages.firstIndex(where: { $0.id == thinkingId }) {
             messages[index] = reply
         } else {
             messages.append(reply)
         }
+        return id
+    }
+
+    /// Fills in the intro line of a queue card that was shown without one.
+    func setIntro(id: Int, text: String) {
+        guard let index = messages.firstIndex(where: { $0.id == id }),
+              case .djReply(let replyId, let prompt, let result, nil) = messages[index] else { return }
+        messages[index] = .djReply(id: replyId, prompt: prompt, result: result, aiIntro: text)
     }
 
     // MARK: Playback commands (Android `onPlaySongs` / `onQueueSongs`)

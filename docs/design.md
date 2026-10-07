@@ -539,6 +539,39 @@ Stage 12 screenshot ids (signed out on the plain ids; demo data, no network): `a
 Stage 13 ids: `aiPlaylist` (sheet over Home), `taisChat` (empty), `taisChatConversation` (a scripted genre request
 and question; ready `screen.taisChat`), `aiPlaylistLab` (cover). Shots: `UITests/AIScreenshotTests`.
 
+### On-device AI by default (2026-10-07, local AI phase 1; owner decisions, a departure from Android)
+
+- **Default and fallback.** The on-device model (Foundation Models) is the default assistant for every AI feature.
+  Cloud providers are optional and off by default; an on-device selection never falls back to a cloud provider
+  (`AISettingsBridge.providerChain` → the orchestrator's new `providerChain`). Key-less Gemini users move to on-device
+  once at launch (`ai_provider_migrated_v1`) and again after a restore.
+- **Settings › AI features:** an "Assistant" group with the on-device model row (in use / not on this iPhone / turned
+  off / downloading / language; a checkmark when it is the assistant; always "ready" in UI tests), then "Cloud
+  assistants (optional)": a "Use a cloud assistant" switch (off by default) that reveals the cloud provider picker
+  (Android's order, no "(Free)" label), Save on usage, sign-in, model and base URL. Advanced shows only Temperature
+  on-device (the on-device paths size their own prompts and answers); the whole Android block for a cloud assistant.
+  Rows stay settings glass rows; nothing new is glass on glass.
+- **On-device paths** (`App/Services/AI`): `OnDeviceAI` (the sessions, serialised per feature, prewarmed when the AI
+  sheets open), `OnDevicePlaylistCurator` + `OnDeviceCuration` (numbered pool without ids, dynamic schema, budget
+  ladder; Lab requests over 40 songs are planned, filled from the library, the first 40 ordered), Taizo's chat with
+  memory and the `searchLibrary` tool (`LibraryLookup`), `OnDeviceLyricsTranslator` (behind `AILyricsTranslator`; the
+  lyrics UI is unchanged), Home's AI greeting (`HomeAIGreeter`). Pure parts live in files without Foundation Models
+  (`OnDevicePrompts`, `OnDeviceCuration`, `OnDeviceLyricsTranslation`) so AppTests cover them; `OnDeviceModel`
+  maps every error (iOS 27's types through `Compat27`). None of it runs in UI tests (CI simulators have no model).
+- **Taizo:** an on-device media answer shows its queue card at once; the intro line fills in when the model has
+  written it (`TaisChatModel.setIntro`). UI tests keep the synchronous scripted intro.
+- **Home greeting card:** Android's AI headline (once a day, cached in `home_greeting_text` / `home_greeting_date`)
+  replaces the local one with the existing crossfade; expanding the card asks for the AI insight, with a small
+  spinner while it is written (the chevron is disabled meanwhile, as on Android) and the local insight as fallback.
+- **Library › Create playlist › With AI:** while the selected on-device model can't answer, the card says why
+  ("Needs on-device AI · Turned off in system settings.", `cpu` symbol) and the button reads "Open AI settings".
+
+Ids: `settingsCategory.ai.cloud` (AI features with the cloud assistant switched on; ready
+`screen.settingsCategory.ai`), `libraryCreatePlaylist.onDeviceOff` (the creation sheet with the on-device model
+turned off; ready `sheet.createPlaylist`). Shots: `SettingsScreenshotTests.testAICategoryCloudLight/Dark`,
+`testAICategoryAdvancedOnDeviceLight`, `LibraryScreenshotTests.testLibraryCreatePlaylistOnDeviceOffDark`; the existing
+`settingsCategory.ai` shots now show the on-device default.
+
 ## Stage 15 notes (backup, setup, updates, localisation)
 
 - **Backup** (`App/Services/Backup`, `Features/Backup`): `env.backup` (`BackupService`) exports, inspects and restores on

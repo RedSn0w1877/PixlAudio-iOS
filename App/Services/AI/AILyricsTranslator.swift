@@ -6,8 +6,13 @@ import PixlNet
 /// Lyric translation through the configured AI provider (Android `AiStateHolder.translateLyrics` + the outcome
 /// handling of `LyricsStateHolder.translateLyricsViaAi`): Android's prompt, `GENERAL` type at temperature 0.1, the
 /// `ALREADY_IN_TARGET_LANGUAGE` sentinel, and the reply validated like an imported LRC file.
+///
+/// With the on-device model selected (the default since 2026-10-07), `onDevice` translates line by line instead
+/// (`OnDeviceLyricsTranslator`): same API, same outcomes, same stored LRC.
 nonisolated struct AILyricsTranslator: LyricsTranslating {
     let orchestrator: AiOrchestrator
+    /// The on-device path (nil: the orchestrator only — UI tests and unit tests).
+    var onDevice: OnDeviceLyricsTranslator? = nil
 
     /// The device language's display name (Android `locales[0].displayLanguage`).
     static var deviceLanguageName: String {
@@ -20,6 +25,9 @@ nonisolated struct AILyricsTranslator: LyricsTranslating {
             return .alreadyTranslated
         }
         guard let rawLyrics, !rawLyrics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return .notFound }
+        if let onDevice, await onDevice.isActive() {
+            return await onDevice.translate(rawLyrics: rawLyrics, current: current, targetLanguage: targetLanguage)
+        }
         do {
             let response = try await orchestrator.generateContent(prompt: Self.prompt(lyrics: rawLyrics, targetLanguage: targetLanguage),
                                                                   type: .general, temperature: 0.1)

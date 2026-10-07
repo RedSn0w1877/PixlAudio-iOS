@@ -264,6 +264,25 @@ struct AiOrchestratorTests {
                                           settings: Settings(provider: .onDevice, keys: [:]), sha256: sha, onDeviceClient: Local())
         #expect(try await orchestrator.generateContent(prompt: "hi", type: .taizoChat) == "on-device:local")
     }
+
+    /// iOS (owner decision 2026-10-07): an on-device selection never falls back to a cloud provider. The app passes
+    /// its own chain; with only ON_DEVICE in it, a failure lists just that provider and no request leaves the device.
+    @Test func customProviderChainKeepsOnDeviceRequestsLocal() async {
+        let http = FixtureHTTPClient { _ in HTTPResponse(statusCode: 200, text: #"{"choices":[{"message":{"content":"cloud"}}]}"#) }
+        let orchestrator = AiOrchestrator(http: http, settings: Settings(provider: .onDevice, keys: [.groq: "g", .openai: "o"]),
+                                          sha256: sha, providerChain: { @Sendable provider in
+                                              provider == .onDevice ? [.onDevice] : AiProviderSupport.buildProviderChain(provider)
+                                          })
+        do {
+            _ = try await orchestrator.generateContent(prompt: "x")
+            Issue.record("expected failure")
+        } catch let error as AiGenerationError {
+            #expect(error.failures == ["ON_DEVICE: No on-device model available — check Settings > AI > On-Device"])
+        } catch {
+            Issue.record("unexpected \(error)")
+        }
+        #expect(http.requests.isEmpty)
+    }
 }
 
 @Suite("AI playlist prompt and digest")

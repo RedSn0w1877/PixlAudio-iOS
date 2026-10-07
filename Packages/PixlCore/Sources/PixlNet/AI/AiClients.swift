@@ -203,12 +203,16 @@ public actor AiOrchestrator {
     private let onDeviceClient: (any AiClient)?
     private let nowMs: @Sendable () -> Int64
     private let clientFactory: @Sendable (AiProvider, String, String) throws -> any AiClient
+    /// The providers tried for a request, in order (default: Android's `buildProviderChain`). The iOS app passes its
+    /// own so an on-device selection never falls back to a cloud provider.
+    private let providerChain: @Sendable (AiProvider) async -> [AiProvider]
     private var providerCooldowns: [AiProvider: Int64] = [:]
 
     public init(http: any HTTPClient, settings: any AiSettingsProviding, cache: (any AiResponseCaching)? = nil,
                 usage: (any AiUsageRecording)? = nil, sha256: @escaping SHA256Function, onDeviceClient: (any AiClient)? = nil,
                 nowMs: @escaping @Sendable () -> Int64 = { currentTimeMillis() },
-                clientFactory: (@Sendable (AiProvider, String, String) throws -> any AiClient)? = nil) {
+                clientFactory: (@Sendable (AiProvider, String, String) throws -> any AiClient)? = nil,
+                providerChain: (@Sendable (AiProvider) async -> [AiProvider])? = nil) {
         self.http = http
         self.settings = settings
         self.cache = cache
@@ -220,6 +224,7 @@ public actor AiOrchestrator {
         self.clientFactory = clientFactory ?? { provider, apiKey, baseUrl in
             try AiClientFactory.client(for: provider, apiKey: apiKey, baseUrl: baseUrl, http: client)
         }
+        self.providerChain = providerChain ?? { AiProviderSupport.buildProviderChain($0) }
     }
 
     private func basePersona(_ provider: AiProvider) async -> String {
@@ -246,7 +251,7 @@ public actor AiOrchestrator {
 
         var failed: [String] = []
         let now = nowMs()
-        for provider in AiProviderSupport.buildProviderChain(userProvider) {
+        for provider in await providerChain(userProvider) {
             let expiry = providerCooldowns[provider] ?? 0
             if now < expiry {
                 failed.append("\(provider.rawValue): on cooldown (\((expiry - now) / 1000)s remaining)")

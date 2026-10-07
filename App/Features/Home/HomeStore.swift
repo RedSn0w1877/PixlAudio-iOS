@@ -11,6 +11,8 @@ nonisolated struct HomeContent: Sendable, Equatable {
                                 subtitle: HomeLogic.defaultSubtitle)
     /// The inputs of the expanded greeting insight (Android `expandInsight`, local fallback).
     var insight = ""
+    /// What the AI greeting and insight prompts say about the listener.
+    var greetingFacts = HomeGreetingFacts()
     /// "Made for your listening" (`HomeRecommendationPlanner` mixes).
     var mixes: [HomeMusicSection] = []
     /// The discovery shelves under Your Mix.
@@ -59,6 +61,18 @@ final class HomeStore {
     private(set) var isRefreshing = false
     /// The greeting card's expand state (Android `homeGreetingExpandedInsight` / `isLoadingHomeGreetingInsight`).
     private(set) var isInsightExpanded = false
+    /// The AI-written insight once it arrived (nil: the local `content.insight`).
+    private(set) var aiInsight: String?
+    /// The AI insight is being written (the card shows a small spinner).
+    private(set) var isLoadingInsight = false
+
+    /// Asks the selected AI assistant for the greeting's headline or insight (Android `HomeGreetingStateHolder`'s
+    /// AI half). Set at launch (`HomeAIGreeter`); nil in UI tests and previews, where the local texts stay.
+    typealias Greeter = @MainActor (HomeGreetingKind, HomeGreetingFacts) async -> String?
+    @ObservationIgnored var greeter: Greeter?
+    /// One AI headline request per process (Android `hasRequestedAiGreetingThisProcess`).
+    @ObservationIgnored private var hasRequestedAIGreeting = false
+    @ObservationIgnored private var insightTask: Task<Void, Never>?
     /// UI-test jobs (the real ones come from the library import, see `jobs(libraryProgress:)`).
     private(set) var demoJobs: [HomeJob] = []
 
@@ -142,6 +156,7 @@ final class HomeStore {
                               exploration: exploration)
         }
         let stamp = ScreenDataCache.Stamp(historyRevision: history.revision, songCount: snapshot.songs.count)
+        let day = ZoneClock(clock.timeZone).localDate(at: now).description
         let computation = Task { [weak self] in
             let result = await task.value
             guard let self, !Task.isCancelled else { return }
@@ -149,7 +164,11 @@ final class HomeStore {
             if let overview = result.content.statsOverview, overview.range == .week {
                 ScreenDataCache.storeStats(overview, stamp: stamp)
             }
-            if result.content != self.content { self.content = result.content }
+            var content = result.content
+            // Today's AI headline, once written, replaces the local one for the rest of the day.
+            if let cached = self.cachedAIGreeting(day: day) { content.greeting.headline = cached }
+            if content != self.content { self.content = content }
+            self.requestAIGreeting(day: day)
             if result.generatedMixes { self.saveMixes(result.content, nowMs: now) }
             self.isPreparing = false
             self.isRefreshing = false
@@ -158,7 +177,53 @@ final class HomeStore {
         await computation.value
     }
 
-    func toggleInsight() { isInsightExpanded.toggle() }
+    /// Expands the card and asks for the AI insight (Android `expandInsight`: on demand, not cached), or collapses
+    /// it and forgets the insight (`collapseInsight`). Without an assistant the local insight shows.
+    func toggleInsight() {
+        if isInsightExpanded || isLoadingInsight {
+            insightTask?.cancel()
+            insightTask = nil
+            isLoadingInsight = false
+            aiInsight = nil
+            isInsightExpanded = false
+            return
+        }
+        isInsightExpanded = true
+        let facts = content.greetingFacts
+        guard let greeter, facts.librarySize > 0 else { return }
+        isLoadingInsight = true
+        insightTask = Task { [weak self] in
+            let text = await greeter(.insight, facts)
+            guard let self, !Task.isCancelled else { return }
+            self.aiInsight = text.flatMap { HomeLogic.cleanGreeting($0, limit: 600) }
+            self.isLoadingInsight = false
+        }
+    }
+
+    // MARK: AI greeting (Android HomeGreetingStateHolder.refresh)
+
+    /// Today's AI headline (`home_greeting_date` / `home_greeting_text`, Android's keys).
+    private func cachedAIGreeting(day: String) -> String? {
+        guard let defaults, defaults.string(forKey: PreferenceKeys.homeGreetingDate) == day,
+              let text = defaults.string(forKey: PreferenceKeys.homeGreetingText) else { return nil }
+        return HomeLogic.cleanGreeting(text)
+    }
+
+    /// Asks once per process for today's headline when none is cached; it replaces the local headline when it
+    /// arrives and is kept for the day.
+    private func requestAIGreeting(day: String) {
+        let facts = content.greetingFacts
+        guard let greeter, defaults != nil, !hasRequestedAIGreeting, facts.librarySize > 0,
+              cachedAIGreeting(day: day) == nil else { return }
+        hasRequestedAIGreeting = true
+        Task { [weak self] in
+            let text = await greeter(.headline, facts)
+            guard let self, let headline = text.flatMap({ HomeLogic.cleanGreeting($0) }) else { return }
+            self.content.greeting.headline = headline
+            self.defaults?.set(day, forKey: PreferenceKeys.homeGreetingDate)
+            self.defaults?.set(headline, forKey: PreferenceKeys.homeGreetingText)
+        }
+    }
 
     /// Android `regenerateYourMix`: a fresh, non-day-seeded draw, so repeated taps give a different mix.
     func regenerateYourMix(snapshot: LibrarySnapshot) async {
@@ -281,6 +346,9 @@ final class HomeStore {
         content.insight = HomeLogic.expandedFallback(librarySize: songs.count, totalPlayCount: allTime?.totalPlayCount ?? 0,
                                                      topArtist: allTime?.topArtists.first?.artist,
                                                      topGenre: HomeLogic.topGenre(allTime))
+        content.greetingFacts = HomeGreetingFacts(hour: hour, topArtist: allTime?.topArtists.first?.artist,
+                                                  topGenre: HomeLogic.topGenre(allTime),
+                                                  totalPlays: allTime?.totalPlayCount ?? 0, librarySize: songs.count)
 
         // Newest songs (`ORDER BY date_added DESC, id DESC LIMIT 48`).
         content.recentlyAdded = Array(songs.sorted { a, b in

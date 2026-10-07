@@ -8,6 +8,9 @@ import PixlNet
 /// Mix's sparkle button) and the AI Playlist Lab (Library › Create playlist › With AI), refines the Daily Mix with a
 /// prompt, and maps failures to Android's messages. Lives in `AIService`, so a generation keeps running (and its
 /// state survives) when the sheet is dismissed and reopened.
+///
+/// With the on-device model selected (the default since 2026-10-07) the requests go to `OnDevicePlaylistCurator`
+/// instead of PixlNet's generator, whose cloud prompt doesn't fit the on-device window.
 @Observable
 final class AIPlaylistController {
     private(set) var isGenerating = false
@@ -27,9 +30,14 @@ final class AIPlaylistController {
     @ObservationIgnored private let playback: PlaybackStore
     @ObservationIgnored private let router: Router
     @ObservationIgnored private let libraryEditor: @MainActor () -> LibraryEditor
+    /// The on-device curator (nil in UI tests: the scripted provider answers through the generator).
+    @ObservationIgnored private let curator: OnDevicePlaylistCurator?
+    /// The on-device model is the selected provider.
+    @ObservationIgnored private let usesOnDeviceCurator: @MainActor () -> Bool
 
     init(generator: AiPlaylistGenerator, settings: SettingsStore, library: LibraryStore, home: HomeStore,
-         playback: PlaybackStore, router: Router, libraryEditor: @escaping @MainActor () -> LibraryEditor) {
+         playback: PlaybackStore, router: Router, libraryEditor: @escaping @MainActor () -> LibraryEditor,
+         curator: OnDevicePlaylistCurator? = nil, usesOnDeviceCurator: @escaping @MainActor () -> Bool = { false }) {
         self.generator = generator
         self.settings = settings
         self.library = library
@@ -37,6 +45,8 @@ final class AIPlaylistController {
         self.playback = playback
         self.router = router
         self.libraryEditor = libraryEditor
+        self.curator = curator
+        self.usesOnDeviceCurator = usesOnDeviceCurator
     }
 
     // MARK: Sheet state
@@ -89,10 +99,8 @@ final class AIPlaylistController {
         let context = await requestContext(allSongs: allSongs, candidateLimit: 120)
 
         status = "Consulting the Daily Mix guide..."
-        let result = await generator.generate(userPrompt: prompt, allSongs: allSongs, minLength: minLength, maxLength: maxLength,
-                                              candidateSongs: context.candidates, rankedCandidates: context.ranked,
-                                              playCounts: context.playCounts, userDigest: context.digest,
-                                              settings: generationSettings, type: .playlist)
+        let result = await curate(prompt: prompt, allSongs: allSongs, minLength: minLength, maxLength: maxLength,
+                                  context: context, type: .playlist)
         guard !Task.isCancelled else { return }
         switch result {
         case .success(let songs) where !songs.isEmpty:
@@ -148,10 +156,8 @@ final class AIPlaylistController {
         status = "Scanning for vibes..."
         let context = await requestContext(allSongs: allSongs, candidateLimit: 100)
         status = "Applying AI filters..."
-        let result = await generator.generate(userPrompt: prompt, allSongs: allSongs, minLength: minLength, maxLength: maxLength,
-                                              candidateSongs: context.candidates, rankedCandidates: context.ranked,
-                                              playCounts: context.playCounts, userDigest: context.digest,
-                                              settings: generationSettings, type: .dailyMix)
+        let result = await curate(prompt: prompt, allSongs: allSongs, minLength: minLength, maxLength: maxLength,
+                                  context: context, type: .dailyMix)
         switch result {
         case .success(let songs) where !songs.isEmpty:
             home.setDailyMix(songs)
@@ -162,6 +168,21 @@ final class AIPlaylistController {
             error = Self.resolveErrorMessage(failure.message)
             return "Could not update: \(Self.errorDetail(failure.message))"
         }
+    }
+
+    /// The on-device curator when the on-device model is selected, else PixlNet's generator (Android's prompt).
+    private func curate(prompt: String, allSongs: [Song], minLength: Int, maxLength: Int, context: RequestContext,
+                        type: AiSystemPromptType) async -> Result<[Song], AiPlaylistGenerationError> {
+        if let curator, usesOnDeviceCurator() {
+            let candidates = context.candidates.isEmpty ? context.ranked : context.candidates
+            return await curator.curate(OnDevicePlaylistCurator.Request(
+                prompt: prompt, minimum: minLength, maximum: maxLength, allSongs: allSongs, candidates: candidates,
+                playCounts: context.playCounts, taste: context.taste, type: type))
+        }
+        return await generator.generate(userPrompt: prompt, allSongs: allSongs, minLength: minLength, maxLength: maxLength,
+                                        candidateSongs: context.candidates, rankedCandidates: context.ranked,
+                                        playCounts: context.playCounts, userDigest: context.digest,
+                                        settings: generationSettings, type: type)
     }
 
     // MARK: Request context
@@ -176,6 +197,8 @@ final class AIPlaylistController {
         var ranked: [Song]
         var playCounts: [String: Int]
         var digest: String
+        /// The digest's genres, artists and phase without ids (the on-device curator's taste line).
+        var taste = OnDeviceCuration.Taste()
     }
 
     /// The candidate pool (`DailyMixManager.generateDailyMix`, today's seed), the AI ranking fallback
@@ -223,8 +246,14 @@ final class AIPlaylistController {
         let digest = AiProfileDigest.generate(allSongs: allSongs, summary: listening, playlistNames: playlistNames,
                                               isSafeLimit: safeTokenLimit, digestMode: digestMode,
                                               includeExtendedFields: includeExtendedFields)
+        let taste = OnDeviceCuration.Taste(
+            genres: Array(listening.topGenres.filter { $0 != PlaybackStats.unknownGenreLabel }.prefix(3)),
+            artists: Array(listening.topArtists.prefix(3)),
+            phase: listening.dayBuckets.flatMap { buckets in
+                OnDeviceCuration.phase(buckets: buckets.map { (startMinute: $0.startMinute, durationMs: $0.totalDurationMs) })
+            })
         return RequestContext(candidates: candidates, ranked: ranked, playCounts: engagements.mapValues(\.playCount),
-                              digest: digest)
+                              digest: digest, taste: taste)
     }
 
     // MARK: Messages (`resolveAiErrorMessage` / `extractAiErrorDetail`)
@@ -244,7 +273,12 @@ final class AIPlaylistController {
     /// Android's error table, in order. (Android also consults an `AiProviderException` in the cause chain; the
     /// generator's failure already carries the friendly text, so here — as on Android in practice — only the text
     /// rules apply.)
+    ///
+    /// iOS first: the on-device model's failures (not supported on this iPhone, turned off, still downloading, too
+    /// long, stopped by the safety filters, language, busy, slow) keep their own message. Android's rows below match
+    /// network words, which an on-device failure must never be read as.
     nonisolated static func resolveErrorMessage(_ message: String) -> String {
+        if let onDevice = OnDeviceFailure.matching(message) { return onDevice.message }
         let detail = errorDetail(message)
         func has(_ words: String...) -> Bool { words.contains { detail.localizedCaseInsensitiveContains($0) } }
         if has("api key not valid", "invalid api key", "incorrect api key", "invalid key") { return apiKeyMessage }

@@ -11,7 +11,9 @@ import SwiftUI
 ///   in a flow layout; the listener's top artist / genre lead when Home's stats know them).
 /// - **Conversation:** the orb flies into the header (one identity, `matchedGeometryEffect`) and stirs while Taizo is
 ///   thinking; bubbles slide in; a play/queue/find prompt answers with a queue card (artwork mosaic, count, Play / Add
-///   to Queue, the songs — tap one to play it); anything else is answered by the configured AI provider.
+///   to Queue, the songs — tap one to play it); anything else is answered by the configured AI provider — on-device
+///   by default (2026-10-07), with the conversation remembered and a library lookup for questions about the user's
+///   own music; the queue card's intro line then arrives a moment after the card.
 /// - **Composer:** one glass capsule with the send button inside it (accent when there is text, dimmed otherwise), in
 ///   a bottom `safeAreaBar` so it rides the keyboard and the scroll edge effect softens what scrolls under it.
 ///
@@ -61,6 +63,8 @@ struct TaisChatSheet: View {
         .animation(.spring(response: 0.55, dampingFraction: 0.86), value: isEmpty)
         .onAppear {
             sheetVisible = true
+            // The on-device model loads while the user types (nothing in UI tests or with a cloud assistant).
+            env.ai.prewarm(.chat)
             if personalSuggestions.isEmpty {
                 personalSuggestions = TaizoSuggestion.personal(from: env.home.content.statsOverview)
             }

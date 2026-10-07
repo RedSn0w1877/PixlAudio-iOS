@@ -26,6 +26,11 @@ final class LibraryScreenshotTests: XCTestCase {
     func testLibraryReorderTabsDark() throws { try capture("libraryReorderTabs", "dark", ready: "sheet.reorderTabs") }
     func testLibraryMultiSelectionLight() throws { try capture("libraryMultiSelection", "light", ready: "sheet.songSelection") }
     func testLibraryCreatePlaylistLight() throws { try capture("libraryCreatePlaylist", "light", ready: "sheet.createPlaylist") }
+    /// "With AI" while the selected on-device model can't answer (its system switch is off): the reason, and "Open AI
+    /// settings" instead of "Set up API key".
+    func testLibraryCreatePlaylistOnDeviceOffDark() throws {
+        try capture("libraryCreatePlaylist.onDeviceOff", "dark", ready: "sheet.createPlaylist")
+    }
     func testLibraryAddToPlaylistDark() throws { try capture("libraryAddToPlaylist", "dark", ready: "sheet.addToPlaylist") }
 
     // MARK: Song options sheet (ref: pp_card)

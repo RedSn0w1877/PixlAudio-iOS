@@ -83,6 +83,8 @@ final class AppEnvironment {
         self.persistence = persistence
         let settings = isUITest ? SettingsStore.ephemeral() : SettingsStore()
         self.settings = settings
+        // The optional cloud rows of Settings › AI features, for their screenshot.
+        if launch.screen == .settingsAICloud { settings.ai.setUsesCloudAssistant(true) }
         // Settings › Default tab (Android `launchTabFlow`): set before the first frame so Home never flashes first.
         // UI tests open the tab their screen asks for.
         if !isUITest, launch.screen == nil { router.selection = settings.behavior.launchTab }
@@ -218,6 +220,9 @@ final class AppEnvironment {
             artistImages?.prefetchMissing()
         }, isPlaybackActive: { playback.isPlaying })
         spotify.songLookup = { library.song(id: $0) }
+        // Before Home's first refresh, which may ask the selected assistant for today's greeting.
+        await AIProviderStatus.migrateDefaultProviderIfNeeded(self)
+        home.greeter = HomeAIGreeter.make(self)
         await library.load()
         artistImages?.prefetchMissing()
         await playbackServices?.restoreQueue(lookup: library.song(id:))
@@ -235,8 +240,12 @@ final class AppEnvironment {
         backup.onRestored = { [weak self] in
             reloadPlayCounts()
             // A restore may write AI keys and base URLs (it dropped the cached answer): re-check off the main actor.
+            // It may also bring back GEMINI without a key (an Android backup): move that to the on-device model again.
             guard let self else { return }
-            Task { await AIProviderStatus.refresh(self) }
+            Task {
+                await AIProviderStatus.migrateDefaultProviderIfNeeded(self, ignoringFlag: true)
+                await AIProviderStatus.refresh(self)
+            }
         }
         backup.start()
         // Settings › Library › Album Art Cache Limit: the thumbnail disk cache is kept under it.

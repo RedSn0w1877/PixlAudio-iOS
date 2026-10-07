@@ -51,6 +51,8 @@ struct AiPlaylistSheet: View {
         .scrollDismissesKeyboard(.interactively)
         .animation(PixlMotion.state, value: controller.error)
         .animation(PixlMotion.state, value: isSuccess)
+        // The on-device model loads while the user writes the prompt (nothing in UI tests or with a cloud assistant).
+        .onAppear { env.ai.prewarm(.playlist) }
         .onDisappear { controller.reset() }
         .accessibilityIdentifier("screen.aiPlaylist")
     }
