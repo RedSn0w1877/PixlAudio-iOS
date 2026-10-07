@@ -25,7 +25,8 @@
     "sampleRate": 44100,
     "channels": 2,
     "decodedSamples": 10628100,
-    "durationMs": 241000
+    "durationMs": 241000,
+    "sha256": "b66e21bfd056b5178586fbde94ebdb66c9ba669e7e4504f5da92f154ee9d28be"
   },
   "outputs": {
     "instrumental": {

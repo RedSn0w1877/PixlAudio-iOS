@@ -66,7 +66,8 @@
             "sampleRate": {"type": "integer", "minimum": 1},
             "channels": {"type": "integer", "minimum": 1},
             "decodedSamples": {"type": "integer", "minimum": 0, "description": "Frames per channel after decoding at sampleRate (edit lists honoured)."},
-            "durationMs": {"type": "integer", "minimum": 0}
+            "durationMs": {"type": "integer", "minimum": 0},
+            "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$", "description": "The verified input's sha256 (= audio.sha256). The guard only short-circuits a duplicate job whose manifest names the same input."}
           }
         }
       ],
