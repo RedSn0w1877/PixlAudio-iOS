@@ -15,7 +15,7 @@ Hoa's request (switching to local work). This page is the status of every item.
 There's no Mac, and the cloud session had no iOS SDK. The integrated branch was checked with:
 - `swiftc -parse` (Swift 6.4, Linux) on all 113 changed Swift files: **0 failures**;
 - `bash ci/check-forbidden.sh`: **OK**;
-- `swift test` on `Packages/PixlCore` (Linux): see "PixlCore tests" below.
+- `swift test` on `Packages/PixlCore` (Linux, Swift 6.4): **all 1,151 tests pass** (8 test runs), including the new PixlNet streaming policies, the AI provider chain and the PixlLibrary accent maths.
 
 **CI is the first real compile.** Expect a round or two of compile fixes. Every group listed its risky
 spots; they're collected at the bottom of this page.
@@ -77,8 +77,7 @@ spots; they're collected at the bottom of this page.
 
 ## PixlCore tests (Linux)
 
-See the results line in the commit that added this file, or rerun:
-`swift test --package-path Packages/PixlCore`.
+`swift test --package-path Packages/PixlCore` on the integrated branch: 1,151 tests in 144 suites, all passing (2026-10-07). App, AppTests and UITests can only build on CI.
 
 ## Phone checklist (Hoa)
 
