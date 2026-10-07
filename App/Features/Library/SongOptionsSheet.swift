@@ -111,7 +111,6 @@ struct SongOptionsSheet: View {
     // MARK: Options page
 
     private func options(_ song: Song) -> some View {
-        let isFavorite = song.isFavorite
         let shareURL = SongFiles.shareURL(song)
         return VStack(spacing: 10) {
             HStack(spacing: 10) {
@@ -123,15 +122,7 @@ struct SongOptionsSheet: View {
                 .frame(maxWidth: .infinity)
                 .accessibilityIdentifier("songInfo.play")
                 HStack(spacing: 10) {
-                    ActionTile(systemImage: isFavorite ? "heart.fill" : "heart",
-                               accessibilityLabel: isFavorite ? "Remove from favorites" : "Add to favorites",
-                               tint: isFavorite ? theme.primary : theme.surfaceVariant,
-                               foreground: isFavorite ? theme.onPrimary : theme.onSurfaceVariant,
-                               minHeight: 80, cornerRadius: isFavorite ? 26 : 40, iconSize: 32) {
-                        env.libraryEditor.toggleFavorite(song.id)
-                    }
-                    .animation(.easeInOut(duration: 0.3), value: isFavorite)
-                    .accessibilityIdentifier("songInfo.favorite")
+                    SongFavoriteTile(song: song)
                     if let shareURL {
                         ShareLink(item: shareURL) { shareLabel }
                             .pixlGlass(in: Capsule(), tint: theme.secondaryContainer.opacity(GlassTint.prominent),
@@ -280,6 +271,30 @@ struct SongOptionsSheet: View {
         ], selection: $page)
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
+    }
+}
+
+/// The song sheet's favourite tile (a heart; a rounded square when liked, `primary`). Its own small view reading
+/// `observedSong(id:)`, so a tap flips it at once: the sheet's body reads the library's song lookup, which is not
+/// observed, and the heart used to keep its old state until the sheet was opened again.
+private struct SongFavoriteTile: View {
+    let song: Song
+
+    @Environment(AppEnvironment.self) private var env
+    @Environment(LibraryStore.self) private var library
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        let isFavorite = library.observedSong(id: song.id)?.isFavorite ?? song.isFavorite
+        ActionTile(systemImage: isFavorite ? "heart.fill" : "heart",
+                   accessibilityLabel: isFavorite ? "Remove from favorites" : "Add to favorites",
+                   tint: isFavorite ? theme.primary : theme.surfaceVariant,
+                   foreground: isFavorite ? theme.onPrimary : theme.onSurfaceVariant,
+                   minHeight: 80, cornerRadius: isFavorite ? 26 : 40, iconSize: 32) {
+            env.libraryEditor.toggleFavorite(song.id)
+        }
+        .animation(.easeInOut(duration: 0.3), value: isFavorite)
+        .accessibilityIdentifier("songInfo.favorite")
     }
 }
 

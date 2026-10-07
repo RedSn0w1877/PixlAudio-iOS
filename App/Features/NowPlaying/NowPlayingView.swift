@@ -25,7 +25,6 @@ struct NowPlayingView: View {
 
     @Environment(AppEnvironment.self) private var env
     @Environment(PlaybackStore.self) private var playback
-    @Environment(LibraryStore.self) private var library
     @Environment(SettingsStore.self) private var settings
     @Environment(Router.self) private var router
     @Environment(\.playerTheme) private var theme
@@ -97,8 +96,7 @@ struct NowPlayingView: View {
     }
 
     private func controls(_ song: Song) -> some View {
-        let isFavorite = library.song(id: song.id)?.isFavorite ?? song.isFavorite
-        return VStack(spacing: 0) {
+        VStack(spacing: 0) {
             AnimatedPlaybackControls(isPlaying: playback.isPlaying,
                                      onPrevious: { playback.skipToPrevious() },
                                      onPlayPause: { playback.togglePlayPause() },
@@ -107,11 +105,7 @@ struct NowPlayingView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
             Spacer().frame(height: 14)
-            PlayerToggleRow(isShuffleOn: playback.isShuffleEnabled, repeatMode: playback.repeatMode,
-                            isFavorite: isFavorite,
-                            onShuffle: { playback.setShuffleEnabled(!playback.isShuffleEnabled) },
-                            onRepeat: { playback.setRepeatMode(Self.nextRepeatMode(after: playback.repeatMode)) },
-                            onFavorite: { env.libraryEditor.toggleFavorite(song.id) })
+            PlayerToggles(song: song)
                 .padding(.horizontal, 26)
                 .padding(.bottom, 6)
         }
@@ -263,6 +257,27 @@ private struct PlayerTopBar: View {
     /// Spotify / YouTube songs stream (Android: `contentUriString` starting with `spotify:`).
     static func isStreamed(_ song: Song) -> Bool {
         song.spotifyId != nil || song.id.hasPrefix("yt:") || song.id.hasPrefix("sp:")
+    }
+}
+
+/// Shuffle · repeat · favourite with their state read here, so a favourite edit or a shuffle / repeat change redraws
+/// this row only, not the whole full player. The favourite goes through `observedSong(id:)`: the library's song
+/// lookup is not observed, and reading it in the player's body left the heart stale until something else (shuffle,
+/// repeat, play / pause) redrew the player.
+private struct PlayerToggles: View {
+    let song: Song
+
+    @Environment(AppEnvironment.self) private var env
+    @Environment(PlaybackStore.self) private var playback
+    @Environment(LibraryStore.self) private var library
+
+    var body: some View {
+        let isFavorite = library.observedSong(id: song.id)?.isFavorite ?? song.isFavorite
+        PlayerToggleRow(isShuffleOn: playback.isShuffleEnabled, repeatMode: playback.repeatMode,
+                        isFavorite: isFavorite,
+                        onShuffle: { playback.setShuffleEnabled(!playback.isShuffleEnabled) },
+                        onRepeat: { playback.setRepeatMode(NowPlayingView.nextRepeatMode(after: playback.repeatMode)) },
+                        onFavorite: { env.libraryEditor.toggleFavorite(song.id) })
     }
 }
 
