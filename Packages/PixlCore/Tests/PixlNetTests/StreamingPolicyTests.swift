@@ -145,3 +145,117 @@ struct StreamRetryPolicyTests {
         #expect(attempt == 3)
     }
 }
+
+/// R11: `findMatchFanOut` (the play-time matcher) returns exactly what `findMatch` returns, whatever order the
+/// concurrent searches answer in.
+@Suite("TrackMatcher fan-out")
+struct TrackMatcherFanOutTests {
+    struct Failure: Error {}
+
+    /// Scripted searches: per query (and shelf) a delay and the results, or a failure; every call is logged.
+    struct ScriptedSearch: YouTubeMusicSearching {
+        let songs: [String: (delayMs: UInt64, results: [YouTubeSearchResult]?)]
+        var videos: [String: [YouTubeSearchResult]] = [:]
+        var videoDelayMs: UInt64 = 0
+        let log = Box<[String]>([])
+
+        func searchSongs(_ query: String, limit: Int) async throws -> [YouTubeSearchResult] {
+            log.mutate { $0.append("songs:\(query)") }
+            let entry = songs[query] ?? (0, [])
+            if entry.delayMs > 0 { try await Task.sleep(nanoseconds: entry.delayMs * 1_000_000) }
+            guard let results = entry.results else { throw Failure() }
+            return results
+        }
+
+        func searchVideos(_ query: String, limit: Int) async throws -> [YouTubeSearchResult] {
+            log.mutate { $0.append("videos:\(query)") }
+            if videoDelayMs > 0 { try await Task.sleep(nanoseconds: videoDelayMs * 1_000_000) }
+            return videos[query] ?? []
+        }
+    }
+
+    static let song = MatchableTrack(title: "Northern Lights", artist: "Nova, Guest", album: "First Light",
+                                     durationMs: 183_000)
+    // "Northern Lights Nova", "Northern Lights Nova First Light", "Northern Lights".
+    static let queries = TrackMatcher.buildQueries(song)
+
+    static func hit(_ id: String, seconds: Int?, album: String? = "First Light") -> YouTubeSearchResult {
+        YouTubeSearchResult(videoId: id, title: "Northern Lights", artist: "Nova", album: album, durationSeconds: seconds)
+    }
+
+    func both(_ search: ScriptedSearch) async -> (sequential: Result<TrackMatch?, MusicSearchUnavailableError>,
+                                                  fanOut: Result<TrackMatch?, MusicSearchUnavailableError>) {
+        func run(_ body: () async throws -> TrackMatch?) async -> Result<TrackMatch?, MusicSearchUnavailableError> {
+            do { return .success(try await body()) } catch let error as MusicSearchUnavailableError {
+                return .failure(error)
+            } catch {
+                return .failure(MusicSearchUnavailableError(underlying: "unexpected \(error)"))
+            }
+        }
+        let matcher = TrackMatcher(search: search)
+        let sequential = await run { try await matcher.findMatch(Self.song) }
+        let fanOut = await run { try await matcher.findMatchFanOut(Self.song) }
+        return (sequential, fanOut)
+    }
+
+    @Test func theRecordedSearchIsAcceptedOnTheFirstQuery() async throws {
+        guard case .results(let recorded) = InnerTubeParsing.searchResults(try Fixtures.json("innertube-search"),
+                                                                           limit: 10, isVideo: false) else {
+            Issue.record("expected results")
+            return
+        }
+        let search = ScriptedSearch(songs: [Self.queries[0]: (0, recorded)])
+        let (sequential, fanOut) = await both(search)
+        #expect(try sequential.get()?.videoId == "abcdefghijk")
+        #expect(try fanOut.get() == sequential.get())
+        // Accepted at once: the fan-out searched only once.
+        #expect(search.log.value.filter { $0 == "songs:\(Self.queries[0])" }.count == 2)
+        #expect(search.log.value.count == 2)
+    }
+
+    @Test func aLaterAnswerNeverBeatsAnEarlierAccept() async throws {
+        // Query 1 is close (0.85), query 2 is accepted (1.0) but answers last; query 3 would also be perfect.
+        let search = ScriptedSearch(songs: [
+            Self.queries[0]: (0, [Self.hit("closeAAAAAA", seconds: 188)]),
+            Self.queries[1]: (120, [Self.hit("secondBBBBB", seconds: 183)]),
+            Self.queries[2]: (0, [Self.hit("thirdCCCCCC", seconds: 183)]),
+        ])
+        let (sequential, fanOut) = await both(search)
+        #expect(try sequential.get()?.videoId == "secondBBBBB")
+        #expect(try fanOut.get() == sequential.get())
+    }
+
+    @Test func theVideoShelfDecidesWhenNoSongIsAccepted() async throws {
+        var search = ScriptedSearch(songs: [
+            Self.queries[0]: (30, [Self.hit("closeAAAAAA", seconds: 188)]),
+            Self.queries[1]: (0, []),
+            Self.queries[2]: (10, [Self.hit("noAlbumDDDD", seconds: nil, album: nil)]),
+        ])
+        search.videos = [Self.queries[0]: [Self.hit("videoEEEEEE", seconds: 183, album: nil)]]
+        let (sequential, fanOut) = await both(search)
+        #expect(try sequential.get()?.videoId == "videoEEEEEE")
+        #expect(try fanOut.get() == sequential.get())
+        // Nothing acceptable at all: nil from both.
+        let none = ScriptedSearch(songs: [Self.queries[0]: (0, [Self.hit("farFFFFFFFF", seconds: 400)])])
+        let (noneSequential, noneFanOut) = await both(none)
+        #expect(try noneSequential.get() == nil)
+        #expect(try noneFanOut.get() == nil)
+    }
+
+    @Test func failuresCountOnlyWhereFindMatchWouldHaveSearched() async throws {
+        // A failed search with nothing acceptable: both report the search as unavailable.
+        let failing = ScriptedSearch(songs: [Self.queries[0]: (0, []), Self.queries[1]: (0, nil), Self.queries[2]: (0, [])])
+        let (sequential, fanOut) = await both(failing)
+        #expect(throws: MusicSearchUnavailableError.self) { try sequential.get() }
+        #expect(throws: MusicSearchUnavailableError.self) { try fanOut.get() }
+        // A failure after the accepting query doesn't count.
+        let accepted = ScriptedSearch(songs: [
+            Self.queries[0]: (0, []),
+            Self.queries[1]: (60, [Self.hit("secondBBBBB", seconds: 183)]),
+            Self.queries[2]: (0, nil),
+        ])
+        let (acceptedSequential, acceptedFanOut) = await both(accepted)
+        #expect(try acceptedSequential.get()?.videoId == "secondBBBBB")
+        #expect(try acceptedFanOut.get() == acceptedSequential.get())
+    }
+}

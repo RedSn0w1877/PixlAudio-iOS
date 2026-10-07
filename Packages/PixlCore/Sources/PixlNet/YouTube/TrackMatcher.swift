@@ -111,6 +111,83 @@ public struct TrackMatcher: Sendable {
         return result
     }
 
+    /// Streaming speed R11 (iOS first, Android later): `findMatch` for a song about to play. The first song search runs
+    /// alone (most tracks are accepted there); when it doesn't settle the match, the remaining song searches and the
+    /// video search run at the same time and are judged in `findMatch`'s order with its early accept — the same
+    /// result, sooner, at the cost of searches `findMatch` might have skipped. Failures count only for searches
+    /// `findMatch` would have reached.
+    public func findMatchFanOut(_ song: MatchableTrack) async throws -> TrackMatch? {
+        let queries = Self.buildQueries(song)
+        var best: TrackMatch?
+        var lastFailure: (any Error)?
+
+        func consider(_ outcome: SearchOutcome) {
+            switch outcome {
+            case .failed(let error):
+                lastFailure = error
+            case .results(let candidates):
+                for candidate in candidates {
+                    let score = Self.score(song, candidate)
+                    if best == nil || score > best!.score {
+                        best = TrackMatch(videoId: candidate.videoId, score: score, candidateTitle: candidate.title)
+                    }
+                }
+            }
+        }
+
+        consider(try await Self.runSearch(search, queries[0], videos: false))
+        if let current = best, current.score >= Self.earlyAcceptScore { return current }
+
+        // The other song queries, then the first query's video shelf — all at once, judged in this order.
+        let rest: [(query: String, videos: Bool)] = queries.dropFirst().map { ($0, false) } + [(queries[0], true)]
+        let search = self.search
+        let accepted: TrackMatch? = try await withThrowingTaskGroup(of: (Int, SearchOutcome).self) { group in
+            for (index, item) in rest.enumerated() {
+                group.addTask { (index, try await Self.runSearch(search, item.query, videos: item.videos)) }
+            }
+            var outcomes = [SearchOutcome?](repeating: nil, count: rest.count)
+            var next = 0
+            while let arrived = try await group.next() {
+                outcomes[arrived.0] = arrived.1
+                while next < rest.count, let outcome = outcomes[next] {
+                    consider(outcome)
+                    next += 1
+                    // The video search is the last one; an early accept before it ends the match as in `findMatch`.
+                    if let current = best, current.score >= Self.earlyAcceptScore, next < rest.count {
+                        group.cancelAll()
+                        return current
+                    }
+                }
+            }
+            return nil
+        }
+        if let accepted { return accepted }
+        if best == nil || best!.score < Self.minAcceptScore, let lastFailure {
+            throw MusicSearchUnavailableError(underlying: String(describing: lastFailure))
+        }
+        guard let result = best, result.score >= Self.minAcceptScore else { return nil }
+        return result
+    }
+
+    private enum SearchOutcome: Sendable {
+        case results([YouTubeSearchResult])
+        case failed(any Error)
+    }
+
+    /// One search; a failure becomes an outcome (cancellation is rethrown, as in `findMatch`).
+    private static func runSearch(_ search: any YouTubeMusicSearching, _ query: String,
+                                  videos: Bool) async throws -> SearchOutcome {
+        do {
+            return .results(videos
+                ? try await search.searchVideos(query, limit: candidatesPerQuery)
+                : try await search.searchSongs(query, limit: candidatesPerQuery))
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            return .failed(error)
+        }
+    }
+
     /// `buildQueries`: "title primaryArtist", "title primaryArtist album" (real albums only), "title" — distinct.
     public static func buildQueries(_ song: MatchableTrack) -> [String] {
         let primaryArtist = NetText.trim(NetText.substringBefore(song.artist, ","))
