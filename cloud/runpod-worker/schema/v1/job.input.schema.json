@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/RedSn0w1877/PixlAudio-iOS/blob/main/cloud/runpod-worker/schema/v1/job.input.schema.json",
+  "title": "PixlAudio Cloud Studio job input (pixl.cloudstudio.job v1)",
+  "description": "The `input` object of a RunPod /run or /runsync body. Unknown fields are ignored by both sides; a breaking change becomes v 2. The worker re-checks every rule here in src/pixl_worker/schema.py (stdlib only) and adds the size caps from its environment.",
+  "type": "object",
+  "required": ["v", "op"],
+  "properties": {
+    "schema": {"const": "pixl.cloudstudio.job", "description": "Optional for op selftest/bench, required for op process."},
+    "v": {"const": 1},
+    "op": {"enum": ["process", "selftest", "bench"]},
+    "jobKey": {"$ref": "#/$defs/jobKey"},
+    "client": {
+      "type": "object",
+      "properties": {
+        "app": {"type": "string", "maxLength": 64},
+        "build": {"type": "string", "maxLength": 64}
+      }
+    },
+    "storage": {"enum": ["presigned", "volume"]},
+    "audio": {"$ref": "#/$defs/audio"},
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"enum": ["instrumental", "vocals", "stems4", "lyrics"]}
+    },
+    "separation": {
+      "type": "object",
+      "properties": {
+        "quality": {"enum": ["standard", "best"], "default": "standard"}
+      }
+    },
+    "lyrics": {"$ref": "#/$defs/lyrics"},
+    "output": {"$ref": "#/$defs/output"},
+    "guard": {"$ref": "#/$defs/guard"},
+    "bench": {"$ref": "#/$defs/bench"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"op": {"const": "process"}}, "required": ["op"]},
+      "then": {"required": ["schema", "jobKey", "storage", "audio", "tasks", "output"]}
+    },
+    {
+      "if": {"properties": {"storage": {"const": "presigned"}}, "required": ["storage"]},
+      "then": {
+        "properties": {
+          "audio": {"required": ["get"]},
+          "output": {"required": ["put"], "properties": {"put": {"required": ["manifest"]}}}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"storage": {"const": "volume"}}, "required": ["storage"]},
+      "then": {"properties": {"audio": {"required": ["key"]}}}
+    },
+    {
+      "if": {"properties": {"tasks": {"contains": {"const": "lyrics"}}}, "required": ["tasks"]},
+      "then": {"required": ["lyrics"]}
+    }
+  ],
+  "$defs": {
+    "jobKey": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "Lower-case UUID chosen by the phone. Names in/<jobKey>.<ext> and out/<jobKey>/."
+    },
+    "presignedUrl": {
+      "type": "string",
+      "maxLength": 4096,
+      "pattern": "^https://",
+      "description": "A SigV4 query-presigned R2 URL (must carry X-Amz-Signature). The worker also checks the host allowlist, a public resolved IP and the object path."
+    },
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "ext": {"enum": ["m4a", "mp3", "flac", "wav", "ogg", "opus", "webm"]},
+    "audio": {
+      "type": "object",
+      "required": ["ext", "bytes", "sha256", "durationMs"],
+      "properties": {
+        "get": {"$ref": "#/$defs/presignedUrl", "description": "GET of in/<jobKey>.<ext> (the path must end with exactly that)."},
+        "delete": {"$ref": "#/$defs/presignedUrl", "description": "Optional DELETE of the same object, used only after an ok or partial result."},
+        "key": {
+          "type": "string",
+          "pattern": "^in/[0-9a-f-]{36}\\.(m4a|mp3|flac|wav|ogg|opus|webm)$",
+          "description": "storage volume only: the object under /runpod-volume."
+        },
+        "ext": {"$ref": "#/$defs/ext"},
+        "bytes": {"type": "integer", "minimum": 1},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "durationMs": {"type": "integer", "minimum": 1}
+      }
+    },
+    "lyricsLine": {
+      "type": "object",
+      "required": ["text"],
+      "properties": {
+        "startMs": {"type": "integer", "minimum": 0, "description": "Required when lyrics.synced is true."},
+        "endMs": {"type": "integer", "minimum": 0, "description": "Optional; the worker uses the next line's start when it is missing."},
+        "text": {"type": "string", "maxLength": 2000}
+      }
+    },
+    "lyrics": {
+      "type": "object",
+      "properties": {
+        "mode": {"enum": ["align", "transcribe", "auto"], "default": "auto"},
+        "language": {
+          "type": "string",
+          "pattern": "^[a-z]{2,3}([-_][A-Za-z0-9]{2,8})*$",
+          "description": "Optional hint (ISO 639-1, or a BCP-47 tag such as zh-Hant whose primary subtag is used)."
+        },
+        "synced": {"type": "boolean", "default": true, "description": "true: every line has startMs, sorted ascending, and the worker aligns inside each line's window. false: plain lyrics; windows come from voice activity."},
+        "lines": {"type": "array", "maxItems": 500, "items": {"$ref": "#/$defs/lyricsLine"}, "description": "Caps (worker env): 500 lines, 20,000 characters in total."}
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "codec": {"enum": ["aac", "flac"], "default": "aac"},
+        "kbps": {"type": "integer", "minimum": 128, "maximum": 256, "default": 256},
+        "put": {
+          "type": "object",
+          "description": "One presigned PUT per output object. The worker refuses (BAD_URL) any URL whose path does not end in the object it expects: out/<jobKey>/<slot>.m4a for aac or out/<jobKey>/<slot>.flac for flac (slots instrumental, vocals, drums, bass, other), out/<jobKey>/lyrics.json and out/<jobKey>/manifest.json. Every requested task needs its slot (stems4 needs drums, bass and other); manifest is always required and is written last.",
+          "properties": {
+            "instrumental": {"$ref": "#/$defs/presignedUrl"},
+            "vocals": {"$ref": "#/$defs/presignedUrl"},
+            "drums": {"$ref": "#/$defs/presignedUrl"},
+            "bass": {"$ref": "#/$defs/presignedUrl"},
+            "other": {"$ref": "#/$defs/presignedUrl"},
+            "lyrics": {"$ref": "#/$defs/presignedUrl"},
+            "manifest": {"$ref": "#/$defs/presignedUrl"}
+          }
+        }
+      }
+    },
+    "guard": {
+      "type": "object",
+      "description": "Optional duplicate/poison guard (design 2.3). Without it the worker just processes the job.",
+      "required": ["manifestGet", "attemptGet", "attemptPut"],
+      "properties": {
+        "manifestGet": {"$ref": "#/$defs/presignedUrl"},
+        "attemptGet": {"$ref": "#/$defs/presignedUrl"},
+        "attemptPut": {"$ref": "#/$defs/presignedUrl"}
+      }
+    },
+    "bench": {
+      "type": "object",
+      "description": "op bench only.",
+      "properties": {
+        "seconds": {"type": "integer", "minimum": 10, "maximum": 900, "default": 240},
+        "stages": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"enum": ["decode", "separate", "stems4", "align", "transcribe", "encode"]}
+        },
+        "crash": {"type": "boolean", "default": false, "description": "Test builds only (PIXL_ALLOW_CRASH_TEST=1): kills the process to measure RunPod re-delivery."}
+      }
+    }
+  }
+}

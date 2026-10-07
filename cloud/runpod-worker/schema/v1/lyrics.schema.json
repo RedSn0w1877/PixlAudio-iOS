@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/RedSn0w1877/PixlAudio-iOS/blob/main/cloud/runpod-worker/schema/v1/lyrics.schema.json",
+  "title": "PixlAudio Cloud Studio lyrics (pixl.cloudstudio.lyrics v1)",
+  "description": "Written to out/<jobKey>/lyrics.json. mode aligned keeps the sent text unchanged; mode transcribed is machine-written text (the app labels it \"AI-written lyrics\"). Words carry UTF-16 offsets into their line's text so the app rebuilds them exactly (the aligner strips punctuation). Unknown fields must be ignored.",
+  "type": "object",
+  "required": ["schema", "v", "mode", "language", "lines"],
+  "properties": {
+    "schema": {"const": "pixl.cloudstudio.lyrics"},
+    "v": {"const": 1},
+    "mode": {"enum": ["aligned", "transcribed"]},
+    "language": {"type": ["string", "null"], "description": "ISO 639 code the worker used (hint or detected), or null."},
+    "offsetMs": {"type": "integer", "description": "Global shift applied to the sent line times before aligning (0 when none). Already included in every time below."},
+    "lines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["i", "startMs", "endMs", "text", "timing", "words"],
+        "properties": {
+          "i": {"type": "integer", "minimum": 0, "description": "Index of the sent line (aligned), or the running line number (transcribed)."},
+          "startMs": {"type": "integer", "minimum": 0},
+          "endMs": {"type": "integer", "minimum": 0},
+          "text": {"type": "string", "description": "aligned: the sent line, unchanged. transcribed: the recognised text."},
+          "timing": {"enum": ["word", "line"], "description": "line = word timing was not possible (unsupported language, empty or collapsed alignment); words is then empty."},
+          "words": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["startMs", "endMs", "text", "c0", "c1"],
+              "properties": {
+                "startMs": {"type": "integer", "minimum": 0},
+                "endMs": {"type": "integer", "minimum": 0},
+                "text": {"type": "string", "description": "The aligner's unit (a word, or one CJK character), punctuation removed."},
+                "c0": {"type": "integer", "minimum": 0, "description": "UTF-16 offset of the unit's first character in the line text."},
+                "c1": {"type": "integer", "minimum": 0, "description": "UTF-16 offset just past its last character (c0 < c1)."},
+                "conf": {"type": "number", "minimum": 0, "maximum": 1, "description": "Reserved. v1 workers do not emit it (the aligner reports no confidence)."}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

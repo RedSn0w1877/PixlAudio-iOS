@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/RedSn0w1877/PixlAudio-iOS/blob/main/cloud/runpod-worker/schema/v1/job.result.schema.json",
+  "title": "PixlAudio Cloud Studio job result (pixl.cloudstudio.result v1)",
+  "description": "Written to out/<jobKey>/manifest.json (last, after every output) and returned as the RunPod job output for op process. On status error the RunPod job itself is FAILED with the string \"<CODE>: <message>\"; the manifest in storage carries the details. Unknown fields must be ignored.",
+  "type": "object",
+  "required": ["schema", "v", "jobKey", "status", "error", "warnings", "worker", "models", "input", "outputs", "lyrics", "timings"],
+  "properties": {
+    "schema": {"const": "pixl.cloudstudio.result"},
+    "v": {"const": 1},
+    "jobKey": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
+    "status": {"enum": ["ok", "partial", "error"]},
+    "error": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "required": ["code", "message"],
+          "properties": {
+            "code": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_]*$",
+              "description": "Known v1 codes: BAD_SCHEMA, UNSUPPORTED_VERSION, BAD_OP, BAD_URL, INPUT_TOO_LARGE, INPUT_MISMATCH, INPUT_MISSING, DOWNLOAD_FAILED, TOO_LONG, UNSUPPORTED_FORMAT, DECODE_FAILED, GPU_OOM, DEADLINE, UPLOAD_FAILED, POISONED, INTERNAL. Treat any other code as INTERNAL.",
+              "examples": ["INPUT_MISMATCH", "INPUT_MISSING", "POISONED"]
+            },
+            "message": {"type": "string", "maxLength": 500, "description": "Redacted: never contains URLs, signatures or lyrics."}
+          }
+        }
+      ]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {"type": "string", "maxLength": 300},
+      "description": "Free text for people, plus the machine-readable token \"duplicate\" (the guard found a finished manifest and returned it without working)."
+    },
+    "worker": {
+      "type": "object",
+      "required": ["version", "gitSha", "gpu", "vramGB", "cuda"],
+      "properties": {
+        "version": {"type": "string"},
+        "gitSha": {"type": "string"},
+        "gpu": {"type": ["string", "null"]},
+        "vramGB": {"type": ["number", "null"]},
+        "cuda": {"type": ["string", "null"]}
+      }
+    },
+    "models": {
+      "type": "object",
+      "required": ["separator", "stems4", "aligner", "asr"],
+      "properties": {
+        "separator": {"type": ["string", "null"]},
+        "stems4": {"type": ["string", "null"]},
+        "aligner": {"type": ["string", "null"]},
+        "asr": {"type": ["string", "null"]}
+      },
+      "description": "The model ids this job actually used (null when a stage did not run)."
+    },
+    "input": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "required": ["codec", "sampleRate", "channels", "decodedSamples", "durationMs"],
+          "properties": {
+            "codec": {"type": "string"},
+            "sampleRate": {"type": "integer", "minimum": 1},
+            "channels": {"type": "integer", "minimum": 1},
+            "decodedSamples": {"type": "integer", "minimum": 0, "description": "Frames per channel after decoding at sampleRate (edit lists honoured)."},
+            "durationMs": {"type": "integer", "minimum": 0}
+          }
+        }
+      ],
+      "description": "null when the job failed before the input was decoded."
+    },
+    "outputs": {
+      "type": "object",
+      "description": "Keys are the output slots that were delivered (instrumental, vocals, drums, bass, other). Empty on error.",
+      "additionalProperties": {"$ref": "#/$defs/outputFile"}
+    },
+    "lyrics": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "required": ["key", "mode", "language", "lines", "wordTimedLines", "words"],
+          "properties": {
+            "key": {"type": "string"},
+            "bytes": {"type": "integer", "minimum": 0},
+            "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "mode": {"enum": ["aligned", "transcribed"]},
+            "language": {"type": ["string", "null"]},
+            "lines": {"type": "integer", "minimum": 0},
+            "wordTimedLines": {"type": "integer", "minimum": 0},
+            "words": {"type": "integer", "minimum": 0},
+            "offsetMs": {"type": "integer", "description": "Global shift the worker applied to the sent line times (0 when none)."}
+          }
+        }
+      ]
+    },
+    "timings": {
+      "type": "object",
+      "required": ["coldStartMs", "downloadMs", "decodeMs", "separateMs", "stemsMs", "lyricsMs", "encodeMs", "uploadMs", "totalMs"],
+      "properties": {
+        "coldStartMs": {"type": "integer", "minimum": 0, "description": "Model load time on the first job of a process, 0 afterwards."},
+        "downloadMs": {"type": "integer", "minimum": 0},
+        "decodeMs": {"type": "integer", "minimum": 0},
+        "separateMs": {"type": "integer", "minimum": 0},
+        "stemsMs": {"type": "integer", "minimum": 0},
+        "lyricsMs": {"type": "integer", "minimum": 0},
+        "encodeMs": {"type": "integer", "minimum": 0},
+        "uploadMs": {"type": "integer", "minimum": 0},
+        "totalMs": {"type": "integer", "minimum": 0}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "error"}}, "required": ["status"]},
+      "then": {"properties": {"error": {"type": "object"}}},
+      "else": {"properties": {"error": {"type": "null"}}}
+    }
+  ],
+  "$defs": {
+    "outputFile": {
+      "type": "object",
+      "required": ["key", "bytes", "sha256", "codec", "samples"],
+      "properties": {
+        "key": {"type": "string", "pattern": "^out/[0-9a-f-]{36}/[A-Za-z0-9_.-]+$"},
+        "bytes": {"type": "integer", "minimum": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "codec": {"enum": ["aac", "flac"]},
+        "kbps": {"type": ["integer", "null"], "description": "null for flac."},
+        "sampleRate": {"type": "integer", "minimum": 1, "description": "Always the input's sampleRate."},
+        "samples": {"type": "integer", "minimum": 0, "description": "Frames per channel the worker encoded; equals input.decodedSamples."}
+      }
+    }
+  }
+}

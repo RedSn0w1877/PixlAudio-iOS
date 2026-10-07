@@ -1,0 +1,15 @@
+{
+  "schema": "pixl.cloudstudio.job",
+  "v": 1,
+  "op": "bench",
+  "bench": {
+    "seconds": 240,
+    "stages": [
+      "decode",
+      "separate",
+      "align",
+      "transcribe",
+      "encode"
+    ]
+  }
+}
