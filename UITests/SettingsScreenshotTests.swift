@@ -48,6 +48,36 @@ final class SettingsScreenshotTests: XCTestCase {
     func testAboutCategoryLight() throws { try capture("settingsCategory.about", "light") }
     func testAboutCategoryDark() throws { try capture("settingsCategory.about", "dark") }
 
+    // MARK: Accent colour (iOS-only, owner request 2026-10-07)
+
+    /// Appearance with a picked accent (`-accent`): the swatch grid's ring on Red, and the page's captions, switches
+    /// and value capsules in the red scheme (vivid in light, pastel in dark); icons and row glass take its hue.
+    func testAppearanceAccentRedLight() throws {
+        try capture("settingsCategory.appearance", "light", extra: ["-accent", "FF453A"], suffix: "-accentRed")
+    }
+    func testAppearanceAccentRedDark() throws {
+        try capture("settingsCategory.appearance", "dark", extra: ["-accent", "FF453A"], suffix: "-accentRed")
+    }
+    /// Graphite: a grey scheme (pure greys at the scheme's tones).
+    func testAppearanceAccentGraphiteDark() throws {
+        try capture("settingsCategory.appearance", "dark", extra: ["-accent", "8E8E93"], suffix: "-accentGraphite")
+    }
+    /// A custom colour (not a preset): the ring moves to the Custom well.
+    func testAppearanceAccentCustomLight() throws {
+        try capture("settingsCategory.appearance", "light", extra: ["-accent", "B4502D"], suffix: "-accentCustom")
+    }
+    /// Tapping a preset re-themes the page live and moves the ring (the default violet → Green).
+    func testAppearanceAccentTapGreenLight() throws {
+        try capture("settingsCategory.appearance", "light", suffix: "-accentTapGreen") { app in
+            let green = app.buttons["settings.accent.green"].firstMatch
+            XCTAssertTrue(green.waitForExistence(timeout: 5), "the Green swatch is not on screen")
+            XCTAssertTrue(app.buttons["settings.accent.default"].firstMatch.isSelected, "the default is selected")
+            green.tap()
+            let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isSelected == true"), object: green)
+            XCTAssertEqual(XCTWaiter().wait(for: [selected], timeout: 5), .completed, "Green did not become selected")
+        }
+    }
+
     // MARK: Sub-screens
 
     func testExperimentalLight() throws { try capture("experimental", "light") }
@@ -84,11 +114,15 @@ final class SettingsScreenshotTests: XCTestCase {
 
     // MARK: - Helper
 
-    private func capture(_ screen: String, _ appearance: String, ready: String? = nil,
+    /// `ready`: the element that marks the screen as loaded (default `screen.<screen>`). `extra`: more launch
+    /// arguments (e.g. `-accent RRGGBB`); `suffix` tells such a shot apart from the plain one
+    /// (`<screen>-<appearance><suffix>`), so the exported PNGs don't collide.
+    private func capture(_ screen: String, _ appearance: String, ready: String? = nil, extra: [String] = [],
+                         suffix: String? = nil,
                          interact: ((XCUIApplication) -> Void)? = nil) throws {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["-uiTest", "-screen", screen, "-appearance", appearance]
+        app.launchArguments = ["-uiTest", "-screen", screen, "-appearance", appearance] + extra
         app.launch()
 
         let identifier = ready ?? "screen.\(screen)"
@@ -100,7 +134,7 @@ final class SettingsScreenshotTests: XCTestCase {
         Thread.sleep(forTimeInterval: 2.0)
 
         let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = "\(screen)-\(appearance)" + (interact == nil ? "" : "-interacted")
+        attachment.name = "\(screen)-\(appearance)" + (suffix ?? (interact == nil ? "" : "-interacted"))
         attachment.lifetime = .keepAlways
         add(attachment)
 

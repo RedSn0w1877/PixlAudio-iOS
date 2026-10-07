@@ -723,3 +723,27 @@ in for the model calls; the behaviour itself waits for Hoa's iPhone.
 - `UITests/SettingsScreenshotTests.testAICategoryCloudLight/Dark` (`settingsCategory.ai.cloud`),
   `testAICategoryAdvancedOnDeviceLight`; `UITests/LibraryScreenshotTests.testLibraryCreatePlaylistOnDeviceOffDark`
   (`libraryCreatePlaylist.onDeviceOff`).
+
+## Accent colour (owner request 2026-10-07, iOS-only, Swift-only)
+Android has no accent setting, so there is nothing to port; these define the iOS behaviour.
+- `PixlLibraryTests/AccentPairTests` (7) — `ArtworkTheme.accentPair(seed:)`: WCAG AA (4.5:1) for `onPrimary` on
+  `primary`, `primary` on the background and surface, and `onPrimaryContainer` on `primaryContainer`, light and dark,
+  for every preset and a sweep of 606 custom picks (24 hues × 5 chromas × 5 tones plus black, white, mid grey and
+  the RGB primaries); the light primaries (and four dark ones) equal Google's reference colour utilities
+  (material-color-utilities, run once in the planning scratchpad: Red #BD0E12, Blue #005DB8, …); the primary's chroma
+  is never below TonalSpot's and clearly above it for the saturated presets; Graphite is pure grey at the exact role
+  tones with red errors; surfaces, secondary and tertiary equal TonalSpot's; the default `brandPair` is unchanged.
+- `PixlBackupTests/ModuleTests` — `catalogueKinds` (accent_color_v1 is portable, every catalogue key listed once incl.
+  `iosOnly`), `iosOnlyAccentColorRoundTripsAndOldBackupsClearIt` (export → restore keeps it; a backup without it
+  restores with nothing skipped and clears it).
+- `AppTests/AccentColorTests` (11) — hex parsing (with or without `#`, any case, spaces; empty / short / long / non-hex
+  / signed → nil) and formatting; a picked `Color` → hex (opacity dropped, extended range clamped); the preset list and
+  lookup by colour; `ThemeStore` keeps the violet by default, follows a picked accent live in light and dark, gives the
+  player the accent when nothing plays, and registers observation even on a cached accent; persistence under
+  `accent_color_v1` and `reload(from:)`; the window tint's light and dark colours.
+- `AppTests/BackupServiceTests` — `testAccentColorIsExportedAndRestored` (exported as a string, restored into another
+  store and reloaded live), `testOldBackupWithoutTheAccentRestoresTheDefault`.
+- `AppTests/LaunchConfigurationTests.testAccentArgumentIsForUITestsOnly` — `-accent RRGGBB`.
+- `UITests/SettingsScreenshotTests` — Appearance with Red (light, dark), Graphite (dark) and a custom colour (light),
+  and a tap on Green that must select it (`isSelected`) and re-theme the page; `UITests/ScreenshotTests` — Home in
+  Green (dark), Library in Blue (light), the settings list in Pink (light).

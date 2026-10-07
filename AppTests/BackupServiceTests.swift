@@ -78,6 +78,43 @@ final class BackupServiceTests: XCTestCase {
         XCTAssertEqual(store.playback.crossfadeDurationMs, 6000)
     }
 
+    /// Settings › Appearance › Accent Color (iOS-only) travels in the global-settings module as a string and comes
+    /// back on restore; the running app follows (`reload`).
+    func testAccentColorIsExportedAndRestored() throws {
+        let source = SettingsStore(defaults: defaults)
+        source.appearance.accentColor = "#FF453A"
+        let values = SettingsBackup.exportValues(defaults: defaults, keychain: { _ in nil })
+        let byKey = Dictionary(values.map { ($0.key, $0.value) }, uniquingKeysWith: { first, _ in first })
+        XCTAssertEqual(byKey[PreferenceKeys.accentColor], .string("#FF453A"))
+
+        let payload = PreferencesModule.export(.globalSettings, values: values)
+        let restore = try PreferencesModule.restore(.globalSettings, payload: payload)
+        XCTAssertFalse(restore.skippedKeys.contains(PreferenceKeys.accentColor))
+        let targetSuite = suiteName + ".target"
+        let target = try XCTUnwrap(UserDefaults(suiteName: targetSuite))
+        defer { target.removePersistentDomain(forName: targetSuite) }
+        let running = SettingsStore(defaults: target)
+        XCTAssertEqual(running.appearance.accentColor, "")
+        SettingsBackup.apply(restore, defaults: target)
+        running.reload(from: target)
+        XCTAssertEqual(running.appearance.accentColor, "#FF453A")
+    }
+
+    /// A backup made before the accent existed (or on Android) restores cleanly: nothing is skipped, and the accent
+    /// returns to PixlAudio's violet like every setting the backup doesn't carry.
+    func testOldBackupWithoutTheAccentRestoresTheDefault() throws {
+        let store = SettingsStore(defaults: defaults)
+        store.appearance.accentColor = "#34C759"
+        let old = PreferencesModule.export(.globalSettings, values: [("app_theme_mode", .string("dark"))])
+        let restore = try PreferencesModule.restore(.globalSettings, payload: old)
+        XCTAssertTrue(restore.skippedKeys.isEmpty)
+        SettingsBackup.apply(restore, defaults: defaults)
+        store.reload(from: defaults)
+        XCTAssertEqual(store.appearance.appThemeMode, .dark)
+        XCTAssertEqual(store.appearance.accentColor, "")
+        XCTAssertNil(defaults.object(forKey: PreferenceKeys.accentColor))
+    }
+
     // MARK: Restore
 
     func testRestoresTheAndroidFixtureAndReportsUnmatchedSongs() async throws {

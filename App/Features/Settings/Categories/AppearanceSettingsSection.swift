@@ -8,6 +8,10 @@ import UIKit
 /// TonalSpot scheme), NavBar corner radius, smooth corners (every iOS corner is already continuous).
 /// App language opens the system's per-app language setting (iOS apps can't switch language in-app); it shows only
 /// when the app has more than one localisation.
+///
+/// iOS-only (owner request 2026-10-07): Accent Color under Global Theme, after App Theme (`AccentColorRow`). It
+/// takes the place of Android's wallpaper colours, so Player Theme's "System Dynamic" option (stored as `dynamic`)
+/// reads "Accent Color" here: the player uses the accent instead of the album colours.
 struct AppearanceSettingsSection: View {
     @Environment(SettingsStore.self) private var settings
 
@@ -33,6 +37,7 @@ struct AppearanceSettingsSection: View {
                                  selectedKey: appearance.appThemeMode.rawValue, systemImage: "sun.max") {
                     appearance.appThemeMode = AppThemeMode(rawValue: $0) ?? .followSystem
                 }
+                AccentColorRow(selectedHex: appearance.accentColor) { appearance.accentColor = $0 }
                 SwitchSettingRow(title: L10n.settingsDisableBlurAllOverTitle,
                                  subtitle: L10n.settingsDisableBlurAllOverSubtitle,
                                  isOn: $appearance.disableBlurAllOver, systemImage: "circle.dotted")
@@ -44,7 +49,7 @@ struct AppearanceSettingsSection: View {
                                  options: [SettingsOption(key: PlayerThemePreference.albumArt.rawValue,
                                                           label: L10n.settingsPlayerThemeAlbumArt),
                                            SettingsOption(key: PlayerThemePreference.dynamic.rawValue,
-                                                          label: L10n.settingsPlayerThemeDynamic)],
+                                                          label: L10n.settingsPlayerThemeAccent)],
                                  selectedKey: appearance.playerTheme.rawValue, systemImage: "play.circle") {
                     appearance.playerTheme = PlayerThemePreference(rawValue: $0) ?? .albumArt
                 }

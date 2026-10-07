@@ -165,6 +165,10 @@ nonisolated enum PreferenceKeys {
     static let musicLearningEnabled = "learning_enabled"
     static let musicDiscoveryEnabled = "discovery_enabled"
     static let musicExplorationFraction = "exploration_fraction"
+    // iOS-only (owner requests). Backed up by name through PixlBackup's `AndroidPreferenceCatalog.iosOnly`.
+    /// Settings › Appearance › Accent Color: a `"#RRGGBB"` seed, `""` = PixlAudio's violet (owner request 2026-10-07).
+    /// A string, not an Int: an ARGB above `Int32.max` would flip sign as an Android `int` on a round trip.
+    static let accentColor = "accent_color_v1"
 }
 
 /// Android `AppThemeMode`.
@@ -175,7 +179,9 @@ nonisolated enum AppThemeMode: String, Sendable, CaseIterable {
 }
 
 /// Android `ThemePreference` (`player_theme_preference_v2`): which scheme themes the player — and, for `global`,
-/// the whole app. `dynamic` (Material You wallpaper colours) has no iOS source and behaves like `default`.
+/// the whole app. `dynamic` (Material You wallpaper colours on Android) has no iOS source: here it means the app's
+/// accent scheme (Settings › Appearance › Accent Color; the option is labelled "Accent Color"), like `default`. The
+/// stored value stays `dynamic` so backups keep their meaning on both platforms.
 nonisolated enum PlayerThemePreference: String, Sendable, CaseIterable {
     case `default` = "default"
     case dynamic = "dynamic"
@@ -241,6 +247,9 @@ final class AppearanceSettings {
     var colorAccuracy: Int {
         didSet { defaults.set(ArtworkColorAccuracy.clamp(colorAccuracy), forKey: PreferenceKeys.albumArtColorAccuracy) }
     }
+    /// Settings › Appearance › Accent Color (iOS-only): `"#RRGGBB"`, `""` = PixlAudio's violet. `ThemeStore` builds
+    /// the app's scheme from it (`AccentPalette.seed(hex:)`); unreadable values fall back to the violet.
+    var accentColor: String { didSet { defaults.set(accentColor, forKey: PreferenceKeys.accentColor) } }
     var showScrollbar: Bool { didSet { defaults.set(showScrollbar, forKey: PreferenceKeys.showScrollbar) } }
     var disableBlurAllOver: Bool {
         didSet { defaults.set(disableBlurAllOver, forKey: PreferenceKeys.disableBlurAllOver) }
@@ -287,6 +296,7 @@ final class AppearanceSettings {
         paletteStyle = ArtworkPaletteStyle.fromStorageKey(defaults.string(forKey: PreferenceKeys.albumArtPaletteStyle))
         colorAccuracy = ArtworkColorAccuracy.clamp(defaults.int(PreferenceKeys.albumArtColorAccuracy,
                                                                 default: ArtworkColorAccuracy.default))
+        accentColor = defaults.string(PreferenceKeys.accentColor, default: "")
         showScrollbar = defaults.bool(PreferenceKeys.showScrollbar, default: true)
     }
 }

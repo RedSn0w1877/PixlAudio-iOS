@@ -267,6 +267,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
 ///     -paused                      start paused (default: playing)
 ///     -noSong                      nothing playing (no mini player)
 ///     -demoScale <n>               repeat the demo library n times (performance tests: a library of real size)
+///     -accent RRGGBB               UI tests only: start with this accent colour (Settings › Appearance › Accent Color)
 nonisolated struct LaunchConfiguration: Equatable, Sendable {
     nonisolated enum Appearance: String, Sendable {
         case system, light, dark
@@ -283,6 +284,9 @@ nonisolated struct LaunchConfiguration: Equatable, Sendable {
     var demoScale: Int
     /// `-cloudFilter`: the song picker shows its LOCAL / CLOUD switch although the demo library has no streamed songs.
     var forcesCloudFilter: Bool
+    /// `-accent RRGGBB` (UI tests only, `#` optional): the accent the ephemeral settings start with, for the accent
+    /// screenshots. The raw value; `AppEnvironment` normalises it (and ignores anything unreadable).
+    var accentHex: String?
 
     init(arguments: [String]) {
         func value(after flag: String) -> String? {
@@ -303,6 +307,7 @@ nonisolated struct LaunchConfiguration: Equatable, Sendable {
         hasSong = !arguments.contains("-noSong")
         demoScale = min(max(value(after: "-demoScale").flatMap(Int.init) ?? 1, 1), 400)
         forcesCloudFilter = isUITest && arguments.contains("-cloudFilter")
+        accentHex = isUITest ? value(after: "-accent") : nil
     }
 
     /// The configuration of this process.

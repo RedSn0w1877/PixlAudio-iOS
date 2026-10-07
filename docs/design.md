@@ -42,10 +42,16 @@ Forbidden in `App/` (CI, `ci/check-forbidden.sh`): Material / Compose names as i
 
 - `ThemeColors` (`DesignSystem/Theme.swift`) exposes all 48 PixlAudio palette roles as `Color`
   (`theme.onPrimaryContainer`), backed by PixlLibrary's `ColorRoles`. Two environment values:
-  - `\.appTheme` — the app chrome (Android's `MaterialTheme.colorScheme` outside the player): the brand scheme,
-    or the album scheme when *player theme = Global*;
+  - `\.appTheme` — the app chrome (Android's `MaterialTheme.colorScheme` outside the player): the **accent
+    scheme** (Settings › Appearance › Accent Color, iOS-only; PixlAudio's violet `brandPair` by default), or the
+    album scheme when *player theme = Global*;
   - `\.playerTheme` — the current song's album scheme (Android `LocalMaterialTheme` in the player / mini player);
-    equals `appTheme` when nothing plays or album theming is off.
+    equals `appTheme` when nothing plays or album theming is off (Player Theme "Accent Color", stored `dynamic`).
+- The accent (owner request 2026-10-07, see § Accent colour): a picked colour becomes
+  `ArtworkTheme.accentPair(seed:)` — TonalSpot's surfaces, secondary, tertiary and role tones with the primary at
+  the pick's own chroma (≥ 36), so the primary family is vivid in light mode and pastel (tone 80) in dark mode, and
+  surfaces / icons take a faint cast of its hue as with the violet. Album schemes are unchanged. Never hard-code the
+  violet: read `theme.primary` & co.
 - `ThemeStore` follows the current song (`.task(id:)` in the shell) and `player_theme_preference_v2`,
   `album_art_palette_style_v1`, `album_art_color_accuracy_v1`; `ColorExtractor` decodes the art at 128 px and runs
   the ported seed selection + scheme generation off the main thread, cached in memory and `ArtworkThemeRecord`
@@ -265,6 +271,10 @@ goes into `docs/api-notes.md`.
 `miniPlayer` (library with a vivid song: album-tinted mini player) and `miniPlayerAlone` (pushed screen: bar
 hidden). The ready element of each is `screen.<id>`. Stage 4 shots: home, library, miniPlayer, miniPlayerAlone in
 light + dark; search, settings, nowPlaying, diagnostics.
+
+`-accent RRGGBB` (UI tests only) starts any screen with that accent colour (Settings › Appearance › Accent Color);
+shots taken with it carry a suffix (`settingsCategory.appearance-dark-accentRed`, `home-dark-accentGreen`). Accent
+swatches are `settings.accent.<preset id>` / `settings.accent.custom`, the row `settings.accentColor`.
 
 Stage 7a ids (Library tab on screen, ready `screen.library` plus the page/sheet id): `libraryPlaylists`,
 `libraryAlbums` (grid), `libraryAlbumsList`, `libraryArtists`, `libraryFolders`, `libraryLiked`, `librarySelection`
@@ -828,3 +838,46 @@ divergences.
 - **Left out:** R9 (cipher / JavaScriptCore warm-up — only if the timings show `n` on VISIONOS URLs), R10 (delegate
   streaming — only if first-byte latency remains), R5b (persisted URLs, owner: not now).
 
+
+## Accent colour (owner request 2026-10-07; iOS-only, no Android counterpart)
+
+Hoa asked for an app-wide accent: presets plus a custom colour, applied to every tint and Liquid Glass tint, saved
+and backed up, updating live. Decisions (DECISIONS.md › Accent colour): option A "seed chroma, vivid"; the player
+keeps album colours; the unused Player Theme "System Dynamic" option is renamed "Accent Color"; the default stays
+today's soft violet; presets Blue, Indigo, Purple, Pink, Red, Orange, Yellow, Green, Mint, Graphite (grey), Custom.
+
+- **Where:** Settings › Appearance › Global Theme, right after App Theme: `AccentColorRow` — `ThemeSelectorRow`'s
+  layout (24 pt `paintpalette` icon in `secondary`, `titleMedium` title, `bodyMedium` description, 16 pt padding,
+  `settingsRowGlass()`), with two rows of six 44 pt cells where the value capsule was: PixlAudio (the default), the
+  ten presets, then Custom. Six cells fit the narrowest text column (375 pt phone: 271 pt); wider phones spread them.
+- **Swatches** are plain 32 pt circle fills on the row's glass (no glass on glass) with `PressScaleButtonStyle`;
+  selected = a 42 pt `onSurface` ring (2.5 pt) and a 13 pt bold check, white on the swatch unless that falls below
+  3:1, then black. A swatch shows the *named* colour (its seed), not the scheme tone: the dark-mode tones are
+  pastel and nearly equal for Red / Pink and Blue / Indigo, and the light tones turn Yellow and Orange into olive
+  and brown, so the seeds are what tells the choices apart. The app itself shows the scheme's tone.
+- **Custom** is the system `ColorPicker` (`supportsOpacity: false`), its well ringed while a custom colour is the
+  accent. The picker reports every drag step; the row commits 180 ms after the last one, never the value it was
+  seeded with (opening the page never saves the violet's seed over the default `""`).
+- **Scheme:** `ArtworkTheme.accentPair(seed:)` (PixlLibrary): TonalSpot palettes and role tones with the primary
+  palette at max(36, seed chroma). Light primaries: Red #BD0E12, Blue #005DB8, Green #006E28, Yellow #705D00 (the
+  same numbers as Google's reference utilities); dark ones stay pastel (Red #FFB4AA, Blue #AAC7FF). Contrast comes
+  from the fixed role tones: ≥ 4.5:1 for `onPrimary` on `primary`, `primary` on the background and
+  `onPrimaryContainer` on `primaryContainer`, for every preset and a sweep of custom picks (`AccentPairTests`).
+  Near-grey picks (Graphite) are pure greys at the exact role tones (#5E5E5E / #C6C6C6), error stays red.
+- **Applied:** `ThemeStore.accentPair` (memoised per stored value; reading it observes the setting) replaces the brand
+  pair in `colors(for:)`, so `appTheme`, the shell's `.tint`, the tab bar pill, sheet tab capsules, selected pills,
+  the playing song card, toggles, sliders, captions, icons (secondary) and row glass (surfaceContainer) all follow.
+  Sheets and covers re-apply `.tint` (they used to fall back to the static `AccentColor` asset), `alwaysDarkTheme`
+  tints with the dark tone, and the windows' `tintColor` follows the accent (`WindowTint`) for UIKit alerts,
+  dialogs and menus. The accent snaps (no animation: the root `.animation` is keyed to album colours only, so the
+  three tab stacks never cross-fade a re-theme).
+- **Player:** Album Art (default) keeps album colours in the mini and full player and the lyrics; with no artwork
+  or nothing playing, the player takes the accent. "Accent Color" (stored `dynamic`, Android's "System Dynamic")
+  puts the accent on the player too. Album / artist pages with art keep their art colours (`ArtworkThemed`).
+- **Storage:** `accent_color_v1` in `UserDefaults`, a `"#RRGGBB"` string (`""` = violet; an Int would flip sign as an
+  Android `int`). Backed up in the global-settings module through PixlBackup's `AndroidPreferenceCatalog.iosOnly`;
+  restored live (`SettingsReload`). A backup without the key (older iOS, Android) restores cleanly and resets the
+  accent to the violet, like any setting a backup doesn't carry.
+- **Not done (follow-ups):** Increase Contrast could build the pair with `contrastLevel` 0.5 / 1.0 (the static asset
+  has a high-contrast variant, the accent scheme doesn't yet); the launch screen and anything UIKit draws before
+  the first frame still use the static `AccentColor` asset.

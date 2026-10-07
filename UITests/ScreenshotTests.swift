@@ -28,6 +28,21 @@ final class ScreenshotTests: XCTestCase {
     func testNowPlayingDark() throws { try capture("nowPlaying", "dark", ready: "screen.nowPlaying") }
     func testDiagnosticsLight() throws { try capture("diagnostics", "light", ready: "screen.diagnostics") }
 
+    // MARK: Accent colour (iOS-only, owner request 2026-10-07): the chrome takes the accent, the player its album
+
+    /// Home in Green (dark): the tab bar's pill, Home's chrome and cards; the mini player keeps its album colours.
+    func testHomeAccentGreenDark() throws {
+        try capture("home", "dark", extra: ["-accent", "34C759"], suffix: "-accentGreen")
+    }
+    /// Library in Blue (light, the vivid tone): the pill, the library tabs and chips.
+    func testLibraryAccentBlueLight() throws {
+        try capture("library", "light", extra: ["-accent", "0A84FF"], suffix: "-accentBlue")
+    }
+    /// The settings list in Pink (light): icons and row glass take the accent's hue.
+    func testSettingsAccentPinkLight() throws {
+        try capture("settings", "light", extra: ["-accent", "FF2D55"], suffix: "-accentPink")
+    }
+
     // MARK: Tab bar (owner change 2026-10-01: iOS-style glass bar, accent pill gliding between tabs)
 
     /// A tap switches tabs and marks the tab selected; the shot shows the pill under Library.
@@ -105,10 +120,13 @@ final class ScreenshotTests: XCTestCase {
         "settings": "screen.settings",
     ]
 
-    private func capture(_ screen: String, _ appearance: String, ready: String? = nil) throws {
+    /// `extra`: more launch arguments (e.g. `-accent RRGGBB`); `suffix` tells such a shot apart from the plain one
+    /// (`<screen>-<appearance><suffix>`), so the exported PNGs don't collide.
+    private func capture(_ screen: String, _ appearance: String, ready: String? = nil, extra: [String] = [],
+                         suffix: String = "") throws {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["-uiTest", "-screen", screen, "-appearance", appearance]
+        app.launchArguments = ["-uiTest", "-screen", screen, "-appearance", appearance] + extra
         app.launch()
 
         let identifier = ready ?? Self.readyIdentifiers[screen] ?? "screen.\(screen)"
@@ -127,7 +145,7 @@ final class ScreenshotTests: XCTestCase {
         Thread.sleep(forTimeInterval: 2.0)
 
         let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = "\(screen)-\(appearance)"
+        attachment.name = "\(screen)-\(appearance)" + suffix
         attachment.lifetime = .keepAlways
         add(attachment)
 

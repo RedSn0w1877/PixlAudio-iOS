@@ -85,6 +85,10 @@ final class AppEnvironment {
         self.settings = settings
         // The optional cloud rows of Settings › AI features, for their screenshot.
         if launch.screen == .settingsAICloud { settings.ai.setUsesCloudAssistant(true) }
+        // `-accent RRGGBB` (UI tests): the accent screenshots start with a picked colour, stored normalised.
+        if isUITest, let seed = launch.accentHex.flatMap(AccentPalette.seed(hex:)) {
+            settings.appearance.accentColor = AccentPalette.hex(argb: seed)
+        }
         // Settings › Default tab (Android `launchTabFlow`): set before the first frame so Home never flashes first.
         // UI tests open the tab their screen asks for.
         if !isUITest, launch.screen == nil { router.selection = settings.behavior.launchTab }

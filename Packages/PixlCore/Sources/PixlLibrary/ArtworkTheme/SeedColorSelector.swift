@@ -340,6 +340,37 @@ enum SchemeBuilder {
         return ColorRolesPair(light: light, dark: dark)
     }
 
+    /// The app-wide accent scheme (iOS-only, owner request 2026-10-07; no Android counterpart): TonalSpot's
+    /// secondary, tertiary and neutral palettes and its role tones, but the primary palette keeps the seed's own
+    /// chroma (never below TonalSpot's 36). A picked red stays a real red in light mode instead of TonalSpot's brick;
+    /// a muted pick stays muted. Contrast still comes from the fixed role tones (primary 40 / 80 against the
+    /// background), so every seed is as legible as the brand scheme. Dark tones (80) are gamut-limited and come out
+    /// pastel, much like TonalSpot's.
+    ///
+    /// Near-grey seeds (the same test as `pair`, e.g. the Graphite preset) give pure greys: every palette at chroma 0,
+    /// so each role is the exact grey of its tone (error stays red). `pair` instead maps the tinted roles through
+    /// Android's HSL grayscale, which can land a hair under 4.5:1 for `primary` on the background; the accent has no
+    /// Android counterpart to match, so it keeps the scheme's contrast exactly.
+    static func accentPair(seed: ARGB) -> ColorRolesPair {
+        let source = Hct.fromInt(seed)
+        let forceNeutral = source.chroma <= SeedColorSelector.grayscaleChromaThreshold
+            && SeedColorSelector.isArgbNearGrayscale(seed)
+        func roles(isDark: Bool) -> ColorRoles {
+            if forceNeutral {
+                let grey = TonalPalette.fromHueAndChroma(source.hue, 0.0)
+                return DynamicScheme(source: source, variant: .tonalSpot, isDark: isDark, contrastLevel: 0,
+                                     primary: grey, secondary: grey, tertiary: grey, neutral: grey,
+                                     neutralVariant: grey).colorRoles()
+            }
+            let base = DynamicScheme.tonalSpot(source, isDark: isDark)
+            return DynamicScheme(source: source, variant: .tonalSpot, isDark: isDark, contrastLevel: 0,
+                                 primary: .fromHueAndChroma(source.hue, max(36.0, source.chroma)),
+                                 secondary: base.secondaryPalette, tertiary: base.tertiaryPalette,
+                                 neutral: base.neutralPalette, neutralVariant: base.neutralVariantPalette).colorRoles()
+        }
+        return ColorRolesPair(light: roles(isDark: false), dark: roles(isDark: true))
+    }
+
     static func monochromePair(seed: ARGB) -> ColorRolesPair {
         let source = Hct.fromInt(seed)
         return ColorRolesPair(light: DynamicScheme.monochrome(source, isDark: false).colorRoles(),
