@@ -83,11 +83,12 @@ struct LyricsMoreSheet: View {
         VStack(alignment: .leading, spacing: 2) {
             caption("Lyrics")
             if let onSync = actions.onSyncYourself, song != nil {
+                // The lyrics screen opens the editor from this sheet's onDismiss, once the sheet has gone.
                 row(isUserSynced ? "Fix my word timing" : "Sync the words yourself",
                     subtitle: !isUserSynced && !hasWordTiming ? "Tap along so each word lights up" : nil,
-                    systemImage: "hand.tap", accent: true, corners: (18, 8)) {
-                    dismiss()
+                    systemImage: "hand.tap", accent: true, corners: (18, 8), identifier: "lyricsMore.syncYourself") {
                     onSync()
+                    dismiss()
                 }
             }
             if lyrics != nil, let onSave = actions.onSave {
@@ -198,9 +199,13 @@ struct LyricsMoreSheet: View {
                                bottomTrailingRadius: corners.1, topTrailingRadius: corners.0, style: .continuous)
     }
 
+    /// `identifier` is an optional id for UI tests: the row's label joins its title and subtitle, so a label query is
+    /// fragile.
+    @ViewBuilder
     private func row(_ title: LocalizedStringKey, subtitle: LocalizedStringKey? = nil, systemImage: String,
-                     accent: Bool = false, corners: (CGFloat, CGFloat), action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+                     accent: Bool = false, corners: (CGFloat, CGFloat), identifier: String? = nil,
+                     action: @escaping () -> Void) -> some View {
+        let button = Button(action: action) {
             HStack(spacing: 16) {
                 Image(systemName: systemImage)
                     .font(.system(size: 20, weight: .medium))
@@ -225,6 +230,11 @@ struct LyricsMoreSheet: View {
             .contentShape(shape(corners))
         }
         .buttonStyle(PressScaleButtonStyle(pressedScale: 0.98))
+        if let identifier {
+            button.accessibilityIdentifier(identifier)
+        } else {
+            button
+        }
     }
 
     private func switchRow(_ title: LocalizedStringKey, systemImage: String, isOn: Binding<Bool>,

@@ -64,11 +64,15 @@ struct SheetDestination: View {
 struct CoverDestination: View {
     let cover: AppCover
 
+    @Environment(Router.self) private var router
+
     var body: some View {
         switch cover {
         case .nowPlaying: NowPlayingView()
         case .lyrics: LyricsView()
-        case .lyricsSync(let songId): LyricsSyncEditorView(songId: songId)
+        // `-screen lyricsSync` UI tests only: the app opens the editor over the lyrics screen and Edit song.
+        case .lyricsSync(let songId):
+            LyricsSyncEditorView(songId: songId, onClose: { if router.cover == cover { router.dismissCover() } })
         case .setup: SetupView()
         case .editSong(let songId): EditSongSheet(songId: songId)
         case .aiPlaylistLab: AiPlaylistLabView()
