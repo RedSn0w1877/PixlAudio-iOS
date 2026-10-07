@@ -18,6 +18,9 @@ nonisolated struct ThemeColors: Sendable, Equatable {
     /// The raw ARGB value of a role (for colour maths such as luminance).
     func argb(_ keyPath: KeyPath<ColorRoles, UInt32>) -> UInt32 { roles[keyPath: keyPath] }
 
+    /// PixlAudio's violet (`ArtworkTheme.brandPair`): the default accent, and the environment's default before the
+    /// shell injects the live colours. The app's real chrome scheme comes from `ThemeStore.colors(for:)`, which
+    /// follows Settings › Appearance › Accent Color.
     static let brandLight = ThemeColors(roles: ArtworkTheme.brandPair.light, isDark: false)
     static let brandDark = ThemeColors(roles: ArtworkTheme.brandPair.dark, isDark: true)
 
@@ -37,7 +40,8 @@ extension Color {
 
 extension EnvironmentValues {
     /// The app chrome's scheme (Android's `MaterialTheme.colorScheme` outside the player: the system dynamic scheme
-    /// there, PixlAudio's brand scheme here, or the album scheme when "Global" album theming is on).
+    /// there; here the accent scheme — PixlAudio's violet by default, Settings › Appearance › Accent Color — or the
+    /// album scheme when "Global" album theming is on).
     @Entry var appTheme: ThemeColors = .brandLight
     /// The current song's album-art scheme (Android `LocalMaterialTheme` inside the player sheet / mini player);
     /// equals `appTheme` when nothing is playing or album theming is off.
@@ -62,11 +66,14 @@ extension View {
     /// dark while the palette stayed the light one, so anything drawn with scheme roles — the lyrics More sheet's
     /// `onSurface` rows, its `surfaceContainer*` fills, the fetch dialog — came out near-black on a near-black sheet
     /// whenever the phone was in light mode. Sheets presented from below this modifier inherit the dark palette.
+    /// The tint is re-resolved too: inside the cover's own (system-scheme) tint, so default-tinted controls take the
+    /// accent's dark tone rather than its light one on black.
     func alwaysDarkTheme(_ store: ThemeStore) -> some View {
         let colors = store.colors(for: .dark)
         return environment(\.appTheme, colors.app)
             .environment(\.playerTheme, colors.player)
             .environment(\.colorScheme, .dark)
+            .tint(colors.app.primary)
             .preferredColorScheme(.dark)
     }
 }

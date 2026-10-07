@@ -31,6 +31,8 @@ extension AppearanceSettings {
         sync(\.playerTheme, self, f)
         sync(\.paletteStyle, self, f)
         sync(\.colorAccuracy, self, f)
+        // The accent re-tints the running app at once (ThemeStore observes it).
+        sync(\.accentColor, self, f)
         sync(\.showScrollbar, self, f)
         sync(\.disableBlurAllOver, self, f)
         sync(\.carouselStyle, self, f)
