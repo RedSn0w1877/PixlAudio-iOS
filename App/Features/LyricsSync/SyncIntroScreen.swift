@@ -234,11 +234,14 @@ struct SyncErrorScreen: View {
                 .pixlFont(.custom(size: 20, weight: .semibold, lineHeight: 26))
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
-            EditorButton(palette: palette, prominent: true, action: session.close) { color in
+            EditorButton(palette: palette, prominent: true, action: { session.close(.user) }) { color in
                 EditorButtonText(text: SyncStrings.close, color: color)
             }
+            .accessibilityIdentifier("sync.error.close")
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("sync.error")
     }
 }

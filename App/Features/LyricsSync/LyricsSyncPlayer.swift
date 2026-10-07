@@ -30,6 +30,9 @@ final class LyricsSyncPlayer {
 
     var currentSong: Song? { playback.current }
 
+    /// A Spotify Connect device drives playback: transport and position would be the remote's.
+    var isRemoteActive: Bool { playback.isRemoteActive }
+
     /// The engine's rate now (restored when the session ends).
     var currentRate: Float { engine?.rate ?? 1 }
 

@@ -94,6 +94,14 @@ nonisolated enum SyncStrings {
     static let noResults = String(localized: "lyrics_sync_no_results", defaultValue: "No lyrics found online. Paste them instead.")
     static let pickResult = String(localized: "lyrics_sync_pick_result", defaultValue: "Pick the right lyrics")
     static let noSong = String(localized: "lyrics_sync_no_song", defaultValue: "Play the song first, then sync its words.")
+    /// Android `lyrics_sync_casting` ("…Stop casting first."), worded for Spotify Connect (owner decision 2026-10-07).
+    static let remoteOutput = String(localized: "lyrics_sync_casting",
+                                     defaultValue: "Syncing only works on this iPhone. Switch playback back to this iPhone first.")
+    /// iOS only: getting ready took longer than `LyricsSyncSession.openWaitMs`.
+    static let openTimedOut = String(localized: "lyrics_sync_open_timed_out",
+                                     defaultValue: "Couldn't get the song ready. Close and try again.")
+    /// iOS only: the player unloaded while the editor was open.
+    static let playbackStopped = String(localized: "lyrics_sync_playback_stopped", defaultValue: "Playback stopped.")
 
     static let ok = String(localized: "common_ok", defaultValue: "OK")
     static let cancel = String(localized: "common_cancel", defaultValue: "Cancel")
