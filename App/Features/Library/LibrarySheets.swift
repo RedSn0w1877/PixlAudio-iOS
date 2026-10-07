@@ -294,8 +294,19 @@ struct ReorderTabsSheet: View {
         .accessibilityIdentifier("reorder.\(tab.rawValue)")
     }
 
-    /// Android `FloatingToolBar`: a 22 pt panel (`surfaceContainerHigh`) with the reset button and the Done pill.
+    /// Android `FloatingToolBar`: a 22 pt panel (`surfaceContainerHigh`) with the reset button and the Done pill. Hoa
+    /// (2026-10-07): the primary button on a floating bar is its own glass pill, so the panel's glass went (no glass on
+    /// glass) and Reset is a glass circle beside Done, 10 pt apart in one container. Both keep their places (the
+    /// panel's 12 pt padding is added to the bottom).
     private var toolbar: some View {
+        GlassEffectContainer(spacing: 4) {
+            toolbarButtons
+        }
+        .padding(8)
+        .padding(.bottom, 8 + 12)
+    }
+
+    private var toolbarButtons: some View {
         HStack(spacing: 10) {
             Button { showsReset = true } label: {
                 Image(systemName: "arrow.counterclockwise")
@@ -304,7 +315,8 @@ struct ReorderTabsSheet: View {
                     .frame(width: 48, height: 48)
                     .contentShape(.circle)
             }
-            .buttonStyle(PressScaleButtonStyle())
+            .buttonStyle(.plain)
+            .pixlGlass(in: Circle(), tint: theme.surfaceContainerHigh.opacity(GlassTint.container), interactive: true)
             .accessibilityLabel("Reset")
             Button {
                 prefs.tabOrder = tabs
@@ -317,17 +329,12 @@ struct ReorderTabsSheet: View {
                 .foregroundStyle(theme.onPrimaryContainer)
                 .padding(.horizontal, 20)
                 .frame(height: 56)
-                .background(Capsule().fill(theme.primaryContainer))
                 .contentShape(.capsule)
             }
-            .buttonStyle(PressScaleButtonStyle())
+            .buttonStyle(.plain)
+            .pixlGlass(in: Capsule(), tint: theme.primaryContainer.opacity(GlassTint.prominent), interactive: true)
             .accessibilityIdentifier("reorder.done")
         }
-        .padding(12)
-        .pixlGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous),
-                   tint: theme.surfaceContainerHigh.opacity(GlassTint.container))
-        .padding(8)
-        .padding(.bottom, 8)
     }
 }
 

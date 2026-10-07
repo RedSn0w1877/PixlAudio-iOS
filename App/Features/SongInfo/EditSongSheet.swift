@@ -6,7 +6,8 @@ import UIKit
 /// "Edit song" (Android `EditSongSheet`), full screen: the "Edit song" title (`displaySmall`) with an info circle,
 /// then — 16 pt margins, 12 pt apart — the cover-art card and the fields (title, artist, album, album artist, genre,
 /// composer, track and disc number, ReplayGain track / album, lyrics), each a coloured label over a 10 pt rounded
-/// field with a role-coloured icon; Cancel and Save float in a capsule at the bottom (hidden while typing).
+/// field with a role-coloured icon; Cancel and Save float at the bottom (hidden while typing): Android's capsule bar,
+/// with each button its own glass pill (Hoa, 2026-10-07) and the bar's glass gone (no glass on glass).
 /// Timed lyrics show their words read-only with "Change the words" / "Fix timing" (the sync editor). Saving goes
 /// through `SongTagEditor` (override + file write-back).
 struct EditSongSheet: View {
@@ -298,7 +299,16 @@ struct EditSongSheet: View {
 
     // MARK: Toolbar
 
+    /// Cancel (`secondaryContainer`) and Save (`primary`) as two glass pills, 8 pt apart in one container (spacing below
+    /// the gap). They keep the positions they had inside Android's capsule (its 8 pt padding is added to the bottom).
     private func bottomToolbar(_ song: Song) -> some View {
+        GlassEffectContainer(spacing: 4) {
+            bottomButtons(song)
+        }
+        .padding(.bottom, 24 + 8)
+    }
+
+    private func bottomButtons(_ song: Song) -> some View {
         HStack(spacing: 8) {
             Button { dismiss() } label: {
                 Text("Cancel")
@@ -306,10 +316,10 @@ struct EditSongSheet: View {
                     .foregroundStyle(theme.onSecondaryContainer)
                     .padding(.horizontal, 24)
                     .frame(height: 48)
-                    .background(Capsule().fill(theme.secondaryContainer))
                     .contentShape(.capsule)
             }
-            .buttonStyle(PressScaleButtonStyle(pressedScale: 0.95))
+            .buttonStyle(.plain)
+            .pixlGlass(in: Capsule(), tint: theme.secondaryContainer.opacity(GlassTint.container), interactive: true)
             Button {
                 guard !isSaving else { return }
                 guard let form else { dismiss(); return }
@@ -328,15 +338,12 @@ struct EditSongSheet: View {
                     .foregroundStyle(theme.onPrimary)
                     .padding(.horizontal, 24)
                     .frame(height: 48)
-                    .background(Capsule().fill(theme.primary))
                     .contentShape(.capsule)
             }
-            .buttonStyle(PressScaleButtonStyle(pressedScale: 0.95))
+            .buttonStyle(.plain)
+            .pixlGlass(in: Capsule(), tint: theme.primary.opacity(GlassTint.prominent), interactive: true)
             .accessibilityIdentifier("editSong.save")
         }
-        .padding(8)
-        .pixlGlass(in: Capsule(), tint: theme.surfaceContainerLow.opacity(GlassTint.container))
-        .padding(.bottom, 24)
     }
 }
 
