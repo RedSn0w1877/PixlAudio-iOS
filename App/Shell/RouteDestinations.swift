@@ -47,15 +47,16 @@ struct SheetDestination: View {
 
     var body: some View {
         switch sheet {
-        case .queue: QueueSheet().pixlSheet(detents: [.large])
-        case .songInfo(let songId): SongInfoSheet(songId: songId).pixlSheet(detents: [.large])
+        // See-through glass at 92 % (Hoa, 2026-10-07): a full-height sheet turns opaque on iOS 26.
+        case .queue: QueueSheet().pixlSheet(detents: [.tallGlass])
+        case .songInfo(let songId): SongInfoSheet(songId: songId).pixlSheet(detents: [.tallGlass])
         case .sleepTimer: SleepTimerSheet().sleepTimerPresentation()
         case .lyricsOptions(let songId): LyricsOptionsSheet(songId: songId).pixlSheet()
         case .changelog, .betaInfo, .jobs: HomeInfoSheet(sheet: sheet).pixlSheet()
         case .devices: DevicesSheet() // sizes its own detent
         case .artistPicker(let songId): PlayerArtistPickerSheet(songId: songId) // sizes its own detent
-        case .aiPlaylist: AiPlaylistSheet().pixlSheet(detents: [.large])
-        case .taisChat: TaisChatSheet().pixlSheet(detents: [.large])
+        case .aiPlaylist: AiPlaylistSheet().pixlSheet(detents: [.tallGlass])
+        case .taisChat: TaisChatSheet().pixlSheet(detents: [.tallGlass])
         }
     }
 }

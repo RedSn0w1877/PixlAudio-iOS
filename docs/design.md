@@ -354,7 +354,7 @@ categories, sheets; glass in place of Material; text legible in light and dark. 
   title/artist (+ artist picker for several credits), lyrics and AI DJ circles, `PlayerSeekBar` (≤ 4 Hz from
   `PlaybackStore.clock`), `AnimatedPlaybackControls` (weighted glass pills), `PlayerToggleRow`, the
   `player_ambient_style` background. Controls are clear glass tinted with the album roles (`playerGlass`).
-- **Sheets:** `AppSheet.queue` (large), `.sleepTimer`, `.devices`, `.artistPicker(songId:)`, `.taisChat` (stage 13's
+- **Sheets:** `AppSheet.queue` (large; see-through `tallGlass` since 2026-10-07), `.sleepTimer`, `.devices`, `.artistPicker(songId:)`, `.taisChat` (stage 13's
   TAIS DJ chat, from the sparkles circle); `AppCover.editSong(songId:)`. The queue presents the song sheet, the timer and Save as
   playlist itself. The song sheet's edit button (`SongOptionsSheet(onEdit:)`) opens `EditSongSheet`.
 - **Shared-file changes (all additive):** `Shell/RootView.swift` (slot + host, cover binding), `Core/Routes.swift`
@@ -532,6 +532,7 @@ Stage 12 screenshot ids (signed out on the plain ids; demo data, no network): `a
   avatar keeps Android's `primary → tertiary` gradient (a mark, not a Material surface). Online (catalogue) results
   import through `SearchProviding.importAndPlay` on tap. The sheet uses the large detent: Android caps the column at 620 dp, but the system's
   partial-height sheet floats with clearer glass, and the Home content behind made the chat hard to read.
+  (2026-10-07: Hoa asked for the see-through glass after all; it now uses `tallGlass`, see Glass expansion.)
 - **Taizo redesign (owner request 2026-10-03, "make taizo up much better and more beautiful"; the port rule is relaxed
   for this sheet only).** Empty: `TaizoOrb` — a 3×3 `MeshGradient` of the theme's fixed roles (same in light and dark)
   with a specular highlight, rim and glow, drifting at ≤ 24 fps (paused off screen / sheet gone / background / Reduce
@@ -751,9 +752,84 @@ surfaces such as the queue. So small menus are SwiftUI `Menu`s, and the system d
 - Content: `SortMenuSections` (Sort by and Order as inline pickers) and `LibrarySortMenuContent` (plus View / Playlist
   View / Cloud Only), the playlist options (edit, transition, export, batch actions, delete), and Sort & Play
   (Shuffle, Quick Fill, Sort By).
-- The queue keeps its own menu. The Android sort and options sheets stay, for UI-test launch states.
+- The queue keeps its own menu. The Android sort and options sheets stay, for UI-test launch states. (2026-10-07:
+  the queue's ⋯ circle now liquid-morphs into its menu's pills, see Glass expansion; still not a system `Menu`.)
 - `[record:Class]` in a commit message films that UI test class on CI (`MenuRecordingTests` opens these menus slowly),
   so the morph can be compared frame by frame with the reference recording.
+
+## Glass expansion (owner change 2026-10-07)
+
+Hoa asked for more Liquid Glass, starting with the queue, which read as "not glass": the sheet turned opaque at full
+height, its toolbar circles were opaque fills on a glass capsule, and the ⋯ menu slid in on its own. These are the
+plan's options A + B plus the floating-bar pills (owner decisions). The lyrics page and the full player's top bar
+belong to other work and are untouched.
+
+- **See-through tall sheets.** `PresentationDetent.tallGlass` (`SheetScaffold.swift`) is one `.fraction(0.92)`
+  detent. iOS 26 draws a partial-detent sheet as inset Liquid Glass and turns a `.large` one opaque. The queue, the
+  song sheet (from any row, and from the queue), the AI Daily Mix sheet and Taizo's chat use it, so the player or the
+  page shows around and through them. `presentationBackground` is never touched. Trade-offs:
+  - one detent, so there is no dragging to full height (dragging down still dismisses);
+  - lower contrast over bright art;
+  - the player keeps rendering beneath (the ambient styles at their 30 Hz);
+  - Taizo's chat had moved to `.large` in stage 13 because the floating glass over Home was hard to read, so check
+    it in the shots;
+  - Apple documents no threshold for the glass look, so CI shots must confirm that 0.92 still renders inset and
+    translucent (0.85 otherwise).
+- **Queue toolbar.** Shuffle, repeat and the timer are each their own interactive glass circle: `primary` at
+  prominent when on, a hint of `surfaceContainer` when off, the symbol replaced with a content transition. There is no
+  backing capsule: Android puts glass circles on a glass capsule, which iOS can't stack (the same call as
+  `PlayerToggleRow`). The capsule's padding stays, so nothing moves.
+- **Queue ⋯ menu morph.** The toolbar and the open menu share one `GlassEffectContainer(spacing: 8)`. It never
+  leaves the tree; only its content switches between the toolbar and the pills.
+  - The ⋯ circle and "Save as playlist" carry the same `glassEffectID`, so the circle morphs into that pill and back.
+  - The toolbar circles and Locate / Clear use `glassEffectTransition(.materialize)`: they fade rather than being
+    pulled into the Save pill, which overlaps the toolbar's area.
+  - The toolbar leaves while the menu is open, because overlapping shapes in one container would blend. The undo
+    bar stays outside the container for the same reason.
+  - It runs on `PixlMotion.selection` through `withAnimation`. The root no longer carries an implicit animation on
+    `isMenuExpanded`, which would flatten the spring.
+  - Android's 0.55 scrim and the gradient stay.
+  - VoiceOver: `.isModal`, the escape action and `queue.menu` sit on the pills' VStack, which exists only while the
+    menu is open. On a wrapper around the container they would trap VoiceOver in the closed toolbar and swallow the
+    escape that dismisses the sheet.
+  - Fallback if the shared-id morph looks wrong on the phone: put the toolbar back outside, give the pills their own
+    container under the scrim and restore the slide-in (`.move(edge: .bottom)`). Never keep the pills and a visible
+    toolbar in one container.
+- **Floating bars: the primary button is its own glass pill.** This covers Save as playlist, Edit song, the Library
+  tab order and genre Quick Fill. A glass button can't sit on a glass bar, so each bar's backing glass is gone and its
+  controls are separate glass shapes in one container, with spacing below their gaps:
+  - Save as playlist: the summary capsule (`secondaryContainer`) and Save (`primary`), both 56 pt.
+  - Edit song: Cancel (`secondaryContainer` at container) and Save (`primary` at prominent), where the capsule held
+    them.
+  - Tab order: Reset becomes a glass circle beside Done (`primaryContainer` at prominent).
+  - Quick Fill: the Select all · Clear pair, a status capsule (`surfaceContainerHighest`) and Next / Quick Fill
+    (`primary`). On the genre step the pair leaves and the status capsule takes its room; Android keeps its panel and
+    hides the pair.
+- **Listening Stats header.** It uses the `SettingsScaffold` glass bar (`surfaceContainerHigh` at `GlassTint.bar`,
+  fading in over the first half of the collapse) instead of the solid band. The circles and the pill row sit on it,
+  as Settings' back circle does.
+- **Missed decision-10 conversions (parity).**
+  - Full player: the loading chip becomes clear glass inside the lyrics / AI circles' container, and the format pill
+    under the seek bar becomes clear glass (both Material Surfaces on Android).
+  - Genre page: the artist group header becomes glass (a Surface), and the album play button a glass circle (an
+    IconButton).
+- **Also glass.**
+  - The playlist editor's collage placeholder and Pick Image tile, tinted at `GlassTint.container`: the flat page
+    gives them nothing to refract.
+  - For performance only: the sleep timer's surfaces and the Save as playlist fields now share a container each.
+- **Left alone on purpose.**
+  - The queue's swipe-to-remove reveal: glass there would add a second glass layer to a lazy row, mid-gesture.
+  - The row ⋮ fills, and the content panels behind glass rows.
+  - The playlist editor's top bar: nothing scrolls under it.
+  - The devices sheet's tiles: their tap target is a UIKit route picker, untested inside a container.
+- **Screenshot ids.**
+  - `queue.saveAsPlaylist`: the queue opens Save as playlist after 0.7 s; ready `sheet.saveQueue`.
+  - `genre.quickFill`: the genre page opens Quick Fill; ready `screen.quickFill.genre`.
+- **Tests.**
+  - `PlayerScreenshotTests`: `testQueueMenuDark`, `testSaveQueueLight` / `Dark`.
+  - `LibraryScreenshotTests`: `testGenreQuickFillLight`, `testGenreQuickFillGenreStepDark`.
+  - `GlassAccessibilityTests/testQueueControlsKeepButtonTraits`.
+  - `MenuRecordingTests/testQueueMenuMorph`, filmed with `[record:MenuRecordingTests]`.
 
 ## Spotify Connect output (2026-10-03, branch `spotify-connect`; shared spec with Android)
 

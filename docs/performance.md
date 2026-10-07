@@ -138,7 +138,17 @@ launch-into-expanded path (UI tests and launch states) showed it; the app's own 
   keeps its container; Library's action row had its container before the menus came).
 - Grouped glass keeps its accessibility: `UITests/GlassAccessibilityTests` checks that controls inside the new
   containers are still buttons, sliders and switches with their labels (settings groups, the player's top bar, the
-  album header).
+  album header, the queue's toolbar and ⋯ menu).
+- A glass morph needs a container that stays in the tree and an animation nobody overrides (the queue's ⋯ menu,
+  2026-10-07). The toolbar and the open menu share one `GlassEffectContainer` whose content switches; an `if` around
+  the container, or a modifier applied conditionally to it, changes its identity and drops the morph. An implicit
+  `.animation(_:value:)` on an ancestor replaces the `withAnimation` spring for the whole subtree. Modal accessibility
+  (`.isModal`, escape) goes on the part that exists only while open, never on a wrapper that also holds the closed
+  state. The queue menu is PixlAudio's own glass, not a system `Menu`, so the rule above about keeping system menus
+  outside containers doesn't apply to it.
+- A see-through tall sheet (`PresentationDetent.tallGlass`: queue, song sheet, AI Daily Mix, Taizo) leaves the
+  screen beneath on display, so that screen keeps rendering (the full player's ambient styles at their 30 Hz under
+  the queue). A `.large` sheet covered it.
 
 ## Pending on-device checks (Hoa's phone, before merging)
 

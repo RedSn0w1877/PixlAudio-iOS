@@ -48,6 +48,17 @@ final class PlayerScreenshotTests: XCTestCase {
     func testQueueMenuLight() throws {
         try capture("queue", "light", ready: "screen.queue", tap: "More actions", name: "queueMenu")
     }
+    func testQueueMenuDark() throws {
+        try capture("queue", "dark", ready: "screen.queue", tap: "More actions", name: "queueMenu")
+    }
+    /// Save as playlist, opened by the queue on launch (`queue.saveAsPlaylist`): the summary capsule and the Save pill
+    /// as separate glass (2026-10-07). The name field focuses itself, so the keyboard may show.
+    func testSaveQueueLight() throws {
+        try capture("queue.saveAsPlaylist", "light", ready: "sheet.saveQueue", name: "saveQueue")
+    }
+    func testSaveQueueDark() throws {
+        try capture("queue.saveAsPlaylist", "dark", ready: "sheet.saveQueue", name: "saveQueue")
+    }
     func testSleepTimerLight() throws { try capture("sleepTimer", "light", ready: "screen.sleepTimer") }
     func testSleepTimerDark() throws { try capture("sleepTimer", "dark", ready: "screen.sleepTimer") }
     func testSongInfoLight() throws { try capture("songInfo", "light", ready: "screen.songInfo", name: "playerSongInfo") }

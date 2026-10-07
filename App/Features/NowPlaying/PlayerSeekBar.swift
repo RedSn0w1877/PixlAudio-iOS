@@ -149,7 +149,10 @@ struct PlayerSeekBar: View {
                     .foregroundStyle(color.opacity(0.96))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 3)
-                    .background(color.opacity(0.14), in: Capsule())
+                    // Android's Material `Surface` (FullPlayerContent.kt:2090-2096) as clear glass over the player's
+                    // background (decision 10), not interactive. Re-applied with the same values on each ≤ 4 Hz tick,
+                    // which changes nothing; hoist it out of the TimelineView if a hitch ever shows.
+                    .glassEffect(Glass.clear.tint(color.opacity(0.14)), in: Capsule())
                     .padding(.horizontal, 58)
             }
         }

@@ -57,6 +57,11 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     // Stage 8: the player's sheets (presented over the expanded player) and the song editor
     case devices, artistPicker, editSong
 
+    // Glass expansion (2026-10-07): the queue's Save as playlist cover (opened by the queue once it's up) and the
+    // genre page's Quick Fill cover (opened by the page), for their floating glass bars
+    case queueSaveAsPlaylist = "queue.saveAsPlaylist"
+    case genreQuickFill = "genre.quickFill"
+
     // Spotify Connect output: the devices sheet on its DEVICES page with demo devices (idle, playing on the Echo,
     // linked before Connect's scopes, no devices), and the "Playing on" chip in the full and the mini player
     case devicesSpotifyConnect = "devices.spotifyConnect"
@@ -126,7 +131,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .playlistEdit: return .playlistEditor(playlistId: demo.playlists.first?.id)
         case .playlistAddSongs, .playlistOptions, .playlistReorder:
             return .playlistDetail(playlistId: demo.playlists.first?.id ?? "")
-        case .genreSort: return .genreDetail(genreId: "Indie")
+        case .genreSort, .genreQuickFill: return .genreDetail(genreId: "Indie")
         case .miniPlayerAlone, .albumDetail: return .albumDetail(albumId: demo.albums.first?.id ?? 1)
         case .artistDetail: return .artistDetail(artistId: demo.artists.first?.id ?? 1)
         case .genreDetail: return .genreDetail(genreId: "Indie")
@@ -169,7 +174,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .youTubeLogin, .youTubeLoginCode, .youTubeLoginCookie, .youTubeLoginSignedIn: return .youTubeLogin
         case .playbackDiagnostics, .playbackDiagnosticsFailed, .playbackDiagnosticsTimings: return .playbackDiagnostics
         case .queue, .songInfo, .sleepTimer, .lyricsOptions, .changelog, .betaInfo, .jobs,
-             .nowPlaying, .lyrics, .lyricsSync, .setup, .devices, .artistPicker, .editSong:
+             .nowPlaying, .lyrics, .lyricsSync, .setup, .devices, .artistPicker, .editSong, .queueSaveAsPlaylist:
             return nil
         case .aiPlaylist, .taisChat, .taisChatConversation, .aiPlaylistLab: return nil
         case .setupPermission, .setupFolders, .setupBackup, .setupTheme, .setupLibraryLayout, .setupSpotify, .setupFinish:
@@ -191,7 +196,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryFolders, .libraryLiked,
              .librarySelection, .librarySort, .libraryReorderTabs, .libraryMultiSelection, .libraryCreatePlaylist,
              .libraryAddToPlaylist, .songOptionsInfo, .playlistEdit, .playlistAddSongs, .playlistOptions,
-             .playlistReorder, .genreSort, .libraryCompactNav, .libraryCreatePlaylistOnDeviceOff:
+             .playlistReorder, .genreSort, .libraryCompactNav, .libraryCreatePlaylistOnDeviceOff, .genreQuickFill:
             .library
         default: .home
         }
@@ -200,7 +205,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     var sheet: AppSheet? {
         let songId = DemoLibrary.songs.first?.id ?? ""
         switch self {
-        case .queue: return .queue
+        case .queue, .queueSaveAsPlaylist: return .queue
         case .songInfo, .songOptionsInfo, .taisSongSheet: return .songInfo(songId: songId)
         case .sleepTimer: return .sleepTimer
         case .lyricsOptions: return .lyricsOptions(songId: songId)
@@ -219,7 +224,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     /// Stage 8: the player's sheets open over the expanded player, as on Android (`AppEnvironment` expands it).
     var opensOverPlayer: Bool {
         switch self {
-        case .queue, .sleepTimer, .devices, .artistPicker: true
+        case .queue, .queueSaveAsPlaylist, .sleepTimer, .devices, .artistPicker: true
         case .devicesSpotifyConnect, .devicesSpotifyPlaying, .devicesSpotifyReconnect, .devicesSpotifyEmpty: true
         default: false
         }

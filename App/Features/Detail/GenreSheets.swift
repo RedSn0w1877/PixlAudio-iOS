@@ -262,54 +262,63 @@ struct QuickFillSheet: View {
         }
     }
 
+    /// Android's floating toolbar: a 32 pt `surfaceContainerHighest` panel with Select all · Clear, the status and the
+    /// Next / Quick Fill pill. Hoa (2026-10-07): the primary button on a floating bar is its own glass pill, so the
+    /// panel's glass went (no glass on glass): the Select all · Clear pair, a status capsule and the pill are separate
+    /// glass shapes in one container (spacing 0, below the pair's 2 pt seam). On the genre step the pair leaves and the
+    /// status capsule takes its room (Android keeps the panel and hides the pair).
     private var toolbar: some View {
-        HStack(spacing: 0) {
-            HStack(spacing: 2) {
-                SegmentedGlassButton(title: "Select all", systemImage: "checklist", accessibilityLabel: "Select all",
-                                     leading: 50, trailing: 4, height: 44, horizontalPadding: 16, iconSize: 0,
-                                     tint: theme.surfaceContainerHigh.opacity(GlassTint.prominent),
-                                     foreground: theme.onSurface) { selected = Set(filtered.map(\.id)) }
-                SegmentedGlassButton(title: "Clear", systemImage: "xmark", accessibilityLabel: "Clear",
-                                     leading: 4, trailing: 50, height: 44, horizontalPadding: 16, iconSize: 0,
-                                     tint: theme.surfaceContainerHigh.opacity(GlassTint.prominent),
-                                     foreground: theme.onSurface) { selected.removeAll() }
-            }
-            .opacity(step == 0 ? 1 : 0)
-            .disabled(step != 0)
-            Spacer().frame(width: 16)
-            Text(step == 0 ? "\(selected.count) selected" : (genre.map { "Genre: \($0)" } ?? "Select a genre"))
-                .pixlFont(.labelMedium)
-                .foregroundStyle(theme.onSurfaceVariant)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Spacer().frame(width: 16)
-            Button {
+        let canContinue = step == 0 ? !selected.isEmpty : genre != nil
+        return GlassEffectContainer(spacing: 0) {
+            // 6 pt gaps and 12 pt capsule padding leave the status about the width it had between Android's 16 pt
+            // spacers.
+            HStack(spacing: 6) {
                 if step == 0 {
-                    guard !selected.isEmpty else { return }
-                    withAnimation(PixlMotion.state) { step = 1 }
-                } else if let genre {
-                    onApply(Array(selected), genre)
-                    dismiss()
+                    HStack(spacing: 2) {
+                        SegmentedGlassButton(title: "Select all", systemImage: "checklist", accessibilityLabel: "Select all",
+                                             leading: 50, trailing: 4, height: 44, horizontalPadding: 16, iconSize: 0,
+                                             tint: theme.surfaceContainerHigh.opacity(GlassTint.prominent),
+                                             foreground: theme.onSurface) { selected = Set(filtered.map(\.id)) }
+                        SegmentedGlassButton(title: "Clear", systemImage: "xmark", accessibilityLabel: "Clear",
+                                             leading: 4, trailing: 50, height: 44, horizontalPadding: 16, iconSize: 0,
+                                             tint: theme.surfaceContainerHigh.opacity(GlassTint.prominent),
+                                             foreground: theme.onSurface) { selected.removeAll() }
+                    }
+                    .transition(.opacity)
                 }
-            } label: {
-                HStack(spacing: 8) {
-                    Text(step == 0 ? "Next" : "Quick Fill").pixlFont(.labelLarge)
-                    Image(systemName: step == 0 ? "arrow.right" : "checkmark").font(.system(size: 16, weight: .semibold))
+                Text(step == 0 ? "\(selected.count) selected" : (genre.map { "Genre: \($0)" } ?? "Select a genre"))
+                    .pixlFont(.labelMedium)
+                    .foregroundStyle(theme.onSurfaceVariant)
+                    .lineLimit(1)
+                    .padding(.horizontal, 12)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .pixlGlass(in: Capsule(), tint: theme.surfaceContainerHighest.opacity(GlassTint.container))
+                Button {
+                    if step == 0 {
+                        guard !selected.isEmpty else { return }
+                        withAnimation(PixlMotion.state) { step = 1 }
+                    } else if let genre {
+                        onApply(Array(selected), genre)
+                        dismiss()
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Text(step == 0 ? "Next" : "Quick Fill").pixlFont(.labelLarge)
+                        Image(systemName: step == 0 ? "arrow.right" : "checkmark").font(.system(size: 16, weight: .semibold))
+                    }
+                    .foregroundStyle(theme.onPrimary)
+                    .padding(.horizontal, 16)
+                    .frame(height: 44)
+                    .contentShape(.capsule)
                 }
-                .foregroundStyle(theme.onPrimary)
-                .padding(.horizontal, 16)
-                .frame(height: 44)
-                .background(Capsule().fill(theme.primary))
-                .contentShape(.capsule)
+                .buttonStyle(.plain)
+                .pixlGlass(in: Capsule(), tint: theme.primary.opacity(GlassTint.prominent), interactive: canContinue)
+                .opacity(canContinue ? 1 : 0.5)
             }
-            .buttonStyle(PressScaleButtonStyle())
-            .opacity((step == 0 && selected.isEmpty) || (step == 1 && genre == nil) ? 0.5 : 1)
         }
-        .padding(.horizontal, 10)
-        .frame(height: 64)
-        .pixlGlass(in: RoundedRectangle(cornerRadius: 32, style: .continuous),
-                   tint: theme.surfaceContainerHighest.opacity(GlassTint.container))
-        .padding(16)
+        // Where the controls sat inside Android's panel (16 pt outside it, 10 pt inside, centred in its 64 pt).
+        .padding(.horizontal, 16 + 10)
+        .padding(.bottom, 16 + 10)
     }
 
     // Custom genres (`custom_genres`, a string set on Android) — a string array here.

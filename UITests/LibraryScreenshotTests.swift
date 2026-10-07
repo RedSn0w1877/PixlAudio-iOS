@@ -48,6 +48,35 @@ final class LibraryScreenshotTests: XCTestCase {
     func testGenreDetailLight() throws { try capture("genreDetail", "light", ready: "screen.genreDetail") }
     func testGenreDetailDark() throws { try capture("genreDetail", "dark", ready: "screen.genreDetail") }
     func testGenreSortLight() throws { try capture("genreSort", "light", ready: "screen.genreDetail", tap: "Options") }
+    /// Genre Quick Fill, opened by the genre page on launch (`genre.quickFill`): the floating bar's Select all · Clear
+    /// pair, status capsule and Next pill as separate glass (2026-10-07).
+    func testGenreQuickFillLight() throws {
+        try capture("genre.quickFill", "light", ready: "screen.quickFill.genre")
+    }
+    /// The same bar on the genre step (Select all, then Next): the pair has left and the status capsule takes its room.
+    func testGenreQuickFillGenreStepDark() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTest", "-screen", "genre.quickFill", "-appearance", "dark"]
+        app.launch()
+        XCTAssertTrue(app.descendants(matching: .any)["screen.quickFill.genre"].firstMatch.waitForExistence(timeout: 20),
+                      "Quick Fill did not appear")
+        // By label: controls inside a glass container keep only their labels.
+        let selectAll = app.buttons.matching(NSPredicate(format: "label == %@", "Select all")).firstMatch
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 10), "Select all is missing")
+        selectAll.tap()
+        let next = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Next")).firstMatch
+        XCTAssertTrue(next.waitForExistence(timeout: 10), "Next is missing")
+        next.tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Quick Fill")).firstMatch
+                          .waitForExistence(timeout: 10), "the genre step did not open")
+        Thread.sleep(forTimeInterval: 2.0)
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "genre.quickFill.genreStep-dark"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        app.terminate()
+    }
     func testFolderExplorerLight() throws { try capture("folderExplorer", "light", ready: "screen.folderExplorer") }
 
     // MARK: Playlists

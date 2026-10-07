@@ -4,8 +4,11 @@ import SwiftUI
 /// "Save as playlist" (Android `SaveQueueAsPlaylistSheet`), full screen: the close circle, the title
 /// (`headlineMedium` semibold) and Select all / Deselect all (rounding into a `tertiary` pill when everything is
 /// selected); the playlist name field (focused, the default name selected) and the song search capsule; the queue's
-/// songs as capsules with a check box and round art; and the bottom capsule ("N songs selected" · "Save as: …") with
-/// the Save pill. Saves the checked songs in queue order as a new playlist.
+/// songs as capsules with a check box and round art; and the bottom bar: the summary capsule ("N songs selected" ·
+/// "Save as: …") beside the Save pill. Saves the checked songs in queue order as a new playlist.
+///
+/// Android puts the Save pill on the summary capsule. Hoa (2026-10-07) asked for the primary buttons on floating
+/// bars to be their own glass pills, so the two are separate glass shapes in one container (no glass on glass).
 struct SaveQueueAsPlaylistSheet: View {
     let songs: [Song]
     let defaultName: String
@@ -32,31 +35,33 @@ struct SaveQueueAsPlaylistSheet: View {
         let allSelected = !allIds.isEmpty && selected.count == allIds.count
         VStack(spacing: 0) {
             topBar(allSelected: allSelected)
-            VStack(spacing: 12) {
-                fieldBox {
-                    TextField("Playlist name", text: $name)
-                        .pixlFont(.bodyLarge)
-                        .foregroundStyle(theme.onSurface)
-                        .focused($nameFocused)
-                        .submitLabel(.done)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(theme.onSurfaceVariant)
-                    TextField("Search songs to include…", text: $query)
-                        .pixlFont(.bodyLarge)
-                        .foregroundStyle(theme.onSurface)
-                    if !query.isEmpty {
-                        Button { query = "" } label: {
-                            Image(systemName: "xmark.circle.fill").foregroundStyle(theme.onSurfaceVariant)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Clear search")
+            // The name field and the search capsule render together (12 pt apart, above the 6 pt spacing).
+            GlassEffectContainer(spacing: 6) {
+                VStack(spacing: 12) {
+                    fieldBox {
+                        TextField("Playlist name", text: $name)
+                            .pixlFont(.bodyLarge)
+                            .foregroundStyle(theme.onSurface)
+                            .focused($nameFocused)
+                            .submitLabel(.done)
                     }
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(theme.onSurfaceVariant)
+                        TextField("Search songs to include…", text: $query)
+                            .pixlFont(.bodyLarge)
+                            .foregroundStyle(theme.onSurface)
+                        if !query.isEmpty {
+                            Button { query = "" } label: {
+                                Image(systemName: "xmark.circle.fill").foregroundStyle(theme.onSurfaceVariant)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Clear search")
+                        }
+                    }
+                    .padding(.horizontal, 18)
+                    .frame(height: 56)
+                    .pixlGlass(in: Capsule(), tint: theme.surfaceContainerHigh.opacity(GlassTint.surface))
                 }
-                .padding(.horizontal, 18)
-                .frame(height: 56)
-                .pixlGlass(in: Capsule(), tint: theme.surfaceContainerHigh.opacity(GlassTint.surface))
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
@@ -198,39 +203,44 @@ struct SaveQueueAsPlaylistSheet: View {
         .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 
+    /// The summary capsule (`secondaryContainer`) and the Save pill (`primary`), each its own glass, 12 pt apart in one
+    /// container (spacing below the gap: they never blend at rest).
     private var bottomBar: some View {
         let count = selected.count
-        return HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 0) {
-                Text(count == 1 ? String(localized: "1 song selected") : String(localized: "\(count) songs selected"))
-                    .pixlFont(.labelLarge)
-                    .foregroundStyle(theme.onSecondaryContainer)
-                Text(name.trimmingCharacters(in: .whitespaces).isEmpty ? String(localized: "Enter a playlist name")
-                     : String(localized: "Save as: \(name)"))
-                    .pixlFont(.bodySmall)
-                    .foregroundStyle(theme.onSecondaryContainer.opacity(0.8))
-                    .lineLimit(1)
-            }
-            .padding(.leading, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            Button(action: save) {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark").font(.system(size: 15, weight: .bold))
-                    Text("Save").pixlFont(.labelLarge)
+        let canSave = !selected.isEmpty
+        return GlassEffectContainer(spacing: 6) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(count == 1 ? String(localized: "1 song selected")
+                                    : String(localized: "\(count) songs selected"))
+                        .pixlFont(.labelLarge)
+                        .foregroundStyle(theme.onSecondaryContainer)
+                    Text(name.trimmingCharacters(in: .whitespaces).isEmpty ? String(localized: "Enter a playlist name")
+                         : String(localized: "Save as: \(name)"))
+                        .pixlFont(.bodySmall)
+                        .foregroundStyle(theme.onSecondaryContainer.opacity(0.8))
+                        .lineLimit(1)
                 }
-                .foregroundStyle(theme.onPrimary)
                 .padding(.horizontal, 20)
-                .frame(height: 48)
-                .background(Capsule().fill(theme.primary))
-                .contentShape(.capsule)
+                .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+                .pixlGlass(in: Capsule(), tint: theme.secondaryContainer.opacity(GlassTint.prominent))
+                Button(action: save) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark").font(.system(size: 15, weight: .bold))
+                        Text("Save").pixlFont(.labelLarge)
+                    }
+                    .foregroundStyle(theme.onPrimary)
+                    .padding(.horizontal, 22)
+                    .frame(height: 56)
+                    .contentShape(.capsule)
+                }
+                .buttonStyle(.plain)
+                .disabled(!canSave)
+                .pixlGlass(in: Capsule(), tint: theme.primary.opacity(GlassTint.prominent), interactive: canSave)
+                .opacity(canSave ? 1 : 0.38)
+                .accessibilityIdentifier("saveQueue.save")
             }
-            .buttonStyle(PressScaleButtonStyle(pressedScale: 0.95))
-            .disabled(selected.isEmpty)
-            .opacity(selected.isEmpty ? 0.38 : 1)
-            .accessibilityIdentifier("saveQueue.save")
         }
-        .padding(12)
-        .pixlGlass(in: Capsule(), tint: theme.secondaryContainer.opacity(GlassTint.prominent))
     }
 
     private func save() {

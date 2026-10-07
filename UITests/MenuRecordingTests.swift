@@ -19,6 +19,24 @@ final class MenuRecordingTests: XCTestCase {
         openAndClose(app, button: "More options", shot: "menuPlaylistMore-light")
     }
 
+    /// The queue's own ⋯ menu (2026-10-07): the ⋯ circle liquid-morphs into "Save as playlist" while Locate and Clear
+    /// materialise, and back. Closed by tapping the scrim above the pills (a tap low on the screen would hit them).
+    func testQueueMenuMorph() throws {
+        let app = launch("queue", ready: "screen.queue")
+        let more = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@", "queue.more",
+                                                    "More actions")).firstMatch
+        XCTAssertTrue(more.waitForExistence(timeout: 10), "More actions is missing")
+        more.tap()
+        Thread.sleep(forTimeInterval: 2.0)
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "menuQueue-light"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)).tap()
+        Thread.sleep(forTimeInterval: 1.5)
+        XCTAssertTrue(more.waitForExistence(timeout: 5), "the menu did not close back into the ⋯ circle")
+    }
+
     // MARK: - Helpers
 
     private func launch(_ screen: String, ready: String) -> XCUIApplication {
