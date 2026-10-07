@@ -41,7 +41,6 @@ nonisolated struct StreamFetcher: Sendable {
         }
     }
 
-
     let service: InnerTubeService
     let cache: StreamCache
     let session: URLSession

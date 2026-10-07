@@ -266,7 +266,7 @@ struct DiagnosticsCard: View {
 /// Android `DeepProbeCard`: the raw report, scrollable (max 340 pt), Copy / Close. The Stream start timings card
 /// (iOS only) is the same card under its own title.
 struct DeepProbeCard: View {
-    var title = "Deep probe (debug)"
+    var title: LocalizedStringKey = "Deep probe (debug)"
     let isRunning: Bool
     let report: String?
     let onDismiss: () -> Void
