@@ -25,6 +25,8 @@ final class DiagnosticsModel {
     // MARK: Device
 
     private(set) var maxRefreshRate: Int?
+    /// The newest stream start's breakdown (streaming speed R12), read when the screen appears.
+    private(set) var lastStreamStart: String?
     let proMotionKeyPresent: Bool
     let onDeviceModelStatus: String
     let systemVersion: String
@@ -51,6 +53,7 @@ final class DiagnosticsModel {
     func refreshDisplayInfo() {
         let scene = UIApplication.shared.connectedScenes.lazy.compactMap { $0 as? UIWindowScene }.first
         maxRefreshRate = scene?.screen.maximumFramesPerSecond
+        lastStreamStart = PlaybackStartTimings.shared.lastStartSummary()
     }
 
     // MARK: - On-device model

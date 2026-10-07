@@ -75,8 +75,8 @@ nonisolated final class PixlNetYouTubeBridge: SpotifyYouTubeBridge {
 }
 
 /// Plays Spotify songs (`spotify://<id>`, Android `SpotifyStreamProxy`): looks up the track's matched video —
-/// matching it on the spot when the background matcher hasn't got to it yet (25 s cap, never over a manual choice) —
-/// and hands the video to the YouTube bridge. Every other song goes to `base` unchanged.
+/// matching it on the spot when the background matcher hasn't got to it yet (25 s cap, never over a manual choice;
+/// the searches fan out, R11) — and hands the video to the YouTube bridge. Every other song goes to `base` unchanged.
 nonisolated struct SpotifyPlayableURLResolver: PlayableURLResolving {
     static let onDemandMatchTimeoutSeconds: Double = 25
 
@@ -111,7 +111,9 @@ nonisolated struct SpotifyPlayableURLResolver: PlayableURLResolving {
         guard let record = try? await persistence.spotifySong(spotifyId: spotifyId), record.matchState != .manual else { return nil }
         let matcher = TrackMatcher(search: bridge.search)
         let track = record.matchable
-        guard let found = try? await withTimeout(seconds: Self.onDemandMatchTimeoutSeconds, { try await matcher.findMatch(track) }),
+        // Streaming speed R11: on the play-time path the searches after the first run at once (same result as the
+        // background matcher's sequential `findMatch`, sooner).
+        guard let found = try? await withTimeout(seconds: Self.onDemandMatchTimeoutSeconds, { try await matcher.findMatchFanOut(track) }),
               let match = found else { return nil }
         try? await persistence.updateAutomaticMatch(spotifyId: spotifyId, videoId: match.videoId, score: match.score, state: .matched)
         return (try? await persistence.matchedVideoId(spotifyId: spotifyId)) ?? match.videoId

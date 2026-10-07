@@ -4,10 +4,12 @@ import PixlNet
 
 /// The network half of the streaming loader: ranged GETs against the resolved googlevideo (or Piped) URL with
 /// exactly the User-Agent of the client that obtained it (Origin/Referer would get a 403), written into the sparse
-/// `StreamCache`. A 401/403/404/410 means the URL expired or belongs to another client: the URL is dropped, the
-/// stream re-resolved without the strategy that failed, and the request retried (up to three resolutions; Piped
-/// is the last strategy). Every response is checked like Android's `CloudStreamSecurity` (safe host, audio
-/// content type, sane length).
+/// `StreamCache`. GET sizes follow PixlNet's `StreamChunkPolicy` (streaming speed R2): the first GET reads 128 KiB
+/// ahead of AVFoundation's 2-byte request, and each loading request's fetches grow 128 KiB → 512 KiB → 2 MiB.
+/// Failures follow `StreamRetryPolicy` (R5a, Android oct3's rules): a 401/403/404/410 drops the URL and resolves
+/// again with the same client first (the IP may have changed), then past it (only while nothing of the file is
+/// cached); 429/5xx back off 250 ms × attempt; four attempts at most (Piped is the last strategy). Every response is
+/// checked like Android's `CloudStreamSecurity` (safe host, audio content type, sane length).
 nonisolated struct StreamFetcher: Sendable {
     nonisolated enum Failure: Error, LocalizedError, Equatable {
         case unresolvable
@@ -39,46 +41,53 @@ nonisolated struct StreamFetcher: Sendable {
         }
     }
 
-    /// Bytes per network request (googlevideo throttles very large single ranges).
-    static let chunkSize: Int64 = 1 << 20
-    static let maxResolutions = 3
-
     let service: InnerTubeService
     let cache: StreamCache
     let session: URLSession
 
     // MARK: Info
 
-    func info(videoId: String) async throws -> Info {
+    /// `allowsConstrained: false` keeps a speculative fetch off Low Data Mode paths (the prefetcher's head bytes).
+    func info(videoId: String, allowsConstrained: Bool = true) async throws -> Info {
         if let meta = await cache.meta(videoId), meta.contentLength > 0 {
             return Info(contentLength: meta.contentLength, contentType: meta.contentType)
         }
-        _ = try await fetch(videoId: videoId, range: 0..<2)
+        // AVFoundation's first request wants the content information and bytes 0-1: one GET of the first 128 KiB
+        // answers both, and the following request's first bytes come from disk (the size is Content-Range's total).
+        _ = try await fetch(videoId: videoId, range: 0..<2, readAhead: StreamChunkPolicy.startFetchBytes,
+                            allowsConstrained: allowsConstrained)
         guard let meta = await cache.meta(videoId) else { throw Failure.badResponse("No size for the stream.") }
         return Info(contentLength: meta.contentLength, contentType: meta.contentType)
     }
 
     // MARK: Data
 
-    /// The next bytes from `offset` (before `end`): cached bytes when there are some there, else one network
-    /// chunk, stopping where cached bytes resume.
-    func data(videoId: String, from offset: Int64, upTo end: Int64) async throws -> Data {
-        let wanted = min(Self.chunkSize, end - offset)
-        guard wanted > 0 else { return Data() }
-        let cached = await cache.contiguousLength(videoId, from: offset, limit: wanted)
-        if cached > 0, let data = await cache.read(videoId, offset..<(offset + cached)) { return data }
-        var stop = offset + wanted
-        if let next = await cache.nextCachedStart(videoId, after: offset) { stop = min(stop, next) }
-        return try await fetch(videoId: videoId, range: offset..<max(stop, offset + 1))
+    /// The next bytes from `offset` (before `end`): cached bytes when there are some there (up to 2 MiB at once),
+    /// else one network fetch of at most `fetchSize`, stopping where cached bytes resume. `fromNetwork` tells the
+    /// loader's ramp that a GET was made.
+    func read(videoId: String, from offset: Int64, upTo end: Int64, fetchSize: Int64 = StreamChunkPolicy.maxFetchBytes,
+              allowsConstrained: Bool = true) async throws -> (data: Data, fromNetwork: Bool) {
+        guard end > offset else { return (Data(), false) }
+        let cacheLimit = min(max(fetchSize, StreamChunkPolicy.maxFetchBytes), end - offset)
+        let cached = await cache.contiguousLength(videoId, from: offset, limit: cacheLimit)
+        if cached > 0, let data = await cache.read(videoId, offset..<(offset + cached)) { return (data, false) }
+        let next = await cache.nextCachedStart(videoId, after: offset)
+        let stop = StreamChunkPolicy.fetchEnd(offset: offset, end: end, fetchSize: fetchSize, nextCachedStart: next)
+        return (try await fetch(videoId: videoId, range: offset..<stop, allowsConstrained: allowsConstrained), true)
     }
 
-    /// Fetches the first `bytes` into the cache (prefetch before the track starts).
-    func prefetch(videoId: String, bytes: Int64 = 1 << 20) async {
-        guard let info = try? await info(videoId: videoId) else { return }
+    /// Fetches the first `bytes` into the cache (prefetch before the track starts). Never on the caller's actor
+    /// (`@concurrent`: the prefetcher calls it from the main actor). `allowsConstrained: false` for speculative
+    /// prefetches, which then fail fast in Low Data Mode.
+    @concurrent
+    func prefetch(videoId: String, bytes: Int64 = 1 << 20, allowsConstrained: Bool = true) async {
+        guard let info = try? await info(videoId: videoId, allowsConstrained: allowsConstrained) else { return }
         var offset: Int64 = 0
         let end = min(bytes, info.contentLength)
         while offset < end, !Task.isCancelled {
-            guard let data = try? await data(videoId: videoId, from: offset, upTo: end), !data.isEmpty else { return }
+            guard let data = try? await read(videoId: videoId, from: offset, upTo: end,
+                                             allowsConstrained: allowsConstrained).data,
+                  !data.isEmpty else { return }
             offset += Int64(data.count)
         }
     }
@@ -89,7 +98,7 @@ nonisolated struct StreamFetcher: Sendable {
         var offset: Int64 = 0
         while offset < info.contentLength {
             try Task.checkCancellation()
-            let data = try await data(videoId: videoId, from: offset, upTo: info.contentLength)
+            let data = try await read(videoId: videoId, from: offset, upTo: info.contentLength).data
             guard !data.isEmpty else { throw Failure.badResponse("The stream ended early.") }
             offset += Int64(data.count)
             await progress?(offset, info.contentLength)
@@ -98,29 +107,44 @@ nonisolated struct StreamFetcher: Sendable {
 
     // MARK: Network
 
-    /// One ranged GET (with re-resolution on 403) whose bytes go into the cache. Returns the bytes of `range`.
+    /// One ranged GET (with re-resolution on 403) whose bytes go into the cache. Returns the bytes of `range`; the GET
+    /// itself reads up to `readAhead` bytes from `range.lowerBound` (never into cached bytes or past the end).
     @discardableResult
-    func fetch(videoId: String, range: Range<Int64>) async throws -> Data {
+    func fetch(videoId: String, range: Range<Int64>, readAhead: Int64 = 0, allowsConstrained: Bool = true) async throws -> Data {
+        let requested = StreamChunkPolicy.requestRange(
+            for: range, readAhead: readAhead,
+            nextCachedStart: await cache.nextCachedStart(videoId, after: range.lowerBound),
+            contentLength: await cache.meta(videoId)?.contentLength)
         var excluded: Set<String> = []
-        for _ in 0..<Self.maxResolutions {
+        for attempt in 0..<StreamRetryPolicy.maxAttempts {
             try Task.checkCancellation()
             guard let stream = await service.resolve(videoId: videoId, excluding: excluded) else { throw Failure.unresolvable }
             let allowed = await service.allowedHosts()
             guard CloudStreamSecurity.isSafeRemoteStreamURL(stream.url, allowedHostSuffixes: allowed),
                   let url = URL(string: stream.url) else { throw Failure.unsafeURL }
             var request = URLRequest(url: url)
+            request.allowsConstrainedNetworkAccess = allowsConstrained
+            // Streaming speed R6: googlevideo speaks HTTP/3. Racing QUIC without Alt-Svc discovery saves a round trip
+            // on each song's new rrN---sn-… host; where UDP is blocked the request falls back to TCP.
+            if URLCoding.host(stream.url)?.lowercased().hasSuffix(".googlevideo.com") == true {
+                request.assumesHTTP3Capable = true
+            }
             request.setValue(stream.userAgent, forHTTPHeaderField: "User-Agent")
-            request.setValue(ContentRange.requestHeader(range), forHTTPHeaderField: "Range")
+            request.setValue(ContentRange.requestHeader(requested), forHTTPHeaderField: "Range")
             let (body, response) = try await session.data(for: request)
+            PlaybackStartTimings.shared.networkFetched(key: YouTubeSongIdentity.timingKey(videoId: videoId), bytes: body.count)
             guard let http = response as? HTTPURLResponse else { throw Failure.badResponse("No HTTP response.") }
-            switch http.statusCode {
-            case 206, 200:
+            if http.statusCode == 206 || http.statusCode == 200 {
                 return try await store(videoId: videoId, range: range, body: body, response: http, streamURL: stream.url)
-            case 401, 403, 404, 410:
-                await service.invalidate(videoId: videoId)
-                excluded.insert(stream.strategyName ?? InnerTubeService.pipedStrategyName)
-            default:
+            }
+            let hasCachedBytes = await cache.meta(videoId) != nil
+            switch StreamRetryPolicy.decide(status: http.statusCode, attempt: attempt, hasCachedBytes: hasCachedBytes) {
+            case .fail:
                 throw Failure.http(http.statusCode)
+            case .retry(let switchClient, let delayMs):
+                await service.invalidate(videoId: videoId)
+                if switchClient { excluded.insert(stream.strategyName ?? InnerTubeService.pipedStrategyName) }
+                if delayMs > 0 { try await Task.sleep(for: .milliseconds(delayMs)) }
             }
         }
         throw Failure.http(403)

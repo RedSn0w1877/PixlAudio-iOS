@@ -459,10 +459,11 @@ on the demo engine).
 - **Streaming:** songs whose item URL is `pixlstream://<videoId>` (YouTube Music `yt:` songs; stage 12 can point matched
   Spotify songs there too) are served by `YouTubeResourceLoader`, registered with `StreamingResourceLoaderRegistry`. It answers
   from `StreamCache` (sparse file + `ByteRangeSet`, `Library/Caches/YouTube/streams`, 1 GB LRU) and fetches gaps with
-  `StreamFetcher` (1 MiB ranged GETs, the client's User-Agent only, 403 → re-resolve without that strategy). The resolver
-  (`StreamingPlayableURLResolver`, wrapping the engine's default) plays downloaded files first, then fully cached files.
-  `YouTubePrefetcher` (fed by `PlaybackServices.onUpcomingChanged`) resolves the next song at once and caches its first MiB
-  30 s before the end.
+  `StreamFetcher` (ranged GETs, the client's User-Agent only, 403 → re-resolve; since 2026-10-07 a 128 KiB first GET and
+  growing fetches, Android's retry rules — see "Streaming speed" below). The resolver (`StreamingPlayableURLResolver`,
+  wrapping the engine's default) plays downloaded files first, then fully cached files. `YouTubePrefetcher` (fed by
+  `PlaybackServices.onUpcomingChanged` / `onPlayStateChanged`) prepares the next streamed songs while music plays and
+  caches the next one's first MiB 30 s before the end.
 - **PoToken:** `PoTokenGenerator` runs `po_token.html` (copied from the Android assets) in a 1×1 `WKWebView` with
   `callAsyncJavaScript`; PixlNet asks for a token only for the signed-in WEB_REMIX fallback (VISIONOS needs none).
 - **Sign-in:** the web page (Android's flow) with two glass-capsule fallbacks under it — the device-code flow (Android's
@@ -474,7 +475,8 @@ on the demo engine).
   "Download all songs". Song rows (`SongCard`) show Android's `SongAvailabilityBadge` (downloaded / downloading / failed)
   from `DownloadBadges`, injected at the root — kind only, so progress ticks never re-render the lists.
 - **Screenshot ids:** `youTubeLogin`, `youTubeLoginCode`, `youTubeLoginCookie`, `youTubeLoginSignedIn`, `playbackDiagnostics`
-  (all steps green), `playbackDiagnosticsFailed` (audio step red) — `UITests/YouTubeScreenshotTests`, light + dark.
+  (all steps green), `playbackDiagnosticsFailed` (audio step red), `playbackDiagnosticsTimings` (the Stream start
+  timings card, 2026-10-07) — `UITests/YouTubeScreenshotTests`, light + dark.
 
 ## Stage 12 notes (Spotify)
 
@@ -745,3 +747,51 @@ docs/api-notes.md › Spotify Connect output.
 - **Screenshot ids** (`UITests/SpotifyConnectScreenshotTests`, demo devices, no network): `devices.spotifyConnect`,
   `devices.spotifyPlaying`, `devices.spotifyReconnect`, `devices.spotifyEmpty` (the sheet opens on DEVICES),
   `nowPlaying.spotifyConnect`, `miniPlayer.spotifyConnect`.
+
+## Streaming speed (2026-10-07, branch `wt/stream`; iOS first, Android later)
+
+Hoa asked for streamed songs (YouTube Music, Spotify matched to YouTube) to start faster on tap and on skip. Plan:
+`plans/streaming-speed.json` (R-numbers below); owner decisions: measure first, then R2, R3, R4, R5a, R7, R11; R8
+behind a remote flag that defaults off; R5b and the client order unchanged. Divergences: docs/parity.md › iOS-first
+divergences.
+
+- **Measure (R12).** `PlaybackStartTimings` (App/Playback, no YouTube code: the streaming layer reports by the item
+  URL's text `pixlstream://<videoId>`) keeps the last 8 starts: tap → URL (Spotify matched, file or stream chosen) →
+  audio track loaded → item built → first `.playing`, plus the resolution (time, client, attempt detail, whether the
+  URL carries `n`, remote-config wait), the loader's requests (content-info / to-end) and cancellations, the network
+  fetches (first chunk time and size) and the first `respond(with:)`, all within the start's first 10 s. One `Mutex`;
+  never touched by the processing tap. Signposts: category "Streaming". **Where Hoa reads it:** Settings › Developer ›
+  Test playback › "Stream start timings" (a `DeepProbeCard` under its own title, Copy / Close; a snapshot per tap) and
+  the deep probe's "Last start" and "Overlapping clients" lines; the newest start also shows in Settings › Developer ›
+  Diagnostics › "Last Song Start" (a plain `Form` section, read when the screen appears; shot `diagnostics`). A skip into a prepared song reads "(skip into the
+  prepared song)"; a prefetched resolution "done before the tap (prefetch)".
+- **First fetch (R2).** PixlNet `StreamChunkPolicy`: AVFoundation's first loading request (content info + bytes 0–1)
+  is answered by a GET of the first 128 KiB, so the next request starts from disk; each loading request's network
+  fetches then grow 128 KiB → 512 KiB → 2 MiB (cache hits don't advance the ramp; cache reads up to 2 MiB). Prefetch
+  and downloads use 2 MiB fetches.
+- **Prepare ahead (R3).** `YouTubePrefetcher` v2, one task re-planned on queue / track / play-state changes, cancelled on
+  pause: 1.5 s after playback starts, the next songs in skip order (2 on Wi-Fi or Ethernet, 1 on cellular or a
+  metered path, none in Low Data Mode — `NetworkConditionsMonitor`, an `NWPathMonitor` started the first time music
+  plays) go through the engine's full resolver (Spotify songs are matched on the way) and get their URL resolved;
+  once the current song has played 3 s, their first 512 KiB are cached with `allowsConstrainedNetworkAccess = false`;
+  30 s before the end the next song's first MiB as before. Off the main actor (`@concurrent`). In Low Data Mode only
+  the near-end top-up runs (it was there before, and the gapless hand-over needs those bytes seconds later anyway).
+- **Client table (R4).** Resolution never awaits `remote/config.json`; a due refresh starts in the background at
+  utility priority, and the saved file's modification date gates the six-hour refresh across relaunches.
+- **Retries (R5a).** PixlNet `StreamRetryPolicy` (Android oct3 `CloudStreamProxy.fetch`): four attempts; the first
+  401/403/404/410 resolves again with the same client (an IP change), later ones move past it, never once bytes of the
+  file are cached (another client may serve another itag → `formatChanged` → skip); 429/5xx wait 250 ms × attempt.
+- **HTTP/3 (R6).** `assumesHTTP3Capable` on `*.googlevideo.com` range requests (QUIC racing; TCP fallback).
+- **Skip into the prepared song (R7).** `DualDeckEngine.jump` takes over `preparedIncoming` when it is exactly the
+  target (crossfade on: from ~1.5 s into the song; gapless: the last ~4.5 s): the incoming deck is captured before the
+  swap, the scheduled hand-over cancelled, a crossfade's zero-gain ramp cleared, the transition reported as manual.
+- **Overlapping clients (R8, off).** `ChainedYouTubeStreamResolver` hedging (next client after 1.5 s or at once on a
+  failure, 8 s per client, first URL wins) runs only when `remote/config.json` sets `innertube.hedge.enabled` — turn
+  it on there (no release needed) if the timings show slow or failing VISIONOS. Android's sequential chain is the
+  default and its parity tests are unchanged.
+- **Matching (R11).** `TrackMatcher.findMatchFanOut` for on-demand matches (play time and R3's pre-matching): after
+  the first song search, the rest at once, folded in `findMatch`'s order — same video. The background
+  `SpotifyMatchRunner` keeps `findMatch`.
+- **Left out:** R9 (cipher / JavaScriptCore warm-up — only if the timings show `n` on VISIONOS URLs), R10 (delegate
+  streaming — only if first-byte latency remains), R5b (persisted URLs, owner: not now).
+

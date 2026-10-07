@@ -31,6 +31,10 @@ nonisolated final class YouTubeResourceLoader: NSObject, AVAssetResourceLoaderDe
     func resourceLoader(_ resourceLoader: AVAssetResourceLoader,
                         shouldWaitForLoadingOfRequestedResource loadingRequest: AVAssetResourceLoadingRequest) -> Bool {
         guard let url = loadingRequest.request.url, let videoId = YouTubeSongIdentity.videoId(from: url) else { return false }
+        PlaybackStartTimings.shared.loaderRequest(
+            key: YouTubeSongIdentity.timingKey(videoId: videoId),
+            contentInfo: loadingRequest.contentInformationRequest != nil,
+            toEnd: loadingRequest.dataRequest?.requestsAllDataToEndOfResource ?? false)
         let box = RequestBox(loadingRequest)
         let key = ObjectIdentifier(loadingRequest)
         // Stored under the lock before the task can finish (its `finished` call waits for the lock).
@@ -50,6 +54,9 @@ nonisolated final class YouTubeResourceLoader: NSObject, AVAssetResourceLoaderDe
         let task = tasks.removeValue(forKey: key)
         lock.unlock()
         task?.cancel()
+        if task != nil, let url = loadingRequest.request.url, let videoId = YouTubeSongIdentity.videoId(from: url) {
+            PlaybackStartTimings.shared.loaderCancelled(key: YouTubeSongIdentity.timingKey(videoId: videoId))
+        }
     }
 
     private func finished(_ key: ObjectIdentifier) {
@@ -72,13 +79,23 @@ nonisolated final class YouTubeResourceLoader: NSObject, AVAssetResourceLoaderDe
                     ? info.contentLength
                     : min(info.contentLength, dataRequest.requestedOffset + Int64(dataRequest.requestedLength))
                 var position = dataRequest.currentOffset
+                var answered = false
+                // Streaming speed R2: this request's network fetches grow 128 KiB → 512 KiB → 2 MiB (cache hits don't
+                // count), so the first audio arrives after a small download.
+                var fetchSize = StreamChunkPolicy.startFetchBytes
                 while position < end {
                     try Task.checkCancellation()
-                    let data = try await fetcher.data(videoId: videoId, from: position, upTo: end)
+                    let (data, fromNetwork) = try await fetcher.read(videoId: videoId, from: position, upTo: end,
+                                                                     fetchSize: fetchSize)
                     guard !data.isEmpty else { throw StreamFetcher.Failure.badResponse("The stream ended early.") }
                     try Task.checkCancellation()
                     dataRequest.respond(with: data)
                     position += Int64(data.count)
+                    if fromNetwork { fetchSize = StreamChunkPolicy.nextFetchSize(after: fetchSize) }
+                    if !answered {
+                        answered = true
+                        PlaybackStartTimings.shared.answered(key: YouTubeSongIdentity.timingKey(videoId: videoId))
+                    }
                 }
             }
             if Task.isCancelled { return }
