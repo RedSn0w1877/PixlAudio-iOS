@@ -1,5 +1,7 @@
 # Start here: PixlAudio iOS, current state (2026-10-04)
 
+> **Update 2026-10-07:** a big batch of owner requests landed (sync editor fix, faster streaming, on-device AI, accent colour, more glass, player fixes, new logo); some items are still open. Status, plans and owner decisions: [`2026-10-07-batch-status.md`](2026-10-07-batch-status.md). §3 below is out of date for those items.
+
 `AGENTS.md` has the **rules**. This page has the **current state**: what's built, what's in
 flight, what's waiting on Hoa, and where to look. Read `AGENTS.md` first and this second. Then
 open only the docs your task needs (map in §6).
