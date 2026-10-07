@@ -371,7 +371,11 @@ private struct PlaylistCoverFormView: View {
                         .font(.system(size: 64, weight: .regular))
                         .foregroundStyle(theme.onSurfaceVariant.opacity(0.5))
                         .frame(width: 180, height: 180)
-                        .background(RoundedRectangle(cornerRadius: 32, style: .continuous).fill(theme.surfaceContainerHighest))
+                        // Glass (2026-10-07; Android draws a plain tile, CreatePlaylistScreen.kt:1086-1090). Tinted at
+                        // the card strength: the flat page behind gives the glass nothing to refract, so a fainter tint
+                        // would lose the tile.
+                        .pixlGlass(in: RoundedRectangle(cornerRadius: 32, style: .continuous),
+                                   tint: theme.surfaceContainerHighest.opacity(GlassTint.container))
                     Text("Auto-generated collage")
                         .pixlFont(.bodySmall)
                         .foregroundStyle(theme.onSurfaceVariant)
@@ -427,10 +431,11 @@ private struct PlaylistCoverFormView: View {
                 }
                 .foregroundStyle(theme.onSurfaceVariant)
                 .frame(width: 180, height: 180)
-                .background(RoundedRectangle(cornerRadius: 32, style: .continuous).fill(theme.surfaceContainerHighest))
-                .contentShape(.rect)
+                .contentShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
             }
             .buttonStyle(.plain)
+            .pixlGlass(in: RoundedRectangle(cornerRadius: 32, style: .continuous),
+                       tint: theme.surfaceContainerHighest.opacity(GlassTint.container), interactive: true)
             .accessibilityLabel("Add Photo")
         }
     }

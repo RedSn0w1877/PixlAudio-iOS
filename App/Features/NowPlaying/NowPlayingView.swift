@@ -276,7 +276,6 @@ private struct PlayerMetadataRow: View {
     @Environment(\.playerTheme) private var theme
 
     var body: some View {
-        let chip = theme.onPrimary.opacity(0.8)
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(song.title)
@@ -295,19 +294,23 @@ private struct PlayerMetadataRow: View {
             }
             .padding(.vertical, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
-            if playback.isPreparing {
-                ProgressView()
-                    .controlSize(.regular)
-                    .tint(theme.primary)
-                    .frame(width: 28, height: 28)
-                    .padding(10)
-                    .background(Circle().fill(chip))
-                    .padding(.trailing, 8)
-                    .transition(.scale(scale: 0.85).combined(with: .opacity))
-            }
-            // The two circles render together (spacing below their 12 pt gap: they never blend at rest).
+            // The loading chip and the two circles render together (spacing below their 12 pt / 20 pt gaps: they never
+            // blend at rest).
             GlassEffectContainer(spacing: 6) {
                 HStack(spacing: 12) {
+                    if playback.isPreparing {
+                        // Android's chip is a Material circle `Surface` (FullPlayerContent.kt:1630-1644): clear glass
+                        // over the player's background like its neighbours (decision 10), not interactive (no button).
+                        ProgressView()
+                            .controlSize(.regular)
+                            .tint(theme.primary)
+                            .frame(width: 28, height: 28)
+                            .padding(10)
+                            .glassEffect(Glass.clear.tint(theme.onPrimary.opacity(GlassTint.playerChrome)),
+                                         in: Circle())
+                            .padding(.trailing, 8)
+                            .transition(.scale(scale: 0.85).combined(with: .opacity))
+                    }
                     circle(systemImage: "quote.bubble", label: "Lyrics", identifier: "player.lyrics") {
                         router.present(AppCover.lyrics)
                     }

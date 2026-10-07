@@ -150,6 +150,7 @@ private struct GenreDetailContent: View {
     @State private var showsQuickFill = false
     @State private var showsSelectionSheet = false
     @State private var addToPlaylistIds: [String]?
+    @State private var didApplyLaunchState = false
 
     private var displayName: String {
         genreId.replacingOccurrences(of: "_", with: " ").split(separator: " ")
@@ -216,6 +217,12 @@ private struct GenreDetailContent: View {
                 .pixlSheet(detents: [.large])
         }
         .libraryToast()
+        .onAppear {
+            // UI tests open Quick Fill straight away (`-screen genre.quickFill`), once.
+            guard !didApplyLaunchState else { return }
+            didApplyLaunchState = true
+            if env.launch.screen == .genreQuickFill { showsQuickFill = true }
+        }
     }
 
     private var content: GenreContent {
@@ -261,9 +268,11 @@ private struct GenreDetailContent: View {
                 Spacer()
             }
             .padding(16)
-            .background(theme.surfaceContainerHigh)
-            .clipShape(UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0,
-                                              topTrailingRadius: 24, style: .continuous))
+            // Android's `Surface(surfaceContainerHigh)` (GenreDetailScreen.kt:865-871) as glass (decision 10), like the
+            // artist page's album headers. The icon chip on it stays a fill.
+            .pixlGlass(in: UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0,
+                                                  topTrailingRadius: 24, style: .continuous),
+                       tint: theme.surfaceContainerHigh.opacity(GlassTint.surface))
         case .albumHeader(_, let name, let artUri, let albumSongs, let artistStyle):
             HStack(spacing: 16) {
                 ArtworkView(source: ArtworkSource(uriString: artUri), size: 48, cornerRadius: 8)
@@ -277,17 +286,11 @@ private struct GenreDetailContent: View {
                         .foregroundStyle(theme.onSurfaceVariant)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                Button {
+                // Android's `IconButton` (kt:983-990) as a glass circle (decision 10); it sits on the group's fill.
+                GlassCircleButton(systemImage: "play.fill", accessibilityLabel: "Play album", size: 40, iconSize: 16,
+                                  tint: theme.primary.opacity(GlassTint.prominent), foreground: theme.onPrimary) {
                     if let first = albumSongs.first { playback.play(first, in: playOrder) }
-                } label: {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(theme.onPrimary)
-                        .frame(width: 40, height: 40)
-                        .background(Circle().fill(theme.primary))
                 }
-                .buttonStyle(PressScaleButtonStyle())
-                .accessibilityLabel("Play album")
             }
             .padding(.horizontal, 16)
             .padding(.top, 16)
