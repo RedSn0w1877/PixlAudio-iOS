@@ -48,13 +48,15 @@ nonisolated struct StreamFetcher: Sendable {
 
     // MARK: Info
 
-    func info(videoId: String) async throws -> Info {
+    /// `allowsConstrained: false` keeps a speculative fetch off Low Data Mode paths (the prefetcher's head bytes).
+    func info(videoId: String, allowsConstrained: Bool = true) async throws -> Info {
         if let meta = await cache.meta(videoId), meta.contentLength > 0 {
             return Info(contentLength: meta.contentLength, contentType: meta.contentType)
         }
         // AVFoundation's first request wants the content information and bytes 0-1: one GET of the first 128 KiB
         // answers both, and the following request's first bytes come from disk (the size is Content-Range's total).
-        _ = try await fetch(videoId: videoId, range: 0..<2, readAhead: StreamChunkPolicy.startFetchBytes)
+        _ = try await fetch(videoId: videoId, range: 0..<2, readAhead: StreamChunkPolicy.startFetchBytes,
+                            allowsConstrained: allowsConstrained)
         guard let meta = await cache.meta(videoId) else { throw Failure.badResponse("No size for the stream.") }
         return Info(contentLength: meta.contentLength, contentType: meta.contentType)
     }
@@ -64,24 +66,29 @@ nonisolated struct StreamFetcher: Sendable {
     /// The next bytes from `offset` (before `end`): cached bytes when there are some there (up to 2 MiB at once),
     /// else one network fetch of at most `fetchSize`, stopping where cached bytes resume. `fromNetwork` tells the
     /// loader's ramp that a GET was made.
-    func read(videoId: String, from offset: Int64, upTo end: Int64,
-              fetchSize: Int64 = StreamChunkPolicy.maxFetchBytes) async throws -> (data: Data, fromNetwork: Bool) {
+    func read(videoId: String, from offset: Int64, upTo end: Int64, fetchSize: Int64 = StreamChunkPolicy.maxFetchBytes,
+              allowsConstrained: Bool = true) async throws -> (data: Data, fromNetwork: Bool) {
         guard end > offset else { return (Data(), false) }
         let cacheLimit = min(max(fetchSize, StreamChunkPolicy.maxFetchBytes), end - offset)
         let cached = await cache.contiguousLength(videoId, from: offset, limit: cacheLimit)
         if cached > 0, let data = await cache.read(videoId, offset..<(offset + cached)) { return (data, false) }
         let next = await cache.nextCachedStart(videoId, after: offset)
         let stop = StreamChunkPolicy.fetchEnd(offset: offset, end: end, fetchSize: fetchSize, nextCachedStart: next)
-        return (try await fetch(videoId: videoId, range: offset..<stop), true)
+        return (try await fetch(videoId: videoId, range: offset..<stop, allowsConstrained: allowsConstrained), true)
     }
 
-    /// Fetches the first `bytes` into the cache (prefetch before the track starts).
-    func prefetch(videoId: String, bytes: Int64 = 1 << 20) async {
-        guard let info = try? await info(videoId: videoId) else { return }
+    /// Fetches the first `bytes` into the cache (prefetch before the track starts). Never on the caller's actor
+    /// (`@concurrent`: the prefetcher calls it from the main actor). `allowsConstrained: false` for speculative
+    /// prefetches, which then fail fast in Low Data Mode.
+    @concurrent
+    func prefetch(videoId: String, bytes: Int64 = 1 << 20, allowsConstrained: Bool = true) async {
+        guard let info = try? await info(videoId: videoId, allowsConstrained: allowsConstrained) else { return }
         var offset: Int64 = 0
         let end = min(bytes, info.contentLength)
         while offset < end, !Task.isCancelled {
-            guard let data = try? await read(videoId: videoId, from: offset, upTo: end).data, !data.isEmpty else { return }
+            guard let data = try? await read(videoId: videoId, from: offset, upTo: end,
+                                             allowsConstrained: allowsConstrained).data,
+                  !data.isEmpty else { return }
             offset += Int64(data.count)
         }
     }
@@ -104,7 +111,7 @@ nonisolated struct StreamFetcher: Sendable {
     /// One ranged GET (with re-resolution on 403) whose bytes go into the cache. Returns the bytes of `range`; the GET
     /// itself reads up to `readAhead` bytes from `range.lowerBound` (never into cached bytes or past the end).
     @discardableResult
-    func fetch(videoId: String, range: Range<Int64>, readAhead: Int64 = 0) async throws -> Data {
+    func fetch(videoId: String, range: Range<Int64>, readAhead: Int64 = 0, allowsConstrained: Bool = true) async throws -> Data {
         let requested = StreamChunkPolicy.requestRange(
             for: range, readAhead: readAhead,
             nextCachedStart: await cache.nextCachedStart(videoId, after: range.lowerBound),
@@ -117,6 +124,7 @@ nonisolated struct StreamFetcher: Sendable {
             guard CloudStreamSecurity.isSafeRemoteStreamURL(stream.url, allowedHostSuffixes: allowed),
                   let url = URL(string: stream.url) else { throw Failure.unsafeURL }
             var request = URLRequest(url: url)
+            request.allowsConstrainedNetworkAccess = allowsConstrained
             request.setValue(stream.userAgent, forHTTPHeaderField: "User-Agent")
             request.setValue(ContentRange.requestHeader(requested), forHTTPHeaderField: "Range")
             let (body, response) = try await session.data(for: request)

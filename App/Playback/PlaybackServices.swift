@@ -24,6 +24,8 @@ final class PlaybackServices {
     var recordTaste: ((ListeningStatsTracker.Record) -> Void)?
     /// The current item or the queue changed (stage 11's prefetcher resolves the next streamed song).
     var onUpcomingChanged: (() -> Void)?
+    /// Playback started or paused (the prefetcher prepares upcoming streamed songs only while playing).
+    var onPlayStateChanged: ((Bool) -> Void)?
     /// A finished listening session's engagement row (its play count) has been written. `recordHistory` bumps the
     /// history revision before that write lands, so `AppEnvironment` re-reads the play counts from here.
     var onEngagementRecorded: (() -> Void)?
@@ -120,6 +122,7 @@ final class PlaybackServices {
             self.nowPlaying.update()
             // Coalesced and encoded off the main actor (the pause position is the same a second later).
             if !playing { self.snapshots.scheduleSave() }
+            self.onPlayStateChanged?(playing)
         }
         engine.onQueueChanged = { [weak self] in
             self?.nowPlaying.update()

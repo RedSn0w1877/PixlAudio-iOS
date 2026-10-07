@@ -38,3 +38,71 @@ public enum StreamChunkPolicy {
         return max(stop, offset + 1)
     }
 }
+
+/// R3: how far ahead the app prepares upcoming streamed songs while music plays (owner decision 2026-10-07: the next
+/// 1 song on cellular, the next 2 on Wi-Fi, 512 KB each, none in Low Data Mode, only while playing). Preparing means
+/// matching a Spotify song to its video, resolving the stream URL and caching the first 512 KiB.
+public enum StreamPrefetchPolicy {
+    /// The network the phone is on (the app maps `NWPath` to this).
+    public enum Network: Sendable, Hashable {
+        case wifi, wired, cellular, other, offline
+        /// No path reported yet.
+        case unknown
+    }
+
+    public struct Conditions: Sendable, Hashable {
+        public var network: Network
+        /// Low Data Mode.
+        public var isConstrained: Bool
+        /// A metered path (cellular, or a Wi-Fi personal hotspot).
+        public var isExpensive: Bool
+
+        public init(network: Network, isConstrained: Bool = false, isExpensive: Bool = false) {
+            self.network = network
+            self.isConstrained = isConstrained
+            self.isExpensive = isExpensive
+        }
+
+        public static let unknown = Conditions(network: .unknown)
+    }
+
+    /// The most songs prepared ahead.
+    public static let maxDepth = 2
+    /// Head bytes cached early for each prepared song.
+    public static let headBytes: Int64 = 512 << 10
+    /// The next song's first MiB is cached this long before the current one ends (the gapless hand-over's bytes).
+    public static let topUpBytes: Int64 = 1 << 20
+    public static let topUpLeadMs: Int64 = 30_000
+    /// Matching and resolution start this long after playback starts or the queue changes (Android's 1.5 s settle).
+    public static let prepareDelayMs: Int64 = 1_500
+    /// Head bytes are fetched once the current song has played this far.
+    public static let headStartPositionMs: Int64 = 3_000
+
+    /// How many upcoming songs to prepare early: none while paused, offline or in Low Data Mode; two on Wi-Fi or
+    /// Ethernet (unless the path is metered, e.g. a personal hotspot); one on cellular and anything else.
+    public static func depth(_ conditions: Conditions, isPlaying: Bool) -> Int {
+        guard isPlaying, !conditions.isConstrained else { return 0 }
+        switch conditions.network {
+        case .offline: return 0
+        case .wifi, .wired: return conditions.isExpensive ? 1 : maxDepth
+        case .cellular, .other, .unknown: return 1
+        }
+    }
+
+    /// The queue indices to prepare, in skip order: the entries after `current` (wrapping to the start under
+    /// repeat-all), at most `depth`, never the current one.
+    public static func upcomingIndices(current: Int, count: Int, wraps: Bool, depth: Int) -> [Int] {
+        guard count > 0, current >= 0, current < count, depth > 0 else { return [] }
+        var indices: [Int] = []
+        for step in 1...depth {
+            var index = current + step
+            if index >= count {
+                guard wraps else { break }
+                index %= count
+            }
+            if index == current || indices.contains(index) { break }
+            indices.append(index)
+        }
+        return indices
+    }
+}

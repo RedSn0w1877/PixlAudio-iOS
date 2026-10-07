@@ -50,3 +50,52 @@ struct StreamChunkPolicyTests {
         #expect(StreamChunkPolicy.fetchEnd(offset: 100, end: 100, fetchSize: 1_000, nextCachedStart: nil) == 101)
     }
 }
+
+/// R3: what the prefetcher prepares ahead (owner decision: next 1 on cellular, next 2 on Wi-Fi, 512 KB each, none in
+/// Low Data Mode, only while playing).
+@Suite("Stream prefetch policy")
+struct StreamPrefetchPolicyTests {
+    typealias Policy = StreamPrefetchPolicy
+
+    @Test func depthFollowsTheNetwork() {
+        #expect(Policy.depth(.init(network: .wifi), isPlaying: true) == 2)
+        #expect(Policy.depth(.init(network: .wired), isPlaying: true) == 2)
+        #expect(Policy.depth(.init(network: .cellular, isExpensive: true), isPlaying: true) == 1)
+        #expect(Policy.depth(.init(network: .cellular), isPlaying: true) == 1)
+        // A personal hotspot is Wi-Fi but metered: treated like cellular.
+        #expect(Policy.depth(.init(network: .wifi, isExpensive: true), isPlaying: true) == 1)
+        #expect(Policy.depth(.init(network: .other), isPlaying: true) == 1)
+        #expect(Policy.depth(.unknown, isPlaying: true) == 1)
+        #expect(Policy.depth(.init(network: .offline), isPlaying: true) == 0)
+    }
+
+    @Test func nothingInLowDataModeOrWhilePaused() {
+        #expect(Policy.depth(.init(network: .wifi, isConstrained: true), isPlaying: true) == 0)
+        #expect(Policy.depth(.init(network: .cellular, isConstrained: true, isExpensive: true), isPlaying: true) == 0)
+        #expect(Policy.depth(.init(network: .wifi), isPlaying: false) == 0)
+        #expect(Policy.depth(.init(network: .cellular), isPlaying: false) == 0)
+    }
+
+    @Test func sizesAndTimings() {
+        #expect(Policy.headBytes == 524_288)
+        #expect(Policy.topUpBytes == 1_048_576)
+        #expect(Policy.topUpLeadMs == 30_000)
+        #expect(Policy.prepareDelayMs == 1_500)
+        #expect(Policy.headStartPositionMs == 3_000)
+        #expect(Policy.maxDepth == 2)
+    }
+
+    @Test func upcomingSongsInSkipOrder() {
+        #expect(Policy.upcomingIndices(current: 0, count: 5, wraps: false, depth: 2) == [1, 2])
+        #expect(Policy.upcomingIndices(current: 3, count: 5, wraps: false, depth: 2) == [4])
+        #expect(Policy.upcomingIndices(current: 4, count: 5, wraps: false, depth: 2) == [])
+        // Repeat-all wraps to the start.
+        #expect(Policy.upcomingIndices(current: 4, count: 5, wraps: true, depth: 2) == [0, 1])
+        #expect(Policy.upcomingIndices(current: 3, count: 5, wraps: true, depth: 2) == [4, 0])
+        // Never the current song, never twice.
+        #expect(Policy.upcomingIndices(current: 0, count: 1, wraps: true, depth: 2) == [])
+        #expect(Policy.upcomingIndices(current: 1, count: 2, wraps: true, depth: 2) == [0])
+        #expect(Policy.upcomingIndices(current: 0, count: 5, wraps: false, depth: 0) == [])
+        #expect(Policy.upcomingIndices(current: 7, count: 5, wraps: false, depth: 2) == [])
+    }
+}
