@@ -717,6 +717,14 @@ Signatures checked against the developer.apple.com documentation JSON (2026-10-0
 | `Grid`, `GridRow` | 16.0 | /documentation/swiftui/grid | `TaizoArtworkStack` | 2×2 cover mosaic. |
 | `View.preferredColorScheme(_:)` + `environment(\.colorScheme, _:)` with re-resolved palettes | 13.0 | /documentation/swiftui/view/preferredcolorscheme(_:) | `alwaysDarkTheme(_:)` (lyrics, sync editor) | Forcing a scheme must also re-resolve `appTheme` / `playerTheme`: the shell resolves them for the system scheme, so a forced-dark screen otherwise hands light roles to the sheets it presents. |
 
+## More Liquid Glass (2026-10-07, owner request)
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `PresentationDetent.fraction(_:)` | 16.0 | /documentation/swiftui/presentationdetent/fraction(_:) | `PresentationDetent.tallGlass` (queue, song sheet, AI Daily Mix, Taizo) | One 0.92 detent. Apple: half sheets are inset so content peeks through, and a sheet expanding to full height "transitions to a more opaque appearance" (/documentation/technologyoverviews/adopting-liquid-glass). No documented threshold for a near-full fraction: CI shots decide (0.85 is the fallback). |
+| `View.glassEffectTransition(_:)`, `GlassEffectTransition.materialize` | 26.0 | /documentation/swiftui/view/glasseffecttransition(_:), /documentation/swiftui/glasseffecttransition | `QueueSheet` | The toolbar circles and the Locate / Clear pills fade their glass in and out instead of matching the geometry of a nearby shape (the default for effects within the container's spacing). Applied outside the `glassEffect`, as `glassEffectID` is. |
+| `View.glassEffectID(_:in:)` shared by a removed and an inserted view | 26.0 | /documentation/swiftui/view/glasseffectid(_:in:) | `QueueSheet` | The ⋯ circle (closed) and "Save as playlist" (open) carry the same id in one container that never leaves the tree, so the circle morphs into the pill. Apple's sample gives each effect its own id and lets spacing and geometry decide; one id across an if / else mirrors `matchedGeometryEffect` and `GlassPillRow`'s moving selection. Unverified on device: fallback in docs/design.md › Glass expansion. |
+| `Glass.clear` (non-interactive) on a `ProgressView` and a `Text` pill | 26.0 | /documentation/swiftui/glass/clear | full player's loading chip, seek bar's format pill | Clear glass over the player's background, like its neighbours; not interactive because neither is a button. |
+
 ## Spotify Connect output (2026-10-03, branch `spotify-connect`)
 Spotify Web API facts, checked on 2026-10-03 against developer.spotify.com/documentation/web-api (paths below are
 under that root). Every Player endpoint "only works for users who have Spotify Premium" and "the order of execution
