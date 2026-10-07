@@ -1,15 +1,19 @@
-import FoundationModels
 import PixlNet
 import SwiftUI
 import UIKit
 
 /// Settings › AI features (Android `SettingsCategoryScreen` AI_INTEGRATION): the automatic-studio and
-/// music-intelligence cards, assistant (provider) and "save on usage", sign-in (API key, Keychain), model, base URL
-/// for configurable providers, the on-device model, personality (system prompt + presets), and the collapsed
-/// "Advanced" block (generation parameters, song data, usage report).
+/// music-intelligence cards, the assistant, sign-in (API key, Keychain), model, base URL for configurable providers,
+/// personality (system prompt + presets), and the collapsed "Advanced" block (generation parameters, song data,
+/// usage report).
 ///
 /// iOS: the on-device provider uses the system's on-device language model (Foundation Models) instead of importing
 /// a MediaPipe file. The model picker lists the provider's chat models (stage 13, `AIService.availableModels`).
+///
+/// Owner decision 2026-10-07 (a departure from Android, docs/parity.md): the on-device model is the assistant by
+/// default and comes first; cloud providers sit in an optional "Cloud assistants" section behind a switch that is
+/// off by default, with no automatic fallback to the cloud. With the on-device model selected, Advanced shows only
+/// Temperature (the on-device paths size their own prompts and answers), and "Save on usage" is a cloud setting.
 struct AISettingsSection: View {
     @Environment(SettingsStore.self) private var settings
     @Environment(AppEnvironment.self) private var environment
@@ -27,24 +31,33 @@ struct AISettingsSection: View {
 
     var body: some View {
         @Bindable var ai = settings.ai
+        let cloud = ai.usesCloudAssistant
         SettingsCategoryScaffold(category: .ai) {
             AutomaticStudioCard()
             Spacer().frame(height: 20)
             MusicIntelligenceCard()
             Spacer().frame(height: 20)
-            SettingsSubsection(title: L10n.settingsAiProviderSection) {
-                ThemeSelectorRow(label: L10n.settingsAiProviderTitle, description: L10n.settingsAiProviderSubtitle,
-                                 options: AiProvider.entries.map {
-                                     SettingsOption(key: $0.rawValue,
-                                                    label: $0 == .gemini ? "\($0.displayName) (Free)" : $0.displayName)
-                                 },
-                                 selectedKey: ai.provider, systemImage: "flask") { ai.provider = $0 }
-                SwitchSettingRow(title: L10n.settingsSafeTokenTitle,
-                                 subtitle: ai.safeTokenLimit ? L10n.settingsSafeTokenOn : L10n.settingsSafeTokenOff,
-                                 isOn: $ai.safeTokenLimit, systemImage: "chart.line.uptrend.xyaxis",
-                                 iconColor: ai.safeTokenLimit ? theme.primary : theme.tertiary)
+            SettingsSubsection(title: L10n.settingsAiProviderTitle) {
+                OnDeviceModelRow(isSelected: !cloud)
             }
-            if provider != .onDevice {
+            SettingsSubsection(title: "Cloud assistants (optional)") {
+                SwitchSettingRow(title: "Use a cloud assistant",
+                                 subtitle: cloud ? "AI requests go to \(provider.displayName) with your own key."
+                                     : "Off: every AI feature runs on this iPhone, privately. Nothing goes to the cloud.",
+                                 isOn: Binding(get: { ai.usesCloudAssistant }, set: { ai.setUsesCloudAssistant($0) }),
+                                 systemImage: "cloud", iconColor: cloud ? theme.primary : theme.tertiary)
+                    .accessibilityIdentifier("settings.ai.cloud")
+                if cloud {
+                    ThemeSelectorRow(label: L10n.settingsAiProviderTitle, description: L10n.settingsAiProviderSubtitle,
+                                     options: Self.cloudProviders.map { SettingsOption(key: $0.rawValue, label: $0.displayName) },
+                                     selectedKey: ai.provider, systemImage: "flask") { ai.provider = $0 }
+                    SwitchSettingRow(title: L10n.settingsSafeTokenTitle,
+                                     subtitle: ai.safeTokenLimit ? L10n.settingsSafeTokenOn : L10n.settingsSafeTokenOff,
+                                     isOn: $ai.safeTokenLimit, systemImage: "chart.line.uptrend.xyaxis",
+                                     iconColor: ai.safeTokenLimit ? theme.primary : theme.tertiary)
+                }
+            }
+            if cloud {
                 SettingsSubsection(title: L10n.settingsCredentialsSection) {
                     if provider == .gemini && apiKey.isEmpty {
                         SettingsItemRow(title: L10n.settingsAiGetFreeKey, subtitle: L10n.settingsAiGetFreeKeySubtitle,
@@ -56,29 +69,24 @@ struct AISettingsSection: View {
                                   subtitle: L10n.settingsAiApiKeySubtitle(sourceLabel),
                                   placeholder: L10n.settingsEnterApiKeyPlaceholder, secure: true) { saveKey($0) }
                 }
-            }
-            if !apiKey.isEmpty {
-                SettingsSubsection(title: L10n.settingsModelSelectionSection) {
-                    modelSelection
-                }
-            }
-            if provider.hasConfigurableUrl {
-                SettingsSubsection(title: "API Base URL") {
-                    AITextSaveRow(value: ai.baseUrl(for: provider.rawValue), title: "Base URL",
-                                  subtitle: provider == .ollama
-                                      ? "e.g. http://192.168.1.50:11434/v1 (your Ollama server's LAN address)"
-                                      : "e.g. https://api.example.com/v1",
-                                  placeholder: "https://", secure: false) {
-                        ai.setBaseUrl($0, for: provider.rawValue)
-                        // Ollama counts as set up with a base URL alone ("New playlist" › With AI reads this).
-                        let environment = self.environment
-                        Task { await AIProviderStatus.refresh(environment) }
+                if !apiKey.isEmpty {
+                    SettingsSubsection(title: L10n.settingsModelSelectionSection) {
+                        modelSelection
                     }
                 }
-            }
-            if provider == .onDevice {
-                SettingsSubsection(title: "On-Device Model") {
-                    OnDeviceModelRow()
+                if provider.hasConfigurableUrl {
+                    SettingsSubsection(title: "API Base URL") {
+                        AITextSaveRow(value: ai.baseUrl(for: provider.rawValue), title: "Base URL",
+                                      subtitle: provider == .ollama
+                                          ? "e.g. http://192.168.1.50:11434/v1 (your Ollama server's LAN address)"
+                                          : "e.g. https://api.example.com/v1",
+                                      placeholder: "https://", secure: false) {
+                            ai.setBaseUrl($0, for: provider.rawValue)
+                            // Ollama counts as set up with a base URL alone ("New playlist" › With AI reads this).
+                            let environment = self.environment
+                            Task { await AIProviderStatus.refresh(environment) }
+                        }
+                    }
                 }
             }
             SettingsSubsection(title: L10n.settingsPromptBehaviorSection, addBottomSpace: false) {
@@ -88,7 +96,7 @@ struct AISettingsSection: View {
             advancedToggle
             Spacer().frame(height: 8)
             if showsAdvanced {
-                advanced
+                advanced(cloud: cloud)
             }
         }
         .animation(PixlMotion.state, value: showsAdvanced)
@@ -176,27 +184,47 @@ struct AISettingsSection: View {
         .accessibilityIdentifier("settings.ai.advanced")
     }
 
+    /// Cloud providers in Android's order (the on-device model has its own row).
+    static let cloudProviders = AiProvider.entries.filter { $0 != .onDevice }
+
+    /// On-device: Temperature only. Cloud: Android's whole block.
     @ViewBuilder
-    private var advanced: some View {
+    private func advanced(cloud: Bool) -> some View {
         @Bindable var ai = settings.ai
-        SettingsSubsection(title: "Generation Parameters") {
+        SettingsSubsection(title: "Generation Parameters", addBottomSpace: cloud) {
             AIParameterRow(label: "Temperature", value: $ai.temperature, range: 0...2, steps: 20,
                            help: "Controls randomness. Lower = more deterministic, higher = more creative.") {
                 String(format: "%.2f", $0)
             }
-            AIParameterRow(label: "Top P", value: $ai.topP, range: 0...1, steps: 20,
-                           help: "Nucleus sampling. Higher = more diverse tokens considered.") { String(format: "%.2f", $0) }
-            AIParameterRow(label: "Top K", value: intBinding($ai.topK), range: 1...100, steps: 98,
-                           help: "Limits token selection to the K most likely candidates.") { "\(Int($0))" }
-            AIParameterRow(label: "Max Output Tokens", value: intBinding($ai.maxTokens), range: 128...8192, steps: 62,
-                           help: "Maximum length of the AI response. Higher = longer but more expensive.") { "\(Int($0))" }
-            AIParameterRow(label: "Presence Penalty", value: $ai.presencePenalty, range: -2...2, steps: 39,
-                           help: "Penalizes repeated topics. Positive = more diverse topics.") { String(format: "%.1f", $0) }
-            AIParameterRow(label: "Frequency Penalty", value: $ai.frequencyPenalty, range: -2...2, steps: 39,
-                           help: "Penalizes repeated phrases. Positive = more natural language.") {
-                String(format: "%.1f", $0)
+            if cloud {
+                cloudParameters
             }
         }
+        if cloud {
+            cloudSongData
+        }
+    }
+
+    @ViewBuilder
+    private var cloudParameters: some View {
+        @Bindable var ai = settings.ai
+        AIParameterRow(label: "Top P", value: $ai.topP, range: 0...1, steps: 20,
+                       help: "Nucleus sampling. Higher = more diverse tokens considered.") { String(format: "%.2f", $0) }
+        AIParameterRow(label: "Top K", value: intBinding($ai.topK), range: 1...100, steps: 98,
+                       help: "Limits token selection to the K most likely candidates.") { "\(Int($0))" }
+        AIParameterRow(label: "Max Output Tokens", value: intBinding($ai.maxTokens), range: 128...8192, steps: 62,
+                       help: "Maximum length of the AI response. Higher = longer but more expensive.") { "\(Int($0))" }
+        AIParameterRow(label: "Presence Penalty", value: $ai.presencePenalty, range: -2...2, steps: 39,
+                       help: "Penalizes repeated topics. Positive = more diverse topics.") { String(format: "%.1f", $0) }
+        AIParameterRow(label: "Frequency Penalty", value: $ai.frequencyPenalty, range: -2...2, steps: 39,
+                       help: "Penalizes repeated phrases. Positive = more natural language.") {
+            String(format: "%.1f", $0)
+        }
+    }
+
+    @ViewBuilder
+    private var cloudSongData: some View {
+        @Bindable var ai = settings.ai
         SettingsSubsection(title: "Song Data Configuration") {
             AIParameterRow(label: "Sample Size", value: intBinding($ai.sampleSize), range: 10...120, steps: 10,
                            help: "Number of songs sent to the AI for playlist generation. More = better context but higher cost.") {
@@ -250,7 +278,7 @@ struct AISettingsSection: View {
         case .openrouter: "OpenRouter (openrouter.ai)"
         case .ollama: "Ollama (local server)"
         case .custom: "Custom Provider"
-        case .onDevice: "On-Device (Offline)"
+        case .onDevice: "On-device model"
         }
     }
 
@@ -413,37 +441,59 @@ struct AIParameterRow: View {
     }
 }
 
-/// The on-device model's availability (iOS stand-in for Android's imported MediaPipe model file).
+/// The on-device model, the default assistant (iOS stand-in for Android's imported MediaPipe model file): whether it
+/// is in use, and why it can't answer when it can't (not on this iPhone, turned off, downloading, language). UI tests
+/// show it ready, so the screenshots don't depend on the simulator.
 struct OnDeviceModelRow: View {
+    /// The on-device model is the selected assistant (off while a cloud assistant is switched on).
+    var isSelected = true
+
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        let (title, detail) = status
+        let (title, detail, ready) = status
         HStack(spacing: 12) {
-            SettingsIcon(systemImage: "cpu")
+            SettingsIcon(systemImage: "cpu", color: isSelected && ready ? theme.primary : nil)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).pixlFont(.bodyMedium, weight: .medium).foregroundStyle(theme.onSurface)
                 Text(detail).pixlFont(.bodySmall).foregroundStyle(theme.onSurfaceVariant)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            if isSelected && ready {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(theme.primary)
+                    .accessibilityHidden(true)
+            }
         }
         .padding(16)
         .settingsRowGlass()
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("settings.ai.onDevice")
     }
 
-    private var status: (String, String) {
-        switch SystemLanguageModel.default.availability {
-        case .available:
-            return ("On-device model ready", "AI features run privately on this iPhone, offline.")
-        case .unavailable(.deviceNotEligible):
-            return ("Not available on this device", "This iPhone can't run the on-device model; pick another assistant.")
-        case .unavailable(.appleIntelligenceNotEnabled):
-            return ("Turned off in system settings", "Enable the system's intelligence features to use the on-device model.")
-        case .unavailable(.modelNotReady):
-            return ("Downloading", "The on-device model is still being prepared; try again later.")
-        case .unavailable:
-            return ("Unavailable", "The on-device model can't be used right now.")
+    private var status: (title: String, detail: String, ready: Bool) {
+        let isUITest = LaunchConfiguration.current.isUITest
+        if let issue = isUITest ? nil : OnDeviceModel.unavailability {
+            switch issue {
+            case .deviceNotEligible:
+                return ("Not available on this iPhone", "This iPhone can't run the on-device model. Turn on a cloud assistant below to use AI features.", false)
+            case .intelligenceOff:
+                return ("Turned off in system settings", "Turn on the intelligence features in the iPhone's Settings app to use the on-device model.", false)
+            case .notReady:
+                return ("Downloading", "The on-device model is still downloading. AI features start working when it's ready.", false)
+            default:
+                return ("Can't be used right now", issue.message, false)
+            }
         }
+        if !isUITest, !OnDeviceModel.supportsLocale() {
+            return ("Language not supported yet", "The on-device model doesn't support your device language yet.", false)
+        }
+        if isSelected {
+            return ("On-device model · in use", "Playlists, Taizo, translation and Home's greeting run privately on this iPhone.", true)
+        }
+        return ("On-device model", "Ready. Turn off the cloud assistant to use it instead.", true)
     }
 }
 

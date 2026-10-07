@@ -16,6 +16,8 @@ struct HomeGreetingCard: View {
     let greeting: HomeGreeting
     let insight: String
     let isExpanded: Bool
+    /// The AI insight is being written: a small spinner in its place, the chevron disabled (Android).
+    var isLoadingInsight = false
     let onToggle: () -> Void
 
     @Environment(\.appTheme) private var theme
@@ -41,6 +43,7 @@ struct HomeGreetingCard: View {
                         .contentShape(Rectangle().inset(by: -6))
                 }
                 .buttonStyle(PressScaleButtonStyle(pressedScale: 0.85))
+                .disabled(isLoadingInsight)
                 .padding(.leading, 8)
                 .accessibilityLabel(isExpanded ? "Show less insight" : "Show more insight")
                 .accessibilityIdentifier("home.greeting.expand")
@@ -49,7 +52,15 @@ struct HomeGreetingCard: View {
                 .pixlFont(.bodyMedium)
                 .foregroundStyle(theme.onSurfaceVariant)
                 .lineLimit(1)
-            if isExpanded {
+            if isExpanded && isLoadingInsight {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(theme.onSurfaceVariant)
+                    .frame(width: 18, height: 18)
+                    .padding(.top, 8)
+                    .transition(.opacity)
+                    .accessibilityLabel("Writing your insight")
+            } else if isExpanded {
                 Text(insight)
                     .pixlFont(.bodyMedium)
                     .foregroundStyle(theme.onSurface.opacity(0.9))
@@ -72,6 +83,7 @@ struct HomeGreetingCard: View {
         }
         .clipShape(shape)
         .pixlGlass(in: shape, tint: theme.surfaceContainerHigh.opacity(GlassTint.surface + 0.12))
+        .animation(PixlMotion.state, value: isLoadingInsight)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("home.greeting")
     }

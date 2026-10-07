@@ -20,6 +20,25 @@ final class SettingsScreenshotTests: XCTestCase {
     func testBehaviorCategoryDark() throws { try capture("settingsCategory.behavior", "dark") }
     func testAICategoryLight() throws { try capture("settingsCategory.ai", "light") }
     func testAICategoryDark() throws { try capture("settingsCategory.ai", "dark") }
+    /// AI features with the optional cloud assistant switched on (Gemini, the demo key): provider picker, sign-in.
+    func testAICategoryCloudLight() throws {
+        try capture("settingsCategory.ai.cloud", "light", ready: "screen.settingsCategory.ai")
+    }
+    func testAICategoryCloudDark() throws {
+        try capture("settingsCategory.ai.cloud", "dark", ready: "screen.settingsCategory.ai")
+    }
+    /// On-device: Advanced shows only Temperature.
+    func testAICategoryAdvancedOnDeviceLight() throws {
+        try capture("settingsCategory.ai", "light") { app in
+            let advanced = app.descendants(matching: .any)["settings.ai.advanced"].firstMatch
+            for _ in 0..<6 {
+                if advanced.exists && advanced.isHittable { break }
+                app.swipeUp()
+            }
+            if advanced.exists && advanced.isHittable { advanced.tap() }
+            app.swipeUp()
+        }
+    }
     func testBackupCategoryLight() throws { try capture("settingsCategory.backup_restore", "light") }
     func testBackupCategoryDark() throws { try capture("settingsCategory.backup_restore", "dark") }
     func testDeveloperCategoryLight() throws { try capture("settingsCategory.developer", "light") }
@@ -65,13 +84,14 @@ final class SettingsScreenshotTests: XCTestCase {
 
     // MARK: - Helper
 
-    private func capture(_ screen: String, _ appearance: String, interact: ((XCUIApplication) -> Void)? = nil) throws {
+    private func capture(_ screen: String, _ appearance: String, ready: String? = nil,
+                         interact: ((XCUIApplication) -> Void)? = nil) throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = ["-uiTest", "-screen", screen, "-appearance", appearance]
         app.launch()
 
-        let identifier = "screen.\(screen)"
+        let identifier = ready ?? "screen.\(screen)"
         let element = app.descendants(matching: .any)[identifier].firstMatch
         XCTAssertTrue(element.waitForExistence(timeout: 20), "\(identifier) did not appear")
         interact?(app)

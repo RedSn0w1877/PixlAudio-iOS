@@ -32,19 +32,29 @@ nonisolated enum TaizoTurn: Sendable, Equatable {
 /// through the deterministic intent parser and the media router — instant, offline-capable, no key needed — and
 /// gets a best-effort AI intro line (1.2 s budget); anything else is a real question for the configured AI provider
 /// (`TAIZO_CHAT`, 25 s budget).
+///
+/// On-device (the default since 2026-10-07, `onDevice` set and selected): questions go to `OnDeviceAI.chat` — one
+/// conversation with memory and the library lookup tool — and the intro line no longer holds the queue card back:
+/// the card shows at once and `deferredIntro` fills the line in (a cold model rarely answers within 1.2 s).
 nonisolated struct TaisDjEngine: Sendable {
     static let chatTimeoutSeconds: Double = 25
     static let introTimeoutSeconds: Double = 1.2
+    /// The on-device intro's budget: it arrives after the card, so it can wait for a cold model.
+    static let onDeviceIntroTimeoutSeconds: Double = 8
 
     let router: TaisMediaRouter
     let orchestrator: AiOrchestrator
+    /// The on-device path (nil in UI tests and unit tests: everything goes through the orchestrator, synchronously).
+    var onDevice: OnDeviceContext? = nil
 
     func respond(_ prompt: String) async -> TaizoTurn {
+        let local = await usesOnDevice()
         if TaisIntentParser.isMediaRequest(prompt) {
             let intent = TaisIntentParser.parse(prompt)
             let result = await router.route(intent)
-            return .media(intent, result, aiIntro: await aiIntro(prompt: prompt, result: result))
+            return .media(intent, result, aiIntro: local ? nil : await aiIntro(prompt: prompt, result: result))
         }
+        if local, let onDevice { return await onDeviceChat(prompt, onDevice) }
         do {
             let orchestrator = self.orchestrator
             let reply = try await withTimeout(seconds: Self.chatTimeoutSeconds) {
@@ -73,6 +83,42 @@ nonisolated struct TaisDjEngine: Sendable {
         }) else { return nil }
         let line = Self.trimQuotes(raw.trimmingCharacters(in: .whitespacesAndNewlines))
         return line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : line
+    }
+
+    /// The on-device model is selected (and wired).
+    private func usesOnDevice() async -> Bool {
+        guard let onDevice else { return false }
+        return await onDevice.isActive()
+    }
+
+    /// The intro of an on-device media reply, after the card is shown (nil: none, or not on-device).
+    func deferredIntro(prompt: String, result: DjRouteResult) async -> String? {
+        guard result.count > 0, let onDevice, await onDevice.isActive() else { return nil }
+        let ai = onDevice.ai
+        let count = result.count
+        guard let line = try? await withTimeout(seconds: Self.onDeviceIntroTimeoutSeconds, {
+            try await ai.introLine(request: prompt, count: count)
+        }) else { return nil }
+        return line
+    }
+
+    /// A question for the on-device model: the conversation continues in the same session.
+    private func onDeviceChat(_ prompt: String, _ onDevice: OnDeviceContext) async -> TaizoTurn {
+        let setup = OnDeviceAI.ChatSetup(persona: await onDevice.persona(),
+                                         temperature: await onDevice.temperature(.taizoChat), songs: router.songs)
+        let ai = onDevice.ai
+        do {
+            let reply = try await withTimeout(seconds: Self.chatTimeoutSeconds) {
+                try await ai.chat(prompt, setup: setup)
+            }
+            guard let reply else { return .error(OnDeviceFailure.slow.message) }
+            let trimmed = reply.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? .error(OnDeviceFailure.other("").message) : .conversation(trimmed)
+        } catch is CancellationError {
+            return .error(OnDeviceFailure.slow.message)
+        } catch {
+            return .error(OnDeviceModel.failure(for: error).message)
+        }
     }
 
     /// Kotlin `trim('"')`.

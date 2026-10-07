@@ -103,7 +103,10 @@ struct AiPlaylistLabView: View {
             requested = false
             if controller.error == nil { dismiss() }
         }
-        .onAppear { controller.clearError() }
+        .onAppear {
+            controller.clearError()
+            env.ai.prewarm(.playlist)
+        }
         .accessibilityIdentifier("screen.aiPlaylistLab")
     }
 
