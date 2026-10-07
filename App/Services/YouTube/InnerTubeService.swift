@@ -65,7 +65,9 @@ actor InnerTubeService {
     }
 
     private func resolveFresh(videoId: String, excluding: Set<String>, validate: Bool) async -> ResolvedStream? {
+        let started = ContinuousClock.now
         await remote.refreshIfNeeded()
+        let configMs = PlaybackStartTimings.ms(from: started, to: .now)
         var stream = (try? await resolver.resolveStream(videoId: videoId, validate: validate,
                                                         excludedStrategies: excluding)) ?? nil
         var attempts = await resolver.lastAttempts
@@ -85,7 +87,26 @@ actor InnerTubeService {
         lastAttempts = attempts
         lastSuccessfulStrategy = stream == nil ? nil : successful
         if let stream { cache[videoId] = (stream, Self.expiry(of: stream.url)) }
+        if !validate {
+            PlaybackStartTimings.shared.resolved(
+                key: YouTubeSongIdentity.timingKey(videoId: videoId),
+                Self.timing(stream: stream, strategy: successful, attempts: attempts,
+                            ms: PlaybackStartTimings.ms(from: started, to: .now), configMs: configMs))
+        }
         return stream
+    }
+
+    /// The start-timings view of a resolution: the winner's detail (itag, bitrate, `n`), or every attempt.
+    static func timing(stream: ResolvedStream?, strategy: String?, attempts: [String], ms: Int,
+                       configMs: Int) -> PlaybackStartTimings.Resolve {
+        guard let stream else {
+            return PlaybackStartTimings.Resolve(ms: ms, configMs: configMs, strategy: nil,
+                                                detail: attempts.joined(separator: "; "), hasN: nil)
+        }
+        var detail = attempts.last ?? ""
+        if let separator = detail.range(of: ": ") { detail = String(detail[separator.upperBound...]) }
+        return PlaybackStartTimings.Resolve(ms: ms, configMs: configMs, strategy: strategy, detail: detail,
+                                            hasN: URLCoding.androidQueryParameter(stream.url, "n") != nil)
     }
 
     /// Drops the cached URL (googlevideo answered 403/410: expired, or bound to another client).
@@ -178,4 +199,7 @@ nonisolated enum YouTubeSongIdentity {
     }
 
     static func streamURL(videoId: String) -> URL? { URL(string: "\(scheme)://\(videoId)") }
+
+    /// The `PlaybackStartTimings` key of a streamed video: the item URL's text (`pixlstream://<videoId>`).
+    static func timingKey(videoId: String) -> String { "\(scheme)://\(videoId)" }
 }

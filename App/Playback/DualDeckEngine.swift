@@ -48,6 +48,8 @@ final class DualDeckEngine: PlaybackEngine {
     private var isPreparing = false
     /// Set by a manual skip that uses the pre-inserted item (so the advance is not reported as automatic).
     private var manualAdvancePending = false
+    /// The open `PlaybackStartTimings` record of the start in progress (closed at the first `.playing`).
+    private var startTiming: Int?
 
     // MARK: Crossfade state (see +Crossfade)
     var crossfadeTask: Task<Void, Never>?
@@ -150,6 +152,10 @@ final class DualDeckEngine: PlaybackEngine {
         playWhenReady = false
         // Paused before the first item started: give back a session that `setQueue` activated ahead of the load.
         if activeItem == nil { session.releasePreparedActivation() }
+        if activeItem != nil, let timing = startTiming {
+            PlaybackStartTimings.shared.readyPaused(timing)
+            startTiming = nil
+        }
         emitPlaying()
         active.pause()
         fade?.deck.pause()
@@ -283,6 +289,7 @@ final class DualDeckEngine: PlaybackEngine {
         pause()
         finishFadeNow()
         cancelLoading()
+        abandonStartTiming()
         discard(active.removeAll())
         discard(idle.removeAll())
         activeItem = nil
@@ -358,15 +365,18 @@ final class DualDeckEngine: PlaybackEngine {
         loadGeneration += 1
         let generation = loadGeneration
         pendingStartSeconds = seconds
+        abandonStartTiming()
         guard let entry = queue.current else {
             setPreparing(false)
             return
         }
         setPreparing(true)
+        let timing = PlaybackStartTimings.shared.begin(title: entry.song.title)
+        startTiming = timing
         loadTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let item = try await self.factory.makeItem(for: entry)
+                let item = try await self.factory.makeItem(for: entry, timing: timing)
                 guard generation == self.loadGeneration else {
                     self.factory.discard(item)
                     return
@@ -387,7 +397,12 @@ final class DualDeckEngine: PlaybackEngine {
         active.load(item, at: seconds)
         pendingStartSeconds = 0
         consecutiveFailures = 0
-        if playWhenReady { startActive() }
+        if playWhenReady {
+            startActive()
+        } else if let timing = startTiming {
+            PlaybackStartTimings.shared.readyPaused(timing)
+            startTiming = nil
+        }
         setPreparing(false)
         onTimingChanged?()
         scheduleNext()
@@ -395,6 +410,10 @@ final class DualDeckEngine: PlaybackEngine {
 
     private func loadFailed(entry: QueueEntry, error: any Error) {
         setPreparing(false)
+        if let timing = startTiming {
+            PlaybackStartTimings.shared.failed(timing, error.localizedDescription)
+            startTiming = nil
+        }
         emit(.failed(message: "Couldn't play \"\(entry.song.title)\" (\(error.localizedDescription))"))
         consecutiveFailures += 1
         if playWhenReady, consecutiveFailures < queue.count, let next = queue.nextIndexForSkip {
@@ -412,6 +431,13 @@ final class DualDeckEngine: PlaybackEngine {
         loadTask = nil
         nextTask?.cancel()
         nextTask = nil
+    }
+
+    /// The start in progress ends without playing (another song was chosen, or playback stopped).
+    private func abandonStartTiming() {
+        guard let timing = startTiming else { return }
+        startTiming = nil
+        PlaybackStartTimings.shared.abandoned(timing)
     }
 
     func startActive() {
@@ -508,6 +534,10 @@ final class DualDeckEngine: PlaybackEngine {
             }
         case .statusChanged(let status):
             guard deck === active else { return }
+            if status == .playing, activeItem != nil, let timing = startTiming {
+                PlaybackStartTimings.shared.playing(timing)
+                startTiming = nil
+            }
             setPreparing(loadTask != nil || (playWhenReady && status == .waitingToPlayAtSpecifiedRate))
         case .itemEnded(let item):
             guard deck === active, item === activeItem, deck.upcoming.isEmpty else { return }

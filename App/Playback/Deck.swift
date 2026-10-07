@@ -71,13 +71,15 @@ final class DeckItemFactory {
         self.streaming = streaming
     }
 
-    /// `overrideURL` plays other audio for the same queue entry (stage 14: a rendered instrumental).
-    func makeItem(for entry: QueueEntry, overrideURL: URL? = nil) async throws -> DeckItem {
+    /// `overrideURL` plays other audio for the same queue entry (stage 14: a rendered instrumental). `timing` is the
+    /// start record (`PlaybackStartTimings`) the steps are reported to; nil for items prepared ahead.
+    func makeItem(for entry: QueueEntry, overrideURL: URL? = nil, timing: Int? = nil) async throws -> DeckItem {
         var resolved = overrideURL
         if resolved == nil { resolved = await resolver.playableURL(for: entry.song) }
         guard let url = resolved else {
             throw DeckItemError.unresolvable(songId: entry.song.id)
         }
+        if let timing { PlaybackStartTimings.shared.urlResolved(timing, url: url) }
         let asset = AVURLAsset(url: url)
         streaming.attach(to: asset)
         let tracks = try await asset.loadTracks(withMediaType: .audio)
@@ -85,6 +87,7 @@ final class DeckItemFactory {
             streaming.detach(from: asset)
             throw DeckItemError.noAudioTrack(songId: entry.song.id)
         }
+        if let timing { PlaybackStartTimings.shared.tracksLoaded(timing) }
         let duration = try? await asset.load(.duration)
         var seconds = duration.map { $0.isValid && $0.isNumeric ? $0.seconds : 0 } ?? 0
         if seconds <= 0 { seconds = Double(entry.song.duration) / 1000 }
@@ -94,6 +97,7 @@ final class DeckItemFactory {
         // Pitch-preserving rate changes (sync editor speeds 0.75 / 0.5).
         item.audioTimePitchAlgorithm = .spectral
         item.audioMix = ProcessingTap.makeAudioMix(for: track, effects: effects, item: parameters)
+        if let timing { PlaybackStartTimings.shared.itemBuilt(timing) }
         return DeckItem(entry: entry, playerItem: item, asset: asset, tap: parameters, durationSeconds: seconds,
                         isLocalFile: url.isFileURL)
     }

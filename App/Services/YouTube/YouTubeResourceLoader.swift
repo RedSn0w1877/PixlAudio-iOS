@@ -31,6 +31,10 @@ nonisolated final class YouTubeResourceLoader: NSObject, AVAssetResourceLoaderDe
     func resourceLoader(_ resourceLoader: AVAssetResourceLoader,
                         shouldWaitForLoadingOfRequestedResource loadingRequest: AVAssetResourceLoadingRequest) -> Bool {
         guard let url = loadingRequest.request.url, let videoId = YouTubeSongIdentity.videoId(from: url) else { return false }
+        PlaybackStartTimings.shared.loaderRequest(
+            key: YouTubeSongIdentity.timingKey(videoId: videoId),
+            contentInfo: loadingRequest.contentInformationRequest != nil,
+            toEnd: loadingRequest.dataRequest?.requestsAllDataToEndOfResource ?? false)
         let box = RequestBox(loadingRequest)
         let key = ObjectIdentifier(loadingRequest)
         // Stored under the lock before the task can finish (its `finished` call waits for the lock).
@@ -50,6 +54,9 @@ nonisolated final class YouTubeResourceLoader: NSObject, AVAssetResourceLoaderDe
         let task = tasks.removeValue(forKey: key)
         lock.unlock()
         task?.cancel()
+        if task != nil, let url = loadingRequest.request.url, let videoId = YouTubeSongIdentity.videoId(from: url) {
+            PlaybackStartTimings.shared.loaderCancelled(key: YouTubeSongIdentity.timingKey(videoId: videoId))
+        }
     }
 
     private func finished(_ key: ObjectIdentifier) {
@@ -72,6 +79,7 @@ nonisolated final class YouTubeResourceLoader: NSObject, AVAssetResourceLoaderDe
                     ? info.contentLength
                     : min(info.contentLength, dataRequest.requestedOffset + Int64(dataRequest.requestedLength))
                 var position = dataRequest.currentOffset
+                var answered = false
                 while position < end {
                     try Task.checkCancellation()
                     let data = try await fetcher.data(videoId: videoId, from: position, upTo: end)
@@ -79,6 +87,10 @@ nonisolated final class YouTubeResourceLoader: NSObject, AVAssetResourceLoaderDe
                     try Task.checkCancellation()
                     dataRequest.respond(with: data)
                     position += Int64(data.count)
+                    if !answered {
+                        answered = true
+                        PlaybackStartTimings.shared.answered(key: YouTubeSongIdentity.timingKey(videoId: videoId))
+                    }
                 }
             }
             if Task.isCancelled { return }

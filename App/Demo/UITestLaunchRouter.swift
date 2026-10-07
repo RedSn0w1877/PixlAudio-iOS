@@ -33,6 +33,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case accounts, spotifyDashboard, spotifyBrowse, youTubeLogin
     // Stage 11: YouTube sign-in states and the playback test
     case youTubeLoginCode, youTubeLoginCookie, youTubeLoginSignedIn, playbackDiagnostics, playbackDiagnosticsFailed
+    /// Streaming speed (R12): the playback test with the Stream start timings card open (demo starts).
+    case playbackDiagnosticsTimings
 
     // Sheets
     case queue, songInfo, sleepTimer, lyricsOptions, changelog, betaInfo, jobs
@@ -161,7 +163,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .spotifyBrowseArtist, .spotifyBrowseAlbum: return .spotifyBrowse(query: "")
         case .spotifyBrowse: return .spotifyBrowse(query: "")
         case .youTubeLogin, .youTubeLoginCode, .youTubeLoginCookie, .youTubeLoginSignedIn: return .youTubeLogin
-        case .playbackDiagnostics, .playbackDiagnosticsFailed: return .playbackDiagnostics
+        case .playbackDiagnostics, .playbackDiagnosticsFailed, .playbackDiagnosticsTimings: return .playbackDiagnostics
         case .queue, .songInfo, .sleepTimer, .lyricsOptions, .changelog, .betaInfo, .jobs,
              .nowPlaying, .lyrics, .lyricsSync, .setup, .devices, .artistPicker, .editSong:
             return nil

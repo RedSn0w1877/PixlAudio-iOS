@@ -112,6 +112,7 @@ nonisolated struct StreamFetcher: Sendable {
             request.setValue(stream.userAgent, forHTTPHeaderField: "User-Agent")
             request.setValue(ContentRange.requestHeader(range), forHTTPHeaderField: "Range")
             let (body, response) = try await session.data(for: request)
+            PlaybackStartTimings.shared.networkFetched(key: YouTubeSongIdentity.timingKey(videoId: videoId), bytes: body.count)
             guard let http = response as? HTTPURLResponse else { throw Failure.badResponse("No HTTP response.") }
             switch http.statusCode {
             case 206, 200:
