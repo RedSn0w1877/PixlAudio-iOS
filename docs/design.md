@@ -355,6 +355,23 @@ categories, sheets; glass in place of Material; text legible in light and dark. 
   `PlaybackStore.clock`), `AnimatedPlaybackControls` (weighted glass pills), `PlayerToggleRow`, the
   `player_ambient_style` background. Controls are clear glass tinted with the album roles (`playerGlass`).
 - **Sheets:** `AppSheet.queue` (large; see-through `tallGlass` since 2026-10-07), `.sleepTimer`, `.devices`, `.artistPicker(songId:)`, `.taisChat` (stage 13's
+
+- **Player changes (owner overrides of parity, Hoa 2026-10-07):**
+  - *Top bar:* no "Now Playing" title and no cloud for streamed songs (Android shows them unless it casts). The output
+    pill names the output for anything but the phone's own speaker (Spotify Connect, AirPlay, Bluetooth, wired, car;
+    the kind, e.g. "Bluetooth audio", when the route has no name) and stays icon only on the speaker. It hugs its
+    content (50 pt icon only, like Android's wrapped pill and the queue pill; no 190 pt cap) and the right-hand cluster
+    has `layoutPriority(1)` over the bar's `Spacer`, so a name may use about width − 146 pt before it truncates at the
+    tail. The dot marks only outputs that play elsewhere (Connect, AirPlay); "Connecting…" with a spinner while a
+    Connect session starts. It springs on the name itself. VoiceOver: "Playing on <device>" / "Playing on this
+    phone". `PlayerTopBar` no longer takes the song.
+  - *Transport:* previous / next settle back 220 ms after the tap, like play/pause (Android holds a skip 600 ms).
+  - *Favourite hearts* (full player, song sheet, lyrics More sheet) read `LibraryStore.observedSong(id:)` in their own
+    small views (`PlayerToggles`, `SongFavoriteTile`, the More sheet's body): the library's song lookup is
+    `@ObservationIgnored`, so a heart read through `song(id:)` stayed stale until something else redrew the view.
+    `observedSong` also reads `revision`: use it only in small views, never in list rows, `NowPlayingView.body` or
+    `LyricsView`. The lock screen's Like toggles the same favourite and follows edits made in the app.
+- **Sheets:** `AppSheet.queue` (large), `.sleepTimer`, `.devices`, `.artistPicker(songId:)`, `.taisChat` (stage 13's
   TAIS DJ chat, from the sparkles circle); `AppCover.editSong(songId:)`. The queue presents the song sheet, the timer and Save as
   playlist itself. The song sheet's edit button (`SongOptionsSheet(onEdit:)`) opens `EditSongSheet`.
 - **Shared-file changes (all additive):** `Shell/RootView.swift` (slot + host, cover binding), `Core/Routes.swift`
@@ -367,6 +384,9 @@ categories, sheets; glass in place of Material; text legible in light and dark. 
 Stage 8 screenshot ids (`UITests/PlayerScreenshotTests`): `miniPlayer` (collapsed), `nowPlaying` (expanded; `-paused`
 for pp_full), `queue`, `sleepTimer`, `songInfo`, `editSong`, `artistPicker` (song 16, two credits), `devices` —
 the player's sheets open over the expanded player. Gesture tests: drag up from the mini player, collapse circle.
+`nowPlaying.bluetooth` (2026-10-07): the expanded player with `AudioRouteMonitor`'s demo route ("AirPods Pro"; the
+simulator always plays to its speaker), for the named output pill. Favourite tests tap the liked heart in
+`nowPlaying`, `songInfo` and `lyricsOptions` and expect it to flip at once.
 
 ## Stage 9 notes (karaoke lyrics, lyrics services)
 
@@ -845,8 +865,10 @@ docs/api-notes.md › Spotify Connect output.
   Alexa app." Hidden while Spotify isn't linked; a pre-Connect login shows only "Reconnect Spotify to use Connect".
   While a device plays, "Stop playing on <device>" heads the list and the CONTROLS hero shows the device (icon, name,
   "Spotify Connect • Playing") with its volume slider when `supports_volume` (else a note) instead of the phone's.
-- **Chip:** the full player's output pill shows the device's symbol and name, like AirPlay's route name (VoiceOver: "Playing on <device>"; long press: Stop
-  playing on <device>); the mini player's artist line becomes "Playing on <device>" with a small speaker icon.
+- **Chip:** the full player's output pill shows the device's symbol and name, like any other named output (since
+  2026-10-07 the pill names AirPlay, Bluetooth, wired and car outputs too and may use the width the removed "Now
+  Playing" title left; VoiceOver: "Playing on <device>"; long press: Stop playing on <device>); the mini player's
+  artist line becomes "Playing on <device>" with a small speaker icon.
 - **Toasts:** Connect has its own `LibraryToast` instance, shown by `RootView` above the bars and inside the devices
   sheet (skipped songs once per resolution pass, takeovers, errors).
 - **Seam:** `RemotePlaybackOutput` (`App/Core`). While attached, `PlaybackStore` sends play / pause / next / previous /

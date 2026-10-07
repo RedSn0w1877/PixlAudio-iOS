@@ -111,6 +111,11 @@ launch-into-expanded path (UI tests and launch states) showed it; the app's own 
 - A `safeAreaBar` (or `safeAreaInset`) around a `NavigationStack` does not reach its pages here: the old shell bar
   never inset them. Screens that scroll to their end or pin content to the bottom (Home scrolled down, YouTube
   sign-in, the brick game, floating Save buttons) are the screenshots that show a changed inset.
+- `LibraryStore`'s lookups (`song(id:)`, `album(id:)`, …) are `@ObservationIgnored` and patched in place by edits: a
+  `body` that shows a field an edit changes in place (the favourite heart) reads `observedSong(id:)`, which also
+  reads `revision`, in its **own small view** (`PlayerToggles`, `SongFavoriteTile`), so a library revision (an edit,
+  an artist-image batch, a rescan) redraws that view only. Never from list rows, `NowPlayingView.body` or
+  `LyricsView` (2026-10-07: the full player's heart stayed stale until shuffle or repeat redrew the player).
 - A view that should start with data has it on its first frame (a synchronous cache, a memo in `body`, or a value
   seeded in `init`), not in `onChange(initial:)` / `task`, which costs a second pass or a pop-in.
 - A cache that replaces a synchronous answer must be right whenever the old answer was: key it on **every** input

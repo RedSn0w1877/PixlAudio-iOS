@@ -48,6 +48,16 @@ final class LibraryStore {
     var playlists: [Playlist] { snapshot.playlists }
 
     func song(id: String) -> Song? { songsById[id] }
+
+    /// `song(id:)` for a view's `body`: also reads `revision`, so the view redraws after the next edit (the lookup
+    /// itself is `@ObservationIgnored` and patched in place by `applyEdit`). Use it in small views that show a field an
+    /// edit changes in place, such as the favourite heart; keep `song(id:)` in actions and long lists, where a
+    /// dependency on every revision would redraw each visible row.
+    func observedSong(id: String) -> Song? {
+        _ = revision
+        return songsById[id]
+    }
+
     func album(id: Int64) -> Album? { albumsById[id] }
     func artist(id: Int64) -> Artist? { artistsById[id] }
     func playlist(id: String) -> Playlist? { playlistsById[id] }

@@ -182,6 +182,12 @@ final class AppEnvironment {
                     nowPlaying.update()
                 }
                 spotifyConnect.onRemoteStateChanged = { nowPlaying.update() }
+                // Lock screen / Control Center "Like" toggles the playing song's favourite (the library owns
+                // favourites); its state follows favourite edits made anywhere in the app.
+                let favorites = LibraryEditor(store: library, persistence: persistence, writesCache: true)
+                nowPlaying.onLike = { song in favorites.toggleFavorite(song.id) }
+                nowPlaying.isFavorite = { song in library.song(id: song.id)?.isFavorite ?? song.isFavorite }
+                nowPlaying.followFavorites(revision: { library.revision })
             }
             // Spotify songs (`spotify://<id>`) play their YouTube match; this stays the outermost resolver (after
             // stage 11's streaming resolver) so other songs reach the inner ones unchanged.

@@ -15,6 +15,54 @@ final class PlayerScreenshotTests: XCTestCase {
     }
     func testExpandedDark() throws { try capture("nowPlaying", "dark", ready: "screen.nowPlaying", name: "playerExpanded") }
 
+    // MARK: Top bar (Hoa, 2026-10-07: no "Now Playing" title; the output pill names the device)
+
+    /// A Bluetooth output (the demo route, "AirPods Pro"): the output pill names it and may use the width the title
+    /// left; the title is gone.
+    func testExpandedBluetoothLight() throws {
+        let app = launch("nowPlaying.bluetooth", "light")
+        let pill = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@", "Playing on AirPods Pro")).firstMatch
+        XCTAssertTrue(pill.waitForExistence(timeout: 20), "the output pill does not name the Bluetooth device")
+        XCTAssertFalse(app.staticTexts["Now Playing"].exists, "the top bar still shows its title")
+        snapshot(app, "playerBluetooth-light")
+    }
+
+    // MARK: Favourite hearts flip at once (they used to wait for another control to redraw the view)
+
+    /// The full player's toggle row. Demo song 0 is liked.
+    func testFavoriteTogglesImmediately() throws {
+        let app = launch("nowPlaying", "light")
+        assertFavoriteFlips(app, name: "playerFavoriteToggled-light")
+    }
+
+    /// The song sheet's favourite tile.
+    func testSongInfoFavoriteTogglesImmediately() throws {
+        let app = launch("songInfo", "light")
+        XCTAssertTrue(app.descendants(matching: .any)["screen.songInfo"].firstMatch.waitForExistence(timeout: 20),
+                      "the song sheet did not appear")
+        assertFavoriteFlips(app, name: "songInfoFavoriteToggled-light")
+    }
+
+    /// The lyrics More sheet's shuffle · repeat · favourite row (the heart's state is its selected trait).
+    func testLyricsOptionsFavoriteTogglesImmediately() throws {
+        let app = launch("lyricsOptions", "dark")
+        let sheet = app.descendants(matching: .any)["screen.lyricsOptions"].firstMatch
+        XCTAssertTrue(sheet.waitForExistence(timeout: 20), "the lyrics options did not appear")
+        let heart = app.buttons.matching(NSPredicate(format: "label == %@", "Favorite")).firstMatch
+        XCTAssertTrue(heart.waitForExistence(timeout: 10), "the favourite toggle is missing")
+        var swipes = 0
+        while !heart.isHittable, swipes < 4 {
+            sheet.swipeUp()
+            swipes += 1
+        }
+        XCTAssertTrue(heart.isSelected, "demo song 0 should start liked")
+        heart.tap()
+        let off = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isSelected == false"), object: heart)
+        XCTAssertEqual(XCTWaiter.wait(for: [off], timeout: 3), .completed, "the heart kept its old state after the tap")
+        snapshot(app, "lyricsOptionsFavoriteToggled-dark")
+    }
+
     // MARK: Gestures
 
     /// Drag the mini player up: the sheet follows and settles expanded.
@@ -81,6 +129,20 @@ final class PlayerScreenshotTests: XCTestCase {
         app.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier == %@ OR label == %@", "player.collapse", "Collapse player"))
             .firstMatch
+    }
+
+    /// Taps the liked heart ("Remove from favorites") and expects "Add to favorites" without touching anything else.
+    /// By label: controls inside a `GlassEffectContainer` keep only their labels.
+    private func assertFavoriteFlips(_ app: XCUIApplication, name: String) {
+        let liked = app.buttons.matching(NSPredicate(format: "label == %@", "Remove from favorites")).firstMatch
+        XCTAssertTrue(liked.waitForExistence(timeout: 20), "the liked heart is missing")
+        // The pre-built player is in the hierarchy before it has expanded: wait until the heart can take the tap.
+        let hittable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: liked)
+        XCTAssertEqual(XCTWaiter.wait(for: [hittable], timeout: 10), .completed, "the heart can't be tapped")
+        liked.tap()
+        let unliked = app.buttons.matching(NSPredicate(format: "label == %@", "Add to favorites")).firstMatch
+        XCTAssertTrue(unliked.waitForExistence(timeout: 3), "the heart kept its old state after the tap")
+        snapshot(app, name)
     }
 
     private func launch(_ screen: String, _ appearance: String, extra: [String] = []) -> XCUIApplication {

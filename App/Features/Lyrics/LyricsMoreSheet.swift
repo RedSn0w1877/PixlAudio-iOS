@@ -37,8 +37,14 @@ struct LyricsMoreSheet: View {
 
     @Environment(\.playerTheme) private var theme
     @Environment(\.dismiss) private var dismiss
+    @Environment(LibraryStore.self) private var library
     @State private var showResetDialog = false
     @State private var showDebugDialog = false
+
+    /// The favourite as the library has it now, read in this sheet's own body (`observedSong`: the library's song
+    /// lookup is not observed, so the presenter's `isFavorite` stayed stale after a tap); `isFavorite` when the song
+    /// isn't in the library.
+    private var liked: Bool { song.flatMap { library.observedSong(id: $0.id)?.isFavorite } ?? isFavorite }
 
     private var isUserSynced: Bool { lyrics?.document?.metadata.source == LyricsRepositoryLogic.userSource }
     private var hasWordTiming: Bool { lyrics?.synced?.contains { !($0.words ?? []).isEmpty } ?? false }
@@ -173,7 +179,7 @@ struct LyricsMoreSheet: View {
                    onColor: theme.onPrimary, action: actions.onShuffle)
             toggle(active: repeatMode != .off, systemImage: repeatMode == .one ? "repeat.1" : "repeat", label: "Repeat",
                    color: theme.secondary, onColor: theme.onSecondary, action: actions.onRepeat)
-            toggle(active: isFavorite, systemImage: isFavorite ? "heart.fill" : "heart", label: "Favorite",
+            toggle(active: liked, systemImage: liked ? "heart.fill" : "heart", label: "Favorite",
                    color: theme.tertiary, onColor: theme.onTertiary, action: actions.onFavorite)
         }
         .padding(8)

@@ -747,3 +747,14 @@ Android has no accent setting, so there is nothing to port; these define the iOS
 - `UITests/SettingsScreenshotTests` — Appearance with Red (light, dark), Graphite (dark) and a custom colour (light),
   and a tap on Green that must select it (`isSelected`) and re-theme the page; `UITests/ScreenshotTests` — Home in
   Green (dark), Library in Blue (light), the settings list in Pink (light).
+
+## Player fixes (2026-10-07, branch `wt/player`, Swift-only)
+Nothing to port: Android has no tests for the full player's toggle row, the transport's press timing or the top bar.
+
+- `AppTests/FavoriteObservationTests` — a favourite edit through `LibraryEditor` invalidates a reader of
+  `LibraryStore.observedSong(id:)` and shows the new flag; a reader of the plain `song(id:)` is not invalidated (the
+  root cause of the stale heart).
+- `UITests/PlayerScreenshotTests` — `testFavoriteTogglesImmediately` (full player), `testSongInfoFavoriteTogglesImmediately`
+  (song sheet) and `testLyricsOptionsFavoriteTogglesImmediately` (lyrics More sheet) tap the liked heart of demo song 0
+  and expect the unliked state within 3 s without touching anything else; `testExpandedBluetoothLight`
+  (`-screen nowPlaying.bluetooth`) expects "Playing on AirPods Pro" in the top bar and no "Now Playing" title.
