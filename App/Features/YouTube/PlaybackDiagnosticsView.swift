@@ -49,7 +49,8 @@ final class PlaybackDiagnosticsModel {
         probeReport = nil
         let poTokens = youtube.poTokens
         Task {
-            var out = "Client table: \(await service.remoteSource())\n\n"
+            var out = "Client table: \(await service.remoteSource())\n"
+            out += "Overlapping clients: \(await service.hedgingDescription())\n\n"
             out += "Signature cipher (base.js):\n\(await service.cipherReport())\n"
             let attempts = await service.lastAttempts
             out += "Last resolution:\n" + (attempts.isEmpty ? "(none yet)\n" : attempts.map { "• \($0)" }.joined(separator: "\n") + "\n")

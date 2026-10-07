@@ -259,3 +259,115 @@ struct TrackMatcherFanOutTests {
         #expect(try acceptedFanOut.get() == acceptedSequential.get())
     }
 }
+
+/// R8: overlapping YouTube clients, behind the remote-config flag `innertube.hedge` (off by default; iOS only).
+@Suite("Stream hedging")
+struct StreamHedgingTests {
+    @Test func theFlagIsOffUnlessTheRemoteFileTurnsItOn() throws {
+        #expect(RemoteClientConfig.builtIn.hedging == nil)
+        #expect(RemoteClientConfig.parse(#"{"innertube": {}}"#)?.hedging == nil)
+        #expect(RemoteClientConfig.parse(#"{"innertube": {"hedge": {}}}"#)?.hedging == nil)
+        #expect(RemoteClientConfig.parse(#"{"innertube": {"hedge": {"enabled": false, "afterSeconds": 1}}}"#)?.hedging == nil)
+        #expect(RemoteClientConfig.parse(#"{"innertube": {"hedge": {"enabled": "true"}}}"#)?.hedging == nil)
+        // The repository's file ships it off.
+        var url = URL(fileURLWithPath: #filePath)
+        for _ in 0..<5 { url.deleteLastPathComponent() }
+        let text = try String(contentsOf: url.appendingPathComponent("remote").appendingPathComponent("config.json"),
+                              encoding: .utf8)
+        #expect(try #require(RemoteClientConfig.parse(text)).hedging == nil)
+    }
+
+    @Test func enabledUsesDefaultsAndClampsNumbers() throws {
+        let on = try #require(RemoteClientConfig.parse(#"{"innertube": {"hedge": {"enabled": true}}}"#))
+        #expect(on.hedging == StreamHedging(afterSeconds: 1.5, strategyTimeoutSeconds: 8))
+        let custom = try #require(RemoteClientConfig.parse(
+            #"{"innertube": {"hedge": {"enabled": true, "afterSeconds": 2.5, "strategyTimeoutSeconds": 6}}}"#))
+        #expect(custom.hedging?.afterSeconds == 2.5)
+        #expect(custom.hedging?.strategyTimeoutSeconds == 6)
+        let wild = try #require(RemoteClientConfig.parse(
+            #"{"innertube": {"hedge": {"enabled": true, "afterSeconds": 0.01, "strategyTimeoutSeconds": 99}}}"#))
+        #expect(wild.hedging?.afterSeconds == 0.5)
+        #expect(wild.hedging?.strategyTimeoutSeconds == 15)
+        let text = try #require(RemoteClientConfig.parse(
+            #"{"innertube": {"hedge": {"enabled": true, "afterSeconds": "soon"}}}"#))
+        #expect(text.hedging?.afterSeconds == StreamHedging.defaultAfterSeconds)
+        // The rest of the table is untouched by the flag.
+        #expect(on.chain(signedIn: false) == RemoteClientConfig.builtIn.chain(signedIn: false))
+    }
+
+    /// VISIONOS then IOS, each after its own delay; a nil URL fails the client (LOGIN_REQUIRED).
+    struct Player: YouTubePlayerFetching {
+        let delays: [String: UInt64]
+        let failing: Set<String>
+        let log = Box<[String]>([])
+
+        func fetchPlayer(videoId: String, profile: InnerTubeClientProfile) async throws -> YouTubePlayerResponse? {
+            log.mutate { $0.append(profile.name) }
+            let delay = delays[profile.name] ?? 0
+            if delay > 0 { try await Task.sleep(nanoseconds: delay * 1_000_000) }
+            if failing.contains(profile.name) { return YouTubePlayerResponse(status: "LOGIN_REQUIRED", reason: "bot", formats: []) }
+            return YouTubePlayerResponse(status: "OK", reason: nil, formats: [
+                YouTubeAudioFormat(itag: 18, mimeType: "video/mp4; codecs=\"avc1.42001E, mp4a.40.2\"", bitrate: 500_000,
+                                   url: "https://r1.googlevideo.com/videoplayback?itag=18&c=\(profile.name)",
+                                   signatureCipher: nil, contentLength: 10, approxDurationMs: 1000, isMuxedFallback: true),
+            ])
+        }
+        var lastFailureReason: String? { get async { nil } }
+    }
+
+    struct NoCipher: CipherResolving {
+        func resolveCipheredUrl(_ signatureCipher: String) async -> String? { nil }
+        func applyNTransform(_ url: String) async -> String { url }
+    }
+
+    static let chain = { @Sendable (_: Bool) async -> [YouTubeStreamStrategy] in
+        YouTubeStreamStrategy.preSignedStrategies().filter { ["VISIONOS", "IOS"].contains($0.profile.name) }
+    }
+
+    func resolver(_ player: Player, hedging: StreamHedging?) -> ChainedYouTubeStreamResolver {
+        ChainedYouTubeStreamResolver(player: player, cipher: NoCipher(), validator: nil, strategies: Self.chain,
+                                     hedging: { hedging })
+    }
+
+    @Test func aSlowFirstClientLosesToTheNextOne() async throws {
+        let player = Player(delays: ["VISIONOS": 5_000], failing: [])
+        let started = ContinuousClock.now
+        let stream = try await resolver(player, hedging: StreamHedging(afterSeconds: 0.5)).resolveStream(videoId: "dQw4w9WgXcQ",
+                                                                                                         validate: false)
+        #expect(stream?.strategyName == "IOS")
+        #expect(ContinuousClock.now - started < .seconds(3), "IOS started after 0.5 s instead of waiting for VISIONOS")
+        #expect(player.log.value == ["VISIONOS", "IOS"])
+    }
+
+    @Test func aFailedClientStartsTheNextAtOnce() async throws {
+        let player = Player(delays: [:], failing: ["VISIONOS"])
+        let resolver = resolver(player, hedging: StreamHedging(afterSeconds: 10))
+        let started = ContinuousClock.now
+        let stream = try await resolver.resolveStream(videoId: "dQw4w9WgXcQ", validate: false)
+        #expect(stream?.strategyName == "IOS")
+        #expect(ContinuousClock.now - started < .seconds(5), "no 10 s wait after a failure")
+        #expect(await resolver.lastAttempts.first == "VISIONOS: LOGIN_REQUIRED — bot")
+        #expect(await resolver.lastSuccessfulStrategy == "IOS")
+        // Everything failing ends without waiting for the timers.
+        let none = Player(delays: [:], failing: ["VISIONOS", "IOS"])
+        let noneResolver = self.resolver(none, hedging: StreamHedging(afterSeconds: 10))
+        let noneStarted = ContinuousClock.now
+        #expect(try await noneResolver.resolveStream(videoId: "dQw4w9WgXcQ", validate: false) == nil)
+        #expect(ContinuousClock.now - noneStarted < .seconds(5))
+        #expect(await noneResolver.lastAttempts.count == 2)
+        #expect(await noneResolver.lastSuccessfulStrategy == nil)
+    }
+
+    @Test func offMeansOneClientAfterAnother() async throws {
+        // Without the flag a slow VISIONOS is waited for and IOS never asked (Android's behaviour).
+        let player = Player(delays: ["VISIONOS": 600], failing: [])
+        let stream = try await resolver(player, hedging: nil).resolveStream(videoId: "dQw4w9WgXcQ", validate: false)
+        #expect(stream?.strategyName == "VISIONOS")
+        #expect(player.log.value == ["VISIONOS"])
+        // With the flag but a fast first client, nothing else is asked either.
+        let fast = Player(delays: [:], failing: [])
+        let hedged = try await resolver(fast, hedging: StreamHedging()).resolveStream(videoId: "dQw4w9WgXcQ", validate: false)
+        #expect(hedged?.strategyName == "VISIONOS")
+        #expect(fast.log.value == ["VISIONOS"])
+    }
+}

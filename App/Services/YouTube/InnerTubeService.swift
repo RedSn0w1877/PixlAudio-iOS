@@ -46,7 +46,9 @@ actor InnerTubeService {
             player: client, cipher: cipher, validator: StreamUrlValidator(http: plainHTTP), policy: .iOS,
             isSignedIn: { await account.hasCookie },
             maxBitrateKbps: { StreamingAudioQuality.maxBitrateKbps() },
-            strategies: { signedIn in await remote.current().chain(signedIn: signedIn) })
+            strategies: { signedIn in await remote.current().chain(signedIn: signedIn) },
+            // Streaming speed R8: overlapping clients only when remote/config.json turns `innertube.hedge` on.
+            hedging: { await remote.current().hedging })
     }
 
     // MARK: Resolution
@@ -157,6 +159,12 @@ actor InnerTubeService {
 
     func remoteSource() async -> String {
         await remote.source
+    }
+
+    /// Whether the remote table turns on overlapping clients (streaming speed R8), for the deep probe.
+    func hedgingDescription() async -> String {
+        guard let hedging = await remote.current().hedging else { return "off" }
+        return "on (next client after \(hedging.afterSeconds) s, \(hedging.strategyTimeoutSeconds) s per client)"
     }
 }
 
