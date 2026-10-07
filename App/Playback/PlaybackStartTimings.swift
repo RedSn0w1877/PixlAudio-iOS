@@ -152,14 +152,18 @@ nonisolated final class PlaybackStartTimings: @unchecked Sendable {
 
     // MARK: Engine marks
 
-    /// Opens a record for a start; returns its id for the later marks.
-    func begin(title: String, kind: Kind = .load) -> Int {
+    /// Opens a record for a start; returns its id for the later marks. `url` is the item's URL when it is already
+    /// known (a prepared item taken over).
+    func begin(title: String, kind: Kind = .load, url: URL? = nil) -> Int {
         signposter.emitEvent("StartBegin")
         let now = ContinuousClock.now
         return state.withLock { s in
             let id = s.nextId
             s.nextId += 1
-            s.records.append(Record(id: id, title: title, kind: kind, began: now))
+            var record = Record(id: id, title: title, kind: kind, began: now)
+            record.key = url?.absoluteString
+            record.isFile = url?.isFileURL ?? false
+            s.records.append(record)
             if s.records.count > Self.capacity { s.records.removeFirst(s.records.count - Self.capacity) }
             return id
         }
