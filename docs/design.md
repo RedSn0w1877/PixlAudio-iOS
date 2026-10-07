@@ -935,6 +935,22 @@ docs/api-notes.md › Spotify Connect output.
 - **Screenshot ids** (`UITests/SpotifyConnectScreenshotTests`, demo devices, no network): `devices.spotifyConnect`,
   `devices.spotifyPlaying`, `devices.spotifyReconnect`, `devices.spotifyEmpty` (the sheet opens on DEVICES),
   `nowPlaying.spotifyConnect`, `miniPlayer.spotifyConnect`.
+- **Volume buttons (2026-10-07, owner request):** while a speaker that takes volume commands plays, the phone's
+  volume buttons step it 5 % (foreground only; never for Smartphone/Tablet devices). The system pop-up is kept away
+  and PixlAudio shows its own (`SpotifyConnectVolumeHUD`): a top-centre glass capsule, 6 pt below the safe area,
+  `pixlGlass` tinted `surfaceContainerHigh` at `GlassTint.surface` — the level's speaker symbol in `primary`
+  (`symbolEffect(.replace)` between slash / 1 / 2 / 3 waves), the device name (`labelMedium`, one line, tail
+  truncation), a 132 × 4 pt track (plain capsule fills, `onSurface` 14 % and `primary`; no glass on glass) and the
+  percentage (`labelLarge`, monospaced digits). It slides down from the top with `PixlMotion.bars` (opacity only with
+  Reduce Motion), never takes touches, hides 1.5 s after the last press (a cancelled `Task`, nothing ticks while
+  idle) and VoiceOver hears "<device> volume N%" once when a burst ends. Only the overlay modifier reads its model, so
+  a press redraws the capsule and nothing under it. Placement: the shell covers the tabs and the full player; each
+  sheet and cover shows its own copy (the shell's steps aside while one is up); it stays away while the devices sheet
+  is open, whose hero slider already moves. The devices hero and the Equalizer's volume card share
+  `SpotifyConnectVolumeSlider`, which follows the device except under the user's finger. While Connect plays, the
+  Equalizer's volume card shows the device (its symbol, "<device> • Spotify Connect", its slider and percentage, or
+  "This device sets its own volume") instead of the phone's system slider. Screenshot ids:
+  `nowPlaying.spotifyVolumeHUD`, `lyrics.spotifyVolumeHUD`, `equalizer.spotifyConnect`.
 
 ## Streaming speed (2026-10-07, branch `wt/stream`; iOS first, Android later)
 

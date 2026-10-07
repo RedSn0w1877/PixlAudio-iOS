@@ -680,6 +680,26 @@ Swift-only and define the behaviour both apps share.
 - `UITests/SpotifyConnectScreenshotTests` — the section (light/dark), connect → stop on a demo device, playing state
   (light/dark), the hero with the device volume, reconnect row, empty hint, "Playing on" chip in the full (light/dark)
   and mini player.
+- **Volume buttons (2026-10-07, branch `s17-connect-volume`).** Android gets volume keys from Media3 and has no unit
+  test for `adjustVolume`; these are Swift-only and pin the iOS technique's logic.
+  - `PixlNetTests/SpotifyConnectVolumeTests` — `SpotifyConnectVolumeKeys`: one hardware step (exact 1/16 and the
+    rounded 0.05 / 0.10 reports) is ±1 press, 2/16 is two; the reset's echo (within 0.035 of the centre, or a reset
+    landing in two changes) is not a press; a press before the echo still counts; route-change jumps and small drags
+    re-anchor; the centre snaps to the 1/16 grid inside 0.125…0.875; Smartphone/Tablet and non-`supports_volume`
+    devices are excluded; 5 % per press clamped to 0…100 (50 when the device never reported a volume); the relative
+    mode's end detection. `SpotifyConnectVolumeLane`: the first change goes at once, then at most one request every
+    300 ms with the latest value, one in flight, a 429 keeps the value until Retry-After (a newer value replaces it),
+    another caller's gate holds sends, a failure drops only that value.
+  - `PixlNetTests/SpotifyConnectTests.volumeHoldKeepsTheLocalValueAgainstStalePolls` — the reducer keeps the local
+    volume for 3 s after a change (a stale poll writes nothing), extends it 1.5 s after the `PUT` (never shortens it),
+    applies the device's value after the hold, clamps; states built without a hold apply polls at once.
+  - `AppTests/AudioSessionControllerTests` — the volume buttons' hold: `releasePreparedActivation()` is ignored while
+    held; releasing the hold gives back a session nothing played on; a session `activate()` used is kept; handing over
+    to local playback (`keepingSession`) keeps the prepared session, and a later release works as before.
+  - `UITests/SpotifyConnectScreenshotTests` — the volume pop-up over the full player (light/dark; label "Volume for
+    Kitchen Echo Show, 50%") and over the lyrics screen; the devices hero's slider reads the 50 % the demo press set
+    and the pop-up hides over the devices sheet. `UITests/SettingsScreenshotTests.testEqualizerSpotifyConnect*` — the
+    Equalizer's volume card shows the Echo's volume. The button handling itself can't run in the Simulator.
 
 ## Streaming speed (2026-10-07, branch `wt/stream`; iOS first, Android later)
 Android has no unit tests for `CloudStreamProxy`'s retry loop or chunking; `StreamUrlPrefetcherTest` (3) covers its
