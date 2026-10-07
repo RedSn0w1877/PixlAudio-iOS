@@ -1,3 +1,4 @@
+import FoundationModels
 import SwiftUI
 
 // Compat27 — the ONLY file allowed to use iOS 27-only APIs (CI enforces this in ci/check-forbidden.sh).
@@ -35,5 +36,38 @@ enum Compat27 {
             return true
         }
         return false
+    }
+}
+
+// MARK: - Foundation Models (iOS 27 error types)
+
+extension Compat27 {
+    /// The iOS 27 Foundation Models errors as an `OnDeviceFailure` (nil for anything else, and always on iOS 26 or
+    /// with the Xcode 26 compiler). The iOS 27 SDK deprecates `LanguageModelSession.GenerationError` in favour of
+    /// `LanguageModelError`, `LanguageModelSession.Error` and `SystemLanguageModel.Error`; which ones an app built for
+    /// iOS 26.1 receives on iOS 27 isn't documented, so `OnDeviceModel.failure(for:)` checks both generations.
+    nonisolated static func onDeviceFailure(_ error: any Error) -> OnDeviceFailure? {
+        #if compiler(>=6.4)
+        if #available(iOS 27, *) {
+            if let error = error as? LanguageModelError {
+                switch error {
+                case .contextSizeExceeded: return .tooLong
+                case .guardrailViolation, .refusal: return .blocked
+                case .unsupportedLanguageOrLocale: return .language
+                case .rateLimited: return .busy
+                case .timeout: return .slow
+                default: return .other(error.localizedDescription)
+                }
+            }
+            if let error = error as? LanguageModelSession.Error {
+                switch error {
+                case .concurrentRequests: return .busy
+                default: return .other(error.localizedDescription)
+                }
+            }
+            if error is SystemLanguageModel.Error { return .notReady }
+        }
+        #endif
+        return nil
     }
 }

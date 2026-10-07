@@ -9,38 +9,52 @@ import PixlNet
 /// Playlist and Daily Mix prompts (whose schema asks for a JSON array of song ids) use guided generation
 /// (`OnDevicePlaylistSelection`, `@Generable`), so the small model can't wrap the ids in prose; the ids come back
 /// as the JSON array PixlNet's parser expects.
+///
+/// The app's own on-device features don't come through here any more (2026-10-07: `OnDeviceAI` runs chat, intro
+/// lines, greetings and translation with prompts sized for the model, and `OnDevicePlaylistCurator` the playlists).
+/// This client stays for the orchestrator's generic path: a cloud selection whose chain ends at ON_DEVICE.
+///
+/// - Errors name the provider "On-device model" (the provider's display name, "On-Device (Offline)", made every
+///   on-device failure read as "No Internet Connection") and map every error type through `OnDeviceModel`.
+/// - Plain-text requests use the permissive-guardrails model; the answer budget is what the context window leaves.
 nonisolated struct OnDeviceAiClient: AiClient {
     /// Android's `getDefaultModel()`.
     static let modelName = "on-device"
 
-    static var isAvailable: Bool {
-        if case .available = SystemLanguageModel.default.availability { return true }
-        return false
-    }
+    /// The provider name in error messages: no network words (see `OnDeviceFailure`).
+    static let providerName = "On-device model"
+
+    static var isAvailable: Bool { OnDeviceModel.isAvailable }
 
     var defaultModel: String { Self.modelName }
 
     func generateContent(model: String, systemPrompt: String, prompt: String, parameters: AiGenerationParameters) async throws -> String {
-        guard Self.isAvailable else {
-            throw Self.error("The on-device model isn't available on this iPhone right now. Pick another assistant in Settings › AI features.")
-        }
-        let session = LanguageModelSession(instructions: systemPrompt)
-        let options = GenerationOptions(sampling: nil, temperature: Double(parameters.temperature),
-                                        maximumResponseTokens: min(max(parameters.maxTokens, 256), 4096))
+        if let unavailable = OnDeviceModel.unavailability { throw Self.error(unavailable.message) }
+        let expectsIds = AIPromptShape.expectsSongIdArray(systemPrompt: systemPrompt)
+        // Guided output ignores the permissive guardrails, so the id array keeps the standard model.
+        let session = LanguageModelSession(model: expectsIds ? OnDeviceModel.standard : OnDeviceModel.permissive,
+                                           instructions: systemPrompt)
+        let input = await OnDeviceModel.tokenCount(systemPrompt + "\n" + prompt)
+        let budget = OnDeviceModel.responseBudget(contextSize: OnDeviceModel.contextSize, inputTokens: input,
+                                                  cap: min(max(parameters.maxTokens, 256), 4096))
+        let options = GenerationOptions(sampling: nil, temperature: Double(parameters.temperature), maximumResponseTokens: budget)
         do {
-            if AIPromptShape.expectsSongIdArray(systemPrompt: systemPrompt) {
+            if expectsIds {
                 let response = try await session.respond(to: prompt, generating: OnDevicePlaylistSelection.self, options: options)
-                return AIPromptShape.jsonArray(response.content.songIds)
+                let limit = AIPromptShape.targetLength(inPrompt: prompt)?.max ?? 150
+                return AIPromptShape.jsonArray(Array(response.content.songIds.prefix(max(limit, 1))))
             }
             let response = try await session.respond(to: prompt, options: options)
-            return response.content
-        } catch let error as LanguageModelSession.GenerationError {
-            throw Self.error(Self.message(for: error))
+            return OnDeviceModel.cleanReply(response.content)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw Self.error(OnDeviceModel.failure(for: error).message)
         }
     }
 
     func countTokens(model: String, systemPrompt: String, prompt: String) async -> Int {
-        (systemPrompt.count + prompt.count) / 4
+        await OnDeviceModel.tokenCount(systemPrompt + "\n" + prompt)
     }
 
     func availableModels(apiKey: String) async -> [String] { [Self.modelName] }
@@ -48,25 +62,8 @@ nonisolated struct OnDeviceAiClient: AiClient {
     func validateApiKey(_ apiKey: String) async -> Bool { true }
 
     private static func error(_ message: String) -> AiProviderError {
-        AiProviderSupport.makeError(providerName: AiProvider.onDevice.displayName, statusCode: nil, transportMessage: message,
+        AiProviderSupport.makeError(providerName: providerName, statusCode: nil, transportMessage: message,
                                     responseBody: nil, requestedModel: nil)
-    }
-
-    private static func message(for error: LanguageModelSession.GenerationError) -> String {
-        switch error {
-        case .exceededContextWindowSize:
-            return "The request is too long for the on-device model. Keep \"Save on usage\" on or lower the sample size in AI settings."
-        case .guardrailViolation, .refusal:
-            return "Content was blocked by safety filters. Try rephrasing your prompt."
-        case .unsupportedLanguageOrLocale:
-            return "The on-device model doesn't support this language yet."
-        case .assetsUnavailable:
-            return "The on-device model is still being prepared; try again later."
-        case .rateLimited, .concurrentRequests:
-            return "The on-device model is busy. Wait a moment and try again."
-        default:
-            return error.localizedDescription
-        }
     }
 }
 

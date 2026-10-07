@@ -123,7 +123,9 @@ extension EqualizerPreferences {
 
 extension AISettings {
     func reload(from f: AISettings) {
+        sync(\.cloudProvider, self, f)
         sync(\.provider, self, f)
+        sync(\.providerMigrated, self, f)
         sync(\.safeTokenLimit, self, f)
         sync(\.temperature, self, f)
         sync(\.topP, self, f)

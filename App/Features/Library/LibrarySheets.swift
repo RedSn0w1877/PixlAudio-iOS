@@ -676,12 +676,15 @@ nonisolated enum SongFiles {
 
 /// Android `PlaylistCreationTypeDialog`: "Create playlist" (`headlineSmall` bold, `primary`), "Choose the creation
 /// flow.", the Manual card (`primaryContainer`) and the With AI card (`tertiaryContainer`, or `surfaceContainer`
-/// with "Set up API key" while no AI provider is configured).
+/// with "Set up API key" while no AI provider is configured). iOS: while the selected on-device model can't answer,
+/// the card says why and the button opens the AI settings instead of asking for a key (2026-10-07).
 struct PlaylistCreationTypeSheet: View {
     let onManual: () -> Void
     let onSetupAI: () -> Void
     /// An AI provider is configured (Android `hasActiveAiProviderApiKey`).
     var isAIEnabled = false
+    /// Why the selected on-device model can't answer (nil: a cloud provider, or it can).
+    var onDeviceIssue: OnDeviceFailure? = nil
     /// Opens the AI Playlist Lab (stage 13).
     var onAI: () -> Void = {}
 
@@ -702,18 +705,16 @@ struct PlaylistCreationTypeSheet: View {
                      systemImage: "text.badge.plus", fill: theme.primaryContainer, content: theme.onPrimaryContainer,
                      enabled: true, action: onManual)
                 .accessibilityIdentifier("creation.manual")
-            modeCard(title: "With AI",
-                     subtitle: isAIEnabled ? "Generate a curated playlist with advanced controls."
-                                           : "Requires an AI provider key configured in settings.",
-                     systemImage: isAIEnabled ? "sparkles" : "key.fill",
+            modeCard(title: "With AI", subtitle: aiSubtitle,
+                     systemImage: isAIEnabled ? "sparkles" : (onDeviceIssue == nil ? "key.fill" : "cpu"),
                      fill: isAIEnabled ? theme.tertiaryContainer : theme.surfaceContainer,
                      content: isAIEnabled ? theme.onTertiaryContainer : theme.onSurfaceVariant,
                      enabled: isAIEnabled, action: onAI)
             if !isAIEnabled {
                 Button(action: onSetupAI) {
                     HStack(spacing: 8) {
-                        Image(systemName: "key.fill")
-                        Text("Set up API key").pixlFont(.labelLarge)
+                        Image(systemName: onDeviceIssue == nil ? "key.fill" : "gearshape")
+                        Text(onDeviceIssue == nil ? "Set up API key" : "Open AI settings").pixlFont(.labelLarge)
                     }
                     .foregroundStyle(theme.onPrimary)
                     .frame(maxWidth: .infinity)
@@ -728,6 +729,12 @@ struct PlaylistCreationTypeSheet: View {
         .padding(20)
         .padding(.top, 8)
         .accessibilityIdentifier("sheet.createPlaylist")
+    }
+
+    private var aiSubtitle: String {
+        if isAIEnabled { return "Generate a curated playlist with advanced controls." }
+        if let onDeviceIssue { return "Needs on-device AI · \(onDeviceIssue.title)." }
+        return "Requires an AI provider key configured in settings."
     }
 
     /// Android `CreationModeCard`: 22 pt card, 14 pt padding, the icon in a 12/18 pt squircle, title (`titleMedium`

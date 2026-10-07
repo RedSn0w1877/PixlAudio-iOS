@@ -24,6 +24,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case settingsEqualizer = "settingsCategory.equalizer"
     case settingsBehavior = "settingsCategory.behavior"
     case settingsAI = "settingsCategory.ai"
+    /// AI features with a cloud assistant switched on (Gemini, the demo key): the optional "Cloud assistants" rows.
+    case settingsAICloud = "settingsCategory.ai.cloud"
     case settingsBackupRestore = "settingsCategory.backup_restore"
     case settingsDeveloper = "settingsCategory.developer"
     case settingsDeviceCapabilities = "settingsCategory.device_capabilities"
@@ -44,6 +46,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case libraryAlbums, libraryAlbumsList, libraryArtists, libraryPlaylists, libraryFolders, libraryLiked
     case librarySelection, librarySort, libraryReorderTabs, libraryMultiSelection, libraryCreatePlaylist
     case libraryAddToPlaylist, songOptionsInfo
+    /// The creation sheet when the selected on-device model can't answer (its system switch is off).
+    case libraryCreatePlaylistOnDeviceOff = "libraryCreatePlaylist.onDeviceOff"
     /// Library Navigation › Compact pill & grid (final review).
     case libraryCompactNav
     case playlistEdit, playlistAddSongs, playlistOptions, playlistReorder, genreSort
@@ -90,7 +94,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .library, .miniPlayer, .miniPlayerSpotifyConnect: return "screen.library"
         case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryFolders, .libraryLiked,
              .librarySelection, .librarySort, .libraryReorderTabs, .libraryMultiSelection, .libraryCreatePlaylist,
-             .libraryAddToPlaylist, .libraryCompactNav:
+             .libraryAddToPlaylist, .libraryCompactNav, .libraryCreatePlaylistOnDeviceOff:
             return "screen.library"
         case .songOptionsInfo: return "screen.songInfo"
         case .miniPlayerAlone: return "screen.albumDetail"
@@ -115,7 +119,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
             return nil
         case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryFolders, .libraryLiked,
              .librarySelection, .librarySort, .libraryReorderTabs, .libraryMultiSelection, .libraryCreatePlaylist,
-             .libraryAddToPlaylist, .songOptionsInfo, .libraryCompactNav:
+             .libraryAddToPlaylist, .songOptionsInfo, .libraryCompactNav, .libraryCreatePlaylistOnDeviceOff:
             return nil
         case .playlistEdit: return .playlistEditor(playlistId: demo.playlists.first?.id)
         case .playlistAddSongs, .playlistOptions, .playlistReorder:
@@ -137,7 +141,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .settingsPlayback: return .settingsCategory(.playback)
         case .settingsEqualizer: return .settingsCategory(.equalizer)
         case .settingsBehavior: return .settingsCategory(.behavior)
-        case .settingsAI: return .settingsCategory(.ai)
+        case .settingsAI, .settingsAICloud: return .settingsCategory(.ai)
         case .settingsBackupRestore: return .settingsCategory(.backupRestore)
         case .settingsDeveloper: return .settingsCategory(.developer)
         case .settingsDeviceCapabilities: return .settingsCategory(.deviceCapabilities)
@@ -185,7 +189,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryFolders, .libraryLiked,
              .librarySelection, .librarySort, .libraryReorderTabs, .libraryMultiSelection, .libraryCreatePlaylist,
              .libraryAddToPlaylist, .songOptionsInfo, .playlistEdit, .playlistAddSongs, .playlistOptions,
-             .playlistReorder, .genreSort, .libraryCompactNav:
+             .playlistReorder, .genreSort, .libraryCompactNav, .libraryCreatePlaylistOnDeviceOff:
             .library
         default: .home
         }
