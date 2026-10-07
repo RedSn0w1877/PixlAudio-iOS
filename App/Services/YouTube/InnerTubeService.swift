@@ -66,7 +66,9 @@ actor InnerTubeService {
 
     private func resolveFresh(videoId: String, excluding: Set<String>, validate: Bool) async -> ResolvedStream? {
         let started = ContinuousClock.now
-        await remote.refreshIfNeeded()
+        // Streaming speed R4: never wait for the remote client table; a due refresh runs in the background and the
+        // resolution uses the current table (the saved file, or the built-in one).
+        await remote.refreshInBackground()
         let configMs = PlaybackStartTimings.ms(from: started, to: .now)
         var stream = (try? await resolver.resolveStream(videoId: videoId, validate: validate,
                                                         excludedStrategies: excluding)) ?? nil

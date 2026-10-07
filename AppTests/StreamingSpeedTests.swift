@@ -90,6 +90,35 @@ final class StreamingSpeedTests: XCTestCase {
         XCTAssertEqual(timings.records.first?.title, "\(PlaybackStartTimings.capacity - 1)")
     }
 
+    // MARK: Remote client table (R4)
+
+    func testTheSavedTableGatesTheRefreshAcrossRelaunches() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let file = directory.appendingPathComponent("remote-config.json")
+        try Data(#"{"schema": 1, "innertube": {"note": "saved"}}"#.utf8).write(to: file)
+
+        // Saved minutes ago: a relaunch uses it and makes no request.
+        let http = CountingHTTPClient()
+        let fresh = RemoteClientConfigStore(http: http, directory: directory)
+        await fresh.refreshIfNeeded()
+        await fresh.refreshInBackground()
+        XCTAssertEqual(http.count, 0)
+        let source = await fresh.source
+        XCTAssertEqual(source, "cached remote (saved)")
+
+        // Saved seven hours ago: one refresh, started without waiting for it.
+        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-7 * 3600)],
+                                              ofItemAtPath: file.path)
+        let stale = RemoteClientConfigStore(http: http, directory: directory)
+        await stale.refreshInBackground()
+        let refreshed = await waitUntil(timeout: 5) { http.count == 1 }
+        XCTAssertTrue(refreshed)
+        await stale.refreshIfNeeded()   // the attempt just made gates the next one
+        XCTAssertEqual(http.count, 1)
+    }
+
     func testResolveTimingDescribesTheWinner() {
         let stream = ResolvedStream(url: "https://r1.googlevideo.com/videoplayback?itag=140&n=abc", userAgent: "UA",
                                     strategyName: "VISIONOS")
