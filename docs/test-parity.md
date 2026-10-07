@@ -759,3 +759,22 @@ Nothing to port: Android has no tests for the full player's toggle row, the tran
   (song sheet) and `testLyricsOptionsFavoriteTogglesImmediately` (lyrics More sheet) tap the liked heart of demo song 0
   and expect the unliked state within 3 s without touching anything else; `testExpandedBluetoothLight`
   (`-screen nowPlaying.bluetooth`) expects "Playing on AirPods Pro" in the top bar and no "Now Playing" title.
+
+## Lyrics page (owner items 1 + 11, 2026-10-07, branch `s16-lyrics-page`, Swift-only)
+Android has no tests for the lyrics toolbar or the keep-screen-on switch; these define the iOS behaviour.
+
+- `PixlBackupTests/ModuleTests` — `catalogueKinds` (`keep_screen_on_lyrics` is android-only now, still listed once),
+  `retiredKeepScreenOnIsSkippedAndReported` (a backup carrying it restores the other keys and reports it under
+  skipped settings; nothing unknown or ignored).
+- `AppTests/BackupServiceTests.testOldBackupWithKeepScreenOnRestoresAndListsItSkipped` — restored end to end: the key
+  is skipped, never written to `UserDefaults`, never exported, and a value stored before the switch went is removed
+  by `LyricsViewPreferences`.
+- `UITests/LyricsScreenshotTests` — `testSingActive` (Sing's value "Vocals off" with the demo instrumental playing),
+  `testSingRendering` (value "Removing vocals …" while the demo job runs), `testTranslateMenu` (a long press on
+  Translate offers Translate via AI), `testShowAsPlainText` (the More sheet's switch turns karaoke into plain text, so
+  "Adjust sync" leaves the sheet); `testMoreSheet` now shows the half-height glass sheet and
+  `testMoreSheetBottomInLightApp` swipes twice (grow, then scroll).
+- `UITests/GlassAccessibilityTests.testLyricsToolbarKeepsButtonTraits` — Back, Translate, Sing, Lyrics options and
+  play/pause stay buttons with their labels inside the cluster's glass container; Sing and Translate report a value.
+- `UITests/PlayerScreenshotTests.testLyricsOptionsFavoriteTogglesImmediately` — now finds the More sheet's heart by
+  the full player's labels ("Remove from favorites" → "Add to favorites"), as the row is `PlayerToggleRow`.

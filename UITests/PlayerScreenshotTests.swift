@@ -44,22 +44,23 @@ final class PlayerScreenshotTests: XCTestCase {
         assertFavoriteFlips(app, name: "songInfoFavoriteToggled-light")
     }
 
-    /// The lyrics More sheet's shuffle · repeat · favourite row (the heart's state is its selected trait).
+    /// The lyrics More sheet's shuffle · repeat · favourite row: since 2026-10-07 the full player's liquid
+    /// `PlayerToggleRow`, so the heart reads "Remove from favorites" / "Add to favorites" as it does there.
     func testLyricsOptionsFavoriteTogglesImmediately() throws {
         let app = launch("lyricsOptions", "dark")
         let sheet = app.descendants(matching: .any)["screen.lyricsOptions"].firstMatch
         XCTAssertTrue(sheet.waitForExistence(timeout: 20), "the lyrics options did not appear")
-        let heart = app.buttons.matching(NSPredicate(format: "label == %@", "Favorite")).firstMatch
-        XCTAssertTrue(heart.waitForExistence(timeout: 10), "the favourite toggle is missing")
+        let heart = app.buttons.matching(NSPredicate(format: "label == %@", "Remove from favorites")).firstMatch
+        XCTAssertTrue(heart.waitForExistence(timeout: 10), "the liked heart is missing (demo song 0 starts liked)")
         var swipes = 0
         while !heart.isHittable, swipes < 4 {
             sheet.swipeUp()
             swipes += 1
         }
-        XCTAssertTrue(heart.isSelected, "demo song 0 should start liked")
+        XCTAssertTrue(heart.isSelected, "the liked heart should be selected")
         heart.tap()
-        let off = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isSelected == false"), object: heart)
-        XCTAssertEqual(XCTWaiter.wait(for: [off], timeout: 3), .completed, "the heart kept its old state after the tap")
+        let unliked = app.buttons.matching(NSPredicate(format: "label == %@", "Add to favorites")).firstMatch
+        XCTAssertTrue(unliked.waitForExistence(timeout: 3), "the heart kept its old state after the tap")
         snapshot(app, "lyricsOptionsFavoriteToggled-dark")
     }
 

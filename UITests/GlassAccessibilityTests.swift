@@ -62,6 +62,24 @@ final class GlassAccessibilityTests: XCTestCase {
         XCTAssertTrue(back.waitForExistence(timeout: 15), "Back is not a button")
     }
 
+    /// The lyrics screen's control cluster (2026-10-07: one container for play/pause, the seek bar and the toolbar;
+    /// Translate · Sing replace Synced · Static): every control stays a button with its fixed label, and the segments
+    /// report their state as the value.
+    func testLyricsToolbarKeepsButtonTraits() {
+        let app = launch("lyrics", ready: "screen.lyrics")
+        for label in ["Back", "Translate", "Sing", "Lyrics options"] {
+            let button = app.buttons.matching(NSPredicate(format: "label == %@", label)).firstMatch
+            XCTAssertTrue(button.waitForExistence(timeout: 15), "\(label) is not a button")
+        }
+        let playPause = app.buttons.matching(NSPredicate(format: "label == %@ OR label == %@", "Play", "Pause"))
+            .firstMatch
+        XCTAssertTrue(playPause.exists, "play/pause is not a button")
+        let sing = app.buttons.matching(NSPredicate(format: "label == %@", "Sing")).firstMatch
+        XCTAssertEqual(sing.value as? String, "Vocals on", "Sing does not report its state")
+        let translate = app.buttons.matching(NSPredicate(format: "label == %@", "Translate")).firstMatch
+        XCTAssertFalse((translate.value as? String ?? "").isEmpty, "Translate does not report its state")
+    }
+
     private func launch(_ screen: String, ready: String) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
