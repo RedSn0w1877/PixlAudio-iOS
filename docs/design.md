@@ -762,7 +762,8 @@ divergences.
   fetches (first chunk time and size) and the first `respond(with:)`, all within the start's first 10 s. One `Mutex`;
   never touched by the processing tap. Signposts: category "Streaming". **Where Hoa reads it:** Settings › Developer ›
   Test playback › "Stream start timings" (a `DeepProbeCard` under its own title, Copy / Close; a snapshot per tap) and
-  the deep probe's "Last start" and "Overlapping clients" lines. A skip into a prepared song reads "(skip into the
+  the deep probe's "Last start" and "Overlapping clients" lines; the newest start also shows in Settings › Developer ›
+  Diagnostics › "Last Song Start" (a plain `Form` section, read when the screen appears; shot `diagnostics`). A skip into a prepared song reads "(skip into the
   prepared song)"; a prefetched resolution "done before the tap (prefetch)".
 - **First fetch (R2).** PixlNet `StreamChunkPolicy`: AVFoundation's first loading request (content info + bytes 0–1)
   is answered by a GET of the first 128 KiB, so the next request starts from disk; each loading request's network
