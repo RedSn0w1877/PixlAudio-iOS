@@ -243,4 +243,13 @@ public enum ArtworkTheme {
 
     /// The tonal-spot pair of `brandSeed`.
     public static let brandPair: ColorRolesPair = schemePair(seed: brandSeed)
+
+    /// The app-wide accent scheme of a picked colour (iOS-only, owner request 2026-10-07: Settings › Appearance ›
+    /// Accent Color). TonalSpot surfaces and role tones with the primary at the seed's own chroma (at least 36), so a
+    /// vivid pick stays vivid in light mode and every role keeps its contrast. Near-grey seeds give grey schemes.
+    /// The default accent is `brandPair`, not `accentPair(seed: brandSeed)`, so nothing changes until a colour is
+    /// picked.
+    public static func accentPair(seed: UInt32) -> ColorRolesPair {
+        SchemeBuilder.accentPair(seed: seed)
+    }
 }
