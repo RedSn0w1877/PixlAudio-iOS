@@ -1,10 +1,10 @@
 import SwiftUI
 
 /// Previous / play-pause / next (Android `AnimatedPlaybackControls`): three pills 80 pt tall, 6 pt apart, sharing the
-/// width by weight — the pressed one grows to 1.1 while the others shrink to 0.65, then they settle back (220 ms
-/// after play/pause, 600 ms after a skip) on Android's fast spatial spring. Previous and next are `primary` with an
-/// `onPrimary` icon; play/pause is `tertiaryFixedDim` with an `onTertiaryFixed` icon, a full pill while paused and a
-/// 26 pt rounded rectangle while playing.
+/// width by weight — the pressed one grows to 1.1 while the others shrink to 0.65, then they settle back 220 ms after
+/// any press (Hoa, 2026-10-07: skips match play/pause; Android holds a skip 600 ms) on Android's fast spatial spring.
+/// Previous and next are `primary` with an `onPrimary` icon; play/pause is `tertiaryFixedDim` with an
+/// `onTertiaryFixed` icon, a full pill while paused and a 26 pt rounded rectangle while playing.
 ///
 /// Material's filled pills become tinted Liquid Glass of the same shapes (the play button carries the strongest
 /// tint), in one `GlassEffectContainer` whose spacing is below the 6 pt gaps so they never blend at rest.
@@ -39,6 +39,9 @@ struct AnimatedPlaybackControls: View {
     /// `MotionScheme.expressive().fastSpatialSpec` (damping 0.6, stiffness 800).
     private static let pressSpring = Animation.interpolatingSpring(mass: 1, stiffness: 800,
                                                                    damping: 2 * 0.6 * 800.0.squareRoot())
+    /// How long after a press the pills settle back, for all three (Android's `releaseDelay`, 220 ms; Android holds
+    /// previous / next 600 ms, Hoa asked for them to match play / pause).
+    private static let releaseDelay: Duration = .milliseconds(220)
 
     var body: some View {
         let widths = Self.widths(total: width, lastClicked: lastClicked)
@@ -64,9 +67,8 @@ struct AnimatedPlaybackControls: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isPlaying)
         .pixlHaptic(.selection, trigger: clickCount)
         .task(id: clickCount) {
-            guard let control = lastClicked else { return }
-            let delay: Duration = control == .playPause ? .milliseconds(220) : .milliseconds(600)
-            try? await Task.sleep(for: delay)
+            guard lastClicked != nil else { return }
+            try? await Task.sleep(for: Self.releaseDelay)
             guard !Task.isCancelled else { return }
             withAnimation(Self.pressSpring) { lastClicked = nil }
         }
