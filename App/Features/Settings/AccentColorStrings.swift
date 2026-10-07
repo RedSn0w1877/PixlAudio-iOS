@@ -7,7 +7,7 @@ import Foundation
 nonisolated extension L10n {
     static let settingsAccentColorTitle = String(localized: "settings_accent_color_title", defaultValue: "Accent Color")
     static let settingsAccentColorSubtitle = String(localized: "settings_accent_color_subtitle",
-                                                    defaultValue: "Colors buttons, switches, sliders, the tab bar and selected glass across the app. The player keeps its album colors.")
+                                                    defaultValue: "Colors buttons, switches, sliders, the tab bar and selected glass across the app. The player keeps its album colors (see Player Theme).")
     static let settingsAccentColorCustom = String(localized: "settings_accent_color_custom", defaultValue: "Custom")
     static let settingsAccentColorDefault = String(localized: "settings_accent_color_default", defaultValue: "PixlAudio")
     static let settingsAccentColorBlue = String(localized: "settings_accent_color_blue", defaultValue: "Blue")
