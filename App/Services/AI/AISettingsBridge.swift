@@ -19,8 +19,18 @@ nonisolated final class AISettingsBridge: AiSettingsProviding, @unchecked Sendab
         return String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// The stored provider; unset means the on-device model (the iOS default, `AISettings.provider`).
     func selectedProvider() async -> AiProvider {
-        AiProvider.fromString(defaults.string(forKey: PreferenceKeys.aiProvider) ?? AiProvider.gemini.rawValue)
+        AiProvider.fromString(defaults.string(forKey: PreferenceKeys.aiProvider) ?? AiProvider.onDevice.rawValue)
+    }
+
+    /// The providers a request tries, in order (`AiOrchestrator`'s `providerChain`).
+    func providerChain(_ primary: AiProvider) async -> [AiProvider] { Self.providerChain(primary) }
+
+    /// On-device stays on the device: no automatic cloud fallback (owner decision 2026-10-07). A cloud selection
+    /// keeps Android's chain (the other providers with a key, then the on-device model).
+    static func providerChain(_ primary: AiProvider) -> [AiProvider] {
+        primary == .onDevice ? [.onDevice] : AiProviderSupport.buildProviderChain(primary)
     }
 
     func apiKey(for provider: AiProvider) async -> String { Self.storedKey(for: provider) }

@@ -19,8 +19,8 @@ struct HomeView: View {
         let content = home.content
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 24) {
-                HomeGreetingCard(greeting: content.greeting, insight: content.insight,
-                                 isExpanded: home.isInsightExpanded,
+                HomeGreetingCard(greeting: content.greeting, insight: home.aiInsight ?? content.insight,
+                                 isExpanded: home.isInsightExpanded, isLoadingInsight: home.isLoadingInsight,
                                  onToggle: { withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { home.toggleInsight() } })
                     .padding(.horizontal, HomeMetrics.greetingInset)
 

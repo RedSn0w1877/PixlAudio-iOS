@@ -1,17 +1,33 @@
 import PixlLyrics
 import PixlModel
 import SwiftUI
-import UIKit
+
+/// A request to open the sync editor. The screen that opens it presents it from inside its own presentation (the
+/// lyrics screen's cover, Edit song's cover) with `fullScreenCover(item:)`, so closing the editor returns to that
+/// screen instead of swapping the app's one root cover (which tore the lyrics screen down, and with it the editor).
+/// The id is the song: a second request for the same song while the editor shows changes nothing.
+nonisolated struct LyricsSyncRequest: Identifiable, Hashable, Sendable {
+    let songId: String
+    var entry: SyncEntry = .auto
+
+    var id: String { songId }
+}
 
 /// The "sync it yourself" editor (Android `LyricsSyncEditorOverlay` + the sync screens): a full-screen cover with the
 /// lyrics screen's animated artwork behind it and a light scrim, switching between Intro → Words → Tap → Preview (plus
 /// the resume, manage, loading and error screens). It keeps the screen on, pauses when the app leaves the foreground,
 /// and hands the player back as it was on close (`LyricsSyncSession.close`).
+///
+/// Whoever presents it owns the presentation: `onClose` dismisses it (the lyrics screen and Edit song clear their
+/// `LyricsSyncRequest`; the `AppCover.lyricsSync` route, kept for `-screen lyricsSync` UI tests, dismisses the root
+/// cover). The view only calls `onClose` when the session ends while it is on screen; its own disappearance closes
+/// the session with `.viewGone`, which never navigates.
 struct LyricsSyncEditorView: View {
     let songId: String
+    var entry: SyncEntry = .auto
+    let onClose: () -> Void
 
     @Environment(AppEnvironment.self) private var env
-    @Environment(Router.self) private var router
     @Environment(PlaybackStore.self) private var playback
     @Environment(ThemeStore.self) private var themeStore
     @Environment(\.scenePhase) private var scenePhase
@@ -25,21 +41,6 @@ struct LyricsSyncEditorView: View {
     private var theme: ThemeColors { themeStore.colors(for: .dark).player }
 
     private var isUITest: Bool { LaunchConfiguration.current.isUITest }
-
-    // MARK: Opening
-
-    /// What the next presentation should do (set by `open`; the route carries only the song id).
-    private static var pendingEntry: SyncEntry = .auto
-    private static var pendingReturnToLyrics = false
-    private static var returnToLyrics = false
-
-    /// Opens the editor for a song: from the lyrics screen it returns there when it closes (Android: the editor is a
-    /// layer over the lyrics sheet); "Change the words" / "Fix timing" pass their entry.
-    static func open(songId: String, router: Router, entry: SyncEntry = .auto, fromLyrics: Bool = false) {
-        pendingEntry = entry
-        pendingReturnToLyrics = fromLyrics
-        router.present(AppCover.lyricsSync(songId: songId))
-    }
 
     // MARK: Body
 
@@ -67,11 +68,14 @@ struct LyricsSyncEditorView: View {
                                             removal: .opacity.animation(.easeIn(duration: 0.14))))
 
                 if let notice = session.notice {
+                    // Over the bottom of the tap pad: only Undo takes touches, everything else lets taps through to
+                    // the pad (Android: only the Undo box is clickable; owner decision 2026-10-07).
                     SyncNoticePill(notice: notice, palette: palette, onUndo: session.undoRemoval,
                                    onTimeout: { session.dismissNotice(id: $0) })
                         .padding(.horizontal, 24)
                         .padding(.bottom, 92)
                         .frame(maxHeight: .infinity, alignment: .bottom)
+                        .allowsHitTesting(notice.canUndo)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
@@ -83,8 +87,11 @@ struct LyricsSyncEditorView: View {
         .accessibilityIdentifier("screen.lyricsSync")
         .onAppear(perform: start)
         .onDisappear {
-            session?.close()
-            UIApplication.shared.isIdleTimerDisabled = false
+            // Teardown only: restore the player, keep the taps. Never navigate from here (`.viewGone`); a later
+            // appearance starts a fresh session.
+            session?.close(.viewGone)
+            session = nil
+            ScreenAwake.set(false, for: .lyricsSync)
         }
         .onChange(of: session?.phase) { _, phase in
             // Keep drawing the last screen while the cover leaves.
@@ -92,6 +99,10 @@ struct LyricsSyncEditorView: View {
         }
         .onChange(of: playback.isPlaying) { _, playing in session?.playingChanged(playing) }
         .onChange(of: playback.current?.id) { _, id in session?.currentSongChanged(to: id) }
+        // `remoteOutputName`, not `isRemoteActive`: the latter reads an unobserved weak reference.
+        .onChange(of: playback.remoteOutputName) { _, name in
+            if name != nil { session?.remoteOutputAttached() }
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { session?.onHostStopped() }
         }
@@ -156,11 +167,7 @@ struct LyricsSyncEditorView: View {
 
     private func start() {
         guard session == nil else { return }
-        UIApplication.shared.isIdleTimerDisabled = true
-        let entry = Self.pendingEntry
-        Self.returnToLyrics = Self.pendingReturnToLyrics
-        Self.pendingEntry = .auto
-        Self.pendingReturnToLyrics = false
+        ScreenAwake.set(true, for: .lyricsSync)
 
         let fileManager = FileManager.default
         let draftsDirectory: URL
@@ -180,15 +187,8 @@ struct LyricsSyncEditorView: View {
             draftStore: LyricsSyncDraftStore(directory: draftsDirectory),
             preferences: LyricsSyncPreferences(isUITest: isUITest), isUITest: isUITest,
             songLookup: { library.song(id: $0) })
-        let router = self.router
-        created.onClosed = {
-            if Self.returnToLyrics {
-                Self.returnToLyrics = false
-                router.present(AppCover.lyrics)
-            } else {
-                router.dismissCover()
-            }
-        }
+        // Runs once, and only for a close while the editor is on screen (never for `.viewGone`).
+        created.onClosed = onClose
         session = created
         if isUITest, let step = LyricsSyncLaunchOptions.current.step, let song = playback.current {
             created.applyDemo(LyricsSyncDemoState.make(step, song: song))

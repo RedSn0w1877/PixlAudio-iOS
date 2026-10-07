@@ -233,6 +233,82 @@ final class DualDeckEngineTests: XCTestCase {
         XCTAssertEqual(engine.queue.currentIndex, 2)
     }
 
+    // MARK: Skips into the prepared item (streaming speed R7)
+
+    func testASkipTakesOverTheCrossfadesPreparedItem() async throws {
+        let urls = try (0..<3).map { try TestAudio.sine(frequency: 300 + Double($0) * 100, seconds: 8) }
+        let songs = urls.enumerated().map { TestAudio.song($1, id: "f:\($0)", seconds: 8) }
+        let engine = makeEngine()
+        defer { engine.stop() }
+        let resolver = CountingPlayableURLResolver(base: engine.factory.resolver)
+        engine.factory.resolver = resolver
+        engine.crossfadeEnabled = true
+        engine.globalTransition = TransitionSettings(mode: .overlap, durationMs: 1000, curveIn: .linear,
+                                                     curveOut: .linear)
+        var transitions: [(new: String?, automatic: Bool)] = []
+        engine.onItemTransition = { new, _, automatic in transitions.append((new: new?.id, automatic: automatic)) }
+
+        engine.setQueue(songs, startIndex: 0, startPositionMs: 0, playWhenReady: true)
+        try await waitForAudio(engine)
+        XCTAssertNotNil(engine.plannedCrossfade)
+        let ready = await waitUntil(timeout: 4) { engine.preparedIncoming != nil }
+        XCTAssertTrue(ready, "the crossfade prepares the next item after its 1.5 s debounce")
+        let prepared = try XCTUnwrap(engine.preparedIncoming)
+        XCTAssertEqual(prepared.entry.song.id, "f:1")
+        XCTAssertNotNil(prepared.tap.ramp.read(), "a crossfade's incoming item waits at gain 0")
+        let resolutions = resolver.calls
+
+        engine.skipToNext()
+        // Taken over at once: no new item, no new resolution, full gain.
+        XCTAssertTrue(engine.activeItem === prepared)
+        XCTAssertTrue(engine.active.currentItem === prepared)
+        XCTAssertEqual(resolver.calls, resolutions)
+        XCTAssertEqual(engine.queue.currentIndex, 1)
+        XCTAssertNil(engine.preparedIncoming)
+        XCTAssertNil(prepared.tap.ramp.read())
+        XCTAssertTrue(engine.idle.items.isEmpty, "the outgoing deck is emptied")
+        XCTAssertEqual(transitions.last?.new, "f:1")
+        XCTAssertEqual(transitions.last?.automatic, false)
+        XCTAssertEqual(PlaybackStartTimings.shared.records.first?.kind, .prepared)
+        let playing = await waitUntil(timeout: 3) { prepared.positionSeconds > 0.2 && engine.active.isPlaying }
+        XCTAssertTrue(playing, "the adopted item plays")
+        let measured = await waitUntil(timeout: 2) { PlaybackStartTimings.shared.records.first?.playingMs != nil }
+        XCTAssertTrue(measured, "the skip's start is timed")
+        XCTAssertNotNil(engine.plannedCrossfade, "the next crossfade is planned from the adopted item")
+    }
+
+    func testASkipTakesOverTheGaplessHandOversPreparedItem() async throws {
+        // 6 s songs: the hand-over (transition at 5 s) prepares the next item once within its last 4.5 s.
+        let urls = try (0..<3).map { try TestAudio.sine(frequency: 350 + Double($0) * 100, seconds: 6) }
+        let songs = urls.enumerated().map { TestAudio.song($1, id: "f:\($0)", seconds: 6) }
+        let engine = makeEngine()
+        defer { engine.stop() }
+        let resolver = CountingPlayableURLResolver(base: engine.factory.resolver)
+        engine.factory.resolver = resolver
+        engine.setQueue(songs, startIndex: 0, startPositionMs: 0, playWhenReady: true)
+        try await waitForAudio(engine)
+        XCTAssertNotNil(engine.plannedHandOver)
+        let ready = await waitUntil(timeout: 4) { engine.preparedIncoming != nil }
+        XCTAssertTrue(ready)
+        let prepared = try XCTUnwrap(engine.preparedIncoming)
+        XCTAssertEqual(prepared.entry.song.id, "f:1")
+        let resolutions = resolver.calls
+
+        engine.skipToNext()
+        XCTAssertTrue(engine.activeItem === prepared)
+        XCTAssertEqual(resolver.calls, resolutions)
+        XCTAssertEqual(engine.queue.currentIndex, 1)
+        let playing = await waitUntil(timeout: 3) { prepared.positionSeconds > 0.2 }
+        XCTAssertTrue(playing)
+        XCTAssertLessThan(prepared.positionSeconds, 3, "the adopted item starts from its beginning")
+
+        // A skip to a song nothing prepared still loads it.
+        engine.skipToQueueItem(at: 0)
+        let back = await waitUntil(timeout: 3) { engine.activeItem?.entry.song.id == "f:0" }
+        XCTAssertTrue(back)
+        XCTAssertGreaterThan(resolver.calls, resolutions)
+    }
+
     func testQueueEventsReachThePlaybackStore() async throws {
         let urls = try (0..<5).map { try TestAudio.sine(frequency: 300 + Double($0) * 50, seconds: 2) }
         let songs = urls.enumerated().map { TestAudio.song($1, id: "f:\($0)", seconds: 2) }
@@ -353,5 +429,22 @@ final class DualDeckEngineTests: XCTestCase {
         XCTAssertTrue(ready)
         XCTAssertEqual(Double(restored.currentPositionMs()), 1_500, accuracy: 150)
         defaults.removePersistentDomain(forName: suite)
+    }
+}
+
+/// Counts resolutions around another resolver (each built item resolves once).
+nonisolated final class CountingPlayableURLResolver: PlayableURLResolving, Sendable {
+    let base: any PlayableURLResolving
+    private let count = Mutex(0)
+
+    init(base: any PlayableURLResolving) {
+        self.base = base
+    }
+
+    var calls: Int { count.withLock { $0 } }
+
+    func playableURL(for song: Song) async -> URL? {
+        count.withLock { $0 += 1 }
+        return await base.playableURL(for: song)
     }
 }

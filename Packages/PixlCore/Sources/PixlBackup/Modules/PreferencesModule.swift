@@ -94,8 +94,16 @@ public enum AndroidPreferenceKind: String, Sendable, Hashable {
 }
 
 /// The catalogue of Android preference keys (`UserPreferencesRepository`, `ThemePreferencesRepository`,
-/// `EqualizerPreferencesRepository`, `AiPreferencesRepository`, the lyrics sheet and appearance prefs).
+/// `EqualizerPreferencesRepository`, `AiPreferencesRepository`, the lyrics sheet and appearance prefs), plus the few
+/// settings only the iOS app has (`iosOnly`), which travel in the same global-settings module.
 public enum AndroidPreferenceCatalog {
+    /// Settings only the iOS app has (owner requests), backed up and restored by name like the portable keys.
+    /// Android's `importPreferencesFromBackup` writes every entry whatever its key, so they survive an
+    /// iOS → Android → iOS round trip untouched. A backup without them (older iOS backups, Android backups) restores
+    /// cleanly: the global-settings restore clears them like every portable key, so the iOS default comes back.
+    /// - `accent_color_v1`: Settings › Appearance › Accent Color, a `"#RRGGBB"` string (`""` = PixlAudio's violet).
+    public static let iosOnly: [String] = ["accent_color_v1"]
+
     /// Never exported or imported (`backupExcludedKeyNames`).
     public static let backupExcludedKeys: Set<String> = ["initial_setup_done"]
 
@@ -162,6 +170,7 @@ public enum AndroidPreferenceCatalog {
         for k in androidOnly { t[k] = .androidOnly }
         for k in deviceState { t[k] = .deviceState }
         for k in deviceIds { t[k] = .deviceIds }
+        for k in iosOnly { t[k] = .portable }
         return t
     }()
 

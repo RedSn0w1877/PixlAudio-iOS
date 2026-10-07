@@ -9,6 +9,7 @@
       "WEB_REMIX": { "clientVersion": "1.20260707.12.00" }
     },
     "preSignedOrder": ["VISIONOS", "IOS"],
-    "cipheredOrder": ["TVHTML5", "WEB", "WEB_REMIX"]
+    "cipheredOrder": ["TVHTML5", "WEB", "WEB_REMIX"],
+    "hedge": { "enabled": false, "afterSeconds": 1.5, "strategyTimeoutSeconds": 8 }
   }
 }

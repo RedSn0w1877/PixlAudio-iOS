@@ -351,4 +351,9 @@ public struct AiPlaylistGenerator: Sendable {
 public struct AiPlaylistGenerationError: Error, Sendable, Hashable, CustomStringConvertible {
     public let message: String
     public var description: String { message }
+
+    /// Public so the app's on-device curator reports its failures the way the generator does.
+    public init(message: String) {
+        self.message = message
+    }
 }

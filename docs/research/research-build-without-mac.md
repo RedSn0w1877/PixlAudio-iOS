@@ -11,7 +11,7 @@
 
 ## Project generation: XcodeGen (`project.yml`), .xcodeproj not committed
 - Tuist uses Swift manifests (can't validate on Windows) and had a `.icon` bug. Pure SwiftPM can't make an iOS app bundle with entitlements/icons/UI tests — use SwiftPM only for the logic package.
-- Icon Composer `.icon`: XcodeGen expands it into loose files → needs `options.fileTypes: {icon: {file: true}}` (XcodeGen#1556, no fixed release); `.icon` can't be authored reliably on Windows → use `Assets.xcassets/AppIcon.appiconset` with one 1024×1024 PNG.
+- Icon Composer `.icon`: XcodeGen 2.45.1+ has built-in `.icon` folder support (#1600; the older workaround for XcodeGen#1556 is no longer needed), and CI pins 2.46.0. The asset catalog stays the default because a `.icon` can't be authored or previewed without a Mac: `Assets.xcassets/AppIcon.appiconset` holds 1024×1024 PNGs for the Any, Dark and Tinted appearances, rendered by `ci/make-icon.py`.
 - XcodeGen 2.44+ supports `type: syncedFolder` sources.
 
 Minimal example:

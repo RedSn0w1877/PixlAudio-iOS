@@ -42,10 +42,16 @@ Forbidden in `App/` (CI, `ci/check-forbidden.sh`): Material / Compose names as i
 
 - `ThemeColors` (`DesignSystem/Theme.swift`) exposes all 48 PixlAudio palette roles as `Color`
   (`theme.onPrimaryContainer`), backed by PixlLibrary's `ColorRoles`. Two environment values:
-  - `\.appTheme` — the app chrome (Android's `MaterialTheme.colorScheme` outside the player): the brand scheme,
-    or the album scheme when *player theme = Global*;
+  - `\.appTheme` — the app chrome (Android's `MaterialTheme.colorScheme` outside the player): the **accent
+    scheme** (Settings › Appearance › Accent Color, iOS-only; PixlAudio's violet `brandPair` by default), or the
+    album scheme when *player theme = Global*;
   - `\.playerTheme` — the current song's album scheme (Android `LocalMaterialTheme` in the player / mini player);
-    equals `appTheme` when nothing plays or album theming is off.
+    equals `appTheme` when nothing plays or album theming is off (Player Theme "Accent Color", stored `dynamic`).
+- The accent (owner request 2026-10-07, see § Accent colour): a picked colour becomes
+  `ArtworkTheme.accentPair(seed:)` — TonalSpot's surfaces, secondary, tertiary and role tones with the primary at
+  the pick's own chroma (≥ 36), so the primary family is vivid in light mode and pastel (tone 80) in dark mode, and
+  surfaces / icons take a faint cast of its hue as with the violet. Album schemes are unchanged. Never hard-code the
+  violet: read `theme.primary` & co.
 - `ThemeStore` follows the current song (`.task(id:)` in the shell) and `player_theme_preference_v2`,
   `album_art_palette_style_v1`, `album_art_color_accuracy_v1`; `ColorExtractor` decodes the art at 128 px and runs
   the ported seed selection + scheme generation off the main thread, cached in memory and `ArtworkThemeRecord`
@@ -188,7 +194,7 @@ PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact ba
 | Player sheet (expanded) | `AppCover.nowPlaying` | `NowPlayingView` (Features/NowPlaying) | 8 |
 | Queue / Song info / Sleep timer | `AppSheet.queue/.songInfo/.sleepTimer` | `QueueSheet`, `SongInfoSheet`, `SleepTimerSheet` | 8 |
 | Karaoke lyrics / lyrics options | `AppCover.lyrics`, `AppSheet.lyricsOptions` | `LyricsView`, `LyricsOptionsSheet` (Features/Lyrics) | 9 |
-| Lyrics sync editor | `AppCover.lyricsSync(songId:)` | `LyricsSyncEditorView` (Features/LyricsSync) | 10 |
+| Lyrics sync editor | a cover nested in `LyricsView` / `EditSongSheet` (`LyricsSyncRequest`); `AppCover.lyricsSync(songId:)` only for `-screen lyricsSync` UI tests | `LyricsSyncEditorView` (Features/LyricsSync) | 10 |
 | YouTube login (+ device-code dialog, cookie paste) | `.youTubeLogin` | `YouTubeLoginView` (Features/YouTube) | 11 |
 | Playback test ("Test playback" / "Deep probe", Android: Spotify dashboard cards) | `.playbackDiagnostics` | `PlaybackDiagnosticsView` (Features/YouTube) | 11 |
 | Offline download card (song sheet) | inside `SongOptionsSheet` | `OfflineDownloadCard` (Features/YouTube) | 11 |
@@ -266,6 +272,10 @@ goes into `docs/api-notes.md`.
 hidden). The ready element of each is `screen.<id>`. Stage 4 shots: home, library, miniPlayer, miniPlayerAlone in
 light + dark; search, settings, nowPlaying, diagnostics.
 
+`-accent RRGGBB` (UI tests only) starts any screen with that accent colour (Settings › Appearance › Accent Color);
+shots taken with it carry a suffix (`settingsCategory.appearance-dark-accentRed`, `home-dark-accentGreen`). Accent
+swatches are `settings.accent.<preset id>` / `settings.accent.custom`, the row `settings.accentColor`.
+
 Stage 7a ids (Library tab on screen, ready `screen.library` plus the page/sheet id): `libraryPlaylists`,
 `libraryAlbums` (grid), `libraryAlbumsList`, `libraryArtists`, `libraryFolders`, `libraryLiked`, `librarySelection`
 (three songs selected), `librarySort`, `libraryReorderTabs`, `libraryMultiSelection`, `libraryCreatePlaylist`,
@@ -338,12 +348,29 @@ categories, sheets; glass in place of Material; text legible in light and dark. 
   release rules), tap the mini player, the collapse circle, VoiceOver escape, or swipe in from the leading edge
   (predictive back). An upward flick on the expanded player opens the queue.
 - **`AppCover.nowPlaying` is a request** the sheet consumes (the shell's cover binding skips it): every existing
-  `router.present(AppCover.nowPlaying)` still opens the player. Lyrics (`AppCover.lyrics`) and the sync editor open
-  above the expanded player and return to it.
+  `router.present(AppCover.nowPlaying)` still opens the player. Lyrics (`AppCover.lyrics`) opens above the expanded
+  player and returns to it; the sync editor opens in its own cover over the lyrics screen and returns there.
 - **Full player** (`NowPlayingView`, Android `FullPlayerContent`): top bar, carousel (`carousel_style` peek styles),
   title/artist (+ artist picker for several credits), lyrics and AI DJ circles, `PlayerSeekBar` (≤ 4 Hz from
   `PlaybackStore.clock`), `AnimatedPlaybackControls` (weighted glass pills), `PlayerToggleRow`, the
   `player_ambient_style` background. Controls are clear glass tinted with the album roles (`playerGlass`).
+- **Sheets:** `AppSheet.queue` (large; see-through `tallGlass` since 2026-10-07), `.sleepTimer`, `.devices`, `.artistPicker(songId:)`, `.taisChat` (stage 13's
+
+- **Player changes (owner overrides of parity, Hoa 2026-10-07):**
+  - *Top bar:* no "Now Playing" title and no cloud for streamed songs (Android shows them unless it casts). The output
+    pill names the output for anything but the phone's own speaker (Spotify Connect, AirPlay, Bluetooth, wired, car;
+    the kind, e.g. "Bluetooth audio", when the route has no name) and stays icon only on the speaker. It hugs its
+    content (50 pt icon only, like Android's wrapped pill and the queue pill; no 190 pt cap) and the right-hand cluster
+    has `layoutPriority(1)` over the bar's `Spacer`, so a name may use about width − 146 pt before it truncates at the
+    tail. The dot marks only outputs that play elsewhere (Connect, AirPlay); "Connecting…" with a spinner while a
+    Connect session starts. It springs on the name itself. VoiceOver: "Playing on <device>" / "Playing on this
+    phone". `PlayerTopBar` no longer takes the song.
+  - *Transport:* previous / next settle back 220 ms after the tap, like play/pause (Android holds a skip 600 ms).
+  - *Favourite hearts* (full player, song sheet, lyrics More sheet) read `LibraryStore.observedSong(id:)` in their own
+    small views (`PlayerToggles`, `SongFavoriteTile`, the More sheet's body): the library's song lookup is
+    `@ObservationIgnored`, so a heart read through `song(id:)` stayed stale until something else redrew the view.
+    `observedSong` also reads `revision`: use it only in small views, never in list rows, `NowPlayingView.body` or
+    `LyricsView`. The lock screen's Like toggles the same favourite and follows edits made in the app.
 - **Sheets:** `AppSheet.queue` (large), `.sleepTimer`, `.devices`, `.artistPicker(songId:)`, `.taisChat` (stage 13's
   TAIS DJ chat, from the sparkles circle); `AppCover.editSong(songId:)`. The queue presents the song sheet, the timer and Save as
   playlist itself. The song sheet's edit button (`SongOptionsSheet(onEdit:)`) opens `EditSongSheet`.
@@ -357,6 +384,9 @@ categories, sheets; glass in place of Material; text legible in light and dark. 
 Stage 8 screenshot ids (`UITests/PlayerScreenshotTests`): `miniPlayer` (collapsed), `nowPlaying` (expanded; `-paused`
 for pp_full), `queue`, `sleepTimer`, `songInfo`, `editSong`, `artistPicker` (song 16, two credits), `devices` —
 the player's sheets open over the expanded player. Gesture tests: drag up from the mini player, collapse circle.
+`nowPlaying.bluetooth` (2026-10-07): the expanded player with `AudioRouteMonitor`'s demo route ("AirPods Pro"; the
+simulator always plays to its speaker), for the named output pill. Favourite tests tap the liked heart in
+`nowPlaying`, `songInfo` and `lyricsOptions` and expect it to flip at once.
 
 ## Stage 9 notes (karaoke lyrics, lyrics services)
 
@@ -414,8 +444,9 @@ lyricsCascade.f0…f7 (first-show cascade frames, live clock).
 Port of Android `presentation/lyrics/sync/**` + `LyricsSyncEditorStateHolder` (`AppCover.lyricsSync` →
 `LyricsSyncEditorView`), on PixlLyrics' `LyricsTapSync` / `LyricsExport` / `LyricsSyncDraftStore`.
 
-- **Session** (`LyricsSyncSession`, created by the cover, closed on dismiss): phases Loading → Resume / Words / Intro /
-  Manage → Tap (and Fix a line) → Preview, Android's dialogs as system alerts, notices as a glass pill. While open it
+- **Session** (`LyricsSyncSession`, created when the editor appears, closed with `.viewGone` when it disappears): phases
+  Loading → Resume / Words / Intro / Manage → Tap (and Fix a line) → Preview, Android's dialogs as system alerts,
+  notices as a glass pill. While open it
   pauses, suspends crossfades (`DualDeckEngine.suspendTransitions(owner: "lyrics_sync")`) and opens an exact-timing
   session (`beginExactTimingSession`: no hand-over; at the end of the song the engine pauses on it → "The song ended
   before the last N words"); `close()` restores the rate and both. Drafts autosave 1 s after a change to
@@ -437,17 +468,61 @@ Port of Android `presentation/lyrics/sync/**` + `LyricsSyncEditorStateHolder` (`
   luminous enough, else `inversePrimary`) at `GlassTint.prominent` for Start / Save / the selected speed / the intro
   icons; 35 % black over bright art. Buttons inside the panel are fills. Preview uses the real `KaraokeLyricsView` with
   its own `LyricsDriver` on the editor's clock and the lyrics screen's appearance preferences.
-- **Entry points:** the lyrics More sheet's first row, the empty-state button and the sync chip
-  (`LyricsSyncEditorView.open(…, fromLyrics: true)` — the editor returns to the lyrics screen); Edit song's "Change the
-  words" (`.words`) and "Fix timing" (`.fixTiming`), which start the song paused if another one is playing.
+- **Entry points** (reworked 2026-10-07, below): the lyrics More sheet's first row, the empty-state button and the sync
+  chip open the editor over the lyrics screen; Edit song's "Change the words" (`.words`) and "Fix timing"
+  (`.fixTiming`) open it over Edit song. Both start the song paused if another one is playing.
 - **Shared-file changes (additive):** `Playback/DualDeckEngine.swift` (exact-timing session), `Stores/PlaybackStore.swift`
   (explicit `resume()` / `pause()`), `Services/LyricsController.swift` (`lyricsService`, shared with stage 14), `Features/Lyrics/LyricsView.swift`
-  and `Features/SongInfo/EditSongSheet.swift` (open through `LyricsSyncEditorView.open`).
+  and `Features/SongInfo/EditSongSheet.swift` (each presents the editor in its own nested cover).
+
+### Sync editor entry fix (2026-10-07)
+
+Owner report from the phone: tap sync → "Getting the song ready…" → the editor disappears → nothing. Cause: the editor
+replaced the lyrics screen in the app's single root `fullScreenCover(item:)` slot (`router.present(.lyricsSync)` while
+`.lyrics` showed). Changing the item tears the shown cover down, and the editor's teardown navigated: its
+`onDisappear` closed the session, and `close()` always called `onClosed`, which swapped the root cover or dismissed it
+(through static "return to lyrics" flags shared by every instance). `close()` set `.closed`, which draws the spinner,
+then the navigation took the editor away; on re-appear `guard session == nil` stopped any recovery. CI never saw it:
+every editor test launched straight into `-screen lyricsSync`.
+
+- **The editor is a nested cover.** `LyricsView` and `EditSongSheet` own `@State syncRequest: LyricsSyncRequest?` and
+  `.fullScreenCover(item: $syncRequest)` → `LyricsSyncEditorView(songId:entry:onClose:)`; `onClose` clears the
+  request. Android shows the editor as an overlay inside the full player (`LyricsSyncEditorOverlay`): one present
+  animation, and closing lands on the same lyrics instance. The static `open(…)` and its flags are gone.
+  `AppCover.lyricsSync` stays only for `-screen lyricsSync` UI tests (`CoverDestination` passes
+  `router.dismissCover()`).
+- **The More sheet row only records the request** (`syncAfterMoreSheet`); the sheet's `onDismiss` moves it into
+  `syncRequest`, so the editor never presents while the sheet is still dismissing. Edit song no longer dismisses
+  itself or asks the root for a cover while the song sheet below it is up (SwiftUI would hold the cover until that
+  sheet closed).
+- **Teardown never navigates.** `close(_ reason: SyncCloseReason)` (`user`, `saved`, `removed`, `songChanged`,
+  `viewGone`): every reason restores the player, only `viewGone` skips `onClosed`. The view's `onDisappear` runs
+  `close(.viewGone)` and drops the session, so a later appearance starts a fresh one. `onClosed` still runs once.
+- **Errors instead of silent closes** (a screen with Close, Android's `Error` phase): opening while Spotify Connect
+  plays ("Syncing only works on this iPhone. Switch playback back to this iPhone first.", Android `lyrics_sync_casting`;
+  checked before anything is sent to the device), a Connect device taking over mid-session (taps kept as a draft, no
+  pause, which would stop the speaker; `onChange(of: playback.remoteOutputName)`), a load longer than
+  `openWaitMs` (8 s: "Couldn't get the song ready. Close and try again."), and the player unloading for more than
+  600 ms ("Playback stopped."). The session stays open behind an error, so Close still restores the player.
+- **Keep screen on:** `ScreenAwake` keeps one claim per owner (`.lyrics`, `.lyricsSync`) on the app-wide
+  `isIdleTimerDisabled`, so the editor closing over the lyrics screen never lets the screen lock under it. While the
+  editor is up the lyrics screen stops its display link and pauses its Metal background (the editor draws its own).
+- **Notice pill:** it sits over the bottom of the tap pad (Android's 92 pt), so it lets taps through unless it offers
+  Undo, and its text never takes them (owner decision; Android makes only the Undo box clickable).
+- **Not changed:** the words screen's container tap gesture (plan item, unverified on device) and the full-player /
+  lyrics chrome. Stage 2 of the batch (the lyrics page) builds on this: it can make the lyrics screen's
+  `ScreenAwake` claim unconditional.
 
 Screenshot ids (`UITests/LyricsSyncScreenshotTests`, `-screen lyricsSync -syncStep <step>`; ready `screen.lyricsSync`):
 syncIntro, syncWords, syncResume, syncManage, syncTap, syncTapReady, syncTapBreak, syncTapNotice, syncTapEnded,
 syncFixLine, syncPreview, syncPreviewFixLine, syncTapLight, syncSpeedMenu, syncLiveIntro / syncLiveTapped (a live run
 on the demo engine).
+
+Entry tests (`UITests/LyricsSyncEntryTests`, from `-screen lyrics -lyricsDemo lines|words`): the chip (twice), Lyrics
+options → "Sync the words yourself" (line- and word-synced), each still open 3 s later and closing back to
+`screen.lyrics`; Leave through the alert back to lyrics; `-screen lyricsSync.spotifyConnect` (the demo Echo plays) shows
+the Connect message and Close dismisses it. Shots: syncEntryChip, syncEntryMoreSheet, syncEntryWordSynced,
+syncConnectBlocked. Test ids: `lyrics.syncChip`, `lyricsMore.syncYourself`, `sync.error`, `sync.error.close`.
 
 ## Stage 11 notes (YouTube playback)
 
@@ -459,10 +534,11 @@ on the demo engine).
 - **Streaming:** songs whose item URL is `pixlstream://<videoId>` (YouTube Music `yt:` songs; stage 12 can point matched
   Spotify songs there too) are served by `YouTubeResourceLoader`, registered with `StreamingResourceLoaderRegistry`. It answers
   from `StreamCache` (sparse file + `ByteRangeSet`, `Library/Caches/YouTube/streams`, 1 GB LRU) and fetches gaps with
-  `StreamFetcher` (1 MiB ranged GETs, the client's User-Agent only, 403 → re-resolve without that strategy). The resolver
-  (`StreamingPlayableURLResolver`, wrapping the engine's default) plays downloaded files first, then fully cached files.
-  `YouTubePrefetcher` (fed by `PlaybackServices.onUpcomingChanged`) resolves the next song at once and caches its first MiB
-  30 s before the end.
+  `StreamFetcher` (ranged GETs, the client's User-Agent only, 403 → re-resolve; since 2026-10-07 a 128 KiB first GET and
+  growing fetches, Android's retry rules — see "Streaming speed" below). The resolver (`StreamingPlayableURLResolver`,
+  wrapping the engine's default) plays downloaded files first, then fully cached files. `YouTubePrefetcher` (fed by
+  `PlaybackServices.onUpcomingChanged` / `onPlayStateChanged`) prepares the next streamed songs while music plays and
+  caches the next one's first MiB 30 s before the end.
 - **PoToken:** `PoTokenGenerator` runs `po_token.html` (copied from the Android assets) in a 1×1 `WKWebView` with
   `callAsyncJavaScript`; PixlNet asks for a token only for the signed-in WEB_REMIX fallback (VISIONOS needs none).
 - **Sign-in:** the web page (Android's flow) with two glass-capsule fallbacks under it — the device-code flow (Android's
@@ -474,7 +550,8 @@ on the demo engine).
   "Download all songs". Song rows (`SongCard`) show Android's `SongAvailabilityBadge` (downloaded / downloading / failed)
   from `DownloadBadges`, injected at the root — kind only, so progress ticks never re-render the lists.
 - **Screenshot ids:** `youTubeLogin`, `youTubeLoginCode`, `youTubeLoginCookie`, `youTubeLoginSignedIn`, `playbackDiagnostics`
-  (all steps green), `playbackDiagnosticsFailed` (audio step red) — `UITests/YouTubeScreenshotTests`, light + dark.
+  (all steps green), `playbackDiagnosticsFailed` (audio step red), `playbackDiagnosticsTimings` (the Stream start
+  timings card, 2026-10-07) — `UITests/YouTubeScreenshotTests`, light + dark.
 
 ## Stage 12 notes (Spotify)
 
@@ -520,6 +597,7 @@ Stage 12 screenshot ids (signed out on the plain ids; demo data, no network): `a
   avatar keeps Android's `primary → tertiary` gradient (a mark, not a Material surface). Online (catalogue) results
   import through `SearchProviding.importAndPlay` on tap. The sheet uses the large detent: Android caps the column at 620 dp, but the system's
   partial-height sheet floats with clearer glass, and the Home content behind made the chat hard to read.
+  (2026-10-07: Hoa asked for the see-through glass after all; it now uses `tallGlass`, see Glass expansion.)
 - **Taizo redesign (owner request 2026-10-03, "make taizo up much better and more beautiful"; the port rule is relaxed
   for this sheet only).** Empty: `TaizoOrb` — a 3×3 `MeshGradient` of the theme's fixed roles (same in light and dark)
   with a specular highlight, rim and glow, drifting at ≤ 24 fps (paused off screen / sheet gone / background / Reduce
@@ -536,6 +614,39 @@ Stage 12 screenshot ids (signed out on the plain ids; demo data, no network): `a
 
 Stage 13 ids: `aiPlaylist` (sheet over Home), `taisChat` (empty), `taisChatConversation` (a scripted genre request
 and question; ready `screen.taisChat`), `aiPlaylistLab` (cover). Shots: `UITests/AIScreenshotTests`.
+
+### On-device AI by default (2026-10-07, local AI phase 1; owner decisions, a departure from Android)
+
+- **Default and fallback.** The on-device model (Foundation Models) is the default assistant for every AI feature.
+  Cloud providers are optional and off by default; an on-device selection never falls back to a cloud provider
+  (`AISettingsBridge.providerChain` → the orchestrator's new `providerChain`). Key-less Gemini users move to on-device
+  once at launch (`ai_provider_migrated_v1`) and again after a restore.
+- **Settings › AI features:** an "Assistant" group with the on-device model row (in use / not on this iPhone / turned
+  off / downloading / language; a checkmark when it is the assistant; always "ready" in UI tests), then "Cloud
+  assistants (optional)": a "Use a cloud assistant" switch (off by default) that reveals the cloud provider picker
+  (Android's order, no "(Free)" label), Save on usage, sign-in, model and base URL. Advanced shows only Temperature
+  on-device (the on-device paths size their own prompts and answers); the whole Android block for a cloud assistant.
+  Rows stay settings glass rows; nothing new is glass on glass.
+- **On-device paths** (`App/Services/AI`): `OnDeviceAI` (the sessions, serialised per feature, prewarmed when the AI
+  sheets open), `OnDevicePlaylistCurator` + `OnDeviceCuration` (numbered pool without ids, dynamic schema, budget
+  ladder; Lab requests over 40 songs are planned, filled from the library, the first 40 ordered), Taizo's chat with
+  memory and the `searchLibrary` tool (`LibraryLookup`), `OnDeviceLyricsTranslator` (behind `AILyricsTranslator`; the
+  lyrics UI is unchanged), Home's AI greeting (`HomeAIGreeter`). Pure parts live in files without Foundation Models
+  (`OnDevicePrompts`, `OnDeviceCuration`, `OnDeviceLyricsTranslation`) so AppTests cover them; `OnDeviceModel`
+  maps every error (iOS 27's types through `Compat27`). None of it runs in UI tests (CI simulators have no model).
+- **Taizo:** an on-device media answer shows its queue card at once; the intro line fills in when the model has
+  written it (`TaisChatModel.setIntro`). UI tests keep the synchronous scripted intro.
+- **Home greeting card:** Android's AI headline (once a day, cached in `home_greeting_text` / `home_greeting_date`)
+  replaces the local one with the existing crossfade; expanding the card asks for the AI insight, with a small
+  spinner while it is written (the chevron is disabled meanwhile, as on Android) and the local insight as fallback.
+- **Library › Create playlist › With AI:** while the selected on-device model can't answer, the card says why
+  ("Needs on-device AI · Turned off in system settings.", `cpu` symbol) and the button reads "Open AI settings".
+
+Ids: `settingsCategory.ai.cloud` (AI features with the cloud assistant switched on; ready
+`screen.settingsCategory.ai`), `libraryCreatePlaylist.onDeviceOff` (the creation sheet with the on-device model
+turned off; ready `sheet.createPlaylist`). Shots: `SettingsScreenshotTests.testAICategoryCloudLight/Dark`,
+`testAICategoryAdvancedOnDeviceLight`, `LibraryScreenshotTests.testLibraryCreatePlaylistOnDeviceOffDark`; the existing
+`settingsCategory.ai` shots now show the on-device default.
 
 ## Stage 15 notes (backup, setup, updates, localisation)
 
@@ -618,8 +729,8 @@ How the stages meet on `main`:
   `LyricsController.translateViaAI` sends the song's scanned lyrics, else the LRC of what the screen shows, through
   `env.ai.lyricsTranslator` in the device language, and imports a valid reply like a file (each translation pairs with
   its line by timestamp; the toast is Android's message). Stage 9's on-device translation stays below it, renamed "Translate on device" (character-bubble icon) so the two rows read apart.
-- **Lyrics ↔ sync editor:** "Sync the words yourself" / the sync chip present `AppCover.lyricsSync(songId:)` — stage
-  10's editor (see Stage 10 notes).
+- **Lyrics ↔ sync editor:** "Sync the words yourself" / the sync chip present stage 10's editor in a cover nested in
+  the lyrics screen (see Stage 10 notes › Sync editor entry fix).
 - **Spotify ↔ YouTube:** `AppEnvironment` builds `SpotifyService` after `YouTubeServices` and passes
   `InnerTubeSpotifyBridge` (App/Services/Spotify): the matcher searches through stage 11's InnerTube session, matched
   videos resolve through stage 11's `StreamingPlayableURLResolver` (download → complete cache file →
@@ -658,8 +769,10 @@ an image).
 ## Integration notes (Integrate B: stages 10 and 14 merged — tag `stage-15`)
 
 - **Lyrics ↔ sync editor:** the lyrics More sheet's first row, the empty-state button and the line-synced chip open
-  stage 10's editor (`LyricsSyncEditorView.open(…, fromLyrics: true)`, which returns to the lyrics screen); Edit song's
-  "Change the words" / "Fix timing" open it at the words / fix-timing entries. The placeholder is gone.
+  stage 10's editor; Edit song's "Change the words" / "Fix timing" open it at the words / fix-timing entries. The
+  placeholder is gone. (Since 2026-10-07 each of them presents the editor in its own nested cover, the More sheet's row
+  from the sheet's `onDismiss`; the root-cover swap through `LyricsSyncEditorView.open(…, fromLyrics:)` tore the
+  lyrics screen and the editor down on the phone. See Stage 10 notes › Sync editor entry fix.)
 - **Sync editor ↔ instrumental:** `LyricsSyncPlayer` suspends stage 14's `InstrumentalController` for the session
   (owner `lyrics_sync`, Android `InstrumentalCrossfadeController.suspend`): an instrumental that was playing switches back
   to the song's own audio so the person hears the vocals they are timing, and returns when the editor closes. Crossfades
@@ -706,9 +819,84 @@ surfaces such as the queue. So small menus are SwiftUI `Menu`s, and the system d
 - Content: `SortMenuSections` (Sort by and Order as inline pickers) and `LibrarySortMenuContent` (plus View / Playlist
   View / Cloud Only), the playlist options (edit, transition, export, batch actions, delete), and Sort & Play
   (Shuffle, Quick Fill, Sort By).
-- The queue keeps its own menu. The Android sort and options sheets stay, for UI-test launch states.
+- The queue keeps its own menu. The Android sort and options sheets stay, for UI-test launch states. (2026-10-07:
+  the queue's ⋯ circle now liquid-morphs into its menu's pills, see Glass expansion; still not a system `Menu`.)
 - `[record:Class]` in a commit message films that UI test class on CI (`MenuRecordingTests` opens these menus slowly),
   so the morph can be compared frame by frame with the reference recording.
+
+## Glass expansion (owner change 2026-10-07)
+
+Hoa asked for more Liquid Glass, starting with the queue, which read as "not glass": the sheet turned opaque at full
+height, its toolbar circles were opaque fills on a glass capsule, and the ⋯ menu slid in on its own. These are the
+plan's options A + B plus the floating-bar pills (owner decisions). The lyrics page and the full player's top bar
+belong to other work and are untouched.
+
+- **See-through tall sheets.** `PresentationDetent.tallGlass` (`SheetScaffold.swift`) is one `.fraction(0.92)`
+  detent. iOS 26 draws a partial-detent sheet as inset Liquid Glass and turns a `.large` one opaque. The queue, the
+  song sheet (from any row, and from the queue), the AI Daily Mix sheet and Taizo's chat use it, so the player or the
+  page shows around and through them. `presentationBackground` is never touched. Trade-offs:
+  - one detent, so there is no dragging to full height (dragging down still dismisses);
+  - lower contrast over bright art;
+  - the player keeps rendering beneath (the ambient styles at their 30 Hz);
+  - Taizo's chat had moved to `.large` in stage 13 because the floating glass over Home was hard to read, so check
+    it in the shots;
+  - Apple documents no threshold for the glass look, so CI shots must confirm that 0.92 still renders inset and
+    translucent (0.85 otherwise).
+- **Queue toolbar.** Shuffle, repeat and the timer are each their own interactive glass circle: `primary` at
+  prominent when on, a hint of `surfaceContainer` when off, the symbol replaced with a content transition. There is no
+  backing capsule: Android puts glass circles on a glass capsule, which iOS can't stack (the same call as
+  `PlayerToggleRow`). The capsule's padding stays, so nothing moves.
+- **Queue ⋯ menu morph.** The toolbar and the open menu share one `GlassEffectContainer(spacing: 8)`. It never
+  leaves the tree; only its content switches between the toolbar and the pills.
+  - The ⋯ circle and "Save as playlist" carry the same `glassEffectID`, so the circle morphs into that pill and back.
+  - The toolbar circles and Locate / Clear use `glassEffectTransition(.materialize)`: they fade rather than being
+    pulled into the Save pill, which overlaps the toolbar's area.
+  - The toolbar leaves while the menu is open, because overlapping shapes in one container would blend. The undo
+    bar stays outside the container for the same reason.
+  - It runs on `PixlMotion.selection` through `withAnimation`. The root no longer carries an implicit animation on
+    `isMenuExpanded`, which would flatten the spring.
+  - Android's 0.55 scrim and the gradient stay.
+  - VoiceOver: `.isModal`, the escape action and `queue.menu` sit on the pills' VStack, which exists only while the
+    menu is open. On a wrapper around the container they would trap VoiceOver in the closed toolbar and swallow the
+    escape that dismisses the sheet.
+  - Fallback if the shared-id morph looks wrong on the phone: put the toolbar back outside, give the pills their own
+    container under the scrim and restore the slide-in (`.move(edge: .bottom)`). Never keep the pills and a visible
+    toolbar in one container.
+- **Floating bars: the primary button is its own glass pill.** This covers Save as playlist, Edit song, the Library
+  tab order and genre Quick Fill. A glass button can't sit on a glass bar, so each bar's backing glass is gone and its
+  controls are separate glass shapes in one container, with spacing below their gaps:
+  - Save as playlist: the summary capsule (`secondaryContainer`) and Save (`primary`), both 56 pt.
+  - Edit song: Cancel (`secondaryContainer` at container) and Save (`primary` at prominent), where the capsule held
+    them.
+  - Tab order: Reset becomes a glass circle beside Done (`primaryContainer` at prominent).
+  - Quick Fill: the Select all · Clear pair, a status capsule (`surfaceContainerHighest`) and Next / Quick Fill
+    (`primary`). On the genre step the pair leaves and the status capsule takes its room; Android keeps its panel and
+    hides the pair.
+- **Listening Stats header.** It uses the `SettingsScaffold` glass bar (`surfaceContainerHigh` at `GlassTint.bar`,
+  fading in over the first half of the collapse) instead of the solid band. The circles and the pill row sit on it,
+  as Settings' back circle does.
+- **Missed decision-10 conversions (parity).**
+  - Full player: the loading chip becomes clear glass inside the lyrics / AI circles' container, and the format pill
+    under the seek bar becomes clear glass (both Material Surfaces on Android).
+  - Genre page: the artist group header becomes glass (a Surface), and the album play button a glass circle (an
+    IconButton).
+- **Also glass.**
+  - The playlist editor's collage placeholder and Pick Image tile, tinted at `GlassTint.container`: the flat page
+    gives them nothing to refract.
+  - For performance only: the sleep timer's surfaces and the Save as playlist fields now share a container each.
+- **Left alone on purpose.**
+  - The queue's swipe-to-remove reveal: glass there would add a second glass layer to a lazy row, mid-gesture.
+  - The row ⋮ fills, and the content panels behind glass rows.
+  - The playlist editor's top bar: nothing scrolls under it.
+  - The devices sheet's tiles: their tap target is a UIKit route picker, untested inside a container.
+- **Screenshot ids.**
+  - `queue.saveAsPlaylist`: the queue opens Save as playlist after 0.7 s; ready `sheet.saveQueue`.
+  - `genre.quickFill`: the genre page opens Quick Fill; ready `screen.quickFill.genre`.
+- **Tests.**
+  - `PlayerScreenshotTests`: `testQueueMenuDark`, `testSaveQueueLight` / `Dark`.
+  - `LibraryScreenshotTests`: `testGenreQuickFillLight`, `testGenreQuickFillGenreStepDark`.
+  - `GlassAccessibilityTests/testQueueControlsKeepButtonTraits`.
+  - `MenuRecordingTests/testQueueMenuMorph`, filmed with `[record:MenuRecordingTests]`.
 
 ## Spotify Connect output (2026-10-03, branch `spotify-connect`; shared spec with Android)
 
@@ -724,8 +912,10 @@ docs/api-notes.md › Spotify Connect output.
   Alexa app." Hidden while Spotify isn't linked; a pre-Connect login shows only "Reconnect Spotify to use Connect".
   While a device plays, "Stop playing on <device>" heads the list and the CONTROLS hero shows the device (icon, name,
   "Spotify Connect • Playing") with its volume slider when `supports_volume` (else a note) instead of the phone's.
-- **Chip:** the full player's output pill shows the device's symbol and name, like AirPlay's route name (VoiceOver: "Playing on <device>"; long press: Stop
-  playing on <device>); the mini player's artist line becomes "Playing on <device>" with a small speaker icon.
+- **Chip:** the full player's output pill shows the device's symbol and name, like any other named output (since
+  2026-10-07 the pill names AirPlay, Bluetooth, wired and car outputs too and may use the width the removed "Now
+  Playing" title left; VoiceOver: "Playing on <device>"; long press: Stop playing on <device>); the mini player's
+  artist line becomes "Playing on <device>" with a small speaker icon.
 - **Toasts:** Connect has its own `LibraryToast` instance, shown by `RootView` above the bars and inside the devices
   sheet (skipped songs once per resolution pass, takeovers, errors).
 - **Seam:** `RemotePlaybackOutput` (`App/Core`). While attached, `PlaybackStore` sends play / pause / next / previous /
@@ -745,3 +935,119 @@ docs/api-notes.md › Spotify Connect output.
 - **Screenshot ids** (`UITests/SpotifyConnectScreenshotTests`, demo devices, no network): `devices.spotifyConnect`,
   `devices.spotifyPlaying`, `devices.spotifyReconnect`, `devices.spotifyEmpty` (the sheet opens on DEVICES),
   `nowPlaying.spotifyConnect`, `miniPlayer.spotifyConnect`.
+
+## Streaming speed (2026-10-07, branch `wt/stream`; iOS first, Android later)
+
+Hoa asked for streamed songs (YouTube Music, Spotify matched to YouTube) to start faster on tap and on skip. Plan:
+`plans/streaming-speed.json` (R-numbers below); owner decisions: measure first, then R2, R3, R4, R5a, R7, R11; R8
+behind a remote flag that defaults off; R5b and the client order unchanged. Divergences: docs/parity.md › iOS-first
+divergences.
+
+- **Measure (R12).** `PlaybackStartTimings` (App/Playback, no YouTube code: the streaming layer reports by the item
+  URL's text `pixlstream://<videoId>`) keeps the last 8 starts: tap → URL (Spotify matched, file or stream chosen) →
+  audio track loaded → item built → first `.playing`, plus the resolution (time, client, attempt detail, whether the
+  URL carries `n`, remote-config wait), the loader's requests (content-info / to-end) and cancellations, the network
+  fetches (first chunk time and size) and the first `respond(with:)`, all within the start's first 10 s. One `Mutex`;
+  never touched by the processing tap. Signposts: category "Streaming". **Where Hoa reads it:** Settings › Developer ›
+  Test playback › "Stream start timings" (a `DeepProbeCard` under its own title, Copy / Close; a snapshot per tap) and
+  the deep probe's "Last start" and "Overlapping clients" lines; the newest start also shows in Settings › Developer ›
+  Diagnostics › "Last Song Start" (a plain `Form` section, read when the screen appears; shot `diagnostics`). A skip into a prepared song reads "(skip into the
+  prepared song)"; a prefetched resolution "done before the tap (prefetch)".
+- **First fetch (R2).** PixlNet `StreamChunkPolicy`: AVFoundation's first loading request (content info + bytes 0–1)
+  is answered by a GET of the first 128 KiB, so the next request starts from disk; each loading request's network
+  fetches then grow 128 KiB → 512 KiB → 2 MiB (cache hits don't advance the ramp; cache reads up to 2 MiB). Prefetch
+  and downloads use 2 MiB fetches.
+- **Prepare ahead (R3).** `YouTubePrefetcher` v2, one task re-planned on queue / track / play-state changes, cancelled on
+  pause: 1.5 s after playback starts, the next songs in skip order (2 on Wi-Fi or Ethernet, 1 on cellular or a
+  metered path, none in Low Data Mode — `NetworkConditionsMonitor`, an `NWPathMonitor` started the first time music
+  plays) go through the engine's full resolver (Spotify songs are matched on the way) and get their URL resolved;
+  once the current song has played 3 s, their first 512 KiB are cached with `allowsConstrainedNetworkAccess = false`;
+  30 s before the end the next song's first MiB as before. Off the main actor (`@concurrent`). In Low Data Mode only
+  the near-end top-up runs (it was there before, and the gapless hand-over needs those bytes seconds later anyway).
+- **Client table (R4).** Resolution never awaits `remote/config.json`; a due refresh starts in the background at
+  utility priority, and the saved file's modification date gates the six-hour refresh across relaunches.
+- **Retries (R5a).** PixlNet `StreamRetryPolicy` (Android oct3 `CloudStreamProxy.fetch`): four attempts; the first
+  401/403/404/410 resolves again with the same client (an IP change), later ones move past it, never once bytes of the
+  file are cached (another client may serve another itag → `formatChanged` → skip); 429/5xx wait 250 ms × attempt.
+- **HTTP/3 (R6).** `assumesHTTP3Capable` on `*.googlevideo.com` range requests (QUIC racing; TCP fallback).
+- **Skip into the prepared song (R7).** `DualDeckEngine.jump` takes over `preparedIncoming` when it is exactly the
+  target (crossfade on: from ~1.5 s into the song; gapless: the last ~4.5 s): the incoming deck is captured before the
+  swap, the scheduled hand-over cancelled, a crossfade's zero-gain ramp cleared, the transition reported as manual.
+- **Overlapping clients (R8, off).** `ChainedYouTubeStreamResolver` hedging (next client after 1.5 s or at once on a
+  failure, 8 s per client, first URL wins) runs only when `remote/config.json` sets `innertube.hedge.enabled` — turn
+  it on there (no release needed) if the timings show slow or failing VISIONOS. Android's sequential chain is the
+  default and its parity tests are unchanged.
+- **Matching (R11).** `TrackMatcher.findMatchFanOut` for on-demand matches (play time and R3's pre-matching): after
+  the first song search, the rest at once, folded in `findMatch`'s order — same video. The background
+  `SpotifyMatchRunner` keeps `findMatch`.
+- **Left out:** R9 (cipher / JavaScriptCore warm-up — only if the timings show `n` on VISIONOS URLs), R10 (delegate
+  streaming — only if first-byte latency remains), R5b (persisted URLs, owner: not now).
+
+
+## Accent colour (owner request 2026-10-07; iOS-only, no Android counterpart)
+
+Hoa asked for an app-wide accent: presets plus a custom colour, applied to every tint and Liquid Glass tint, saved
+and backed up, updating live. Decisions (DECISIONS.md › Accent colour): option A "seed chroma, vivid"; the player
+keeps album colours; the unused Player Theme "System Dynamic" option is renamed "Accent Color"; the default stays
+today's soft violet; presets Blue, Indigo, Purple, Pink, Red, Orange, Yellow, Green, Mint, Graphite (grey), Custom.
+
+- **Where:** Settings › Appearance › Global Theme, right after App Theme: `AccentColorRow` — `ThemeSelectorRow`'s
+  layout (24 pt `paintpalette` icon in `secondary`, `titleMedium` title, `bodyMedium` description, 16 pt padding,
+  `settingsRowGlass()`), with two rows of six 44 pt cells where the value capsule was: PixlAudio (the default), the
+  ten presets, then Custom. Six cells fit the narrowest text column (375 pt phone: 271 pt); wider phones spread them.
+- **Swatches** are plain 32 pt circle fills on the row's glass (no glass on glass) with `PressScaleButtonStyle`;
+  selected = a 42 pt `onSurface` ring (2.5 pt) and a 13 pt bold check, white on the swatch unless that falls below
+  3:1, then black. A swatch shows the *named* colour (its seed), not the scheme tone: the dark-mode tones are
+  pastel and nearly equal for Red / Pink and Blue / Indigo, and the light tones turn Yellow and Orange into olive
+  and brown, so the seeds are what tells the choices apart. The app itself shows the scheme's tone.
+- **Custom** is the system `ColorPicker` (`supportsOpacity: false`), its well ringed while a custom colour is the
+  accent. The picker reports every drag step; the row commits 180 ms after the last one, never the value it was
+  seeded with (opening the page never saves the violet's seed over the default `""`).
+- **Scheme:** `ArtworkTheme.accentPair(seed:)` (PixlLibrary): TonalSpot palettes and role tones with the primary
+  palette at max(36, seed chroma). Light primaries: Red #BD0E12, Blue #005DB8, Green #006E28, Yellow #705D00 (the
+  same numbers as Google's reference utilities); dark ones stay pastel (Red #FFB4AA, Blue #AAC7FF). Contrast comes
+  from the fixed role tones: ≥ 4.5:1 for `onPrimary` on `primary`, `primary` on the background and
+  `onPrimaryContainer` on `primaryContainer`, for every preset and a sweep of custom picks (`AccentPairTests`).
+  Near-grey picks (Graphite) are pure greys at the exact role tones (#5E5E5E / #C6C6C6), error stays red.
+- **Applied:** `ThemeStore.accentPair` (memoised per stored value; reading it observes the setting) replaces the brand
+  pair in `colors(for:)`, so `appTheme`, the shell's `.tint`, the tab bar pill, sheet tab capsules, selected pills,
+  the playing song card, toggles, sliders, captions, icons (secondary) and row glass (surfaceContainer) all follow.
+  Sheets and covers re-apply `.tint` (they used to fall back to the static `AccentColor` asset), `alwaysDarkTheme`
+  tints with the dark tone, and the windows' `tintColor` follows the accent (`WindowTint`) for UIKit alerts,
+  dialogs and menus. The accent snaps (no animation: the root `.animation` is keyed to album colours only, so the
+  three tab stacks never cross-fade a re-theme).
+- **Player:** Album Art (default) keeps album colours in the mini and full player and the lyrics; with no artwork
+  or nothing playing, the player takes the accent. "Accent Color" (stored `dynamic`, Android's "System Dynamic")
+  puts the accent on the player too. Album / artist pages with art keep their art colours (`ArtworkThemed`).
+- **Storage:** `accent_color_v1` in `UserDefaults`, a `"#RRGGBB"` string (`""` = violet; an Int would flip sign as an
+  Android `int`). Backed up in the global-settings module through PixlBackup's `AndroidPreferenceCatalog.iosOnly`;
+  restored live (`SettingsReload`). A backup without the key (older iOS, Android) restores cleanly and resets the
+  accent to the violet, like any setting a backup doesn't carry.
+- **Not done (follow-ups):** Increase Contrast could build the pair with `contrastLevel` 0.5 / 1.0 (the static asset
+  has a high-contrast variant, the accent scheme doesn't yet); the launch screen and anything UIKit draws before
+  the first frame still use the static `AccentColor` asset.
+
+## Brand mark: app icon, logo glyph, launch screen (2026-10-07, branch `wt/logo`)
+
+Hoa chose logo concept C, "Glyph", as the universal PixlAudio logo for both apps: the Android launcher icon's
+monochrome silhouette (play triangle, lens cut-out, note) as a white frosted-glass glyph on a sky-to-violet gradient
+(`#7CCBFF → #6F8EFF → #6C4FF5`, the brand seed, `→ #5634D2`).
+
+- **Single source:** `ci/make-icon.py` (Pillow, build time only) holds the geometry and colours and writes every
+  asset below; rerun `python3 ci/make-icon.py` after a change, never edit its outputs. `--preview sheet.png` renders a
+  contact sheet (Home Screen sizes, dark, tinted, the About circle, the launch screen) to check before committing. It
+  also traces the glyph into a vector path, so the SVG (and Android's vector drawables) match the icon exactly.
+- **App icon:** `AppIcon.appiconset`, one 1024 px image per appearance (Xcode's "Single Size"): Any is opaque, Dark
+  has a transparent background (the system draws its dark tile), Tinted is opaque grayscale. Baked effects are kept
+  subtle because the system adds its own edge light. An Icon Composer `.icon` (real Liquid Glass, refraction on
+  iOS 27) is a later step (owner decision); it would replace this catalog icon.
+- **`BrandGlyph`** (`DesignSystem/BrandMark.swift`): the one-colour glyph, a template SVG (`BrandGlyph.imageset`,
+  `preserves-vector-representation`) tinted with `foregroundStyle`. Its square box has the margins of Android's
+  `pixelplay_base_monochrome` (the glyph fills 88.5 % of the height), so Android sizes port 1:1. About uses it as
+  Android does: 28 pt, 10 pt padding, in a `primaryContainer` circle, `onPrimaryContainer`.
+- **`BrandMark`**: the full-colour icon tile (continuous corners), light and dark variants, 120 pt @2x/@3x. It is the
+  launch-screen image; in-app it is available for logo spots but not used yet (the welcome page has no logo, as on
+  Android: owner decision). Raster, so re-render larger before showing it above 120 pt.
+- **Launch screen:** `UILaunchScreen` shows `BrandMark` centred on `LaunchBackground` (`#FDF8FF` light, `#141318`
+  dark: the brand scheme's `background`, so the first frame matches), like Android 12+'s system splash.
+- Both marks are artwork, not glass: never a container background, never under `glassEffect` (no glass on glass).

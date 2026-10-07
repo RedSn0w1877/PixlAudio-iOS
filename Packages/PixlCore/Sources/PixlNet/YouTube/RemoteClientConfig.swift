@@ -24,13 +24,16 @@ public struct RemoteClientConfig: Sendable, Hashable {
     public var cipheredOrder: [String]?
     /// Free-form note shown in diagnostics ("bumped IOS to 21.30").
     public var note: String?
+    /// Streaming speed R8: overlap the clients when one is slow. Off (nil) unless the remote file turns it on.
+    public var hedging: StreamHedging?
 
     public init(profiles: [String: InnerTubeClientProfile] = Self.builtInProfiles, preSignedOrder: [String]? = nil,
-                cipheredOrder: [String]? = nil, note: String? = nil) {
+                cipheredOrder: [String]? = nil, note: String? = nil, hedging: StreamHedging? = nil) {
         self.profiles = profiles
         self.preSignedOrder = preSignedOrder
         self.cipheredOrder = cipheredOrder
         self.note = note
+        self.hedging = hedging
     }
 
     /// The built-in table by name.
@@ -49,7 +52,8 @@ public struct RemoteClientConfig: Sendable, Hashable {
     ///        "note": "…",
     ///        "profiles": {"IOS": {"clientVersion": "21.30.1", "userAgent": "…"}, "NEWCLIENT": {…every field…}},
     ///        "preSignedOrder": ["VISIONOS", "IOS"],
-    ///        "cipheredOrder": ["TVHTML5", "WEB", "WEB_REMIX"]}}
+    ///        "cipheredOrder": ["TVHTML5", "WEB", "WEB_REMIX"],
+    ///        "hedge": {"enabled": false, "afterSeconds": 1.5, "strategyTimeoutSeconds": 8}}}
     public static func parse(_ text: String) -> RemoteClientConfig? {
         guard let root = OrgJSON.parse(text)?.objectValue else { return nil }
         let schema = OrgJSON.optInt(root, "schema", 1)
@@ -74,7 +78,17 @@ public struct RemoteClientConfig: Sendable, Hashable {
         }
         let note = OrgJSON.optString(section, "note")
         return RemoteClientConfig(profiles: profiles, preSignedOrder: order("preSignedOrder"),
-                                  cipheredOrder: order("cipheredOrder"), note: NetText.isBlank(note) ? nil : note)
+                                  cipheredOrder: order("cipheredOrder"), note: NetText.isBlank(note) ? nil : note,
+                                  hedging: hedging(section))
+    }
+
+    /// The `hedge` object: only `"enabled": true` turns hedging on; missing or odd numbers fall back to the defaults
+    /// and are clamped (start the next client after 0.5…10 s; 3…15 s per client).
+    static func hedging(_ section: JSONObject) -> StreamHedging? {
+        guard let hedge = OrgJSON.optObject(section, "hedge"), hedge["enabled"]?.boolValue == true else { return nil }
+        return StreamHedging(afterSeconds: hedge["afterSeconds"]?.doubleValue ?? StreamHedging.defaultAfterSeconds,
+                             strategyTimeoutSeconds: hedge["strategyTimeoutSeconds"]?.doubleValue
+                                 ?? StreamHedging.defaultStrategyTimeoutSeconds)
     }
 
     static func isValidName(_ name: String) -> Bool {

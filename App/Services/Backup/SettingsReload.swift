@@ -31,6 +31,8 @@ extension AppearanceSettings {
         sync(\.playerTheme, self, f)
         sync(\.paletteStyle, self, f)
         sync(\.colorAccuracy, self, f)
+        // The accent re-tints the running app at once (ThemeStore observes it).
+        sync(\.accentColor, self, f)
         sync(\.showScrollbar, self, f)
         sync(\.disableBlurAllOver, self, f)
         sync(\.carouselStyle, self, f)
@@ -123,7 +125,9 @@ extension EqualizerPreferences {
 
 extension AISettings {
     func reload(from f: AISettings) {
+        sync(\.cloudProvider, self, f)
         sync(\.provider, self, f)
+        sync(\.providerMigrated, self, f)
         sync(\.safeTokenLimit, self, f)
         sync(\.temperature, self, f)
         sync(\.topP, self, f)

@@ -215,4 +215,89 @@ final class AITests: XCTestCase {
         XCTAssertEqual(AIService.modelDisplayName("models/llama-3.1_8b-INSTANT"), "Llama 3.1 8b Instant")
         XCTAssertEqual(AIService.modelDisplayName("gpt-4o-mini"), "Gpt 4o Mini")
     }
+
+    // MARK: On-device by default (2026-10-07)
+
+    /// An on-device failure keeps its own message ahead of Android's network rows, through every text it travels
+    /// in: the curator's own message, and the orchestrator's chain summary after PixlNet's generator classified it.
+    func testOnDeviceFailuresResolveToTheirOwnMessages() {
+        for failure in OnDeviceFailure.fixed where failure != .blocked {
+            XCTAssertEqual(AIPlaylistController.resolveErrorMessage(failure.message), failure.message)
+            let viaChain = AiPlaylistPrompt.detailedErrorMessage(
+                message: "AI generation failed: ON_DEVICE: \(OnDeviceAiClient.providerName) API error: \(failure.message)")
+            XCTAssertEqual(AIPlaylistController.resolveErrorMessage(viaChain), failure.message)
+        }
+        let tooLong = AIPlaylistController.resolveErrorMessage(OnDeviceFailure.tooLong.message)
+        XCTAssertFalse(tooLong.contains("No Internet"))
+        XCTAssertEqual(AIPlaylistController.resolveErrorMessage(OnDeviceFailure.blocked.message), OnDeviceFailure.blocked.message)
+        // Android's rows still answer for cloud providers.
+        XCTAssertEqual(AIPlaylistController.resolveErrorMessage("AI Error: network unreachable"),
+                       "No Internet Connection. Please check your WiFi or mobile data and try again.")
+    }
+
+    func testOnDeviceSelectionNeverFallsBackToTheCloud() {
+        XCTAssertEqual(AISettingsBridge.providerChain(.onDevice), [.onDevice])
+        XCTAssertEqual(AISettingsBridge.providerChain(.groq), AiProviderSupport.buildProviderChain(.groq))
+        XCTAssertEqual(AISettingsBridge.providerChain(.gemini).last, .onDevice)
+    }
+
+    func testKeylessGeminiMovesToOnDevice() {
+        XCTAssertTrue(AIProviderStatus.shouldMoveToOnDevice(storedProvider: "GEMINI", hasGeminiKey: false))
+        XCTAssertTrue(AIProviderStatus.shouldMoveToOnDevice(storedProvider: "SOMETHING_OLD", hasGeminiKey: false))
+        XCTAssertFalse(AIProviderStatus.shouldMoveToOnDevice(storedProvider: "GEMINI", hasGeminiKey: true))
+        XCTAssertFalse(AIProviderStatus.shouldMoveToOnDevice(storedProvider: "GROQ", hasGeminiKey: false))
+        XCTAssertFalse(AIProviderStatus.shouldMoveToOnDevice(storedProvider: "ON_DEVICE", hasGeminiKey: false))
+    }
+
+    func testOnDeviceIsTheDefaultAndCloudIsASwitch() throws {
+        let name = "pixlaudio.tests.ai-defaults"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defaults.removePersistentDomain(forName: name)
+        defer { defaults.removePersistentDomain(forName: name) }
+        let ai = AISettings(defaults: defaults)
+        XCTAssertEqual(ai.provider, "ON_DEVICE")
+        XCTAssertFalse(ai.usesCloudAssistant)
+        XCTAssertEqual(ai.cloudProvider, "GEMINI")
+        XCTAssertFalse(ai.providerMigrated)
+        ai.setUsesCloudAssistant(true)
+        XCTAssertEqual(ai.provider, "GEMINI")
+        ai.provider = "GROQ"
+        XCTAssertEqual(ai.cloudProvider, "GROQ")
+        ai.setUsesCloudAssistant(false)
+        XCTAssertEqual(ai.provider, "ON_DEVICE")
+        ai.setUsesCloudAssistant(true)
+        XCTAssertEqual(ai.provider, "GROQ")
+        // A restore (fresh instance over the same defaults) reads them back.
+        ai.providerMigrated = true
+        let restored = AISettings(defaults: defaults)
+        XCTAssertEqual(restored.provider, "GROQ")
+        XCTAssertEqual(restored.cloudProvider, "GROQ")
+        XCTAssertTrue(restored.providerMigrated)
+        // An install that stored Gemini (Android's default) remembers it as the cloud assistant.
+        defaults.removePersistentDomain(forName: name)
+        defaults.set("GEMINI", forKey: PreferenceKeys.aiProvider)
+        XCTAssertEqual(AISettings(defaults: defaults).cloudProvider, "GEMINI")
+    }
+
+    func testTranslatorUsesTheOnDevicePathOnlyWhenSelected() async {
+        func onDevice(active: Bool) -> OnDeviceLyricsTranslator {
+            OnDeviceLyricsTranslator(isActive: { active }, unavailability: { nil }, contextSize: { 4096 },
+                                     respond: { _, _, _ in "1. On-device hello" }, dominantLanguage: { _ in "es" },
+                                     targetLanguageCode: "en")
+        }
+        let local = AILyricsTranslator(orchestrator: demoOrchestrator(), onDevice: onDevice(active: true))
+        guard case .translated(let viaDevice) = await local.translate(rawLyrics: "[00:01.00] Hola", current: nil,
+                                                                       targetLanguage: "English") else {
+            return XCTFail("expected an on-device translation")
+        }
+        XCTAssertEqual(viaDevice.parsedLyrics.synced?.first?.translation, "On-device hello")
+        let cloud = AILyricsTranslator(orchestrator: demoOrchestrator(), onDevice: onDevice(active: false))
+        guard case .translated(let viaCloud) = await cloud.translate(rawLyrics: "[00:01.00] Hola", current: nil,
+                                                                      targetLanguage: "English") else {
+            return XCTFail("expected the scripted provider's translation")
+        }
+        XCTAssertEqual(viaCloud.parsedLyrics.synced?.first?.translation, "(Hola)")
+        XCTAssertEqual(LyricsTranslationOutcome.notConfigured.message,
+                       "Add a valid API key for the selected cloud assistant in Settings › AI features.")
+    }
 }

@@ -129,10 +129,34 @@ import Testing
         #expect(AndroidPreferenceCatalog.kind(of: "playback_queue_snapshot_v1") == .deviceState)
         #expect(AndroidPreferenceCatalog.kind(of: "lyrics_sync_offsets_json") == .deviceIds)
         #expect(AndroidPreferenceCatalog.kind(of: "something_new") == nil)
+        // iOS-only settings (owner requests) restore by name like the portable keys.
+        #expect(AndroidPreferenceCatalog.kind(of: "accent_color_v1") == .portable)
         // The catalogue lists every key once.
         let all = AndroidPreferenceCatalog.portable + AndroidPreferenceCatalog.androidOnly + AndroidPreferenceCatalog.deviceState
-            + AndroidPreferenceCatalog.deviceIds
+            + AndroidPreferenceCatalog.deviceIds + AndroidPreferenceCatalog.iosOnly
         #expect(Set(all).count == all.count)
+    }
+
+    /// The accent colour (iOS-only) round-trips through a global-settings export and restore; a backup without it
+    /// (older iOS backups, Android backups) restores cleanly and clears it like every portable key.
+    @Test func iosOnlyAccentColorRoundTripsAndOldBackupsClearIt() throws {
+        let payload = PreferencesModule.export(.globalSettings, values: [
+            ("app_theme_mode", .string("dark")), ("accent_color_v1", .string("#FF453A")),
+        ])
+        let restored = try PreferencesModule.restore(.globalSettings, payload: payload)
+        #expect(restored.values.map(\.key) == ["app_theme_mode", "accent_color_v1"])
+        #expect(restored.values.last?.value == .string("#FF453A"))
+        #expect(restored.skippedKeys.isEmpty)
+
+        let old = AndroidBackup.PreferenceBackupEntry.encodeList([.string("app_theme_mode", "light")])
+        let oldRestore = try PreferencesModule.restore(.globalSettings, payload: old)
+        #expect(oldRestore.values.map(\.key) == ["app_theme_mode"])
+        #expect(oldRestore.skippedKeys.isEmpty)
+        guard case .allExcept(let kept) = oldRestore.clear else {
+            Issue.record("a global-settings restore clears every portable key but the dedicated modules'")
+            return
+        }
+        #expect(!kept.contains("accent_color_v1"))
     }
 
     @Test func restoreScopesAndReport() throws {

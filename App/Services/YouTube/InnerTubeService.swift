@@ -46,7 +46,9 @@ actor InnerTubeService {
             player: client, cipher: cipher, validator: StreamUrlValidator(http: plainHTTP), policy: .iOS,
             isSignedIn: { await account.hasCookie },
             maxBitrateKbps: { StreamingAudioQuality.maxBitrateKbps() },
-            strategies: { signedIn in await remote.current().chain(signedIn: signedIn) })
+            strategies: { signedIn in await remote.current().chain(signedIn: signedIn) },
+            // Streaming speed R8: overlapping clients only when remote/config.json turns `innertube.hedge` on.
+            hedging: { await remote.current().hedging })
     }
 
     // MARK: Resolution
@@ -65,7 +67,11 @@ actor InnerTubeService {
     }
 
     private func resolveFresh(videoId: String, excluding: Set<String>, validate: Bool) async -> ResolvedStream? {
-        await remote.refreshIfNeeded()
+        let started = ContinuousClock.now
+        // Streaming speed R4: never wait for the remote client table; a due refresh runs in the background and the
+        // resolution uses the current table (the saved file, or the built-in one).
+        await remote.refreshInBackground()
+        let configMs = PlaybackStartTimings.ms(from: started, to: .now)
         var stream = (try? await resolver.resolveStream(videoId: videoId, validate: validate,
                                                         excludedStrategies: excluding)) ?? nil
         var attempts = await resolver.lastAttempts
@@ -85,7 +91,26 @@ actor InnerTubeService {
         lastAttempts = attempts
         lastSuccessfulStrategy = stream == nil ? nil : successful
         if let stream { cache[videoId] = (stream, Self.expiry(of: stream.url)) }
+        if !validate {
+            PlaybackStartTimings.shared.resolved(
+                key: YouTubeSongIdentity.timingKey(videoId: videoId),
+                Self.timing(stream: stream, strategy: successful, attempts: attempts,
+                            ms: PlaybackStartTimings.ms(from: started, to: .now), configMs: configMs))
+        }
         return stream
+    }
+
+    /// The start-timings view of a resolution: the winner's detail (itag, bitrate, `n`), or every attempt.
+    static func timing(stream: ResolvedStream?, strategy: String?, attempts: [String], ms: Int,
+                       configMs: Int) -> PlaybackStartTimings.Resolve {
+        guard let stream else {
+            return PlaybackStartTimings.Resolve(ms: ms, configMs: configMs, strategy: nil,
+                                                detail: attempts.joined(separator: "; "), hasN: nil)
+        }
+        var detail = attempts.last ?? ""
+        if let separator = detail.range(of: ": ") { detail = String(detail[separator.upperBound...]) }
+        return PlaybackStartTimings.Resolve(ms: ms, configMs: configMs, strategy: strategy, detail: detail,
+                                            hasN: URLCoding.androidQueryParameter(stream.url, "n") != nil)
     }
 
     /// Drops the cached URL (googlevideo answered 403/410: expired, or bound to another client).
@@ -135,6 +160,12 @@ actor InnerTubeService {
     func remoteSource() async -> String {
         await remote.source
     }
+
+    /// Whether the remote table turns on overlapping clients (streaming speed R8), for the deep probe.
+    func hedgingDescription() async -> String {
+        guard let hedging = await remote.current().hedging else { return "off" }
+        return "on (next client after \(hedging.afterSeconds) s, \(hedging.strategyTimeoutSeconds) s per client)"
+    }
 }
 
 /// Settings › Playback › Streaming audio quality (Android `AudioQuality.maxBitrateKbps`): the cap the stream
@@ -178,4 +209,7 @@ nonisolated enum YouTubeSongIdentity {
     }
 
     static func streamURL(videoId: String) -> URL? { URL(string: "\(scheme)://\(videoId)") }
+
+    /// The `PlaybackStartTimings` key of a streamed video: the item URL's text (`pixlstream://<videoId>`).
+    static func timingKey(videoId: String) -> String { "\(scheme)://\(videoId)" }
 }

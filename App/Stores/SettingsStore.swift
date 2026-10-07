@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import PixlLibrary
+import PixlNet
 
 /// Android preference keys (`data/preferences/UserPreferencesRepository.kt` `PreferencesKeys`,
 /// `ThemePreferencesRepository`, `EqualizerPreferencesRepository`, `AiPreferencesRepository`). The iOS app stores
@@ -135,6 +136,10 @@ nonisolated enum PreferenceKeys {
     static let aiSampleSize = "ai_sample_size"
     static let aiDigestMode = "ai_digest_mode"
     static let aiIncludeExtendedFields = "ai_include_extended_fields"
+    /// iOS only (2026-10-07): the cloud assistant Settings › AI features › "Use a cloud assistant" switches back to.
+    static let aiCloudProvider = "ai_cloud_provider"
+    /// iOS only (2026-10-07): the one-time switch of key-less Gemini users to the on-device model has run.
+    static let aiProviderMigrated = "ai_provider_migrated_v1"
     /// Per-provider AI keys (Android `AiPreferencesRepository.Keys.get…`): `<provider lowercased>_model` etc.
     /// API keys themselves live in the Keychain under `<provider lowercased>_api_key`.
     static func aiModel(_ providerName: String) -> String { "\(providerName.lowercased())_model" }
@@ -160,6 +165,10 @@ nonisolated enum PreferenceKeys {
     static let musicLearningEnabled = "learning_enabled"
     static let musicDiscoveryEnabled = "discovery_enabled"
     static let musicExplorationFraction = "exploration_fraction"
+    // iOS-only (owner requests). Backed up by name through PixlBackup's `AndroidPreferenceCatalog.iosOnly`.
+    /// Settings › Appearance › Accent Color: a `"#RRGGBB"` seed, `""` = PixlAudio's violet (owner request 2026-10-07).
+    /// A string, not an Int: an ARGB above `Int32.max` would flip sign as an Android `int` on a round trip.
+    static let accentColor = "accent_color_v1"
 }
 
 /// Android `AppThemeMode`.
@@ -170,7 +179,9 @@ nonisolated enum AppThemeMode: String, Sendable, CaseIterable {
 }
 
 /// Android `ThemePreference` (`player_theme_preference_v2`): which scheme themes the player — and, for `global`,
-/// the whole app. `dynamic` (Material You wallpaper colours) has no iOS source and behaves like `default`.
+/// the whole app. `dynamic` (Material You wallpaper colours on Android) has no iOS source: here it means the app's
+/// accent scheme (Settings › Appearance › Accent Color; the option is labelled "Accent Color"), like `default`. The
+/// stored value stays `dynamic` so backups keep their meaning on both platforms.
 nonisolated enum PlayerThemePreference: String, Sendable, CaseIterable {
     case `default` = "default"
     case dynamic = "dynamic"
@@ -236,6 +247,9 @@ final class AppearanceSettings {
     var colorAccuracy: Int {
         didSet { defaults.set(ArtworkColorAccuracy.clamp(colorAccuracy), forKey: PreferenceKeys.albumArtColorAccuracy) }
     }
+    /// Settings › Appearance › Accent Color (iOS-only): `"#RRGGBB"`, `""` = PixlAudio's violet. `ThemeStore` builds
+    /// the app's scheme from it (`AccentPalette.seed(hex:)`); unreadable values fall back to the violet.
+    var accentColor: String { didSet { defaults.set(accentColor, forKey: PreferenceKeys.accentColor) } }
     var showScrollbar: Bool { didSet { defaults.set(showScrollbar, forKey: PreferenceKeys.showScrollbar) } }
     var disableBlurAllOver: Bool {
         didSet { defaults.set(disableBlurAllOver, forKey: PreferenceKeys.disableBlurAllOver) }
@@ -282,6 +296,7 @@ final class AppearanceSettings {
         paletteStyle = ArtworkPaletteStyle.fromStorageKey(defaults.string(forKey: PreferenceKeys.albumArtPaletteStyle))
         colorAccuracy = ArtworkColorAccuracy.clamp(defaults.int(PreferenceKeys.albumArtColorAccuracy,
                                                                 default: ArtworkColorAccuracy.default))
+        accentColor = defaults.string(PreferenceKeys.accentColor, default: "")
         showScrollbar = defaults.bool(PreferenceKeys.showScrollbar, default: true)
     }
 }
@@ -582,13 +597,24 @@ extension EqualizerPreferences {
 }
 
 /// Android `AiPreferencesRepository`: provider, safety limit, generation parameters and per-provider model, prompt
-/// and base URL (API keys go to the Keychain). Defaults are Android's.
+/// and base URL (API keys go to the Keychain). Defaults are Android's, except the provider: the on-device model is
+/// the default on iOS (owner decision 2026-10-07; cloud assistants are optional and off by default).
 @Observable
 final class AISettings {
     private let defaults: UserDefaults
 
-    /// `AiProvider.name` (`GEMINI` default).
-    var provider: String { didSet { defaults.set(provider, forKey: PreferenceKeys.aiProvider) } }
+    /// `AiProvider.name`: `ON_DEVICE` by default (Android: `GEMINI`). Picking a cloud provider also remembers it as
+    /// `cloudProvider`.
+    var provider: String {
+        didSet {
+            defaults.set(provider, forKey: PreferenceKeys.aiProvider)
+            if AiProvider.fromString(provider) != .onDevice, cloudProvider != provider { cloudProvider = provider }
+        }
+    }
+    /// The cloud assistant "Use a cloud assistant" turns on (the last one picked; Gemini at first).
+    var cloudProvider: String { didSet { defaults.set(cloudProvider, forKey: PreferenceKeys.aiCloudProvider) } }
+    /// Whether key-less Gemini users were moved to the on-device model (once; `AIProviderStatus`).
+    var providerMigrated: Bool { didSet { defaults.set(providerMigrated, forKey: PreferenceKeys.aiProviderMigrated) } }
     var safeTokenLimit: Bool { didSet { defaults.set(safeTokenLimit, forKey: PreferenceKeys.safeTokenLimit) } }
     var temperature: Double { didSet { defaults.set(temperature, forKey: PreferenceKeys.aiTemperature) } }
     var topP: Double { didSet { defaults.set(topP, forKey: PreferenceKeys.aiTopP) } }
@@ -615,7 +641,11 @@ final class AISettings {
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
-        provider = defaults.string(PreferenceKeys.aiProvider, default: "GEMINI")
+        let provider = defaults.string(PreferenceKeys.aiProvider, default: AiProvider.onDevice.rawValue)
+        self.provider = provider
+        cloudProvider = defaults.string(forKey: PreferenceKeys.aiCloudProvider)
+            ?? (AiProvider.fromString(provider) == .onDevice ? AiProvider.gemini.rawValue : provider)
+        providerMigrated = defaults.bool(PreferenceKeys.aiProviderMigrated, default: false)
         safeTokenLimit = defaults.bool(PreferenceKeys.safeTokenLimit, default: true)
         temperature = defaults.double(PreferenceKeys.aiTemperature, default: 0.7)
         topP = defaults.double(PreferenceKeys.aiTopP, default: 0.95)
@@ -650,6 +680,19 @@ final class AISettings {
 
     func setBaseUrl(_ url: String, for providerName: String) {
         defaults.set(url, forKey: PreferenceKeys.aiBaseUrl(providerName))
+    }
+
+    /// A cloud provider is selected (Settings › AI features › "Use a cloud assistant" is on).
+    var usesCloudAssistant: Bool { AiProvider.fromString(provider) != .onDevice }
+
+    /// The switch: on selects the remembered cloud provider, off the on-device model.
+    func setUsesCloudAssistant(_ on: Bool) {
+        if on {
+            let cloud = AiProvider.fromString(cloudProvider)
+            provider = (cloud == .onDevice ? AiProvider.gemini : cloud).rawValue
+        } else {
+            provider = AiProvider.onDevice.rawValue
+        }
     }
 }
 

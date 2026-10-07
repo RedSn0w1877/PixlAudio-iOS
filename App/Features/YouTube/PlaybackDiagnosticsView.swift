@@ -5,7 +5,8 @@ import SwiftUI
 import UIKit
 
 /// Runs the playback test (Android `PlaybackDiagnostics` via the Spotify dashboard's "Test playback") and the
-/// debug probe (Android "Deep probe": the cipher's base.js steps, the client attempts, the client table source).
+/// debug probe (Android "Deep probe": the cipher's base.js steps, the client attempts, the client table source),
+/// and shows the stream start timings (iOS only: how long the last starts took, step by step).
 @MainActor
 @Observable
 final class PlaybackDiagnosticsModel {
@@ -14,6 +15,8 @@ final class PlaybackDiagnosticsModel {
     var didRun = false
     var isProbing = false
     var probeReport: String?
+    /// The Stream start timings card's text (a snapshot taken when the button is tapped).
+    var timingsReport: String?
 
     /// The song to test: the current one when it streams, else the first YouTube / Spotify song in the library.
     static func track(playback: PlaybackStore, library: LibraryStore) -> DiagnosticsTrack? {
@@ -46,14 +49,21 @@ final class PlaybackDiagnosticsModel {
         probeReport = nil
         let poTokens = youtube.poTokens
         Task {
-            var out = "Client table: \(await service.remoteSource())\n\n"
+            var out = "Client table: \(await service.remoteSource())\n"
+            out += "Overlapping clients: \(await service.hedgingDescription())\n\n"
             out += "Signature cipher (base.js):\n\(await service.cipherReport())\n"
             let attempts = await service.lastAttempts
             out += "Last resolution:\n" + (attempts.isEmpty ? "(none yet)\n" : attempts.map { "• \($0)" }.joined(separator: "\n") + "\n")
             if let error = poTokens?.lastError { out += "\nPoToken: \(error)\n" }
+            if let last = PlaybackStartTimings.shared.lastStartSummary() { out += "\nLast start:\n\(last)\n" }
             probeReport = out
             isProbing = false
         }
+    }
+
+    /// Snapshots the measured starts (newest first) into the Stream start timings card.
+    func showTimings() {
+        timingsReport = PlaybackStartTimings.shared.report()
     }
 
     // MARK: Demo (UI tests)
@@ -65,6 +75,35 @@ final class PlaybackDiagnosticsModel {
         .init(title: PlaybackDiagnostics.titleStream, ok: true, detail: "Playable via VISIONOS."),
         .init(title: PlaybackDiagnostics.titleLoader, ok: true, detail: "Audio reaches the player (audio/mp4)."),
     ], succeeded: true)
+
+    /// Two demo starts in the real format: a cold stream, then a skip into the prepared next song.
+    static var demoTimings: String {
+        let began = ContinuousClock.now
+        var cold = PlaybackStartTimings.Record(id: 1, title: "Neon Harbor", kind: .load, began: began)
+        cold.key = "pixlstream://dQw4w9WgXcQ"
+        cold.urlMs = 12
+        cold.tracksMs = 622
+        cold.builtMs = 627
+        cold.playingMs = 840
+        cold.resolve = PlaybackStartTimings.Resolve(ms: 310, configMs: 0, strategy: "VISIONOS",
+                                                    detail: "itag 140, 129 kbps, n sin cambiar (sin validar)", hasN: false)
+        cold.requests = 3
+        cold.infoRequests = 1
+        cold.toEndRequests = 1
+        cold.cancelled = 1
+        cold.fetches = 3
+        cold.fetchedBytes = 2_752_512
+        cold.firstFetchMs = 420
+        cold.firstFetchBytes = 131_072
+        cold.firstAnswerMs = 455
+        var skip = PlaybackStartTimings.Record(id: 2, title: "Glass Tides", kind: .prepared, began: began)
+        skip.key = "pixlstream://Zz9_-Zz9_-Z"
+        skip.playingMs = 38
+        skip.earlierResolve = PlaybackStartTimings.Resolve(ms: 290, configMs: 0, strategy: "VISIONOS",
+                                                           detail: "itag 140, 129 kbps, n sin cambiar (sin validar)",
+                                                           hasN: false)
+        return [skip, cold].map { $0.lines(now: began).joined(separator: "\n") }.joined(separator: "\n\n")
+    }
 
     static let demoFailed = PlaybackDiagnosticsReport(steps: [
         .init(title: PlaybackDiagnostics.titleTrack, ok: true, detail: "Testing with \"Neon Harbor\" by Luma Vale."),
@@ -98,6 +137,11 @@ struct PlaybackDiagnosticsView: View {
                     YouTubeWideButton(title: "Deep probe (debug)", systemImage: "ladybug", enabled: !model.isProbing) {
                         model.deepProbe(env.youtube)
                     }
+                    // iOS only (streaming speed): how long the last starts took, step by step.
+                    YouTubeWideButton(title: "Stream start timings", systemImage: "stopwatch") {
+                        model.showTimings()
+                    }
+                    .accessibilityIdentifier("diagnostics.showTimings")
                     if model.isRunning || model.didRun {
                         DiagnosticsCard(isRunning: model.isRunning, report: model.report) {
                             model.report = nil
@@ -106,6 +150,13 @@ struct PlaybackDiagnosticsView: View {
                     }
                     if model.isProbing || model.probeReport != nil {
                         DeepProbeCard(isRunning: model.isProbing, report: model.probeReport) { model.probeReport = nil }
+                    }
+                    if let timings = model.timingsReport {
+                        DeepProbeCard(title: "Stream start timings", isRunning: false, report: timings) {
+                            model.timingsReport = nil
+                        }
+                        .accessibilityElement(children: .contain)
+                        .accessibilityIdentifier("diagnostics.timings")
                     }
                 }
                 .padding(.horizontal, YouTubeMetrics.screenPadding)
@@ -138,6 +189,8 @@ struct PlaybackDiagnosticsView: View {
         case .playbackDiagnosticsFailed:
             model.report = PlaybackDiagnosticsModel.demoFailed
             model.didRun = true
+        case .playbackDiagnosticsTimings:
+            model.timingsReport = PlaybackDiagnosticsModel.demoTimings
         default:
             break
         }
@@ -210,8 +263,10 @@ struct DiagnosticsCard: View {
     }
 }
 
-/// Android `DeepProbeCard`: the raw report, scrollable (max 340 pt), Copy / Close.
+/// Android `DeepProbeCard`: the raw report, scrollable (max 340 pt), Copy / Close. The Stream start timings card
+/// (iOS only) is the same card under its own title.
 struct DeepProbeCard: View {
+    var title: LocalizedStringKey = "Deep probe (debug)"
     let isRunning: Bool
     let report: String?
     let onDismiss: () -> Void
@@ -221,7 +276,7 @@ struct DeepProbeCard: View {
     var body: some View {
         GlassCard(cornerRadius: 20, tint: theme.surfaceContainerHigh.opacity(GlassTint.surface / GlassTint.container)) {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Deep probe (debug)")
+                Text(title)
                     .pixlFont(.titleMedium, weight: .bold)
                     .foregroundStyle(theme.onSurface)
                 if isRunning {

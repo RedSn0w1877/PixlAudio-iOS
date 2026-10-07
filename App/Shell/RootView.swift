@@ -51,10 +51,13 @@ struct RootView: View {
         .environment(\.playerTheme, colors.player)
         .tint(colors.app.primary)
         .animation(.easeInOut(duration: 0.45), value: themeStore.albumPair)
+        // Presentations don't inherit the shell's `.tint` (it sits inside these modifiers), so each one gets the accent
+        // again; without it default-tinted controls in sheets and covers fell back to the static AccentColor asset.
         .sheet(item: $router.sheet) { sheet in
             SheetDestination(sheet: sheet)
                 .environment(\.appTheme, colors.app)
                 .environment(\.playerTheme, colors.player)
+                .tint(colors.app.primary)
         }
         // `.nowPlaying` is not a cover: the player sheet takes it and expands in place.
         .fullScreenCover(item: Binding(get: { router.cover == .nowPlaying ? nil : router.cover },
@@ -62,9 +65,15 @@ struct RootView: View {
             CoverDestination(cover: cover)
                 .environment(\.appTheme, colors.app)
                 .environment(\.playerTheme, colors.player)
+                .tint(colors.app.primary)
         }
         .task(id: playback.current?.id) {
             await themeStore.update(for: playback.current)
+        }
+        // Settings › Appearance › Accent Color: UIKit-presented controls (alerts, dialogs, menus) follow the window's
+        // tint. The accent snaps (no animation: the root `.animation` is keyed to the album colours only).
+        .onChange(of: themeStore.accentPair, initial: true) { _, pair in
+            WindowTint.apply(pair)
         }
         // The mini player steps aside with the tab bar, in the same transaction: the sheet keeps its slot and slides
         // the card down instead of dropping it and rebuilding it when the keyboard goes.

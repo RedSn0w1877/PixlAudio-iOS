@@ -6,7 +6,8 @@ import UIKit
 /// "Edit song" (Android `EditSongSheet`), full screen: the "Edit song" title (`displaySmall`) with an info circle,
 /// then — 16 pt margins, 12 pt apart — the cover-art card and the fields (title, artist, album, album artist, genre,
 /// composer, track and disc number, ReplayGain track / album, lyrics), each a coloured label over a 10 pt rounded
-/// field with a role-coloured icon; Cancel and Save float in a capsule at the bottom (hidden while typing).
+/// field with a role-coloured icon; Cancel and Save float at the bottom (hidden while typing): Android's capsule bar,
+/// with each button its own glass pill (Hoa, 2026-10-07) and the bar's glass gone (no glass on glass).
 /// Timed lyrics show their words read-only with "Change the words" / "Fix timing" (the sync editor). Saving goes
 /// through `SongTagEditor` (override + file write-back).
 struct EditSongSheet: View {
@@ -14,7 +15,6 @@ struct EditSongSheet: View {
 
     @Environment(AppEnvironment.self) private var env
     @Environment(LibraryStore.self) private var library
-    @Environment(Router.self) private var router
     @Environment(\.appTheme) private var theme
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
@@ -33,6 +33,8 @@ struct EditSongSheet: View {
     /// Set while Save writes the cover and applies the edit: a second tap is ignored (Save ran once, synchronously,
     /// before the cover write moved off the main thread).
     @State private var isSaving = false
+    /// "Change the words" / "Fix timing": the sync editor, presented over this screen (it returns here).
+    @State private var syncRequest: LyricsSyncRequest?
 
     var body: some View {
         Group {
@@ -46,6 +48,9 @@ struct EditSongSheet: View {
         }
         .background(theme.surface.ignoresSafeArea())
         .accessibilityIdentifier("screen.editSong")
+        .fullScreenCover(item: $syncRequest) { request in
+            LyricsSyncEditorView(songId: request.songId, entry: request.entry, onClose: { syncRequest = nil })
+        }
     }
 
     private func content(_ song: Song) -> some View {
@@ -284,9 +289,10 @@ struct EditSongSheet: View {
         return doc.lines.map { $0.text.trimmingCharacters(in: .whitespaces) }.joined(separator: "\n")
     }
 
+    /// Opens the editor over this screen. It used to dismiss Edit song and ask the root for a cover while the song sheet
+    /// below was still up, so the editor waited until that sheet closed (or never showed).
     private func openSyncEditor(_ song: Song, entry: SyncEntry) {
-        dismiss()
-        LyricsSyncEditorView.open(songId: song.id, router: router, entry: entry)
+        syncRequest = LyricsSyncRequest(songId: song.id, entry: entry)
     }
 
     /// Android opens lrclib.net's search for the title and artist.
@@ -298,7 +304,16 @@ struct EditSongSheet: View {
 
     // MARK: Toolbar
 
+    /// Cancel (`secondaryContainer`) and Save (`primary`) as two glass pills, 8 pt apart in one container (spacing below
+    /// the gap). They keep the positions they had inside Android's capsule (its 8 pt padding is added to the bottom).
     private func bottomToolbar(_ song: Song) -> some View {
+        GlassEffectContainer(spacing: 4) {
+            bottomButtons(song)
+        }
+        .padding(.bottom, 24 + 8)
+    }
+
+    private func bottomButtons(_ song: Song) -> some View {
         HStack(spacing: 8) {
             Button { dismiss() } label: {
                 Text("Cancel")
@@ -306,10 +321,10 @@ struct EditSongSheet: View {
                     .foregroundStyle(theme.onSecondaryContainer)
                     .padding(.horizontal, 24)
                     .frame(height: 48)
-                    .background(Capsule().fill(theme.secondaryContainer))
                     .contentShape(.capsule)
             }
-            .buttonStyle(PressScaleButtonStyle(pressedScale: 0.95))
+            .buttonStyle(.plain)
+            .pixlGlass(in: Capsule(), tint: theme.secondaryContainer.opacity(GlassTint.container), interactive: true)
             Button {
                 guard !isSaving else { return }
                 guard let form else { dismiss(); return }
@@ -328,15 +343,12 @@ struct EditSongSheet: View {
                     .foregroundStyle(theme.onPrimary)
                     .padding(.horizontal, 24)
                     .frame(height: 48)
-                    .background(Capsule().fill(theme.primary))
                     .contentShape(.capsule)
             }
-            .buttonStyle(PressScaleButtonStyle(pressedScale: 0.95))
+            .buttonStyle(.plain)
+            .pixlGlass(in: Capsule(), tint: theme.primary.opacity(GlassTint.prominent), interactive: true)
             .accessibilityIdentifier("editSong.save")
         }
-        .padding(8)
-        .pixlGlass(in: Capsule(), tint: theme.surfaceContainerLow.opacity(GlassTint.container))
-        .padding(.bottom, 24)
     }
 }
 

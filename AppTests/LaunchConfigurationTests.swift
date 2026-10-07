@@ -33,6 +33,16 @@ final class LaunchConfigurationTests: XCTestCase {
         XCTAssertEqual(launch.appearance, .system)
     }
 
+    /// `-accent RRGGBB` (accent screenshots) only counts in UI tests; AppEnvironment normalises it into the settings.
+    func testAccentArgumentIsForUITestsOnly() {
+        let launch = LaunchConfiguration(arguments: ["PixlAudio", "-uiTest", "-screen", "home", "-accent", "34c759"])
+        XCTAssertEqual(launch.accentHex, "34c759")
+        XCTAssertEqual(launch.accentHex.flatMap(AccentPalette.seed(hex:)).map(AccentPalette.hex(argb:)), "#34C759")
+        XCTAssertNil(LaunchConfiguration(arguments: ["PixlAudio", "-accent", "34C759"]).accentHex)
+        XCTAssertNil(LaunchConfiguration(arguments: ["PixlAudio", "-uiTest"]).accentHex)
+        XCTAssertNil(LaunchConfiguration(arguments: ["PixlAudio", "-uiTest", "-accent"]).accentHex)
+    }
+
     func testMiniPlayerScreensUseTheVividSong() {
         let launch = LaunchConfiguration(arguments: ["-uiTest", "-screen", "miniPlayer"])
         XCTAssertEqual(launch.songIndex, UITestLaunchRouter.vividSongIndex)

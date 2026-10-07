@@ -448,7 +448,7 @@ struct LibraryView: View {
                 selectedTab = .songs
                 for song in LibrarySorting.sortSongs(demo.songs, by: prefs.songSort).prefix(4) { songSelection.toggle(song.id) }
                 sheet = .songSelection
-            case .libraryCreatePlaylist:
+            case .libraryCreatePlaylist, .libraryCreatePlaylistOnDeviceOff:
                 selectedTab = .playlists
                 sheet = .createPlaylist
             case .libraryAddToPlaylist:
@@ -502,7 +502,7 @@ struct LibraryView: View {
             }, onSetupAI: {
                 self.sheet = nil
                 router.push(.settingsCategory(.ai))
-            }, isAIEnabled: AIProviderStatus.isConfigured(env), onAI: {
+            }, isAIEnabled: AIProviderStatus.isConfigured(env), onDeviceIssue: AIProviderStatus.onDeviceIssue(env), onAI: {
                 self.sheet = nil
                 // The Lab is full screen (Android `CreateAiPlaylistDialog`); present it once this sheet has gone.
                 Task {

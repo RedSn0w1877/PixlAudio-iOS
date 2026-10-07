@@ -111,6 +111,11 @@ launch-into-expanded path (UI tests and launch states) showed it; the app's own 
 - A `safeAreaBar` (or `safeAreaInset`) around a `NavigationStack` does not reach its pages here: the old shell bar
   never inset them. Screens that scroll to their end or pin content to the bottom (Home scrolled down, YouTube
   sign-in, the brick game, floating Save buttons) are the screenshots that show a changed inset.
+- `LibraryStore`'s lookups (`song(id:)`, `album(id:)`, …) are `@ObservationIgnored` and patched in place by edits: a
+  `body` that shows a field an edit changes in place (the favourite heart) reads `observedSong(id:)`, which also
+  reads `revision`, in its **own small view** (`PlayerToggles`, `SongFavoriteTile`), so a library revision (an edit,
+  an artist-image batch, a rescan) redraws that view only. Never from list rows, `NowPlayingView.body` or
+  `LyricsView` (2026-10-07: the full player's heart stayed stale until shuffle or repeat redrew the player).
 - A view that should start with data has it on its first frame (a synchronous cache, a memo in `body`, or a value
   seeded in `init`), not in `onChange(initial:)` / `task`, which costs a second pass or a pop-in.
 - A cache that replaces a synchronous answer must be right whenever the old answer was: key it on **every** input
@@ -138,7 +143,17 @@ launch-into-expanded path (UI tests and launch states) showed it; the app's own 
   keeps its container; Library's action row had its container before the menus came).
 - Grouped glass keeps its accessibility: `UITests/GlassAccessibilityTests` checks that controls inside the new
   containers are still buttons, sliders and switches with their labels (settings groups, the player's top bar, the
-  album header).
+  album header, the queue's toolbar and ⋯ menu).
+- A glass morph needs a container that stays in the tree and an animation nobody overrides (the queue's ⋯ menu,
+  2026-10-07). The toolbar and the open menu share one `GlassEffectContainer` whose content switches; an `if` around
+  the container, or a modifier applied conditionally to it, changes its identity and drops the morph. An implicit
+  `.animation(_:value:)` on an ancestor replaces the `withAnimation` spring for the whole subtree. Modal accessibility
+  (`.isModal`, escape) goes on the part that exists only while open, never on a wrapper that also holds the closed
+  state. The queue menu is PixlAudio's own glass, not a system `Menu`, so the rule above about keeping system menus
+  outside containers doesn't apply to it.
+- A see-through tall sheet (`PresentationDetent.tallGlass`: queue, song sheet, AI Daily Mix, Taizo) leaves the
+  screen beneath on display, so that screen keeps rendering (the full player's ambient styles at their 30 Hz under
+  the queue). A `.large` sheet covered it.
 
 ## Pending on-device checks (Hoa's phone, before merging)
 
@@ -158,3 +173,26 @@ launch-into-expanded path (UI tests and launch states) showed it; the app's own 
    spring's progress during non-drag expands to reproduce it.
 5. **Idle cost of the hidden pre-built full player**, and whether zero-opacity glass costs anything (the card's glass
    is still removed above 25 %).
+
+## Streaming start (2026-10-07, branch `wt/stream`)
+
+Streamed songs start through the network path in docs/design.md › Streaming speed. Nothing was measured on a device
+before these changes (the estimates in `plans/streaming-speed.json` come from the code: a 1 MiB first chunk costs
+~0.8 s at 10 Mbps and ~2.7 s at 3 Mbps; the remote-config fetch blocked the first stream of every launch for up to
+10 s; skips rebuilt the next song from scratch). The app now measures every start: Settings › Developer › Test
+playback › Stream start timings (and the deep probe's "Last start"). Read it as:
+`• Song — 840 ms to play` / `steps (ms): url · tracks · item · start` / `resolve: … via VISIONOS (…) · n: no ·
+config wait 0 ms` / `network: first chunk at … ms (128 KB), N fetches` / `loader: N requests (…), N cancelled`.
+
+### Pending on-device checks (Hoa's phone)
+
+1. Play five streamed songs cold (fresh launch, songs never played) and five skips; copy the Stream start timings.
+   Expected: first chunk 128 KB, `config wait` ≈ 0 ms, skips to the next song "(skip into the prepared song)" when
+   crossfade is on or in the last seconds, otherwise "network: none before playback" for the next 1–2 songs.
+2. Same on cellular and with Low Data Mode on (Settings › Cellular › Data Mode): one song prepared on cellular, none
+   in Low Data Mode.
+3. Look at `n: yes/no` on VISIONOS resolutions and at the `cancelled` counts: `n: yes` makes R9 (cipher warm-up)
+   worth doing; many cancellations or a slow first chunk after R2 make R10 (delegate streaming) worth doing; slow or
+   failing VISIONOS resolutions mean turning on `innertube.hedge` in `remote/config.json` (R8).
+4. A skip during a crossfade's prepared window plays at full volume at once (R7), and the gapless hand-over at the end
+   of a song still has no gap.

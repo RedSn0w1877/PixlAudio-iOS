@@ -24,6 +24,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case settingsEqualizer = "settingsCategory.equalizer"
     case settingsBehavior = "settingsCategory.behavior"
     case settingsAI = "settingsCategory.ai"
+    /// AI features with a cloud assistant switched on (Gemini, the demo key): the optional "Cloud assistants" rows.
+    case settingsAICloud = "settingsCategory.ai.cloud"
     case settingsBackupRestore = "settingsCategory.backup_restore"
     case settingsDeveloper = "settingsCategory.developer"
     case settingsDeviceCapabilities = "settingsCategory.device_capabilities"
@@ -33,6 +35,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case accounts, spotifyDashboard, spotifyBrowse, youTubeLogin
     // Stage 11: YouTube sign-in states and the playback test
     case youTubeLoginCode, youTubeLoginCookie, youTubeLoginSignedIn, playbackDiagnostics, playbackDiagnosticsFailed
+    /// Streaming speed (R12): the playback test with the Stream start timings card open (demo starts).
+    case playbackDiagnosticsTimings
 
     // Sheets
     case queue, songInfo, sleepTimer, lyricsOptions, changelog, betaInfo, jobs
@@ -44,12 +48,19 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case libraryAlbums, libraryAlbumsList, libraryArtists, libraryPlaylists, libraryFolders, libraryLiked
     case librarySelection, librarySort, libraryReorderTabs, libraryMultiSelection, libraryCreatePlaylist
     case libraryAddToPlaylist, songOptionsInfo
+    /// The creation sheet when the selected on-device model can't answer (its system switch is off).
+    case libraryCreatePlaylistOnDeviceOff = "libraryCreatePlaylist.onDeviceOff"
     /// Library Navigation › Compact pill & grid (final review).
     case libraryCompactNav
     case playlistEdit, playlistAddSongs, playlistOptions, playlistReorder, genreSort
 
     // Stage 8: the player's sheets (presented over the expanded player) and the song editor
     case devices, artistPicker, editSong
+
+    // Glass expansion (2026-10-07): the queue's Save as playlist cover (opened by the queue once it's up) and the
+    // genre page's Quick Fill cover (opened by the page), for their floating glass bars
+    case queueSaveAsPlaylist = "queue.saveAsPlaylist"
+    case genreQuickFill = "genre.quickFill"
 
     // Spotify Connect output: the devices sheet on its DEVICES page with demo devices (idle, playing on the Echo,
     // linked before Connect's scopes, no devices), and the "Playing on" chip in the full and the mini player
@@ -59,6 +70,11 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case devicesSpotifyEmpty = "devices.spotifyEmpty"
     case nowPlayingSpotifyConnect = "nowPlaying.spotifyConnect"
     case miniPlayerSpotifyConnect = "miniPlayer.spotifyConnect"
+    /// The full player playing to Bluetooth headphones ("AirPods Pro", `AudioRouteMonitor`'s demo route): the output
+    /// pill shows the device's name (the simulator itself always plays to its speaker).
+    case nowPlayingBluetooth = "nowPlaying.bluetooth"
+    /// The sync editor opened while the Echo plays: it refuses with "Syncing only works on this iPhone…" and Close.
+    case lyricsSyncSpotifyConnect = "lyricsSync.spotifyConnect"
 
     // Stage 12: account screens signed in with demo data (plain ids are signed out), dashboard with a playback test
     // report, browse drill-downs (search results, an artist, an album)
@@ -90,7 +106,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .library, .miniPlayer, .miniPlayerSpotifyConnect: return "screen.library"
         case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryFolders, .libraryLiked,
              .librarySelection, .librarySort, .libraryReorderTabs, .libraryMultiSelection, .libraryCreatePlaylist,
-             .libraryAddToPlaylist, .libraryCompactNav:
+             .libraryAddToPlaylist, .libraryCompactNav, .libraryCreatePlaylistOnDeviceOff:
             return "screen.library"
         case .songOptionsInfo: return "screen.songInfo"
         case .miniPlayerAlone: return "screen.albumDetail"
@@ -111,16 +127,16 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         switch self {
         case .home, .search, .searchResults, .library, .miniPlayer, .miniPlayerSpotifyConnect: return nil
         case .devicesSpotifyConnect, .devicesSpotifyPlaying, .devicesSpotifyReconnect, .devicesSpotifyEmpty,
-             .nowPlayingSpotifyConnect:
+             .nowPlayingSpotifyConnect, .nowPlayingBluetooth, .lyricsSyncSpotifyConnect:
             return nil
         case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryFolders, .libraryLiked,
              .librarySelection, .librarySort, .libraryReorderTabs, .libraryMultiSelection, .libraryCreatePlaylist,
-             .libraryAddToPlaylist, .songOptionsInfo, .libraryCompactNav:
+             .libraryAddToPlaylist, .songOptionsInfo, .libraryCompactNav, .libraryCreatePlaylistOnDeviceOff:
             return nil
         case .playlistEdit: return .playlistEditor(playlistId: demo.playlists.first?.id)
         case .playlistAddSongs, .playlistOptions, .playlistReorder:
             return .playlistDetail(playlistId: demo.playlists.first?.id ?? "")
-        case .genreSort: return .genreDetail(genreId: "Indie")
+        case .genreSort, .genreQuickFill: return .genreDetail(genreId: "Indie")
         case .miniPlayerAlone, .albumDetail: return .albumDetail(albumId: demo.albums.first?.id ?? 1)
         case .artistDetail: return .artistDetail(artistId: demo.artists.first?.id ?? 1)
         case .genreDetail: return .genreDetail(genreId: "Indie")
@@ -137,7 +153,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .settingsPlayback: return .settingsCategory(.playback)
         case .settingsEqualizer: return .settingsCategory(.equalizer)
         case .settingsBehavior: return .settingsCategory(.behavior)
-        case .settingsAI: return .settingsCategory(.ai)
+        case .settingsAI, .settingsAICloud: return .settingsCategory(.ai)
         case .settingsBackupRestore: return .settingsCategory(.backupRestore)
         case .settingsDeveloper: return .settingsCategory(.developer)
         case .settingsDeviceCapabilities: return .settingsCategory(.deviceCapabilities)
@@ -161,9 +177,9 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .spotifyBrowseArtist, .spotifyBrowseAlbum: return .spotifyBrowse(query: "")
         case .spotifyBrowse: return .spotifyBrowse(query: "")
         case .youTubeLogin, .youTubeLoginCode, .youTubeLoginCookie, .youTubeLoginSignedIn: return .youTubeLogin
-        case .playbackDiagnostics, .playbackDiagnosticsFailed: return .playbackDiagnostics
+        case .playbackDiagnostics, .playbackDiagnosticsFailed, .playbackDiagnosticsTimings: return .playbackDiagnostics
         case .queue, .songInfo, .sleepTimer, .lyricsOptions, .changelog, .betaInfo, .jobs,
-             .nowPlaying, .lyrics, .lyricsSync, .setup, .devices, .artistPicker, .editSong:
+             .nowPlaying, .lyrics, .lyricsSync, .setup, .devices, .artistPicker, .editSong, .queueSaveAsPlaylist:
             return nil
         case .aiPlaylist, .taisChat, .taisChatConversation, .aiPlaylistLab: return nil
         case .setupPermission, .setupFolders, .setupBackup, .setupTheme, .setupLibraryLayout, .setupSpotify, .setupFinish:
@@ -185,7 +201,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryFolders, .libraryLiked,
              .librarySelection, .librarySort, .libraryReorderTabs, .libraryMultiSelection, .libraryCreatePlaylist,
              .libraryAddToPlaylist, .songOptionsInfo, .playlistEdit, .playlistAddSongs, .playlistOptions,
-             .playlistReorder, .genreSort, .libraryCompactNav:
+             .playlistReorder, .genreSort, .libraryCompactNav, .libraryCreatePlaylistOnDeviceOff, .genreQuickFill:
             .library
         default: .home
         }
@@ -194,7 +210,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     var sheet: AppSheet? {
         let songId = DemoLibrary.songs.first?.id ?? ""
         switch self {
-        case .queue: return .queue
+        case .queue, .queueSaveAsPlaylist: return .queue
         case .songInfo, .songOptionsInfo, .taisSongSheet: return .songInfo(songId: songId)
         case .sleepTimer: return .sleepTimer
         case .lyricsOptions: return .lyricsOptions(songId: songId)
@@ -213,7 +229,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     /// Stage 8: the player's sheets open over the expanded player, as on Android (`AppEnvironment` expands it).
     var opensOverPlayer: Bool {
         switch self {
-        case .queue, .sleepTimer, .devices, .artistPicker: true
+        case .queue, .queueSaveAsPlaylist, .sleepTimer, .devices, .artistPicker: true
         case .devicesSpotifyConnect, .devicesSpotifyPlaying, .devicesSpotifyReconnect, .devicesSpotifyEmpty: true
         default: false
         }
@@ -230,17 +246,17 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     /// A demo Spotify Connect session plays on the Echo ("Playing on Kitchen Echo Show").
     var startsSpotifyConnectSession: Bool {
         switch self {
-        case .devicesSpotifyPlaying, .nowPlayingSpotifyConnect, .miniPlayerSpotifyConnect: true
+        case .devicesSpotifyPlaying, .nowPlayingSpotifyConnect, .miniPlayerSpotifyConnect, .lyricsSyncSpotifyConnect: true
         default: false
         }
     }
 
     var cover: AppCover? {
         switch self {
-        case .nowPlaying, .nowPlayingSpotifyConnect: .nowPlaying
+        case .nowPlaying, .nowPlayingSpotifyConnect, .nowPlayingBluetooth: .nowPlaying
         case .editSong: .editSong(songId: DemoLibrary.songs.first?.id ?? "")
         case .lyrics, .taisInstrumental, .taisInstrumentalRendering, .taisInstrumentalActive: .lyrics
-        case .lyricsSync: .lyricsSync(songId: DemoLibrary.songs.first?.id ?? "")
+        case .lyricsSync, .lyricsSyncSpotifyConnect: .lyricsSync(songId: DemoLibrary.songs.first?.id ?? "")
         case .setup, .setupPermission, .setupFolders, .setupBackup, .setupTheme, .setupLibraryLayout, .setupSpotify,
              .setupFinish:
             .setup
@@ -261,6 +277,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
 ///     -paused                      start paused (default: playing)
 ///     -noSong                      nothing playing (no mini player)
 ///     -demoScale <n>               repeat the demo library n times (performance tests: a library of real size)
+///     -accent RRGGBB               UI tests only: start with this accent colour (Settings › Appearance › Accent Color)
 nonisolated struct LaunchConfiguration: Equatable, Sendable {
     nonisolated enum Appearance: String, Sendable {
         case system, light, dark
@@ -277,6 +294,9 @@ nonisolated struct LaunchConfiguration: Equatable, Sendable {
     var demoScale: Int
     /// `-cloudFilter`: the song picker shows its LOCAL / CLOUD switch although the demo library has no streamed songs.
     var forcesCloudFilter: Bool
+    /// `-accent RRGGBB` (UI tests only, `#` optional): the accent the ephemeral settings start with, for the accent
+    /// screenshots. The raw value; `AppEnvironment` normalises it (and ignores anything unreadable).
+    var accentHex: String?
 
     init(arguments: [String]) {
         func value(after flag: String) -> String? {
@@ -297,6 +317,7 @@ nonisolated struct LaunchConfiguration: Equatable, Sendable {
         hasSong = !arguments.contains("-noSong")
         demoScale = min(max(value(after: "-demoScale").flatMap(Int.init) ?? 1, 1), 400)
         forcesCloudFilter = isUITest && arguments.contains("-cloudFilter")
+        accentHex = isUITest ? value(after: "-accent") : nil
     }
 
     /// The configuration of this process.

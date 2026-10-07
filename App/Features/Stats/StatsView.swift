@@ -129,8 +129,11 @@ final class StatsCollapseState {
 }
 
 /// Android `CollapsibleCommonTopBar` + `RangeTabsHeader`: the title (`headlineMedium` bold, scaled 1.2 → 0.8) slides
-/// from the bottom-left of the expanded bar to beside the back button; the bar's `surfaceContainerHigh` fill fades
-/// in over the first half of the collapse. Back / refresh are glass circles; the range tabs a glass pill row.
+/// from the bottom-left of the expanded bar to beside the back button; the bar fades in over the first half of the
+/// collapse. Back / refresh are glass circles; the range tabs a glass pill row.
+///
+/// The bar is frosted glass tinted `surfaceContainerHigh`, like Settings' (Hoa, 2026-10-07; Android fills it): the
+/// `SettingsScaffold` recipe. It carries the circles and the pill row: glass under glass, accepted by that precedent.
 private struct StatsHeader: View {
     let collapse: StatsCollapseState
     let topInset: CGFloat
@@ -184,6 +187,13 @@ private struct StatsHeader: View {
         }
         .padding(.top, topInset)
         .padding(.bottom, 8)
-        .background(theme.surfaceContainerHigh.opacity(solidAlpha))
+        .background {
+            Rectangle()
+                .fill(.clear)
+                .pixlGlass(in: Rectangle(), tint: theme.surfaceContainerHigh.opacity(GlassTint.bar))
+                .opacity(solidAlpha)
+                .ignoresSafeArea(edges: .top)
+                .allowsHitTesting(false)
+        }
     }
 }

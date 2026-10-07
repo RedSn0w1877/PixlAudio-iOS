@@ -4,13 +4,29 @@ import PixlLyrics
 import PixlModel
 
 /// Where the editor should start (Android `SyncEntry`).
-nonisolated enum SyncEntry: Sendable, Equatable {
+nonisolated enum SyncEntry: Sendable, Hashable {
     /// Decide from the song's lyrics and any draft (the lyrics screen's entry points).
     case auto
     /// Straight to "Paste the lyrics", pre-filled with the current words ("Change the words").
     case words
     /// Straight to the preview of the saved timing ("Fix timing").
     case fixTiming
+}
+
+/// Why a session ends (`LyricsSyncSession.close`). Every reason restores the player; only `viewGone` leaves navigation
+/// alone, because the editor is already off screen (or being replaced) and a dismissal from its teardown would take
+/// down whatever is on screen now.
+nonisolated enum SyncCloseReason: Sendable, Equatable {
+    /// ✕ / Back, Leave, or Close on an error screen.
+    case user
+    /// Save finished.
+    case saved
+    /// "Remove my timing".
+    case removed
+    /// OK on "The song changed".
+    case songChanged
+    /// The editor's view disappeared (its cover was dismissed or replaced). Never navigates.
+    case viewGone
 }
 
 /// The editor's screens (Android `SyncPhase`, spec §2).
@@ -32,6 +48,13 @@ nonisolated enum SyncPhase: Sendable, Equatable {
     var isTapScreen: Bool {
         switch self {
         case .tapping, .fixLine: true
+        default: false
+        }
+    }
+
+    var isError: Bool {
+        switch self {
+        case .error: true
         default: false
         }
     }
@@ -68,14 +91,19 @@ nonisolated struct SyncPreview: Sendable, Equatable {
 /// player positions and turns its results into seeks, drafts and the saved `LyricsDoc`.
 ///
 /// While open it owns the player: it pauses, suspends crossfades and the hand-over to the next song (pausing at the
-/// end of the song instead), and changes the speed. `close()` restores all of it, whatever the reason for closing.
+/// end of the song instead), and changes the speed. `close(_:)` restores all of it, whatever the reason for closing.
+/// It never closes by itself: when it can't go on (Spotify Connect plays, the player unloaded, getting ready takes too
+/// long) it shows an error screen whose Close ends it.
 /// Fine-grained observable properties: a tap changes `draft` (and the session counters), never per-frame state —
 /// the position is read on demand.
 @Observable
 final class LyricsSyncSession {
     static let speeds: [Float] = [1, 0.75, 0.5]
     static let introShowCount = 2
+    /// The longest "Getting the song ready…" may show before it turns into an error with Close.
     static let openWaitMs: Int64 = 8_000
+    /// A brief nil current song happens while a queue is rebuilt; only one that lasts this long stops the editor.
+    static let unloadedGraceMs: Int64 = 600
     static let draftSaveDelayMs: Int64 = 1_000
     static let fixLineReturnMs: Int64 = 1_000
     static let finishPollMs: Int64 = 100
@@ -127,7 +155,7 @@ final class LyricsSyncSession {
     @ObservationIgnored private let preferences: LyricsSyncPreferences
     @ObservationIgnored private let songLookup: (String) -> Song?
     @ObservationIgnored private let isUITest: Bool
-    /// Called once the session has closed (the view dismisses the cover).
+    /// Called once when the session closes for any reason but `.viewGone` (the view dismisses its cover).
     @ObservationIgnored var onClosed: (() -> Void)?
 
     // MARK: Session state (Android `Session`)
@@ -148,6 +176,8 @@ final class LyricsSyncSession {
     @ObservationIgnored private var holdsDemoNotice = false
 
     @ObservationIgnored private var loadTask: Task<Void, Never>?
+    /// Turns a load that never finishes into an error (`openWaitMs`).
+    @ObservationIgnored private var loadWatchdogTask: Task<Void, Never>?
     @ObservationIgnored private var draftSaveTask: Task<Void, Never>?
     @ObservationIgnored private var undoSeekTask: Task<Void, Never>?
     @ObservationIgnored private var finishTask: Task<Void, Never>?
@@ -185,16 +215,27 @@ final class LyricsSyncSession {
             phase = .error(SyncStrings.noSong)
             return
         }
-        if player.currentSong?.id != target.id {
-            player.playback.play([target], startIndex: 0, startPositionMs: 0, playWhenReady: false)
-        }
         song = target
         songId = target.id
         title = target.title
         artist = target.displayArtist
+        // Android refuses while casting (LyricsSyncEditorStateHolder: lyrics_sync_casting): taps are timed against
+        // this phone's player. Checked before anything is sent: `play` / `pause` would go to the Connect device.
+        if player.isRemoteActive {
+            phase = .error(SyncStrings.remoteOutput)
+            return
+        }
+        if player.currentSong?.id != target.id {
+            player.playback.play([target], startIndex: 0, startPositionMs: 0, playWhenReady: false)
+        }
         phase = .loading
         startSession()
         loadTask = Task { [weak self] in await self?.load(target, entry: entry) }
+        loadWatchdogTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(Self.openWaitMs))
+            guard !Task.isCancelled, let self, self.sessionOpen, self.phase == .loading else { return }
+            self.stopForError(SyncStrings.openTimedOut)
+        }
     }
 
     private func startSession() {
@@ -220,7 +261,7 @@ final class LyricsSyncSession {
         if speed != player.currentRate { player.setRate(speed) }
 
         let lyrics = await currentLyrics(for: song)
-        guard sessionOpen, songId == song.id else { return }
+        guard isStillLoading(song) else { return }
 
         if entry == .words {
             wordsSeed = Self.plainText(of: lyrics)
@@ -231,24 +272,31 @@ final class LyricsSyncSession {
         let seed = await Task.detached(priority: .userInitiated) {
             LyricsTapSync.buildDraft(song: song, lyrics: lyrics, pasted: nil)
         }.value
-        guard sessionOpen, songId == song.id else { return }
+        guard isStillLoading(song) else { return }
         seedDraft = seed.draft
         origin = seed.origin
 
         if entry == .fixTiming, let seedDraft = seed.draft {
             setDraft(seedDraft, dirty: false)
             goToPreview()
-            return
+            // No timed word to preview: carry on as from the lyrics screen instead of staying on the spinner.
+            if phase == .preview { return }
         }
 
         let stored = await draftStore.load(song.id)
-        guard sessionOpen, songId == song.id else { return }
+        guard isStillLoading(song) else { return }
         if let stored, stored.tappedCount > 0 {
             storedDraft = stored
             phase = .resumePrompt(tapped: stored.tappedCount, total: stored.tappableCount)
             return
         }
         startFromSeed(seed.draft, origin: seed.origin)
+    }
+
+    /// The load may go on: still this song's open session, still on the loading screen (the watchdog, a Connect device
+    /// or the player unloading may have turned it into an error meanwhile), not cancelled.
+    private func isStillLoading(_ song: Song) -> Bool {
+        sessionOpen && songId == song.id && phase == .loading && !Task.isCancelled
     }
 
     /// The song's lyrics: what the lyrics screen has loaded for it, else what is stored (Android `getStoredLyrics`).
@@ -289,7 +337,7 @@ final class LyricsSyncSession {
             pause()
             dialog = .leave
         } else {
-            close()
+            close(.user)
         }
     }
 
@@ -306,12 +354,14 @@ final class LyricsSyncSession {
         requestClose()
     }
 
-    /// Ends the session for any reason and puts the player back as it was. Idempotent.
-    func close() {
+    /// Ends the session and puts the player back as it was (rate, crossfades, the hand-over, the instrumental), keeping
+    /// unsaved taps as a draft. Idempotent. `onClosed` (navigation) runs once, and never for `.viewGone`: teardown
+    /// from a disappearing view must not dismiss whatever is on screen by then.
+    func close(_ reason: SyncCloseReason = .user) {
         let wasOpen = sessionOpen
         sessionOpen = false
-        for task in [loadTask, undoSeekTask, finishTask, fixLineReturnTask, previewTask, previewSeekTask, searchTask,
-                     draftSaveTask, unloadedTask] {
+        for task in [loadTask, loadWatchdogTask, undoSeekTask, finishTask, fixLineReturnTask, previewTask, previewSeekTask,
+                     searchTask, draftSaveTask, unloadedTask] {
             task?.cancel()
         }
         if wasOpen {
@@ -323,7 +373,23 @@ final class LyricsSyncSession {
         }
         let wasClosed = phase == .closed
         phase = .closed
+        guard reason != .viewGone else { return }
         if !wasClosed || wasOpen { onClosed?() }
+    }
+
+    /// The editor can't go on: stop everything that would seek or play, keep the taps as a draft and show `message`
+    /// with Close (Android's `Error` phase). The session stays open, so Close (`close`) still restores the player. It
+    /// does not pause: with a Connect device attached, pausing would stop the speaker the person just picked.
+    private func stopForError(_ message: String) {
+        for task in [loadTask, loadWatchdogTask, undoSeekTask, finishTask, fixLineReturnTask, previewTask,
+                     previewSeekTask, searchTask, unloadedTask] {
+            task?.cancel()
+        }
+        flushDraft()
+        dialog = .none
+        notice = nil
+        lineSelectMode = false
+        phase = .error(message)
     }
 
     /// The app went to the background: pause and keep the taps.
@@ -335,20 +401,28 @@ final class LyricsSyncSession {
 
     /// The store's current song changed (Android's `currentSong` collector).
     func currentSongChanged(to id: String?) {
-        guard sessionOpen, phase != .closed else { return }
+        guard sessionOpen, phase != .closed, !phase.isError else { return }
         unloadedTask?.cancel()
         if id == nil {
-            // The player unloaded; a brief nil can happen during a queue rebuild, so only close if it stays.
+            // The player unloaded; a brief nil can happen during a queue rebuild, so only stop if it stays. The editor
+            // says so and waits for Close instead of vanishing.
             unloadedTask = Task { [weak self] in
-                try? await Task.sleep(for: .milliseconds(600))
+                try? await Task.sleep(for: .milliseconds(Self.unloadedGraceMs))
                 guard !Task.isCancelled, let self, self.sessionOpen, self.player.currentSong == nil else { return }
-                self.close()
+                self.stopForError(SyncStrings.playbackStopped)
             }
         } else if id != songId {
             pause()
             flushDraft()
             dialog = .songChanged
         }
+    }
+
+    /// A Spotify Connect device took over playback mid-session (Android: casting started → flushDraft + Error, no
+    /// pause). The taps can't be timed against a remote clock, so the editor stops with the Connect message.
+    func remoteOutputAttached() {
+        guard sessionOpen, phase != .closed, !phase.isError else { return }
+        stopForError(SyncStrings.remoteOutput)
     }
 
     /// The store's play state changed (the engine paused by itself, an interruption…).
@@ -359,13 +433,13 @@ final class LyricsSyncSession {
 
     func dismissDialog() {
         if dialog == .songChanged {
-            close()
+            close(.songChanged)
         } else {
             dialog = .none
         }
     }
 
-    func confirmLeave() { close() }
+    func confirmLeave() { close(.user) }
 
     // MARK: - Resume prompt, manage, words, intro
 
@@ -400,7 +474,7 @@ final class LyricsSyncSession {
         saved = true
         deleteDraftFile()
         lyricsController.reset(song: song)
-        close()
+        close(.removed)
     }
 
     func findLyricsOnline() {
@@ -803,7 +877,7 @@ final class LyricsSyncSession {
             }
             self.deleteDraftFile()
             self.saved = true
-            self.close()
+            self.close(.saved)
             if service != nil { self.lyricsController.load(song, forceRefresh: false) }
             self.lyricsController.message = SyncStrings.saved
         }

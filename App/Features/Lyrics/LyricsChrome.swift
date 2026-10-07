@@ -503,6 +503,7 @@ struct LyricsSyncChip: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("lyrics.syncChip")
             Button(action: onDismiss) {
                 Image(systemName: "xmark")
                     .font(.system(size: 13, weight: .bold))

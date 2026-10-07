@@ -11,6 +11,20 @@ nonisolated struct HomeGreeting: Sendable, Equatable {
     var subtitle: String
 }
 
+/// What Android's AI greeting prompt says about the listener (`HomeGreetingStateHolder.refresh` / `expandInsight`).
+nonisolated struct HomeGreetingFacts: Sendable, Equatable {
+    var hour = 12
+    var topArtist: String?
+    var topGenre: String?
+    var totalPlays = 0
+    var librarySize = 0
+}
+
+/// The two AI texts of the greeting card: the once-a-day headline and the on-demand insight.
+nonisolated enum HomeGreetingKind: Sendable, Equatable {
+    case headline, insight
+}
+
 /// One row of the recently played lists (Android `RecentlyPlayedSongUiModel`).
 nonisolated struct RecentlyPlayedItem: Sendable, Equatable, Identifiable {
     var song: Song
@@ -90,6 +104,32 @@ nonisolated enum HomeLogic {
 
     static func topGenre(_ summary: PlaybackStatsSummary?) -> String? {
         summary?.topGenres.first { $0.genre != PlaybackStats.unknownGenreLabel }?.genre
+    }
+
+    // MARK: AI greeting (Android HomeGreetingStateHolder, the AI half)
+
+    /// The headline prompt: `time_of_day=evening, top_artist=…, top_genre=…, total_plays=N`.
+    static func greetingPrompt(_ facts: HomeGreetingFacts) -> String {
+        var text = "time_of_day=\(dayPhase(hour: facts.hour))"
+        if let artist = facts.topArtist { text += ", top_artist=\(artist)" }
+        if let genre = facts.topGenre { text += ", top_genre=\(genre)" }
+        text += ", total_plays=\(facts.totalPlays)"
+        return text
+    }
+
+    /// The expanded insight's prompt (`expandInsight`): the headline facts, the library size and the request.
+    static func insightPrompt(_ facts: HomeGreetingFacts) -> String {
+        greetingPrompt(facts) + ", library_size=\(facts.librarySize)"
+            + ". Write 2-3 sentences of listening insight, more detailed than a one-line greeting."
+    }
+
+    /// Android `text.trim().trim('"').take(140)`; nil when nothing is left.
+    static func cleanGreeting(_ text: String, limit: Int = 140) -> String? {
+        var slice = Substring(text.trimmingCharacters(in: .whitespacesAndNewlines))
+        while slice.first == "\"" { slice = slice.dropFirst() }
+        while slice.last == "\"" { slice = slice.dropLast() }
+        let clean = String(slice.prefix(limit)).trimmingCharacters(in: .whitespacesAndNewlines)
+        return clean.isEmpty ? nil : clean
     }
 
     // MARK: Recently played (Android presentation/model/RecentlyPlayedSongUi.kt)

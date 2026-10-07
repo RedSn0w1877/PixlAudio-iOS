@@ -1,8 +1,9 @@
 import XCTest
 
 /// Stage 11 screenshots: the YouTube sign-in screen (sign-in page stand-in, the device-code sheet, the cookie paste
-/// sheet, signed in) and the playback test (all green, and failing at the audio step), light + dark. Compare with
-/// Android's `YouTubeLoginScreen`, `YouTubeSignInDialog`, `YouTubeAccountCard` and `DiagnosticsCard`.
+/// sheet, signed in) and the playback test (all green, failing at the audio step, and the iOS-only Stream start
+/// timings card), light + dark. Compare with Android's `YouTubeLoginScreen`, `YouTubeSignInDialog`,
+/// `YouTubeAccountCard` and `DiagnosticsCard`.
 @MainActor
 final class YouTubeScreenshotTests: XCTestCase {
     func testLoginLight() throws { try capture("youTubeLogin", "light", ready: "youtube.signInPage") }
@@ -20,6 +21,13 @@ final class YouTubeScreenshotTests: XCTestCase {
     }
     func testPlaybackDiagnosticsFailedDark() throws {
         try capture("playbackDiagnosticsFailed", "dark", ready: "diagnostics.card")
+    }
+    /// Streaming speed (R12): the Stream start timings card with demo starts.
+    func testPlaybackDiagnosticsTimingsLight() throws {
+        try capture("playbackDiagnosticsTimings", "light", ready: "diagnostics.timings")
+    }
+    func testPlaybackDiagnosticsTimingsDark() throws {
+        try capture("playbackDiagnosticsTimings", "dark", ready: "diagnostics.timings")
     }
 
     // MARK: - Helper

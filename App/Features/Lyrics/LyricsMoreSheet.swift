@@ -37,8 +37,14 @@ struct LyricsMoreSheet: View {
 
     @Environment(\.playerTheme) private var theme
     @Environment(\.dismiss) private var dismiss
+    @Environment(LibraryStore.self) private var library
     @State private var showResetDialog = false
     @State private var showDebugDialog = false
+
+    /// The favourite as the library has it now, read in this sheet's own body (`observedSong`: the library's song
+    /// lookup is not observed, so the presenter's `isFavorite` stayed stale after a tap); `isFavorite` when the song
+    /// isn't in the library.
+    private var liked: Bool { song.flatMap { library.observedSong(id: $0.id)?.isFavorite } ?? isFavorite }
 
     private var isUserSynced: Bool { lyrics?.document?.metadata.source == LyricsRepositoryLogic.userSource }
     private var hasWordTiming: Bool { lyrics?.synced?.contains { !($0.words ?? []).isEmpty } ?? false }
@@ -83,11 +89,12 @@ struct LyricsMoreSheet: View {
         VStack(alignment: .leading, spacing: 2) {
             caption("Lyrics")
             if let onSync = actions.onSyncYourself, song != nil {
+                // The lyrics screen opens the editor from this sheet's onDismiss, once the sheet has gone.
                 row(isUserSynced ? "Fix my word timing" : "Sync the words yourself",
                     subtitle: !isUserSynced && !hasWordTiming ? "Tap along so each word lights up" : nil,
-                    systemImage: "hand.tap", accent: true, corners: (18, 8)) {
-                    dismiss()
+                    systemImage: "hand.tap", accent: true, corners: (18, 8), identifier: "lyricsMore.syncYourself") {
                     onSync()
+                    dismiss()
                 }
             }
             if lyrics != nil, let onSave = actions.onSave {
@@ -173,7 +180,7 @@ struct LyricsMoreSheet: View {
                    onColor: theme.onPrimary, action: actions.onShuffle)
             toggle(active: repeatMode != .off, systemImage: repeatMode == .one ? "repeat.1" : "repeat", label: "Repeat",
                    color: theme.secondary, onColor: theme.onSecondary, action: actions.onRepeat)
-            toggle(active: isFavorite, systemImage: isFavorite ? "heart.fill" : "heart", label: "Favorite",
+            toggle(active: liked, systemImage: liked ? "heart.fill" : "heart", label: "Favorite",
                    color: theme.tertiary, onColor: theme.onTertiary, action: actions.onFavorite)
         }
         .padding(8)
@@ -198,9 +205,13 @@ struct LyricsMoreSheet: View {
                                bottomTrailingRadius: corners.1, topTrailingRadius: corners.0, style: .continuous)
     }
 
+    /// `identifier` is an optional id for UI tests: the row's label joins its title and subtitle, so a label query is
+    /// fragile.
+    @ViewBuilder
     private func row(_ title: LocalizedStringKey, subtitle: LocalizedStringKey? = nil, systemImage: String,
-                     accent: Bool = false, corners: (CGFloat, CGFloat), action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+                     accent: Bool = false, corners: (CGFloat, CGFloat), identifier: String? = nil,
+                     action: @escaping () -> Void) -> some View {
+        let button = Button(action: action) {
             HStack(spacing: 16) {
                 Image(systemName: systemImage)
                     .font(.system(size: 20, weight: .medium))
@@ -225,6 +236,11 @@ struct LyricsMoreSheet: View {
             .contentShape(shape(corners))
         }
         .buttonStyle(PressScaleButtonStyle(pressedScale: 0.98))
+        if let identifier {
+            button.accessibilityIdentifier(identifier)
+        } else {
+            button
+        }
     }
 
     private func switchRow(_ title: LocalizedStringKey, systemImage: String, isOn: Binding<Bool>,

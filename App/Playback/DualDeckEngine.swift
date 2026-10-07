@@ -48,6 +48,8 @@ final class DualDeckEngine: PlaybackEngine {
     private var isPreparing = false
     /// Set by a manual skip that uses the pre-inserted item (so the advance is not reported as automatic).
     private var manualAdvancePending = false
+    /// The open `PlaybackStartTimings` record of the start in progress (closed at the first `.playing`).
+    private var startTiming: Int?
 
     // MARK: Crossfade state (see +Crossfade)
     var crossfadeTask: Task<Void, Never>?
@@ -150,6 +152,10 @@ final class DualDeckEngine: PlaybackEngine {
         playWhenReady = false
         // Paused before the first item started: give back a session that `setQueue` activated ahead of the load.
         if activeItem == nil { session.releasePreparedActivation() }
+        if activeItem != nil, let timing = startTiming {
+            PlaybackStartTimings.shared.readyPaused(timing)
+            startTiming = nil
+        }
         emitPlaying()
         active.pause()
         fade?.deck.pause()
@@ -283,6 +289,7 @@ final class DualDeckEngine: PlaybackEngine {
         pause()
         finishFadeNow()
         cancelLoading()
+        abandonStartTiming()
         discard(active.removeAll())
         discard(idle.removeAll())
         activeItem = nil
@@ -358,15 +365,18 @@ final class DualDeckEngine: PlaybackEngine {
         loadGeneration += 1
         let generation = loadGeneration
         pendingStartSeconds = seconds
+        abandonStartTiming()
         guard let entry = queue.current else {
             setPreparing(false)
             return
         }
         setPreparing(true)
+        let timing = PlaybackStartTimings.shared.begin(title: entry.song.title)
+        startTiming = timing
         loadTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let item = try await self.factory.makeItem(for: entry)
+                let item = try await self.factory.makeItem(for: entry, timing: timing)
                 guard generation == self.loadGeneration else {
                     self.factory.discard(item)
                     return
@@ -387,7 +397,12 @@ final class DualDeckEngine: PlaybackEngine {
         active.load(item, at: seconds)
         pendingStartSeconds = 0
         consecutiveFailures = 0
-        if playWhenReady { startActive() }
+        if playWhenReady {
+            startActive()
+        } else if let timing = startTiming {
+            PlaybackStartTimings.shared.readyPaused(timing)
+            startTiming = nil
+        }
         setPreparing(false)
         onTimingChanged?()
         scheduleNext()
@@ -395,6 +410,10 @@ final class DualDeckEngine: PlaybackEngine {
 
     private func loadFailed(entry: QueueEntry, error: any Error) {
         setPreparing(false)
+        if let timing = startTiming {
+            PlaybackStartTimings.shared.failed(timing, error.localizedDescription)
+            startTiming = nil
+        }
         emit(.failed(message: "Couldn't play \"\(entry.song.title)\" (\(error.localizedDescription))"))
         consecutiveFailures += 1
         if playWhenReady, consecutiveFailures < queue.count, let next = queue.nextIndexForSkip {
@@ -414,6 +433,13 @@ final class DualDeckEngine: PlaybackEngine {
         nextTask = nil
     }
 
+    /// The start in progress ends without playing (another song was chosen, or playback stopped).
+    private func abandonStartTiming() {
+        guard let timing = startTiming else { return }
+        startTiming = nil
+        PlaybackStartTimings.shared.abandoned(timing)
+    }
+
     func startActive() {
         session.activate()
         active.play(rate: rate)
@@ -431,7 +457,8 @@ final class DualDeckEngine: PlaybackEngine {
         loadCurrent(at: 0)
     }
 
-    /// A user-initiated move to `index`. Uses the pre-inserted gapless item when it is exactly that entry (instant).
+    /// A user-initiated move to `index`. Uses the pre-inserted gapless item, or the item already prepared on the idle
+    /// deck, when it is exactly that entry (instant).
     private func jump(to index: Int) {
         hasEnded = false
         guard let target = queue.entry(at: index) else { return }
@@ -442,7 +469,55 @@ final class DualDeckEngine: PlaybackEngine {
             if playWhenReady { startActive() }
             return
         }
+        if adoptPreparedIncoming(target: target, index: index) { return }
         advance(to: index, automatic: false, previous: queue.current?.song)
+    }
+
+    /// Streaming speed R7: a skip to the song already prepared on the idle deck — a crossfade's incoming item (built
+    /// 1.5 s into the song) or a gapless hand-over's (its last 4.5 s) — takes that item over instead of building it
+    /// again (no new resolution, no new download). Returns false when nothing prepared matches `target`.
+    private func adoptPreparedIncoming(target: QueueEntry, index: Int) -> Bool {
+        guard fade == nil, activeItem != nil, let prepared = preparedIncoming, prepared.entry.id == target.id,
+              idle.currentItem === prepared else { return false }
+        // `idle` is computed from `active`: keep the incoming deck before swapping.
+        let incomingDeck = idle
+        cancelScheduledHandOver()
+        crossfadeTask?.cancel()
+        crossfadeTask = nil
+        preparingIncomingTask?.cancel()
+        preparingIncomingTask = nil
+        plannedTransition = nil
+        cancelLoading()
+        // A crossfade's incoming curve starts at 0 gain: play the adopted item at full gain.
+        prepared.tap.ramp.publish(nil)
+        let previous = activeItem
+        abandonStartTiming()
+        let timing = PlaybackStartTimings.shared.begin(title: prepared.song.title, kind: .prepared,
+                                                       url: prepared.asset.url)
+        startTiming = timing
+        discard(active.removeAll())
+        active = incomingDeck
+        activeItem = prepared
+        preparedIncoming = nil
+        incomingDeck.restoreStallWaiting()
+        if prepared.positionSeconds > 0.05 { incomingDeck.seek(to: 0) }
+        hasEnded = false
+        pendingStartSeconds = 0
+        consecutiveFailures = 0
+        if let volume = lastAppliedReplayGainFor(prepared) { lastAppliedReplayGain = volume }
+        queue.setCurrentIndex(index)
+        emit(.currentIndexChanged(queue.currentIndex))
+        onItemTransition?(prepared.song, previous?.song, false)
+        if playWhenReady {
+            startActive()
+        } else {
+            PlaybackStartTimings.shared.readyPaused(timing)
+            startTiming = nil
+        }
+        setPreparing(false)
+        onTimingChanged?()
+        scheduleNext()
+        return true
     }
 
     // MARK: - What comes next
@@ -508,6 +583,10 @@ final class DualDeckEngine: PlaybackEngine {
             }
         case .statusChanged(let status):
             guard deck === active else { return }
+            if status == .playing, activeItem != nil, let timing = startTiming {
+                PlaybackStartTimings.shared.playing(timing)
+                startTiming = nil
+            }
             setPreparing(loadTask != nil || (playWhenReady && status == .waitingToPlayAtSpecifiedRate))
         case .itemEnded(let item):
             guard deck === active, item === activeItem, deck.upcoming.isEmpty else { return }

@@ -74,9 +74,11 @@ final class YouTubeServices {
         guard let playback, let loader, let cache, let service, let fetcher else { return }
         StreamingResourceLoaderRegistry.shared.register(scheme: YouTubeSongIdentity.scheme) { _ in loader }
         playback.engine.factory.resolver = StreamingPlayableURLResolver(base: playback.engine.factory.resolver, cache: cache)
-        let prefetcher = YouTubePrefetcher(engine: playback.engine, service: service, fetcher: fetcher)
+        let prefetcher = YouTubePrefetcher(engine: playback.engine, service: service, fetcher: fetcher,
+                                           network: NetworkConditionsMonitor())
         self.prefetcher = prefetcher
         playback.onUpcomingChanged = { [weak prefetcher] in prefetcher?.upcomingChanged() }
+        playback.onPlayStateChanged = { [weak prefetcher] playing in prefetcher?.playingChanged(playing) }
     }
 
     /// Launch work (cheap): sign-in state, downloads, cache trim.

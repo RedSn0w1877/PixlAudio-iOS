@@ -599,8 +599,9 @@ network): `YouTubeStreamingTests.swift`; app (XCTest): `AppTests/YouTubeServices
 | `UITests/SettingsScreenshotTests` (stage 7d) | settings (dark) and every category × light/dark; experimental, artists, delimiters, word delimiters, transitions × 2, licences, easter egg (menu + playing), equalizer graph mode |
 | `AITests` (stage 13) | Android has no unit tests for these (its AI tests — `AiProviderSupportTest`, `TaisIntentParserTest` — are ported in PixlNet, stage 3c); checked against the Kotlin source by hand: `TaisMediaRouter` genre `LIKE` arms, offline routes (genre / free text / both), exact library match before the catalogue, catalogue fallback through the Search seam; `TaisDjEngine` media vs conversation turns with the AI intro; `TaisChatModel` thinking-row replacement; `AiStateHolder` request context (candidate pool, digest), scripted generation end to end through `AiOrchestrator`, the error table, `generateShortAiTitle` / `resolveAiPlaylistName`; `buildAiPlaylistPrompt` + range validation; `translateLyrics` prompt, sentinel, validation, already-translated / not-found / not-configured outcomes; on-device prompt-shape detection; model display names |
 | `UITests/AIScreenshotTests` (stage 13) | AI playlist sheet (empty × light/dark, prompt, error), TAIS DJ chat (empty × light/dark, scripted conversation × light/dark), AI Playlist Lab (top, scrolled) — scripted provider, no network |
-| `LyricsSyncTests` (stage 10) | Android has no unit tests for `LyricsSyncEditorStateHolder`; checked against the Kotlin by hand: plain text of every lyrics shape (plain / synced / `LyricsDoc`), export file-name sanitising, preview line ↔ draft line mapping, the rough-line mark, the tap model's sung / next words, the music break before a gap line, and a session on the demo engine (open → tap → undo → close) |
+| `LyricsSyncTests` (stage 10) | Android has no unit tests for `LyricsSyncEditorStateHolder`; checked against the Kotlin by hand: plain text of every lyrics shape (plain / synced / `LyricsDoc`), export file-name sanitising, preview line ↔ draft line mapping, the rough-line mark, the tap model's sung / next words, the music break before a gap line, and a session on the demo engine (open → tap → undo → close); 2026-10-07 entry fix: a `.viewGone` close never calls `onClosed` (and nothing is left to close after it), a user close navigates exactly once, Android's casting guard as the Spotify Connect guard (open refused with the message and nothing sent to the device; a mid-session takeover shows the error, ignores song changes behind it and never pauses the device — Android `LyricsSyncEditorStateHolder.kt:259-262`, `300-307`), and `ScreenAwake` keeping the screen on while any owner holds it |
 | `UITests/LyricsSyncScreenshotTests` (stage 10) | sync editor: intro, words, resume, manage, tap (playing / paused / music break / notice / ended early / fix a line), preview (+ fix a line), light appearance staying dark, speed menu, a live tapping run on the demo engine |
+| `UITests/LyricsSyncEntryTests` (2026-10-07) | iOS only (Android shows the editor as an overlay and has no UI test for it): the editor opened from the real entry points — the sync chip (twice), Lyrics options → "Sync the words yourself" on line- and word-synced lyrics — is still open 3 s later and closes back to the lyrics screen; Leave through the alert returns to lyrics; with the demo Spotify Connect session the editor shows the Connect message and Close dismisses it |
 | `TaisModelTests` (stage 14) | the released `models-v1` archives downloaded in the simulator and installed (size + SHA-256 pin, ustar extract, `compileModel`): wav2vec2 gives one normalised row per 20 ms frame, alignment refuses lyrics over a pure tone, MDX-Net renders a complete peak-safe WAV, a wrong archive is refused before extraction, streamed SHA-256 equals CryptoKit's one-shot digest. Skips when the release can't be reached (~220 MB per app CI run) |
 | `UITests/TaisScreenshotTests` (stage 14) | Experimental's Remaster Song card and on-device models panel (× light/dark), the song sheet's Remaster card (× light/dark), the lyrics screen's instrumental card (ready / rendering) and floating toggle (playing) |
 
@@ -679,3 +680,82 @@ Swift-only and define the behaviour both apps share.
 - `UITests/SpotifyConnectScreenshotTests` — the section (light/dark), connect → stop on a demo device, playing state
   (light/dark), the hero with the device volume, reconnect row, empty hint, "Playing on" chip in the full (light/dark)
   and mini player.
+
+## Streaming speed (2026-10-07, branch `wt/stream`; iOS first, Android later)
+Android has no unit tests for `CloudStreamProxy`'s retry loop or chunking; `StreamUrlPrefetcherTest` (3) covers its
+one-lookup prefetcher, whose rules (one task, a queue change cancels the obsolete one, pause cancels the latest,
+a failure stays optional) the iOS prefetcher keeps in its own way (one task re-planned on change, cancelled on
+pause; `try?` everywhere). PixlNet tests run on Linux, Windows and macOS; the app tests on CI.
+
+| Android source | Swift test | Module | Status | Notes |
+|---|---|---|---|---|
+| `CloudStreamProxy.UPSTREAM_CHUNK_SIZE` (512 KB) | `StreamChunkPolicyTests` (3) | PixlNet | new (R2) | 128 KiB → 512 KiB → 2 MiB ramp and cap; the first request is `bytes=0-131071`; read-ahead never past the end or into cached bytes; fetch ends at size / end / cached start. |
+| `MusicService.updateNextStreamPrefetch` (playing-only gate) | `StreamPrefetchPolicyTests` (4) | PixlNet | new (R3) | Wi-Fi/Ethernet 2, cellular / metered / unknown 1, offline / Low Data Mode / paused 0; skip-order indices with repeat-all wrap, never the current song; sizes and delays. |
+| `CloudStreamProxy.fetch` (`MAX_UPSTREAM_ATTEMPTS = 4`, refresh first, `delay(250L * (attempt + 1))`) | `StreamRetryPolicyTests` (4) | PixlNet | ported (R5a) | Same client first, then switch (never with cached bytes); back-off 250/500/750 ms for 429/5xx; four attempts; other statuses fail at once. |
+| _iOS only (R8)_ | `StreamHedgingTests` (5) | PixlNet | new | The `innertube.hedge` flag is off unless `"enabled": true` (the repo file ships it off), defaults and clamping; a slow client loses to the next after `afterSeconds`; a failure starts the next at once; all failing ends without waiting; off = strictly sequential. |
+| `data/youtube/TrackMatcher.findMatch` | `TrackMatcherFanOutTests` (4) | PixlNet | new (R11) | `findMatchFanOut` gives exactly `findMatch`'s answer: the recorded `innertube-search.json` accepted on the first query with one search, a later answer never beating an earlier accept, the video shelf deciding, failures counted only where `findMatch` would have searched. |
+| _iOS only (R12, R4)_ | `StreamingSpeedTests` (4) | app | new | Start timings record every step and only their own key's events; a prefetched resolution, local files, paused / failed / left starts, capacity; the resolve summary (winner detail, `n`); the client table's six-hour gate seeded from the saved file across relaunches, refreshed in the background when stale. |
+| _iOS only (R7)_ | `DualDeckEngineTests.testASkipTakesOverTheCrossfadesPreparedItem`, `testASkipTakesOverTheGaplessHandOversPreparedItem` | app | new | A skip takes over the crossfade's (gain ramp cleared) or the hand-over's prepared item with no new resolution, manual transition, timed as a prepared skip; an unprepared target still loads. |
+| _iOS only (R12 UI)_ | `YouTubeScreenshotTests.testPlaybackDiagnosticsTimingsLight/Dark` | UI | new | The Stream start timings card with demo starts. |
+
+
+## On-device AI by default (2026-10-07, local AI phase 1, Swift-only)
+
+Nothing here is ported: Android has no on-device paths for these features (its on-device provider is a MediaPipe
+model behind the same orchestrator). The system language model can't run on CI's simulators, so every test stands
+in for the model calls; the behaviour itself waits for Hoa's iPhone.
+
+- `PixlNetTests/AiTests.customProviderChainKeepsOnDeviceRequestsLocal` — with the app's chain (`[ON_DEVICE]` when
+  on-device is selected) a failure lists only ON_DEVICE and no HTTP request is made.
+- `AppTests/OnDeviceAITests` (17 tests; also run on Linux against the pure files during development):
+  on-device failure messages never contain a network/key word, never become "No Internet Connection" through
+  `AiPlaylistPrompt.detailedErrorMessage` (the old "On-Device (Offline)" name did) and read back with `matching`;
+  reply clean-up and token estimates (Latin, CJK, Vietnamese); the curator's prompt (1-based aliases, no ids, the
+  taste line), the request-aware pool, the budget ladder with an injected counter, mapping back (dedupe, out of range,
+  top-up), the curator end to end with a stand-in model (every other song, a too-long retry with half the pool, the
+  guardrail retry as text, unavailability), long playlists (plan → fill → the first 40 ordered), plan parsing and
+  fill; lyric translation (timestamps kept, each line translated once, already in the target language, plain lyrics,
+  lines from the screen), its parser and chunks; Taizo's library lookup, prompts and the intro that arrives after the
+  card (`TaizoOnDevice` stand-in); Home's greeting prompts (Android `HomeGreetingStateHolder`'s strings).
+- `AppTests/AITests` (5 more): on-device failures resolve to their own message ahead of Android's error rows (and
+  through the orchestrator's chain summary); the provider chain; the key-less Gemini rule; `AISettings` defaults
+  (ON_DEVICE, the remembered cloud provider, the switch, a restore); the translator's on-device path only when
+  selected.
+- `UITests/SettingsScreenshotTests.testAICategoryCloudLight/Dark` (`settingsCategory.ai.cloud`),
+  `testAICategoryAdvancedOnDeviceLight`; `UITests/LibraryScreenshotTests.testLibraryCreatePlaylistOnDeviceOffDark`
+  (`libraryCreatePlaylist.onDeviceOff`).
+
+## Accent colour (owner request 2026-10-07, iOS-only, Swift-only)
+Android has no accent setting, so there is nothing to port; these define the iOS behaviour.
+- `PixlLibraryTests/AccentPairTests` (7) — `ArtworkTheme.accentPair(seed:)`: WCAG AA (4.5:1) for `onPrimary` on
+  `primary`, `primary` on the background and surface, and `onPrimaryContainer` on `primaryContainer`, light and dark,
+  for every preset and a sweep of 606 custom picks (24 hues × 5 chromas × 5 tones plus black, white, mid grey and
+  the RGB primaries); the light primaries (and four dark ones) equal Google's reference colour utilities
+  (material-color-utilities, run once in the planning scratchpad: Red #BD0E12, Blue #005DB8, …); the primary's chroma
+  is never below TonalSpot's and clearly above it for the saturated presets; Graphite is pure grey at the exact role
+  tones with red errors; surfaces, secondary and tertiary equal TonalSpot's; the default `brandPair` is unchanged.
+- `PixlBackupTests/ModuleTests` — `catalogueKinds` (accent_color_v1 is portable, every catalogue key listed once incl.
+  `iosOnly`), `iosOnlyAccentColorRoundTripsAndOldBackupsClearIt` (export → restore keeps it; a backup without it
+  restores with nothing skipped and clears it).
+- `AppTests/AccentColorTests` (11) — hex parsing (with or without `#`, any case, spaces; empty / short / long / non-hex
+  / signed → nil) and formatting; a picked `Color` → hex (opacity dropped, extended range clamped); the preset list and
+  lookup by colour; `ThemeStore` keeps the violet by default, follows a picked accent live in light and dark, gives the
+  player the accent when nothing plays, and registers observation even on a cached accent; persistence under
+  `accent_color_v1` and `reload(from:)`; the window tint's light and dark colours.
+- `AppTests/BackupServiceTests` — `testAccentColorIsExportedAndRestored` (exported as a string, restored into another
+  store and reloaded live), `testOldBackupWithoutTheAccentRestoresTheDefault`.
+- `AppTests/LaunchConfigurationTests.testAccentArgumentIsForUITestsOnly` — `-accent RRGGBB`.
+- `UITests/SettingsScreenshotTests` — Appearance with Red (light, dark), Graphite (dark) and a custom colour (light),
+  and a tap on Green that must select it (`isSelected`) and re-theme the page; `UITests/ScreenshotTests` — Home in
+  Green (dark), Library in Blue (light), the settings list in Pink (light).
+
+## Player fixes (2026-10-07, branch `wt/player`, Swift-only)
+Nothing to port: Android has no tests for the full player's toggle row, the transport's press timing or the top bar.
+
+- `AppTests/FavoriteObservationTests` — a favourite edit through `LibraryEditor` invalidates a reader of
+  `LibraryStore.observedSong(id:)` and shows the new flag; a reader of the plain `song(id:)` is not invalidated (the
+  root cause of the stale heart).
+- `UITests/PlayerScreenshotTests` — `testFavoriteTogglesImmediately` (full player), `testSongInfoFavoriteTogglesImmediately`
+  (song sheet) and `testLyricsOptionsFavoriteTogglesImmediately` (lyrics More sheet) tap the liked heart of demo song 0
+  and expect the unliked state within 3 s without touching anything else; `testExpandedBluetoothLight`
+  (`-screen nowPlaying.bluetooth`) expects "Playing on AirPods Pro" in the top bar and no "Now Playing" title.

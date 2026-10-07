@@ -27,8 +27,17 @@ final class AudioRouteMonitor {
     @ObservationIgnored private var observer: (any NSObjectProtocol)?
     @ObservationIgnored private let detector = AVRouteDetector()
     @ObservationIgnored private var detectorObserver: (any NSObjectProtocol)?
+    /// UI tests (`-screen nowPlaying.bluetooth`): a fixed output that route changes don't overwrite, since the
+    /// simulator always plays to its own speaker.
+    @ObservationIgnored private var isDemoRoute = false
 
     private init() {
+        let launch = LaunchConfiguration.current
+        if launch.isUITest, launch.screen == .nowPlayingBluetooth {
+            isDemoRoute = true
+            kind = .bluetooth
+            name = "AirPods Pro"
+        }
         refresh()
         observer = NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification,
                                                           object: nil, queue: .main) { @Sendable [weak self] _ in
@@ -53,6 +62,7 @@ final class AudioRouteMonitor {
     }
 
     private func refresh() {
+        guard !isDemoRoute else { return }
         let output = AVAudioSession.sharedInstance().currentRoute.outputs.first
         let newKind: Kind
         switch output?.portType {
@@ -80,6 +90,26 @@ final class AudioRouteMonitor {
         }
     }
 
-    /// Android shows the route's name next to the icon while casting; AirPlay is the iOS counterpart.
+    /// AirPlay plays elsewhere (Android's cast): the dot in the player's output pill.
     var isRemote: Bool { kind == .airPlay }
+
+    /// The output's name for the player's top bar: nil on the phone's own speaker or earpiece, else the route's name
+    /// ("AirPods Pro", "Living Room", a car), or the kind when the system gives no name.
+    var deviceName: String? {
+        guard kind != .phone else { return nil }
+        return name.isEmpty ? kindLabel : name
+    }
+
+    /// The kind of output in words: "Local playback", "Headphones", "Bluetooth audio", "AirPlay", "Car audio" or
+    /// "Audio output" (the devices sheet's subtitle, the top bar's fallback name).
+    var kindLabel: String {
+        switch kind {
+        case .phone: String(localized: "Local playback")
+        case .headphones: String(localized: "Headphones")
+        case .bluetooth: String(localized: "Bluetooth audio")
+        case .airPlay: String(localized: "AirPlay")
+        case .carAudio: String(localized: "Car audio")
+        case .other: String(localized: "Audio output")
+        }
+    }
 }

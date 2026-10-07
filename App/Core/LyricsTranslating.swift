@@ -19,7 +19,8 @@ nonisolated enum LyricsTranslationOutcome: Sendable, Equatable {
     case alreadyTranslated
     case alreadyInTargetLanguage
     case notFound
-    /// No usable provider (Android matches "key"/"config" in the error).
+    /// No usable provider (Android matches "key"/"config" in the error). The on-device model reports its own reason
+    /// as `.failed` instead (it has no key to set up).
     case notConfigured
     case failed(detail: String)
 
@@ -30,7 +31,7 @@ nonisolated enum LyricsTranslationOutcome: Sendable, Equatable {
         case .alreadyTranslated: "These lyrics already have a translation"
         case .alreadyInTargetLanguage: "These lyrics are already in this language"
         case .notFound: "Lyrics not found"
-        case .notConfigured: "Please configure a valid API key for the selected AI provider in Settings."
+        case .notConfigured: "Add a valid API key for the selected cloud assistant in Settings › AI features."
         case .failed(let detail): "AI Error: \(detail)"
         }
     }

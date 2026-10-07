@@ -80,6 +80,18 @@ struct DiagnosticsView: View {
                 .accessibilityIdentifier("diagnostics.libraryImport")
             }
 
+            Section {
+                Text(model.lastStreamStart ?? "No start measured yet. Play a song, then come back.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                    .accessibilityIdentifier("diagnostics.lastStart")
+            } header: {
+                Text("Last Song Start")
+            } footer: {
+                Text("How long the last song took to start, step by step. Every recent start: Developer › Test playback › Stream start timings.")
+            }
+
             Section("Device") {
                 LabeledContent("Maximum refresh rate", value: model.maxRefreshRate.map { "\($0) Hz" } ?? "—")
                 LabeledContent("ProMotion enabled", value: model.proMotionKeyPresent ? "Yes" : "No")
