@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// About (Android `AboutScreen`): the collapsing "About" header (170 dp), the hero card (app icon circle, name,
+/// About (Android `AboutScreen`): the collapsing "About" header (170 dp), the hero card (logo glyph circle, name,
 /// tagline, the version capsule — long-press opens the easter egg — and the three signal chips), the app-update
 /// card, "Maintainer" with the maintainer card, and "Licenses and notices" with the open-source licences row. Cards
 /// are glass; the small chips inside them are fills.
@@ -42,12 +42,11 @@ private struct AboutHeroCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 12) {
-                Image(systemName: "waveform")
-                    .font(.system(size: 22, weight: .bold))
+                BrandGlyph()
                     .foregroundStyle(theme.onPrimaryContainer)
-                    .frame(width: 48, height: 48)
+                    .frame(width: 28, height: 28)
+                    .padding(10)
                     .background(theme.primaryContainer, in: Circle())
-                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(L10n.aboutAppName)
                         .pixlFont(.headlineSmall, weight: .bold)

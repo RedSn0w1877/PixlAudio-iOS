@@ -73,7 +73,12 @@ targets:
         CFBundleDevelopmentRegion: en
         LSRequiresIPhoneOS: true
         ITSAppUsesNonExemptEncryption: false
-        UILaunchScreen: {}
+        # The logo tile (BrandMark, 120 pt) centred on the brand background, like Android 12+'s system splash.
+        # iOS caches launch screens: a changed one can take a reboot to show.
+        UILaunchScreen:
+          UIImageName: BrandMark
+          UIColorName: LaunchBackground
+          UIImageRespectsSafeAreaInsets: true
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         UIApplicationSupportsIndirectInputEvents: true

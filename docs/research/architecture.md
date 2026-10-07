@@ -17,7 +17,7 @@
 project.yml   AGENTS.md   README.md   .gitignore (PixlAudio.xcodeproj, build/, .build/, DerivedData)   .gitattributes (LF)
 App/
   PixlAudioApp.swift, AppEnvironment.swift, Info.plist (generated from project.yml)
-  Assets.xcassets (AppIcon 1024 PNG, AccentColor)
+  Assets.xcassets (AppIcon 1024 PNGs: Any/Dark/Tinted; BrandMark, BrandGlyph, AccentColor, LaunchBackground)
   Resources/Localizable.xcstrings, Shaders/LyricsScene.metal
   Shell/ (RootTabView, MiniPlayerAccessory, Router, PresentationState)
   Features/{Home,Library,Detail,Search,NowPlaying,Queue,Lyrics,LyricsSync,Settings,Equalizer,Transitions,
