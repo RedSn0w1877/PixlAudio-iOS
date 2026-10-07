@@ -1,0 +1,5 @@
+{"delayTime": 15000, "executionTime": 900, "id": "sync-selftest-1", "status": "COMPLETED",
+ "output": {"schema": "pixl.cloudstudio.selftest", "v": 1, "supported": [1],
+            "worker": {"version": "1.0.0", "gitSha": "abc1234def56", "gpu": "NVIDIA L4", "vramGB": 24, "cuda": "12.8"},
+            "models": {"separator": "anvuew-bs-roformer-ft1", "stems4": "htdemucs_ft",
+                       "aligner": "qwen3-forced-aligner-0.6b", "asr": "qwen3-asr-1.7b"}}}

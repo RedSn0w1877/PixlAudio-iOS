@@ -1,0 +1,19 @@
+{
+  "schema": "pixl.cloudstudio.result", "v": 1, "jobKey": "6f1c2a9e-3b7d-4c11-9a0e-2d5f8b7c4e10",
+  "status": "ok",
+  "error": null,
+  "warnings": ["lyrics: 2 lines fell back to line timing"],
+  "worker": {"version": "1.0.0", "gitSha": "abc1234def56", "gpu": "NVIDIA L4", "vramGB": 24, "cuda": "12.8"},
+  "models": {"separator": "anvuew-bs-roformer-ft1", "stems4": null,
+             "aligner": "qwen3-forced-aligner-0.6b", "asr": null},
+  "input":  {"codec": "aac", "sampleRate": 44100, "channels": 2, "decodedSamples": 10628100, "durationMs": 241000},
+  "outputs": {
+    "instrumental": {"key": "out/6f1c2a9e-3b7d-4c11-9a0e-2d5f8b7c4e10/instrumental.m4a", "bytes": 7801234,
+                     "sha256": "4c1d2e3f405162738495a6b7c8d9eafb0c1d2e3f405162738495a6b7c8d9eafb",
+                     "codec": "aac", "kbps": 256, "samples": 10628100}
+  },
+  "lyrics": {"key": "out/6f1c2a9e-3b7d-4c11-9a0e-2d5f8b7c4e10/lyrics.json", "mode": "aligned", "language": "ko",
+             "lines": 48, "wordTimedLines": 46, "words": 312},
+  "timings": {"coldStartMs": 18400, "downloadMs": 900, "decodeMs": 700, "separateMs": 12100,
+              "stemsMs": 0, "lyricsMs": 2600, "encodeMs": 1900, "uploadMs": 1200, "totalMs": 19400}
+}

@@ -1,0 +1,8 @@
+{
+  "schema": "pixl.cloudstudio.result", "v": 1, "jobKey": "6f1c2a9e-3b7d-4c11-9a0e-2d5f8b7c4e10",
+  "status": "error",
+  "error": {"code": "INPUT_MISSING", "message": "input GET returned 404"},
+  "warnings": [],
+  "worker": {"version": "1.0.0", "gitSha": "abc1234def56", "gpu": "NVIDIA L4", "vramGB": 24, "cuda": "12.8"},
+  "timings": {"coldStartMs": 0, "totalMs": 400}
+}
