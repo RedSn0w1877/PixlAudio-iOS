@@ -59,6 +59,9 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case devicesSpotifyEmpty = "devices.spotifyEmpty"
     case nowPlayingSpotifyConnect = "nowPlaying.spotifyConnect"
     case miniPlayerSpotifyConnect = "miniPlayer.spotifyConnect"
+    /// The full player playing to Bluetooth headphones ("AirPods Pro", `AudioRouteMonitor`'s demo route): the output
+    /// pill shows the device's name (the simulator itself always plays to its speaker).
+    case nowPlayingBluetooth = "nowPlaying.bluetooth"
 
     // Stage 12: account screens signed in with demo data (plain ids are signed out), dashboard with a playback test
     // report, browse drill-downs (search results, an artist, an album)
@@ -111,7 +114,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         switch self {
         case .home, .search, .searchResults, .library, .miniPlayer, .miniPlayerSpotifyConnect: return nil
         case .devicesSpotifyConnect, .devicesSpotifyPlaying, .devicesSpotifyReconnect, .devicesSpotifyEmpty,
-             .nowPlayingSpotifyConnect:
+             .nowPlayingSpotifyConnect, .nowPlayingBluetooth:
             return nil
         case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryFolders, .libraryLiked,
              .librarySelection, .librarySort, .libraryReorderTabs, .libraryMultiSelection, .libraryCreatePlaylist,
@@ -237,7 +240,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
 
     var cover: AppCover? {
         switch self {
-        case .nowPlaying, .nowPlayingSpotifyConnect: .nowPlaying
+        case .nowPlaying, .nowPlayingSpotifyConnect, .nowPlayingBluetooth: .nowPlaying
         case .editSong: .editSong(songId: DemoLibrary.songs.first?.id ?? "")
         case .lyrics, .taisInstrumental, .taisInstrumentalRendering, .taisInstrumentalActive: .lyrics
         case .lyricsSync: .lyricsSync(songId: DemoLibrary.songs.first?.id ?? "")
