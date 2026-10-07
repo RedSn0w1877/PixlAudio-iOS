@@ -65,7 +65,7 @@ an API (AGENTS.md). "CI" = proven to compile on the `xcode-27` lane (Xcode 27.0,
 | `CFBundleDocumentTypes`, `UTImportedTypeDeclarations`, `UTExportedTypeDeclarations` | /documentation/uniformtypeidentifiers/defining-file-and-data-types-for-your-app | Audio, .lrc, .ttml, .m3u/.m3u8, .pxpl (exported). |
 | `NSAppTransportSecurity.NSAllowsArbitraryLoads` | /documentation/bundleresources/information-property-list/nsapptransportsecurity | **Deviation:** `NSAllowsLocalNetworking` omitted — when present, iOS ignores `NSAllowsArbitraryLoads`, which would block user-typed HTTP AI endpoints. |
 | `NSAppleMusicUsageDescription`, `NSLocalNetworkUsageDescription` | /documentation/bundleresources/information-property-list/nsapplemusicusagedescription | Strings never say "Apple Music". |
-| `UILaunchScreen`, `UIApplicationSceneManifest` | /documentation/bundleresources/information-property-list/uilaunchscreen | |
+| `UILaunchScreen`, `UIApplicationSceneManifest` | /documentation/bundleresources/information-property-list/uilaunchscreen | Launch image and colour since 2026-10-07 (› Logo and launch screen). |
 
 ## Foundation and the standard library in PixlCore (Windows + macOS)
 PixlCore must build on swift-corelibs-foundation, so it sticks to these. Swift Testing is listed under Testing.
@@ -746,3 +746,11 @@ grace period in which polls may show the state from before a command). All of th
 | `LabelStyle` (custom `makeBody`) with `Label(_:systemImage:)` | 14 | /documentation/swiftui/labelstyle | `MiniPlayerBar` | The mini player's "Playing on <device>" line with a small speaker icon. |
 | `Slider(value:in:step:onEditingChanged:)` | 13 | /documentation/swiftui/slider | `SpotifyConnectVolume` | Sends the device volume on release (debounced 250 ms). |
 | `View.refreshable(action:)` on the devices page | 15 | /documentation/swiftui/view/refreshable(action:) | `DevicesSheet` | Pull to refresh the Connect devices. |
+
+## Logo and launch screen (2026-10-07, branch `wt/logo`)
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| App icon Dark and Tinted appearances: single-size `AppIcon.appiconset` entries (`idiom` universal, `platform` ios, `size` 1024x1024) with `appearances: [{appearance: luminosity, value: dark}]` / `value: tinted` | 18 (Xcode 16) | /documentation/xcode/configuring-your-app-icon | `AppIcon.appiconset` | "Provide your tinted app icon as a grayscale image. Provide your dark app icon with a transparent background so the system-provided background can show through." Any stays opaque. Same `luminosity` syntax as `AccentColor.colorset`. Validated by actool on CI. |
+| Image set with a `luminosity` `dark` appearance (@2x/@3x PNGs), `Image(_:)` | 13 | /documentation/xcode/asset-management | `BrandMark` | Light/dark logo tile; also the launch image. |
+| `Image(_:)` SVG template image set + `renderingMode(.template)` | 13 | /documentation/xcode/asset-management | `BrandGlyph` | Same mechanism as `GenreArt.xcassets` (Stage 7c), tinted by `foregroundStyle`. |
+| `UILaunchScreen` subkeys `UIImageName`, `UIColorName`, `UIImageRespectsSafeAreaInsets` | 14 | /documentation/bundleresources/information-property-list/uilaunchscreen | `project.yml` | Asset-catalog names `BrandMark` and `LaunchBackground` (a colour set with a dark appearance). iOS caches launch screens; a changed one can need a reboot. |

@@ -745,3 +745,28 @@ docs/api-notes.md › Spotify Connect output.
 - **Screenshot ids** (`UITests/SpotifyConnectScreenshotTests`, demo devices, no network): `devices.spotifyConnect`,
   `devices.spotifyPlaying`, `devices.spotifyReconnect`, `devices.spotifyEmpty` (the sheet opens on DEVICES),
   `nowPlaying.spotifyConnect`, `miniPlayer.spotifyConnect`.
+
+## Brand mark: app icon, logo glyph, launch screen (2026-10-07, branch `wt/logo`)
+
+Hoa chose logo concept C, "Glyph", as the universal PixlAudio logo for both apps: the Android launcher icon's
+monochrome silhouette (play triangle, lens cut-out, note) as a white frosted-glass glyph on a sky-to-violet gradient
+(`#7CCBFF → #6F8EFF → #6C4FF5`, the brand seed, `→ #5634D2`).
+
+- **Single source:** `ci/make-icon.py` (Pillow, build time only) holds the geometry and colours and writes every
+  asset below; rerun `python3 ci/make-icon.py` after a change, never edit its outputs. `--preview sheet.png` renders a
+  contact sheet (Home Screen sizes, dark, tinted, the About circle, the launch screen) to check before committing. It
+  also traces the glyph into a vector path, so the SVG (and Android's vector drawables) match the icon exactly.
+- **App icon:** `AppIcon.appiconset`, one 1024 px image per appearance (Xcode's "Single Size"): Any is opaque, Dark
+  has a transparent background (the system draws its dark tile), Tinted is opaque grayscale. Baked effects are kept
+  subtle because the system adds its own edge light. An Icon Composer `.icon` (real Liquid Glass, refraction on
+  iOS 27) is a later step (owner decision); it would replace this catalog icon.
+- **`BrandGlyph`** (`DesignSystem/BrandMark.swift`): the one-colour glyph, a template SVG (`BrandGlyph.imageset`,
+  `preserves-vector-representation`) tinted with `foregroundStyle`. Its square box has the margins of Android's
+  `pixelplay_base_monochrome` (the glyph fills 88.5 % of the height), so Android sizes port 1:1. About uses it as
+  Android does: 28 pt, 10 pt padding, in a `primaryContainer` circle, `onPrimaryContainer`.
+- **`BrandMark`**: the full-colour icon tile (continuous corners), light and dark variants, 120 pt @2x/@3x. It is the
+  launch-screen image; in-app it is available for logo spots but not used yet (the welcome page has no logo, as on
+  Android: owner decision). Raster, so re-render larger before showing it above 120 pt.
+- **Launch screen:** `UILaunchScreen` shows `BrandMark` centred on `LaunchBackground` (`#FDF8FF` light, `#141318`
+  dark: the brand scheme's `background`, so the first frame matches), like Android 12+'s system splash.
+- Both marks are artwork, not glass: never a container background, never under `glassEffect` (no glass on glass).
