@@ -80,13 +80,18 @@ nonisolated final class YouTubeResourceLoader: NSObject, AVAssetResourceLoaderDe
                     : min(info.contentLength, dataRequest.requestedOffset + Int64(dataRequest.requestedLength))
                 var position = dataRequest.currentOffset
                 var answered = false
+                // Streaming speed R2: this request's network fetches grow 128 KiB → 512 KiB → 2 MiB (cache hits don't
+                // count), so the first audio arrives after a small download.
+                var fetchSize = StreamChunkPolicy.startFetchBytes
                 while position < end {
                     try Task.checkCancellation()
-                    let data = try await fetcher.data(videoId: videoId, from: position, upTo: end)
+                    let (data, fromNetwork) = try await fetcher.read(videoId: videoId, from: position, upTo: end,
+                                                                     fetchSize: fetchSize)
                     guard !data.isEmpty else { throw StreamFetcher.Failure.badResponse("The stream ended early.") }
                     try Task.checkCancellation()
                     dataRequest.respond(with: data)
                     position += Int64(data.count)
+                    if fromNetwork { fetchSize = StreamChunkPolicy.nextFetchSize(after: fetchSize) }
                     if !answered {
                         answered = true
                         PlaybackStartTimings.shared.answered(key: YouTubeSongIdentity.timingKey(videoId: videoId))
