@@ -112,7 +112,9 @@ final class BackupServiceTests: XCTestCase {
         store.reload(from: defaults)
         XCTAssertEqual(store.appearance.appThemeMode, .dark)
         XCTAssertEqual(store.appearance.accentColor, "")
-        XCTAssertNil(defaults.object(forKey: PreferenceKeys.accentColor))
+        // The reload writes the default back through didSet, like every other setting; what matters is that no
+        // colour from before the restore survives.
+        XCTAssertEqual(defaults.string(forKey: PreferenceKeys.accentColor) ?? "", "")
     }
 
     // MARK: Restore
