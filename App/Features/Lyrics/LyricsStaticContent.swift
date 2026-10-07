@@ -207,10 +207,13 @@ struct LyricsStatusContent: View {
                     }
                     .foregroundStyle(.white.opacity(0.85))
                     .frame(minHeight: 44)
-                    .padding(.horizontal, 12)
-                    .contentShape(Rectangle())
+                    .padding(.horizontal, 16)
+                    .contentShape(Capsule())
                 }
-                .buttonStyle(PressScaleButtonStyle(pressedScale: 0.97))
+                .buttonStyle(.plain)
+                // On the artwork, not on the card: its own clear glass, tinted like the lyrics chrome (2026-10-07).
+                .glassEffect(Glass.clear.tint(theme.onPrimary.opacity(GlassTint.playerChrome)).interactive(),
+                             in: Capsule())
                 .padding(.top, 8)
             }
         }

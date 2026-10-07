@@ -17,8 +17,11 @@ struct LyricsMoreActions {
 }
 
 /// The lyrics More sheet (Android `LyricsMoreBottomSheet`): Lyrics actions, Appearance (alignment), Controls
-/// (sync offset, romanisation, translations, immersive once, keep screen on) and the shuffle / repeat / favourite row.
-/// In the system sheet (glass), so its rows are fills — no glass on glass.
+/// (sync offset, romanisation, translations, show as plain text, immersive once) and the shuffle / repeat / favourite
+/// row. The lyrics screen presents it at half height, where iOS draws the sheet as floating Liquid Glass (owner,
+/// 2026-10-07: "0 liquid glass"); its rows stay soft fills on that glass (no glass on glass), while the alignment
+/// picker (the liquid lens, `LiquidTabCapsule`) and the shuffle / repeat / favourite row (`PlayerToggleRow`) are
+/// liquid. "Keep screen on" is gone: the lyrics screen always keeps it on.
 struct LyricsMoreSheet: View {
     let song: Song?
     let lyrics: Lyrics?
@@ -34,6 +37,9 @@ struct LyricsMoreSheet: View {
     let repeatMode: RepeatMode
     let isFavorite: Bool
     let actions: LyricsMoreActions
+    /// "Show as plain text" for this song (the lyrics screen's override of the automatic synced / plain choice); nil
+    /// where the sheet isn't over the lyrics screen (`LyricsOptionsSheet`).
+    var plainText: Binding<Bool>?
 
     @Environment(\.playerTheme) private var theme
     @Environment(\.dismiss) private var dismiss
@@ -48,7 +54,15 @@ struct LyricsMoreSheet: View {
 
     private var isUserSynced: Bool { lyrics?.document?.metadata.source == LyricsRepositoryLogic.userSource }
     private var hasWordTiming: Bool { lyrics?.synced?.contains { !($0.words ?? []).isEmpty } ?? false }
+    private var hasSyncedLines: Bool { !(lyrics?.synced ?? []).isEmpty }
     private var itemFill: Color { theme.onSurface.opacity(0.08) }
+
+    /// The lyrics alignment on the liquid lens (Android's three alignment buttons).
+    private static let alignmentTabs: [LiquidTabCapsule<String>.Tab] = [
+        .init(value: "left", title: "Left", systemImage: "text.alignleft", identifier: "lyrics.align.left"),
+        .init(value: "center", title: "Center", systemImage: "text.aligncenter", identifier: "lyrics.align.center"),
+        .init(value: "right", title: "Right", systemImage: "text.alignright", identifier: "lyrics.align.right"),
+    ]
 
     var body: some View {
         ScrollView {
@@ -88,39 +102,40 @@ struct LyricsMoreSheet: View {
     private var lyricsGroup: some View {
         VStack(alignment: .leading, spacing: 2) {
             caption("Lyrics")
-            if let onSync = actions.onSyncYourself, song != nil {
-                // The lyrics screen opens the editor from this sheet's onDismiss, once the sheet has gone.
-                row(isUserSynced ? "Fix my word timing" : "Sync the words yourself",
-                    subtitle: !isUserSynced && !hasWordTiming ? "Tap along so each word lights up" : nil,
-                    systemImage: "hand.tap", accent: true, corners: (18, 8), identifier: "lyricsMore.syncYourself") {
-                    onSync()
-                    dismiss()
+            rowGroup(bottomRadius: 18) {
+                if let onSync = actions.onSyncYourself, song != nil {
+                    // The lyrics screen opens the editor from this sheet's onDismiss, once the sheet has gone.
+                    row(isUserSynced ? "Fix my word timing" : "Sync the words yourself",
+                        subtitle: !isUserSynced && !hasWordTiming ? "Tap along so each word lights up" : nil,
+                        systemImage: "hand.tap", accent: true, identifier: "lyricsMore.syncYourself") {
+                        onSync()
+                        dismiss()
+                    }
                 }
-            }
-            if lyrics != nil, let onSave = actions.onSave {
-                row("Save Lyrics", systemImage: "square.and.arrow.down",
-                    corners: actions.onSyncYourself != nil && song != nil ? (8, 8) : (18, 8)) {
-                    dismiss()
-                    onSave()
+                if lyrics != nil, let onSave = actions.onSave {
+                    row("Save Lyrics", systemImage: "square.and.arrow.down") {
+                        dismiss()
+                        onSave()
+                    }
                 }
-            }
-            if lyrics != nil, let onTranslateViaAI = actions.onTranslateViaAI {
-                row("Translate via AI", systemImage: "translate", corners: (8, 8)) {
-                    dismiss()
-                    onTranslateViaAI()
+                if lyrics != nil, let onTranslateViaAI = actions.onTranslateViaAI {
+                    row("Translate via AI", systemImage: "translate") {
+                        dismiss()
+                        onTranslateViaAI()
+                    }
                 }
-            }
-            if lyrics != nil, let onTranslate = actions.onTranslate {
-                row("Translate on device", systemImage: "character.bubble", corners: (8, 8)) {
-                    dismiss()
-                    onTranslate()
+                if lyrics != nil, let onTranslate = actions.onTranslate {
+                    row("Translate on device", systemImage: "character.bubble") {
+                        dismiss()
+                        onTranslate()
+                    }
                 }
-            }
-            row("Reset imported lyrics", systemImage: "arrow.counterclockwise", corners: (8, 8)) {
-                showResetDialog = true
-            }
-            row("Lyrics debug info", systemImage: "ladybug", corners: (8, 18)) {
-                showDebugDialog = true
+                row("Reset imported lyrics", systemImage: "arrow.counterclockwise") {
+                    showResetDialog = true
+                }
+                row("Lyrics debug info", systemImage: "ladybug") {
+                    showDebugDialog = true
+                }
             }
         }
     }
@@ -132,11 +147,7 @@ struct LyricsMoreSheet: View {
                 Text("Alignment")
                     .pixlFont(.bodyLarge, weight: .medium)
                     .foregroundStyle(theme.onSurface)
-                HStack(spacing: 8) {
-                    alignmentButton("left", systemImage: "text.alignleft", label: "Align lyrics left")
-                    alignmentButton("center", systemImage: "text.aligncenter", label: "Align lyrics center")
-                    alignmentButton("right", systemImage: "text.alignright", label: "Align lyrics right")
-                }
+                LiquidTabCapsule(tabs: Self.alignmentTabs, selection: $preferences.alignment)
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -146,47 +157,45 @@ struct LyricsMoreSheet: View {
 
     @ViewBuilder private var controlsGroup: some View {
         let syncVisible = showSyncedLyrics && actions.onToggleSyncControls != nil
+        let plainVisible = plainText != nil && hasSyncedLines
         let immersiveVisible = showSyncedLyrics && immersiveEnabled
-        VStack(alignment: .leading, spacing: 2) {
-            caption("Controls")
-            if syncVisible, let toggle = actions.onToggleSyncControls {
-                row(isSyncControlsVisible ? "Hide sync controls" : "Adjust sync", systemImage: "slider.horizontal.3",
-                    corners: (18, 8)) {
-                    dismiss()
-                    toggle()
+        if syncVisible || hasRomanizedLyrics || hasTranslatedLyrics || plainVisible || immersiveVisible {
+            VStack(alignment: .leading, spacing: 2) {
+                caption("Controls")
+                rowGroup(bottomRadius: 24) {
+                    if syncVisible, let toggle = actions.onToggleSyncControls {
+                        row(isSyncControlsVisible ? "Hide sync controls" : "Adjust sync",
+                            systemImage: "slider.horizontal.3") {
+                            dismiss()
+                            toggle()
+                        }
+                    }
+                    if hasRomanizedLyrics {
+                        switchRow("Show romanization", systemImage: "character.textbox",
+                                  isOn: $preferences.showRomanization)
+                    }
+                    if hasTranslatedLyrics {
+                        switchRow("Show translations", systemImage: "translate", isOn: $preferences.showTranslation)
+                    }
+                    if plainVisible, let plainText {
+                        switchRow("Show as plain text", systemImage: "text.justify.leading", isOn: plainText)
+                    }
+                    if immersiveVisible {
+                        switchRow("Disable immersive (once)", systemImage: "eye.slash",
+                                  isOn: $immersiveTemporarilyDisabled)
+                    }
                 }
             }
-            if hasRomanizedLyrics {
-                switchRow("Show romanization", systemImage: "character.textbox", isOn: $preferences.showRomanization,
-                          corners: (syncVisible ? 8 : 18, 8))
-            }
-            if hasTranslatedLyrics {
-                switchRow("Show translations", systemImage: "translate", isOn: $preferences.showTranslation,
-                          corners: (syncVisible || hasRomanizedLyrics ? 8 : 18, 8))
-            }
-            if immersiveVisible {
-                switchRow("Disable immersive (once)", systemImage: "eye.slash", isOn: $immersiveTemporarilyDisabled,
-                          corners: (8, 8))
-            }
-            switchRow("Keep screen on", systemImage: "sun.max", isOn: $preferences.keepScreenOn,
-                      corners: (syncVisible || hasRomanizedLyrics || hasTranslatedLyrics || immersiveVisible ? 8 : 18, 24))
         }
     }
 
-    /// Shuffle · Repeat · Favourite (Android `BottomToggleRow`, 74 pt, 60 pt corners).
+    /// Shuffle · Repeat · Favourite (Android `BottomToggleRow`, 74 pt): the full player's liquid segments, each its
+    /// own interactive glass (owner, 2026-10-07: the row "becomes liquid").
     private var toggleRow: some View {
-        HStack(spacing: 8) {
-            toggle(active: isShuffleEnabled, systemImage: "shuffle", label: "Shuffle", color: theme.primary,
-                   onColor: theme.onPrimary, action: actions.onShuffle)
-            toggle(active: repeatMode != .off, systemImage: repeatMode == .one ? "repeat.1" : "repeat", label: "Repeat",
-                   color: theme.secondary, onColor: theme.onSecondary, action: actions.onRepeat)
-            toggle(active: liked, systemImage: liked ? "heart.fill" : "heart", label: "Favorite",
-                   color: theme.tertiary, onColor: theme.onTertiary, action: actions.onFavorite)
-        }
-        .padding(8)
-        .frame(height: 74)
-        .background(theme.surfaceContainer.opacity(0.6), in: RoundedRectangle(cornerRadius: 60, style: .continuous))
-        .padding(.horizontal, 20)
+        PlayerToggleRow(isShuffleOn: isShuffleEnabled, repeatMode: repeatMode, isFavorite: liked,
+                        onShuffle: actions.onShuffle, onRepeat: actions.onRepeat, onFavorite: actions.onFavorite)
+            .padding(8)
+            .padding(.horizontal, 20)
     }
 
     // MARK: Pieces
@@ -200,16 +209,25 @@ struct LyricsMoreSheet: View {
             .accessibilityAddTraits(.isHeader)
     }
 
-    private func shape(_ corners: (CGFloat, CGFloat)) -> UnevenRoundedRectangle {
-        UnevenRoundedRectangle(topLeadingRadius: corners.0, bottomLeadingRadius: corners.1,
-                               bottomTrailingRadius: corners.1, topTrailingRadius: corners.0, style: .continuous)
+    /// Rows 2 pt apart, each with 8 pt corners, the group clipped to 18 pt at the top and `bottomRadius` at the bottom
+    /// (Android clips the column; as `SettingsGroup`), so the first and last rows get the outer corners whichever rows
+    /// show.
+    private func rowGroup<Content: View>(bottomRadius: CGFloat, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            content()
+        }
+        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 18, bottomLeadingRadius: bottomRadius,
+                                          bottomTrailingRadius: bottomRadius, topTrailingRadius: 18,
+                                          style: .continuous))
     }
+
+    private var rowShape: RoundedRectangle { RoundedRectangle(cornerRadius: 8, style: .continuous) }
 
     /// `identifier` is an optional id for UI tests: the row's label joins its title and subtitle, so a label query is
     /// fragile.
     @ViewBuilder
     private func row(_ title: LocalizedStringKey, subtitle: LocalizedStringKey? = nil, systemImage: String,
-                     accent: Bool = false, corners: (CGFloat, CGFloat), identifier: String? = nil,
+                     accent: Bool = false, identifier: String? = nil,
                      action: @escaping () -> Void) -> some View {
         let button = Button(action: action) {
             HStack(spacing: 16) {
@@ -232,8 +250,8 @@ struct LyricsMoreSheet: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 16)
             .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
-            .background(itemFill, in: shape(corners))
-            .contentShape(shape(corners))
+            .background(itemFill, in: rowShape)
+            .contentShape(rowShape)
         }
         .buttonStyle(PressScaleButtonStyle(pressedScale: 0.98))
         if let identifier {
@@ -243,8 +261,7 @@ struct LyricsMoreSheet: View {
         }
     }
 
-    private func switchRow(_ title: LocalizedStringKey, systemImage: String, isOn: Binding<Bool>,
-                           corners: (CGFloat, CGFloat)) -> some View {
+    private func switchRow(_ title: LocalizedStringKey, systemImage: String, isOn: Binding<Bool>) -> some View {
         HStack(spacing: 16) {
             Image(systemName: systemImage)
                 .font(.system(size: 20, weight: .medium))
@@ -260,43 +277,7 @@ struct LyricsMoreSheet: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
-        .background(itemFill, in: shape(corners))
-    }
-
-    private func alignmentButton(_ value: String, systemImage: String, label: LocalizedStringKey) -> some View {
-        let active = preferences.alignment == value
-        let shape = RoundedRectangle(cornerRadius: active ? 24 : 8, style: .continuous)
-        return Button {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { preferences.alignment = value }
-        } label: {
-            Image(systemName: systemImage)
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(active ? theme.onPrimary : theme.onSurface.opacity(0.78))
-                .frame(maxWidth: .infinity)
-                .frame(height: 48)
-                .background(active ? theme.primary : theme.surfaceContainerLow, in: shape)
-                .contentShape(shape)
-        }
-        .buttonStyle(PressScaleButtonStyle(pressedScale: 0.95))
-        .accessibilityLabel(label)
-        .accessibilityAddTraits(active ? .isSelected : [])
-    }
-
-    private func toggle(active: Bool, systemImage: String, label: LocalizedStringKey, color: Color, onColor: Color,
-                        action: @escaping () -> Void) -> some View {
-        let shape = RoundedRectangle(cornerRadius: active ? 60 : 8, style: .continuous)
-        return Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(active ? onColor : theme.onSurfaceVariant)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(active ? color : theme.surfaceContainerHighest, in: shape)
-                .contentShape(shape)
-        }
-        .buttonStyle(PressScaleButtonStyle(pressedScale: 0.95))
-        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: active)
-        .accessibilityLabel(label)
-        .accessibilityAddTraits(active ? .isSelected : [])
+        .background(itemFill, in: rowShape)
     }
 
     private var debugMessage: String {

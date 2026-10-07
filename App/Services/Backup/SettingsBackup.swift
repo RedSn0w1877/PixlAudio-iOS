@@ -104,6 +104,7 @@ nonisolated enum SettingsBackup {
         "is_graph_view": .bool,
         "is_shuffle_on": .bool,
         "keep_playing_in_background": .bool,
+        // Android-only since 2026-10-07 (the lyrics screen always keeps the screen on); kept so the table mirrors Android.
         "keep_screen_on_lyrics": .bool,
         "last_applied_directory_rules_version": .int,
         "last_daily_mix_update": .long,

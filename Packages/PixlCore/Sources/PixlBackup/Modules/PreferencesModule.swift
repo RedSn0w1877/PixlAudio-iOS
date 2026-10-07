@@ -124,7 +124,7 @@ public enum AndroidPreferenceCatalog {
         // lyrics
         "lyrics_source_preference", "auto_scan_lrc_files", "lyrics_tap_offset_speaker_ms", "lyrics_tap_offset_bluetooth_ms",
         "lyrics_sync_default_speed", "lyrics_sync_haptics", "immersive_lyrics_enabled", "immersive_lyrics_timeout",
-        "animated_lyrics_blur_enabled", "animated_lyrics_blur_strength", "disable_blur_all_over", "keep_screen_on_lyrics",
+        "animated_lyrics_blur_enabled", "animated_lyrics_blur_strength", "disable_blur_all_over",
         "lyrics_alignment", "show_lyrics_translation", "show_lyrics_romanization",
         // equalizer
         "equalizer_enabled", "equalizer_preset", "equalizer_custom_bands", "bass_boost_strength", "virtualizer_strength",
@@ -147,6 +147,9 @@ public enum AndroidPreferenceCatalog {
         "folders_source", "hide_local_media", "is_folder_filter_active", "folder_back_gesture_navigation",
         "loudness_enhancer_enabled", "loudness_enhancer_strength", "liquid_glass_intensity", "app_ui_style",
         "album_art_cache_limit_mb",
+        // Retired on iOS (owner, 2026-10-07): the lyrics screen always keeps the screen on. Old backups (Android, or
+        // iOS before the switch went) still restore; the key is listed under skipped settings and never written.
+        "keep_screen_on_lyrics",
     ]
 
     static let deviceState: [String] = [

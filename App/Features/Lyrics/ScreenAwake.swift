@@ -2,7 +2,7 @@ import UIKit
 
 /// Who wants the screen kept on.
 nonisolated enum ScreenAwakeOwner: Hashable, Sendable {
-    /// The lyrics screen ("Keep screen on").
+    /// The lyrics screen, always while it is open (owner, 2026-10-07; Android has a "Keep screen on" switch).
     case lyrics
     /// The sync editor, always while it is open (Android's window flag in `LyricsSyncEditorOverlay`).
     case lyricsSync

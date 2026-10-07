@@ -131,6 +131,8 @@ import Testing
         #expect(AndroidPreferenceCatalog.kind(of: "something_new") == nil)
         // iOS-only settings (owner requests) restore by name like the portable keys.
         #expect(AndroidPreferenceCatalog.kind(of: "accent_color_v1") == .portable)
+        // Retired on iOS: the lyrics screen always keeps the screen on.
+        #expect(AndroidPreferenceCatalog.kind(of: "keep_screen_on_lyrics") == .androidOnly)
         // The catalogue lists every key once.
         let all = AndroidPreferenceCatalog.portable + AndroidPreferenceCatalog.androidOnly + AndroidPreferenceCatalog.deviceState
             + AndroidPreferenceCatalog.deviceIds + AndroidPreferenceCatalog.iosOnly
@@ -157,6 +159,20 @@ import Testing
             return
         }
         #expect(!kept.contains("accent_color_v1"))
+    }
+
+    /// "Keep screen on" left the lyrics More sheet (2026-10-07: always on). A backup that still carries it (Android,
+    /// or iOS from before) restores cleanly: the key is reported under skipped settings and never written.
+    @Test func retiredKeepScreenOnIsSkippedAndReported() throws {
+        let old = AndroidBackup.PreferenceBackupEntry.encodeList([
+            .boolean("keep_screen_on_lyrics", true), .string("app_theme_mode", "dark"),
+        ])
+        let restored = try PreferencesModule.restore(.globalSettings, payload: old)
+        #expect(restored.values.map(\.key) == ["app_theme_mode"])
+        #expect(restored.skippedAndroidOnly == ["keep_screen_on_lyrics"])
+        #expect(restored.skippedKeys.contains("keep_screen_on_lyrics"))
+        #expect(restored.unknownKeys.isEmpty)
+        #expect(restored.ignored.isEmpty)
     }
 
     @Test func restoreScopesAndReport() throws {

@@ -117,6 +117,27 @@ final class BackupServiceTests: XCTestCase {
         XCTAssertEqual(defaults.string(forKey: PreferenceKeys.accentColor) ?? "", "")
     }
 
+    /// "Keep screen on" left the lyrics More sheet (owner, 2026-10-07: the lyrics screen always keeps the screen on).
+    /// An old backup that still carries the key (Android, or iOS from before) restores cleanly: the key is listed under
+    /// skipped settings and never written. A value stored before the switch went is dropped and never exported.
+    func testOldBackupWithKeepScreenOnRestoresAndListsItSkipped() throws {
+        let old = PreferencesModule.export(.globalSettings, values: [
+            ("keep_screen_on_lyrics", .bool(true)), ("app_theme_mode", .string("dark")),
+        ])
+        let restore = try PreferencesModule.restore(.globalSettings, payload: old)
+        XCTAssertEqual(restore.skippedKeys, ["keep_screen_on_lyrics"])
+        let result = SettingsBackup.apply(restore, defaults: defaults)
+        XCTAssertEqual(result.applied, 1)
+        XCTAssertEqual(defaults.string(forKey: "app_theme_mode"), "dark")
+        XCTAssertNil(defaults.object(forKey: "keep_screen_on_lyrics"))
+
+        defaults.set(true, forKey: "keep_screen_on_lyrics")
+        XCTAssertFalse(SettingsBackup.exportValues(defaults: defaults, keychain: { _ in nil })
+            .contains { $0.key == "keep_screen_on_lyrics" })
+        _ = LyricsViewPreferences(defaults: defaults)
+        XCTAssertNil(defaults.object(forKey: "keep_screen_on_lyrics"))
+    }
+
     // MARK: Restore
 
     func testRestoresTheAndroidFixtureAndReportsUnmatchedSongs() async throws {
