@@ -33,6 +33,28 @@ final class GlassAccessibilityTests: XCTestCase {
         XCTAssertTrue(collapse.waitForExistence(timeout: 15), "Collapse player is not a button")
     }
 
+    /// The queue's toolbar and ⋯ menu (2026-10-07): separate glass circles and pills in one container with the menu,
+    /// the ⋯ circle morphing into "Save as playlist". The circles and pills stay buttons with their labels, and the
+    /// morphed pill still opens Save as playlist.
+    func testQueueControlsKeepButtonTraits() {
+        let app = launch("queue", ready: "screen.queue")
+        for label in ["Toggle shuffle", "Toggle repeat", "Sleep timer"] {
+            let circle = app.buttons.matching(NSPredicate(format: "label == %@", label)).firstMatch
+            XCTAssertTrue(circle.waitForExistence(timeout: 15), "\(label) is not a button")
+        }
+        let more = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@", "queue.more",
+                                                    "More actions")).firstMatch
+        XCTAssertTrue(more.waitForExistence(timeout: 10), "More actions is not a button")
+        more.tap()
+        let clear = app.buttons.matching(NSPredicate(format: "label == %@", "Clear queue")).firstMatch
+        XCTAssertTrue(clear.waitForExistence(timeout: 10), "Clear queue is not a button")
+        let save = app.buttons.matching(NSPredicate(format: "label == %@", "Save as playlist")).firstMatch
+        XCTAssertTrue(save.waitForExistence(timeout: 10), "Save as playlist is not a button")
+        save.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["sheet.saveQueue"].firstMatch.waitForExistence(timeout: 15),
+                      "Save as playlist did not open from the menu")
+    }
+
     /// The album header's circles: Back is a button with its label.
     func testDetailHeaderKeepsButtonTraits() {
         let app = launch("albumDetail", ready: "screen.albumDetail")
