@@ -125,6 +125,11 @@ nonisolated struct StreamFetcher: Sendable {
                   let url = URL(string: stream.url) else { throw Failure.unsafeURL }
             var request = URLRequest(url: url)
             request.allowsConstrainedNetworkAccess = allowsConstrained
+            // Streaming speed R6: googlevideo speaks HTTP/3. Racing QUIC without Alt-Svc discovery saves a round trip
+            // on each song's new rrN---sn-… host; where UDP is blocked the request falls back to TCP.
+            if URLCoding.host(stream.url)?.lowercased().hasSuffix(".googlevideo.com") == true {
+                request.assumesHTTP3Capable = true
+            }
             request.setValue(stream.userAgent, forHTTPHeaderField: "User-Agent")
             request.setValue(ContentRange.requestHeader(requested), forHTTPHeaderField: "Range")
             let (body, response) = try await session.data(for: request)
