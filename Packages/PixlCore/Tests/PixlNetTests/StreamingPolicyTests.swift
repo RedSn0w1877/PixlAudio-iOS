@@ -99,3 +99,49 @@ struct StreamPrefetchPolicyTests {
         #expect(Policy.upcomingIndices(current: 7, count: 5, wraps: false, depth: 2) == [])
     }
 }
+
+/// R5a: Android oct3's upstream retry rules (`CloudStreamProxy.fetch`; Android has no unit test for them).
+@Suite("Stream retry policy")
+struct StreamRetryPolicyTests {
+    typealias Policy = StreamRetryPolicy
+
+    @Test func theFirstRejectionRetriesTheSameClient() {
+        for status in [401, 403, 404, 410] {
+            #expect(Policy.decide(status: status, attempt: 0, hasCachedBytes: false) == .retry(switchClient: false, delayMs: 0))
+            #expect(Policy.decide(status: status, attempt: 1, hasCachedBytes: false) == .retry(switchClient: true, delayMs: 0))
+            #expect(Policy.decide(status: status, attempt: 2, hasCachedBytes: false) == .retry(switchClient: true, delayMs: 0))
+        }
+    }
+
+    @Test func cachedBytesKeepTheClient() {
+        // Another client may serve another itag: never switch once bytes of the file are on disk.
+        #expect(Policy.decide(status: 403, attempt: 1, hasCachedBytes: true) == .retry(switchClient: false, delayMs: 0))
+        #expect(Policy.decide(status: 503, attempt: 2, hasCachedBytes: true) == .retry(switchClient: false, delayMs: 750))
+    }
+
+    @Test func throttlingAndServerErrorsBackOff() {
+        #expect(Policy.decide(status: 429, attempt: 0, hasCachedBytes: false) == .retry(switchClient: false, delayMs: 250))
+        #expect(Policy.decide(status: 500, attempt: 1, hasCachedBytes: false) == .retry(switchClient: true, delayMs: 500))
+        #expect(Policy.decide(status: 502, attempt: 2, hasCachedBytes: false) == .retry(switchClient: true, delayMs: 750))
+        #expect(Policy.decide(status: 504, attempt: 0, hasCachedBytes: true) == .retry(switchClient: false, delayMs: 250))
+    }
+
+    @Test func fourAttemptsAtMostAndOtherStatusesFail() {
+        #expect(Policy.maxAttempts == 4)
+        for status in Policy.retryableStatuses {
+            #expect(Policy.decide(status: status, attempt: 3, hasCachedBytes: false) == .fail)
+        }
+        for status in [400, 405, 416, 501, 302] {
+            #expect(Policy.decide(status: status, attempt: 0, hasCachedBytes: false) == .fail)
+        }
+        // A GET that keeps answering 403 resolves four times: same client, then two others, then gives up.
+        var switches: [Bool] = []
+        var attempt = 0
+        while case .retry(let switchClient, _) = Policy.decide(status: 403, attempt: attempt, hasCachedBytes: false) {
+            switches.append(switchClient)
+            attempt += 1
+        }
+        #expect(switches == [false, true, true])
+        #expect(attempt == 3)
+    }
+}

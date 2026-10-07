@@ -5,10 +5,11 @@ import PixlNet
 /// The network half of the streaming loader: ranged GETs against the resolved googlevideo (or Piped) URL with
 /// exactly the User-Agent of the client that obtained it (Origin/Referer would get a 403), written into the sparse
 /// `StreamCache`. GET sizes follow PixlNet's `StreamChunkPolicy` (streaming speed R2): the first GET reads 128 KiB
-/// ahead of AVFoundation's 2-byte request, and each loading request's fetches grow 128 KiB → 512 KiB → 2 MiB. A 401/403/404/410 means the URL expired or belongs to another client: the URL is dropped, the
-/// stream re-resolved without the strategy that failed, and the request retried (up to three resolutions; Piped
-/// is the last strategy). Every response is checked like Android's `CloudStreamSecurity` (safe host, audio
-/// content type, sane length).
+/// ahead of AVFoundation's 2-byte request, and each loading request's fetches grow 128 KiB → 512 KiB → 2 MiB.
+/// Failures follow `StreamRetryPolicy` (R5a, Android oct3's rules): a 401/403/404/410 drops the URL and resolves
+/// again with the same client first (the IP may have changed), then past it (only while nothing of the file is
+/// cached); 429/5xx back off 250 ms × attempt; four attempts at most (Piped is the last strategy). Every response is
+/// checked like Android's `CloudStreamSecurity` (safe host, audio content type, sane length).
 nonisolated struct StreamFetcher: Sendable {
     nonisolated enum Failure: Error, LocalizedError, Equatable {
         case unresolvable
@@ -40,7 +41,6 @@ nonisolated struct StreamFetcher: Sendable {
         }
     }
 
-    static let maxResolutions = 3
 
     let service: InnerTubeService
     let cache: StreamCache
@@ -117,7 +117,7 @@ nonisolated struct StreamFetcher: Sendable {
             nextCachedStart: await cache.nextCachedStart(videoId, after: range.lowerBound),
             contentLength: await cache.meta(videoId)?.contentLength)
         var excluded: Set<String> = []
-        for _ in 0..<Self.maxResolutions {
+        for attempt in 0..<StreamRetryPolicy.maxAttempts {
             try Task.checkCancellation()
             guard let stream = await service.resolve(videoId: videoId, excluding: excluded) else { throw Failure.unresolvable }
             let allowed = await service.allowedHosts()
@@ -130,14 +130,17 @@ nonisolated struct StreamFetcher: Sendable {
             let (body, response) = try await session.data(for: request)
             PlaybackStartTimings.shared.networkFetched(key: YouTubeSongIdentity.timingKey(videoId: videoId), bytes: body.count)
             guard let http = response as? HTTPURLResponse else { throw Failure.badResponse("No HTTP response.") }
-            switch http.statusCode {
-            case 206, 200:
+            if http.statusCode == 206 || http.statusCode == 200 {
                 return try await store(videoId: videoId, range: range, body: body, response: http, streamURL: stream.url)
-            case 401, 403, 404, 410:
-                await service.invalidate(videoId: videoId)
-                excluded.insert(stream.strategyName ?? InnerTubeService.pipedStrategyName)
-            default:
+            }
+            let hasCachedBytes = await cache.meta(videoId) != nil
+            switch StreamRetryPolicy.decide(status: http.statusCode, attempt: attempt, hasCachedBytes: hasCachedBytes) {
+            case .fail:
                 throw Failure.http(http.statusCode)
+            case .retry(let switchClient, let delayMs):
+                await service.invalidate(videoId: videoId)
+                if switchClient { excluded.insert(stream.strategyName ?? InnerTubeService.pipedStrategyName) }
+                if delayMs > 0 { try await Task.sleep(for: .milliseconds(delayMs)) }
             }
         }
         throw Failure.http(403)

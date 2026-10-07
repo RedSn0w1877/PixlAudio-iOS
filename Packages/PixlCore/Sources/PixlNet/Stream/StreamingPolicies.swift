@@ -106,3 +106,29 @@ public enum StreamPrefetchPolicy {
         return indices
     }
 }
+
+/// R5a: Android oct3's retry rules for one ranged GET (`CloudStreamProxy.fetch`, `MAX_UPSTREAM_ATTEMPTS = 4`). A
+/// 401/403/404/410 usually means the URL expired or the phone's IP changed (Wi-Fi ↔ cellular), so the first retry
+/// resolves again with the same client; only a further failure moves past that client — and only while no bytes of
+/// the file are cached, because another client may serve another format (`formatChanged` would skip the song).
+/// 429 and 5xx back off 250 ms × attempt first. Every retry drops the cached URL.
+public enum StreamRetryPolicy {
+    /// Attempts per GET (the first one included).
+    public static let maxAttempts = 4
+    public static let retryableStatuses: Set<Int> = [401, 403, 404, 410, 429, 500, 502, 503, 504]
+
+    public enum Decision: Sendable, Hashable {
+        /// Not a retry status, or the budget is spent: the GET fails with this status.
+        case fail
+        /// Drop the URL and resolve again after `delayMs` — past the failing client when `switchClient`.
+        case retry(switchClient: Bool, delayMs: Int)
+    }
+
+    /// What to do after a GET answered `status` (`attempt` is 0-based; `hasCachedBytes`: bytes of this file are
+    /// already on disk).
+    public static func decide(status: Int, attempt: Int, hasCachedBytes: Bool) -> Decision {
+        guard retryableStatuses.contains(status), attempt >= 0, attempt < maxAttempts - 1 else { return .fail }
+        let delayMs = status == 429 || status >= 500 ? 250 * (attempt + 1) : 0
+        return .retry(switchClient: attempt > 0 && !hasCachedBytes, delayMs: delayMs)
+    }
+}
