@@ -1,5 +1,9 @@
 # PixlAudio for iOS
 
+<p align="center">
+  <img src="docs/brand/pixlaudio-icon.png" alt="PixlAudio icon" width="128"/>
+</p>
+
 A native iPhone music player — the iOS port of the PixlAudio Android app. Swift 6 and SwiftUI,
 **Liquid Glass only**, built exclusively from Apple's system frameworks (no third-party code in the app).
 Plays your own music (folders, Files, the DRM-free part of your music library), streams matched
