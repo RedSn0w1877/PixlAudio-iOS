@@ -1,5 +1,6 @@
 import Foundation
 import MediaPlayer
+import Observation
 import PixlModel
 import UIKit
 
@@ -20,6 +21,8 @@ final class NowPlayingController {
     var onLike: ((Song) -> Void)?
     /// Whether a song is a favourite (for the like command's state).
     var isFavorite: ((Song) -> Bool)?
+    /// Read under observation tracking by `followFavorites(revision:)`: a change re-reads the like state.
+    private var favoritesRevision: (() -> Int)?
     /// Spotify Connect while it drives playback: the transport commands go there and the published position, rate
     /// and duration are the remote device's.
     weak var remote: (any RemotePlaybackOutput)?
@@ -84,6 +87,26 @@ final class NowPlayingController {
     func uninstall() {
         for target in commandTargets { target.command.removeTarget(target.token) }
         commandTargets = []
+    }
+
+    /// Keeps the like command's state in step with favourite edits made anywhere else (the full player's heart, the
+    /// song sheet, a restore, a Spotify like): `revision` (the library's) is read under observation tracking, and each
+    /// change re-reads the current song's state. Nothing runs between changes.
+    func followFavorites(revision: @escaping () -> Int) {
+        favoritesRevision = revision
+        trackFavorites()
+    }
+
+    private func trackFavorites() {
+        guard let favoritesRevision else { return }
+        withObservationTracking {
+            _ = favoritesRevision()
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.refreshCommandStates()
+                self?.trackFavorites()
+            }
+        }
     }
 
     /// The parts of a command event the handlers need (events are not Sendable; values are extracted first).
