@@ -92,6 +92,8 @@ struct DiagnosticsView: View {
                 Text("How long the last song took to start, step by step. Every recent start: Developer › Test playback › Stream start timings.")
             }
 
+            ConnectVolumeButtonsSection(buttons: environment.spotifyConnect.volumeButtons)
+
             Section("Device") {
                 LabeledContent("Maximum refresh rate", value: model.maxRefreshRate.map { "\($0) Hz" } ?? "—")
                 LabeledContent("ProMotion enabled", value: model.proMotionKeyPresent ? "Yes" : "No")
@@ -118,5 +120,38 @@ struct DiagnosticsView: View {
         }
         .onAppear { model.refreshDisplayInfo() }
         .accessibilityIdentifier("screen.diagnostics")
+    }
+}
+
+/// Whether the volume buttons drive the Spotify Connect device on this phone, and how (`SpotifyConnectVolumeButtons`):
+/// the re-centre trick is undocumented, so Hoa reads the mode here instead of guessing from the feel.
+private struct ConnectVolumeButtonsSection: View {
+    let buttons: SpotifyConnectVolumeButtons?
+
+    var body: some View {
+        let status = buttons?.status ?? SpotifyConnectVolumeButtons.Status()
+        Section {
+            LabeledContent("Mode", value: Self.label(status.mode))
+                .accessibilityIdentifier("diagnostics.volumeButtons.mode")
+            LabeledContent("Presses counted", value: "\(status.presses)")
+            LabeledContent("Last change", value: status.lastDelta.map { String(format: "%+.4f", Double($0)) } ?? "—")
+            if let note = status.note {
+                Text(note)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("Volume Buttons (Spotify Connect)")
+        } footer: {
+            Text("Play on a Spotify Connect speaker, press the volume buttons, then come back here. \"Re-centre\" means presses work at any phone volume; \"Relative\" means they stop at full or silent.")
+        }
+    }
+
+    private static func label(_ mode: SpotifyConnectVolumeButtons.Mode) -> String {
+        switch mode {
+        case .off: "Off"
+        case .recentre: "Re-centre"
+        case .relative: "Relative"
+        }
     }
 }

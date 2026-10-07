@@ -141,10 +141,32 @@ final class AudioSessionController {
     /// Undoes `prepareActivation()` when nothing played after it — the queue's items all failed to load, or playback
     /// was paused before the first one loaded — so another app's audio isn't left interrupted by a session PixlAudio
     /// never used. Before the activation moved ahead of the load, the session was only activated by `activate()`, at
-    /// the first successful start. Does nothing once `activate()` has run.
+    /// the first successful start. Does nothing once `activate()` has run, nor while the volume buttons hold the
+    /// session.
     func releasePreparedActivation() {
-        guard isPreparedOnly || preparing != nil else { return }
+        guard !isHeldForVolumeButtons, isPreparedOnly || preparing != nil else { return }
         deactivate()
+    }
+
+    // MARK: Volume buttons (Spotify Connect)
+
+    /// The session stays active for the volume buttons: while a Spotify Connect device plays, an active `.playback`
+    /// session is what makes the buttons change the media volume (and report it) instead of the ringer. Nothing plays
+    /// locally then, so without the hold a paused engine or a failed item load would give the session back.
+    private(set) var isHeldForVolumeButtons = false
+
+    func holdForVolumeButtons() {
+        guard !isHeldForVolumeButtons else { return }
+        isHeldForVolumeButtons = true
+        prepareActivation()
+    }
+
+    /// Ends the hold. A session only the hold activated (nothing played on it) is given back so other apps can
+    /// resume — unless local playback is taking over (`keepingSession`), which activates it again right away.
+    func releaseVolumeButtonsHold(keepingSession: Bool = false) {
+        guard isHeldForVolumeButtons else { return }
+        isHeldForVolumeButtons = false
+        if !keepingSession { releasePreparedActivation() }
     }
 
     /// Deactivates after a permanent stop so other apps can resume.
@@ -177,6 +199,8 @@ final class AudioSessionController {
         } else {
             let actions = focus.interruptionEnded(shouldResume: shouldResume, transitionRunning: isTransitionRunning())
             if actions.contains(.resumeMaster) { activate() }
+            // The volume buttons need the session back (a call ended while a Connect device plays).
+            if isHeldForVolumeButtons, !isActive { prepareActivation() }
             if !actions.isEmpty { onCommand?(.focus(actions)) }
         }
     }
@@ -210,6 +234,7 @@ final class AudioSessionController {
         isPreparedOnly = false
         focus = AudioFocusResumeState()
         configure()
+        if isHeldForVolumeButtons { prepareActivation() }
         onCommand?(.rebuildAfterReset)
     }
 

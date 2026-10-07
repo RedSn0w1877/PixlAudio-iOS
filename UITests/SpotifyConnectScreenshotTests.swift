@@ -3,7 +3,8 @@ import XCTest
 /// Spotify Connect output: the devices sheet's "Spotify Connect" section on its DEVICES page (demo devices: an Echo
 /// Show, a TV, the active desktop, a receiver without volume control, a restricted car), the playing state with the
 /// stop row and the device volume in the hero, the reconnect row of a pre-Connect login, the empty hint, and the
-/// "Playing on <device>" chip in the full and the mini player. Demo data only (`-uiTest`): no network.
+/// "Playing on <device>" chip in the full and the mini player, and the volume pop-up the volume buttons show. Demo data
+/// only (`-uiTest`): no network.
 @MainActor
 final class SpotifyConnectScreenshotTests: XCTestCase {
     func testDevicesLight() throws {
@@ -89,6 +90,50 @@ final class SpotifyConnectScreenshotTests: XCTestCase {
         let app = launch("miniPlayer.spotifyConnect", "light")
         try waitFor(app, "miniPlayer.remoteDevice")
         snapshot(app, "spotifyConnectMiniPlayer-light")
+    }
+
+    // MARK: - Volume buttons (2026-10-07)
+
+    /// PixlAudio's volume pop-up after one press up on the Echo (45 % → 50 %), at the top of the full player. The real
+    /// button handling can't run here (the simulator can't change the volume); the demo shows the pop-up pinned.
+    func testVolumeHUDLight() throws {
+        let app = launch("nowPlaying.spotifyVolumeHUD", "light")
+        try waitFor(app, "screen.nowPlaying")
+        let hud = app.descendants(matching: .any)["spotifyConnect.volumeHUD"].firstMatch
+        XCTAssertTrue(hud.waitForExistence(timeout: 10), "the volume pop-up is missing")
+        XCTAssertEqual(hud.label, "Volume for Kitchen Echo Show, 50%")
+        snapshot(app, "spotifyConnectVolumeHUD-light")
+    }
+
+    func testVolumeHUDDark() throws {
+        let app = launch("nowPlaying.spotifyVolumeHUD", "dark")
+        try waitFor(app, "spotifyConnect.volumeHUD")
+        snapshot(app, "spotifyConnectVolumeHUD-dark")
+    }
+
+    /// Over the lyrics screen (a full-screen cover, which shows its own copy of the pop-up).
+    func testVolumeHUDOverLyricsLight() throws {
+        let app = launch("lyrics.spotifyVolumeHUD", "light")
+        try waitFor(app, "screen.lyrics")
+        try waitFor(app, "spotifyConnect.volumeHUD")
+        snapshot(app, "spotifyConnectVolumeHUDLyrics-light")
+    }
+
+    /// The hero's slider follows the volume the buttons set (50 % after the demo press).
+    func testVolumeHUDHeroFollowsLight() throws {
+        let app = launch("nowPlaying.spotifyVolumeHUD", "light")
+        try waitFor(app, "spotifyConnect.volumeHUD")
+        let pill = app.buttons.matching(identifier: "player.devices").firstMatch
+        XCTAssertTrue(pill.waitForExistence(timeout: 10))
+        pill.tap()
+        let slider = app.sliders.matching(identifier: "spotifyConnect.volume").firstMatch
+        XCTAssertTrue(slider.waitForExistence(timeout: 10), "the device volume slider is missing")
+        XCTAssertTrue((slider.value as? String)?.contains("50") == true,
+                      "the hero's slider reads \(String(describing: slider.value)), not the 50 % the press set")
+        // The devices sheet hides the pop-up (its slider already moves).
+        XCTAssertTrue(app.descendants(matching: .any)["spotifyConnect.volumeHUD"].firstMatch.waitForNonExistence(timeout: 5),
+                      "the pop-up stays over the devices sheet")
+        snapshot(app, "spotifyConnectVolumeHUDHero-light")
     }
 
     // MARK: - Helpers

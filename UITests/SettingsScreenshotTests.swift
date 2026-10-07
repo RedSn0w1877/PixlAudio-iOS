@@ -105,6 +105,26 @@ final class SettingsScreenshotTests: XCTestCase {
         }
     }
 
+    /// While a Spotify Connect device plays, the volume card shows the device's volume (scrolled into view; the drag
+    /// runs along the left edge, clear of the band sliders).
+    func testEqualizerSpotifyConnectLight() throws {
+        try capture("equalizer.spotifyConnect", "light", ready: "screen.equalizer") { app in self.revealConnectVolume(app) }
+    }
+
+    func testEqualizerSpotifyConnectDark() throws {
+        try capture("equalizer.spotifyConnect", "dark", ready: "screen.equalizer") { app in self.revealConnectVolume(app) }
+    }
+
+    private func revealConnectVolume(_ app: XCUIApplication) {
+        let slider = app.descendants(matching: .any)["eq.volume.connect"].firstMatch
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.85))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.3))
+        for _ in 0..<4 where !(slider.exists && slider.isHittable) {
+            start.press(forDuration: 0.05, thenDragTo: end)
+        }
+        XCTAssertTrue(slider.waitForExistence(timeout: 5), "the Connect device's volume is missing from the volume card")
+    }
+
     func testEasterEggPlayingLight() throws {
         try capture("easterEgg", "light") { app in
             let play = app.descendants(matching: .any)["brick.play"].firstMatch

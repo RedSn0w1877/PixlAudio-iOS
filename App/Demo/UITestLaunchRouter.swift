@@ -75,6 +75,12 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case nowPlayingBluetooth = "nowPlaying.bluetooth"
     /// The sync editor opened while the Echo plays: it refuses with "Syncing only works on this iPhone…" and Close.
     case lyricsSyncSpotifyConnect = "lyricsSync.spotifyConnect"
+    /// Connect volume buttons (2026-10-07): PixlAudio's volume pop-up after one press up on the Echo, over the full
+    /// player and over the lyrics screen (a cover shows its own copy), pinned for the screenshot; and the Equalizer,
+    /// whose volume card shows the Echo's volume while it plays.
+    case nowPlayingSpotifyVolumeHUD = "nowPlaying.spotifyVolumeHUD"
+    case lyricsSpotifyVolumeHUD = "lyrics.spotifyVolumeHUD"
+    case equalizerSpotifyConnect = "equalizer.spotifyConnect"
 
     // Stage 12: account screens signed in with demo data (plain ids are signed out), dashboard with a playback test
     // report, browse drill-downs (search results, an artist, an album)
@@ -127,8 +133,10 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         switch self {
         case .home, .search, .searchResults, .library, .miniPlayer, .miniPlayerSpotifyConnect: return nil
         case .devicesSpotifyConnect, .devicesSpotifyPlaying, .devicesSpotifyReconnect, .devicesSpotifyEmpty,
-             .nowPlayingSpotifyConnect, .nowPlayingBluetooth, .lyricsSyncSpotifyConnect:
+             .nowPlayingSpotifyConnect, .nowPlayingBluetooth, .lyricsSyncSpotifyConnect,
+             .nowPlayingSpotifyVolumeHUD, .lyricsSpotifyVolumeHUD:
             return nil
+        case .equalizerSpotifyConnect: return .equalizer
         case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryFolders, .libraryLiked,
              .librarySelection, .librarySort, .libraryReorderTabs, .libraryMultiSelection, .libraryCreatePlaylist,
              .libraryAddToPlaylist, .songOptionsInfo, .libraryCompactNav, .libraryCreatePlaylistOnDeviceOff:
@@ -247,15 +255,21 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     var startsSpotifyConnectSession: Bool {
         switch self {
         case .devicesSpotifyPlaying, .nowPlayingSpotifyConnect, .miniPlayerSpotifyConnect, .lyricsSyncSpotifyConnect: true
+        case .nowPlayingSpotifyVolumeHUD, .lyricsSpotifyVolumeHUD, .equalizerSpotifyConnect: true
         default: false
         }
     }
 
+    /// The Connect volume pop-up shows, pinned (`SpotifyConnectController.startDemoSessionIfNeeded`).
+    var showsSpotifyVolumeHUD: Bool {
+        self == .nowPlayingSpotifyVolumeHUD || self == .lyricsSpotifyVolumeHUD
+    }
+
     var cover: AppCover? {
         switch self {
-        case .nowPlaying, .nowPlayingSpotifyConnect, .nowPlayingBluetooth: .nowPlaying
+        case .nowPlaying, .nowPlayingSpotifyConnect, .nowPlayingBluetooth, .nowPlayingSpotifyVolumeHUD: .nowPlaying
         case .editSong: .editSong(songId: DemoLibrary.songs.first?.id ?? "")
-        case .lyrics, .taisInstrumental, .taisInstrumentalRendering, .taisInstrumentalActive: .lyrics
+        case .lyrics, .taisInstrumental, .taisInstrumentalRendering, .taisInstrumentalActive, .lyricsSpotifyVolumeHUD: .lyrics
         case .lyricsSync, .lyricsSyncSpotifyConnect: .lyricsSync(songId: DemoLibrary.songs.first?.id ?? "")
         case .setup, .setupPermission, .setupFolders, .setupBackup, .setupTheme, .setupLibraryLayout, .setupSpotify,
              .setupFinish:

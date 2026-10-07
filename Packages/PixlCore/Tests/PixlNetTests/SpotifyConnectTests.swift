@@ -376,6 +376,34 @@ struct SpotifyConnectReducerTests {
         #expect(SpotifyConnectReducer.remoteRepeat(repeatOne: false) == .off)
     }
 
+    @Test func volumeHoldKeepsTheLocalValueAgainstStalePolls() {
+        var s = Self.state()
+        SpotifyConnectReducer.setVolume(55, &s, nowMs: 100_000)
+        #expect(s.volumePercent == 55 && s.volumeHoldUntilMs == 100_000 + SpotifyConnectReducer.volumeHoldMs)
+        // A poll from before the PUT (still 40) doesn't snap it back, and writes nothing.
+        let before = s
+        #expect(SpotifyConnectReducer.apply(Self.poll("spotify:track:a", progress: 11_000), to: &s, nowMs: 101_000).change == .none)
+        #expect(s == before)
+        // Other changes in the same poll still count; the volume stays.
+        #expect(SpotifyConnectReducer.apply(Self.poll("spotify:track:a", playing: false, progress: 11_000), to: &s, nowMs: 101_100).change == .updated)
+        #expect(!s.isPlaying && s.volumePercent == 55)
+        // The PUT went through: held a little longer, never shorter.
+        SpotifyConnectReducer.volumeSent(&s, nowMs: 102_000)
+        #expect(s.volumeHoldUntilMs == 103_500)
+        SpotifyConnectReducer.volumeSent(&s, nowMs: 100_500)
+        #expect(s.volumeHoldUntilMs == 103_500)
+        // After the hold the device's value applies (someone turned it on the speaker itself).
+        #expect(SpotifyConnectReducer.apply(Self.poll("spotify:track:a", playing: false, progress: 11_000, volume: 30), to: &s, nowMs: 103_500).change == .updated)
+        #expect(s.volumePercent == 30)
+        // Clamped.
+        SpotifyConnectReducer.setVolume(130, &s, nowMs: 104_000)
+        #expect(s.volumePercent == 100)
+        SpotifyConnectReducer.setVolume(-5, &s, nowMs: 104_000)
+        #expect(s.volumePercent == 0)
+        // A state built without a hold (existing call sites) applies polls at once.
+        #expect(Self.state().volumeHoldUntilMs == 0)
+    }
+
     @Test func optimisticCommands() {
         var s = Self.state()
         SpotifyConnectReducer.setPlaying(false, &s, nowMs: 102_000)

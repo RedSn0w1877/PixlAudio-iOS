@@ -87,10 +87,13 @@ struct DevicesSheet: View {
         .onAppear {
             volume.start()
             route.setDetecting(true)
+            // The hero's slider moves with the volume buttons: no pop-up over it.
+            env.spotifyConnect.volumeHUD.isSuppressed = true
         }
         .onDisappear {
             volume.stop()
             route.setDetecting(false)
+            env.spotifyConnect.volumeHUD.isSuppressed = false
         }
         // Spotify Connect: the device list is fetched again every time the sheet opens.
         .task { await env.spotifyConnect.refreshDevices() }

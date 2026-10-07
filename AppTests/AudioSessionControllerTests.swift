@@ -171,4 +171,58 @@ final class AudioSessionControllerTests: XCTestCase {
         controller.releasePreparedActivation()
         XCTAssertEqual(controller.isActive, activated, "a session something played on is not given back")
     }
+
+    // MARK: The volume buttons' hold (Spotify Connect)
+
+    func testReleaseIsIgnoredWhileTheVolumeButtonsHoldTheSession() async {
+        let controller = AudioSessionController()
+        defer { controller.releaseVolumeButtonsHold(); controller.deactivate() }
+        controller.holdForVolumeButtons()
+        XCTAssertTrue(controller.isHeldForVolumeButtons)
+        let settled = await waitUntil(timeout: Self.activationTimeout) { !controller.isPreparingActivation }
+        XCTAssertTrue(settled)
+        let wasActive = controller.isActive
+        // What a paused engine or a failed item load does during a Connect session.
+        controller.releasePreparedActivation()
+        XCTAssertEqual(controller.isActive, wasActive, "the hold keeps the session")
+        XCTAssertEqual(controller.isPreparedOnly, wasActive)
+    }
+
+    func testReleasingTheHoldGivesBackASessionNothingPlayedOn() async {
+        let controller = AudioSessionController()
+        defer { controller.deactivate() }
+        controller.holdForVolumeButtons()
+        let settled = await waitUntil(timeout: Self.activationTimeout) { !controller.isPreparingActivation }
+        XCTAssertTrue(settled)
+        controller.releaseVolumeButtonsHold()
+        XCTAssertFalse(controller.isHeldForVolumeButtons)
+        XCTAssertFalse(controller.isActive)
+        XCTAssertFalse(controller.isPreparedOnly)
+    }
+
+    func testReleasingTheHoldKeepsASessionLocalPlaybackUses() async {
+        let controller = AudioSessionController()
+        defer { controller.deactivate() }
+        controller.holdForVolumeButtons()
+        let activated = controller.activate()
+        let settled = await waitUntil(timeout: Self.activationTimeout) { !controller.isPreparingActivation }
+        XCTAssertTrue(settled)
+        controller.releaseVolumeButtonsHold()
+        XCTAssertEqual(controller.isActive, activated, "a session something played on is not given back")
+    }
+
+    func testReleasingTheHoldForLocalPlaybackKeepsThePreparedSession() async {
+        let controller = AudioSessionController()
+        defer { controller.deactivate() }
+        controller.holdForVolumeButtons()
+        let settled = await waitUntil(timeout: Self.activationTimeout) { !controller.isPreparingActivation }
+        XCTAssertTrue(settled)
+        let wasActive = controller.isActive
+        controller.releaseVolumeButtonsHold(keepingSession: true)
+        XCTAssertFalse(controller.isHeldForVolumeButtons)
+        XCTAssertEqual(controller.isActive, wasActive, "local playback takes the session over without a gap")
+        // Without the hold a later release (the item failed to load) gives it back as before.
+        controller.releasePreparedActivation()
+        XCTAssertFalse(controller.isActive)
+    }
 }
