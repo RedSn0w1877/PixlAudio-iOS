@@ -1,10 +1,12 @@
 import PixlLyrics
 import PixlModel
+import UIKit
 import XCTest
 @testable import PixlAudio
 
 /// Stage 10: the sync editor's helpers (Android `LyricsSyncEditorStateHolder` companion), the tap screen's derived
-/// model and a session run on the demo engine.
+/// model and a session run on the demo engine; plus (2026-10-07) close reasons, the Spotify Connect guard and the
+/// shared keep-screen-on claim.
 @MainActor
 final class LyricsSyncTests: XCTestCase {
     func testPlainTextOfEveryLyricsShape() {
@@ -116,5 +118,128 @@ final class LyricsSyncTests: XCTestCase {
         session.confirmLeave()
         XCTAssertEqual(session.phase, .closed)
         XCTAssertTrue(closed)
+    }
+
+    // MARK: - Close reasons and errors (2026-10-07: "tap sync → loading → the editor disappears")
+
+    /// The editor's teardown (its view disappeared) restores the player but never navigates: a dismissal from there
+    /// used to take down whatever was on screen by then, the lyrics screen included.
+    func testViewGoneCloseNeverNavigates() async throws {
+        let playback = PlaybackStore(engine: DemoPlaybackEngine())
+        playback.play(DemoLibrary.songs, startIndex: 0, playWhenReady: true)
+        let (session, directory) = makeSession(playback: playback)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        var closedCount = 0
+        session.onClosed = { closedCount += 1 }
+
+        session.open(songId: DemoLibrary.songs[0].id, entry: .auto)
+        try await waitForPhase(.intro, session)
+        session.close(.viewGone)
+        XCTAssertEqual(session.phase, .closed)
+        XCTAssertEqual(closedCount, 0, "a disappearing editor must not navigate")
+        session.close()
+        XCTAssertEqual(closedCount, 0, "nothing is left to close after the teardown")
+    }
+
+    /// Every other reason navigates exactly once, and the teardown that follows the dismissal is a no-op.
+    func testUserCloseNavigatesOnce() async throws {
+        let playback = PlaybackStore(engine: DemoPlaybackEngine())
+        playback.play(DemoLibrary.songs, startIndex: 0, playWhenReady: false)
+        let (session, directory) = makeSession(playback: playback)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        var closedCount = 0
+        session.onClosed = { closedCount += 1 }
+
+        session.open(songId: DemoLibrary.songs[0].id, entry: .auto)
+        try await waitForPhase(.intro, session)
+        session.requestClose()
+        XCTAssertEqual(closedCount, 1)
+        session.close(.viewGone)
+        session.close()
+        XCTAssertEqual(closedCount, 1)
+    }
+
+    /// Android refuses while casting: with a Spotify Connect device attached the editor shows the message and Close,
+    /// and sends nothing to the device (no queue, pause or seek).
+    func testSpotifyConnectBlocksOpenWithoutTouchingTheDevice() async throws {
+        let playback = PlaybackStore(engine: DemoPlaybackEngine())
+        playback.play(DemoLibrary.songs, startIndex: 0, playWhenReady: false)
+        let remote = SpotifyConnectStoreTests.FakeRemote()
+        playback.attachRemote(remote, name: "Kitchen Echo", isPlaying: true)
+        let (session, directory) = makeSession(playback: playback)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        var closedCount = 0
+        session.onClosed = { closedCount += 1 }
+
+        session.open(songId: DemoLibrary.songs[0].id, entry: .auto)
+        XCTAssertEqual(session.phase, .error(SyncStrings.remoteOutput))
+        XCTAssertEqual(session.title, DemoLibrary.songs[0].title)
+        XCTAssertEqual(remote.calls, [], "nothing goes to the Connect device")
+
+        session.close()
+        XCTAssertEqual(closedCount, 1, "Close on the error screen dismisses the editor")
+        XCTAssertEqual(remote.calls, [])
+    }
+
+    /// A Connect device taking over mid-session stops the editor with the message, keeps the session's restore for
+    /// Close, and never pauses the speaker the person just picked (Android: flushDraft + Error, no pause).
+    func testSpotifyConnectMidSessionStopsWithoutPausingTheDevice() async throws {
+        let playback = PlaybackStore(engine: DemoPlaybackEngine())
+        playback.play(DemoLibrary.songs, startIndex: 0, playWhenReady: true)
+        let (session, directory) = makeSession(playback: playback)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        var closedCount = 0
+        session.onClosed = { closedCount += 1 }
+
+        session.open(songId: DemoLibrary.songs[0].id, entry: .auto)
+        try await waitForPhase(.intro, session)
+        let remote = SpotifyConnectStoreTests.FakeRemote()
+        playback.attachRemote(remote, name: "Kitchen Echo", isPlaying: true)
+        session.remoteOutputAttached()
+        XCTAssertEqual(session.phase, .error(SyncStrings.remoteOutput))
+        XCTAssertEqual(closedCount, 0, "the error waits for Close")
+
+        session.currentSongChanged(to: nil)
+        session.currentSongChanged(to: DemoLibrary.songs[1].id)
+        XCTAssertEqual(session.dialog, .none, "the error screen stays; no song-changed dialog over it")
+
+        session.close()
+        XCTAssertEqual(session.phase, .closed)
+        XCTAssertEqual(closedCount, 1)
+        XCTAssertEqual(remote.calls, [], "no pause, play or seek reached the device")
+    }
+
+    /// The lyrics screen and the sync editor over it each hold their own keep-awake claim: the editor closing must not
+    /// let the screen lock under lyrics that still want it on.
+    func testScreenStaysAwakeWhileAnyOwnerHoldsIt() {
+        defer {
+            ScreenAwake.set(false, for: .lyrics)
+            ScreenAwake.set(false, for: .lyricsSync)
+        }
+        ScreenAwake.set(true, for: .lyrics)
+        ScreenAwake.set(true, for: .lyricsSync)
+        ScreenAwake.set(false, for: .lyricsSync)
+        XCTAssertTrue(UIApplication.shared.isIdleTimerDisabled, "the lyrics screen still holds it")
+        ScreenAwake.set(false, for: .lyrics)
+        XCTAssertFalse(UIApplication.shared.isIdleTimerDisabled)
+    }
+
+    // MARK: - Helpers
+
+    private func makeSession(playback: PlaybackStore) -> (LyricsSyncSession, URL) {
+        let settings = SettingsStore.ephemeral()
+        let lyricsStore = LyricsStore()
+        let controller = LyricsController(store: lyricsStore, settings: settings, persistence: nil, isUITest: true)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("sync-tests-\(UUID().uuidString)")
+        let session = LyricsSyncSession(
+            player: LyricsSyncPlayer(playback: playback, engine: nil), settings: settings, lyricsStore: lyricsStore,
+            lyricsController: controller, draftStore: LyricsSyncDraftStore(directory: directory),
+            preferences: LyricsSyncPreferences(isUITest: true), isUITest: true, songLookup: { _ in nil })
+        return (session, directory)
+    }
+
+    private func waitForPhase(_ phase: SyncPhase, _ session: LyricsSyncSession) async throws {
+        for _ in 0..<200 where session.phase != phase { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertEqual(session.phase, phase)
     }
 }

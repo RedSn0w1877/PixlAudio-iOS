@@ -59,6 +59,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case devicesSpotifyEmpty = "devices.spotifyEmpty"
     case nowPlayingSpotifyConnect = "nowPlaying.spotifyConnect"
     case miniPlayerSpotifyConnect = "miniPlayer.spotifyConnect"
+    /// The sync editor opened while the Echo plays: it refuses with "Syncing only works on this iPhone…" and Close.
+    case lyricsSyncSpotifyConnect = "lyricsSync.spotifyConnect"
 
     // Stage 12: account screens signed in with demo data (plain ids are signed out), dashboard with a playback test
     // report, browse drill-downs (search results, an artist, an album)
@@ -111,7 +113,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         switch self {
         case .home, .search, .searchResults, .library, .miniPlayer, .miniPlayerSpotifyConnect: return nil
         case .devicesSpotifyConnect, .devicesSpotifyPlaying, .devicesSpotifyReconnect, .devicesSpotifyEmpty,
-             .nowPlayingSpotifyConnect:
+             .nowPlayingSpotifyConnect, .lyricsSyncSpotifyConnect:
             return nil
         case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryFolders, .libraryLiked,
              .librarySelection, .librarySort, .libraryReorderTabs, .libraryMultiSelection, .libraryCreatePlaylist,
@@ -230,7 +232,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     /// A demo Spotify Connect session plays on the Echo ("Playing on Kitchen Echo Show").
     var startsSpotifyConnectSession: Bool {
         switch self {
-        case .devicesSpotifyPlaying, .nowPlayingSpotifyConnect, .miniPlayerSpotifyConnect: true
+        case .devicesSpotifyPlaying, .nowPlayingSpotifyConnect, .miniPlayerSpotifyConnect, .lyricsSyncSpotifyConnect: true
         default: false
         }
     }
@@ -240,7 +242,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .nowPlaying, .nowPlayingSpotifyConnect: .nowPlaying
         case .editSong: .editSong(songId: DemoLibrary.songs.first?.id ?? "")
         case .lyrics, .taisInstrumental, .taisInstrumentalRendering, .taisInstrumentalActive: .lyrics
-        case .lyricsSync: .lyricsSync(songId: DemoLibrary.songs.first?.id ?? "")
+        case .lyricsSync, .lyricsSyncSpotifyConnect: .lyricsSync(songId: DemoLibrary.songs.first?.id ?? "")
         case .setup, .setupPermission, .setupFolders, .setupBackup, .setupTheme, .setupLibraryLayout, .setupSpotify,
              .setupFinish:
             .setup
