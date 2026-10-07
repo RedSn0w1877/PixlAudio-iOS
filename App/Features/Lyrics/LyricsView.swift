@@ -37,6 +37,10 @@ struct LyricsView: View {
     @State private var showImporter = false
     @State private var exportDocument: LyricsTextDocument?
     @State private var syncChipDismissedFor: String?
+    /// The sync editor, presented over this screen (its own nested cover; Android's overlay on the lyrics sheet).
+    @State private var syncRequest: LyricsSyncRequest?
+    /// The More sheet's sync row: opened from the sheet's `onDismiss`, once the sheet has gone.
+    @State private var syncAfterMoreSheet: LyricsSyncRequest?
     @State private var translationConfig: TranslationSession.Configuration?
     @State private var translationLines: [String] = []
     @State private var translationSongId: String?
@@ -115,8 +119,9 @@ struct LyricsView: View {
                     artSource: song.flatMap(ArtworkSource.init(song:)),
                     overrideImage: isUITest && launch.brightArt ? LyricsDemoArt.bright : nil,
                     fallbackTheme: theme,
+                    // Also paused under the sync editor, which draws its own.
                     paused: scenePhase != .active || ProcessInfo.processInfo.isLowPowerModeEnabled
-                        || (isUITest && launch.freezeMs != nil),
+                        || (isUITest && launch.freezeMs != nil) || syncRequest != nil,
                     deterministic: isUITest,
                     onBrightArtChange: { brightArt = $0 })
 
@@ -186,7 +191,12 @@ struct LyricsView: View {
             if state == .success { closeFetchDialog() }
         }
         .onChange(of: controller.preferences.keepScreenOn) { _, on in
-            UIApplication.shared.isIdleTimerDisabled = on
+            ScreenAwake.set(on, for: .lyrics)
+        }
+        // Nothing ticks under the sync editor: its preview has its own driver. Back on screen, the lines pick up at
+        // the player's position.
+        .onChange(of: syncRequest == nil) { _, editorGone in
+            if editorGone { startDriver() } else { driver.stop() }
         }
         .onChange(of: scenePhase) { _, phase in
             // Android turns keep-screen-on off when the screen goes off or the app stops.
@@ -196,7 +206,10 @@ struct LyricsView: View {
         .animation(.spring(response: 0.31, dampingFraction: 1), value: immersive)
         .animation(.easeInOut(duration: 0.25), value: showFetchDialog)
         .animation(.spring(response: 0.4, dampingFraction: 0.9), value: controller.message)
-        .sheet(isPresented: $showMoreSheet) { moreSheet }
+        .sheet(isPresented: $showMoreSheet, onDismiss: { openSyncAfterMoreSheet() }) { moreSheet }
+        .fullScreenCover(item: $syncRequest) { request in
+            LyricsSyncEditorView(songId: request.songId, entry: request.entry, onClose: { syncRequest = nil })
+        }
         .alert("Save Lyrics", isPresented: $showSaveDialog) {
             if !(lyrics?.synced ?? []).isEmpty {
                 Button("Synced (with timestamps)") { export(synced: true) }
@@ -348,10 +361,23 @@ struct LyricsView: View {
             .allowsHitTesting(visible)
     }
 
+    /// The sync chip and the empty state: the editor opens over this screen at once.
     private var syncYourselfAction: (() -> Void)? {
         guard let song else { return nil }
-        let router = self.router
-        return { LyricsSyncEditorView.open(songId: song.id, router: router, fromLyrics: true) }
+        return { syncRequest = LyricsSyncRequest(songId: song.id) }
+    }
+
+    /// The More sheet's sync row only records the request: presenting the editor while the sheet is still
+    /// dismissing races two presentations, so `openSyncAfterMoreSheet` opens it once the sheet has gone.
+    private var syncAfterMoreSheetAction: (() -> Void)? {
+        guard let song else { return nil }
+        return { syncAfterMoreSheet = LyricsSyncRequest(songId: song.id) }
+    }
+
+    private func openSyncAfterMoreSheet() {
+        guard let request = syncAfterMoreSheet else { return }
+        syncAfterMoreSheet = nil
+        syncRequest = request
     }
 
     // MARK: More sheet
@@ -367,7 +393,7 @@ struct LyricsView: View {
             isShuffleEnabled: playback.isShuffleEnabled, repeatMode: playback.repeatMode,
             isFavorite: song.map { env.libraryEditor.isFavorite($0.id) } ?? false,
             actions: LyricsMoreActions(
-                onSyncYourself: syncYourselfAction,
+                onSyncYourself: syncAfterMoreSheetAction,
                 onSave: { showSaveDialog = true },
                 onTranslate: { startTranslation() },
                 onTranslateViaAI: {
@@ -455,12 +481,12 @@ struct LyricsView: View {
         driver.offsetMs = Int64(lyricsStore.offsetMs)
         driver.start()
         interaction.touch()
-        UIApplication.shared.isIdleTimerDisabled = controller.preferences.keepScreenOn
+        ScreenAwake.set(controller.preferences.keepScreenOn, for: .lyrics)
     }
 
     private func stopDriver() {
         driver.stop()
-        UIApplication.shared.isIdleTimerDisabled = false
+        ScreenAwake.set(false, for: .lyrics)
     }
 
     // MARK: Immersive mode and swipes

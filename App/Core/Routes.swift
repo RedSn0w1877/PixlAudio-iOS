@@ -224,6 +224,8 @@ nonisolated enum AppSheet: Hashable, Sendable, Identifiable {
 nonisolated enum AppCover: Hashable, Sendable, Identifiable {
     case nowPlaying
     case lyrics
+    /// The sync editor straight from launch (`-screen lyricsSync` UI tests). The app presents the editor from inside
+    /// the lyrics screen and Edit song instead (`LyricsSyncRequest`), never by swapping the root cover.
     case lyricsSync(songId: String)
     case setup
     /// Stage 8: "Edit song" (Android `EditSongSheet`, a full-screen dialog).

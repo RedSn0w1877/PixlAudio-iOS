@@ -194,7 +194,7 @@ PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact ba
 | Player sheet (expanded) | `AppCover.nowPlaying` | `NowPlayingView` (Features/NowPlaying) | 8 |
 | Queue / Song info / Sleep timer | `AppSheet.queue/.songInfo/.sleepTimer` | `QueueSheet`, `SongInfoSheet`, `SleepTimerSheet` | 8 |
 | Karaoke lyrics / lyrics options | `AppCover.lyrics`, `AppSheet.lyricsOptions` | `LyricsView`, `LyricsOptionsSheet` (Features/Lyrics) | 9 |
-| Lyrics sync editor | `AppCover.lyricsSync(songId:)` | `LyricsSyncEditorView` (Features/LyricsSync) | 10 |
+| Lyrics sync editor | a cover nested in `LyricsView` / `EditSongSheet` (`LyricsSyncRequest`); `AppCover.lyricsSync(songId:)` only for `-screen lyricsSync` UI tests | `LyricsSyncEditorView` (Features/LyricsSync) | 10 |
 | YouTube login (+ device-code dialog, cookie paste) | `.youTubeLogin` | `YouTubeLoginView` (Features/YouTube) | 11 |
 | Playback test ("Test playback" / "Deep probe", Android: Spotify dashboard cards) | `.playbackDiagnostics` | `PlaybackDiagnosticsView` (Features/YouTube) | 11 |
 | Offline download card (song sheet) | inside `SongOptionsSheet` | `OfflineDownloadCard` (Features/YouTube) | 11 |
@@ -348,8 +348,8 @@ categories, sheets; glass in place of Material; text legible in light and dark. 
   release rules), tap the mini player, the collapse circle, VoiceOver escape, or swipe in from the leading edge
   (predictive back). An upward flick on the expanded player opens the queue.
 - **`AppCover.nowPlaying` is a request** the sheet consumes (the shell's cover binding skips it): every existing
-  `router.present(AppCover.nowPlaying)` still opens the player. Lyrics (`AppCover.lyrics`) and the sync editor open
-  above the expanded player and return to it.
+  `router.present(AppCover.nowPlaying)` still opens the player. Lyrics (`AppCover.lyrics`) opens above the expanded
+  player and returns to it; the sync editor opens in its own cover over the lyrics screen and returns there.
 - **Full player** (`NowPlayingView`, Android `FullPlayerContent`): top bar, carousel (`carousel_style` peek styles),
   title/artist (+ artist picker for several credits), lyrics and AI DJ circles, `PlayerSeekBar` (≤ 4 Hz from
   `PlaybackStore.clock`), `AnimatedPlaybackControls` (weighted glass pills), `PlayerToggleRow`, the
@@ -444,8 +444,9 @@ lyricsCascade.f0…f7 (first-show cascade frames, live clock).
 Port of Android `presentation/lyrics/sync/**` + `LyricsSyncEditorStateHolder` (`AppCover.lyricsSync` →
 `LyricsSyncEditorView`), on PixlLyrics' `LyricsTapSync` / `LyricsExport` / `LyricsSyncDraftStore`.
 
-- **Session** (`LyricsSyncSession`, created by the cover, closed on dismiss): phases Loading → Resume / Words / Intro /
-  Manage → Tap (and Fix a line) → Preview, Android's dialogs as system alerts, notices as a glass pill. While open it
+- **Session** (`LyricsSyncSession`, created when the editor appears, closed with `.viewGone` when it disappears): phases
+  Loading → Resume / Words / Intro / Manage → Tap (and Fix a line) → Preview, Android's dialogs as system alerts,
+  notices as a glass pill. While open it
   pauses, suspends crossfades (`DualDeckEngine.suspendTransitions(owner: "lyrics_sync")`) and opens an exact-timing
   session (`beginExactTimingSession`: no hand-over; at the end of the song the engine pauses on it → "The song ended
   before the last N words"); `close()` restores the rate and both. Drafts autosave 1 s after a change to
@@ -467,17 +468,61 @@ Port of Android `presentation/lyrics/sync/**` + `LyricsSyncEditorStateHolder` (`
   luminous enough, else `inversePrimary`) at `GlassTint.prominent` for Start / Save / the selected speed / the intro
   icons; 35 % black over bright art. Buttons inside the panel are fills. Preview uses the real `KaraokeLyricsView` with
   its own `LyricsDriver` on the editor's clock and the lyrics screen's appearance preferences.
-- **Entry points:** the lyrics More sheet's first row, the empty-state button and the sync chip
-  (`LyricsSyncEditorView.open(…, fromLyrics: true)` — the editor returns to the lyrics screen); Edit song's "Change the
-  words" (`.words`) and "Fix timing" (`.fixTiming`), which start the song paused if another one is playing.
+- **Entry points** (reworked 2026-10-07, below): the lyrics More sheet's first row, the empty-state button and the sync
+  chip open the editor over the lyrics screen; Edit song's "Change the words" (`.words`) and "Fix timing"
+  (`.fixTiming`) open it over Edit song. Both start the song paused if another one is playing.
 - **Shared-file changes (additive):** `Playback/DualDeckEngine.swift` (exact-timing session), `Stores/PlaybackStore.swift`
   (explicit `resume()` / `pause()`), `Services/LyricsController.swift` (`lyricsService`, shared with stage 14), `Features/Lyrics/LyricsView.swift`
-  and `Features/SongInfo/EditSongSheet.swift` (open through `LyricsSyncEditorView.open`).
+  and `Features/SongInfo/EditSongSheet.swift` (each presents the editor in its own nested cover).
+
+### Sync editor entry fix (2026-10-07)
+
+Owner report from the phone: tap sync → "Getting the song ready…" → the editor disappears → nothing. Cause: the editor
+replaced the lyrics screen in the app's single root `fullScreenCover(item:)` slot (`router.present(.lyricsSync)` while
+`.lyrics` showed). Changing the item tears the shown cover down, and the editor's teardown navigated: its
+`onDisappear` closed the session, and `close()` always called `onClosed`, which swapped the root cover or dismissed it
+(through static "return to lyrics" flags shared by every instance). `close()` set `.closed`, which draws the spinner,
+then the navigation took the editor away; on re-appear `guard session == nil` stopped any recovery. CI never saw it:
+every editor test launched straight into `-screen lyricsSync`.
+
+- **The editor is a nested cover.** `LyricsView` and `EditSongSheet` own `@State syncRequest: LyricsSyncRequest?` and
+  `.fullScreenCover(item: $syncRequest)` → `LyricsSyncEditorView(songId:entry:onClose:)`; `onClose` clears the
+  request. Android shows the editor as an overlay inside the full player (`LyricsSyncEditorOverlay`): one present
+  animation, and closing lands on the same lyrics instance. The static `open(…)` and its flags are gone.
+  `AppCover.lyricsSync` stays only for `-screen lyricsSync` UI tests (`CoverDestination` passes
+  `router.dismissCover()`).
+- **The More sheet row only records the request** (`syncAfterMoreSheet`); the sheet's `onDismiss` moves it into
+  `syncRequest`, so the editor never presents while the sheet is still dismissing. Edit song no longer dismisses
+  itself or asks the root for a cover while the song sheet below it is up (SwiftUI would hold the cover until that
+  sheet closed).
+- **Teardown never navigates.** `close(_ reason: SyncCloseReason)` (`user`, `saved`, `removed`, `songChanged`,
+  `viewGone`): every reason restores the player, only `viewGone` skips `onClosed`. The view's `onDisappear` runs
+  `close(.viewGone)` and drops the session, so a later appearance starts a fresh one. `onClosed` still runs once.
+- **Errors instead of silent closes** (a screen with Close, Android's `Error` phase): opening while Spotify Connect
+  plays ("Syncing only works on this iPhone. Switch playback back to this iPhone first.", Android `lyrics_sync_casting`;
+  checked before anything is sent to the device), a Connect device taking over mid-session (taps kept as a draft, no
+  pause, which would stop the speaker; `onChange(of: playback.remoteOutputName)`), a load longer than
+  `openWaitMs` (8 s: "Couldn't get the song ready. Close and try again."), and the player unloading for more than
+  600 ms ("Playback stopped."). The session stays open behind an error, so Close still restores the player.
+- **Keep screen on:** `ScreenAwake` keeps one claim per owner (`.lyrics`, `.lyricsSync`) on the app-wide
+  `isIdleTimerDisabled`, so the editor closing over the lyrics screen never lets the screen lock under it. While the
+  editor is up the lyrics screen stops its display link and pauses its Metal background (the editor draws its own).
+- **Notice pill:** it sits over the bottom of the tap pad (Android's 92 pt), so it lets taps through unless it offers
+  Undo, and its text never takes them (owner decision; Android makes only the Undo box clickable).
+- **Not changed:** the words screen's container tap gesture (plan item, unverified on device) and the full-player /
+  lyrics chrome. Stage 2 of the batch (the lyrics page) builds on this: it can make the lyrics screen's
+  `ScreenAwake` claim unconditional.
 
 Screenshot ids (`UITests/LyricsSyncScreenshotTests`, `-screen lyricsSync -syncStep <step>`; ready `screen.lyricsSync`):
 syncIntro, syncWords, syncResume, syncManage, syncTap, syncTapReady, syncTapBreak, syncTapNotice, syncTapEnded,
 syncFixLine, syncPreview, syncPreviewFixLine, syncTapLight, syncSpeedMenu, syncLiveIntro / syncLiveTapped (a live run
 on the demo engine).
+
+Entry tests (`UITests/LyricsSyncEntryTests`, from `-screen lyrics -lyricsDemo lines|words`): the chip (twice), Lyrics
+options → "Sync the words yourself" (line- and word-synced), each still open 3 s later and closing back to
+`screen.lyrics`; Leave through the alert back to lyrics; `-screen lyricsSync.spotifyConnect` (the demo Echo plays) shows
+the Connect message and Close dismisses it. Shots: syncEntryChip, syncEntryMoreSheet, syncEntryWordSynced,
+syncConnectBlocked. Test ids: `lyrics.syncChip`, `lyricsMore.syncYourself`, `sync.error`, `sync.error.close`.
 
 ## Stage 11 notes (YouTube playback)
 
@@ -684,8 +729,8 @@ How the stages meet on `main`:
   `LyricsController.translateViaAI` sends the song's scanned lyrics, else the LRC of what the screen shows, through
   `env.ai.lyricsTranslator` in the device language, and imports a valid reply like a file (each translation pairs with
   its line by timestamp; the toast is Android's message). Stage 9's on-device translation stays below it, renamed "Translate on device" (character-bubble icon) so the two rows read apart.
-- **Lyrics ↔ sync editor:** "Sync the words yourself" / the sync chip present `AppCover.lyricsSync(songId:)` — stage
-  10's editor (see Stage 10 notes).
+- **Lyrics ↔ sync editor:** "Sync the words yourself" / the sync chip present stage 10's editor in a cover nested in
+  the lyrics screen (see Stage 10 notes › Sync editor entry fix).
 - **Spotify ↔ YouTube:** `AppEnvironment` builds `SpotifyService` after `YouTubeServices` and passes
   `InnerTubeSpotifyBridge` (App/Services/Spotify): the matcher searches through stage 11's InnerTube session, matched
   videos resolve through stage 11's `StreamingPlayableURLResolver` (download → complete cache file →
@@ -724,8 +769,10 @@ an image).
 ## Integration notes (Integrate B: stages 10 and 14 merged — tag `stage-15`)
 
 - **Lyrics ↔ sync editor:** the lyrics More sheet's first row, the empty-state button and the line-synced chip open
-  stage 10's editor (`LyricsSyncEditorView.open(…, fromLyrics: true)`, which returns to the lyrics screen); Edit song's
-  "Change the words" / "Fix timing" open it at the words / fix-timing entries. The placeholder is gone.
+  stage 10's editor; Edit song's "Change the words" / "Fix timing" open it at the words / fix-timing entries. The
+  placeholder is gone. (Since 2026-10-07 each of them presents the editor in its own nested cover, the More sheet's row
+  from the sheet's `onDismiss`; the root-cover swap through `LyricsSyncEditorView.open(…, fromLyrics:)` tore the
+  lyrics screen and the editor down on the phone. See Stage 10 notes › Sync editor entry fix.)
 - **Sync editor ↔ instrumental:** `LyricsSyncPlayer` suspends stage 14's `InstrumentalController` for the session
   (owner `lyrics_sync`, Android `InstrumentalCrossfadeController.suspend`): an instrumental that was playing switches back
   to the song's own audio so the person hears the vocals they are timing, and returns when the editor closes. Crossfades

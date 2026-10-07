@@ -15,7 +15,6 @@ struct EditSongSheet: View {
 
     @Environment(AppEnvironment.self) private var env
     @Environment(LibraryStore.self) private var library
-    @Environment(Router.self) private var router
     @Environment(\.appTheme) private var theme
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
@@ -34,6 +33,8 @@ struct EditSongSheet: View {
     /// Set while Save writes the cover and applies the edit: a second tap is ignored (Save ran once, synchronously,
     /// before the cover write moved off the main thread).
     @State private var isSaving = false
+    /// "Change the words" / "Fix timing": the sync editor, presented over this screen (it returns here).
+    @State private var syncRequest: LyricsSyncRequest?
 
     var body: some View {
         Group {
@@ -47,6 +48,9 @@ struct EditSongSheet: View {
         }
         .background(theme.surface.ignoresSafeArea())
         .accessibilityIdentifier("screen.editSong")
+        .fullScreenCover(item: $syncRequest) { request in
+            LyricsSyncEditorView(songId: request.songId, entry: request.entry, onClose: { syncRequest = nil })
+        }
     }
 
     private func content(_ song: Song) -> some View {
@@ -285,9 +289,10 @@ struct EditSongSheet: View {
         return doc.lines.map { $0.text.trimmingCharacters(in: .whitespaces) }.joined(separator: "\n")
     }
 
+    /// Opens the editor over this screen. It used to dismiss Edit song and ask the root for a cover while the song sheet
+    /// below was still up, so the editor waited until that sheet closed (or never showed).
     private func openSyncEditor(_ song: Song, entry: SyncEntry) {
-        dismiss()
-        LyricsSyncEditorView.open(songId: song.id, router: router, entry: entry)
+        syncRequest = LyricsSyncRequest(songId: song.id, entry: entry)
     }
 
     /// Android opens lrclib.net's search for the title and artist.

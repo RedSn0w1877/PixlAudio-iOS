@@ -270,7 +270,8 @@ nonisolated enum SyncGlassID: Hashable, Sendable {
 }
 
 /// The transient message pill ("Removed timing for 14 words · Undo"); dismisses itself after 4 s (Android
-/// `SyncNoticePill`: a dark 20 pt rounded surface — a glass panel here).
+/// `SyncNoticePill`: a dark 20 pt rounded surface — a glass panel here). It sits over the bottom of the tap pad, so
+/// only Undo takes touches: the editor turns hit testing off for pills without Undo, and the text never takes them.
 struct SyncNoticePill: View {
     let notice: SyncNotice
     let palette: SyncEditorPalette
@@ -285,6 +286,7 @@ struct SyncNoticePill: View {
                 .pixlFont(.custom(size: 14))
                 .foregroundStyle(.white)
                 .fixedSize(horizontal: false, vertical: true)
+                .allowsHitTesting(false)
             if notice.canUndo {
                 Button(action: onUndo) {
                     Text(SyncStrings.commonUndo)
