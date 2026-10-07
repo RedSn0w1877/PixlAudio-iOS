@@ -679,3 +679,29 @@ Swift-only and define the behaviour both apps share.
 - `UITests/SpotifyConnectScreenshotTests` — the section (light/dark), connect → stop on a demo device, playing state
   (light/dark), the hero with the device volume, reconnect row, empty hint, "Playing on" chip in the full (light/dark)
   and mini player.
+
+## On-device AI by default (2026-10-07, local AI phase 1, Swift-only)
+
+Nothing here is ported: Android has no on-device paths for these features (its on-device provider is a MediaPipe
+model behind the same orchestrator). The system language model can't run on CI's simulators, so every test stands
+in for the model calls; the behaviour itself waits for Hoa's iPhone.
+
+- `PixlNetTests/AiTests.customProviderChainKeepsOnDeviceRequestsLocal` — with the app's chain (`[ON_DEVICE]` when
+  on-device is selected) a failure lists only ON_DEVICE and no HTTP request is made.
+- `AppTests/OnDeviceAITests` (17 tests; also run on Linux against the pure files during development):
+  on-device failure messages never contain a network/key word, never become "No Internet Connection" through
+  `AiPlaylistPrompt.detailedErrorMessage` (the old "On-Device (Offline)" name did) and read back with `matching`;
+  reply clean-up and token estimates (Latin, CJK, Vietnamese); the curator's prompt (1-based aliases, no ids, the
+  taste line), the request-aware pool, the budget ladder with an injected counter, mapping back (dedupe, out of range,
+  top-up), the curator end to end with a stand-in model (every other song, a too-long retry with half the pool, the
+  guardrail retry as text, unavailability), long playlists (plan → fill → the first 40 ordered), plan parsing and
+  fill; lyric translation (timestamps kept, each line translated once, already in the target language, plain lyrics,
+  lines from the screen), its parser and chunks; Taizo's library lookup, prompts and the intro that arrives after the
+  card (`TaizoOnDevice` stand-in); Home's greeting prompts (Android `HomeGreetingStateHolder`'s strings).
+- `AppTests/AITests` (5 more): on-device failures resolve to their own message ahead of Android's error rows (and
+  through the orchestrator's chain summary); the provider chain; the key-less Gemini rule; `AISettings` defaults
+  (ON_DEVICE, the remembered cloud provider, the switch, a restore); the translator's on-device path only when
+  selected.
+- `UITests/SettingsScreenshotTests.testAICategoryCloudLight/Dark` (`settingsCategory.ai.cloud`),
+  `testAICategoryAdvancedOnDeviceLight`; `UITests/LibraryScreenshotTests.testLibraryCreatePlaylistOnDeviceOffDark`
+  (`libraryCreatePlaylist.onDeviceOff`).

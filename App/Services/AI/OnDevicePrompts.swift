@@ -291,6 +291,16 @@ nonisolated enum LibraryLookup {
 
 // MARK: - Taizo
 
+/// What Taizo needs from the on-device model: `OnDeviceContext` in the app, a stand-in in unit tests.
+nonisolated protocol TaizoOnDevice: Sendable {
+    /// The on-device model is the selected provider.
+    func isActive() async -> Bool
+    /// The answer to a question, remembering the conversation; `songs` backs the library lookup tool.
+    func chat(_ message: String, songs: @escaping @MainActor @Sendable () -> [Song]) async throws -> String
+    /// The one-line intro above a queue card (nil: none).
+    func introLine(request: String, count: Int) async throws -> String?
+}
+
 /// Taizo's on-device instructions and prompts: short (the whole conversation shares one 4,096-token window), with
 /// the library tool for questions about the user's own music.
 nonisolated enum TaizoPrompts {

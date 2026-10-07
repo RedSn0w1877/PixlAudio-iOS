@@ -44,8 +44,8 @@ nonisolated struct TaisDjEngine: Sendable {
 
     let router: TaisMediaRouter
     let orchestrator: AiOrchestrator
-    /// The on-device path (nil in UI tests and unit tests: everything goes through the orchestrator, synchronously).
-    var onDevice: OnDeviceContext? = nil
+    /// The on-device path (nil in UI tests: everything goes through the orchestrator, synchronously).
+    var onDevice: (any TaizoOnDevice)? = nil
 
     func respond(_ prompt: String) async -> TaizoTurn {
         let local = await usesOnDevice()
@@ -94,22 +94,19 @@ nonisolated struct TaisDjEngine: Sendable {
     /// The intro of an on-device media reply, after the card is shown (nil: none, or not on-device).
     func deferredIntro(prompt: String, result: DjRouteResult) async -> String? {
         guard result.count > 0, let onDevice, await onDevice.isActive() else { return nil }
-        let ai = onDevice.ai
         let count = result.count
         guard let line = try? await withTimeout(seconds: Self.onDeviceIntroTimeoutSeconds, {
-            try await ai.introLine(request: prompt, count: count)
+            try await onDevice.introLine(request: prompt, count: count)
         }) else { return nil }
         return line
     }
 
     /// A question for the on-device model: the conversation continues in the same session.
-    private func onDeviceChat(_ prompt: String, _ onDevice: OnDeviceContext) async -> TaizoTurn {
-        let setup = OnDeviceAI.ChatSetup(persona: await onDevice.persona(),
-                                         temperature: await onDevice.temperature(.taizoChat), songs: router.songs)
-        let ai = onDevice.ai
+    private func onDeviceChat(_ prompt: String, _ onDevice: any TaizoOnDevice) async -> TaizoTurn {
+        let songs = router.songs
         do {
             let reply = try await withTimeout(seconds: Self.chatTimeoutSeconds) {
-                try await ai.chat(prompt, setup: setup)
+                try await onDevice.chat(prompt, songs: songs)
             }
             guard let reply else { return .error(OnDeviceFailure.slow.message) }
             let trimmed = reply.trimmingCharacters(in: .whitespacesAndNewlines)

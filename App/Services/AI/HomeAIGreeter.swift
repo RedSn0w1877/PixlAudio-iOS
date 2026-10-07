@@ -36,15 +36,23 @@ enum HomeAIGreeter {
             let instructions = kind == .headline
                 ? AiPromptEngine.buildPrompt(basePersona: persona, type: .greeting) : insightInstructions
             let temperature = Double(AiPromptEngine.effectiveTemperature(type: .greeting, setting: Float(ai.temperature)))
-            let text = try? await OnDeviceAI.shared.greeting(instructions: instructions, prompt: prompt,
-                                                             temperature: temperature,
-                                                             maxTokens: kind == .headline ? 60 : 220)
+            let maxTokens = kind == .headline ? 60 : 220
+            // The card's chevron waits for the insight: never longer than this.
+            let text = try? await withTimeout(seconds: timeoutSeconds) {
+                try await OnDeviceAI.shared.greeting(instructions: instructions, prompt: prompt, temperature: temperature,
+                                                     maxTokens: maxTokens)
+            }
             return text.flatMap { HomeLogic.cleanGreeting(OnDeviceText.cleanReply($0), limit: limit) }
         }
         let (configured, _) = await AIProviderStatus.check(provider, baseUrl: ai.baseUrl(for: provider.rawValue))
         guard configured else { return nil }
         let orchestrator = env.ai.orchestrator
-        let text = try? await orchestrator.generateContent(prompt: prompt, type: .greeting)
+        let text = try? await withTimeout(seconds: timeoutSeconds) {
+            try await orchestrator.generateContent(prompt: prompt, type: .greeting)
+        }
         return text.flatMap { HomeLogic.cleanGreeting($0, limit: limit) }
     }
+
+    /// The longest Home waits for an AI greeting or insight before keeping its local text.
+    static let timeoutSeconds: Double = 20
 }

@@ -78,7 +78,7 @@ actor OnDeviceAI {
         let options = GenerationOptions(sampling: nil, temperature: setup.temperature, maximumResponseTokens: 400)
         do {
             let reply = try await Self.text(session(for: setup), message, options)
-            chatTurns.append(TaizoPrompts.Turn(user: message, reply: reply))
+            remember(message, reply)
             return reply
         } catch is CancellationError {
             throw CancellationError()
@@ -91,7 +91,7 @@ actor OnDeviceAI {
         chatSession = fresh
         do {
             let reply = try await Self.text(fresh, message, options)
-            chatTurns.append(TaizoPrompts.Turn(user: message, reply: reply))
+            remember(message, reply)
             return reply
         } catch is CancellationError {
             throw CancellationError()
@@ -101,6 +101,12 @@ actor OnDeviceAI {
             chatTurns.removeAll()
             throw OnDeviceModel.failure(for: error)
         }
+    }
+
+    /// Keeps the last turns as text (only the last two are ever carried into a fresh session).
+    private func remember(_ message: String, _ reply: String) {
+        chatTurns.append(TaizoPrompts.Turn(user: message, reply: reply))
+        if chatTurns.count > 8 { chatTurns.removeFirst(chatTurns.count - 8) }
     }
 
     /// Forgets the conversation (a new chat).
@@ -330,6 +336,17 @@ nonisolated struct OnDeviceContext: Sendable {
     func temperature(_ type: AiSystemPromptType) async -> Double {
         let setting = await settings.generationParameters().temperature
         return Double(AiPromptEngine.effectiveTemperature(type: type, setting: setting))
+    }
+}
+
+extension OnDeviceContext: TaizoOnDevice {
+    func chat(_ message: String, songs: @escaping @MainActor @Sendable () -> [Song]) async throws -> String {
+        let setup = OnDeviceAI.ChatSetup(persona: await persona(), temperature: await temperature(.taizoChat), songs: songs)
+        return try await ai.chat(message, setup: setup)
+    }
+
+    func introLine(request: String, count: Int) async throws -> String? {
+        try await ai.introLine(request: request, count: count)
     }
 }
 
