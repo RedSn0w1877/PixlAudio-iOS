@@ -158,3 +158,26 @@ launch-into-expanded path (UI tests and launch states) showed it; the app's own 
    spring's progress during non-drag expands to reproduce it.
 5. **Idle cost of the hidden pre-built full player**, and whether zero-opacity glass costs anything (the card's glass
    is still removed above 25 %).
+
+## Streaming start (2026-10-07, branch `wt/stream`)
+
+Streamed songs start through the network path in docs/design.md › Streaming speed. Nothing was measured on a device
+before these changes (the estimates in `plans/streaming-speed.json` come from the code: a 1 MiB first chunk costs
+~0.8 s at 10 Mbps and ~2.7 s at 3 Mbps; the remote-config fetch blocked the first stream of every launch for up to
+10 s; skips rebuilt the next song from scratch). The app now measures every start: Settings › Developer › Test
+playback › Stream start timings (and the deep probe's "Last start"). Read it as:
+`• Song — 840 ms to play` / `steps (ms): url · tracks · item · start` / `resolve: … via VISIONOS (…) · n: no ·
+config wait 0 ms` / `network: first chunk at … ms (128 KB), N fetches` / `loader: N requests (…), N cancelled`.
+
+### Pending on-device checks (Hoa's phone)
+
+1. Play five streamed songs cold (fresh launch, songs never played) and five skips; copy the Stream start timings.
+   Expected: first chunk 128 KB, `config wait` ≈ 0 ms, skips to the next song "(skip into the prepared song)" when
+   crossfade is on or in the last seconds, otherwise "network: none before playback" for the next 1–2 songs.
+2. Same on cellular and with Low Data Mode on (Settings › Cellular › Data Mode): one song prepared on cellular, none
+   in Low Data Mode.
+3. Look at `n: yes/no` on VISIONOS resolutions and at the `cancelled` counts: `n: yes` makes R9 (cipher warm-up)
+   worth doing; many cancellations or a slow first chunk after R2 make R10 (delegate streaming) worth doing; slow or
+   failing VISIONOS resolutions mean turning on `innertube.hedge` in `remote/config.json` (R8).
+4. A skip during a crossfade's prepared window plays at full volume at once (R7), and the gapless hand-over at the end
+   of a song still has no gap.

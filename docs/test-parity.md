@@ -679,3 +679,21 @@ Swift-only and define the behaviour both apps share.
 - `UITests/SpotifyConnectScreenshotTests` — the section (light/dark), connect → stop on a demo device, playing state
   (light/dark), the hero with the device volume, reconnect row, empty hint, "Playing on" chip in the full (light/dark)
   and mini player.
+
+## Streaming speed (2026-10-07, branch `wt/stream`; iOS first, Android later)
+Android has no unit tests for `CloudStreamProxy`'s retry loop or chunking; `StreamUrlPrefetcherTest` (3) covers its
+one-lookup prefetcher, whose rules (one task, a queue change cancels the obsolete one, pause cancels the latest,
+a failure stays optional) the iOS prefetcher keeps in its own way (one task re-planned on change, cancelled on
+pause; `try?` everywhere). PixlNet tests run on Linux, Windows and macOS; the app tests on CI.
+
+| Android source | Swift test | Module | Status | Notes |
+|---|---|---|---|---|
+| `CloudStreamProxy.UPSTREAM_CHUNK_SIZE` (512 KB) | `StreamChunkPolicyTests` (3) | PixlNet | new (R2) | 128 KiB → 512 KiB → 2 MiB ramp and cap; the first request is `bytes=0-131071`; read-ahead never past the end or into cached bytes; fetch ends at size / end / cached start. |
+| `MusicService.updateNextStreamPrefetch` (playing-only gate) | `StreamPrefetchPolicyTests` (4) | PixlNet | new (R3) | Wi-Fi/Ethernet 2, cellular / metered / unknown 1, offline / Low Data Mode / paused 0; skip-order indices with repeat-all wrap, never the current song; sizes and delays. |
+| `CloudStreamProxy.fetch` (`MAX_UPSTREAM_ATTEMPTS = 4`, refresh first, `delay(250L * (attempt + 1))`) | `StreamRetryPolicyTests` (4) | PixlNet | ported (R5a) | Same client first, then switch (never with cached bytes); back-off 250/500/750 ms for 429/5xx; four attempts; other statuses fail at once. |
+| _iOS only (R8)_ | `StreamHedgingTests` (5) | PixlNet | new | The `innertube.hedge` flag is off unless `"enabled": true` (the repo file ships it off), defaults and clamping; a slow client loses to the next after `afterSeconds`; a failure starts the next at once; all failing ends without waiting; off = strictly sequential. |
+| `data/youtube/TrackMatcher.findMatch` | `TrackMatcherFanOutTests` (4) | PixlNet | new (R11) | `findMatchFanOut` gives exactly `findMatch`'s answer: the recorded `innertube-search.json` accepted on the first query with one search, a later answer never beating an earlier accept, the video shelf deciding, failures counted only where `findMatch` would have searched. |
+| _iOS only (R12, R4)_ | `StreamingSpeedTests` (4) | app | new | Start timings record every step and only their own key's events; a prefetched resolution, local files, paused / failed / left starts, capacity; the resolve summary (winner detail, `n`); the client table's six-hour gate seeded from the saved file across relaunches, refreshed in the background when stale. |
+| _iOS only (R7)_ | `DualDeckEngineTests.testASkipTakesOverTheCrossfadesPreparedItem`, `testASkipTakesOverTheGaplessHandOversPreparedItem` | app | new | A skip takes over the crossfade's (gain ramp cleared) or the hand-over's prepared item with no new resolution, manual transition, timed as a prepared skip; an unprepared target still loads. |
+| _iOS only (R12 UI)_ | `YouTubeScreenshotTests.testPlaybackDiagnosticsTimingsLight/Dark` | UI | new | The Stream start timings card with demo starts. |
+
