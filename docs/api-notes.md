@@ -746,3 +746,14 @@ grace period in which polls may show the state from before a command). All of th
 | `LabelStyle` (custom `makeBody`) with `Label(_:systemImage:)` | 14 | /documentation/swiftui/labelstyle | `MiniPlayerBar` | The mini player's "Playing on <device>" line with a small speaker icon. |
 | `Slider(value:in:step:onEditingChanged:)` | 13 | /documentation/swiftui/slider | `SpotifyConnectVolume` | Sends the device volume on release (debounced 250 ms). |
 | `View.refreshable(action:)` on the devices page | 15 | /documentation/swiftui/view/refreshable(action:) | `DevicesSheet` | Pull to refresh the Connect devices. |
+
+## Player fixes (2026-10-07, branch `wt/player`)
+No API is new to the app; these are now load-bearing in the full player and were not in the ledger yet.
+
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `View.layoutPriority(_:)` | 13 | /documentation/swiftui/view/layoutpriority(_:) | `PlayerTopBar` (also `SongOptionsSheet`) | Acts among the siblings of the immediate parent stack only: "A parent layout offers the child views with the highest layout priority all the space offered to the parent minus the minimum space required for all its lower-priority children." So it sits on the top bar's right-hand cluster (the `Spacer`'s sibling), not on the output pill. |
+| `View.frame(minWidth:idealWidth:maxWidth:minHeight:idealHeight:maxHeight:alignment:)` with only a minimum width | 13 | /documentation/swiftui/view/frame(minwidth:idealwidth:maxwidth:minheight:idealheight:maxheight:alignment:) | output pill | With a minimum and no maximum the frame hugs its content (at least the minimum); with both, it takes the proposal clamped (the old pill rendered 58 pt icon only). |
+| `View.truncationMode(_:)` (`.tail`) | 13 | /documentation/swiftui/view/truncationmode(_:) | output pill (also `GenreBrowseView`) | A long device name ends in an ellipsis. |
+| `observationIgnored` lookups read with a tracked property (`_ = revision`) | 17 | /documentation/observation/observationignored() | `LibraryStore.observedSong(id:)` | `@ObservationIgnored` "disables observation tracking of a property": reading the tracked `revision` first makes a body depend on the next edit. |
+| `XCTNSPredicateExpectation(predicate:object:)`, `XCTWaiter.wait(for:timeout:)` | Xcode 8 | /documentation/xctest/xctnspredicateexpectation | `UITests/PlayerScreenshotTests` | Waits for `isHittable` / `isSelected == false` on a heart. |
