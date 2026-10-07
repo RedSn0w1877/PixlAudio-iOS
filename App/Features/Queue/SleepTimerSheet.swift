@@ -33,41 +33,46 @@ struct SleepTimerSheet: View {
         let state = timer.state
         let eotOn = state.isEndOfTrackActive
         ScrollView {
-            VStack(spacing: 0) {
-                Text("Sleep timer")
-                    .pixlFont(.headlineMedium)
-                    .foregroundStyle(theme.primary)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .pixlGlass(in: Capsule(), tint: theme.surfaceContainerLowest.opacity(GlassTint.container))
-                Spacer().frame(height: 24)
-                sliderGroup(label: timerLabel) {
-                    Slider(value: $timerPosition, in: 0...Double(Self.stops.count - 1), step: 1,
-                           onEditingChanged: { editing in
-                               if editing { isTimerMode = true } else { commitTimer() }
-                           })
-                    .disabled(!(isTimerMode || counterPosition == 1))
-                    .accessibilityIdentifier("sleepTimer.duration")
+            // The six glass surfaces render together (performance rule). The gaps are 6–24 pt, above the 4 pt
+            // spacing, so nothing blends at rest; the VStack inside keeps its padding and measuring, so the fitted
+            // detent measures the same height.
+            GlassEffectContainer(spacing: 4) {
+                VStack(spacing: 0) {
+                    Text("Sleep timer")
+                        .pixlFont(.headlineMedium)
+                        .foregroundStyle(theme.primary)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .pixlGlass(in: Capsule(), tint: theme.surfaceContainerLowest.opacity(GlassTint.container))
+                    Spacer().frame(height: 24)
+                    sliderGroup(label: timerLabel) {
+                        Slider(value: $timerPosition, in: 0...Double(Self.stops.count - 1), step: 1,
+                               onEditingChanged: { editing in
+                                   if editing { isTimerMode = true } else { commitTimer() }
+                               })
+                        .disabled(!(isTimerMode || counterPosition == 1))
+                        .accessibilityIdentifier("sleepTimer.duration")
+                    }
+                    Spacer().frame(height: 16)
+                    sliderGroup(label: counterLabel) {
+                        Slider(value: $counterPosition, in: 1...10, step: 1,
+                               onEditingChanged: { editing in
+                                   if editing { isTimerMode = false } else { commitCounter() }
+                               })
+                        .disabled(!(!isTimerMode || timerPosition == 0))
+                        .accessibilityIdentifier("sleepTimer.count")
+                    }
+                    Spacer().frame(height: 16)
+                    endOfTrackRow(isOn: eotOn)
+                    buttons(state: state)
+                        .padding(.vertical, 16)
+                        .padding(.horizontal, 6)
+                    Spacer().frame(height: 16)
                 }
-                Spacer().frame(height: 16)
-                sliderGroup(label: counterLabel) {
-                    Slider(value: $counterPosition, in: 1...10, step: 1,
-                           onEditingChanged: { editing in
-                               if editing { isTimerMode = false } else { commitCounter() }
-                           })
-                    .disabled(!(!isTimerMode || timerPosition == 0))
-                    .accessibilityIdentifier("sleepTimer.count")
-                }
-                Spacer().frame(height: 16)
-                endOfTrackRow(isOn: eotOn)
-                buttons(state: state)
-                    .padding(.vertical, 16)
-                    .padding(.horizontal, 6)
-                Spacer().frame(height: 16)
+                .padding(.horizontal, 18)
+                .padding(.top, 28)
+                .measuringHeight($contentHeight, rememberedAs: heightKey)
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 28)
-            .measuringHeight($contentHeight, rememberedAs: heightKey)
         }
         .fittedSheetDetent(contentHeight ?? FittedSheetHeights.values[heightKey])
         .tint(theme.primary)

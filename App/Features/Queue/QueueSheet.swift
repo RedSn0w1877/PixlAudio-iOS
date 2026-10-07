@@ -8,10 +8,16 @@ import SwiftUI
 ///   22 pt corners — the current one a capsule with circular art, bold `primary` title and the playing indicator.
 ///   Songs after the current one have a drag handle (reorder) and swipe left to remove (60 pt of tension, then free;
 ///   past 40 % of the width it goes), with an undo bar;
-/// - the bottom toolbar: shuffle / repeat / sleep timer circles in a capsule and the ⋯ circle, which opens Locate
-///   current song · Clear queue · Save as playlist over a scrim.
+/// - the bottom toolbar: shuffle / repeat / sleep timer circles and the ⋯ circle, which opens Locate current song ·
+///   Clear queue · Save as playlist over a scrim.
 /// Every row's ⋮ opens the song sheet; the timer opens `SleepTimerSheet`; Save as playlist opens
 /// `SaveQueueAsPlaylistSheet`.
+///
+/// Liquid (Hoa, 2026-10-07, "more Liquid Glass"; docs/design.md › Glass expansion): the sheet is see-through glass at
+/// 92 % (`PresentationDetent.tallGlass`); the toolbar's circles are each their own interactive glass (Android puts
+/// glass circles on a glass capsule, which iOS can't stack, so the capsule went, as in `PlayerToggleRow`); and the
+/// toolbar and the open menu share one `GlassEffectContainer`, so the ⋯ circle liquid-morphs into the
+/// "Save as playlist" pill (one `glassEffectID`) while Locate and Clear materialise.
 struct QueueSheet: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(PlaybackStore.self) private var playback
@@ -29,6 +35,15 @@ struct QueueSheet: View {
     @State private var rowPitch: CGFloat = 84
     @State private var undo: QueueUndo?
     @State private var locateRequest = 0
+    @State private var didApplyLaunchState = false
+    @Namespace private var glassNamespace
+
+    /// The glass shapes of the toolbar and the menu that morph (`glassEffectID`): the ⋯ circle and "Save as playlist"
+    /// share `.menu`, so the circle flows into the pill and back. `nonisolated`: the id must be `Sendable` under the
+    /// app's default MainActor isolation (as `GlassPillRow.GlassID`).
+    nonisolated private enum QueueGlassID: Hashable, Sendable {
+        case menu, locate, clear
+    }
 
     var body: some View {
         let queue = playback.queue
@@ -55,22 +70,37 @@ struct QueueSheet: View {
                 }
             }
             .accessibilityHidden(isMenuExpanded)
-            toolbar
-                .padding(.bottom, 16)
             if isMenuExpanded {
-                menuOverlay(canLocate: currentDisplay >= 0 && currentDisplay < displayCount)
+                menuScrim
+            }
+            // The toolbar and the open menu in ONE container, so the ⋯ circle can morph into the menu's pills. The
+            // container always stays in the tree and only its content switches (an `if` around it would change its
+            // identity and drop the morph). The toolbar leaves while the menu is open: the Save pill overlaps its
+            // area, and overlapping shapes in one container would blend.
+            GlassEffectContainer(spacing: 8) {
+                ZStack(alignment: .bottom) {
+                    if isMenuExpanded {
+                        menuPills(canLocate: currentDisplay >= 0 && currentDisplay < displayCount)
+                            .padding(.bottom, 36)
+                    } else {
+                        toolbar
+                            .padding(.bottom, 16)
+                    }
+                }
             }
             if let undo {
+                // Outside the container: the undo bar overlaps the open menu.
                 undoBar(undo)
                     .padding(.bottom, 96)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .animation(.easeOut(duration: 0.2), value: isMenuExpanded)
+        // No implicit animation on `isMenuExpanded`: it would override the morph's spring (`withAnimation` in
+        // `toggleMenu` / `closeMenu`) for the whole subtree.
         .animation(PixlMotion.bars, value: undo?.id)
         .pixlHaptic(.selection, trigger: isMenuExpanded)
         .sheet(item: $songInfo) { ref in
-            SongInfoSheet(songId: ref.id).pixlSheet(detents: [.large])
+            SongInfoSheet(songId: ref.id).pixlSheet(detents: [.tallGlass])
         }
         .sheet(isPresented: $showsTimer) {
             SleepTimerSheet().sleepTimerPresentation()
@@ -88,6 +118,13 @@ struct QueueSheet: View {
         .onChange(of: playback.queueRevision) { _, _ in
             reorder.queueDidChange()
             completeUndoIfNeeded(playback.queue.map(\.id))
+        }
+        .task {
+            // UI tests open Save as playlist straight away (`-screen queue.saveAsPlaylist`), once the sheet is up.
+            guard env.launch.screen == .queueSaveAsPlaylist, !didApplyLaunchState else { return }
+            didApplyLaunchState = true
+            try? await Task.sleep(for: .milliseconds(700))
+            showsSaveAsPlaylist = true
         }
         .accessibilityIdentifier("screen.queue")
     }
@@ -204,103 +241,128 @@ struct QueueSheet: View {
 
     // MARK: Toolbar
 
+    /// Shuffle · repeat · sleep timer as separate glass circles, then the ⋯ circle (Android `QueueControlsToolbar`).
+    /// The gaps are 12 pt between the circles and 16 pt to the ⋯ circle, above the container's 8 pt: they render
+    /// together but never blend at rest.
     private var toolbar: some View {
         let timerActive = env.sleepTimer.state.display != nil || env.sleepTimer.state.countedPlay != nil
-        return GlassEffectContainer(spacing: 2) {
-            HStack(spacing: 4) {
-                HStack(spacing: 12) {
-                    toolbarButton("shuffle", label: "Toggle shuffle", active: playback.isShuffleEnabled) {
-                        playback.setShuffleEnabled(!playback.isShuffleEnabled)
-                    }
-                    toolbarButton(playback.repeatMode == .one ? "repeat.1" : "repeat", label: "Toggle repeat",
-                                  active: playback.repeatMode != .off) {
-                        playback.setRepeatMode(NowPlayingView.nextRepeatMode(after: playback.repeatMode))
-                    }
-                    toolbarButton("timer", label: "Sleep timer", active: timerActive) {
-                        showsTimer = true
-                    }
-                    .accessibilityIdentifier("queue.timer")
+        return HStack(spacing: 4) {
+            HStack(spacing: 12) {
+                toolbarButton("shuffle", label: "Toggle shuffle", active: playback.isShuffleEnabled) {
+                    playback.setShuffleEnabled(!playback.isShuffleEnabled)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .frame(maxHeight: .infinity)
-                .pixlGlass(in: Capsule(), tint: theme.surfaceContainerHighest.opacity(GlassTint.container))
-                Button {
-                    isMenuExpanded.toggle()
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundStyle(theme.onTertiaryContainer)
-                        .rotationEffect(.degrees(isMenuExpanded ? 90 : 0))
-                        .frame(width: 70, height: 70)
-                        .contentShape(.circle)
+                toolbarButton(playback.repeatMode == .one ? "repeat.1" : "repeat", label: "Toggle repeat",
+                              active: playback.repeatMode != .off) {
+                    playback.setRepeatMode(NowPlayingView.nextRepeatMode(after: playback.repeatMode))
                 }
-                .buttonStyle(.plain)
-                .pixlGlass(in: Circle(), tint: theme.tertiaryContainer.opacity(GlassTint.prominent), interactive: true)
-                .accessibilityLabel("More actions")
-                .accessibilityIdentifier("queue.more")
+                toolbarButton("timer", label: "Sleep timer", active: timerActive) {
+                    showsTimer = true
+                }
+                .accessibilityIdentifier("queue.timer")
             }
-            .frame(height: 70)
+            // Android's capsule padding, kept so nothing moves now that the capsule's glass is gone.
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .frame(maxHeight: .infinity)
+            Button(action: toggleMenu) {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(theme.onTertiaryContainer)
+                    .frame(width: 70, height: 70)
+                    .contentShape(.circle)
+            }
+            .buttonStyle(.plain)
+            .pixlGlass(in: Circle(), tint: theme.tertiaryContainer.opacity(GlassTint.prominent), interactive: true)
+            .glassEffectID(QueueGlassID.menu, in: glassNamespace)
+            // UI tests find it by identifier OR label: inside a glass container it may keep only its label.
+            .accessibilityLabel("More actions")
+            .accessibilityIdentifier("queue.more")
         }
+        .frame(height: 70)
     }
 
+    /// One toolbar circle: its own interactive glass (`primary` when on, a hint of `surfaceContainer` when off), the
+    /// `PlayerToggleRow` recipe with `.regular` glass (the queue isn't over media). It materialises in and out when
+    /// the menu opens instead of being pulled into the Save pill.
     private func toolbarButton(_ systemImage: String, label: LocalizedStringKey, active: Bool,
                                action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 19, weight: .semibold))
                 .foregroundStyle(active ? theme.onPrimary : theme.onSurfaceVariant)
+                .contentTransition(.symbolEffect(.replace))
                 .frame(width: 48, height: 48)
-                .background(Circle().fill(active ? theme.primary : theme.surfaceContainer))
                 .contentShape(.circle)
         }
-        .buttonStyle(PressScaleButtonStyle())
+        .buttonStyle(.plain)
+        .pixlGlass(in: Circle(),
+                   tint: active ? theme.primary.opacity(GlassTint.prominent)
+                                : theme.surfaceContainer.opacity(GlassTint.surface),
+                   interactive: true)
+        .glassEffectTransition(.materialize)
+        .animation(.spring(response: 0.45, dampingFraction: 0.75), value: active)
         .accessibilityLabel(label)
         .accessibilityAddTraits(active ? .isSelected : [])
     }
 
     // MARK: Menu (the ⋯ circle)
 
-    private func menuOverlay(canLocate: Bool) -> some View {
-        ZStack(alignment: .bottom) {
-            ZStack {
-                theme.scrim.opacity(0.55)
-                LinearGradient(colors: [.clear, theme.surfaceContainerLowest], startPoint: .top, endPoint: .bottom)
+    private func toggleMenu() {
+        withAnimation(PixlMotion.selection) { isMenuExpanded.toggle() }
+    }
+
+    private func closeMenu() {
+        withAnimation(PixlMotion.selection) { isMenuExpanded = false }
+    }
+
+    /// Android's 0.55 scrim plus the gradient into `surfaceContainerLowest` (kt:1038-1080); a tap closes the menu.
+    private var menuScrim: some View {
+        ZStack {
+            theme.scrim.opacity(0.55)
+            LinearGradient(colors: [.clear, theme.surfaceContainerLowest], startPoint: .top, endPoint: .bottom)
+        }
+        .ignoresSafeArea()
+        .onTapGesture { closeMenu() }
+        .accessibilityHidden(true)
+        .transition(.opacity.animation(.easeOut(duration: 0.2)))
+    }
+
+    /// Locate current song · Clear queue · Save as playlist. "Save as playlist" (nearest the toolbar) carries the ⋯
+    /// circle's glass id, so the circle morphs into it; Locate and Clear materialise.
+    private func menuPills(canLocate: Bool) -> some View {
+        VStack(spacing: 10) {
+            if canLocate {
+                menuButton("Locate current song", systemImage: "location.fill", tint: theme.tertiaryContainer,
+                           foreground: theme.onTertiaryContainer, id: .locate) {
+                    closeMenu()
+                    locateRequest += 1
+                }
+                .glassEffectTransition(.materialize)
             }
-            .ignoresSafeArea()
-            .onTapGesture { isMenuExpanded = false }
-            VStack(spacing: 10) {
-                if canLocate {
-                    menuButton("Locate current song", systemImage: "location.fill", tint: theme.tertiaryContainer,
-                               foreground: theme.onTertiaryContainer) {
-                        isMenuExpanded = false
-                        locateRequest += 1
-                    }
-                }
-                menuButton("Clear queue", systemImage: "clear.fill", tint: theme.errorContainer,
-                           foreground: theme.onErrorContainer) {
-                    isMenuExpanded = false
-                    confirmsClear = true
-                }
-                menuButton("Save as playlist", systemImage: "text.badge.plus", tint: theme.primaryContainer,
-                           foreground: theme.onPrimaryContainer) {
-                    isMenuExpanded = false
-                    showsSaveAsPlaylist = true
-                }
+            menuButton("Clear queue", systemImage: "clear.fill", tint: theme.errorContainer,
+                       foreground: theme.onErrorContainer, id: .clear) {
+                closeMenu()
+                confirmsClear = true
             }
-            .padding(.bottom, 36)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .glassEffectTransition(.materialize)
+            menuButton("Save as playlist", systemImage: "text.badge.plus", tint: theme.primaryContainer,
+                       foreground: theme.onPrimaryContainer, id: .menu) {
+                closeMenu()
+                showsSaveAsPlaylist = true
+            }
         }
         // Modal for VoiceOver: the queue under the scrim is out of reach, and the escape gesture closes the menu
-        // (instead of bubbling up and dismissing the whole queue).
+        // (instead of bubbling up and dismissing the whole queue). On the pills themselves, which exist only while
+        // the menu is open: on a wrapper around the container they would also trap VoiceOver in the closed toolbar
+        // and swallow the escape that dismisses the sheet.
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isModal)
-        .accessibilityAction(.escape) { isMenuExpanded = false }
+        .accessibilityAction(.escape) { closeMenu() }
         .accessibilityIdentifier("queue.menu")
     }
 
     private func menuButton(_ title: LocalizedStringKey, systemImage: String, tint: Color, foreground: Color,
-                            action: @escaping () -> Void) -> some View {
+                            id: QueueGlassID, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 14) {
                 Image(systemName: systemImage).font(.system(size: 18, weight: .semibold))
@@ -315,6 +377,7 @@ struct QueueSheet: View {
         .buttonStyle(.plain)
         .pixlGlass(in: RoundedRectangle(cornerRadius: 18, style: .continuous), tint: tint.opacity(GlassTint.prominent),
                    interactive: true)
+        .glassEffectID(id, in: glassNamespace)
     }
 
     // MARK: Removing, undo, clearing
