@@ -74,6 +74,20 @@ def test_process_example_normalises(caps):
     assert job.stem_slots() == ("instrumental",)
 
 
+def test_last_in_batch_is_optional_and_false_by_default(caps):
+    assert validate_job(load_example("job.input.process.json"), caps).last_in_batch is True
+    for name in ("job.input.transcribe.json", "job.input.volume.json"):
+        assert "policy" not in load_example(name)
+        assert validate_job(load_example(name), caps).last_in_batch is False
+    doc = _process()
+    doc["policy"] = {}
+    assert validate_job(doc, caps).last_in_batch is False
+    doc["policy"] = {"last_in_batch": False, "future": 1}  # unknown policy fields are ignored, like everywhere
+    assert validate_job(doc, caps).last_in_batch is False
+    jsonschema.Draft202012Validator(load_schema("job.input")).validate(doc)
+    assert validate_job({"v": 1, "op": "selftest", "policy": {"last_in_batch": True}}, caps).last_in_batch is False
+
+
 def test_transcribe_example_is_auto_transcribe(caps):
     job = validate_job(load_example("job.input.transcribe.json"), caps)
     assert job.lyrics.effective_mode == "transcribe"
@@ -148,6 +162,9 @@ def _mutations():
          errors.BAD_URL, False),
         ("dotdot", setp(["audio", "get"], f"{host}/x/../in/{jk}.m4a?{good_sig}"), errors.BAD_URL, False),
         ("guard incomplete", delp(["guard", "attemptPut"]), errors.BAD_SCHEMA, True),
+        ("policy not an object", setp(["policy"], "last"), errors.BAD_SCHEMA, True),
+        ("last_in_batch not a boolean", setp(["policy", "last_in_batch"], "yes"), errors.BAD_SCHEMA, True),
+        ("last_in_batch a number", setp(["policy", "last_in_batch"], 1), errors.BAD_SCHEMA, True),
     ]
 
 

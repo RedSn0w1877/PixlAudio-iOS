@@ -4,6 +4,15 @@ At start the process loads the separator and the aligner once (their load is bil
 FlashBoot keeps the worker warm); Qwen3-ASR and htdemucs_ft load lazily on first use. Each job is validated
 (schema v1 + server caps) and dispatched to pipeline.process, selftest or bench. Nothing here ever logs or
 returns a URL, a signature or lyrics.
+
+Idle workers bill (observed 2026-10-08: one sat idle and ready for 7+ minutes past a 10 s idleTimeout), so the
+worker stops itself after the jobs nothing follows: every selftest and bench, and the process job the phone marks
+`policy.last_in_batch`. It uses runpod's per-job switch, a top-level `refresh_worker: True` in the returned dict:
+runpod 1.12.0 (`serverless/modules/rp_job.py`, `run_job`) pops it, together with `error`, before the rest becomes
+the job's output, and answers RunPod with `stopPod: True`, so the output (the manifest the phone reads) keeps its
+shape. Not the `start({"refresh_worker": True})` config flag: that would stop the worker after every job, a cold
+start for each song of a batch. And not the documented `{"refresh_worker": True, "job_results": ...}`: 1.12.0 has
+no `job_results` key, so the manifest would end up nested under it.
 """
 
 from __future__ import annotations
@@ -52,6 +61,15 @@ class Worker:
         return value
 
     def handle(self, job: dict) -> dict:
+        out = self._dispatch(job)
+        reason = refresh_reason(job.get("input"))
+        if reason and not out.get("refresh_worker"):
+            out = {**out, "refresh_worker": True}
+        if out.get("refresh_worker"):
+            log.info("worker_refresh", reason=reason or "error")
+        return out
+
+    def _dispatch(self, job: dict) -> dict:
         runpod_job_id = str(job.get("id") or "unknown")[:200]
         try:
             spec = validate_job(job.get("input"), self.caps)
@@ -84,6 +102,20 @@ class Worker:
         except Exception as exc:  # last resort: never let a traceback (which may hold a URL) reach RunPod
             log.error("handler_exception", error=type(exc).__name__, trace=redact_exception(exc))
             return {"error": f"{INTERNAL}: unexpected {type(exc).__name__}"}
+
+
+def refresh_reason(raw: Any) -> str | None:
+    """Why the worker should stop itself after this job, or None to stay warm for the next one. Read from the raw
+    input, so a job that fails validation still honours it: "selftest" and "bench" always (one-off jobs that nothing
+    follows), "last_in_batch" for the process job the phone marks as the last of a submit burst."""
+    if not isinstance(raw, dict):
+        return None
+    if raw.get("op") in ("selftest", "bench"):
+        return str(raw["op"])
+    policy = raw.get("policy")
+    if isinstance(policy, dict) and policy.get("last_in_batch") is True:
+        return "last_in_batch"
+    return None
 
 
 def gpu_info() -> dict:

@@ -109,6 +109,8 @@ class Job:
     output: OutputSpec | None = None
     guard: Guard | None = None
     bench: BenchSpec | None = None
+    # input.policy.last_in_batch: the phone's last job of a submit burst; the worker stops itself after it.
+    last_in_batch: bool = False
 
     def wants(self, task: str) -> bool:
         return task in self.tasks
@@ -344,9 +346,13 @@ def validate_job(raw: Any, caps: Caps) -> Job:
         # Not an error: the worker falls back to standard and says so (pipeline adds the warning).
         pass
 
+    policy = _obj(raw.get("policy"), "policy", required=False) or {}
+    last_in_batch = _bool(policy.get("last_in_batch"), "policy.last_in_batch", False)
+
     return Job(
         op="process", job_key=job_key, client_app=client_app, client_build=client_build, storage=storage,
         audio=audio, tasks=tuple(tasks), quality=quality, lyrics=lyrics, output=output, guard=guard,
+        last_in_batch=last_in_batch,
     )
 
 

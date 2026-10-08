@@ -63,6 +63,9 @@
       "manifestGet": "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/pixl-cloud-studio/out/6f1c2a9e-3b7d-4c11-9a0e-2d5f8b7c4e10/manifest.json?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=EXAMPLEACCESSKEYID%2F20261007%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261007T120000Z&X-Amz-Expires=273600&X-Amz-SignedHeaders=host&X-Amz-Signature=2b5ad91c3eff9fa6fd7cf53b8fdb4d30678e5573e9788483b77f80ca3be8dad7",
       "attemptGet": "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/pixl-cloud-studio/out/6f1c2a9e-3b7d-4c11-9a0e-2d5f8b7c4e10/attempt.json?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=EXAMPLEACCESSKEYID%2F20261007%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261007T120000Z&X-Amz-Expires=273600&X-Amz-SignedHeaders=host&X-Amz-Signature=d2c1522eca5698eb1a747e2918fff079ebe634e0788433046ae43f2a2497c204",
       "attemptPut": "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/pixl-cloud-studio/out/6f1c2a9e-3b7d-4c11-9a0e-2d5f8b7c4e10/attempt.json?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=EXAMPLEACCESSKEYID%2F20261007%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261007T120000Z&X-Amz-Expires=273600&X-Amz-SignedHeaders=host&X-Amz-Signature=ab347d81f484f04567a6f12e342de72632bb111037d08a56c6a35acbce6d2680"
+    },
+    "policy": {
+      "last_in_batch": true
     }
   },
   "policy": {

@@ -34,7 +34,8 @@
     "lyrics": {"$ref": "#/$defs/lyrics"},
     "output": {"$ref": "#/$defs/output"},
     "guard": {"$ref": "#/$defs/guard"},
-    "bench": {"$ref": "#/$defs/bench"}
+    "bench": {"$ref": "#/$defs/bench"},
+    "policy": {"$ref": "#/$defs/policy"}
   },
   "allOf": [
     {
@@ -153,6 +154,17 @@
           "items": {"enum": ["decode", "separate", "stems4", "align", "transcribe", "encode"]}
         },
         "crash": {"type": "boolean", "default": false, "description": "Test builds only (PIXL_ALLOW_CRASH_TEST=1): kills the process to measure RunPod re-delivery."}
+      }
+    },
+    "policy": {
+      "type": "object",
+      "description": "The job's own instructions to the worker. Not RunPod's request policy (ttl, executionTimeout), which sits next to `input` in the /run body. Added after v1 shipped: optional, and an older worker ignores it.",
+      "properties": {
+        "last_in_batch": {
+          "type": "boolean",
+          "default": false,
+          "description": "op process: the last job of one submit burst from the phone (a single song is a burst of one). After it the worker asks RunPod to stop it (the SDK's per-job refresh_worker), so no idle worker stays up and billed; jobs sent later start a fresh worker. The job's result is unchanged. op selftest and op bench always stop the worker afterwards, whatever this says."
+        }
       }
     }
   }
