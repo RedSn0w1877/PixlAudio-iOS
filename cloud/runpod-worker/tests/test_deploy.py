@@ -281,6 +281,29 @@ def test_keepalive_never_restores_a_crash_loop():
     assert not [c for c in api.calls if c[0] == "patch"]
 
 
+def test_keepalive_treats_a_cancelled_or_timed_out_deploy_like_a_failed_one(capsys):
+    # A deploy stopped half way may have PATCHed the image without a selftest ever answering.
+    for conclusion in ("cancelled", "timed_out", "startup_failure"):
+        api = FakeRunPod(scaled_down(0))
+        assert K.keepalive(api, TEMPLATE, alarm=2.0, last_deploy=conclusion) == 1, conclusion
+        assert not [c for c in api.calls if c[0] == "patch"], conclusion
+        assert f"didn't pass ({conclusion})" in capsys.readouterr().out
+    for conclusion in ("success", ""):  # "" = no deploy has run yet
+        api = FakeRunPod(scaled_down(0))
+        assert K.keepalive(api, TEMPLATE, alarm=2.0, last_deploy=conclusion) == 0, conclusion
+        assert [c for c in api.calls if c[0] == "patch"], conclusion
+
+
+def test_the_keepalive_workflow_ignores_deploy_runs_that_never_ran():
+    # A failed or superseded main build still starts a deploy run, whose job is skipped: if the newest such run
+    # counted, it would hide the failed deploy before it. (The Docker test stage holds only cloud/runpod-worker.)
+    workflow = ROOT.parents[1] / ".github" / "workflows" / "cloud-worker-keepalive.yml"
+    if not workflow.is_file():
+        pytest.skip("the repository's workflows are not in this checkout")
+    text = workflow.read_text(encoding="utf-8")
+    assert 'select(.conclusion != "skipped"' in text and "--limit 1 " not in text
+
+
 def test_keepalive_spend_alarm_never_prints_the_amount(capsys):
     api = FakeRunPod(deployed(), spend=3.1415)
     assert K.keepalive(api, TEMPLATE, alarm=2.0, last_deploy="") == 1

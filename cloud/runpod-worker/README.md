@@ -93,7 +93,8 @@ the GPU and timings; the endpoint id is masked and money is never printed.
 - *unhealthy workers*: workers are crashing at start. RunPod lowers max workers on such endpoints, and the
   keepalive deliberately does not undo it. Open the endpoint's Logs in the RunPod console (look for
   `models_loaded` or a Python traceback), fix, push to main; the next green deploy re-arms the keepalive;
-- *the last deploy failed*: same idea; fix the deploy first;
+- *the last deploy didn't pass* (failed, timed out or was cancelled): same idea; fix it and run a deploy that
+  passes (deploy runs skipped after a failed main build don't count either way);
 - *spend over the alarm*: check RunPod → Billing. If it isn't you, disable `pixl-iphone`;
 - */health failed*: RunPod is unreachable or the key was revoked.
 GitHub stops scheduled workflows in public repositories after 60 days without activity; re-enable it in the

@@ -3,8 +3,10 @@
     RUNPOD_API_KEY=... CLOUD_WEEKLY_ALARM_USD=2 LAST_DEPLOY_CONCLUSION=success python3 deploy/keepalive.py
 
 1. Health first. RunPod also lowers max workers on an endpoint that keeps producing unhealthy (crashing)
-   workers, and every crash bills its model load. So when any worker is unhealthy, or the last deploy failed,
-   this does NOT restore anything: it fails the run, and GitHub emails the owner.
+   workers, and every crash bills its model load. So when any worker is unhealthy, or the last deploy didn't
+   pass (failed, timed out or was cancelled, possibly half way through), this does NOT restore anything: it
+   fails the run, and GitHub emails the owner. The workflow skips deploy runs that never ran (a main build
+   that failed or was superseded still starts one, as "skipped"), so those can't hide a failed deploy.
 2. Otherwise undo RunPod's idle scale-down (3 idle days -> max 2, 7 -> max 0): when workers.max is below
    deploy/endpoint.json's value, PATCH the workers back (min, max and idleTimeout together).
 3. GET /health as a reachability check only (it probably doesn't reset the idle timer; no job is sent, so
@@ -26,6 +28,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from runpod_api import ApiError, RunPod, mask  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
+# Conclusions of a cloud-worker-deploy run that leave the endpoint in a state no selftest vouched for.
+NOT_PASSED = frozenset({"failure", "timed_out", "cancelled", "startup_failure"})
 
 
 def say(line: str) -> None:
@@ -60,12 +64,14 @@ def keepalive(api: RunPod | None, template: dict, *, alarm: float, last_deploy: 
 
     summary = (api.workers(endpoint_id) or {}).get("summary") or {}
     unhealthy = int(summary.get("unhealthy") or 0)
-    healthy_to_restore = unhealthy == 0 and last_deploy != "failure"
+    deploy_failed = last_deploy in NOT_PASSED
+    healthy_to_restore = unhealthy == 0 and not deploy_failed
     if unhealthy:
         failures.append(f"{unhealthy} unhealthy worker(s): RunPod may be scaling the endpoint down for crashing; "
                         "not restoring max workers. Read the endpoint's logs, fix, redeploy.")
-    if last_deploy == "failure":
-        failures.append("the last cloud-worker-deploy run failed; not restoring max workers until a deploy passes")
+    if deploy_failed:
+        failures.append(f"the last cloud-worker-deploy run didn't pass ({last_deploy}); not restoring max workers "
+                        "until a deploy passes")
 
     want = template["workers"]
     have = endpoint.get("workers") or {}
