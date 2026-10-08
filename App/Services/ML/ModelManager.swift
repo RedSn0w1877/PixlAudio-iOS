@@ -142,6 +142,14 @@ final class ModelManager {
         }
         guard !isDemo else { return }
         let model = ModelCatalog.descriptor(id)
+        // The local AI model is ~900 MB: say so up front rather than failing half-way through the install.
+        if let free = Self.availableSpace(), free < Self.spaceNeeded(model) {
+            let message = "Not enough free space on this iPhone: installing it needs about "
+                + "\(ModelCatalog.formattedSize(Self.spaceNeeded(model))) free for a moment."
+            states[id] = .failed(message)
+            resume(id, with: .failure(ModelError(message: message)))
+            return
+        }
         states[id] = .downloading(fraction: 0)
         let task = makeSession().downloadTask(with: model.downloadURL)
         task.taskDescription = id.rawValue
@@ -250,6 +258,19 @@ final class ModelManager {
         return model.extraFiles.allSatisfy { name in extraFileURL(model, name).map { fm.fileExists(atPath: $0.path) } ?? false }
     }
 
+    /// What an install can hold on disk at once: the archive while it's extracted (then deleted), or the extracted
+    /// package while it's compiled, plus room to spare.
+    nonisolated static func spaceNeeded(_ model: ModelDescriptor) -> Int64 {
+        model.bytes * 2 + 100_000_000
+    }
+
+    /// Free space for important data on the app's volume (nil when unknown).
+    nonisolated static func availableSpace() -> Int64? {
+        (try? URL(fileURLWithPath: NSHomeDirectory())
+            .resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+            .volumeAvailableCapacityForImportantUsage) ?? nil
+    }
+
     nonisolated static func directorySize(_ url: URL) -> Int64 {
         guard let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey]) else {
             return 0
@@ -282,6 +303,8 @@ final class ModelManager {
         try await Task.detached(priority: .utility) {
             try UstarExtractor.extract(archive: archive, to: work) { _ in try Task.checkCancellation() }
         }.value
+        // Extracted: the archive's copy goes before the compile makes another (the phone's free space).
+        try? fm.removeItem(at: archive)
         let package = work.appendingPathComponent(model.package, isDirectory: true)
         guard fm.fileExists(atPath: package.path) else {
             throw ModelError(message: "The model archive is missing \(model.package).")
