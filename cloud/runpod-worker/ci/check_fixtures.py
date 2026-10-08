@@ -13,7 +13,8 @@ import sys
 from pathlib import Path
 
 WORKER = Path(__file__).resolve().parents[1]
-REPO = WORKER.parents[1]
+# cloud/runpod-worker -> the repository root (inside the test container the worker is /t, with no repo around it)
+REPO = WORKER.parents[1] if len(WORKER.parents) > 1 else WORKER
 EXAMPLES = WORKER / "schema" / "v1" / "examples"
 APP_COPIES = REPO / "Packages" / "PixlCore" / "Tests" / "PixlNetTests" / "Fixtures" / "cloud"
 
