@@ -64,6 +64,11 @@ jobs:
       - uses: actions/checkout@v5
       - name: Toolchain
         run: swift --version
+      # Cloud Studio (design §2.3): the copies PixlNet's tests decode (Fixtures/cloud/) must be byte-identical to the
+      # worker's golden examples (cloud/runpod-worker/schema/v1/examples/). The worker's own workflow checks the
+      # same pair from its side (cloud-worker-build › check_fixtures.py), since this workflow ignores cloud/**.
+      - name: Cloud fixtures match the worker's schema examples
+        run: bash ci/check-cloud-fixtures.sh
       - name: swift test
         run: swift test --package-path Packages/PixlCore --parallel
       # Stage 11: search + VISIONOS-first resolution + a ranged probe + BotGuard Create against the real services.
