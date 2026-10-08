@@ -15,8 +15,10 @@ endpoint or R2 bucket yet** — CI builds it, runs the unit tests with fakes and
   read any more, the screen says "Cloud keys missing — paste them again".
 - **Test connection** checks RunPod (`/health`: 401/403 = the key, 404 = the Endpoint ID) and storage (a 1-byte
   `probe/<id>` PUT, HEAD and DELETE) separately, each with a sentence to act on. **Run selftest (~1¢)** wakes a worker
-  once through `/runsync` and reports its version and GPU (and refuses a worker that doesn't speak job v1 or misses a
-  model).
+  once through `/runsync` and reports its version, GPU and song limits ("Worker 1.0.0 on NVIDIA L4 · songs up to
+  160 MB and 15 min"); it refuses a worker that doesn't speak job v1, misses a model, or allows no storage host. The
+  limits it reports are kept (until the Endpoint ID changes), and a song the endpoint would refuse stops before its
+  upload with a sentence naming the endpoint setting.
 - **Outputs:** Instrumental, Word-timed lyrics, "Write lyrics when none are found (AI transcription)" (saved as
   AI-written lyrics), Standard/Best. **Network:** Use cellular data (off). **Cost:** GPU price per second ($0.000192)
   and a monthly cap ($3.00) with "This month: … used or on its way".
@@ -68,7 +70,7 @@ endpoint or R2 bucket yet** — CI builds it, runs the unit tests with fakes and
 
 The phone's types were written from the design before the worker existed. Decoding
 `origin/s19-cloud-worker:cloud/runpod-worker/schema/v1/examples/*` (now copied byte for byte into
-`Packages/PixlCore/Tests/PixlNetTests/Fixtures/cloud/worker/`) showed, and this branch fixed on the phone side:
+`Packages/PixlCore/Tests/PixlNetTests/Fixtures/cloud/`) showed, and this branch fixed on the phone side:
 
 1. The manifest's `lyrics` entry carries `bytes`, `sha256` and **`offsetMs`** (the phone had `lyricsOffsetMs`).
 2. `lyrics.json` has a top-level `offsetMs`.
@@ -80,30 +82,56 @@ The phone's types were written from the design before the worker existed. Decodi
 7. The worker's language pattern is lower-case `^[a-z]{2,3}(…)` and a line's text is capped at 2,000 characters; synced
    lines must be sorted.
 8. Upload cap: **160 MB** (`CloudLimits.maxInputBytes`, coordinator note; the design's 60 MB was sized for AAC, a
-   15-minute FLAC is ~90–110 MB). **The worker's `PIXL_MAX_INPUT_MB` must be 160 too** — its branch had only the schema
-   when this was written.
+   15-minute FLAC is ~90–110 MB). The finished worker's `PIXL_MAX_INPUT_MB` default is 160 too (checked on its branch).
+9. From the worker's final review (2026-10-07 22:05, `9dbdf06`): the manifest's `input` names the verified input's
+   `sha256`, and the selftest reports the endpoint's `caps` (`maxInputMB`, `maxAudioS`, `bestMaxAudioS`, lyrics caps,
+   `hostsConfigured`). The phone decodes both: a manifest in the bucket that names another input is an earlier
+   attempt's and isn't imported (`CloudImportCheck.manifestDescribesUpload`), and the caps are used as above
+   (`CloudLimits.workerRefusal`). A lyrics-only job whose lyrics fail is now an error with the lyrics' code (or
+   `INTERNAL`) and keeps its upload: the phone already sends those again without re-uploading.
 
-`bash ci/check-cloud-fixtures.sh origin/s19-cloud-worker` compares the copies with the worker branch; once the worker
-is on `main`, `bash ci/check-cloud-fixtures.sh` compares with the checkout (it is not wired into `ci.yml` yet).
+**Fixture layout (fixed this round):** the worker's own drift check (`cloud/runpod-worker/ci/check_fixtures.py`)
+compares every `*.json` directly in `Packages/PixlCore/Tests/PixlNetTests/Fixtures/cloud/` with its examples, so that
+folder now holds exactly the 14 worker examples (synced to `9dbdf06`), and the phone's own fixtures (RunPod responses,
+a bucket listing, lyrics edge cases) moved to `Fixtures/cloud-phone/`. Before, the copies sat in `cloud/worker/` (which
+the worker's script doesn't read) next to phone-only files it would have flagged. `bash ci/check-cloud-fixtures.sh
+origin/s19-cloud-worker` compares with the worker branch (OK, 14 match); once the worker is on `main`,
+`bash ci/check-cloud-fixtures.sh` compares with the checkout (not wired into `ci.yml` yet). The worker's own script,
+run against these copies, reports no drift.
+
+## The CI failure this round (runs 37711835786 and 37715125605)
+
+Both failed on one unit test, `CloudAudioPreparerTests.testWAVIsDecodedToFLACAtTheWorkersRate`, line 90: a 3-second
+tone (132,300 frames) was written as FLAC but read back by `AVAssetReader` as **133,632 = 29 × 4,608** frames. The
+earlier fix (bc8051d, "count by the buffer's sample count") was aimed at the writer, but both runs failed at the
+read-back, so the writer had been right all along: Apple's FLAC encoder works in whole 4,608-frame packets and pads a
+short last packet, and decoders disagree on whether to trim that padding. In the app this would have made every
+decoded (non-AAC) song fail the import's sample check (1,332 frames > the 1,024 tolerance), redo as FLAC once, and fail
+again. Fix: the preparer ends the file on a whole packet of silence (under 0.1 s, from the file format's
+`mFramesPerPacket`; if the format doesn't say, the read-back count sets the silence and the file is written once more)
+and records the phone's own read-back as `frames`, so the phone, the worker's ffmpeg and the import check all see the
+same length.
 
 ## How it was verified
 
-- Windows, Swift 6.4: **all 1,246 PixlCore tests pass** (PixlNet 349, incl. the new schema, lyrics, budget and
-  estimate suites). The earlier saved state had tests that never compiled (mutating calls inside `#expect`, a
-  non-Sendable presign type) and two expressions the type checker gave up on; fixed.
-- CI run `RUN_ID` on `HEAD_SHA`: STATUS_LINE
-- Screenshots looked at: SHOTS_LINE
+- Windows, Swift 6.4: **PixlNet's 352 tests pass** after this round (the earlier full PixlCore run: 1,246); new ones
+  cover the worker caps, the selftest's limits and empty allowlist, and the manifest's input check. The worker's
+  `check_fixtures.py` logic run against the new `Fixtures/cloud/`: no drift.
+- CI run 37731451069 on `5a525d6`: **green** — core 1,249 PixlCore tests (PixlNet 352), app 287 unit tests (incl. the FLAC read-back test that failed before, plus 3 new orchestrator/settings tests), 50 screenshot tests (SettingsScreenshotTests + CloudStudioScreenshotTests), 0 failures. The non-blocking YouTube live smoke failed (external; not this branch).
+- Screenshots looked at: Cloud processing light/dark incl. the tested state (RunPod, Storage and the new Worker line "Worker 1.0.0 on NVIDIA L4 · songs up to 160 MB and 15 min"), the queue, the confirm sheet (Send fits on one line), Experimental's Cloud processing row: all render correctly.
 
 ## Phone checklist (Hoa)
 
 - [ ] Settings › Developer Options › Experimental shows the **Cloud processing** panel; it opens the screen.
 - [ ] Paste the six values (Safari → the field; keys never in chat). The account ID under the R2 field matches.
 - [ ] **Test connection**: both RunPod and Storage green. Break one value on purpose and check the sentence is right.
-- [ ] **Run selftest (~1¢)**: shows the worker version and GPU (the first one can take a few minutes: cold start).
+- [ ] **Run selftest (~1¢)**: shows the worker version, GPU and "songs up to 160 MB and 15 min" (the first one can
+      take a few minutes: cold start).
 - [ ] Cloud queue › Add › **Current song** with a local song: the confirm sheet's numbers look sane → Send.
 - [ ] The row goes Preparing → Uploading % → Waiting for a GPU → Separating vocals % → Done; Sing uses the new
       instrumental and the lyrics are word-timed. The cost line is about a cent.
-- [ ] A **streamed** song and a **Spotify** song: they download first, then go up as FLAC.
+- [ ] A **streamed** song and a **Spotify** song: they download first, then go up as FLAC, and their instrumentals
+      import (this is the path the FLAC packet fix covers; a "didn't line up" error here means it needs another look).
 - [ ] Send 3 songs, **lock the phone** for 30+ minutes, reopen: results come in (the R2 listing).
 - [ ] Swipe the app away during an upload: the row says it stopped; reopening starts it again.
 - [ ] A playlist's ⋯ › **Process all in the cloud** (≈10 songs): one cold start, then ~20–30 s per song.
@@ -118,6 +146,11 @@ is on `main`, `bash ci/check-cloud-fixtures.sh` compares with the checkout (it i
   exists); the storage picker's Other-S3 / RunPod-volume modes (R2 only; the signer has header signing for the
   volume fallback, unused); url-session handlers for the existing `downloads` / `models` sessions; jitter between
   streamed downloads (they are 2 at a time).
-- `ci/check-cloud-fixtures.sh` should run in `ci.yml` once the worker is merged.
+- `ci/check-cloud-fixtures.sh` should run in `ci.yml` once the worker is merged (left out of the shared `ci.yml` for
+  now). Merge order doesn't matter: the worker's `check_fixtures.py` passes with a notice until `Fixtures/cloud/` exists
+  and passes on these copies once both are on `main`.
+- Measured only on the iOS 27 simulator: the FLAC read-back. That the worker's ffmpeg decodes the padded upload to the
+  same count is reasoned (no short last packet left to trim), not measured; the first real job with a decoded
+  (non-AAC) song settles it: the manifest's `input.decodedSamples` must equal the job's recorded `frames`.
 - Next: merge the worker (W1: deploy, selftest, bench, owner step F), then run the phone checklist; record the real
   timings and per-song cost in a handoff note; then Android (design §8).
