@@ -40,9 +40,13 @@ tidy what main's screenshots showed. No device testing was done; everything belo
    - AI settings: the "cloud" shots looked identical to the on-device ones because the cloud rows sit below the two
      cards. They now scroll to the Assistant section (on-device row, cloud switch, provider, Save on usage).
    - Fixed: Save as playlist's title truncated to "Save as pl…" and "Deselect all" wrapped inside its 40 pt pill. The
-     pill keeps one line; the title steps down a text style until it fits (`ViewThatFits`).
-   - Fixed: genre Quick Fill's bar squeezed Select all · Clear to "S…" "C…". They keep their width; the status shows
-     the count alone ("0") when "0 selected" doesn't fit beside them (VoiceOver reads it in full).
+     pill keeps one line (`fixedSize`). A first try that stepped the title down a text style (`ViewThatFits`) still
+     truncated on CI (no style fits beside the pill on a 402 pt iPhone), so the top bar is now Android's two-row
+     `MediumTopAppBar`: close circle and Select all / Deselect all on a 64 pt row, "Save as playlist" (headlineMedium)
+     on its own 48 pt row below, 20 pt in.
+   - Fixed: genre Quick Fill's bar squeezed Select all · Clear to "S…" "C…". They keep their width. The songs step's
+     status capsule (about 40 pt left, it showed a lone "0") is gone: Android has nothing between Select all · Clear
+     and Next there. The genre step keeps its "Select a genre" / "Genre: …" capsule.
 4. **String Catalog regenerated** (`tools/localization/android_strings_to_xcstrings.py`, Android beta2 `res`, English
    only): 922 → 1,143 keys. Added: the 77 `lyrics_sync_*` keys, 14 `settings_accent_*`, `common_ok`, `common_undo`,
    one `settings_player_*`, and 139 SwiftUI labels added since the last run. No existing text changed; 12 keys the app
@@ -50,8 +54,14 @@ tidy what main's screenshots showed. No device testing was done; everything belo
    catalog conflicts by hand.
 5. **`2026-10-07-batch-status.md`** now says CI compiled and passed the integrated branch (run 37678758736), that it is
    merged to `main` (PR #2), that R6 (HTTP/3 to googlevideo) landed, and that the open items are on `s16`–`s20`.
+6. **A flaky unit test.** Run 37712713121 failed only on `SpotifyConnectStoreTests.testTransportGoesToTheRemoteWhileAttached`
+   (all 145 UI tests passed). The test slept a fixed 20 ms after each command for the player's events, which the
+   store hears on the main actor, shared with the test host app's own launch work. On a busy simulator the last two
+   events ("moved to song 4", "playing") hadn't arrived yet. The app was fine; the test now waits up to 3 s for the
+   state it checks (`waitUntil`, already used by the other playback tests). It passed before and after on CI.
 
-Docs: `api-notes.md` (Main health section: `accessibilityElementsHidden`, coordinate taps, `fixedSize`, `ViewThatFits`),
+Docs: `api-notes.md` (Main health section: `accessibilityElementsHidden`, coordinate taps, `fixedSize`; `ViewThatFits`
+marked as tried and removed),
 `design.md` (player changes › tab bar; floating bars › Quick Fill and Save as playlist), `test-parity.md` (player fixes).
 
 ## How it was verified (CI only, no Mac, no phone)
@@ -59,9 +69,13 @@ Docs: `api-notes.md` (Main health section: `accessibilityElementsHidden`, coordi
 - Diagnostic runs 37707836493 and 37709339732 (temporary test + app log line, removed afterwards).
 - Run 37711302173: build, all 261 unit tests, the favourite tests, the new accessibility test, collapse / drag, the tab
   bar tap and drag, and `GlassAccessibilityTests`: all green.
-- Final run (below): build + unit tests + `PlayerScreenshotTests`, `LibraryScreenshotTests`, `SettingsScreenshotTests`,
-  `AIScreenshotTests`, `HomeStatsScreenshotTests`, `GlassAccessibilityTests` and the three tab bar tests. The light and
-  dark screenshots were looked at.
+- Run 37712713121 (`cf965ba`): build, `PlayerScreenshotTests`, `LibraryScreenshotTests`, `SettingsScreenshotTests`,
+  `AIScreenshotTests`, `HomeStatsScreenshotTests`, `GlassAccessibilityTests` and the three tab bar tests: all 145 UI
+  tests green; one unit test flaked (item 6). Its screenshots showed the AI cloud rows, the toggled hearts and the
+  tab bar right, and Save as playlist's title still truncated, which led to the two-row bar.
+- Run 37730110289 (`80baeba`): build, all 261 unit tests, Save as playlist light + dark, Quick Fill (songs step light,
+  genre step dark) and `GlassAccessibilityTests`: green. The four screenshots were looked at: the full title on its
+  own row, one-line "Deselect all", Select all · Clear and Next with an empty gap, the genre step's status capsule.
 - `ci/parse-check.ps1` on every changed Swift file; `ci/check-forbidden.sh`.
 
 Not verified: the full `main` run with the new limit. It runs on the next push to `main` after this branch merges.
@@ -74,11 +88,14 @@ Not verified: the full `main` run with the new limit. It runs on the next push t
       repeat, and on the song sheet (⋮ › heart).
 - [ ] With VoiceOver on, drag a finger over the full player's shuffle · repeat · heart row: it reads those controls,
       never "Home", "Search" or "Library". Collapse the player: the tab bar reads normally again.
-- [ ] Queue › ⋯ › Save as playlist: the title shows in full (a bit smaller) and "Deselect all" is one line.
-- [ ] A genre page › ⋮ › Quick Fill (Unknown genre): "Select all" and "Clear" are readable; the count shows beside them.
+- [ ] Queue › ⋯ › Save as playlist: "Save as playlist" shows in full on its own line under the close button, and
+      "Deselect all" is one line.
+- [ ] A genre page › ⋮ › Quick Fill (Unknown genre): "Select all" and "Clear" are readable, with Next on the right;
+      after Next the bar reads "Select a genre", then "Genre: …" once you pick one.
 
 ## Next step
 
-Merge `s21-main-health` into `main` once its run is green (owner's call), then watch main's full run: it should finish
-in about 95–100 minutes inside the new 160-minute limit. If the suite grows past about 130 minutes, raise the limit
-again or split the run.
+The branch is green (run 37730110289). Merge `s21-main-health` into `main` (owner's call), then watch main's full run:
+it should finish in about 95–100 minutes inside the new 160-minute limit. If the suite grows past about 130 minutes,
+raise the limit again or split the run. After the other `s16`–`s20` branches merge, re-run
+`tools/localization/android_strings_to_xcstrings.py` once so the String Catalog picks up their strings.

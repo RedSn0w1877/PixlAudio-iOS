@@ -9,7 +9,8 @@ Hoa's request (switching to local work). This page is the status of every item.
 > still open below are being built locally on their own branches: `s16-lyrics-page` (items 1 + 11),
 > `s17-connect-volume` (8), `s18-local-model` (4, phase 2), `s19-cloud-worker` and `s20-cloud-studio` (Cloud Studio).
 > `s21-main-health` fixes main's own CI: the two favourite-heart UI tests and the full screenshot run's timeout, and
-> regenerates the String Catalog (see `2026-10-07-main-health.md`).
+> regenerates the String Catalog (see `2026-10-07-main-health.md`). It is green on CI (run 37730110289) and waits for
+> the owner's merge.
 
 **Read first:** `AGENTS.md`, then `docs/handoff/2026-10-04-start-here.md`, then this page.
 
