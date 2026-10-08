@@ -62,11 +62,15 @@ Owner items 1 and 11 of the 2026-10-07 batch, built from `2026-10-07-plans/lyric
 - `ci/parse-check.ps1` on every changed Swift file and `ci/check-forbidden.sh`: OK.
 - PixlCore `PixlBackupTests` on Windows (Swift 6.4): 146 tests pass, including the new
   `retiredKeepScreenOnIsSkippedAndReported` and the updated `catalogueKinds`.
-- CI (macOS, Xcode 27): see the run on this branch — the core job, the app build, the unit tests (including
-  `BackupServiceTests.testOldBackupWithKeepScreenOnRestoresAndListsItSkipped`) and the screenshot classes
-  `LyricsScreenshotTests`, `LyricsSyncScreenshotTests`, `LyricsSyncEntryTests`, `GlassAccessibilityTests`,
-  `BackupOnboardingScreenshotTests`, `SettingsScreenshotTests`, plus `PlayerScreenshotTests/testLyricsOptionsFavoriteTogglesImmediately`
-  and the three `TaisScreenshotTests/testInstrument*` shots.
+- CI (macOS, Xcode 27): **green on run 37730028431 (commit 1ed20d0)** — the core job, the app build, the unit tests
+  (261 passed, including `BackupServiceTests.testOldBackupWithKeepScreenOnRestoresAndListsItSkipped`) and 109 UI
+  test runs: the classes `LyricsScreenshotTests`, `LyricsSyncScreenshotTests`, `LyricsSyncEntryTests`,
+  `GlassAccessibilityTests`, `BackupOnboardingScreenshotTests`, `SettingsScreenshotTests`, plus
+  `PlayerScreenshotTests/testLyricsOptionsFavoriteTogglesImmediately` and the three `TaisScreenshotTests/testInstrument*`
+  shots. One retry: `BackupOnboardingScreenshotTests/testBackupExportPickerLight` hit "Failed to terminate" the app
+  (the simulator, not this branch) and passed on its second try. The core job's "YouTube live smoke (non-blocking)"
+  step reports exit 1, as it is allowed to. Shots checked by eye: the More sheet at half height, its bottom, and
+  Show as plain text turned on (Adjust sync gone, the switch on).
 - New UI tests: `testSingActive`, `testSingRendering`, `testTranslateMenu`, `testShowAsPlainText`,
   `GlassAccessibilityTests/testLyricsToolbarKeepsButtonTraits`.
 
@@ -93,6 +97,7 @@ speaker, so those paths are only checked with demo states.
 
 ## Next step
 
-Merge after review once the branch is green, then check the list above on the phone. Not done here (plan
+The branch is green (run 37730028431): review and merge into `main` (not done by the agents), then check the list
+above on the phone. Not done here (plan
 "optional"): Android's AI lyric-sync row in the More sheet, and letting lines scroll under the glass bars (owner:
 not for now).
