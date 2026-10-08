@@ -236,6 +236,9 @@ final class CloudStudio {
 
     /// The system woke the app for the transfer session: take its events, then submit what is ready.
     func transferSessionWake() async {
+        // A relaunch for the session has read nothing yet: the stored jobs come first, so the events that arrive as
+        // soon as the session exists find their jobs (and a save never writes an empty list over them).
+        await loadIfNeeded()
         guard settings.isEnabled || !jobs.isEmpty else { return }
         let transfers = connectTransfers()
         if let session = transfers as? CloudTransfers { await session.waitForBackgroundEvents(timeoutSeconds: 20) }
@@ -490,8 +493,14 @@ final class CloudStudio {
         await submitReadyBatches(clients)
         await watchRunPod(clients)
         await collectResults(clients)
-        if !activeJobs.contains(where: { $0.state == .queued || $0.state == .preparing }) {
+        // Continued processing lasts while songs are being prepared or are due to be; a song waiting out a retry
+        // (up to an hour) doesn't hold the system's progress UI open.
+        let now = dependencies.nowMs()
+        let toPrepare = jobs.filter { $0.state == .preparing || ($0.state == .queued && $0.isDue(nowMs: now)) }.count
+        if toPrepare == 0 {
             dependencies.background?.endPreparing()
+        } else {
+            dependencies.background?.updatePreparing(remaining: toPrepare)
         }
     }
 
@@ -534,8 +543,10 @@ final class CloudStudio {
         if jobs.count != before { persist() }
     }
 
-    /// Saves the list in order (each save waits for the one before).
+    /// Saves the list in order (each save waits for the one before). Never before the stored list was read: an
+    /// unread list is empty, and saving it would erase every stored job.
     private func persist() {
+        guard isLoaded else { return }
         let snapshot = jobs
         let previous = saveChain
         let store = dependencies.store
@@ -638,7 +649,10 @@ final class CloudStudio {
             try Task.checkCancellation()
             var identity: String?
             if record.isStreamed { identity = await dependencies.host.streamIdentity(for: song) }
-            let prepared = try await dependencies.preparer.prepare(source: source, jobKey: jobKey)
+            // A streamed song's download (YouTube's DASH AAC) always goes up decoded as FLAC (design §7.3): the worker
+            // then sees exactly the samples this phone plays, whatever priming the download's container declares.
+            let prepared = try await dependencies.preparer.prepare(source: source, jobKey: jobKey,
+                                                                   forceDecode: record.isStreamed)
             guard job(jobKey)?.state == .preparing else {
                 dependencies.preparer.removeUpload(jobKey: jobKey)
                 return
@@ -711,6 +725,8 @@ final class CloudStudio {
     // MARK: Transfer events
 
     func handle(_ event: CloudTransferEvent) async {
+        // After a background relaunch the session's events can come before the first pass has read the jobs.
+        await loadIfNeeded()
         let now = dependencies.nowMs()
         switch event {
         case .uploaded(let jobKey):
@@ -812,6 +828,22 @@ final class CloudStudio {
                 update(jobKey) { _ = $0.apply(.requeue, nowMs: now) }
                 fail(jobKey, "This job lost its upload details; it will be uploaded again.", code: nil, retryable: true)
                 continue
+            }
+            if record.submittedAtMs != nil {
+                // Sent before (a worker error, a lost job, a re-upload, Retry): the earlier run's manifest and guard
+                // marker are still in the bucket, and the worker doesn't clear them. Left there, the next listing would
+                // read the old error as this run's answer and send the job again and again.
+                do {
+                    try await clients.objects.delete(key: CloudKeys.manifest(jobKey: jobKey))
+                    try await clients.objects.delete(key: CloudKeys.attempt(jobKey: jobKey))
+                } catch is CancellationError {
+                    return
+                } catch {
+                    fail(jobKey, "Couldn't clear the earlier attempt from storage; trying again soon.", code: nil,
+                         retryable: true)
+                    continue
+                }
+                guard self.job(jobKey)?.state == .uploaded else { continue }
             }
             do {
                 let job = try await clients.runpod.run(request)

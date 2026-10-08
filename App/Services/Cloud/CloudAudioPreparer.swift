@@ -129,9 +129,10 @@ nonisolated enum CloudAudioPreparer {
     // MARK: Prepare
 
     /// Prepares `source` (a file URL or an `ipod-library://` URL) as job `jobKey`'s upload. Replaces an earlier
-    /// prepared file of the same job. `@concurrent`: never runs on the caller's actor.
+    /// prepared file of the same job. `forceDecode` decodes to FLAC even an AAC-LC source that could go up as it is
+    /// (a streamed song's download, design §7.3). `@concurrent`: never runs on the caller's actor.
     @concurrent
-    static func prepare(source: URL, jobKey: String) async throws -> CloudPreparedAudio {
+    static func prepare(source: URL, jobKey: String, forceDecode: Bool = false) async throws -> CloudPreparedAudio {
         guard CloudKeys.isValidJobKey(jobKey) else { throw Failure(message: "Bad job key") }
         let scoped = source.startAccessingSecurityScopedResource()
         defer { if scoped { source.stopAccessingSecurityScopedResource() } }
@@ -148,9 +149,10 @@ nonisolated enum CloudAudioPreparer {
             sourceRate = basic.pointee.mSampleRate
         }
         let isLibraryItem = source.scheme?.lowercased() == "ipod-library"
-        let route = route(isLibraryItem: isLibraryItem, fileExtension: source.pathExtension,
-                          audioTrackCount: audioTracks.count, videoTrackCount: videoTracks.count,
-                          formatID: formatID, sourceSampleRate: sourceRate)
+        let route: Route = forceDecode ? .decode
+            : Self.route(isLibraryItem: isLibraryItem, fileExtension: source.pathExtension,
+                         audioTrackCount: audioTracks.count, videoTrackCount: videoTracks.count,
+                         formatID: formatID, sourceSampleRate: sourceRate)
         removeUpload(jobKey: jobKey)
 
         var output: URL

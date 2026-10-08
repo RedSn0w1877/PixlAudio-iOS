@@ -73,6 +73,19 @@ final class CloudAudioPreparerTests: XCTestCase {
         XCTAssertEqual(Double(prepared.durationMs), 2_000, accuracy: 100)
     }
 
+    func testAStreamedSongsAACDownloadIsDecodedToFLAC() async throws {
+        // A streamed song's download is AAC-LC in an M4A, which could go up as it is; design §7.3 decodes it anyway, so
+        // the worker sees the samples this phone plays whatever priming the download's container declares.
+        let source = temporary.appendingPathComponent("download.m4a")
+        try TestAudioFiles.writeM4A(to: source, seconds: 2)
+        let prepared = try await CloudAudioPreparer.prepare(source: source, jobKey: newJobKey(), forceDecode: true)
+        XCTAssertFalse(prepared.passthrough)
+        XCTAssertEqual(prepared.ext, "flac")
+        let counted = try await CloudAudioPreparer.countFrames(of: prepared.fileURL)
+        XCTAssertEqual(counted, prepared.frames)
+        XCTAssertEqual(Double(prepared.durationMs), 2_000, accuracy: 200)
+    }
+
     func testWAVIsDecodedToFLACAtTheWorkersRate() async throws {
         let source = temporary.appendingPathComponent("tone.wav")
         try TestToneWriter.makeWAV(seconds: 3).write(to: source)

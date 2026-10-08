@@ -142,7 +142,9 @@ nonisolated final class DemoCloudTransfers: CloudTransferring, @unchecked Sendab
 }
 
 nonisolated struct DemoCloudPreparer: CloudAudioPreparing {
-    func prepare(source: URL, jobKey: String) async throws -> CloudPreparedAudio { throw CloudStudio.Failure("Demo") }
+    func prepare(source: URL, jobKey: String, forceDecode: Bool) async throws -> CloudPreparedAudio {
+        throw CloudStudio.Failure("Demo")
+    }
     func removeUpload(jobKey: String) {}
     func uploadFile(jobKey: String, ext: String) -> URL? { nil }
 }

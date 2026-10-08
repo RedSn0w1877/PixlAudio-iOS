@@ -24,6 +24,7 @@ final class CloudBackground {
     private var assertion: UIBackgroundTaskIdentifier = .invalid
     private let preparingRun = TaisBackgroundRun(identifier: TaisBackgroundRun.cloudPrepareIdentifier)
     private var preparingActive = false
+    private var preparingTotal = 0
 
     /// Asks iOS for a refresh about 15 minutes out (replacing an earlier request).
     func scheduleRefresh() {
@@ -59,15 +60,26 @@ final class CloudBackground {
     /// A person-started batch: keep preparing in the background (only from the foreground tap, as Apple requires).
     func beginPreparing(count: Int) {
         guard UIApplication.shared.applicationState == .active else { return }
+        preparingTotal = preparingActive ? preparingTotal + count : count
         preparingActive = true
         preparingRun.begin(title: "Preparing songs for the cloud",
                            subtitle: count == 1 ? "1 song" : "\(count) songs")
     }
 
-    /// Every song of the batch is prepared (or stopped).
+    /// The system's progress for the run: `remaining` songs still to prepare (each pass reports it, so the bar moves
+    /// as songs go up instead of sitting at zero).
+    func updatePreparing(remaining: Int) {
+        guard preparingActive, preparingTotal > 0 else { return }
+        let done = min(max(preparingTotal - remaining, 0), preparingTotal)
+        preparingRun.update(subtitle: "\(done) of \(preparingTotal) prepared",
+                            fraction: Double(done) / Double(preparingTotal))
+    }
+
+    /// Every song of the batch is prepared (or stopped, or waiting out a retry).
     func endPreparing() {
         guard preparingActive else { return }
         preparingActive = false
+        preparingTotal = 0
         preparingRun.end(success: true)
     }
 }

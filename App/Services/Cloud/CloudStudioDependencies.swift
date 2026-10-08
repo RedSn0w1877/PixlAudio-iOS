@@ -24,15 +24,16 @@ nonisolated extension CloudTransfers: CloudTransferring {}
 
 /// Prepares a song's audio for upload (`CloudAudioPreparer`).
 nonisolated protocol CloudAudioPreparing: Sendable {
-    func prepare(source: URL, jobKey: String) async throws -> CloudPreparedAudio
+    /// `forceDecode`: decode to FLAC even when the source could go up as it is (streamed songs, design §7.3).
+    func prepare(source: URL, jobKey: String, forceDecode: Bool) async throws -> CloudPreparedAudio
     func removeUpload(jobKey: String)
     /// The prepared file of a job, if it is still on disk (an upload restarted after a relaunch).
     func uploadFile(jobKey: String, ext: String) -> URL?
 }
 
 nonisolated struct LiveCloudAudioPreparer: CloudAudioPreparing {
-    func prepare(source: URL, jobKey: String) async throws -> CloudPreparedAudio {
-        try await CloudAudioPreparer.prepare(source: source, jobKey: jobKey)
+    func prepare(source: URL, jobKey: String, forceDecode: Bool) async throws -> CloudPreparedAudio {
+        try await CloudAudioPreparer.prepare(source: source, jobKey: jobKey, forceDecode: forceDecode)
     }
 
     func removeUpload(jobKey: String) { CloudAudioPreparer.removeUpload(jobKey: jobKey) }

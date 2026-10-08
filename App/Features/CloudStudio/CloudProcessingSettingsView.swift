@@ -171,7 +171,12 @@ struct CloudProcessingSettingsView: View {
                 }
                 SettingsFillButton(title: "Run selftest (~1¢)", systemImage: "cpu", style: .tonal,
                                    enabled: problems.isEmpty && !cloud.isTesting) {
-                    Task { await cloud.runSelftest() }
+                    Task {
+                        // Keys typed a moment ago are saved first (the draft is otherwise saved 0.6 s after typing).
+                        saveTask?.cancel()
+                        await settings.updateSecrets(draft)
+                        await cloud.runSelftest()
+                    }
                 }
                 .accessibilityIdentifier("cloud.selftest")
                 if let selftest = cloud.selftestCheck {

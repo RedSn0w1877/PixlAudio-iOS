@@ -28,6 +28,7 @@ final class CloudStudioTests: XCTestCase {
         XCTAssertEqual(h.transfers.uploads.count, 1)
         XCTAssertTrue(h.transfers.uploads[0].url.contains("/in/\(key).flac?m=PUT"))
         XCTAssertEqual(h.preparer.prepared, [key])
+        XCTAssertEqual(h.preparer.forcedDecode, [false], "a local AAC file may go up as it is")
         let noRunYet = await h.runpod.runs.count
         XCTAssertEqual(noRunYet, 0, "nothing goes to RunPod before the upload is done")
 
@@ -206,6 +207,61 @@ final class CloudStudioTests: XCTestCase {
         XCTAssertEqual(h.studio.job(key)?.state, .uploading)
     }
 
+    func testARetryableWorkerErrorGoesOutAgainWithoutRereadingTheOldManifest() async throws {
+        let h = CloudHarness()
+        let key = try await h.submittedJob()
+        // The worker ran out of GPU memory: its error manifest stays in the bucket (the worker never clears it).
+        h.store(manifest: CloudJobResult(jobKey: key, status: .error,
+                                         error: CloudResultError(code: "GPU_OOM", message: "CUDA out of memory")))
+        await h.runpod.setStatus("rp-1", RunPodJob(id: "rp-1", status: "FAILED", error: "GPU_OOM: CUDA out of memory"))
+        h.clock.advance(16_000)
+        await h.studio.pump()
+        XCTAssertEqual(h.studio.job(key)?.state, .uploaded, "sent again from the upload already in the bucket")
+        XCTAssertEqual(h.studio.job(key)?.attempts, 1)
+        // After the first rung it goes out again, and the earlier run's manifest and marker are cleared first.
+        h.clock.advance(CloudTiming.backoffLadderMs[0] + 1)
+        await h.studio.pump()
+        var runs = await h.runpod.runs.count
+        XCTAssertEqual(runs, 2)
+        XCTAssertTrue(h.objects.deleted.contains("out/\(key)/manifest.json"))
+        XCTAssertTrue(h.objects.deleted.contains("out/\(key)/attempt.json"))
+        // The next listings find no old error to take: the job waits for its new run instead of being sent again.
+        for _ in 0..<2 {
+            h.clock.advance(16_000)
+            await h.studio.pump()
+        }
+        XCTAssertEqual(h.studio.job(key)?.state, .submitted)
+        XCTAssertEqual(h.studio.job(key)?.runpodJobId, "rp-2")
+        XCTAssertEqual(h.studio.job(key)?.attempts, 1)
+        runs = await h.runpod.runs.count
+        XCTAssertEqual(runs, 2)
+    }
+
+    func testTransferEventsAfterARelaunchKeepTheStoredJobs() async throws {
+        // A job an earlier launch saved, its upload still with the system's transfer daemon.
+        let key = CloudHarness.key(7)
+        var record = CloudJobRecord(jobKey: key, songId: "f:root/a.m4a", title: "A", artist: "B", batchId: "b",
+                                    tasks: [.instrumental], lyricsMode: nil, quality: .standard, createdAtMs: 1_000)
+        record.state = .uploading
+        record.inputExt = "flac"
+        record.sha256 = CloudHarness.uploadSHA
+        record.bytes = 1_024
+        record.durationMs = 240_000
+        record.decodedFrames = CloudHarness.sourceFrames
+        record.sampleRate = 44_100
+        let store = CloudJobStore(file: nil)
+        await store.save([record])
+        let h = CloudHarness(store: store)
+        h.addSong("f:root/a.m4a")
+        // iOS relaunches the app for the transfer session: the upload's event arrives before any pass has run.
+        await h.studio.handle(.uploaded(jobKey: key))
+        XCTAssertEqual(h.studio.job(key)?.state, .uploaded, "the event found its stored job")
+        await h.studio.pump()
+        XCTAssertEqual(h.studio.job(key)?.state, .submitted)
+        let stored = await store.load(nowMs: h.clock.ms)
+        XCTAssertEqual(stored.map(\.jobKey), [key], "the stored list was never replaced by an empty one")
+    }
+
     func testAPoisonedJobStopsAndEmptiesTheBucket() async throws {
         let h = CloudHarness()
         let key = try await h.submittedJob()
@@ -298,6 +354,7 @@ final class CloudStudioTests: XCTestCase {
         h.host.identity[song.id] = "dQw4w9WgXcQ"
         let key = try await h.submittedJob(song: song)
         XCTAssertEqual(h.studio.job(key)?.videoId, "dQw4w9WgXcQ")
+        XCTAssertEqual(h.preparer.forcedDecode, [true], "a streamed song's download always goes up as FLAC")
         h.host.identity[song.id] = "9bZkp7q19f0"
         await h.runpod.setStatus("rp-1", RunPodJob(id: "rp-1", status: "COMPLETED", result: h.finish(key)))
         h.clock.advance(16_000)
@@ -460,7 +517,8 @@ final class CloudHarness {
     private var nextKey = 100
     let instrumental = Data(repeating: 7, count: 4_096)
 
-    init() {
+    /// `store`: a job list an earlier launch left (a relaunch); empty by default.
+    init(store: CloudJobStore = CloudJobStore(file: nil)) {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("CloudHarness-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let clock = CloudTestClock(), host = FakeCloudHost(), transfers = FakeCloudTransfers()
@@ -476,7 +534,7 @@ final class CloudHarness {
         settings.r2Endpoint = "0123456789abcdef0123456789abcdef"
         var counter = 0
         let dependencies = CloudStudio.Dependencies(
-            store: CloudJobStore(file: nil), host: host, makeTransfers: { transfers }, preparer: preparer,
+            store: store, host: host, makeTransfers: { transfers }, preparer: preparer,
             inspector: inspector, makeRunPod: { _ in runpod }, makeObjects: { _ in objects },
             nowMs: { clock.ms }, monthStartMs: { _ in 0 },
             newJobKey: {
@@ -633,17 +691,23 @@ nonisolated final class FakeCloudPreparer: CloudAudioPreparing, @unchecked Senda
     private let lock = NSLock()
     private let directory: URL
     private var storedPrepared: [String] = []
+    private var storedForced: [Bool] = []
     private var storedRemoved: [String] = []
 
     init(directory: URL) { self.directory = directory }
 
     var prepared: [String] { lock.withLock { storedPrepared } }
+    /// `forceDecode` of each `prepare` call, in order.
+    var forcedDecode: [Bool] { lock.withLock { storedForced } }
     var removed: [String] { lock.withLock { Array(Set(storedRemoved)).sorted() } }
 
-    func prepare(source: URL, jobKey: String) async throws -> CloudPreparedAudio {
+    func prepare(source: URL, jobKey: String, forceDecode: Bool) async throws -> CloudPreparedAudio {
         let url = directory.appendingPathComponent("\(jobKey).flac")
         try Data(repeating: 1, count: 1_024).write(to: url)
-        lock.withLock { storedPrepared.append(jobKey) }
+        lock.withLock {
+            storedPrepared.append(jobKey)
+            storedForced.append(forceDecode)
+        }
         return CloudPreparedAudio(fileURL: url, ext: "flac", bytes: 1_024, sha256: CloudTestValues.uploadSHA,
                                   durationMs: 240_000, frames: CloudTestValues.sourceFrames, sampleRate: 44_100,
                                   passthrough: false)
