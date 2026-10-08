@@ -48,17 +48,18 @@ struct SpotifyConnectVolumeHUD: View {
 
     @Environment(\.appTheme) private var theme
 
-    /// Wide enough for a typical speaker name ("Kitchen Echo Show") on one line.
-    private static let trackWidth: CGFloat = 160
+    /// Wide enough for a typical speaker name ("Kitchen Echo Show") on one line, while the whole capsule (264 pt) still
+    /// fits between the full player's collapse and queue buttons.
+    private static let trackWidth: CGFloat = 144
 
     var body: some View {
         let spoken = "Volume for \(deviceName), \(percent)%"
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             Image(systemName: symbolName)
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(theme.primary)
                 .contentTransition(.symbolEffect(.replace))
-                .frame(width: 26)
+                .frame(width: 22)
             VStack(alignment: .leading, spacing: 6) {
                 Text(deviceName)
                     .pixlFont(.labelMedium)
@@ -78,14 +79,14 @@ struct SpotifyConnectVolumeHUD: View {
                 .pixlFont(.labelLarge)
                 .foregroundStyle(theme.onSurface)
                 .monospacedDigit()
-                .frame(minWidth: 42, alignment: .trailing)
+                .frame(width: 48, alignment: .trailing) // fits "100%": the capsule never changes width
         }
-        .padding(.leading, 16)
-        .padding(.trailing, 18)
+        .padding(.leading, 14)
+        .padding(.trailing, 16)
         .padding(.vertical, 10)
-        // The bar's tint, not a panel's: the pop-up floats over whatever is at the top (the full player's output pill,
-        // the lyrics header), and a lighter tint let that content's text show through it.
-        .pixlGlass(in: Capsule(), tint: theme.surfaceContainerHigh.opacity(GlassTint.bar))
+        // As strong as Connect's toasts, not a panel's tint: the pop-up floats over whatever is at the top (the full
+        // player's output pill, the lyrics header), and lighter tints let that content's text show through it.
+        .pixlGlass(in: Capsule(), tint: theme.surfaceContainerHigh.opacity(GlassTint.prominent))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(spoken)
         .accessibilityIdentifier("spotifyConnect.volumeHUD")

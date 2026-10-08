@@ -938,11 +938,12 @@ docs/api-notes.md › Spotify Connect output.
 - **Volume buttons (2026-10-07, owner request):** while a speaker that takes volume commands plays, the phone's
   volume buttons step it 5 % (foreground only; never for Smartphone/Tablet devices). The system pop-up is kept away
   and PixlAudio shows its own (`SpotifyConnectVolumeHUD`): a top-centre glass capsule, 6 pt below the safe area,
-  `pixlGlass` tinted `surfaceContainerHigh` at `GlassTint.bar` (it floats over the full player's output pill and the
-  lyrics header; the lighter panel tint let their text show through) — the level's speaker symbol in `primary`
+  264 pt wide (it fits between the full player's collapse and queue buttons), `pixlGlass` tinted `surfaceContainerHigh`
+  at `GlassTint.prominent` like Connect's toasts (it floats over the full player's output pill and the lyrics header;
+  lighter tints let their text show through) — the level's speaker symbol in `primary`
   (`symbolEffect(.replace)` between slash / 1 / 2 / 3 waves), the device name (`labelMedium`, one line, tail
-  truncation), a 160 × 4 pt track (plain capsule fills, `onSurface` 14 % and `primary`; no glass on glass) and the
-  percentage (`labelLarge`, monospaced digits). It slides down from the top with `PixlMotion.bars` (opacity only with
+  truncation), a 144 × 4 pt track (plain capsule fills, `onSurface` 14 % and `primary`; no glass on glass) and the
+  percentage (`labelLarge`, monospaced digits, 48 pt so "100%" never widens it). It slides down from the top with `PixlMotion.bars` (opacity only with
   Reduce Motion), never takes touches, hides 1.5 s after the last press (a cancelled `Task`, nothing ticks while
   idle) and VoiceOver hears "<device> volume N%" once when a burst ends. Only the overlay modifier reads its model, so
   a press redraws the capsule and nothing under it. Placement: the shell covers the tabs and the full player; each
