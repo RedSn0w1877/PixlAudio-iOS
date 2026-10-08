@@ -60,6 +60,17 @@ tidy what main's screenshots showed. No device testing was done; everything belo
    events ("moved to song 4", "playing") hadn't arrived yet. The app was fine; the test now waits up to 3 s for the
    state it checks (`waitUntil`, already used by the other playback tests). It passed before and after on CI.
 
+7. **Review (2026-10-08).** A second agent reviewed `origin/main...HEAD` against AGENTS.md, DECISIONS and the
+   player-controls plan, read the Android sources (`SaveQueueAsPlaylistSheet`'s `MediumTopAppBar` with no scroll
+   behaviour and a 4 dp title inset; Quick Fill's songs step with only a weighted `Spacer`) and looked at the
+   screenshots of runs 37712713121 and 37730110289. No blocker or major found. Two small fixes:
+   - `testTabBarLeavesAccessibilityUnderThePlayer` looked the Library tab up with `app.buttons`. The UIKit segment's
+     element type isn't pinned (the tab bar tests use `descendants(matching: .any)`, as the plan asks), so the
+     "hidden" check could pass without matching anything. It now uses `descendants`, and it also collapses the
+     player and checks that the tabs come back and can be tapped. Nothing tested that half before: a flag stuck on
+     would have hidden the tab bar from VoiceOver for the rest of the session.
+   - `SettingsScreenshotTests`: `capture`'s doc comment had ended up on the new `scrollToAssistant` helper.
+
 Docs: `api-notes.md` (Main health section: `accessibilityElementsHidden`, coordinate taps, `fixedSize`; `ViewThatFits`
 marked as tried and removed),
 `design.md` (player changes › tab bar; floating bars › Quick Fill and Save as playlist), `test-parity.md` (player fixes).

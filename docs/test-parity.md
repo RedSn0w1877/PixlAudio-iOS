@@ -760,6 +760,6 @@ Nothing to port: Android has no tests for the full player's toggle row, the tran
   and expect the unliked state within 3 s without touching anything else. Main health (2026-10-07): the first two find
   their heart by identifier (`player.favorite`, `songInfo.favorite`; a label query found the collapsed player's hidden
   heart first) and tap its centre, where a finger lands; `testTabBarLeavesAccessibilityUnderThePlayer` checks that the
-  tab bar's tabs are out of the accessibility tree under the expanded player and that an element tap then reaches the
-  liked heart; `AppTests/FavoriteObservationTests.testEveryToggleInvalidatesTheNextRead` toggles three times in a row; `testExpandedBluetoothLight`
+  tab bar's tabs are out of the accessibility tree under the expanded player, that an element tap then reaches the
+  liked heart, and that the tabs are back (and tappable) once the player collapses; `AppTests/FavoriteObservationTests.testEveryToggleInvalidatesTheNextRead` toggles three times in a row; `testExpandedBluetoothLight`
   (`-screen nowPlaying.bluetooth`) expects "Playing on AirPods Pro" in the top bar and no "Now Playing" title.

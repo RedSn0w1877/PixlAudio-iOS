@@ -118,9 +118,6 @@ final class SettingsScreenshotTests: XCTestCase {
 
     // MARK: - Helper
 
-    /// `ready`: the element that marks the screen as loaded (default `screen.<screen>`). `extra`: more launch
-    /// arguments (e.g. `-accent RRGGBB`); `suffix` tells such a shot apart from the plain one
-    /// (`<screen>-<appearance><suffix>`), so the exported PNGs don't collide.
     /// Swipes AI features up until the on-device model row (`settings.ai.onDevice`, first row of the assistant
     /// section) can be tapped, so the section and the cloud rows under it fill the screen.
     private static func scrollToAssistant(_ app: XCUIApplication) {
@@ -131,6 +128,9 @@ final class SettingsScreenshotTests: XCTestCase {
         }
     }
 
+    /// `ready`: the element that marks the screen as loaded (default `screen.<screen>`). `extra`: more launch
+    /// arguments (e.g. `-accent RRGGBB`); `suffix` tells such a shot apart from the plain one
+    /// (`<screen>-<appearance><suffix>`), so the exported PNGs don't collide.
     private func capture(_ screen: String, _ appearance: String, ready: String? = nil, extra: [String] = [],
                          suffix: String? = nil,
                          interact: ((XCUIApplication) -> Void)? = nil) throws {

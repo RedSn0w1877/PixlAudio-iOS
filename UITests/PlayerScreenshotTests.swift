@@ -65,17 +65,20 @@ final class PlayerScreenshotTests: XCTestCase {
     }
 
     /// While the full player is up, the tab bar under it is out of the accessibility tree, so the player's controls
-    /// can be tapped as elements. The bar's UIKit tabs used to stay in it under the shuffle · repeat · favourite row:
-    /// XCUITest then tapped each toggle at its top-left corner (CI diagnostics, 2026-10-07), which misses a toggle
-    /// that is on (a full capsule), and VoiceOver touch exploration could land on a hidden tab.
+    /// can be tapped as elements; once the player collapses, the tabs are back. The bar's UIKit tabs used to stay in
+    /// the tree under the shuffle · repeat · favourite row: XCUITest then tapped each toggle at its top-left corner
+    /// (CI diagnostics, 2026-10-07), which misses a toggle that is on (a full capsule), and VoiceOver touch
+    /// exploration could land on a hidden tab. The tab is found with `descendants(matching: .any)`, as the tab bar
+    /// tests find it: the UIKit segment's element type isn't pinned, and a query that never matches would pass the
+    /// "hidden" check without proving anything.
     func testTabBarLeavesAccessibilityUnderThePlayer() throws {
         let app = launch("nowPlaying", "light")
-        continueAfterFailure = true // both checks report
+        continueAfterFailure = true // every check reports
         let heart = app.buttons["player.favorite"]
         XCTAssertTrue(heart.waitForExistence(timeout: 20), "the heart is missing")
         let hittable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: heart)
         XCTAssertEqual(XCTWaiter.wait(for: [hittable], timeout: 10), .completed, "the heart can't be tapped")
-        let libraryTab = app.buttons["navBar.library"]
+        let libraryTab = app.descendants(matching: .any)["navBar.library"].firstMatch
         XCTAssertFalse(libraryTab.exists && libraryTab.isHittable, "the hidden tab bar still answers under the player")
         XCTAssertEqual(heart.label, "Remove from favorites", "demo song 0 should start liked")
         heart.tap()
@@ -83,6 +86,17 @@ final class PlayerScreenshotTests: XCTestCase {
                                                 object: heart)
         XCTAssertEqual(XCTWaiter.wait(for: [unliked], timeout: 3), .completed,
                        "an element tap on the liked heart did not reach it")
+
+        // Collapsed again, the tabs are back in the accessibility tree: VoiceOver reads them and taps reach them.
+        let collapse = collapseButton(app)
+        XCTAssertTrue(collapse.waitForExistence(timeout: 5), "the collapse circle is missing")
+        collapse.tap()
+        XCTAssertTrue(libraryTab.waitForExistence(timeout: 10),
+                      "the tab bar did not come back to accessibility after the player collapsed")
+        let tabHittable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"),
+                                                    object: libraryTab)
+        XCTAssertEqual(XCTWaiter.wait(for: [tabHittable], timeout: 5), .completed,
+                       "the Library tab can't be tapped after the player collapsed")
         app.terminate()
     }
 
