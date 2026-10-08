@@ -101,7 +101,7 @@ import PixlFoundation
         let request = try #require(CloudJobBuilder.request(for: record, build: "1", lyrics: nil, presign: Self.fakePresign))
         #expect(request.input.output?.codec == "flac")
         #expect(request.input.output?.kbps == nil)
-        #expect(request.input.output?.put["instrumental"]?.contains("/instrumental.flac?") == true)
+        #expect(request.input.output?.put?["instrumental"]?.contains("/instrumental.flac?") == true)
         #expect(request.input.lyrics == nil)
     }
 

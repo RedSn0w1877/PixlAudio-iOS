@@ -64,8 +64,12 @@ public enum CloudConfig {
 
     /// A Cloudflare account ID: 32 hex characters.
     public static func isAccountId(_ text: String) -> Bool {
-        text.utf8.count == 32 && text.utf8.allSatisfy {
-            ($0 >= 0x30 && $0 <= 0x39) || ($0 >= 0x61 && $0 <= 0x66) || ($0 >= 0x41 && $0 <= 0x46)
+        guard text.utf8.count == 32 else { return false }
+        return text.utf8.allSatisfy { byte in
+            switch byte {
+            case 0x30...0x39, 0x61...0x66, 0x41...0x46: true
+            default: false
+            }
         }
     }
 
@@ -80,9 +84,17 @@ public enum CloudConfig {
         let candidate = lower.hasPrefix("https://") ? trimmed : "https://" + trimmed
         guard let host = S3Location(endpoint: candidate, bucket: defaultBucket).endpointHost,
               host.contains("."), !host.hasPrefix("."), !host.hasSuffix("."),
-              host.unicodeScalars.allSatisfy({ $0.isASCII && ($0 == "." || $0 == "-" || $0 == ":"
-                                                 || CharacterSet.alphanumerics.contains($0)) }) else { return nil }
+              host.unicodeScalars.allSatisfy(isHostScalar) else { return nil }
         return "https://\(host)"
+    }
+
+    /// ASCII letters, digits, `.`, `-` and `:` (a port).
+    static func isHostScalar(_ scalar: Unicode.Scalar) -> Bool {
+        guard scalar.isASCII else { return false }
+        switch scalar {
+        case ".", "-", ":": return true
+        default: return CharacterSet.alphanumerics.contains(scalar)
+        }
     }
 
     /// The account ID inside an R2 endpoint, if it is one (shown under the field so a wrong paste is easy to spot).

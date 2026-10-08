@@ -5,7 +5,7 @@
 import Foundation
 
 /// Signs one object URL: (method, key, seconds valid) → URL. `CloudObjectStoring.presignedURL` in the app.
-public typealias CloudPresign = (_ method: HTTPMethod, _ key: String, _ expiresSeconds: Int) -> String?
+public typealias CloudPresign = @Sendable (_ method: HTTPMethod, _ key: String, _ expiresSeconds: Int) -> String?
 
 public enum CloudJobBuilder {
     /// The `output.put` slots a job needs: its tasks' audio slots, `lyrics` when lyrics were asked for, and always
@@ -41,9 +41,29 @@ public enum CloudJobBuilder {
                                                               lyricsReferenceDurationMs: lyricsReferenceDurationMs,
                                                               audioDurationMs: audioDurationMs)
         return CloudLyricsRequest(mode: effectiveMode,
-                                  language: language.flatMap { $0.isEmpty ? nil : $0 },
+                                  language: normalizedLanguage(language),
                                   synced: synced,
                                   lines: effectiveMode == .transcribe ? nil : known)
+    }
+
+    /// The language hint as the worker's schema wants it (`^[a-z]{2,3}([-_][A-Za-z0-9]{2,8})*$`): the primary subtag
+    /// lower-cased, the rest kept; nil for anything else ("und", empty, malformed).
+    public static func normalizedLanguage(_ language: String?) -> String? {
+        guard let raw = language?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else { return nil }
+        var parts = raw.split(separator: "-", omittingEmptySubsequences: false).flatMap {
+            $0.split(separator: "_", omittingEmptySubsequences: false)
+        }.map(String.init)
+        guard let first = parts.first else { return nil }
+        let primary = first.lowercased()
+        guard (2...3).contains(primary.count), primary.unicodeScalars.allSatisfy({ $0 >= "a" && $0 <= "z" }),
+              primary != "und" else { return nil }
+        parts[0] = primary
+        for part in parts.dropFirst() {
+            guard (2...8).contains(part.count), part.unicodeScalars.allSatisfy({ $0.isASCII && CharacterSet.alphanumerics.contains($0) }) else {
+                return primary
+            }
+        }
+        return parts.joined(separator: "-")
     }
 
     /// The whole `/run` body for a prepared and uploaded job, or nil when its input isn't known or a URL can't be

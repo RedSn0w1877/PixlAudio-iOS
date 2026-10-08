@@ -1,0 +1,38 @@
+{
+  "schema": "pixl.cloudstudio.result",
+  "v": 1,
+  "jobKey": "6f1c2a9e-3b7d-4c11-9a0e-2d5f8b7c4e10",
+  "status": "error",
+  "error": {
+    "code": "INPUT_MISMATCH",
+    "message": "the downloaded input's sha256 does not match audio.sha256"
+  },
+  "warnings": [],
+  "worker": {
+    "version": "1.0.0",
+    "gitSha": "abc1234def56",
+    "gpu": "NVIDIA L4",
+    "vramGB": 22.5,
+    "cuda": "12.8"
+  },
+  "models": {
+    "separator": null,
+    "stems4": null,
+    "aligner": null,
+    "asr": null
+  },
+  "input": null,
+  "outputs": {},
+  "lyrics": null,
+  "timings": {
+    "coldStartMs": 0,
+    "downloadMs": 850,
+    "decodeMs": 0,
+    "separateMs": 0,
+    "stemsMs": 0,
+    "lyricsMs": 0,
+    "encodeMs": 0,
+    "uploadMs": 0,
+    "totalMs": 1020
+  }
+}

@@ -20,7 +20,8 @@ public enum CloudLyrics {
     public static func requestLines(_ lyrics: Lyrics?) -> (lines: [CloudLyricsInputLine], hasLineTimes: Bool)? {
         guard let lyrics else { return nil }
         if let synced = lyrics.synced, synced.contains(where: { !$0.line.isKotlinBlank }) {
-            let timed = synced.filter { !$0.line.isKotlinBlank }
+            // The worker wants synced lines sorted by start.
+            let timed = synced.filter { !$0.line.isKotlinBlank }.sorted { $0.time < $1.time }
             var lines: [CloudLyricsInputLine] = []
             for (index, line) in timed.enumerated() {
                 let next = index + 1 < timed.count ? Int64(timed[index + 1].time) : nil
@@ -39,7 +40,10 @@ public enum CloudLyrics {
     static func capped(_ lines: [CloudLyricsInputLine]) -> [CloudLyricsInputLine] {
         var out: [CloudLyricsInputLine] = []
         var chars = 0
-        for line in lines.prefix(CloudLimits.maxLyricsLines) {
+        for var line in lines.prefix(CloudLimits.maxLyricsLines) {
+            if line.text.count > CloudLimits.maxLyricsLineChars {
+                line.text = String(line.text.prefix(CloudLimits.maxLyricsLineChars))
+            }
             chars += line.text.count
             if chars > CloudLimits.maxLyricsChars { break }
             out.append(line)

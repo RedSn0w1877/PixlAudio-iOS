@@ -58,8 +58,18 @@ public struct S3Location: Sendable, Hashable {
     public var hasValidBucket: Bool {
         let bytes = Array(bucket.utf8)
         guard (3...63).contains(bytes.count) else { return false }
-        func ok(_ b: UInt8) -> Bool { (b >= 0x61 && b <= 0x7A) || (b >= 0x30 && b <= 0x39) || b == 0x2E || b == 0x2D }
-        func alnum(_ b: UInt8) -> Bool { (b >= 0x61 && b <= 0x7A) || (b >= 0x30 && b <= 0x39) }
+        func ok(_ b: UInt8) -> Bool {
+            switch b {
+            case 0x61...0x7A, 0x30...0x39, 0x2E, 0x2D: true
+            default: false
+            }
+        }
+        func alnum(_ b: UInt8) -> Bool {
+            switch b {
+            case 0x61...0x7A, 0x30...0x39: true
+            default: false
+            }
+        }
         return bytes.allSatisfy(ok) && alnum(bytes[0]) && alnum(bytes[bytes.count - 1])
     }
 
@@ -183,11 +193,19 @@ public struct S3Signer: Sendable {
 
     /// Query parameters URI-encoded and sorted by encoded name, then value.
     static func canonicalQuery(_ parameters: [(String, String)]) -> String {
-        parameters
-            .map { (uriEncode($0.0, encodeSlash: true), uriEncode($0.1, encodeSlash: true)) }
-            .sorted { $0.0 == $1.0 ? $0.1 < $1.1 : $0.0 < $1.0 }
-            .map { "\($0.0)=\($0.1)" }
-            .joined(separator: "&")
+        // Spelled out with explicit types: the chained-closure version made the type checker time out.
+        var encoded: [(name: String, value: String)] = []
+        encoded.reserveCapacity(parameters.count)
+        for (name, value) in parameters {
+            encoded.append((uriEncode(name, encodeSlash: true), uriEncode(value, encodeSlash: true)))
+        }
+        encoded.sort { (a: (name: String, value: String), b: (name: String, value: String)) -> Bool in
+            a.name == b.name ? a.value < b.value : a.name < b.name
+        }
+        var pairs: [String] = []
+        pairs.reserveCapacity(encoded.count)
+        for pair in encoded { pairs.append(pair.name + "=" + pair.value) }
+        return pairs.joined(separator: "&")
     }
 
     /// AWS `UriEncode`: every byte except `A–Z a–z 0–9 - _ . ~` as `%XX` (upper-case hex); `/` kept in paths.
@@ -196,9 +214,7 @@ public struct S3Signer: Sendable {
         var out = ""
         out.reserveCapacity(text.utf8.count)
         for byte in text.utf8 {
-            let unreserved = (byte >= 0x41 && byte <= 0x5A) || (byte >= 0x61 && byte <= 0x7A) || (byte >= 0x30 && byte <= 0x39)
-                || byte == 0x2D || byte == 0x5F || byte == 0x2E || byte == 0x7E
-            if unreserved || (byte == 0x2F && !encodeSlash) {
+            if isUnreserved(byte) || (byte == 0x2F && !encodeSlash) {
                 out.unicodeScalars.append(Unicode.Scalar(byte))
             } else {
                 out.append("%")
@@ -207,6 +223,14 @@ public struct S3Signer: Sendable {
             }
         }
         return out
+    }
+
+    /// `A–Z a–z 0–9 - _ . ~` (a switch: the long `||` chain made the type checker time out).
+    static func isUnreserved(_ byte: UInt8) -> Bool {
+        switch byte {
+        case 0x41...0x5A, 0x61...0x7A, 0x30...0x39, 0x2D, 0x5F, 0x2E, 0x7E: true
+        default: false
+        }
     }
 
     /// Header values: leading/trailing spaces removed, inner runs of spaces collapsed to one.

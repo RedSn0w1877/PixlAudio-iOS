@@ -21,7 +21,13 @@ public enum CloudKeys {
 
     /// The worker's jobKey rule: 36 characters of `0-9 a-f -` (a lower-case UUID).
     public static func isValidJobKey(_ key: String) -> Bool {
-        key.utf8.count == 36 && key.utf8.allSatisfy { ($0 >= 0x30 && $0 <= 0x39) || ($0 >= 0x61 && $0 <= 0x66) || $0 == 0x2D }
+        guard key.utf8.count == 36 else { return false }
+        return key.utf8.allSatisfy { byte in
+            switch byte {
+            case 0x30...0x39, 0x61...0x66, 0x2D: true
+            default: false
+            }
+        }
     }
 
     /// A new job key from a UUID string (any case).
@@ -58,8 +64,9 @@ public enum CloudLimits {
     public static let maxDurationMs: Int64 = 900_000
     /// `PIXL_BEST_MAX_AUDIO_S` 480: `best` quality only up to 8 minutes.
     public static let bestQualityMaxDurationMs: Int64 = 480_000
-    /// `PIXL_MAX_INPUT_MB` 60 (the worker's streamed byte cap).
-    public static let maxInputBytes: Int64 = 60 * 1_048_576
+    /// `PIXL_MAX_INPUT_MB` 160 (the worker's streamed byte cap): a 15-minute song decoded to 16-bit FLAC is about
+    /// 90–110 MB, so the design's 60 MB (sized for AAC) would refuse long lossless uploads.
+    public static let maxInputBytes: Int64 = 160 * 1_048_576
     public static let maxSongsPerBatch = 200
     /// Streamed songs are fetched 2 at a time with jitter, at most 50 per batch (§7.3).
     public static let maxStreamedPerBatch = 50
@@ -67,6 +74,8 @@ public enum CloudLimits {
     /// `PIXL_MAX_LYRICS_LINES` / `_CHARS`.
     public static let maxLyricsLines = 500
     public static let maxLyricsChars = 20_000
+    /// The schema's `maxLength` of one line's text.
+    public static let maxLyricsLineChars = 2_000
     /// Output AAC bitrate (decision 4: AAC 256k).
     public static let outputKbps = 256
 }

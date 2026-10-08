@@ -141,6 +141,22 @@ public enum CloudConnectionTest {
         guard let api else { return CloudCheck(ok: false, message: "Fill in the Endpoint ID and the RunPod key first.") }
         do {
             let job = try await api.selftest(build: build)
+            if job.typedStatus == .completed, let selftest = job.selftest {
+                guard selftest.isOK else {
+                    let reason = selftest.error.map { "\($0.code): \($0.message ?? "")" } ?? "status \(selftest.status)"
+                    return CloudCheck(ok: false, message: "The worker started but reported a problem (\(CloudRedaction.redact(reason))).")
+                }
+                guard selftest.agreedVersion != nil else {
+                    return CloudCheck(ok: false, message: "The worker doesn't speak this app's job format (v\(CloudSchema.version)). Update the worker or the app.")
+                }
+                let missing = (selftest.models ?? [:]).filter { !$0.value.isAvailable }.map(\.key).sorted()
+                guard missing.isEmpty else {
+                    return CloudCheck(ok: false, message: "The worker is missing models: \(missing.joined(separator: ", ")).")
+                }
+                let version = selftest.worker?.version ?? "?"
+                let gpu = selftest.worker?.gpu ?? "unknown GPU"
+                return CloudCheck(ok: true, message: "The worker answered.", detail: "Worker \(version) on \(gpu)")
+            }
             if job.typedStatus == .completed, let output = job.outputJSON {
                 let version = output["worker"]?["version"]?.stringValue ?? "?"
                 let gpu = output["worker"]?["gpu"]?.stringValue ?? "unknown GPU"

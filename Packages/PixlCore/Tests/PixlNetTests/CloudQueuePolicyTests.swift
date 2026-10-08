@@ -251,16 +251,22 @@ import PixlModel
 
     @Test func eventsStampTimes() {
         var r = Self.record()
-        #expect(r.apply(.prepareStarted, nowMs: 2))
-        #expect(r.apply(.prepared, nowMs: 3))
-        #expect(r.apply(.uploadFinished, nowMs: 4))
+        let applied1 = r.apply(.prepareStarted, nowMs: 2)
+        #expect(applied1)
+        let applied2 = r.apply(.prepared, nowMs: 3)
+        #expect(applied2)
+        let applied3 = r.apply(.uploadFinished, nowMs: 4)
+        #expect(applied3)
         #expect(r.uploadedAtMs == 4)
-        #expect(!r.apply(.imported, nowMs: 5))
+        let applied4 = r.apply(.imported, nowMs: 5)
+        #expect(!applied4)
         #expect(r.state == .uploaded)
-        #expect(r.apply(.submitted, nowMs: 6))
+        let applied5 = r.apply(.submitted, nowMs: 6)
+        #expect(applied5)
         #expect(r.submittedAtMs == 6)
         r.runpodJobId = "job"
-        #expect(r.apply(.resubmit, nowMs: 7))
+        let applied6 = r.apply(.resubmit, nowMs: 7)
+        #expect(applied6)
         #expect(r.runpodJobId == nil)
         #expect(r.state == .uploaded)
         r.inputExt = "flac"

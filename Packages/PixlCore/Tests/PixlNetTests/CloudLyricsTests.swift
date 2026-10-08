@@ -5,7 +5,7 @@ import PixlModel
 
 @Suite struct CloudLyricsTests {
     static func aligned() throws -> CloudLyricsDocument {
-        try CloudJSON.decode(CloudLyricsDocument.self, from: CloudFixtures.data("lyrics.aligned"))
+        try CloudJSON.decode(CloudLyricsDocument.self, from: CloudFixtures.data("edge.lyrics.aligned"))
     }
 
     @Test func wordsAreRebuiltFromTheOriginalText() throws {
@@ -35,7 +35,7 @@ import PixlModel
     }
 
     @Test func transcribedLyricsAreMarked() throws {
-        let cloud = try CloudJSON.decode(CloudLyricsDocument.self, from: CloudFixtures.data("lyrics.transcribed"))
+        let cloud = try CloudJSON.decode(CloudLyricsDocument.self, from: CloudFixtures.data("edge.lyrics.transcribed"))
         #expect(cloud.isTranscribed)
         let doc = try #require(CloudLyrics.lyricsDoc(cloud, durationMs: 200_000))
         #expect(doc.metadata.source == CloudLyrics.transcribedSource)
@@ -108,5 +108,42 @@ import PixlModel
         #expect(CloudLyrics.level(of: lineOnly) == .lineSynced)
         #expect(CloudLyrics.level(of: Lyrics(plain: ["x"], synced: nil, areFromRemote: false)) == .plain)
         #expect(CloudLyrics.level(of: nil) == .none)
+    }
+    /// The worker's own golden examples (`Fixtures/cloud/worker/`).
+    @Test func workerAlignedExampleRebuildsEveryLine() throws {
+        let cloud = try CloudJSON.decode(CloudLyricsDocument.self, from: CloudFixtures.worker("lyrics.aligned"))
+        #expect(cloud.offsetMs == 0)
+        let doc = try #require(CloudLyrics.lyricsDoc(cloud, durationMs: 241_000))
+        // The empty fourth line (an instrumental gap) is dropped.
+        #expect(doc.lines.count == 3)
+        #expect(doc.lines[0].syllables.map(\.text) == ["별빛 ", "아래 ", "우리 ", "둘이"])
+        // The comma the aligner stripped stays with its word.
+        #expect(doc.lines[1].syllables.map(\.text) == ["다시 ", "노래해, ", "오늘 ", "밤"])
+        // Leading "(" joins the first word; "Oh-oh" was aligned as "Ohoh" but the original text is kept.
+        #expect(doc.lines[2].syllables.map(\.text) == ["(Oh-oh) ", "Stay ", "with ", "me"])
+        #expect(doc.lines[2].syllables.map(\.startMs) == [19_240, 20_500, 21_100, 21_600])
+        for line in doc.lines { #expect(line.syllables.map(\.text).joined() == line.text) }
+        #expect(CloudLyrics.level(of: doc) == .wordSynced)
+        #expect(CloudLyrics.isUsable(doc))
+    }
+
+    @Test func workerTranscribedExampleIsLineTimedAndMarked() throws {
+        let cloud = try CloudJSON.decode(CloudLyricsDocument.self, from: CloudFixtures.worker("lyrics.transcribed"))
+        #expect(cloud.isTranscribed)
+        let doc = try #require(CloudLyrics.lyricsDoc(cloud, durationMs: 198_500))
+        #expect(doc.metadata.source == CloudLyrics.transcribedSource)
+        #expect(doc.lines.map(\.text) == ["Hôm nay trời đẹp quá", "Mình cùng hát nhé"])
+        #expect(doc.lines.allSatisfy { $0.syllables.isEmpty })
+        #expect(CloudLyrics.level(of: doc) == .lineSynced)
+        #expect(CloudLyrics.isUsable(doc))
+    }
+
+    @Test func requestLinesAreSortedAndCappedPerLine() throws {
+        let long = String(repeating: "a", count: 2_500)
+        let lyrics = Lyrics(plain: nil, synced: [SyncedLine(time: 5_000, line: "late"), SyncedLine(time: 1_000, line: long)],
+                            areFromRemote: false)
+        let request = try #require(CloudLyrics.requestLines(lyrics))
+        #expect(request.lines.map(\.startMs) == [1_000, 5_000])
+        #expect(request.lines[0].text.count == CloudLimits.maxLyricsLineChars)
     }
 }

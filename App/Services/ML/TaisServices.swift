@@ -36,16 +36,23 @@ final class TaisServices {
                             downloads: DownloadManager?) async throws -> URL {
         let url = await (resolver ?? DefaultPlayableURLResolver()).playableURL(for: song)
         if let url, url.isFileURL || url.scheme == "ipod-library" { return url }
-        guard let downloads, let videoId = YouTubeSongIdentity.videoId(for: song) else {
+        // A Spotify song plays its YouTube match (`pixlstream://<videoId>`): download that video (design §7.1's
+        // `sp:` fix). Results stay keyed by the Spotify song.
+        let ownVideoId = YouTubeSongIdentity.videoId(for: song)
+        guard let downloads, let videoId = ownVideoId ?? url.flatMap(YouTubeSongIdentity.videoId(from:)) else {
             throw TaisStudio.JobFailure(message: "This song has no available audio source")
+        }
+        var download = song
+        if ownVideoId == nil, let stream = YouTubeSongIdentity.streamURL(videoId: videoId) {
+            download.contentUriString = stream.absoluteString
         }
         if let file = DownloadFiles.existingFile(videoId: videoId) { return file }
         for attempt in 1...3 {
-            downloads.download(song)
+            downloads.download(download)
             let deadline = Date().addingTimeInterval(90)
             waiting: while Date() < deadline {
                 try Task.checkCancellation()
-                let state = downloads.state(for: song)
+                let state = downloads.state(for: download)
                 if case .downloaded? = state, let file = DownloadFiles.existingFile(videoId: videoId) { return file }
                 if case .failed? = state { break waiting }
                 try await Task.sleep(for: .milliseconds(500))

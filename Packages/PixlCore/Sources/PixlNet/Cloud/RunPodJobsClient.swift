@@ -75,7 +75,9 @@ public struct RunPodJob: Sendable, Hashable {
     public var result: CloudJobResult?
     /// A text output: the progress string while running.
     public var outputText: String?
-    /// The raw output JSON when it is an object that isn't a manifest (the selftest's).
+    /// The selftest's output (`pixl.cloudstudio.selftest`).
+    public var selftest: CloudSelftestResult?
+    /// The raw output JSON when it is an object that isn't a manifest (the selftest's too).
     public var outputJSON: JSONValue?
     /// RunPod's `error` (the handler returns `"<CODE>: <message>"`).
     public var error: String?
@@ -123,9 +125,13 @@ public struct RunPodJob: Sendable, Hashable {
             job.outputText = text
         case .object(let output)?:
             let value = JSONValue.object(output)
-            if output["schema"]?.stringValue == CloudSchema.result,
+            let schema = output["schema"]?.stringValue
+            if schema == CloudSchema.result,
                let result = try? CloudJSON.decode(CloudJobResult.self, from: Data(JSONWriter.write(value).utf8)) {
                 job.result = result
+            } else if schema == CloudSchema.selftest {
+                job.selftest = try? CloudJSON.decode(CloudSelftestResult.self, from: Data(JSONWriter.write(value).utf8))
+                job.outputJSON = value
             } else if let error = output["error"]?.stringValue, job.error == nil {
                 job.error = error
                 job.outputJSON = value
@@ -247,8 +253,13 @@ public actor RunPodJobsClient: RunPodJobsAPI {
     public static func isValidEndpointId(_ id: String) -> Bool { isSafeIdentifier(id, maxLength: 64) }
 
     static func isSafeIdentifier(_ id: String, maxLength: Int) -> Bool {
-        !id.isEmpty && id.utf8.count <= maxLength
-            && id.utf8.allSatisfy { ($0 >= 0x30 && $0 <= 0x39) || ($0 >= 0x41 && $0 <= 0x5A) || ($0 >= 0x61 && $0 <= 0x7A) || $0 == 0x2D || $0 == 0x5F }
+        guard !id.isEmpty, id.utf8.count <= maxLength else { return false }
+        return id.utf8.allSatisfy { byte in
+            switch byte {
+            case 0x30...0x39, 0x41...0x5A, 0x61...0x7A, 0x2D, 0x5F: true
+            default: false
+            }
+        }
     }
 
     /// How long the Retry-After gate still holds (0 = open).
