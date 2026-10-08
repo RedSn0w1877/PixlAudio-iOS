@@ -222,7 +222,8 @@ final class SpotifyConnectVolumeButtons {
     }
 
     private func echoTimedOut(target: Float) {
-        guard isRunning, !isPaused, awaitingEcho else { return }
+        // An interruption (a call, Siri) took the session meanwhile: the reset proved nothing either way.
+        guard isRunning, !isPaused, !isInterrupted, awaitingEcho else { return }
         awaitingEcho = false
         // No change came back: fine if the volume is there anyway (a reset that made no KVO change).
         if abs(AVAudioSession.sharedInstance().outputVolume - target) > SpotifyConnectVolumeKeys.echoTolerance {
@@ -358,6 +359,10 @@ final class SpotifyConnectVolumeButtons {
 
     private func interrupted(began: Bool) {
         isInterrupted = began
+        if began {
+            echoTask?.cancel()
+            awaitingEcho = false
+        }
         guard isRunning, !began, !isPaused else { return }
         settle()
     }

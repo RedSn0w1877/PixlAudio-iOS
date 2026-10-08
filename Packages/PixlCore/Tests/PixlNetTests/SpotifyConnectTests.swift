@@ -404,6 +404,28 @@ struct SpotifyConnectReducerTests {
         #expect(Self.state().volumeHoldUntilMs == 0)
     }
 
+    @Test func aRefusedVolumeStaysOffWhateverPollsSay() {
+        var s = Self.state()
+        // Without a refusal, a poll reporting `supports_volume` turns volume control on.
+        s.supportsVolume = false
+        #expect(SpotifyConnectReducer.apply(Self.poll("spotify:track:a", progress: 10_000), to: &s, nowMs: 100_000).change == .updated)
+        #expect(s.supportsVolume)
+        // The device refused a volume command (VOLUME_CONTROL_DISALLOW): off for the rest of the session, so polls
+        // don't offer it again and every press doesn't fail (and toast) again.
+        SpotifyConnectReducer.refuseVolume(&s)
+        #expect(!s.supportsVolume && s.volumeRefused)
+        let before = s
+        #expect(SpotifyConnectReducer.apply(Self.poll("spotify:track:a", progress: 10_000), to: &s, nowMs: 100_000).change == .none)
+        #expect(s == before)
+        // The device list says the same: refused stays refused; nothing refused yet follows the device.
+        #expect(!SpotifyConnectReducer.supportsVolume(true, in: s))
+        #expect(SpotifyConnectReducer.supportsVolume(true, in: Self.state()))
+        #expect(SpotifyConnectReducer.supportsVolume(true, in: nil))
+        #expect(!SpotifyConnectReducer.supportsVolume(false, in: Self.state()))
+        // A new session starts without the refusal.
+        #expect(!Self.state().volumeRefused)
+    }
+
     @Test func optimisticCommands() {
         var s = Self.state()
         SpotifyConnectReducer.setPlaying(false, &s, nowMs: 102_000)

@@ -161,15 +161,17 @@ final class SpotifyConnectController: RemotePlaybackOutput {
             set(\.devices, list)
             set(\.deviceListError, nil)
             if let active, let device = list.first(where: { $0.deviceId == active.id }) {
+                // A device that refused a volume command stays without volume control, whatever the list says.
+                let supportsVolume = SpotifyConnectReducer.supportsVolume(device.supportsVolume, in: session)
                 set(\.active, ActiveDevice(id: active.id, name: device.name, type: device.type,
-                                           supportsVolume: device.supportsVolume))
+                                           supportsVolume: supportsVolume))
                 // Not over a value PixlAudio just set (the list may predate the last `PUT`).
                 if let polled = device.volumePercent, now() >= session?.volumeHoldUntilMs ?? 0 {
                     set(\.volumePercent, polled)
                     if var state = session { state.volumePercent = polled; session = state }
                 }
-                if var state = session, state.supportsVolume != device.supportsVolume {
-                    state.supportsVolume = device.supportsVolume
+                if var state = session, state.supportsVolume != supportsVolume {
+                    state.supportsVolume = supportsVolume
                     session = state
                 }
                 updateVolumeButtons()
@@ -753,7 +755,8 @@ final class SpotifyConnectController: RemotePlaybackOutput {
                 // A gate a poll or a command hit: wait it out instead of failing fast.
                 let gate = await self.client.retryAfterRemainingMs
                 guard !Task.isCancelled else { return }
-                if gate > 0 {
+                // Only a change still waiting is held up (after the last send, the poller's gate is its own).
+                if gate > 0, self.volumeLane.pending != nil {
                     self.volumeLane.gate(untilMs: self.now() + gate)
                     self.volumeBusy(waitMs: gate)
                 }
@@ -782,7 +785,13 @@ final class SpotifyConnectController: RemotePlaybackOutput {
                         }
                         continue
                     }
-                    if failure is CancellationError { return }
+                    if failure is CancellationError {
+                        // Not this task's cancellation (checked above): drop the value and free the lane, or every
+                        // later change would wait for a task that has ended.
+                        self.volumeLane.failed()
+                        self.volumeTask = nil
+                        return
+                    }
                     switch failure as? SpotifyConnectError {
                     case .rateLimited(let ms)?:
                         self.volumeLane.rateLimited(retryAfterMs: ms, nowMs: self.now())
@@ -814,7 +823,8 @@ final class SpotifyConnectController: RemotePlaybackOutput {
             active = device
             toast.show(SpotifyConnectError.volumeNotSupported.userMessage)
         }
-        if var state = session { state.supportsVolume = false; session = state }
+        // Sticky for the session: later polls and device lists keep reporting `supports_volume`.
+        if var state = session { SpotifyConnectReducer.refuseVolume(&state); session = state }
         volumeHUD.hide()
         updateVolumeButtons()
     }
