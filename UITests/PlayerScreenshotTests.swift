@@ -64,40 +64,40 @@ final class PlayerScreenshotTests: XCTestCase {
         snapshot(app, "lyricsOptionsFavoriteToggled-dark")
     }
 
-    /// TEMPORARY diagnosis (s21-main-health): does the full player's heart tap reach its action, and does the row
-    /// redraw? Prints facts instead of failing early.
+    /// TEMPORARY diagnosis (s21-main-health), round 2: element taps on a segment that is on (heart liked, shuffle on)
+    /// did nothing in round 1, element taps on segments that are off worked, and a coordinate tap at (0.3, 0.3) on the
+    /// liked heart worked. Prints what each kind of tap does; fails at the end so the app's output is kept.
     func testFavoriteDiagnostics() throws {
         continueAfterFailure = true
         let app = XCUIApplication()
         app.launchArguments = ["-uiTest", "-screen", "nowPlaying", "-appearance", "light"]
         app.launch()
         let heart = app.buttons["player.favorite"]
-        let shuffle = app.buttons["player.shuffle"]
         let repeatButton = app.buttons["player.repeat"]
         XCTAssertTrue(heart.waitForExistence(timeout: 20), "no heart")
         let hittable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: heart)
         _ = XCTWaiter.wait(for: [hittable], timeout: 10)
-        print("[diag] start heart=\(heart.label) sel=\(heart.isSelected) frame=\(heart.frame)")
-        print("[diag] start shuffle sel=\(shuffle.isSelected) repeat=\(repeatButton.label)")
-        shuffle.tap()
-        Thread.sleep(forTimeInterval: 2)
-        print("[diag] after shuffle tap: shuffle sel=\(shuffle.isSelected) heart=\(heart.label)")
+        func state(_ step: String) {
+            Thread.sleep(forTimeInterval: 2)
+            print("[diag] \(step): heart=\(heart.label) repeat=\(repeatButton.label)")
+        }
+        print("[diag] heart debug: \(heart.debugDescription)")
+        state("start")
+        heart.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        state("1 coordinate centre tap on the liked heart")
         heart.tap()
-        Thread.sleep(forTimeInterval: 2)
-        print("[diag] after heart tap: heart=\(heart.label) sel=\(heart.isSelected)")
+        state("2 element tap on the unliked heart")
+        heart.tap()
+        state("3 element tap on the liked heart")
+        heart.press(forDuration: 0.25)
+        state("4 element press 0.25 s on the heart")
         repeatButton.tap()
-        Thread.sleep(forTimeInterval: 2)
-        print("[diag] after repeat tap: repeat=\(repeatButton.label) heart=\(heart.label)")
-        heart.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.3)).tap()
-        Thread.sleep(forTimeInterval: 2)
-        print("[diag] after coordinate heart tap: heart=\(heart.label)")
-        shuffle.tap()
-        Thread.sleep(forTimeInterval: 2)
-        print("[diag] after 2nd shuffle tap: shuffle sel=\(shuffle.isSelected) heart=\(heart.label)")
-        let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = "favoriteDiagnostics-light"
-        attachment.lifetime = .keepAlways
-        add(attachment)
+        state("5 element tap on repeat (off)")
+        repeatButton.tap()
+        state("6 element tap on repeat (on)")
+        repeatButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        state("7 coordinate centre tap on repeat")
+        XCTFail("diagnostics run: fails on purpose so the result bundle and app output are uploaded")
         app.terminate()
     }
 

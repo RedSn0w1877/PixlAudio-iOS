@@ -49,7 +49,11 @@ struct PlayerToggleRow: View {
     private func segment(active: Bool, systemImage: String, label: LocalizedStringKey, fill: Color, icon: Color,
                          action: @escaping () -> Void) -> some View {
         let shape = RoundedRectangle(cornerRadius: active ? Self.height / 2 : 18, style: .continuous)
-        return Button(action: action) {
+        return Button {
+            // TEMPORARY diagnosis (s21-main-health): does the action run in the UI tests?
+            if LaunchConfiguration.current.isUITest { print("[diag-app] segment action \(systemImage) active=\(active)") }
+            action()
+        } label: {
             Image(systemName: systemImage)
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(active ? icon : theme.onSurface)
