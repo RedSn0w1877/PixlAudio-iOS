@@ -84,3 +84,33 @@ def test_unexpected_exceptions_become_INTERNAL_without_details(tmp_path, monkeyp
     monkeypatch.setattr(handler.st, "selftest", explode)
     out = worker.handle({"id": "j", "input": {"v": 1, "op": "selftest"}})
     assert out == {"error": "INTERNAL: unexpected RuntimeError"}
+
+
+def test_bench_never_inherits_a_finished_jobs_deadline(tmp_path):
+    from pixl_worker.deadline import Deadline
+    from pixl_worker.lyrics import languages
+
+    class Aligner:
+        model_id = "fake-aligner"
+
+        def __init__(self):
+            self.deadline = Deadline(0)  # long expired: what an earlier process job used to leave behind
+
+        def supports(self, language):
+            return language == "en"
+
+        def align(self, requests):
+            if self.deadline is not None:
+                self.deadline.check("lyrics")
+            return [[] for _ in requests]
+
+    languages.clear_backends()
+    languages.register_backend(Aligner())
+    try:
+        worker, _ = make_worker(tmp_path)
+        out = worker.handle({"id": "j", "input": {"v": 1, "op": "bench",
+                                                  "bench": {"seconds": 10, "stages": ["align"]}}})
+    finally:
+        languages.clear_backends()
+    assert out.get("status") == "ok", out
+    assert "align" in out["stagesMs"] and out["stagesMs"]["alignWindows"] == 2

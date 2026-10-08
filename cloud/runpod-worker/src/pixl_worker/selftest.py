@@ -147,6 +147,8 @@ def bench(spec, *, caps: Caps, worker: dict, separator, stems4, transcriber_fact
                     clip = voice16k[int(start * 16000): int((start + 5.5) * 16000)]
                     requests.append(AlignRequest(key=k, text="la la la sing along with me", language="en",
                                                  audio=clip, offset_s=start))
+                if hasattr(backend, "deadline"):
+                    backend.deadline = None  # the bench has no deadline; never inherit a finished job's
                 timed("align", lambda: backend.align(requests))
                 stages["alignWindows"] = len(requests)
         if "transcribe" in spec.stages and transcriber_factory is not None:
@@ -154,6 +156,8 @@ def bench(spec, *, caps: Caps, worker: dict, separator, stems4, transcriber_fact
             transcriber = transcriber_factory()
             loads["asr"] = int(round((time.monotonic() - t0) * 1000))
             clips = [voice16k[int(4.0 * k * 16000): int((4.0 * k + 3.0) * 16000)] for k in range(min(10, spec.seconds // 4))]
+            if hasattr(transcriber, "deadline"):
+                transcriber.deadline = None
             timed("transcribe", lambda: transcriber.transcribe(clips, "en"))
             stages["transcribeClips"] = len(clips)
         if "encode" in spec.stages:

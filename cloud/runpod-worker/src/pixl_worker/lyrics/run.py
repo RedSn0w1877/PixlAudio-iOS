@@ -53,6 +53,19 @@ def _check(deadline) -> None:
         deadline.check("lyrics")
 
 
+def _with_deadline(model, deadline, call):
+    """Run `call()` with this job's deadline set on a shared model, and always take it off again: the aligner
+    and the transcriber live for the whole process (FlashBoot resumes it), so a deadline left behind would end a
+    later job that sets none (op bench) with DEADLINE."""
+    if not hasattr(model, "deadline"):
+        return call()
+    model.deadline = deadline
+    try:
+        return call()
+    finally:
+        model.deadline = None
+
+
 def _run_backends(requests: list[tuple[AlignRequest, object]], deadline) -> tuple[dict[int, list], str | None]:
     """Group requests by backend and run each group. Returns ({key: tokens|None}, model id used)."""
     by_backend: dict[int, tuple[object, list[AlignRequest]]] = {}
@@ -62,9 +75,7 @@ def _run_backends(requests: list[tuple[AlignRequest, object]], deadline) -> tupl
     used = None
     for backend, reqs in by_backend.values():
         _check(deadline)
-        if hasattr(backend, "deadline"):
-            backend.deadline = deadline
-        results = backend.align(reqs)
+        results = _with_deadline(backend, deadline, lambda: backend.align(reqs))
         used = used or getattr(backend, "model_id", None)
         for req, result in zip(reqs, results):
             tokens[req.key] = result
@@ -164,10 +175,8 @@ def _transcribe(request: LyricsRequest, vocals16k, segments, duration_s, transcr
         return LyricsOutcome(doc=doc, warnings=["lyrics: no singing found to transcribe"])
     _check(deadline)
     transcriber = transcriber_factory()
-    if hasattr(transcriber, "deadline"):
-        transcriber.deadline = deadline
     clips = [W.cut(vocals16k, s, e) for s, e in spans]
-    recognised = transcriber.transcribe(clips, request.language)
+    recognised = _with_deadline(transcriber, deadline, lambda: transcriber.transcribe(clips, request.language))
 
     kept: list[tuple[int, float, float, str, str | None]] = []
     for (s, e), (lang, text) in zip(spans, recognised):

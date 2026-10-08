@@ -154,3 +154,58 @@ def test_silence_transcribes_to_nothing():
     out = run_lyrics(request([], mode="transcribe"), np.zeros(W.SR * 5, dtype=np.float32),
                      transcriber_factory=lambda: FakeASR([]))
     assert out.doc["lines"] == [] and any("no singing" in w for w in out.warnings)
+
+
+class DeadlineBackend(Backend):
+    """Like the real aligner and transcriber: lives for the whole process and checks the deadline it was handed."""
+
+    def __init__(self, langs, *, fail=False):
+        super().__init__(langs)
+        self.deadline, self.seen, self.fail = None, [], fail
+
+    def align(self, requests):
+        self.seen.append(self.deadline)
+        if self.deadline is not None:
+            self.deadline.check("lyrics")
+        if self.fail:
+            raise RuntimeError("aligner blew up")
+        return super().align(requests)
+
+
+class DeadlineASR(FakeASR):
+    def __init__(self, texts):
+        super().__init__(texts)
+        self.deadline, self.seen = None, []
+
+    def transcribe(self, clips, language):
+        self.seen.append(self.deadline)
+        return super().transcribe(clips, language)
+
+
+def test_a_jobs_deadline_never_stays_on_the_shared_models():
+    # FlashBoot resumes the same process, so a deadline left on the aligner would end the next op bench (which
+    # sets none) with DEADLINE as soon as the finished job's time had run out.
+    from pixl_worker.deadline import Deadline
+
+    deadline = Deadline(600)
+    aligner = DeadlineBackend({"en"})
+    languages.register_backend(aligner)
+    lines = [(int(s * 1000), int(e * 1000), t) for (s, e), t in zip(PHRASES, TEXTS)]
+    run_lyrics(request(lines), voice(PHRASES, 24), transcriber_factory=None, deadline=deadline)
+    assert aligner.seen == [deadline] and aligner.deadline is None
+
+    asr = DeadlineASR(["la la sing"])
+    run_lyrics(request([], mode="transcribe"), voice(PHRASES[:1], 6), transcriber_factory=lambda: asr,
+               deadline=deadline)
+    assert asr.seen == [deadline] and asr.deadline is None and aligner.deadline is None
+
+
+def test_the_deadline_comes_off_the_aligner_even_when_it_fails():
+    from pixl_worker.deadline import Deadline
+
+    aligner = DeadlineBackend({"en"}, fail=True)
+    languages.register_backend(aligner)
+    lines = [(int(s * 1000), int(e * 1000), t) for (s, e), t in zip(PHRASES, TEXTS)]
+    with pytest.raises(RuntimeError):
+        run_lyrics(request(lines), voice(PHRASES, 24), transcriber_factory=None, deadline=Deadline(600))
+    assert aligner.deadline is None
