@@ -649,6 +649,7 @@ final class CloudStudio {
                 r.decodedFrames = prepared.frames
                 r.sampleRate = prepared.sampleRate
                 if let identity { r.videoId = identity }
+                r.lowQualitySource = r.isStreamed && prepared.lowQuality
                 r.apply(.prepared, nowMs: now)
             }
             persist()

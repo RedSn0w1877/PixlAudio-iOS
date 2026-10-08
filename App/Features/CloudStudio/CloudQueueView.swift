@@ -233,7 +233,7 @@ nonisolated enum CloudJobRowText {
            let error = record.lastError, !error.isEmpty {
             lines.append(error)
         }
-        if record.lowQualitySource { lines.append("Low-quality source: only a 48 kbps stream was on offer.") }
+        if record.lowQualitySource { lines.append("Low-quality source: only a low-bitrate stream was on offer.") }
         if record.state != .imported, record.lyricsMode == .transcribe, record.tasks.contains(.lyrics) {
             lines.append("No lyrics yet: the cloud will write them (AI-written lyrics).")
         }

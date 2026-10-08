@@ -20,6 +20,8 @@ nonisolated struct CloudPreparedAudio: Sendable, Hashable {
     var sampleRate: Double
     /// The source's own bytes were uploaded (copy or passthrough export), not a decode.
     var passthrough: Bool
+    /// The source was HE-AAC, below 32 kHz, or muxed video (YouTube itag 139 / 18): shown on the queue row.
+    var lowQuality = false
 }
 
 /// Prepares a song for upload, off the main actor (design §1 step 1, §7.1):
@@ -191,9 +193,11 @@ nonisolated enum CloudAudioPreparer {
             }
             try Task.checkCancellation()
             let sha256 = try ModelManager.sha256Hex(of: output)
+            let heAAC = formatID == kAudioFormatMPEG4AAC_HE || formatID == kAudioFormatMPEG4AAC_HE_V2
+            let lowQuality = heAAC || (sourceRate ?? sampleRate) < minimumPassthroughSampleRate || !videoTracks.isEmpty
             return CloudPreparedAudio(fileURL: output, ext: output.pathExtension.lowercased(), bytes: bytes, sha256: sha256,
                                       durationMs: durationMs, frames: frames, sampleRate: sampleRate,
-                                      passthrough: passthrough)
+                                      passthrough: passthrough, lowQuality: lowQuality)
         } catch {
             try? FileManager.default.removeItem(at: output)
             throw error
