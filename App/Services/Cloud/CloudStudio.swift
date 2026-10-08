@@ -271,6 +271,7 @@ final class CloudStudio {
                  replaceUserSynced: Bool = false) async -> CloudBatchPreview {
         isPreviewing = true
         defer { isPreviewing = false }
+        await settings.loadBuiltInKeys()
         await loadIfNeeded()
         let host = dependencies.host
         let pending = pendingSongIds
@@ -328,6 +329,8 @@ final class CloudStudio {
 
     /// The person confirmed the batch: one job per song, then everything runs on its own.
     func send(_ preview: CloudBatchPreview) async {
+        // Built-in keys that turn out not to open switch the default consent off: know before anything is queued.
+        await settings.loadBuiltInKeys()
         guard settings.isEnabled, !preview.isEmpty, preview.estimate.fitsCap else { return }
         await loadIfNeeded()
         let now = dependencies.nowMs()

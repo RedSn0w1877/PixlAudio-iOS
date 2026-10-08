@@ -575,12 +575,16 @@ final class CloudHarness {
     let objects: FakeCloudObjects
     let settings: CloudSettings
     let studio: CloudStudio
+    /// The configs RunPod and the bucket clients were made with, and how often the transfer session was made.
+    let configs: CloudConfigLog
     private let directory: URL
     private var nextKey = 100
     let instrumental = Data(repeating: 7, count: 4_096)
 
-    /// `store`: a job list an earlier launch left (a relaunch); empty by default.
-    init(store: CloudJobStore = CloudJobStore(file: nil)) {
+    /// `store`: a job list an earlier launch left (a relaunch); empty by default. `builtIn`: the build's built-in
+    /// keys (none by default); `ownKeys: false` leaves the person's own fields empty and the switch at its default.
+    init(store: CloudJobStore = CloudJobStore(file: nil), builtIn: (any CloudBuiltInKeysProviding)? = nil,
+         ownKeys: Bool = true) {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("CloudHarness-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let clock = CloudTestClock(), host = FakeCloudHost(), transfers = FakeCloudTransfers()
@@ -589,21 +593,38 @@ final class CloudHarness {
         inspector.decodedFrames = CloudTestValues.sourceFrames
         let suite = "cloud-harness-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite) ?? .standard
-        let settings = CloudSettings(defaults: defaults, secrets: CloudMemorySecrets(
-            CloudSecrets(runpodKey: "rpa_TEST", accessKeyId: "AKID", secretAccessKey: "SECRET")))
-        settings.isEnabled = true
-        settings.endpointId = "abc123xyz"
-        settings.r2Endpoint = "0123456789abcdef0123456789abcdef"
+        let settings = CloudSettings(defaults: defaults, secrets: CloudMemorySecrets(ownKeys
+            ? CloudSecrets(runpodKey: "rpa_TEST", accessKeyId: "AKID", secretAccessKey: "SECRET") : .empty),
+                                     builtIn: builtIn)
+        if ownKeys {
+            settings.isEnabled = true
+            settings.endpointId = "abc123xyz"
+            settings.r2Endpoint = "0123456789abcdef0123456789abcdef"
+        }
         var counter = 0
+        let log = CloudConfigLog()
         let dependencies = CloudStudio.Dependencies(
-            store: store, host: host, makeTransfers: { transfers }, preparer: preparer,
-            inspector: inspector, makeRunPod: { _ in runpod }, makeObjects: { _ in objects },
+            store: store, host: host,
+            makeTransfers: {
+                log.transfersMade += 1
+                return transfers
+            },
+            preparer: preparer, inspector: inspector,
+            makeRunPod: { config in
+                log.runpod.append(config)
+                return runpod
+            },
+            makeObjects: { config in
+                log.objects.append(config)
+                return objects
+            },
             nowMs: { clock.ms }, monthStartMs: { _ in 0 },
             newJobKey: {
                 counter += 1
                 return CloudTestValues.key(counter)
             },
             build: "1.0 (test)", removeStaged: { _ in }, background: nil)
+        configs = log
         self.directory = directory
         self.clock = clock
         self.host = host
@@ -682,6 +703,13 @@ final class CloudHarness {
             try? await Task.sleep(for: .milliseconds(10))
         }
     }
+}
+
+/// What the harness's client factories were called with.
+final class CloudConfigLog {
+    var runpod: [CloudConfigInput] = []
+    var objects: [CloudConfigInput] = []
+    var transfersMade = 0
 }
 
 nonisolated final class CloudTestClock: @unchecked Sendable {
