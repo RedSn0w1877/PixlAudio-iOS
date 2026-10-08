@@ -16,7 +16,11 @@ Steps (stdlib only, idempotent):
    while they drain, so it retries); the storage host allowlist must not be empty;
 6. --bench: one `op: bench` (per-stage seconds, peak VRAM), then the W1 concurrency check: 3 bench jobs at
    once while polling the workers every 5 s for the peak number running (above 1 means "extra workers" exist
-   and every max-1 cost bound is off).
+   and every max-1 cost bound is off). Each selftest and bench stops its worker afterwards (handler.py), so the
+   3 concurrency jobs each start a worker of their own;
+7. after the selftest/bench, whether they passed or not: the idle release of deploy/reaper.py (two /health reads
+   a minute apart; a worker still idle and ready with nothing to do is released by max workers 0 and back), since
+   an idle worker left by the deploy's own jobs bills until something stops it (seen on 2026-10-08).
 Prints only pass/fail lines, the GPU name and timings: never a key, the endpoint id, a response body or money.
 """
 
@@ -34,6 +38,7 @@ from typing import Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from reaper import STILL_THERE, ReaperError, release_idle  # noqa: E402
 from runpod_api import FINAL_STATES, ApiError, RunPod, ghcr_public, mask, wait_for_job  # noqa: E402
 
 IMAGE_REPO = "ghcr.io/redsn0w1877/pixl-cloud-worker"
@@ -209,6 +214,28 @@ def concurrency_check(api: RunPod, endpoint_id: str, *, jobs: int = 3, poll_s: f
     return peak_running
 
 
+def release_after_jobs(api: RunPod, endpoint_id: str, template: dict, *, strict: bool,
+                       sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.monotonic,
+                       **kw) -> str | None:
+    """The selftest and bench stop their own worker (refresh_worker); this makes sure no idle worker stays behind
+    anyway. A failed read is a warning (cloud-worker-reaper looks again within 30 minutes); workers that couldn't
+    be put back fail the deploy unless it is already failing (`strict` False), when it is an error line."""
+    try:
+        current = (api.get_endpoint(endpoint_id) or {}).get("workers") or template["workers"]
+        outcome = release_idle(api, endpoint_id, current, template, sleep=sleep, clock=clock, say=say, **kw)
+    except ApiError as exc:
+        say(f"::warning::idle check after the jobs failed ({exc}); cloud-worker-reaper looks again within 30 minutes")
+        return None
+    except ReaperError as exc:
+        if strict:
+            raise DeployError(str(exc)) from None
+        say(f"::error::{exc}")
+        return None
+    if outcome == STILL_THERE:
+        say("::warning::a worker stayed idle at max workers 0; cloud-worker-reaper tries again within 30 minutes")
+    return outcome
+
+
 def deploy(api: RunPod | None, *, tag: str, git_sha: str, account_id: str, create: bool, auto: bool,
            run_selftest: bool, run_bench: bool, extra_pools: list[str], template: dict,
            pull_check=ghcr_public, sleep: Callable[[float], None] = time.sleep,
@@ -253,11 +280,17 @@ def deploy(api: RunPod | None, *, tag: str, git_sha: str, account_id: str, creat
         raise DeployError("RunPod did not return an endpoint id")
     if changed and current is not None:
         wait_rollout(api, endpoint_id, sleep=sleep, clock=clock)
-    if run_selftest:
-        report_selftest(selftest(api, endpoint_id, git_sha, sleep=sleep, clock=clock))
-    if run_bench:
-        bench(api, endpoint_id, sleep=sleep, clock=clock)
-        concurrency_check(api, endpoint_id, sleep=sleep, clock=clock)
+    passed = False
+    try:
+        if run_selftest:
+            report_selftest(selftest(api, endpoint_id, git_sha, sleep=sleep, clock=clock))
+        if run_bench:
+            bench(api, endpoint_id, sleep=sleep, clock=clock)
+            concurrency_check(api, endpoint_id, sleep=sleep, clock=clock)
+        passed = True
+    finally:
+        if run_selftest or run_bench:
+            release_after_jobs(api, endpoint_id, template, strict=passed, sleep=sleep, clock=clock)
     return 0
 
 

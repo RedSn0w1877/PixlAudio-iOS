@@ -1,0 +1,33 @@
+name: cloud-worker-reaper
+
+# Safety net for idle billing (2026-10-08: after the first deploy's selftest a worker sat idle and ready for 7+
+# minutes despite idleTimeout 10 s, and RunPod bills idle workers). Every 30 minutes: two /health reads a minute
+# apart; when both show an idle or ready worker with nothing queued, in progress or running, set max workers to 0
+# until it is gone (2 minutes at most), then back to what it was (never above deploy/endpoint.json). Sends no jobs.
+# Before setup (no endpoint yet) it just succeeds. The worker normally stops itself (handler.py, refresh_worker),
+# so most runs only read /health. Logs are public: counts only, the endpoint id is masked, no money.
+on:
+  schedule:
+    - cron: '7,37 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloud-worker-reaper
+  cancel-in-progress: false
+
+jobs:
+  reap:
+    runs-on: ubuntu-24.04
+    environment: runpod
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Release an idle worker
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+        run: python3 cloud/runpod-worker/deploy/reaper.py

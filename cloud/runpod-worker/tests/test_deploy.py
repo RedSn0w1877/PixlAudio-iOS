@@ -1,6 +1,7 @@
 """deploy/: the REST v2 client (retries, safe errors), the desired state and the smallest valid PATCH, the deploy
-flow (auto vs by hand, private package, rollout, selftest gitSha), the W1 concurrency check, and the keepalive
-(restore only when healthy, spend alarm without printing money). No network: a fake RunPod and a fake opener."""
+flow (auto vs by hand, private package, rollout, selftest gitSha), the W1 concurrency check, the keepalive
+(restore only when healthy, spend alarm without printing money), and the idle-worker reaper (alone and after the
+deploy's jobs). No network: a fake RunPod and a fake opener."""
 
 import copy
 import io
@@ -15,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "deploy"))
 
 import keepalive as K  # noqa: E402
+import reaper as RP  # noqa: E402
 import runpod_api as R  # noqa: E402
 import runpod_deploy as D  # noqa: E402
 
@@ -44,6 +46,9 @@ class FakeRunPod:
         self.calls.append(("create", body))
         self.endpoint = {**copy.deepcopy(body), "id": "ep123456"}
         return {**body, "id": "ep123456"}
+
+    def get_endpoint(self, endpoint_id):
+        return copy.deepcopy(self.endpoint)
 
     def update_endpoint(self, endpoint_id, body):
         self.calls.append(("patch", body))
@@ -411,3 +416,259 @@ def test_mask_only_inside_actions(capsys, monkeypatch):
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
     R.mask("ep1")
     assert capsys.readouterr().out == "::add-mask::ep1\n"
+
+
+# ---- the idle-worker reaper -----------------------------------------------------------------------------
+
+IDLE = {"jobs": {"completed": 1, "failed": 0, "inProgress": 0, "inQueue": 0, "retried": 0},
+        "workers": {"idle": 1, "initializing": 0, "ready": 1, "running": 0, "throttled": 0, "unhealthy": 0}}
+GONE = {"jobs": {"completed": 1, "failed": 0, "inProgress": 0, "inQueue": 0, "retried": 0},
+        "workers": {"idle": 0, "initializing": 0, "ready": 0, "running": 0, "throttled": 0, "unhealthy": 0}}
+
+
+def health(*, idle=0, ready=0, running=0, initializing=0, in_queue=0, in_progress=0):
+    return {"jobs": {"inQueue": in_queue, "inProgress": in_progress, "completed": 3},
+            "workers": {"idle": idle, "ready": ready, "running": running, "initializing": initializing}}
+
+
+class Clock:
+    """Time moves only when the code sleeps."""
+
+    def __init__(self):
+        self.now = 0.0
+        self.slept = []
+
+    def sleep(self, seconds):
+        self.slept.append(seconds)
+        self.now += seconds
+
+    def __call__(self):
+        return self.now
+
+
+class Reaped(FakeRunPod):
+    """/health answers from a script (the last answer repeats; an exception is raised); PATCHes can be made to fail."""
+
+    def __init__(self, endpoint, script, *, fail_patch=()):
+        super().__init__(endpoint)
+        self.script = list(script)
+        self.fail_patch = set(fail_patch)  # indexes of PATCH calls that fail
+        self.patches = 0
+
+    def health(self, endpoint_id):
+        self.calls.append(("health",))
+        step = self.script.pop(0) if len(self.script) > 1 else self.script[0]
+        if isinstance(step, Exception):
+            raise step
+        return copy.deepcopy(step)
+
+    def update_endpoint(self, endpoint_id, body):
+        index, self.patches = self.patches, self.patches + 1
+        if index in self.fail_patch:
+            self.calls.append(("patch-failed", body))
+            raise R.ApiError("PATCH /v2/serverless/{id}", 503, "Service Unavailable")
+        return super().update_endpoint(endpoint_id, body)
+
+
+def patches(api):
+    return [c[1] for c in api.calls if c[0] == "patch"]
+
+
+ZERO = {"workers": {"min": 0, "max": 0, "idleTimeout": 10}}
+BACK = {"workers": {"min": 0, "max": 1, "idleTimeout": 10}}
+
+
+def release(api, clock=None, template=TEMPLATE):
+    clock = clock or Clock()
+    return RP.release_idle(api, "ep123456", (api.endpoint or {}).get("workers") or {}, template,
+                           sleep=clock.sleep, clock=clock)
+
+
+def test_reaper_releases_a_worker_idle_on_both_reads_and_puts_max_back(capsys):
+    api = Reaped(deployed(), [IDLE, IDLE, IDLE, GONE])
+    clock = Clock()
+    assert release(api, clock) == RP.RELEASED
+    assert patches(api) == [ZERO, BACK]
+    assert clock.slept[0] == RP.CONFIRM_S  # the two reads are a minute apart
+    assert api.endpoint["workers"] == {"min": 0, "max": 1, "idleTimeout": 10}
+    out = capsys.readouterr().out
+    assert "idle worker is gone after 20 s" in out and "max workers back to 1" in out
+    assert "ep123456" not in out and "$" not in out
+
+
+@pytest.mark.parametrize("second", [
+    health(idle=1, running=1),          # it picked up a job
+    health(idle=1, in_queue=1),         # a job is waiting for it
+    health(ready=1, in_progress=1),
+    GONE,                               # it left on its own (refresh_worker, idleTimeout)
+])
+def test_reaper_leaves_a_worker_that_isnt_idle_on_the_second_read(second):
+    api = Reaped(deployed(), [IDLE, second])
+    assert release(api) == RP.NOTHING_IDLE
+    assert patches(api) == []
+
+
+@pytest.mark.parametrize("first", [GONE, health(running=1, in_progress=1), health(idle=1, in_queue=2),
+                                   health(initializing=1, in_queue=1), {}, None])
+def test_reaper_does_nothing_without_an_idle_worker(first):
+    api = Reaped(deployed(), [first])
+    clock = Clock()
+    assert release(api, clock) == RP.NOTHING_IDLE
+    assert patches(api) == [] and clock.slept == []  # no second read: nothing to confirm
+
+
+def test_reaper_counts_only_idle_or_ready_workers_with_nothing_to_do():
+    assert RP.stranded(RP.counts(IDLE)) and RP.stranded(RP.counts(health(ready=1)))
+    assert RP.stranded(RP.counts(health(idle=1)))
+    assert not RP.stranded(RP.counts(health(idle=1, running=1)))
+    assert not RP.stranded(RP.counts({"workers": {"idle": True}}))  # not a count
+    assert RP.counts({"jobs": "x", "workers": None}) == RP.counts({})
+    assert RP.gone(RP.counts(GONE)) and not RP.gone(RP.counts(health(initializing=1)))
+
+
+def test_reaper_restores_at_once_when_a_job_arrives_at_max_0():
+    api = Reaped(deployed(), [IDLE, IDLE, health(idle=1, in_queue=1)])
+    clock = Clock()
+    assert release(api, clock) == RP.JOB_ARRIVED
+    assert patches(api) == [ZERO, BACK]
+    assert clock.now == RP.CONFIRM_S + RP.POLL_S  # the job waited one poll, not the 2 minutes
+
+
+def test_reaper_gives_up_after_two_minutes_but_always_restores(capsys):
+    api = Reaped(deployed(), [IDLE])  # the worker never leaves
+    clock = Clock()
+    assert release(api, clock) == RP.STILL_THERE
+    assert patches(api) == [ZERO, BACK]
+    assert clock.now - RP.CONFIRM_S == RP.GONE_TIMEOUT_S
+    assert "::warning::" in capsys.readouterr().out
+
+
+def test_reaper_restores_when_health_fails_while_waiting():
+    api = Reaped(deployed(), [IDLE, IDLE, R.ApiError("GET /health", 502, "Bad Gateway")])
+    assert release(api) == RP.UNKNOWN
+    assert patches(api) == [ZERO, BACK]
+
+
+def test_reaper_leaves_a_switched_off_endpoint_alone():
+    endpoint = deployed()
+    endpoint["workers"] = {"min": 0, "max": 0, "idleTimeout": 10}
+    api = Reaped(endpoint, [IDLE])
+    assert release(api) == RP.OFF
+    assert api.calls == []  # not even a /health read
+
+
+def test_reaper_never_raises_max_above_what_it_found_or_endpoint_json():
+    template = copy.deepcopy(TEMPLATE)
+    template["workers"]["max"] = 3
+    api = Reaped(deployed(), [IDLE, IDLE, GONE])  # found max 1
+    assert release(api, template=template) == RP.RELEASED
+    assert patches(api)[-1] == BACK
+    endpoint = deployed()
+    endpoint["workers"] = {"min": 0, "max": 2, "idleTimeout": 10}  # raised by hand above endpoint.json's 1
+    api = Reaped(endpoint, [IDLE, IDLE, GONE])
+    assert release(api) == RP.RELEASED
+    assert patches(api)[-1] == BACK
+
+
+def test_reaper_a_failed_restore_fails_loudly():
+    api = Reaped(deployed(), [IDLE, IDLE, GONE], fail_patch={1})
+    with pytest.raises(RP.ReaperError, match="back to 1"):
+        release(api)
+    assert patches(api) == [ZERO]
+
+
+def test_reaper_a_failed_patch_to_0_still_restores_then_fails():
+    # The PATCH may have been applied before the connection dropped, so the restore runs anyway.
+    api = Reaped(deployed(), [IDLE, IDLE, GONE], fail_patch={0})
+    with pytest.raises(RP.ReaperError, match="to 0"):
+        release(api)
+    assert patches(api) == [BACK]
+    assert [c for c in api.calls if c[0] == "health"] == [("health",)] * 2  # no waiting without the PATCH
+
+
+def test_reap_before_setup_succeeds_quietly(capsys):
+    assert RP.reap(None, TEMPLATE) == 0
+    assert RP.reap(FakeRunPod(), TEMPLATE) == 0
+    out = capsys.readouterr().out
+    assert "::" not in out and "nothing to do" in out
+
+
+def test_reap_treats_a_failed_read_as_a_warning_and_changes_nothing(capsys):
+    class Down(FakeRunPod):
+        def find_endpoint(self, name):
+            raise R.ApiError("GET /v2/serverless", 503, "Service Unavailable")
+
+    assert RP.reap(Down(), TEMPLATE) == 0
+    api = Reaped(deployed(), [R.ApiError("GET /health", 502, "")])
+    assert RP.reap(api, TEMPLATE) == 0
+    assert patches(api) == []
+    assert capsys.readouterr().out.count("::warning::") == 2
+
+
+def test_reap_masks_the_endpoint_id_first_and_fails_when_the_worker_stays(capsys, monkeypatch):
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    clock = Clock()
+    api = Reaped(deployed(), [IDLE])
+    assert RP.reap(api, TEMPLATE, sleep=clock.sleep, clock=clock) == 1
+    out = capsys.readouterr().out
+    assert out.startswith("::add-mask::ep123456\n") and out.count("ep123456") == 1
+    assert "::error::" in out
+    clock = Clock()
+    assert RP.reap(Reaped(deployed(), [IDLE, IDLE, GONE]), TEMPLATE, sleep=clock.sleep, clock=clock) == 0
+
+
+def test_reaper_main_without_a_key_succeeds(monkeypatch, capsys):
+    monkeypatch.delenv("RUNPOD_API_KEY", raising=False)
+    assert RP.main() == 0
+    assert "::" not in capsys.readouterr().out
+
+
+def test_deploy_releases_an_idle_worker_left_by_its_selftest(capsys):
+    api = Reaped(deployed(), [IDLE, IDLE, GONE])
+    assert go(api) == 0
+    assert patches(api) == [ZERO, BACK]
+    kinds = [c[0] for c in api.calls]
+    assert kinds.index("runsync") < kinds.index("health")  # after the selftest, never before
+    assert "idle worker is gone" in capsys.readouterr().out
+
+
+def test_deploy_without_jobs_doesnt_look_for_idle_workers():
+    api = Reaped(deployed(), [IDLE])
+    assert go(api, run_selftest=False) == 0
+    assert ("health",) not in api.calls
+
+
+def test_deploy_after_a_failed_selftest_still_releases_and_keeps_its_own_error(capsys):
+    api = Reaped(deployed(), [IDLE, IDLE, GONE], fail_patch={1})
+    api.selftest_shas = ["FAIL"]
+    with pytest.raises(D.DeployError, match="selftest FAILED"):
+        go(api)
+    out = capsys.readouterr().out
+    assert "::error::couldn't set max workers back to 1" in out
+
+
+def test_deploy_fails_when_the_workers_cant_be_put_back():
+    api = Reaped(deployed(), [IDLE, IDLE, GONE], fail_patch={1})
+    with pytest.raises(D.DeployError, match="back to 1"):
+        go(api)
+
+
+def test_deploy_only_warns_when_the_idle_check_cant_read_health(capsys):
+    api = Reaped(deployed(), [R.ApiError("GET /health", 502, "")])
+    assert go(api) == 0
+    assert "::warning::idle check after the jobs failed" in capsys.readouterr().out
+
+
+def test_the_reaper_workflow_runs_every_30_minutes_in_the_runpod_environment():
+    found = [p / ".github" / "workflows" / "cloud-worker-reaper.yml" for p in ROOT.parents]
+    workflow = next((w for w in found if w.is_file()), None)
+    if workflow is None:
+        pytest.skip("the repository's workflows are not in this checkout")
+    text = workflow.read_text(encoding="utf-8")
+    assert "cron: '7,37 * * * *'" in text and "workflow_dispatch" in text
+    assert "environment: runpod" in text and "contents: read" in text
+    assert "python3 cloud/runpod-worker/deploy/reaper.py" in text
+    for line in text.splitlines():
+        if "uses:" in line:
+            ref = line.split("@", 1)[1].split()[0]
+            assert len(ref) == 40 and all(ch in "0123456789abcdef" for ch in ref), line  # pinned to a commit
