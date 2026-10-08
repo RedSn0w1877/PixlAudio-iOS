@@ -1,0 +1,66 @@
+name: cloud-e2e
+
+# End-to-end check of PixlAudio's built-in cloud keys (docs/handoff/2026-10-08-baked-keys.md), run by hand after the
+# keys were baked: cloud/runpod-worker/deploy/e2e.py opens the committed App/Resources/CloudDefaults.enc with the
+# CLOUD_DEFAULTS_KEY secret, uploads a short generated clip to R2 (in/), sends one job to the RunPod endpoint in the
+# blob with input.policy.last_in_batch, waits for it, checks the instrumental in out/ against its manifest, deletes
+# every test object, then makes sure no worker is left idle (one that lingers is released like cloud-worker-reaper:
+# max workers 0, then back). About a cent.
+# Logs are public: every value from the blob is masked before anything else happens, and only pass/fail lines, sizes,
+# timings and the GPU name are printed. Without the secret, or with the placeholder blob, it fails with what to do.
+on:
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: Length of the test clip in seconds (5-120)
+        type: string
+        default: '20'
+      clip:
+        description: >-
+          Optional: a repository path or an https URL of an audio file to use (its first <seconds>) instead of the
+          generated tones. Shown in the public log, so never a URL with a token in it.
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloud-e2e
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    runs-on: ubuntu-24.04
+    environment: runpod
+    # A cold start plus the job (25 minutes at most before it is cancelled), the idle check (3 minutes) and, at
+    # worst, releasing a lingering worker.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Tools (ffmpeg, cryptography)
+        run: |
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq --no-install-recommends ffmpeg >/dev/null
+          fi
+          ffmpeg -hide_banner -version | head -1
+          # AES-GCM for the blob: cryptography and its two dependencies, pinned with hashes, in a throwaway venv.
+          python3 -m venv "$RUNNER_TEMP/e2e-venv"
+          "$RUNNER_TEMP/e2e-venv/bin/pip" install -q --disable-pip-version-check --require-hashes --only-binary :all: \
+            -r cloud/runpod-worker/deploy/e2e-requirements.txt
+      - name: End-to-end
+        env:
+          CLOUD_DEFAULTS_KEY: ${{ secrets.CLOUD_DEFAULTS_KEY }}
+          # The deploy key, only to release a worker that stays idle (the job itself uses the blob's Restricted key).
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+          E2E_SECONDS: ${{ inputs.seconds }}
+          E2E_CLIP: ${{ inputs.clip }}
+        # exec: python becomes the step's own process, so the SIGINT GitHub sends on a cancel reaches it and the
+        # cleanup (cancel the job, delete the objects) still runs.
+        run: >-
+          exec "$RUNNER_TEMP/e2e-venv/bin/python" cloud/runpod-worker/deploy/e2e.py
+          --seconds "${E2E_SECONDS:-20}" --clip "${E2E_CLIP:-}"

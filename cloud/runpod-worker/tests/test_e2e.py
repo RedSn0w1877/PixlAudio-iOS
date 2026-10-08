@@ -1,6 +1,7 @@
 """deploy/e2e.py (cloud-e2e.yml): the SigV4 port against AWS's example, the /run body against the worker's own schema
-and validator, the manifest checks, the idle check and release, the whole flow with fakes (cleanup on every path,
-nothing secret printed), and, where `cryptography` is installed (not in the test image), opening the blob. No network.
+and validator, the clip (FLAC header length, --clip), the manifest checks, the idle check and release, the whole flow
+with fakes (cleanup on every path, nothing secret printed), the clear failures before anything is sent, and, where
+`cryptography` is installed (not in the test image), opening the blob. No network.
 """
 
 import base64
@@ -14,7 +15,6 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-REPO = ROOT.parents[1]
 sys.path.insert(0, str(ROOT / "deploy"))
 
 import e2e as E  # noqa: E402
@@ -106,12 +106,64 @@ def test_manifest_checks():
             E.check_manifest(doc, job_key=JOB_KEY, sha256="ab" * 32, seconds=20)
 
 
+def streaminfo(rate=44_100, samples=882_000, body=b"\x01" * 50_000):
+    """A FLAC file's start: the magic, a last-block STREAMINFO header and its 34 bytes (stereo, 16-bit)."""
+    info = bytearray(34)
+    info[10] = (rate >> 12) & 0xFF
+    info[11] = (rate >> 4) & 0xFF
+    info[12] = ((rate & 0x0F) << 4) | (1 << 1) | 0  # 2 channels, bits-per-sample high bit 0
+    info[13] = (15 << 4) | ((samples >> 32) & 0x0F)  # 16 bits per sample
+    info[14:18] = (samples & 0xFFFFFFFF).to_bytes(4, "big")
+    return b"fLaC" + bytes([0x80, 0, 0, 34]) + bytes(info) + body
+
+
+def test_flac_length_reads_streaminfo():
+    assert E.flac_length(streaminfo()) == (44_100, 882_000)
+    assert E.flac_length(streaminfo(rate=48_000, samples=(1 << 33) + 5)) == (48_000, (1 << 33) + 5)
+    for bad in (b"", b"RIFF" + streaminfo()[4:], streaminfo(samples=100), b"fLaC" + b"\x04" + streaminfo()[5:]):
+        with pytest.raises(E.E2EError):
+            E.flac_length(bad)
+
+
 def test_make_clip_is_flac_44k_stereo(tmp_path):
     if not __import__("shutil").which("ffmpeg"):
         pytest.skip("ffmpeg not installed")
     path = tmp_path / "clip.flac"
     E.make_clip(path, 2)
-    assert path.read_bytes()[:4] == b"fLaC"
+    data = path.read_bytes()
+    rate, total = E.flac_length(data)
+    assert rate == 44_100 and abs(total - 88_200) < 4_608
+    # --clip: the first seconds of another file, converted the same way.
+    cut = tmp_path / "cut.flac"
+    E.make_clip(cut, 1, source=path)
+    rate, total = E.flac_length(cut.read_bytes())
+    assert rate == 44_100 and abs(total - 44_100) < 4_608
+
+
+def test_clip_sources(tmp_path, monkeypatch, capsys):
+    local = tmp_path / "song.wav"
+    local.write_bytes(b"RIFF")
+    assert E.fetch_clip(str(local), tmp_path) == local
+    with pytest.raises(E.E2EError, match="no such file"):
+        E.fetch_clip(str(tmp_path / "missing.wav"), tmp_path)
+
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    url = "https://example.com/clip.m4a?token=SECRET0TOKEN"
+    got = E.fetch_clip(url, tmp_path, opener=lambda req, timeout=None: Resp(200, b"\x00" * 2_000_000))
+    assert got.read_bytes() == b"\x00" * 2_000_000
+    out = capsys.readouterr().out
+    assert f"::add-mask::{url}" in out and out.replace(f"::add-mask::{url}", "").count("SECRET0TOKEN") == 0
+
+    monkeypatch.setattr(E, "CLIP_DOWNLOAD_MAX", 1_000)
+    with pytest.raises(E.E2EError, match="over"):
+        E.fetch_clip(url, tmp_path, opener=lambda req, timeout=None: Resp(200, b"\x00" * 5_000))
+
+    def refused(req, timeout=None):
+        raise urllib.error.HTTPError(req.full_url, 403, "Forbidden", {}, io.BytesIO(b""))
+
+    with pytest.raises(E.E2EError, match="HTTP 403") as info:
+        E.fetch_clip(url, tmp_path, opener=refused)
+    assert "SECRET0TOKEN" not in str(info.value)
 
 
 # ---- fakes ---------------------------------------------------------------------------------------------------------
@@ -137,7 +189,9 @@ class FakeBucket:
             self.objects.pop(key, None)
             return Resp(204)
         if key.endswith("manifest.json"):
-            return Resp(200, json.dumps(self.manifest_doc).encode())
+            # The worker writes the manifest for the job that asked (e2e.py makes a new jobKey every run).
+            job = key.split("/")[1]
+            return Resp(200, json.dumps(self.manifest_doc).replace(JOB_KEY, job).encode())
         if key.endswith("instrumental.m4a"):
             return Resp(200, self.instrumental)
         raise urllib.error.HTTPError(url, 404, "Not Found", {}, io.BytesIO(b""))
@@ -147,8 +201,12 @@ class Resp:
     def __init__(self, status, body=b""):
         self.status, self.body = status, body
 
-    def read(self):
-        return self.body
+    def read(self, size=-1):
+        if size is None or size < 0:
+            body, self.body = self.body, b""
+            return body
+        chunk, self.body = self.body[:size], self.body[size:]
+        return chunk
 
     def __enter__(self):
         return self
@@ -199,8 +257,11 @@ class Clock:
         self.t += s
 
 
+CLIP = streaminfo()
+
+
 def fake_clip(path, seconds):
-    path.write_bytes(b"fLaC" + b"\x01" * 50_000)
+    path.write_bytes(CLIP)
 
 
 def run_flow(tmp_path, *, api, bucket, admin=None):
@@ -211,7 +272,7 @@ def run_flow(tmp_path, *, api, bucket, admin=None):
 
 def good_bucket():
     audio = b"\x07" * 640_000
-    clip_sha = hashlib.sha256(b"fLaC" + b"\x01" * 50_000).hexdigest()
+    clip_sha = hashlib.sha256(CLIP).hexdigest()
     doc = manifest(sha=clip_sha)
     doc["outputs"]["instrumental"]["sha256"] = hashlib.sha256(audio).hexdigest()
     return FakeBucket(instrumental=audio, manifest_doc=doc), doc
@@ -276,12 +337,61 @@ def test_without_the_admin_key_a_lingering_worker_fails_the_run(tmp_path):
     assert run_flow(tmp_path, api=api, bucket=bucket, admin=None) == 1
 
 
+def test_the_jobs_own_worker_winding_down_is_waited_for(tmp_path):
+    bucket, doc = good_bucket()
+    winding = {"workers": {"idle": 0, "ready": 0, "running": 1}, "jobs": {"inQueue": 0, "inProgress": 0}}
+    api = FakeApi(output=doc, health=[winding, winding, {"workers": {"idle": 0, "ready": 0, "running": 0}}])
+    assert run_flow(tmp_path, api=api, bucket=bucket, admin=api) == 0
+    assert api.patches == [] and api.health_seq == [{"workers": {"idle": 0, "ready": 0, "running": 0}}]
+
+
+def test_the_job_is_sent_with_the_clips_real_length(tmp_path):
+    bucket, doc = good_bucket()
+    api = FakeApi(output=doc)
+    assert run_flow(tmp_path, api=api, bucket=bucket) == 0
+    job_input, _ = api.runs[0]
+    assert job_input["audio"]["durationMs"] == 20_000
+    assert job_input["audio"]["bytes"] == len(CLIP)
+    assert bucket.log[0][0] == "PUT" and bucket.log[0][1].startswith("in/")
+
+
 def test_other_jobs_on_the_endpoint_are_left_alone(tmp_path):
     bucket, doc = good_bucket()
     busy = {"workers": {"idle": 1, "ready": 0, "running": 1}, "jobs": {"inQueue": 2, "inProgress": 1}}
     api = FakeApi(output=doc, health=[busy])
     assert run_flow(tmp_path, api=api, bucket=bucket, admin=api) == 0
     assert api.patches == []
+
+
+# ---- clear failures before anything is sent ------------------------------------------------------------------------
+
+def test_without_the_secret_it_says_what_to_do(monkeypatch, capsys):
+    monkeypatch.delenv("CLOUD_DEFAULTS_KEY", raising=False)
+    assert E.main([]) == 1
+    out = capsys.readouterr().out
+    assert "CLOUD_DEFAULTS_KEY secret is not set" in out and "bake-cloud-keys.mjs" in out
+
+
+def test_a_bad_or_placeholder_key_stops_before_anything_is_sent(monkeypatch, capsys, tmp_path):
+    blob = tmp_path / "CloudDefaults.enc"
+    blob.write_bytes(b"PXCD1" + b"\x00" * 60)
+    monkeypatch.setenv("CLOUD_DEFAULTS_KEY", "not base64!")
+    assert E.main(["--blob", str(blob)]) == 1
+    assert "not base64" in capsys.readouterr().out
+    monkeypatch.setenv("CLOUD_DEFAULTS_KEY", base64.b64encode(bytes(16)).decode())
+    assert E.main(["--blob", str(blob)]) == 1
+    assert "not 32 bytes" in capsys.readouterr().out
+    monkeypatch.setenv("CLOUD_DEFAULTS_KEY", E.PLACEHOLDER_KEY)
+    assert E.main(["--blob", str(blob)]) == 1
+    assert "public placeholder key" in capsys.readouterr().out
+    monkeypatch.setenv("CLOUD_DEFAULTS_KEY", base64.b64encode(bytes(range(32))).decode())
+    assert E.main(["--blob", str(tmp_path / "missing.enc")]) == 1
+    assert "could not be read" in capsys.readouterr().out
+
+
+def test_the_repository_root_resolves_inside_the_test_image_too():
+    # In the worker's test image this file is /t/deploy/e2e.py (no repository around it): importing must not fail.
+    assert E.DEFAULT_BLOB.name == "CloudDefaults.enc"
 
 
 # ---- the blob (needs `cryptography`, which cloud-e2e.yml installs; the test image doesn't have it) -----------------
@@ -323,7 +433,7 @@ def test_open_blob_round_trip_and_failures(monkeypatch, capsys):
 
 def test_the_committed_placeholder_is_recognised():
     pytest.importorskip("cryptography")
-    blob = (REPO / "App" / "Resources" / "CloudDefaults.enc")
+    blob = E.DEFAULT_BLOB
     if not blob.exists():
         pytest.skip("not in the app repository checkout")
     data = blob.read_bytes()
@@ -335,3 +445,25 @@ def test_the_committed_placeholder_is_recognised():
     assert keys.endpoint_id == "placeholder0endpoint"
     with pytest.raises(E.E2EError, match="placeholder"):
         E.open_blob(data, bytes(32))
+
+
+# ---- the workflow ----------------------------------------------------------------------------------------------------
+
+def test_the_workflow_is_manual_in_the_runpod_environment_and_execs_python():
+    found = [p / ".github" / "workflows" / "cloud-e2e.yml" for p in ROOT.parents]
+    workflow = next((w for w in found if w.is_file()), None)
+    if workflow is None:
+        pytest.skip("the repository's workflows are not in this checkout")
+    text = workflow.read_text(encoding="utf-8")
+    trigger = text.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
+    assert "workflow_dispatch:" in trigger and "push" not in trigger and "schedule" not in trigger
+    assert "environment: runpod" in text and "contents: read" in text
+    assert "CLOUD_DEFAULTS_KEY: ${{ secrets.CLOUD_DEFAULTS_KEY }}" in text
+    assert 'exec "$RUNNER_TEMP/e2e-venv/bin/python" cloud/runpod-worker/deploy/e2e.py' in text
+    assert "--require-hashes" in text and "e2e-requirements.txt" in text
+    # Inputs reach the script through the environment, never pasted into the shell script.
+    assert "${{ inputs." not in text.split("run: >-", 1)[1]
+    for line in text.splitlines():
+        if "uses:" in line:
+            ref = line.split("@", 1)[1].split()[0]
+            assert len(ref) == 40 and all(ch in "0123456789abcdef" for ch in ref), line  # pinned to a commit

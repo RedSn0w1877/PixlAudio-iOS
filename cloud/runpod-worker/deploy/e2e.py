@@ -3,11 +3,14 @@ does with the keys baked into the app. Stdlib, plus `cryptography` for AES-GCM (
 installs it from deploy/e2e-requirements.txt into a throwaway venv). About a cent.
 
     CLOUD_DEFAULTS_KEY=<base64> RUNPOD_API_KEY=<the deploy key> python3 deploy/e2e.py [--blob FILE] [--seconds 20]
+        [--clip FILE_OR_HTTPS_URL]
 
 1. Open the committed App/Resources/CloudDefaults.enc with CLOUD_DEFAULTS_KEY and mask every value it holds
-   (::add-mask::) before anything else is printed or sent.
+   (::add-mask::) before anything else is printed or sent. A missing key, the public placeholder key or the
+   placeholder blob stop here with a clear message.
 2. Make a ~20 s synthetic clip with ffmpeg: sine tones with a slow tremolo plus pink noise (no music), FLAC 44.1 kHz
-   16-bit stereo.
+   16-bit stereo. With --clip, the first --seconds of that file (a repository path, or an https URL downloaded, at most
+   100 MB) instead, converted the same way. Its length comes from the FLAC header, as the phone's does.
 3. PUT it to R2 as in/<jobKey>.flac with a presigned URL (SigV4, PixlNet's S3Signer ported).
 4. POST /run with the built-in Restricted key: schema v1 op process, tasks [instrumental], every worker URL presigned,
    the guard, input.policy.last_in_batch true (the worker stops itself afterwards).
@@ -29,6 +32,7 @@ import base64
 import binascii
 import hashlib
 import hmac
+import http.client
 import json
 import os
 import re
@@ -46,11 +50,12 @@ from typing import Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from reaper import STILL_THERE, ReaperError, counts, has_work, release_idle  # noqa: E402
+from reaper import STILL_THERE, ReaperError, counts, release_idle  # noqa: E402
 from runpod_api import FINAL_STATES, ApiError, RunPod, mask, wait_for_job  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
-REPO = HERE.parents[2]
+# cloud/runpod-worker/deploy -> the repository root (the worker's test image has only cloud/runpod-worker, as /t).
+REPO = HERE.parents[2] if len(HERE.parents) > 2 else HERE.parent
 DEFAULT_BLOB = REPO / "App" / "Resources" / "CloudDefaults.enc"
 MAGIC = b"PXCD1"
 # The committed placeholder's public throwaway key (tools/cloud/bake-cloud-keys.mjs): opening with it means the real
@@ -65,6 +70,7 @@ PRESIGN_S = 2 * 3600  # every URL of the job; it takes minutes
 JOB_DEADLINE_S = 1500.0
 IDLE_WAIT_S = 180.0
 IDLE_POLL_S = 10.0
+CLIP_DOWNLOAD_MAX = 100 * 1024 * 1024
 USER_AGENT = "pixl-cloud-e2e/1"
 
 
@@ -122,8 +128,12 @@ def normalized_endpoint(value: str) -> str:
 
 def open_blob(blob: bytes, key: bytes) -> Keys:
     """The built-in keys inside `blob` (AES-256-GCM, PXCD1 layout); E2EError when it doesn't open or isn't usable."""
-    from cryptography.exceptions import InvalidTag
-    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    try:
+        from cryptography.exceptions import InvalidTag
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    except ImportError:
+        raise E2EError("the cryptography package is missing: pip install --require-hashes -r "
+                       "cloud/runpod-worker/deploy/e2e-requirements.txt") from None
 
     if len(blob) <= len(MAGIC) + 12 + 16 or not blob.startswith(MAGIC):
         raise E2EError("App/Resources/CloudDefaults.enc is not a PXCD1 blob")
@@ -224,7 +234,9 @@ class R2:
                     status, body = resp.status, resp.read()
             except urllib.error.HTTPError as exc:
                 status, body = exc.code, b""
-            except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as exc:
+            except (urllib.error.URLError, TimeoutError, ConnectionError, OSError, ValueError,
+                    http.client.HTTPException) as exc:
+                # Only the type: a URL (with its signature) must never reach the log.
                 status, body = 0, type(exc).__name__.encode()
             if status in expect:
                 return body
@@ -236,20 +248,71 @@ class R2:
 
 # ---- the clip and the job ------------------------------------------------------------------------------------------
 
-def make_clip(path: Path, seconds: int = 20, ffmpeg: str = "ffmpeg") -> None:
-    """Synthetic stereo audio: two sine chords with a slow tremolo plus a little pink noise. No music."""
-    tones = ("aevalsrc=exprs="
-             "(0.22*sin(2*PI*220*t)+0.10*sin(2*PI*659.25*t))*(0.75+0.25*sin(2*PI*0.5*t))|"
-             "(0.22*sin(2*PI*329.63*t)+0.10*sin(2*PI*440*t))*(0.75+0.25*sin(2*PI*0.7*t))"
-             f":s={SAMPLE_RATE}:d={seconds}")
-    noise = f"anoisesrc=d={seconds}:c=pink:r={SAMPLE_RATE}:a=0.03"
-    cmd = [ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-           "-f", "lavfi", "-i", tones, "-f", "lavfi", "-i", noise,
-           "-filter_complex", "[1:a]aformat=channel_layouts=stereo[n];[0:a][n]amix=inputs=2:normalize=0[out]",
-           "-map", "[out]", "-ar", str(SAMPLE_RATE), "-ac", "2", "-sample_fmt", "s16", "-c:a", "flac", str(path)]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+def make_clip(path: Path, seconds: int = 20, ffmpeg: str = "ffmpeg", source: Path | None = None) -> None:
+    """FLAC 44.1 kHz 16-bit stereo at `path`: the first `seconds` of `source`, or synthetic audio (two sine chords with
+    a slow tremolo plus a little pink noise; no music)."""
+    out = ["-ar", str(SAMPLE_RATE), "-ac", "2", "-sample_fmt", "s16", "-c:a", "flac", str(path)]
+    base = [ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y"]
+    if source is not None:
+        cmd = base + ["-i", str(source), "-vn", "-t", str(seconds)] + out
+    else:
+        tones = ("aevalsrc=exprs="
+                 "(0.22*sin(2*PI*220*t)+0.10*sin(2*PI*659.25*t))*(0.75+0.25*sin(2*PI*0.5*t))|"
+                 "(0.22*sin(2*PI*329.63*t)+0.10*sin(2*PI*440*t))*(0.75+0.25*sin(2*PI*0.7*t))"
+                 f":s={SAMPLE_RATE}:d={seconds}")
+        noise = f"anoisesrc=d={seconds}:c=pink:r={SAMPLE_RATE}:a=0.03"
+        cmd = base + ["-f", "lavfi", "-i", tones, "-f", "lavfi", "-i", noise,
+                      "-filter_complex",
+                      "[1:a]aformat=channel_layouts=stereo[n];[0:a][n]amix=inputs=2:normalize=0[out]",
+                      "-map", "[out]"] + out
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise E2EError(f"ffmpeg could not run ({type(exc).__name__}); install it") from None
     if result.returncode != 0 or not path.exists() or path.stat().st_size < 1000:
         raise E2EError("ffmpeg could not make the test clip: " + (result.stderr.strip().splitlines() or ["?"])[-1][:200])
+
+
+def flac_length(data: bytes) -> tuple[int, int]:
+    """(sample rate, total samples) from a FLAC file's STREAMINFO block (the phone reads the same numbers)."""
+    if len(data) < 42 or data[:4] != b"fLaC" or (data[4] & 0x7F) != 0:
+        raise E2EError("the test clip is not a FLAC file")
+    info = data[8:42]
+    rate = (info[10] << 12) | (info[11] << 4) | (info[12] >> 4)
+    total = ((info[13] & 0x0F) << 32) | int.from_bytes(info[14:18], "big")
+    if rate <= 0 or total < rate:
+        raise E2EError("the test clip is shorter than a second (or its FLAC header has no length)")
+    return rate, total
+
+
+def fetch_clip(source: str, workdir: Path, *, opener: Callable = urllib.request.urlopen) -> Path:
+    """--clip: a file in the repository (or anywhere on disk), or an https URL downloaded into `workdir`. The URL is
+    masked (it may carry a token) and never printed."""
+    if not source.lower().startswith("https://"):
+        path = Path(source)
+        if not path.is_absolute():
+            path = REPO / path
+        if not path.is_file():
+            raise E2EError("--clip: no such file")
+        return path
+    mask(source)
+    target = workdir / "source.bin"
+    req = urllib.request.Request(source, headers={"User-Agent": USER_AGENT})
+    try:
+        with opener(req, timeout=120) as resp, open(target, "wb") as fh:
+            size = 0
+            while chunk := resp.read(1 << 20):
+                size += len(chunk)
+                if size > CLIP_DOWNLOAD_MAX:
+                    raise E2EError(f"--clip: the download is over {CLIP_DOWNLOAD_MAX // (1024 * 1024)} MB")
+                fh.write(chunk)
+    except urllib.error.HTTPError as exc:
+        raise E2EError(f"--clip: the download answered HTTP {exc.code}") from None
+    except (urllib.error.URLError, TimeoutError, ConnectionError, OSError, ValueError,
+            http.client.HTTPException) as exc:
+        raise E2EError(f"--clip: the download failed ({type(exc).__name__})") from None
+    say(f"clip source: downloaded {target.stat().st_size / 1e6:.1f} MB")
+    return target
 
 
 def job_keys(job_key: str) -> dict[str, str]:
@@ -279,7 +342,7 @@ def build_job(r2: R2, job_key: str, *, size: int, sha256: str, duration_ms: int,
     return job_input, {"ttl": 3_600_000, "executionTimeout": 900_000}
 
 
-def check_manifest(manifest: dict, *, job_key: str, sha256: str, seconds: int) -> dict:
+def check_manifest(manifest: dict, *, job_key: str, sha256: str, seconds: float) -> dict:
     """The instrumental entry of an ok manifest for this upload; E2EError otherwise."""
     if manifest.get("schema") != "pixl.cloudstudio.result" or manifest.get("jobKey") != job_key:
         raise E2EError("the manifest is not this job's")
@@ -294,7 +357,7 @@ def check_manifest(manifest: dict, *, job_key: str, sha256: str, seconds: int) -
     size = out.get("bytes")
     # 256 kb/s AAC is ~32 KB a second; anything far off is broken.
     if not isinstance(size, int) or not (seconds * 8_000 <= size <= seconds * 80_000):
-        raise E2EError(f"the instrumental's size is not sane ({size} bytes for {seconds} s)")
+        raise E2EError(f"the instrumental's size is not sane ({size} bytes for {seconds:.1f} s)")
     samples, rate = out.get("samples"), out.get("sampleRate")
     if not isinstance(samples, int) or not isinstance(rate, int) or rate <= 0 \
             or abs(samples / rate - seconds) > 0.25:
@@ -307,20 +370,22 @@ def check_manifest(manifest: dict, *, job_key: str, sha256: str, seconds: int) -
 def wait_idle(api: RunPod, endpoint_id: str, *, admin: RunPod | None, template: dict,
               sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.monotonic,
               wait_s: float = IDLE_WAIT_S, poll_s: float = IDLE_POLL_S, **release_kw) -> str:
-    """Step 8. Returns "gone", "busy" (other jobs running: left to cloud-worker-reaper) or the reaper's outcome."""
+    """Step 8. Returns "gone", "busy" (other jobs queued or in progress: left to cloud-worker-reaper) or the reaper's
+    outcome. A worker still counted as running with no job anywhere is this job's, winding down: it is waited for."""
     started = clock()
+    reader = admin or api
     while True:
-        c = counts(api.health(endpoint_id))
-        if c["idle"] + c["ready"] == 0:
+        c = counts(reader.health(endpoint_id))
+        if c["idle"] + c["ready"] + c["running"] == 0:
             say(f"idle check: no idle worker {int(clock() - started)} s after the job")
             return "gone"
-        if has_work(c):
-            say("idle check: other jobs are running on the endpoint; cloud-worker-reaper looks after the rest")
+        if c["inQueue"] > 0 or c["inProgress"] > 0:
+            say("idle check: other jobs are on the endpoint; cloud-worker-reaper looks after the rest")
             return "busy"
         if clock() - started >= wait_s:
             break
         sleep(poll_s)
-    say(f"::warning::a worker was still idle {int(wait_s)} s after the job: last_in_batch didn't stop it; releasing it "
+    say(f"::warning::a worker was still up {int(wait_s)} s after the job: last_in_batch didn't stop it; releasing it "
         "like cloud-worker-reaper")
     if admin is None:
         raise E2EError("RUNPOD_API_KEY is not set, so the idle worker can't be released; run cloud-worker-reaper")
@@ -343,8 +408,10 @@ def run(keys: Keys, *, api: RunPod, admin: RunPod | None, r2: R2, template: dict
     path = workdir / "clip.flac"
     clip(path, seconds)
     data = path.read_bytes()
+    rate, total = flac_length(data)
+    length_s = total / rate
     sha = hashlib.sha256(data).hexdigest()
-    say(f"clip: {seconds} s synthetic tones and noise, FLAC, {len(data) / 1e6:.1f} MB")
+    say(f"clip: {length_s:.1f} s, FLAC, {len(data) / 1e6:.1f} MB")
     failure: str | None = None
     job_id: str | None = None
     state: str | None = None
@@ -352,7 +419,8 @@ def run(keys: Keys, *, api: RunPod, admin: RunPod | None, r2: R2, template: dict
         t0 = clock()
         r2.request("PUT", objects["input"], data, what="upload (R2 PUT)")
         say(f"upload: ok in {clock() - t0:.1f} s")
-        job_input, policy = build_job(r2, job_key, size=len(data), sha256=sha, duration_ms=seconds * 1000, build=build)
+        job_input, policy = build_job(r2, job_key, size=len(data), sha256=sha, duration_ms=total * 1000 // rate,
+                                      build=build)
         t1 = clock()
         first = api.run(keys.endpoint_id, job_input, policy)
         job_id = first.get("id")
@@ -374,7 +442,7 @@ def run(keys: Keys, *, api: RunPod, admin: RunPod | None, r2: R2, template: dict
             manifest = json.loads(r2.request("GET", objects["manifest"], what="manifest (R2 GET)").decode("utf-8"))
         except (UnicodeDecodeError, ValueError):
             raise E2EError("the manifest in R2 is not JSON") from None
-        out = check_manifest(manifest, job_key=job_key, sha256=sha, seconds=seconds)
+        out = check_manifest(manifest, job_key=job_key, sha256=sha, seconds=length_s)
         audio = r2.request("GET", objects["instrumental"], what="instrumental (R2 GET)")
         if len(audio) != out["bytes"] or hashlib.sha256(audio).hexdigest() != out["sha256"]:
             raise E2EError("the instrumental in R2 doesn't match its manifest (size or sha256)")
@@ -384,6 +452,8 @@ def run(keys: Keys, *, api: RunPod, admin: RunPod | None, r2: R2, template: dict
         failure = str(exc)
     except KeyboardInterrupt:
         failure = "cancelled"
+    except Exception as exc:  # noqa: BLE001 - the type only (a message could carry a URL); cleanup still runs
+        failure = f"unexpected {type(exc).__name__}"
     finally:
         if job_id and state not in FINAL_STATES:
             try:
@@ -415,28 +485,40 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--blob", type=Path, default=DEFAULT_BLOB)
     parser.add_argument("--seconds", type=int, default=20)
+    parser.add_argument("--clip", default="", help="a repository path or an https URL (default: synthetic audio)")
     args = parser.parse_args(argv)
     key_text = os.environ.get("CLOUD_DEFAULTS_KEY", "")
     mask(key_text.strip())
     if not key_text.strip():
-        say("::error::CLOUD_DEFAULTS_KEY is not set (tools/cloud/bake-cloud-keys.mjs sets it)")
+        say("::error::cloud e2e: the CLOUD_DEFAULTS_KEY secret is not set. Bake the keys first: "
+            "node tools/cloud/bake-cloud-keys.mjs --commit (docs/handoff/2026-10-08-baked-keys.md)")
         return 1
     admin_key = os.environ.get("RUNPOD_API_KEY", "").strip()
+    mask(admin_key)
     try:
-        keys = open_blob(args.blob.read_bytes(), decode_key(key_text))
+        key = decode_key(key_text)
+        if key == decode_key(PLACEHOLDER_KEY):
+            raise E2EError("CLOUD_DEFAULTS_KEY is the public placeholder key, not a real one: run "
+                           "tools/cloud/bake-cloud-keys.mjs (it makes a key and sets the secret)")
+        keys = open_blob(args.blob.read_bytes(), key)
     except (E2EError, OSError) as exc:
         say(f"::error::cloud e2e FAILED: {exc if isinstance(exc, E2EError) else 'the blob could not be read'}")
         return 1
     say("blob: opened with CLOUD_DEFAULTS_KEY; v1, every field filled in (all masked)")
     template = json.loads((HERE / "endpoint.json").read_text(encoding="utf-8"))
     build = "e2e " + os.environ.get("GITHUB_SHA", "local")[:12]
+    seconds = max(5, min(args.seconds, 120))
     with tempfile.TemporaryDirectory(prefix="pixl-e2e-") as tmp:
         try:
+            source = fetch_clip(args.clip.strip(), Path(tmp)) if args.clip.strip() else None
             return run(keys, api=RunPod(keys.runpod_key), admin=RunPod(admin_key) if admin_key else None,
-                       r2=R2(keys), template=template, workdir=Path(tmp), seconds=max(5, min(args.seconds, 120)),
-                       build=build)
+                       r2=R2(keys), template=template, workdir=Path(tmp), seconds=seconds, build=build,
+                       clip=lambda path, s: make_clip(path, s, source=source))
         except E2EError as exc:
             say(f"::error::cloud e2e FAILED: {exc}")
+            return 1
+        except Exception as exc:  # noqa: BLE001 - a traceback could carry a URL or a value: the type only
+            say(f"::error::cloud e2e FAILED: unexpected {type(exc).__name__}")
             return 1
 
 
