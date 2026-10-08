@@ -84,7 +84,51 @@ final class CloudStudioTests: XCTestCase {
         XCTAssertEqual(h.studio.job(key)?.state, .downloading)
     }
 
+    func testAnEarlierAttemptsManifestIsNotTaken() async throws {
+        let h = CloudHarness()
+        let key = try await h.submittedJob()
+        await h.runpod.setMissing("rp-1")
+        // The bucket still holds a manifest from an attempt with another input (the song was prepared again).
+        var stale = h.finish(key)
+        stale.input = CloudInputInfo(codec: "flac", sampleRate: 44_100, channels: 2,
+                                     decodedSamples: CloudTestValues.sourceFrames, durationMs: 240_000,
+                                     sha256: String(repeating: "0", count: 64))
+        h.store(manifest: stale)
+        h.clock.advance(60 * 60_000)
+        await h.studio.pump()
+        // The bucket shows the worker has the job, but another input's results are not imported.
+        XCTAssertEqual(h.studio.job(key)?.state.isAtRunPod, true, "\(String(describing: h.studio.job(key)?.state))")
+        XCTAssertTrue(h.host.savedLyrics.isEmpty)
+        // This upload's manifest arrives: it is taken.
+        var fresh = h.finish(key)
+        fresh.input = CloudInputInfo(codec: "flac", sampleRate: 44_100, channels: 2,
+                                     decodedSamples: CloudTestValues.sourceFrames, durationMs: 240_000,
+                                     sha256: CloudHarness.uploadSHA)
+        h.store(manifest: fresh)
+        h.clock.advance(60 * 60_000)
+        await h.studio.pump()
+        XCTAssertEqual(h.studio.job(key)?.state, .downloading)
+    }
+
     // MARK: Guards
+
+    func testASongOverTheEndpointsLimitsStopsBeforeUpload() async throws {
+        let h = CloudHarness()
+        // The last selftest said this endpoint takes songs up to 3 minutes; the prepared song is 4.
+        h.settings.workerCaps = CloudWorkerCaps(maxInputMB: 160, maxAudioS: 180, hostsConfigured: 1)
+        let song = h.addSong("f:root/a.m4a")
+        h.host.facts[song.id] = CloudHarness.lineSyncedFacts
+        await h.studio.send(await h.studio.preview(songs: [song], title: "Test"))
+        await h.studio.pump()
+        await h.studio.settle()
+        let key = try XCTUnwrap(h.studio.jobs.first?.jobKey)
+        XCTAssertEqual(h.studio.job(key)?.state, .failed)
+        XCTAssertEqual(h.studio.job(key)?.lastError?.contains("3-minute"), true)
+        XCTAssertTrue(h.transfers.uploads.isEmpty, "nothing is uploaded")
+        XCTAssertTrue(h.preparer.removed.contains(key), "the prepared file is deleted")
+        let runs = await h.runpod.runs.count
+        XCTAssertEqual(runs, 0)
+    }
 
     func testNothingIsSentWithoutConsent() async {
         let h = CloudHarness()
@@ -323,6 +367,24 @@ final class CloudStudioTests: XCTestCase {
             XCTAssertFalse(keys.contains(key), "\(key) would be exported")
             XCTAssertFalse(SettingsBackup.isKeychainKey(key), "\(key) looks like an exported key")
         }
+    }
+
+    func testWorkerCapsAreKeptUntilTheEndpointChanges() throws {
+        let suite = "cloud-caps-test-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = CloudSettings(defaults: defaults, secrets: CloudMemorySecrets())
+        XCTAssertNil(settings.workerCaps, "unknown until a selftest ran")
+        settings.endpointId = "abc123xyz"
+        let caps = CloudWorkerCaps(maxInputMB: 120, maxAudioS: 600, bestMaxAudioS: 480, hostsConfigured: 1)
+        settings.workerCaps = caps
+        XCTAssertEqual(CloudSettings(defaults: defaults, secrets: CloudMemorySecrets()).workerCaps, caps,
+                       "kept across launches")
+        settings.endpointId = "abc123xyz"
+        XCTAssertEqual(settings.workerCaps, caps, "the same endpoint keeps them")
+        settings.endpointId = "other999"
+        XCTAssertNil(settings.workerCaps, "another endpoint's limits are unknown")
+        XCTAssertNil(CloudSettings(defaults: defaults, secrets: CloudMemorySecrets()).workerCaps)
     }
 
     func testCloudSettingsDefaults() throws {

@@ -160,12 +160,13 @@ final class CloudStudio {
     }
 
     /// UI tests: the demo's jobs, last test and pending batch (no pass ever runs in the demo).
-    func loadDemo(jobs: [CloudJobRecord], report: CloudConnectionReport?, progress: [String: Double],
-                  batch: CloudBatchPreview?) {
+    func loadDemo(jobs: [CloudJobRecord], report: CloudConnectionReport?, selftest: CloudCheck? = nil,
+                  progress: [String: Double], batch: CloudBatchPreview?) {
         guard isDemo else { return }
         self.jobs = jobs
         isLoaded = true
         connectionReport = report
+        selftestCheck = selftest
         transferProgress = progress
         pendingBatch = batch
     }

@@ -32,8 +32,12 @@ enum CloudDemo {
             runpod: CloudCheck(ok: true, message: "RunPod works: the endpoint answered and accepted the key.",
                                detail: "0 songs waiting · no worker awake (normal when idle)"),
             storage: CloudCheck(ok: true, message: "Storage works: a test file was written, found and deleted."))
+        // What a selftest of the deployed worker reports (its default limits).
+        let selftest = CloudCheck(ok: true, message: "The worker answered.",
+                                  detail: "Worker 1.0.0 on NVIDIA L4 · songs up to 160 MB and 15 min")
         studio.loadDemo(jobs: screen == .cloudSettings ? Array(jobs().prefix(2)) : jobs(),
                         report: screen == .cloudSettings ? report : nil,
+                        selftest: screen == .cloudSettings ? selftest : nil,
                         progress: [jobKey(1): 0.42],
                         batch: screen == .cloudConfirm ? batch() : nil)
         return studio
