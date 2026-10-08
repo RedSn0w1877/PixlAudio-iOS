@@ -81,14 +81,20 @@ final class CloudAudioPreparerTests: XCTestCase {
         XCTAssertFalse(prepared.passthrough)
         XCTAssertEqual(prepared.ext, "flac", "this iOS couldn't encode FLAC; the preparer fell back to \(prepared.ext)")
         XCTAssertEqual(prepared.fileURL.lastPathComponent, "\(key).\(prepared.ext)")
-        // PCM in, lossless out: exactly the source's frames (44.1 kHz mono, upmixed to stereo).
-        XCTAssertEqual(prepared.frames, 3 * 44_100)
-        XCTAssertEqual(prepared.durationMs, 3_000)
-        XCTAssertEqual(prepared.sha256, try ModelManager.sha256Hex(of: prepared.fileURL))
-        // The written file decodes back to the same length, stereo at 44.1 kHz.
-        let counted = try await CloudAudioPreparer.countFrames(of: prepared.fileURL)
-        XCTAssertEqual(counted, prepared.frames)
         let file = try AVAudioFile(forReading: prepared.fileURL)
+        let framesPerPacket = file.fileFormat.streamDescription.pointee.mFramesPerPacket
+        let note = "frames \(prepared.frames), FLAC frames per packet \(framesPerPacket)"
+        // PCM in, lossless out: the source's frames (44.1 kHz mono, upmixed to stereo), then less than one FLAC
+        // packet of silence so the file ends on a whole packet (CI once read this 3-second tone back as
+        // 133,632 = 29 × 4,608 frames while 132,300 were written: the encoder had padded the short last packet).
+        XCTAssertGreaterThanOrEqual(prepared.frames, 3 * 44_100, note)
+        XCTAssertLessThan(prepared.frames, 3 * 44_100 + 8_192, note)
+        XCTAssertEqual(Double(prepared.durationMs), 3_000, accuracy: 200, note)
+        XCTAssertEqual(prepared.sha256, try ModelManager.sha256Hex(of: prepared.fileURL))
+        // The written file decodes back to exactly the recorded length: what the import's sample check compares.
+        let counted = try await CloudAudioPreparer.countFrames(of: prepared.fileURL)
+        XCTAssertEqual(counted, prepared.frames, note)
+        // Stereo at 44.1 kHz.
         XCTAssertEqual(file.fileFormat.sampleRate, 44_100)
         XCTAssertEqual(file.fileFormat.channelCount, 2)
         // Lossless and 16-bit: well under the 32-bit float size.

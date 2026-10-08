@@ -214,7 +214,13 @@ nonisolated enum CloudAudioPreparer {
     }
 
     /// Decodes to 44.1 kHz stereo and writes 16-bit FLAC; if this iOS can't encode FLAC, FLAC without the bit-depth
-    /// hint, then 16-bit WAV (the worker accepts both). Returns the file and its frame count.
+    /// hint, then 16-bit WAV (the worker accepts both). Returns the file and the phone's own decode of it.
+    ///
+    /// The FLAC encoder works in whole packets (4,608 frames at 44.1 kHz): it pads a short last packet with silence,
+    /// and decoders disagree on whether to trim that padding (CI: `AVAssetReader` read a 3-second tone back as
+    /// 133,632 frames, 1,332 more than were written). So the file always ends on a whole packet of silence: then no
+    /// decoder has anything to trim, the phone and the worker's ffmpeg decode the same length, and the import's
+    /// sample check compares like with like. At most one packet (~0.1 s) of silence is added at the end.
     private static func decodeToLossless(_ asset: AVURLAsset, track: AVAssetTrack,
                                          jobKey: String) async throws -> (URL, Int64) {
         let flacHinted: [String: Any] = [
@@ -242,8 +248,17 @@ nonisolated enum CloudAudioPreparer {
             let output = try outputURL(jobKey: jobKey, ext: ext)
             try? FileManager.default.removeItem(at: output)
             do {
-                let frames = try decode(asset, track: track, writingTo: output, settings: settings)
-                return (output, frames)
+                // Pass 1 pads to a whole packet as the file's format describes it.
+                let written = try decode(asset, track: track, writingTo: output, settings: settings, silence: .wholePacket)
+                let readBack = try await readBackFrames(of: output)
+                guard readBack > written.total else { return (output, readBack) }
+                // The encoder still padded (its packet size wasn't in the format): write it again with exactly
+                // that much silence, which ends it on a whole packet.
+                try Task.checkCancellation()
+                try? FileManager.default.removeItem(at: output)
+                _ = try decode(asset, track: track, writingTo: output, settings: settings,
+                               silence: .frames(readBack - written.source))
+                return (output, try await readBackFrames(of: output))
             } catch is CancellationError {
                 try? FileManager.default.removeItem(at: output)
                 throw CancellationError()
@@ -259,9 +274,24 @@ nonisolated enum CloudAudioPreparer {
         throw Failure(message: "Couldn't write the song for upload (\(lastError?.localizedDescription ?? "unknown error"))")
     }
 
-    /// One decode pass: interleaved float32 from the reader, deinterleaved into the file's processing format.
+    /// Silence written after the song (see `decodeToLossless`).
+    nonisolated private enum TrailingSilence: Sendable {
+        /// Up to the next whole packet of the file's format (none for PCM, or when the format doesn't say).
+        case wholePacket
+        /// Exactly this many frames.
+        case frames(Int64)
+    }
+
+    /// One decode pass's frame counts: the song's own, and with the trailing silence.
+    nonisolated private struct Written: Sendable {
+        var source: Int64
+        var total: Int64
+    }
+
+    /// One decode pass: interleaved float32 from the reader, deinterleaved into the file's processing format, then the
+    /// trailing silence.
     private static func decode(_ asset: AVURLAsset, track: AVAssetTrack, writingTo output: URL,
-                               settings: [String: Any]) throws -> Int64 {
+                               settings: [String: Any], silence: TrailingSilence) throws -> Written {
         let reader: AVAssetReader
         do {
             reader = try AVAssetReader(asset: asset)
@@ -277,7 +307,7 @@ nonisolated enum CloudAudioPreparer {
         }
         defer { if reader.status == .reading { reader.cancelReading() } }
 
-        let frames: Int64
+        let frames: Written
         do {
             // The file is finished (and closed) when it is released at the end of this scope.
             let file = try AVAudioFile(forWriting: output, settings: settings, commonFormat: .pcmFormatFloat32,
@@ -297,8 +327,7 @@ nonisolated enum CloudAudioPreparer {
             while let sample = readerOutput.copyNextSampleBuffer() {
                 try Task.checkCancellation()
                 guard let block = CMSampleBufferGetDataBuffer(sample) else { continue }
-                // The buffer's own sample count: its block can be larger than the samples it holds (the last one
-                // is padded), and copying by byte length wrote that padding into the upload (CI caught 1,332 frames).
+                // The buffer's own sample count (its block may be larger than the samples it holds).
                 let totalFrames = min(CMSampleBufferGetNumSamples(sample),
                                       CMBlockBufferGetDataLength(block) / (MemoryLayout<Float>.size * channels))
                 var frameOffset = 0
@@ -322,12 +351,47 @@ nonisolated enum CloudAudioPreparer {
                 }
                 if written > maximumFrames { throw Failure.decode("This song is longer than 15 minutes") }
             }
-            frames = written
-        }
-        if reader.status == .failed {
-            throw Failure.decode("Audio decoding stopped (\(reader.error?.localizedDescription ?? "unknown error"))")
+            if reader.status == .failed {
+                throw Failure.decode("Audio decoding stopped (\(reader.error?.localizedDescription ?? "unknown error"))")
+            }
+            let source = written
+            let padding: Int64
+            switch silence {
+            case .wholePacket:
+                let framesPerPacket = Int64(file.fileFormat.streamDescription.pointee.mFramesPerPacket)
+                let remainder = framesPerPacket > 1 ? written % framesPerPacket : 0
+                padding = remainder == 0 ? 0 : framesPerPacket - remainder
+            case .frames(let count):
+                padding = max(0, count)
+            }
+            if padding > 0 {
+                let left = destination[0], right = destination[1]
+                left.update(repeating: 0, count: capacity)
+                right.update(repeating: 0, count: capacity)
+                var remaining = padding
+                while remaining > 0 {
+                    let chunk = Int(min(remaining, Int64(capacity)))
+                    buffer.frameLength = AVAudioFrameCount(chunk)
+                    try file.write(from: buffer)
+                    written += Int64(chunk)
+                    remaining -= Int64(chunk)
+                }
+            }
+            frames = Written(source: source, total: written)
         }
         return frames
+    }
+
+    /// `countFrames` of a file this preparer just wrote. A failure here is the written file's, not the song's, so it
+    /// lets `decodeToLossless` try the next format.
+    private static func readBackFrames(of url: URL) async throws -> Int64 {
+        do {
+            return try await countFrames(of: url)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw Failure(message: "The written file couldn't be read back (\(error.localizedDescription))")
+        }
     }
 
     /// The decoded length of a file at 44.1 kHz stereo, counted without keeping the samples.
