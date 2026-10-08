@@ -297,8 +297,9 @@ def test_keepalive_treats_a_cancelled_or_timed_out_deploy_like_a_failed_one(caps
 def test_the_keepalive_workflow_ignores_deploy_runs_that_never_ran():
     # A failed or superseded main build still starts a deploy run, whose job is skipped: if the newest such run
     # counted, it would hide the failed deploy before it. (The Docker test stage holds only cloud/runpod-worker.)
-    workflow = ROOT.parents[1] / ".github" / "workflows" / "cloud-worker-keepalive.yml"
-    if not workflow.is_file():
+    found = [p / ".github" / "workflows" / "cloud-worker-keepalive.yml" for p in ROOT.parents]
+    workflow = next((w for w in found if w.is_file()), None)
+    if workflow is None:
         pytest.skip("the repository's workflows are not in this checkout")
     text = workflow.read_text(encoding="utf-8")
     assert 'select(.conclusion != "skipped"' in text and "--limit 1 " not in text
