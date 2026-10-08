@@ -43,9 +43,9 @@ endpoint or R2 bucket yet** — CI builds it, runs the unit tests with fakes and
   session `io.github.redsn0w1877.pixlaudio.cloud`), `CloudBackground`, `CloudPlatform` (CryptoKit, sessions, month).
 - **UI (`App/Features/CloudStudio/`)** — `CloudProcessingSettingsView`, `CloudQueueView`, `CloudConfirmSheet`; routes
   `.cloudProcessing`, `.cloudQueue`, sheet `.cloudConfirm`; demo `App/Demo/CloudDemo.swift`.
-- **A song's path:** prepare (AAC-LC `.m4a` as is, music-library AAC by passthrough export, everything else decoded by
-  the player's decoder to 44.1 kHz stereo 16-bit FLAC; streamed songs are downloaded permanently first, Spotify ones
-  through their YouTube match) → the SHA-256, duration and frame count recorded → presigned PUT (24 h) in the
+- **A song's path:** prepare (a local AAC-LC `.m4a` as is, music-library AAC by passthrough export, everything else
+  decoded by the player's decoder to 44.1 kHz stereo 16-bit FLAC; streamed songs are downloaded permanently first,
+  Spotify ones through their YouTube match, and always decoded to FLAC, even when the download is AAC) → the SHA-256, duration and frame count recorded → presigned PUT (24 h) in the
   background session → once the batch's uploads are done (or 2 min after the first) `/run` with every worker URL
   signed at that moment (≈ 76 h) and the job id saved before the next POST → `/status` every ≥ 15 s while the app is
   open and RunPod holds jobs, plus one `ListObjectsV2 out/` per pass (results after `/status` expired) → lyrics.json
@@ -112,6 +112,33 @@ again. Fix: the preparer ends the file on a whole packet of silence (under 0.1 s
 and records the phone's own read-back as `frames`, so the phone, the worker's ffmpeg and the import check all see the
 same length.
 
+## Review round (2026-10-08, adversarial review of the whole branch)
+
+Fixed in `8b434b6` (each with an AppTest that fails without the fix):
+
+1. **Blocker — the job list was erased by a background relaunch.** When iOS relaunched the app for the transfer
+   session (an upload finished while the app was terminated), the session's `.uploaded` event reached
+   `CloudStudio.handle` before anything had read `jobs.json`; it saved the empty in-memory list over the file, and the
+   next pass loaded that empty list: every job, RunPod ids included, gone. `handle` and `transferSessionWake` now read
+   the stored jobs first, and `persist()` never saves before they are read
+   (`testTransferEventsAfterARelaunchKeepTheStoredJobs`).
+2. **Major — a retried worker error was re-read as the new run's answer.** The worker never clears an earlier error
+   manifest, so after GPU_OOM / DEADLINE / INTERNAL / INPUT_MISSING the next `out/` listing took the old manifest
+   again, abandoned the new RunPod job (still billed), sent another, and the song failed after 4 "attempts". A job
+   that was sent before now has `out/<jobKey>/manifest.json` and `attempt.json` deleted before it goes out again
+   (`testARetryableWorkerErrorGoesOutAgainWithoutRereadingTheOldManifest`).
+3. **Major (design §7.3) — streamed songs went up as YouTube's AAC**, not FLAC as the design, this note and the
+   confirm sheet's size estimate said: a download is an AAC-LC `.m4a`, which the preparer copied as is. The preparer
+   now takes `forceDecode` and the orchestrator sets it for streamed songs (`testAStreamedSongsAACDownloadIsDecodedToFLAC`
+   and the `forcedDecode` checks in the orchestrator tests).
+4. Minor: the continued-processing run ("Preparing songs for the cloud") now reports progress and ends while songs only
+   wait out a retry; **Run selftest** saves keys typed a moment ago first, like Test connection.
+
+Reviewed and left as they are (not bugs, or out of this branch's scope): a stale-format `jobs.json` that fails to
+decode is dropped (only matters once `CloudJobRecord` gains a required field; add defaults then); a selftest whose
+cold start outlasts `/runsync` says "still starting" and the queued selftest still runs once (~1¢); after a relaunch
+a transfer that finished meanwhile may be started once more before its event arrives (wasted bandwidth, not wrong).
+
 ## How it was verified
 
 - Windows, Swift 6.4: **PixlNet's 352 tests pass** after this round (the earlier full PixlCore run: 1,246); new ones
@@ -133,6 +160,8 @@ same length.
 - [ ] A **streamed** song and a **Spotify** song: they download first, then go up as FLAC, and their instrumentals
       import (this is the path the FLAC packet fix covers; a "didn't line up" error here means it needs another look).
 - [ ] Send 3 songs, **lock the phone** for 30+ minutes, reopen: results come in (the R2 listing).
+- [ ] Send 3 songs with **nothing playing**, leave the app in the background (other apps, lock) until the uploads
+      finish, reopen: the queue still lists all 3 (the background-relaunch fix of 2026-10-08).
 - [ ] Swipe the app away during an upload: the row says it stopped; reopening starts it again.
 - [ ] A playlist's ⋯ › **Process all in the cloud** (≈10 songs): one cold start, then ~20–30 s per song.
 - [ ] Lower the monthly cap to $0.01: Send is off on the confirm sheet.

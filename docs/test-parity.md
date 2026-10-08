@@ -780,8 +780,11 @@ Android has no tests for a RunPod/R2 pipeline; everything here is new.
   lyrics import → background download → size/SHA-256/sample checks → `Stems/` → bucket cleanup; results found in
   R2 after `/status` expired; consent off; the monthly cap at send and at submission; the batch gate; INPUT_MISSING
   (re-upload), POISONED (stop, empty the bucket, Retry), a job lost twice (resent once, then expired); a damaged
-  download; the FLAC redo; a changed YouTube match; cancel; the job file across launches; cloud keys never in a backup.
+  download; the FLAC redo; a changed YouTube match; cancel; the job file across launches; cloud keys never in a backup;
+  a retried worker error clears the old manifest before it goes out again; transfer events after a background
+  relaunch find their stored jobs; streamed songs are prepared with `forceDecode`.
 - `AppTests/CloudAudioPreparerTests` — AAC-LC M4A as is, everything else as 44.1 kHz stereo FLAC with its SHA-256 and
-  frame count; the FLAC ends on a whole encoder packet and decodes back to exactly the recorded frames.
+  frame count; the FLAC ends on a whole encoder packet and decodes back to exactly the recorded frames; a streamed
+  song's AAC download is decoded to FLAC.
 - `UITests/CloudStudioScreenshotTests` — Cloud processing (top and Test connection), the queue (top and its Done
   part), the confirm sheet, and Experimental's Cloud processing row, light and dark.
