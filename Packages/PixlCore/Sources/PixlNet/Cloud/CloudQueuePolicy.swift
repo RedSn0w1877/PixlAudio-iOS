@@ -202,7 +202,8 @@ public enum CloudJobMachine {
         case (_, .cancelled) where !state.isFinished: .cancelled
         case (_, .failed) where !state.isFinished: .failed
         case (.failed, .requeue), (.cancelled, .requeue), (.expired, .requeue), (.uploaded, .requeue),
-             (.submitted, .requeue), (.running, .requeue), (.uploading, .requeue), (.preparing, .requeue):
+             (.submitted, .requeue), (.running, .requeue), (.uploading, .requeue), (.preparing, .requeue),
+             (.resultsReady, .requeue), (.downloading, .requeue):
             .queued
         case (.submitted, .resubmit), (.running, .resubmit), (.expired, .resubmit), (.failed, .resubmit),
              (.resultsReady, .resubmit), (.downloading, .resubmit):
@@ -436,6 +437,8 @@ public enum CloudCost {
     public static let extraSecondsStems: Int64 = 5
     /// One cold start per batch: model load plus the 10 s idle timeout.
     public static let coldStartSeconds: Int64 = 35
+    /// The song length §6's figures are for (4 minutes).
+    public static let referenceSongMs: Int64 = 240_000
 
     /// The per-second price for a GPU name from a manifest (`worker.gpu`), else `fallback`.
     public static func pricePerSecondMicroUSD(gpu: String?, fallback: Int64 = defaultPricePerSecondMicroUSD) -> Int64 {
@@ -454,7 +457,7 @@ public enum CloudCost {
         if plan.lyricsMode == .transcribe { seconds += extraSecondsTranscribe }
         if plan.tasks.contains(.stems4) { seconds += extraSecondsStems }
         if CloudSelector.quality(quality, durationMs: plan.durationMs) == .best { seconds += extraSecondsBest }
-        let scale = max(Double(plan.durationMs) / 240_000, 0.25)
+        let scale = max(Double(plan.durationMs) / Double(referenceSongMs), 0.25)
         return Int64((Double(seconds) * scale).rounded(.up))
     }
 
@@ -493,6 +496,18 @@ public enum CloudBudget {
         }
     }
 
+    /// What the month has used or will use: the recorded cost of jobs completed this month, plus the estimate of every
+    /// job RunPod is running or holding now, so a large batch can't overshoot the cap before its first result arrives.
+    public static func committedMicroUSD(_ records: [CloudJobRecord], monthStartMs: Int64,
+                                         pricePerSecondMicroUSD: Int64) -> Int64 {
+        let price = max(pricePerSecondMicroUSD, 0)
+        var inFlight: Int64 = 0
+        for record in records where record.isRunningAtRunPod {
+            inFlight += CloudCost.estimatedSeconds(record.plan, quality: record.quality) * price
+        }
+        return spentMicroUSD(records, monthStartMs: monthStartMs) + inFlight
+    }
+
     public static func remainingMicroUSD(capMicroUSD: Int64, spentMicroUSD: Int64) -> Int64 {
         max(capMicroUSD - spentMicroUSD, 0)
     }
@@ -514,6 +529,72 @@ public enum CloudBudget {
         let doy = (153 * mp + 2) / 5
         let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy
         return (era * 146_097 + doe - 719_468) * 86_400_000
+    }
+}
+
+// MARK: - Batch estimate (the confirm sheet)
+
+/// The confirm sheet's figures for a batch (design §7.3): songs, minutes, upload size, estimated cost and what's left
+/// of the month's cap.
+public struct CloudBatchEstimate: Sendable, Hashable {
+    public var songs: Int
+    public var streamedSongs: Int
+    public var totalDurationMs: Int64
+    public var uploadBytes: Int64
+    public var costMicroUSD: Int64
+    public var remainingMicroUSD: Int64
+    public var capMicroUSD: Int64
+
+    public init(songs: Int, streamedSongs: Int, totalDurationMs: Int64, uploadBytes: Int64, costMicroUSD: Int64,
+                remainingMicroUSD: Int64, capMicroUSD: Int64) {
+        self.songs = songs
+        self.streamedSongs = streamedSongs
+        self.totalDurationMs = totalDurationMs
+        self.uploadBytes = uploadBytes
+        self.costMicroUSD = costMicroUSD
+        self.remainingMicroUSD = remainingMicroUSD
+        self.capMicroUSD = capMicroUSD
+    }
+
+    /// The batch fits what's left of this month's cap.
+    public var fitsCap: Bool { costMicroUSD <= remainingMicroUSD }
+
+    /// Whole minutes, rounded up.
+    public var minutes: Int64 { (totalDurationMs + 59_999) / 60_000 }
+
+    /// Megabytes, rounded up.
+    public var uploadMB: Int64 { (uploadBytes + 1_048_575) / 1_048_576 }
+
+    public static func make(plans: [CloudSongPlan], uploadBytes: [String: Int64], quality: CloudSeparationQuality,
+                            pricePerSecondMicroUSD: Int64, committedMicroUSD: Int64,
+                            capMicroUSD: Int64) -> CloudBatchEstimate {
+        var duration: Int64 = 0
+        var bytes: Int64 = 0
+        var streamed = 0
+        for plan in plans {
+            duration += max(plan.durationMs, 0)
+            bytes += uploadBytes[plan.songId]
+                ?? CloudUploadEstimate.bytes(durationMs: plan.durationMs, passthroughBitsPerSecond: nil)
+            if plan.isStreamed { streamed += 1 }
+        }
+        let cost = CloudCost.estimateMicroUSD(plans, quality: quality, pricePerSecondMicroUSD: pricePerSecondMicroUSD)
+        let remaining = CloudBudget.remainingMicroUSD(capMicroUSD: capMicroUSD, spentMicroUSD: committedMicroUSD)
+        return CloudBatchEstimate(songs: plans.count, streamedSongs: streamed, totalDurationMs: duration,
+                                  uploadBytes: bytes, costMicroUSD: cost, remainingMicroUSD: remaining,
+                                  capMicroUSD: capMicroUSD)
+    }
+}
+
+/// The size of an upload before it is prepared (§1 step 1): an AAC-LC source goes as it is (its bitrate), anything
+/// else as 16-bit stereo FLAC at 44.1 kHz, about 60 % of PCM (25–35 MB for 4 minutes).
+public enum CloudUploadEstimate {
+    public static let flacFraction = 0.6
+
+    public static func bytes(durationMs: Int64, passthroughBitsPerSecond: Int?) -> Int64 {
+        let ms = max(durationMs, 0)
+        if let bps = passthroughBitsPerSecond, bps > 0 { return ms * Int64(bps) / 8_000 }
+        let pcm = Double(ms) / 1000 * 44_100 * 2 * 2
+        return Int64((pcm * flacFraction).rounded(.up))
     }
 }
 

@@ -51,6 +51,9 @@ import PixlModel
         #expect(CloudJobMachine.next(.uploading, on: .failed) == .failed)
         #expect(CloudJobMachine.next(.submitted, on: .expired) == .expired)
         #expect(CloudJobMachine.next(.failed, on: .requeue) == .queued)
+        // A FLAC redo after the AAC result didn't line up starts over from the upload.
+        #expect(CloudJobMachine.next(.downloading, on: .requeue) == .queued)
+        #expect(CloudJobMachine.next(.resultsReady, on: .requeue) == .queued)
         #expect(CloudJobMachine.next(.expired, on: .resubmit) == .uploaded)
         #expect(CloudJobMachine.next(.running, on: .resubmit) == .uploaded)
         #expect(CloudJobMachine.next(.uploaded, on: .resultsReady) == .resultsReady) // found in R2 after a lost response
@@ -319,5 +322,79 @@ import PixlModel
         r.outputs = ["instrumental": CloudOutputFile(key: "k", bytes: 1, sha256: "a", codec: "aac", kbps: 256, samples: 9)]
         let data = try JSONEncoder().encode([r])
         #expect(try JSONDecoder().decode([CloudJobRecord].self, from: data) == [r])
+    }
+}
+
+/// The month's committed spend and the confirm sheet's batch figures (design §5 app guards, §7.3).
+@Suite struct CloudBudgetTests {
+    static func record(_ key: String, state: CloudJobState, durationMs: Int64 = 240_000) -> CloudJobRecord {
+        var r = CloudJobRecord(jobKey: key, songId: "s-\(key)", title: "T", artist: "A", batchId: "b",
+                               tasks: [.instrumental, .lyrics], lyricsMode: .align, quality: .standard, createdAtMs: 0)
+        r.state = state
+        r.durationMs = durationMs
+        return r
+    }
+
+    @Test func committedCountsJobsStillAtRunPod() {
+        var done = Self.record("a", state: .imported)
+        done.completedAtMs = 2_000
+        done.costMicroUSD = 5_000
+        var running = Self.record("b", state: .running)
+        running.submittedAtMs = 1_500
+        let waiting = Self.record("c", state: .submitted)
+        let queued = Self.record("d", state: .queued)
+        // A redo after an earlier result counts again; one that already finished this run doesn't.
+        var redo = Self.record("e", state: .submitted)
+        redo.completedAtMs = 1_000
+        redo.submittedAtMs = 3_000
+        var finishedRun = Self.record("f", state: .running)
+        finishedRun.completedAtMs = 4_000
+        finishedRun.submittedAtMs = 3_000
+        let records = [done, running, waiting, queued, redo, finishedRun]
+        // 20 s warm each at 192 µ$/s for a 4-minute song: running, waiting and the redo.
+        #expect(CloudBudget.committedMicroUSD(records, monthStartMs: 0, pricePerSecondMicroUSD: 192)
+            == 5_000 + 3 * 20 * 192)
+        #expect(running.isRunningAtRunPod && waiting.isRunningAtRunPod && redo.isRunningAtRunPod)
+        #expect(!finishedRun.isRunningAtRunPod && !queued.isRunningAtRunPod)
+    }
+
+    @Test func planUsesThePreparedThenTheLibraryLength() {
+        var r = Self.record("a", state: .queued)
+        r.durationMs = nil
+        #expect(r.plan.durationMs == CloudCost.referenceSongMs)
+        r.songDurationMs = 300_000
+        #expect(r.plan.durationMs == 300_000)
+        r.durationMs = 301_000
+        #expect(r.plan.durationMs == 301_000)
+        #expect(r.plan.tasks == [.instrumental, .lyrics])
+    }
+
+    @Test func redoAddsItsRunToTheCost() throws {
+        var r = Self.record("a", state: .running)
+        let result = try CloudJSON.decode(CloudJobResult.self, from: CloudFixtures.worker("job.result.ok"))
+        r.takeResult(result, fallbackPricePerSecondMicroUSD: 192, nowMs: 10)
+        #expect(r.costMicroUSD == 7_258)
+        r.takeResult(result, fallbackPricePerSecondMicroUSD: 192, nowMs: 20)
+        #expect(r.costMicroUSD == 14_516)
+    }
+
+    @Test func batchEstimateForTheConfirmSheet() {
+        let plans = [CloudSongPlan(songId: "a", tasks: [.instrumental, .lyrics], lyricsMode: .align, isStreamed: false,
+                                   durationMs: 240_000),
+                     CloudSongPlan(songId: "b", tasks: [.instrumental], lyricsMode: nil, isStreamed: true,
+                                   durationMs: 120_000)]
+        let estimate = CloudBatchEstimate.make(plans: plans, uploadBytes: ["a": 8_000_000], quality: .standard,
+                                               pricePerSecondMicroUSD: 192, committedMicroUSD: 2_990_000,
+                                               capMicroUSD: 3_000_000)
+        #expect(estimate.songs == 2 && estimate.streamedSongs == 1)
+        #expect(estimate.minutes == 6)
+        // "b" as FLAC: 120 s × 176,400 B/s × 0.6.
+        #expect(estimate.uploadBytes == 8_000_000 + 12_700_800)
+        #expect(estimate.uploadMB == 20)
+        // One cold start (35 s) + 20 s + 10 s.
+        #expect(estimate.costMicroUSD == (35 + 20 + 10) * 192)
+        #expect(estimate.remainingMicroUSD == 10_000)
+        #expect(!estimate.fitsCap)
+        #expect(CloudUploadEstimate.bytes(durationMs: 240_000, passthroughBitsPerSecond: 256_000) == 7_680_000)
     }
 }

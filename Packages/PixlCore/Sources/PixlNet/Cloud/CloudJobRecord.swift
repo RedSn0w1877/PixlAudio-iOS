@@ -15,6 +15,8 @@ public struct CloudJobRecord: Codable, Sendable, Hashable, Identifiable {
     public var contentLength: Int64?
     public var title: String
     public var artist: String
+    /// The library's length of the song (cost estimates before the audio is prepared).
+    public var songDurationMs: Int64?
     /// Songs sent together (the submission gate works per batch).
     public var batchId: String
     public var isStreamed: Bool
@@ -66,6 +68,8 @@ public struct CloudJobRecord: Codable, Sendable, Hashable, Identifiable {
     public var resultStatus: String?
     public var outputs: [String: CloudOutputFile]?
     public var lyricsKey: String?
+    /// The manifest's `lyrics` entry (size and SHA-256 of `lyrics.json`, its mode and counts).
+    public var lyricsFile: CloudLyricsSummary?
     public var lyricsTranscribed: Bool
     public var importedInstrumental: Bool
     public var importedLyrics: Bool
@@ -160,20 +164,37 @@ public struct CloudJobRecord: Codable, Sendable, Hashable, Identifiable {
         resultStatus = result.status
         outputs = result.outputs
         lyricsKey = result.lyrics?.key
+        lyricsFile = result.lyrics
         lyricsTranscribed = result.lyrics?.mode == "transcribed"
         warnings = (result.warnings ?? []).filter { $0 != "duplicate" }
         timings = result.timings
         gpu = result.worker?.gpu
         coldStartMs = result.timings?.coldStartMs
-        // A duplicate answer cost a few hundred ms; the first delivery's cost was already recorded.
-        if costMicroUSD == nil || !result.isDuplicate {
-            costMicroUSD = CloudCost.actualMicroUSD(timings: result.isDuplicate ? nil : result.timings, gpu: result.worker?.gpu,
-                                                    fallbackPricePerSecondMicroUSD: fallbackPricePerSecondMicroUSD)
+        // A duplicate answer cost a few hundred ms; the first delivery's cost was already recorded. A redo (a FLAC
+        // redo, a re-upload) adds its own run to what the job already cost.
+        if !result.isDuplicate {
+            costMicroUSD = (costMicroUSD ?? 0) + CloudCost.actualMicroUSD(timings: result.timings, gpu: result.worker?.gpu,
+                                                                          fallbackPricePerSecondMicroUSD: fallbackPricePerSecondMicroUSD)
+        } else if costMicroUSD == nil {
+            costMicroUSD = 0
         }
         completedAtMs = nowMs
         updatedAtMs = nowMs
         progressStage = nil
         progressPercent = nil
+    }
+
+    /// The job as a selection plan (cost estimates): its tasks at its prepared, else library, length.
+    public var plan: CloudSongPlan {
+        CloudSongPlan(songId: songId, tasks: tasks, lyricsMode: lyricsMode, isStreamed: isStreamed,
+                      durationMs: durationMs ?? songDurationMs ?? CloudCost.referenceSongMs)
+    }
+
+    /// RunPod holds this job now and hasn't finished the run (a redo after an earlier result counts again).
+    public var isRunningAtRunPod: Bool {
+        guard state.isAtRunPod else { return false }
+        guard let completed = completedAtMs else { return true }
+        return (submittedAtMs ?? 0) > completed
     }
 
     /// Every result this job asked for has been imported.
