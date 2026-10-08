@@ -139,13 +139,14 @@ struct SaveQueueAsPlaylistSheet: View {
             GlassCircleButton(systemImage: "xmark", accessibilityLabel: "Close",
                               tint: theme.surfaceContainerHigh.opacity(GlassTint.container)) { dismiss() }
                 .padding(.leading, 8)
-            // The pill keeps its one-line size and the title shrinks to the width left (on a 402 pt iPhone the title
-            // at full size truncated to "Save as pl…" and "Deselect all" wrapped inside its 40 pt pill).
-            Text("Save as playlist")
-                .pixlFont(.headlineMedium, weight: .semibold)
-                .foregroundStyle(theme.onSurface)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+            // The pill keeps its one-line size and the title steps down a text style until it fits (on a 402 pt
+            // iPhone the full-size title truncated to "Save as pl…" and "Deselect all" wrapped inside its 40 pt pill;
+            // `minimumScaleFactor` doesn't shrink `pixlFont` text, which carries tracking).
+            ViewThatFits(in: .horizontal) {
+                title(.headlineMedium)
+                title(.headlineSmall)
+                title(.titleLarge)
+            }
             Spacer(minLength: 8)
             Button {
                 selected = allSelected ? [] : allIds
@@ -171,6 +172,13 @@ struct SaveQueueAsPlaylistSheet: View {
             .padding(.trailing, 12)
         }
         .frame(height: 64)
+    }
+
+    private func title(_ style: PixlTextStyle) -> some View {
+        Text("Save as playlist")
+            .pixlFont(style, weight: .semibold)
+            .foregroundStyle(theme.onSurface)
+            .lineLimit(1)
     }
 
     private func fieldBox<Content: View>(@ViewBuilder content: () -> Content) -> some View {
