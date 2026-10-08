@@ -773,7 +773,7 @@ Android has no tests for the lyrics toolbar or the keep-screen-on switch; these 
   `testSingRendering` (value "Removing vocals …" while the demo job runs), `testTranslateMenu` (a long press on
   Translate opens the menu with Translate via AI instead of running the tap), `testShowAsPlainText` (the More sheet's
   switch turns karaoke into plain text, so "Adjust sync" leaves the sheet; the switch is first scrolled clear of the
-  screen's edge and left to settle); `testMoreSheet` now shows the half-height glass sheet and
+  screen's edge and left to settle, and if the tap is lost the knob is dragged on, which can't switch it back off); `testMoreSheet` now shows the half-height glass sheet and
   `testMoreSheetBottomInLightApp` swipes on the sheet until its own heart is on screen.
 - `UITests/GlassAccessibilityTests.testLyricsToolbarKeepsButtonTraits` — Back, Translate, Sing, Lyrics options and
   play/pause stay buttons with their labels inside the cluster's glass container; Sing and Translate report a value.
@@ -783,3 +783,6 @@ Android has no tests for the lyrics toolbar or the keep-screen-on switch; these 
   one and could not scroll to it).
 - `UITests/LyricsSyncEntryTests` — the sync chip is found by identifier or label ("Make the words light up · Sync it
   yourself"): inside the lyrics screen it keeps only its label (the screen's own identifier reaches its children).
+  Under `-uiTest` the editor clears its drafts folder (in the temporary directory) once per launch: once
+  `testLeaveReturnsToLyrics` could reach the editor it left a 3-tap draft behind, and every later editor test opened on
+  "You synced 3 of 128 words last time" instead of the intro (`LyricsSyncScreenshotTests.testLiveTapping` too).

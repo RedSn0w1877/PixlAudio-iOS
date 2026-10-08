@@ -39,8 +39,14 @@ Owner items 1 and 11 of the 2026-10-07 batch, built from `2026-10-07-plans/lyric
     the sheet, same labels, off screen) instead of the sheet's; it now looks inside the sheet. The same unscoped
     query is a likely cause of `testSongInfoFavoriteTogglesImmediately` failing on main ("the heart can't be tapped":
     it waits for the hidden full player's heart). That test belongs to `s21-main-health`; not changed here.
-  - `testShowAsPlainText` (flaky once) and `testMoreSheetBottomInLightApp` (its shot never reached the bottom row)
-    now swipe on the sheet until the target sits clear of the screen's edge.
+  - Once the chip was found, `testLeaveReturnsToLyrics` left a 3-tap draft in the UI-test drafts folder, which
+    outlives the app between tests, and every later editor test opened on "You synced 3 of 128 words last time"
+    instead of the intro. Under `-uiTest` the editor now clears that folder once per launch
+    (`LyricsSyncEditorView.clearUITestDraftsOnce`; real drafts are untouched).
+  - `testShowAsPlainText` and `testMoreSheetBottomInLightApp` (its shot never reached the bottom row) now swipe on the
+    sheet until the target sits clear of the screen's edge. CI lost the quick tap on the plain-text switch in 5 of 6
+    tries (it flipped once), so the test drags the knob on if the tap didn't take. Worth a look on the phone: does
+    the switch flip on the first tap?
 - **Docs:** `design.md`, `parity.md` (rows 25 and 27), `api-notes.md` (`isIdleTimerDisabled`, `glassEffectTransition`,
   `contextMenu` with a caution for the player's output pill, `Menu(content:label:primaryAction:)`, first use of
   `Toggle(_:systemImage:isOn:)`, iOS 14, checked on developer.apple.com), `test-parity.md`.
@@ -69,7 +75,8 @@ speaker, so those paths are only checked with demo states.
 - [ ] Sing on a downloaded song: the first time it renders ("Removing vocals …"), then the vocals go away; tap
       again brings them back without a skip. On a Spotify Connect speaker, Sing is greyed out.
 - [ ] ⋯ opens as a half-height floating glass sheet; drag it up, still see-through. Is it readable over bright art?
-- [ ] Show as plain text switches to plain lyrics and back; the next song goes back to synced.
+- [ ] Show as plain text switches to plain lyrics and back on the first tap (CI's simulator taps sometimes missed
+      it); the next song goes back to synced.
 - [ ] The alignment lens and the shuffle / repeat / heart row feel like the full player's; the heart flips at once.
 - [ ] The controls look like the full player's glass (not dark plastic), also over very bright and very dark art.
 - [ ] Seek by dragging the seek bar: the thumb stays under the finger.

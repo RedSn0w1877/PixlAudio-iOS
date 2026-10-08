@@ -110,10 +110,21 @@ final class LyricsScreenshotTests: XCTestCase {
             XCTAssertTrue(adjustSync.exists, "karaoke lyrics should offer Adjust sync")
             // The switch sits at the row's trailing end; the row's centre is its title.
             let knob = plain.switches.firstMatch
-            if knob.exists, knob.isHittable {
+            let hasKnob = knob.exists && knob.isHittable
+            if hasKnob {
                 knob.tap()
             } else {
                 plain.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+            }
+            if !adjustSync.waitForNonExistence(timeout: 2) {
+                // On CI a quick tap on this switch was sometimes lost (the sheet's scroll view); dragging the knob to
+                // the right can only turn it on, so trying again can't undo a tap that did land.
+                if hasKnob {
+                    knob.swipeRight()
+                } else {
+                    plain.coordinate(withNormalizedOffset: CGVector(dx: 0.82, dy: 0.5))
+                        .press(forDuration: 0.1, thenDragTo: plain.coordinate(withNormalizedOffset: CGVector(dx: 1.0, dy: 0.5)))
+                }
             }
             XCTAssertTrue(adjustSync.waitForNonExistence(timeout: 5), "the lyrics did not switch to plain text")
             Thread.sleep(forTimeInterval: 1.0)

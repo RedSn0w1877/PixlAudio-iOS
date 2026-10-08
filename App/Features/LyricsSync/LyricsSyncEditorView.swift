@@ -165,6 +165,17 @@ struct LyricsSyncEditorView: View {
 
     // MARK: Session
 
+    /// UI tests keep drafts in the temporary directory, which outlives the app from one test to the next: a test that
+    /// leaves taps behind ("Leave without saving?") turned the next test's intro into "You synced 3 of 128 words last
+    /// time" (CI, 2026-10-07). Each launch starts without them; within a launch they stay (leave, reopen, resume).
+    private static var uiTestDraftsCleared = false
+
+    private static func clearUITestDraftsOnce(_ directory: URL) {
+        guard !uiTestDraftsCleared else { return }
+        uiTestDraftsCleared = true
+        try? FileManager.default.removeItem(at: directory)
+    }
+
     private func start() {
         guard session == nil else { return }
         ScreenAwake.set(true, for: .lyricsSync)
@@ -174,6 +185,7 @@ struct LyricsSyncEditorView: View {
         if isUITest {
             draftsDirectory = fileManager.temporaryDirectory
                 .appendingPathComponent("uitest-" + LyricsSyncDraftStore.directoryName, isDirectory: true)
+            Self.clearUITestDraftsOnce(draftsDirectory)
         } else {
             let support = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
                 ?? fileManager.temporaryDirectory
