@@ -1,0 +1,164 @@
+name: cloud-worker-build
+
+# The Cloud Studio RunPod worker (cloud/runpod-worker, design 3.1). Free ubuntu runners only; ci.yml ignores these
+# paths so worker changes never hold a macOS runner.
+#   test  - every push and PR touching the worker: weights check, fixture drift check, CPU unit tests in Docker.
+#   image - main: build and push ghcr.io/redsn0w1877/pixl-cloud-worker:sha-<12> (+ :main as the cache source).
+#           Any other branch: build without pushing (plus the CPU smoke test) only when the commit message carries
+#           [image], because workflow_dispatch can't start a workflow that isn't on the default branch yet.
+on:
+  push:
+    paths:
+      - 'cloud/runpod-worker/**'
+      - '.github/workflows/cloud-worker-build.yml'
+  pull_request:
+    paths:
+      - 'cloud/runpod-worker/**'
+      - '.github/workflows/cloud-worker-build.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloud-worker-build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/redsn0w1877/pixl-cloud-worker
+  DOCKER_BUILD_RECORD_UPLOAD: 'false'
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Dockerfile and weights.lock agree
+        run: python3 cloud/runpod-worker/ci/check_weights.py
+      - name: The app's fixture copies match the schema examples
+        run: python3 cloud/runpod-worker/ci/check_fixtures.py
+      - name: Unit tests (CPU only, no torch, no weights, no network)
+        run: |
+          docker build --target test -t pixl-worker-test cloud/runpod-worker
+          docker run --rm --network none pixl-worker-test
+
+  image:
+    needs: test
+    if: >-
+      github.event_name != 'pull_request' &&
+      (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' ||
+       contains(github.event.head_commit.message, '[image]'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Free disk space
+        run: |
+          {
+            echo "### Runner disk before cleanup"
+            echo '```'
+            df -h / /mnt 2>/dev/null || df -h /
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL \
+            /usr/local/share/boost /usr/local/.ghcup /opt/hostedtoolcache/go /usr/share/swift || true
+          docker system prune -af > /dev/null
+          # The temporary disk at /mnt is usually the larger one: put Docker (and BuildKit's state) there.
+          root_free=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
+          mnt_free=$(df -BG --output=avail /mnt 2>/dev/null | tail -1 | tr -dc '0-9' || echo 0)
+          if [ "${mnt_free:-0}" -gt "$root_free" ]; then
+            sudo systemctl stop docker docker.socket
+            sudo mkdir -p /mnt/docker
+            echo '{"data-root": "/mnt/docker"}' | sudo tee /etc/docker/daemon.json > /dev/null
+            sudo systemctl start docker
+            free=$mnt_free; where=/mnt
+          else
+            free=$root_free; where=/
+          fi
+          {
+            echo "### Runner disk after cleanup (Docker data on $where, ${free} GB free)"
+            echo '```'
+            df -h / /mnt 2>/dev/null || df -h /
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$free" -lt 35 ]; then
+            echo "::error::only ${free} GB free for Docker; the cold build needs about 30 GB (design 3.2)"
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Tags
+        id: tags
+        run: |
+          echo "short=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then echo "push=true" >> "$GITHUB_OUTPUT"; else echo "push=false" >> "$GITHUB_OUTPUT"; fi
+      - name: Log in to GHCR
+        if: steps.tags.outputs.push == 'true'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push (main)
+        if: steps.tags.outputs.push == 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: cloud/runpod-worker
+          target: final
+          platforms: linux/amd64
+          provenance: false
+          sbom: false
+          build-args: GIT_SHA=${{ github.sha }}
+          tags: |
+            ${{ env.IMAGE }}:sha-${{ steps.tags.outputs.short }}
+            ${{ env.IMAGE }}:main
+          cache-from: type=registry,ref=${{ env.IMAGE }}:main
+          cache-to: type=inline
+          outputs: type=image,compression=gzip,compression-level=1,push=true
+      - name: Build without pushing (branch, [image])
+        if: steps.tags.outputs.push != 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: cloud/runpod-worker
+          target: final
+          platforms: linux/amd64
+          provenance: false
+          sbom: false
+          build-args: GIT_SHA=${{ github.sha }}
+          outputs: type=cacheonly
+      - name: Disk after the image build
+        if: always()
+        run: |
+          {
+            echo "### Runner disk after the image build"
+            echo '```'
+            df -h / /mnt 2>/dev/null || df -h /
+            docker buildx du 2>/dev/null | tail -n 3 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: CPU smoke test (real weights, every model the worker loads except ASR)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: cloud/runpod-worker
+          target: smoke
+          platforms: linux/amd64
+          provenance: false
+          sbom: false
+          outputs: type=cacheonly
+      - name: Disk after the smoke test
+        if: always()
+        run: |
+          {
+            echo "### Runner disk at the end"
+            echo '```'
+            df -h / /mnt 2>/dev/null || df -h /
+            echo '```'
+            echo "Image tag: sha-${{ steps.tags.outputs.short }} (pushed: ${{ steps.tags.outputs.push }})"
+          } >> "$GITHUB_STEP_SUMMARY"

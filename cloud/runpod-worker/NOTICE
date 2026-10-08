@@ -1,0 +1,58 @@
+PixlAudio Cloud Studio worker (ghcr.io/redsn0w1877/pixl-cloud-worker)
+=====================================================================
+
+This container image is published publicly, which counts as distribution, so this file lists what it contains,
+under which licence, and where each source lives. Licence texts are in /opt/pixl/LICENSES/ in the image
+(cloud/runpod-worker/LICENSES/ in the repository). Exact model files, sizes and sha256 are in
+/opt/pixl/weights.lock. Not legal advice; see the design's section 5 ("Licences") for the reasoning.
+
+Worker code
+-----------
+src/pixl_worker/ (the handler, storage, audio, lyrics and deploy code in cloud/runpod-worker/) is part of
+https://github.com/RedSn0w1877/PixlAudio-iOS and is covered by that repository's LICENSE.
+
+Model weights (data, loaded by the code above; baked in at build time, never downloaded at runtime)
+-------------------------------------------------------------------------------------------------------
+- BS-RoFormer vocals model "ft1" by anvuew: bs_roformer_ft1_anvuew_sdr_12.55.ckpt + config.yaml
+  Licence: GPL-3.0 (the model card's licence tag)  Text: LICENSES/GPL-3.0.txt
+  Source: https://huggingface.co/anvuew/BS-RoFormer at commit 24988f47270cb3529b62c4f3bbb8234f4586de9b
+  The model card credits the dataset to bascurtiz and does not state the training data's licence.
+- htdemucs_ft (Hybrid Transformer Demucs, fine-tuned bag of 4) by Meta Platforms, Inc. and affiliates
+  Licence: MIT  Text: LICENSES/MIT-demucs.txt
+  Source: https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/ (f7e0c4bc, d12395a8, 92cfc3b6, 04573f0d)
+  and https://github.com/facebookresearch/demucs (the bag file models/demucs/htdemucs_ft.yaml comes from it)
+- Qwen3-ForcedAligner-0.6B by the Qwen team, Alibaba Cloud
+  Licence: Apache-2.0  Text: LICENSES/Apache-2.0.txt
+  Source: https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B at commit c7cbfc2048c462b0d63a45797104fc9db3ad62b7
+- Qwen3-ASR-1.7B by the Qwen team, Alibaba Cloud
+  Licence: Apache-2.0  Text: LICENSES/Apache-2.0.txt
+  Source: https://huggingface.co/Qwen/Qwen3-ASR-1.7B at commit 7278e1e70fe206f11671096ffdd38061171dd6e5
+Neither Qwen repository ships a NOTICE file at those commits.
+
+Python libraries (installed from PyPI by hash; see requirements.lock)
+-----------------------------------------------------------------------
+- msst 0.1.0 (Music Source Separation Training, Roman Solovyev / ZFTurbo): MIT, LICENSES/MIT-msst.txt.
+  Its PyPI metadata carries no licence field; the text is the one shipped in its wheel, from
+  https://github.com/ZFTurbo/Music-Source-Separation-Training.
+- demucs 4.1.0: MIT, LICENSES/MIT-demucs.txt.
+- runpod 1.12.0: MIT, LICENSES/MIT-runpod.txt.
+- qwen-asr 0.0.6: Apache-2.0, LICENSES/Apache-2.0.txt.
+- Every other package (transformers, accelerate, librosa, numpy, scipy, ...) keeps its own licence file in its
+  .dist-info directory under /usr/local/lib/python3.12/dist-packages/, as pip installed it.
+  /opt/pixl/pip-freeze.txt lists every installed version.
+
+Base image and system packages
+------------------------------
+- pytorch/pytorch:2.11.0-cuda12.8-cudnn9-runtime (pinned by digest in the Dockerfile): PyTorch is BSD-3-Clause;
+  the CUDA and cuDNN runtime libraries are under NVIDIA's redistributable-runtime terms, whose texts ship with
+  them inside the base image; Ubuntu 24.04 packages keep their copyright files in /usr/share/doc/*/copyright.
+- ffmpeg from Ubuntu 24.04 (apt). Ubuntu builds it with GPL components enabled, so the binaries are under the
+  GPL: LICENSES/GPL-2.0.txt, LICENSES/GPL-3.0.txt and LICENSES/LGPL-2.1.txt, with the exact terms in
+  /usr/share/doc/ffmpeg/copyright and /usr/share/doc/libavcodec*/copyright.
+  Source: the Ubuntu source packages of the versions listed in /opt/pixl/apt-versions.txt (written at build
+  time by dpkg-query), available from https://launchpad.net/ubuntu/+source/ffmpeg and the Ubuntu archive.
+
+Not included on purpose
+-----------------------
+No BS-RoFormer "SW" (6-stem) model (unknown licence and provenance) and no CC-BY-NC weights (MMS, the
+ctc-forced-aligner default model, becruily deux).

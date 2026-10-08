@@ -1,0 +1,41 @@
+name: cloud-worker-keepalive
+
+# Daily (design 3.4): undo RunPod's idle scale-down of the Cloud Studio endpoint, but never while workers are
+# unhealthy or after a failed deploy, and fail (GitHub emails the owner) when the last 7 days cost more than
+# vars.CLOUD_WEEKLY_ALARM_USD (default 2). Sends no jobs, so it costs nothing. Before setup it just succeeds.
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: cloud-worker-keepalive
+  cancel-in-progress: false
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-24.04
+    environment: runpod
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Result of the last deploy
+        id: last
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          conclusion=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow cloud-worker-deploy.yml --status completed \
+            --limit 1 --json conclusion --jq '.[0].conclusion // ""' 2>/dev/null || echo "")
+          echo "conclusion=${conclusion}" >> "$GITHUB_OUTPUT"
+      - name: Keepalive and spend alarm
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+          CLOUD_WEEKLY_ALARM_USD: ${{ vars.CLOUD_WEEKLY_ALARM_USD }}
+          LAST_DEPLOY_CONCLUSION: ${{ steps.last.outputs.conclusion }}
+        run: python3 cloud/runpod-worker/deploy/keepalive.py
