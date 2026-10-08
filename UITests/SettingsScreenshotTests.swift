@@ -20,12 +20,16 @@ final class SettingsScreenshotTests: XCTestCase {
     func testBehaviorCategoryDark() throws { try capture("settingsCategory.behavior", "dark") }
     func testAICategoryLight() throws { try capture("settingsCategory.ai", "light") }
     func testAICategoryDark() throws { try capture("settingsCategory.ai", "dark") }
-    /// AI features with the optional cloud assistant switched on (Gemini, the demo key): provider picker, sign-in.
+    /// AI features with the optional cloud assistant switched on (Gemini, the demo key): the on-device row, then the
+    /// cloud switch, provider picker and sign-in. Scrolled to them: they sit below the two cards, so the unscrolled
+    /// shot looked the same as the on-device one.
     func testAICategoryCloudLight() throws {
-        try capture("settingsCategory.ai.cloud", "light", ready: "screen.settingsCategory.ai")
+        try capture("settingsCategory.ai.cloud", "light", ready: "screen.settingsCategory.ai", suffix: "",
+                    interact: Self.scrollToAssistant)
     }
     func testAICategoryCloudDark() throws {
-        try capture("settingsCategory.ai.cloud", "dark", ready: "screen.settingsCategory.ai")
+        try capture("settingsCategory.ai.cloud", "dark", ready: "screen.settingsCategory.ai", suffix: "",
+                    interact: Self.scrollToAssistant)
     }
     /// On-device: Advanced shows only Temperature.
     func testAICategoryAdvancedOnDeviceLight() throws {
@@ -117,6 +121,16 @@ final class SettingsScreenshotTests: XCTestCase {
     /// `ready`: the element that marks the screen as loaded (default `screen.<screen>`). `extra`: more launch
     /// arguments (e.g. `-accent RRGGBB`); `suffix` tells such a shot apart from the plain one
     /// (`<screen>-<appearance><suffix>`), so the exported PNGs don't collide.
+    /// Swipes AI features up until the on-device model row (`settings.ai.onDevice`, first row of the assistant
+    /// section) can be tapped, so the section and the cloud rows under it fill the screen.
+    private static func scrollToAssistant(_ app: XCUIApplication) {
+        let row = app.descendants(matching: .any)["settings.ai.onDevice"].firstMatch
+        for _ in 0..<4 {
+            if row.exists && row.isHittable { break }
+            app.swipeUp()
+        }
+    }
+
     private func capture(_ screen: String, _ appearance: String, ready: String? = nil, extra: [String] = [],
                          suffix: String? = nil,
                          interact: ((XCUIApplication) -> Void)? = nil) throws {
