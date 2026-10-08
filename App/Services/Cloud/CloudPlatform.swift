@@ -27,10 +27,33 @@ nonisolated enum CloudPlatform {
         return (digest, total)
     }
 
+    /// The lower-case hex SHA-256 of a small payload (`lyrics.json`).
+    static func sha256Hex(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
     /// The signer for the bucket in `config`, or nil when it isn't filled in.
     static func signer(_ config: CloudConfigInput) -> S3Signer? {
         guard let location = config.location, config.credentials.isComplete else { return nil }
         return S3Signer(credentials: config.credentials, location: location, sha256: sha256, hmac: hmac)
+    }
+
+    /// RunPod and the bucket's small requests: no cookies, no cache (responses can carry job details).
+    static let apiSession: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpCookieStorage = nil
+        configuration.httpShouldSetCookies = false
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.timeoutIntervalForRequest = 60
+        return URLSession(configuration: configuration)
+    }()
+
+    /// Start of the local calendar month containing `ms` (the monthly cap resets on the 1st, here).
+    static func localMonthStartMs(_ ms: Int64) -> Int64 {
+        let date = Date(timeIntervalSince1970: Double(ms) / 1000)
+        let start = Calendar.current.dateInterval(of: .month, for: date)?.start ?? date
+        return Int64((start.timeIntervalSince1970 * 1000).rounded(.down))
     }
 
     /// `CFBundleShortVersionString (CFBundleVersion)` for `client.build`.

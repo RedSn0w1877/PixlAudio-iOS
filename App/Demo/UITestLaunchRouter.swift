@@ -98,6 +98,10 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case taisInstrumental = "tais.instrumental", taisInstrumentalRendering = "tais.instrumentalRendering"
     case taisInstrumentalActive = "tais.instrumentalActive"
 
+    // Cloud Studio (iOS-first): Cloud processing filled in with a passed Test connection, the queue in every state,
+    // and the confirm sheet for a 12-song batch (`CloudDemo`, no network)
+    case cloudSettings = "cloud.settings", cloudQueue = "cloud.queue", cloudConfirm = "cloud.confirm"
+
     /// The accessibility identifier present once the screen is up (`screen.<id>`).
     var readyIdentifier: String {
         switch self {
@@ -113,6 +117,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .aiPlaylist: return "screen.aiPlaylist"
         case .taisChat, .taisChatConversation: return "screen.taisChat"
         case .aiPlaylistLab: return "screen.aiPlaylistLab"
+        case .cloudConfirm: return "screen.cloudConfirm"
         default:
             if let route { return "screen.\(route.screenID)" }
             if let sheet { return "screen.\(sheet.id.split(separator: ".").first ?? "")" }
@@ -187,6 +192,10 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         // A full-screen cover: nothing needs to be pushed underneath (one destination per demo screen).
         case .backupRestorePlan, .backupImportReport: return nil
         case .taisStudio, .taisModels: return .experimental
+        case .cloudSettings: return .cloudProcessing
+        case .cloudQueue: return .cloudQueue
+        // A sheet: one destination per demo screen (it opens over Home; in the app the queue presents it).
+        case .cloudConfirm: return nil
         case .taisSongSheet, .taisInstrumental, .taisInstrumentalRendering, .taisInstrumentalActive: return nil
         }
     }
@@ -222,6 +231,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .artistPicker: return .artistPicker(songId: DemoLibrary.songs[DemoLibrary.featuredSongIndex].id)
         case .aiPlaylist: return .aiPlaylist
         case .taisChat, .taisChatConversation: return .taisChat
+        case .cloudConfirm: return .cloudConfirm
         default: return nil
         }
     }
@@ -352,7 +362,7 @@ nonisolated enum UITestLaunchRouter {
     private static let underSettings: Set<String> = [
         "paletteStyle", "experimental", "artistSettings", "delimiterConfig", "wordDelimiterConfig", "equalizer",
         "editTransition", "deviceCapabilities", "about", "openSourceLicenses", "easterEgg", "quickFill",
-        "diagnostics", "accounts",
+        "diagnostics", "accounts", "cloudProcessing", "cloudQueue",
     ]
     private static let underAccounts: Set<String> = ["spotifyDashboard", "spotifyBrowse", "youTubeLogin", "playbackDiagnostics"]
 

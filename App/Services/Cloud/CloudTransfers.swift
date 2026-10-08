@@ -12,6 +12,20 @@ nonisolated enum CloudTransferEvent: Sendable, Hashable {
     case downloadFailed(jobKey: String, slot: String, message: String, httpStatus: Int?)
 }
 
+/// True the first time only (a continuation resumed by whichever of two callbacks comes first).
+nonisolated final class OnceFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var claimed = false
+
+    func claim() -> Bool {
+        lock.withLock {
+            guard !claimed else { return false }
+            claimed = true
+            return true
+        }
+    }
+}
+
 /// Cloud Studio's background `URLSession` (design §7.1 `CloudTransfers`, §7.4): the song upload (a presigned PUT,
 /// `uploadTask(with:fromFile:)`) and the large result downloads (presigned GETs). Transfers continue in the system's
 /// transfer daemon while PixlAudio is suspended or terminated by the system, and iOS relaunches the app in the
@@ -163,6 +177,20 @@ nonisolated final class CloudTransfers: NSObject, URLSessionDownloadDelegate, @u
             return false
         }
         if runNow { DispatchQueue.main.async { completion() } }
+    }
+
+    /// A background wake for this session (`.backgroundTask(.urlSession(…))`): returns once the session has delivered
+    /// every pending event, or after `timeoutSeconds`.
+    func waitForBackgroundEvents(timeoutSeconds: Double) async {
+        let once = OnceFlag()
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            handleBackgroundEvents {
+                if once.claim() { continuation.resume() }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + timeoutSeconds) {
+                if once.claim() { continuation.resume() }
+            }
+        }
     }
 
     // MARK: Staging

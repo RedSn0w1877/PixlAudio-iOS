@@ -404,6 +404,13 @@ final class TaisStudio {
         return (true, "Done — \(song.title) lyrics synced")
     }
 
+    /// Cloud Studio moved an instrumental into `Stems/` (design §7.5): the instrumental switch and the lyrics screen
+    /// look again.
+    func noteInstrumentalImported() { instrumentalRevision += 1 }
+
+    /// Cloud Studio saved word-timed lyrics for `song`: the lyrics screen reloads them if it shows that song.
+    func noteLyricsImported(song: Song) { reloadLyricsIfShowing(song) }
+
     private func reloadLyricsIfShowing(_ song: Song) {
         lyricsRevision += 1
         guard let controller = dependencies?.lyricsController, controller.loadedSongId == song.id else { return }
