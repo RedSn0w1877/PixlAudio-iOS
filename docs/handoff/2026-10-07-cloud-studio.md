@@ -145,6 +145,10 @@ a transfer that finished meanwhile may be started once more before its event arr
   cover the worker caps, the selftest's limits and empty allowlist, and the manifest's input check. The worker's
   `check_fixtures.py` logic run against the new `Fixtures/cloud/`: no drift.
 - CI run 37731451069 on `5a525d6`: **green** — core 1,249 PixlCore tests (PixlNet 352), app 287 unit tests (incl. the FLAC read-back test that failed before, plus 3 new orchestrator/settings tests), 50 screenshot tests (SettingsScreenshotTests + CloudStudioScreenshotTests), 0 failures. The non-blocking YouTube live smoke failed (external; not this branch).
+- Review round, CI run 37735978559 on `8b434b6`: **green** — core 1,249 PixlCore tests, app 290 unit tests (the 3 new
+  ones above included), 0 failures; only the non-blocking YouTube live smoke failed (external). Shots weren't re-run:
+  the one view change (Run selftest saving the keys first) is inside a button action. Parse check and
+  `check-forbidden.sh` passed before the push.
 - Screenshots looked at: Cloud processing light/dark incl. the tested state (RunPod, Storage and the new Worker line "Worker 1.0.0 on NVIDIA L4 · songs up to 160 MB and 15 min"), the queue, the confirm sheet (Send fits on one line), Experimental's Cloud processing row: all render correctly.
 
 ## Phone checklist (Hoa)
