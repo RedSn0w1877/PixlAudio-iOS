@@ -20,7 +20,8 @@ struct DownloadedModelRows: View {
         @Bindable var ai = settings.ai
         let state = env.tais.models.state(.llm)
         let on = ai.useDownloadedModel
-        SwitchSettingRow(title: "Use downloaded AI model", subtitle: Self.switchSubtitle(on: on, state: state),
+        SwitchSettingRow(title: "Use downloaded AI model",
+                         subtitle: Self.switchSubtitle(on: on, state: state, cloud: ai.usesCloudAssistant),
                          isOn: Binding(get: { ai.useDownloadedModel }, set: { setOn($0) }),
                          systemImage: "arrow.down.circle", iconColor: on ? theme.primary : theme.tertiary)
         if on || state != .notInstalled {
@@ -67,7 +68,7 @@ struct DownloadedModelRows: View {
             Button("Delete", role: .destructive) { delete() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("It frees \(ModelCatalog.formattedSize(Self.model.bytes)). AI features use the system's on-device model again until you download it.")
+            Text("It frees \(ModelCatalog.formattedSize(Self.model.bytes)) and turns off \"Use downloaded AI model\": AI features use the system's on-device model again.")
         }
     }
 
@@ -98,9 +99,12 @@ struct DownloadedModelRows: View {
         Task { await AIProviderStatus.refresh(env) }
     }
 
+    /// Deleting also turns the switch off, so AI features go back to the system's model instead of failing for want
+    /// of the file (what the confirmation promises).
     private func delete() {
         LocalModelRuntime.shared.unload()
         env.tais.models.delete(.llm)
+        setOn(false)
     }
 
     private func isInstalled(_ state: ModelManager.State) -> Bool {
@@ -115,10 +119,13 @@ struct DownloadedModelRows: View {
 
     // MARK: Texts
 
-    static func switchSubtitle(on: Bool, state: ModelManager.State) -> String {
+    static func switchSubtitle(on: Bool, state: ModelManager.State, cloud: Bool = false) -> String {
         guard on else {
             return "Off: AI features use the system's on-device model. Turn on to run them on a free model you download instead."
         }
+        // A cloud assistant answers while it's switched on (`AiProvider` isn't on-device): say so rather than claim
+        // the downloaded model does.
+        if cloud { return "On, but the cloud assistant answers while it's switched on." }
         if case .installed = state {
             return "On: playlists, Taizo, translation and Home's greeting run on the downloaded model, privately."
         }

@@ -1,5 +1,6 @@
 import CoreML
 import Foundation
+import PixlBackup
 import PixlFoundation
 import PixlModel
 import PixlNet
@@ -184,6 +185,41 @@ final class LocalModelTests: XCTestCase {
         XCTAssertEqual(after, [97, 98])
     }
 
+    /// A time-out (`withTimeout` waits for its child) or a closed sheet must not wait behind another request.
+    func testACancelledRequestDoesNotWaitForTheQueue() async throws {
+        let descriptor = try await installTinyModel()
+        let runtime = LocalModelRuntime(descriptor: descriptor)
+        // Holds the queue for 3 s without looking at its flag, like a model load.
+        let blocker = Task {
+            try await runtime.run { _ -> Int in
+                Thread.sleep(forTimeInterval: 3)
+                return 1
+            }
+        }
+        try await Task.sleep(for: .milliseconds(300))
+        let clock = ContinuousClock()
+        let started = clock.now
+        let ran = CancelFlag()
+        let waiting = Task {
+            try await runtime.run { _ -> Int in
+                ran.set()
+                return 2
+            }
+        }
+        try await Task.sleep(for: .milliseconds(100))
+        waiting.cancel()
+        do {
+            _ = try await waiting.value
+            XCTFail("the cancelled request still ran")
+        } catch {
+            XCTAssertTrue(error is CancellationError, "\(error)")
+        }
+        XCTAssertLessThan(clock.now - started, .milliseconds(1500), "the cancelled request waited for the queue")
+        let first = try await blocker.value
+        XCTAssertEqual(first, 1)
+        XCTAssertFalse(ran.isSet, "a request cancelled while it waited must never run")
+    }
+
     func testAMissingModelIsReportedNotLoaded() async throws {
         let missing = ModelDescriptor(id: .llm, file: "none.tar", package: "None.mlpackage", bytes: 1,
                                       sha256: "not-installed", title: "None", purpose: "None",
@@ -247,6 +283,26 @@ final class LocalModelTests: XCTestCase {
         XCTAssertEqual(AIPlaylistController.resolveErrorMessage(message), message)
         XCTAssertTrue(OnDeviceFailure.localModelMissing.stopsCuration)
         XCTAssertTrue(message.contains("Use downloaded AI model"))
+    }
+
+    /// The switch is iOS-only device state: never exported, never cleared by a restore (its key must not look like
+    /// a per-provider `…_model` key, which the backup catalogue treats as portable).
+    func testTheSwitchStaysOutOfBackups() throws {
+        XCTAssertNil(AndroidPreferenceCatalog.kind(of: PreferenceKeys.aiUseDownloadedModel))
+        let suite = "pixlaudio.localmodeltests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(true, forKey: PreferenceKeys.aiUseDownloadedModel)
+        defaults.set("dark", forKey: "app_theme_mode")
+        let values = SettingsBackup.exportValues(defaults: defaults, keychain: { _ in nil })
+        XCTAssertTrue(values.contains { $0.key == "app_theme_mode" })
+        XCTAssertFalse(values.contains { $0.key == PreferenceKeys.aiUseDownloadedModel }, "the switch was exported")
+        // An Android backup (which never has it) restored over it.
+        let payload = PreferencesModule.export(.globalSettings, values: [("app_theme_mode", .string("light"))])
+        let restore = try PreferencesModule.restore(.globalSettings, payload: payload)
+        SettingsBackup.apply(restore, defaults: defaults)
+        XCTAssertEqual(defaults.string(forKey: "app_theme_mode"), "light")
+        XCTAssertTrue(defaults.bool(forKey: PreferenceKeys.aiUseDownloadedModel), "the restore cleared the switch")
     }
 
     func testTheCatalogPinsTheModelAndItsTokenizer() {

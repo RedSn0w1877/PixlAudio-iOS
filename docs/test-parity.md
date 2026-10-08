@@ -744,13 +744,14 @@ real one instead (fixtures from Hugging Face `tokenizers` on Qwen2.5's `tokenize
   cache usable, NaN logits forgetting the cache, banned tokens, the constrained number list against a model that wants
   something else; prompt fitting (oldest turns dropped first), plan parsing (only the library's values, clamped
   energy, defaults), the causal mask.
-- `AppTests/LocalModelTests` (10): the simulator smoke test — a tiny random Qwen2-shaped model from the same
+- `AppTests/LocalModelTests` (12): the simulator smoke test — a tiny random Qwen2-shaped model from the same
   conversion (stateful KV cache, int4) reproduces the greedy tokens Core ML gave on the CI Mac from a fresh cache, a
   reused prefix and after a reset; mask and logits shapes at the end of the context; `ModelManager.install` keeps the
   tokenizer beside the compiled model (and the model isn't "installed" without it); `LocalModelRuntime` answers on its
-  queue and stops an endless request when its task is cancelled; a missing model is reported without loading; the
-  library note, chat turn, plan prompt and pick budget; the missing-model message never reads as a network problem;
-  the catalog pins.
+  queue and stops an endless request when its task is cancelled, and a request cancelled while it waits for the queue
+  throws at once and never runs; a missing model is reported without loading; the library note, chat turn, plan
+  prompt and pick budget; the missing-model message never reads as a network problem; the switch stays out of
+  backups (never exported, never cleared by a restore); the catalog pins.
 - `UITests/SettingsScreenshotTests.testAICategoryLocalModelDownloading{Light,Dark}`,
   `testAICategoryLocalModelReady{Light,Dark}` (`settingsCategory.ai.localModel`, `.localModelReady`);
   `UITests/AIScreenshotTests.testAiPlaylistLocalModelMissingLight` (`#demo-local-model`).

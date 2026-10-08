@@ -141,8 +141,10 @@ nonisolated enum PreferenceKeys {
     /// iOS only (2026-10-07): the one-time switch of key-less Gemini users to the on-device model has run.
     static let aiProviderMigrated = "ai_provider_migrated_v1"
     /// iOS only (2026-10-07, local AI phase 2): Settings › AI features › "Use downloaded AI model" (off by default).
-    /// Not in backups: the model itself isn't either.
-    static let aiUseDownloadedModel = "ai_use_downloaded_model"
+    /// Not in backups: the model itself isn't either. The name must not end in `_model` (or another per-provider
+    /// suffix): the backup catalogue treats such keys as portable AI settings, so it would export the switch and
+    /// clear it on every restore.
+    static let aiUseDownloadedModel = "ai_downloaded_model_enabled"
     /// Per-provider AI keys (Android `AiPreferencesRepository.Keys.get…`): `<provider lowercased>_model` etc.
     /// API keys themselves live in the Keychain under `<provider lowercased>_api_key`.
     static func aiModel(_ providerName: String) -> String { "\(providerName.lowercased())_model" }

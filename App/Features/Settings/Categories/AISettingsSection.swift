@@ -38,7 +38,8 @@ struct AISettingsSection: View {
             MusicIntelligenceCard()
             Spacer().frame(height: 20)
             SettingsSubsection(title: L10n.settingsAiProviderTitle) {
-                OnDeviceModelRow(isSelected: !cloud && !ai.useDownloadedModel, downloadedModelOn: ai.useDownloadedModel)
+                OnDeviceModelRow(isSelected: !cloud && !ai.useDownloadedModel,
+                                 downloadedModelOn: !cloud && ai.useDownloadedModel)
                 DownloadedModelRows()
             }
             SettingsSubsection(title: "Cloud assistants (optional)") {

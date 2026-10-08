@@ -84,30 +84,33 @@ nonisolated final class LocalModelRuntime: @unchecked Sendable {
     // MARK: Requests
 
     /// Runs `body` on the queue with the tokenizer loaded. Cancelling the calling task stops a generation inside
-    /// `body` before its next model step (and a request still waiting for the queue before it starts).
+    /// `body` before its next model step; a request still waiting for the queue throws `CancellationError` at once
+    /// and never runs (so a time-out or a closed sheet doesn't wait behind another request's generation).
     func run<T: Sendable>(_ body: @escaping @Sendable (Session) throws -> T) async throws -> T {
         let flag = CancelFlag()
+        let pending = PendingRequest<T>()
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<T, any Error>) in
+                // Already cancelled: answered with the error, nothing to queue.
+                guard pending.install(continuation) else { return }
                 queue.async {
-                    guard !flag.isSet else {
-                        continuation.resume(throwing: CancellationError())
-                        return
-                    }
+                    // Cancelled while waiting: its caller already has the error.
+                    guard pending.begin() else { return }
                     self.idleUnload?.cancel()
                     defer { self.scheduleIdleUnload() }
                     do {
                         let session = Session(tokenizer: try self.loadTokenizer(), runtime: self, flag: flag)
-                        continuation.resume(returning: try body(session))
+                        pending.succeed(try body(session))
                     } catch let error as LocalGenerationError where error == .cancelled {
-                        continuation.resume(throwing: CancellationError())
+                        pending.fail(CancellationError())
                     } catch {
-                        continuation.resume(throwing: error)
+                        pending.fail(error)
                     }
                 }
             }
         } onCancel: {
             flag.set()
+            pending.cancelIfWaiting()
         }
     }
 
@@ -219,5 +222,62 @@ nonisolated final class CancelFlag: @unchecked Sendable {
         lock.lock()
         value = true
         lock.unlock()
+    }
+}
+
+/// One `run` request's continuation, resumed exactly once: by the queue when the request ran, or by the task's
+/// cancellation handler when it was cancelled before the queue reached it.
+nonisolated final class PendingRequest<T: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<T, any Error>?
+    private var started = false
+    private var cancelled = false
+
+    /// Keeps the continuation; false (and resumed with `CancellationError`) when the task was already cancelled.
+    func install(_ continuation: CheckedContinuation<T, any Error>) -> Bool {
+        lock.lock()
+        guard !cancelled else {
+            lock.unlock()
+            continuation.resume(throwing: CancellationError())
+            return false
+        }
+        self.continuation = continuation
+        lock.unlock()
+        return true
+    }
+
+    /// The queue reached the request: false when it was cancelled first (its caller already has the error).
+    func begin() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !cancelled else { return false }
+        started = true
+        return true
+    }
+
+    /// The task was cancelled: a request that hasn't started is answered now; a running one stops through its flag.
+    func cancelIfWaiting() {
+        lock.lock()
+        cancelled = true
+        let waiting = started ? nil : continuation
+        if waiting != nil { continuation = nil }
+        lock.unlock()
+        waiting?.resume(throwing: CancellationError())
+    }
+
+    func succeed(_ value: T) {
+        take()?.resume(returning: value)
+    }
+
+    func fail(_ error: any Error) {
+        take()?.resume(throwing: error)
+    }
+
+    private func take() -> CheckedContinuation<T, any Error>? {
+        lock.lock()
+        defer { lock.unlock() }
+        let taken = continuation
+        continuation = nil
+        return taken
     }
 }
