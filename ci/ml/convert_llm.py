@@ -54,6 +54,9 @@ MODELS = {
                      "title": "Qwen2.5 0.5B Instruct"},
 }
 TOKENIZER_FILE = "qwen2_5.pxbpe"
+# float16 safety, exact in fp32 (build_module): Core ML computes in float16, where Qwen2.5-1.5B's RMSNorm statistics
+# and unscaled attention scores overflow (probe run 37711190768; parity run 37708304642 gave NaN everywhere).
+CONVERT_OPTIONS = {"safe_norm": True, "q_fold": True, "mlp_scale": 1 / 32}
 CONTEXT = 4096
 MAX_QUERY = 512
 PREFILL_CHUNK = 64
@@ -218,6 +221,8 @@ def build_module(cfg: dict, weights: dict, context: int, options: dict | None = 
       q_fold        bool: 1/sqrt(head_dim) folded into q_proj (weight and bias; RoPE is linear), and attention written
                     out (matmul, mask, softmax, matmul) with no further scale, so q.k never forms unscaled.
       norm_fp32     bool: RMSNorm statistics in fp32 when the module runs in fp16 (what the "mixed" selector keeps).
+      safe_norm     bool: RMSNorm on x / max|x| (eps / max|x|^2 added), so x^2 never forms: Qwen2.5-1.5B's residual
+                    reaches ~6,600, its square overflows float16 (probe run 37711190768: mean x^2 = 79,556).
       probe         dict to fill with the largest |value| seen per kind (residual, mlp, q, k, scores, variance).
     """
     import torch
@@ -227,6 +232,7 @@ def build_module(cfg: dict, weights: dict, context: int, options: dict | None = 
     mlp_scale = float(options.get("mlp_scale", 1.0))
     q_fold = bool(options.get("q_fold", False))
     norm_fp32 = bool(options.get("norm_fp32", False))
+    safe_norm = bool(options.get("safe_norm", False))
 
     layers = cfg["num_hidden_layers"]
     hidden = cfg["hidden_size"]
@@ -281,6 +287,12 @@ def build_module(cfg: dict, weights: dict, context: int, options: dict | None = 
                 self.probe[kind] = max(self.probe.get(kind, 0.0), float(value.detach().abs().max().float()))
 
         def rms_norm(self, x, weight):
+            if safe_norm:
+                scale = x.abs().amax(-1, keepdim=True).clamp(min=1e-3)
+                scaled = x / scale
+                variance = scaled.pow(2).mean(-1, keepdim=True)
+                self.note("variance", variance)
+                return weight * (scaled * torch.rsqrt(variance + eps / (scale * scale)))
             if norm_fp32 and x.dtype != torch.float32:
                 wide = x.float()
                 variance = wide.pow(2).mean(-1, keepdim=True)
@@ -561,7 +573,7 @@ def convert_variants(module, cfg: dict, context: int, out_dir: str, info: dict, 
                 "pixl.layers": str(cfg["num_hidden_layers"]), "pixl.kvHeads": str(cfg["num_key_value_heads"]),
                 "pixl.headDim": str(cfg["hidden_size"] // cfg["num_attention_heads"]), "pixl.precision": name,
                 "pixl.quantization": quantization, "pixl.tokenizer": TOKENIZER_FILE,
-                "pixl.eos": json.dumps(info.get("eos", []))}
+                "pixl.eos": json.dumps(info.get("eos", [])), "pixl.fp16Safety": json.dumps(CONVERT_OPTIONS)}
         for key, value in meta.items():
             mlmodel.user_defined_metadata[key] = value
         path = os.path.join(out_dir, f"{name}-{quantization}", info["package"])
@@ -623,7 +635,7 @@ def tiny_model(out_dir: str, keep: int = 4) -> dict:
     scored = []
     for seed in range(120):
         for embed_scale in (0.5, 1.0):
-            module = build_module(TINY_CONFIG, tiny_weights(seed, embed_scale), TINY_CONTEXT)
+            module = build_module(TINY_CONFIG, tiny_weights(seed, embed_scale), TINY_CONTEXT, CONVERT_OPTIONS)
             step = torch_step(module)
             tokens = greedy_sequence(step, TINY_PROMPT, TINY_STEPS, eos=[])
             module.keyCache.zero_()
@@ -637,7 +649,7 @@ def tiny_model(out_dir: str, keep: int = 4) -> dict:
     for c in scored[:keep]:
         info = {"id": "pixl/tiny-random-qwen2", "revision": f"seed-{c['seed']}-embed-{c['embed_scale']}",
                 "package": "TinyQwen.mlpackage", "title": "Tiny random Qwen2 (tests only)", "eos": []}
-        module = build_module(TINY_CONFIG, tiny_weights(c["seed"], c["embed_scale"]), TINY_CONTEXT)
+        module = build_module(TINY_CONFIG, tiny_weights(c["seed"], c["embed_scale"]), TINY_CONTEXT, CONVERT_OPTIONS)
         produced = convert_variants(module, TINY_CONFIG, TINY_CONTEXT,
                                     os.path.join(out_dir, "tiny", f"seed{c['seed']}-{c['embed_scale']}"), info, ["fp16"])
         c["path"] = os.path.join(f"seed{c['seed']}-{c['embed_scale']}", produced[0]["path"])
@@ -698,7 +710,7 @@ def cmd_convert(args) -> int:
 
     # Our module through the app's path vs the reference.
     weights = load_weights(model_dir)
-    module = build_module(cfg, weights, args.context)
+    module = build_module(cfg, weights, args.context, CONVERT_OPTIONS)
     del weights
     gc.collect()
     step = torch_step(module)
@@ -728,6 +740,24 @@ def cmd_convert(args) -> int:
                                             quantize=not args.no_quantize)
     report["passed"] = True
     save()
+
+    # Informational: the same module in float16 (torch, CPU) on the first two prompts, as a first sign of how Core ML's
+    # float16 will do (the parity gate on macOS decides).
+    started = time.time()
+    module = module.half()
+
+    def half_step(ids, mask):
+        with torch.no_grad():
+            return module(torch.from_numpy(ids), torch.from_numpy(mask.astype(np.float16))).float().numpy()[0, 0]
+
+    half = []
+    for r in refs[:2]:
+        module.keyCache.zero_()
+        module.valueCache.zero_()
+        half.append(compare(r, run_sequence(half_step, r["prompt_ids"], r["continuation"])))
+    report["steps"]["torch_fp16"] = dict(aggregate(half), seconds=round(time.time() - started, 1))
+    log("torch fp16 vs reference:", json.dumps(report["steps"]["torch_fp16"]))
+    save()
     log("done")
     return 0
 
@@ -737,7 +767,7 @@ def cmd_convert(args) -> int:
 PROBE_CONFIGS = [
     ("fp16", {}),
     ("fp16+norm32", {"norm_fp32": True}),
-    ("fp16+norm32+mlp/32+qfold", {"norm_fp32": True, "mlp_scale": 1 / 32, "q_fold": True}),
+    ("fp16+convert-options", CONVERT_OPTIONS),
 ]
 
 

@@ -17,6 +17,15 @@ own Swift. Some of that Swift is a port of open-source code, listed here with it
   constants unchanged (verified bit-exact against the Android classes, see `tools/android-reference/ThemeGen.java`).
 - Copyright 2021–2024 Google LLC. Licensed under the Apache License, Version 2.0 (full text below).
 
+## Qwen2.5 1.5B Instruct (the downloadable local AI model)
+
+- Upstream: https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct (revision `989aa7980e`), by the Qwen team, Alibaba
+  Cloud.
+- Not part of the app: Settings › AI features › "Use downloaded AI model" downloads it on request from PixlAudio's
+  `models-v1` release, converted to Core ML by `ci/ml/convert_llm.py` (weights quantized to 4 bits; its tokenizer
+  vocabulary and merges repacked as `qwen2_5.pxbpe`). PixlAudio runs it with its own Swift tokenizer and sampler.
+- Copyright 2024 Alibaba Cloud. Licensed under the Apache License, Version 2.0 (full text below).
+
 ## FabBar (technique for the bottom tab bar)
 
 - Upstream: https://github.com/ryanashcraft/FabBar (Swift, MIT).

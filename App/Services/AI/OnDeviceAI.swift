@@ -363,7 +363,7 @@ nonisolated struct OnDeviceContext: Sendable {
     }
 }
 
-extension OnDeviceContext: TaizoOnDevice {
+nonisolated extension OnDeviceContext: TaizoOnDevice {
     func chat(_ message: String, songs: @escaping @MainActor @Sendable () -> [Song]) async throws -> String {
         if usesDownloadedModel(), let local {
             return try await local.chat(message, persona: await persona(), temperature: await temperature(.taizoChat),
