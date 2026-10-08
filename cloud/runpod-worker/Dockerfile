@@ -44,9 +44,12 @@ COPY requirements.lock ci/pip_check.py /opt/pixl/build/
 # --no-deps: the lock is the complete closure (ci/lock.py), so pip resolves nothing and cannot replace torch.
 # --no-build-isolation: the one source-only package (antlr4-python3-runtime, pure Python) builds with the base's
 # setuptools instead of fetching unpinned build tools.
+# spin is a PyTorch developer tool in the base image (never used at runtime) that pins click<8.4, which runpod
+# 1.12.0 (click>=8.4.2) can't share, so it is removed rather than ignored by the check.
 RUN python3 -m pip freeze --all > /opt/pixl/base-freeze.txt \
  && python3 /opt/pixl/build/pip_check.py --save-baseline /opt/pixl/build/pip-check-base.txt \
  && python3 -m pip install --no-deps --no-build-isolation --require-hashes -r /opt/pixl/build/requirements.lock \
+ && python3 -m pip uninstall -y spin \
  && python3 /opt/pixl/build/pip_check.py --baseline /opt/pixl/build/pip-check-base.txt \
  && python3 -m pip freeze --all > /opt/pixl/pip-freeze.txt \
  && python3 -c "import torch, torchaudio, runpod, msst, msst.utils.model_utils, msst.models.bs_roformer, \
