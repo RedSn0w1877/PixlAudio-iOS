@@ -48,7 +48,8 @@ struct SpotifyConnectVolumeHUD: View {
 
     @Environment(\.appTheme) private var theme
 
-    private static let trackWidth: CGFloat = 132
+    /// Wide enough for a typical speaker name ("Kitchen Echo Show") on one line.
+    private static let trackWidth: CGFloat = 160
 
     var body: some View {
         let spoken = "Volume for \(deviceName), \(percent)%"
@@ -82,7 +83,9 @@ struct SpotifyConnectVolumeHUD: View {
         .padding(.leading, 16)
         .padding(.trailing, 18)
         .padding(.vertical, 10)
-        .pixlGlass(in: Capsule(), tint: theme.surfaceContainerHigh.opacity(GlassTint.surface))
+        // The bar's tint, not a panel's: the pop-up floats over whatever is at the top (the full player's output pill,
+        // the lyrics header), and a lighter tint let that content's text show through it.
+        .pixlGlass(in: Capsule(), tint: theme.surfaceContainerHigh.opacity(GlassTint.bar))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(spoken)
         .accessibilityIdentifier("spotifyConnect.volumeHUD")
