@@ -93,9 +93,17 @@ def smoke(models_dir: str, seconds: float = 4.0) -> bool:
             raise RuntimeError("htdemucs_ft weights are missing")
         t0 = time.monotonic()
         instrumental = mix - vocals if vocals is not None else mix
-        out = stems4.stems(instrumental[: int(3.0 * sr)], sr)
+        calls: list[tuple[int, int]] = []
+        out = stems4.stems(instrumental[: int(3.0 * sr)], sr, progress=lambda done, total: calls.append((done, total)))
         ok = sorted(out) == ["bass", "drums", "other"] and all(v.shape == (int(3.0 * sr), 2) for v in out.values())
-        results.append(_line("stems4", ok, runMs=int((time.monotonic() - t0) * 1000)))
+        # The progress hook sees the whole bag: one total for every call, never going backwards, reaching the
+        # last model (the pipeline's reporter turns this into ~10 updates and checks the deadline on each call).
+        dones = [d for d, _ in calls]
+        totals = {t for _, t in calls}
+        progress_ok = (bool(calls) and len(totals) == 1 and min(totals) > 1000 and dones == sorted(dones)
+                       and dones[-1] >= min(totals) - 1000)
+        results.append(_line("stems4", ok and progress_ok, runMs=int((time.monotonic() - t0) * 1000),
+                             progressCalls=len(calls), progressTotal=sorted(totals), progressLast=dones[-1:]))
     except Exception as exc:
         results.append(_line("stems4", False, error=f"{type(exc).__name__}: {str(exc)[:300]}"))
 

@@ -123,12 +123,19 @@ class Stems4:
         wav = torch.from_numpy(np.ascontiguousarray(src.T, dtype=np.float32))
         ref = wav.mean(0)
         mean, std = ref.mean(), ref.std() + 1e-8
-        done = {"n": 0}
+        length = max(1, int(src.shape[0]))
 
         def callback(info: dict) -> None:
-            if progress is not None:
-                done["n"] += 1
-                progress(done["n"], max(done["n"], 1))
+            # demucs 4.1.0 apply_model calls this at the start and at the end of every chunk of every model in the
+            # bag, with model_idx_in_bag / models and the chunk's segment_offset (samples). Report how far through
+            # the whole bag that is (the reporter checks the deadline on every call and sends ~10 updates; each
+            # runpod progress_update is its own thread and HTTP call, so never one per chunk).
+            if progress is None:
+                return
+            models = max(1, int(info.get("models") or 1))
+            idx = min(models - 1, max(0, int(info.get("model_idx_in_bag") or 0)))
+            within = min(1.0, max(0.0, float(info.get("segment_offset") or 0) / length))
+            progress(int(round(1000 * (idx + within))), 1000 * models)
 
         try:
             with torch.inference_mode():
