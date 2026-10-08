@@ -10,6 +10,11 @@ import UIKit
 @MainActor
 final class TaisBackgroundRun {
     static let identifier = "io.github.redsn0w1877.pixlaudio.tais-studio"
+    /// Cloud Studio's "Send N songs" preparation (its own identifier, so the two runs never share a task).
+    static let cloudPrepareIdentifier = "io.github.redsn0w1877.pixlaudio.cloud-prepare"
+
+    /// The `BGTaskSchedulerPermittedIdentifiers` entry this run submits.
+    let identifier: String
 
     /// Called when the system or the person ends the run early.
     var onExpired: (() -> Void)?
@@ -22,6 +27,10 @@ final class TaisBackgroundRun {
     private var pendingSubtitle = ""
     private var pendingFraction = 0.0
 
+    init(identifier: String = TaisBackgroundRun.identifier) {
+        self.identifier = identifier
+    }
+
     /// Starts a run (from a button tap). Safe to call while one is active.
     func begin(title: String, subtitle: String) {
         pendingTitle = title
@@ -33,7 +42,7 @@ final class TaisBackgroundRun {
         isActive = true
         pendingFraction = 0
         register()
-        let request = BGContinuedProcessingTaskRequest(identifier: Self.identifier, title: title, subtitle: subtitle)
+        let request = BGContinuedProcessingTaskRequest(identifier: identifier, title: title, subtitle: subtitle)
         request.strategy = .fail
         do {
             try BGTaskScheduler.shared.submit(request)
@@ -66,7 +75,7 @@ final class TaisBackgroundRun {
     private func register() {
         guard !registered else { return }
         registered = true
-        _ = BGTaskScheduler.shared.register(forTaskWithIdentifier: Self.identifier, using: .main) { [weak self] task in
+        _ = BGTaskScheduler.shared.register(forTaskWithIdentifier: identifier, using: .main) { [weak self] task in
             MainActor.assumeIsolated {
                 guard let continued = task as? BGContinuedProcessingTask else {
                     task.setTaskCompleted(success: false)

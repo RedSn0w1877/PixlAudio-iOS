@@ -26,13 +26,16 @@ nonisolated enum KeychainStore {
         ]
     }
 
-    /// Stores `data` for `account`, replacing any existing item.
-    static func set(_ data: Data, for account: String) throws {
+    /// Stores `data` for `account`, replacing any existing item. `thisDeviceOnly` keeps the item out of
+    /// device-to-device migration and encrypted backups (`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`; Cloud
+    /// Studio's keys); it stays readable by background work after the first unlock either way.
+    static func set(_ data: Data, for account: String, thisDeviceOnly: Bool = false) throws {
         let query = baseQuery(account: account)
         SecItemDelete(query as CFDictionary)
         var attributes = query
         attributes[kSecValueData as String] = data
-        attributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        attributes[kSecAttrAccessible as String] = thisDeviceOnly ? kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            : kSecAttrAccessibleAfterFirstUnlock
         let status = SecItemAdd(attributes as CFDictionary, nil)
         guard status == errSecSuccess else { throw KeychainError.status(status) }
     }

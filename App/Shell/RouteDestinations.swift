@@ -32,6 +32,8 @@ struct RouteDestination: View {
         case .easterEgg: EasterEggView()
         case .quickFill: QuickFillView()
         case .diagnostics: DiagnosticsView()
+        case .cloudProcessing: CloudProcessingSettingsView()
+        case .cloudQueue: CloudQueueView()
         case .accounts: AccountsView()
         case .spotifyDashboard: SpotifyDashboardView()
         case .spotifyBrowse(let query): SpotifyBrowseView(query: query)
@@ -58,6 +60,7 @@ struct SheetDestination: View {
             case .artistPicker(let songId): PlayerArtistPickerSheet(songId: songId) // sizes its own detent
             case .aiPlaylist: AiPlaylistSheet().pixlSheet(detents: [.tallGlass])
             case .taisChat: TaisChatSheet().pixlSheet(detents: [.tallGlass])
+            case .cloudConfirm: CloudConfirmSheet().pixlSheet(detents: [.tallGlass])
             }
         }
         // The Connect volume pop-up: the shell's copy doesn't reach into a sheet.

@@ -1,0 +1,54 @@
+{
+  "schema": "pixl.cloudstudio.result",
+  "v": 1,
+  "jobKey": "6f1c2a9e-3b7d-4c11-9a0e-2d5f8b7c4e10",
+  "status": "partial",
+  "error": null,
+  "warnings": [
+    "lyrics: failed (INTERNAL); the instrumental is complete"
+  ],
+  "worker": {
+    "version": "1.0.0",
+    "gitSha": "abc1234def56",
+    "gpu": "NVIDIA L4",
+    "vramGB": 22.5,
+    "cuda": "12.8"
+  },
+  "models": {
+    "separator": "anvuew-bs-roformer-ft1",
+    "stems4": null,
+    "aligner": null,
+    "asr": null
+  },
+  "input": {
+    "codec": "aac",
+    "sampleRate": 44100,
+    "channels": 2,
+    "decodedSamples": 10628100,
+    "durationMs": 241000,
+    "sha256": "b66e21bfd056b5178586fbde94ebdb66c9ba669e7e4504f5da92f154ee9d28be"
+  },
+  "outputs": {
+    "instrumental": {
+      "key": "out/6f1c2a9e-3b7d-4c11-9a0e-2d5f8b7c4e10/instrumental.m4a",
+      "bytes": 7801234,
+      "sha256": "32528ed2244f2862f45198934d8ad057ab94ee63d928f99c1188aeae20eee65b",
+      "codec": "aac",
+      "kbps": 256,
+      "sampleRate": 44100,
+      "samples": 10628100
+    }
+  },
+  "lyrics": null,
+  "timings": {
+    "coldStartMs": 0,
+    "downloadMs": 900,
+    "decodeMs": 700,
+    "separateMs": 12100,
+    "stemsMs": 0,
+    "lyricsMs": 2600,
+    "encodeMs": 1900,
+    "uploadMs": 1200,
+    "totalMs": 19400
+  }
+}

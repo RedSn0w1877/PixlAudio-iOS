@@ -543,7 +543,7 @@ private struct JobsSheetContent: View {
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        let jobs = env.home.jobs(libraryProgress: library.lastImportProgress)
+        let jobs = Self.withCloud(env.home.jobs(libraryProgress: library.lastImportProgress), cloud: env.cloud)
         VStack(alignment: .leading, spacing: 0) {
             Text("Active jobs")
                 .pixlFont(.titleLarge, weight: .bold)
@@ -568,6 +568,14 @@ private struct JobsSheetContent: View {
         .padding(.horizontal, 20)
         .padding(.top, 28)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    /// Cloud Studio's one summary line ("Cloud: 12 waiting, 1 processing") after Home's own jobs.
+    private static func withCloud(_ jobs: [HomeJob], cloud: CloudStudio) -> [HomeJob] {
+        guard let line = cloud.summaryLine else { return jobs }
+        let running = cloud.activeJobs.contains { $0.state == .running }
+        return jobs + [HomeJob(id: "cloud", label: line, detail: "Cloud processing", percent: nil,
+                               state: running ? .running : .queued)]
     }
 
     private func row(_ job: HomeJob) -> some View {

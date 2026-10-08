@@ -7,8 +7,9 @@ import SwiftUI
 /// the failure (error), and a full-width tonal button. Android: a 10 dp `surfaceContainer` surface, 16 dp padding,
 /// 12 dp spacing → a 10 pt glass panel tinted `surfaceContainer`; the buttons and bars sit on it as fills.
 ///
-/// iOS additions: a running job can be cancelled from its row (Android cancels from the notification), and a job
-/// whose model isn't on the phone yet shows the model download inside its row.
+/// iOS additions: a running job can be cancelled from its row (Android cancels from the notification), a job
+/// whose model isn't on the phone yet shows the model download inside its row, and — once Cloud processing is on —
+/// a Cloud row sends the song to the owner's RunPod GPU.
 struct TaisStudioProgressCard: View {
     let song: Song?
     var showRoformerTools = false
@@ -57,6 +58,11 @@ struct TaisStudioProgressCard: View {
                            onStart: { studio.start(.roformer, song: $0) },
                            onCancel: { studio.cancel(.roformer, songId: $0.id) })
             }
+            // Cloud Studio (iOS-first): once Cloud processing is on, the song can go to the RunPod GPU from here.
+            if env.cloud.settings.isEnabled {
+                divider
+                CloudSongRow(song: song)
+            }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -98,6 +104,43 @@ struct TaisStudioProgressCard: View {
             } else {
                 studio.start(.lyrics, song: song)
             }
+        }
+    }
+}
+
+/// The card's Cloud row: the song's cloud job, or the button that sends it (through the confirm sheet).
+private struct CloudSongRow: View {
+    let song: Song?
+
+    @Environment(AppEnvironment.self) private var env
+    @Environment(Router.self) private var router
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        let cloud = env.cloud
+        let job = song.flatMap { song in cloud.jobs.last { $0.songId == song.id } }
+        let pending = job?.state.isPending == true
+        VStack(alignment: .leading, spacing: 8) {
+            if let job {
+                HStack(spacing: 8) {
+                    Image(systemName: CloudJobStateIcon.symbol(job.state))
+                        .foregroundStyle(job.state == .failed ? theme.error : theme.primary)
+                    Text(verbatim: "Cloud: " + CloudJobRowText.status(job, progress: cloud.transferProgress[job.jobKey]))
+                        .pixlFont(.bodySmall)
+                        .foregroundStyle(job.state == .failed ? theme.error : theme.onSurfaceVariant)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .accessibilityIdentifier("tais.cloud.status")
+            }
+            SettingsFillButton(title: song == nil ? "Play a song first" : "Process in the cloud", style: .tonal,
+                               enabled: song != nil && !pending && !cloud.isPreviewing) {
+                guard let song else { return }
+                Task {
+                    await cloud.requestBatch(songs: [song], title: song.title)
+                    if cloud.pendingBatch != nil { router.present(AppSheet.cloudConfirm) }
+                }
+            }
+            .accessibilityIdentifier("tais.cloud.start")
         }
     }
 }

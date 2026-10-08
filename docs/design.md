@@ -1164,3 +1164,27 @@ monochrome silhouette (play triangle, lens cut-out, note) as a white frosted-gla
 - **Launch screen:** `UILaunchScreen` shows `BrandMark` centred on `LaunchBackground` (`#FDF8FF` light, `#141318`
   dark: the brand scheme's `background`, so the first frame matches), like Android 12+'s system splash.
 - Both marks are artwork, not glass: never a container background, never under `glassEffect` (no glass on glass).
+
+## Cloud Studio screens (2026-10-07, branch `s20-cloud-studio`; iOS-first, no Android screen to copy)
+Android has no RunPod screens, so these use the settings design system as it is (decision 10 still holds: nothing
+Material, glass where Android would fill a surface).
+
+- **Cloud processing** (`CloudProcessingSettingsView`, route `.cloudProcessing`, from Experimental's "Cloud processing"
+  panel): `SettingsScaffold` + `SettingsSubsection`s — Consent (switch + one explanatory panel), RunPod (Endpoint ID,
+  Restricted key), Storage (R2 endpoint or account ID with the detected account under it, bucket, access key ID,
+  secret), Test connection (what is still missing, the filled button, one `CloudCheckLine` per check, the tonal
+  selftest button), Outputs (three switches + a two-pill Standard/Best `GlassPillRow`), Network, Cost (price, cap,
+  "This month: …"), Queue (a chevron row), the promise text and a destructive "Forget keys". Fields are
+  `SettingsTextField`s on a `SettingsPanel` (fills on one glass row; no glass on glass).
+- **Cloud queue** (`CloudQueueView`, route `.cloudQueue`): an optional notice panel (error / tertiary container tint),
+  the three Add rows, then "On its way", "Needs you", "Done" groups of `CloudJobRow`s (one glass row each in the
+  scaffold's lazy stack; state symbol, title, artist, a primary-coloured status line, a detail line; trailing: a
+  plain-fill cancel circle, a tonal Retry, or nothing), "Clear done", the month line and the promise.
+- **Confirm sheet** (`CloudConfirmSheet`, `AppSheet.cloudConfirm`): `SheetScaffold("Send to the cloud")` at the
+  see-through `.tallGlass` detent; a 2×2 grid of figures on `surfaceContainerHigh` fills, plain lines for the cap,
+  streamed songs, Wi-Fi and skips, then Cancel (outlined) and "Send N songs" (filled; disabled over the cap or with the
+  switch off).
+- Performance: nothing is formatted or sorted in `body` beyond the store's small filters; upload/download progress
+  reaches the rows at whole percents (`CloudTransfers.onProgress`); worker progress only from `/status` every ≥ 15 s
+  while jobs are at RunPod; no timer runs while nothing is in flight; hashing, decoding and file checks are detached
+  or `@concurrent`.

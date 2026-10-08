@@ -51,9 +51,13 @@ struct StemSeparationTests {
     @Test func fileNamesPreferTheCloudRenderAndRoundTrip() {
         let names = StemFiles.candidates(songId: "f:Music/a b.mp3")
         #expect(names[0].hasSuffix("_hq_roformer_inst.wav"))
-        #expect(names[1].hasSuffix("_instrumental.wav"))
+        #expect(names[1].hasSuffix("_cloud_inst.m4a"))
+        #expect(names[2].hasSuffix("_cloud_inst.flac"))
+        #expect(names[3].hasSuffix("_instrumental.wav"))
         #expect(!names[0].contains("/") && !names[0].contains(":"))
         #expect(StemFiles.songId(fileName: names[1]) == StemFiles.safeName("f:Music/a b.mp3"))
+        #expect(StemFiles.songId(fileName: names[2]) == StemFiles.safeName("f:Music/a b.mp3"))
+        #expect(StemFiles.songId(fileName: names[3]) == StemFiles.safeName("f:Music/a b.mp3"))
         #expect(StemFiles.safeName("a:b") != StemFiles.safeName("a/b"))
     }
 

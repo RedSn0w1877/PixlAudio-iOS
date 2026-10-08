@@ -1,0 +1,7 @@
+{"schema": "pixl.cloudstudio.lyrics", "v": 1, "mode": "transcribed", "language": "en",
+ "lines": [
+  {"i": 0, "startMs": 5000, "endMs": 7200, "text": "Under neon rain", "timing": "word",
+   "words": [{"startMs": 5000, "endMs": 5600, "text": "Under", "conf": 0.7, "c0": 0, "c1": 5},
+             {"startMs": 5700, "endMs": 6300, "text": "neon", "conf": 0.75, "c0": 6, "c1": 10},
+             {"startMs": 6400, "endMs": 7100, "text": "rain", "conf": 0.8, "c0": 11, "c1": 15}]}
+ ]}

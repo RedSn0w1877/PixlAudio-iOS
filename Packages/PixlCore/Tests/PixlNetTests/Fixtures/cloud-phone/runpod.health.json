@@ -1,0 +1,2 @@
+{"jobs": {"completed": 12, "failed": 1, "inProgress": 1, "inQueue": 3, "retried": 0},
+ "workers": {"idle": 0, "initializing": 0, "ready": 0, "running": 1, "throttled": 0, "unhealthy": 0}}

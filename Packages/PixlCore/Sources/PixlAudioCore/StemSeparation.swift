@@ -272,20 +272,26 @@ public enum StereoWav {
 }
 
 /// `TaisInstrumentalIndex`'s file rules: `<songId>_instrumental.wav` (on-device MDX-Net) and
-/// `<songId>_hq_roformer_inst.wav` (cloud BS-RoFormer, preferred when complete).
+/// `<songId>_hq_roformer_inst.wav` (cloud BS-RoFormer, preferred when complete), plus iOS's Cloud Studio result
+/// `<songId>_cloud_inst.m4a` (AAC from the RunPod worker; never stored under a `.wav` name) or, after a FLAC redo,
+/// `<songId>_cloud_inst.flac`.
 public enum StemFiles {
     public static let instrumentalSuffix = "_instrumental.wav"
     public static let roformerSuffix = "_hq_roformer_inst.wav"
+    /// Cloud Studio (design §7.1): ranked after the BS-RoFormer render and before the on-device MDX-Net one.
+    public static let cloudSuffix = "_cloud_inst.m4a"
+    /// A Cloud Studio result redone with FLAC output (the AAC one didn't line up with the song, design §7.5).
+    public static let cloudFlacSuffix = "_cloud_inst.flac"
 
     /// File names to try for a song, best first.
     public static func candidates(songId: String) -> [String] {
         let safe = safeName(songId)
-        return [safe + roformerSuffix, safe + instrumentalSuffix]
+        return [safe + roformerSuffix, safe + cloudSuffix, safe + cloudFlacSuffix, safe + instrumentalSuffix]
     }
 
     /// The song id a stem file belongs to.
     public static func songId(fileName: String) -> String? {
-        for suffix in [instrumentalSuffix, roformerSuffix] where fileName.hasSuffix(suffix) {
+        for suffix in [instrumentalSuffix, roformerSuffix, cloudSuffix, cloudFlacSuffix] where fileName.hasSuffix(suffix) {
             return String(fileName.dropLast(suffix.count))
         }
         return nil

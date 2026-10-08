@@ -72,6 +72,9 @@ final class AppEnvironment {
     let backup: BackupService
     /// Stage 15: the notify-only GitHub release check.
     let updates: UpdateNotifier
+    /// Cloud Studio (iOS-first): instrumentals and word-timed lyrics on the owner's RunPod GPU, results through R2.
+    /// Built here because a background relaunch (BGAppRefresh, the transfer session) never runs `start()`.
+    let cloud: CloudStudio
 
     init(launch: LaunchConfiguration) {
         self.launch = launch
@@ -221,6 +224,12 @@ final class AppEnvironment {
         backup = BackupService(persistence: persistence, library: library, settings: settings, defaults: settingsDefaults,
                                history: home.history, playbackServices: playbackServices, isUITest: isUITest)
         updates = UpdateNotifier(isEnabled: !isUITest)
+        let cloud = CloudStudio.make(launch: launch, defaults: settingsDefaults, library: library, playback: playback,
+                                     tais: tais, lyricsService: lyricsController.lyricsService,
+                                     persistence: persistence, playbackServices: playbackServices, youtube: youtube)
+        self.cloud = cloud
+        // The automatic studio leaves songs alone while the cloud is working on them (design §7.1).
+        automaticStudio.skipsSong = { [weak cloud] songId in cloud?.hasPendingJob(songId: songId) ?? false }
     }
 
     /// Launch work, off the first frame: load the library snapshot (cache first, then the store), then start the

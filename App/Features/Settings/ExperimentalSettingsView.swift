@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Experimental (Android `ExperimentalSettingsScreen`): "Player UI tweaks" — lyrics blur (+ strength), Magic
-/// Instrumentalize, the BS-RoFormer render backend, Remaster Song, TAIS DJ, and the full-player loading steps
+/// Instrumentalize, the BS-RoFormer render backend, Remaster Song, TAIS DJ, Cloud processing (iOS-first), and the
+/// full-player loading steps
 /// (delay, placeholders, trigger mode, thresholds) — then "Visual Quality" with the album-art resolution list. Rows
 /// are 10 pt glass panels 4 pt apart.
 ///
@@ -62,6 +63,30 @@ struct ExperimentalSettingsView: View {
                 .buttonStyle(.plain)
                 .experimentalPanelGlass(interactive: true)
                 .accessibilityIdentifier("experimental.taisDJ")
+                // Cloud Studio (iOS-first): the owner's RunPod GPU for instrumentals and word-timed lyrics.
+                Button {
+                    router.push(.cloudProcessing)
+                } label: {
+                    HStack(spacing: 12) {
+                        SettingsIcon(systemImage: "icloud.and.arrow.up")
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(verbatim: "Cloud processing").pixlFont(.titleMedium).foregroundStyle(theme.onSurface)
+                            Text(verbatim: env.cloud.settings.isEnabled
+                                 ? (env.cloud.summaryLine ?? "On — instrumentals and word-timed lyrics on your RunPod GPU.")
+                                 : "Instrumentals and word-timed lyrics on your own RunPod GPU. Off until you set it up.")
+                                .pixlFont(.bodyMedium).foregroundStyle(theme.onSurfaceVariant)
+                        }
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(theme.onSurfaceVariant)
+                    }
+                    .padding(16)
+                }
+                .buttonStyle(.plain)
+                .experimentalPanelGlass(interactive: true)
+                .accessibilityIdentifier("experimental.cloudProcessing")
 
                 header(L10n.settingsExpStep1DelayHeader)
                 SwitchSettingRow(title: L10n.settingsExpDelayEverythingTitle, subtitle: L10n.settingsExpDelayEverythingSubtitle,

@@ -133,6 +133,9 @@ nonisolated enum AppRoute: Hashable, Sendable {
     case easterEgg
     case quickFill
     case diagnostics
+    /// Cloud Studio (iOS-first, design §7.2): Settings › Developer › Experimental › Cloud processing, and its queue.
+    case cloudProcessing
+    case cloudQueue
 
     // Accounts
     case accounts
@@ -174,6 +177,8 @@ nonisolated enum AppRoute: Hashable, Sendable {
         case .easterEgg: "easterEgg"
         case .quickFill: "quickFill"
         case .diagnostics: "diagnostics"
+        case .cloudProcessing: "cloudProcessing"
+        case .cloudQueue: "cloudQueue"
         case .accounts: "accounts"
         case .spotifyDashboard: "spotifyDashboard"
         case .spotifyBrowse: "spotifyBrowse"
@@ -201,6 +206,8 @@ nonisolated enum AppSheet: Hashable, Sendable, Identifiable {
     case aiPlaylist
     /// Stage 13: the TAIS DJ chat (Android `TaisChatSheet`) — from the player's sparkles circle and Experimental.
     case taisChat
+    /// Cloud Studio's confirm sheet for a batch (`CloudStudio.pendingBatch`).
+    case cloudConfirm
 
     var id: String {
         switch self {
@@ -215,6 +222,7 @@ nonisolated enum AppSheet: Hashable, Sendable, Identifiable {
         case .artistPicker(let id): "artistPicker.\(id)"
         case .aiPlaylist: "aiPlaylist"
         case .taisChat: "taisChat"
+        case .cloudConfirm: "cloudConfirm"
         }
     }
 }

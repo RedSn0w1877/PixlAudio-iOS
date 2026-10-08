@@ -44,6 +44,8 @@ final class AutomaticStudioRunner {
     @ObservationIgnored private var loop: Task<Void, Never>?
     @ObservationIgnored private var isScanning = false
     @ObservationIgnored private var observers: [any NSObjectProtocol] = []
+    /// Songs another worker owns right now (Cloud Studio's pending jobs): treated as done, so nothing runs twice.
+    @ObservationIgnored var skipsSong: (String) -> Bool = { _ in false }
 
     private static let ledgerKey = "automatic_studio_cooldowns_v1"
     private static let windowStartKey = "automatic_studio_window_start_ms"
@@ -328,6 +330,7 @@ final class AutomaticStudioRunner {
     }
 
     private func isComplete(_ kind: AutomaticStudioKind, song: Song) async -> Bool {
+        if skipsSong(song.id) { return true }
         switch kind {
         case .instrumental:
             return InstrumentalFiles.bestAvailable(songId: song.id) != nil

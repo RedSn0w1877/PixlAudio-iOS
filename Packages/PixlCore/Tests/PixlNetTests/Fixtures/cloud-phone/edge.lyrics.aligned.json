@@ -1,0 +1,14 @@
+{"schema": "pixl.cloudstudio.lyrics", "v": 1, "mode": "aligned", "language": "ko",
+ "lines": [
+  {"i": 0, "startMs": 12410, "endMs": 15620, "text": "원문 가사", "timing": "word",
+   "words": [{"startMs": 12410, "endMs": 12890, "text": "원문", "conf": 0.94, "c0": 0, "c1": 2},
+             {"startMs": 13020, "endMs": 15400, "text": "가사", "conf": 0.88, "c0": 3, "c1": 5}]},
+  {"i": 1, "startMs": 15800, "endMs": 18950, "text": "Hello, bright world", "timing": "word",
+   "words": [{"startMs": 15800, "endMs": 16300, "text": "Hello", "conf": 0.97, "c0": 0, "c1": 5},
+             {"startMs": 16450, "endMs": 17100, "text": "bright", "conf": 0.91, "c0": 7, "c1": 13},
+             {"startMs": 17200, "endMs": 18900, "text": "world", "conf": 0.9, "c0": 14, "c1": 19}]},
+  {"i": 2, "startMs": 19100, "endMs": 21000, "text": "Fly 🚀 high", "timing": "word",
+   "words": [{"startMs": 19100, "endMs": 19600, "text": "Fly", "conf": 0.8, "c0": 0, "c1": 3},
+             {"startMs": 20100, "endMs": 20900, "text": "high", "conf": 0.85, "c0": 7, "c1": 11}]},
+  {"i": 3, "startMs": 21500, "endMs": 24000, "text": "La la la (ooh)", "timing": "line", "words": []}
+ ]}
