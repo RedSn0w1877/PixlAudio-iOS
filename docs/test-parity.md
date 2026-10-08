@@ -771,10 +771,15 @@ Android has no tests for the lyrics toolbar or the keep-screen-on switch; these 
   by `LyricsViewPreferences`.
 - `UITests/LyricsScreenshotTests` — `testSingActive` (Sing's value "Vocals off" with the demo instrumental playing),
   `testSingRendering` (value "Removing vocals …" while the demo job runs), `testTranslateMenu` (a long press on
-  Translate offers Translate via AI), `testShowAsPlainText` (the More sheet's switch turns karaoke into plain text, so
-  "Adjust sync" leaves the sheet); `testMoreSheet` now shows the half-height glass sheet and
-  `testMoreSheetBottomInLightApp` swipes twice (grow, then scroll).
+  Translate opens the menu with Translate via AI instead of running the tap), `testShowAsPlainText` (the More sheet's
+  switch turns karaoke into plain text, so "Adjust sync" leaves the sheet; the switch is first scrolled clear of the
+  screen's edge and left to settle); `testMoreSheet` now shows the half-height glass sheet and
+  `testMoreSheetBottomInLightApp` swipes on the sheet until its own heart is on screen.
 - `UITests/GlassAccessibilityTests.testLyricsToolbarKeepsButtonTraits` — Back, Translate, Sing, Lyrics options and
   play/pause stay buttons with their labels inside the cluster's glass container; Sing and Translate report a value.
 - `UITests/PlayerScreenshotTests.testLyricsOptionsFavoriteTogglesImmediately` — now finds the More sheet's heart by
-  the full player's labels ("Remove from favorites" → "Add to favorites"), as the row is `PlayerToggleRow`.
+  the full player's labels ("Remove from favorites" → "Add to favorites"), as the row is `PlayerToggleRow`, looked up
+  inside the sheet: the full player built under it carries the same labels off screen (an unscoped query found that
+  one and could not scroll to it).
+- `UITests/LyricsSyncEntryTests` — the sync chip is found by identifier or label ("Make the words light up · Sync it
+  yourself"): inside the lyrics screen it keeps only its label (the screen's own identifier reaches its children).

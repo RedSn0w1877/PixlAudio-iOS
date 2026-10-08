@@ -10,9 +10,12 @@ Owner items 1 and 11 of the 2026-10-07 batch, built from `2026-10-07-plans/lyric
   - **Translate:** a tap shows or hides the lyrics' translations. When they have none, it translates the synced lines
     on this iPhone into the phone's language (the system translator), with a spinner while it runs. Touch and hold:
     **Translate via AI** and **Show romanization** (when the lyrics have it). Plain-only lyrics: the segment looks
-    dimmed and a tap explains why; Translate via AI still works from the long press.
+    dimmed and a tap explains why; Translate via AI still works from the long press. The segment is a SwiftUI `Menu`
+    with a primary action: the first build used a `contextMenu`, and on CI holding it ran the tap instead of opening
+    the menu.
   - **Sing:** vocals off / on through the song's studio instrumental. Without one, a tap starts the render
-    ("Removing vocals 48 %", the progress filling the segment) and switches to the instrumental when it is ready.
+    ("Removing vocals 48 %" in place of the mic symbol, the progress filling the segment) and switches to the
+    instrumental when it is ready.
     Disabled while the player switches and while Spotify Connect plays. The floating instrumental button is gone.
   - Synced vs plain is automatic. The More sheet has a **Show as plain text** switch for the current song.
 - **Screen always on** while the lyrics are open, paused too. The Keep screen on switch is gone (UI and
@@ -25,13 +28,22 @@ Owner items 1 and 11 of the 2026-10-07 batch, built from `2026-10-07-plans/lyric
   35 % dim).
 - **Glass on the More sheet:** it opens at half height (`[.medium, .tallGlass]`) as floating Liquid Glass (at full
   height iOS made it opaque). Rows stay soft fills, grouped like Settings. The alignment picker is the liquid lens
-  (`LiquidTabCapsule`), and shuffle / repeat / heart is the full player's `PlayerToggleRow`. The heart keeps the
-  observed-lookup fix (`liked`, `@Environment(LibraryStore.self)`).
+  (`LiquidTabCapsule`, in the sheet's album palette), and shuffle / repeat / heart is the full player's
+  `PlayerToggleRow`. The heart keeps the observed-lookup fix (`liked`, `@Environment(LibraryStore.self)`).
 - **Unchanged on purpose:** lines still fade before the bars; the karaoke engine and its constants; the seek bar is
   not interactive glass (it could pull the thumb from the finger); the track pill is outside the container.
+- **Tests fixed along the way** (they failed on the first CI run of this branch):
+  - `LyricsSyncEntryTests` looked for the sync chip by identifier, which the lyrics screen's own identifier hides;
+    it now also matches the chip's label. These tests had never run green on CI before (main's full run timed out).
+  - `PlayerScreenshotTests.testLyricsOptionsFavoriteTogglesImmediately` found the full player's heart (built under
+    the sheet, same labels, off screen) instead of the sheet's; it now looks inside the sheet. The same unscoped
+    query is a likely cause of `testSongInfoFavoriteTogglesImmediately` failing on main ("the heart can't be tapped":
+    it waits for the hidden full player's heart). That test belongs to `s21-main-health`; not changed here.
+  - `testShowAsPlainText` (flaky once) and `testMoreSheetBottomInLightApp` (its shot never reached the bottom row)
+    now swipe on the sheet until the target sits clear of the screen's edge.
 - **Docs:** `design.md`, `parity.md` (rows 25 and 27), `api-notes.md` (`isIdleTimerDisabled`, `glassEffectTransition`,
-  `contextMenu`, first use of `Toggle(_:systemImage:isOn:)`, iOS 14, checked on developer.apple.com),
-  `test-parity.md`.
+  `contextMenu` with a caution for the player's output pill, `Menu(content:label:primaryAction:)`, first use of
+  `Toggle(_:systemImage:isOn:)`, iOS 14, checked on developer.apple.com), `test-parity.md`.
 
 ## How it was verified
 

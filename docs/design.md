@@ -454,11 +454,13 @@ purpose and is listed in `docs/parity.md` row 25.
     translations, or, when they have none, translates the synced lines on this iPhone into the phone's language
     (the system translator, `translationTask`; a spinner while it runs, cleared before the song guard so a song
     change can't leave it on). Plain-only lyrics: the segment looks dimmed and a tap explains that on-device
-    translation needs synced lyrics. Touch and hold (`contextMenu`): **Translate via AI** (`env.ai.lyricsTranslator`,
-    so the provider can change underneath) and **Show romanization** when the lyrics have it.
+    translation needs synced lyrics. Touch and hold: **Translate via AI** (`env.ai.lyricsTranslator`, so the provider
+    can change underneath) and **Show romanization** when the lyrics have it. The segment is a
+    `Menu(content:label:primaryAction:)` (the tap is the primary action): a `contextMenu` on the glass button never
+    opened inside the cluster's container on CI. The menu morphs out of the segment's glass, like `ShapedGlassMenu`.
   - *Sing* (`LyricsSingSegment`): the vocals off / on through the song's studio instrumental
     (`InstrumentalController.toggle()`, the in-sync 700 ms crossfade). Active ("Vocals off") while the instrumental
-    plays. Without a render a tap starts the MDX-Net job ("Removing vocals 48 %", the progress filling the segment
+    plays. Without a render a tap starts the MDX-Net job ("Removing vocals 48 %" without the mic symbol, so it fits; the progress filling the segment
     under the label, content on the glass) and switches to the instrumental when it lands if the song is still on;
     a failure shows the job's reason in the toast. Off while the player switches and while Spotify Connect plays.
     Per song: a new song starts with its vocals. It replaces Android's `FloatingInstrumentalToggle`
@@ -485,7 +487,8 @@ purpose and is listed in `docs/parity.md` row 25.
   floating Liquid Glass; at `.large` it turned opaque (the old `lyricsMoreSheet` shot). Rows stay soft `onSurface`
   8 % fills on that glass (no glass on glass), each group clipped to its outer corners like `SettingsGroup` (8 pt
   inside), so the first and last rows get the round corners whichever rows show. The alignment picker is the
-  liquid lens (`LiquidTabCapsule`, Left / Center / Right, 56 pt; Android's buttons are 48), and shuffle / repeat /
+  liquid lens (`LiquidTabCapsule`, Left / Center / Right, 56 pt; Android's buttons are 48; given the sheet's player
+  palette, so the route-level copy over the app doesn't mix in the app accent), and shuffle / repeat /
   favourite is the full player's `PlayerToggleRow` (its heart reads `liked`, the observed lookup from the player fix).
   The Controls caption hides when no control row shows.
 - **Kept on purpose:** lyric lines still fade out before the bars (no scroll-under; owner); the karaoke view's engine
