@@ -770,11 +770,14 @@ Android has no tests for the lyrics toolbar or the keep-screen-on switch; these 
   is skipped, never written to `UserDefaults`, never exported, and a value stored before the switch went is removed
   by `LyricsViewPreferences`.
 - `UITests/LyricsScreenshotTests` — `testSingActive` (Sing's value "Vocals off" with the demo instrumental playing),
-  `testSingRendering` (value "Removing vocals …" while the demo job runs), `testTranslateMenu` (a long press on
-  Translate opens the menu with Translate via AI instead of running the tap), `testShowAsPlainText` (the More sheet's
-  switch turns karaoke into plain text, so "Adjust sync" leaves the sheet; the switch is first scrolled clear of the
-  screen's edge and left to settle, and if the tap is lost the knob is dragged on, which can't switch it back off); `testMoreSheet` now shows the half-height glass sheet and
-  `testMoreSheetBottomInLightApp` swipes on the sheet until its own heart is on screen.
+  `testSingRendering` (value "Removing vocals …" while the demo job runs), `testTranslateMenu` (a tap on Translate
+  hides the demo's translations and a second shows them again — the value goes "Translations hidden" → "Showing
+  translations"; then a long press opens the menu with Translate via AI instead of running the tap),
+  `testShowAsPlainText` (a tap on the More sheet's "Show as plain text" row turns karaoke into plain text, so "Adjust
+  sync" leaves the sheet; the row is first scrolled clear of the screen's edge and left to settle, and it is tapped a
+  second time only while the switch still reads off, so a late first tap can't be undone); `testMoreSheet` now shows
+  the half-height glass sheet and `testMoreSheetBottomInLightApp` swipes on the sheet until its own heart is on
+  screen.
 - `UITests/GlassAccessibilityTests.testLyricsToolbarKeepsButtonTraits` — Back, Translate, Sing, Lyrics options and
   play/pause stay buttons with their labels inside the cluster's glass container; Sing and Translate report a value.
 - `UITests/PlayerScreenshotTests.testLyricsOptionsFavoriteTogglesImmediately` — now finds the More sheet's heart by

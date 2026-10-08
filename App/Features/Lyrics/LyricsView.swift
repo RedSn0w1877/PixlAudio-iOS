@@ -353,6 +353,7 @@ struct LyricsView: View {
                 translateViaAI()
                 resetImmersive()
             },
+            onSegmentTap: { resetImmersive() },
             onBack: { router.dismissCover() },
             onMore: { showMoreSheet = true })
             .padding(.horizontal, 16)
@@ -473,8 +474,10 @@ struct LyricsView: View {
     }
 
     private func finishTranslation(_ map: [Int: String]?, songId: String?) {
-        // Cleared first, so a song change mid-translation can't leave the spinner on.
-        translating = false
+        // Cleared before the song guard, so the spinner never sticks; but only by the run it belongs to, so a late
+        // result for an earlier song can't clear the spinner of a translation started since (a song change already
+        // cleared it, `.task(id:)`).
+        if songId == translationSongId { translating = false }
         guard let song = playback.current, song.id == songId else { return }
         guard let map else {
             controller.message = "Translation isn't available for these lyrics"

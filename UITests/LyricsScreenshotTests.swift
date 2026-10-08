@@ -78,13 +78,21 @@ final class LyricsScreenshotTests: XCTestCase {
         }
     }
 
-    /// Touch and hold Translate: Translate via AI, and Show romanization when the lyrics need it. The hold must open
-    /// the menu, not run the tap (until 2026-10-07 it hid the demo's translations instead).
+    /// A tap on Translate hides the lyrics' translations and the next shows them again (the menu's primary action).
+    /// Touch and hold: Translate via AI, and Show romanization when the lyrics need it. The hold must open the menu,
+    /// not run the tap (until 2026-10-07 it hid the demo's translations instead).
     func testTranslateMenu() throws {
         try capture("lyricsTranslateMenu", demo: "words", freezeMs: 42_300, settle: 2.0) { app in
             let translate = app.buttons.matching(NSPredicate(format: "label == %@", "Translate")).firstMatch
             XCTAssertTrue(translate.waitForExistence(timeout: 10), "Translate is missing")
             XCTAssertEqual(translate.value as? String, "Showing translations", "the demo lyrics show a translation")
+            for expected in ["Translations hidden", "Showing translations"] {
+                translate.tap()
+                let state = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", expected),
+                                                      object: translate)
+                XCTAssertEqual(XCTWaiter.wait(for: [state], timeout: 5), .completed,
+                               "a tap on Translate should leave it \"\(expected)\" (it reads \(translate.value ?? "nil"))")
+            }
             translate.press(forDuration: 1.2)
             let viaAI = app.descendants(matching: .any)
                 .matching(NSPredicate(format: "label == %@", "Translate via AI")).firstMatch

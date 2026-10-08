@@ -208,6 +208,8 @@ struct LyricsControlCluster: View {
     let onSeekPreview: (Int64?) -> Void
     let onTranslate: () -> Void
     let onTranslateViaAI: () -> Void
+    /// Any tap on Translate or Sing (it restarts the immersive timer, as the Synced / Static segments did).
+    let onSegmentTap: () -> Void
     let onBack: () -> Void
     let onMore: () -> Void
 
@@ -228,7 +230,8 @@ struct LyricsControlCluster: View {
                 Spacer().frame(height: 16)
                 LyricsToolbar(hasLyrics: hasLyrics, song: song, canTranslateOnDevice: canTranslateOnDevice,
                               translating: translating, chrome: chrome, brightArt: brightArt, onTranslate: onTranslate,
-                              onTranslateViaAI: onTranslateViaAI, onBack: onBack, onMore: onMore)
+                              onTranslateViaAI: onTranslateViaAI, onSegmentTap: onSegmentTap, onBack: onBack,
+                              onMore: onMore)
             }
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.9), value: showSyncControls)
@@ -382,6 +385,7 @@ private struct LyricsToolbar: View {
     let brightArt: Bool
     let onTranslate: () -> Void
     let onTranslateViaAI: () -> Void
+    let onSegmentTap: () -> Void
     let onBack: () -> Void
     let onMore: () -> Void
 
@@ -392,8 +396,8 @@ private struct LyricsToolbar: View {
                 HStack(spacing: 8) {
                     LyricsTranslateSegment(canTranslateOnDevice: canTranslateOnDevice, translating: translating,
                                            chrome: chrome, brightArt: brightArt, onTranslate: onTranslate,
-                                           onTranslateViaAI: onTranslateViaAI)
-                    LyricsSingSegment(song: song, chrome: chrome, brightArt: brightArt)
+                                           onTranslateViaAI: onTranslateViaAI, onTap: onSegmentTap)
+                    LyricsSingSegment(song: song, chrome: chrome, brightArt: brightArt, onTap: onSegmentTap)
                 }
                 .frame(maxWidth: .infinity)
             } else {
@@ -434,8 +438,12 @@ private struct LyricsTranslateSegment: View {
     let brightArt: Bool
     let onTranslate: () -> Void
     let onTranslateViaAI: () -> Void
+    /// Every tap (the immersive timer restarts).
+    let onTap: () -> Void
 
     @Environment(AppEnvironment.self) private var env
+    /// Taps, for the haptic: it answers the finger, not a song change that happens to show or drop translations.
+    @State private var taps = 0
 
     var body: some View {
         let controller = env.lyricsController
@@ -455,6 +463,8 @@ private struct LyricsTranslateSegment: View {
                                active: active, faded: !hasTranslation && !canTranslateOnDevice && !translating,
                                busy: translating, chrome: chrome)
         } primaryAction: {
+            onTap()
+            taps += 1
             if hasTranslation {
                 controller.preferences.showTranslation.toggle()
             } else if translating {
@@ -469,7 +479,7 @@ private struct LyricsTranslateSegment: View {
         .buttonStyle(.plain)
         .modifier(LyricsSegmentGlass(active: active, enabled: true, accessibilityLabel: "Translate",
                                      accessibilityValue: value, chrome: chrome, brightArt: brightArt))
-        .pixlHaptic(.selection, trigger: active)
+        .pixlHaptic(.selection, trigger: taps)
     }
 }
 
@@ -483,11 +493,15 @@ private struct LyricsSingSegment: View {
     let song: Song?
     let chrome: LyricsChromeColors
     let brightArt: Bool
+    /// Every tap (the immersive timer restarts).
+    let onTap: () -> Void
 
     @Environment(AppEnvironment.self) private var env
     @Environment(PlaybackStore.self) private var playback
     /// The song a tap started a render for: it switches to the instrumental when the render lands.
     @State private var pendingSongId: String?
+    /// Taps, for the haptic: it answers the finger, not a new song resetting the instrumental.
+    @State private var taps = 0
 
     var body: some View {
         let instrumental = env.tais.instrumental
@@ -506,12 +520,16 @@ private struct LyricsSingSegment: View {
             enabled: song != nil && !instrumental.isSwitching && !remote,
             progress: determinate ? Double(percent) / 100 : nil, accessibilityLabel: "Sing",
             accessibilityValue: value, chrome: chrome, brightArt: brightArt) {
+            onTap()
+            taps += 1
             tap(rendering: rendering, detail: job?.detail)
         }
-        .pixlHaptic(.selection, trigger: active)
+        .pixlHaptic(.selection, trigger: taps)
         .onChange(of: instrumental.isAvailable) { _, available in
             guard available, let pendingSongId, pendingSongId == song?.id else { return }
             self.pendingSongId = nil
+            // Not onto this iPhone's player while a Connect speaker plays: the render waits for the next tap.
+            guard playback.remoteOutputName == nil else { return }
             instrumental.playInstrumental()
         }
         .onChange(of: job?.phase) { _, phase in
@@ -536,6 +554,9 @@ private struct LyricsSingSegment: View {
             instrumental.toggle()
         } else if rendering {
             pendingSongId = song.id
+            // A render already queued or running is kept; if it is the automatic studio's, this makes it the
+            // person's own, so starting playback no longer cancels it (`TaisStudio.start` adopts it).
+            env.tais.studio.start(.instrumental, song: song)
             env.lyricsController.message = detail ?? String(localized: "Removing the vocals…")
         } else {
             pendingSongId = song.id

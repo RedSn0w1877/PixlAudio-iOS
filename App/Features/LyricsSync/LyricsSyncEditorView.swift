@@ -105,6 +105,9 @@ struct LyricsSyncEditorView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { session?.onHostStopped() }
+            // Claimed again on coming back, as the lyrics screen does (the docs don't say the flag survives the
+            // background); opened from Edit song there is no lyrics screen underneath to do it.
+            if phase == .active { ScreenAwake.set(true, for: .lyricsSync) }
         }
         .alert(SyncStrings.leaveTitle, isPresented: dialogBinding(.leave)) {
             Button(SyncStrings.leave, role: .destructive) { session?.confirmLeave() }
