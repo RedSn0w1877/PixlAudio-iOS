@@ -43,15 +43,16 @@ final class CloudStudioScreenshotTests: XCTestCase {
 
     // MARK: - Helpers
 
-    /// Scrolls until `identifier` sits in the upper part of the screen.
+    /// Scrolls in short, slow, held drags along the leading margin (no momentum, so it can't overshoot; never on a
+    /// field or a switch) until `identifier` sits in the upper part of the screen, below the collapsed header.
     private func scroll(_ app: XCUIApplication, until identifier: String) {
         let target = app.descendants(matching: .any)[identifier].firstMatch
         let height = app.windows.firstMatch.frame.height
-        for _ in 0..<12 {
-            if target.exists, target.isHittable, target.frame.minY < height * 0.55 { break }
-            let start = app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
-            let end = app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
-            start.press(forDuration: 0.05, thenDragTo: end)
+        for _ in 0..<24 {
+            if target.exists, target.frame.minY > height * 0.12, target.frame.minY < height * 0.4 { break }
+            let start = app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.04, dy: 0.7))
+            let end = app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.04, dy: 0.45))
+            start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.2)
         }
         XCTAssertTrue(target.exists, "\(identifier) is missing")
     }

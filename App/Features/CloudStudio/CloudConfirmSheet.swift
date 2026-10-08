@@ -73,7 +73,7 @@ struct CloudConfirmSheet: View {
             }
             .scrollIndicators(.hidden)
             HStack(spacing: 12) {
-                SettingsFillButton(title: "Cancel", style: .outlined) {
+                SettingsFillButton(title: "Cancel", style: .outlined, fullWidth: false) {
                     cloud.pendingBatch = nil
                     router.dismissSheet()
                 }

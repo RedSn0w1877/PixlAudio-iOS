@@ -297,7 +297,10 @@ nonisolated enum CloudAudioPreparer {
             while let sample = readerOutput.copyNextSampleBuffer() {
                 try Task.checkCancellation()
                 guard let block = CMSampleBufferGetDataBuffer(sample) else { continue }
-                let totalFrames = CMBlockBufferGetDataLength(block) / (MemoryLayout<Float>.size * channels)
+                // The buffer's own sample count: its block can be larger than the samples it holds (the last one
+                // is padded), and copying by byte length wrote that padding into the upload (CI caught 1,332 frames).
+                let totalFrames = min(CMSampleBufferGetNumSamples(sample),
+                                      CMBlockBufferGetDataLength(block) / (MemoryLayout<Float>.size * channels))
                 var frameOffset = 0
                 while frameOffset < totalFrames {
                     let chunk = min(totalFrames - frameOffset, capacity)
