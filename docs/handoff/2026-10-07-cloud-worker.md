@@ -273,7 +273,11 @@ failed or refused one; none before it or for a non-boolean flag; the SDK's view 
 the real-SDK run), `test_schema.py` (the flag's default, both validators on bad values), `test_deploy.py` (the
 reaper's every branch with a scripted `/health` and a clock that moves only on sleep, the deploy's release, the
 workflow's schedule, environment, permissions and pinned actions). **281 passed, 1 skipped** locally (Python 3.12,
-real ffmpeg; the skip is the real-SDK test), and **282 passed** in a second venv with runpod 1.12.0 installed.
+real ffmpeg; the skip is the real-SDK test), and **282 passed** in a second venv with runpod 1.12.0 installed
+(the image's pinned version). CI on `8e3d27f`: `cloud-worker-build` run **37776517635** green (test job: 279 passed,
+3 skipped: the two workflow-file checks, which need the repository around the container, and the real-SDK test;
+no `[image]` build, the image's contents didn't change) and `ci` run **37776517678** green (see the app note).
+`check_fixtures.py`, `ci/check-cloud-fixtures.sh` and `ci/check-forbidden.sh` pass.
 
 ## For Hoa (iPhone and accounts)
 

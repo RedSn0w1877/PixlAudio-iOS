@@ -149,6 +149,11 @@ a transfer that finished meanwhile may be started once more before its event arr
   ones above included), 0 failures; only the non-blocking YouTube live smoke failed (external). Shots weren't re-run:
   the one view change (Run selftest saving the keys first) is inside a button action. Parse check and
   `check-forbidden.sh` passed before the push.
+- Idle workers (`s22-cloud-idle`, 2026-10-08): Windows, Swift 6.4, the whole PixlCore suite passes (1,298 tests,
+  PixlNet 400, the new burst/builder/schema tests included); `ci/parse-check.ps1` OK on the 8 changed Swift files.
+  CI run **37776517678** on `8e3d27f`: **green** — core 1,298 PixlCore tests, app 311 unit tests (CloudStudioTests
+  26, the 3 new ones included), 0 failures; only the non-blocking YouTube live smoke failed (external). No view
+  changed, so no screenshots.
 - Screenshots looked at: Cloud processing light/dark incl. the tested state (RunPod, Storage and the new Worker line "Worker 1.0.0 on NVIDIA L4 · songs up to 160 MB and 15 min"), the queue, the confirm sheet (Send fits on one line), Experimental's Cloud processing row: all render correctly.
 
 ## Idle workers: `last_in_batch` (2026-10-08, branch `s22-cloud-idle`)
