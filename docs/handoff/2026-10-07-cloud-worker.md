@@ -62,7 +62,8 @@ made with a key, and no money was spent.**
      REST v2): anonymous GHCR pull check, create or minimal PATCH (complete env, pools with exclusions), rollout
      wait, selftest until this build's gitSha answers, optional bench + W1 concurrency check.
    - `cloud-worker-keepalive` (daily 06:17 UTC): restores `workers.max` after RunPod's idle scale-down, but never
-     while workers are unhealthy or after a failed deploy; fails (email) when 7 days cost more than
+     while workers are unhealthy or after a deploy that didn't pass (failed, cancelled or timed out; deploy runs
+     that were skipped don't count); fails (email) when 7 days cost more than
      `CLOUD_WEEKLY_ALARM_USD`. Sends no jobs. Before setup it just succeeds.
    - Public logs: no keys, no endpoint id (masked), no response bodies, no money.
 4. **Docs**: `cloud/runpod-worker/README.md` (how it works, cost, owner checklist, runbook), `NOTICE` +
@@ -79,11 +80,15 @@ made with a key, and no money was spent.**
   gets its own timing.
 - **Input cap 160 MB** instead of 60 MB (the app uploads FLAC for anything that isn't AAC-LC M4A).
 - Added: the CPU smoke stage, the rejection manifest, `caps` in the selftest.
+- **The guard also covers a resend whose input is already gone** (second review): the design returns only an `ok`
+  manifest at the start. A resend that then finds the input deleted (the input goes only after `ok`/`partial`)
+  now hands back the earlier `ok` or `partial` result instead of overwriting it with `INPUT_MISSING`. A partial
+  job is still re-processed when the phone uploads the song again (the input is there), so a lyrics retry works.
 
 ## Verified how
 
-- CPU pytest locally (Python 3.12 venv, real ffmpeg): **224 passed** before the review, **231** after it (see
-  "Review" below); the same suite passes in the image's `test` stage on CI (runs 37711121150 and 37711887788,
+- CPU pytest locally (Python 3.12 venv, real ffmpeg): **224 passed** before the review, **231** after it, **240**
+  after the second review (see "Review" below); the same suite passes in the image's `test` stage on CI (runs 37711121150 and 37711887788,
   `test` job, and the review's run). `ci/check_weights.py`, `ci/check_fixtures.py` and
   `bash ci/check-forbidden.sh` pass.
 - Third-party APIs checked against their released sources, not guessed: msst 0.1.0 `Separator`
@@ -158,19 +163,69 @@ loop really calls the progress hook (`pbar=detailed_progress`); qwen-asr's `tran
 result fields; the runpod SDK pops `error`/`refresh_worker` and logs job outputs only at DEBUG (the image sets
 `RUNPOD_LOG_LEVEL=INFO`). No app code changed on this branch, so there are no screenshots to look at.
 
+## Review, second pass (2026-10-08)
+
+A second adversarial review read the whole diff again (worker, image, workflows, deploy and keepalive scripts,
+schema, tests) against the design and DECISIONS. Fixed on the branch, each with a test that fails without it (the
+4-stem one in the CPU smoke stage, since it needs the real demucs):
+
+- **A finished song's time limit broke a later bench on the same worker.** The aligner and the transcriber live
+  for the whole process (FlashBoot resumes it), and each song set its deadline on them without taking it off. An
+  `op: bench` afterwards (Hoa re-running the deploy with bench ticked after using the app) failed with `DEADLINE`.
+  The deadline now comes off after every call, failures included, and the bench clears it as well.
+- **4-stem progress flooded RunPod.** demucs calls the hook at the start and end of every chunk of every model;
+  the hook reported 100 % each time, so one 4-minute song sent ~300 `stems4:100` updates, each a new thread and
+  HTTP call in runpod's `progress_update` (checked in runpod 1.12.0's `rp_progress.py`). It now reports how far
+  through the bag the split is (~10 updates, deadline still checked on every call), using the callback fields
+  demucs 4.1.0 actually passes (`model_idx_in_bag`, `models`, `segment_offset`; read in `demucs/apply.py`). The
+  CPU smoke stage drives the real htdemucs_ft through the hook and checks the numbers.
+- **A resend after a partial result destroyed it** (see "Deviations"): the second run hit `INPUT_MISSING` and
+  replaced the good manifest with an error, stranding the delivered instrumental.
+- **The keepalive could re-arm an endpoint after a failed deploy.** It read only the newest finished deploy run,
+  and a failed or superseded main build still starts a deploy run whose job is skipped; that run hid the failure.
+  It now reads the newest deploy that actually ran (`select(.conclusion != "skipped")`, checked with gh's jq), and
+  a cancelled, timed-out or start-up-failed deploy counts as not passed.
+- **An oversized guard object ended the job as `INTERNAL`** before any work (the transport's size error went
+  straight through the best-effort guard). It now counts as unreadable and the job carries on.
+- Docs: `R2_ACCOUNT_ID` is already set (checked with `gh variable list --env runpod`: both it and
+  `CLOUD_WEEKLY_ALARM_USD` are `runpod` environment variables, where the deploy and keepalive jobs run; the secret
+  `RUNPOD_API_KEY` is there too and the environment allows `main` only), so the README checklist starts at
+  billing; its step numbers and the deploy's "no build yet" hint were renumbered to match.
+
+Checked and left as is: the guard's attempt counting and `POISONED` path; URL checks (host allowlist, signature,
+own object path), pinned-IP transport and redirects; validation against the JSON Schemas (both validators run on
+the same inputs); the deploy's PATCH rules, rollout wait, gitSha retry and job cancelling; the build's tags, push
+only on main, `[image]` branch builds, pinned actions; the environment and secret names the workflows use.
+
+Left for later (minor, written down so nobody is surprised):
+- Encoding and uploads at the end don't watch the deadline (by design: the 30 s margin is for them). A very slow
+  R2 on a 15-minute FLAC job could run past 900 s; RunPod then ends the job without a manifest and the phone
+  treats it as lost and resubmits it once.
+- A job without a guard (an old app) that is sent twice after its input was deleted still ends in
+  `INPUT_MISSING` over the first result; the app always sends the guard (design 2.3).
+- The by-hand deploy retries `/runsync` on a 5xx; a retried selftest can leave one extra ~1¢ job.
+
+Verified: CPU pytest **240 passed** locally (Python 3.12, real ffmpeg); `ci/check_weights.py`,
+`ci/check_fixtures.py` and `bash ci/check-forbidden.sh` pass. Branch run **37731906545** (commit `e9b6f5e`,
+`[image]`) is green: the `test` job (239 passed, 1 skipped: the workflow-file check, which needs the repository
+around it and skips inside the test container), the whole image build without pushing, and the CPU smoke stage
+with the real weights (separator, 48 kHz, aligner spans unchanged; htdemucs_ft through the progress hook: 8 calls,
+one total of 4000 for the bag of 4 models, last value 3000, i.e. the last model reached). Nothing was deployed and
+no RunPod or Cloudflare call was made.
+
 ## For Hoa (iPhone and accounts)
 
 There is nothing to test on the iPhone yet: the app side (design 7.7, P1–P5) isn't built. What Hoa does, in order,
 is the checklist in `cloud/runpod-worker/README.md`:
 
-- [ ] Add the GitHub variable `R2_ACCOUNT_ID` (32 hex, not secret).
+- [x] The GitHub variable `R2_ACCOUNT_ID` (32 hex, not secret): already in the `runpod` environment.
 - [ ] RunPod: auto-pay off, low-balance email at $3, old Android endpoint and old full-access key removed.
 - [ ] Cloudflare: bucket `pixl-cloud-studio` with the three lifecycle rules (`in/` 7 d, `out/` 30 d, no prefix
       30 d) and a token limited to that bucket.
 - [ ] Merge `s19-cloud-worker` to main; then make the `pixl-cloud-worker` package public (once).
 - [ ] Run `cloud-worker-deploy` by hand with **bench** ticked and `image_tag` empty; copy the summary's numbers
       into this note (GPU, cold start, seconds per stage, peak VRAM, peak running workers).
-- [ ] Make the `pixl-iphone` Restricted key; do the two-minute throwaway-key check (README step 9) and note the result.
+- [ ] Make the `pixl-iphone` Restricted key; do the two-minute throwaway-key check (README step 8) and note the result.
 - [ ] Optional: the re-delivery test with `PIXL_ALLOW_CRASH_TEST=1` (README › Runbook).
 
 ## Next step
