@@ -123,6 +123,8 @@ The earlier attempt (run 37711121150) failed in the dependency check on `spin` v
   - Qwen3-ForcedAligner: load 8.6 s, align 0.6 s, tokens `Hello world sing along with me` mapped back to the
     text's UTF-16 spans `[0,5] [6,11] [13,17] [18,23] [24,28] [29,31]`;
   - htdemucs_ft from the local repo: 3 s split into drums/bass/other in 10.2 s.
+- **Repeated on the final branch state**: run **37713452539** (commit `4b1c980`) is green with the cleanup
+  skipped: image job **6.5 min** (build 3.4 min, smoke 2.7 min), disk 86 GB → 60 GB free (again ~26 GB used).
 - **Not measured yet** (they need a main build or a GPU): the push time to GHCR and the compressed image size
   (the first main build's log shows both), and everything on RunPod (cold start, seconds per song, VRAM, the
   GPU actually picked, extra workers): the first deploy with **bench** ticked records them.
