@@ -144,6 +144,7 @@ final class CloudStudio {
     @ObservationIgnored private var reconciled = false
     @ObservationIgnored private var isPumping = false
     @ObservationIgnored private var pumpRequested = false
+    @ObservationIgnored private var pumpWaiters: [CheckedContinuation<Void, Never>] = []
     @ObservationIgnored private var saveChain: Task<Void, Never>?
     @ObservationIgnored private var pollLoop: Task<Void, Never>?
     @ObservationIgnored private var isActive = false
@@ -352,7 +353,7 @@ final class CloudStudio {
         if record.state.isAtRunPod, let id = record.runpodJobId, let clients {
             try? await clients.runpod.cancel(jobId: id)
         }
-        update(jobKey) { $0.apply(.cancelled, nowMs: self.dependencies.nowMs()) }
+        update(jobKey) { _ = $0.apply(.cancelled, nowMs: self.dependencies.nowMs()) }
         persist()
         cleanUpLocal(jobKey)
         if let clients { await deleteRemote(keys, clients) }
@@ -425,12 +426,15 @@ final class CloudStudio {
         Task { await self.pump() }
     }
 
-    /// One pass over every job: prepare, upload, submit, watch, collect. Re-entrant calls are folded into one more
-    /// pass.
+    /// One pass over every job: prepare, upload, submit, watch, collect. A call while a pass runs asks for one more
+    /// pass and returns when that one has finished too.
     func pump() async {
         guard !isDemo else { return }
         if isPumping {
             pumpRequested = true
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                pumpWaiters.append(continuation)
+            }
             return
         }
         isPumping = true
@@ -439,6 +443,9 @@ final class CloudStudio {
             await pumpOnce()
         } while pumpRequested
         isPumping = false
+        let waiters = pumpWaiters
+        pumpWaiters.removeAll()
+        for waiter in waiters { waiter.resume() }
         startPollLoopIfNeeded()
     }
 
@@ -589,10 +596,10 @@ final class CloudStudio {
         for record in jobs {
             switch record.state {
             case .preparing where preparing[record.jobKey] == nil:
-                update(record.jobKey) { $0.apply(.requeue, nowMs: now) }
+                update(record.jobKey) { _ = $0.apply(.requeue, nowMs: now) }
             case .downloading:
                 let description = CloudTransfers.taskDescription(jobKey: record.jobKey, slot: Self.instrumentalSlot)
-                if !pending.contains(description) { update(record.jobKey) { $0.apply(.resultsReady, nowMs: now) } }
+                if !pending.contains(description) { update(record.jobKey) { _ = $0.apply(.resultsReady, nowMs: now) } }
             default:
                 break
             }
@@ -608,7 +615,7 @@ final class CloudStudio {
             guard preparing.count < Self.maxConcurrentPreparations else { break }
             guard preparing[record.jobKey] == nil else { continue }
             let jobKey = record.jobKey
-            update(jobKey) { $0.apply(.prepareStarted, nowMs: now) }
+            update(jobKey) { _ = $0.apply(.prepareStarted, nowMs: now) }
             preparing[jobKey] = Task { [weak self] in
                 await self?.prepare(jobKey: jobKey)
                 self?.preparing[jobKey] = nil
@@ -626,7 +633,8 @@ final class CloudStudio {
         do {
             let source = try await dependencies.host.audioSource(for: song)
             try Task.checkCancellation()
-            let identity = record.isStreamed ? await dependencies.host.streamIdentity(for: song) : nil
+            var identity: String?
+            if record.isStreamed { identity = await dependencies.host.streamIdentity(for: song) }
             let prepared = try await dependencies.preparer.prepare(source: source, jobKey: jobKey)
             guard job(jobKey)?.state == .preparing else {
                 dependencies.preparer.removeUpload(jobKey: jobKey)
@@ -650,7 +658,7 @@ final class CloudStudio {
         } catch {
             let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             let decodeFailure = (error as? CloudAudioPreparer.Failure)?.isDecodeFailure ?? false
-            update(jobKey) { $0.apply(.requeue, nowMs: self.dependencies.nowMs()) }
+            update(jobKey) { _ = $0.apply(.requeue, nowMs: self.dependencies.nowMs()) }
             fail(jobKey, message, code: nil, retryable: !decodeFailure)
         }
     }
@@ -661,7 +669,7 @@ final class CloudStudio {
         let now = dependencies.nowMs()
         guard let file = fileURL ?? dependencies.preparer.uploadFile(jobKey: jobKey, ext: ext) else {
             // The prepared file is gone (storage was cleaned): prepare it again.
-            update(jobKey) { $0.apply(.requeue, nowMs: now) }
+            update(jobKey) { _ = $0.apply(.requeue, nowMs: now) }
             return
         }
         let key = CloudKeys.input(jobKey: jobKey, ext: ext)
@@ -696,7 +704,7 @@ final class CloudStudio {
         case .uploaded(let jobKey):
             activeTransfers.remove(CloudTransfers.taskDescription(jobKey: jobKey, slot: CloudTransfers.uploadSlot))
             transferProgress[jobKey] = nil
-            update(jobKey) { $0.apply(.uploadFinished, nowMs: now) }
+            update(jobKey) { _ = $0.apply(.uploadFinished, nowMs: now) }
             persist()
             requestPump()
         case .uploadFailed(let jobKey, let message, let status):
@@ -725,11 +733,11 @@ final class CloudStudio {
             guard job(jobKey)?.state == .downloading else { return }
             if status == 404 {
                 // The lifecycle (or someone) removed the result before it was fetched: start the job over.
-                update(jobKey) { $0.apply(.requeue, nowMs: now) }
+                update(jobKey) { _ = $0.apply(.requeue, nowMs: now) }
                 fail(jobKey, "The result was gone from storage; the song will be processed again.", code: nil,
                      retryable: true)
             } else {
-                update(jobKey) { $0.apply(.resultsReady, nowMs: now) }
+                update(jobKey) { _ = $0.apply(.resultsReady, nowMs: now) }
                 fail(jobKey, "Download: \(message)", code: nil, retryable: true)
             }
             requestPump()
@@ -761,7 +769,7 @@ final class CloudStudio {
         for jobKey in ready {
             guard let record = job(jobKey), record.state == .uploaded, record.isDue(nowMs: now) else { continue }
             if CloudRetention.inputTooOldToSubmit(uploadedAtMs: record.uploadedAtMs, nowMs: now) {
-                update(jobKey) { $0.apply(.requeue, nowMs: now) }
+                update(jobKey) { _ = $0.apply(.requeue, nowMs: now) }
                 continue
             }
             let price = settings.pricePerSecondMicroUSD
@@ -789,7 +797,7 @@ final class CloudStudio {
             let presign: CloudPresign = { method, key, seconds in objects.presignedURL(method, key: key, expiresSeconds: seconds) }
             guard let request = CloudJobBuilder.request(for: record, build: dependencies.build, lyrics: lyrics,
                                                         presign: presign) else {
-                update(jobKey) { $0.apply(.requeue, nowMs: now) }
+                update(jobKey) { _ = $0.apply(.requeue, nowMs: now) }
                 fail(jobKey, "This job lost its upload details; it will be uploaded again.", code: nil, retryable: true)
                 continue
             }
@@ -849,7 +857,7 @@ final class CloudStudio {
                 for record in jobs where record.state.isAtRunPod && folders.contains(record.jobKey) {
                     if await takeManifestIfPresent(record.jobKey, clients) { continue }
                     // attempt.json is there but no manifest yet: the worker has the job.
-                    update(record.jobKey) { $0.apply(.started, nowMs: now) }
+                    update(record.jobKey) { _ = $0.apply(.started, nowMs: now) }
                 }
             }
         }
@@ -861,7 +869,7 @@ final class CloudStudio {
         for record in running + Array(waiting) where now - (record.lastPolledAtMs ?? 0) >= CloudTiming.statusPollIntervalMs {
             guard job(record.jobKey)?.state.isAtRunPod == true else { continue }
             guard let jobId = record.runpodJobId else {
-                update(record.jobKey) { $0.apply(.resubmit, nowMs: now) }
+                update(record.jobKey) { _ = $0.apply(.resubmit, nowMs: now) }
                 continue
             }
             update(record.jobKey) { $0.lastPolledAtMs = now }
@@ -967,10 +975,10 @@ final class CloudStudio {
         let now = dependencies.nowMs()
         let text = code.message
         if code.needsReupload {
-            update(jobKey) { $0.apply(.requeue, nowMs: now) }
+            update(jobKey) { _ = $0.apply(.requeue, nowMs: now) }
             fail(jobKey, text, code: code.rawValue, retryable: true)
         } else if code.isRetryable {
-            update(jobKey) { $0.apply(.resubmit, nowMs: now) }
+            update(jobKey) { _ = $0.apply(.resubmit, nowMs: now) }
             fail(jobKey, text, code: code.rawValue, retryable: true)
         } else {
             fail(jobKey, text, code: code.rawValue, retryable: false)
@@ -979,7 +987,7 @@ final class CloudStudio {
     }
 
     private func retryAtRunPod(_ jobKey: String, _ message: String) {
-        update(jobKey) { $0.apply(.resubmit, nowMs: self.dependencies.nowMs()) }
+        update(jobKey) { _ = $0.apply(.resubmit, nowMs: self.dependencies.nowMs()) }
         fail(jobKey, message, code: nil, retryable: true)
     }
 
@@ -1040,7 +1048,7 @@ final class CloudStudio {
                 fail(jobKey, "The result named a file outside its folder.", code: nil, retryable: false)
                 return
             }
-            update(jobKey) { $0.apply(.downloadStarted, nowMs: self.dependencies.nowMs()) }
+            update(jobKey) { _ = $0.apply(.downloadStarted, nowMs: self.dependencies.nowMs()) }
             persist()
             let transfers = connectTransfers()
             transfers.allowsCellular = settings.useCellular
@@ -1121,7 +1129,7 @@ final class CloudStudio {
             guard CloudImportCheck.matches(expectedBytes: output.bytes, expectedSHA256: output.sha256,
                                            actualBytes: digest.bytes, actualSHA256: digest.sha256) else {
                 try? FileManager.default.removeItem(at: staged)
-                update(jobKey) { $0.apply(.resultsReady, nowMs: now) }
+                update(jobKey) { _ = $0.apply(.resultsReady, nowMs: now) }
                 fail(jobKey, "The downloaded instrumental was damaged; it will be fetched again.", code: nil,
                      retryable: true)
                 return
@@ -1146,7 +1154,7 @@ final class CloudStudio {
             try? FileManager.default.removeItem(at: staged)
         } catch {
             try? FileManager.default.removeItem(at: staged)
-            update(jobKey) { $0.apply(.resultsReady, nowMs: now) }
+            update(jobKey) { _ = $0.apply(.resultsReady, nowMs: now) }
             let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             fail(jobKey, "Import: \(CloudRedaction.redact(message))", code: nil, retryable: true)
         }
@@ -1200,7 +1208,7 @@ final class CloudStudio {
         guard let record = job(jobKey), record.state == .resultsReady || record.state == .downloading,
               record.isFullyImported else { return }
         let keys = CloudJobBuilder.objectKeys(for: record)
-        update(jobKey) { $0.apply(.imported, nowMs: self.dependencies.nowMs()) }
+        update(jobKey) { _ = $0.apply(.imported, nowMs: self.dependencies.nowMs()) }
         persist()
         cleanUpLocal(jobKey)
         await deleteRemote(keys, clients)

@@ -20,7 +20,7 @@ nonisolated protocol CloudTransferring: AnyObject, Sendable {
     func pendingTaskDescriptions() async -> [String]
 }
 
-extension CloudTransfers: CloudTransferring {}
+nonisolated extension CloudTransfers: CloudTransferring {}
 
 /// Prepares a song's audio for upload (`CloudAudioPreparer`).
 nonisolated protocol CloudAudioPreparing: Sendable {
@@ -157,7 +157,8 @@ final class LiveCloudStudioHost: CloudStudioHost {
             }
         }
         let request = CloudLyrics.requestLines(lyrics)
-        let reference = lyrics?.document.map { $0.metadata.durationMs }.flatMap { $0 > 0 ? $0 : nil }
+        var reference: Int64?
+        if let duration = lyrics?.document?.metadata.durationMs, duration > 0 { reference = duration }
         return CloudLyricsFacts(state: state, lines: request?.lines, hasLineTimes: request?.hasLineTimes ?? false,
                                 referenceDurationMs: reference, language: nil)
     }
@@ -188,7 +189,8 @@ final class LiveCloudStudioHost: CloudStudioHost {
                                        replaceUserSynced: replaceUserSynced) else {
             return userSynced && !replaceUserSynced ? .keptUserSynced : .keptBetter
         }
-        let saved = await service.save(song: song, rawContent: LyricsDocCodec.encode(doc), source: doc.metadata.source)
+        let saved = await service.save(song: song, rawContent: LyricsDocCodec.encode(doc),
+                                       source: doc.metadata.source ?? CloudLyrics.source)
         return saved == nil ? .unusable : .saved
     }
 
