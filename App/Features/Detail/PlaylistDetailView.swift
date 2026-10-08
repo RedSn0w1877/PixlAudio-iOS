@@ -331,6 +331,16 @@ struct PlaylistDetailView: View {
                 LibraryToast.shared.show(queued == 0 ? "Every song here already has an instrumental."
                                                      : "Rendering instrumentals for \(queued) songs")
             }
+            // Cloud Studio (iOS-first): only once Cloud processing is switched on; the confirm sheet comes first.
+            if env.cloud.settings.isEnabled {
+                Button("Process all in the cloud", systemImage: "icloud.and.arrow.up") {
+                    let cloud = env.cloud, router = self.router, batch = songs, title = playlist?.name ?? "Playlist"
+                    Task {
+                        await cloud.requestBatch(songs: batch, title: title)
+                        if cloud.pendingBatch != nil { router.present(AppSheet.cloudConfirm) }
+                    }
+                }
+            }
         }
         Button("Delete playlist", systemImage: "trash", role: .destructive) { confirmsDelete = true }
     }
