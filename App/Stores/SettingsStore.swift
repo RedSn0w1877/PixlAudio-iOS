@@ -140,6 +140,11 @@ nonisolated enum PreferenceKeys {
     static let aiCloudProvider = "ai_cloud_provider"
     /// iOS only (2026-10-07): the one-time switch of key-less Gemini users to the on-device model has run.
     static let aiProviderMigrated = "ai_provider_migrated_v1"
+    /// iOS only (2026-10-07, local AI phase 2): Settings › AI features › "Use downloaded AI model" (off by default).
+    /// Not in backups: the model itself isn't either. The name must not end in `_model` (or another per-provider
+    /// suffix): the backup catalogue treats such keys as portable AI settings, so it would export the switch and
+    /// clear it on every restore.
+    static let aiUseDownloadedModel = "ai_downloaded_model_enabled"
     /// Per-provider AI keys (Android `AiPreferencesRepository.Keys.get…`): `<provider lowercased>_model` etc.
     /// API keys themselves live in the Keychain under `<provider lowercased>_api_key`.
     static func aiModel(_ providerName: String) -> String { "\(providerName.lowercased())_model" }
@@ -615,6 +620,10 @@ final class AISettings {
     var cloudProvider: String { didSet { defaults.set(cloudProvider, forKey: PreferenceKeys.aiCloudProvider) } }
     /// Whether key-less Gemini users were moved to the on-device model (once; `AIProviderStatus`).
     var providerMigrated: Bool { didSet { defaults.set(providerMigrated, forKey: PreferenceKeys.aiProviderMigrated) } }
+    /// The on-device features run on the downloaded model (`LocalModelAI`) instead of the system's (off by default).
+    var useDownloadedModel: Bool {
+        didSet { defaults.set(useDownloadedModel, forKey: PreferenceKeys.aiUseDownloadedModel) }
+    }
     var safeTokenLimit: Bool { didSet { defaults.set(safeTokenLimit, forKey: PreferenceKeys.safeTokenLimit) } }
     var temperature: Double { didSet { defaults.set(temperature, forKey: PreferenceKeys.aiTemperature) } }
     var topP: Double { didSet { defaults.set(topP, forKey: PreferenceKeys.aiTopP) } }
@@ -646,6 +655,7 @@ final class AISettings {
         cloudProvider = defaults.string(forKey: PreferenceKeys.aiCloudProvider)
             ?? (AiProvider.fromString(provider) == .onDevice ? AiProvider.gemini.rawValue : provider)
         providerMigrated = defaults.bool(PreferenceKeys.aiProviderMigrated, default: false)
+        useDownloadedModel = defaults.bool(PreferenceKeys.aiUseDownloadedModel, default: false)
         safeTokenLimit = defaults.bool(PreferenceKeys.safeTokenLimit, default: true)
         temperature = defaults.double(PreferenceKeys.aiTemperature, default: 0.7)
         topP = defaults.double(PreferenceKeys.aiTopP, default: 0.95)

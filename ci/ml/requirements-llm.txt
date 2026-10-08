@@ -1,0 +1,8 @@
+# Build-time only (ml-convert.yml, job llm_convert); nothing here ships in the app. torch comes from the CPU wheel
+# index first (torch==2.5.0), so pip doesn't pull the CUDA build.
+numpy==1.26.4
+transformers==4.46.3
+tokenizers==0.20.3
+safetensors==0.8.0
+huggingface_hub==0.36.2
+coremltools==8.3.0

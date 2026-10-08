@@ -128,6 +128,8 @@ extension AISettings {
         sync(\.cloudProvider, self, f)
         sync(\.provider, self, f)
         sync(\.providerMigrated, self, f)
+        // Not in backups, so a restore leaves it as it was; synced so the running app always matches its stored value.
+        sync(\.useDownloadedModel, self, f)
         sync(\.safeTokenLimit, self, f)
         sync(\.temperature, self, f)
         sync(\.topP, self, f)

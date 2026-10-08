@@ -11,10 +11,17 @@ nonisolated struct DemoAiClient: AiClient {
 
     /// A prompt containing this fails like a provider rejecting the key (the AI sheet's error state).
     static let errorTrigger = "#demo-error"
+    /// A prompt containing this fails like "Use downloaded AI model" without the model downloaded.
+    static let localModelTrigger = "#demo-local-model"
 
     var defaultModel: String { "demo-model" }
 
     func generateContent(model: String, systemPrompt: String, prompt: String, parameters: AiGenerationParameters) async throws -> String {
+        if prompt.contains(Self.localModelTrigger) {
+            throw AiProviderSupport.makeError(providerName: OnDeviceAiClient.providerName, statusCode: nil,
+                                              transportMessage: OnDeviceFailure.localModelMissing.message,
+                                              responseBody: nil, requestedModel: model)
+        }
         if prompt.contains(Self.errorTrigger) {
             // The error screenshot: a rejected key, as a provider reports it.
             throw AiProviderSupport.makeError(providerName: "Demo", statusCode: 401, transportMessage: "Unauthorized",

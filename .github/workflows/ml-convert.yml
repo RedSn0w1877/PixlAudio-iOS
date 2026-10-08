@@ -9,14 +9,27 @@ name: ml-convert
 #              gated against PyTorch (ci/ml/convert_wav2vec2.py). Required.
 #   mdx      — ATTEMPT: UVR-MDX-NET-Voc_FT (Android's on-device instrumental model) via ONNX -> PyTorch -> Core ML,
 #              gated against ONNX Runtime (ci/ml/convert_mdx.py). Allowed to fail; its report says why.
+#   llm      — the downloadable local AI model (Settings › AI features › "Use downloaded AI model"): a Qwen2.5
+#              instruct model (Apache-2.0) as a stateful ML Program (MLState KV cache), weights quantized (int4 first;
+#              the smallest that passes ships), plus our tokenizer file (ci/ml/convert_llm.py). Converted on Linux, gated on macOS against the
+#              transformers reference. Never part of `all` (it is large and slow).
 on:
   workflow_dispatch:
     inputs:
       models:
         description: Which models to convert
         type: choice
-        options: [all, wav2vec2, mdx]
+        options: [all, wav2vec2, mdx, llm, llm-probe]
         default: all
+      llm_model:
+        description: Which local AI model (llm only)
+        type: choice
+        options: [qwen2.5-1.5b, qwen2.5-0.5b]
+        default: qwen2.5-1.5b
+      dry_run:
+        description: Convert and check only; publish nothing
+        type: boolean
+        default: false
       replace:
         description: Replace assets that already exist on models-v1 (update ModelCatalog.swift's pins too!)
         type: boolean
@@ -112,9 +125,176 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
+  # Diagnostics only (publishes nothing): where the local AI model overflows float16 (convert_llm.py probe).
+  llm_probe:
+    if: inputs.models == 'llm-probe'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Python environment
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.5.0
+          pip install -r ci/ml/requirements-llm.txt
+      - name: Probe
+        env:
+          HF_HUB_DISABLE_TELEMETRY: '1'
+        run: |
+          . .venv/bin/activate
+          python ci/ml/convert_llm.py probe --model "${{ inputs.llm_model }}" --out out
+      - name: Report
+        if: always()
+        run: |
+          if [ -f out/llm-probe.json ]; then
+            echo '### Local AI model float16 probe' >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat out/llm-probe.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: llm-probe
+          path: out/llm-probe.json
+          retention-days: 7
+          if-no-files-found: warn
+
+  llm_convert:
+    if: inputs.models == 'llm'
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v5
+      - name: Room to work (disk and swap)
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost || true
+          sudo swapoff -a || true
+          sudo fallocate -l 12G /mnt/llm.swap && sudo chmod 600 /mnt/llm.swap && sudo mkswap /mnt/llm.swap && sudo swapon /mnt/llm.swap
+          free -g
+          df -h / /mnt
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Python environment
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.5.0
+          pip install -r ci/ml/requirements-llm.txt
+          pip freeze | grep -iE 'torch|coreml|transformers|numpy|tokenizers|safetensors'
+      - name: Convert (reference, module check, Core ML candidates, tokenizer, tiny model)
+        env:
+          HF_HUB_DISABLE_TELEMETRY: '1'
+          HF_HOME: /mnt/hf
+        run: |
+          . .venv/bin/activate
+          sudo mkdir -p /mnt/hf /mnt/candidates && sudo chown "$USER" /mnt/hf /mnt/candidates
+          python ci/ml/convert_llm.py convert --model "${{ inputs.llm_model }}" --out /mnt/candidates
+          sudo rm -rf /mnt/hf
+          du -sh /mnt/candidates/*
+      - name: Report
+        if: always()
+        run: |
+          if [ -f /mnt/candidates/llm-convert-report.json ]; then
+            echo '### Local AI model conversion' >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            python3 -c "import json; d=json.load(open('/mnt/candidates/llm-convert-report.json')); print(json.dumps({k: v for k, v in d.items() if k != 'tiny'}, indent=1))" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: llm-candidates
+          path: /mnt/candidates
+          retention-days: 3
+          compression-level: 0
+          if-no-files-found: error
+
+  llm_parity:
+    needs: llm_convert
+    runs-on: macos-26
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Python environment
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          pip install numpy==1.26.4 coremltools==8.3.0
+      - uses: actions/download-artifact@v4
+        with:
+          name: llm-candidates
+          path: candidates
+      - name: Core ML parity gate + package
+        run: |
+          . .venv/bin/activate
+          sw_vers
+          expected="$(shasum -a 256 Packages/PixlCore/Tests/PixlNetTests/Fixtures/LocalLLM/qwen2_5.pxbpe | cut -d' ' -f1)"
+          python ci/ml/convert_llm.py parity --model "${{ inputs.llm_model }}" --candidates candidates --out out \
+            --expect-tokenizer-sha "$expected"
+      - name: Tokenizer fixtures still match the real tokenizer
+        if: always()
+        run: |
+          # PixlCore's tokenizer tests use fixtures made with a newer `tokenizers` than this run's; both must agree.
+          python3 - <<'EOF'
+          import json
+          repo = json.load(open("Packages/PixlCore/Tests/PixlNetTests/Fixtures/LocalLLM/tokenizer-cases.json"))
+          run = json.load(open("candidates/tokenizer-cases.json"))
+          a = {c["text"]: c["ids"] for c in repo["cases"]}
+          b = {c["text"]: c["ids"] for c in run["cases"]}
+          diff = [t for t in a if t in b and a[t] != b[t]]
+          missing = [t for t in a if t not in b]
+          chat = (repo.get("chat") or {}).get("ids") == (run.get("chat") or {}).get("ids")
+          print(f"{len(a)} cases, {len(diff)} differ, {len(missing)} missing, chat identical: {chat}")
+          for t in diff:
+              print(f"::warning::tokenizer fixture differs for {t!r}")
+          if not chat:
+              print("::warning::the chat-template fixture differs")
+          EOF
+      - name: Report
+        if: always()
+        run: |
+          if [ -f out/llm-report.json ]; then
+            echo '### Local AI model parity (Core ML vs transformers fp32)' >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            python3 -c "import json; d=json.load(open('out/llm-report.json')); [u.pop('per_prompt', None) for a in d.get('attempts', []) for u in a['units'].values()]; print(json.dumps(d, indent=1))" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ml-llm
+          path: |
+            out/llm-report.json
+            out/qwen2_5_*.tar
+          retention-days: 7
+          compression-level: 0
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: llm-fixtures
+          path: |
+            out/tiny_qwen.mlpackage.tar
+            out/tiny-expected.json
+            candidates/tokenizer-cases.json
+            candidates/qwen2_5.pxbpe
+            candidates/llm-reference.json
+          retention-days: 14
+          if-no-files-found: warn
+
   publish:
-    needs: [wav2vec2, mdx]
-    if: always() && (needs.wav2vec2.result == 'success' || needs.mdx.result == 'success')
+    needs: [wav2vec2, mdx, llm_parity]
+    if: >-
+      always() && !inputs.dry_run &&
+      (needs.wav2vec2.result == 'success' || needs.mdx.result == 'success' || needs.llm_parity.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

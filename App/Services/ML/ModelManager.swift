@@ -142,6 +142,14 @@ final class ModelManager {
         }
         guard !isDemo else { return }
         let model = ModelCatalog.descriptor(id)
+        // The local AI model is ~900 MB: say so up front rather than failing half-way through the install.
+        if let free = Self.availableSpace(), free < Self.spaceNeeded(model) {
+            let message = "Not enough free space on this iPhone: installing it needs about "
+                + "\(ModelCatalog.formattedSize(Self.spaceNeeded(model))) free for a moment."
+            states[id] = .failed(message)
+            resume(id, with: .failure(ModelError(message: message)))
+            return
+        }
         states[id] = .downloading(fraction: 0)
         let task = makeSession().downloadTask(with: model.downloadURL)
         task.taskDescription = id.rawValue
@@ -224,13 +232,43 @@ final class ModelManager {
         rootDirectory?.appendingPathComponent(".staging", isDirectory: true).appendingPathComponent("\(id.rawValue).tar")
     }
 
+    /// `<id>/<name>`: a file the tar carries next to the package (the local AI model's tokenizer).
+    nonisolated static func extraFileURL(_ model: ModelDescriptor, _ name: String) -> URL? {
+        directory(for: model)?.appendingPathComponent(name, isDirectory: false)
+    }
+
     /// The installed model's size, or nil when it isn't installed (or was built from another catalog pin).
     nonisolated static func installedSize(_ model: ModelDescriptor) -> Int64? {
+        guard isInstalled(model), let compiled = compiledURL(model) else { return nil }
+        var total = directorySize(compiled)
+        for name in model.extraFiles {
+            guard let url = extraFileURL(model, name) else { continue }
+            total += Int64((try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+        }
+        return total
+    }
+
+    /// Cheap check (no size walk): the pin matches and the compiled model and its extra files are in place.
+    nonisolated static func isInstalled(_ model: ModelDescriptor) -> Bool {
+        let fm = FileManager.default
         guard let dir = directory(for: model), let compiled = compiledURL(model),
               let pin = try? String(contentsOf: dir.appendingPathComponent("sha256.txt"), encoding: .utf8),
               pin.trimmingCharacters(in: .whitespacesAndNewlines) == model.sha256,
-              FileManager.default.fileExists(atPath: compiled.path) else { return nil }
-        return directorySize(compiled)
+              fm.fileExists(atPath: compiled.path) else { return false }
+        return model.extraFiles.allSatisfy { name in extraFileURL(model, name).map { fm.fileExists(atPath: $0.path) } ?? false }
+    }
+
+    /// What an install can hold on disk at once: the archive while it's extracted (then deleted), or the extracted
+    /// package while it's compiled, plus room to spare.
+    nonisolated static func spaceNeeded(_ model: ModelDescriptor) -> Int64 {
+        model.bytes * 2 + 100_000_000
+    }
+
+    /// Free space for important data on the app's volume (nil when unknown).
+    nonisolated static func availableSpace() -> Int64? {
+        (try? URL(fileURLWithPath: NSHomeDirectory())
+            .resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+            .volumeAvailableCapacityForImportantUsage) ?? nil
     }
 
     nonisolated static func directorySize(_ url: URL) -> Int64 {
@@ -265,15 +303,26 @@ final class ModelManager {
         try await Task.detached(priority: .utility) {
             try UstarExtractor.extract(archive: archive, to: work) { _ in try Task.checkCancellation() }
         }.value
+        // Extracted: the archive's copy goes before the compile makes another (the phone's free space).
+        try? fm.removeItem(at: archive)
         let package = work.appendingPathComponent(model.package, isDirectory: true)
         guard fm.fileExists(atPath: package.path) else {
             throw ModelError(message: "The model archive is missing \(model.package).")
         }
+        for name in model.extraFiles where !fm.fileExists(atPath: work.appendingPathComponent(name).path) {
+            throw ModelError(message: "The model archive is missing \(name).")
+        }
         let temporaryCompiled = try await MLModel.compileModel(at: package)
         defer { try? fm.removeItem(at: temporaryCompiled) }
+        // The package is compiled: its ~1 GB copy goes before the compiled one moves in (the phone's free space).
+        try? fm.removeItem(at: package)
         try? fm.removeItem(at: dir)
         try fm.createDirectory(at: dir, withIntermediateDirectories: true)
         try fm.moveItem(at: temporaryCompiled, to: compiled)
+        for name in model.extraFiles {
+            guard let destination = extraFileURL(model, name) else { continue }
+            try fm.moveItem(at: work.appendingPathComponent(name), to: destination)
+        }
         try Data(model.sha256.utf8).write(to: dir.appendingPathComponent("sha256.txt"))
         var values = URLResourceValues()
         values.isExcludedFromBackup = true

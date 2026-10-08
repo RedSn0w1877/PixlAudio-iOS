@@ -748,6 +748,37 @@ in for the model calls; the behaviour itself waits for Hoa's iPhone.
   `testAICategoryAdvancedOnDeviceLight`; `UITests/LibraryScreenshotTests.testLibraryCreatePlaylistOnDeviceOffDark`
   (`libraryCreatePlaylist.onDeviceOff`).
 
+## Downloadable local AI model (2026-10-07, local AI phase 2, Swift-only)
+
+Nothing here is ported: Android's on-device provider imports a MediaPipe file. The tokenizer is checked against the
+real one instead (fixtures from Hugging Face `tokenizers` on Qwen2.5's `tokenizer.json` at the pinned revision, made by
+`ci/ml/convert_llm.py tokenizer` and re-compared with the parity runner's own `tokenizers` on every conversion).
+
+- `PixlNetTests/LocalLLMTests` (15): the tokenizer file loads (151,936 rows, 22 added tokens, the special, digit,
+  comma and space ids); encode and decode equal the reference on 55 cases (contractions, `ſ`, numbers digit by
+  digit, CRLF, tabs, trailing and leading spaces, Vietnamese, CJK, Hangul, Cyrillic, Arabic, decomposed accents,
+  emoji ZWJ and flags, control tokens, URLs, curly quotes, zero-width space); the ChatML render and its ids equal
+  transformers' `apply_chat_template`; control-token text inside content stays text; Qwen2's split; the sampler
+  (greedy ties, bans, allowed lists, NaN/inf, repetition penalty both signs, seeded top-k and top-p); the number-list
+  constraint (distinct, in range, minimum and maximum, prefixes past a used number, a pool smaller than the minimum).
+- `PixlNetTests/LocalLLMGeneratorTests` (16): the generation loop against a scripted model that fails on any read of
+  an unwritten cache row — stop tokens, chunked prefill, prefix reuse (shared prefix, the same prompt, a continued
+  conversation), prompts too long, the end of the context, stop conditions, cancellation between steps keeping the
+  cache usable, NaN logits forgetting the cache, banned tokens, the constrained number list against a model that wants
+  something else; prompt fitting (oldest turns dropped first), plan parsing (only the library's values, clamped
+  energy, defaults), the causal mask.
+- `AppTests/LocalModelTests` (12): the simulator smoke test — a tiny random Qwen2-shaped model from the same
+  conversion (stateful KV cache, int4) reproduces the greedy tokens Core ML gave on the CI Mac from a fresh cache, a
+  reused prefix and after a reset; mask and logits shapes at the end of the context; `ModelManager.install` keeps the
+  tokenizer beside the compiled model (and the model isn't "installed" without it); `LocalModelRuntime` answers on its
+  queue and stops an endless request when its task is cancelled, and a request cancelled while it waits for the queue
+  throws at once and never runs; a missing model is reported without loading; the library note, chat turn, plan
+  prompt and pick budget; the missing-model message never reads as a network problem; the switch stays out of
+  backups (never exported, never cleared by a restore); the catalog pins.
+- `UITests/SettingsScreenshotTests.testAICategoryLocalModelDownloading{Light,Dark}`,
+  `testAICategoryLocalModelReady{Light,Dark}` (`settingsCategory.ai.localModel`, `.localModelReady`);
+  `UITests/AIScreenshotTests.testAiPlaylistLocalModelMissingLight` (`#demo-local-model`).
+
 ## Accent colour (owner request 2026-10-07, iOS-only, Swift-only)
 Android has no accent setting, so there is nothing to port; these define the iOS behaviour.
 - `PixlLibraryTests/AccentPairTests` (7) — `ArtworkTheme.accentPair(seed:)`: WCAG AA (4.5:1) for `onPrimary` on

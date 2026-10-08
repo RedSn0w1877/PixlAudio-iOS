@@ -65,7 +65,11 @@ final class AIService {
                                           sha256: AIService.sha256, onDeviceClient: onDeviceClient,
                                           clientFactory: factory, providerChain: chain)
         self.orchestrator = orchestrator
-        let onDevice = realBridge.map { OnDeviceContext(ai: .shared, settings: $0) }
+        // "Use downloaded AI model" (off by default) moves every on-device feature to the downloaded model.
+        let onDevice = realBridge.map {
+            OnDeviceContext(ai: .shared, settings: $0, local: LocalModelAI.shared,
+                            downloadedSwitch: { UserDefaults.standard.bool(forKey: PreferenceKeys.aiUseDownloadedModel) })
+        }
         self.onDevice = onDevice
         let generator = AiPlaylistGenerator(orchestrator: orchestrator)
         playlistGenerator = generator
@@ -86,6 +90,11 @@ final class AIService {
     /// assistant selected.
     func prewarm(_ feature: OnDeviceAI.Feature) {
         guard let onDevice, AiProvider.fromString(settings.ai.provider) == .onDevice else { return }
+        if settings.ai.useDownloadedModel {
+            // Loading the downloaded model (and, the first time, specialising it for the GPU) takes seconds.
+            if feature == .chat || feature == .playlist { onDevice.local?.prewarm() }
+            return
+        }
         let songs = librarySongs
         Task.detached(priority: .utility) {
             var setup: OnDeviceAI.ChatSetup?
@@ -108,7 +117,8 @@ final class AIService {
         if isDemo { return true }
         let provider = AiProvider.fromString(settings.ai.provider)
         switch provider {
-        case .onDevice: return OnDeviceModel.isAvailable
+        case .onDevice:
+            return settings.ai.useDownloadedModel ? ModelManager.isInstalled(ModelCatalog.llm) : OnDeviceModel.isAvailable
         case .ollama: return !AISettingsBridge.storedKey(for: provider).isEmpty || !settings.ai.baseUrl(for: provider.rawValue).isEmpty
         default: return !AISettingsBridge.storedKey(for: provider).isEmpty
         }

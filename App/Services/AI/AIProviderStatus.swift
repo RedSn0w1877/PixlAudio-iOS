@@ -17,6 +17,8 @@ enum AIProviderStatus {
     private struct Entry {
         let provider: String
         let baseUrl: String
+        /// "Use downloaded AI model" when it was checked.
+        let downloaded: Bool
         let isConfigured: Bool
         /// Why the on-device model can't answer (nil for cloud providers and when it can).
         let onDeviceIssue: OnDeviceFailure?
@@ -29,7 +31,12 @@ enum AIProviderStatus {
     static func isConfigured(_ env: AppEnvironment) -> Bool {
         if env.launch.screen == .libraryCreatePlaylistOnDeviceOff { return false }
         let providerName = env.settings.ai.provider
-        if let cached, cached.provider == providerName,
+        // The downloaded model: the model manager's state, always current (a download may finish while Settings is
+        // closed).
+        if !env.launch.isUITest, env.settings.ai.useDownloadedModel, AiProvider.fromString(providerName) == .onDevice {
+            return downloadedModelInstalled(env)
+        }
+        if let cached, cached.provider == providerName, cached.downloaded == env.settings.ai.useDownloadedModel,
            cached.baseUrl == env.settings.ai.baseUrl(for: AiProvider.fromString(providerName).rawValue) {
             return cached.isConfigured
         }
@@ -43,8 +50,15 @@ enum AIProviderStatus {
         if env.launch.screen == .libraryCreatePlaylistOnDeviceOff { return .intelligenceOff }
         let providerName = env.settings.ai.provider
         guard AiProvider.fromString(providerName) == .onDevice, !env.launch.isUITest else { return nil }
-        if let cached, cached.provider == providerName { return cached.onDeviceIssue }
+        if env.settings.ai.useDownloadedModel { return downloadedModelInstalled(env) ? nil : .localModelMissing }
+        if let cached, cached.provider == providerName, !cached.downloaded { return cached.onDeviceIssue }
         return OnDeviceModel.unavailability
+    }
+
+    /// The downloaded model is installed (`ModelManager`'s in-memory state: no file access).
+    static func downloadedModelInstalled(_ env: AppEnvironment) -> Bool {
+        if case .installed = env.tais.models.state(.llm) { return true }
+        return false
     }
 
     /// Forgets the cached answer; the next question is answered synchronously until a `refresh` lands.
@@ -60,24 +74,31 @@ enum AIProviderStatus {
         let providerName = env.settings.ai.provider
         let provider = AiProvider.fromString(providerName)
         let baseUrl = env.settings.ai.baseUrl(for: provider.rawValue)
+        let downloaded = env.settings.ai.useDownloadedModel
         guard !env.launch.isUITest else {
-            cached = Entry(provider: providerName, baseUrl: baseUrl, isConfigured: true, onDeviceIssue: nil)
+            cached = Entry(provider: providerName, baseUrl: baseUrl, downloaded: downloaded, isConfigured: true,
+                           onDeviceIssue: nil)
             return
         }
-        let (configured, issue) = await check(provider, baseUrl: baseUrl)
-        // A newer refresh or invalidation, or a provider or base URL change, while the check ran: its own refresh, or
-        // the fallback, answers.
+        let (configured, issue) = await check(provider, baseUrl: baseUrl, downloaded: downloaded)
+        // A newer refresh or invalidation, or a provider, base URL or downloaded-model change, while the check ran:
+        // its own refresh, or the fallback, answers.
         guard started == generation, providerName == env.settings.ai.provider,
+              downloaded == env.settings.ai.useDownloadedModel,
               baseUrl == env.settings.ai.baseUrl(for: provider.rawValue) else { return }
-        cached = Entry(provider: providerName, baseUrl: baseUrl, isConfigured: configured, onDeviceIssue: issue)
+        cached = Entry(provider: providerName, baseUrl: baseUrl, downloaded: downloaded, isConfigured: configured,
+                       onDeviceIssue: issue)
     }
 
-    /// `AIService.isProviderConfigured`, off the main actor, with the on-device model's reason when it can't answer.
+    /// `AIService.isProviderConfigured`, off the main actor, with the on-device model's reason when it can't answer
+    /// (`downloaded`: the "Use downloaded AI model" switch, which makes the downloaded model the one to ask).
     @concurrent
-    nonisolated static func check(_ provider: AiProvider, baseUrl: String) async -> (Bool, OnDeviceFailure?) {
+    nonisolated static func check(_ provider: AiProvider, baseUrl: String,
+                                  downloaded: Bool = false) async -> (Bool, OnDeviceFailure?) {
         switch provider {
         case .onDevice:
-            let issue = OnDeviceModel.unavailability
+            let issue = downloaded ? (ModelManager.isInstalled(ModelCatalog.llm) ? nil : OnDeviceFailure.localModelMissing)
+                : OnDeviceModel.unavailability
             return (issue == nil, issue)
         case .ollama: return (!AISettingsBridge.storedKey(for: provider).isEmpty || !baseUrl.isEmpty, nil)
         default: return (!AISettingsBridge.storedKey(for: provider).isEmpty, nil)

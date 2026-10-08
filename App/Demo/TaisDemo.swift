@@ -33,6 +33,10 @@ enum TaisDemo {
             studio.setDemoState(TaisStudio.JobState(phase: .succeeded(updated: true), percent: 100,
                                                     detail: "Word-synced lyrics from LRCLIB", indeterminate: false),
                                 kind: .lyrics, songId: sheetSong.id)
+        case .settingsAILocalModel:
+            models.setDemoState(.downloading(fraction: 0.42), for: .llm)
+        case .settingsAILocalModelReady:
+            models.setDemoState(.installed(bytes: ModelCatalog.llm.bytes + 2_400_000), for: .llm)
         case .taisInstrumental:
             tais.instrumental.setDemo(available: true, active: false)
         case .taisInstrumentalActive:

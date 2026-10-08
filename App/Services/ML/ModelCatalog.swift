@@ -13,6 +13,9 @@ nonisolated struct ModelDescriptor: Sendable, Hashable, Identifiable {
         case wav2vec2
         /// UVR-MDX-NET-Voc_FT — on-device instrumentals (Android `TaisStemSeparator`).
         case mdxnet
+        /// Qwen2.5 1.5B Instruct — the downloadable local AI model (Settings › AI features › "Use downloaded AI
+        /// model", 2026-10-07). iOS only: Android runs a MediaPipe file the user imports.
+        case llm
     }
 
     let id: ID
@@ -25,6 +28,8 @@ nonisolated struct ModelDescriptor: Sendable, Hashable, Identifiable {
     /// What the user sees (Experimental › On-device models).
     let title: String
     let purpose: String
+    /// Other files in the tar, next to the package, kept beside the compiled model (the local AI model's tokenizer).
+    var extraFiles: [String] = []
 
     var downloadURL: URL {
         URL(string: "https://github.com/RedSn0w1877/PixlAudio-iOS/releases/download/\(ModelCatalog.release)/\(file)")!
@@ -45,12 +50,30 @@ nonisolated enum ModelCatalog {
         bytes: 33_505_280, sha256: "e6cc0e50c7eb5a321ded78f88ba52445d451be9e48975113f4a487426cef800b",
         title: "Instrumental model", purpose: "MDX-Net · separates vocals for instrumentals")
 
-    static let all: [ModelDescriptor] = [wav2vec2, mdxnet]
+    /// From `models-v1.json` (ml-convert run 37714890106, Qwen/Qwen2.5-1.5B-Instruct at 989aa79): the Core ML
+    /// program (float16, weights int4 per block of 32; parity gate: 86 % greedy agreement with transformers fp32, the
+    /// reference token in Core ML's top 5 at 98 % of positions) and its tokenizer file (SHA-256 9bc6e945…, the same
+    /// as PixlCore's fixture).
+    static let llm = ModelDescriptor(
+        id: .llm, file: "qwen2_5_1_5b_instruct_int4_affine_block32.tar", package: "Qwen25Instruct1_5B.mlpackage",
+        bytes: 896_256_000, sha256: "f107c845748da679dd6ef9a8e9e29b243687af29ecaa2b4f9074d58845cfbfd7",
+        title: "Local AI model", purpose: "Qwen2.5 1.5B Instruct · runs AI features on this iPhone",
+        extraFiles: [LocalLLM.tokenizerFile])
+
+    /// The TAIS Studio models (Experimental › On-device models).
+    static let tais: [ModelDescriptor] = [wav2vec2, mdxnet]
+    static let all: [ModelDescriptor] = tais + [llm]
+
+    /// "870 MB" (the system's file-size style).
+    static func formattedSize(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
 
     static func descriptor(_ id: ModelDescriptor.ID) -> ModelDescriptor {
         switch id {
         case .wav2vec2: wav2vec2
         case .mdxnet: mdxnet
+        case .llm: llm
         }
     }
 
@@ -69,5 +92,18 @@ nonisolated enum ModelCatalog {
     nonisolated enum Mdx {
         static let input = "spectrum"
         static let output = "vocals"
+    }
+
+    /// The local AI model (`ci/ml/convert_llm.py`): `inputIds` int32 [1, Q] (the new tokens) and `causalMask`
+    /// float16 [1, 1, Q, P + Q] (0 attends, -inf masks) over the states `keyCache` / `valueCache` (float16, P rows
+    /// already filled) → `logits` float16 [1, 1, vocabulary] after the last new token. Q ≤ 512, P + Q ≤ 4,096.
+    nonisolated enum LocalLLM {
+        static let inputIds = "inputIds"
+        static let causalMask = "causalMask"
+        static let output = "logits"
+        static let context = 4096
+        static let maxQuery = 512
+        static let vocabulary = 151_936
+        static let tokenizerFile = "qwen2_5.pxbpe"
     }
 }

@@ -27,7 +27,7 @@ struct OnDeviceModelsPanel: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            ForEach(ModelCatalog.all) { model in
+            ForEach(ModelCatalog.tais) { model in
                 Rectangle().fill(theme.outlineVariant).frame(height: 1)
                 ModelRow(model: model, state: models.state(model.id),
                          onDownload: { models.download(model.id) },

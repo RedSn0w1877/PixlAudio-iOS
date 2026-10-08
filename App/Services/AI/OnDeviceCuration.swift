@@ -138,7 +138,7 @@ extension OnDeviceFailure {
     /// The model can't answer at all: no point falling back to a plan-less fill that also needs it.
     nonisolated var stopsCuration: Bool {
         switch self {
-        case .deviceNotEligible, .intelligenceOff, .notReady, .language: true
+        case .deviceNotEligible, .intelligenceOff, .notReady, .language, .localModelMissing: true
         default: false
         }
     }

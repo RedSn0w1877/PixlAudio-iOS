@@ -95,7 +95,7 @@ nonisolated struct TaisDjEngine: Sendable {
     func deferredIntro(prompt: String, result: DjRouteResult) async -> String? {
         guard result.count > 0, let onDevice, await onDevice.isActive() else { return nil }
         let count = result.count
-        guard let line = try? await withTimeout(seconds: Self.onDeviceIntroTimeoutSeconds, {
+        guard let line = try? await withTimeout(seconds: onDevice.introTimeoutSeconds, {
             try await onDevice.introLine(request: prompt, count: count)
         }) else { return nil }
         return line
@@ -105,7 +105,7 @@ nonisolated struct TaisDjEngine: Sendable {
     private func onDeviceChat(_ prompt: String, _ onDevice: any TaizoOnDevice) async -> TaizoTurn {
         let songs = router.songs
         do {
-            let reply = try await withTimeout(seconds: Self.chatTimeoutSeconds) {
+            let reply = try await withTimeout(seconds: onDevice.chatTimeoutSeconds) {
                 try await onDevice.chat(prompt, songs: songs)
             }
             guard let reply else { return .error(OnDeviceFailure.slow.message) }

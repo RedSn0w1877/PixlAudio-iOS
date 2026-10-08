@@ -31,6 +31,41 @@ final class SettingsScreenshotTests: XCTestCase {
         try capture("settingsCategory.ai.cloud", "dark", ready: "screen.settingsCategory.ai", suffix: "",
                     interact: Self.scrollToAssistant)
     }
+    /// "Use downloaded AI model" on, the model downloading (42 %): the switch, the progress bar and Cancel.
+    func testAICategoryLocalModelDownloadingLight() throws {
+        try capture("settingsCategory.ai.localModel", "light", ready: "screen.settingsCategory.ai",
+                    suffix: "", interact: Self.scrollToLocalModel)
+    }
+    func testAICategoryLocalModelDownloadingDark() throws {
+        try capture("settingsCategory.ai.localModel", "dark", ready: "screen.settingsCategory.ai",
+                    suffix: "", interact: Self.scrollToLocalModel)
+    }
+    /// The model downloaded: its size on the phone and Delete; the system model's row says it isn't in use.
+    func testAICategoryLocalModelReadyLight() throws {
+        try capture("settingsCategory.ai.localModelReady", "light", ready: "screen.settingsCategory.ai",
+                    suffix: "", interact: Self.scrollToLocalModel)
+    }
+    func testAICategoryLocalModelReadyDark() throws {
+        try capture("settingsCategory.ai.localModelReady", "dark", ready: "screen.settingsCategory.ai",
+                    suffix: "", interact: Self.scrollToLocalModel)
+    }
+
+    /// Scrolls until the whole downloaded model's row is above the mini player (it sits under the two AI cards):
+    /// short drags along the leading margin, so a drag never starts on a switch or the discovery slider.
+    private static func scrollToLocalModel(_ app: XCUIApplication) {
+        let row = app.descendants(matching: .any)["settings.ai.localModel"].firstMatch
+        let limit = app.windows.firstMatch.frame.maxY - 130
+        for _ in 0..<8 {
+            if row.exists && row.frame.maxY <= limit { break }
+            let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.03, dy: 0.7))
+            let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.03, dy: 0.4))
+            start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.2)
+            Thread.sleep(forTimeInterval: 0.4)
+        }
+        XCTAssertTrue(row.exists, "the downloaded model's row is missing")
+        XCTAssertLessThanOrEqual(row.frame.maxY, limit, "the downloaded model's row is under the mini player")
+    }
+
     /// On-device: Advanced shows only Temperature.
     func testAICategoryAdvancedOnDeviceLight() throws {
         try capture("settingsCategory.ai", "light") { app in

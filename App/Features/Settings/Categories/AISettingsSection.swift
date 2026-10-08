@@ -38,7 +38,9 @@ struct AISettingsSection: View {
             MusicIntelligenceCard()
             Spacer().frame(height: 20)
             SettingsSubsection(title: L10n.settingsAiProviderTitle) {
-                OnDeviceModelRow(isSelected: !cloud)
+                OnDeviceModelRow(isSelected: !cloud && !ai.useDownloadedModel,
+                                 downloadedModelOn: !cloud && ai.useDownloadedModel)
+                DownloadedModelRows()
             }
             SettingsSubsection(title: "Cloud assistants (optional)") {
                 SwitchSettingRow(title: "Use a cloud assistant",
@@ -445,8 +447,10 @@ struct AIParameterRow: View {
 /// is in use, and why it can't answer when it can't (not on this iPhone, turned off, downloading, language). UI tests
 /// show it ready, so the screenshots don't depend on the simulator.
 struct OnDeviceModelRow: View {
-    /// The on-device model is the selected assistant (off while a cloud assistant is switched on).
+    /// The on-device model is the selected assistant (off while a cloud assistant or the downloaded model is on).
     var isSelected = true
+    /// "Use downloaded AI model" is on: the downloaded model answers instead.
+    var downloadedModelOn = false
 
     @Environment(\.appTheme) private var theme
 
@@ -478,7 +482,7 @@ struct OnDeviceModelRow: View {
         if let issue = isUITest ? nil : OnDeviceModel.unavailability {
             switch issue {
             case .deviceNotEligible:
-                return ("Not available on this iPhone", "This iPhone can't run the on-device model. Turn on a cloud assistant below to use AI features.", false)
+                return ("Not available on this iPhone", "This iPhone can't run the system's on-device model. Use the downloaded AI model below, or a cloud assistant.", false)
             case .intelligenceOff:
                 return ("Turned off in system settings", "Turn on the intelligence features in the iPhone's Settings app to use the on-device model.", false)
             case .notReady:
@@ -492,6 +496,9 @@ struct OnDeviceModelRow: View {
         }
         if isSelected {
             return ("On-device model · in use", "Playlists, Taizo, translation and Home's greeting run privately on this iPhone.", true)
+        }
+        if downloadedModelOn {
+            return ("On-device model", "Ready. Turn off \"Use downloaded AI model\" to use it instead.", true)
         }
         return ("On-device model", "Ready. Turn off the cloud assistant to use it instead.", true)
     }

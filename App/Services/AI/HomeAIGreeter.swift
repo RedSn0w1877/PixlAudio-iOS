@@ -37,10 +37,17 @@ enum HomeAIGreeter {
                 ? AiPromptEngine.buildPrompt(basePersona: persona, type: .greeting) : insightInstructions
             let temperature = Double(AiPromptEngine.effectiveTemperature(type: .greeting, setting: Float(ai.temperature)))
             let maxTokens = kind == .headline ? 60 : 220
-            // The card's chevron waits for the insight: never longer than this.
-            let text = try? await withTimeout(seconds: timeoutSeconds) {
-                try await OnDeviceAI.shared.greeting(instructions: instructions, prompt: prompt, temperature: temperature,
-                                                     maxTokens: maxTokens)
+            // The card's chevron waits for the insight: never longer than this (the downloaded model computes every
+            // token on the phone and may have to load first).
+            let downloaded = ai.useDownloadedModel
+            let text = try? await withTimeout(seconds: downloaded ? downloadedTimeoutSeconds : timeoutSeconds) {
+                () async throws -> String in
+                if downloaded {
+                    return try await LocalModelAI.shared.greeting(instructions: instructions, prompt: prompt,
+                                                                  temperature: temperature, maxTokens: maxTokens)
+                }
+                return try await OnDeviceAI.shared.greeting(instructions: instructions, prompt: prompt,
+                                                            temperature: temperature, maxTokens: maxTokens)
             }
             return text.flatMap { HomeLogic.cleanGreeting(OnDeviceText.cleanReply($0), limit: limit) }
         }
@@ -55,4 +62,6 @@ enum HomeAIGreeter {
 
     /// The longest Home waits for an AI greeting or insight before keeping its local text.
     static let timeoutSeconds: Double = 20
+    /// The same with the downloaded model.
+    static let downloadedTimeoutSeconds: Double = 45
 }

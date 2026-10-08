@@ -26,6 +26,10 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case settingsAI = "settingsCategory.ai"
     /// AI features with a cloud assistant switched on (Gemini, the demo key): the optional "Cloud assistants" rows.
     case settingsAICloud = "settingsCategory.ai.cloud"
+    /// AI features with "Use downloaded AI model" on and the model downloading (42 %).
+    case settingsAILocalModel = "settingsCategory.ai.localModel"
+    /// The same with the model downloaded (its size and Delete).
+    case settingsAILocalModelReady = "settingsCategory.ai.localModelReady"
     case settingsBackupRestore = "settingsCategory.backup_restore"
     case settingsDeveloper = "settingsCategory.developer"
     case settingsDeviceCapabilities = "settingsCategory.device_capabilities"
@@ -161,7 +165,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .settingsPlayback: return .settingsCategory(.playback)
         case .settingsEqualizer: return .settingsCategory(.equalizer)
         case .settingsBehavior: return .settingsCategory(.behavior)
-        case .settingsAI, .settingsAICloud: return .settingsCategory(.ai)
+        case .settingsAI, .settingsAICloud, .settingsAILocalModel, .settingsAILocalModelReady:
+            return .settingsCategory(.ai)
         case .settingsBackupRestore: return .settingsCategory(.backupRestore)
         case .settingsDeveloper: return .settingsCategory(.developer)
         case .settingsDeviceCapabilities: return .settingsCategory(.deviceCapabilities)

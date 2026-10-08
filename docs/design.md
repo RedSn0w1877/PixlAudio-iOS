@@ -710,6 +710,31 @@ turned off; ready `sheet.createPlaylist`). Shots: `SettingsScreenshotTests.testA
 `testAICategoryAdvancedOnDeviceLight`, `LibraryScreenshotTests.testLibraryCreatePlaylistOnDeviceOffDark`; the existing
 `settingsCategory.ai` shots now show the on-device default.
 
+### Downloadable local AI model (2026-10-07, local AI phase 2; owner request, iOS-only for now)
+
+- **Settings › AI features › Assistant:** under the on-device model row, a "Use downloaded AI model" switch (off by
+  default) and, while it is on or the model is on the phone, the model's row: "Qwen2.5 1.5B Instruct", its state
+  (size and "Wi-Fi recommended" / "Downloading — 42% of 896.3 MB" with a progress bar / "Checking and installing…" /
+  "Downloaded · 898.7 MB on this iPhone" plus the last answer's speed) and one fill button (Download or Retry, Cancel,
+  Delete with a confirmation, which also turns the switch off). Turning the switch on never starts the download by
+  itself. With the switch on, the
+  system model's row loses its checkmark ("Turn off "Use downloaded AI model" to use it instead"). Both are ordinary
+  settings glass rows; the buttons are fills (no glass on glass). The state comes from `ModelManager`, which updates
+  once per whole percent; nothing ticks while idle.
+- **What it changes:** every on-device feature (AI playlists and the Lab, Daily Mix refine, Taizo's chat and intro,
+  "Translate via AI", Home's greeting, Library's "With AI" card) runs on `LocalModelAI` instead of the system model,
+  through the phase-1 seams (`OnDeviceContext.usesDownloadedModel`). Without the model, they say so ("The downloaded
+  AI model isn't on this iPhone yet…").
+- **Engine:** `LocalModelRuntime` owns the tokenizer, the Core ML model and its `MLState` on one serial queue; prompts
+  are ChatML, sized to a 3,072-token budget of the 4,096-token window; Taizo's turns reuse the cached prefix, so only
+  the new message is computed. Released after 3 minutes idle, on a memory warning, when the app goes to the
+  background (so a ~1 GB model never puts background playback at risk), when the switch goes off or the model is
+  deleted.
+
+Ids: `settingsCategory.ai.localModel` (switch on, downloading 42 %; ready `screen.settingsCategory.ai`),
+`settingsCategory.ai.localModelReady` (installed). Rows: `settings.ai.localModel`, `.status`, `.download`, `.cancel`,
+`.delete`. Shots: `SettingsScreenshotTests.testAICategoryLocalModel*`, `AIScreenshotTests.testAiPlaylistLocalModelMissingLight`.
+
 ## Stage 15 notes (backup, setup, updates, localisation)
 
 - **Backup** (`App/Services/Backup`, `Features/Backup`): `env.backup` (`BackupService`) exports, inspects and restores on
