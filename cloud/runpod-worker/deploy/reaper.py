@@ -182,7 +182,7 @@ def reap(api: RunPod | None, template: dict, **kw) -> int:
     mask(endpoint_id)
     try:
         outcome = release_idle(api, endpoint_id, endpoint.get("workers") or {}, template, **kw)
-    except ApiError as exc:  # a read before anything changed (a failed PATCH to 0 changed nothing either)
+    except ApiError as exc:  # a /health read before anything changed (PATCH failures are ReaperErrors)
         say(f"::warning::reaper: {exc}; nothing changed")
         return 0
     if outcome == STILL_THERE:
