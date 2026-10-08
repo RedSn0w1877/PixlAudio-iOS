@@ -62,3 +62,16 @@ for now; port it to Android later (the owner chose "iOS first, list them for And
 | R8 overlapping clients | `ChainedYouTubeStreamResolver` hedging behind `innertube.hedge.enabled` in `remote/config.json`, **off by default** | strictly sequential | only if the timings show slow clients |
 | R11 faster play-time matching | `TrackMatcher.findMatchFanOut`: after the first song search, the rest at once, judged in `findMatch`'s order (same result) | sequential `findMatch` | port `findMatchFanOut` |
 
+
+Cloud Studio, owner request 2026-10-07 (`docs/handoff/2026-10-07-cloud-studio.md`, design
+`docs/handoff/2026-10-07-plans/cloud-studio-design.md`). iOS first; Android uses the same endpoint, schema v1 and bucket
+later (design §8).
+
+| Change | iOS | Android today (`origin/android-int-oct3`) | Android later |
+|---|---|---|---|
+| Cloud processing (RunPod Serverless BS-RoFormer + word-timed lyrics) | Settings › Developer › Experimental › Cloud processing: consent switch (off), Endpoint ID, Restricted RunPod key, R2 endpoint or account ID, bucket (`pixl-cloud-studio`), access key, secret (Keychain, this iPhone only); Test connection (RunPod `/health` and an R2 PUT/HEAD/DELETE probe, each on its own) and the optional selftest; outputs, quality, cellular, GPU price, monthly cap ($3) | `CloudStudioClient` (Gradio Space / direct POST backends, Demucs RunPod worker in `tools/runpod-serverless`) | a `RUNPOD` backend in `CloudStudioClient` with WorkManager collection (design §8) |
+| "Process later" queue | Cloud queue: Add › Current song / Songs without word-timed lyrics / Songs without an instrumental → confirm sheet (songs, minutes, upload MB, estimated cost, what's left of the month) → jobs that upload in the background session, go to RunPod once the batch is uploaded, and come back through R2 (`/status` while the app is open, the R2 listing after that, BGAppRefresh and transfer-session wakes) | none | the same queue over WorkManager |
+| Streamed songs | downloaded permanently first (owner decision), uploaded as FLAC decoded by the player's decoder; the YouTube match is re-checked on import | n/a | same |
+| Cloud instrumental file | `Stems/<song>_cloud_inst.m4a` (or `.flac` after a FLAC redo), ranked after the BS-RoFormer render and before the on-device MDX-Net one | `_hq_roformer_inst.wav` / `_instrumental.wav` only | add the suffix to `TaisInstrumentalIndex` |
+| Cloud lyrics | saved through the lyrics store with source `cloud` (aligned) or `cloud-ai` (transcribed, "AI-written lyrics"); never over the person's own sync, only when better than what is stored | none | same rules |
+| The automatic studio | skips songs with a pending cloud job | n/a | same |

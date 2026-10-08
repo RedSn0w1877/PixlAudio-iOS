@@ -759,3 +759,28 @@ Nothing to port: Android has no tests for the full player's toggle row, the tran
   (song sheet) and `testLyricsOptionsFavoriteTogglesImmediately` (lyrics More sheet) tap the liked heart of demo song 0
   and expect the unliked state within 3 s without touching anything else; `testExpandedBluetoothLight`
   (`-screen nowPlaying.bluetooth`) expects "Playing on AirPods Pro" in the top bar and no "Now Playing" title.
+
+## Cloud Studio (2026-10-07, branch `s20-cloud-studio`, Swift-only)
+Android has no tests for a RunPod/R2 pipeline; everything here is new.
+
+- `PixlNetTests/CloudSchemaTests` — every golden example of the worker (`cloud/runpod-worker/schema/v1/examples`, copied
+  byte for byte into `Fixtures/cloud/worker/`, drift check `ci/check-cloud-fixtures.sh`) decodes and re-encodes to the
+  same JSON; the `/run` body the app builds has exactly the shape of the worker's `run.request.json`; unknown codes
+  read as `INTERNAL`; language hints follow the worker's pattern.
+- `PixlNetTests/CloudLyricsTests` — the worker's aligned and transcribed examples become `LyricsDoc`s whose syllables
+  join to the original text (Korean, a stripped comma, a leading bracket); hand-written edge cases (emoji, broken
+  offsets, backwards times); request lines sorted and capped per line.
+- `PixlNetTests/CloudQueuePolicyTests`, `CloudJobRecordTests`, `CloudBudgetTests` — the state machine (incl. the FLAC
+  redo's requeue), selection and caps, the batch gate, cost estimates, the committed monthly spend (jobs still at
+  RunPod count at their estimate), the confirm sheet's batch figures, import checks, retention.
+- `PixlNetTests/S3SignerTests`, `RunPodJobsClientTests`, `CloudBuilderTests`, `CloudObjectClientTests` — SigV4 against
+  AWS's vectors, RunPod error mapping and the Retry-After gate, the settings fields, Test connection, the selftest.
+- `AppTests/CloudStudioTests` — the orchestrator with fakes: Send → prepare → upload → `/run` → `/status` →
+  lyrics import → background download → size/SHA-256/sample checks → `Stems/` → bucket cleanup; results found in
+  R2 after `/status` expired; consent off; the monthly cap at send and at submission; the batch gate; INPUT_MISSING
+  (re-upload), POISONED (stop, empty the bucket, Retry), a job lost twice (resent once, then expired); a damaged
+  download; the FLAC redo; a changed YouTube match; cancel; the job file across launches; cloud keys never in a backup.
+- `AppTests/CloudAudioPreparerTests` — AAC-LC M4A as is, everything else as 44.1 kHz stereo FLAC with its SHA-256 and
+  frame count.
+- `UITests/CloudStudioScreenshotTests` — Cloud processing (top and Test connection), the queue (top and its Done
+  part), the confirm sheet, and Experimental's Cloud processing row, light and dark.
