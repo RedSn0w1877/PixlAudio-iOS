@@ -12,6 +12,8 @@ Hoa's request (switching to local work). This page is the status of every item.
 > regenerates the String Catalog (see `2026-10-07-main-health.md`). It is green on CI (run 37733067168, after review) and waits for
 > the owner's merge.
 
+> **Final state (2026-10-08):** every item below is built and merged to `main` (`955548f`), including `s16`–`s21`. Nothing has been tested on a device yet: the single phone checklist is [`2026-10-08-ios-batch-complete.md`](2026-10-08-ios-batch-complete.md). The Android port is not part of this and is tracked in the Android repo.
+
 **Read first:** `AGENTS.md`, then `docs/handoff/2026-10-04-start-here.md`, then this page.
 
 - Every owner decision is in [`2026-10-07-plans/DECISIONS.md`](2026-10-07-plans/DECISIONS.md). It is binding.
@@ -36,18 +38,18 @@ The risky compile spots each group listed are kept at the bottom of this page fo
 
 | # | Request | Status | Where |
 |---|---|---|---|
-| 1 | Replace the Synced/Static buttons on the lyrics page (owner picked **Translate · Sing**) | 🔨 Being built on `s16-lyrics-page`. | `2026-10-07-plans/lyrics-page.json`, DECISIONS › Lyrics page |
-| 2 | Manual lyric sync screen "shows loading then disappears" on iPhone | ✅ Code done, ⏳ unverified | `2026-10-07-sync-editor.md` |
-| 3 | Research and speed up streaming | ✅ Most done: R12 timings, R2 first chunk, R3 prefetch, R4 config, R5a retry, R7 skip into the prepared next song, R11 Spotify pre-match, R8 overlapping clients behind remote flag `innertube.hedge` (**off**), R6 HTTP/3 to googlevideo (`assumesHTTP3Capable`, landed in `8f4cafe`). Not done: R9, R10 (waiting on Hoa's timings), R5b (owner: no). | `2026-10-07-streaming-speed.md` |
-| 4 | Local AI | ✅ **Phase 1 done:** Apple on-device model is the default for every AI feature; cloud is optional, off, never a fallback. 🔨 **Phase 2 being built on `s18-local-model`:** the downloadable Core ML LLM behind a "Use downloaded AI model" toggle (owner explicitly wants it). | `2026-10-07-local-ai.md`, plan `local-ai.json` option C |
-| 5 | New logo, inspired by Android, on both apps (owner picked **C · Glyph**) | ✅ iOS done (merged here). ✅ Android done on its own branch (see the Android repo's handoff). | `2026-10-07-logo.md` |
-| 6 | More Liquid Glass incl. the queue; prev/next morph as quick as play/pause | ✅ Done: see-through 92 % sheets, queue glass circles and morphing ⋯ menu, glass pills on floating bars, Stats frosted bar; prev/next timing in the player group | `2026-10-07-glass-expansion.md`, `2026-10-07-player-controls.md` |
-| 7 | Heart button only updates after touching another button | ✅ Code done: root cause was `LibraryStore.songsById` being `@ObservationIgnored`. Its two UI tests failed on main because of the tests (wrong heart; a corner tap); fixed on `s21-main-health`, which also takes the hidden tab bar out of accessibility under the player | `2026-10-07-player-controls.md`, `2026-10-07-main-health.md` |
-| 8 | Volume buttons control the Spotify Connect device while in the app | 🔨 Being built on `s17-connect-volume` (option A: outputVolume KVO + hidden MPVolumeView, fallback B). | `2026-10-07-plans/connect-volume.json` |
-| 9 | App-wide accent colour | ✅ Code done. String Catalog regenerated on `s21-main-health` (the `settings_accent_*` and `lyrics_sync_*` keys) | `2026-10-07-accent-color.md` |
-| 10 | Remove "Now Playing" and the cloud icon; show the connected device's name | ✅ Code done: the output pill names AirPlay / Bluetooth / wired / car / Connect devices; the phone speaker is icon only | `2026-10-07-player-controls.md` |
-| 11 | Keep the screen always on in lyrics (remove the toggle); add Liquid Glass to the lyrics page | 🔨 Being built on `s16-lyrics-page` with item 1. | `lyrics-page.json` |
-| — | **Cloud Studio:** RunPod serverless BS-RoFormer + AI lyrics, "process later" | 🔨 Design done and reviewed; the worker is being built on `s19-cloud-worker`, the app side on `s20-cloud-studio`. | `2026-10-07-plans/cloud-studio-design.md`, DECISIONS › Cloud Studio |
+| 1 | Replace the Synced/Static buttons on the lyrics page (owner picked **Translate · Sing**) | ✅ Built and merged to `main` 2026-10-08. ⏳ Not device-tested. | `2026-10-07-plans/lyrics-page.json`, DECISIONS › Lyrics page |
+| 2 | Manual lyric sync screen "shows loading then disappears" on iPhone | ✅ Merged to `main`. ⏳ Not device-tested. | `2026-10-07-sync-editor.md` |
+| 3 | Research and speed up streaming | ✅ Most done: R12 timings, R2 first chunk, R3 prefetch, R4 config, R5a retry, R7 skip into the prepared next song, R11 Spotify pre-match, R8 overlapping clients behind remote flag `innertube.hedge` (**off**), R6 HTTP/3 to googlevideo (`assumesHTTP3Capable`, landed in `8f4cafe`). Not done: R9, R10 (waiting on Hoa's timings), R5b (owner: no). Merged to `main`. ⏳ Not device-tested. | `2026-10-07-streaming-speed.md` |
+| 4 | Local AI | ✅ **Phase 1 done:** Apple on-device model is the default for every AI feature; cloud is optional, off, never a fallback. ✅ **Phase 2 built and merged to `main` 2026-10-08:** the downloadable Core ML LLM behind a "Use downloaded AI model" toggle (owner explicitly wants it). Merged to `main`. ⏳ Not device-tested. | `2026-10-07-local-ai.md`, plan `local-ai.json` option C |
+| 5 | New logo, inspired by Android, on both apps (owner picked **C · Glyph**) | ✅ iOS done (merged here). ✅ Android done on its own branch (see the Android repo's handoff). Merged to `main`. ⏳ Not device-tested. | `2026-10-07-logo.md` |
+| 6 | More Liquid Glass incl. the queue; prev/next morph as quick as play/pause | ✅ Done: see-through 92 % sheets, queue glass circles and morphing ⋯ menu, glass pills on floating bars, Stats frosted bar; prev/next timing in the player group Merged to `main`. ⏳ Not device-tested. | `2026-10-07-glass-expansion.md`, `2026-10-07-player-controls.md` |
+| 7 | Heart button only updates after touching another button | ✅ Code done: root cause was `LibraryStore.songsById` being `@ObservationIgnored`. Its two UI tests failed on main because of the tests (wrong heart; a corner tap); fixed on `s21-main-health`, which also takes the hidden tab bar out of accessibility under the player Merged to `main`. ⏳ Not device-tested. | `2026-10-07-player-controls.md`, `2026-10-07-main-health.md` |
+| 8 | Volume buttons control the Spotify Connect device while in the app | ✅ Built and merged to `main` 2026-10-08 (option A, automatic fallback B). ⏳ Not device-tested. | `2026-10-07-plans/connect-volume.json` |
+| 9 | App-wide accent colour | ✅ Code done. String Catalog regenerated on `s21-main-health` (the `settings_accent_*` and `lyrics_sync_*` keys) Merged to `main`. ⏳ Not device-tested. | `2026-10-07-accent-color.md` |
+| 10 | Remove "Now Playing" and the cloud icon; show the connected device's name | ✅ Code done: the output pill names AirPlay / Bluetooth / wired / car / Connect devices; the phone speaker is icon only Merged to `main`. ⏳ Not device-tested. | `2026-10-07-player-controls.md` |
+| 11 | Keep the screen always on in lyrics (remove the toggle); add Liquid Glass to the lyrics page | ✅ Built and merged to `main` 2026-10-08 with item 1. ⏳ Not device-tested. | `lyrics-page.json` |
+| — | **Cloud Studio:** RunPod serverless BS-RoFormer + AI lyrics, "process later" | ✅ Worker and app side built and merged to `main` 2026-10-08. ⏳ Not device-tested; owner setup steps remain (see `2026-10-08-ios-batch-complete.md`). | `2026-10-07-plans/cloud-studio-design.md`, DECISIONS › Cloud Studio |
 | — | **Android port** of all of the above | 📝 Investigation: 8 of 9 plans written (not yet double-checked). ✅ Logo done. Nothing else built. | Android repo: `handoff/2026-10-07-batch-status.md` |
 
 ### Cloud Studio decisions (owner)
