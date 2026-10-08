@@ -36,8 +36,9 @@ SECONDS = 12
 class MemStorage:
     """The storage driver interface, in memory. `objects` maps slot names to bytes; `ops` records the order."""
 
-    def __init__(self, job, caps, source: bytes, *, guard=True, manifest=None, attempt=None, fail_put=()):
-        self.job, self.caps, self.source = job, caps, source
+    def __init__(self, job, caps, source: bytes, *, guard=True, manifest=None, attempt=None, fail_put=(),
+                 missing=False):
+        self.job, self.caps, self.source, self.missing = job, caps, source, missing
         self.has_guard = guard
         self.objects = {}
         if manifest is not None:
@@ -50,6 +51,8 @@ class MemStorage:
 
     def fetch_input(self, dest, *, total_timeout=120.0):
         self.ops.append(("fetch", total_timeout))
+        if self.missing:
+            raise WorkerError(errors.INPUT_MISSING, "the input object does not exist (expired or never uploaded)")
         with open(dest, "wb") as fh:
             fh.write(self.source)
         return len(self.source)
@@ -318,6 +321,41 @@ def test_a_manifest_for_another_input_is_not_a_duplicate(tmp_path):
     result, storage, _ = run(job_doc(data), data, tmp_path, storage_kwargs={"manifest": existing})
     assert "error" in result  # it went on and processed (and failed on the fake bytes)
     assert ("put", "attempt") in storage.ops
+
+
+def test_a_resend_after_a_partial_result_hands_it_back_instead_of_overwriting_it(tmp_path):
+    # The first run finished partial (instrumental delivered, lyrics failed) and deleted the input; the phone
+    # never got the /run response and sent the job again. That run must return the result, not replace the
+    # manifest with INPUT_MISSING (which would strand the instrumental and make the phone upload again).
+    data = b"not even audio"
+    existing = load_example("job.result.partial.json")
+    existing["input"]["sha256"] = hashlib.sha256(data).hexdigest()
+    result, storage, _ = run(job_doc(data), data, tmp_path, storage_kwargs={"manifest": existing, "missing": True})
+    assert result["status"] == "partial" and result["warnings"][-1] == "duplicate"
+    assert result["outputs"] == existing["outputs"]
+    assert json.loads(storage.objects["manifest"]) == existing  # untouched
+    assert ("put", "manifest") not in storage.ops and not storage.input_deleted
+
+
+def test_a_partial_result_is_not_a_duplicate_while_the_input_is_still_there(tmp_path):
+    # A deliberate retry (the phone uploaded the song again for the same job) is processed, not short-circuited.
+    data = b"not even audio"
+    existing = load_example("job.result.partial.json")
+    existing["input"]["sha256"] = hashlib.sha256(data).hexdigest()
+    result, storage, _ = run(job_doc(data), data, tmp_path, storage_kwargs={"manifest": existing})
+    assert "error" in result  # it downloaded the fake bytes and failed on them
+    assert [op[0] for op in storage.ops][:2] == ["put", "fetch"]  # attempt marker, then the download
+
+
+def test_a_missing_input_without_an_earlier_result_is_still_INPUT_MISSING(tmp_path):
+    data = b"x"
+    error_manifest = load_example("job.result.error.json")
+    error_manifest["input"] = {"sha256": hashlib.sha256(data).hexdigest()}
+    for manifest in (None, error_manifest):
+        result, storage, _ = run(job_doc(data), data, tmp_path,
+                                 storage_kwargs={"manifest": manifest, "missing": True})
+        assert result["error"].startswith("INPUT_MISSING:")
+        assert json.loads(storage.objects["manifest"])["error"]["code"] == "INPUT_MISSING"
 
 
 def test_third_delivery_is_poisoned(tmp_path):

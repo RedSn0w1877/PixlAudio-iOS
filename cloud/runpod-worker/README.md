@@ -112,6 +112,11 @@ sent with AAC output (AAC tops out at 96 kHz; the phone resends it with `output.
 task is `lyrics` fails with the lyrics' own code when they fail (there is nothing else to deliver); with stems
 requested it is `partial` instead.
 
+**Sending a job twice** (a lost `/run` response) costs about a second: a finished `ok` manifest for the same
+input comes straight back with the warning `duplicate`. A resend that finds the input already gone also hands
+back an `ok` or `partial` result instead of overwriting it with `INPUT_MISSING`. To *retry* a partial job for
+its lyrics, upload the song again: while the input is there, a partial result is processed again, not reused.
+
 **Measuring re-delivery (W1, optional).** Set the endpoint env `PIXL_ALLOW_CRASH_TEST=1` in the RunPod console
 (test only), send `{"input":{"v":1,"op":"bench","bench":{"crash":true}}}` to `/run`, watch how many times a
 worker starts it, then remove the env var again (the next deploy also resets env to `deploy/endpoint.json`).

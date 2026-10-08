@@ -22,8 +22,8 @@ import numpy as np
 from . import audio as A
 from .config import Caps
 from .deadline import Deadline
-from .errors import (DEADLINE, GPU_OOM, INPUT_TOO_LARGE, INTERNAL, POISONED, TOO_LONG, UNSUPPORTED_FORMAT,
-                     WorkerError)
+from .errors import (DEADLINE, GPU_OOM, INPUT_MISSING, INPUT_TOO_LARGE, INTERNAL, POISONED, TOO_LONG,
+                     UNSUPPORTED_FORMAT, WorkerError)
 from .log import log, redact, redact_exception
 from .lyrics.postprocess import summarize
 from .lyrics.run import run_lyrics
@@ -143,9 +143,9 @@ def _progress_reporter(ctx: Context, deadline: Deadline, stage: str):
     return report
 
 
-def _guard(storage, job: Job, runpod_job_id: str) -> dict | None:
-    """Design 2.3 Guard. Returns a finished manifest to hand back (duplicate) or None to carry on. Raises
-    POISONED for a third delivery of the same RunPod job. Best effort when storage can't be read."""
+def _earlier_result(storage, job: Job, statuses: tuple[str, ...]) -> dict | None:
+    """The finished manifest an earlier run of this job (same jobKey and input sha256) left in storage, marked
+    as a duplicate, or None. Best effort: unreadable storage is None."""
     if not getattr(storage, "has_guard", False):
         return None
     try:
@@ -154,11 +154,22 @@ def _guard(storage, job: Job, runpod_job_id: str) -> dict | None:
         log.warning("guard_unreadable", what="manifest", reason=type(exc).__name__)
         return None
     if (existing and existing.get("schema") == RESULT_SCHEMA and existing.get("jobKey") == job.job_key
-            and existing.get("status") == "ok"
+            and existing.get("status") in statuses
             and (existing.get("input") or {}).get("sha256") == job.audio.sha256):
         dup = dict(existing)
         dup["warnings"] = list(existing.get("warnings") or []) + ["duplicate"]
         return dup
+    return None
+
+
+def _guard(storage, job: Job, runpod_job_id: str) -> dict | None:
+    """Design 2.3 Guard. Returns a finished manifest to hand back (duplicate) or None to carry on. Raises
+    POISONED for a third delivery of the same RunPod job. Best effort when storage can't be read."""
+    if not getattr(storage, "has_guard", False):
+        return None
+    duplicate = _earlier_result(storage, job, ("ok",))
+    if duplicate is not None:
+        return duplicate
     attempts = 0
     try:
         attempt = storage.get_guard_json("attempt")
@@ -206,6 +217,15 @@ def process(job: Job, runpod_job_id: str, models: Models, ctx: Context, deadline
         log.info("job_done", status=run.status, ms=run.timings["totalMs"], warnings=len(run.warnings))
         return result
     except WorkerError as exc:
+        if exc.code == INPUT_MISSING:
+            # The input goes only after an ok or partial result. So when it's gone and that result is still in
+            # storage, this is a resend of a finished job (a lost /run response, or a guard read that failed at
+            # the start): hand the result back rather than overwrite its manifest with an error, which would
+            # strand the delivered outputs and make the phone upload and pay for the song again.
+            earlier = _earlier_result(storage, job, ("ok", "partial"))
+            if earlier is not None:
+                log.info("job_duplicate", reason="input already used by a finished run")
+                return earlier
         return _fail(run, ctx, storage, exc, t_start)
     except Exception as exc:  # anything unexpected becomes INTERNAL, redacted
         text = str(exc)
