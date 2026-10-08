@@ -45,7 +45,7 @@ struct CloudConfirmSheet: View {
                     }
                     line(estimate.fitsCap
                          ? "This month: \(CloudCost.format(microUSD: estimate.remainingMicroUSD)) left of \(CloudCost.format(microUSD: estimate.capMicroUSD))."
-                         : "Over this month's cap: \(CloudCost.format(microUSD: estimate.remainingMicroUSD)) left of \(CloudCost.format(microUSD: estimate.capMicroUSD)). Raise it in Cloud processing, or send fewer songs.",
+                         : "Over this month's cap: \(CloudCost.format(microUSD: estimate.remainingMicroUSD)) left of \(CloudCost.format(microUSD: estimate.capMicroUSD)). \(cloud.settings.usesBuiltInKeys ? "Send fewer songs, or use your own keys in Cloud processing." : "Raise it in Cloud processing, or send fewer songs.")",
                          systemImage: estimate.fitsCap ? "gauge.with.dots.needle.33percent" : "exclamationmark.triangle",
                          emphasis: !estimate.fitsCap)
                     if estimate.streamedSongs > 0 {
@@ -63,7 +63,7 @@ struct CloudConfirmSheet: View {
                     if !cloud.settings.isEnabled {
                         line(CloudStudio.Notice.off.message, systemImage: "lock", emphasis: true)
                     }
-                    Text(verbatim: CloudProcessingCopy.promise)
+                    Text(verbatim: CloudProcessingCopy.promise(builtIn: cloud.settings.usesBuiltInKeys))
                         .pixlFont(.bodySmall)
                         .foregroundStyle(theme.onSurfaceVariant)
                         .padding(.top, 4)

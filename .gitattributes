@@ -7,3 +7,4 @@
 *.bat text eol=crlf
 *.tar binary
 *.pxbpe binary
+*.enc binary

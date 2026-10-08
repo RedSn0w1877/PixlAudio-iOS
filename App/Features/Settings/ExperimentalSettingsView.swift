@@ -71,9 +71,8 @@ struct ExperimentalSettingsView: View {
                         SettingsIcon(systemImage: "icloud.and.arrow.up")
                         VStack(alignment: .leading, spacing: 0) {
                             Text(verbatim: "Cloud processing").pixlFont(.titleMedium).foregroundStyle(theme.onSurface)
-                            Text(verbatim: env.cloud.settings.isEnabled
-                                 ? (env.cloud.summaryLine ?? "On — instrumentals and word-timed lyrics on your RunPod GPU.")
-                                 : "Instrumentals and word-timed lyrics on your own RunPod GPU. Off until you set it up.")
+                            Text(verbatim: CloudProcessingCopy.experimentalRow(settings: env.cloud.settings,
+                                                                               summary: env.cloud.summaryLine))
                                 .pixlFont(.bodyMedium).foregroundStyle(theme.onSurfaceVariant)
                         }
                         .multilineTextAlignment(.leading)

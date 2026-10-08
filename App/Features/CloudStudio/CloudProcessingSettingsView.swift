@@ -6,6 +6,8 @@ import SwiftUI
 /// owner's setup steps), Test connection (RunPod and storage reported on their own) with the optional selftest, the
 /// outputs, cellular, the GPU price and monthly cap, and the way to the queue. Built from the settings rows; the keys
 /// are edited in a local draft and written to the Keychain (this iPhone only) off the main actor.
+/// A build with PixlAudio's built-in cloud keys (2026-10-08) shows "Using PixlAudio's built-in cloud keys" instead of
+/// the fields, with "Use my own keys" bringing them back; Test connection works with either.
 struct CloudProcessingSettingsView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(Router.self) private var router
@@ -20,13 +22,16 @@ struct CloudProcessingSettingsView: View {
     var body: some View {
         let cloud = env.cloud
         @Bindable var settings = cloud.settings
+        let builtIn = settings.usesBuiltInKeys
         SettingsScaffold(title: "Cloud processing", screenID: "cloudProcessing") {
             SettingsSubsection(title: "Consent") {
-                SwitchSettingRow(title: "Send songs to my RunPod account",
+                SwitchSettingRow(title: builtIn ? "Process songs in the cloud" : "Send songs to my RunPod account",
                                  subtitle: "Nothing leaves this iPhone until this is on, and only songs you send yourself go.",
                                  isOn: $settings.isEnabled, systemImage: "icloud.and.arrow.up")
                 SettingsPanel {
-                    Text(verbatim: "Separates vocals with BS-RoFormer and times lyrics word by word on your own RunPod GPU. Songs go to your Cloudflare R2 bucket and are deleted after import.")
+                    Text(verbatim: builtIn
+                         ? "Separates vocals with BS-RoFormer and times lyrics word by word on PixlAudio's RunPod GPU. Songs go to PixlAudio's Cloudflare R2 bucket and are deleted after import."
+                         : "Separates vocals with BS-RoFormer and times lyrics word by word on your own RunPod GPU. Songs go to your Cloudflare R2 bucket and are deleted after import.")
                         .pixlFont(.bodyMedium)
                         .foregroundStyle(theme.onSurfaceVariant)
                 }
@@ -42,32 +47,11 @@ struct CloudProcessingSettingsView: View {
                 }
                 .padding(.bottom, 10)
             }
-            SettingsSubsection(title: "RunPod") {
-                SettingsPanel {
-                    SettingsTextField(placeholder: "e.g. abc123xyz", text: $settings.endpointId, label: "Endpoint ID")
-                        .accessibilityIdentifier("cloud.endpointId")
-                    SettingsTextField(placeholder: "rpa_…", text: $draft.runpodKey, secure: true,
-                                      label: "RunPod key (Restricted, Read/Write on this endpoint)")
-                        .accessibilityIdentifier("cloud.runpodKey")
-                }
+            if settings.builtInAvailable {
+                keysSection(settings, locked: cloud.jobs.contains { $0.state.isPending })
             }
-            SettingsSubsection(title: "Storage (Cloudflare R2)") {
-                SettingsPanel {
-                    SettingsTextField(placeholder: "https://<account-id>.r2.cloudflarestorage.com", text: $settings.r2Endpoint,
-                                      label: "R2 endpoint or account ID")
-                        .accessibilityIdentifier("cloud.r2Endpoint")
-                    if let account = CloudConfig.r2AccountId(endpoint: settings.r2Endpoint) {
-                        Text(verbatim: "Account \(account)")
-                            .pixlFont(.bodySmall)
-                            .foregroundStyle(theme.onSurfaceVariant)
-                    }
-                    SettingsTextField(placeholder: CloudConfig.defaultBucket, text: $settings.bucket, label: "Bucket")
-                        .accessibilityIdentifier("cloud.bucket")
-                    SettingsTextField(placeholder: "", text: $draft.accessKeyId, secure: true, label: "Access key ID")
-                        .accessibilityIdentifier("cloud.accessKeyId")
-                    SettingsTextField(placeholder: "", text: $draft.secretAccessKey, secure: true, label: "Secret access key")
-                        .accessibilityIdentifier("cloud.secret")
-                }
+            if !builtIn {
+                ownKeyFields(settings)
             }
             connectionSection(cloud: cloud, settings: settings)
             SettingsSubsection(title: "Outputs") {
@@ -104,15 +88,17 @@ struct CloudProcessingSettingsView: View {
                 }
             }
             SettingsPanel {
-                Text(verbatim: CloudProcessingCopy.promise)
+                Text(verbatim: CloudProcessingCopy.promise(builtIn: builtIn))
                     .pixlFont(.bodySmall)
                     .foregroundStyle(theme.onSurfaceVariant)
-                SettingsFillButton(title: "Forget keys", systemImage: "key", style: .destructive,
-                                   enabled: !draft.isEmpty) {
-                    draft = .empty
-                    Task { await settings.forgetSecrets() }
+                if !builtIn {
+                    SettingsFillButton(title: "Forget keys", systemImage: "key", style: .destructive,
+                                       enabled: !draft.isEmpty) {
+                        draft = .empty
+                        Task { await settings.forgetSecrets() }
+                    }
+                    .accessibilityIdentifier("cloud.forgetKeys")
                 }
-                .accessibilityIdentifier("cloud.forgetKeys")
             }
             Spacer().frame(height: 24)
         }
@@ -143,8 +129,66 @@ struct CloudProcessingSettingsView: View {
 
     // MARK: Sections
 
+    /// Built-in keys in this build: which keys are in use, and the way to the person's own. `locked` while songs are
+    /// on their way: they were sent with the keys in use, and their results come back only through those.
+    private func keysSection(_ model: CloudSettings, locked: Bool) -> some View {
+        @Bindable var settings = model
+        return SettingsSubsection(title: "Keys") {
+            if settings.usesBuiltInKeys {
+                SettingsPanel {
+                    Label("Using PixlAudio's built-in cloud keys", systemImage: "key.fill")
+                        .pixlFont(.titleSmall)
+                        .foregroundStyle(theme.onSurface)
+                        .accessibilityIdentifier("cloud.builtInKeys")
+                    Text(verbatim: CloudProcessingCopy.builtInKeysDetail)
+                        .pixlFont(.bodySmall)
+                        .foregroundStyle(theme.onSurfaceVariant)
+                }
+            }
+            SwitchSettingRow(title: "Use my own keys",
+                             subtitle: locked ? "Wait for the songs in the cloud queue to finish, or cancel them, to switch keys."
+                                 : "Your own RunPod endpoint and Cloudflare R2 bucket instead.",
+                             isOn: $settings.useOwnKeys, systemImage: "person.badge.key", enabled: !locked)
+                .accessibilityIdentifier("cloud.useOwnKeys")
+        }
+    }
+
+    /// The person's own endpoint, key and bucket (the only kind before built-in keys).
+    @ViewBuilder
+    private func ownKeyFields(_ model: CloudSettings) -> some View {
+        @Bindable var settings = model
+        SettingsSubsection(title: "RunPod") {
+            SettingsPanel {
+                SettingsTextField(placeholder: "e.g. abc123xyz", text: $settings.endpointId, label: "Endpoint ID")
+                    .accessibilityIdentifier("cloud.endpointId")
+                SettingsTextField(placeholder: "rpa_…", text: $draft.runpodKey, secure: true,
+                                  label: "RunPod key (Restricted, Read/Write on this endpoint)")
+                    .accessibilityIdentifier("cloud.runpodKey")
+            }
+        }
+        SettingsSubsection(title: "Storage (Cloudflare R2)") {
+            SettingsPanel {
+                SettingsTextField(placeholder: "https://<account-id>.r2.cloudflarestorage.com", text: $settings.r2Endpoint,
+                                  label: "R2 endpoint or account ID")
+                    .accessibilityIdentifier("cloud.r2Endpoint")
+                if let account = CloudConfig.r2AccountId(endpoint: settings.r2Endpoint) {
+                    Text(verbatim: "Account \(account)")
+                        .pixlFont(.bodySmall)
+                        .foregroundStyle(theme.onSurfaceVariant)
+                }
+                SettingsTextField(placeholder: CloudConfig.defaultBucket, text: $settings.bucket, label: "Bucket")
+                    .accessibilityIdentifier("cloud.bucket")
+                SettingsTextField(placeholder: "", text: $draft.accessKeyId, secure: true, label: "Access key ID")
+                    .accessibilityIdentifier("cloud.accessKeyId")
+                SettingsTextField(placeholder: "", text: $draft.secretAccessKey, secure: true, label: "Secret access key")
+                    .accessibilityIdentifier("cloud.secret")
+            }
+        }
+    }
+
     private func connectionSection(cloud: CloudStudio, settings: CloudSettings) -> some View {
-        let problems = CloudConfig.problems(settings.configInput(with: draft))
+        // Built-in keys are complete by construction (an incomplete blob counts as none), so nothing to list.
+        let problems = settings.usesBuiltInKeys ? [] : CloudConfig.problems(settings.configInput(with: draft))
         return SettingsSubsection(title: "Test connection") {
             SettingsPanel {
                 if !problems.isEmpty {
@@ -202,9 +246,14 @@ struct CloudProcessingSettingsView: View {
                         if let value = CloudProcessingCopy.parseMicroUSD(text) { settings.monthlyCapMicroUSD = value }
                     }
                 Text(verbatim: CloudProcessingCopy.monthLine(committed: cloud.committedThisMonthMicroUSD,
-                                                             cap: settings.monthlyCapMicroUSD))
+                                                             cap: settings.effectiveMonthlyCapMicroUSD))
                     .pixlFont(.bodyMedium)
                     .foregroundStyle(theme.onSurface)
+                if settings.usesBuiltInKeys {
+                    Text(verbatim: CloudProcessingCopy.builtInCapLine)
+                        .pixlFont(.bodySmall)
+                        .foregroundStyle(theme.onSurfaceVariant)
+                }
                 Text(verbatim: "Estimates: about $0.004 a song once a GPU is awake, plus about $0.007 to wake one. The RunPod balance itself is the hard limit.")
                     .pixlFont(.bodySmall)
                     .foregroundStyle(theme.onSurfaceVariant)
@@ -241,8 +290,25 @@ struct CloudCheckLine: View {
 
 /// Text the cloud screens share (no formatting in `body`).
 nonisolated enum CloudProcessingCopy {
-    /// What the UI promises about the app being closed (design §7.4).
-    static let promise = "Songs are processed on your RunPod account even when PixlAudio is closed. Results come back the next time PixlAudio runs, and are kept for 30 days. Swiping PixlAudio away stops uploads that haven't finished."
+    /// What the UI promises about the app being closed (design §7.4): on the person's own RunPod account, or on
+    /// PixlAudio's with the built-in keys.
+    static func promise(builtIn: Bool) -> String { builtIn ? builtInPromise : ownPromise }
+    static let ownPromise = "Songs are processed on your RunPod account even when PixlAudio is closed. Results come back the next time PixlAudio runs, and are kept for 30 days. Swiping PixlAudio away stops uploads that haven't finished."
+    static let builtInPromise = "Songs are processed in the cloud even when PixlAudio is closed. Results come back the next time PixlAudio runs, and are kept for 30 days. Swiping PixlAudio away stops uploads that haven't finished."
+    /// The Keys panel with the built-in keys in use.
+    static let builtInKeysDetail = "Nothing to fill in. Songs you send go to PixlAudio's own RunPod endpoint and R2 bucket, up to \(CloudCost.format(microUSD: CloudKeyChoice.builtInMonthlyCapMicroUSD)) a month from this iPhone."
+    /// Experimental's Cloud processing row: on or off, with whose GPU.
+    @MainActor
+    static func experimentalRow(settings: CloudSettings, summary: String?) -> String {
+        if settings.isEnabled {
+            return summary ?? (settings.usesBuiltInKeys ? "On — instrumentals and word-timed lyrics in the cloud."
+                : "On — instrumentals and word-timed lyrics on your RunPod GPU.")
+        }
+        return settings.builtInAvailable && !settings.useOwnKeys
+            ? "Instrumentals and word-timed lyrics in the cloud, nothing to set up. Off."
+            : "Instrumentals and word-timed lyrics on your own RunPod GPU. Off until you set it up."
+    }
+    static let builtInCapLine = "With PixlAudio's built-in keys the cap is at most \(CloudCost.format(microUSD: CloudKeyChoice.builtInMonthlyCapMicroUSD)) a month, and estimates never use a GPU price below \(priceText(CloudCost.defaultPricePerSecondMicroUSD)) US$ a second."
 
     static func dollars(_ microUSD: Int64) -> String {
         let cents = (max(microUSD, 0) + 5_000) / 10_000
@@ -271,9 +337,11 @@ nonisolated enum CloudProcessingCopy {
 }
 
 extension CloudSettings {
-    /// The fields with an unsaved key draft (the screen checks what is typed, not what was last saved).
+    /// The fields with an unsaved key draft (the screen checks what is typed, not what was last saved); the built-in
+    /// keys when those are in use.
     func configInput(with draft: CloudSecrets) -> CloudConfigInput {
-        CloudConfigInput(endpointId: endpointId, runpodKey: draft.runpodKey, endpoint: r2Endpoint, bucket: bucket,
-                         accessKeyId: draft.accessKeyId, secretAccessKey: draft.secretAccessKey)
+        if usesBuiltInKeys { return configInput }
+        return CloudConfigInput(endpointId: endpointId, runpodKey: draft.runpodKey, endpoint: r2Endpoint, bucket: bucket,
+                                accessKeyId: draft.accessKeyId, secretAccessKey: draft.secretAccessKey)
     }
 }

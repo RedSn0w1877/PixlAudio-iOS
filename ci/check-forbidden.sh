@@ -91,6 +91,19 @@ if find App -type f \( -iname '*.ttf' -o -iname '*.otf' -o -iname '*.ttc' -o -in
   err "App/: bundled fonts are forbidden (system font only)"
 fi
 
+# 8. Built-in cloud keys: the committed key file is the empty stub. CI writes the real shares from the
+#    CLOUD_DEFAULTS_KEY secret after this check (ci/write-cloud-defaults-key.sh); they must never be committed.
+key_stub=App/Generated/CloudDefaultsKey.swift
+if [ -f "$key_stub" ]; then
+  # Quietly: a committed share must not be printed into a public log as well.
+  if grep -vE '^[[:space:]]*//' "$key_stub" | grep -qE '0x[0-9A-Fa-f]{2}|[0-9]{1,3}[[:space:]]*,'; then
+    err "$key_stub: holds key shares; commit only the empty stub (static let shares: [[UInt8]] = [])"
+  fi
+  if ! grep -qE 'static let shares: \[\[UInt8\]\] = \[\]' "$key_stub"; then
+    err "$key_stub: must be the empty stub (static let shares: [[UInt8]] = [])"
+  fi
+fi
+
 if [ $fail -ne 0 ]; then
   echo "check-forbidden: FAILED"
   exit 1
