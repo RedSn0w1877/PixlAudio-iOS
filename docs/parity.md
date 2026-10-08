@@ -62,3 +62,13 @@ for now; port it to Android later (the owner chose "iOS first, list them for And
 | R8 overlapping clients | `ChainedYouTubeStreamResolver` hedging behind `innertube.hedge.enabled` in `remote/config.json`, **off by default** | strictly sequential | only if the timings show slow clients |
 | R11 faster play-time matching | `TrackMatcher.findMatchFanOut`: after the first song search, the rest at once, judged in `findMatch`'s order (same result) | sequential `findMatch` | port `findMatchFanOut` |
 
+
+### Cloud Studio (owner request 2026-10-07, iOS first — Android later)
+
+The RunPod Serverless worker (`cloud/runpod-worker/`, `docs/handoff/2026-10-07-cloud-worker.md`) is shared by both
+apps: same endpoint, same schema v1, same R2 bucket (design section 8). Only the server side exists so far; the
+app integration (design 7.7, steps P1–P5) is next.
+
+| Change | iOS | Android today (`origin/android-int-oct3`) | Android later |
+|---|---|---|---|
+| Cloud processing worker | BS-RoFormer (anvuew ft1) instrumental + Qwen3 word-timed lyrics (aligned, or transcribed and labelled "AI-written lyrics"; line timing outside the aligner's 11 languages, no Whisper in v1), results via R2 presigned URLs; app side not built yet | `tools/runpod-serverless` (Demucs, base64 payloads, 30 s regions) and the Gradio `CloudStudioClient` | add a `RUNPOD` backend to `CloudStudioClient` (WorkManager upload/submit/collect, keys outside `.pxpl` backups); retire the old worker |
