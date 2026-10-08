@@ -7,6 +7,10 @@ on:
       - 'docs/**'
       - '**/*.md'
       - 'LICENSE'
+      # The RunPod worker builds on ubuntu runners in its own workflows (cloud-worker-*.yml); its changes must
+      # not hold the scarce macOS runners.
+      - 'cloud/**'
+      - '.github/workflows/cloud-worker-*.yml'
   workflow_dispatch:
     inputs:
       shots:

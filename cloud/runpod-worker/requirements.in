@@ -1,0 +1,33 @@
+# Top-level runtime dependencies of the worker image (design 2.2, "Pinned Python dependencies").
+# The full hashed closure is requirements.lock, made by `python ci/lock.py` (uv pip compile against the base
+# image's Python 3.12 / manylinux_2_39, constrained by constraints.txt). Never edit requirements.lock by hand.
+#
+# Not here on purpose:
+# - torch, torchaudio, triton and the nvidia-* CUDA wheels come from the pytorch/pytorch base image and are kept
+#   out of the lock, so pip never replaces them (the Dockerfile installs the lock with --no-deps).
+# - qwen-asr is appended to the lock by ci/lock.py WITHOUT its dependencies: it pins gradio, flask, sox,
+#   qwen-omni-utils and pytz for its demo apps, which the worker never imports. Its real runtime imports are
+#   listed below (transformers, accelerate, nagisa, soynlp, librosa, soundfile). ci/pip_check.py allows exactly
+#   those five missing packages and nothing else.
+
+runpod==1.12.0          # >= 1.10.1: 1.7.11-1.10.0 corrupt job tracking on endpoints with a volume
+msst==0.1.0             # BS-RoFormer inference (msst.Separator)
+demucs==4.1.0           # htdemucs_ft, 4 stems (lazy)
+
+# msst's [bs-roformer] extra (installed explicitly so the lock stays free of the training extras)
+beartype
+einops
+rotary-embedding-torch
+packaging
+
+# qwen-asr 0.0.6's runtime imports (its own pins)
+transformers==4.57.6
+accelerate==1.12.0
+nagisa==0.2.11
+soynlp==0.0.493
+librosa
+soundfile
+soxr
+safetensors
+huggingface-hub
+numpy

@@ -1,0 +1,45 @@
+# Every model file baked into the worker image: one row per file. Design 2.2 ("Baked weights").
+#
+# kind   large = its own `ADD --link --chmod=644 --checksum=sha256:<sha256> <url> <dest>` line in the Dockerfile
+#               (ci/check_weights.py fails the build if a line and its row disagree);
+#        small = fetched by fetch_small.py (KB-sized configs and tokenizers), sha256-verified.
+# slot   the model it belongs to (sep, demucs, aligner, asr).
+# sha256 lower-case hex of the whole file; bytes its exact size.
+# dest   absolute path inside the image (always under /models/).
+# url    pinned: Hugging Face files by *commit* revision (never `main`), demucs files by their content-addressed
+#        names (the 8 hex digits after the dash are the start of the file's own sha256, which demucs re-checks).
+#
+# Sources and licences (also in NOTICE):
+#   sep      huggingface.co/anvuew/BS-RoFormer @ 24988f47270cb3529b62c4f3bbb8234f4586de9b      GPL-3.0 (model card tag)
+#   demucs   dl.fbaipublicfiles.com/demucs/hybrid_transformer (htdemucs_ft bag of 4)            MIT
+#   aligner  huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B @ c7cbfc2048c462b0d63a45797104fc9db3ad62b7  Apache-2.0
+#   asr      huggingface.co/Qwen/Qwen3-ASR-1.7B @ 7278e1e70fe206f11671096ffdd38061171dd6e5      Apache-2.0
+# Verified 2026-10-07: HF sizes and LFS sha256 from https://huggingface.co/api/models/<repo>?blobs=true, small files
+# downloaded at the pinned revision and hashed, demucs files downloaded and hashed (each matches its name).
+#
+# kind  slot     sha256                                                            bytes       license     dest  url
+large   sep      60347271e8493fdff28ef558c3b2297afb869a1f4462594ed548038264bec395  204493312   GPL-3.0     /models/sep/bs_roformer_ft1_anvuew_sdr_12.55.ckpt  https://huggingface.co/anvuew/BS-RoFormer/resolve/24988f47270cb3529b62c4f3bbb8234f4586de9b/bs_roformer_ft1_anvuew_sdr_12.55.ckpt
+small   sep      033e57abee226a480ef410e0631b9fe00e8b7bc9a3bb5fe55659d0b43a238701  1969        GPL-3.0     /models/sep/config.yaml  https://huggingface.co/anvuew/BS-RoFormer/resolve/24988f47270cb3529b62c4f3bbb8234f4586de9b/config.yaml
+small   sep      b58264c1896d6e22972579a3a5ab6139ca6e40c74d6c777428e5280531ca6379  78          GPL-3.0     /models/sep/README.md  https://huggingface.co/anvuew/BS-RoFormer/resolve/24988f47270cb3529b62c4f3bbb8234f4586de9b/README.md
+large   demucs   ba3fe64ae8ef66ac9a4857222ce48efbdc5eb3ad375cb79dd13debee5aaa4066  84141271    MIT         /models/demucs/f7e0c4bc-ba3fe64a.th  https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/f7e0c4bc-ba3fe64a.th
+large   demucs   e57c48e6b0e38af4f7118d7bd08c49f0a0c0edf7d09143bdd902ea0d237303e6  84141271    MIT         /models/demucs/d12395a8-e57c48e6.th  https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/d12395a8-e57c48e6.th
+large   demucs   ef3bcb9c8b40d14ae5d51b6db2587339cc12c6b77c0be151ce6d69002e087bf2  84141271    MIT         /models/demucs/92cfc3b6-ef3bcb9c.th  https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/92cfc3b6-ef3bcb9c.th
+large   demucs   f3cf25b222c4eed7cd49dd8b2c9597d50c18bd154090f7b919cfa5f93cf22c49  84141271    MIT         /models/demucs/04573f0d-f3cf25b2.th  https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/04573f0d-f3cf25b2.th
+large   aligner  47831d0e82f96b20e9034dba01a075ee06436654719f6a68289e49f1b65ce0e7  1835544544  Apache-2.0  /models/aligner/model.safetensors  https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B/resolve/c7cbfc2048c462b0d63a45797104fc9db3ad62b7/model.safetensors
+small   aligner  d616c65d46c4b90bdc651b0a0963ea932732241140f337f9bb6b0335a9c8ef09  5982        Apache-2.0  /models/aligner/config.json  https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B/resolve/c7cbfc2048c462b0d63a45797104fc9db3ad62b7/config.json
+small   aligner  948d089b23bca1d214e768d59c4438365665f52ec6d33678f4062206b3fbbb8c  115         Apache-2.0  /models/aligner/generation_config.json  https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B/resolve/c7cbfc2048c462b0d63a45797104fc9db3ad62b7/generation_config.json
+small   aligner  8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5  1671853     Apache-2.0  /models/aligner/merges.txt  https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B/resolve/c7cbfc2048c462b0d63a45797104fc9db3ad62b7/merges.txt
+small   aligner  45e120a4eda2c20c5d7f2ea9354e63536bf35e27aa573fb7cdf78017b378770d  330         Apache-2.0  /models/aligner/preprocessor_config.json  https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B/resolve/c7cbfc2048c462b0d63a45797104fc9db3ad62b7/preprocessor_config.json
+small   aligner  3ab80063f8511deb9566e6ad438d17b7a6277fcffd52d92854112f19d36bd81c  12666       Apache-2.0  /models/aligner/tokenizer_config.json  https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B/resolve/c7cbfc2048c462b0d63a45797104fc9db3ad62b7/tokenizer_config.json
+small   aligner  ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910  2776833     Apache-2.0  /models/aligner/vocab.json  https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B/resolve/c7cbfc2048c462b0d63a45797104fc9db3ad62b7/vocab.json
+small   aligner  75a8cfca24f00de72d796fbfed6858fc9614ef3dabd8696684cc3bc03a9c58ff  1161        Apache-2.0  /models/aligner/chat_template.json  https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B/resolve/c7cbfc2048c462b0d63a45797104fc9db3ad62b7/chat_template.json
+large   asr      a4cd1f1a04d90b757dc7f7dd26254e69a013b19e80efe590a83c6a3bde8608d6  4220320824  Apache-2.0  /models/asr/model-00001-of-00002.safetensors  https://huggingface.co/Qwen/Qwen3-ASR-1.7B/resolve/7278e1e70fe206f11671096ffdd38061171dd6e5/model-00001-of-00002.safetensors
+large   asr      6e0b9d9e09e2e0238e7ef3cc8a484ab387e91b90f1900bedf88bc92d7929ccfc  478200688   Apache-2.0  /models/asr/model-00002-of-00002.safetensors  https://huggingface.co/Qwen/Qwen3-ASR-1.7B/resolve/7278e1e70fe206f11671096ffdd38061171dd6e5/model-00002-of-00002.safetensors
+small   asr      f994739fe38e5210b9e3e8ce6c6307315e2ceac3cb630e7b7414d69dce520f60  64821       Apache-2.0  /models/asr/model.safetensors.index.json  https://huggingface.co/Qwen/Qwen3-ASR-1.7B/resolve/7278e1e70fe206f11671096ffdd38061171dd6e5/model.safetensors.index.json
+small   asr      2e74a751548b8ad7d7526d29365ad8144c345d8b412b1152d25dc6698452712f  6194        Apache-2.0  /models/asr/config.json  https://huggingface.co/Qwen/Qwen3-ASR-1.7B/resolve/7278e1e70fe206f11671096ffdd38061171dd6e5/config.json
+small   asr      1da527824d81e07118facff437e03f2e24a23311e3bdeb2368973fe77e5f275c  142         Apache-2.0  /models/asr/generation_config.json  https://huggingface.co/Qwen/Qwen3-ASR-1.7B/resolve/7278e1e70fe206f11671096ffdd38061171dd6e5/generation_config.json
+small   asr      8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5  1671853     Apache-2.0  /models/asr/merges.txt  https://huggingface.co/Qwen/Qwen3-ASR-1.7B/resolve/7278e1e70fe206f11671096ffdd38061171dd6e5/merges.txt
+small   asr      45e120a4eda2c20c5d7f2ea9354e63536bf35e27aa573fb7cdf78017b378770d  330         Apache-2.0  /models/asr/preprocessor_config.json  https://huggingface.co/Qwen/Qwen3-ASR-1.7B/resolve/7278e1e70fe206f11671096ffdd38061171dd6e5/preprocessor_config.json
+small   asr      4942d005604266809309cabc9f4e9cb89ce855d59b14681fdc0e1cc62ea26c4c  12487       Apache-2.0  /models/asr/tokenizer_config.json  https://huggingface.co/Qwen/Qwen3-ASR-1.7B/resolve/7278e1e70fe206f11671096ffdd38061171dd6e5/tokenizer_config.json
+small   asr      ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910  2776833     Apache-2.0  /models/asr/vocab.json  https://huggingface.co/Qwen/Qwen3-ASR-1.7B/resolve/7278e1e70fe206f11671096ffdd38061171dd6e5/vocab.json
+small   asr      75a8cfca24f00de72d796fbfed6858fc9614ef3dabd8696684cc3bc03a9c58ff  1161        Apache-2.0  /models/asr/chat_template.json  https://huggingface.co/Qwen/Qwen3-ASR-1.7B/resolve/7278e1e70fe206f11671096ffdd38061171dd6e5/chat_template.json

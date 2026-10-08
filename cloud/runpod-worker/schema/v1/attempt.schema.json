@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/RedSn0w1877/PixlAudio-iOS/blob/main/cloud/runpod-worker/schema/v1/attempt.schema.json",
+  "title": "PixlAudio Cloud Studio attempt marker (pixl.cloudstudio.attempt v1)",
+  "description": "out/<jobKey>/attempt.json, written by the worker's guard before it starts work. A third delivery of the same RunPod job id is refused with POISONED. The phone only deletes it.",
+  "type": "object",
+  "required": ["schema", "v", "runpodJobId", "attempts"],
+  "properties": {
+    "schema": {"const": "pixl.cloudstudio.attempt"},
+    "v": {"const": 1},
+    "runpodJobId": {"type": "string", "maxLength": 200},
+    "attempts": {"type": "integer", "minimum": 1},
+    "updatedAt": {"type": "string", "description": "UTC, ISO 8601."}
+  }
+}

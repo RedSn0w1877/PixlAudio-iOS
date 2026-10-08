@@ -1,0 +1,25 @@
+{
+  "schema": "pixl.cloudstudio.lyrics",
+  "v": 1,
+  "mode": "transcribed",
+  "language": "vi",
+  "offsetMs": 0,
+  "lines": [
+    {
+      "i": 0,
+      "startMs": 9800,
+      "endMs": 13250,
+      "text": "Hôm nay trời đẹp quá",
+      "timing": "line",
+      "words": []
+    },
+    {
+      "i": 1,
+      "startMs": 13900,
+      "endMs": 16400,
+      "text": "Mình cùng hát nhé",
+      "timing": "line",
+      "words": []
+    }
+  ]
+}

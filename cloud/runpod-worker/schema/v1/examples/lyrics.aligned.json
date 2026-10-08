@@ -1,0 +1,128 @@
+{
+  "schema": "pixl.cloudstudio.lyrics",
+  "v": 1,
+  "mode": "aligned",
+  "language": "ko",
+  "offsetMs": 0,
+  "lines": [
+    {
+      "i": 0,
+      "startMs": 12410,
+      "endMs": 15620,
+      "text": "별빛 아래 우리 둘이",
+      "timing": "word",
+      "words": [
+        {
+          "startMs": 12410,
+          "endMs": 12890,
+          "text": "별빛",
+          "c0": 0,
+          "c1": 2
+        },
+        {
+          "startMs": 13050,
+          "endMs": 13600,
+          "text": "아래",
+          "c0": 3,
+          "c1": 5
+        },
+        {
+          "startMs": 13820,
+          "endMs": 14400,
+          "text": "우리",
+          "c0": 6,
+          "c1": 8
+        },
+        {
+          "startMs": 14650,
+          "endMs": 15620,
+          "text": "둘이",
+          "c0": 9,
+          "c1": 11
+        }
+      ]
+    },
+    {
+      "i": 1,
+      "startMs": 15880,
+      "endMs": 19010,
+      "text": "다시 노래해, 오늘 밤",
+      "timing": "word",
+      "words": [
+        {
+          "startMs": 15880,
+          "endMs": 16300,
+          "text": "다시",
+          "c0": 0,
+          "c1": 2
+        },
+        {
+          "startMs": 16420,
+          "endMs": 17350,
+          "text": "노래해",
+          "c0": 3,
+          "c1": 6
+        },
+        {
+          "startMs": 17600,
+          "endMs": 18200,
+          "text": "오늘",
+          "c0": 8,
+          "c1": 10
+        },
+        {
+          "startMs": 18350,
+          "endMs": 19010,
+          "text": "밤",
+          "c0": 11,
+          "c1": 12
+        }
+      ]
+    },
+    {
+      "i": 2,
+      "startMs": 19240,
+      "endMs": 22800,
+      "text": "(Oh-oh) Stay with me",
+      "timing": "word",
+      "words": [
+        {
+          "startMs": 19240,
+          "endMs": 20100,
+          "text": "Ohoh",
+          "c0": 1,
+          "c1": 6
+        },
+        {
+          "startMs": 20500,
+          "endMs": 21000,
+          "text": "Stay",
+          "c0": 8,
+          "c1": 12
+        },
+        {
+          "startMs": 21100,
+          "endMs": 21500,
+          "text": "with",
+          "c0": 13,
+          "c1": 17
+        },
+        {
+          "startMs": 21600,
+          "endMs": 22800,
+          "text": "me",
+          "c0": 18,
+          "c1": 20
+        }
+      ]
+    },
+    {
+      "i": 3,
+      "startMs": 23050,
+      "endMs": 26000,
+      "text": "",
+      "timing": "line",
+      "words": []
+    }
+  ]
+}

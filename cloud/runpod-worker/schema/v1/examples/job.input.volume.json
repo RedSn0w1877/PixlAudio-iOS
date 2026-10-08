@@ -1,0 +1,21 @@
+{
+  "schema": "pixl.cloudstudio.job",
+  "v": 1,
+  "op": "process",
+  "jobKey": "6f1c2a9e-3b7d-4c11-9a0e-2d5f8b7c4e10",
+  "storage": "volume",
+  "audio": {
+    "key": "in/6f1c2a9e-3b7d-4c11-9a0e-2d5f8b7c4e10.m4a",
+    "ext": "m4a",
+    "bytes": 7712345,
+    "sha256": "b66e21bfd056b5178586fbde94ebdb66c9ba669e7e4504f5da92f154ee9d28be",
+    "durationMs": 241000
+  },
+  "tasks": [
+    "instrumental"
+  ],
+  "output": {
+    "codec": "aac",
+    "kbps": 256
+  }
+}

@@ -1,0 +1,5 @@
+# The CPU-only test stage (python:3.12-slim): no torch, no weights. Hashed closure: requirements-test.lock
+# (python ci/lock.py). The same tests run locally in any Python 3.12 venv with these three packages.
+pytest
+jsonschema
+numpy

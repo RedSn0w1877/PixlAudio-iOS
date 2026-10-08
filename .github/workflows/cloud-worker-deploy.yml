@@ -1,0 +1,92 @@
+name: cloud-worker-deploy
+
+# Creates or updates the RunPod endpoint for the Cloud Studio worker (design 3.3). Runs in the `runpod` GitHub
+# environment (deployment branches: main only), which holds RUNPOD_API_KEY; R2_ACCOUNT_ID is a variable.
+# - After every successful main build it updates an EXISTING endpoint to the new image (never creates one).
+# - The first deploy is by hand: Actions > cloud-worker-deploy > Run workflow (owner step B4), which creates it.
+#   Without an image_tag it deploys the newest green cloud-worker-build on main, not the main commit it runs on
+#   (app-only commits land on main too, and they build no image).
+# The repo is public, so its logs are public: the scripts print pass/fail lines only and mask the endpoint id.
+on:
+  workflow_run:
+    workflows: [cloud-worker-build]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to deploy, sha-<12 hex> (empty = the newest green cloud-worker-build on main)'
+        required: false
+        default: ''
+      selftest:
+        description: 'Run the selftest after deploying (~1 cent)'
+        type: boolean
+        default: true
+      bench:
+        description: 'Also run op bench and the concurrency check (a few cents)'
+        type: boolean
+        default: false
+      extra_pools:
+        description: 'Extra GPU pools, comma-separated (e.g. ADA_24) when the cheap ones are scarce'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  actions: read  # gh run list: find the newest green build for a by-hand deploy
+
+concurrency:
+  group: cloud-worker-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-24.04
+    environment: runpod
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Deploy
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          EVENT: ${{ github.event_name }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          SELFTEST: ${{ inputs.selftest }}
+          BENCH: ${{ inputs.bench }}
+          EXTRA_POOLS: ${{ inputs.extra_pools }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          args=()
+          tag="sha-${HEAD_SHA::12}"
+          git_sha="$HEAD_SHA"
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            args+=(--create)
+            if [ -n "$IMAGE_TAG" ]; then
+              tag="$IMAGE_TAG"
+              git_sha="${IMAGE_TAG#sha-}"
+            else
+              built=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow cloud-worker-build.yml --branch main \
+                --event push --status success --limit 1 --json headSha --jq '.[0].headSha // ""')
+              if [ -z "$built" ]; then
+                echo "::error::no green cloud-worker-build on main yet: merge the worker and wait for that build (README step 3)"
+                exit 1
+              fi
+              tag="sha-${built::12}"
+              git_sha="$built"
+              echo "deploying the newest green main build: $tag"
+            fi
+            if [ "$SELFTEST" = "false" ]; then args+=(--no-selftest); fi
+            if [ "$BENCH" = "true" ]; then args+=(--bench); fi
+            if [ -n "$EXTRA_POOLS" ]; then args+=(--extra-pools "$EXTRA_POOLS"); fi
+          else
+            args+=(--auto)
+          fi
+          python3 cloud/runpod-worker/deploy/runpod_deploy.py --tag "$tag" --git-sha "$git_sha" "${args[@]}"

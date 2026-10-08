@@ -1,0 +1,10 @@
+# htdemucs_ft: the bag of 4 fine-tuned Hybrid Transformer Demucs models (one per stem: drums, bass, other,
+# vocals). Copied unchanged from demucs 4.1.0 (MIT), demucs/remote/htdemucs_ft.yaml; demucs.pretrained.get_model
+# reads it from the local repo next to the .th files (weights.lock lists them).
+models: ['f7e0c4bc', 'd12395a8', '92cfc3b6', '04573f0d']
+weights: [
+  [1., 0., 0., 0.],
+  [0., 1., 0., 0.],
+  [0., 0., 1., 0.],
+  [0., 0., 0., 1.],
+]

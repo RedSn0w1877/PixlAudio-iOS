@@ -1,0 +1,40 @@
+{
+  "schema": "pixl.cloudstudio.job",
+  "v": 1,
+  "op": "process",
+  "jobKey": "0b7e4d2c-91a5-4f3e-8c6d-5a2b1e9f7c34",
+  "client": {
+    "app": "pixlaudio-ios",
+    "build": "1.0 (412)"
+  },
+  "storage": "presigned",
+  "audio": {
+    "get": "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/pixl-cloud-studio/in/0b7e4d2c-91a5-4f3e-8c6d-5a2b1e9f7c34.flac?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=EXAMPLEACCESSKEYID%2F20261007%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261007T120000Z&X-Amz-Expires=273600&X-Amz-SignedHeaders=host&X-Amz-Signature=4863e7f78ab40a9d23f59d56e6e1d7121db6d32a8bbf19ebc1e55c60ed21f69c",
+    "delete": "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/pixl-cloud-studio/in/0b7e4d2c-91a5-4f3e-8c6d-5a2b1e9f7c34.flac?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=EXAMPLEACCESSKEYID%2F20261007%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261007T120000Z&X-Amz-Expires=273600&X-Amz-SignedHeaders=host&X-Amz-Signature=cbc40c68d51e4456899e0a7114c2af8f142b66bf878cdb53ccb1be09eae95af8",
+    "ext": "flac",
+    "bytes": 31457280,
+    "sha256": "6131e1a0dc529d7a636472df73b1091f70d5569241a42b1c8630543aab57196a",
+    "durationMs": 198500
+  },
+  "tasks": [
+    "instrumental",
+    "lyrics"
+  ],
+  "separation": {
+    "quality": "best"
+  },
+  "lyrics": {
+    "mode": "auto",
+    "language": "vi",
+    "synced": false,
+    "lines": []
+  },
+  "output": {
+    "codec": "flac",
+    "put": {
+      "instrumental": "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/pixl-cloud-studio/out/0b7e4d2c-91a5-4f3e-8c6d-5a2b1e9f7c34/instrumental.flac?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=EXAMPLEACCESSKEYID%2F20261007%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261007T120000Z&X-Amz-Expires=273600&X-Amz-SignedHeaders=host&X-Amz-Signature=a4f50dffa3b2850aa203e19dd3a2b6c34fb7fa5486b17d0151bbb977a0b61925",
+      "lyrics": "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/pixl-cloud-studio/out/0b7e4d2c-91a5-4f3e-8c6d-5a2b1e9f7c34/lyrics.json?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=EXAMPLEACCESSKEYID%2F20261007%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261007T120000Z&X-Amz-Expires=273600&X-Amz-SignedHeaders=host&X-Amz-Signature=39c716b92fd7cca30bffc9b2180b67929024355c8d469554ea8abfdce121c195",
+      "manifest": "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/pixl-cloud-studio/out/0b7e4d2c-91a5-4f3e-8c6d-5a2b1e9f7c34/manifest.json?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=EXAMPLEACCESSKEYID%2F20261007%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261007T120000Z&X-Amz-Expires=273600&X-Amz-SignedHeaders=host&X-Amz-Signature=4a8d644da73848a1edc1ef948c86c2c0d8f6094ef81121b38891bd2e1fffdc74"
+    }
+  }
+}

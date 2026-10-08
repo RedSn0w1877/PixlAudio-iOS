@@ -1,0 +1,7 @@
+# Build context is cloud/runpod-worker/. Keep it to what the stages copy.
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+.venv
+venv
+*.part
