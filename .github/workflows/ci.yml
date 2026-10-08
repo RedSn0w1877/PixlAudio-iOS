@@ -11,6 +11,7 @@ on:
       # not hold the scarce macOS runners.
       - 'cloud/**'
       - '.github/workflows/cloud-worker-*.yml'
+      - '.github/workflows/cloud-e2e.yml'
   workflow_dispatch:
     inputs:
       shots:
@@ -102,6 +103,13 @@ jobs:
       - uses: actions/checkout@v5
       - name: Check forbidden patterns
         run: bash ci/check-forbidden.sh
+      # After the forbidden-pattern check (which insists the committed key file is the empty stub): the
+      # CLOUD_DEFAULTS_KEY secret becomes XOR shares in App/Generated/CloudDefaultsKey.swift. Without the secret
+      # (forks, a repo that never set it) the stub stays and the app simply has no built-in cloud keys.
+      - name: Built-in cloud keys
+        env:
+          CLOUD_DEFAULTS_KEY: ${{ secrets.CLOUD_DEFAULTS_KEY }}
+        run: bash ci/write-cloud-defaults-key.sh
       - name: Tune the runner
         run: bash ci/tune-runner.sh
       - name: Select Xcode
@@ -266,6 +274,13 @@ jobs:
       - uses: actions/checkout@v5
       - name: Check forbidden patterns
         run: bash ci/check-forbidden.sh
+      # After the forbidden-pattern check (which insists the committed key file is the empty stub): the
+      # CLOUD_DEFAULTS_KEY secret becomes XOR shares in App/Generated/CloudDefaultsKey.swift. Without the secret
+      # (forks, a repo that never set it) the stub stays and the app simply has no built-in cloud keys.
+      - name: Built-in cloud keys
+        env:
+          CLOUD_DEFAULTS_KEY: ${{ secrets.CLOUD_DEFAULTS_KEY }}
+        run: bash ci/write-cloud-defaults-key.sh
       - name: Tune the runner
         run: bash ci/tune-runner.sh
       - name: Select Xcode

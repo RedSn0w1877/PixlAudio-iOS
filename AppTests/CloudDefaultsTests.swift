@@ -237,6 +237,45 @@ final class CloudDefaultsTests: XCTestCase {
         XCTAssertEqual(settings.effectiveMonthlyCapMicroUSD, 25_000_000, "own keys, own cap")
     }
 
+    func testBuiltInKeysEstimateAtLeastTheEndpointsPrice() throws {
+        let settings = CloudSettings(defaults: try defaults(), secrets: CloudMemorySecrets(), builtIn: Self.builtIn)
+        settings.pricePerSecondMicroUSD = 1
+        XCTAssertEqual(settings.effectivePricePerSecondMicroUSD, CloudCost.defaultPricePerSecondMicroUSD,
+                       "a price typed lower would let the $3 cap pass more songs than it pays for")
+        settings.useOwnKeys = true
+        XCTAssertEqual(settings.effectivePricePerSecondMicroUSD, 1, "own keys, own price")
+    }
+
+    func testRemovedJobsStillCountTowardsTheMonth() throws {
+        let defaults = try defaults()
+        let settings = CloudSettings(defaults: defaults, secrets: CloudMemorySecrets())
+        settings.addRemovedSpend(250_000, monthStartMs: 1_000)
+        settings.addRemovedSpend(0, monthStartMs: 1_000)
+        settings.addRemovedSpend(50_000, monthStartMs: 1_000)
+        XCTAssertEqual(settings.removedSpendMicroUSD(monthStartMs: 1_000), 300_000)
+        XCTAssertEqual(settings.removedSpendMicroUSD(monthStartMs: 2_000), 0, "another month")
+        XCTAssertEqual(CloudSettings(defaults: defaults, secrets: CloudMemorySecrets())
+            .removedSpendMicroUSD(monthStartMs: 1_000), 300_000, "kept across launches")
+        settings.addRemovedSpend(10_000, monthStartMs: 2_000)
+        XCTAssertEqual(settings.removedSpendMicroUSD(monthStartMs: 2_000), 10_000, "a new month starts from zero")
+        XCTAssertEqual(settings.removedSpendMicroUSD(monthStartMs: 1_000), 0)
+    }
+
+    func testClearingTheListKeepsTheMonthsSpend() async throws {
+        let h = CloudHarness()
+        let key = try await h.submittedJob()
+        await h.runpod.setStatus("rp-1", RunPodJob(id: "rp-1", status: "COMPLETED", result: h.finish(key)))
+        h.clock.advance(16_000)
+        await h.studio.pump()
+        await h.studio.handle(.downloaded(jobKey: key, slot: "instrumental", stagedFile: try h.stagedInstrumental()))
+        XCTAssertEqual(h.studio.job(key)?.state, .imported)
+        let spent = h.studio.committedThisMonthMicroUSD
+        XCTAssertGreaterThan(spent, 0)
+        h.studio.clearFinished()
+        XCTAssertTrue(h.studio.jobs.isEmpty)
+        XCTAssertEqual(h.studio.committedThisMonthMicroUSD, spent, "clearing the list doesn't make room under the cap")
+    }
+
     func testSwitchingKeysForgetsTheEndpointsLimits() throws {
         let settings = CloudSettings(defaults: try defaults(), secrets: CloudMemorySecrets(), builtIn: Self.builtIn)
         settings.workerCaps = CloudWorkerCaps(maxInputMB: 160, maxAudioS: 900, hostsConfigured: 1)

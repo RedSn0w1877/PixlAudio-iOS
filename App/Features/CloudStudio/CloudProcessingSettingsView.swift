@@ -48,7 +48,7 @@ struct CloudProcessingSettingsView: View {
                 .padding(.bottom, 10)
             }
             if settings.builtInAvailable {
-                keysSection(settings)
+                keysSection(settings, locked: cloud.jobs.contains { $0.state.isPending })
             }
             if !builtIn {
                 ownKeyFields(settings)
@@ -129,8 +129,9 @@ struct CloudProcessingSettingsView: View {
 
     // MARK: Sections
 
-    /// Built-in keys in this build: which keys are in use, and the way to the person's own.
-    private func keysSection(_ model: CloudSettings) -> some View {
+    /// Built-in keys in this build: which keys are in use, and the way to the person's own. `locked` while songs are
+    /// on their way: they were sent with the keys in use, and their results come back only through those.
+    private func keysSection(_ model: CloudSettings, locked: Bool) -> some View {
         @Bindable var settings = model
         return SettingsSubsection(title: "Keys") {
             if settings.usesBuiltInKeys {
@@ -144,8 +145,10 @@ struct CloudProcessingSettingsView: View {
                         .foregroundStyle(theme.onSurfaceVariant)
                 }
             }
-            SwitchSettingRow(title: "Use my own keys", subtitle: "Your own RunPod endpoint and Cloudflare R2 bucket instead.",
-                             isOn: $settings.useOwnKeys, systemImage: "person.badge.key")
+            SwitchSettingRow(title: "Use my own keys",
+                             subtitle: locked ? "Wait for the songs in the cloud queue to finish, or cancel them, to switch keys."
+                                 : "Your own RunPod endpoint and Cloudflare R2 bucket instead.",
+                             isOn: $settings.useOwnKeys, systemImage: "person.badge.key", enabled: !locked)
                 .accessibilityIdentifier("cloud.useOwnKeys")
         }
     }
@@ -305,7 +308,7 @@ nonisolated enum CloudProcessingCopy {
             ? "Instrumentals and word-timed lyrics in the cloud, nothing to set up. Off."
             : "Instrumentals and word-timed lyrics on your own RunPod GPU. Off until you set it up."
     }
-    static let builtInCapLine = "With PixlAudio's built-in keys the cap is at most \(CloudCost.format(microUSD: CloudKeyChoice.builtInMonthlyCapMicroUSD)) a month."
+    static let builtInCapLine = "With PixlAudio's built-in keys the cap is at most \(CloudCost.format(microUSD: CloudKeyChoice.builtInMonthlyCapMicroUSD)) a month, and estimates never use a GPU price below \(priceText(CloudCost.defaultPricePerSecondMicroUSD)) US$ a second."
 
     static func dollars(_ microUSD: Int64) -> String {
         let cents = (max(microUSD, 0) + 5_000) / 10_000

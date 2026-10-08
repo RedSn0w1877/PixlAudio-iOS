@@ -61,7 +61,7 @@ actor CloudBuiltInKeys: CloudBuiltInKeysProviding {
         isBundled = Self.isUsable(blobURL, shares)
     }
 
-    private static func isUsable(_ url: URL?, _ shares: [[UInt8]]) -> Bool {
+    private nonisolated static func isUsable(_ url: URL?, _ shares: [[UInt8]]) -> Bool {
         guard let url, FileManager.default.fileExists(atPath: url.path) else { return false }
         return CloudDefaultsKeyShares.combine(shares) != nil
     }

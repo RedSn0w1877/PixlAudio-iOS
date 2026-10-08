@@ -204,11 +204,13 @@ final class CloudStudio {
         return "Cloud: " + parts.joined(separator: ", ")
     }
 
-    /// The month's committed spend (recorded costs plus estimates of jobs at RunPod).
+    /// The month's committed spend (recorded costs plus estimates of jobs at RunPod, and what jobs since removed from
+    /// the list spent this month).
     var committedThisMonthMicroUSD: Int64 {
-        let now = dependencies.nowMs()
-        return CloudBudget.committedMicroUSD(jobs, monthStartMs: dependencies.monthStartMs(now),
-                                             pricePerSecondMicroUSD: settings.pricePerSecondMicroUSD)
+        let monthStart = dependencies.monthStartMs(dependencies.nowMs())
+        return CloudBudget.committedMicroUSD(jobs, monthStartMs: monthStart,
+                                             pricePerSecondMicroUSD: settings.effectivePricePerSecondMicroUSD)
+            + settings.removedSpendMicroUSD(monthStartMs: monthStart)
     }
 
     // MARK: Lifecycle
@@ -296,7 +298,7 @@ final class CloudStudio {
         let selection = CloudSelector.select(facts, options: options)
         let skips = selection.skipCounts.map { CloudBatchPreview.Skip(reason: $0.reason, count: $0.count) }
         let estimate = CloudBatchEstimate.make(plans: selection.plans, uploadBytes: uploadBytes, quality: settings.quality,
-                                               pricePerSecondMicroUSD: settings.pricePerSecondMicroUSD,
+                                               pricePerSecondMicroUSD: settings.effectivePricePerSecondMicroUSD,
                                                committedMicroUSD: committedThisMonthMicroUSD,
                                                capMicroUSD: settings.effectiveMonthlyCapMicroUSD)
         return CloudBatchPreview(id: dependencies.newJobKey(), songs: selection.plans.compactMap { byId[$0.songId] },
@@ -392,14 +394,23 @@ final class CloudStudio {
     /// Removes a finished job from the list.
     func remove(_ jobKey: String) {
         guard let record = job(jobKey), record.state.isFinished else { return }
+        rememberSpend(of: [record])
         jobs.removeAll { $0.jobKey == jobKey }
         persist()
     }
 
     /// Removes every imported job.
     func clearFinished() {
+        rememberSpend(of: jobs.filter { $0.state == .imported })
         jobs.removeAll { $0.state == .imported }
         persist()
+    }
+
+    /// What jobs about to leave the list spent this month stays in the month's total (`CloudSettings.removedSpend`),
+    /// so clearing the list never makes room under the monthly cap.
+    private func rememberSpend(of removed: [CloudJobRecord]) {
+        let monthStart = dependencies.monthStartMs(dependencies.nowMs())
+        settings.addRemovedSpend(CloudBudget.spentMicroUSD(removed, monthStartMs: monthStart), monthStartMs: monthStart)
     }
 
     // MARK: Test connection
@@ -557,6 +568,7 @@ final class CloudStudio {
     private func prune() {
         let now = dependencies.nowMs()
         let before = jobs.count
+        rememberSpend(of: jobs.filter { CloudRetention.shouldPrune($0, nowMs: now) })
         jobs.removeAll { CloudRetention.shouldPrune($0, nowMs: now) }
         if jobs.count != before { persist() }
     }
@@ -822,10 +834,11 @@ final class CloudStudio {
                 update(jobKey) { _ = $0.apply(.requeue, nowMs: now) }
                 continue
             }
-            let price = settings.pricePerSecondMicroUSD
+            let price = settings.effectivePricePerSecondMicroUSD
+            let monthStart = dependencies.monthStartMs(now)
             // The held job isn't at RunPod yet, but it will be: count it.
-            let committed = CloudBudget.committedMicroUSD(jobs, monthStartMs: dependencies.monthStartMs(now),
-                                                          pricePerSecondMicroUSD: price)
+            let committed = CloudBudget.committedMicroUSD(jobs, monthStartMs: monthStart, pricePerSecondMicroUSD: price)
+                + settings.removedSpendMicroUSD(monthStartMs: monthStart)
                 + (burst.holding?.estimateMicroUSD ?? 0)
             let estimate = CloudCost.estimatedSeconds(record.plan, quality: record.quality) * price
             guard CloudBudget.allows(estimateMicroUSD: estimate, capMicroUSD: settings.effectiveMonthlyCapMicroUSD,
@@ -1044,7 +1057,7 @@ final class CloudStudio {
     private func take(_ result: CloudJobResult, _ jobKey: String, _ clients: Clients) async {
         guard let record = job(jobKey), record.state.isAtRunPod || record.state == .uploaded else { return }
         let now = dependencies.nowMs()
-        let price = settings.pricePerSecondMicroUSD
+        let price = settings.effectivePricePerSecondMicroUSD
         update(jobKey) { $0.takeResult(result, fallbackPricePerSecondMicroUSD: price, nowMs: now) }
         if result.hasResults {
             update(jobKey) { r in

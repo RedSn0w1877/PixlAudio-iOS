@@ -138,6 +138,13 @@ import Testing
         #expect(CloudKeyChoice.effectiveMonthlyCap(-5, source: .builtIn) == 0)
     }
 
+    @Test func builtInKeysNeverEstimateBelowTheEndpointsPrice() {
+        let price = CloudCost.defaultPricePerSecondMicroUSD
+        #expect(CloudKeyChoice.effectivePricePerSecond(1, source: .builtIn) == price, "a price typed lower")
+        #expect(CloudKeyChoice.effectivePricePerSecond(price * 3, source: .builtIn) == price * 3, "a higher one stays")
+        #expect(CloudKeyChoice.effectivePricePerSecond(1, source: .own) == 1, "own keys, own price")
+    }
+
     @Test func theEmptyConfigIsNeverComplete() {
         #expect(!CloudConfigInput.empty.isComplete)
         #expect(!CloudConfigInput.empty.hasRunPod && !CloudConfigInput.empty.hasStorage)

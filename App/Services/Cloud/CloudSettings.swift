@@ -31,9 +31,12 @@ final class CloudSettings {
         static let workerCaps = "cloud_studio_worker_caps"
         /// "Use my own keys" (built-in keys exist in this build); unset until the person first chooses.
         static let useOwnKeys = "cloud_studio_use_own_keys"
+        /// What jobs taken off the list spent this month (`[monthStartMs, µ$]`), so Remove and Clear finished don't
+        /// lower the month's total.
+        static let removedSpend = "cloud_studio_removed_spend"
 
         static let all = [enabled, endpointId, r2Endpoint, bucket, instrumental, lyrics, transcribe, quality, cellular,
-                          pricePerSecond, monthlyCap, keysSaved, workerCaps, useOwnKeys]
+                          pricePerSecond, monthlyCap, keysSaved, workerCaps, useOwnKeys, removedSpend]
     }
 
     /// Where the built-in keys stand in this build.
@@ -111,6 +114,9 @@ final class CloudSettings {
     /// Own keys were saved before but the Keychain has none now.
     private var ownKeysMissing = false
     @ObservationIgnored private var keysSaved: Bool
+    /// The month (its start) and the recorded cost of the jobs removed from the list in it.
+    private var removedSpendMonthMs: Int64
+    private var removedSpendTotalMicroUSD: Int64
 
     /// `builtIn`: this build's built-in keys (nil: none, as in tests and the UI-test demo by default).
     init(defaults: UserDefaults, secrets: any CloudSecretStoring, builtIn: (any CloudBuiltInKeysProviding)? = nil) {
@@ -137,6 +143,9 @@ final class CloudSettings {
         let cap = (defaults.object(forKey: Keys.monthlyCap) as? NSNumber)?.int64Value
         monthlyCapMicroUSD = cap.map { min(max($0, 0), 1_000_000_000) } ?? CloudCost.defaultMonthlyCapMicroUSD
         keysSaved = savedKeys
+        let removed = (defaults.array(forKey: Keys.removedSpend) as? [NSNumber]).flatMap { $0.count == 2 ? $0 : nil }
+        removedSpendMonthMs = removed?[0].int64Value ?? 0
+        removedSpendTotalMicroUSD = max(removed?[1].int64Value ?? 0, 0)
         workerCaps = defaults.data(forKey: Keys.workerCaps).flatMap { try? CloudJSON.decode(CloudWorkerCaps.self, from: $0) }
     }
 
@@ -177,6 +186,28 @@ final class CloudSettings {
     /// The cap the money guards use: the field's, but never above $3 a month with the built-in keys.
     var effectiveMonthlyCapMicroUSD: Int64 {
         CloudKeyChoice.effectiveMonthlyCap(monthlyCapMicroUSD, source: keySource)
+    }
+
+    /// The GPU price the estimates and the cap use: the field's, but never below the endpoint's own with the
+    /// built-in keys.
+    var effectivePricePerSecondMicroUSD: Int64 {
+        CloudKeyChoice.effectivePricePerSecond(pricePerSecondMicroUSD, source: keySource)
+    }
+
+    // MARK: Spend of removed jobs
+
+    /// What jobs removed from the list spent in the month starting at `monthStartMs` (0 for any other month).
+    func removedSpendMicroUSD(monthStartMs: Int64) -> Int64 {
+        removedSpendMonthMs == monthStartMs ? removedSpendTotalMicroUSD : 0
+    }
+
+    /// Remembers what removed jobs spent this month: the monthly cap counts the month, not what the list still shows.
+    func addRemovedSpend(_ microUSD: Int64, monthStartMs: Int64) {
+        guard microUSD > 0 else { return }
+        let total = min(removedSpendMicroUSD(monthStartMs: monthStartMs) + microUSD, 1_000_000_000_000)
+        removedSpendMonthMs = monthStartMs
+        removedSpendTotalMicroUSD = total
+        defaults.set([NSNumber(value: monthStartMs), NSNumber(value: total)], forKey: Keys.removedSpend)
     }
 
     /// Saves edited secrets to the Keychain (off the main actor).

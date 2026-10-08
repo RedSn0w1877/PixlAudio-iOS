@@ -163,6 +163,12 @@ public enum CloudKeyChoice {
     public static func effectiveMonthlyCap(_ capMicroUSD: Int64, source: CloudKeySource) -> Int64 {
         source == .builtIn ? min(max(capMicroUSD, 0), builtInMonthlyCapMicroUSD) : capMicroUSD
     }
+
+    /// The GPU price the estimates and the cap use: the field's, but never below PixlAudio's own endpoint price with
+    /// the built-in keys (a lower price typed in would otherwise let the $3 cap pass more songs than it pays for).
+    public static func effectivePricePerSecond(_ priceMicroUSD: Int64, source: CloudKeySource) -> Int64 {
+        source == .builtIn ? max(priceMicroUSD, CloudCost.defaultPricePerSecondMicroUSD) : priceMicroUSD
+    }
 }
 
 extension CloudConfigInput {
