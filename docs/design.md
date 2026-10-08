@@ -371,6 +371,11 @@ categories, sheets; glass in place of Material; text legible in light and dark. 
     `@ObservationIgnored`, so a heart read through `song(id:)` stayed stale until something else redrew the view.
     `observedSong` also reads `revision`: use it only in small views, never in list rows, `NowPlayingView.body` or
     `LyricsView`. The lock screen's Like toggles the same favourite and follows edits made in the app.
+  - *Tab bar under the expanded player (main health, 2026-10-07):* the bar's tabs are UIKit segments
+    (`LiquidTabBar`), which SwiftUI's `accessibilityHidden` around the bar doesn't reach. They stayed in the
+    accessibility tree under the toggle row and answered accessibility hit tests there (UI tests then tapped each
+    toggle at its top-left corner, outside a toggle that is on). `HiddenWhilePlayerExpanded` now also sets
+    `\.tabBarAccessibilityHidden`, and `LiquidTabBar` turns it into `accessibilityElementsHidden` on its view.
 - **Sheets:** `AppSheet.queue` (large), `.sleepTimer`, `.devices`, `.artistPicker(songId:)`, `.taisChat` (stage 13's
   TAIS DJ chat, from the sparkles circle); `AppCover.editSong(songId:)`. The queue presents the song sheet, the timer and Save as
   playlist itself. The song sheet's edit button (`SongOptionsSheet(onEdit:)`) opens `EditSongSheet`.
@@ -872,6 +877,10 @@ belong to other work and are untouched.
   - Quick Fill: the Select all · Clear pair, a status capsule (`surfaceContainerHighest`) and Next / Quick Fill
     (`primary`). On the genre step the pair leaves and the status capsule takes its room; Android keeps its panel and
     hides the pair.
+  - Main health (2026-10-07): the pills keep their one-line width (`fixedSize`). Quick Fill's status shows the count
+    alone when "N selected" doesn't fit beside the pair (≈ 40 pt on a 402 pt iPhone; VoiceOver reads the full text);
+    Save as playlist's title steps down headlineMedium → headlineSmall → titleLarge until it fits beside "Deselect
+    all" (`ViewThatFits`; `minimumScaleFactor` doesn't shrink `pixlFont` text).
 - **Listening Stats header.** It uses the `SettingsScaffold` glass bar (`surfaceContainerHigh` at `GlassTint.bar`,
   fading in over the first half of the collapse) instead of the solid band. The circles and the pill row sit on it,
   as Settings' back circle does.
