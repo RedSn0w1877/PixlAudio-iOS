@@ -2,7 +2,7 @@ import PixlLibrary
 import PixlModel
 import SwiftUI
 
-/// Home (Android `HomeScreen`): the top row (Beta chip; jobs, changelog and settings circles) over a scrolling
+/// Home (Android `HomeScreen`): the top row (Beta chip; the active-jobs capsule, changelog and settings circles) over a scrolling
 /// column, 24 pt apart — greeting card, quick actions, "Made for your listening", Your Mix, the discovery shelves,
 /// Just added, Recently Played and the listening stats card. Every Material surface is Liquid Glass with the
 /// colour Android filled it with as the tint; layout and sizes are the Compose values (1 dp = 1 pt).
@@ -88,6 +88,9 @@ struct HomeView: View {
         .task(id: HomeRefreshKey(libraryRevision: library.revision, revision: home.history.revision)) {
             await home.refresh(snapshot: library.snapshot, libraryRevision: library.revision)
         }
+        // Cloud Studio's stored jobs (read once, off the main actor): its work may have moved on while the app was closed,
+        // and the jobs button should show it.
+        .task { await env.cloud.loadForDisplay() }
         .accessibilityIdentifier("screen.home")
     }
 
@@ -170,14 +173,14 @@ private struct HomeTopBar: View {
     let onSettings: () -> Void
 
     @Environment(AppEnvironment.self) private var env
-    @Environment(LibraryStore.self) private var library
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        // The import progress is read here, not in HomeView: a library scan reports progress several times (at
-        // launch and on every return to the foreground), and each tick should re-run only this bar, not Home's
-        // shelves — Home stays alive under the other tabs.
-        let jobCount = env.home.jobs(libraryProgress: library.lastImportProgress).count
+        // The count is read here, not in HomeView: `ActiveJobs` writes it only when the number changes, so a scan or a
+        // transfer reporting progress never re-runs this bar, and Home's shelves (alive under the other tabs) never
+        // see it.
+        let activeJobs = env.activeJobs
+        let jobCount = activeJobs.badgeCount
         GlassEffectContainer(spacing: 2) {
             HStack(spacing: 0) {
                 Button(action: onBeta) {
@@ -198,11 +201,8 @@ private struct HomeTopBar: View {
 
                 HStack(spacing: Tokens.TopBar.actionSpacing) {
                     if jobCount > 0 {
-                        GlassCircleButton(systemImage: "hourglass", accessibilityLabel: "Active jobs",
-                                          tint: theme.surfaceContainerHigh.opacity(GlassTint.surface),
-                                          action: onJobs)
-                            .accessibilityValue(Text(verbatim: "\(jobCount)"))
-                            .accessibilityIdentifier("home.jobs")
+                        ActiveJobsButton(count: jobCount, isWorking: activeJobs.isWorking, action: onJobs)
+                            .transition(.scale(scale: 0.85).combined(with: .opacity))
                     }
                     GlassCircleButton(systemImage: "newspaper", accessibilityLabel: "Changelog",
                                       tint: theme.surfaceContainerHigh.opacity(GlassTint.surface), action: onChangelog)
@@ -216,23 +216,8 @@ private struct HomeTopBar: View {
             .padding(.trailing, HomeMetrics.topBarTrailing)
             .frame(height: HomeMetrics.topBarHeight)
         }
-        // The jobs badge sits outside the container: a GlassEffectContainer composites its glass over the
-        // children's own overlays, which hid most of the badge. Placed where `BadgedBox` puts it on the jobs circle.
-        .overlay(alignment: .topTrailing) {
-            if jobCount > 0 {
-                let circle = Tokens.TopBar.circleButtonSize
-                Text("\(jobCount)")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(theme.onError)
-                    .padding(.horizontal, 5)
-                    .frame(minWidth: 16, minHeight: 16)
-                    .background(theme.error, in: Capsule())
-                    .padding(.top, (HomeMetrics.topBarHeight - circle) / 2 - 2)
-                    .padding(.trailing, HomeMetrics.topBarTrailing + 2 * (circle + Tokens.TopBar.actionSpacing) - 2)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-            }
-        }
+        // The jobs button appears and goes with a short spring (not while it only changes its count).
+        .animation(PixlMotion.bars, value: jobCount > 0)
         .background(alignment: .top) {
             let scrim = theme.surfaceContainerHighest
             LinearGradient(stops: [.init(color: scrim, location: 0), .init(color: scrim, location: 0.55),

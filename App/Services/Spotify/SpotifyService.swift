@@ -252,30 +252,34 @@ final class SpotifyService {
         isSyncing = true
         syncStatus = nil
         syncTask = Task {
-            var resume = false
-            var attempts = 0
-            while !Task.isCancelled {
-                do {
-                    let result = try await sync.syncAll(resumeInterrupted: resume, onProgress: { _, _, name in
-                        await self.setSyncStatus(name)
-                    }, onProfile: { profile in
-                        await self.cacheProfile(profile)
-                    })
-                    if result.syncedSongCount > 0 { startMatching(retryFailed: false) }
-                    if result.isComplete {
-                        preferences.setLastFullSync(currentTimeMillis())
+            // About 30 s of extra time if the app is switched away mid-import; after that iOS suspends it, and the
+            // background refresh (resumeInterrupted) or the next open carries on.
+            await BackgroundGrace.run("Spotify import", onExpire: { [weak self] in self?.scheduleBackgroundRefresh() }) {
+                var resume = false
+                var attempts = 0
+                while !Task.isCancelled {
+                    do {
+                        let result = try await sync.syncAll(resumeInterrupted: resume, onProgress: { _, _, name in
+                            await self.setSyncStatus(name)
+                        }, onProfile: { profile in
+                            await self.cacheProfile(profile)
+                        })
+                        if result.syncedSongCount > 0 { startMatching(retryFailed: false) }
+                        if result.isComplete {
+                            preferences.setLastFullSync(currentTimeMillis())
+                            break
+                        }
+                        resume = true
+                    } catch is CancellationError {
                         break
+                    } catch {
+                        attempts += 1
+                        if attempts >= 3 {
+                            message = "Spotify import failed: \(error)"
+                            break
+                        }
+                        try? await Task.sleep(for: .seconds(30 * Double(attempts)))
                     }
-                    resume = true
-                } catch is CancellationError {
-                    break
-                } catch {
-                    attempts += 1
-                    if attempts >= 3 {
-                        message = "Spotify import failed: \(error)"
-                        break
-                    }
-                    try? await Task.sleep(for: .seconds(30 * Double(attempts)))
                 }
             }
             isSyncing = false
@@ -307,28 +311,32 @@ final class SpotifyService {
         let bridge = self.bridge
         let isPlaying = isPlaybackActive
         matchTask = Task {
-            let matcher = TrackMatcher(search: bridge.search)
-            let runner = SpotifyMatchRunner(store: persistence, matcher: { try await matcher.findMatch($0) })
-            var requeue = retryFailed
-            var backoff = Self.matchBackoffSeconds
-            while !Task.isCancelled {
-                let result: SpotifyMatchPassResult
-                do {
-                    result = try await runner.run(retryFailed: requeue, isPlaybackActive: { await isPlaying() },
-                                                  shouldContinue: { !Task.isCancelled },
-                                                  onProgress: { _, _ in await self.refreshLibraryState() })
-                } catch {
-                    break
+            // The pass gets iOS's ~30 s of extra time when the app is switched away; the Spotify background refresh runs a
+            // short slice later (a pass that is waiting out a retry holds the assertion only until iOS asks for it back).
+            await BackgroundGrace.run("Spotify matching", onExpire: { [weak self] in self?.scheduleBackgroundRefresh() }) {
+                let matcher = TrackMatcher(search: bridge.search)
+                let runner = SpotifyMatchRunner(store: persistence, matcher: { try await matcher.findMatch($0) })
+                var requeue = retryFailed
+                var backoff = Self.matchBackoffSeconds
+                while !Task.isCancelled {
+                    let result: SpotifyMatchPassResult
+                    do {
+                        result = try await runner.run(retryFailed: requeue, isPlaybackActive: { await isPlaying() },
+                                                      shouldContinue: { !Task.isCancelled },
+                                                      onProgress: { _, _ in await self.refreshLibraryState() })
+                    } catch {
+                        break
+                    }
+                    requeue = false
+                    await refreshLibraryState()
+                    if result.retryLater {
+                        try? await Task.sleep(for: .seconds(backoff))
+                        backoff = min(backoff * 2, 3600)
+                        continue
+                    }
+                    backoff = Self.matchBackoffSeconds
+                    if !result.moreWork { break }
                 }
-                requeue = false
-                await refreshLibraryState()
-                if result.retryLater {
-                    try? await Task.sleep(for: .seconds(backoff))
-                    backoff = min(backoff * 2, 3600)
-                    continue
-                }
-                backoff = Self.matchBackoffSeconds
-                if !result.moreWork { break }
             }
             matchTask = nil
             isMatching = false

@@ -39,17 +39,6 @@ nonisolated struct HomeContent: Sendable, Equatable {
     var usesFallbackYourMix: Bool { curatedYourMix.isEmpty && dailyMix.isEmpty }
 }
 
-/// A background job for the jobs button and sheet (Android `PixelPlayJob`).
-nonisolated struct HomeJob: Sendable, Equatable, Identifiable {
-    nonisolated enum State: Sendable, Equatable { case running, queued, finished }
-    var id: String
-    var label: String
-    var detail: String?
-    /// 0…100 when known.
-    var percent: Int?
-    var state: State
-}
-
 /// The Home tab's state holder. Lives in `AppEnvironment` (process-scoped like Android's `@Singleton` holders),
 /// so Home keeps its snapshot across navigation.
 @Observable
@@ -73,8 +62,6 @@ final class HomeStore {
     /// One AI headline request per process (Android `hasRequestedAiGreetingThisProcess`).
     @ObservationIgnored private var hasRequestedAIGreeting = false
     @ObservationIgnored private var insightTask: Task<Void, Never>?
-    /// UI-test jobs (the real ones come from the library import, see `jobs(libraryProgress:)`).
-    private(set) var demoJobs: [HomeJob] = []
 
     let history: ListeningHistoryStore
     private let defaults: UserDefaults?
@@ -96,37 +83,22 @@ final class HomeStore {
         var learning: Bool
     }
 
-    init(history: ListeningHistoryStore, defaults: UserDefaults?, demoJobs: [HomeJob] = []) {
+    init(history: ListeningHistoryStore, defaults: UserDefaults?) {
         self.history = history
         self.defaults = defaults
-        self.demoJobs = demoJobs
     }
 
-    /// The store for a launch: UI tests get the demo history, a pinned clock, no persistence and two demo jobs.
+    /// The store for a launch: UI tests get the demo history, a pinned clock, no persistence.
     static func make(launch: LaunchConfiguration) -> HomeStore {
         if launch.isUITest {
             let clock = HomeClock.uiTest
             let history = ListeningHistoryStore(
                 clock: clock, file: nil,
                 seed: DemoListeningHistory.events(songs: DemoLibrary.songs, nowMs: clock.nowMs()))
-            return HomeStore(history: history, defaults: nil, demoJobs: [
-                HomeJob(id: "align", label: "Syncing lyrics word by word", detail: "Neon Harbor", percent: 64,
-                        state: .running),
-                HomeJob(id: "match", label: "Matching Spotify tracks", detail: nil, percent: nil, state: .queued),
-            ])
+            return HomeStore(history: history, defaults: nil)
         }
         let history = ListeningHistoryStore(clock: .live, file: ListeningHistoryFile.defaultURL().map(ListeningHistoryFile.init))
         return HomeStore(history: history, defaults: .standard)
-    }
-
-    /// Jobs shown by the top bar and the jobs sheet.
-    func jobs(libraryProgress: LibraryImportProgress?) -> [HomeJob] {
-        var jobs = demoJobs
-        if let progress = libraryProgress, progress.total > 0, progress.completed < progress.total {
-            jobs.insert(HomeJob(id: "library", label: "Syncing your library", detail: progress.phase,
-                                percent: Int((progress.fraction * 100).rounded()), state: .running), at: 0)
-        }
-        return jobs
     }
 
     // MARK: Refresh

@@ -22,6 +22,9 @@ final class DownloadManager {
 
     /// By video id.
     private(set) var states: [String: State] = [:]
+    /// The title of each download started this launch, for the Home jobs sheet (not observed: it is set just before
+    /// the state that makes the sheet read it).
+    @ObservationIgnored private(set) var titles: [String: String] = [:]
 
     @ObservationIgnored private let service: InnerTubeService?
     @ObservationIgnored private let fetcher: StreamFetcher?
@@ -81,6 +84,7 @@ final class DownloadManager {
         case .downloaded, .downloading: return
         default: break
         }
+        titles[videoId] = song.title
         setState(videoId, .downloading(percent: nil))
         guard let service, let fetcher else { return }
         Task {

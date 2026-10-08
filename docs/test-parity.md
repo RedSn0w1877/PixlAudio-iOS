@@ -927,3 +927,17 @@ Android has no tests for a RunPod/R2 pipeline; everything here is new.
   song's AAC download is decoded to FLAC.
 - `UITests/CloudStudioScreenshotTests` — Cloud processing (top and Test connection), the queue (top and its Done
   part), the confirm sheet, and Experimental's Cloud processing row, light and dark.
+- `PixlModelTests/ActiveJobBoardTests` — the jobs list: Android's kind labels, clamped percentages, running rows before
+  queued ones, the badge count, when the symbol animates, the last day's finished rows, VoiceOver wording.
+- `PixlNetTests/CloudActiveJobsTests` — Cloud rows: one per batch with an averaged bar, a lone job's real transfer
+  or worker percentage, done / needs-you / cancelled batches, retry waits.
+- `PixlNetTests/CloudBackgroundPlannerTests` — which BGAppRefresh / BGProcessing requests exist and when, the wake
+  windows (nothing new in the last seconds), when a long pass keeps waiting, one completion per background task.
+- `PixlNetTests/CloudBatchNotificationTests` — which finished batches are announced (once, never old ones or ones the
+  person cancelled) and the notification's words.
+- `AppTests/CloudBackgroundTests` — Cloud Studio with fakes: one notification per finished batch and permission asked
+  when sending; nothing while the switch is off; no download starts in a wake's last seconds; nothing starts after iOS
+  takes the time back; the job list is saved.
+- `AppTests/ActiveJobsTests` — the button's count and the sheet's two lists from the demo rows.
+- `UITests/ActiveJobsScreenshotTests` — Home with the jobs button, the sheet running / mixed / empty (light and dark),
+  and the tap from the button to the sheet.

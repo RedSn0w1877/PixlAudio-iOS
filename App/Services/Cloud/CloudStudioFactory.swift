@@ -44,7 +44,11 @@ extension CloudStudio {
             newJobKey: { UUID().uuidString.lowercased() },
             build: CloudPlatform.build,
             removeStaged: { CloudTransfers.removeStaged(jobKey: $0) },
-            background: CloudBackground())
-        return CloudStudio(settings: settings, dependencies: dependencies)
+            background: CloudBackground(),
+            notifier: LiveCloudNotifier())
+        let studio = CloudStudio(settings: settings, dependencies: dependencies)
+        // BGProcessing handlers must be registered before the app finishes launching: this runs in AppEnvironment.init.
+        CloudBackground.registerProcessing(for: studio)
+        return studio
     }
 }

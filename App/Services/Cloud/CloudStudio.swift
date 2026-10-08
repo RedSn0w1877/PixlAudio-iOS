@@ -103,6 +103,8 @@ final class CloudStudio {
         var removeStaged: (String) -> Void
         /// Keeps the app running for a submission burst that started in the background (nil in tests).
         var background: CloudBackground?
+        /// "Your instrumentals are ready" (nil in tests unless a fake is given, and in the UI-test demo).
+        var notifier: (any CloudNotifying)?
     }
 
     nonisolated struct Clients: Sendable {
@@ -157,8 +159,18 @@ final class CloudStudio {
     @ObservationIgnored private var isActive = false
     @ObservationIgnored private var lastListAtMs: Int64 = 0
     @ObservationIgnored private var lastHealthAtMs: Int64 = 0
+    /// Set while a background wake runs: nothing new (a transfer, a submission, an import) starts in its last seconds.
+    @ObservationIgnored private var backgroundWindow: BackgroundWorkWindow?
+    /// iOS took a background pass's time back: nothing starts until the next wake or the app is opened.
+    @ObservationIgnored private var backgroundExpired = false
+    /// The batches that still had a job outstanding at the last check, to tell which just finished.
+    @ObservationIgnored private var incompleteBatches: Set<String> = []
+    /// Notifications are posted one after another, and a background wake waits for them before it ends.
+    @ObservationIgnored private var notifyChain: Task<Void, Never>?
     /// The foreground polling interval (tests shorten it).
     @ObservationIgnored var pollInterval: Duration = .seconds(15)
+    /// Between two checks of RunPod inside one long background pass (tests shorten it).
+    @ObservationIgnored var processingPollInterval: Duration = .milliseconds(CloudBackgroundPlanner.processingPollMs)
 
     init(settings: CloudSettings, dependencies: Dependencies, isDemo: Bool = false) {
         self.settings = settings
@@ -219,6 +231,9 @@ final class CloudStudio {
     /// feature is off (no file read, no session).
     func resume() {
         isActive = true
+        // The person is here: no background window limits the work any more.
+        backgroundWindow = nil
+        backgroundExpired = false
         guard settings.isEnabled else { return }
         requestPump()
     }
@@ -228,19 +243,25 @@ final class CloudStudio {
         await loadIfNeeded()
     }
 
-    /// The app went to the background: stop polling, ask iOS for a refresh while jobs are in flight.
+    /// The app went to the background: stop polling, and ask iOS for the wakes the outstanding jobs need.
     func didEnterBackground() {
         isActive = false
         pollLoop?.cancel()
         pollLoop = nil
-        if hasWorkInFlight { dependencies.background?.scheduleRefresh() }
+        scheduleBackground()
     }
 
-    /// BGAppRefresh (about 25 s): one pass — the R2 listing, lyrics imports, downloads queued, pending submissions.
+    /// Puts the BGAppRefresh and BGProcessing requests in place for the jobs as they are now, and takes back the ones
+    /// nothing needs (`CloudBackgroundPlanner`).
+    func scheduleBackground() {
+        let plan = CloudBackgroundPlanner.plan(jobs: jobs, nowMs: dependencies.nowMs(), isEnabled: settings.isEnabled)
+        dependencies.background?.apply(plan)
+    }
+
+    /// BGAppRefresh (about 30 s): one pass — the R2 listing, lyrics imports, downloads queued, pending submissions —
+    /// that starts nothing new in its last seconds.
     func backgroundRefresh() async {
-        await pump()
-        await settleImports()
-        if hasWorkInFlight { dependencies.background?.scheduleRefresh() }
+        await runBackgroundPass(window: .appRefresh(startedAtMs: dependencies.nowMs()))
     }
 
     /// The system woke the app for the transfer session: take its events, then submit what is ready.
@@ -249,18 +270,69 @@ final class CloudStudio {
         // soon as the session exists find their jobs (and a save never writes an empty list over them).
         await loadIfNeeded()
         guard settings.isEnabled || !jobs.isEmpty else { return }
+        let window = BackgroundWorkWindow.appRefresh(startedAtMs: dependencies.nowMs())
         let transfers = connectTransfers()
         if let session = transfers as? CloudTransfers { await session.waitForBackgroundEvents(timeoutSeconds: 20) }
         let assertion = dependencies.background?.beginAssertion()
-        await pump()
-        await settleImports()
+        await runBackgroundPass(window: window)
         assertion?.end()
-        if hasWorkInFlight { dependencies.background?.scheduleRefresh() }
     }
 
-    /// Jobs whose next step happens without the person.
-    var hasWorkInFlight: Bool {
-        jobs.contains { !$0.state.isFinished && $0.state != .queued && $0.state != .preparing }
+    /// BGProcessingTask (iOS decides when; minutes, often overnight): the same pass, then — while a job is at RunPod
+    /// or its results are coming in — a poll every 30 s inside a two-minute window, so a batch that finishes meanwhile
+    /// is imported in this wake instead of waiting for the next. `window` is injectable for tests.
+    func backgroundProcessing(window: BackgroundWorkWindow? = nil) async {
+        let window = window ?? .processing(startedAtMs: dependencies.nowMs())
+        await loadIfNeeded()
+        backgroundWindow = window
+        backgroundExpired = false
+        repeat {
+            await pump()
+            // Preparations that started count too (this is the pass for songs still waiting to go up), not only imports.
+            await settle()
+            let now = dependencies.nowMs()
+            guard !Task.isCancelled,
+                  CloudBackgroundPlanner.shouldKeepWaiting(jobs: jobs, window: window, nowMs: now) else { break }
+            // Not past the point after which nothing new may start: the pass ends with its window, not 30 s after it.
+            let slack = Duration.milliseconds(max(window.remainingMs(nowMs: now) - window.safetyMarginMs, 0))
+            try? await Task.sleep(for: min(processingPollInterval, slack))
+        } while !Task.isCancelled
+        await finishBackgroundWake()
+    }
+
+    /// iOS is taking a long background pass's time back: nothing new starts, what is known is saved, the next request
+    /// is placed. The pass itself is cancelled by its owner.
+    func backgroundWillExpire() async {
+        backgroundExpired = true
+        await finishBackgroundWake()
+    }
+
+    private func runBackgroundPass(window: BackgroundWorkWindow) async {
+        backgroundWindow = window
+        backgroundExpired = false
+        await pump()
+        await settleImports()
+        await finishBackgroundWake()
+    }
+
+    /// The end of every background wake, whatever ended it: notifications posted, the job list on disk (a save still
+    /// in flight when the app is suspended may never finish), and the next requests in place.
+    private func finishBackgroundWake() async {
+        backgroundWindow = nil
+        await notifyChain?.value
+        await persistNow()
+        scheduleBackground()
+    }
+
+    /// Nothing new may start: inside a background wake's last seconds, or after iOS took the time back.
+    private var canStartNewWork: Bool {
+        if backgroundExpired { return false }
+        return backgroundWindow?.canStartTransfer(nowMs: dependencies.nowMs()) ?? true
+    }
+
+    /// A tap on "Your instrumentals are ready" opens the queue (called once from `AppEnvironment.init`).
+    func installNotificationRouting(router: Router) {
+        dependencies.notifier?.install(onOpen: { [weak router] in router?.openCloudQueue() })
     }
 
     // MARK: Person's actions
@@ -353,6 +425,10 @@ final class CloudStudio {
         persist()
         // A person-started batch keeps preparing in the background (continued processing, design §7.4).
         dependencies.background?.beginPreparing(count: preview.plans.count)
+        // The one moment iOS may ask about notifications: the person just sent songs and will probably leave the app.
+        if settings.notifyWhenDone, let notifier = dependencies.notifier {
+            Task { await notifier.requestAuthorizationIfNeeded() }
+        }
         requestPump()
     }
 
@@ -387,6 +463,8 @@ final class CloudStudio {
             r.lastErrorCode = nil
             r.apply(.requeue, nowMs: self.dependencies.nowMs())
         }
+        // The batch is outstanding again, and may be announced again when it finishes.
+        settings.forgetNotified(record.batchId)
         persist()
         requestPump()
     }
@@ -563,6 +641,8 @@ final class CloudStudio {
         // Jobs added while the file was being read (none in practice) stay after the stored ones.
         jobs = loaded + jobs.filter { added in !loaded.contains { $0.jobKey == added.jobKey } }
         isLoaded = true
+        // The baseline for "which batch just finished": what was outstanding when this launch (or background wake) began.
+        incompleteBatches = CloudBatchNotifier.incompleteBatchIds(jobs)
     }
 
     private func prune() {
@@ -583,6 +663,30 @@ final class CloudStudio {
         saveChain = Task {
             await previous?.value
             await store.save(snapshot)
+        }
+        checkBatchCompletions()
+    }
+
+    /// After every change: which batches just finished. A notification for each (when the switch is on and iOS allows
+    /// it; the notifier stays quiet while PixlAudio is on screen), and the background requests are taken back once
+    /// nothing is outstanding.
+    private func checkBatchCompletions() {
+        let outstanding = CloudBatchNotifier.incompleteBatchIds(jobs)
+        // Nothing finished since the last check (the common case): just remember new batches.
+        guard !incompleteBatches.isSubset(of: outstanding) else {
+            incompleteBatches.formUnion(outstanding)
+            return
+        }
+        let finished = CloudBatchNotifier.completions(previouslyIncomplete: incompleteBatches, jobs: jobs,
+                                                      alreadyNotified: settings.notifiedBatchIds)
+        incompleteBatches = outstanding
+        if outstanding.isEmpty { dependencies.background?.apply(CloudBackgroundPlan.none) }
+        guard settings.notifyWhenDone, let notifier = dependencies.notifier, !finished.isEmpty else { return }
+        for outcome in finished { settings.markNotified(outcome.batchId) }
+        let previous = notifyChain
+        notifyChain = Task {
+            await previous?.value
+            for outcome in finished { await notifier.notifyBatchFinished(outcome) }
         }
     }
 
@@ -654,6 +758,7 @@ final class CloudStudio {
     // MARK: Prepare and upload
 
     private func startPreparations() {
+        guard canStartNewWork else { return }
         let now = dependencies.nowMs()
         for record in jobs where record.state == .queued && record.isDue(nowMs: now) {
             guard preparing.count < Self.maxConcurrentPreparations else { break }
@@ -722,6 +827,8 @@ final class CloudStudio {
     /// The song upload: a presigned PUT valid 24 h, handed to the background session.
     private func startUpload(_ jobKey: String, fileURL: URL?, _ clients: Clients) {
         guard let record = job(jobKey), record.state == .uploading, let ext = record.inputExt else { return }
+        // Left in "uploading" with no transfer: the next pass that may start work starts it (restartStalledUploads).
+        guard canStartNewWork else { return }
         let now = dependencies.nowMs()
         guard let file = fileURL ?? dependencies.preparer.uploadFile(jobKey: jobKey, ext: ext) else {
             // The prepared file is gone (storage was cleaned): prepare it again.
@@ -743,6 +850,7 @@ final class CloudStudio {
 
     /// Uploads with no transfer running (after a relaunch, a failure's wait, an expired link) start again.
     private func restartStalledUploads(_ clients: Clients) {
+        guard canStartNewWork else { return }
         let now = dependencies.nowMs()
         for record in jobs where record.state == .uploading && record.isDue(nowMs: now) {
             let description = CloudTransfers.taskDescription(jobKey: record.jobKey, slot: CloudTransfers.uploadSlot)
@@ -828,7 +936,13 @@ final class CloudStudio {
         // instead of staying up, idle and billed. Each job waits until the next one is ready (or the pass ends) to go
         // out, since only then is it known whether it is the last (`CloudSubmitBurst`).
         var burst = CloudSubmitBurst<PendingSubmit>()
+        var outOfTime = false
         for jobKey in ready {
+            // A background wake with no time left sends nothing more (a request cut off half-way is wasted).
+            guard canStartNewWork else {
+                outOfTime = true
+                break
+            }
             guard let record = job(jobKey), record.state == .uploaded, record.isDue(nowMs: now) else { continue }
             if CloudRetention.inputTooOldToSubmit(uploadedAtMs: record.uploadedAtMs, nowMs: now) {
                 update(jobKey) { _ = $0.apply(.requeue, nowMs: now) }
@@ -886,7 +1000,9 @@ final class CloudStudio {
                 guard await submit(previous, lastInBatch: false, clients) else { return }
             }
         }
-        if let last = burst.end() {
+        // The job held for the next one is not the batch's last when time ran out: it stays "uploaded" for the next wake,
+        // so the worker is not told to stop itself while more jobs are still to come.
+        if let last = burst.end(), !outOfTime {
             await submit(last, lastInBatch: true, clients)
         }
     }
@@ -1113,6 +1229,7 @@ final class CloudStudio {
     private func collectResults(_ clients: Clients) async {
         let now = dependencies.nowMs()
         for record in jobs where record.state == .resultsReady && record.isDue(nowMs: now) {
+            guard canStartNewWork else { return }
             await collect(record.jobKey, clients)
         }
     }
