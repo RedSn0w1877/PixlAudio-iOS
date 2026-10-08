@@ -156,7 +156,7 @@ jobs:
           . .venv/bin/activate
           sudo mkdir -p /mnt/hf /mnt/candidates && sudo chown "$USER" /mnt/hf /mnt/candidates
           python ci/ml/convert_llm.py convert --model "${{ inputs.llm_model }}" --out /mnt/candidates
-          rm -rf /mnt/hf
+          sudo rm -rf /mnt/hf
           du -sh /mnt/candidates/*
       - name: Report
         if: always()
