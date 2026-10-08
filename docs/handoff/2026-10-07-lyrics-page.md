@@ -57,6 +57,34 @@ Owner items 1 and 11 of the 2026-10-07 batch, built from `2026-10-07-plans/lyric
   `Toggle(_:systemImage:isOn:)`, iOS 14, and `accessibilityRepresentation(representation:)`, iOS 15, checked on
   developer.apple.com), `test-parity.md`.
 
+## Adversarial review (2026-10-08)
+
+A second agent reviewed `git diff origin/main...HEAD` against the plan, `DECISIONS.md` and `AGENTS.md`, and looked at
+the shots of run 37730028431 (Translate · Sing, the half-height sheet, Show as plain text, Sing rendering, the
+Translate menu, bright art, no lyrics). No blocker or major was found. Fixed (commit `cdac85a`):
+
+- Translate and Sing taps didn't count as touching the screen, so with immersive lyrics on the controls could hide
+  right after a tap (Synced / Static did call `resetImmersive`). They do now (`onSegmentTap`).
+- Their haptic fired on any state change, including a song change that showed or dropped translations or reset
+  Sing. It now answers taps only.
+- Tapping Sing while the automatic studio was already rendering the song only waited for it; pressing play then
+  cancelled that unattended job, so the tap was lost without a word. The tap now calls `studio.start`, which adopts
+  the running job as the person's (`TaisStudio.adopt`).
+- A render landing while a Spotify Connect speaker plays no longer switches this iPhone's player to the instrumental.
+- A late on-device translation result for an earlier song could clear the spinner of a translation started since;
+  `finishTranslation` now clears it only for its own run (a song change already clears it in `.task(id:)`).
+- The sync editor re-claims "screen always on" when the app becomes active (plan item; matters when it is opened
+  from Edit song, with no lyrics screen underneath).
+- `testTranslateMenu` now also taps Translate twice (hide, show) before the long press, so the segment's main action
+  has a test. `test-parity.md` described the old drag fallback of `testShowAsPlainText`; corrected.
+
+Left as is (minor, noted for later):
+- With "Show as plain text" on, the plain view shows the plain lines, which don't carry translations made from the
+  synced lines, so Translate can light up with nothing visible changing. Plain mode rendered translations the same
+  way before this branch (the old Static segment).
+- The alignment lens (`LiquidTabCapsule`, 56 pt frame) leaves a gap above and below its capsule inside the
+  Alignment card. It is the shared component's frame; changing it would move the other sheets' tab capsules.
+
 ## How it was verified
 
 - `ci/parse-check.ps1` on every changed Swift file and `ci/check-forbidden.sh`: OK.
@@ -84,6 +112,7 @@ speaker, so those paths are only checked with demo states.
 - [ ] Hold Translate: Translate via AI works; Show romanization appears on a song that has it (e.g. Japanese, Korean).
 - [ ] Sing on a downloaded song: the first time it renders ("Removing vocals …"), then the vocals go away; tap
       again brings them back without a skip. On a Spotify Connect speaker, Sing is greyed out.
+- [ ] With immersive lyrics on (Settings), tapping Translate or Sing keeps the controls up for the full timeout.
 - [ ] ⋯ opens as a half-height floating glass sheet; drag it up, still see-through. Is it readable over bright art?
 - [ ] Show as plain text switches to plain lyrics and back on the first tap, on the switch and on the row's title
       alike (the whole row is the target, as on Android); the next song goes back to synced. Same for Show
