@@ -284,12 +284,15 @@ struct QuickFillSheet: View {
                                              tint: theme.surfaceContainerHigh.opacity(GlassTint.prominent),
                                              foreground: theme.onSurface) { selected.removeAll() }
                     }
+                    // At their own width: the status capsule's flexible frame squeezed them to "S…" and "C…".
+                    .fixedSize()
                     .transition(.opacity)
                 }
                 Text(step == 0 ? "\(selected.count) selected" : (genre.map { "Genre: \($0)" } ?? "Select a genre"))
                     .pixlFont(.labelMedium)
                     .foregroundStyle(theme.onSurfaceVariant)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                     .padding(.horizontal, 12)
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     .pixlGlass(in: Capsule(), tint: theme.surfaceContainerHighest.opacity(GlassTint.container))
@@ -309,6 +312,7 @@ struct QuickFillSheet: View {
                     .foregroundStyle(theme.onPrimary)
                     .padding(.horizontal, 16)
                     .frame(height: 44)
+                    .fixedSize()
                     .contentShape(.capsule)
                 }
                 .buttonStyle(.plain)
