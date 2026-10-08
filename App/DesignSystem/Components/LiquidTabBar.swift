@@ -54,6 +54,10 @@ struct LiquidTabBar: UIViewRepresentable {
     let restingGlyphColor: UIColor
     /// Glyph colour under the lifted, clear lens (the accent, as on the system tab bar).
     let liftedGlyphColor: UIColor
+    /// Takes the bar's UIKit segments out of the accessibility tree (`accessibilityElementsHidden`), e.g. while the
+    /// full player covers the bar. SwiftUI's `accessibilityHidden` around this view does not reach them: the hidden
+    /// tabs kept answering accessibility hit tests under the player's shuffle · repeat · favourite row.
+    var accessibilityHidden = false
     let onSelect: (RootTab) -> Void
 
     static func items() -> [LiquidSegmentItem] {
@@ -95,6 +99,9 @@ struct LiquidTabBar: UIViewRepresentable {
         control.restingGlyphColor = restingGlyphColor
         control.liftedGlyphColor = liftedGlyphColor
         control.baseGlyphColor = .label
+        if view.accessibilityElementsHidden != accessibilityHidden {
+            view.accessibilityElementsHidden = accessibilityHidden
+        }
         let width: CGFloat? = minimized
             ? CGFloat(RootTab.allCases.count) * Tokens.Shell.navBarMinimizedSegmentWidth + 2 * Tokens.Shell.navGlassPadding
             : nil

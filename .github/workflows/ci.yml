@@ -80,7 +80,9 @@ jobs:
       contains(github.event.head_commit.message, '[shots:') ||
       (github.event_name == 'workflow_dispatch' && inputs.shots)) && ' + UI screenshots' || '' }}, Xcode 27)
     runs-on: xcode-27
-    timeout-minutes: 130
+    # Build + boot + unit tests take ~13 min and the full screenshot run ~95-100 min (see the Screenshot tests step):
+    # 195 leaves room for both limits below.
+    timeout-minutes: 195
     env:
       RUN_SHOTS: >-
         ${{ github.ref == 'refs/heads/main' ||
@@ -133,11 +135,15 @@ jobs:
         id: prepare
         if: ${{ !cancelled() && env.RUN_SHOTS == 'true' && steps.boot.outcome == 'success' }}
         run: bash ci/sim.sh prepare-shots
-      # A full run (main) costs ~16 s per UI test: 202 tests took 55 min (run 36941876010), and the suite keeps
-      # growing (226 after wave B). Raise this limit, and the job's, as classes are added.
+      # A full run (main) costs ~20 s per UI test, ~13 s of it launching the app (automation session + idle wait):
+      # 202 tests took 55 min (run 36941876010); 276 tests took 100 min (run 37679882164, 2026-10-07: 93 min of
+      # passes plus 12 retried failures), which hit the old 100-minute limit just as the tests finished, so nothing
+      # was exported. 160 min leaves ~60 % headroom for the batch's new classes and for retries; branch runs
+      # ([shots:Class,...]) take a few minutes and are unaffected. Raise this limit, and the job's, as classes are
+      # added (per-class times: grep "Test Case .* passed" in build/shots.log of a main run).
       - name: Screenshot tests
         if: ${{ !cancelled() && env.RUN_SHOTS == 'true' && steps.prepare.outcome == 'success' }}
-        timeout-minutes: 100
+        timeout-minutes: 160
         env:
           COMMIT_MSG: ${{ github.event.head_commit.message }}
           SHOTS_ONLY_INPUT: ${{ inputs.shots_only }}

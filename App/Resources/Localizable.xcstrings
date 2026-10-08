@@ -1,6 +1,17 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "AI Playlist Lab" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Playlist Lab"
+          }
+        }
+      }
+    },
     "Access them from the repository's GitHub Actions workflow artifacts if available." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -45,6 +56,17 @@
         }
       }
     },
+    "Add lyrics and sync them" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add lyrics and sync them"
+          }
+        }
+      }
+    },
     "Add songs" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -52,6 +74,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Add songs"
+          }
+        }
+      }
+    },
+    "Add to Queue" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add to Queue"
+          }
+        }
+      }
+    },
+    "Add whole album to library" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add whole album to library"
+          }
+        }
+      }
+    },
+    "Adjust your cover art" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adjust your cover art"
           }
         }
       }
@@ -67,6 +122,28 @@
         }
       }
     },
+    "Album" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Album"
+          }
+        }
+      }
+    },
+    "Alignment" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alignment"
+          }
+        }
+      }
+    },
     "Allow Access…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -78,6 +155,39 @@
         }
       }
     },
+    "Always open the picker instead of auto-applying the first match" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Always open the picker instead of auto-applying the first match"
+          }
+        }
+      }
+    },
+    "Apply cover art" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apply cover art"
+          }
+        }
+      }
+    },
+    "Are you sure you want to clear all songs from the queue except the current one?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Are you sure you want to clear all songs from the queue except the current one?"
+          }
+        }
+      }
+    },
     "Are you sure you want to delete this playlist?" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -85,6 +195,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Are you sure you want to delete this playlist?"
+          }
+        }
+      }
+    },
+    "Artist" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Artist"
+          }
+        }
+      }
+    },
+    "Ascending" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ascending"
+          }
+        }
+      }
+    },
+    "Ask Taizo anything" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ask Taizo anything"
           }
         }
       }
@@ -129,6 +272,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Beta"
+          }
+        }
+      }
+    },
+    "Browse artists, albums & top songs" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Browse artists, albums & top songs"
           }
         }
       }
@@ -188,6 +342,17 @@
         }
       }
     },
+    "Cancel timer" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel timer"
+          }
+        }
+      }
+    },
     "Change the range or play more songs to fill this timeline." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -232,6 +397,17 @@
         }
       }
     },
+    "Choose a new image" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a new image"
+          }
+        }
+      }
+    },
     "Choose the creation flow." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -243,13 +419,35 @@
         }
       }
     },
-    "Close" : {
+    "Choose where your music plays" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Close"
+            "value" : "Choose where your music plays"
+          }
+        }
+      }
+    },
+    "Choose which version to save:" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose which version to save:"
+          }
+        }
+      }
+    },
+    "Clear" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear"
           }
         }
       }
@@ -261,6 +459,94 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cloud"
+          }
+        }
+      }
+    },
+    "Cloud Only" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cloud Only"
+          }
+        }
+      }
+    },
+    "Connect a provider to manage it from this screen." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connect a provider to manage it from this screen."
+          }
+        }
+      }
+    },
+    "Connect device" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connect device"
+          }
+        }
+      }
+    },
+    "Connected" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connected"
+          }
+        }
+      }
+    },
+    "Connected Accounts" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connected Accounts"
+          }
+        }
+      }
+    },
+    "Connectivity" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connectivity"
+          }
+        }
+      }
+    },
+    "Couldn't find anything for that — try a different genre or mood." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't find anything for that — try a different genre or mood."
+          }
+        }
+      }
+    },
+    "Cover art" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cover art"
           }
         }
       }
@@ -287,6 +573,39 @@
         }
       }
     },
+    "Curate with precision" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Curate with precision"
+          }
+        }
+      }
+    },
+    "Custom time" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Custom time"
+          }
+        }
+      }
+    },
+    "Define mood, activity, constraints and depth." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Define mood, activity, constraints and depth."
+          }
+        }
+      }
+    },
     "Delete" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -309,6 +628,39 @@
         }
       }
     },
+    "Delete playlist" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete playlist"
+          }
+        }
+      }
+    },
+    "Descending" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descending"
+          }
+        }
+      }
+    },
+    "Describe the vibe, mood, or activity and let AI curate the perfect playlist from your library." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Describe the vibe, mood, or activity and let AI curate the perfect playlist from your library."
+          }
+        }
+      }
+    },
     "Device" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -320,6 +672,28 @@
         }
       }
     },
+    "Devices appear when they're online and signed in to your Spotify. For an Echo, link Spotify in the Alexa app." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Devices appear when they're online and signed in to your Spotify. For an Echo, link Spotify in the Alexa app."
+          }
+        }
+      }
+    },
+    "Dismiss" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dismiss"
+          }
+        }
+      }
+    },
     "Done" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -327,6 +701,105 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Done"
+          }
+        }
+      }
+    },
+    "Download all songs" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download all songs"
+          }
+        }
+      }
+    },
+    "Edit playlist" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit playlist"
+          }
+        }
+      }
+    },
+    "Edit song" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit song"
+          }
+        }
+      }
+    },
+    "Editing a song's metadata can affect how it's displayed and organized in your library. Changes are permanent and may not be reversible." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editing a song's metadata can affect how it's displayed and organized in your library. Changes are permanent and may not be reversible."
+          }
+        }
+      }
+    },
+    "End of current track" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "End of current track"
+          }
+        }
+      }
+    },
+    "Error" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Error"
+          }
+        }
+      }
+    },
+    "Export Playlist" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export Playlist"
+          }
+        }
+      }
+    },
+    "Find or import lyrics" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Find or import lyrics"
+          }
+        }
+      }
+    },
+    "Firing every request shape at YouTube… this takes a bit." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Firing every request shape at YouTube… this takes a bit."
           }
         }
       }
@@ -364,6 +837,39 @@
         }
       }
     },
+    "Generate" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generate"
+          }
+        }
+      }
+    },
+    "Generate Playlist" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generate Playlist"
+          }
+        }
+      }
+    },
+    "Generating…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generating…"
+          }
+        }
+      }
+    },
     "GitHub issue shortcut" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -371,6 +877,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "GitHub issue shortcut"
+          }
+        }
+      }
+    },
+    "Got it" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Got it"
+          }
+        }
+      }
+    },
+    "Grid" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grid"
+          }
+        }
+      }
+    },
+    "How long the last song took to start, step by step. Every recent start: Developer › Test playback › Stream start timings." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How long the last song took to start, step by step. Every recent start: Developer › Test playback › Stream start timings."
           }
         }
       }
@@ -386,6 +925,39 @@
         }
       }
     },
+    "I'm Taizo, your on-device AI DJ.\nPick a vibe, or ask me anything." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I'm Taizo, your on-device AI DJ.\nPick a vibe, or ask me anything."
+          }
+        }
+      }
+    },
+    "If Google won't sign in here, sign in to music.youtube.com in a desktop browser, open the developer tools, copy the Cookie header of any request and paste it below. It must include SAPISID. It is stored only in this phone's Keychain." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If Google won't sign in here, sign in to music.youtube.com in a desktop browser, open the developer tools, copy the Cookie header of any request and paste it below. It must include SAPISID. It is stored only in this phone's Keychain."
+          }
+        }
+      }
+    },
+    "Imported playlists" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imported playlists"
+          }
+        }
+      }
+    },
     "Include music library" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -393,6 +965,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Include music library"
+          }
+        }
+      }
+    },
+    "Instrumental" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instrumental"
+          }
+        }
+      }
+    },
+    "Instrumentalize all songs" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instrumentalize all songs"
           }
         }
       }
@@ -408,6 +1002,17 @@
         }
       }
     },
+    "Keep mine" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep mine"
+          }
+        }
+      }
+    },
     "Keychain" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -415,6 +1020,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Keychain"
+          }
+        }
+      }
+    },
+    "Last Song Start" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last Song Start"
+          }
+        }
+      }
+    },
+    "Last playback error" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last playback error"
           }
         }
       }
@@ -448,6 +1075,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Liked"
+          }
+        }
+      }
+    },
+    "Linked Services" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Linked Services"
+          }
+        }
+      }
+    },
+    "List" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "List"
           }
         }
       }
@@ -496,24 +1145,79 @@
         }
       }
     },
-    "Lyrics arrive in stage 9" : {
+    "Loading lyrics…" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lyrics arrive in stage 9"
+            "value" : "Loading lyrics…"
           }
         }
       }
     },
-    "Lyrics options arrive in stage 9" : {
+    "Lyric Sync and Render Instrumental run on this iPhone. Their models download the first time you use them." : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lyrics options arrive in stage 9"
+            "value" : "Lyric Sync and Render Instrumental run on this iPhone. Their models download the first time you use them."
+          }
+        }
+      }
+    },
+    "Lyrics" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lyrics"
+          }
+        }
+      }
+    },
+    "Lyrics not found" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lyrics not found"
+          }
+        }
+      }
+    },
+    "Make sure your TV or speaker is on and sharing the same Wi‑Fi network." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make sure your TV or speaker is on and sharing the same Wi‑Fi network."
+          }
+        }
+      }
+    },
+    "Make the words light up · Sync it yourself" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make the words light up · Sync it yourself"
+          }
+        }
+      }
+    },
+    "Manage linked providers and keep each integration under your control." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manage linked providers and keep each integration under your control."
           }
         }
       }
@@ -540,6 +1244,28 @@
         }
       }
     },
+    "Move down" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move down"
+          }
+        }
+      }
+    },
+    "Move up" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move up"
+          }
+        }
+      }
+    },
     "Music Library" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -547,6 +1273,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Music Library"
+          }
+        }
+      }
+    },
+    "Nearby devices" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nearby devices"
           }
         }
       }
@@ -562,6 +1299,17 @@
         }
       }
     },
+    "Next up" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next up"
+          }
+        }
+      }
+    },
     "Nightly builds are generated from the latest commit and may contain unfinished changes, temporary bugs, or regressions. They are more experimental than official releases." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -569,6 +1317,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nightly builds are generated from the latest commit and may contain unfinished changes, temporary bugs, or regressions. They are more experimental than official releases."
+          }
+        }
+      }
+    },
+    "No Spotify devices found" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Spotify devices found"
           }
         }
       }
@@ -606,6 +1365,39 @@
         }
       }
     },
+    "No linked accounts yet" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No linked accounts yet"
+          }
+        }
+      }
+    },
+    "No lyrics for this song yet" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No lyrics for this song yet"
+          }
+        }
+      }
+    },
+    "Not connected" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not connected"
+          }
+        }
+      }
+    },
     "Nothing running right now." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -613,6 +1405,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nothing running right now."
+          }
+        }
+      }
+    },
+    "OK" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        }
+      }
+    },
+    "Offline" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offline"
           }
         }
       }
@@ -650,6 +1464,39 @@
         }
       }
     },
+    "Paste the client ID of your Spotify app. Its redirect URI must be pixlaudio://spotify-callback. Leave it empty to use the one built into the app." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste the client ID of your Spotify app. Its redirect URI must be pixlaudio://spotify-callback. Leave it empty to use the one built into the app."
+          }
+        }
+      }
+    },
+    "Pause" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pause"
+          }
+        }
+      }
+    },
+    "Phone volume" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phone volume"
+          }
+        }
+      }
+    },
     "Pick Image" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -657,6 +1504,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pick Image"
+          }
+        }
+      }
+    },
+    "Pick an Artist" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pick an Artist"
           }
         }
       }
@@ -672,6 +1530,28 @@
         }
       }
     },
+    "Plain (text only)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plain (text only)"
+          }
+        }
+      }
+    },
+    "Play" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Play"
+          }
+        }
+      }
+    },
     "Play all" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -683,13 +1563,35 @@
         }
       }
     },
-    "Player arrives in stage 8" : {
+    "Play from here" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Player arrives in stage 8"
+            "value" : "Play from here"
+          }
+        }
+      }
+    },
+    "Playback position" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playback position"
+          }
+        }
+      }
+    },
+    "Playback test" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playback test"
           }
         }
       }
@@ -705,6 +1607,17 @@
         }
       }
     },
+    "Playlist View" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playlist View"
+          }
+        }
+      }
+    },
     "Playlist options" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -712,6 +1625,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Playlist options"
+          }
+        }
+      }
+    },
+    "Playlist size" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playlist size"
           }
         }
       }
@@ -727,6 +1651,17 @@
         }
       }
     },
+    "Plays one streamed song through every step — search, matching, the YouTube clients and the streaming loader — and shows where it breaks." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plays one streamed song through every step — search, matching, the YouTube clients and the streaming loader — and shows where it breaks."
+          }
+        }
+      }
+    },
     "Prepare lyrics and instrumentals quietly while PixlAudio is open." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -734,6 +1669,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Prepare lyrics and instrumentals quietly while PixlAudio is open."
+          }
+        }
+      }
+    },
+    "Queue" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Queue"
           }
         }
       }
@@ -749,13 +1695,35 @@
         }
       }
     },
-    "Queue arrives in stage 8" : {
+    "Queue is empty." : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Queue arrives in stage 8"
+            "value" : "Queue is empty."
+          }
+        }
+      }
+    },
+    "Quick Fill Genre" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quick Fill Genre"
+          }
+        }
+      }
+    },
+    "Ready to Play" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ready to Play"
           }
         }
       }
@@ -782,6 +1750,61 @@
         }
       }
     },
+    "Reconnect Spotify to import playlists" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reconnect Spotify to import playlists"
+          }
+        }
+      }
+    },
+    "Remove custom image" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove custom image"
+          }
+        }
+      }
+    },
+    "Remove from queue" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove from queue"
+          }
+        }
+      }
+    },
+    "Render an instrumental or sync the lyrics word-by-word for this track — each runs on its own, so you don't have to wait on one to get the other." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Render an instrumental or sync the lyrics word-by-word for this track — each runs on its own, so you don't have to wait on one to get the other."
+          }
+        }
+      }
+    },
+    "Rendered instrumentals" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rendered instrumentals"
+          }
+        }
+      }
+    },
     "Reorder library tabs" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -789,6 +1812,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Reorder library tabs"
+          }
+        }
+      }
+    },
+    "Reorder tabs" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reorder tabs"
+          }
+        }
+      }
+    },
+    "Replace" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replace"
           }
         }
       }
@@ -870,13 +1915,35 @@
         }
       }
     },
-    "Runs quietly in the background when the phone is idle. It pauses during playback, low battery, heat, storage pressure, or manual processing; longer tracks remain available through the manual controls." : {
+    "SYNCED" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Runs quietly in the background when the phone is idle. It pauses during playback, low battery, heat, storage pressure, or manual processing; longer tracks remain available through the manual controls."
+            "value" : "SYNCED"
+          }
+        }
+      }
+    },
+    "Save" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save"
+          }
+        }
+      }
+    },
+    "Save as playlist" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save as playlist"
           }
         }
       }
@@ -903,6 +1970,39 @@
         }
       }
     },
+    "Search songs, artists, albums" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search songs, artists, albums"
+          }
+        }
+      }
+    },
+    "Searching for devices…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Searching for devices…"
+          }
+        }
+      }
+    },
+    "Searching for lyrics…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Searching for lyrics…"
+          }
+        }
+      }
+    },
     "Search…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -914,13 +2014,35 @@
         }
       }
     },
-    "Set up API key" : {
+    "Select a square image and fine-tune it so your cover art looks great across the app." : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Set up API key"
+            "value" : "Select a square image and fine-tune it so your cover art looks great across the app."
+          }
+        }
+      }
+    },
+    "Set custom duration" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set custom duration"
+          }
+        }
+      }
+    },
+    "Set default transition" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set default transition"
           }
         }
       }
@@ -936,6 +2058,61 @@
         }
       }
     },
+    "Show Controls" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show Controls"
+          }
+        }
+      }
+    },
+    "Show lyric options" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show lyric options"
+          }
+        }
+      }
+    },
+    "Shuffle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shuffle"
+          }
+        }
+      }
+    },
+    "Sign in" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in"
+          }
+        }
+      }
+    },
+    "Sign in to bring your liked songs and playlists into PixlAudio." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in to bring your liked songs and playlists into PixlAudio."
+          }
+        }
+      }
+    },
     "Skip / Not now" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -947,13 +2124,13 @@
         }
       }
     },
-    "Sleep timer arrives in stage 8" : {
+    "Sleep timer" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sleep timer arrives in stage 8"
+            "value" : "Sleep timer"
           }
         }
       }
@@ -965,6 +2142,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Smart Rule"
+          }
+        }
+      }
+    },
+    "Song files on this iPhone are deleted; other songs are removed from the library and won't come back when it is scanned again." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Song files on this iPhone are deleted; other songs are removed from the library and won't come back when it is scanned again."
+          }
+        }
+      }
+    },
+    "Song not found" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Song not found"
           }
         }
       }
@@ -1013,6 +2212,72 @@
         }
       }
     },
+    "Spotify Connect" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spotify Connect"
+          }
+        }
+      }
+    },
+    "Spotify is refusing to hand over the songs inside your playlists (HTTP 403). Your login is from before the app asked for that permission, so the saved token never got it — which is why every playlist imports empty while Liked Songs works fine.\n\nSigning in again fixes it. This keeps your library and the audio already matched — it only replaces the login." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spotify is refusing to hand over the songs inside your playlists (HTTP 403). Your login is from before the app asked for that permission, so the saved token never got it — which is why every playlist imports empty while Liked Songs works fine.\n\nSigning in again fixes it. This keeps your library and the audio already matched — it only replaces the login."
+          }
+        }
+      }
+    },
+    "Sync lyrics for all songs" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sync lyrics for all songs"
+          }
+        }
+      }
+    },
+    "Synced (with timestamps)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Synced (with timestamps)"
+          }
+        }
+      }
+    },
+    "Tap to Retry" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap to Retry"
+          }
+        }
+      }
+    },
+    "The AI will only use songs from your local library." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The AI will only use songs from your local library."
+          }
+        }
+      }
+    },
     "The app's own folder (Files › On My iPhone › PixlAudio) is always included." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1024,6 +2289,39 @@
         }
       }
     },
+    "The test could not run." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The test could not run."
+          }
+        }
+      }
+    },
+    "They can be rendered again from the song sheet." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "They can be rendered again from the song sheet."
+          }
+        }
+      }
+    },
+    "This device sets its own volume" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device sets its own volume"
+          }
+        }
+      }
+    },
     "This playlist is empty." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1031,6 +2329,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "This playlist is empty."
+          }
+        }
+      }
+    },
+    "This window closes itself once you finish signing in." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This window closes itself once you finish signing in."
+          }
+        }
+      }
+    },
+    "Title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Title"
           }
         }
       }
@@ -1112,6 +2432,61 @@
         }
       }
     },
+    "Trying one song end to end…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trying one song end to end…"
+          }
+        }
+      }
+    },
+    "Undo" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undo"
+          }
+        }
+      }
+    },
+    "Use pinch and drag gestures to find the perfect framing." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use pinch and drag gestures to find the perfect framing."
+          }
+        }
+      }
+    },
+    "View" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View"
+          }
+        }
+      }
+    },
+    "We couldn't find lyrics automatically. You can edit the title or artist and try searching manually." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "We couldn't find lyrics automatically. You can edit the title or artist and try searching manually."
+          }
+        }
+      }
+    },
     "When reporting an issue from a nightly build, always mention that it happened on a nightly build, not on the official release. Include the build date, workflow run name or number, or commit SHA if possible. Also check if the same problem happens on the latest official release." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1119,6 +2494,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "When reporting an issue from a nightly build, always mention that it happened on a nightly build, not on the official release. Include the build date, workflow run name or number, or commit SHA if possible. Also check if the same problem happens on the latest official release."
+          }
+        }
+      }
+    },
+    "Would you like to search for lyrics online?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Would you like to search for lyrics online?"
           }
         }
       }
@@ -1134,13 +2520,24 @@
         }
       }
     },
-    "You're using a beta build that may contain bugs, crashes, or experimental features. Help us improve by reporting issues." : {
+    "You can still listen without vocals. Render an instrumental once and keep it on this device for offline listening." : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "You're using a beta build that may contain bugs, crashes, or experimental features. Help us improve by reporting issues."
+            "value" : "You can still listen without vocals. Render an instrumental once and keep it on this device for offline listening."
+          }
+        }
+      }
+    },
+    "You synced this song yourself. Replace your timing with the automatic one?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You synced this song yourself. Replace your timing with the automatic one?"
           }
         }
       }
@@ -2113,6 +3510,17 @@
         }
       }
     },
+    "common_ok" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        }
+      }
+    },
     "common_percentage_text" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2208,6 +3616,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Settings"
+          }
+        }
+      }
+    },
+    "common_undo" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undo"
           }
         }
       }
@@ -2362,6 +3781,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Delimiters"
+          }
+        }
+      }
+    },
+    "e.g. Chill evening vibes, upbeat workout energy…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "e.g. Chill evening vibes, upbeat workout energy…"
           }
         }
       }
@@ -2971,6 +4401,39 @@
         }
       }
     },
+    "lyrics_sync_already_timed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "These lyrics already have word timing. Tap Start to redo it, or Fix a line in the preview."
+          }
+        }
+      }
+    },
+    "lyrics_sync_back5" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back 5 s"
+          }
+        }
+      }
+    },
+    "lyrics_sync_casting" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Syncing only works on this iPhone. Switch playback back to this iPhone first."
+          }
+        }
+      }
+    },
     "lyrics_sync_decrease" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2978,6 +4441,138 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Less"
+          }
+        }
+      }
+    },
+    "lyrics_sync_earlier" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Earlier"
+          }
+        }
+      }
+    },
+    "lyrics_sync_edit" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit"
+          }
+        }
+      }
+    },
+    "lyrics_sync_ended_early" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The song ended before the last %d words."
+          }
+        }
+      }
+    },
+    "lyrics_sync_file_failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't save the file"
+          }
+        }
+      }
+    },
+    "lyrics_sync_file_saved" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lyrics file saved"
+          }
+        }
+      }
+    },
+    "lyrics_sync_find_online" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Find lyrics online"
+          }
+        }
+      }
+    },
+    "lyrics_sync_fix_line" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fix a line"
+          }
+        }
+      }
+    },
+    "lyrics_sync_fix_line_hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the line that's off"
+          }
+        }
+      }
+    },
+    "lyrics_sync_fix_timing" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fix timing"
+          }
+        }
+      }
+    },
+    "lyrics_sync_fix_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fix my word timing"
+          }
+        }
+      }
+    },
+    "lyrics_sync_got_it" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Got it, don't show this again"
+          }
+        }
+      }
+    },
+    "lyrics_sync_hold_tip" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tip: hold it down on long notes"
           }
         }
       }
@@ -2993,6 +4588,50 @@
         }
       }
     },
+    "lyrics_sync_intro_1" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Play the song."
+          }
+        }
+      }
+    },
+    "lyrics_sync_intro_2" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the big button each time a new word starts."
+          }
+        }
+      }
+    },
+    "lyrics_sync_intro_3" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Made a mistake? Tap Undo. It rewinds a little so you can try again."
+          }
+        }
+      }
+    },
+    "lyrics_sync_keep_going" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep going"
+          }
+        }
+      }
+    },
     "lyrics_sync_keep_mine" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3000,6 +4639,292 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Keep mine"
+          }
+        }
+      }
+    },
+    "lyrics_sync_keep_tapping" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep tapping"
+          }
+        }
+      }
+    },
+    "lyrics_sync_later" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Later"
+          }
+        }
+      }
+    },
+    "lyrics_sync_leave" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leave"
+          }
+        }
+      }
+    },
+    "lyrics_sync_leave_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your taps are kept as a draft, so you can come back."
+          }
+        }
+      }
+    },
+    "lyrics_sync_leave_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leave without saving?"
+          }
+        }
+      }
+    },
+    "lyrics_sync_line_of" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Line %1$d of %2$d"
+          }
+        }
+      }
+    },
+    "lyrics_sync_loading" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Getting the song ready…"
+          }
+        }
+      }
+    },
+    "lyrics_sync_music_break" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Music break"
+          }
+        }
+      }
+    },
+    "lyrics_sync_next" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next"
+          }
+        }
+      }
+    },
+    "lyrics_sync_next_label" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next"
+          }
+        }
+      }
+    },
+    "lyrics_sync_no_results" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No lyrics found online. Paste them instead."
+          }
+        }
+      }
+    },
+    "lyrics_sync_no_song" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Play the song first, then sync its words."
+          }
+        }
+      }
+    },
+    "lyrics_sync_nudge_value" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$+d ms"
+          }
+        }
+      }
+    },
+    "lyrics_sync_open_timed_out" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't get the song ready. Close and try again."
+          }
+        }
+      }
+    },
+    "lyrics_sync_past_next_line" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That's past the next line. Tap Undo and try again."
+          }
+        }
+      }
+    },
+    "lyrics_sync_paste_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Put each line of the song on its own line. We'll use them as they are."
+          }
+        }
+      }
+    },
+    "lyrics_sync_paste_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste the lyrics"
+          }
+        }
+      }
+    },
+    "lyrics_sync_pause" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pause"
+          }
+        }
+      }
+    },
+    "lyrics_sync_paused" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paused · tap to keep going"
+          }
+        }
+      }
+    },
+    "lyrics_sync_pick_result" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pick the right lyrics"
+          }
+        }
+      }
+    },
+    "lyrics_sync_play" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Play"
+          }
+        }
+      }
+    },
+    "lyrics_sync_playback_stopped" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playback stopped."
+          }
+        }
+      }
+    },
+    "lyrics_sync_preview_timing_q" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Words light up too early / too late?"
+          }
+        }
+      }
+    },
+    "lyrics_sync_remove" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove my timing"
+          }
+        }
+      }
+    },
+    "lyrics_sync_remove_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This deletes the timing you made and goes back to the lyrics we found online."
+          }
+        }
+      }
+    },
+    "lyrics_sync_removed_words" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Removed timing for %d words"
           }
         }
       }
@@ -3015,6 +4940,270 @@
         }
       }
     },
+    "lyrics_sync_resume_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You synced %1$d of %2$d words last time."
+          }
+        }
+      }
+    },
+    "lyrics_sync_resume_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pick up where you left off?"
+          }
+        }
+      }
+    },
+    "lyrics_sync_rough" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Timed roughly"
+          }
+        }
+      }
+    },
+    "lyrics_sync_save" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save"
+          }
+        }
+      }
+    },
+    "lyrics_sync_save_failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't save. Your taps are kept as a draft."
+          }
+        }
+      }
+    },
+    "lyrics_sync_saved" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved. The words will light up from now on."
+          }
+        }
+      }
+    },
+    "lyrics_sync_saving" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saving…"
+          }
+        }
+      }
+    },
+    "lyrics_sync_see_result" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "See how it looks"
+          }
+        }
+      }
+    },
+    "lyrics_sync_share" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share lyrics file"
+          }
+        }
+      }
+    },
+    "lyrics_sync_share_lrc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For most apps (.lrc)"
+          }
+        }
+      }
+    },
+    "lyrics_sync_share_ttml" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Most detail (.ttml)"
+          }
+        }
+      }
+    },
+    "lyrics_sync_skip_line" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skip this line (time it roughly)"
+          }
+        }
+      }
+    },
+    "lyrics_sync_song_changed_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your taps are saved as a draft."
+          }
+        }
+      }
+    },
+    "lyrics_sync_song_changed_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The song changed"
+          }
+        }
+      }
+    },
+    "lyrics_sync_speed_help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slower is easier. The timing still comes out right."
+          }
+        }
+      }
+    },
+    "lyrics_sync_speed_label" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speed"
+          }
+        }
+      }
+    },
+    "lyrics_sync_speed_normal" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Normal"
+          }
+        }
+      }
+    },
+    "lyrics_sync_speed_slower" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slower"
+          }
+        }
+      }
+    },
+    "lyrics_sync_speed_slowest" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slowest"
+          }
+        }
+      }
+    },
+    "lyrics_sync_speed_x" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@×"
+          }
+        }
+      }
+    },
+    "lyrics_sync_start" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start"
+          }
+        }
+      }
+    },
+    "lyrics_sync_start_over" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start over"
+          }
+        }
+      }
+    },
+    "lyrics_sync_start_song" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start the song"
+          }
+        }
+      }
+    },
+    "lyrics_sync_stay" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stay"
+          }
+        }
+      }
+    },
     "lyrics_sync_studio_replace_q" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3022,6 +5211,94 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "You synced this song yourself. Replace your timing with the automatic one?"
+          }
+        }
+      }
+    },
+    "lyrics_sync_tap_hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap when you hear it"
+          }
+        }
+      }
+    },
+    "lyrics_sync_time_rest" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Time the rest roughly"
+          }
+        }
+      }
+    },
+    "lyrics_sync_too_long" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That's a lot of words. Is this the whole album?"
+          }
+        }
+      }
+    },
+    "lyrics_sync_try_again" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try again"
+          }
+        }
+      }
+    },
+    "lyrics_sync_undo" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undo"
+          }
+        }
+      }
+    },
+    "lyrics_sync_use_anyway" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use anyway"
+          }
+        }
+      }
+    },
+    "lyrics_sync_wait_tip" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tip: wait for the singer before tapping"
+          }
+        }
+      }
+    },
+    "lyrics_sync_yourself_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sync the words yourself"
           }
         }
       }
@@ -3543,6 +5820,17 @@
         }
       }
     },
+    "removed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "removed"
+          }
+        }
+      }
+    },
     "selected" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3550,6 +5838,160 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "selected"
+          }
+        }
+      }
+    },
+    "settings_accent_color_blue" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blue"
+          }
+        }
+      }
+    },
+    "settings_accent_color_custom" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Custom"
+          }
+        }
+      }
+    },
+    "settings_accent_color_default" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PixlAudio"
+          }
+        }
+      }
+    },
+    "settings_accent_color_graphite" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Graphite"
+          }
+        }
+      }
+    },
+    "settings_accent_color_green" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Green"
+          }
+        }
+      }
+    },
+    "settings_accent_color_indigo" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indigo"
+          }
+        }
+      }
+    },
+    "settings_accent_color_mint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mint"
+          }
+        }
+      }
+    },
+    "settings_accent_color_orange" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Orange"
+          }
+        }
+      }
+    },
+    "settings_accent_color_pink" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pink"
+          }
+        }
+      }
+    },
+    "settings_accent_color_purple" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Purple"
+          }
+        }
+      }
+    },
+    "settings_accent_color_red" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Red"
+          }
+        }
+      }
+    },
+    "settings_accent_color_subtitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colors buttons, switches, sliders, the tab bar and selected glass across the app. The player keeps its album colors (see Player Theme)."
+          }
+        }
+      }
+    },
+    "settings_accent_color_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accent Color"
+          }
+        }
+      }
+    },
+    "settings_accent_color_yellow" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yellow"
           }
         }
       }
@@ -6623,17 +9065,6 @@
         }
       }
     },
-    "settings_exp_play_song_first" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Play a song first"
-          }
-        }
-      }
-    },
     "settings_exp_playback_controls_subtitle" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6685,17 +9116,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Progress bar"
-          }
-        }
-      }
-    },
-    "settings_exp_remaster_body" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Render an instrumental or sync the lyrics word-by-word for this track — each runs on its own, so you don't have to wait on one to get the other."
           }
         }
       }
@@ -6806,17 +9226,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "TAIS Engine 3 — tell it a mood or genre and it finds songs, offline from your library or online via Spotify."
-          }
-        }
-      }
-    },
-    "settings_exp_tais_dj_later" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "TAIS DJ arrives with the TAIS update."
           }
         }
       }
@@ -8104,6 +10513,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Player Gestures"
+          }
+        }
+      }
+    },
+    "settings_player_theme_accent" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accent Color"
           }
         }
       }
@@ -9688,6 +12108,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Third-party notices"
+          }
+        }
+      }
+    },
+    "to continue to YouTube Music" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "to continue to YouTube Music"
           }
         }
       }

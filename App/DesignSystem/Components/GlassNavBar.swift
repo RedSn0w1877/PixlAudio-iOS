@@ -23,6 +23,7 @@ struct GlassNavBar: View {
     let onSelect: (RootTab) -> Void
 
     @Environment(\.appTheme) private var theme
+    @Environment(\.tabBarAccessibilityHidden) private var accessibilityHidden
 
     var body: some View {
         LiquidTabBar(selection: selection,
@@ -31,6 +32,7 @@ struct GlassNavBar: View {
                      pillColor: UIColor(theme.primary.opacity(GlassTint.prominent)),
                      restingGlyphColor: UIColor(theme.onPrimary),
                      liftedGlyphColor: UIColor(theme.primary),
+                     accessibilityHidden: accessibilityHidden,
                      onSelect: onSelect)
             .frame(height: LiquidTabBar.height(compact: compact, minimized: minimized))
             .frame(maxWidth: .infinity)
@@ -38,4 +40,10 @@ struct GlassNavBar: View {
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("navBar")
     }
+}
+
+extension EnvironmentValues {
+    /// True while something covers the tab bar (the expanded full player): `GlassNavBar` then hides its UIKit tabs
+    /// from accessibility, which `accessibilityHidden` on the bar can't do (see `LiquidTabBar.accessibilityHidden`).
+    @Entry var tabBarAccessibilityHidden = false
 }

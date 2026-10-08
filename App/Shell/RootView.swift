@@ -173,11 +173,17 @@ private struct TabAccessibilityHidden: ViewModifier {
     }
 }
 
-/// Hides the tab bar from VoiceOver while the full player covers it (the mini player's own layer hides itself).
+/// Hides the tab bar from VoiceOver while the full player covers it (the mini player's own layer hides itself). The
+/// bar's tabs are UIKit segments, which `accessibilityHidden` doesn't reach, so `GlassNavBar` also hides them itself
+/// (`tabBarAccessibilityHidden`): left in the tree, they answered accessibility hit tests under the player's toggle
+/// row (CI, 2026-10-07: UI tests tapped the heart at its corner, outside the round "on" segment).
 private struct HiddenWhilePlayerExpanded: ViewModifier {
     @Environment(AppEnvironment.self) private var environment
 
     func body(content: Content) -> some View {
-        content.accessibilityHidden(environment.playerSheet.isExpanded)
+        let isExpanded = environment.playerSheet.isExpanded
+        content
+            .environment(\.tabBarAccessibilityHidden, isExpanded)
+            .accessibilityHidden(isExpanded)
     }
 }

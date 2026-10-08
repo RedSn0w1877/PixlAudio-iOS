@@ -1,9 +1,9 @@
 import PixlModel
 import SwiftUI
 
-/// "Save as playlist" (Android `SaveQueueAsPlaylistSheet`), full screen: the close circle, the title
-/// (`headlineMedium` semibold) and Select all / Deselect all (rounding into a `tertiary` pill when everything is
-/// selected); the playlist name field (focused, the default name selected) and the song search capsule; the queue's
+/// "Save as playlist" (Android `SaveQueueAsPlaylistSheet`), full screen: Android's `MediumTopAppBar` (two rows, it
+/// never collapses here) with the close circle and Select all / Deselect all (rounding into a `tertiary` pill when
+/// everything is selected) on top and the title (`headlineMedium` semibold) on its own row; the playlist name field (focused, the default name selected) and the song search capsule; the queue's
 /// songs as capsules with a check box and round art; and the bottom bar: the summary capsule ("N songs selected" ·
 /// "Save as: …") beside the Save pill. Saves the checked songs in queue order as a new playlist.
 ///
@@ -134,38 +134,49 @@ struct SaveQueueAsPlaylistSheet: View {
         }
     }
 
+    /// Android's `MediumTopAppBar`: a 64 pt row (close circle, Select all pill) and a 48 pt title row below it, the
+    /// title 20 pt in (4 pt bar padding + 12 pt title inset + the Text's own 4 pt). On one row the title truncated to
+    /// "Save as pl…" beside "Deselect all" on a 402 pt iPhone, at every text style that still reads as a title.
     private func topBar(allSelected: Bool) -> some View {
-        HStack(spacing: 12) {
-            GlassCircleButton(systemImage: "xmark", accessibilityLabel: "Close",
-                              tint: theme.surfaceContainerHigh.opacity(GlassTint.container)) { dismiss() }
-                .padding(.leading, 8)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
+                GlassCircleButton(systemImage: "xmark", accessibilityLabel: "Close",
+                                  tint: theme.surfaceContainerHigh.opacity(GlassTint.container)) { dismiss() }
+                    .padding(.leading, 8)
+                Spacer(minLength: 8)
+                Button {
+                    selected = allSelected ? [] : allIds
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: allSelected ? "checklist.unchecked" : "checklist.checked")
+                            .font(.system(size: 15, weight: .semibold))
+                        Text(allSelected ? "Deselect all" : "Select all")
+                            .pixlFont(.labelLarge, weight: .bold)
+                            .lineLimit(1)
+                    }
+                    .fixedSize()
+                    .foregroundStyle(allSelected ? theme.onTertiary : theme.onSurface)
+                    .padding(.horizontal, 16)
+                    .frame(height: 40)
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .pixlGlass(in: RoundedRectangle(cornerRadius: allSelected ? 20 : 6, style: .continuous),
+                           tint: (allSelected ? theme.tertiary : theme.surfaceContainerHigh)
+                               .opacity(allSelected ? GlassTint.prominent : GlassTint.container), interactive: true)
+                .animation(.spring(response: 0.35, dampingFraction: 0.8), value: allSelected)
+                .padding(.trailing, 12)
+            }
+            .frame(height: 64)
             Text("Save as playlist")
                 .pixlFont(.headlineMedium, weight: .semibold)
                 .foregroundStyle(theme.onSurface)
                 .lineLimit(1)
-            Spacer(minLength: 8)
-            Button {
-                selected = allSelected ? [] : allIds
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: allSelected ? "checklist.unchecked" : "checklist.checked")
-                        .font(.system(size: 15, weight: .semibold))
-                    Text(allSelected ? "Deselect all" : "Select all")
-                        .pixlFont(.labelLarge, weight: .bold)
-                }
-                .foregroundStyle(allSelected ? theme.onTertiary : theme.onSurface)
-                .padding(.horizontal, 16)
-                .frame(height: 40)
-                .contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-            .pixlGlass(in: RoundedRectangle(cornerRadius: allSelected ? 20 : 6, style: .continuous),
-                       tint: (allSelected ? theme.tertiary : theme.surfaceContainerHigh)
-                           .opacity(allSelected ? GlassTint.prominent : GlassTint.container), interactive: true)
-            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: allSelected)
-            .padding(.trailing, 12)
+                .accessibilityAddTraits(.isHeader)
+                .padding(.horizontal, 20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: 48, alignment: .top)
         }
-        .frame(height: 64)
     }
 
     private func fieldBox<Content: View>(@ViewBuilder content: () -> Content) -> some View {

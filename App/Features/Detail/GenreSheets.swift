@@ -262,11 +262,12 @@ struct QuickFillSheet: View {
         }
     }
 
-    /// Android's floating toolbar: a 32 pt `surfaceContainerHighest` panel with Select all · Clear, the status and the
-    /// Next / Quick Fill pill. Hoa (2026-10-07): the primary button on a floating bar is its own glass pill, so the
-    /// panel's glass went (no glass on glass): the Select all · Clear pair, a status capsule and the pill are separate
-    /// glass shapes in one container (spacing 0, below the pair's 2 pt seam). On the genre step the pair leaves and the
-    /// status capsule takes its room (Android keeps the panel and hides the pair).
+    /// Android's floating toolbar: a 32 pt `surfaceContainerHighest` panel with Select all · Clear (songs step) or the
+    /// chosen genre (genre step) and the Next / Quick Fill pill. Hoa (2026-10-07): the primary button on a floating bar
+    /// is its own glass pill, so the panel's glass went (no glass on glass): the Select all · Clear pair, the genre
+    /// status capsule and the pill are separate glass shapes in one container (spacing 0, below the pair's 2 pt seam).
+    /// On the genre step the pair leaves and the status capsule takes its room (Android keeps the panel and hides the
+    /// pair); on the songs step the gap between the pair and Next stays empty, as on Android.
     private var toolbar: some View {
         let canContinue = step == 0 ? !selected.isEmpty : genre != nil
         return GlassEffectContainer(spacing: 0) {
@@ -284,15 +285,23 @@ struct QuickFillSheet: View {
                                              tint: theme.surfaceContainerHigh.opacity(GlassTint.prominent),
                                              foreground: theme.onSurface) { selected.removeAll() }
                     }
+                    // At their own width: the status capsule's flexible frame squeezed them to "S…" and "C…".
+                    .fixedSize()
                     .transition(.opacity)
                 }
-                Text(step == 0 ? "\(selected.count) selected" : (genre.map { "Genre: \($0)" } ?? "Select a genre"))
-                    .pixlFont(.labelMedium)
-                    .foregroundStyle(theme.onSurfaceVariant)
-                    .lineLimit(1)
-                    .padding(.horizontal, 12)
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    .pixlGlass(in: Capsule(), tint: theme.surfaceContainerHighest.opacity(GlassTint.container))
+                if step == 0 {
+                    // Android leaves this gap empty (a weighted Spacer) on the songs step. A status capsule here had
+                    // about 40 pt beside the pair on a 402 pt iPhone and showed a lone "0".
+                    Spacer(minLength: 0)
+                } else {
+                    Text(genre.map { "Genre: \($0)" } ?? "Select a genre")
+                        .pixlFont(.labelMedium)
+                        .foregroundStyle(theme.onSurfaceVariant)
+                        .lineLimit(1)
+                        .padding(.horizontal, 12)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .pixlGlass(in: Capsule(), tint: theme.surfaceContainerHighest.opacity(GlassTint.container))
+                }
                 Button {
                     if step == 0 {
                         guard !selected.isEmpty else { return }
@@ -309,6 +318,7 @@ struct QuickFillSheet: View {
                     .foregroundStyle(theme.onPrimary)
                     .padding(.horizontal, 16)
                     .frame(height: 44)
+                    .fixedSize()
                     .contentShape(.capsule)
                 }
                 .buttonStyle(.plain)

@@ -24,6 +24,25 @@ final class FavoriteObservationTests: XCTestCase {
         XCTAssertEqual(store.observedSong(id: id)?.isFavorite, false)
     }
 
+    /// Tap after tap, as on the full player's heart: each toggle invalidates the reader that the previous redraw
+    /// registered, and the flag alternates (liked → not → liked → not).
+    func testEveryToggleInvalidatesTheNextRead() {
+        let store = LibraryStore(snapshot: DemoLibrary.snapshot)
+        let editor = LibraryEditor(store: store, persistence: nil, writesCache: false)
+        let id = DemoLibrary.songs[0].id
+        for expected in [false, true, false] {
+            let changed = expectation(description: "toggle to \(expected) invalidates the reader")
+            withObservationTracking {
+                _ = store.observedSong(id: id)
+            } onChange: {
+                changed.fulfill()
+            }
+            editor.toggleFavorite(id)
+            wait(for: [changed], timeout: 1)
+            XCTAssertEqual(store.observedSong(id: id)?.isFavorite, expected)
+        }
+    }
+
     /// Why `observedSong` exists: the plain lookup registers nothing, so its reader is never invalidated.
     func testPlainLookupIsNotObserved() {
         let store = LibraryStore(snapshot: DemoLibrary.snapshot)

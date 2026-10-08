@@ -371,6 +371,11 @@ categories, sheets; glass in place of Material; text legible in light and dark. 
     `@ObservationIgnored`, so a heart read through `song(id:)` stayed stale until something else redrew the view.
     `observedSong` also reads `revision`: use it only in small views, never in list rows, `NowPlayingView.body` or
     `LyricsView`. The lock screen's Like toggles the same favourite and follows edits made in the app.
+  - *Tab bar under the expanded player (main health, 2026-10-07):* the bar's tabs are UIKit segments
+    (`LiquidTabBar`), which SwiftUI's `accessibilityHidden` around the bar doesn't reach. They stayed in the
+    accessibility tree under the toggle row and answered accessibility hit tests there (UI tests then tapped each
+    toggle at its top-left corner, outside a toggle that is on). `HiddenWhilePlayerExpanded` now also sets
+    `\.tabBarAccessibilityHidden`, and `LiquidTabBar` turns it into `accessibilityElementsHidden` on its view.
 - **Sheets:** `AppSheet.queue` (large), `.sleepTimer`, `.devices`, `.artistPicker(songId:)`, `.taisChat` (stage 13's
   TAIS DJ chat, from the sparkles circle); `AppCover.editSong(songId:)`. The queue presents the song sheet, the timer and Save as
   playlist itself. The song sheet's edit button (`SongOptionsSheet(onEdit:)`) opens `EditSongSheet`.
@@ -872,6 +877,11 @@ belong to other work and are untouched.
   - Quick Fill: the Select all · Clear pair, a status capsule (`surfaceContainerHighest`) and Next / Quick Fill
     (`primary`). On the genre step the pair leaves and the status capsule takes its room; Android keeps its panel and
     hides the pair.
+  - Main health (2026-10-07): the pills keep their one-line width (`fixedSize`). Quick Fill's songs step leaves the
+    gap between Select all · Clear and Next empty, as Android does (a status capsule there had about 40 pt and showed
+    a lone count); the genre step keeps its status capsule. Save as playlist's top bar is Android's two-row
+    `MediumTopAppBar`: close circle and Select all / Deselect all on a 64 pt row, the title (`headlineMedium`
+    semibold, 20 pt in) on a 48 pt row below. On one row the title truncated beside "Deselect all" at every style.
 - **Listening Stats header.** It uses the `SettingsScaffold` glass bar (`surfaceContainerHigh` at `GlassTint.bar`,
   fading in over the first half of the collapse) instead of the solid band. The circles and the pill row sit on it,
   as Settings' back circle does.

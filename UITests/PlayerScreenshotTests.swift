@@ -33,15 +33,16 @@ final class PlayerScreenshotTests: XCTestCase {
     /// The full player's toggle row. Demo song 0 is liked.
     func testFavoriteTogglesImmediately() throws {
         let app = launch("nowPlaying", "light")
-        assertFavoriteFlips(app, name: "playerFavoriteToggled-light")
+        assertFavoriteFlips(app, heart: "player.favorite", name: "playerFavoriteToggled-light")
     }
 
-    /// The song sheet's favourite tile.
+    /// The song sheet's favourite tile. By its own identifier: the full player is pre-built under the sheet, collapsed
+    /// and off screen, and its heart carries the same label (a label query found that one first, which can't be tapped).
     func testSongInfoFavoriteTogglesImmediately() throws {
         let app = launch("songInfo", "light")
         XCTAssertTrue(app.descendants(matching: .any)["screen.songInfo"].firstMatch.waitForExistence(timeout: 20),
                       "the song sheet did not appear")
-        assertFavoriteFlips(app, name: "songInfoFavoriteToggled-light")
+        assertFavoriteFlips(app, heart: "songInfo.favorite", name: "songInfoFavoriteToggled-light")
     }
 
     /// The lyrics More sheet's shuffle · repeat · favourite row (the heart's state is its selected trait).
@@ -61,6 +62,42 @@ final class PlayerScreenshotTests: XCTestCase {
         let off = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isSelected == false"), object: heart)
         XCTAssertEqual(XCTWaiter.wait(for: [off], timeout: 3), .completed, "the heart kept its old state after the tap")
         snapshot(app, "lyricsOptionsFavoriteToggled-dark")
+    }
+
+    /// While the full player is up, the tab bar under it is out of the accessibility tree, so the player's controls
+    /// can be tapped as elements; once the player collapses, the tabs are back. The bar's UIKit tabs used to stay in
+    /// the tree under the shuffle · repeat · favourite row: XCUITest then tapped each toggle at its top-left corner
+    /// (CI diagnostics, 2026-10-07), which misses a toggle that is on (a full capsule), and VoiceOver touch
+    /// exploration could land on a hidden tab. The tab is found with `descendants(matching: .any)`, as the tab bar
+    /// tests find it: the UIKit segment's element type isn't pinned, and a query that never matches would pass the
+    /// "hidden" check without proving anything.
+    func testTabBarLeavesAccessibilityUnderThePlayer() throws {
+        let app = launch("nowPlaying", "light")
+        continueAfterFailure = true // every check reports
+        let heart = app.buttons["player.favorite"]
+        XCTAssertTrue(heart.waitForExistence(timeout: 20), "the heart is missing")
+        let hittable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: heart)
+        XCTAssertEqual(XCTWaiter.wait(for: [hittable], timeout: 10), .completed, "the heart can't be tapped")
+        let libraryTab = app.descendants(matching: .any)["navBar.library"].firstMatch
+        XCTAssertFalse(libraryTab.exists && libraryTab.isHittable, "the hidden tab bar still answers under the player")
+        XCTAssertEqual(heart.label, "Remove from favorites", "demo song 0 should start liked")
+        heart.tap()
+        let unliked = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "Add to favorites"),
+                                                object: heart)
+        XCTAssertEqual(XCTWaiter.wait(for: [unliked], timeout: 3), .completed,
+                       "an element tap on the liked heart did not reach it")
+
+        // Collapsed again, the tabs are back in the accessibility tree: VoiceOver reads them and taps reach them.
+        let collapse = collapseButton(app)
+        XCTAssertTrue(collapse.waitForExistence(timeout: 5), "the collapse circle is missing")
+        collapse.tap()
+        XCTAssertTrue(libraryTab.waitForExistence(timeout: 10),
+                      "the tab bar did not come back to accessibility after the player collapsed")
+        let tabHittable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"),
+                                                    object: libraryTab)
+        XCTAssertEqual(XCTWaiter.wait(for: [tabHittable], timeout: 5), .completed,
+                       "the Library tab can't be tapped after the player collapsed")
+        app.terminate()
     }
 
     // MARK: Gestures
@@ -131,17 +168,24 @@ final class PlayerScreenshotTests: XCTestCase {
             .firstMatch
     }
 
-    /// Taps the liked heart ("Remove from favorites") and expects "Add to favorites" without touching anything else.
-    /// By label: controls inside a `GlassEffectContainer` keep only their labels.
-    private func assertFavoriteFlips(_ app: XCUIApplication, name: String) {
-        let liked = app.buttons.matching(NSPredicate(format: "label == %@", "Remove from favorites")).firstMatch
-        XCTAssertTrue(liked.waitForExistence(timeout: 20), "the liked heart is missing")
+    /// Taps the liked heart (identifier `heart`, labelled "Remove from favorites") in its centre, where a finger
+    /// lands, and expects the same button to read "Add to favorites" without touching anything else. By identifier:
+    /// both hearts keep theirs (CI hierarchy dumps, 2026-10-07), and the collapsed player's hidden heart shares the
+    /// label. At the centre rather than `tap()`'s hit point: XCUITest picks that point from accessibility hit tests,
+    /// and anything left in the tree under the heart moves it to a corner, outside a toggle that is on (see
+    /// `testTabBarLeavesAccessibilityUnderThePlayer`, which guards that case).
+    private func assertFavoriteFlips(_ app: XCUIApplication, heart identifier: String, name: String) {
+        let heart = app.buttons[identifier]
+        XCTAssertTrue(heart.waitForExistence(timeout: 20), "the heart \(identifier) is missing")
         // The pre-built player is in the hierarchy before it has expanded: wait until the heart can take the tap.
-        let hittable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: liked)
+        let hittable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: heart)
         XCTAssertEqual(XCTWaiter.wait(for: [hittable], timeout: 10), .completed, "the heart can't be tapped")
-        liked.tap()
-        let unliked = app.buttons.matching(NSPredicate(format: "label == %@", "Add to favorites")).firstMatch
-        XCTAssertTrue(unliked.waitForExistence(timeout: 3), "the heart kept its old state after the tap")
+        XCTAssertEqual(heart.label, "Remove from favorites", "demo song 0 should start liked")
+        heart.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let unliked = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "Add to favorites"),
+                                                object: heart)
+        XCTAssertEqual(XCTWaiter.wait(for: [unliked], timeout: 3), .completed,
+                       "the heart kept its old state after the tap")
         snapshot(app, name)
     }
 
