@@ -67,14 +67,19 @@ in PixlCore. Phase 1 (the system model by default) is `2026-10-07-local-ai.md`; 
   taken. Looked at: the AI playlist sheet's "isn't on this iPhone yet" card is right; the Settings shots stopped
   scrolling while the model's row was still under the mini player, so the scroll now goes on until the whole row is
   above it.
-- The run after that (free-space check, the scroll fix, this note) is in the final report.
+- Run 37732899180 on `78f2a19` (free-space check, scroll fix, `[shots:SettingsScreenshotTests]`): green on the
+  second attempt. The first attempt's only failure was `SpotifyConnectStoreTests.testTransportGoesToTheRemoteWhileAttached`
+  (a 20 ms timing test, not touched here, which passed in the run before) on a runner that also lost its network
+  (the artifact upload failed with ENOTFOUND); the re-run passed everything. The Settings shots now show the whole
+  model row: "Downloading — 42% of 896.3 MB" with the bar and Cancel, and "Downloaded · 898.7 MB on this iPhone"
+  with Delete, light and dark.
 
 ## Hoa's iPhone checklist
 
 Settings › AI features, on Wi-Fi, with ~2 GB free:
 
 - [ ] "Use downloaded AI model" is off by default; the on-device model row still says "in use".
-- [ ] Turn it on: the row appears with "Not downloaded · 896 MB. Wi-Fi recommended." and Download; nothing downloads
+- [ ] Turn it on: the row appears with "Not downloaded · 896.3 MB. Wi-Fi recommended." and Download; nothing downloads
       by itself. The system model's row loses its checkmark.
 - [ ] Download: the percentage and bar move once per percent; Cancel works; Download again resumes from zero.
 - [ ] After it finishes: "Checking and installing…" for a while (the first compile takes time), then "Downloaded ·

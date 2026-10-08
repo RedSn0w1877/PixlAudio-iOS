@@ -652,8 +652,8 @@ turned off; ready `sheet.createPlaylist`). Shots: `SettingsScreenshotTests.testA
 
 - **Settings › AI features › Assistant:** under the on-device model row, a "Use downloaded AI model" switch (off by
   default) and, while it is on or the model is on the phone, the model's row: "Qwen2.5 1.5B Instruct", its state
-  (size and "Wi-Fi recommended" / "Downloading — 42% of 896 MB" with a progress bar / "Checking and installing…" /
-  "Downloaded · 898 MB on this iPhone" plus the last answer's speed) and one fill button (Download or Retry, Cancel,
+  (size and "Wi-Fi recommended" / "Downloading — 42% of 896.3 MB" with a progress bar / "Checking and installing…" /
+  "Downloaded · 898.7 MB on this iPhone" plus the last answer's speed) and one fill button (Download or Retry, Cancel,
   Delete with a confirmation). Turning the switch on never starts the download by itself. With the switch on, the
   system model's row loses its checkmark ("Turn off "Use downloaded AI model" to use it instead"). Both are ordinary
   settings glass rows; the buttons are fills (no glass on glass). The state comes from `ModelManager`, which updates
