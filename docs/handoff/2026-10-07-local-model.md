@@ -93,6 +93,11 @@ in PixlCore. Phase 1 (the system model by default) is `2026-10-07-local-ai.md`; 
   (the artifact upload failed with ENOTFOUND); the re-run passed everything. The Settings shots now show the whole
   model row: "Downloading — 42% of 896.3 MB" with the bar and Cancel, and "Downloaded · 898.7 MB on this iPhone"
   with Delete, light and dark.
+- Run 37741078324 on `762302d` (the review fixes; a manual run with `shots_only: SettingsScreenshotTests`, because the
+  push's head commit was the docs commit and carried no `[shots:]`; it superseded the push run 37740982881, which the
+  concurrency group cancelled): green. 272 app unit tests passed (the two new `LocalModelTests` among them) and every
+  Settings shot was taken; the AI category shots look as before (the changed texts only show with a cloud assistant
+  on together with the switch, or in the Delete confirmation, which no shot opens).
 
 ## Hoa's iPhone checklist
 
@@ -123,6 +128,6 @@ Settings › AI features, on Wi-Fi, with ~2 GB free:
 
 ## Next step
 
-Watch the CI run listed above go green, look at the screenshots, then merge with the batch. If the model is too slow
+Install a build from this branch and go through the checklist, then merge with the batch. If the model is too slow
 or its answers too weak on the phone, the cheapest change is the 0.5B model (`llm_model: qwen2.5-0.5b`, same pipeline,
 new pin). (Qwen2.5 3B is not Apache-2.0, so it isn't an option.)
