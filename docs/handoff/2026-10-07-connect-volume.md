@@ -38,15 +38,29 @@ in Control Center while a speaker plays is not a press. Speakers that round thei
 single 5 % step as unchanged after a few seconds.
 
 ## How it was verified
-- **CI** (no Mac, no device): run `37691708574` — see the final status in the batch report. PixlCore tests,
-  build, AppTests (incl. the audio-session hold tests) and the screenshot classes `SpotifyConnectScreenshotTests`,
-  `PlayerScreenshotTests`, `SettingsScreenshotTests`.
-- **Locally on Windows:** `swift test --filter SpotifyConnect` on PixlCore (34 tests, 7 suites pass); parse check and
+- **CI** (no Mac, no device):
+  - run `37691708574` (`c9b5e5a`, the feature): PixlCore tests, build and AppTests (incl. the audio-session hold
+    tests) pass; screenshot classes `SpotifyConnectScreenshotTests`, `PlayerScreenshotTests` and
+    `SettingsScreenshotTests` pass except `PlayerScreenshotTests/testFavoriteTogglesImmediately` and
+    `testSongInfoFavoriteTogglesImmediately`, which fail on main too (branch `s21-main-health` owns them; this branch
+    doesn't touch the player).
+  - run `37705767037` (`f4a7e0e`): all green — core, build, unit tests, `SpotifyConnectScreenshotTests` +
+    `SettingsScreenshotTests` (57 UI tests, light + dark).
+  - run `37708207135` (`95482df`, the pop-up's final size): `SpotifyConnectScreenshotTests` pass (15). Its
+    first attempt failed one unit test this branch doesn't touch (`DualDeckEngineTests.testCrossfadeOverlapsBothDecks
+    WithTheirGainCurves`: 10 audio buffers checked where it wants more than 10, a timing flake on the shared runner;
+    it passed on the two runs before); the re-run (attempt 2) is all green.
+- **Locally on Windows:** `swift test --filter SpotifyConnect` on PixlCore (34 tests in 7 suites pass); parse check and
   forbidden-pattern check pass.
-- **Screenshots looked at:** the pop-up over the full player (light/dark) and over the lyrics screen, the devices
-  hero after the demo press, and the Equalizer's Connect volume card (light/dark).
+- **Screenshots looked at** (light + dark): the pop-up over the full player and over the lyrics screen, the devices
+  hero after the demo press (slider at 50 %, no pop-up over the sheet), and the Equalizer's Connect volume card. The
+  first pop-up let the output pill's and the lyrics title's text show through its glass and truncated "Kitchen Echo
+  Show"; it now uses the toasts' tint strength and is 264 pt wide, so it sits between the full player's collapse and
+  queue buttons with the whole name.
 - **Not verified anywhere:** the button handling itself. The Simulator can't change the volume, so UI tests show the
   pop-up from a demo press only. Nothing here was tested on a phone.
+- **Open design choice:** the pop-up uses the app's colours (like Connect's toasts), not the album-art colours, even
+  over the full player. Say so if it should follow the player's colours there.
 
 ## Hoa's iPhone checklist
 - [ ] Play on the Echo (or any Connect speaker), stay in PixlAudio, press volume up/down: the speaker moves 5 % per
