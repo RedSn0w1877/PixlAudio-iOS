@@ -3,13 +3,15 @@ import Observation
 import PixlLyrics
 
 /// The lyrics screen's own look preferences (Android DataStore keys read by `rememberLyricsAppearancePrefs` and the
-/// More sheet): alignment, translation and romanisation visibility, keep-screen-on. The blur preferences live in
-/// `LyricsSettings` (Settings › Appearance) and `disable_blur_all_over`.
+/// More sheet): alignment, translation and romanisation visibility. The blur preferences live in `LyricsSettings`
+/// (Settings › Appearance) and `disable_blur_all_over`. Android's `keep_screen_on_lyrics` is retired: the lyrics
+/// screen always keeps the screen on (owner, 2026-10-07), so the stored value is dropped and never read.
 @Observable
 final class LyricsViewPreferences {
     private let defaults: UserDefaults
 
-    static let keepScreenOnKey = "keep_screen_on_lyrics"
+    /// Android's "Keep screen on" switch, retired on iOS (always on); removed from the defaults so it never lingers.
+    static let retiredKeepScreenOnKey = "keep_screen_on_lyrics"
 
     /// "left", "center" or "right".
     var alignment: String { didSet { defaults.set(alignment, forKey: LyricsAppearancePrefs.Key.alignment) } }
@@ -19,14 +21,13 @@ final class LyricsViewPreferences {
     var showRomanization: Bool {
         didSet { defaults.set(showRomanization, forKey: LyricsAppearancePrefs.Key.showRomanization) }
     }
-    var keepScreenOn: Bool { didSet { defaults.set(keepScreenOn, forKey: Self.keepScreenOnKey) } }
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
         alignment = defaults.string(LyricsAppearancePrefs.Key.alignment, default: "left")
         showTranslation = defaults.bool(LyricsAppearancePrefs.Key.showTranslation, default: true)
         showRomanization = defaults.bool(LyricsAppearancePrefs.Key.showRomanization, default: true)
-        keepScreenOn = defaults.bool(Self.keepScreenOnKey, default: false)
+        defaults.removeObject(forKey: Self.retiredKeepScreenOnKey)
     }
 
     /// `disable_blur_all_over` (Settings › Appearance; global "no blur" switch).

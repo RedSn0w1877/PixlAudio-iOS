@@ -80,6 +80,7 @@ extension BackupRestoreReport {
         ],
         failures: [Failure(section: .aiUsageLogs, message: "AI Activity Logs payload has an incomplete entry.")],
         warnings: ["This is a legacy backup (v2). Some new modules may not be available."],
-        skippedSettings: ["nav_bar_corner_radius", "use_smooth_corners", "hi_fi_mode_enabled", "favorite_song_ids"],
+        skippedSettings: ["nav_bar_corner_radius", "use_smooth_corners", "hi_fi_mode_enabled", "keep_screen_on_lyrics",
+                          "favorite_song_ids"],
         pendingPlaylistSongs: 9, restoredSettings: true)
 }

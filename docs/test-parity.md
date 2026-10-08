@@ -786,3 +786,33 @@ Nothing to port: Android has no tests for the full player's toggle row, the tran
   tab bar's tabs are out of the accessibility tree under the expanded player, that an element tap then reaches the
   liked heart, and that the tabs are back (and tappable) once the player collapses; `AppTests/FavoriteObservationTests.testEveryToggleInvalidatesTheNextRead` toggles three times in a row; `testExpandedBluetoothLight`
   (`-screen nowPlaying.bluetooth`) expects "Playing on AirPods Pro" in the top bar and no "Now Playing" title.
+
+## Lyrics page (owner items 1 + 11, 2026-10-07, branch `s16-lyrics-page`, Swift-only)
+Android has no tests for the lyrics toolbar or the keep-screen-on switch; these define the iOS behaviour.
+
+- `PixlBackupTests/ModuleTests` — `catalogueKinds` (`keep_screen_on_lyrics` is android-only now, still listed once),
+  `retiredKeepScreenOnIsSkippedAndReported` (a backup carrying it restores the other keys and reports it under
+  skipped settings; nothing unknown or ignored).
+- `AppTests/BackupServiceTests.testOldBackupWithKeepScreenOnRestoresAndListsItSkipped` — restored end to end: the key
+  is skipped, never written to `UserDefaults`, never exported, and a value stored before the switch went is removed
+  by `LyricsViewPreferences`.
+- `UITests/LyricsScreenshotTests` — `testSingActive` (Sing's value "Vocals off" with the demo instrumental playing),
+  `testSingRendering` (value "Removing vocals …" while the demo job runs), `testTranslateMenu` (a tap on Translate
+  hides the demo's translations and a second shows them again — the value goes "Translations hidden" → "Showing
+  translations"; then a long press opens the menu with Translate via AI instead of running the tap),
+  `testShowAsPlainText` (a tap on the More sheet's "Show as plain text" row turns karaoke into plain text, so "Adjust
+  sync" leaves the sheet; the row is first scrolled clear of the screen's edge and left to settle, and it is tapped a
+  second time only while the switch still reads off, so a late first tap can't be undone); `testMoreSheet` now shows
+  the half-height glass sheet and `testMoreSheetBottomInLightApp` swipes on the sheet until its own heart is on
+  screen.
+- `UITests/GlassAccessibilityTests.testLyricsToolbarKeepsButtonTraits` — Back, Translate, Sing, Lyrics options and
+  play/pause stay buttons with their labels inside the cluster's glass container; Sing and Translate report a value.
+- `UITests/PlayerScreenshotTests.testLyricsOptionsFavoriteTogglesImmediately` — now finds the More sheet's heart by
+  the full player's labels ("Remove from favorites" → "Add to favorites"), as the row is `PlayerToggleRow`, looked up
+  inside the sheet: the full player built under it carries the same labels off screen (an unscoped query found that
+  one and could not scroll to it).
+- `UITests/LyricsSyncEntryTests` — the sync chip is found by identifier or label ("Make the words light up · Sync it
+  yourself"): inside the lyrics screen it keeps only its label (the screen's own identifier reaches its children).
+  Under `-uiTest` the editor clears its drafts folder (in the temporary directory) once per launch: once
+  `testLeaveReturnsToLyrics` could reach the editor it left a 3-tap draft behind, and every later editor test opened on
+  "You synced 3 of 128 words last time" instead of the intro (`LyricsSyncScreenshotTests.testLiveTapping` too).

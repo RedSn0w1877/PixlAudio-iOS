@@ -3,7 +3,9 @@ import PixlModel
 import SwiftUI
 
 /// The "find lyrics" dialog (Android `FetchLyricsDialog`): ask → searching → pick a result / not found (manual title
-/// and artist) / error. A centred glass card (32 pt corners) over a dim backdrop.
+/// and artist) / error. A centred glass card (32 pt corners) over a dim backdrop. Since 2026-10-07 (Hoa: the lyrics page
+/// had "0 liquid glass") the card is tinted 45 % rather than 62 % and the backdrop dims 35 % rather than 45 %, so the
+/// animated artwork reads through; the fields and result rows inside stay fills (no glass on glass).
 struct FetchLyricsDialog: View {
     let state: LyricsController.SearchState
     let song: Song?
@@ -20,7 +22,7 @@ struct FetchLyricsDialog: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.45)
+            Color.black.opacity(0.35)
                 .ignoresSafeArea()
                 .onTapGesture(perform: onDismiss)
             VStack(spacing: 0) {
@@ -34,7 +36,7 @@ struct FetchLyricsDialog: View {
             }
             .padding(24)
             .frame(maxWidth: .infinity)
-            .glassEffect(Glass.regular.tint(theme.surfaceContainerHigh.opacity(GlassTint.container)),
+            .glassEffect(Glass.regular.tint(theme.surfaceContainerHigh.opacity(0.45)),
                          in: RoundedRectangle(cornerRadius: 32, style: .continuous))
             .padding(24)
         }

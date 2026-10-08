@@ -27,6 +27,8 @@ final class LyricsScreenshotTests: XCTestCase {
         try capture("lyricsLight", demo: "words", freezeMs: 42_300, appearance: "light")
     }
 
+    /// The More sheet opens at half height, where iOS draws it as floating Liquid Glass over the lyrics (Hoa,
+    /// 2026-10-07: "that page has 0 liquid glass"; at full height the sheet turns opaque).
     func testMoreSheet() throws {
         try capture("lyricsMoreSheet", demo: "words", freezeMs: 42_300, tap: "Lyrics options", settle: 2.5)
     }
@@ -39,10 +41,93 @@ final class LyricsScreenshotTests: XCTestCase {
     }
 
     /// The end of the sheet: Controls and the shuffle / repeat / favourite row (part of the sheet, Android
-    /// `BottomToggleRow`), light app.
+    /// `BottomToggleRow`; the full player's liquid segments since 2026-10-07), light app. Swipes on the sheet (the first
+    /// grows it from half height) until its heart is on screen.
     func testMoreSheetBottomInLightApp() throws {
         try capture("lyricsMoreSheet.lightAppBottom", demo: "words", freezeMs: 42_300, appearance: "light",
-                    tap: "Lyrics options", settle: 2.0, swipeUp: true)
+                    tap: "Lyrics options", settle: 2.0) { app in
+            let sheet = app.descendants(matching: .any)["screen.lyricsOptions"].firstMatch
+            XCTAssertTrue(sheet.waitForExistence(timeout: 10), "the More sheet did not open")
+            // Inside the sheet: the full player under the lyrics has the same heart.
+            let heart = sheet.buttons.matching(NSPredicate(format: "label == %@ OR label == %@", "Add to favorites",
+                                                           "Remove from favorites")).firstMatch
+            XCTAssertTrue(heart.waitForExistence(timeout: 10), "the sheet has no shuffle / repeat / favourite row")
+            self.reveal(heart, in: sheet, app: app, clearOfBottom: 0)
+            XCTAssertTrue(heart.isHittable, "the sheet's bottom row can't be reached")
+        }
+    }
+
+    // MARK: Translate · Sing (owner, 2026-10-07: they replace Synced · Static)
+
+    /// Sing while the instrumental plays: the segment reads "Vocals off" in the accent (demo render, active).
+    func testSingActive() throws {
+        try capture("lyricsSingActive", screen: "tais.instrumentalActive", demo: "words", freezeMs: 42_300) { app in
+            let sing = app.buttons.matching(NSPredicate(format: "label == %@", "Sing")).firstMatch
+            XCTAssertTrue(sing.waitForExistence(timeout: 10), "Sing is missing")
+            XCTAssertEqual(sing.value as? String, "Vocals off", "Sing is not showing the instrumental")
+        }
+    }
+
+    /// Sing while the vocals are being removed: "Removing vocals 48 %" with the progress filling the segment.
+    func testSingRendering() throws {
+        try capture("lyricsSingRendering", screen: "tais.instrumentalRendering", demo: "words", freezeMs: 42_300) { app in
+            let sing = app.buttons.matching(NSPredicate(format: "label == %@", "Sing")).firstMatch
+            XCTAssertTrue(sing.waitForExistence(timeout: 10), "Sing is missing")
+            XCTAssertTrue((sing.value as? String ?? "").hasPrefix("Removing vocals"),
+                          "Sing is not showing the render's progress")
+        }
+    }
+
+    /// A tap on Translate hides the lyrics' translations and the next shows them again (the menu's primary action).
+    /// Touch and hold: Translate via AI, and Show romanization when the lyrics need it. The hold must open the menu,
+    /// not run the tap (until 2026-10-07 it hid the demo's translations instead).
+    func testTranslateMenu() throws {
+        try capture("lyricsTranslateMenu", demo: "words", freezeMs: 42_300, settle: 2.0) { app in
+            let translate = app.buttons.matching(NSPredicate(format: "label == %@", "Translate")).firstMatch
+            XCTAssertTrue(translate.waitForExistence(timeout: 10), "Translate is missing")
+            XCTAssertEqual(translate.value as? String, "Showing translations", "the demo lyrics show a translation")
+            for expected in ["Translations hidden", "Showing translations"] {
+                translate.tap()
+                let state = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", expected),
+                                                      object: translate)
+                XCTAssertEqual(XCTWaiter.wait(for: [state], timeout: 5), .completed,
+                               "a tap on Translate should leave it \"\(expected)\" (it reads \(translate.value ?? "nil"))")
+            }
+            translate.press(forDuration: 1.2)
+            let viaAI = app.descendants(matching: .any)
+                .matching(NSPredicate(format: "label == %@", "Translate via AI")).firstMatch
+            XCTAssertTrue(viaAI.waitForExistence(timeout: 5), "the long-press menu has no Translate via AI")
+            Thread.sleep(forTimeInterval: 1.0)
+        }
+    }
+
+    /// "Show as plain text" in the More sheet's Controls (synced vs plain is automatic now): turning it on shows the
+    /// song as plain text, so the karaoke-only row (Adjust sync) leaves the sheet.
+    func testShowAsPlainText() throws {
+        try capture("lyricsShowAsPlainText", demo: "words", freezeMs: 42_300, tap: "Lyrics options", settle: 1.5) { app in
+            let sheet = app.descendants(matching: .any)["screen.lyricsOptions"].firstMatch
+            XCTAssertTrue(sheet.waitForExistence(timeout: 10), "the More sheet did not open")
+            let plain = sheet.descendants(matching: .any)
+                .matching(NSPredicate(format: "label == %@", "Show as plain text")).firstMatch
+            XCTAssertTrue(plain.waitForExistence(timeout: 10), "Show as plain text is missing")
+            // Well clear of the screen's bottom edge, and settled: a tap on a row still sliding in (or under the home
+            // indicator) is lost.
+            self.reveal(plain, in: sheet, app: app, clearOfBottom: 120)
+            XCTAssertEqual(plain.value as? String, "0", "Show as plain text should start off")
+            let adjustSync = sheet.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Adjust sync")).firstMatch
+            XCTAssertTrue(adjustSync.exists, "karaoke lyrics should offer Adjust sync")
+            // The whole row flips the switch, as on Android (since 2026-10-08; before, only the switch took taps and
+            // CI's simulator lost every tap and drag on it). Tap the row's title.
+            let title = plain.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
+            title.tap()
+            if !adjustSync.waitForNonExistence(timeout: 3), plain.value as? String == "0" {
+                // Still off, so a second tap can't undo a first one that landed late.
+                title.tap()
+            }
+            let switched = adjustSync.waitForNonExistence(timeout: 5)
+            XCTAssertTrue(switched, "the lyrics did not switch to plain text (the switch reads \(plain.value ?? "nil"))")
+            Thread.sleep(forTimeInterval: 1.0)
+        }
     }
 
     func testFetchDialogInLightApp() throws {
@@ -78,12 +163,15 @@ final class LyricsScreenshotTests: XCTestCase {
 
     // MARK: - Helper
 
-    private func capture(_ name: String, demo: String, freezeMs: Int? = nil, ready: String = "screen.lyrics",
-                         readyText: String? = nil, appearance: String = "dark", extra: [String] = [], tap: String? = nil,
-                         settle: TimeInterval = 3.0, swipeUp: Bool = false) throws {
+    /// `screen`: the lyrics cover's demo screen (`lyrics`, or a `tais.instrumental*` state). `swipes`: swipes up after
+    /// settling (a half-height sheet grows on the first). `then` runs before the shot.
+    private func capture(_ name: String, screen: String = "lyrics", demo: String, freezeMs: Int? = nil,
+                         ready: String = "screen.lyrics", readyText: String? = nil, appearance: String = "dark",
+                         extra: [String] = [], tap: String? = nil, settle: TimeInterval = 3.0, swipes: Int = 0,
+                         then: ((XCUIApplication) -> Void)? = nil) throws {
         continueAfterFailure = false
         let app = XCUIApplication()
-        var arguments = ["-uiTest", "-screen", "lyrics", "-appearance", appearance, "-lyricsDemo", demo]
+        var arguments = ["-uiTest", "-screen", screen, "-appearance", appearance, "-lyricsDemo", demo]
         if let freezeMs { arguments += ["-lyricsFreezeMs", String(freezeMs)] }
         app.launchArguments = arguments + extra
         app.launch()
@@ -97,11 +185,24 @@ final class LyricsScreenshotTests: XCTestCase {
         }
         // Let the cascade, the artwork bake and the background crossfade settle.
         Thread.sleep(forTimeInterval: settle)
-        if swipeUp {
+        for _ in 0..<swipes {
             app.swipeUp(velocity: .fast)
             Thread.sleep(forTimeInterval: 1.5)
         }
+        then?(app)
         attach(app, name: "\(name)-\(appearance)")
+    }
+
+    /// Swipes the More sheet up (the first swipe grows a half-height sheet) until `element` can take a tap at least
+    /// `clearOfBottom` points above the screen's bottom edge, letting each swipe settle.
+    private func reveal(_ element: XCUIElement, in sheet: XCUIElement, app: XCUIApplication, clearOfBottom: CGFloat) {
+        let limit = app.frame.maxY - clearOfBottom
+        var swipes = 0
+        while !(element.isHittable && element.frame.maxY <= limit), swipes < 5 {
+            sheet.swipeUp()
+            Thread.sleep(forTimeInterval: 1.2)
+            swipes += 1
+        }
     }
 
     private func attach(_ app: XCUIApplication, name: String) {

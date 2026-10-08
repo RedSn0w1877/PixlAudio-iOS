@@ -7,8 +7,10 @@ import UniformTypeIdentifiers
 
 /// The karaoke lyrics screen (Android `LyricsSheet` with `KaraokeLyricsView`): the animated artwork background, the
 /// karaoke lines (or plain lyrics, or the loading / no-lyrics state), the track pill on top, and the control cluster
-/// at the bottom (play/pause, seek bar, back · Synced · Static · more) that hides in immersive mode. Swipe sideways
-/// for the previous / next song. Always dark.
+/// at the bottom (play/pause, seek bar, back · Translate · Sing · more) that hides in immersive mode. Swipe sideways
+/// for the previous / next song. Always dark, and the screen never locks while it is open (owner, 2026-10-07: always
+/// on, paused too; the "Keep screen on" switch is gone). Synced vs plain is automatic; the More sheet's "Show as
+/// plain text" overrides it for the song.
 struct LyricsView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(Router.self) private var router
@@ -44,6 +46,8 @@ struct LyricsView: View {
     @State private var translationConfig: TranslationSession.Configuration?
     @State private var translationLines: [String] = []
     @State private var translationSongId: String?
+    /// An on-device translation is running (the Translate segment's spinner).
+    @State private var translating = false
     @State private var shownPrepared: PreparedLyrics?
     @State private var shownPreparedSong: String?
 
@@ -182,6 +186,7 @@ struct LyricsView: View {
         .task(id: song?.id) {
             controller.ensureLoaded(for: song)
             if overrideSongId != song?.id { syncedOverride = nil }
+            if translationSongId != song?.id { translating = false }
         }
         .onChange(of: controller.prepared, initial: true) { _, _ in updateShownPrepared() }
         .onChange(of: controller.preparedSongId) { _, _ in updateShownPrepared() }
@@ -190,17 +195,15 @@ struct LyricsView: View {
         .onChange(of: controller.searchState) { _, state in
             if state == .success { closeFetchDialog() }
         }
-        .onChange(of: controller.preferences.keepScreenOn) { _, on in
-            ScreenAwake.set(on, for: .lyrics)
-        }
         // Nothing ticks under the sync editor: its preview has its own driver. Back on screen, the lines pick up at
         // the player's position.
         .onChange(of: syncRequest == nil) { _, editorGone in
             if editorGone { startDriver() } else { driver.stop() }
         }
         .onChange(of: scenePhase) { _, phase in
-            // Android turns keep-screen-on off when the screen goes off or the app stops.
-            if phase == .background && controller.preferences.keepScreenOn { controller.preferences.keepScreenOn = false }
+            // Always on while the lyrics are open: claim again on coming back (Apple doesn't document whether the
+            // flag survives the app going to the background).
+            if phase == .active { ScreenAwake.set(true, for: .lyrics) }
         }
         .task(id: ImmersiveKey(active: immersiveActive, immersive: immersive)) { await runImmersiveTimer() }
         .animation(.spring(response: 0.31, dampingFraction: 1), value: immersive)
@@ -320,14 +323,12 @@ struct LyricsView: View {
     // MARK: Controls
 
     private func controls(chrome: LyricsChromeColors, safeBottom: CGFloat, visible: Bool) -> some View {
-        VStack(spacing: 0) {
-        // Stage 14: Android's floating instrumental toggle sits above the cluster when the song has a render.
-        InstrumentalLyricsToggle(chrome: chrome, brightArt: brightArt)
+        // Android's floating instrumental toggle is the toolbar's Sing segment now (owner, 2026-10-07).
         LyricsControlCluster(
             chrome: chrome, brightArt: brightArt, isPlaying: playback.isPlaying,
             showSyncControls: showSyncedLyrics == true && lyrics?.synced != nil && showSyncControls,
-            offsetMs: lyricsStore.offsetMs, showSyncedLyrics: showSyncedLyrics,
-            hasSyncedLyrics: !(lyrics?.synced ?? []).isEmpty, clock: playback.clock,
+            offsetMs: lyricsStore.offsetMs, hasLyrics: showSyncedLyrics != nil, song: song,
+            canTranslateOnDevice: !(lyrics?.synced ?? []).isEmpty, translating: translating, clock: playback.clock,
             onOffsetChange: { ms in
                 if let song { controller.setOffset(ms, songId: song.id) }
                 resetImmersive()
@@ -344,14 +345,17 @@ struct LyricsView: View {
                 seekPreview.positionMs = ms
                 driver.wake()
             },
-            onShowSyncedChange: { synced in
-                syncedOverride = synced
-                overrideSongId = song?.id
+            onTranslate: {
+                startTranslation()
                 resetImmersive()
             },
+            onTranslateViaAI: {
+                translateViaAI()
+                resetImmersive()
+            },
+            onSegmentTap: { resetImmersive() },
             onBack: { router.dismissCover() },
             onMore: { showMoreSheet = true })
-        }
             .padding(.horizontal, 16)
             .padding(.bottom, safeBottom + 10)
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { controlsHeight = $0 }
@@ -396,21 +400,32 @@ struct LyricsView: View {
                 onSyncYourself: syncAfterMoreSheetAction,
                 onSave: { showSaveDialog = true },
                 onTranslate: { startTranslation() },
-                onTranslateViaAI: {
-                    if let song { controller.translateViaAI(song: song, translator: env.ai.lyricsTranslator) }
-                },
+                onTranslateViaAI: { translateViaAI() },
                 onReset: { if let song { controller.reset(song: song) } },
                 onToggleSyncControls: {
                     resetImmersive()
-                    showSyncControls.toggle()
+                    // Animated, so the row's glass materialises (`glassEffectTransition(.materialize)`).
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) { showSyncControls.toggle() }
                 },
                 onShuffle: { playback.setShuffleEnabled(!playback.isShuffleEnabled) },
                 onRepeat: { playback.setRepeatMode(LyricsView.nextRepeatMode(playback.repeatMode)) },
-                onFavorite: { if let song { env.libraryEditor.toggleFavorite(song.id) } }))
+                onFavorite: { if let song { env.libraryEditor.toggleFavorite(song.id) } }),
+            plainText: Binding(get: { syncedOverride == false && overrideSongId == song?.id },
+                               set: { plain in
+                                   syncedOverride = plain ? false : nil
+                                   overrideSongId = song?.id
+                               }))
             .environment(\.appTheme, theme)
             .environment(\.playerTheme, theme)
             .preferredColorScheme(.dark)
-            .pixlSheet(detents: [.large])
+            // A partial-height sheet floats as inset Liquid Glass over the lyrics; at full height iOS turns it opaque
+            // (Hoa, 2026-10-07: "that page has 0 liquid glass"), so it opens at half height and grows to `tallGlass`.
+            .pixlSheet(detents: [.medium, .tallGlass])
+    }
+
+    /// "Translate via AI" (the Translate segment's long press and the More sheet), through the swappable provider.
+    private func translateViaAI() {
+        if let song { controller.translateViaAI(song: song, translator: env.ai.lyricsTranslator) }
     }
 
     /// Android's repeat cycle: off → all → one → off.
@@ -446,9 +461,10 @@ struct LyricsView: View {
             controller.message = "These lyrics already have a translation"
             return
         }
-        guard let synced = lyrics?.synced, !synced.isEmpty else { return }
+        guard let synced = lyrics?.synced, !synced.isEmpty, !translating else { return }
         translationLines = synced.map(\.line)
         translationSongId = song?.id
+        translating = true
         controller.message = "Translating lyrics..."
         if translationConfig == nil {
             translationConfig = TranslationSession.Configuration(source: nil, target: Locale.current.language)
@@ -458,6 +474,10 @@ struct LyricsView: View {
     }
 
     private func finishTranslation(_ map: [Int: String]?, songId: String?) {
+        // Cleared before the song guard, so the spinner never sticks; but only by the run it belongs to, so a late
+        // result for an earlier song can't clear the spinner of a translation started since (a song change already
+        // cleared it, `.task(id:)`).
+        if songId == translationSongId { translating = false }
         guard let song = playback.current, song.id == songId else { return }
         guard let map else {
             controller.message = "Translation isn't available for these lyrics"
@@ -467,6 +487,7 @@ struct LyricsView: View {
             controller.message = "These lyrics are already in this language"
         } else {
             controller.applyTranslations(map, song: song)
+            controller.preferences.showTranslation = true
         }
     }
 
@@ -481,7 +502,7 @@ struct LyricsView: View {
         driver.offsetMs = Int64(lyricsStore.offsetMs)
         driver.start()
         interaction.touch()
-        ScreenAwake.set(controller.preferences.keepScreenOn, for: .lyrics)
+        ScreenAwake.set(true, for: .lyrics)
     }
 
     private func stopDriver() {

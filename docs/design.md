@@ -205,7 +205,7 @@ PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact ba
 | TAIS DJ chat (Experimental › TAIS DJ; player's Taizo button) | `AppSheet.taisChat` | `TaisChatSheet` (Features/AI) | 13 |
 | Setup | `AppCover.setup` | `SetupView` (Features/Onboarding) | 15 |
 | TAIS Studio "Remaster Song" card (Experimental, song sheet), on-device models panel (iOS only) | inside `ExperimentalSettingsView` / `SongOptionsSheet` | `TaisStudioProgressCard`, `OnDeviceModelsPanel` (Features/Tais) | 14 |
-| Lyrics screen instrumental card + floating instrumental toggle | inside `LyricsView` | `InstrumentalRenderAction`, `InstrumentalLyricsToggle` (Features/Tais) | 14 |
+| Lyrics screen instrumental card + the toolbar's Sing segment (replaced the floating instrumental toggle, owner 2026-10-07) | inside `LyricsView` | `InstrumentalRenderAction` (Features/Tais), `LyricsSingSegment` (Features/Lyrics/LyricsChrome) | 14, lyrics page |
 | Backup export / restore | `AppCover.backupExport`, `.backupImport` | `BackupExportCover`, `BackupImportCover` (Features/Backup) | 15 |
 | Plus / license debug, nav-bar corner radius | — (dropped: everything unlocked; Material-only setting) | — | — |
 
@@ -417,19 +417,20 @@ and `Services/Lyrics*.swift` + `Services/CJKRomanization.swift`.
   atlas; `LyricsScene.metal` (twist, composite, grade, overlays, dither) fills the screen from a
   `TimelineView(.animation(minimumInterval: 1/30, paused:))`; 1.7 s crossfade; paused when hidden, in Low Power Mode
   or with a frozen UI-test clock. CI downloads the Metal toolchain when a runner lacks it (`ci/select-xcode.sh`).
-- **Chrome:** Android's Material-mode cluster, each Material element as glass over the scrim: track pill (clear glass
-  tinted `onPrimaryFixedVariant`, spinning 54 pt art, playing bars), play/pause (78 pt, squircle ↔ circle,
-  `tertiaryFixedDim` tinted glass), seek-bar pill (50 pt, wavy track), back · Synced · Static · more (40 pt circles,
-  50 pt segments: capsule when active, 8 pt corners when not), sync-offset capsule (fills inside, no glass on glass),
-  immersive "show controls" disc, sync chip. Over bright art the clear glass takes a 35 % black tint.
+- **Chrome:** Android's Material-mode cluster, each Material element as glass over the scrim: track pill (spinning
+  54 pt art, playing bars), play/pause (78 pt, squircle ↔ circle, `tertiaryFixedDim` tinted glass), seek-bar pill
+  (50 pt, wavy track), back · Translate · Sing · more (40 pt circles, 50 pt segments: capsule when active, 8 pt corners
+  when not; Synced · Static until 2026-10-07), the sync-offset buttons, immersive "show controls" disc, sync chip. Over
+  bright art the clear glass takes a 35 % black tint. Since 2026-10-07 the passive glass takes the full player's
+  chrome breath and the cluster shares one container (see "Lyrics page" below).
 - **Always dark, palette included:** the lyrics screen and the sync editor apply `alwaysDarkTheme(_:)` (Theme.swift),
   which forces `.dark` *and* re-resolves `appTheme` / `playerTheme` for dark. `preferredColorScheme(.dark)` alone left
   the palette the shell resolved for the system scheme, so with the phone in light mode the More sheet (and the fetch
   dialog) drew light-scheme roles — near-black `onSurface` rows, cream fills — on the dark system sheet (fixed
   2026-10-03; shots `lyricsMoreSheet.lightApp`, `lyricsMoreSheet.lightAppBottom`, `lyricsFetchDialog.lightApp`). The
   shuffle / repeat / favourite row at the sheet's end is the sheet's own (Android `BottomToggleRow`), not the screen's.
-- **Sheets:** the More sheet is a system sheet with PixlAudio's groups as fills (inside glass); the fetch dialog is a
-  centred glass card (32 pt) over a dim backdrop. Save Lyrics exports `.lrc` with `fileExporter`; import goes through
+- **Sheets:** the More sheet is a system sheet with PixlAudio's groups as fills (inside glass), at half height since
+  2026-10-07 so iOS draws it as floating glass; the fetch dialog is a centred glass card (32 pt) over a dim backdrop. Save Lyrics exports `.lrc` with `fileExporter`; import goes through
   `LyricsImportSecurity`.
 - **Services:** `LyricsService` (actor): memory → stored row (`LyricsRecord.docJSON` holds Android's raw lyrics
   content) → JSON cache (`Application Support/lyrics/<id>.json`, Android `LyricsData`) → the song's scanned text, then
@@ -442,7 +443,63 @@ Screenshot ids (`UITests/LyricsScreenshotTests`, `-screen lyrics` + `-lyricsDemo
 `-lyricsFreezeMs <ms>`, `-lyricsBrightArt`, `-lyricsHighContrast`, `-lyricsImmersive`): lyricsWordFill (42 300),
 lyricsEmphasis (47 600), lyricsInterlude (61 000), lyricsDuet, lyricsBrightArt, lyricsHighContrast, lyricsLineSynced,
 lyricsPlain, lyricsNone, lyricsImmersive, lyricsLight, lyricsMoreSheet, lyricsFetchDialog, lyricsOptions,
-lyricsCascade.f0…f7 (first-show cascade frames, live clock).
+lyricsCascade.f0…f7 (first-show cascade frames, live clock); since 2026-10-07 also lyricsSingActive and
+lyricsSingRendering (`-screen tais.instrumentalActive|tais.instrumentalRendering -lyricsDemo words`),
+lyricsTranslateMenu (Translate held) and lyricsShowAsPlainText.
+
+### Lyrics page (2026-10-07, owner items 1 + 11; branch `s16-lyrics-page`)
+
+Owner decisions (`docs/handoff/2026-10-07-plans/DECISIONS.md` › Lyrics page); every point departs from Android on
+purpose and is listed in `docs/parity.md` row 25.
+
+- **Translate · Sing replace Synced · Static.** Synced vs plain is automatic (synced when there is synced text); the
+  More sheet's **Show as plain text** switch overrides it for the current song (the same `syncedOverride` /
+  `overrideSongId` state the segments used; a new song resets it).
+  - *Translate* (`LyricsTranslateSegment`): active while translations show. A tap shows / hides the lyrics'
+    translations, or, when they have none, translates the synced lines on this iPhone into the phone's language
+    (the system translator, `translationTask`; a spinner while it runs, cleared before the song guard so a song
+    change can't leave it on). Plain-only lyrics: the segment looks dimmed and a tap explains that on-device
+    translation needs synced lyrics. Touch and hold: **Translate via AI** (`env.ai.lyricsTranslator`, so the provider
+    can change underneath) and **Show romanization** when the lyrics have it. The segment is a
+    `Menu(content:label:primaryAction:)` (the tap is the primary action): a `contextMenu` on the glass button never
+    opened inside the cluster's container on CI. The menu morphs out of the segment's glass, like `ShapedGlassMenu`.
+  - *Sing* (`LyricsSingSegment`): the vocals off / on through the song's studio instrumental
+    (`InstrumentalController.toggle()`, the in-sync 700 ms crossfade). Active ("Vocals off") while the instrumental
+    plays. Without a render a tap starts the MDX-Net job ("Removing vocals 48 %" without the mic symbol, so it fits; the progress filling the segment
+    under the label, content on the glass) and switches to the instrumental when it lands if the song is still on;
+    a failure shows the job's reason in the toast. Off while the player switches and while Spotify Connect plays.
+    Per song: a new song starts with its vocals. It replaces Android's `FloatingInstrumentalToggle`
+    (`InstrumentalLyricsToggle` is deleted). With no lyrics the segments' slot stays empty and the empty state's
+    instrumental card does the job, as before.
+  - Each segment reads the controller / studio in its own small view, so a translation or a job's progress redraws
+    only that segment. VoiceOver: fixed labels "Translate" / "Sing", the state as the value.
+- **Keep screen on: always**, while the lyrics screen is open, paused too (`ScreenAwake.set(true, for: .lyrics)` on
+  appear and when the app becomes active again, released on disappear). The switch is gone from the More sheet and
+  from `LyricsViewPreferences` (the stored `keep_screen_on_lyrics` is removed at launch). In backups the key is
+  `androidOnly` now: an old backup restores cleanly and lists it under skipped settings; it is never written or
+  exported.
+- **"0 liquid glass", the screen:** the passive glass (track pill, seek bar, Back / More circles, inactive segments,
+  the sync-offset buttons) is tinted like the full player's chrome (`onPrimary` × `GlassTint.playerChrome`, 14 %)
+  instead of the album container at about 34 %, which read as dark plastic; Increase Contrast keeps the container,
+  and bright art keeps the 35 % black. Play/pause, the active segment and the discs stay at `GlassTint.prominent`,
+  as strong as the full player's transport and active toggles. Play/pause, the seek bar, the toolbar and the sync
+  row share **one** `GlassEffectContainer(spacing: 3)` (below the smallest gap, 6 pt), so they sample the artwork
+  together. The sync-offset row is five clear interactive capsules (Android: filled pills in one capsule, which
+  would be glass on glass) that materialise (`glassEffectTransition(.materialize)`, toggled in `withAnimation`).
+  "Add lyrics and sync them" got its own clear glass capsule. The fetch dialog's card is tinted 45 % (was 62 %) over
+  a 35 % dim (was 45 %).
+- **"0 liquid glass", the More sheet:** it opens at half height (`[.medium, .tallGlass]`), where iOS draws a sheet as
+  floating Liquid Glass; at `.large` it turned opaque (the old `lyricsMoreSheet` shot). Rows stay soft `onSurface`
+  8 % fills on that glass (no glass on glass), each group clipped to its outer corners like `SettingsGroup` (8 pt
+  inside), so the first and last rows get the round corners whichever rows show. The alignment picker is the
+  liquid lens (`LiquidTabCapsule`, Left / Center / Right, 56 pt; Android's buttons are 48; given the sheet's player
+  palette, so the route-level copy over the app doesn't mix in the app accent), and shuffle / repeat /
+  favourite is the full player's `PlayerToggleRow` (its heart reads `liked`, the observed lookup from the player fix).
+  The Controls caption hides when no control row shows.
+- **Kept on purpose:** lyric lines still fade out before the bars (no scroll-under; owner); the karaoke view's engine
+  constants are untouched (AGENTS rule 7); the seek bar's glass stays non-interactive (an interactive glass scales
+  under the finger and could pull the thumb away from it; the plan left this to a phone check); the track pill
+  stays outside the container (inside it the outgoing and incoming pills could merge on a song change).
 
 ## Stage 10 notes (lyrics sync editor)
 
@@ -515,8 +572,8 @@ every editor test launched straight into `-screen lyricsSync`.
 - **Notice pill:** it sits over the bottom of the tap pad (Android's 92 pt), so it lets taps through unless it offers
   Undo, and its text never takes them (owner decision; Android makes only the Undo box clickable).
 - **Not changed:** the words screen's container tap gesture (plan item, unverified on device) and the full-player /
-  lyrics chrome. Stage 2 of the batch (the lyrics page) builds on this: it can make the lyrics screen's
-  `ScreenAwake` claim unconditional.
+  lyrics chrome. Stage 2 of the batch (the lyrics page) made the lyrics screen's `ScreenAwake` claim unconditional
+  (see Stage 9 notes › Lyrics page).
 
 Screenshot ids (`UITests/LyricsSyncScreenshotTests`, `-screen lyricsSync -syncStep <step>`; ready `screen.lyricsSync`):
 syncIntro, syncWords, syncResume, syncManage, syncTap, syncTapReady, syncTapBreak, syncTapNotice, syncTapEnded,
@@ -710,7 +767,8 @@ turned off; ready `sheet.createPlaylist`). Shots: `SettingsScreenshotTests.testA
   card; `OnDeviceModelsPanel` (iOS only, under it in Experimental): each model's state, size, Download / Cancel /
   Remove, and the rendered instrumentals' size with Delete; the lyrics screen's `InstrumentalRenderAction` (no lyrics:
   Render → Rendering… → Play instrumental → Play original, on the 28 pt clear-glass card) and Android's
-  `FloatingInstrumentalToggle` (44 pt clear-glass circle growing to a 172 pt "Instrumental" pill) above the controls.
+  `FloatingInstrumentalToggle` (44 pt clear-glass circle growing to a 172 pt "Instrumental" pill) above the controls —
+  since 2026-10-07 the toolbar's Sing segment instead (owner; Stage 9 notes › Lyrics page).
 - **Shared-file changes (additive):** `AppEnvironment` (`tais`, started after YouTube), `Playback/Deck.swift`
   (`makeItem(for:overrideURL:)`, `start(rate:at:atHostTime:)`), `Playback/PlaybackServices.swift` (vocal attenuation),
   `Services/LyricsController.swift` (`lyricsService`), `Features/Lyrics/LyricsStaticContent.swift` + `LyricsView.swift`
@@ -721,7 +779,9 @@ turned off; ready `sheet.createPlaylist`). Shots: `SettingsScreenshotTests.testA
 Stage 14 screenshot ids (`UITests/TaisScreenshotTests`; demo states, no network or Core ML): `tais.studio`
 (Experimental scrolled to Remaster Song: lyric sync running, instrumental ready, BS-RoFormer failed), `tais.models`
 (the models panel with wav2vec2 downloading), `tais.songSheet` (the song sheet's card mid-render),
-`tais.instrumental`, `tais.instrumentalRendering`, `tais.instrumentalActive` (the lyrics screen with `-lyricsDemo none`).
+`tais.instrumental`, `tais.instrumentalRendering`, `tais.instrumentalActive` (the lyrics screen with `-lyricsDemo none`;
+no floating toggle since 2026-10-07 — with lyrics, the same states show the Sing segment: lyricsSingActive,
+lyricsSingRendering).
 
 ## Integration notes (wave A: stages 8, 9, 11, 12, 13, 15 merged — tag `stage-13`)
 
