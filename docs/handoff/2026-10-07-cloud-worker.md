@@ -83,7 +83,7 @@ made with a key, and no money was spent.**
 ## Verified how
 
 - CPU pytest locally (Python 3.12 venv, real ffmpeg): **224 passed**; the same suite passed in the image's `test`
-  stage on CI (run 37711121150, `test` job). `ci/check_weights.py`, `ci/check_fixtures.py` and
+  stage on CI (runs 37711121150 and 37711887788, `test` job). `ci/check_weights.py`, `ci/check_fixtures.py` and
   `bash ci/check-forbidden.sh` pass.
 - Third-party APIs checked against their released sources, not guessed: msst 0.1.0 `Separator`
   (`config_path/checkpoint_path/model_type/device_ids`, `separate(audio, sample_rate=, channels_first=)`, the
@@ -97,7 +97,35 @@ made with a key, and no money was spent.**
 
 ## Image build
 
-FILLED IN BELOW AFTER THE RUN.
+Branch build of the whole image without pushing (`[image]`), run **37711887788** (commit `736d345`): **green**.
+The earlier attempt (run 37711121150) failed in the dependency check on `spin` vs `click`, fixed in `3878615`.
+
+- **Time**: test job 47 s; image job 13.5 min, of which the disk cleanup took 7.1 min (now skipped when the
+  runner already has ≥ 45 GB free), the cold build **3.6 min** (4.3 GB base pull, ffmpeg, ~150 Python packages
+  installed from hashes in ~40 s, all 7.1 GB of weights downloaded in parallel and checksum-verified), and the CPU
+  smoke stage **2.3 min**.
+- **Disk** (`df -h /`, root volume 145 GB, no separate `/mnt` on this runner):
+
+  | When | Used | Free |
+  |---|---|---|
+  | Job start | 59 GB | 86 GB |
+  | After cleanup | 31 GB | 114 GB |
+  | After the cold image build (no push) | 57 GB | 88 GB |
+  | After the smoke stage | 57 GB | 88 GB |
+
+  So the cold build used **~26 GB** (`docker buildx du`: 28.0 GB), against the design's ~30 GB estimate (3.2). A
+  main build also writes the compressed layers it pushes (~12 GB, an estimate): ~40 GB, well inside 88 GB.
+- **Dependencies**: `pip check: 0 new problem(s); 5 expected qwen-asr demo deps not installed`;
+  `imports ok: torch 2.11.0+cu128 runpod 1.12.0`; `ffmpeg version 6.1.1-3ubuntu5`.
+- **CPU smoke with the real weights** (4-vCPU runner, fp32):
+  - BS-RoFormer: load 1.8 s, 4 s of audio separated in 57.7 s (one 21.8 s model chunk on CPU), output
+    (176400, 2) = the input's frames; a 48 kHz input keeps its own rate and frame count;
+  - Qwen3-ForcedAligner: load 8.6 s, align 0.6 s, tokens `Hello world sing along with me` mapped back to the
+    text's UTF-16 spans `[0,5] [6,11] [13,17] [18,23] [24,28] [29,31]`;
+  - htdemucs_ft from the local repo: 3 s split into drums/bass/other in 10.2 s.
+- **Not measured yet** (they need a main build or a GPU): the push time to GHCR and the compressed image size
+  (the first main build's log shows both), and everything on RunPod (cold start, seconds per song, VRAM, the
+  GPU actually picked, extra workers): the first deploy with **bench** ticked records them.
 
 ## For Hoa (iPhone and accounts)
 
