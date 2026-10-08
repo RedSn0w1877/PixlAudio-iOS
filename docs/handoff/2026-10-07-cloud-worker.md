@@ -213,6 +213,66 @@ with the real weights (separator, 48 kHz, aligner spans unchanged; htdemucs_ft t
 one total of 4000 for the bag of 4 models, last value 3000, i.e. the last model reached). Nothing was deployed and
 no RunPod or Cloudflare call was made.
 
+## Idle workers (2026-10-08, branch `s22-cloud-idle`)
+
+**Seen on the live endpoint** (`pixl-cloud-studio`, the day of the first deploy): after the deploy's selftest a
+worker sat idle=1 / ready=1 for 7+ minutes although `idleTimeout` is 10 s. RunPod bills idle worker time (about
+$0.58–0.69 an hour on these pools), so every batch or deploy could leave a billed worker behind. Setting max workers
+to 0 and back released it at once. Hoa saw the same with the old Android Demucs endpoint in 2026-09. Three fixes,
+from the first line of defence to the last; nothing was deployed and no RunPod or Cloudflare call was made.
+
+1. **The worker stops itself after the jobs nothing follows** (`handler.py`): every `op: selftest` and `op: bench`,
+   and a process job whose input carries the new `policy.last_in_batch: true` (failed and refused jobs included).
+   Checked in the runpod 1.12.0 source (`serverless/modules/rp_job.py`, `run_job` and `handle_job`, and
+   `rp_scale.py`) before choosing the mechanism:
+   - the per-job switch is a top-level `refresh_worker: True` in the handler's dict: `run_job` pops it (and `error`)
+     before the rest becomes `output`, and answers RunPod with `stopPod: True`. So the output the phone reads is still
+     the manifest, unchanged. A test drives `Worker.handle` through the real `run_job` (it runs where runpod is
+     installed; locally in a venv with runpod 1.12.0: `{"output": <manifest>, "stopPod": true}`; the CPU test stage
+     has no runpod and skips it), and a stdlib copy of the same pop rules always runs;
+   - the documented `{"refresh_worker": True, "job_results": ...}` form is **not** what 1.12.0 implements: there is no
+     `job_results` handling anywhere in the SDK, so the manifest would arrive nested under `job_results`;
+   - `start({"refresh_worker": True})` stops the worker after **every** job (`handle_job` sets `stopPod`,
+     `JobScaler.handle_job` also kills the loop): a cold start for every song of a batch. Not used.
+   - Found on the way, unchanged: `run_job` pops `error` from every dict output, so an `ok` manifest read from
+     `/status` has no `error: null` (the copy in R2 keeps it). The phone already decodes `error` as optional.
+   - Schema v1, additive: `input.policy` (an object; RunPod's own request `policy` with `ttl`/`executionTimeout` sits
+     next to `input` and is untouched) with `last_in_batch` (boolean, default false). The stdlib validator agrees
+     with jsonschema (non-boolean or non-object is `BAD_SCHEMA`). `job.input.process.json` and `run.request.json`
+     carry it (each is a single song, a burst of one); the transcribe/volume examples don't (optional). The app's
+     fixture copies are synced (`ci/check_fixtures.py` and `ci/check-cloud-fixtures.sh`: no drift).
+   - Cost side effect: the deploy's W1 concurrency check now starts a worker per bench job (a cent or two more).
+2. **`cloud-worker-reaper`** (new workflow, cron `7,37 * * * *` + workflow_dispatch, `environment: runpod`,
+   `permissions: contents: read`, checkout pinned to the same SHA as the other cloud workflows) runs
+   `deploy/reaper.py` (stdlib, the existing REST v2 client): `/health` twice 60 s apart; only when both show idle +
+   ready > 0 with running, `inQueue` and `inProgress` all 0 does it PATCH `workers` to max 0, poll `/health` every
+   10 s until no idle/ready/running/initializing worker is left (≤ 2 min; a job turning up ends the wait at once),
+   then PATCH back. Decisions:
+   - It uses `PATCH https://api.runpod.io/v2/serverless/<id>` with `{"workers": {"min", "max", "idleTimeout"}}`, the
+     same call the keepalive already makes, rather than REST v1's `workersMax` (v1 retires 2026-11-15).
+   - Max goes back to what it found, never above `deploy/endpoint.json` (so it never undoes RunPod's own scale-down
+     of a crashing endpoint, which the keepalive also leaves alone); an endpoint already at max 0 (the off switch) is
+     left alone without even a read.
+   - The restore always runs, also after a failed read while waiting or a failed PATCH to 0 (it may have been
+     applied before the connection dropped). A failed PATCH and a worker still there after 2 minutes fail the run
+     (email). A read that fails before anything changed is only a warning: the keepalive reports an unreachable
+     RunPod or a revoked key once a day, instead of an email every half hour.
+   - Before setup (no key, no endpoint) it succeeds with a plain line. Logs: counts only, the id masked first
+     (`::add-mask::`), never money.
+   - It shares no concurrency group with the deploy (a pending run of one would cancel a pending run of the other);
+     overlapping is harmless: each restores what it found and the deploy enforces `endpoint.json`.
+   - Every run is a deployment of the `runpod` environment, so its history grows by 48 a day (noise only).
+3. **`runpod_deploy.py`** does the same release (`release_after_jobs`) after its selftest/bench, passed or not: a
+   failed read is a warning; workers that can't be put back fail a deploy that passed and are an `::error::` line
+   on one that already failed (its own error is kept). A deploy without jobs (`--no-selftest`, no bench) skips it.
+
+Tests (pytest, CPU): `test_handler.py` (refresh after selftest/bench, also refused ones; after the last job, also a
+failed or refused one; none before it or for a non-boolean flag; the SDK's view of the output equals the manifest;
+the real-SDK run), `test_schema.py` (the flag's default, both validators on bad values), `test_deploy.py` (the
+reaper's every branch with a scripted `/health` and a clock that moves only on sleep, the deploy's release, the
+workflow's schedule, environment, permissions and pinned actions). **280 passed, 1 skipped** locally (Python 3.12,
+real ffmpeg; the skip is the real-SDK test, which passes in a venv with runpod 1.12.0).
+
 ## For Hoa (iPhone and accounts)
 
 There is nothing to test on the iPhone yet: the app side (design 7.7, P1–P5) isn't built. What Hoa does, in order,
@@ -229,6 +289,16 @@ is the checklist in `cloud/runpod-worker/README.md`:
 - [ ] Optional: the re-delivery test with `PIXL_ALLOW_CRASH_TEST=1` (README › Runbook).
 
 ## Next step
+
+- **Idle workers, after `s22-cloud-idle` merges:** nothing to set up (the reaper uses the `runpod` environment's
+  key). Look at the first few `cloud-worker-reaper` runs in the Actions tab: they should say "nothing idle", and after
+  a batch the worker's log should end in `worker_refresh`. The first time a run actually releases a worker, note it
+  here: it means RunPod ignored `stopPod`/`idleTimeout` again.
+- **Android (branch `port-cloud-studio` on the Android repo) must send `input.policy.last_in_batch: true` too**, on
+  the final job of each submit burst and on a single-song submit, or every Android batch ends with the worker idling
+  until the reaper's next run (≤ 30 min, ~$0.35). Hold each prepared job until the next one is ready (or the pass
+  ends), as iOS's `CloudSubmitBurst` does, so the flag lands on the job that actually went out last (a later one may
+  be skipped, fail to sign or stop at the monthly cap). Jobs before the last send no `policy` at all.
 
 P1 (after the 2026-10-07 wave merges): PixlCore `CloudJobSchema` decoding these examples (copy them to
 `Packages/PixlCore/Tests/PixlNetTests/Fixtures/cloud/`; the drift check then enforces them), `S3Signer`,

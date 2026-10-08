@@ -151,6 +151,32 @@ a transfer that finished meanwhile may be started once more before its event arr
   `check-forbidden.sh` passed before the push.
 - Screenshots looked at: Cloud processing light/dark incl. the tested state (RunPod, Storage and the new Worker line "Worker 1.0.0 on NVIDIA L4 · songs up to 160 MB and 15 min"), the queue, the confirm sheet (Send fits on one line), Experimental's Cloud processing row: all render correctly.
 
+## Idle workers: `last_in_batch` (2026-10-08, branch `s22-cloud-idle`)
+
+A worker can stay up idle, and billed, well past its 10 s idle timeout (seen on the live endpoint on 2026-10-08; the
+worker side and the reaper are in [`2026-10-07-cloud-worker.md`](2026-10-07-cloud-worker.md) › Idle workers). The
+worker now stops itself after a job whose input says `policy.last_in_batch: true`, so the phone marks the last job of
+every submit burst:
+
+- PixlNet: `CloudJobInputPolicy` (`input.policy`, key `last_in_batch`; not RunPod's `CloudJobPolicy`, which stays next
+  to `input`), `CloudJobInput.policy` / `isLastInBatch`, `CloudJobBuilder.request(…, lastInBatch:)` and
+  `CloudJobRequest.markingLastInBatch(_:)`. Jobs before the last send no `policy` at all (their bodies are exactly what
+  they were). `CloudSubmitBurst<Item>` decides which job is the last: one submit pass is one burst, each job is held
+  until the next one is ready (`ready` hands back the one before, unmarked) or the pass ends (`end` hands back the
+  held one, marked). A later job that is skipped, can't be signed or stops at the monthly cap therefore doesn't leave
+  the burst without its last.
+- `CloudStudio.submitReadyBatches` runs its loop through `CloudSubmitBurst` and sends through the new `submit(_:
+  lastInBatch:_:)` (the old send code, unchanged in what it does). The budget check counts the held job as already at
+  RunPod; the cap now `break`s instead of `return`ing, so the job held so far still goes out, as the last. A single
+  song, a retry and a job the 2-minute gate lets go alone are each a burst of one.
+- No new Apple API (nothing for `docs/api-notes.md`).
+- Tests: `CloudQueuePolicyTests` (`submitBurstMarksOnlyItsLastJob`, `…LastIsTheLastJobThatActuallyGoesOut`,
+  `…HoldsOneJobAtATime`), `CloudBuilderTests.onlyABurstsLastJobCarriesLastInBatch`, `CloudSchemaTests` (the worker's
+  examples now carry the flag and still round-trip; the built body matches `run.request.json`'s shape when it is the
+  last; an earlier job has no `input.policy`); AppTests `CloudStudioTests`: the single song is marked, three songs go
+  out as one burst with only the third marked, a song the gate let go alone and the one after it are each marked, and
+  the cap stopping a burst at the third song leaves the second marked.
+
 ## Phone checklist (Hoa)
 
 - [ ] Settings › Developer Options › Experimental shows the **Cloud processing** panel; it opens the screen.
@@ -168,6 +194,9 @@ a transfer that finished meanwhile may be started once more before its event arr
       finish, reopen: the queue still lists all 3 (the background-relaunch fix of 2026-10-08).
 - [ ] Swipe the app away during an upload: the row says it stopped; reopening starts it again.
 - [ ] A playlist's ⋯ › **Process all in the cloud** (≈10 songs): one cold start, then ~20–30 s per song.
+- [ ] After that batch (and after a single song), RunPod → Serverless → `pixl-cloud-studio` → Workers is empty within
+      a minute of the last song finishing (its log ends in `worker_refresh`). A worker left *idle* there means
+      `last_in_batch` didn't land: note it in the worker's handoff note (the reaper releases it within 30 minutes).
 - [ ] Lower the monthly cap to $0.01: Send is off on the confirm sheet.
 - [ ] In R2, `in/` and `out/` are empty after the imports (lifecycle rules are only the backstop).
 - [ ] Re-sign the app with another tool/team if that ever happens: the screen asks for the keys again.
@@ -187,3 +216,6 @@ a transfer that finished meanwhile may be started once more before its event arr
   (non-AAC) song settles it: the manifest's `input.decodedSamples` must equal the job's recorded `frames`.
 - Next: merge the worker (W1: deploy, selftest, bench, owner step F), then run the phone checklist; record the real
   timings and per-song cost in a handoff note; then Android (design §8).
+- **Android (`port-cloud-studio` on the Android repo) must send `input.policy.last_in_batch: true`** on the final job
+  of each submit burst and on a single-song submit, held back until the next job is ready like `CloudSubmitBurst`;
+  otherwise every Android batch leaves the worker idle until `cloud-worker-reaper` releases it (≤ 30 min, ~$0.35).

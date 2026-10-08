@@ -851,7 +851,8 @@ Android has no tests for the lyrics toolbar or the keep-screen-on switch; these 
 ## Cloud Studio worker (2026-10-07, branch `s19-cloud-worker`, Python, server side)
 Nothing to port: Android's old RunPod worker (`tools/runpod-serverless`) has no tests. The worker's own suite is
 pytest, CPU only (no torch, no weights), run by `cloud-worker-build` inside the image's `test` stage and locally
-with `python -m pytest -q tests` in `cloud/runpod-worker/` (240 tests).
+with `python -m pytest -q tests` in `cloud/runpod-worker/` (281 tests after `s22-cloud-idle`; one needs the runpod SDK
+and is skipped without it).
 
 - `test_schema.py` — every golden example validates against its JSON Schema; the stdlib validator and jsonschema
   agree on good and broken inputs; caps, URL rules (host allowlist, https, signature, the job's own object keys).
@@ -873,14 +874,20 @@ with `python -m pytest -q tests` in `cloud/runpod-worker/` (240 tests).
   the languages the first lacks), transcription; a job's deadline always comes off the shared aligner and
   transcriber afterwards (failures included).
 - `test_handler.py` — dispatch, error strings, cold start reported once, the selftest answer (with caps) against its
-  schema, no URL in any returned error; a bench on a worker whose aligner still holds an expired deadline runs.
+  schema, no URL in any returned error; a bench on a worker whose aligner still holds an expired deadline runs;
+  `refresh_worker` after every selftest/bench (refused ones too) and after a job marked `policy.last_in_batch`
+  (failed and refused ones too), never before the last or for a non-boolean flag, and the output RunPod keeps is
+  the unchanged manifest (with the SDK's pop rules, and through the real runpod `run_job` when it is installed).
 - `test_ci_tools.py` — the Dockerfile and weights.lock agree (and each kind of disagreement fails), the small-file
   fetcher's size/sha checks and retries, the pip-check allowlist, fixture drift, the lock's base-package filter.
 - `test_deploy.py` — REST v2 client retries and safe errors, desired state and the smallest valid PATCH (complete
   env, pools with exclusions), the deploy flow (auto vs by hand, private package, rollout, selftest gitSha retry),
   the concurrency check, jobs still queued when the deploy stops waiting are cancelled, the keepalive (restore
   only when healthy and the last deploy that ran passed: failed, cancelled and timed-out deploys block it,
-  skipped deploy runs don't count; the spend alarm without printing money).
+  skipped deploy runs don't count; the spend alarm without printing money); the idle-worker reaper (two reads a
+  minute apart, released by max 0 and back, a job arriving or a worker that never leaves, max never raised, the off
+  switch left alone, the restore after every failure, quiet before setup, the id masked first) and the deploy's
+  release after its selftest/bench; the reaper workflow's schedule, environment, permissions and pinned actions.
 - `src/pixl_worker/smoke.py` (Docker `smoke` stage on CI, not pytest) — loads the real BS-RoFormer, aligner and
   htdemucs_ft weights on CPU and runs each once; the htdemucs_ft run goes through the progress hook (one total
   for the bag of models, never going backwards).
@@ -892,22 +899,27 @@ Android has no tests for a RunPod/R2 pipeline; everything here is new.
   byte for byte into `Fixtures/cloud/`, drift checks `ci/check-cloud-fixtures.sh` and the worker's `ci/check_fixtures.py`;
   the phone's own fixtures are in `Fixtures/cloud-phone/`) decodes and re-encodes to the
   same JSON; the `/run` body the app builds has exactly the shape of the worker's `run.request.json`; unknown codes
-  read as `INTERNAL`; language hints follow the worker's pattern.
+  read as `INTERNAL`; language hints follow the worker's pattern; the examples' `input.policy.last_in_batch`
+  round-trips, and a body built as a burst's last has `run.request.json`'s shape (an earlier one has no `policy`).
 - `PixlNetTests/CloudLyricsTests` — the worker's aligned and transcribed examples become `LyricsDoc`s whose syllables
   join to the original text (Korean, a stripped comma, a leading bracket); hand-written edge cases (emoji, broken
   offsets, backwards times); request lines sorted and capped per line.
 - `PixlNetTests/CloudQueuePolicyTests`, `CloudJobRecordTests`, `CloudBudgetTests` — the state machine (incl. the FLAC
   redo's requeue), selection and caps, the batch gate, cost estimates, the committed monthly spend (jobs still at
-  RunPod count at their estimate), the confirm sheet's batch figures, import checks, retention.
+  RunPod count at their estimate), the confirm sheet's batch figures, import checks, retention; `CloudSubmitBurst`
+  marks only the last job that actually goes out (skips, a failed signature, the cap stopping the pass).
 - `PixlNetTests/S3SignerTests`, `RunPodJobsClientTests`, `CloudBuilderTests`, `CloudObjectClientTests` — SigV4 against
-  AWS's vectors, RunPod error mapping and the Retry-After gate, the settings fields, Test connection, the selftest.
+  AWS's vectors, RunPod error mapping and the Retry-After gate, the settings fields, Test connection, the selftest;
+  `last_in_batch` only on a burst's last body, on the wire as `input.policy.last_in_batch`.
 - `AppTests/CloudStudioTests` — the orchestrator with fakes: Send → prepare → upload → `/run` → `/status` →
   lyrics import → background download → size/SHA-256/sample checks → `Stems/` → bucket cleanup; results found in
   R2 after `/status` expired; consent off; the monthly cap at send and at submission; the batch gate; INPUT_MISSING
   (re-upload), POISONED (stop, empty the bucket, Retry), a job lost twice (resent once, then expired); a damaged
   download; the FLAC redo; a changed YouTube match; cancel; the job file across launches; cloud keys never in a backup;
   a retried worker error clears the old manifest before it goes out again; transfer events after a background
-  relaunch find their stored jobs; streamed songs are prepared with `forceDecode`.
+  relaunch find their stored jobs; streamed songs are prepared with `forceDecode`; `last_in_batch` on a single song,
+  on only the third of a three-song burst, on each song the batch gate sends alone, and on the second when the cap
+  stops a burst at the third.
 - `AppTests/CloudAudioPreparerTests` — AAC-LC M4A as is, everything else as 44.1 kHz stereo FLAC with its SHA-256 and
   frame count; the FLAC ends on a whole encoder packet and decodes back to exactly the recorded frames; a streamed
   song's AAC download is decoded to FLAC.

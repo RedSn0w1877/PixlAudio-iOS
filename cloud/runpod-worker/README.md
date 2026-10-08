@@ -15,7 +15,8 @@ bills per second. The full design, with every decision and its reasons, is
 2. A GPU worker starts (FlashBoot makes a recently used one resume in about a second), runs the guard (a finished
    manifest is returned at once; a job RunPod re-delivered twice is refused), downloads and checks the input,
    separates, aligns or transcribes, encodes AAC 256k (or FLAC), uploads each output and then `manifest.json`
-   **last**. It deletes the input only after a usable result.
+   **last**. It deletes the input only after a usable result. After the last song of a batch (the phone marks it
+   `policy.last_in_batch`) the worker asks RunPod to stop it, so nothing stays up idle and billed.
 3. The phone reads `/status` while it's open (results stay there 30 minutes) or finds `manifest.json` in R2 any
    time in the next 30 days, downloads, verifies sizes, sha256 and sample counts, and imports.
 
@@ -29,7 +30,12 @@ decode). Errors always come back as a code (`BAD_URL`, `INPUT_MISSING`, `POISONE
 | One warm song (instrumental + aligned lyrics) | ~$0.003 | ~$0.004 |
 | 100 songs sent as one batch | ~$0.33 | ~$0.39 |
 | A song on its own (cold start) | ~$0.008 | ~$0.010 |
-| Doing nothing | $0 | $0 |
+| Doing nothing | $0 * | $0 * |
+
+\* Only while no worker stays up idle. RunPod bills an idle worker like a busy one (about $0.58–0.69 an hour on
+these pools), and on 2026-10-08 one sat idle and ready for 7+ minutes after the first deploy's selftest although
+`idleTimeout` is 10 s. So the worker now stops itself after the jobs nothing follows, and `cloud-worker-reaper`
+releases one that stays anyway within 30 minutes (~$0.35 at worst); see "Idle workers" in the runbook.
 
 The real ceiling is the **prepaid balance**: auto-pay stays off. The keepalive emails when a week costs more
 than `CLOUD_WEEKLY_ALARM_USD` ($2). A job that hangs is cut at 15 minutes (~$0.17); the guard stops a job that
@@ -66,7 +72,9 @@ Still to do, in this order:
    **bench**. It creates the endpoint `pixl-cloud-studio`, waits for it, runs the selftest (~1¢) and the bench
    (a few ¢). Read the job summary: GPU, cold start, seconds per stage, peak VRAM and the peak number of running
    workers (must be 1). If no GPU is free for 25 minutes the run fails and cancels its queued jobs, so nothing
-   bills later; run it again. Every later main build deploys itself.
+   bills later; run it again. Every later main build deploys itself. (The endpoint was created on 2026-10-08.
+   Each selftest and bench job now stops its worker afterwards, so the bench's three concurrency jobs each start
+   a worker of their own: a cent or two more than before. The deploy then checks that no worker stays idle.)
 6. **RunPod console** → Serverless → `pixl-cloud-studio`: copy the **Endpoint ID**. Settings → API Keys → Create
    `pixl-iphone`, permission **Restricted**: `pixl-cloud-studio` → Read/Write, everything else None.
 7. **iPhone** (once the app side ships): Settings → Developer → Experimental → Cloud processing: turn it on,
@@ -100,9 +108,33 @@ the GPU and timings; the endpoint id is masked and money is never printed.
 GitHub stops scheduled workflows in public repositories after 60 days without activity; re-enable it in the
 Actions tab if that happens (the app also notices a paused endpoint).
 
+**Idle workers** (they bill like busy ones). Three layers, from the first to the last resort:
+1. *The worker stops itself* after the jobs nothing follows: every `selftest` and `bench`, and the process job the
+   phone marks `policy.last_in_batch: true` (the last song of each submit burst; a single song is a burst of one).
+   It returns runpod's per-job `refresh_worker`, so RunPod stops it once the result is in; the next job starts a
+   fresh worker (a cold start, FlashBoot makes it short). Songs in the middle of a batch keep the worker warm. Its
+   log says `worker_refresh` with the reason.
+2. *`cloud-worker-reaper`* (every 30 minutes, at :07 and :37, and by hand: Actions → cloud-worker-reaper → Run
+   workflow) reads `/health` twice a minute apart. When both show an idle or ready worker and nothing queued, in
+   progress or running, it sets max workers to 0 until the worker is gone (2 minutes at most; a job that arrives
+   meanwhile only waits for the restore) and then back to what it was, never above `deploy/endpoint.json`. It
+   leaves an endpoint at max 0 alone (that is the off switch). Most runs only read `/health` and print the counts.
+3. *The deploy* does the same release after its selftest/bench, whether they passed or not.
+
+By hand, if a worker ever stays up (RunPod console → Serverless → `pixl-cloud-studio` → Workers shows one *idle*
+for minutes with nothing queued): Edit → Max workers 0 → Save, wait until the worker is gone, then Max workers
+back to 1. Or run `cloud-worker-reaper` by hand.
+
+**Emails from `cloud-worker-reaper`** (it fails only when something needs a look): *max workers 0 didn't release
+the idle worker* (stop it in the console under Workers, and tell RunPod support: it bills), or *couldn't set max
+workers back* / *couldn't set max workers to 0* (a RunPod API error: put Max workers back to 1 in the console, or
+run `cloud-worker-keepalive`, which restores it). A `/health` that can't be read is only a warning there: the
+keepalive's daily run reports an unreachable RunPod or a revoked key.
+
 **Logs.** RunPod console → Serverless → `pixl-cloud-studio` → Logs (or Workers → a worker → Logs). One JSON line
-per event: `boot`, `models_loaded`, `job_start`, `job_done`, `job_error` (with a code), `job_duplicate`.
-URLs appear as host/path only; lyrics, titles and job bodies are never logged.
+per event: `boot`, `models_loaded`, `job_start`, `job_done`, `job_error` (with a code), `job_duplicate`,
+`worker_refresh` (the worker asked RunPod to stop it after this job). URLs appear as host/path only; lyrics,
+titles and job bodies are never logged.
 
 **When a job fails**: the manifest's `error.code` says which step. `BAD_URL`
 with HTTP 403 means expired or wrong signatures (the phone re-signs); `INPUT_MISSING` means the upload is gone
@@ -166,6 +198,6 @@ src/pixl_worker/     handler, schema, storage, audio, separate, lyrics/, pipelin
 schema/v1/           the job contract with the app (+ examples/)
 tests/               pytest, CPU only
 ci/                  check_weights, check_fixtures, pip_check, lock
-deploy/              endpoint.json, runpod_deploy.py, keepalive.py, runpod_api.py (stdlib, REST v2)
+deploy/              endpoint.json, runpod_deploy.py, keepalive.py, reaper.py, runpod_api.py (stdlib, REST v2)
 LICENSES/ NOTICE     licence texts and where every component comes from
 ```
