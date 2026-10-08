@@ -87,6 +87,9 @@ marked as tried and removed),
 - Run 37730110289 (`80baeba`): build, all 261 unit tests, Save as playlist light + dark, Quick Fill (songs step light,
   genre step dark) and `GlassAccessibilityTests`: green. The four screenshots were looked at: the full title on its
   own row, one-line "Deselect all", Select all · Clear and Next with an empty gap, the genre step's status capsule.
+- Run 37733067168 (`4f00a83`, the review fixes): build, all 261 unit tests, `testTabBarLeavesAccessibilityUnderThePlayer`
+  (now with the collapse check) and both favourite tests: green, each on its first try. The song sheet's shot shows the
+  emptied heart.
 - `ci/parse-check.ps1` on every changed Swift file; `ci/check-forbidden.sh`.
 
 Not verified: the full `main` run with the new limit. It runs on the next push to `main` after this branch merges.
@@ -106,7 +109,7 @@ Not verified: the full `main` run with the new limit. It runs on the next push t
 
 ## Next step
 
-The branch is green (run 37730110289). Merge `s21-main-health` into `main` (owner's call), then watch main's full run:
+The branch is green (run 37733067168 after the review; 37730110289 before it). Merge `s21-main-health` into `main` (owner's call), then watch main's full run:
 it should finish in about 95–100 minutes inside the new 160-minute limit. If the suite grows past about 130 minutes,
 raise the limit again or split the run. After the other `s16`–`s20` branches merge, re-run
 `tools/localization/android_strings_to_xcstrings.py` once so the String Catalog picks up their strings.
