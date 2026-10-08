@@ -22,7 +22,9 @@ jobs:
   reap:
     runs-on: ubuntu-24.04
     environment: runpod
-    timeout-minutes: 10
+    # Above the worst case with RunPod retrying every call (about 23 minutes), so a timeout never lands between
+    # max workers 0 and the restore. Runs take seconds, or about 3 minutes when they release a worker.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -30,4 +32,6 @@ jobs:
       - name: Release an idle worker
         env:
           RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
-        run: python3 cloud/runpod-worker/deploy/reaper.py
+        # exec: python becomes the step's own process, so the SIGINT GitHub sends on a cancel reaches it (as
+        # KeyboardInterrupt) and the restore after max workers 0 still runs. Under bash it would stop at the shell.
+        run: exec python3 cloud/runpod-worker/deploy/reaper.py

@@ -6,6 +6,7 @@ deploy's jobs). No network: a fake RunPod and a fake opener."""
 import copy
 import io
 import json
+import re
 import sys
 import urllib.error
 from pathlib import Path
@@ -557,6 +558,75 @@ def test_reaper_leaves_a_switched_off_endpoint_alone():
     assert api.calls == []  # not even a /health read
 
 
+def test_reaper_leaves_a_worker_kept_warm_on_purpose_alone(capsys):
+    endpoint = deployed()
+    endpoint["workers"] = {"min": 1, "max": 1, "idleTimeout": 10}  # min 1 set by hand: always one worker up
+    api = Reaped(endpoint, [IDLE])
+    assert release(api) == RP.WARM
+    assert api.calls == []  # not even a /health read, and certainly no PATCH
+    assert "kept warm on purpose" in capsys.readouterr().out
+
+
+def test_reaper_puts_min_and_idle_timeout_back_as_it_found_them():
+    endpoint = deployed()
+    endpoint["workers"] = {"min": 0, "max": 1, "idleTimeout": 45}  # idleTimeout changed by hand
+    api = Reaped(endpoint, [IDLE, IDLE, GONE])
+    assert release(api) == RP.RELEASED
+    assert patches(api) == [{"workers": {"min": 0, "max": 0, "idleTimeout": 45}},
+                            {"workers": {"min": 0, "max": 1, "idleTimeout": 45}}]
+    # An answer without idleTimeout (REST v2 only promises min and max), or a nonsense one: endpoint.json's.
+    for workers in ({"min": 0, "max": 1}, {"max": 1, "idleTimeout": 0}, {"max": 1, "idleTimeout": True}):
+        endpoint["workers"] = workers
+        api = Reaped(endpoint, [IDLE, IDLE, GONE])
+        assert release(api) == RP.RELEASED, workers
+        assert patches(api) == [ZERO, BACK], workers
+
+
+class SlowClock(Clock):
+    """Every /health read takes `per_read` seconds (RunPod retrying behind the client)."""
+
+    def __init__(self, per_read):
+        super().__init__()
+        self.per_read = per_read
+
+
+class SlowReaped(Reaped):
+    def __init__(self, endpoint, script, clock):
+        super().__init__(endpoint, script)
+        self.clock = clock
+
+    def health(self, endpoint_id):
+        self.clock.now += self.clock.per_read
+        return super().health(endpoint_id)
+
+
+def test_reaper_changes_nothing_when_runpod_answers_too_slowly(capsys):
+    clock = SlowClock(per_read=50.0)  # the two reads span 60 + 2 x 50 s: over CONFIRM_S + SLOW_S
+    api = SlowReaped(deployed(), [IDLE, IDLE, GONE], clock)
+    assert release(api, clock) == RP.SLOW
+    assert patches(api) == []
+    assert "::warning::" in capsys.readouterr().out
+    clock = SlowClock(per_read=5.0)  # a little slow is fine
+    api = SlowReaped(deployed(), [IDLE, IDLE, GONE], clock)
+    assert release(api, clock) == RP.RELEASED
+    assert patches(api) == [ZERO, BACK]
+
+
+def test_reaper_restores_when_the_run_is_cancelled_at_max_0():
+    # The workflow execs python, so GitHub's SIGINT on a cancel (or the job timeout) arrives as KeyboardInterrupt.
+    class Cancelled(Clock):
+        def sleep(self, seconds):
+            super().sleep(seconds)
+            if self.now > RP.CONFIRM_S:
+                raise KeyboardInterrupt
+
+    api = Reaped(deployed(), [IDLE, IDLE, IDLE])
+    clock = Cancelled()
+    with pytest.raises(KeyboardInterrupt):
+        RP.release_idle(api, "ep123456", api.endpoint["workers"], TEMPLATE, sleep=clock.sleep, clock=clock)
+    assert patches(api) == [ZERO, BACK]
+
+
 def test_reaper_without_max_workers_in_the_answer_changes_nothing(capsys):
     for workers in ({}, {"min": 0}, {"max": True}, {"max": "1"}):
         endpoint = deployed()
@@ -677,7 +747,11 @@ def test_the_reaper_workflow_runs_every_30_minutes_in_the_runpod_environment():
     text = workflow.read_text(encoding="utf-8")
     assert "cron: '7,37 * * * *'" in text and "workflow_dispatch" in text
     assert "environment: runpod" in text and "contents: read" in text
-    assert "python3 cloud/runpod-worker/deploy/reaper.py" in text
+    assert "run: exec python3 cloud/runpod-worker/deploy/reaper.py" in text  # SIGINT reaches python on a cancel
+    timeout = int(re.search(r"timeout-minutes: (\d+)", text).group(1))
+    assert timeout >= 25  # above the ~23 minutes a run takes when every RunPod call retries to the end
+    deploy = workflow.with_name("cloud-worker-deploy.yml").read_text(encoding="utf-8")
+    assert "exec python3 cloud/runpod-worker/deploy/runpod_deploy.py" in deploy
     for line in text.splitlines():
         if "uses:" in line:
             ref = line.split("@", 1)[1].split()[0]

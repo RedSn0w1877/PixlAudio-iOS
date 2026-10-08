@@ -89,4 +89,6 @@ jobs:
           else
             args+=(--auto)
           fi
-          python3 cloud/runpod-worker/deploy/runpod_deploy.py --tag "$tag" --git-sha "$git_sha" "${args[@]}"
+          # exec: a cancel's SIGINT then reaches python, so an idle release caught at max workers 0 still restores
+          # them (the keepalive won't after a cancelled deploy).
+          exec python3 cloud/runpod-worker/deploy/runpod_deploy.py --tag "$tag" --git-sha "$git_sha" "${args[@]}"

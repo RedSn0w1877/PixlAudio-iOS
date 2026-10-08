@@ -9,15 +9,18 @@ jobs nothing follows (handler.py, refresh_worker); this is the safety net behind
 .github/workflows/cloud-worker-reaper.yml and by runpod_deploy.py after its selftest/bench.
 
 1. Find the endpoint by name (deploy/endpoint.json); its id is masked at once. No key or no endpoint yet: succeed
-   quietly. Max workers already 0 (switched off by hand, or RunPod's own scale-down): leave it alone.
+   quietly. Max workers already 0 (switched off by hand, or RunPod's own scale-down): leave it alone. Min workers
+   above 0 (a worker kept warm on purpose, set by hand): leave it alone too, it isn't stranded.
 2. GET /health twice, about a minute apart. A worker counts as stranded only when BOTH reads show an idle or
-   ready worker, none running, and no job in the queue or in progress.
+   ready worker, none running, and no job in the queue or in progress. When RunPod took so long to answer that
+   the two reads span well over that minute, change nothing: a struggling API might not take the restore.
 3. PATCH workers.max to 0, then read /health every 10 s until no worker is left (2 minutes at most). A job that
    turns up meanwhile ends the wait at once: it only waits for the restore.
-4. PATCH the workers back: max as it was found (never above endpoint.json's), min and idleTimeout from
-   endpoint.json. Always, also after a timeout, a failed read or a failed PATCH to 0 (it may have been applied
-   before the connection dropped). A failed PATCH, either one, and a worker still there after the 2 minutes fail
-   the run, so GitHub emails the owner.
+4. PATCH the workers back: max as it was found (never above endpoint.json's), min and idleTimeout as they were
+   found (endpoint.json's when RunPod's answer lacks them). Always, also after a timeout, a failed read, a failed
+   PATCH to 0 (it may have been applied before the connection dropped) or a cancelled run (the workflow `exec`s
+   this script, so GitHub's SIGINT reaches it as KeyboardInterrupt and the restore still runs). A failed PATCH,
+   either one, and a worker still there after the 2 minutes fail the run, so GitHub emails the owner.
 A read that fails before anything was changed is only a warning (the daily keepalive reports an unreachable RunPod
 or a revoked key), so an outage doesn't send an email every half hour.
 Prints counts only: never a key, the endpoint id, a response body or money.
@@ -38,11 +41,14 @@ from runpod_api import ApiError, RunPod, mask  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 CONFIRM_S = 60.0  # between the two /health reads that must both show the worker stranded
+SLOW_S = 90.0  # the two reads may take this much longer than CONFIRM_S before RunPod counts as too slow to touch
 GONE_TIMEOUT_S = 120.0  # how long max 0 may take to release the worker
 POLL_S = 10.0
 
 # release_idle outcomes
 OFF = "off"  # max workers is 0: nothing to release, nothing touched
+WARM = "warm"  # min workers above 0: a worker kept up on purpose, nothing touched
+SLOW = "slow"  # RunPod answered the two reads too slowly: nothing touched (the next run looks again)
 NOTHING_IDLE = "nothing idle"
 RELEASED = "released"
 JOB_ARRIVED = "job arrived"  # a job turned up while max was 0: restored at once
@@ -67,6 +73,10 @@ def say(line: str) -> None:
 def _count(doc: dict, key: str) -> int:
     value = doc.get(key)
     return int(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else 0
+
+
+def _int_or_none(value) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
 def counts(health: dict | None) -> dict[str, int]:
@@ -104,15 +114,24 @@ def release_idle(api: RunPod, endpoint_id: str, current_workers: dict, template:
     """Steps 2-4 of the module docstring for one endpoint. Returns one of the outcomes above. Raises ApiError when a
     read fails before anything changed, ReaperError when the workers couldn't be restored."""
     want = template["workers"]
-    raw_max = (current_workers or {}).get("max")
-    if isinstance(raw_max, bool) or not isinstance(raw_max, int):
+    current_workers = current_workers or {}
+    found_max = _int_or_none(current_workers.get("max"))
+    if found_max is None:
         # REST v2's Endpoint always has workers.max; without it there is nothing safe to restore to.
         say("::warning::reaper: RunPod's answer doesn't say the endpoint's max workers; nothing changed")
         return NO_MAX
-    found_max = raw_max
     if found_max <= 0:
         say("reaper: max workers is 0 (switched off or scaled down); left alone")
         return OFF
+    found_min = _int_or_none(current_workers.get("min")) or 0
+    if found_min > 0:
+        # Min workers above 0 keeps a worker up on purpose (set by hand: endpoint.json says 0). Releasing it here
+        # would undo that every half hour.
+        say(f"reaper: min workers is {found_min}, so a worker is kept warm on purpose; left alone")
+        return WARM
+    found_idle = _int_or_none(current_workers.get("idleTimeout"))
+    idle_timeout = found_idle if found_idle is not None and 1 <= found_idle <= 3600 else int(want["idleTimeout"])
+    t_first = clock()
     first = counts(api.health(endpoint_id))
     if not stranded(first):
         say(f"reaper: nothing idle ({describe(first)})")
@@ -122,9 +141,14 @@ def release_idle(api: RunPod, endpoint_id: str, current_workers: dict, template:
     if not stranded(second):
         say(f"reaper: nothing idle on the second look ({describe(second)})")
         return NOTHING_IDLE
+    if clock() - t_first > confirm_s + SLOW_S:
+        # Retries on 5xx or timeouts stretched the reads. Max 0 now might outlive the run (the restore needs the
+        # same API, and the job has a timeout), so leave it for the next run.
+        say(f"::warning::reaper: RunPod took {int(clock() - t_first)} s to answer two reads; nothing changed, the "
+            "next run looks again")
+        return SLOW
     restore_max = min(found_max, int(want["max"]))
-    restore = {"min": min(int(want.get("min", 0)), restore_max), "max": restore_max,
-               "idleTimeout": int(want["idleTimeout"])}
+    restore = {"min": 0, "max": restore_max, "idleTimeout": idle_timeout}
     say(f"reaper: a worker has been idle for over {int(confirm_s)} s with nothing to do ({describe(second)}); "
         "setting max workers to 0 to release it")
     outcome = STILL_THERE
