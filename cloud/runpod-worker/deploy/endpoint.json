@@ -1,0 +1,23 @@
+{
+  "name": "pixl-cloud-studio",
+  "type": "QUEUE",
+  "disk": 30,
+  "gpu": {
+    "pools": ["AMPERE_16", "AMPERE_24"],
+    "excludedTypes": ["NVIDIA RTX 2000 Ada Generation"],
+    "count": 1,
+    "minCudaVersion": "12.8"
+  },
+  "workers": {"min": 0, "max": 1, "idleTimeout": 10},
+  "scaling": {"type": "QUEUE_DELAY", "queueDelay": 4},
+  "flashboot": "FLASHBOOT",
+  "timeout": 900000,
+  "env": {
+    "PIXL_MAX_AUDIO_S": "900",
+    "PIXL_MAX_INPUT_MB": "160",
+    "PIXL_BEST_MAX_AUDIO_S": "480",
+    "PIXL_EXECUTION_TIMEOUT_S": "900",
+    "PIXL_ALLOWED_HOST_SUFFIXES": "{R2_ACCOUNT_ID}.r2.cloudflarestorage.com",
+    "PIXL_LOG_LEVEL": "INFO"
+  }
+}

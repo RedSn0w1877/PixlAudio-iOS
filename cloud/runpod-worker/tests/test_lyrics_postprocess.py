@@ -94,6 +94,8 @@ def test_finalize_and_summary():
     ("我爱你", None, "zh"),
     ("我爱你", "yue", "yue"),
     ("Hôm nay trời đẹp quá", None, "vi"),
+    ("Tôi yêu em", "vi", "vi"),  # no vi-only letter, but diacritics in a Vietnamese song
+    ("Baby I love you", "vi", "en"),  # plain ASCII in a Vietnamese song: an English hook
     ("Bonjour tout le monde", "fr", "fr"),
     ("Привет", None, "ru"),
     ("สวัสดี", None, "th"),

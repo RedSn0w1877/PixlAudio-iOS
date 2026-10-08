@@ -146,6 +146,10 @@ def line_language(text: str, hint: str | None) -> str | None:
     if dominant == "latin":
         if any(ch in _VIETNAMESE for ch in text):
             return "vi"
+        if hint == "vi":
+            # Vietnamese is written with diacritics; a line of plain ASCII letters in a Vietnamese song is almost
+            # always an English hook, which the aligner can time word by word.
+            return "vi" if any(ord(ch) > 0x7F and ch.isalpha() for ch in text) else "en"
         # An English line in a Korean/Japanese/Chinese/Russian... song: the hint names the song, not the line.
         return hint if hint and hint not in _NON_LATIN_LANGUAGES else "en"
     return {
