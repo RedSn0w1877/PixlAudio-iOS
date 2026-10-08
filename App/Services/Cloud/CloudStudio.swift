@@ -297,7 +297,7 @@ final class CloudStudio {
         let estimate = CloudBatchEstimate.make(plans: selection.plans, uploadBytes: uploadBytes, quality: settings.quality,
                                                pricePerSecondMicroUSD: settings.pricePerSecondMicroUSD,
                                                committedMicroUSD: committedThisMonthMicroUSD,
-                                               capMicroUSD: settings.monthlyCapMicroUSD)
+                                               capMicroUSD: settings.effectiveMonthlyCapMicroUSD)
         return CloudBatchPreview(id: dependencies.newJobKey(), songs: selection.plans.compactMap { byId[$0.songId] },
                                  plans: selection.plans, skipped: skips, estimate: estimate,
                                  replaceUserSynced: replaceUserSynced, title: title)
@@ -484,6 +484,11 @@ final class CloudStudio {
             return
         }
         await settings.loadSecrets()
+        // On by default only while the built-in keys looked available: a blob that didn't open switches that off.
+        guard settings.isEnabled else {
+            notice = .off
+            return
+        }
         if settings.keysMissing {
             notice = .keysMissing
             return
@@ -493,6 +498,9 @@ final class CloudStudio {
             return
         }
         if notice == .off || notice == .notConfigured || notice == .keysMissing || notice == .rateLimited { notice = nil }
+        // Nothing sent and no session yet (the usual launch now that the feature can be on by default): no transfer
+        // session, no RunPod or bucket call.
+        guard !jobs.isEmpty || transfersStorage != nil else { return }
         _ = connectTransfers()
         await reconcileTransfers()
         startPreparations()
@@ -817,7 +825,7 @@ final class CloudStudio {
                                                           pricePerSecondMicroUSD: price)
                 + (burst.holding?.estimateMicroUSD ?? 0)
             let estimate = CloudCost.estimatedSeconds(record.plan, quality: record.quality) * price
-            guard CloudBudget.allows(estimateMicroUSD: estimate, capMicroUSD: settings.monthlyCapMicroUSD,
+            guard CloudBudget.allows(estimateMicroUSD: estimate, capMicroUSD: settings.effectiveMonthlyCapMicroUSD,
                                      spentMicroUSD: committed) else {
                 notice = .capReached
                 break  // the job held so far still goes out, as the burst's last

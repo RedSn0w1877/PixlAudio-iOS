@@ -10,7 +10,9 @@ extension CloudStudio {
                      tais: TaisServices, lyricsService: LyricsService?, persistence: PersistenceActor?,
                      playbackServices: PlaybackServices?, youtube: YouTubeServices) -> CloudStudio {
         if launch.isUITest { return CloudDemo.make(launch: launch, defaults: defaults) }
-        let settings = CloudSettings(defaults: defaults, secrets: CloudKeychain())
+        // PixlAudio's built-in keys when this build carries them (CI, from the CLOUD_DEFAULTS_KEY secret); decrypted on
+        // first use, off the main actor.
+        let settings = CloudSettings(defaults: defaults, secrets: CloudKeychain(), builtIn: CloudBuiltInKeys())
         let host = LiveCloudStudioHost(
             library: library, playback: playback, lyricsService: lyricsService, studio: tais.studio,
             audioSource: { [weak playbackServices, weak youtube] song in

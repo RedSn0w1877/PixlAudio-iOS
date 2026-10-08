@@ -109,8 +109,10 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case taisInstrumentalActive = "tais.instrumentalActive"
 
     // Cloud Studio (iOS-first): Cloud processing filled in with a passed Test connection, the queue in every state,
-    // and the confirm sheet for a 12-song batch (`CloudDemo`, no network)
+    // and the confirm sheet for a 12-song batch (`CloudDemo`, no network); `cloud.settings.builtin` is the same screen
+    // in a build with PixlAudio's built-in cloud keys (2026-10-08: no fields, "Use my own keys")
     case cloudSettings = "cloud.settings", cloudQueue = "cloud.queue", cloudConfirm = "cloud.confirm"
+    case cloudSettingsBuiltIn = "cloud.settings.builtin"
 
     /// The accessibility identifier present once the screen is up (`screen.<id>`).
     var readyIdentifier: String {
@@ -205,7 +207,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         // A full-screen cover: nothing needs to be pushed underneath (one destination per demo screen).
         case .backupRestorePlan, .backupImportReport: return nil
         case .taisStudio, .taisModels: return .experimental
-        case .cloudSettings: return .cloudProcessing
+        case .cloudSettings, .cloudSettingsBuiltIn: return .cloudProcessing
         case .cloudQueue: return .cloudQueue
         // A sheet: one destination per demo screen (it opens over Home; in the app the queue presents it).
         case .cloudConfirm: return nil

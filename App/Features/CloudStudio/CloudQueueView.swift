@@ -65,10 +65,10 @@ struct CloudQueueView: View {
             }
             SettingsPanel {
                 Text(verbatim: CloudProcessingCopy.monthLine(committed: cloud.committedThisMonthMicroUSD,
-                                                             cap: cloud.settings.monthlyCapMicroUSD))
+                                                             cap: cloud.settings.effectiveMonthlyCapMicroUSD))
                     .pixlFont(.bodyMedium)
                     .foregroundStyle(theme.onSurface)
-                Text(verbatim: CloudProcessingCopy.promise)
+                Text(verbatim: CloudProcessingCopy.promise(builtIn: cloud.settings.usesBuiltInKeys))
                     .pixlFont(.bodySmall)
                     .foregroundStyle(theme.onSurfaceVariant)
             }

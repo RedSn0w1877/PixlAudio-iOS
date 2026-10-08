@@ -10,11 +10,24 @@ enum CloudDemo {
     static let secrets = CloudSecrets(runpodKey: "rpa_DEMO0000000000000000000000000000", accessKeyId: "DEMOACCESSKEY0000000",
                                       secretAccessKey: "demo-secret-0000000000000000000000000000")
 
+    /// What the demo's built-in keys hold (`cloud.settings.builtin`; never shown, only used for the screen's state).
+    static let builtInConfig = CloudConfigInput(endpointId: "pixl0builtin0demo", runpodKey: "rpa_DEMOBUILTIN000000",
+                                                endpoint: CloudConfig.r2Endpoint(accountId: accountId),
+                                                bucket: CloudConfig.defaultBucket, accessKeyId: "DEMOBUILTINKEY000000",
+                                                secretAccessKey: "demo-builtin-secret-000000000000000000")
+
     static func make(launch: LaunchConfiguration, defaults: UserDefaults) -> CloudStudio {
         let screen = launch.screen
-        let isCloudScreen = screen == .cloudSettings || screen == .cloudQueue || screen == .cloudConfirm
-        let settings = CloudSettings(defaults: defaults, secrets: CloudMemorySecrets(isCloudScreen ? secrets : .empty))
-        if isCloudScreen {
+        let builtInScreen = screen == .cloudSettingsBuiltIn
+        let isCloudScreen = screen == .cloudSettings || screen == .cloudQueue || screen == .cloudConfirm || builtInScreen
+        let ownSecrets = isCloudScreen && !builtInScreen ? secrets : .empty
+        let settings = CloudSettings(defaults: defaults, secrets: CloudMemorySecrets(ownSecrets),
+                                     builtIn: builtInScreen ? CloudFixedBuiltInKeys(config: builtInConfig) : nil)
+        if builtInScreen {
+            // A fresh install of a build with built-in keys: nothing typed, on by default.
+            settings.useOwnKeys = false
+            settings.isEnabled = true
+        } else if isCloudScreen {
             settings.isEnabled = true
             settings.endpointId = endpointId
             settings.r2Endpoint = CloudConfig.r2Endpoint(accountId: accountId)
@@ -35,9 +48,10 @@ enum CloudDemo {
         // What a selftest of the deployed worker reports (its default limits).
         let selftest = CloudCheck(ok: true, message: "The worker answered.",
                                   detail: "Worker 1.0.0 on NVIDIA L4 · songs up to 160 MB and 15 min")
-        studio.loadDemo(jobs: screen == .cloudSettings ? Array(jobs().prefix(2)) : jobs(),
-                        report: screen == .cloudSettings ? report : nil,
-                        selftest: screen == .cloudSettings ? selftest : nil,
+        let settingsScreen = screen == .cloudSettings || builtInScreen
+        studio.loadDemo(jobs: settingsScreen ? Array(jobs().prefix(2)) : jobs(),
+                        report: settingsScreen ? report : nil,
+                        selftest: settingsScreen ? selftest : nil,
                         progress: [jobKey(1): 0.42],
                         batch: screen == .cloudConfirm ? batch() : nil)
         return studio
