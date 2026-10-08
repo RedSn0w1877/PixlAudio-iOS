@@ -693,6 +693,9 @@ Swift-only and define the behaviour both apps share.
   - `PixlNetTests/SpotifyConnectTests.volumeHoldKeepsTheLocalValueAgainstStalePolls` — the reducer keeps the local
     volume for 3 s after a change (a stale poll writes nothing), extends it 1.5 s after the `PUT` (never shortens it),
     applies the device's value after the hold, clamps; states built without a hold apply polls at once.
+    `aRefusedVolumeStaysOffWhateverPollsSay` — once the device refuses a volume command (`VOLUME_CONTROL_DISALLOW`)
+    volume control stays off for the session although polls and the device list keep reporting `supports_volume`
+    (before, the buttons, the slider and the toast came back with every poll).
   - `AppTests/AudioSessionControllerTests` — the volume buttons' hold: `releasePreparedActivation()` is ignored while
     held; releasing the hold gives back a session nothing played on; a session `activate()` used is kept; handing over
     to local playback (`keepingSession`) keeps the prepared session, and a later release works as before.

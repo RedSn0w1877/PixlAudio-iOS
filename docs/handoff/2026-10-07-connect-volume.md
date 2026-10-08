@@ -62,6 +62,24 @@ single 5 % step as unchanged after a few seconds.
 - **Open design choice:** the pop-up uses the app's colours (like Connect's toasts), not the album-art colours, even
   over the full player. Say so if it should follow the player's colours there.
 
+## Review (adversarial pass after the implementer)
+Checked the diff against the plan, DECISIONS and AGENTS.md, and looked at the latest screenshots (pop-up over the full
+player light/dark and over the lyrics screen, the hero after the demo press, the Equalizer card). Fixed:
+- **A speaker that refuses volume commands** (`VOLUME_CONTROL_DISALLOW` while it reports `supports_volume`) got volume
+  control back with the next poll (every second): the buttons restarted and re-centred the phone volume, the slider
+  came back, and every press showed the "can't change the volume" toast again. The refusal now sticks for the session
+  (`SpotifyConnectReducer.refuseVolume`; polls and the device list can't undo it; unit-tested).
+- No "Spotify is busy" toast when a poll's 429 lands right after the last volume request (nothing was waiting).
+- A cancellation error that isn't the lane's own can no longer leave the volume lane stuck (every later change would
+  have waited forever).
+- A call or Siri during a reset no longer switches the buttons to Relative mode for the session.
+
+Left as is (by design or edge cases, listed so they're known): the pop-up's glass lets a faint ghost of the output
+pill's name show through in light mode (legible); a reset that lands later than 500 ms switches to Relative and its
+late echo then counts as one press the other way (one lost press, once); in Relative mode a phone volume already at
+full or silent gets no toast until a press reaches the end; after "Waiting: another app is playing audio" the buttons
+start the next time PixlAudio becomes active (the hint notification doesn't reach an app without an active session).
+
 ## Hoa's iPhone checklist
 - [ ] Play on the Echo (or any Connect speaker), stay in PixlAudio, press volume up/down: the speaker moves 5 % per
       press and PixlAudio's glass pop-up shows (not the iPhone's own volume pop-up).
