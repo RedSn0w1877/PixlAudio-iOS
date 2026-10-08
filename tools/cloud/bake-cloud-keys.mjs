@@ -388,6 +388,11 @@ async function main(argv) {
       (v) => (/^[0-9a-f]{32}$/.test(v) ? '' : 'R2 access key IDs are usually 32 hex characters'));
     const r2SecretAccessKey = await readSecret('PIXL_R2_SECRET', 'R2 secret access key',
       (v) => (/^[0-9a-f]{64}$/.test(v) ? '' : 'R2 secret access keys are usually 64 hex characters'));
+    // A wrong shape is what R2 answers with HTTP 400 later, so refuse it here, before anything is written.
+    if (!/^[0-9a-f]{32}$/.test(r2AccessKeyId) || !/^[0-9a-f]{64}$/.test(r2SecretAccessKey)) {
+      throw new BakeError(`the R2 access key ID must be 32 hex characters (it is ${r2AccessKeyId.length}) and the secret ` +
+        `64 (it is ${r2SecretAccessKey.length}); they may be swapped or cut short. Nothing was changed; run it again`);
+    }
     if (r2AccessKeyId === r2SecretAccessKey || runpodKey === r2SecretAccessKey || runpodKey === r2AccessKeyId) {
       throw new BakeError('two of the three secrets are the same; paste each one from its own field');
     }

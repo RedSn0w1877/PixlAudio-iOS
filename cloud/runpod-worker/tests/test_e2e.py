@@ -467,3 +467,25 @@ def test_the_workflow_is_manual_in_the_runpod_environment_and_execs_python():
         if "uses:" in line:
             ref = line.split("@", 1)[1].split()[0]
             assert len(ref) == 40 and all(ch in "0123456789abcdef" for ch in ref), line  # pinned to a commit
+
+
+# ---- key shapes and S3 error codes (2026-10-08: the first real run got an R2 400 and said nothing about why) -------
+
+def test_s3_error_detail_keeps_the_code_and_masks_long_runs():
+    body = (b"<Error><Code>InvalidArgument</Code><Message>Credential access key has length 64, should be 32 "
+            b"ee3d165633f9d553f40d560d0f8fbe052b3bf2989ad0</Message></Error>")
+    detail = E.s3_error_detail(body)
+    assert detail.startswith(" (InvalidArgument: Credential access key has length 64, should be 32")
+    assert "ee3d1656" not in detail
+    assert E.s3_error_detail(b"") == "" and E.s3_error_detail(b"not xml") == ""
+
+
+def test_key_shape_notes_report_lengths_only_and_spot_a_swap():
+    swapped = E.Keys(endpoint_id="x", runpod_key="rpa_SECRETVALUE", r2_endpoint="https://x.r2.cloudflarestorage.com",
+                     bucket="b", access_key_id="a" * 64, secret_access_key="b" * 32)
+    notes = " | ".join(E.key_shape_notes(swapped))
+    assert "R2 access key ID: 64 chars" in notes and "look swapped" in notes
+    assert "SECRETVALUE" not in notes and "a" * 8 not in notes
+    good = E.Keys(endpoint_id="x", runpod_key="rpa_x", r2_endpoint="https://x.r2.cloudflarestorage.com",
+                  bucket="b", access_key_id="a" * 32, secret_access_key="b" * 64)
+    assert "swapped" not in " ".join(E.key_shape_notes(good))

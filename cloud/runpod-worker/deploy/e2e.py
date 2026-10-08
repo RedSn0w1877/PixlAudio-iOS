@@ -211,6 +211,31 @@ def presign(method: str, key: str, *, keys: Keys, expires_s: int, now_s: int | N
     return f"https://{host}{path}?{canonical_query}&X-Amz-Signature={signature}"
 
 
+def s3_error_detail(body: bytes) -> str:
+    """` (Code: Message)` from an S3 error body, long token-like runs masked; '' when there is none."""
+    text = body.decode("utf-8", "replace")
+    code = re.search(r"<Code>([A-Za-z0-9]{1,64})</Code>", text)
+    if not code:
+        return ""
+    message = re.search(r"<Message>([^<]{0,300})</Message>", text)
+    note = re.sub(r"[A-Za-z0-9/+=_-]{24,}", "***", message.group(1)).strip()[:160] if message else ""
+    return f" ({code.group(1)}{': ' + note if note else ''})"
+
+
+def key_shape_notes(keys: Keys) -> list[str]:
+    """What shape each secret has (lengths and character classes only, never a value), for the log."""
+    def hexlen(value: str) -> str:
+        return f"{len(value)} chars, {'hex' if re.fullmatch(r'[0-9a-f]+', value) else 'not all hex'}"
+    notes = [
+        f"RunPod key: {len(keys.runpod_key)} chars, {'starts with rpa_' if keys.runpod_key.startswith('rpa_') else 'does not start with rpa_'}",
+        f"R2 access key ID: {hexlen(keys.access_key_id)} (expected 32 hex)",
+        f"R2 secret access key: {hexlen(keys.secret_access_key)} (expected 64 hex)",
+    ]
+    if len(keys.access_key_id) == 64 and len(keys.secret_access_key) == 32:
+        notes.append("the R2 access key ID and secret look swapped: bake again with each in its own prompt")
+    return notes
+
+
 class R2:
     """The bucket through presigned URLs (what the phone's background session and CloudObjectClient do)."""
 
@@ -224,7 +249,9 @@ class R2:
     def request(self, method: str, key: str, data: bytes | None = None, *, what: str,
                 expect: tuple[int, ...] = (200,), tries: int = 3) -> bytes:
         status = 0
+        detail = ""
         for attempt in range(tries):
+            detail = ""
             headers = {"User-Agent": USER_AGENT}
             if data is not None:
                 headers["Content-Type"] = "application/octet-stream"
@@ -233,7 +260,12 @@ class R2:
                 with self.opener(req, timeout=300) as resp:
                     status, body = resp.status, resp.read()
             except urllib.error.HTTPError as exc:
-                status, body = exc.code, b""
+                status = exc.code
+                try:
+                    body = exc.read()[:4096]
+                except OSError:
+                    body = b""
+                detail = s3_error_detail(body)
             except (urllib.error.URLError, TimeoutError, ConnectionError, OSError, ValueError,
                     http.client.HTTPException) as exc:
                 # Only the type: a URL (with its signature) must never reach the log.
@@ -243,7 +275,7 @@ class R2:
             if status not in (0, 429, 500, 502, 503, 504) or attempt + 1 == tries:
                 break
             self.sleep(2.0 * (2 ** attempt))
-        raise E2EError(f"{what}: HTTP {status}")
+        raise E2EError(f"{what}: HTTP {status}{detail}")
 
 
 # ---- the clip and the job ------------------------------------------------------------------------------------------
@@ -403,6 +435,8 @@ def wait_idle(api: RunPod, endpoint_id: str, *, admin: RunPod | None, template: 
 def run(keys: Keys, *, api: RunPod, admin: RunPod | None, r2: R2, template: dict, workdir: Path, seconds: int,
         build: str, sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.monotonic,
         clip: Callable[[Path, int], None] = make_clip, **idle_kw) -> int:
+    for note in key_shape_notes(keys):
+        say(f"keys: {note}")
     job_key = str(uuid.uuid4())
     objects = job_keys(job_key)
     path = workdir / "clip.flac"
