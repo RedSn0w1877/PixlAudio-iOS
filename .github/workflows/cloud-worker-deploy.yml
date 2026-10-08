@@ -76,7 +76,7 @@ jobs:
               built=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow cloud-worker-build.yml --branch main \
                 --event push --status success --limit 1 --json headSha --jq '.[0].headSha // ""')
               if [ -z "$built" ]; then
-                echo "::error::no green cloud-worker-build on main yet: merge the worker and wait for that build (README step 4)"
+                echo "::error::no green cloud-worker-build on main yet: merge the worker and wait for that build (README step 3)"
                 exit 1
               fi
               tag="sha-${built::12}"

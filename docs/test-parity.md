@@ -763,12 +763,12 @@ Nothing to port: Android has no tests for the full player's toggle row, the tran
 ## Cloud Studio worker (2026-10-07, branch `s19-cloud-worker`, Python, server side)
 Nothing to port: Android's old RunPod worker (`tools/runpod-serverless`) has no tests. The worker's own suite is
 pytest, CPU only (no torch, no weights), run by `cloud-worker-build` inside the image's `test` stage and locally
-with `python -m pytest -q tests` in `cloud/runpod-worker/` (231 tests).
+with `python -m pytest -q tests` in `cloud/runpod-worker/` (240 tests).
 
 - `test_schema.py` — every golden example validates against its JSON Schema; the stdlib validator and jsonschema
   agree on good and broken inputs; caps, URL rules (host allowlist, https, signature, the job's own object keys).
 - `test_storage.py` — streamed download with size and sha256 checks, status mapping (404 → `INPUT_MISSING`, 403 →
-  `BAD_URL`), retries, the guard objects, the volume driver and sweep, the real HTTPS transport against a local TLS
+  `BAD_URL`), retries, the guard objects (an oversized one is unreadable, not a crash), the volume driver and sweep, the real HTTPS transport against a local TLS
   server (pinned IP, an unreachable first address falls through to the next, no redirects, wrong certificate
   refused).
 - `test_audio.py` — ffprobe parsing (cover art ignored, video/hls/concat refused, caps) and real ffmpeg round trips.
@@ -777,17 +777,22 @@ with `python -m pytest -q tests` in `cloud/runpod-worker/` (231 tests).
   `DEADLINE`, error manifests, the rejection manifest for jobs that fail validation; a lyrics-only job whose
   lyrics fail is an error that keeps its input (not `partial`); a 192 kHz input with AAC output fails before the
   separation, and with FLAC output keeps its rate; every document against its schema; sample counts equal to the
-  decoded input (AAC and FLAC).
+  decoded input (AAC and FLAC); a resend of a job whose input a finished `ok`/`partial` run already deleted hands
+  that result back instead of overwriting it with `INPUT_MISSING`, while a missing input with no such result is
+  still `INPUT_MISSING`.
 - `test_lyrics_run.py`, `test_lyrics_windows.py`, `test_lyrics_postprocess.py` — VAD, the global offset check,
   synced and plain windows, token → UTF-16 offsets, line-timing fallback, the Whisper hook (a second backend takes
-  the languages the first lacks), transcription.
+  the languages the first lacks), transcription; a job's deadline always comes off the shared aligner and
+  transcriber afterwards (failures included).
 - `test_handler.py` — dispatch, error strings, cold start reported once, the selftest answer (with caps) against its
-  schema, no URL in any returned error.
+  schema, no URL in any returned error; a bench on a worker whose aligner still holds an expired deadline runs.
 - `test_ci_tools.py` — the Dockerfile and weights.lock agree (and each kind of disagreement fails), the small-file
   fetcher's size/sha checks and retries, the pip-check allowlist, fixture drift, the lock's base-package filter.
 - `test_deploy.py` — REST v2 client retries and safe errors, desired state and the smallest valid PATCH (complete
   env, pools with exclusions), the deploy flow (auto vs by hand, private package, rollout, selftest gitSha retry),
   the concurrency check, jobs still queued when the deploy stops waiting are cancelled, the keepalive (restore
-  only when healthy, the spend alarm without printing money).
+  only when healthy and the last deploy that ran passed: failed, cancelled and timed-out deploys block it,
+  skipped deploy runs don't count; the spend alarm without printing money).
 - `src/pixl_worker/smoke.py` (Docker `smoke` stage on CI, not pytest) — loads the real BS-RoFormer, aligner and
-  htdemucs_ft weights on CPU and runs each once.
+  htdemucs_ft weights on CPU and runs each once; the htdemucs_ft run goes through the progress hook (one total
+  for the bag of models, never going backwards).

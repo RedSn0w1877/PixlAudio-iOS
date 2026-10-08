@@ -43,36 +43,36 @@ Already done:
 - [x] GitHub environment **`runpod`**, deployment branches limited to `main`.
 - [x] Secret **`RUNPOD_API_KEY`** (a RunPod key with permission **All**, named e.g. `pixl-deploy`).
 - [x] Variable **`CLOUD_WEEKLY_ALARM_USD`** = `2`.
+- [x] Variable **`R2_ACCOUNT_ID`** (the 32-character Cloudflare account id; not secret). Both variables live in the
+  `runpod` environment, which is where the deploy and keepalive jobs run. The deploy uses the id to allow only
+  *your* R2 account's URLs (`<id>.r2.cloudflarestorage.com`).
 
 Still to do, in this order:
-1. **GitHub variable `R2_ACCOUNT_ID`** (Settings → Secrets and variables → Actions → Variables, or the `runpod`
-   environment's variables): the 32-character Cloudflare account id. It is not secret; the deploy uses it to
-   allow only *your* R2 account's URLs (`<id>.r2.cloudflarestorage.com`).
-2. **RunPod billing** (runpod.io → Billing): make sure **auto-pay is off**, add $10 if the balance is low, turn on
+1. **RunPod billing** (runpod.io → Billing): make sure **auto-pay is off**, add $10 if the balance is low, turn on
    the low-balance email at $3. Delete or disable the old Android Demucs endpoint and its old full-access key.
    The balance is the most anyone could ever spend.
-3. **Cloudflare R2**: bucket **`pixl-cloud-studio`** (create it if it doesn't exist; automatic location). Under the
+2. **Cloudflare R2**: bucket **`pixl-cloud-studio`** (create it if it doesn't exist; automatic location). Under the
    bucket's Settings → Object lifecycle rules add three rules: prefix `in/` delete after **7 days**, prefix `out/`
    delete after **30 days**, and one rule with **no prefix** that deletes after **30 days**. Keep the default rule
    that aborts unfinished multipart uploads. Then R2 → Manage API tokens → Create: **Object Read & Write**, only
    for the bucket `pixl-cloud-studio`. Keep the Access Key ID and Secret for the app (step 7).
-4. **Merge the worker to `main`.** The first `cloud-worker-build` on main pushes
+3. **Merge the worker to `main`.** The first `cloud-worker-build` on main pushes
    `ghcr.io/redsn0w1877/pixl-cloud-worker:sha-<12>`. Its automatic deploy then says "No endpoint yet" and stops:
    that's expected.
-5. **Make the package public** (once): your GitHub profile → Packages → `pixl-cloud-worker` → Package settings →
+4. **Make the package public** (once): your GitHub profile → Packages → `pixl-cloud-worker` → Package settings →
    Change visibility → Public. RunPod pulls it without a password, and public packages cost nothing.
-6. **First deploy**: Actions → `cloud-worker-deploy` → Run workflow (branch `main`), leave `image_tag` empty (it
+5. **First deploy**: Actions → `cloud-worker-deploy` → Run workflow (branch `main`), leave `image_tag` empty (it
    deploys the newest green `cloud-worker-build` on main, even when app commits landed on main since), tick
    **bench**. It creates the endpoint `pixl-cloud-studio`, waits for it, runs the selftest (~1¢) and the bench
    (a few ¢). Read the job summary: GPU, cold start, seconds per stage, peak VRAM and the peak number of running
    workers (must be 1). If no GPU is free for 25 minutes the run fails and cancels its queued jobs, so nothing
    bills later; run it again. Every later main build deploys itself.
-7. **RunPod console** → Serverless → `pixl-cloud-studio`: copy the **Endpoint ID**. Settings → API Keys → Create
+6. **RunPod console** → Serverless → `pixl-cloud-studio`: copy the **Endpoint ID**. Settings → API Keys → Create
    `pixl-iphone`, permission **Restricted**: `pixl-cloud-studio` → Read/Write, everything else None.
-8. **iPhone** (once the app side ships): Settings → Developer → Experimental → Cloud processing: turn it on,
+7. **iPhone** (once the app side ships): Settings → Developer → Experimental → Cloud processing: turn it on,
    paste the Endpoint ID, the restricted key, the R2 endpoint `https://<account-id>.r2.cloudflarestorage.com`,
    the bucket name, the access key id and the secret, then **Test connection**.
-9. **Two-minute key check** (design 3.5 F): make a second throwaway Restricted key like `pixl-iphone`, then try
+8. **Two-minute key check** (design 3.5 F): make a second throwaway Restricted key like `pixl-iphone`, then try
    `PATCH https://api.runpod.io/v2/serverless/<id>` with `{"workers":{"max":2}}` (must be refused with 401/403),
    `GET https://api.runpod.io/v2/billing/serverless` (must be refused) and `GET
    https://api.runpod.ai/v2/<id>/health` (must work). Note the results in the handoff note and delete the key. If
