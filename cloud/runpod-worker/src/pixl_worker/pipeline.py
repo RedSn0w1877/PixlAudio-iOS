@@ -22,7 +22,8 @@ import numpy as np
 from . import audio as A
 from .config import Caps
 from .deadline import Deadline
-from .errors import DEADLINE, GPU_OOM, INTERNAL, POISONED, TOO_LONG, INPUT_TOO_LARGE, WorkerError
+from .errors import (DEADLINE, GPU_OOM, INPUT_TOO_LARGE, INTERNAL, POISONED, TOO_LONG, UNSUPPORTED_FORMAT,
+                     WorkerError)
 from .log import log, redact, redact_exception
 from .lyrics.postprocess import summarize
 from .lyrics.run import run_lyrics
@@ -252,6 +253,11 @@ def _process(job: Job, run: _Run, models: Models, ctx: Context, deadline: Deadli
     ctx.progress("decode:0")
     with _Stage(run, "decodeMs", clock):
         info = A.probe(src, caps, timeout=deadline.budget(15.0))
+        if job.output.codec == "aac" and job.stem_slots() and info.sample_rate not in A.AAC_SAMPLE_RATES:
+            # ffmpeg would quietly resample (192 kHz -> 96 kHz), so the stem's rate and sample count would not be
+            # the input's and the phone's import check would reject it after a billed separation. Fail before it.
+            raise WorkerError(UNSUPPORTED_FORMAT, f"AAC output can't keep a {info.sample_rate} Hz input's sample "
+                                                  "rate; ask for flac output")
         mix = A.decode(src, info, caps, work_dir, timeout=deadline.budget(60.0))
     sr = info.sample_rate
     frames = int(mix.shape[0])
@@ -294,10 +300,13 @@ def _process(job: Job, run: _Run, models: Models, ctx: Context, deadline: Deadli
             stems.update(models.stems4.stems(instrumental, sr, progress=_progress_reporter(ctx, deadline, "stems4")))
         run.models["stems4"] = models.stems4.model_id
 
-    # 6 lyrics (a failure here leaves the instrumental intact: status partial)
+    # 6 lyrics. With stems requested, a failure here leaves them intact (status partial). When lyrics are the only
+    # output (a song that already has its instrumental), a failure is the job's failure: an error manifest with the
+    # code, and the input stays for a retry (partial would delete it and report a result with nothing in it).
     lyrics_doc = None
     if job.wants("lyrics"):
         ctx.progress("lyrics:0")
+        kept = "the instrumental is complete" if "instrumental" in stems else "the other outputs are complete"
         with _Stage(run, "lyricsMs", clock):
             try:
                 deadline.check("lyrics")
@@ -309,16 +318,21 @@ def _process(job: Job, run: _Run, models: Models, ctx: Context, deadline: Deadli
                 run.models["aligner"] = outcome.aligner
                 run.models["asr"] = outcome.asr
             except WorkerError as exc:
+                log.warning("lyrics_failed", code=exc.code, message=exc.message)
+                if not stems:
+                    raise
                 run.status = "partial"
                 run.refresh_worker = run.refresh_worker or exc.refresh_worker
-                run.warnings.append(f"lyrics: failed ({exc.code}); the {'instrumental' if stems else 'job'} is complete")
-                log.warning("lyrics_failed", code=exc.code, message=exc.message)
+                run.warnings.append(f"lyrics: failed ({exc.code}); {kept}")
             except Exception as exc:
-                run.status = "partial"
-                run.warnings.append("lyrics: failed (INTERNAL); the instrumental is complete")
                 log.error("lyrics_exception", error=type(exc).__name__, trace=redact_exception(exc))
-                if "CUDA" in str(exc) or "cuda" in str(exc):
-                    run.refresh_worker = True
+                cuda = "CUDA" in str(exc) or "cuda" in str(exc)
+                if not stems:
+                    raise WorkerError(INTERNAL, f"lyrics failed unexpectedly ({type(exc).__name__})",
+                                      refresh_worker=cuda) from None
+                run.status = "partial"
+                run.refresh_worker = run.refresh_worker or cuda
+                run.warnings.append(f"lyrics: failed (INTERNAL); {kept}")
     del vocals
 
     # 7 encode + upload (each output, then lyrics.json, then the manifest last). The deadline no longer

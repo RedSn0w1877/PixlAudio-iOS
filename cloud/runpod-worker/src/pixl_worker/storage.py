@@ -78,16 +78,25 @@ def _public_addresses(host: str, port: int) -> list[str]:
 
 
 class _PinnedHTTPSConnection(http.client.HTTPSConnection):
-    """HTTPS to an already-validated IP address, with SNI and certificate checks for the real host name."""
+    """HTTPS to already-validated IP addresses (tried in order, so an unreachable IPv6 address on a host without
+    IPv6 routing falls through to IPv4), with SNI and certificate checks for the real host name."""
 
-    def __init__(self, host: str, address: str, *, timeout: float, context: ssl.SSLContext):
+    def __init__(self, host: str, addresses: list[str], *, timeout: float, context: ssl.SSLContext):
         super().__init__(host, 443, timeout=timeout, context=context)
-        self._address = address
+        self._addresses = list(addresses)
         self._ctx = context
 
     def connect(self) -> None:  # noqa: D401 - http.client API
-        sock = socket.create_connection((self._address, 443), self.timeout)
-        self.sock = self._ctx.wrap_socket(sock, server_hostname=self.host)
+        last: OSError | None = None
+        for address in self._addresses:
+            try:
+                sock = socket.create_connection((address, 443), self.timeout)
+            except OSError as exc:
+                last = exc
+                continue
+            self.sock = self._ctx.wrap_socket(sock, server_hostname=self.host)
+            return
+        raise last or OSError("no address to connect to")
 
 
 class HttpTransport:
@@ -107,7 +116,7 @@ class HttpTransport:
         if parts.query:
             target += "?" + parts.query
         addresses = self._resolver(host, 443)
-        conn = _PinnedHTTPSConnection(host, addresses[0], timeout=self._connect_timeout, context=self._context)
+        conn = _PinnedHTTPSConnection(host, addresses, timeout=self._connect_timeout, context=self._context)
         try:
             try:
                 conn.connect()

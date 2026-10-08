@@ -4,6 +4,8 @@ name: cloud-worker-deploy
 # environment (deployment branches: main only), which holds RUNPOD_API_KEY; R2_ACCOUNT_ID is a variable.
 # - After every successful main build it updates an EXISTING endpoint to the new image (never creates one).
 # - The first deploy is by hand: Actions > cloud-worker-deploy > Run workflow (owner step B4), which creates it.
+#   Without an image_tag it deploys the newest green cloud-worker-build on main, not the main commit it runs on
+#   (app-only commits land on main too, and they build no image).
 # The repo is public, so its logs are public: the scripts print pass/fail lines only and mask the endpoint id.
 on:
   workflow_run:
@@ -13,7 +15,7 @@ on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: 'Image tag to deploy, sha-<12 hex> (empty = this commit)'
+        description: 'Image tag to deploy, sha-<12 hex> (empty = the newest green cloud-worker-build on main)'
         required: false
         default: ''
       selftest:
@@ -31,6 +33,7 @@ on:
 
 permissions:
   contents: read
+  actions: read  # gh run list: find the newest green build for a by-hand deploy
 
 concurrency:
   group: cloud-worker-deploy
@@ -59,6 +62,7 @@ jobs:
           SELFTEST: ${{ inputs.selftest }}
           BENCH: ${{ inputs.bench }}
           EXTRA_POOLS: ${{ inputs.extra_pools }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           args=()
           tag="sha-${HEAD_SHA::12}"
@@ -68,6 +72,16 @@ jobs:
             if [ -n "$IMAGE_TAG" ]; then
               tag="$IMAGE_TAG"
               git_sha="${IMAGE_TAG#sha-}"
+            else
+              built=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow cloud-worker-build.yml --branch main \
+                --event push --status success --limit 1 --json headSha --jq '.[0].headSha // ""')
+              if [ -z "$built" ]; then
+                echo "::error::no green cloud-worker-build on main yet: merge the worker and wait for that build (README step 4)"
+                exit 1
+              fi
+              tag="sha-${built::12}"
+              git_sha="$built"
+              echo "deploying the newest green main build: $tag"
             fi
             if [ "$SELFTEST" = "false" ]; then args+=(--no-selftest); fi
             if [ "$BENCH" = "true" ]; then args+=(--bench); fi

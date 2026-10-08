@@ -221,6 +221,73 @@ def test_lyrics_failure_is_partial_and_keeps_the_instrumental(song_m4a, tmp_path
 
 
 @needs_ffmpeg
+@pytest.mark.parametrize("failure, code", [
+    (WorkerError(errors.DEADLINE, "the job ran out of time during lyrics"), "DEADLINE"),
+    (RuntimeError("aligner blew up"), "INTERNAL"),
+])
+def test_lyrics_only_job_whose_lyrics_fail_is_an_error_and_keeps_the_input(song_m4a, tmp_path, monkeypatch,
+                                                                             failure, code):
+    # A song that already has its instrumental sends tasks ["lyrics"]: when the lyrics fail there is nothing to
+    # deliver, so the job fails with the code (not "partial", which would delete the input and report no result).
+    def boom(*args, **kwargs):
+        raise failure
+
+    monkeypatch.setattr(pipeline, "run_lyrics", boom)
+    doc = job_doc(song_m4a, tasks=["lyrics"])
+    del doc["output"]["put"]["instrumental"]
+    result, storage, _ = run(doc, song_m4a, tmp_path)
+    assert result["error"].startswith(f"{code}:"), result
+    manifest = json.loads(storage.objects["manifest"])
+    RESULT.validate(manifest)
+    assert manifest["status"] == "error" and manifest["error"]["code"] == code and manifest["outputs"] == {}
+    assert not storage.input_deleted and "lyrics" not in storage.objects
+
+
+@needs_ffmpeg
+def test_vocals_and_lyrics_job_names_what_was_kept(song_m4a, tmp_path, monkeypatch):
+    def boom(*args, **kwargs):
+        raise WorkerError(errors.DEADLINE, "the job ran out of time during lyrics")
+
+    monkeypatch.setattr(pipeline, "run_lyrics", boom)
+    doc = job_doc(song_m4a, tasks=["vocals", "lyrics"])
+    doc["output"]["put"]["vocals"] = doc["output"]["put"]["instrumental"].replace("instrumental.m4a", "vocals.m4a")
+    del doc["output"]["put"]["instrumental"]
+    result, storage, _ = run(doc, song_m4a, tmp_path)
+    assert result["status"] == "partial" and list(result["outputs"]) == ["vocals"]
+    assert "lyrics: failed (DEADLINE); the other outputs are complete" in result["warnings"]
+
+
+@needs_ffmpeg
+def test_aac_output_of_a_192k_input_fails_before_the_separation(tmp_path):
+    # ffmpeg's AAC encoder would quietly resample 192 kHz to 96 kHz: the stem's sample count would not match the
+    # input, and the phone would reject it after a billed separation. FLAC output keeps the rate.
+    src = tmp_path / "hires.flac"
+    A.encode(synthetic_song(3, 192000), 192000, str(src), codec="flac", kbps=256)
+    data = src.read_bytes()
+
+    class Never(HalfVocals):
+        def vocals(self, *args, **kwargs):
+            raise AssertionError("separated a job that can't be encoded")
+
+    doc = job_doc(data, tasks=["instrumental"])
+    doc["audio"]["ext"] = "flac"
+    for key in ("get", "delete"):
+        doc["audio"][key] = doc["audio"][key].replace(".m4a?", ".flac?")
+    doc["audio"]["durationMs"] = 3000
+    result, storage, _ = run(doc, data, tmp_path, models=pipeline.Models(separator=Never()))
+    assert result["error"].startswith("UNSUPPORTED_FORMAT:") and "flac" in result["error"]
+    assert not storage.input_deleted
+
+    doc["output"]["codec"] = "flac"
+    doc["output"]["put"]["instrumental"] = doc["output"]["put"]["instrumental"].replace(
+        "instrumental.m4a", "instrumental.flac")
+    result, storage, _ = run(doc, data, tmp_path)
+    assert result["status"] == "ok", result
+    inst = result["outputs"]["instrumental"]
+    assert inst["sampleRate"] == 192000 and inst["samples"] == result["input"]["decodedSamples"] == 3 * 192000
+
+
+@needs_ffmpeg
 def test_best_quality_on_a_long_song_falls_back_to_standard(song_m4a, tmp_path):
     seen = {}
 

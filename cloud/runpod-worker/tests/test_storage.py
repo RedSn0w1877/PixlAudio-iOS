@@ -301,3 +301,30 @@ def test_http_transport_rejects_a_wrong_certificate(tls_server, monkeypatch):
     transport = HttpTransport(resolver=lambda host, p: ["127.0.0.1"])  # system trust store: self-signed fails
     with pytest.raises(TransientError):
         transport.request("GET", "https://bucket.test.example/in/a.m4a", timeout=5)
+
+
+def test_http_transport_falls_through_an_unreachable_address(tls_server, monkeypatch):
+    # A host without IPv6 routing: the first (IPv6) address can't be reached, the IPv4 one can.
+    port, client_ctx, _, _ = tls_server
+    import pixl_worker.storage as S
+
+    tried = []
+    real_create = socket.create_connection
+
+    def create(addr, timeout=None):
+        tried.append(addr[0])
+        if addr[0] == "2001:db8::1":
+            raise OSError(101, "Network is unreachable")
+        return real_create(("127.0.0.1", port), timeout)
+
+    monkeypatch.setattr(S.socket, "create_connection", create)
+    transport = HttpTransport(resolver=lambda host, p: ["2001:db8::1", "127.0.0.1"], context=client_ctx)
+    chunks = []
+    resp = transport.request("GET", "https://bucket.test.example/in/a.m4a?X-Amz-Signature=x", sink=chunks.append,
+                             max_body=len(DATA), timeout=5)
+    assert resp.status == 200 and b"".join(chunks) == DATA
+    assert tried == ["2001:db8::1", "127.0.0.1"]
+    monkeypatch.setattr(S.socket, "create_connection", lambda addr, timeout=None: (_ for _ in ()).throw(
+        OSError(101, "Network is unreachable")))
+    with pytest.raises(TransientError):  # no address reachable: a retryable failure, as before
+        transport.request("GET", "https://bucket.test.example/in/a.m4a", timeout=5)

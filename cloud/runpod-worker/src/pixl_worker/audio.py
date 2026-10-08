@@ -24,6 +24,8 @@ FFMPEG = os.environ.get("PIXL_FFMPEG", "ffmpeg")
 FFPROBE = os.environ.get("PIXL_FFPROBE", "ffprobe")
 BASE = ["-nostdin", "-hide_banner", "-loglevel", "error"]
 PROBE_BASE = ["-hide_banner", "-loglevel", "error"]  # ffprobe has no -nostdin
+# The sample rates ffmpeg's native AAC encoder takes; any other rate it resamples silently (192 kHz -> 96 kHz).
+AAC_SAMPLE_RATES = frozenset((96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350))
 
 
 @dataclass(frozen=True)

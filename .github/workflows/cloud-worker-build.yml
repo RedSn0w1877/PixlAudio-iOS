@@ -8,6 +8,7 @@ name: cloud-worker-build
 #           [image], because workflow_dispatch can't start a workflow that isn't on the default branch yet.
 on:
   push:
+    branches: ['**']  # branches only: path filters don't apply to tag pushes, so a stage-NN tag would run this too
     paths:
       - 'cloud/runpod-worker/**'
       - '.github/workflows/cloud-worker-build.yml'
