@@ -61,7 +61,13 @@ in PixlCore. Phase 1 (the system model by default) is `2026-10-07-local-ai.md`; 
 
 ## CI
 
-(Filled in at the end of the session.)
+- Run 37730107724 on `6eb1e15` (the pin + smoke test, `[shots:SettingsScreenshotTests,AIScreenshotTests]`): green.
+  All 270 app unit tests passed, the 10 `LocalModelTests` among them — so the simulator's Core ML reproduced the CI
+  Mac's greedy tokens exactly, from a fresh cache, a reused prefix and after a reset. Every shot of both classes was
+  taken. Looked at: the AI playlist sheet's "isn't on this iPhone yet" card is right; the Settings shots stopped
+  scrolling while the model's row was still under the mini player, so the scroll now goes on until the whole row is
+  above it.
+- The run after that (free-space check, the scroll fix, this note) is in the final report.
 
 ## Hoa's iPhone checklist
 

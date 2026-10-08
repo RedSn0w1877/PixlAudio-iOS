@@ -46,14 +46,20 @@ final class SettingsScreenshotTests: XCTestCase {
                     suffix: "", interact: Self.scrollToLocalModel)
     }
 
-    /// Scrolls until the downloaded model's row is on screen (it sits under the two AI cards).
+    /// Scrolls until the whole downloaded model's row is above the mini player (it sits under the two AI cards):
+    /// short drags along the leading margin, so a drag never starts on a switch or the discovery slider.
     private static func scrollToLocalModel(_ app: XCUIApplication) {
         let row = app.descendants(matching: .any)["settings.ai.localModel"].firstMatch
-        for _ in 0..<6 {
-            if row.exists && row.isHittable { break }
-            app.swipeUp(velocity: .slow)
+        let limit = app.windows.firstMatch.frame.maxY - 130
+        for _ in 0..<8 {
+            if row.exists && row.frame.maxY <= limit { break }
+            let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.03, dy: 0.7))
+            let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.03, dy: 0.4))
+            start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.2)
+            Thread.sleep(forTimeInterval: 0.4)
         }
         XCTAssertTrue(row.exists, "the downloaded model's row is missing")
+        XCTAssertLessThanOrEqual(row.frame.maxY, limit, "the downloaded model's row is under the mini player")
     }
 
     /// On-device: Advanced shows only Temperature.
