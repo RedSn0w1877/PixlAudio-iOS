@@ -851,7 +851,7 @@ Android has no tests for the lyrics toolbar or the keep-screen-on switch; these 
 ## Cloud Studio worker (2026-10-07, branch `s19-cloud-worker`, Python, server side)
 Nothing to port: Android's old RunPod worker (`tools/runpod-serverless`) has no tests. The worker's own suite is
 pytest, CPU only (no torch, no weights), run by `cloud-worker-build` inside the image's `test` stage and locally
-with `python -m pytest -q tests` in `cloud/runpod-worker/` (281 tests after `s22-cloud-idle`; one needs the runpod SDK
+with `python -m pytest -q tests` in `cloud/runpod-worker/` (282 tests after `s22-cloud-idle`; one needs the runpod SDK
 and is skipped without it).
 
 - `test_schema.py` — every golden example validates against its JSON Schema; the stdlib validator and jsonschema

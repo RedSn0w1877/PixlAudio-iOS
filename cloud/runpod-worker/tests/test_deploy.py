@@ -557,6 +557,16 @@ def test_reaper_leaves_a_switched_off_endpoint_alone():
     assert api.calls == []  # not even a /health read
 
 
+def test_reaper_without_max_workers_in_the_answer_changes_nothing(capsys):
+    for workers in ({}, {"min": 0}, {"max": True}, {"max": "1"}):
+        endpoint = deployed()
+        endpoint["workers"] = workers
+        api = Reaped(endpoint, [IDLE])
+        assert release(api) == RP.NO_MAX, workers
+        assert api.calls == []
+    assert "::warning::" in capsys.readouterr().out
+
+
 def test_reaper_never_raises_max_above_what_it_found_or_endpoint_json():
     template = copy.deepcopy(TEMPLATE)
     template["workers"]["max"] = 3

@@ -48,6 +48,7 @@ RELEASED = "released"
 JOB_ARRIVED = "job arrived"  # a job turned up while max was 0: restored at once
 STILL_THERE = "still there"  # max 0 didn't release the worker within GONE_TIMEOUT_S (restored anyway)
 UNKNOWN = "unknown"  # /health failed while waiting at max 0 (restored at once; the next run looks again)
+NO_MAX = "no max"  # the endpoint's workers.max wasn't in RunPod's answer: nothing touched
 
 
 class ReaperError(Exception):
@@ -103,7 +104,12 @@ def release_idle(api: RunPod, endpoint_id: str, current_workers: dict, template:
     """Steps 2-4 of the module docstring for one endpoint. Returns one of the outcomes above. Raises ApiError when a
     read fails before anything changed, ReaperError when the workers couldn't be restored."""
     want = template["workers"]
-    found_max = _count(current_workers or {}, "max")
+    raw_max = (current_workers or {}).get("max")
+    if isinstance(raw_max, bool) or not isinstance(raw_max, int):
+        # REST v2's Endpoint always has workers.max; without it there is nothing safe to restore to.
+        say("::warning::reaper: RunPod's answer doesn't say the endpoint's max workers; nothing changed")
+        return NO_MAX
+    found_max = raw_max
     if found_max <= 0:
         say("reaper: max workers is 0 (switched off or scaled down); left alone")
         return OFF

@@ -247,7 +247,9 @@ from the first line of defence to the last; nothing was deployed and no RunPod o
    `deploy/reaper.py` (stdlib, the existing REST v2 client): `/health` twice 60 s apart; only when both show idle +
    ready > 0 with running, `inQueue` and `inProgress` all 0 does it PATCH `workers` to max 0, poll `/health` every
    10 s until no idle/ready/running/initializing worker is left (≤ 2 min; a job turning up ends the wait at once),
-   then PATCH back. Decisions:
+   then PATCH back. Checked against RunPod's public REST v2 OpenAPI spec (fetched without a key on 2026-10-08):
+   `Endpoint.workers` always carries `min`/`max`, and `UpdateEndpointRequest.workers` takes any of `min`, `max`,
+   `idleTimeout`. An answer without `workers.max` is a warning and changes nothing. Decisions:
    - It uses `PATCH https://api.runpod.io/v2/serverless/<id>` with `{"workers": {"min", "max", "idleTimeout"}}`, the
      same call the keepalive already makes, rather than REST v1's `workersMax` (v1 retires 2026-11-15).
    - Max goes back to what it found, never above `deploy/endpoint.json` (so it never undoes RunPod's own scale-down
@@ -270,8 +272,8 @@ Tests (pytest, CPU): `test_handler.py` (refresh after selftest/bench, also refus
 failed or refused one; none before it or for a non-boolean flag; the SDK's view of the output equals the manifest;
 the real-SDK run), `test_schema.py` (the flag's default, both validators on bad values), `test_deploy.py` (the
 reaper's every branch with a scripted `/health` and a clock that moves only on sleep, the deploy's release, the
-workflow's schedule, environment, permissions and pinned actions). **280 passed, 1 skipped** locally (Python 3.12,
-real ffmpeg; the skip is the real-SDK test, which passes in a venv with runpod 1.12.0).
+workflow's schedule, environment, permissions and pinned actions). **281 passed, 1 skipped** locally (Python 3.12,
+real ffmpeg; the skip is the real-SDK test), and **282 passed** in a second venv with runpod 1.12.0 installed.
 
 ## For Hoa (iPhone and accounts)
 
