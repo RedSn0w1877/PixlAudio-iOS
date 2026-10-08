@@ -163,6 +163,9 @@ enum CloudFixtures {
         #expect(input.output?.kbps == 256)
         #expect(Set(input.output?.put.map { Array($0.keys) } ?? []) == ["instrumental", "lyrics", "manifest"])
         #expect(input.guard?.attemptPut.contains("attempt.json") == true)
+        // A single song is a burst of one: the worker stops itself after it.
+        #expect(input.policy == CloudJobInputPolicy(lastInBatch: true))
+        #expect(input.isLastInBatch)
     }
 
     @Test func volumeAndBenchInputs() throws {
@@ -179,6 +182,9 @@ enum CloudFixtures {
         #expect(transcribe.output?.codec == "flac" && transcribe.output?.kbps == nil)
         #expect(transcribe.lyrics?.synced == false && transcribe.lyrics?.lines == [])
         #expect(transcribe.audio?.ext == "flac")
+        // `policy` is optional and false by default (the examples without it are jobs before a burst's last).
+        #expect(transcribe.policy == nil && !transcribe.isLastInBatch)
+        #expect(volume.policy == nil && bench.policy == nil)
     }
 
     @Test func okManifestDecodes() throws {
@@ -256,10 +262,17 @@ enum CloudFixtures {
         let presign: CloudPresign = { method, key, seconds in
             "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/pixl-cloud-studio/\(key)?X-Amz-Expires=\(seconds)&X-Amz-Signature=\(method.rawValue)"
         }
-        let request = try #require(CloudJobBuilder.request(for: record, build: "1.0 (412)", lyrics: lyrics, presign: presign))
+        // The example is a single song, so the last (only) job of its burst.
+        let request = try #require(CloudJobBuilder.request(for: record, build: "1.0 (412)", lyrics: lyrics,
+                                                           lastInBatch: true, presign: presign))
         let built = try JSONParser().parse(utf8: [UInt8](try CloudJSON.encode(request)))
         let example = try JSONParser().parse(utf8: [UInt8](try CloudFixtures.worker("run.request")))
         #expect(CloudFixtures.shape(built) == CloudFixtures.shape(example))
+        #expect(built["input"]?["policy"]?["last_in_batch"]?.boolValue == true)
+        // A job before a burst's last sends no `input.policy` at all; RunPod's own `policy` stays.
+        let earlier = try JSONParser().parse(utf8: [UInt8](try CloudJSON.encode(request.markingLastInBatch(false))))
+        #expect(earlier["input"]?["policy"] == nil)
+        #expect(earlier["policy"]?["ttl"]?.int64Value == 259_200_000)
         // `auto` in the example, `align` here: both are valid modes; everything else matches field for field.
         #expect(built["input"]?["lyrics"]?["mode"]?.stringValue == "align")
         // Every URL ends in the object the worker expects for its slot.

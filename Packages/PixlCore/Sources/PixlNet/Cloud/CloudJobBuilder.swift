@@ -67,9 +67,10 @@ public enum CloudJobBuilder {
     }
 
     /// The whole `/run` body for a prepared and uploaded job, or nil when its input isn't known or a URL can't be
-    /// signed. `lyrics` is required when the job has the lyrics task.
+    /// signed. `lyrics` is required when the job has the lyrics task. `lastInBatch` marks the last job of a submit
+    /// burst (`CloudSubmitBurst`; `CloudJobRequest.markingLastInBatch` sets it on a body built earlier).
     public static func request(for record: CloudJobRecord, build: String, lyrics: CloudLyricsRequest?,
-                               presign: CloudPresign) -> CloudJobRequest? {
+                               lastInBatch: Bool = false, presign: CloudPresign) -> CloudJobRequest? {
         guard CloudKeys.isValidJobKey(record.jobKey), let ext = record.inputExt, let inputKey = record.inputKey,
               let sha = record.sha256, let bytes = record.bytes, let durationMs = record.durationMs else { return nil }
         let seconds = CloudTiming.workerPresignSeconds
@@ -103,6 +104,7 @@ public enum CloudJobBuilder {
             guard: CloudJobGuard(manifestGet: manifestGet, attemptGet: attemptGet, attemptPut: attemptPut))
         return CloudJobRequest(input: input, policy: CloudJobPolicy(ttl: CloudTiming.ttlMs,
                                                                     executionTimeout: CloudTiming.executionTimeoutMs))
+            .markingLastInBatch(lastInBatch)
     }
 
     /// Every object a job may leave in the bucket (deleted after import or on cancel): its input and outputs, the
@@ -124,5 +126,15 @@ public enum CloudJobBuilder {
         }
         keys.append(CloudKeys.attempt(jobKey: record.jobKey))
         return keys
+    }
+}
+
+extension CloudJobRequest {
+    /// The same body with `input.policy.last_in_batch` set (true) or left out (false: the worker's default, so the
+    /// jobs before a burst's last send exactly what they sent before the flag existed).
+    public func markingLastInBatch(_ last: Bool) -> CloudJobRequest {
+        var copy = self
+        copy.input.policy = last ? CloudJobInputPolicy(lastInBatch: true) : nil
+        return copy
     }
 }

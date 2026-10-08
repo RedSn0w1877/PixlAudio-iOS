@@ -95,6 +95,26 @@ import PixlFoundation
         #expect(decoded == request)
     }
 
+    @Test func onlyABurstsLastJobCarriesLastInBatch() throws {
+        let record = Self.uploadedRecord(tasks: [.instrumental])
+        let plain = try #require(CloudJobBuilder.request(for: record, build: "1", lyrics: nil, presign: Self.fakePresign))
+        #expect(plain.input.policy == nil && !plain.input.isLastInBatch)
+        let last = try #require(CloudJobBuilder.request(for: record, build: "1", lyrics: nil, lastInBatch: true,
+                                                        presign: Self.fakePresign))
+        #expect(last.input.policy == CloudJobInputPolicy(lastInBatch: true) && last.input.isLastInBatch)
+        // Marking a body built earlier is the same as building it marked, and unmarking gives the plain body back.
+        #expect(plain.markingLastInBatch(true) == last)
+        #expect(last.markingLastInBatch(false) == plain)
+        // On the wire: `input.policy.last_in_batch` (the worker's name), next to RunPod's untouched `policy`.
+        let body = try JSONParser().parse(utf8: [UInt8](try CloudJSON.encode(last)))
+        #expect(body["input"]?["policy"]?["last_in_batch"]?.boolValue == true)
+        #expect(body["policy"]?["executionTimeout"]?.int64Value == CloudTiming.executionTimeoutMs)
+        #expect(body["policy"]?["last_in_batch"] == nil)
+        let plainBody = try JSONParser().parse(utf8: [UInt8](try CloudJSON.encode(plain)))
+        #expect(plainBody["input"]?["policy"] == nil)
+        #expect(try CloudJSON.decode(CloudJobRequest.self, from: try CloudJSON.encode(last)) == last)
+    }
+
     @Test func flacRedoAsksForFlacOutputs() throws {
         var record = Self.uploadedRecord(tasks: [.instrumental])
         record.outputCodec = .flac

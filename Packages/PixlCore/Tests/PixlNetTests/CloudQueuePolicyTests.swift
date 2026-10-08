@@ -159,6 +159,56 @@ import PixlModel
         #expect(CloudBatchGate.shouldSubmit(uploadsPending: 2, uploadsDone: 1, firstUploadDoneAtMs: 1_000, nowMs: 121_000))
     }
 
+    /// Runs a submit pass through `CloudSubmitBurst` the way `CloudStudio.submitReadyBatches` does: nil in `items` is
+    /// a job that turned out not to be sendable (skipped, unsigned); the pass stops early at `stopAt` (the cap).
+    static func sends(_ items: [String?], stopAt: Int? = nil) -> [(String, Bool)] {
+        var burst = CloudSubmitBurst<String>()
+        var sent: [(String, Bool)] = []
+        for (index, item) in items.enumerated() {
+            if index == stopAt { break }
+            guard let item else { continue }
+            if let previous = burst.ready(item) { sent.append((previous, false)) }
+        }
+        if let last = burst.end() { sent.append((last, true)) }
+        return sent
+    }
+
+    @Test func submitBurstMarksOnlyItsLastJob() {
+        let three = Self.sends(["a", "b", "c"])
+        #expect(three.map { $0.0 } == ["a", "b", "c"])
+        #expect(three.map { $0.1 } == [false, false, true])
+        // A single song is a burst of one.
+        let one = Self.sends(["a"])
+        #expect(one.map { $0.0 } == ["a"] && one.map { $0.1 } == [true])
+        #expect(Self.sends([]).isEmpty)
+        #expect(Self.sends([nil, nil]).isEmpty)
+    }
+
+    @Test func submitBurstsLastIsTheLastJobThatActuallyGoesOut() {
+        // The final job can't be sent (its URLs didn't sign): the one before it is the last.
+        let skippedEnd = Self.sends(["a", "b", nil])
+        #expect(skippedEnd.map { $0.0 } == ["a", "b"] && skippedEnd.map { $0.1 } == [false, true])
+        // A job skipped in the middle changes nothing.
+        let skippedMiddle = Self.sends(["a", nil, "c"])
+        #expect(skippedMiddle.map { $0.0 } == ["a", "c"] && skippedMiddle.map { $0.1 } == [false, true])
+        // The monthly cap stops the pass at the third job: the second, already held, goes out as the last.
+        let capped = Self.sends(["a", "b", "c", "d"], stopAt: 2)
+        #expect(capped.map { $0.0 } == ["a", "b"] && capped.map { $0.1 } == [false, true])
+    }
+
+    @Test func submitBurstHoldsOneJobAtATime() {
+        var burst = CloudSubmitBurst<Int>()
+        #expect(burst.holding == nil)
+        let first = burst.ready(1)
+        #expect(first == nil && burst.holding == 1)
+        let second = burst.ready(2)
+        #expect(second == 1 && burst.holding == 2)
+        let last = burst.end()
+        #expect(last == 2 && burst.holding == nil)
+        let again = burst.end()
+        #expect(again == nil)
+    }
+
     // MARK: Cost
 
     @Test func gpuPrices() {

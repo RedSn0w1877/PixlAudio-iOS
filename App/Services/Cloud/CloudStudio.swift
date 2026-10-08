@@ -110,6 +110,13 @@ final class CloudStudio {
         let objects: any CloudObjectStoring
     }
 
+    /// A job of the current submit pass that is ready to go out, held until the next one is ready (`CloudSubmitBurst`).
+    nonisolated struct PendingSubmit: Sendable {
+        let jobKey: String
+        let request: CloudJobRequest
+        let estimateMicroUSD: Int64
+    }
+
     static let instrumentalSlot = "instrumental"
     static let maxConcurrentPreparations = 2
 
@@ -794,6 +801,10 @@ final class CloudStudio {
         var order: [String: Int] = [:]
         for (index, record) in jobs.enumerated() where order[record.jobKey] == nil { order[record.jobKey] = index }
         ready.sort { (order[$0] ?? 0) < (order[$1] ?? 0) }
+        // The pass is one burst: its last job carries `policy.last_in_batch`, so the worker stops itself after it
+        // instead of staying up, idle and billed. Each job waits until the next one is ready (or the pass ends) to go
+        // out, since only then is it known whether it is the last (`CloudSubmitBurst`).
+        var burst = CloudSubmitBurst<PendingSubmit>()
         for jobKey in ready {
             guard let record = job(jobKey), record.state == .uploaded, record.isDue(nowMs: now) else { continue }
             if CloudRetention.inputTooOldToSubmit(uploadedAtMs: record.uploadedAtMs, nowMs: now) {
@@ -801,13 +812,15 @@ final class CloudStudio {
                 continue
             }
             let price = settings.pricePerSecondMicroUSD
+            // The held job isn't at RunPod yet, but it will be: count it.
             let committed = CloudBudget.committedMicroUSD(jobs, monthStartMs: dependencies.monthStartMs(now),
                                                           pricePerSecondMicroUSD: price)
+                + (burst.holding?.estimateMicroUSD ?? 0)
             let estimate = CloudCost.estimatedSeconds(record.plan, quality: record.quality) * price
             guard CloudBudget.allows(estimateMicroUSD: estimate, capMicroUSD: settings.monthlyCapMicroUSD,
                                      spentMicroUSD: committed) else {
                 notice = .capReached
-                return
+                break  // the job held so far still goes out, as the burst's last
             }
             if notice == .capReached { notice = nil }
             var lyrics: CloudLyricsRequest?
@@ -845,46 +858,64 @@ final class CloudStudio {
                 }
                 guard self.job(jobKey)?.state == .uploaded else { continue }
             }
-            do {
-                let job = try await clients.runpod.run(request)
-                guard self.job(jobKey)?.state == .uploaded else {
-                    // Cancelled while the request was out: stop it at RunPod too.
-                    try? await clients.runpod.cancel(jobId: job.id)
-                    continue
-                }
-                let sentAt = dependencies.nowMs()
-                update(jobKey) { r in
-                    r.runpodJobId = job.id
-                    r.lastError = nil
-                    r.lastErrorCode = nil
-                    r.nextAttemptAtMs = nil
-                    r.apply(.submitted, nowMs: sentAt)
-                }
-                // The id is on disk before the next POST (design §7.4).
-                await persistNow()
-            } catch let error as RunPodError {
-                switch error {
-                case .unauthorized:
-                    notice = .runpodKeyRefused
-                    return
-                case .endpointNotFound:
-                    notice = .endpointNotFound
-                    return
-                case .rateLimited:
-                    notice = .rateLimited
-                    return
-                case .notConfigured:
-                    notice = .notConfigured
-                    return
-                default:
-                    // A lost response may still have queued the job; the worker's guard makes a repeat harmless.
-                    fail(jobKey, error.description, code: nil, retryable: true)
-                }
-            } catch is CancellationError {
-                return
-            } catch {
-                fail(jobKey, CloudRedaction.redact(error.localizedDescription), code: nil, retryable: true)
+            if let previous = burst.ready(PendingSubmit(jobKey: jobKey, request: request, estimateMicroUSD: estimate)) {
+                guard await submit(previous, lastInBatch: false, clients) else { return }
             }
+        }
+        if let last = burst.end() {
+            await submit(last, lastInBatch: true, clients)
+        }
+    }
+
+    /// Sends one job of a burst. False when the pass should stop (the key, the Endpoint ID, rate limiting, missing
+    /// settings, cancellation); a failure of this job alone carries on with the next.
+    @discardableResult
+    private func submit(_ pending: PendingSubmit, lastInBatch: Bool, _ clients: Clients) async -> Bool {
+        let jobKey = pending.jobKey
+        // Cancelled while it waited for the next job to be ready.
+        guard job(jobKey)?.state == .uploaded else { return true }
+        do {
+            let job = try await clients.runpod.run(pending.request.markingLastInBatch(lastInBatch))
+            guard self.job(jobKey)?.state == .uploaded else {
+                // Cancelled while the request was out: stop it at RunPod too.
+                try? await clients.runpod.cancel(jobId: job.id)
+                return true
+            }
+            let sentAt = dependencies.nowMs()
+            update(jobKey) { r in
+                r.runpodJobId = job.id
+                r.lastError = nil
+                r.lastErrorCode = nil
+                r.nextAttemptAtMs = nil
+                r.apply(.submitted, nowMs: sentAt)
+            }
+            // The id is on disk before the next POST (design §7.4).
+            await persistNow()
+            return true
+        } catch let error as RunPodError {
+            switch error {
+            case .unauthorized:
+                notice = .runpodKeyRefused
+                return false
+            case .endpointNotFound:
+                notice = .endpointNotFound
+                return false
+            case .rateLimited:
+                notice = .rateLimited
+                return false
+            case .notConfigured:
+                notice = .notConfigured
+                return false
+            default:
+                // A lost response may still have queued the job; the worker's guard makes a repeat harmless.
+                fail(jobKey, error.description, code: nil, retryable: true)
+                return true
+            }
+        } catch is CancellationError {
+            return false
+        } catch {
+            fail(jobKey, CloudRedaction.redact(error.localizedDescription), code: nil, retryable: true)
+            return true
         }
     }
 

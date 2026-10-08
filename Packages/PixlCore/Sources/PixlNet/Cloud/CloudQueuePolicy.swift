@@ -433,6 +433,37 @@ public enum CloudBatchGate {
     }
 }
 
+// MARK: - Submit burst
+
+/// One submit pass sends the ready jobs in order, and the last of them carries `policy.last_in_batch`: the worker then
+/// stops itself after that job instead of staying up, idle and billed (on 2026-10-08 one sat idle for 7+ minutes past
+/// its 10 s idle timeout). Which job is the last is only known once the next one is ready to go (a later one may be
+/// skipped, fail to sign or stop at the monthly cap), so each job is held until the next one is ready, or until the
+/// pass ends, and only then sent: `ready` hands back the job before it (not the last), `end` the final one (the last).
+/// A single song is a burst of one.
+public struct CloudSubmitBurst<Item> {
+    private var held: Item?
+
+    public init() {}
+
+    /// The job waiting to be sent: the next budget check counts it as already at RunPod.
+    public var holding: Item? { held }
+
+    /// `item` is ready to send: hold it, and hand back the job held before it, to send as not the last.
+    public mutating func ready(_ item: Item) -> Item? {
+        defer { held = item }
+        return held
+    }
+
+    /// The pass is over (or stopped at the cap): hand back the held job, to send as the burst's last.
+    public mutating func end() -> Item? {
+        defer { held = nil }
+        return held
+    }
+}
+
+extension CloudSubmitBurst: Sendable where Item: Sendable {}
+
 // MARK: - Cost
 
 /// Estimates and actual costs in micro-dollars (µ$; $1 = 1,000,000 µ$). RunPod Flex prices (§6).

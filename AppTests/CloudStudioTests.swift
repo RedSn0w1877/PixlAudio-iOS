@@ -45,6 +45,8 @@ final class CloudStudioTests: XCTestCase {
         XCTAssertEqual(input.lyrics?.lines?.first?.text, "hello world")
         XCTAssertEqual(input.guard?.attemptPut.contains("/out/\(key)/attempt.json"), true)
         XCTAssertEqual(runs.first?.policy, CloudJobPolicy(ttl: CloudTiming.ttlMs, executionTimeout: CloudTiming.executionTimeoutMs))
+        // A single song is a burst of one: the worker stops itself after it instead of idling, billed.
+        XCTAssertEqual(input.policy, CloudJobInputPolicy(lastInBatch: true))
         XCTAssertEqual(h.studio.job(key)?.state, .submitted)
         XCTAssertEqual(h.studio.job(key)?.runpodJobId, "rp-1")
 
@@ -184,6 +186,66 @@ final class CloudStudioTests: XCTestCase {
         await h.studio.pump()
         runs = await h.runpod.runs.count
         XCTAssertEqual(runs, 1)
+    }
+
+    // MARK: Idle workers (last_in_batch)
+
+    /// Three songs sent, prepared and handed to the background session; their uploads not yet finished.
+    private func threeUploadingJobs(_ h: CloudHarness) async -> [String] {
+        let songs = ["a", "b", "c"].map { h.addSong("f:root/\($0).m4a") }
+        await h.studio.send(await h.studio.preview(songs: songs, title: "Three"))
+        await h.studio.pump()
+        await h.studio.settle()
+        return h.studio.jobs.map(\.jobKey)
+    }
+
+    func testOnlyTheLastJobOfABurstAsksTheWorkerToStop() async throws {
+        let h = CloudHarness()
+        let keys = await threeUploadingJobs(h)
+        XCTAssertEqual(keys.count, 3)
+        XCTAssertEqual(h.studio.jobs.map(\.state), [.uploading, .uploading, .uploading])
+        for key in keys { await h.studio.handle(.uploaded(jobKey: key)) }
+        await h.studio.pump()
+        let runs = await h.runpod.runs
+        XCTAssertEqual(runs.compactMap(\.input.jobKey), keys, "one burst, in queue order")
+        // The worker stays warm between the songs and stops itself after the last one.
+        XCTAssertEqual(runs.map(\.input.policy), [nil, nil, CloudJobInputPolicy(lastInBatch: true)])
+        XCTAssertEqual(h.studio.jobs.map(\.state), [.submitted, .submitted, .submitted])
+    }
+
+    func testAJobSentLaterIsTheLastOfItsOwnBurst() async throws {
+        let h = CloudHarness()
+        let a = h.addSong("f:root/a.m4a"), b = h.addSong("f:root/b.m4a")
+        await h.studio.send(await h.studio.preview(songs: [a, b], title: "Two"))
+        await h.studio.pump()
+        await h.studio.settle()
+        let keys = h.studio.jobs.map(\.jobKey)
+        await h.studio.handle(.uploaded(jobKey: keys[0]))
+        h.clock.advance(CloudTiming.batchGateMs + 1)
+        await h.studio.pump()
+        // The gate let the first song go alone; the second follows when its upload is done.
+        await h.studio.handle(.uploaded(jobKey: keys[1]))
+        await h.studio.pump()
+        let runs = await h.runpod.runs
+        XCTAssertEqual(runs.compactMap(\.input.jobKey), keys)
+        XCTAssertEqual(runs.map(\.input.isLastInBatch), [true, true])
+    }
+
+    func testTheCapEndsABurstWithTheLastJobThatWentOut() async throws {
+        let h = CloudHarness()
+        let keys = await threeUploadingJobs(h)
+        XCTAssertEqual(keys.count, 3)
+        // Room for two songs this month: the third waits, and the second is the burst's last.
+        let record = try XCTUnwrap(h.studio.job(keys[0]))
+        let estimate = CloudCost.estimatedSeconds(record.plan, quality: record.quality) * h.settings.pricePerSecondMicroUSD
+        h.settings.monthlyCapMicroUSD = 2 * estimate
+        for key in keys { await h.studio.handle(.uploaded(jobKey: key)) }
+        await h.studio.pump()
+        let runs = await h.runpod.runs
+        XCTAssertEqual(runs.compactMap(\.input.jobKey), Array(keys.prefix(2)))
+        XCTAssertEqual(runs.map(\.input.isLastInBatch), [false, true])
+        XCTAssertEqual(h.studio.notice, .capReached)
+        XCTAssertEqual(h.studio.job(keys[2])?.state, .uploaded)
     }
 
     // MARK: Worker errors

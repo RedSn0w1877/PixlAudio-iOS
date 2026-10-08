@@ -120,12 +120,14 @@ public struct CloudJobInput: Codable, Sendable, Hashable {
     public var `guard`: CloudJobGuard?
     /// `op: "bench"` only.
     public var bench: CloudBenchOptions?
+    /// The job's own instructions to the worker (`last_in_batch`); absent on every job but a burst's last.
+    public var policy: CloudJobInputPolicy?
 
     public init(schema: String = CloudSchema.job, v: Int = CloudSchema.version, op: String = CloudOp.process.rawValue,
                 jobKey: String? = nil, client: CloudClientInfo? = nil, storage: String? = nil,
                 audio: CloudAudioInput? = nil, tasks: [String]? = nil, separation: CloudSeparation? = nil,
                 lyrics: CloudLyricsRequest? = nil, output: CloudOutputRequest? = nil, guard: CloudJobGuard? = nil,
-                bench: CloudBenchOptions? = nil) {
+                bench: CloudBenchOptions? = nil, policy: CloudJobInputPolicy? = nil) {
         self.schema = schema
         self.v = v
         self.op = op
@@ -139,10 +141,28 @@ public struct CloudJobInput: Codable, Sendable, Hashable {
         self.output = output
         self.guard = `guard`
         self.bench = bench
+        self.policy = policy
     }
 
     /// The typed tasks (unknown entries dropped).
     public var typedTasks: [CloudTask] { (tasks ?? []).compactMap(CloudTask.init(rawValue:)) }
+
+    /// `policy.last_in_batch` as sent (false when absent).
+    public var isLastInBatch: Bool { policy?.lastInBatch == true }
+}
+
+/// `input.policy`: the job's own instructions to the worker. Not RunPod's request policy (`CloudJobPolicy`, the ttl
+/// and execution timeout next to `input` in the `/run` body). Added after v1 shipped; an older worker ignores it.
+public struct CloudJobInputPolicy: Codable, Sendable, Hashable {
+    /// The last job of one submit burst (a single song is a burst of one): the worker asks RunPod to stop it after
+    /// this job, so no idle worker stays up and billed. The result is unchanged.
+    public var lastInBatch: Bool?
+
+    public init(lastInBatch: Bool?) { self.lastInBatch = lastInBatch }
+
+    enum CodingKeys: String, CodingKey {
+        case lastInBatch = "last_in_batch"
+    }
 }
 
 /// `input.client`.
