@@ -139,10 +139,13 @@ struct SaveQueueAsPlaylistSheet: View {
             GlassCircleButton(systemImage: "xmark", accessibilityLabel: "Close",
                               tint: theme.surfaceContainerHigh.opacity(GlassTint.container)) { dismiss() }
                 .padding(.leading, 8)
+            // The pill keeps its one-line size and the title shrinks to the width left (on a 402 pt iPhone the title
+            // at full size truncated to "Save as pl…" and "Deselect all" wrapped inside its 40 pt pill).
             Text("Save as playlist")
                 .pixlFont(.headlineMedium, weight: .semibold)
                 .foregroundStyle(theme.onSurface)
                 .lineLimit(1)
+                .minimumScaleFactor(0.7)
             Spacer(minLength: 8)
             Button {
                 selected = allSelected ? [] : allIds
@@ -152,7 +155,9 @@ struct SaveQueueAsPlaylistSheet: View {
                         .font(.system(size: 15, weight: .semibold))
                     Text(allSelected ? "Deselect all" : "Select all")
                         .pixlFont(.labelLarge, weight: .bold)
+                        .lineLimit(1)
                 }
+                .fixedSize()
                 .foregroundStyle(allSelected ? theme.onTertiary : theme.onSurface)
                 .padding(.horizontal, 16)
                 .frame(height: 40)
