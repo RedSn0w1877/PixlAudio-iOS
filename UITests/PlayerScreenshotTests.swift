@@ -33,15 +33,16 @@ final class PlayerScreenshotTests: XCTestCase {
     /// The full player's toggle row. Demo song 0 is liked.
     func testFavoriteTogglesImmediately() throws {
         let app = launch("nowPlaying", "light")
-        assertFavoriteFlips(app, name: "playerFavoriteToggled-light")
+        assertFavoriteFlips(app, heart: "player.favorite", name: "playerFavoriteToggled-light")
     }
 
-    /// The song sheet's favourite tile.
+    /// The song sheet's favourite tile. By its own identifier: the full player is pre-built under the sheet, collapsed
+    /// and off screen, and its heart carries the same label (a label query found that one first, which can't be tapped).
     func testSongInfoFavoriteTogglesImmediately() throws {
         let app = launch("songInfo", "light")
         XCTAssertTrue(app.descendants(matching: .any)["screen.songInfo"].firstMatch.waitForExistence(timeout: 20),
                       "the song sheet did not appear")
-        assertFavoriteFlips(app, name: "songInfoFavoriteToggled-light")
+        assertFavoriteFlips(app, heart: "songInfo.favorite", name: "songInfoFavoriteToggled-light")
     }
 
     /// The lyrics More sheet's shuffle · repeat · favourite row (the heart's state is its selected trait).
@@ -61,6 +62,43 @@ final class PlayerScreenshotTests: XCTestCase {
         let off = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isSelected == false"), object: heart)
         XCTAssertEqual(XCTWaiter.wait(for: [off], timeout: 3), .completed, "the heart kept its old state after the tap")
         snapshot(app, "lyricsOptionsFavoriteToggled-dark")
+    }
+
+    /// TEMPORARY diagnosis (s21-main-health): does the full player's heart tap reach its action, and does the row
+    /// redraw? Prints facts instead of failing early.
+    func testFavoriteDiagnostics() throws {
+        continueAfterFailure = true
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTest", "-screen", "nowPlaying", "-appearance", "light"]
+        app.launch()
+        let heart = app.buttons["player.favorite"]
+        let shuffle = app.buttons["player.shuffle"]
+        let repeatButton = app.buttons["player.repeat"]
+        XCTAssertTrue(heart.waitForExistence(timeout: 20), "no heart")
+        let hittable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: heart)
+        _ = XCTWaiter.wait(for: [hittable], timeout: 10)
+        print("[diag] start heart=\(heart.label) sel=\(heart.isSelected) frame=\(heart.frame)")
+        print("[diag] start shuffle sel=\(shuffle.isSelected) repeat=\(repeatButton.label)")
+        shuffle.tap()
+        Thread.sleep(forTimeInterval: 2)
+        print("[diag] after shuffle tap: shuffle sel=\(shuffle.isSelected) heart=\(heart.label)")
+        heart.tap()
+        Thread.sleep(forTimeInterval: 2)
+        print("[diag] after heart tap: heart=\(heart.label) sel=\(heart.isSelected)")
+        repeatButton.tap()
+        Thread.sleep(forTimeInterval: 2)
+        print("[diag] after repeat tap: repeat=\(repeatButton.label) heart=\(heart.label)")
+        heart.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.3)).tap()
+        Thread.sleep(forTimeInterval: 2)
+        print("[diag] after coordinate heart tap: heart=\(heart.label)")
+        shuffle.tap()
+        Thread.sleep(forTimeInterval: 2)
+        print("[diag] after 2nd shuffle tap: shuffle sel=\(shuffle.isSelected) heart=\(heart.label)")
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "favoriteDiagnostics-light"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        app.terminate()
     }
 
     // MARK: Gestures
@@ -131,17 +169,21 @@ final class PlayerScreenshotTests: XCTestCase {
             .firstMatch
     }
 
-    /// Taps the liked heart ("Remove from favorites") and expects "Add to favorites" without touching anything else.
-    /// By label: controls inside a `GlassEffectContainer` keep only their labels.
-    private func assertFavoriteFlips(_ app: XCUIApplication, name: String) {
-        let liked = app.buttons.matching(NSPredicate(format: "label == %@", "Remove from favorites")).firstMatch
-        XCTAssertTrue(liked.waitForExistence(timeout: 20), "the liked heart is missing")
+    /// Taps the liked heart (identifier `heart`, labelled "Remove from favorites") and expects the same button to read
+    /// "Add to favorites" without touching anything else. Both hearts keep their identifiers (CI hierarchy dumps,
+    /// 2026-10-07), so the query can't pick the other heart that shares the label.
+    private func assertFavoriteFlips(_ app: XCUIApplication, heart identifier: String, name: String) {
+        let heart = app.buttons[identifier]
+        XCTAssertTrue(heart.waitForExistence(timeout: 20), "the heart \(identifier) is missing")
         // The pre-built player is in the hierarchy before it has expanded: wait until the heart can take the tap.
-        let hittable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: liked)
+        let hittable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: heart)
         XCTAssertEqual(XCTWaiter.wait(for: [hittable], timeout: 10), .completed, "the heart can't be tapped")
-        liked.tap()
-        let unliked = app.buttons.matching(NSPredicate(format: "label == %@", "Add to favorites")).firstMatch
-        XCTAssertTrue(unliked.waitForExistence(timeout: 3), "the heart kept its old state after the tap")
+        XCTAssertEqual(heart.label, "Remove from favorites", "demo song 0 should start liked")
+        heart.tap()
+        let unliked = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "Add to favorites"),
+                                                object: heart)
+        XCTAssertEqual(XCTWaiter.wait(for: [unliked], timeout: 3), .completed,
+                       "the heart kept its old state after the tap")
         snapshot(app, name)
     }
 
