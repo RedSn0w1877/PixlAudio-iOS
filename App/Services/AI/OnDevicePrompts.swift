@@ -30,11 +30,13 @@ nonisolated enum OnDeviceFailure: Error, Sendable, Equatable {
     case deviceNotEligible
     /// The system's intelligence features are turned off.
     case intelligenceOff
+    /// "Use downloaded AI model" is on but the model isn't installed (2026-10-07, local AI phase 2).
+    case localModelMissing
     case other(String)
 
     /// Every failure with a fixed message, for matching text back to a failure.
     static let fixed: [OnDeviceFailure] = [.tooLong, .blocked, .language, .notReady, .busy, .slow, .deviceNotEligible,
-                                           .intelligenceOff]
+                                           .intelligenceOff, .localModelMissing]
 
     var message: String {
         switch self {
@@ -47,6 +49,8 @@ nonisolated enum OnDeviceFailure: Error, Sendable, Equatable {
         case .deviceNotEligible:
             "On-device AI isn't supported on this iPhone. You can add a cloud assistant in Settings › AI features."
         case .intelligenceOff: "On-device AI is turned off. Turn on the intelligence features in the iPhone's Settings app."
+        case .localModelMissing:
+            "The downloaded AI model isn't on this iPhone yet. Download it in Settings › AI features, or turn off \"Use downloaded AI model\"."
         case .other(let detail):
             Self.isSafeDetail(detail) ? "The on-device model couldn't answer (\(detail)). Try again."
                 : "The on-device model couldn't answer. Try again."
@@ -60,6 +64,7 @@ nonisolated enum OnDeviceFailure: Error, Sendable, Equatable {
         case .intelligenceOff: "Turned off in system settings"
         case .notReady: "Downloading"
         case .language: "Language not supported yet"
+        case .localModelMissing: "Downloaded model not on this iPhone"
         default: "Can't be used right now"
         }
     }
@@ -299,6 +304,14 @@ nonisolated protocol TaizoOnDevice: Sendable {
     func chat(_ message: String, songs: @escaping @MainActor @Sendable () -> [Song]) async throws -> String
     /// The one-line intro above a queue card (nil: none).
     func introLine(request: String, count: Int) async throws -> String?
+    /// How long a reply may take (the downloaded model needs longer than the system's).
+    var chatTimeoutSeconds: Double { get }
+    var introTimeoutSeconds: Double { get }
+}
+
+nonisolated extension TaizoOnDevice {
+    var chatTimeoutSeconds: Double { TaisDjEngine.chatTimeoutSeconds }
+    var introTimeoutSeconds: Double { TaisDjEngine.onDeviceIntroTimeoutSeconds }
 }
 
 /// Taizo's on-device instructions and prompts: short (the whole conversation shares one 4,096-token window), with

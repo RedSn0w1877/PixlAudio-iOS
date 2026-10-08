@@ -317,13 +317,37 @@ nonisolated struct LibraryLookupTool: Tool {
 
 /// What the AI features need to run on the device: the sessions, and the settings that pick the provider and tune
 /// the model (the persona and the temperature, the only knob Settings shows for on-device).
+///
+/// Local AI phase 2 (2026-10-07): with Settings › AI features › "Use downloaded AI model" on, every on-device
+/// feature runs on the downloaded model (`local`) instead of the system's; the features themselves don't change.
 nonisolated struct OnDeviceContext: Sendable {
     let ai: OnDeviceAI
     let settings: any AiSettingsProviding
+    /// The downloaded model (nil: the system model only — unit tests).
+    var local: LocalModelAI? = nil
+    /// The "Use downloaded AI model" switch (a thread-safe settings read).
+    var downloadedSwitch: @Sendable () -> Bool = { false }
 
-    /// The on-device model is the selected provider.
+    /// The on-device model is the selected provider (the system's or the downloaded one).
     func isActive() async -> Bool {
         await settings.selectedProvider() == .onDevice
+    }
+
+    /// The downloaded model answers instead of the system's.
+    func usesDownloadedModel() -> Bool {
+        local != nil && downloadedSwitch()
+    }
+
+    /// Why the model that would answer can't (nil when it can).
+    func unavailability() -> OnDeviceFailure? {
+        if usesDownloadedModel(), let local { return local.unavailability() }
+        return OnDeviceModel.unavailability
+    }
+
+    /// The prompt budget of the model that would answer.
+    var contextSize: Int {
+        if usesDownloadedModel(), let local { return local.contextSize }
+        return OnDeviceModel.contextSize
     }
 
     /// The user's persona for the on-device provider (nil: the default).
@@ -341,47 +365,74 @@ nonisolated struct OnDeviceContext: Sendable {
 
 extension OnDeviceContext: TaizoOnDevice {
     func chat(_ message: String, songs: @escaping @MainActor @Sendable () -> [Song]) async throws -> String {
+        if usesDownloadedModel(), let local {
+            return try await local.chat(message, persona: await persona(), temperature: await temperature(.taizoChat),
+                                        songs: songs)
+        }
         let setup = OnDeviceAI.ChatSetup(persona: await persona(), temperature: await temperature(.taizoChat), songs: songs)
         return try await ai.chat(message, setup: setup)
     }
 
     func introLine(request: String, count: Int) async throws -> String? {
-        try await ai.introLine(request: request, count: count)
+        if usesDownloadedModel(), let local { return try await local.introLine(request: request, count: count) }
+        return try await ai.introLine(request: request, count: count)
     }
+
+    /// The downloaded model computes every token on the phone and may load first: more time than the system's.
+    var chatTimeoutSeconds: Double { usesDownloadedModel() ? 90 : TaisDjEngine.chatTimeoutSeconds }
+    var introTimeoutSeconds: Double { usesDownloadedModel() ? 30 : TaisDjEngine.onDeviceIntroTimeoutSeconds }
 }
 
 // MARK: - Live wiring
 
 extension OnDevicePlaylistCurator {
-    /// The curator on the shared sessions.
+    /// The curator on the shared sessions: the system model's, or the downloaded model's when its switch is on
+    /// (decided per call, so the switch applies to the next request).
     static func live(_ context: OnDeviceContext) -> OnDevicePlaylistCurator {
         let ai = context.ai
+        let downloaded: @Sendable () -> LocalModelAI? = { context.usesDownloadedModel() ? context.local : nil }
         return OnDevicePlaylistCurator(model: Model(
-            unavailability: { OnDeviceModel.unavailability },
-            contextSize: { OnDeviceModel.contextSize },
-            tokens: { await OnDeviceModel.tokenCount($0) },
+            unavailability: { context.unavailability() },
+            contextSize: { context.contextSize },
+            tokens: { text in
+                if let local = downloaded() { return await local.tokenCount(text) }
+                return await OnDeviceModel.tokenCount(text)
+            },
             temperature: { await context.temperature($0) },
             pick: { prompt, poolSize, minimum, maximum, temperature in
-                try await ai.pickNumbers(prompt: prompt, poolSize: poolSize, minimum: minimum, maximum: maximum,
-                                         temperature: temperature)
+                if let local = downloaded() {
+                    return try await local.pickNumbers(prompt: prompt, poolSize: poolSize, minimum: minimum,
+                                                       maximum: maximum, temperature: temperature)
+                }
+                return try await ai.pickNumbers(prompt: prompt, poolSize: poolSize, minimum: minimum, maximum: maximum,
+                                                temperature: temperature)
             },
             pickAsText: { prompt in
-                try await ai.text(.playlist, instructions: OnDeviceCuration.instructions, prompt: prompt, maxTokens: 400)
+                if let local = downloaded() {
+                    return try await local.text(instructions: OnDeviceCuration.instructions, prompt: prompt, maxTokens: 400)
+                }
+                return try await ai.text(.playlist, instructions: OnDeviceCuration.instructions, prompt: prompt, maxTokens: 400)
             },
-            plan: { prompt, genres, artists in try await ai.plan(prompt: prompt, genres: genres, artists: artists) }))
+            plan: { prompt, genres, artists in
+                if let local = downloaded() { return try await local.plan(prompt: prompt, genres: genres, artists: artists) }
+                return try await ai.plan(prompt: prompt, genres: genres, artists: artists)
+            }))
     }
 }
 
 extension OnDeviceLyricsTranslator {
-    /// The translator on the shared sessions, into the device language.
+    /// The translator on the shared sessions (or the downloaded model), into the device language.
     static func live(_ context: OnDeviceContext) -> OnDeviceLyricsTranslator {
         let ai = context.ai
         return OnDeviceLyricsTranslator(
             isActive: { await context.isActive() },
-            unavailability: { OnDeviceModel.unavailability },
-            contextSize: { OnDeviceModel.contextSize },
+            unavailability: { context.unavailability() },
+            contextSize: { context.contextSize },
             respond: { instructions, prompt, maxTokens in
-                try await ai.text(.translation, instructions: instructions, prompt: prompt, maxTokens: maxTokens)
+                if context.usesDownloadedModel(), let local = context.local {
+                    return try await local.text(instructions: instructions, prompt: prompt, maxTokens: maxTokens)
+                }
+                return try await ai.text(.translation, instructions: instructions, prompt: prompt, maxTokens: maxTokens)
             },
             dominantLanguage: { text in
                 let recognizer = NLLanguageRecognizer()

@@ -32,6 +32,22 @@ final class AIScreenshotTests: XCTestCase {
         }
     }
 
+    /// "Use downloaded AI model" on without the model (2026-10-07, local AI phase 2): the sheet says how to get it.
+    func testAiPlaylistLocalModelMissingLight() throws {
+        try capture("aiPlaylist", "light", name: "aiPlaylist-localModelMissing") { app in
+            let field = app.descendants(matching: .any)["aiPlaylist.prompt"].firstMatch
+            field.tap()
+            field.typeText("Rainy morning jazz #demo-local-model")
+            app.descendants(matching: .any)["Playlist size"].firstMatch.tap()
+            app.descendants(matching: .any)["aiPlaylist.generate"].firstMatch.tap()
+            XCTAssertTrue(app.descendants(matching: .any)["aiPlaylist.error"].firstMatch.waitForExistence(timeout: 15),
+                          "the error card did not appear")
+            let message = NSPredicate(format: "label CONTAINS %@", "downloaded AI model")
+            XCTAssertTrue(app.staticTexts.containing(message).firstMatch.waitForExistence(timeout: 5),
+                          "the downloaded-model message did not appear")
+        }
+    }
+
     // MARK: TAIS DJ chat
 
     func testTaisChatLight() throws { try capture("taisChat", "light") }

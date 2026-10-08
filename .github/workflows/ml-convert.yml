@@ -19,7 +19,7 @@ on:
       models:
         description: Which models to convert
         type: choice
-        options: [all, wav2vec2, mdx, llm]
+        options: [all, wav2vec2, mdx, llm, llm-probe]
         default: all
       llm_model:
         description: Which local AI model (llm only)
@@ -122,6 +122,45 @@ jobs:
           path: |
             out/mdx-report.json
             out/*.tar
+          retention-days: 7
+          if-no-files-found: warn
+
+  # Diagnostics only (publishes nothing): where the local AI model overflows float16 (convert_llm.py probe).
+  llm_probe:
+    if: inputs.models == 'llm-probe'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Python environment
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.5.0
+          pip install -r ci/ml/requirements-llm.txt
+      - name: Probe
+        env:
+          HF_HUB_DISABLE_TELEMETRY: '1'
+        run: |
+          . .venv/bin/activate
+          python ci/ml/convert_llm.py probe --model "${{ inputs.llm_model }}" --out out
+      - name: Report
+        if: always()
+        run: |
+          if [ -f out/llm-probe.json ]; then
+            echo '### Local AI model float16 probe' >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat out/llm-probe.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: llm-probe
+          path: out/llm-probe.json
           retention-days: 7
           if-no-files-found: warn
 

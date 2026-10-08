@@ -61,6 +61,11 @@ nonisolated enum ModelCatalog {
     static let tais: [ModelDescriptor] = [wav2vec2, mdxnet]
     static let all: [ModelDescriptor] = tais + [llm]
 
+    /// "870 MB" (the system's file-size style).
+    static func formattedSize(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
+
     static func descriptor(_ id: ModelDescriptor.ID) -> ModelDescriptor {
         switch id {
         case .wav2vec2: wav2vec2

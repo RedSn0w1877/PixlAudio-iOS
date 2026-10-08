@@ -27,6 +27,35 @@ final class SettingsScreenshotTests: XCTestCase {
     func testAICategoryCloudDark() throws {
         try capture("settingsCategory.ai.cloud", "dark", ready: "screen.settingsCategory.ai")
     }
+    /// "Use downloaded AI model" on, the model downloading (42 %): the switch, the progress bar and Cancel.
+    func testAICategoryLocalModelDownloadingLight() throws {
+        try capture("settingsCategory.ai.localModel", "light", ready: "screen.settingsCategory.ai",
+                    suffix: "", interact: Self.scrollToLocalModel)
+    }
+    func testAICategoryLocalModelDownloadingDark() throws {
+        try capture("settingsCategory.ai.localModel", "dark", ready: "screen.settingsCategory.ai",
+                    suffix: "", interact: Self.scrollToLocalModel)
+    }
+    /// The model downloaded: its size on the phone and Delete; the system model's row says it isn't in use.
+    func testAICategoryLocalModelReadyLight() throws {
+        try capture("settingsCategory.ai.localModelReady", "light", ready: "screen.settingsCategory.ai",
+                    suffix: "", interact: Self.scrollToLocalModel)
+    }
+    func testAICategoryLocalModelReadyDark() throws {
+        try capture("settingsCategory.ai.localModelReady", "dark", ready: "screen.settingsCategory.ai",
+                    suffix: "", interact: Self.scrollToLocalModel)
+    }
+
+    /// Scrolls until the downloaded model's row is on screen (it sits under the two AI cards).
+    private static func scrollToLocalModel(_ app: XCUIApplication) {
+        let row = app.descendants(matching: .any)["settings.ai.localModel"].firstMatch
+        for _ in 0..<6 {
+            if row.exists && row.isHittable { break }
+            app.swipeUp(velocity: .slow)
+        }
+        XCTAssertTrue(row.exists, "the downloaded model's row is missing")
+    }
+
     /// On-device: Advanced shows only Temperature.
     func testAICategoryAdvancedOnDeviceLight() throws {
         try capture("settingsCategory.ai", "light") { app in

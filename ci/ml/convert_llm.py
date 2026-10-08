@@ -211,9 +211,22 @@ def tokenizer_fixtures(tokenizer_json: str, out_path: str, chat_tokenizer=None) 
 
 # MARK: - The stateful PyTorch module
 
-def build_module(cfg: dict, weights: dict, context: int):
+def build_module(cfg: dict, weights: dict, context: int, options: dict | None = None):
+    """`options` (fp16 safety, all exact in fp32 arithmetic):
+      mlp_scale     float, folded into the weights: up_proj x s, down_proj / s, so the MLP's widest values
+                    (silu(gate) * up) are s times smaller while the layer's output is unchanged.
+      q_fold        bool: 1/sqrt(head_dim) folded into q_proj (weight and bias; RoPE is linear), and attention written
+                    out (matmul, mask, softmax, matmul) with no further scale, so q.k never forms unscaled.
+      norm_fp32     bool: RMSNorm statistics in fp32 when the module runs in fp16 (what the "mixed" selector keeps).
+      probe         dict to fill with the largest |value| seen per kind (residual, mlp, q, k, scores, variance).
+    """
     import torch
     import torch.nn.functional as F
+
+    options = options or {}
+    mlp_scale = float(options.get("mlp_scale", 1.0))
+    q_fold = bool(options.get("q_fold", False))
+    norm_fp32 = bool(options.get("norm_fp32", False))
 
     layers = cfg["num_hidden_layers"]
     hidden = cfg["hidden_size"]
@@ -261,9 +274,20 @@ def build_module(cfg: dict, weights: dict, context: int):
             self.register_buffer("ropeCos", emb.cos(), persistent=False)
             self.register_buffer("ropeSin", emb.sin(), persistent=False)
 
-        @staticmethod
-        def rms_norm(x, weight):
+            self.probe = None
+
+        def note(self, kind, value):
+            if self.probe is not None:
+                self.probe[kind] = max(self.probe.get(kind, 0.0), float(value.detach().abs().max().float()))
+
+        def rms_norm(self, x, weight):
+            if norm_fp32 and x.dtype != torch.float32:
+                wide = x.float()
+                variance = wide.pow(2).mean(-1, keepdim=True)
+                self.note("variance", variance)
+                return weight * (wide * torch.rsqrt(variance + eps)).to(x.dtype)
             variance = x.pow(2).mean(-1, keepdim=True)
+            self.note("variance", variance)
             return weight * (x * torch.rsqrt(variance + eps))
 
         @staticmethod
@@ -287,17 +311,30 @@ def build_module(cfg: dict, weights: dict, context: int):
                 v = self.v[i](h).view(1, q_len, kv_heads, head_dim).transpose(1, 2)
                 q = self.rotate(q, cos, sin)
                 k = self.rotate(k, cos, sin)
+                self.note("q", q)
+                self.note("k", k)
                 self.keyCache[i:i + 1, :, past:end, :] = k
                 self.valueCache[i:i + 1, :, past:end, :] = v
                 keys = self.keyCache[i:i + 1, :, :end, :]
                 values = self.valueCache[i:i + 1, :, :end, :]
                 # [1, heads, Q, D] -> [1, kv_heads, rep * Q, D]: head h reads KV head h // rep, like repeat_kv.
                 grouped = q.reshape(1, kv_heads, rep * q_len, head_dim)
-                attn = F.scaled_dot_product_attention(grouped, keys, values, attn_mask=mask)
+                if q_fold:
+                    scores = torch.matmul(grouped, keys.transpose(-1, -2))
+                    self.note("scores", scores)
+                    attn = torch.matmul(torch.softmax(scores + mask, dim=-1), values)
+                else:
+                    if self.probe is not None:
+                        self.note("scores", torch.matmul(grouped, keys.transpose(-1, -2)) / head_dim ** 0.5)
+                    attn = F.scaled_dot_product_attention(grouped, keys, values, attn_mask=mask)
                 attn = attn.reshape(1, heads, q_len, head_dim).transpose(1, 2).reshape(1, q_len, heads * head_dim)
                 x = x + self.o[i](attn)
+                self.note("residual", x)
                 h = self.rms_norm(x, self.post_norms[i])
-                x = x + self.down[i](F.silu(self.gate[i](h)) * self.up[i](h))
+                inner = F.silu(self.gate[i](h)) * self.up[i](h)
+                self.note("mlp", inner)
+                x = x + self.down[i](inner)
+                self.note("residual", x)
             x = self.rms_norm(x[:, -1:, :], self.final_norm)
             return F.linear(x, self.embed.weight)
 
@@ -314,10 +351,13 @@ def build_module(cfg: dict, weights: dict, context: int):
             for name, target in (("q", module.q[i]), ("k", module.k[i]), ("v", module.v[i])):
                 target.weight.copy_(take(p + f"self_attn.{name}_proj.weight"))
                 target.bias.copy_(take(p + f"self_attn.{name}_proj.bias"))
+            if q_fold:
+                module.q[i].weight.mul_(1.0 / head_dim ** 0.5)
+                module.q[i].bias.mul_(1.0 / head_dim ** 0.5)
             module.o[i].weight.copy_(take(p + "self_attn.o_proj.weight"))
             module.gate[i].weight.copy_(take(p + "mlp.gate_proj.weight"))
-            module.up[i].weight.copy_(take(p + "mlp.up_proj.weight"))
-            module.down[i].weight.copy_(take(p + "mlp.down_proj.weight"))
+            module.up[i].weight.copy_(take(p + "mlp.up_proj.weight") * mlp_scale)
+            module.down[i].weight.copy_(take(p + "mlp.down_proj.weight") / mlp_scale)
         module.final_norm.copy_(take("model.norm.weight"))
         lm_head = weights.pop("lm_head.weight", None)
         if lm_head is not None and not torch.equal(lm_head.to(torch.float32), module.embed.weight):
@@ -692,6 +732,92 @@ def cmd_convert(args) -> int:
     return 0
 
 
+# MARK: - probe (Linux): where float16 overflows
+
+PROBE_CONFIGS = [
+    ("fp16", {}),
+    ("fp16+norm32", {"norm_fp32": True}),
+    ("fp16+norm32+mlp/32+qfold", {"norm_fp32": True, "mlp_scale": 1 / 32, "q_fold": True}),
+]
+
+
+def cmd_probe(args) -> int:
+    """The fp32 module's largest values per kind (anything over 65504 overflows float16), then the module run in
+    float16 (CPU, torch) with each fp16-safety option set, against the fp32 module's own greedy continuations."""
+    import torch
+    from huggingface_hub import snapshot_download
+    from transformers import AutoTokenizer
+
+    torch.set_num_threads(int(os.environ.get("PIXL_THREADS", os.cpu_count() or 1)))
+    info = MODELS[args.model]
+    os.makedirs(args.out, exist_ok=True)
+    model_dir = args.model_dir or snapshot_download(info["id"], revision=info["revision"],
+                                                    allow_patterns=["*.json", "*.safetensors", "merges.txt"])
+    with open(os.path.join(model_dir, "config.json")) as f:
+        cfg = json.load(f)
+    tokenizer = AutoTokenizer.from_pretrained(model_dir)
+    eos = [tokenizer.convert_tokens_to_ids("<|im_end|>"), tokenizer.convert_tokens_to_ids("<|endoftext|>")]
+    prompts = []
+    for system, user in PROMPTS[: args.prompts]:
+        text = tokenizer.apply_chat_template([{"role": "system", "content": system}, {"role": "user", "content": user}],
+                                             tokenize=False, add_generation_prompt=True)
+        prompts.append(tokenizer(text, add_special_tokens=False)["input_ids"])
+    base = load_weights(model_dir)
+    report = {"model": info["id"], "configs": {}}
+
+    def save():
+        write_json(os.path.join(args.out, "llm-probe.json"), report)
+
+    # fp32: the largest values, and the continuations the others are compared on.
+    probe = {}
+    module = build_module(cfg, dict(base), args.context)
+    module.probe = probe
+    step = torch_step(module)
+    refs = []
+    for ids in prompts:
+        module.keyCache.zero_()
+        module.valueCache.zero_()
+        continuation = greedy_sequence(step, ids, CONTINUATION, eos)
+        module.keyCache.zero_()
+        module.valueCache.zero_()
+        logits = run_sequence(step, ids, continuation)
+        refs.append({"ids": ids, "continuation": continuation, "argmax": logits.argmax(-1).tolist()})
+    report["fp32_max"] = probe
+    report["continuations"] = [tokenizer.decode(r["continuation"]) for r in refs]
+    log("fp32 maxima:", json.dumps(probe))
+    save()
+    del module
+    gc.collect()
+
+    for name, options in PROBE_CONFIGS:
+        started = time.time()
+        probe = {}
+        module = build_module(cfg, dict(base), args.context, options).half()
+        module.probe = probe
+
+        def half_step(ids, mask, module=module):
+            with torch.no_grad():
+                out = module(torch.from_numpy(ids), torch.from_numpy(mask.astype(np.float16)))
+                return out.float().numpy()[0, 0]
+
+        agree, total, finite = 0, 0, True
+        for r in refs:
+            module.keyCache.zero_()
+            module.valueCache.zero_()
+            logits = run_sequence(half_step, r["ids"], r["continuation"])
+            finite = finite and bool(np.isfinite(logits).all())
+            agree += int((logits.argmax(-1) == np.array(r["argmax"])).sum())
+            total += len(r["argmax"])
+        result = {"options": options, "finite": finite, "argmax_agreement": agree / max(total, 1), "positions": total,
+                  "max": probe, "seconds": round(time.time() - started, 1)}
+        report["configs"][name] = result
+        log(name, json.dumps(result))
+        save()
+        del module
+        gc.collect()
+    return 0
+
+
 def cmd_tokenizer(args) -> int:
     from huggingface_hub import hf_hub_download
 
@@ -878,11 +1004,17 @@ def main() -> int:
     parity.add_argument("--candidates", default="candidates")
     parity.add_argument("--expect-tokenizer-sha")
     parity.add_argument("--out", default="out")
+    probe = sub.add_parser("probe")
+    probe.add_argument("--model", choices=sorted(MODELS), default="qwen2.5-1.5b")
+    probe.add_argument("--model-dir")
+    probe.add_argument("--context", type=int, default=CONTEXT)
+    probe.add_argument("--prompts", type=int, default=2)
+    probe.add_argument("--out", default="out")
     tok = sub.add_parser("tokenizer")
     tok.add_argument("--model", choices=sorted(MODELS), default="qwen2.5-1.5b")
     tok.add_argument("--out", default="out")
     args = parser.parse_args()
-    return {"convert": cmd_convert, "parity": cmd_parity, "tokenizer": cmd_tokenizer}[args.command](args)
+    return {"convert": cmd_convert, "parity": cmd_parity, "probe": cmd_probe, "tokenizer": cmd_tokenizer}[args.command](args)
 
 
 if __name__ == "__main__":

@@ -85,6 +85,10 @@ final class AppEnvironment {
         self.settings = settings
         // The optional cloud rows of Settings › AI features, for their screenshot.
         if launch.screen == .settingsAICloud { settings.ai.setUsesCloudAssistant(true) }
+        // The downloaded AI model's rows (its demo states are set in `TaisDemo`).
+        if launch.screen == .settingsAILocalModel || launch.screen == .settingsAILocalModelReady {
+            settings.ai.useDownloadedModel = true
+        }
         // `-accent RRGGBB` (UI tests): the accent screenshots start with a picked colour, stored normalised.
         if isUITest, let seed = launch.accentHex.flatMap(AccentPalette.seed(hex:)) {
             settings.appearance.accentColor = AccentPalette.hex(argb: seed)
