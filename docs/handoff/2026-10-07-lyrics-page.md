@@ -44,12 +44,18 @@ Owner items 1 and 11 of the 2026-10-07 batch, built from `2026-10-07-plans/lyric
     instead of the intro. Under `-uiTest` the editor now clears that folder once per launch
     (`LyricsSyncEditorView.clearUITestDraftsOnce`; real drafts are untouched).
   - `testShowAsPlainText` and `testMoreSheetBottomInLightApp` (its shot never reached the bottom row) now swipe on the
-    sheet until the target sits clear of the screen's edge. CI lost the quick tap on the plain-text switch in 5 of 6
-    tries (it flipped once), so the test drags the knob on if the tap didn't take. Worth a look on the phone: does
-    the switch flip on the first tap?
+    sheet until the target sits clear of the screen's edge.
+  - `testShowAsPlainText` still failed in all three CI runs: the switch read "0" after a tap on it and after a drag
+    across it (the sheet was settled, the switch on screen and hittable). The More sheet's switch rows now work as
+    Android's do: the **whole row** is the tap target (Android puts `.clickable { onChange(!checked) }` on each row),
+    with the rows' press feedback. The switch only shows the state (it takes no touches of its own, so a tap can't
+    flip it twice); VoiceOver and UI tests still see a switch with the row's title (`accessibilityRepresentation`).
+    This applies to Show romanization, Show translations, Show as plain text and Disable immersive (once). The test
+    taps the row's title and reports what the switch reads if the lyrics don't switch.
 - **Docs:** `design.md`, `parity.md` (rows 25 and 27), `api-notes.md` (`isIdleTimerDisabled`, `glassEffectTransition`,
-  `contextMenu` with a caution for the player's output pill, `Menu(content:label:primaryAction:)`, first use of
-  `Toggle(_:systemImage:isOn:)`, iOS 14, checked on developer.apple.com), `test-parity.md`.
+  `contextMenu` with a caution for the player's output pill, `Menu(content:label:primaryAction:)`, first uses of
+  `Toggle(_:systemImage:isOn:)`, iOS 14, and `accessibilityRepresentation(representation:)`, iOS 15, checked on
+  developer.apple.com), `test-parity.md`.
 
 ## How it was verified
 
@@ -75,8 +81,9 @@ speaker, so those paths are only checked with demo states.
 - [ ] Sing on a downloaded song: the first time it renders ("Removing vocals …"), then the vocals go away; tap
       again brings them back without a skip. On a Spotify Connect speaker, Sing is greyed out.
 - [ ] ⋯ opens as a half-height floating glass sheet; drag it up, still see-through. Is it readable over bright art?
-- [ ] Show as plain text switches to plain lyrics and back on the first tap (CI's simulator taps sometimes missed
-      it); the next song goes back to synced.
+- [ ] Show as plain text switches to plain lyrics and back on the first tap, on the switch and on the row's title
+      alike (the whole row is the target, as on Android); the next song goes back to synced. Same for Show
+      translations. The switch no longer slides under a drag: tap it.
 - [ ] The alignment lens and the shuffle / repeat / heart row feel like the full player's; the heart flips at once.
 - [ ] The controls look like the full player's glass (not dark plastic), also over very bright and very dark art.
 - [ ] Seek by dragging the seek bar: the thumb stays under the finger.

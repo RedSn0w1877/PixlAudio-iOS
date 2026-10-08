@@ -108,25 +108,16 @@ final class LyricsScreenshotTests: XCTestCase {
             XCTAssertEqual(plain.value as? String, "0", "Show as plain text should start off")
             let adjustSync = sheet.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Adjust sync")).firstMatch
             XCTAssertTrue(adjustSync.exists, "karaoke lyrics should offer Adjust sync")
-            // The switch sits at the row's trailing end; the row's centre is its title.
-            let knob = plain.switches.firstMatch
-            let hasKnob = knob.exists && knob.isHittable
-            if hasKnob {
-                knob.tap()
-            } else {
-                plain.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+            // The whole row flips the switch, as on Android (since 2026-10-08; before, only the switch took taps and
+            // CI's simulator lost every tap and drag on it). Tap the row's title.
+            let title = plain.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
+            title.tap()
+            if !adjustSync.waitForNonExistence(timeout: 3), plain.value as? String == "0" {
+                // Still off, so a second tap can't undo a first one that landed late.
+                title.tap()
             }
-            if !adjustSync.waitForNonExistence(timeout: 2) {
-                // On CI a quick tap on this switch was sometimes lost (the sheet's scroll view); dragging the knob to
-                // the right can only turn it on, so trying again can't undo a tap that did land.
-                if hasKnob {
-                    knob.swipeRight()
-                } else {
-                    plain.coordinate(withNormalizedOffset: CGVector(dx: 0.82, dy: 0.5))
-                        .press(forDuration: 0.1, thenDragTo: plain.coordinate(withNormalizedOffset: CGVector(dx: 1.0, dy: 0.5)))
-                }
-            }
-            XCTAssertTrue(adjustSync.waitForNonExistence(timeout: 5), "the lyrics did not switch to plain text")
+            let switched = adjustSync.waitForNonExistence(timeout: 5)
+            XCTAssertTrue(switched, "the lyrics did not switch to plain text (the switch reads \(plain.value ?? "nil"))")
             Thread.sleep(forTimeInterval: 1.0)
         }
     }

@@ -264,23 +264,39 @@ struct LyricsMoreSheet: View {
         }
     }
 
+    /// A switch row as Android's (`ListItem` with a trailing `Switch` and `.clickable { onChange(!checked) }` on the
+    /// row): a tap anywhere on the row flips it, with the rows' press feedback. The switch only shows the state, so a
+    /// tap on it is the row's tap (one handler, never a double flip); VoiceOver and UI tests still get a switch with
+    /// the row's title. Until 2026-10-08 only the switch took taps, and CI's simulator lost every tap on it.
     private func switchRow(_ title: LocalizedStringKey, systemImage: String, isOn: Binding<Bool>) -> some View {
-        HStack(spacing: 16) {
-            Image(systemName: systemImage)
-                .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(theme.onSurface)
-                .frame(width: 24)
-            Toggle(isOn: isOn) {
+        Button {
+            isOn.wrappedValue.toggle()
+        } label: {
+            HStack(spacing: 16) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(theme.onSurface)
+                    .frame(width: 24)
                 Text(title)
                     .pixlFont(.bodyLarge)
                     .foregroundStyle(theme.onSurface)
+                Spacer(minLength: 8)
+                Toggle(title, isOn: isOn)
+                    .labelsHidden()
+                    .tint(theme.primary)
+                    .allowsHitTesting(false)
+                    .animation(PixlMotion.state, value: isOn.wrappedValue)
             }
-            .tint(theme.primary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+            .background(itemFill, in: rowShape)
+            .contentShape(rowShape)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
-        .background(itemFill, in: rowShape)
+        .buttonStyle(PressScaleButtonStyle(pressedScale: 0.98))
+        .accessibilityRepresentation {
+            Toggle(isOn: isOn) { Text(title) }
+        }
     }
 
     private var debugMessage: String {
