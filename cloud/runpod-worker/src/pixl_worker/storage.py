@@ -302,7 +302,11 @@ class PresignedStorage:
         """which: manifest | attempt. Returns None when the object does not exist. Raises TransientError when
         storage can't be read (the caller decides; the guard is best effort)."""
         url = self.job.guard.manifest_get if which == "manifest" else self.job.guard.attempt_get
-        resp = self.transport.request("GET", url, max_body=256 * 1024, timeout=10.0, deadline=self.clock() + 10.0)
+        try:
+            resp = self.transport.request("GET", url, max_body=256 * 1024, timeout=10.0,
+                                          deadline=self.clock() + 10.0)
+        except TooLarge:  # no manifest or marker comes near this, so it isn't ours: unreadable, not a job failure
+            raise TransientError("the guard object is larger than 256 KB") from None
         if resp.status == 404:
             return None
         if resp.status != 200:

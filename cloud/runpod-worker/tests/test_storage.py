@@ -148,6 +148,14 @@ def test_guard_objects(tmp_path):
     assert transport.calls[2][0] == "PUT" and "/attempt.json?" in transport.calls[2][1]
 
 
+def test_an_oversized_guard_object_is_unreadable_not_a_crash(tmp_path):
+    # The real transport raises TooLarge past max_body; the guard treats that like any unreadable object (the job
+    # goes on) instead of letting it end the job as INTERNAL before any work.
+    storage, _ = storage_with([TooLarge()])
+    with pytest.raises(TransientError):
+        storage.get_guard_json("attempt")
+
+
 def test_delete_input_is_best_effort():
     storage, transport = storage_with([TransientError("down")])
     storage.delete_input()  # no exception
