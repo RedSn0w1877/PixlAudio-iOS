@@ -353,8 +353,76 @@ private struct EqualizerEffectCard: View {
     }
 }
 
-/// Android `VolumeControlCard`: "Volume", the speaker icon, the system volume slider and the percentage.
+/// Android `VolumeControlCard`: "Volume", the speaker icon, the system volume slider and the percentage. While a
+/// Spotify Connect device plays, the phone's volume does nothing audible: the card shows and drives the device's
+/// instead (owner decision 2026-10-07), the same value the devices sheet's hero and the volume buttons change.
 private struct EqualizerVolumeCard: View {
+    @Environment(AppEnvironment.self) private var env
+
+    var body: some View {
+        if let device = env.spotifyConnect.active {
+            EqualizerConnectVolumeCard(device: device)
+        } else {
+            EqualizerPhoneVolumeCard()
+        }
+    }
+}
+
+/// The volume card for the Spotify Connect device: "Volume", the device's name, its symbol, its volume slider and the
+/// percentage (or a note when it sets its own volume).
+private struct EqualizerConnectVolumeCard: View {
+    let device: SpotifyConnectController.ActiveDevice
+
+    @Environment(\.appTheme) private var theme
+    @State private var level: Double = 50
+
+    var body: some View {
+        VStack(spacing: 16) {
+            VStack(spacing: 4) {
+                Text(L10n.equalizerVolume)
+                    .pixlFont(.titleMedium)
+                    .foregroundStyle(theme.onSurface)
+                Text("\(device.name) \u{2022} Spotify Connect")
+                    .pixlFont(.bodySmall)
+                    .foregroundStyle(theme.onSurfaceVariant)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            HStack(spacing: 16) {
+                Image(systemName: device.symbolName)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(theme.onSurfaceVariant)
+                    .frame(width: 22)
+                    .accessibilityHidden(true)
+                if device.supportsVolume {
+                    SpotifyConnectVolumeSlider(level: $level, label: Text("\(device.name) volume"), tint: theme.primary,
+                                               identifier: "eq.volume.connect")
+                        .frame(height: 36)
+                    Text("\(Int(level.rounded()))%")
+                        .pixlFont(.labelLarge)
+                        .foregroundStyle(theme.onSurface)
+                        .monospacedDigit()
+                        .frame(width: 46)
+                } else {
+                    Text("This device sets its own volume")
+                        .pixlFont(.bodyMedium)
+                        .foregroundStyle(theme.onSurfaceVariant)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity)
+        .pixlGlass(in: RoundedRectangle(cornerRadius: 24, style: .continuous),
+                   tint: theme.surfaceContainerLow.opacity(SettingsTint.row))
+        .padding(.horizontal, 16)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("eq.volume")
+    }
+}
+
+/// The phone's volume (the system slider): this phone plays.
+private struct EqualizerPhoneVolumeCard: View {
     @State private var volume = SystemVolumeObserver()
     @Environment(\.appTheme) private var theme
 

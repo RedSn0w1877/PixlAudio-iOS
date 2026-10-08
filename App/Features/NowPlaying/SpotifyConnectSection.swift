@@ -163,13 +163,12 @@ struct SpotifyConnectSection: View {
 }
 
 /// The Connect device's volume in the devices sheet's hero (instead of the phone's): a slider while the device
-/// takes volume commands (`supports_volume`), a note otherwise. Sent debounced (`SpotifyConnectController.setVolume`).
+/// takes volume commands (`supports_volume`), a note otherwise.
 struct SpotifyConnectVolume: View {
     let device: SpotifyConnectController.ActiveDevice
     let tint: Color
 
-    @Environment(AppEnvironment.self) private var env
-    @State private var level: Double = 0
+    @State private var level: Double = 50
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -186,22 +185,56 @@ struct SpotifyConnectVolume: View {
             }
             .foregroundStyle(tint)
             if device.supportsVolume {
-                Slider(value: $level, in: 0...100, step: 1, onEditingChanged: { editing in
-                    if !editing { env.spotifyConnect.setVolume(Int(level.rounded())) }
-                })
-                .tint(tint)
-                .frame(height: 34)
-                .accessibilityLabel("\(device.name) volume")
-                .accessibilityIdentifier("spotifyConnect.volume")
+                SpotifyConnectVolumeSlider(level: $level, label: Text("\(device.name) volume"), tint: tint)
+                    .frame(height: 34)
             } else {
                 Text("This device sets its own volume")
                     .pixlFont(.bodySmall)
                     .foregroundStyle(tint.opacity(0.8))
             }
         }
-        .onAppear { level = Double(device.volumePercent ?? 50) }
-        .onChange(of: device.volumePercent) { _, newValue in
-            if let newValue { level = Double(newValue) }
+    }
+}
+
+/// The Connect device's volume as a slider (the devices sheet's hero, the Equalizer's volume card). It follows the
+/// device — polls, the volume buttons, the other slider — except under the user's finger, and sends on release
+/// (`SpotifyConnectController.setVolume`, throttled there). A VoiceOver adjustment is sent as it happens.
+struct SpotifyConnectVolumeSlider: View {
+    @Binding var level: Double
+    let label: Text
+    let tint: Color
+    var identifier = "spotifyConnect.volume"
+
+    @Environment(AppEnvironment.self) private var env
+    @State private var isEditing = false
+    /// The last value taken from the device (a change to anything else came from the user).
+    @State private var synced: Double?
+
+    var body: some View {
+        Slider(value: $level, in: 0...100, step: 1, onEditingChanged: { editing in
+            isEditing = editing
+            if !editing { send(level) }
+        })
+        .tint(tint)
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(identifier)
+        .onAppear { follow(env.spotifyConnect.volumePercent) }
+        .onChange(of: env.spotifyConnect.volumePercent) { _, newValue in
+            if !isEditing { follow(newValue) }
         }
+        .onChange(of: level) { _, newValue in
+            if !isEditing, let synced, newValue != synced { send(newValue) }
+        }
+    }
+
+    private func follow(_ percent: Int?) {
+        let value = Double(percent ?? 50)
+        synced = value
+        if level != value { level = value }
+    }
+
+    private func send(_ value: Double) {
+        synced = value
+        env.spotifyConnect.setVolume(Int(value.rounded()))
     }
 }

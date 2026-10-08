@@ -182,6 +182,12 @@ final class AppEnvironment {
                     nowPlaying.update()
                 }
                 spotifyConnect.onRemoteStateChanged = { nowPlaying.update() }
+                // The phone's volume buttons drive the Connect device while the app is open (not in UI tests: the
+                // simulator can't change the volume).
+                let volumeButtons = SpotifyConnectVolumeButtons(session: realPlayback.session)
+                volumeButtons.onPress = { [weak spotifyConnect] presses in spotifyConnect?.adjustVolume(byPresses: presses) }
+                volumeButtons.onEndReached = { [weak spotifyConnect] in spotifyConnect?.volumeButtonsReachedEnd() }
+                spotifyConnect.volumeButtons = volumeButtons
                 // Lock screen / Control Center "Like" toggles the playing song's favourite (the library owns
                 // favourites); its state follows favourite edits made anywhere in the app.
                 let favorites = LibraryEditor(store: library, persistence: persistence, writesCache: true)

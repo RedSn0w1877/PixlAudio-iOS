@@ -754,7 +754,7 @@ grace period in which polls may show the state from before a command). All of th
 |---|---|---|---|---|
 | `View.contextMenu(menuItems:)` | 13 | /documentation/swiftui/view/contextmenu(menuitems:) | player output pill | Long press on "Playing on <device>": Stop playing on <device> (the system menu). |
 | `LabelStyle` (custom `makeBody`) with `Label(_:systemImage:)` | 14 | /documentation/swiftui/labelstyle | `MiniPlayerBar` | The mini player's "Playing on <device>" line with a small speaker icon. |
-| `Slider(value:in:step:onEditingChanged:)` | 13 | /documentation/swiftui/slider | `SpotifyConnectVolume` | Sends the device volume on release (debounced 250 ms). |
+| `Slider(value:in:step:onEditingChanged:)` | 13 | /documentation/swiftui/slider | `SpotifyConnectVolumeSlider` (devices hero, Equalizer volume card) | Sends the device volume on release (and on a VoiceOver adjustment) through the volume lane (2026-10-07; was a 250 ms debounce); follows the device except under the finger. |
 | `View.refreshable(action:)` on the devices page | 15 | /documentation/swiftui/view/refreshable(action:) | `DevicesSheet` | Pull to refresh the Connect devices. |
 
 ## Streaming speed (2026-10-07, branch `wt/stream`)
@@ -845,3 +845,37 @@ No API is new to the app; these are now load-bearing in the full player and were
 | `XCUICoordinate.tap()` from `XCUIElement.coordinate(withNormalizedOffset:)` (0.5, 0.5) | Xcode 7 | /documentation/xctest/xcuicoordinate/tap() | `UITests/PlayerScreenshotTests` favourite tests | Taps the element's centre, where a finger lands. `XCUIElement.tap()` taps its *hit point*, which XCUITest picks from accessibility hit tests: with other elements answering under the toggle row it was the frame's top-left corner, outside a toggle that is on. |
 | `View.fixedSize()` | 13 | /documentation/swiftui/view/fixedsize() | `QuickFillSheet` toolbar, `SaveQueueAsPlaylistSheet` top bar | The pills keep their one-line ideal size; the flexible sibling (spacer or genre capsule) takes what is left. |
 | `ViewThatFits(in: .horizontal)` | 16 | /documentation/swiftui/viewthatfits | No longer used (tried on this branch, removed again) | Picks the first child whose ideal width fits, else the last child. Beside "Deselect all" on a 402 pt iPhone no title style fitted (CI showed the last one, titleLarge, still truncated), so the title moved to its own row as on Android (`MediumTopAppBar`), and Quick Fill's songs step dropped the status, as Android has none. |
+
+## Spotify Connect volume buttons (2026-10-07, branch `s17-connect-volume`)
+Owner request: the phone's volume buttons change the Connect speaker's volume while PixlAudio is open. **iOS has no
+API for this.** Apple staff point to key-value observing `outputVolume` to *notice* presses
+(developer.apple.com/forums/thread/765821) and say it is read-only, so it can't be *set*
+(/forums/thread/756484). What PixlAudio does on top of that is long-standing community practice but **undocumented
+behaviour**, not an API contract: it can stop working with any iOS update, and the Simulator can't change the volume
+at all (MPVolumeView docs), so none of it is proven until Hoa's iPhone runs it. Everything is checked live and
+degrades on its own; Settings › Developer › Diagnostics › "Volume Buttons (Spotify Connect)" shows the mode.
+
+- **Re-centre** (option A): set the phone's volume back after each press through the `UISlider` inside a
+  `MPVolumeView`. Apple DTS, 2020: "There's no supported way to change the system volume programmatically. Digging
+  into the MPVolumeView view hierarchy wasn't a reliable way to do this, and (as you've seen) it generally doesn't
+  work now." (/forums/thread/649183, an AirPlay question). Spotify lost its own version of this feature in 2024 (the
+  deprecated `MPMusicPlayerController` volume setter, reportedly shut down in iOS 17.6; not used here). PixlAudio
+  checks each reset: when `outputVolume` doesn't come back within 500 ms it switches to…
+- **Relative** (option B, public APIs only): presses still count, the phone's own volume moves with them, and at
+  full or silent no further change is reported, so a toast points to the slider in Devices.
+- **System pop-up:** an `MPVolumeView` in the window keeps the system volume pop-up away (b4x 2016/2019,
+  JPSVolumeButtonHandler). Not documented, not verified for the iOS 26/27 pop-up. PixlAudio places it 1×1 pt in the
+  window's top-left corner, clipped, alpha 0.01 (reports differ on off-screen frames; hidden or alpha 0 never works).
+- Known iOS 18+ `outputVolume` problems (stale after a session reactivation, a first read of 0, values rounded to
+  ~0.05): the start value is read from the hidden slider after a layout pass, the session is kept through Control
+  Center pulls, and the press/echo windows allow for the rounding (`SpotifyConnectVolumeKeys`).
+
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `NSObject.observe(_:options:changeHandler:)` with `[.old, .new]` on `AVAudioSession.outputVolume`, `NSKeyValueObservedChange.oldValue` | 6 / Swift 4 | /documentation/avfaudio/avaudiosession/outputvolume | `SpotifyConnectVolumeButtons` | Extends the `.new`-only use (`SystemVolumeObserver`). The handler is built nonisolated and hops with `DispatchQueue.main.async` (not `Task`) so changes stay in order for the echo matching. |
+| `MPVolumeView(frame:)` added to the key window, `alpha` 0.01, `clipsToBounds`, `isUserInteractionEnabled = false`, `accessibilityElementsHidden` | 2 | /documentation/mediaplayer/mpvolumeview | `SpotifyConnectVolumeButtons` | **Undocumented effect:** keeps the system volume pop-up away while it is in the window (PixlAudio's glass pop-up shows instead). Added on start, removed in the background / when the session ends. Window lookup as `PoTokenGenerator` (`UIWindowScene.keyWindow`). |
+| `UISlider.setValue(_:animated:)` + `UIControl.sendActions(for: .valueChanged)` on MPVolumeView's internal slider | 2 / 2 | /documentation/uikit/uislider/setvalue(_:animated:) | `SpotifyConnectVolumeButtons` (re-centre, restore) | **Undocumented hierarchy** (searched recursively, never assumed); DTS says it "generally doesn't work now". Guarded by the 500 ms echo check → relative mode. `sendActions(for:)` was already ledgered (tab bar); this is a new use. |
+| `AVAudioSession.secondaryAudioShouldBeSilencedHint`, `silenceSecondaryAudioHintNotification` | 8 | /documentation/avfaudio/avaudiosession/secondaryaudioshouldbesilencedhint | `SpotifyConnectVolumeButtons` | "Whether another app, with a nonmixable audio session, is playing audio": PixlAudio never activates its session over it. The notification reaches only foreground apps with an active session, so a skipped start is retried when the app becomes active again. |
+| `UIApplication.applicationState` | 4 | /documentation/uikit/uiapplication/applicationstate | `SpotifyConnectVolumeButtons` (also `AutomaticStudioRunner`, unledgered until now) | Presses count only while `.active` (Control Center makes the app inactive). |
+| `UIApplication.willResignActiveNotification` / `didBecomeActiveNotification` / `didEnterBackgroundNotification`, `AVAudioSession.routeChangeNotification` / `interruptionNotification` | 2–6 | (ledgered) | `SpotifyConnectVolumeButtons` | New uses: pause and restore the phone's volume on resign-active, re-read on return, stop in the background; re-anchor on a route change or an interruption's end. |
+| `PUT /v1/me/player/volume` | — | developer.spotify.com /reference/set-volume-for-users-playback | `SpotifyConnectController` volume lane | Now driven by the buttons too: the first change at once, then at most one request every 300 ms with the latest value, one in flight, Retry-After waited out quietly (one toast per gate ≥ 3 s), polls ignored for 3 s after a change (1.5 s after the device accepted it). |

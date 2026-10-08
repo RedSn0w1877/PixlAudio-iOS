@@ -29,11 +29,19 @@ public struct SpotifyConnectSessionState: Sendable, Hashable {
     public var hasMoreAfterWindow: Bool
     /// The URI for which the next window was already requested (once per arrival at the window's end).
     public var extendedAtURI: String?
+    /// Until then polls keep the volume PixlAudio set (the device may not have applied the last `PUT` yet, and a
+    /// burst of volume-button presses steps from the local value, not from a stale poll).
+    public var volumeHoldUntilMs: Int64
+    /// The device refused a volume command (`VOLUME_CONTROL_DISALLOW`) although it reports `supports_volume`: no
+    /// volume control for the rest of the session, whatever later polls say (else every poll would offer it again and
+    /// every press would fail again).
+    public var volumeRefused: Bool
 
     public init(deviceId: String, deviceName: String, deviceType: String, window: SpotifyConnectWindow,
                 windowPosition: Int = 0, isPlaying: Bool = true, progressMs: Int64 = 0, anchorMs: Int64,
                 durationMs: Int64 = 0, volumePercent: Int? = nil, supportsVolume: Bool = false,
-                graceUntilMs: Int64 = 0, hasMoreAfterWindow: Bool = false) {
+                graceUntilMs: Int64 = 0, hasMoreAfterWindow: Bool = false, volumeHoldUntilMs: Int64 = 0,
+                volumeRefused: Bool = false) {
         self.deviceId = deviceId
         self.deviceName = deviceName
         self.deviceType = deviceType
@@ -47,6 +55,9 @@ public struct SpotifyConnectSessionState: Sendable, Hashable {
         self.supportsVolume = supportsVolume
         self.graceUntilMs = graceUntilMs
         self.hasMoreAfterWindow = hasMoreAfterWindow
+        self.volumeHoldUntilMs = volumeHoldUntilMs
+        self.volumeRefused = volumeRefused
+        if volumeRefused { self.supportsVolume = false }
     }
 
     /// The queue index playing now.
@@ -116,6 +127,8 @@ public enum SpotifyConnectReducer {
     public static let commandGraceMs: Int64 = 2500
     /// Grace after starting a session (the device may have to wake up and buffer).
     public static let startGraceMs: Int64 = 6000
+    /// How long polls keep a volume PixlAudio set.
+    public static let volumeHoldMs: Int64 = 3000
 
     /// Folds a poll (`nil` = 204, nothing playing) into `state`.
     public static func apply(_ poll: SpotifyPlaybackState?, to state: inout SpotifyConnectSessionState,
@@ -151,11 +164,12 @@ public enum SpotifyConnectReducer {
             || duration != state.durationMs || change != .none {
             if change == .none { change = .updated }
         }
-        if let volume = poll.device?.volumePercent, volume != state.volumePercent {
+        // Inside the volume hold the local value stands (a poll from before the last `PUT` would snap it back).
+        if let volume = poll.device?.volumePercent, volume != state.volumePercent, nowMs >= state.volumeHoldUntilMs {
             state.volumePercent = volume
             if change == .none { change = .updated }
         }
-        if let supports = poll.device?.supportsVolume, supports != state.supportsVolume {
+        if let supports = poll.device?.supportsVolume, !state.volumeRefused, supports != state.supportsVolume {
             state.supportsVolume = supports
             if change == .none { change = .updated }
         }
@@ -202,6 +216,29 @@ public enum SpotifyConnectReducer {
         state.anchorMs = nowMs
         state.isPlaying = playing
         state.graceUntilMs = nowMs + commandGraceMs
+    }
+
+    /// PixlAudio set the device volume (the slider, the volume buttons): clamped to 0…100 and held against polls for
+    /// `volumeHoldMs`.
+    public static func setVolume(_ percent: Int, _ state: inout SpotifyConnectSessionState, nowMs: Int64) {
+        state.volumePercent = min(max(percent, 0), 100)
+        state.volumeHoldUntilMs = nowMs + volumeHoldMs
+    }
+
+    /// The device refused a volume command: no volume control until the session ends.
+    public static func refuseVolume(_ state: inout SpotifyConnectSessionState) {
+        state.volumeRefused = true
+        state.supportsVolume = false
+    }
+
+    /// Whether a device that reports `supports_volume` takes volume commands in this session.
+    public static func supportsVolume(_ reported: Bool, in state: SpotifyConnectSessionState?) -> Bool {
+        reported && state?.volumeRefused != true
+    }
+
+    /// The device accepted a volume `PUT`: polls keep the value a little longer, until the device reports it.
+    public static func volumeSent(_ state: inout SpotifyConnectSessionState, nowMs: Int64, settleMs: Int64 = 1500) {
+        state.volumeHoldUntilMs = max(state.volumeHoldUntilMs, nowMs + settleMs)
     }
 
     public static func seek(to positionMs: Int64, _ state: inout SpotifyConnectSessionState, nowMs: Int64) {

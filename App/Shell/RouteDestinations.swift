@@ -46,18 +46,22 @@ struct SheetDestination: View {
     let sheet: AppSheet
 
     var body: some View {
-        switch sheet {
-        // See-through glass at 92 % (Hoa, 2026-10-07): a full-height sheet turns opaque on iOS 26.
-        case .queue: QueueSheet().pixlSheet(detents: [.tallGlass])
-        case .songInfo(let songId): SongInfoSheet(songId: songId).pixlSheet(detents: [.tallGlass])
-        case .sleepTimer: SleepTimerSheet().sleepTimerPresentation()
-        case .lyricsOptions(let songId): LyricsOptionsSheet(songId: songId).pixlSheet()
-        case .changelog, .betaInfo, .jobs: HomeInfoSheet(sheet: sheet).pixlSheet()
-        case .devices: DevicesSheet() // sizes its own detent
-        case .artistPicker(let songId): PlayerArtistPickerSheet(songId: songId) // sizes its own detent
-        case .aiPlaylist: AiPlaylistSheet().pixlSheet(detents: [.tallGlass])
-        case .taisChat: TaisChatSheet().pixlSheet(detents: [.tallGlass])
+        Group {
+            switch sheet {
+            // See-through glass at 92 % (Hoa, 2026-10-07): a full-height sheet turns opaque on iOS 26.
+            case .queue: QueueSheet().pixlSheet(detents: [.tallGlass])
+            case .songInfo(let songId): SongInfoSheet(songId: songId).pixlSheet(detents: [.tallGlass])
+            case .sleepTimer: SleepTimerSheet().sleepTimerPresentation()
+            case .lyricsOptions(let songId): LyricsOptionsSheet(songId: songId).pixlSheet()
+            case .changelog, .betaInfo, .jobs: HomeInfoSheet(sheet: sheet).pixlSheet()
+            case .devices: DevicesSheet() // sizes its own detent
+            case .artistPicker(let songId): PlayerArtistPickerSheet(songId: songId) // sizes its own detent
+            case .aiPlaylist: AiPlaylistSheet().pixlSheet(detents: [.tallGlass])
+            case .taisChat: TaisChatSheet().pixlSheet(detents: [.tallGlass])
+            }
         }
+        // The Connect volume pop-up: the shell's copy doesn't reach into a sheet.
+        .spotifyConnectVolumeHUD()
     }
 }
 
@@ -68,18 +72,22 @@ struct CoverDestination: View {
     @Environment(Router.self) private var router
 
     var body: some View {
-        switch cover {
-        case .nowPlaying: NowPlayingView()
-        case .lyrics: LyricsView()
-        // `-screen lyricsSync` UI tests only: the app opens the editor over the lyrics screen and Edit song.
-        case .lyricsSync(let songId):
-            LyricsSyncEditorView(songId: songId, onClose: { if router.cover == cover { router.dismissCover() } })
-        case .setup: SetupView()
-        case .editSong(let songId): EditSongSheet(songId: songId)
-        case .aiPlaylistLab: AiPlaylistLabView()
-        case .backupImport: BackupImportCover()
-        case .backupExport: BackupExportCover()
+        Group {
+            switch cover {
+            case .nowPlaying: NowPlayingView()
+            case .lyrics: LyricsView()
+            // `-screen lyricsSync` UI tests only: the app opens the editor over the lyrics screen and Edit song.
+            case .lyricsSync(let songId):
+                LyricsSyncEditorView(songId: songId, onClose: { if router.cover == cover { router.dismissCover() } })
+            case .setup: SetupView()
+            case .editSong(let songId): EditSongSheet(songId: songId)
+            case .aiPlaylistLab: AiPlaylistLabView()
+            case .backupImport: BackupImportCover()
+            case .backupExport: BackupExportCover()
+            }
         }
+        // The Connect volume pop-up over the lyrics screen and the other covers.
+        .spotifyConnectVolumeHUD()
     }
 }
 

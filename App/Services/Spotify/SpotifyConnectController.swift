@@ -23,14 +23,16 @@ final class SpotifyConnectController: RemotePlaybackOutput {
         case ready
     }
 
-    /// The device a session plays on, as the UI shows it.
+    /// The device a session plays on, as the UI shows it. Its volume is `volumePercent` on the controller, so a
+    /// volume change doesn't redraw everything that shows the device (the full player's output pill, the sheets).
     nonisolated struct ActiveDevice: Equatable, Sendable {
         var id: String
         var name: String
         var type: String
         var supportsVolume: Bool
-        var volumePercent: Int?
         var symbolName: String { SpotifyConnectDevice.symbolName(forType: type) }
+        /// Whether the phone's volume buttons drive it (it takes volume commands and isn't a phone or a tablet).
+        var takesVolumeButtons: Bool { SpotifyConnectVolumeKeys.controls(type: type, supportsVolume: supportsVolume) }
     }
 
     // MARK: Published state
@@ -45,9 +47,17 @@ final class SpotifyConnectController: RemotePlaybackOutput {
     private(set) var connectingDeviceId: String?
     /// nil while this phone plays.
     private(set) var active: ActiveDevice?
+    /// The active device's volume (nil while none plays, or when it never reported one).
+    private(set) var volumePercent: Int?
 
     /// Connect's own toasts (shown by `RootView` and the devices sheet, over whatever is on screen).
     @ObservationIgnored let toast = LibraryToast()
+    /// The volume pop-up the volume buttons show (`SpotifyConnectVolumeHUD`).
+    @ObservationIgnored let volumeHUD = SpotifyConnectVolumeHUDModel()
+    /// The phone's volume buttons (real launches only; `AppEnvironment` sets it).
+    @ObservationIgnored var volumeButtons: SpotifyConnectVolumeButtons? {
+        didSet { updateVolumeButtons() }
+    }
     /// Now Playing republishes when the remote state changes, and learns when a session starts or ends.
     @ObservationIgnored var onRemoteStateChanged: (() -> Void)?
     @ObservationIgnored var onSessionChanged: ((_ active: Bool) -> Void)?
@@ -72,6 +82,10 @@ final class SpotifyConnectController: RemotePlaybackOutput {
     @ObservationIgnored private var resyncTask: Task<Void, Never>?
     @ObservationIgnored private var volumeTask: Task<Void, Never>?
     @ObservationIgnored private var commandTask: Task<Void, Never>?
+    /// Volume requests: their own single-flight lane, so a press never waits behind a window send's searches.
+    @ObservationIgnored private var volumeLane = SpotifyConnectVolumeLane()
+    /// No "Spotify is busy" toast for volume before this (one per Retry-After gate).
+    @ObservationIgnored private var volumeBusyToastUntilMs: Int64 = 0
     @ObservationIgnored private var connectTask: Task<Void, Never>?
     @ObservationIgnored private var lastRepeatSent: SpotifyRepeatState?
     /// Background resolution found more after a short first window: send the longer one at the next track change.
@@ -96,6 +110,10 @@ final class SpotifyConnectController: RemotePlaybackOutput {
     static let backgroundScanLimit = 200
     /// Consecutive failed polls (no network, 5xx) before the session is given up.
     static let maxNetworkFailures = 15
+    /// Percent per volume-button press (Android `VOLUME_STEP`).
+    static let volumeStep = SpotifyConnectVolumeKeys.step
+    /// After the device accepted a volume `PUT`, polls keep the local value this much longer.
+    static let volumeSettleMs: Int64 = 1500
 
     init(launch: LaunchConfiguration, spotify: SpotifyService, playback: PlaybackStore) {
         isDemo = launch.isUITest
@@ -143,9 +161,20 @@ final class SpotifyConnectController: RemotePlaybackOutput {
             set(\.devices, list)
             set(\.deviceListError, nil)
             if let active, let device = list.first(where: { $0.deviceId == active.id }) {
-                let updated = ActiveDevice(id: active.id, name: device.name, type: device.type,
-                                           supportsVolume: device.supportsVolume, volumePercent: device.volumePercent ?? active.volumePercent)
-                set(\.active, updated)
+                // A device that refused a volume command stays without volume control, whatever the list says.
+                let supportsVolume = SpotifyConnectReducer.supportsVolume(device.supportsVolume, in: session)
+                set(\.active, ActiveDevice(id: active.id, name: device.name, type: device.type,
+                                           supportsVolume: supportsVolume))
+                // Not over a value PixlAudio just set (the list may predate the last `PUT`).
+                if let polled = device.volumePercent, now() >= session?.volumeHoldUntilMs ?? 0 {
+                    set(\.volumePercent, polled)
+                    if var state = session { state.volumePercent = polled; session = state }
+                }
+                if var state = session, state.supportsVolume != supportsVolume {
+                    state.supportsVolume = supportsVolume
+                    session = state
+                }
+                updateVolumeButtons()
             }
         } catch is CancellationError {
             return
@@ -241,8 +270,11 @@ final class SpotifyConnectController: RemotePlaybackOutput {
         sessionGeneration += 1
         networkFailures = 0
         extendAtNextTrack = false
-        set(\.active, ActiveDevice(id: deviceId, name: device.name, type: device.type, supportsVolume: device.supportsVolume,
-                                    volumePercent: device.volumePercent))
+        resetVolumeLane()
+        set(\.active, ActiveDevice(id: deviceId, name: device.name, type: device.type, supportsVolume: device.supportsVolume))
+        set(\.volumePercent, device.volumePercent)
+        // Before `attachRemote`: its `engine.pause()` must already see the volume buttons' hold on the audio session.
+        updateVolumeButtons()
         playback.attachRemote(self, name: device.name, isPlaying: true)
         if first != playback.currentIndex { playback.remoteMoved(toQueueIndex: first) }
         if !wasRemote { onSessionChanged?(true) }
@@ -422,10 +454,12 @@ final class SpotifyConnectController: RemotePlaybackOutput {
     /// Pushes the remote state to the store, the active device and Now Playing (only on a reducer change).
     private func publish(_ state: SpotifyConnectSessionState) {
         playback.remotePlayingChanged(state.isPlaying)
-        if var device = active, device.volumePercent != state.volumePercent || device.supportsVolume != state.supportsVolume {
-            device.volumePercent = state.volumePercent
+        // The reducer keeps the local volume during the hold, so this never undoes a press.
+        set(\.volumePercent, state.volumePercent)
+        if var device = active, device.supportsVolume != state.supportsVolume {
             device.supportsVolume = state.supportsVolume
             active = device
+            updateVolumeButtons()
         }
         onRemoteStateChanged?()
     }
@@ -676,23 +710,136 @@ final class SpotifyConnectController: RemotePlaybackOutput {
 
     // MARK: Volume
 
-    /// The device volume (debounced; only when the device supports it).
-    func setVolume(_ percent: Int) {
-        guard var device = active, device.supportsVolume else { return }
+    /// The phone's volume buttons: `presses` steps of 5 % (Android `adjustVolume`), with the pop-up.
+    func adjustVolume(byPresses presses: Int) {
+        guard presses != 0, !isStopping, active?.supportsVolume == true else { return }
+        setVolume(SpotifyConnectVolumeKeys.percent(after: presses, from: volumePercent), fromButtons: true)
+    }
+
+    /// The buttons can't go further without setting the phone's volume back (that didn't work on this phone): the
+    /// slider in Devices still can.
+    func volumeButtonsReachedEnd() {
+        guard let name = active?.name else { return }
+        toast.show("Use the slider in Devices to change \(name)'s volume further")
+    }
+
+    /// The device volume (only when the device supports it): shown at once and held against polls, then sent through
+    /// the volume lane — the first change at once, then at most one request every 300 ms with the latest value, one
+    /// at a time, quietly waiting out a 429.
+    func setVolume(_ percent: Int, fromButtons: Bool = false) {
+        guard let device = active, device.supportsVolume else { return }
         let clamped = min(max(percent, 0), 100)
-        if device.volumePercent != clamped {
-            device.volumePercent = clamped
-            active = device
+        let changed = volumePercent != clamped
+        set(\.volumePercent, clamped)
+        if var state = session {
+            SpotifyConnectReducer.setVolume(clamped, &state, nowMs: now())
+            session = state
         }
-        if var state = session { state.volumePercent = clamped; session = state }
-        guard !isDemo else { return }
-        volumeTask?.cancel()
-        let deviceId = device.id
+        if fromButtons { volumeHUD.show(percent: clamped, deviceName: device.name) }
+        guard !isDemo, changed || !volumeLane.isIdle else { return }
+        volumeLane.enqueue(clamped)
+        pumpVolumeLane()
+    }
+
+    /// Runs the lane until it has nothing left to send. One task at a time; a newer value joins it.
+    private func pumpVolumeLane() {
+        guard volumeTask == nil else { return }
+        let generation = sessionGeneration
         volumeTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(250))
-            guard !Task.isCancelled, let self else { return }
-            self.enqueue { [client = self.client] in try await client.setVolume(deviceId: deviceId, percent: clamped) }
+            while true {
+                guard !Task.isCancelled, let self else { return }
+                guard generation == self.sessionGeneration, let deviceId = self.session?.deviceId else {
+                    self.volumeTask = nil
+                    return
+                }
+                // A gate a poll or a command hit: wait it out instead of failing fast.
+                let gate = await self.client.retryAfterRemainingMs
+                guard !Task.isCancelled else { return }
+                // Only a change still waiting is held up (after the last send, the poller's gate is its own).
+                if gate > 0, self.volumeLane.pending != nil {
+                    self.volumeLane.gate(untilMs: self.now() + gate)
+                    self.volumeBusy(waitMs: gate)
+                }
+                switch self.volumeLane.next(nowMs: self.now()) {
+                case .idle:
+                    self.volumeTask = nil
+                    return
+                case .wait(let ms):
+                    try? await Task.sleep(for: .milliseconds(ms))
+                case .send(let percent):
+                    var failure: (any Error)?
+                    do {
+                        try await self.client.setVolume(deviceId: deviceId, percent: percent)
+                    } catch {
+                        failure = error
+                    }
+                    // Cancelled: the lane was reset (a new session, the session ended) and isn't this task's any
+                    // more. Neither the answer nor a cancelled request's error (URLSession reports it as a network
+                    // failure) may touch it or show a toast.
+                    guard !Task.isCancelled else { return }
+                    guard let failure else {
+                        self.volumeLane.completed()
+                        if generation == self.sessionGeneration, var state = self.session {
+                            SpotifyConnectReducer.volumeSent(&state, nowMs: self.now(), settleMs: Self.volumeSettleMs)
+                            self.session = state
+                        }
+                        continue
+                    }
+                    if failure is CancellationError {
+                        // Not this task's cancellation (checked above): drop the value and free the lane, or every
+                        // later change would wait for a task that has ended.
+                        self.volumeLane.failed()
+                        self.volumeTask = nil
+                        return
+                    }
+                    switch failure as? SpotifyConnectError {
+                    case .rateLimited(let ms)?:
+                        self.volumeLane.rateLimited(retryAfterMs: ms, nowMs: self.now())
+                        self.volumeBusy(waitMs: ms)
+                    case .volumeNotSupported?:
+                        self.volumeLane.failed()
+                        self.volumeNotSupported()
+                    default:
+                        self.volumeLane.failed()
+                        self.report(failure)
+                    }
+                }
+            }
         }
+    }
+
+    /// One toast per Retry-After gate, and only for a wait that can be felt; the value is sent when it opens.
+    private func volumeBusy(waitMs: Int64) {
+        let nowMs = now()
+        guard waitMs >= 3000, nowMs >= volumeBusyToastUntilMs else { return }
+        volumeBusyToastUntilMs = nowMs + waitMs
+        toast.show("Spotify is busy. The volume changes in \(max(1, (waitMs + 999) / 1000)) s")
+    }
+
+    /// The device refused a volume command (`VOLUME_CONTROL_DISALLOW`): no more slider or buttons for it.
+    private func volumeNotSupported() {
+        if var device = active, device.supportsVolume {
+            device.supportsVolume = false
+            active = device
+            toast.show(SpotifyConnectError.volumeNotSupported.userMessage)
+        }
+        // Sticky for the session: later polls and device lists keep reporting `supports_volume`.
+        if var state = session { SpotifyConnectReducer.refuseVolume(&state); session = state }
+        volumeHUD.hide()
+        updateVolumeButtons()
+    }
+
+    private func resetVolumeLane() {
+        volumeTask?.cancel()
+        volumeTask = nil
+        volumeLane = SpotifyConnectVolumeLane()
+        volumeBusyToastUntilMs = 0
+    }
+
+    /// The volume buttons listen while a device that takes them plays (`ActiveDevice.takesVolumeButtons`).
+    private func updateVolumeButtons(handingOverToLocalPlayback: Bool = false) {
+        volumeButtons?.setWanted(active?.takesVolumeButtons ?? false,
+                                 handingOverToLocalPlayback: handingOverToLocalPlayback)
     }
 
     // MARK: Ending a session
@@ -738,7 +885,12 @@ final class SpotifyConnectController: RemotePlaybackOutput {
         session = nil
         sessionGeneration += 1
         set(\.active, nil)
+        set(\.volumePercent, nil)
+        volumeHUD.hide()
         playback.resumeLocally(atQueueIndex: index.flatMap { $0 >= 0 ? $0 : nil }, positionMs: positionMs, play: playLocally)
+        // After `resumeLocally`: playing here again keeps the audio session instead of giving it back and taking it
+        // again (which would tell other apps to resume, then stop them).
+        updateVolumeButtons(handingOverToLocalPlayback: playLocally)
         onSessionChanged?(false)
         onRemoteStateChanged?()
         if let message { toast.show(message) }
@@ -749,14 +901,13 @@ final class SpotifyConnectController: RemotePlaybackOutput {
         pollTask?.cancel()
         resolveTask?.cancel()
         resyncTask?.cancel()
-        volumeTask?.cancel()
         commandTask?.cancel()
         connectTask?.cancel()
         pollTask = nil
         resolveTask = nil
         resyncTask = nil
-        volumeTask = nil
         commandTask = nil
+        resetVolumeLane()
     }
 
     // MARK: Lifecycle
@@ -794,10 +945,16 @@ final class SpotifyConnectController: RemotePlaybackOutput {
         SpotifyConnectDevice(deviceId: "demo-car", name: "Car", type: "Automobile", isRestricted: true),
     ]
 
-    /// Demo: starts a session on the Echo (the "playing on" screenshots).
+    /// Demo: starts a session on the Echo (the "playing on" screenshots); the volume pop-up screens show it after
+    /// one press up, pinned so the screenshot doesn't race its hide.
     func startDemoSessionIfNeeded(_ screen: DemoScreen?) {
-        guard isDemo, screen?.startsSpotifyConnectSession == true, let echo = Self.demoDevices.first else { return }
+        guard isDemo, let screen, screen.startsSpotifyConnectSession, let echo = Self.demoDevices.first else { return }
         demoConnect(echo)
+        if screen.showsSpotifyVolumeHUD {
+            let percent = SpotifyConnectVolumeKeys.percent(after: 1, from: echo.volumePercent)
+            setVolume(percent)
+            volumeHUD.show(percent: percent, deviceName: echo.name, pinned: true)
+        }
     }
 
     private func demoConnect(_ device: SpotifyConnectDevice) {
@@ -809,8 +966,8 @@ final class SpotifyConnectController: RemotePlaybackOutput {
                                              durationMs: playback.queue[safe: index]?.duration ?? 0,
                                              volumePercent: device.volumePercent, supportsVolume: device.supportsVolume)
         demoAnchor = (42_000, Date())
-        active = ActiveDevice(id: deviceId, name: device.name, type: device.type, supportsVolume: device.supportsVolume,
-                              volumePercent: device.volumePercent)
+        active = ActiveDevice(id: deviceId, name: device.name, type: device.type, supportsVolume: device.supportsVolume)
+        volumePercent = device.volumePercent
         playback.attachRemote(self, name: device.name, isPlaying: true)
         markDeviceActive(deviceId)
     }
