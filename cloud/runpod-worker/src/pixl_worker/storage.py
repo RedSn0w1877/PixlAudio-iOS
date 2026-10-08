@@ -174,6 +174,12 @@ def _backoff(attempt: int) -> float:
     return min(8.0, 1.0 * (3 ** attempt))
 
 
+def download_budget_s(size_bytes: int) -> float:
+    """Time allowed for the whole input download, all tries together: 120 s plus 1 s per 2 MB (a 160 MB FLAC gets
+    200 s). R2 to a RunPod host normally runs far faster; the budget only stops a stalled transfer."""
+    return 120.0 + max(0, size_bytes) / (2 * 1024 * 1024)
+
+
 class PresignedStorage:
     """Every object is reached through a URL the phone presigned for this job only."""
 
@@ -188,12 +194,17 @@ class PresignedStorage:
 
     # ---- input --------------------------------------------------------------------------------------------
     def fetch_input(self, dest_path: str, *, total_timeout: float = 120.0) -> int:
+        """Stream the input to dest_path. `total_timeout` bounds every try together, not each one."""
         audio = self.job.audio
         expect = audio.bytes
         if expect > self.caps.max_input_bytes:
             raise WorkerError(INPUT_TOO_LARGE, f"the input is larger than {self.caps.max_input_mb} MB")
         last = "unknown"
+        end = self.clock() + total_timeout
         for attempt in range(self.tries):
+            if attempt and self.clock() >= end - 1.0:
+                last = "out of time"
+                break
             digest = hashlib.sha256()
             with open(dest_path, "wb") as fh:
                 def sink(chunk: bytes) -> None:
@@ -201,8 +212,7 @@ class PresignedStorage:
                     fh.write(chunk)
                 try:
                     resp = self.transport.request(
-                        "GET", audio.get, sink=sink, max_body=expect, timeout=30.0,
-                        deadline=self.clock() + total_timeout)
+                        "GET", audio.get, sink=sink, max_body=expect, timeout=30.0, deadline=end)
                 except TooLarge:
                     raise WorkerError(INPUT_MISMATCH, "the input is larger than audio.bytes") from None
                 except TransientError as exc:

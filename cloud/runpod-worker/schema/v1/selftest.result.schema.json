@@ -34,6 +34,19 @@
     },
     "wordTimingLanguages": {"type": "array", "items": {"type": "string"}, "description": "Languages that get word timing; everything else gets line timing."},
     "coldStartMs": {"type": "integer", "minimum": 0},
+    "caps": {
+      "type": "object",
+      "description": "The worker's server-side limits (environment variables on the endpoint). The app must respect them before uploading; it cannot raise them. Optional: older workers omit it.",
+      "properties": {
+        "maxInputMB": {"type": "integer", "minimum": 1},
+        "maxAudioS": {"type": "integer", "minimum": 1},
+        "bestMaxAudioS": {"type": "integer", "minimum": 0},
+        "maxLyricsLines": {"type": "integer", "minimum": 0},
+        "maxLyricsChars": {"type": "integer", "minimum": 0},
+        "maxBodyKB": {"type": "integer", "minimum": 1},
+        "hostsConfigured": {"type": "integer", "minimum": 0, "description": "How many storage hosts the allowlist holds; 0 means every presigned job fails BAD_URL."}
+      }
+    },
     "error": {
       "oneOf": [
         {"type": "null"},

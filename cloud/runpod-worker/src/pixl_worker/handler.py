@@ -57,10 +57,17 @@ class Worker:
             spec = validate_job(job.get("input"), self.caps)
         except WorkerError as exc:
             log.error("job_rejected", code=exc.code, message=exc.message, runpodJobId=runpod_job_id)
-            return {"error": f"{exc.code}: {exc.message}"}
+            try:
+                written = pipeline.write_rejection(job.get("input"), self.caps, exc, self.worker_info,
+                                                   self.storage_factory)
+                if written:
+                    log.info("rejection_manifest_written", code=exc.code)
+            except Exception as put_exc:  # never let the best-effort manifest change the answer
+                log.warning("rejection_manifest_failed", reason=type(put_exc).__name__)
+            return {"error": f"{exc.code}: {redact(exc.message)}"}
         try:
             if spec.op == "selftest":
-                return st.selftest(self.worker_info, self.models_state(), self._take_cold_start())
+                return st.selftest(self.worker_info, self.models_state(), self._take_cold_start(), caps=self.caps)
             if spec.op == "bench":
                 return st.bench(spec.bench, caps=self.caps, worker=self.worker_info,
                                 separator=self.models.separator, stems4=self.models.stems4,

@@ -38,14 +38,26 @@ def versions() -> dict[str, str | None]:
     return out
 
 
-def selftest(worker: dict, models_state: dict, cold_start_ms: int) -> dict[str, Any]:
+def caps_summary(caps: Caps) -> dict[str, Any]:
+    """The server-side limits the app should respect before it uploads anything (it can't raise them)."""
     return {
+        "maxInputMB": caps.max_input_mb, "maxAudioS": caps.max_audio_s, "bestMaxAudioS": caps.best_max_audio_s,
+        "maxLyricsLines": caps.max_lyrics_lines, "maxLyricsChars": caps.max_lyrics_chars,
+        "maxBodyKB": caps.max_body_kb, "hostsConfigured": len(caps.allowed_host_suffixes),
+    }
+
+
+def selftest(worker: dict, models_state: dict, cold_start_ms: int, caps: Caps | None = None) -> dict[str, Any]:
+    out = {
         "schema": "pixl.cloudstudio.selftest", "v": 1, "status": "ok",
         "supported": list(SUPPORTED_VERSIONS), "ops": OPS,
         "worker": dict(worker), "models": dict(models_state), "versions": versions(),
         "wordTimingLanguages": word_timing_languages(),
         "coldStartMs": int(cold_start_ms), "error": None,
     }
+    if caps is not None:
+        out["caps"] = caps_summary(caps)
+    return out
 
 
 def synthetic_song(seconds: int, sr: int = 44100, seed: int = 7) -> np.ndarray:

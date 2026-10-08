@@ -30,7 +30,7 @@ def _list(env: dict, name: str, default: tuple[str, ...]) -> tuple[str, ...]:
 
 @dataclass(frozen=True)
 class Caps:
-    max_input_mb: int = 60
+    max_input_mb: int = 160  # agreed with the app: a 15-min song decoded to FLAC on the phone is ~90-130 MB
     max_audio_s: int = 900
     best_max_audio_s: int = 480
     max_lyrics_lines: int = 500
@@ -69,7 +69,7 @@ class Caps:
 def load_caps(env: dict | None = None) -> Caps:
     env = dict(os.environ if env is None else env)
     return Caps(
-        max_input_mb=_int(env, "PIXL_MAX_INPUT_MB", 60, 1, 2048),
+        max_input_mb=_int(env, "PIXL_MAX_INPUT_MB", 160, 1, 2048),
         max_audio_s=_int(env, "PIXL_MAX_AUDIO_S", 900, 10, 7200),
         best_max_audio_s=_int(env, "PIXL_BEST_MAX_AUDIO_S", 480, 0, 7200),
         max_lyrics_lines=_int(env, "PIXL_MAX_LYRICS_LINES", 500, 0, 5000),

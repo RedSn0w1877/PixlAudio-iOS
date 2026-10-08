@@ -19,12 +19,14 @@ MODEL_ID = "qwen3-forced-aligner-0.6b"
 class QwenAligner:
     model_id = MODEL_ID
 
-    def __init__(self, path: str, *, device: str = "cuda:0", batch_size: int = 8, max_batch_s: float = 240.0):
+    def __init__(self, path: str, *, device: str | None = None, batch_size: int = 8, max_batch_s: float = 240.0):
         import torch
         from qwen_asr import Qwen3ForcedAligner
 
         self._torch = torch
-        dtype = torch.bfloat16 if torch.cuda.is_available() else torch.float32
+        cuda = torch.cuda.is_available()
+        device = device or ("cuda:0" if cuda else "cpu")  # CPU only for the CI smoke test
+        dtype = torch.bfloat16 if cuda else torch.float32
         self._impl = Qwen3ForcedAligner.from_pretrained(path, dtype=dtype, device_map=device)
         self.batch_size = batch_size
         self.max_batch_s = max_batch_s

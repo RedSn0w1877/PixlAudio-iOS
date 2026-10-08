@@ -26,8 +26,8 @@ from .errors import DEADLINE, GPU_OOM, INTERNAL, POISONED, TOO_LONG, INPUT_TOO_L
 from .log import log, redact, redact_exception
 from .lyrics.postprocess import summarize
 from .lyrics.run import run_lyrics
-from .schema import Job
-from .storage import CONTENT_TYPES, TransientError
+from .schema import JOB_KEY_RE, Job, OutputSpec, check_presigned_url
+from .storage import CONTENT_TYPES, TransientError, download_budget_s
 
 RESULT_SCHEMA = "pixl.cloudstudio.result"
 ATTEMPT_SCHEMA = "pixl.cloudstudio.attempt"
@@ -82,6 +82,39 @@ def manifest(run: _Run, ctx: Context, error: WorkerError | None = None) -> dict:
 
 def _encode_json(doc: dict) -> bytes:
     return (json.dumps(doc, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
+
+
+def write_rejection(raw: Any, caps: Caps, exc: WorkerError, worker: dict, storage_factory) -> bool:
+    """A process job that failed validation (BAD_SCHEMA, UNSUPPORTED_VERSION, BAD_URL, ...) still gets an error
+    manifest when its own manifest slot can be trusted: a valid jobKey plus an output.put.manifest URL that passes
+    every URL check on its own (presigned), or the volume's out/<jobKey>/ (volume). Without it a phone that
+    collects from storage after /status expired would see a "lost" job and resubmit a request that can never
+    succeed. Returns True when the manifest was written."""
+    if not isinstance(raw, dict) or raw.get("op") != "process":
+        return False
+    job_key = raw.get("jobKey")
+    if not isinstance(job_key, str) or not JOB_KEY_RE.match(job_key):
+        return False
+    storage_mode = raw.get("storage")
+    put: dict = {}
+    if storage_mode == "presigned":
+        output = raw.get("output") if isinstance(raw.get("output"), dict) else {}
+        slots = output.get("put") if isinstance(output.get("put"), dict) else {}
+        try:
+            put["manifest"] = check_presigned_url(slots.get("manifest"), "output.put.manifest", caps,
+                                                  f"out/{job_key}/manifest.json")
+        except WorkerError:
+            return False
+    elif storage_mode != "volume":
+        return False
+    job = Job(op="process", job_key=job_key, storage=storage_mode, output=OutputSpec(codec="aac", kbps=256, put=put))
+    doc = manifest(_Run(job=job), Context(caps=caps, worker=worker, storage_factory=storage_factory), exc)
+    try:
+        storage_factory(job, caps).put_json("manifest", _encode_json(doc))
+    except Exception as put_exc:  # best effort: the RunPod job still fails with the code
+        log.warning("rejection_manifest_unwritable", reason=type(put_exc).__name__)
+        return False
+    return True
 
 
 class _Stage:
@@ -212,7 +245,7 @@ def _process(job: Job, run: _Run, models: Models, ctx: Context, deadline: Deadli
     ctx.progress("download:0")
     src = os.path.join(work_dir, f"input.{job.audio.ext}")
     with _Stage(run, "downloadMs", clock):
-        storage.fetch_input(src, total_timeout=deadline.budget(120.0))
+        storage.fetch_input(src, total_timeout=deadline.budget(download_budget_s(job.audio.bytes)))
 
     # 2-3 probe + decode
     deadline.check("decode")

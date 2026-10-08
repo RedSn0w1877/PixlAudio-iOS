@@ -21,12 +21,14 @@ MODEL_ID = "qwen3-asr-1.7b"
 class QwenTranscriber:
     model_id = MODEL_ID
 
-    def __init__(self, path: str, *, device: str = "cuda:0", batch_size: int = 8):
+    def __init__(self, path: str, *, device: str | None = None, batch_size: int = 8):
         import torch
         from qwen_asr import Qwen3ASRModel
 
         self._torch = torch
-        dtype = torch.bfloat16 if torch.cuda.is_available() else torch.float32
+        cuda = torch.cuda.is_available()
+        device = device or ("cuda:0" if cuda else "cpu")  # CPU only for the CI smoke test
+        dtype = torch.bfloat16 if cuda else torch.float32
         self._impl = Qwen3ASRModel.from_pretrained(
             path, dtype=dtype, device_map=device, max_inference_batch_size=batch_size, max_new_tokens=256)
         self.batch_size = batch_size
