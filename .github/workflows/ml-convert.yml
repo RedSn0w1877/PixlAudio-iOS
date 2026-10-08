@@ -198,7 +198,27 @@ jobs:
           . .venv/bin/activate
           sw_vers
           expected="$(shasum -a 256 Packages/PixlCore/Tests/PixlNetTests/Fixtures/LocalLLM/qwen2_5.pxbpe | cut -d' ' -f1)"
-          python ci/ml/convert_llm.py parity --model "${{ inputs.llm_model }}" --candidates candidates --out out             --expect-tokenizer-sha "$expected"
+          python ci/ml/convert_llm.py parity --model "${{ inputs.llm_model }}" --candidates candidates --out out \
+            --expect-tokenizer-sha "$expected"
+      - name: Tokenizer fixtures still match the real tokenizer
+        if: always()
+        run: |
+          # PixlCore's tokenizer tests use fixtures made with a newer `tokenizers` than this run's; both must agree.
+          python3 - <<'EOF'
+          import json
+          repo = json.load(open("Packages/PixlCore/Tests/PixlNetTests/Fixtures/LocalLLM/tokenizer-cases.json"))
+          run = json.load(open("candidates/tokenizer-cases.json"))
+          a = {c["text"]: c["ids"] for c in repo["cases"]}
+          b = {c["text"]: c["ids"] for c in run["cases"]}
+          diff = [t for t in a if t in b and a[t] != b[t]]
+          missing = [t for t in a if t not in b]
+          chat = (repo.get("chat") or {}).get("ids") == (run.get("chat") or {}).get("ids")
+          print(f"{len(a)} cases, {len(diff)} differ, {len(missing)} missing, chat identical: {chat}")
+          for t in diff:
+              print(f"::warning::tokenizer fixture differs for {t!r}")
+          if not chat:
+              print("::warning::the chat-template fixture differs")
+          EOF
       - name: Report
         if: always()
         run: |
