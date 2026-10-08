@@ -7,7 +7,8 @@ import PixlNet
 /// and requests run one after another (they share one cache).
 ///
 /// - **Lazy:** the tokenizer loads on the first request (or token count), the model on the first generation or a
-///   prewarm (a sheet opening). Both are released after `idleSeconds` without use and on a memory warning.
+///   prewarm (a sheet opening). Both are released after `idleSeconds` without use, on a memory warning and when the
+///   app goes to the background (a ~1 GB model must not make the system end background playback).
 /// - **Cancellable:** a cancelled task stops the generation before its next model step (`LocalLLMGenerator`).
 /// - **GPU first:** `.cpuAndGPU`; if a step ever produces NaN there, the model reloads on the CPU (the configuration
 ///   the CI parity gate measured) and the request runs again once, and the CPU stays in use until the app restarts.
@@ -47,7 +48,7 @@ nonisolated final class LocalModelRuntime: @unchecked Sendable {
         }
     }
 
-    static let idleSeconds: Double = 120
+    static let idleSeconds: Double = 180
 
     let descriptor: ModelDescriptor
     private let queue = DispatchQueue(label: "io.github.redsn0w1877.pixlaudio.localmodel", qos: .userInitiated)
@@ -62,14 +63,15 @@ nonisolated final class LocalModelRuntime: @unchecked Sendable {
 
     private let statsLock = NSLock()
     private var storedStats: Stats?
-    private var memoryObserver: (any NSObjectProtocol)?
+    private var observers: [any NSObjectProtocol] = []
 
     init(descriptor: ModelDescriptor) {
         self.descriptor = descriptor
-        // By name: this initialiser is not on the main actor (UIApplication's constant is).
-        memoryObserver = NotificationCenter.default.addObserver(
-            forName: Notification.Name("UIApplicationDidReceiveMemoryWarningNotification"), object: nil,
-            queue: nil) { [weak self] _ in self?.unload() }
+        // By name: this initialiser is not on the main actor (UIApplication's constants are).
+        for name in ["UIApplicationDidReceiveMemoryWarningNotification", "UIApplicationDidEnterBackgroundNotification"] {
+            observers.append(NotificationCenter.default.addObserver(forName: Notification.Name(name), object: nil,
+                                                                    queue: nil) { [weak self] _ in self?.unload() })
+        }
     }
 
     /// The last generation's numbers (nil before the first one this launch).

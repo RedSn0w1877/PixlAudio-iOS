@@ -837,3 +837,22 @@ No API is new to the app; these are now load-bearing in the full player and were
 | Image set with a `luminosity` `dark` appearance (@2x/@3x PNGs), `Image(_:)` | 13 | /documentation/xcode/asset-management | `BrandMark` | Light/dark logo tile; also the launch image. |
 | `Image(_:)` SVG template image set + `renderingMode(.template)` | 13 | /documentation/xcode/asset-management | `BrandGlyph` | Same mechanism as `GenreArt.xcassets` (Stage 7c), tinted by `foregroundStyle`. |
 | `UILaunchScreen` subkeys `UIImageName`, `UIColorName`, `UIImageRespectsSafeAreaInsets` | 14 | /documentation/bundleresources/information-property-list/uilaunchscreen | `project.yml` | Asset-catalog names `BrandMark` and `LaunchBackground` (a colour set with a dark appearance). iOS caches launch screens; a changed one can need a reboot. |
+
+## Downloadable local AI model (2026-10-07, local AI phase 2)
+
+Settings › AI features › "Use downloaded AI model" (`LocalModelRuntime`, `CoreMLCausalModel`, `LocalModelAI`): a
+stateful Core ML program (Qwen2.5 1.5B Instruct, `ci/ml/convert_llm.py`) run with PixlNet's own tokenizer and sampler.
+Paths under https://developer.apple.com. The simulator smoke test (`AppTests/LocalModelTests`) runs a tiny model made
+by the same conversion; the real model's speed and answers wait for Hoa's iPhone.
+
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `MLModel.makeState() -> MLState` | 18.0 | /documentation/coreml/mlmodel/makestate() | `CoreMLCausalModel` | A new state is all zeros; one per loaded model, kept across requests (prefix reuse) and replaced by `resetState()`. |
+| `MLState` (`Sendable`) | 18.0 | /documentation/coreml/mlstate | `CoreMLCausalModel` | "Predictions that share the same MLState must be serialized": only `LocalModelRuntime`'s serial queue touches it. Its buffers are never read or written by the app (`withMultiArray(for:_:)` unused). |
+| `MLModel.prediction(from:using:options:)` (synchronous; `options` has no default) | 18.0 | /documentation/coreml/mlmodel/prediction(from:using:options:) | `CoreMLCausalModel.step` | Called from a non-async function on the runtime's queue, so the synchronous overload is the one picked; `MLPredictionOptions()` passed explicitly. The async overload names its first parameter `input` and defaults `options`. |
+| `MLMultiArray(shape:dataType:)` with `.float16`, `withUnsafeMutableBufferPointer(ofType: Float16.self)`, `withUnsafeBufferPointer(ofType: Float16.self)` | 16.0 | /documentation/coreml/mlmultiarraydatatype/float16 | `CoreMLCausalModel` | The causal mask (0 / -inf) and the logits. Output read through its strides; float32 output handled too. |
+| `MLModelConfiguration.computeUnits = .cpuAndGPU` / `.cpuOnly` | 12.0 | /documentation/coreml/mlcomputeunits | `LocalModelRuntime` | GPU first (flexible shapes don't suit the Neural Engine); NaN logits once → reload on the CPU (what the CI parity gate measured) for the rest of the launch. Foreground only: background GPU work needs an entitlement free signing can't carry. |
+| `MLModelDescription.metadata[.creatorDefinedKey]` (`[String: String]`) | 11.0 | /documentation/coreml/mlmodelmetadatakey/creatordefinedkey | `CoreMLCausalModel` | `pixl.context`, `pixl.maxQuery`, `pixl.vocab` written by the conversion; the catalog's constants are the fallback. |
+| `DispatchQueue(label:qos:)`, `async(execute:)`, `asyncAfter(deadline:execute:)` with `DispatchWorkItem` | 8.0 | /documentation/dispatch/dispatchqueue | `LocalModelRuntime` | Generation runs on its own serial queue (never on the main thread or a Swift concurrency thread); bridged with `withCheckedThrowingContinuation` + `withTaskCancellationHandler` (a lock-guarded flag the generator checks before every model step). Idle unload after 120 s. |
+| `NotificationCenter.addObserver(forName:object:queue:using:)` with `"UIApplicationDidReceiveMemoryWarningNotification"` and `"UIApplicationDidEnterBackgroundNotification"` | 4.0 | /documentation/foundation/notificationcenter/addobserver(forname:object:queue:using:) | `LocalModelRuntime` | By name, as `ArtworkPipeline` does (the runtime isn't main-actor isolated). A memory warning or going to the background releases the model. |
+| `ByteCountFormatter.string(fromByteCount:countStyle:)` | 6.0 | /documentation/foundation/bytecountformatter | `ModelCatalog.formattedSize` | The download and installed sizes in Settings. |

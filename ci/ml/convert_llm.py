@@ -47,10 +47,10 @@ from common import sha256_of, write_json  # noqa: E402
 
 MODELS = {
     "qwen2.5-1.5b": {"id": "Qwen/Qwen2.5-1.5B-Instruct", "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
-                     "package": "Qwen25Instruct1_5B.mlpackage", "asset": "qwen2_5_1_5b_instruct_int4.tar",
+                     "package": "Qwen25Instruct1_5B.mlpackage", "asset": "qwen2_5_1_5b_instruct",
                      "title": "Qwen2.5 1.5B Instruct"},
     "qwen2.5-0.5b": {"id": "Qwen/Qwen2.5-0.5B-Instruct", "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
-                     "package": "Qwen25Instruct0_5B.mlpackage", "asset": "qwen2_5_0_5b_instruct_int4.tar",
+                     "package": "Qwen25Instruct0_5B.mlpackage", "asset": "qwen2_5_0_5b_instruct",
                      "title": "Qwen2.5 0.5B Instruct"},
 }
 TOKENIZER_FILE = "qwen2_5.pxbpe"
@@ -87,6 +87,17 @@ PROMPTS = [
     ("You are Taizo, the AI DJ inside the PixlAudio music app, running privately on this iPhone.\nAnswer in 1 to 4 "
      "warm, plain sentences. No markdown, no JSON, no lists unless the user asks for one.",
      "Who wrote Bohemian Rhapsody, and which album is it on?"),
+    ("You plan playlists from a listener's request. Pick the genres and artists that fit the request best, only from "
+     "the allowed values (none when nothing fits), up to three mood words, an energy level from 1 (calm) to 5 "
+     "(intense), and whether the listener's familiar favorites suit it. Answer in exactly five lines:\n"
+     "genres: …\nartists: …\nmoods: …\nenergy: 1-5\nfamiliar: yes or no",
+     "Request: upbeat songs for a summer road trip\nListener: plays mostly Pop, Rock; top artists Taylor Swift, "
+     "The Killers.\nAllowed genres: Pop, Rock, Indie, Hip-Hop, Folk\nAllowed artists: Taylor Swift, The Killers, "
+     "Phoebe Bridgers, Kendrick Lamar"),
+    ("You write a short listening insight for a music app's home screen. From the facts given, write 2 to 3 warm "
+     "sentences about the listener's habits and what they might enjoy next. No quotes, no emoji, no markdown.",
+     "Time: evening\nTop genres this week: Indie, Folk\nTop artist: Bon Iver\nSongs played today: 23\n"
+     "New favorites: 2"),
 ]
 
 # Tokenizer fixtures: what PixlCore's BytePairTokenizer must reproduce exactly (ids from the real tokenizer).
@@ -528,7 +539,8 @@ def mixed_selector(op) -> bool:
     return True
 
 
-def convert_variants(module, cfg: dict, context: int, out_dir: str, info: dict, variants, quantize=True) -> list:
+def convert_variants(module, cfg: dict, context: int, out_dir: str, info: dict, variants, quantize=True,
+                     quantizations=("int4-affine-block32",)) -> list:
     import coremltools as ct
     import torch
 
@@ -553,42 +565,63 @@ def convert_variants(module, cfg: dict, context: int, out_dir: str, info: dict, 
     for name in variants:
         started = time.time()
         precision = ct.precision.FLOAT16 if name == "fp16" else ct.transform.FP16ComputePrecision(op_selector=mixed_selector)
-        mlmodel = ct.convert(traced, inputs=inputs, states=states, outputs=outputs, convert_to="mlprogram",
-                             compute_precision=precision, minimum_deployment_target=ct.target.iOS18,
-                             skip_model_load=True)
+        converted = ct.convert(traced, inputs=inputs, states=states, outputs=outputs, convert_to="mlprogram",
+                               compute_precision=precision, minimum_deployment_target=ct.target.iOS18,
+                               skip_model_load=True)
         log(f"converted {name} in {time.time() - started:.0f} s")
-        quantization = "none"
-        if quantize:
-            op_config = ct.optimize.coreml.OpLinearQuantizerConfig(mode="linear_symmetric", dtype="int4",
-                                                                   granularity="per_block", block_size=32)
-            mlmodel = ct.optimize.coreml.linear_quantize_weights(
-                mlmodel, config=ct.optimize.coreml.OptimizationConfig(global_config=op_config))
-            quantization = "int4-block32"
-            log(f"quantized {name}")
-        mlmodel.author = f"PixlAudio (converted from {info['id']}, Apache-2.0)"
-        mlmodel.license = "Apache-2.0"
-        mlmodel.short_description = f"{info['title']}, stateful KV cache, {context}-token context (PixlAudio local AI)"
-        meta = {"pixl.model": info["id"], "pixl.revision": info["revision"], "pixl.context": str(context),
-                "pixl.maxQuery": str(min(MAX_QUERY, context)), "pixl.vocab": str(cfg["vocab_size"]),
-                "pixl.layers": str(cfg["num_hidden_layers"]), "pixl.kvHeads": str(cfg["num_key_value_heads"]),
-                "pixl.headDim": str(cfg["hidden_size"] // cfg["num_attention_heads"]), "pixl.precision": name,
-                "pixl.quantization": quantization, "pixl.tokenizer": TOKENIZER_FILE,
-                "pixl.eos": json.dumps(info.get("eos", [])), "pixl.fp16Safety": json.dumps(CONVERT_OPTIONS)}
-        for key, value in meta.items():
-            mlmodel.user_defined_metadata[key] = value
-        path = os.path.join(out_dir, f"{name}-{quantization}", info["package"])
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        mlmodel.save(path)
-        size = sum(os.path.getsize(os.path.join(r, f)) for r, _, fs in os.walk(path) for f in fs)
-        produced.append({"variant": f"{name}-{quantization}", "precision": name, "quantization": quantization,
-                         "path": os.path.relpath(path, out_dir), "bytes": size,
-                         "convert_seconds": round(time.time() - started, 1)})
-        log(f"saved {path} ({size / 1e9:.2f} GB)")
-        del mlmodel
+        for quantization in (list(quantizations) if quantize else ["none"]):
+            try:
+                produced.append(save_variant(converted, name, quantization, cfg, context, out_dir, info, started))
+            except Exception as error:  # noqa: BLE001 — one quantization failing must not lose the others
+                log(f"FAILED {name} {quantization}: {error!r}")
+            started = time.time()
+        del converted
         gc.collect()
     del traced
     gc.collect()
     return produced
+
+
+# Weight quantizations, in the order the parity gate prefers them (smallest first). Symmetric int4 per block of 32
+# (Apple's Llama recipe) kept only 83-84 % of the reference's top tokens on Qwen2.5-1.5B (parity run 37712774773).
+QUANTIZATIONS = {
+    "int4-affine-block32": {"mode": "linear", "dtype": "int4", "granularity": "per_block", "block_size": 32},
+    "int4-affine-block16": {"mode": "linear", "dtype": "int4", "granularity": "per_block", "block_size": 16},
+    "int8-channel": {"mode": "linear_symmetric", "dtype": "int8", "granularity": "per_channel"},
+}
+
+
+def save_variant(converted, name: str, quantization: str, cfg: dict, context: int, out_dir: str, info: dict,
+                 started: float) -> dict:
+    import coremltools as ct
+
+    mlmodel = converted
+    if quantization != "none":
+        op_config = ct.optimize.coreml.OpLinearQuantizerConfig(**QUANTIZATIONS[quantization])
+        mlmodel = ct.optimize.coreml.linear_quantize_weights(
+            converted, config=ct.optimize.coreml.OptimizationConfig(global_config=op_config))
+        log(f"quantized {name} {quantization}")
+    mlmodel.author = f"PixlAudio (converted from {info['id']}, Apache-2.0)"
+    mlmodel.license = "Apache-2.0"
+    mlmodel.short_description = f"{info['title']}, stateful KV cache, {context}-token context (PixlAudio local AI)"
+    meta = {"pixl.model": info["id"], "pixl.revision": info["revision"], "pixl.context": str(context),
+            "pixl.maxQuery": str(min(MAX_QUERY, context)), "pixl.vocab": str(cfg["vocab_size"]),
+            "pixl.layers": str(cfg["num_hidden_layers"]), "pixl.kvHeads": str(cfg["num_key_value_heads"]),
+            "pixl.headDim": str(cfg["hidden_size"] // cfg["num_attention_heads"]), "pixl.precision": name,
+            "pixl.quantization": quantization, "pixl.tokenizer": TOKENIZER_FILE,
+            "pixl.eos": json.dumps(info.get("eos", [])), "pixl.fp16Safety": json.dumps(CONVERT_OPTIONS)}
+    for key, value in meta.items():
+        mlmodel.user_defined_metadata[key] = value
+    path = os.path.join(out_dir, f"{name}-{quantization}", info["package"])
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    mlmodel.save(path)
+    size = sum(os.path.getsize(os.path.join(r, f)) for r, _, fs in os.walk(path) for f in fs)
+    log(f"saved {path} ({size / 1e9:.2f} GB)")
+    if mlmodel is not converted:
+        del mlmodel
+        gc.collect()
+    return {"variant": f"{name}-{quantization}", "precision": name, "quantization": quantization,
+            "path": os.path.relpath(path, out_dir), "bytes": size, "convert_seconds": round(time.time() - started, 1)}
 
 
 TINY_CONFIG = {"vocab_size": 256, "hidden_size": 64, "num_hidden_layers": 2, "num_attention_heads": 4,
@@ -737,7 +770,8 @@ def cmd_convert(args) -> int:
 
     variants = [v for v in args.variants.split(",") if v]
     report["candidates"] = convert_variants(module, cfg, args.context, args.out, info, variants,
-                                            quantize=not args.no_quantize)
+                                            quantize=not args.no_quantize,
+                                            quantizations=[q for q in args.quantizations.split(",") if q])
     report["passed"] = True
     save()
 
@@ -998,6 +1032,8 @@ def cmd_parity(args) -> int:
         if ok and shipped is None and candidate["quantization"] != "none":
             shipped = (candidate, path, attempt)
         write_json(os.path.join(args.out, "llm-report.json"), report)
+        if shipped is not None:
+            break  # candidates come smallest first: the first that passes ships
 
     if shipped is None:
         print("Parity gate FAILED for every candidate")
@@ -1006,7 +1042,9 @@ def cmd_parity(args) -> int:
     candidate, path, attempt = shipped
     # The manifest reads the last attempt as the shipped one's parity.
     report["attempts"] = [a for a in report["attempts"] if a is not attempt] + [attempt]
-    asset = tar_files([(path, info["package"]), (tokenizer_path, TOKENIZER_FILE)], os.path.join(args.out, info["asset"]))
+    # The release asset is named after the quantization that passed (assets are never replaced).
+    asset_name = f"{info['asset']}_{candidate['quantization'].replace('-', '_')}.tar"
+    asset = tar_files([(path, info["package"]), (tokenizer_path, TOKENIZER_FILE)], os.path.join(args.out, asset_name))
     asset.update({"id": "llm", "package": info["package"], "tokenizer": TOKENIZER_FILE, "variant": candidate["variant"],
                   "model": info["id"], "revision": info["revision"],
                   "tokenizerSha256": sha256_of(tokenizer_path)})
@@ -1024,7 +1062,8 @@ def main() -> int:
     convert.add_argument("--model", choices=sorted(MODELS), default="qwen2.5-1.5b")
     convert.add_argument("--model-dir")
     convert.add_argument("--context", type=int, default=CONTEXT)
-    convert.add_argument("--variants", default="fp16,mixed")
+    convert.add_argument("--variants", default="fp16")
+    convert.add_argument("--quantizations", default=",".join(QUANTIZATIONS))
     convert.add_argument("--no-quantize", action="store_true")
     convert.add_argument("--skip-tiny", action="store_true")
     convert.add_argument("--reuse-reference", action="store_true", help="local iteration: keep out/llm-reference.json")

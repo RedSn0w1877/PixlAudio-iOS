@@ -10,8 +10,8 @@ name: ml-convert
 #   mdx      — ATTEMPT: UVR-MDX-NET-Voc_FT (Android's on-device instrumental model) via ONNX -> PyTorch -> Core ML,
 #              gated against ONNX Runtime (ci/ml/convert_mdx.py). Allowed to fail; its report says why.
 #   llm      — the downloadable local AI model (Settings › AI features › "Use downloaded AI model"): a Qwen2.5
-#              instruct model (Apache-2.0) as a stateful ML Program (MLState KV cache), int4 per block of 32, plus our
-#              tokenizer file (ci/ml/convert_llm.py). Converted on Linux (16 GB RAM), gated on macOS against the
+#              instruct model (Apache-2.0) as a stateful ML Program (MLState KV cache), weights quantized (int4 first;
+#              the smallest that passes ships), plus our tokenizer file (ci/ml/convert_llm.py). Converted on Linux, gated on macOS against the
 #              transformers reference. Never part of `all` (it is large and slow).
 on:
   workflow_dispatch:
