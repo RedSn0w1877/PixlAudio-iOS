@@ -258,7 +258,7 @@ public struct CloudSelectionOptions: Sendable, Hashable {
 }
 
 /// Why a song wasn't sent.
-public enum CloudSkipReason: String, Sendable, Hashable, CaseIterable {
+public enum CloudSkipReason: String, Sendable, Hashable, CaseIterable, Error {
     case alreadyDone
     case pendingJob
     case noAudio

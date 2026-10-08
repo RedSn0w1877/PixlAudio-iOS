@@ -3,8 +3,8 @@ import PixlAudioCore
 
 /// Rendered instrumentals on disk (Android `TaisInstrumentalIndex`): `Application Support/Stems/`, one
 /// `<song>_instrumental.wav` (on-device MDX-Net) and/or `<song>_hq_roformer_inst.wav` (cloud BS-RoFormer, preferred)
-/// per song, names from PixlAudioCore's `StemFiles` (song ids made file-safe). Excluded from iCloud backups — they
-/// can be rendered again.
+/// and/or `<song>_cloud_inst.m4a` (Cloud Studio, ranked between the two) per song, names from PixlAudioCore's
+/// `StemFiles` (song ids made file-safe). Excluded from iCloud backups — they can be rendered again.
 nonisolated enum InstrumentalFiles {
     static var directory: URL? {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
@@ -17,6 +17,11 @@ nonisolated enum InstrumentalFiles {
 
     static func roformerURL(songId: String) -> URL? {
         directory?.appendingPathComponent(StemFiles.safeName(songId) + StemFiles.roformerSuffix)
+    }
+
+    /// Cloud Studio's result: `<song>_cloud_inst.m4a` (AAC), or `.flac` after a FLAC redo.
+    static func cloudURL(songId: String, flac: Bool) -> URL? {
+        directory?.appendingPathComponent(StemFiles.safeName(songId) + (flac ? StemFiles.cloudFlacSuffix : StemFiles.cloudSuffix))
     }
 
     /// The best complete render for a song (`bestAvailableFile`), or nil.
