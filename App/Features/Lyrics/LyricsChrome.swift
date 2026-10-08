@@ -423,6 +423,10 @@ private struct LyricsToolbar: View {
 /// while translations show. A tap shows or hides the lyrics' translations, or (when they have none) translates them
 /// on this iPhone. Touch and hold: Translate via AI, and Show romanization when the lyrics need it. Reads the lyrics
 /// controller itself, so a translation landing redraws only this segment.
+///
+/// A `Menu` with a primary action, not a `contextMenu` on a button: inside the cluster's glass container the context
+/// menu never opened (CI, 2026-10-07: holding the segment ran its tap instead). The menu's own long press opens it, and
+/// on iOS 26 it morphs out of the segment's glass like the app's other small menus (`ShapedGlassMenu`).
 private struct LyricsTranslateSegment: View {
     let canTranslateOnDevice: Bool
     let translating: Bool
@@ -439,10 +443,18 @@ private struct LyricsTranslateSegment: View {
         let active = hasTranslation && controller.preferences.showTranslation
         let value: LocalizedStringKey = translating ? "Translating" : active ? "Showing translations"
             : hasTranslation ? "Translations hidden" : "Off"
-        LyricsToggleSegment(
-            title: translating ? "Translating…" : "Translate", systemImage: "translate", active: active,
-            enabled: true, dimmed: !hasTranslation && !canTranslateOnDevice && !translating, busy: translating,
-            accessibilityLabel: "Translate", accessibilityValue: value, chrome: chrome, brightArt: brightArt) {
+        Menu {
+            Button("Translate via AI", systemImage: "sparkles", action: onTranslateViaAI)
+            if controller.hasRomanizedLyrics {
+                Toggle("Show romanization", systemImage: "character.textbox",
+                       isOn: Binding(get: { controller.preferences.showRomanization },
+                                     set: { controller.preferences.showRomanization = $0 }))
+            }
+        } label: {
+            LyricsSegmentLabel(title: translating ? "Translating…" : "Translate", systemImage: "translate",
+                               active: active, faded: !hasTranslation && !canTranslateOnDevice && !translating,
+                               busy: translating, chrome: chrome)
+        } primaryAction: {
             if hasTranslation {
                 controller.preferences.showTranslation.toggle()
             } else if translating {
@@ -453,14 +465,10 @@ private struct LyricsTranslateSegment: View {
                 controller.message = String(localized: "On-device translation needs synced lyrics. Touch and hold Translate for Translate via AI.")
             }
         }
-        .contextMenu {
-            Button("Translate via AI", systemImage: "sparkles", action: onTranslateViaAI)
-            if controller.hasRomanizedLyrics {
-                Toggle("Show romanization", systemImage: "character.textbox",
-                       isOn: Binding(get: { controller.preferences.showRomanization },
-                                     set: { controller.preferences.showRomanization = $0 }))
-            }
-        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .modifier(LyricsSegmentGlass(active: active, enabled: true, accessibilityLabel: "Translate",
+                                     accessibilityValue: value, chrome: chrome, brightArt: brightArt))
         .pixlHaptic(.selection, trigger: active)
     }
 }
@@ -494,7 +502,7 @@ private struct LyricsSingSegment: View {
         let value: LocalizedStringKey = determinate ? "Removing vocals \(percent) %"
             : rendering ? "Removing vocals" : active ? "Vocals off" : "Vocals on"
         LyricsToggleSegment(
-            title: title, systemImage: "music.mic", active: active,
+            title: title, systemImage: rendering ? nil : "music.mic", active: active,
             enabled: song != nil && !instrumental.isSwitching && !remote,
             progress: determinate ? Double(percent) / 100 : nil, accessibilityLabel: "Sing",
             accessibilityValue: value, chrome: chrome, brightArt: brightArt) {
@@ -538,15 +546,12 @@ private struct LyricsSingSegment: View {
 }
 
 /// Android `ToggleSegmentButton`: active = accent capsule, inactive = 8 pt rounded rectangle, both clear glass in the
-/// cluster's container. Optional symbol, a busy spinner in its place, and a progress fill drawn under the label
-/// (content on the glass, not glass on glass). The label is fixed for VoiceOver; the state is its value.
+/// cluster's container (Sing; Translate is a menu on the same label and glass).
 private struct LyricsToggleSegment: View {
     let title: LocalizedStringKey
     var systemImage: String?
     let active: Bool
     let enabled: Bool
-    /// Looks unavailable but still answers a tap (with an explanation) and a long press.
-    var dimmed = false
     var busy = false
     /// 0…1: a job's progress, filling the segment from the leading edge.
     var progress: Double?
@@ -557,51 +562,92 @@ private struct LyricsToggleSegment: View {
     let action: () -> Void
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: active ? LyricsChromeMetrics.toggleHeight / 2 : 8, style: .continuous)
-        let foreground = active ? chrome.onSelected : chrome.content
         Button(action: action) {
-            HStack(spacing: 6) {
-                if busy {
-                    ProgressView()
-                        .controlSize(.small)
-                        .tint(foreground)
-                } else if let systemImage {
-                    Image(systemName: systemImage)
-                        .font(.system(size: 15, weight: .semibold))
-                }
-                Text(title)
-                    .pixlFont(.bodyMedium, weight: .bold)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.85)
-                    .multilineTextAlignment(.center)
-            }
-            .foregroundStyle(foreground)
-            .padding(.horizontal, 8)
-            .frame(maxWidth: .infinity)
-            .frame(height: LyricsChromeMetrics.toggleHeight)
-            .background(alignment: .leading) {
-                if let progress {
-                    GeometryReader { geometry in
-                        chrome.selected.opacity(0.4)
-                            .frame(width: geometry.size.width * min(max(progress, 0), 1))
-                    }
-                    .clipShape(shape)
-                    .animation(PixlMotion.state, value: progress)
-                }
-            }
-            .opacity(enabled && !dimmed ? 1 : 0.5)
-            .contentShape(shape)
+            LyricsSegmentLabel(title: title, systemImage: systemImage, active: active, faded: !enabled, busy: busy,
+                               progress: progress, chrome: chrome)
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
-        .glassEffect(active
-                     ? Glass.clear.tint(chrome.selected.opacity(enabled ? GlassTint.prominent : GlassTint.prominent / 2)).interactive()
-                     : chrome.panelGlass(brightArt: brightArt, interactive: true),
-                     in: shape)
-        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: active)
-        .accessibilityLabel(Text(accessibilityLabel))
-        .accessibilityValue(Text(accessibilityValue))
-        .accessibilityAddTraits(active ? .isSelected : [])
+        .modifier(LyricsSegmentGlass(active: active, enabled: enabled, accessibilityLabel: accessibilityLabel,
+                                     accessibilityValue: accessibilityValue, chrome: chrome, brightArt: brightArt))
+    }
+}
+
+/// A toolbar segment's face: optional symbol (a busy spinner in its place), the title, and a progress fill drawn under
+/// them (content on the glass, not glass on glass). `faded` looks unavailable; the caller decides whether it still
+/// answers a tap.
+private struct LyricsSegmentLabel: View {
+    let title: LocalizedStringKey
+    var systemImage: String?
+    let active: Bool
+    let faded: Bool
+    var busy = false
+    /// 0…1: a job's progress, filling the segment from the leading edge.
+    var progress: Double?
+    let chrome: LyricsChromeColors
+
+    var body: some View {
+        let shape = LyricsSegmentGlass.shape(active: active)
+        let foreground = active ? chrome.onSelected : chrome.content
+        HStack(spacing: 6) {
+            if busy {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(foreground)
+            } else if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.system(size: 15, weight: .semibold))
+            }
+            Text(title)
+                .pixlFont(.bodyMedium, weight: .bold)
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
+                .multilineTextAlignment(.center)
+        }
+        .foregroundStyle(foreground)
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity)
+        .frame(height: LyricsChromeMetrics.toggleHeight)
+        .background(alignment: .leading) {
+            if let progress {
+                GeometryReader { geometry in
+                    chrome.selected.opacity(0.4)
+                        .frame(width: geometry.size.width * min(max(progress, 0), 1))
+                }
+                .clipShape(shape)
+                .animation(PixlMotion.state, value: progress)
+            }
+        }
+        .opacity(faded ? 0.5 : 1)
+        .contentShape(shape)
+    }
+}
+
+/// A toolbar segment's glass, applied after everything that changes its look (Apple: "Apply the glassEffect(_:in:)
+/// modifier after other modifiers"): the accent capsule when active, the panel tint otherwise; interactive. The label
+/// is fixed for VoiceOver (and for UI tests: identifiers don't survive the glass container); the state is its value.
+private struct LyricsSegmentGlass: ViewModifier {
+    let active: Bool
+    let enabled: Bool
+    let accessibilityLabel: LocalizedStringKey
+    let accessibilityValue: LocalizedStringKey
+    let chrome: LyricsChromeColors
+    let brightArt: Bool
+
+    static func shape(active: Bool) -> RoundedRectangle {
+        RoundedRectangle(cornerRadius: active ? LyricsChromeMetrics.toggleHeight / 2 : 8, style: .continuous)
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .glassEffect(active
+                         ? Glass.clear.tint(chrome.selected.opacity(enabled ? GlassTint.prominent : GlassTint.prominent / 2)).interactive()
+                         : chrome.panelGlass(brightArt: brightArt, interactive: true),
+                         in: Self.shape(active: active))
+            .animation(.spring(response: 0.5, dampingFraction: 0.8), value: active)
+            .accessibilityLabel(Text(accessibilityLabel))
+            .accessibilityValue(Text(accessibilityValue))
+            .accessibilityAddTraits(active ? .isSelected : [])
     }
 }
 

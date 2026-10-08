@@ -45,21 +45,24 @@ final class PlayerScreenshotTests: XCTestCase {
     }
 
     /// The lyrics More sheet's shuffle · repeat · favourite row: since 2026-10-07 the full player's liquid
-    /// `PlayerToggleRow`, so the heart reads "Remove from favorites" / "Add to favorites" as it does there.
+    /// `PlayerToggleRow`, so the heart reads "Remove from favorites" / "Add to favorites" as it does there. Looked up
+    /// inside the sheet: the full player under it is built too and has the same heart (off screen).
     func testLyricsOptionsFavoriteTogglesImmediately() throws {
         let app = launch("lyricsOptions", "dark")
         let sheet = app.descendants(matching: .any)["screen.lyricsOptions"].firstMatch
         XCTAssertTrue(sheet.waitForExistence(timeout: 20), "the lyrics options did not appear")
-        let heart = app.buttons.matching(NSPredicate(format: "label == %@", "Remove from favorites")).firstMatch
+        let heart = sheet.buttons.matching(NSPredicate(format: "label == %@", "Remove from favorites")).firstMatch
         XCTAssertTrue(heart.waitForExistence(timeout: 10), "the liked heart is missing (demo song 0 starts liked)")
         var swipes = 0
         while !heart.isHittable, swipes < 4 {
             sheet.swipeUp()
+            Thread.sleep(forTimeInterval: 1.0)
             swipes += 1
         }
+        XCTAssertTrue(heart.isHittable, "the sheet's heart can't be reached")
         XCTAssertTrue(heart.isSelected, "the liked heart should be selected")
         heart.tap()
-        let unliked = app.buttons.matching(NSPredicate(format: "label == %@", "Add to favorites")).firstMatch
+        let unliked = sheet.buttons.matching(NSPredicate(format: "label == %@", "Add to favorites")).firstMatch
         XCTAssertTrue(unliked.waitForExistence(timeout: 3), "the heart kept its old state after the tap")
         snapshot(app, "lyricsOptionsFavoriteToggled-dark")
     }

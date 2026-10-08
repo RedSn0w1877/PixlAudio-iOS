@@ -41,11 +41,20 @@ final class LyricsScreenshotTests: XCTestCase {
     }
 
     /// The end of the sheet: Controls and the shuffle / repeat / favourite row (part of the sheet, Android
-    /// `BottomToggleRow`; the full player's liquid segments since 2026-10-07), light app. The first swipe grows the
-    /// half-height sheet, the second scrolls it.
+    /// `BottomToggleRow`; the full player's liquid segments since 2026-10-07), light app. Swipes on the sheet (the first
+    /// grows it from half height) until its heart is on screen.
     func testMoreSheetBottomInLightApp() throws {
         try capture("lyricsMoreSheet.lightAppBottom", demo: "words", freezeMs: 42_300, appearance: "light",
-                    tap: "Lyrics options", settle: 2.0, swipes: 2)
+                    tap: "Lyrics options", settle: 2.0) { app in
+            let sheet = app.descendants(matching: .any)["screen.lyricsOptions"].firstMatch
+            XCTAssertTrue(sheet.waitForExistence(timeout: 10), "the More sheet did not open")
+            // Inside the sheet: the full player under the lyrics has the same heart.
+            let heart = sheet.buttons.matching(NSPredicate(format: "label == %@ OR label == %@", "Add to favorites",
+                                                           "Remove from favorites")).firstMatch
+            XCTAssertTrue(heart.waitForExistence(timeout: 10), "the sheet has no shuffle / repeat / favourite row")
+            self.reveal(heart, in: sheet, app: app, clearOfBottom: 0)
+            XCTAssertTrue(heart.isHittable, "the sheet's bottom row can't be reached")
+        }
     }
 
     // MARK: Translate · Sing (owner, 2026-10-07: they replace Synced · Static)
@@ -69,14 +78,17 @@ final class LyricsScreenshotTests: XCTestCase {
         }
     }
 
-    /// Touch and hold Translate: Translate via AI, and Show romanization when the lyrics need it.
+    /// Touch and hold Translate: Translate via AI, and Show romanization when the lyrics need it. The hold must open
+    /// the menu, not run the tap (until 2026-10-07 it hid the demo's translations instead).
     func testTranslateMenu() throws {
         try capture("lyricsTranslateMenu", demo: "words", freezeMs: 42_300, settle: 2.0) { app in
             let translate = app.buttons.matching(NSPredicate(format: "label == %@", "Translate")).firstMatch
             XCTAssertTrue(translate.waitForExistence(timeout: 10), "Translate is missing")
+            XCTAssertEqual(translate.value as? String, "Showing translations", "the demo lyrics show a translation")
             translate.press(forDuration: 1.2)
-            XCTAssertTrue(app.buttons["Translate via AI"].firstMatch.waitForExistence(timeout: 5),
-                          "the long-press menu has no Translate via AI")
+            let viaAI = app.descendants(matching: .any)
+                .matching(NSPredicate(format: "label == %@", "Translate via AI")).firstMatch
+            XCTAssertTrue(viaAI.waitForExistence(timeout: 5), "the long-press menu has no Translate via AI")
             Thread.sleep(forTimeInterval: 1.0)
         }
     }
@@ -87,18 +99,22 @@ final class LyricsScreenshotTests: XCTestCase {
         try capture("lyricsShowAsPlainText", demo: "words", freezeMs: 42_300, tap: "Lyrics options", settle: 1.5) { app in
             let sheet = app.descendants(matching: .any)["screen.lyricsOptions"].firstMatch
             XCTAssertTrue(sheet.waitForExistence(timeout: 10), "the More sheet did not open")
-            let plain = app.descendants(matching: .any)
+            let plain = sheet.descendants(matching: .any)
                 .matching(NSPredicate(format: "label == %@", "Show as plain text")).firstMatch
             XCTAssertTrue(plain.waitForExistence(timeout: 10), "Show as plain text is missing")
-            var swipes = 0
-            while !plain.isHittable, swipes < 4 {
-                sheet.swipeUp()
-                swipes += 1
-            }
-            let adjustSync = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Adjust sync")).firstMatch
+            // Well clear of the screen's bottom edge, and settled: a tap on a row still sliding in (or under the home
+            // indicator) is lost.
+            self.reveal(plain, in: sheet, app: app, clearOfBottom: 120)
+            XCTAssertEqual(plain.value as? String, "0", "Show as plain text should start off")
+            let adjustSync = sheet.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Adjust sync")).firstMatch
             XCTAssertTrue(adjustSync.exists, "karaoke lyrics should offer Adjust sync")
             // The switch sits at the row's trailing end; the row's centre is its title.
-            plain.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+            let knob = plain.switches.firstMatch
+            if knob.exists, knob.isHittable {
+                knob.tap()
+            } else {
+                plain.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+            }
             XCTAssertTrue(adjustSync.waitForNonExistence(timeout: 5), "the lyrics did not switch to plain text")
             Thread.sleep(forTimeInterval: 1.0)
         }
@@ -165,6 +181,18 @@ final class LyricsScreenshotTests: XCTestCase {
         }
         then?(app)
         attach(app, name: "\(name)-\(appearance)")
+    }
+
+    /// Swipes the More sheet up (the first swipe grows a half-height sheet) until `element` can take a tap at least
+    /// `clearOfBottom` points above the screen's bottom edge, letting each swipe settle.
+    private func reveal(_ element: XCUIElement, in sheet: XCUIElement, app: XCUIApplication, clearOfBottom: CGFloat) {
+        let limit = app.frame.maxY - clearOfBottom
+        var swipes = 0
+        while !(element.isHittable && element.frame.maxY <= limit), swipes < 5 {
+            sheet.swipeUp()
+            Thread.sleep(forTimeInterval: 1.2)
+            swipes += 1
+        }
     }
 
     private func attach(_ app: XCUIApplication, name: String) {

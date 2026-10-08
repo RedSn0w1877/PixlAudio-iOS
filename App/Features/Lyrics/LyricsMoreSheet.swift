@@ -147,7 +147,10 @@ struct LyricsMoreSheet: View {
                 Text("Alignment")
                     .pixlFont(.bodyLarge, weight: .medium)
                     .foregroundStyle(theme.onSurface)
+                // The lens reads the app palette; this sheet is in the player's (album colours), also where the
+                // route-level copy opens over the app.
                 LiquidTabCapsule(tabs: Self.alignmentTabs, selection: $preferences.alignment)
+                    .environment(\.appTheme, theme)
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)

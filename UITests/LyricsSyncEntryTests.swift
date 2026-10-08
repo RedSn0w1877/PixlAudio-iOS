@@ -12,7 +12,7 @@ final class LyricsSyncEntryTests: XCTestCase {
     func testOpensFromSyncChip() throws {
         let app = launchLyrics(demo: "lines")
         for run in 1...2 {
-            let chip = element(app, "lyrics.syncChip")
+            let chip = syncChip(app)
             XCTAssertTrue(chip.waitForExistence(timeout: 10), "the sync chip is missing (run \(run))")
             chip.tap()
             assertEditorStaysOpen(app, shot: run == 1 ? "syncEntryChip-dark" : nil)
@@ -40,7 +40,7 @@ final class LyricsSyncEntryTests: XCTestCase {
     /// still land on the lyrics screen.
     func testLeaveReturnsToLyrics() throws {
         let app = launchLyrics(demo: "lines")
-        let chip = element(app, "lyrics.syncChip")
+        let chip = syncChip(app)
         XCTAssertTrue(chip.waitForExistence(timeout: 10), "the sync chip is missing")
         chip.tap()
         let start = element(app, "sync.start")
@@ -121,6 +121,13 @@ final class LyricsSyncEntryTests: XCTestCase {
         XCTAssertTrue(element(app, "screen.lyrics").waitForExistence(timeout: 10), "closing did not return to lyrics")
         XCTAssertTrue(app.buttons["Lyrics options"].firstMatch.waitForExistence(timeout: 5),
                       "the lyrics screen's controls are gone")
+    }
+
+    /// "Make the words light up · Sync it yourself", by identifier or label: inside the lyrics screen (whose own
+    /// `screen.lyrics` identifier reaches its children) the chip keeps only its label (docs/performance.md).
+    private func syncChip(_ app: XCUIApplication) -> XCUIElement {
+        app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@", "lyrics.syncChip",
+                                         "Make the words light up · Sync it yourself")).firstMatch
     }
 
     private func element(_ app: XCUIApplication, _ identifier: String) -> XCUIElement {
