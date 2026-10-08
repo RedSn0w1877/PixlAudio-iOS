@@ -925,3 +925,12 @@ First uses in the app (several came with the preparer and transfer-session commi
 | `Calendar.dateInterval(of:for:)` (`.month`) | 10 | /documentation/foundation/calendar/dateinterval(of:for:) | `CloudPlatform.localMonthStartMs` | The $3 monthly cap resets on the 1st of the local month. |
 | `FileManager.replaceItemAt(_:withItemAt:)` (already in the ledger) | 4 | — | `CloudStudio.moveAtomically` | A verified result replaces an earlier one in `Stems/` in one step. |
 | `URLSessionConfiguration.ephemeral` for RunPod (`Authorization: Bearer`) and the bucket's small presigned requests | 7 | /documentation/foundation/urlsessionconfiguration/ephemeral | `CloudPlatform.apiSession` | No cookies or cache; RunPod calls never go through the background session (design §5). |
+
+## Built-in cloud keys (2026-10-08, branch `s23-baked-keys`)
+Unlocks `App/Resources/CloudDefaults.enc` (PixlAudio's built-in cloud keys; format in PixlNet `CloudDefaultsBlob`).
+
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `AES.GCM.SealedBox(nonce:ciphertext:tag:)`, `AES.GCM.Nonce(data:)` (CryptoKit) | 13 | /documentation/cryptokit/aes/gcm/sealedbox/init(nonce:ciphertext:tag:) | `CloudDefaultsCrypto.open` | The blob is `PXCD1` + 12-byte nonce + ciphertext + 16-byte tag (what Node's `aes-256-gcm` writes); a wrong key, a changed byte or a short file all throw and count as no built-in keys. |
+| `AES.GCM.open(_:using:)` with `SymmetricKey(data:)` (32 bytes, AES-256) | 13 | /documentation/cryptokit/aes/gcm/open(_:using:) | `CloudDefaultsCrypto.open` (from the `CloudBuiltInKeys` actor, once, off the main thread) | The key comes from the build's XOR shares (`CloudDefaultsKeyShares.combine`); the plaintext is decoded and dropped, only the parsed config stays in memory. |
+| `AES.GCM.seal(_:using:nonce:)`, `SealedBox.nonce` / `.ciphertext` / `.tag` | 13 | /documentation/cryptokit/aes/gcm/seal(_:using:nonce:) | `CloudDefaultsCrypto.seal` (AppTests only) | Round trips in `CloudDefaultsTests`; the real blobs are written by `tools/cloud/bake-cloud-keys.mjs`, and a Node-written fixture checks that both agree. |

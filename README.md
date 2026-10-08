@@ -31,3 +31,19 @@ swift test --package-path Packages/PixlCore
 ```
 
 Contributors: read [`AGENTS.md`](AGENTS.md) first.
+
+## Built-in cloud keys
+
+Cloud processing (instrumentals and word-timed lyrics on a RunPod GPU, songs through a Cloudflare R2 bucket) works
+without any setup in builds made by this repository's CI: the app ships PixlAudio's own keys, encrypted, in
+`App/Resources/CloudDefaults.enc`. The key that unlocks them is the `CLOUD_DEFAULTS_KEY` Actions secret, written into
+the build just before it compiles (`ci/write-cloud-defaults-key.sh`) and never committed.
+
+- Builds without that secret (forks, local builds) have no built-in keys: Cloud processing is off and asks for your
+  own RunPod endpoint and R2 bucket, as before.
+- Anyone can switch on **Use my own keys** and use their own instead; own keys always win.
+- The built-in keys are limited on purpose: a Restricted RunPod key for one endpoint, an R2 key for one bucket, and at
+  most $3 a month per iPhone. They are obfuscated, not secret: someone who takes the app apart can recover them.
+
+The owner bakes or rotates them with `node tools/cloud/bake-cloud-keys.mjs` and checks them end to end with the
+manual **cloud-e2e** workflow; see [`docs/handoff/2026-10-08-baked-keys.md`](docs/handoff/2026-10-08-baked-keys.md).
