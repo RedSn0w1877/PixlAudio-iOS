@@ -877,10 +877,11 @@ belong to other work and are untouched.
   - Quick Fill: the Select all · Clear pair, a status capsule (`surfaceContainerHighest`) and Next / Quick Fill
     (`primary`). On the genre step the pair leaves and the status capsule takes its room; Android keeps its panel and
     hides the pair.
-  - Main health (2026-10-07): the pills keep their one-line width (`fixedSize`). Quick Fill's status shows the count
-    alone when "N selected" doesn't fit beside the pair (≈ 40 pt on a 402 pt iPhone; VoiceOver reads the full text);
-    Save as playlist's title steps down headlineMedium → headlineSmall → titleLarge until it fits beside "Deselect
-    all" (`ViewThatFits`; `minimumScaleFactor` doesn't shrink `pixlFont` text).
+  - Main health (2026-10-07): the pills keep their one-line width (`fixedSize`). Quick Fill's songs step leaves the
+    gap between Select all · Clear and Next empty, as Android does (a status capsule there had about 40 pt and showed
+    a lone count); the genre step keeps its status capsule. Save as playlist's top bar is Android's two-row
+    `MediumTopAppBar`: close circle and Select all / Deselect all on a 64 pt row, the title (`headlineMedium`
+    semibold, 20 pt in) on a 48 pt row below. On one row the title truncated beside "Deselect all" at every style.
 - **Listening Stats header.** It uses the `SettingsScaffold` glass bar (`surfaceContainerHigh` at `GlassTint.bar`,
   fading in over the first half of the collapse) instead of the solid band. The circles and the pill row sit on it,
   as Settings' back circle does.

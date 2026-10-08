@@ -49,7 +49,7 @@ final class LibraryScreenshotTests: XCTestCase {
     func testGenreDetailDark() throws { try capture("genreDetail", "dark", ready: "screen.genreDetail") }
     func testGenreSortLight() throws { try capture("genreSort", "light", ready: "screen.genreDetail", tap: "Options") }
     /// Genre Quick Fill, opened by the genre page on launch (`genre.quickFill`): the floating bar's Select all · Clear
-    /// pair, status capsule and Next pill as separate glass (2026-10-07).
+    /// pair and Next pill as separate glass (2026-10-07), the gap between them empty as on Android.
     func testGenreQuickFillLight() throws {
         try capture("genre.quickFill", "light", ready: "screen.quickFill.genre")
     }
