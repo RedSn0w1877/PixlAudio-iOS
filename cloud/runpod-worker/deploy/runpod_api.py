@@ -30,6 +30,7 @@ JOBS = "https://api.runpod.ai"
 GHCR = "https://ghcr.io"
 USER_AGENT = "pixl-cloud-worker-deploy/1"
 RETRY_STATUSES = {408, 425, 429, 500, 502, 503, 504}
+FINAL_STATES = frozenset({"COMPLETED", "FAILED", "CANCELLED", "TIMED_OUT"})
 _TITLE = re.compile(r"[^A-Za-z0-9 .,:;'()/_-]")
 
 
@@ -187,14 +188,16 @@ class RunPod:
     def status(self, endpoint_id: str, job_id: str) -> dict:
         return self._jobs("GET", endpoint_id, f"status/{urllib.parse.quote(job_id, safe='')}", what="GET /status") or {}
 
+    def cancel(self, endpoint_id: str, job_id: str) -> dict:
+        return self._jobs("POST", endpoint_id, f"cancel/{urllib.parse.quote(job_id, safe='')}", what="POST /cancel") or {}
+
 
 def wait_for_job(api: RunPod, endpoint_id: str, first: dict, *, deadline_s: float, poll_s: float = 10.0,
                  clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep) -> dict:
     """Follow a /run or /runsync reply until the job is final (COMPLETED, FAILED, CANCELLED, TIMED_OUT)."""
-    final = {"COMPLETED", "FAILED", "CANCELLED", "TIMED_OUT"}
     reply = first
     end = clock() + deadline_s
-    while reply.get("status") not in final:
+    while reply.get("status") not in FINAL_STATES:
         job_id = reply.get("id")
         if not job_id or clock() > end:
             return reply

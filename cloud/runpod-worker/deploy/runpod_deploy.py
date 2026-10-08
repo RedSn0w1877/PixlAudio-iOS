@@ -34,7 +34,7 @@ from typing import Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from runpod_api import ApiError, RunPod, ghcr_public, mask, wait_for_job  # noqa: E402
+from runpod_api import FINAL_STATES, ApiError, RunPod, ghcr_public, mask, wait_for_job  # noqa: E402
 
 IMAGE_REPO = "ghcr.io/redsn0w1877/pixl-cloud-worker"
 TAG_RE = re.compile(r"^sha-[0-9a-f]{12}$")
@@ -124,6 +124,18 @@ def _error_code(reply: dict) -> str:
     return code if re.fullmatch(r"[A-Z][A-Z0-9_]{1,40}", code) else "UNKNOWN"
 
 
+def cancel_unfinished(api: RunPod, endpoint_id: str, job_id: str | None, state: str | None) -> None:
+    """A job still queued when the script stops waiting (no GPU free in the pools) would otherwise start, and bill,
+    whenever a GPU turns up, long after anyone reads the result. Best effort."""
+    if not job_id or state in FINAL_STATES:
+        return
+    try:
+        api.cancel(endpoint_id, job_id)
+        say("cancelled the unfinished job, so it can't start (and bill) later")
+    except ApiError as exc:
+        say(f"::warning::could not cancel the unfinished job (HTTP {exc.status})")
+
+
 def selftest(api: RunPod, endpoint_id: str, git_sha: str, *, tries: int = 3, job_timeout_s: float = 1500,
              sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.monotonic) -> dict:
     """Run op selftest until a worker from this build answers. Returns its output; raises DeployError."""
@@ -132,6 +144,7 @@ def selftest(api: RunPod, endpoint_id: str, git_sha: str, *, tries: int = 3, job
         reply = wait_for_job(api, endpoint_id, first, deadline_s=job_timeout_s, sleep=sleep, clock=clock)
         state = reply.get("status")
         if state != "COMPLETED":
+            cancel_unfinished(api, endpoint_id, reply.get("id") or first.get("id"), state)
             raise DeployError(f"selftest {state or 'did not finish'}" + (f" ({_error_code(reply)})" if reply.get("error") else ""))
         output = reply.get("output") or {}
         answered = (output.get("worker") or {}).get("gitSha")
@@ -161,6 +174,7 @@ def bench(api: RunPod, endpoint_id: str, *, sleep: Callable[[float], None] = tim
     first = api.runsync(endpoint_id, {"v": 1, "op": "bench", "bench": {"seconds": 240}}, wait_ms=300000)
     reply = wait_for_job(api, endpoint_id, first, deadline_s=1500, sleep=sleep, clock=clock)
     if reply.get("status") != "COMPLETED":
+        cancel_unfinished(api, endpoint_id, reply.get("id") or first.get("id"), reply.get("status"))
         raise DeployError(f"bench {reply.get('status')} ({_error_code(reply)})")
     out = reply.get("output") or {}
     stages = out.get("stagesMs") or {}
@@ -184,10 +198,12 @@ def concurrency_check(api: RunPod, endpoint_id: str, *, jobs: int = 3, poll_s: f
         peak_running = max(peak_running, int(summary.get("running") or 0))
         peak_total = max(peak_total, int(summary.get("total") or 0))
         for job_id in list(pending):
-            if api.status(endpoint_id, job_id).get("status") in ("COMPLETED", "FAILED", "CANCELLED", "TIMED_OUT"):
+            if api.status(endpoint_id, job_id).get("status") in FINAL_STATES:
                 pending.discard(job_id)
         if pending:
             sleep(poll_s)
+    for job_id in sorted(pending):  # still queued at the timeout
+        cancel_unfinished(api, endpoint_id, job_id, None)
     say(f"concurrency (W1): peak running workers {peak_running}, peak allocated {peak_total} (workers.max is 1)"
         + ("" if peak_running <= 1 else " - EXTRA WORKERS: every max-1 cost bound in the design is off"))
     return peak_running

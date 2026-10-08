@@ -83,6 +83,10 @@ class FakeRunPod:
         self.jobs[job_id] = job_input
         return {"id": job_id, "status": "IN_QUEUE"}
 
+    def cancel(self, endpoint_id, job_id):
+        self.calls.append(("cancel", job_id))
+        return {"id": job_id, "status": "CANCELLED"}
+
     def health(self, endpoint_id):
         return {"workers": {"idle": 0, "running": 0}}
 
@@ -211,6 +215,40 @@ def test_bench_and_concurrency_check(capsys):
     out = capsys.readouterr().out
     assert "bench (240 s synthetic song): decode 0.7 s, separate 12.0 s" in out
     assert "peak running workers 1" in out or "peak running workers 2" in out
+
+
+class NoGpu(FakeRunPod):
+    """Every job stays IN_QUEUE: no GPU free in the pools."""
+
+    def runsync(self, endpoint_id, job_input, wait_ms=300000):
+        self.calls.append(("runsync", job_input["op"]))
+        return {"id": "q-" + job_input["op"], "status": "IN_QUEUE"}
+
+    def status(self, endpoint_id, job_id):
+        return {"id": job_id, "status": "IN_QUEUE"}
+
+
+def ticking(step=100):
+    ticks = iter(range(0, 10 ** 9, step))
+    return lambda: next(ticks)
+
+
+def test_a_selftest_still_queued_at_the_deadline_is_cancelled(capsys):
+    api = NoGpu(deployed())
+    with pytest.raises(D.DeployError, match="IN_QUEUE"):
+        go(api, clock=ticking())
+    assert ("cancel", "q-selftest") in api.calls  # otherwise it would start, and bill, whenever a GPU turns up
+    assert "cancelled the unfinished job" in capsys.readouterr().out
+
+
+def test_bench_and_concurrency_jobs_still_queued_are_cancelled():
+    api = NoGpu(deployed())
+    with pytest.raises(D.DeployError, match="bench IN_QUEUE"):
+        D.bench(api, "ep123456", sleep=lambda s: None, clock=ticking())
+    assert ("cancel", "q-bench") in api.calls
+    api = NoGpu(deployed())
+    D.concurrency_check(api, "ep123456", sleep=lambda s: None, clock=ticking(1000))
+    assert sorted(c[1] for c in api.calls if c[0] == "cancel") == ["r0", "r1", "r2"]
 
 
 def test_bad_tags_are_refused():
