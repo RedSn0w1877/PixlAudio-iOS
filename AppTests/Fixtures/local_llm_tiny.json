@@ -1,0 +1,40 @@
+{
+ "about": "Tiny random Qwen2-shaped model (ci/ml/convert_llm.py tiny_model: seed 105, embed scale 1.0, int4 per block of 32) from ml-convert run 37714890106 (llm-candidates). greedy = Core ML CPU_ONLY argmax on the CI Mac (macos-26, coremltools 8.3; ALL gave the same tokens), prefill chunk 4, smallest top-1/top-2 margin 0.18. Used by AppTests/LocalModelTests.",
+ "package": "TinyQwen.mlpackage",
+ "context": 64,
+ "prompt": [
+  17,
+  42,
+  99,
+  3,
+  250,
+  7,
+  64,
+  128,
+  5,
+  33
+ ],
+ "greedy": [
+  95,
+  130,
+  184,
+  110,
+  201,
+  112,
+  246,
+  73,
+  138,
+  67,
+  73,
+  73
+ ],
+ "minMargin": 0.1796875,
+ "seed": 105,
+ "embedScale": 1.0,
+ "run": 37714890106,
+ "tar": {
+  "file": "local_llm_tiny.tar",
+  "bytes": 153600,
+  "sha256": "2980ff7755526d080975d7071cc8e359525c7cdcd843abd694fe516280efed27"
+ }
+}

@@ -50,10 +50,13 @@ nonisolated enum ModelCatalog {
         bytes: 33_505_280, sha256: "e6cc0e50c7eb5a321ded78f88ba52445d451be9e48975113f4a487426cef800b",
         title: "Instrumental model", purpose: "MDX-Net · separates vocals for instrumentals")
 
-    /// From `models-v1.json` (pending: ml-convert run): the int4 Core ML program and its tokenizer file.
+    /// From `models-v1.json` (ml-convert run 37714890106, Qwen/Qwen2.5-1.5B-Instruct at 989aa79): the Core ML
+    /// program (float16, weights int4 per block of 32; parity gate: 86 % greedy agreement with transformers fp32, the
+    /// reference token in Core ML's top 5 at 98 % of positions) and its tokenizer file (SHA-256 9bc6e945…, the same
+    /// as PixlCore's fixture).
     static let llm = ModelDescriptor(
-        id: .llm, file: "qwen2_5_1_5b_instruct_int4.tar", package: "Qwen25Instruct1_5B.mlpackage",
-        bytes: 0, sha256: "pending-ml-convert",
+        id: .llm, file: "qwen2_5_1_5b_instruct_int4_affine_block32.tar", package: "Qwen25Instruct1_5B.mlpackage",
+        bytes: 896_256_000, sha256: "f107c845748da679dd6ef9a8e9e29b243687af29ecaa2b4f9074d58845cfbfd7",
         title: "Local AI model", purpose: "Qwen2.5 1.5B Instruct · runs AI features on this iPhone",
         extraFiles: [LocalLLM.tokenizerFile])
 
