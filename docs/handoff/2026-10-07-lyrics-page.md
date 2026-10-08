@@ -78,6 +78,12 @@ Translate menu, bright art, no lyrics). No blocker or major was found. Fixed (co
 - `testTranslateMenu` now also taps Translate twice (hide, show) before the long press, so the segment's main action
   has a test. `test-parity.md` described the old drag fallback of `testShowAsPlainText`; corrected.
 
+Verified: parse-check and check-forbidden OK; **CI run 37736634144 on `cdac85a` is green** — core job, app build,
+261 unit tests, and 50 UI tests with no failures and no retries (`LyricsScreenshotTests` 22, `LyricsSyncScreenshotTests`
+15, `GlassAccessibilityTests` 5, `LyricsSyncEntryTests` 5, the three `TaisScreenshotTests/testInstrumental*`). The
+shots `lyricsTranslateMenu` (menu open after the two taps, translations back on) and `lyricsSingActive` were checked
+by eye. The More sheet, backup and settings code is unchanged since run 37730028431, which covered those classes.
+
 Left as is (minor, noted for later):
 - With "Show as plain text" on, the plain view shows the plain lines, which don't carry translations made from the
   synced lines, so Translate can light up with nothing visible changing. Plain mode rendered translations the same
@@ -126,7 +132,7 @@ speaker, so those paths are only checked with demo states.
 
 ## Next step
 
-The branch is green (run 37730028431): review and merge into `main` (not done by the agents), then check the list
-above on the phone. Not done here (plan
+The branch is green (run 37736634144 on `cdac85a`, after the review; run 37730028431 before it): review and merge
+into `main` (not done by the agents), then check the list above on the phone. Not done here (plan
 "optional"): Android's AI lyric-sync row in the More sheet, and letting lines scroll under the glass bars (owner:
 not for now).
