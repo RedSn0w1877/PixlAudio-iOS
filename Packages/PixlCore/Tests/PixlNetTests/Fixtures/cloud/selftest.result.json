@@ -47,5 +47,14 @@
     "zh"
   ],
   "coldStartMs": 18400,
+  "caps": {
+    "maxInputMB": 160,
+    "maxAudioS": 900,
+    "bestMaxAudioS": 480,
+    "maxLyricsLines": 500,
+    "maxLyricsChars": 20000,
+    "maxBodyKB": 256,
+    "hostsConfigured": 1
+  },
   "error": null
 }

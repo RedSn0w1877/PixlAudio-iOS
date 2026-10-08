@@ -207,4 +207,33 @@ import PixlFoundation
         #expect(check.detail == "Worker 1.0.0 on NVIDIA L4")
         #expect(http.requests.first?.url == "https://api.runpod.ai/v2/abc123xyz/runsync")
     }
+
+    @Test func selftestReportsTheEndpointsLimits() throws {
+        let selftest = try CloudJSON.decode(CloudSelftestResult.self, from: CloudFixtures.worker("selftest.result"))
+        let check = CloudConnectionTest.check(selftest)
+        #expect(check.ok)
+        #expect(check.detail?.hasSuffix(" · songs up to 160 MB and 15 min") == true)
+        // An empty storage allowlist fails every job: the selftest says so instead of "OK".
+        var noHosts = selftest
+        noHosts.caps?.hostsConfigured = 0
+        let refused = CloudConnectionTest.check(noHosts)
+        #expect(!refused.ok)
+        #expect(refused.message.contains("PIXL_ALLOWED_HOST_SUFFIXES"))
+        // An older worker without caps still passes.
+        var older = selftest
+        older.caps = nil
+        #expect(CloudConnectionTest.check(older).ok)
+    }
+
+    @Test func selftestReportKeepsTheCaps() async throws {
+        let output = String(decoding: try CloudFixtures.worker("selftest.result"), as: UTF8.self)
+        let body = #"{"id": "sync-1", "status": "COMPLETED", "output": "# + output + "}"
+        let http = FixtureHTTPClient { _ in HTTPResponse(statusCode: 200, text: body) }
+        let report = await CloudConnectionTest.selftestReport(Self.runpod(http), build: "1.0 (1)")
+        #expect(report.check.ok)
+        #expect(report.caps?.maxInputMB == 160)
+        #expect(report.caps?.hostsConfigured == 1)
+        let unset = await CloudConnectionTest.selftestReport(nil, build: "1.0 (1)")
+        #expect(!unset.check.ok && unset.caps == nil)
+    }
 }

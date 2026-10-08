@@ -78,6 +78,22 @@ public enum CloudLimits {
     public static let maxLyricsLineChars = 2_000
     /// Output AAC bitrate (decision 4: AAC 256k).
     public static let outputKbps = 256
+
+    /// Why the endpoint would refuse a prepared upload under its own limits (the selftest's `caps`, set by its
+    /// environment variables), or nil. The app's limits above are checked on their own; this catches an endpoint set
+    /// stricter than them before the upload and the GPU time are spent.
+    public static func workerRefusal(bytes: Int64, durationMs: Int64, caps: CloudWorkerCaps?) -> String? {
+        guard let caps else { return nil }
+        if let mb = caps.maxInputMB, mb > 0, bytes > Int64(mb) * 1_048_576 {
+            return "The prepared file is \((bytes + 524_288) / 1_048_576) MB, over your cloud worker's \(mb) MB limit "
+                + "(PIXL_MAX_INPUT_MB on the endpoint)."
+        }
+        if let seconds = caps.maxAudioS, seconds > 0, durationMs > Int64(seconds) * 1000 {
+            let limit = seconds % 60 == 0 ? "\(seconds / 60)-minute" : "\(seconds)-second"
+            return "This song is longer than your cloud worker's \(limit) limit (PIXL_MAX_AUDIO_S on the endpoint)."
+        }
+        return nil
+    }
 }
 
 /// Lifetimes and intervals (milliseconds unless named otherwise).
@@ -605,6 +621,13 @@ public enum CloudImportCheck {
     public static let sampleToleranceFrames: Int64 = 1024
     /// The worker's decode rate.
     public static let workerSampleRate: Int64 = 44_100
+
+    /// A manifest found in the bucket belongs to the file uploaded now: a manifest naming another input (the song
+    /// was prepared again since) is an earlier attempt's and is not taken. Older workers don't name the input.
+    public static func manifestDescribesUpload(_ result: CloudJobResult, uploadedSHA256: String?) -> Bool {
+        guard let named = result.input?.sha256, let uploaded = uploadedSHA256 else { return true }
+        return named.lowercased() == uploaded.lowercased()
+    }
 
     /// The downloaded file is the one the manifest describes.
     public static func matches(expectedBytes: Int64, expectedSHA256: String, actualBytes: Int64, actualSHA256: String) -> Bool {

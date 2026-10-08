@@ -23,9 +23,11 @@ final class CloudSettings {
         /// Set once keys were saved: if the Keychain later comes back empty (the app was re-signed by another team),
         /// the screen says "Cloud keys missing — paste them again" instead of failing silently.
         static let keysSaved = "cloud_studio_keys_saved"
+        /// The endpoint's limits from the last selftest (JSON), forgotten when the Endpoint ID changes.
+        static let workerCaps = "cloud_studio_worker_caps"
 
         static let all = [enabled, endpointId, r2Endpoint, bucket, instrumental, lyrics, transcribe, quality, cellular,
-                          pricePerSecond, monthlyCap, keysSaved]
+                          pricePerSecond, monthlyCap, keysSaved, workerCaps]
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -33,7 +35,12 @@ final class CloudSettings {
 
     /// "Send songs to my RunPod account": nothing leaves the phone while this is off.
     var isEnabled: Bool { didSet { defaults.set(isEnabled, forKey: Keys.enabled) } }
-    var endpointId: String { didSet { defaults.set(endpointId, forKey: Keys.endpointId) } }
+    var endpointId: String {
+        didSet {
+            defaults.set(endpointId, forKey: Keys.endpointId)
+            if endpointId != oldValue, workerCaps != nil { workerCaps = nil }
+        }
+    }
     /// As typed: `https://<account-id>.r2.cloudflarestorage.com` or the bare account ID.
     var r2Endpoint: String { didSet { defaults.set(r2Endpoint, forKey: Keys.r2Endpoint) } }
     var bucket: String { didSet { defaults.set(bucket, forKey: Keys.bucket) } }
@@ -48,6 +55,17 @@ final class CloudSettings {
     var pricePerSecondMicroUSD: Int64 { didSet { defaults.set(pricePerSecondMicroUSD, forKey: Keys.pricePerSecond) } }
     /// The app's monthly cap (default $3): submissions stop once the month's recorded cost reaches it.
     var monthlyCapMicroUSD: Int64 { didSet { defaults.set(monthlyCapMicroUSD, forKey: Keys.monthlyCap) } }
+    /// The endpoint's own limits as its last selftest reported them (nil until one ran): prepared songs over them are
+    /// stopped before the upload (`CloudLimits.workerRefusal`).
+    var workerCaps: CloudWorkerCaps? {
+        didSet {
+            if let workerCaps, let data = try? CloudJSON.encode(workerCaps) {
+                defaults.set(data, forKey: Keys.workerCaps)
+            } else {
+                defaults.removeObject(forKey: Keys.workerCaps)
+            }
+        }
+    }
 
     /// The secrets as last loaded or edited (empty until `loadSecrets()`).
     private(set) var secrets: CloudSecrets = .empty
@@ -73,6 +91,7 @@ final class CloudSettings {
         let cap = (defaults.object(forKey: Keys.monthlyCap) as? NSNumber)?.int64Value
         monthlyCapMicroUSD = cap.map { min(max($0, 0), 1_000_000_000) } ?? CloudCost.defaultMonthlyCapMicroUSD
         keysSaved = defaults.bool(Keys.keysSaved, default: false)
+        workerCaps = defaults.data(forKey: Keys.workerCaps).flatMap { try? CloudJSON.decode(CloudWorkerCaps.self, from: $0) }
     }
 
     /// Reads the Keychain off the main actor (once; `force` after a restore or a test).

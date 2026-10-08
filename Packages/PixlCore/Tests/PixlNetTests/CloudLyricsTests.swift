@@ -109,7 +109,7 @@ import PixlModel
         #expect(CloudLyrics.level(of: Lyrics(plain: ["x"], synced: nil, areFromRemote: false)) == .plain)
         #expect(CloudLyrics.level(of: nil) == .none)
     }
-    /// The worker's own golden examples (`Fixtures/cloud/worker/`).
+    /// The worker's own golden examples (`Fixtures/cloud/`).
     @Test func workerAlignedExampleRebuildsEveryLine() throws {
         let cloud = try CloudJSON.decode(CloudLyricsDocument.self, from: CloudFixtures.worker("lyrics.aligned"))
         #expect(cloud.offsetMs == 0)

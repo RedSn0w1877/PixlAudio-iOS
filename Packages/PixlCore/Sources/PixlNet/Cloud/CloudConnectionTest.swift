@@ -138,42 +138,79 @@ public enum CloudConnectionTest {
 
     /// `op: "selftest"` through `/runsync`: the worker's version and GPU (one cold start, about 1¢).
     public static func selftest(_ api: (any RunPodJobsAPI)?, build: String) async -> CloudCheck {
-        guard let api else { return CloudCheck(ok: false, message: "Fill in the Endpoint ID and the RunPod key first.") }
+        await selftestReport(api, build: build).check
+    }
+
+    /// The selftest's sentence plus the endpoint's limits it reported (kept so uploads stay inside them).
+    public static func selftestReport(_ api: (any RunPodJobsAPI)?, build: String) async -> CloudSelftestReport {
+        guard let api else {
+            return CloudSelftestReport(check: CloudCheck(ok: false, message: "Fill in the Endpoint ID and the RunPod key first."))
+        }
         do {
             let job = try await api.selftest(build: build)
             if job.typedStatus == .completed, let selftest = job.selftest {
-                guard selftest.isOK else {
-                    let reason = selftest.error.map { "\($0.code): \($0.message ?? "")" } ?? "status \(selftest.status)"
-                    return CloudCheck(ok: false, message: "The worker started but reported a problem (\(CloudRedaction.redact(reason))).")
-                }
-                guard selftest.agreedVersion != nil else {
-                    return CloudCheck(ok: false, message: "The worker doesn't speak this app's job format (v\(CloudSchema.version)). Update the worker or the app.")
-                }
-                let missing = (selftest.models ?? [:]).filter { !$0.value.isAvailable }.map(\.key).sorted()
-                guard missing.isEmpty else {
-                    return CloudCheck(ok: false, message: "The worker is missing models: \(missing.joined(separator: ", ")).")
-                }
-                let version = selftest.worker?.version ?? "?"
-                let gpu = selftest.worker?.gpu ?? "unknown GPU"
-                return CloudCheck(ok: true, message: "The worker answered.", detail: "Worker \(version) on \(gpu)")
+                return CloudSelftestReport(check: check(selftest), caps: selftest.caps)
             }
-            if job.typedStatus == .completed, let output = job.outputJSON {
-                let version = output["worker"]?["version"]?.stringValue ?? "?"
-                let gpu = output["worker"]?["gpu"]?.stringValue ?? "unknown GPU"
-                let supported = output["supported"]?.arrayValue?.compactMap { $0.int64Value.map(Int.init) } ?? []
-                guard supported.isEmpty || supported.contains(CloudSchema.version) else {
-                    return CloudCheck(ok: false, message: "The worker doesn't speak this app's job format (v\(CloudSchema.version)). Update the worker or the app.")
-                }
-                return CloudCheck(ok: true, message: "The worker answered.", detail: "Worker \(version) on \(gpu)")
-            }
-            if job.typedStatus == .inQueue || job.typedStatus == .inProgress {
-                return CloudCheck(ok: false, message: "The worker is still starting (a cold start can take a few minutes). Try again shortly.")
-            }
-            return CloudCheck(ok: false, message: "The selftest failed: \(CloudRedaction.redact(job.error ?? job.status)).")
+            return CloudSelftestReport(check: check(job))
         } catch let error as RunPodError {
-            return CloudCheck(ok: false, message: message(for: error))
+            return CloudSelftestReport(check: CloudCheck(ok: false, message: message(for: error)))
         } catch {
-            return CloudCheck(ok: false, message: "Couldn't reach RunPod. Check your connection and try again.")
+            return CloudSelftestReport(check: CloudCheck(ok: false, message: "Couldn't reach RunPod. Check your connection and try again."))
         }
+    }
+
+    /// A decoded selftest: problems first, then the worker, its GPU and (when it reports them) its limits.
+    static func check(_ selftest: CloudSelftestResult) -> CloudCheck {
+        guard selftest.isOK else {
+            let reason = selftest.error.map { "\($0.code): \($0.message ?? "")" } ?? "status \(selftest.status)"
+            return CloudCheck(ok: false, message: "The worker started but reported a problem (\(CloudRedaction.redact(reason))).")
+        }
+        guard selftest.agreedVersion != nil else {
+            return CloudCheck(ok: false, message: "The worker doesn't speak this app's job format (v\(CloudSchema.version)). Update the worker or the app.")
+        }
+        let missing = (selftest.models ?? [:]).filter { !$0.value.isAvailable }.map(\.key).sorted()
+        guard missing.isEmpty else {
+            return CloudCheck(ok: false, message: "The worker is missing models: \(missing.joined(separator: ", ")).")
+        }
+        if selftest.caps?.hostsConfigured == 0 {
+            return CloudCheck(ok: false, message: "The worker allows no storage host, so every song would fail. Set "
+                + "PIXL_ALLOWED_HOST_SUFFIXES on the endpoint to <account ID>.r2.cloudflarestorage.com and deploy again.")
+        }
+        let version = selftest.worker?.version ?? "?"
+        let gpu = selftest.worker?.gpu ?? "unknown GPU"
+        var detail = "Worker \(version) on \(gpu)"
+        if let caps = selftest.caps, let mb = caps.maxInputMB, let seconds = caps.maxAudioS {
+            detail += " · songs up to \(mb) MB and \(seconds / 60) min"
+        }
+        return CloudCheck(ok: true, message: "The worker answered.", detail: detail)
+    }
+
+    /// A selftest job whose output isn't the selftest schema (an older worker), or that didn't complete.
+    static func check(_ job: RunPodJob) -> CloudCheck {
+        if job.typedStatus == .completed, let output = job.outputJSON {
+            let version = output["worker"]?["version"]?.stringValue ?? "?"
+            let gpu = output["worker"]?["gpu"]?.stringValue ?? "unknown GPU"
+            let supported = output["supported"]?.arrayValue?.compactMap { $0.int64Value.map(Int.init) } ?? []
+            guard supported.isEmpty || supported.contains(CloudSchema.version) else {
+                return CloudCheck(ok: false, message: "The worker doesn't speak this app's job format (v\(CloudSchema.version)). Update the worker or the app.")
+            }
+            return CloudCheck(ok: true, message: "The worker answered.", detail: "Worker \(version) on \(gpu)")
+        }
+        if job.typedStatus == .inQueue || job.typedStatus == .inProgress {
+            return CloudCheck(ok: false, message: "The worker is still starting (a cold start can take a few minutes). Try again shortly.")
+        }
+        return CloudCheck(ok: false, message: "The selftest failed: \(CloudRedaction.redact(job.error ?? job.status)).")
+    }
+}
+
+/// `CloudConnectionTest.selftestReport`'s answer.
+public struct CloudSelftestReport: Sendable, Hashable {
+    public var check: CloudCheck
+    /// The endpoint's limits, when the worker reported them (older workers don't).
+    public var caps: CloudWorkerCaps?
+
+    public init(check: CloudCheck, caps: CloudWorkerCaps? = nil) {
+        self.check = check
+        self.caps = caps
     }
 }

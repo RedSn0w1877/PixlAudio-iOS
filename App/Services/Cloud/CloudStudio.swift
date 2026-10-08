@@ -410,8 +410,10 @@ final class CloudStudio {
         isTesting = true
         defer { isTesting = false }
         await settings.loadSecrets()
-        selftestCheck = await CloudConnectionTest.selftest(dependencies.makeRunPod(settings.configInput),
-                                                           build: dependencies.build)
+        let report = await CloudConnectionTest.selftestReport(dependencies.makeRunPod(settings.configInput),
+                                                              build: dependencies.build)
+        selftestCheck = report.check
+        if let caps = report.caps { settings.workerCaps = caps }
     }
 
     // MARK: The pump
@@ -638,6 +640,14 @@ final class CloudStudio {
             let prepared = try await dependencies.preparer.prepare(source: source, jobKey: jobKey)
             guard job(jobKey)?.state == .preparing else {
                 dependencies.preparer.removeUpload(jobKey: jobKey)
+                return
+            }
+            if let refusal = CloudLimits.workerRefusal(bytes: prepared.bytes, durationMs: prepared.durationMs,
+                                                       caps: settings.workerCaps) {
+                // The endpoint is set stricter than the app: stop before the upload and the GPU time.
+                dependencies.preparer.removeUpload(jobKey: jobKey)
+                update(jobKey) { _ = $0.apply(.requeue, nowMs: self.dependencies.nowMs()) }
+                fail(jobKey, refusal, code: nil, retryable: false)
                 return
             }
             let now = dependencies.nowMs()
@@ -947,7 +957,9 @@ final class CloudStudio {
     @discardableResult
     private func takeManifestIfPresent(_ jobKey: String, _ clients: Clients) async -> Bool {
         guard let data = try? await clients.objects.get(key: CloudKeys.manifest(jobKey: jobKey)),
-              let result = try? CloudJSON.decode(CloudJobResult.self, from: data), result.jobKey == jobKey else {
+              let result = try? CloudJSON.decode(CloudJobResult.self, from: data), result.jobKey == jobKey,
+              CloudImportCheck.manifestDescribesUpload(result, uploadedSHA256: job(jobKey)?.sha256) else {
+            // Absent, unreadable, or an earlier attempt's (another input): this upload's job goes on.
             return false
         }
         await take(result, jobKey, clients)

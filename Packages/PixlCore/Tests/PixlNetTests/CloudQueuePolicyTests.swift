@@ -121,6 +121,24 @@ import PixlModel
         #expect(streamed.skipCounts.first?.count == 10)
     }
 
+    @Test func workerCapsStopSongsTheEndpointWouldRefuse() {
+        // No selftest yet, or the endpoint at its defaults (= the app's own limits): nothing extra is refused.
+        #expect(CloudLimits.workerRefusal(bytes: 150 * 1_048_576, durationMs: 899_000, caps: nil) == nil)
+        let defaults = CloudWorkerCaps(maxInputMB: 160, maxAudioS: 900, hostsConfigured: 1)
+        #expect(CloudLimits.workerRefusal(bytes: 160 * 1_048_576, durationMs: 900_000, caps: defaults) == nil)
+        // An endpoint set stricter than the app.
+        let strict = CloudWorkerCaps(maxInputMB: 60, maxAudioS: 600)
+        let tooBig = CloudLimits.workerRefusal(bytes: 61 * 1_048_576, durationMs: 200_000, caps: strict)
+        #expect(tooBig?.contains("61 MB") == true && tooBig?.contains("60 MB") == true)
+        #expect(tooBig?.contains("PIXL_MAX_INPUT_MB") == true)
+        let tooLong = CloudLimits.workerRefusal(bytes: 1_048_576, durationMs: 600_001, caps: strict)
+        #expect(tooLong?.contains("10-minute") == true)
+        let short = CloudLimits.workerRefusal(bytes: 1, durationMs: 90_001, caps: CloudWorkerCaps(maxAudioS: 90))
+        #expect(short?.contains("90-second") == true)
+        // Caps the worker didn't report are not limits.
+        #expect(CloudLimits.workerRefusal(bytes: 500 * 1_048_576, durationMs: 1, caps: CloudWorkerCaps()) == nil)
+    }
+
     @Test func syncedOnlyWhenTheDurationsAgree() {
         #expect(CloudSelector.syncedHint(hasLineTimes: true, lyricsReferenceDurationMs: 241_500, audioDurationMs: 240_000))
         #expect(!CloudSelector.syncedHint(hasLineTimes: true, lyricsReferenceDurationMs: 245_000, audioDurationMs: 240_000))
@@ -214,6 +232,15 @@ import PixlModel
         #expect(CloudImportCheck.samplesMatch(sourceFrames: 11_568_000, sourceSampleRate: 48_000,
                                               resultFrames: 10_628_100, resultSampleRate: 44_100))
         #expect(!CloudImportCheck.samplesMatch(sourceFrames: 0, sourceSampleRate: 44_100, resultFrames: 1, resultSampleRate: 44_100))
+        // A manifest naming another input belongs to an earlier attempt; one that names none (older worker) is taken.
+        let sha = String(repeating: "a", count: 64)
+        let named = CloudJobResult(jobKey: Self.key, status: .ok,
+                                   input: CloudInputInfo(codec: "flac", sampleRate: 44_100, channels: 2, decodedSamples: 1,
+                                                         durationMs: 1, sha256: sha))
+        #expect(CloudImportCheck.manifestDescribesUpload(named, uploadedSHA256: sha.uppercased()))
+        #expect(!CloudImportCheck.manifestDescribesUpload(named, uploadedSHA256: String(repeating: "b", count: 64)))
+        #expect(CloudImportCheck.manifestDescribesUpload(named, uploadedSHA256: nil))
+        #expect(CloudImportCheck.manifestDescribesUpload(CloudJobResult(jobKey: Self.key, status: .error), uploadedSHA256: sha))
     }
 
     @Test func retention() {

@@ -424,13 +424,17 @@ public struct CloudInputInfo: Codable, Sendable, Hashable {
     public var channels: Int?
     public var decodedSamples: Int64?
     public var durationMs: Int64?
+    /// The verified input's SHA-256 (= the job's `audio.sha256`). Older workers omit it.
+    public var sha256: String?
 
-    public init(codec: String?, sampleRate: Int?, channels: Int?, decodedSamples: Int64?, durationMs: Int64?) {
+    public init(codec: String?, sampleRate: Int?, channels: Int?, decodedSamples: Int64?, durationMs: Int64?,
+                sha256: String? = nil) {
         self.codec = codec
         self.sampleRate = sampleRate
         self.channels = channels
         self.decodedSamples = decodedSamples
         self.durationMs = durationMs
+        self.sha256 = sha256
     }
 }
 
@@ -630,12 +634,14 @@ public struct CloudSelftestResult: Codable, Sendable, Hashable {
     /// Languages that get word timing; the rest get line timing.
     public var wordTimingLanguages: [String]?
     public var coldStartMs: Int64?
+    /// The worker's server-side limits. Older workers omit them.
+    public var caps: CloudWorkerCaps?
     public var error: CloudResultError?
 
     public init(schema: String = CloudSchema.selftest, v: Int = CloudSchema.version, status: String, supported: [Int],
                 ops: [String]? = nil, worker: CloudWorkerInfo? = nil, models: [String: CloudModelAvailability]? = nil,
                 versions: [String: String?]? = nil, wordTimingLanguages: [String]? = nil, coldStartMs: Int64? = nil,
-                error: CloudResultError? = nil) {
+                caps: CloudWorkerCaps? = nil, error: CloudResultError? = nil) {
         self.schema = schema
         self.v = v
         self.status = status
@@ -646,12 +652,38 @@ public struct CloudSelftestResult: Codable, Sendable, Hashable {
         self.versions = versions
         self.wordTimingLanguages = wordTimingLanguages
         self.coldStartMs = coldStartMs
+        self.caps = caps
         self.error = error
     }
 
     public var isOK: Bool { status == "ok" }
     /// The highest job version both sides speak, or nil when there is none.
     public var agreedVersion: Int? { supported.filter(CloudSchema.supportedVersions.contains).max() }
+}
+
+/// The selftest's `caps`: the endpoint's limits (its environment variables). The app can't raise them, so it keeps its
+/// own uploads inside them (`CloudLimits.effective`).
+public struct CloudWorkerCaps: Codable, Sendable, Hashable {
+    public var maxInputMB: Int?
+    public var maxAudioS: Int?
+    /// Longest song "Best" quality is used for; longer songs are separated at Standard.
+    public var bestMaxAudioS: Int?
+    public var maxLyricsLines: Int?
+    public var maxLyricsChars: Int?
+    public var maxBodyKB: Int?
+    /// Storage hosts in the worker's allowlist; 0 means every presigned job fails `BAD_URL`.
+    public var hostsConfigured: Int?
+
+    public init(maxInputMB: Int? = nil, maxAudioS: Int? = nil, bestMaxAudioS: Int? = nil, maxLyricsLines: Int? = nil,
+                maxLyricsChars: Int? = nil, maxBodyKB: Int? = nil, hostsConfigured: Int? = nil) {
+        self.maxInputMB = maxInputMB
+        self.maxAudioS = maxAudioS
+        self.bestMaxAudioS = bestMaxAudioS
+        self.maxLyricsLines = maxLyricsLines
+        self.maxLyricsChars = maxLyricsChars
+        self.maxBodyKB = maxBodyKB
+        self.hostsConfigured = hostsConfigured
+    }
 }
 
 /// `out/<jobKey>/attempt.json`, the guard's delivery counter (the phone only deletes it).

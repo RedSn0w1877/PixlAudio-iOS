@@ -764,7 +764,8 @@ Nothing to port: Android has no tests for the full player's toggle row, the tran
 Android has no tests for a RunPod/R2 pipeline; everything here is new.
 
 - `PixlNetTests/CloudSchemaTests` — every golden example of the worker (`cloud/runpod-worker/schema/v1/examples`, copied
-  byte for byte into `Fixtures/cloud/worker/`, drift check `ci/check-cloud-fixtures.sh`) decodes and re-encodes to the
+  byte for byte into `Fixtures/cloud/`, drift checks `ci/check-cloud-fixtures.sh` and the worker's `ci/check_fixtures.py`;
+  the phone's own fixtures are in `Fixtures/cloud-phone/`) decodes and re-encodes to the
   same JSON; the `/run` body the app builds has exactly the shape of the worker's `run.request.json`; unknown codes
   read as `INTERNAL`; language hints follow the worker's pattern.
 - `PixlNetTests/CloudLyricsTests` — the worker's aligned and transcribed examples become `LyricsDoc`s whose syllables
@@ -781,6 +782,6 @@ Android has no tests for a RunPod/R2 pipeline; everything here is new.
   (re-upload), POISONED (stop, empty the bucket, Retry), a job lost twice (resent once, then expired); a damaged
   download; the FLAC redo; a changed YouTube match; cancel; the job file across launches; cloud keys never in a backup.
 - `AppTests/CloudAudioPreparerTests` — AAC-LC M4A as is, everything else as 44.1 kHz stereo FLAC with its SHA-256 and
-  frame count.
+  frame count; the FLAC ends on a whole encoder packet and decodes back to exactly the recorded frames.
 - `UITests/CloudStudioScreenshotTests` — Cloud processing (top and Test connection), the queue (top and its Done
   part), the confirm sheet, and Experimental's Cloud processing row, light and dark.

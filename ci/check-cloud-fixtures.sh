@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Cloud Studio schema drift check (design §2.3): the worker's golden examples in
 # cloud/runpod-worker/schema/v1/examples/ and the copies the Swift tests decode in
-# Packages/PixlCore/Tests/PixlNetTests/Fixtures/cloud/worker/ must be identical.
+# Packages/PixlCore/Tests/PixlNetTests/Fixtures/cloud/ must be identical (the same folder the worker's own
+# ci/check_fixtures.py checks). The phone's other fixtures (RunPod responses, a bucket listing, lyrics edge cases)
+# live in Fixtures/cloud-phone/, so every .json in Fixtures/cloud/ is a worker example.
 #
 #   bash ci/check-cloud-fixtures.sh                # compare with the worker folder in this checkout
 #   bash ci/check-cloud-fixtures.sh origin/s19-cloud-worker   # compare with a git ref (before the worker merges)
@@ -12,7 +14,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 examples="cloud/runpod-worker/schema/v1/examples"
-copies="Packages/PixlCore/Tests/PixlNetTests/Fixtures/cloud/worker"
+copies="Packages/PixlCore/Tests/PixlNetTests/Fixtures/cloud"
 sync=0
 if [[ "${1:-}" == "--sync" ]]; then sync=1; shift; fi
 ref="${1:-}"

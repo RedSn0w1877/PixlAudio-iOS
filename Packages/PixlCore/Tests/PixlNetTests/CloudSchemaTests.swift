@@ -3,19 +3,20 @@ import Testing
 import PixlFoundation
 @testable import PixlNet
 
-/// Cloud Studio fixtures. `Fixtures/cloud/worker/` holds byte-for-byte copies of the worker's golden examples
-/// (`cloud/runpod-worker/schema/v1/examples/`, kept in sync by `ci/check-cloud-fixtures.sh`); `Fixtures/cloud/` holds
-/// RunPod's own responses, a bucket listing and hand-written lyrics edge cases.
+/// Cloud Studio fixtures. `Fixtures/cloud/` holds only byte-for-byte copies of the worker's golden examples
+/// (`cloud/runpod-worker/schema/v1/examples/`; the worker's `ci/check_fixtures.py` and `ci/check-cloud-fixtures.sh`
+/// both fail when they drift); `Fixtures/cloud-phone/` holds RunPod's own responses, a bucket listing and
+/// hand-written lyrics edge cases.
 enum CloudFixtures {
     static func data(_ name: String, _ ext: String = "json") throws -> Data {
-        let url = Bundle.module.url(forResource: name, withExtension: ext, subdirectory: "Fixtures/cloud")
-            ?? Bundle.module.url(forResource: name, withExtension: ext, subdirectory: "Fixtures/cloud/worker")
+        let url = Bundle.module.url(forResource: name, withExtension: ext, subdirectory: "Fixtures/cloud-phone")
+            ?? Bundle.module.url(forResource: name, withExtension: ext, subdirectory: "Fixtures/cloud")
         return try Data(contentsOf: try #require(url))
     }
 
     /// One of the worker's golden examples (never a hand-written stand-in).
     static func worker(_ name: String) throws -> Data {
-        let url = try #require(Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "Fixtures/cloud/worker"))
+        let url = try #require(Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "Fixtures/cloud"))
         return try Data(contentsOf: url)
     }
 
@@ -123,6 +124,14 @@ enum CloudFixtures {
         #expect(selftest.models?.values.allSatisfy(\.isAvailable) == true)
         #expect(selftest.wordTimingLanguages?.contains("ko") == true)
         #expect(selftest.versions?["runpod"] == "1.12.0")
+        #expect(selftest.caps == CloudWorkerCaps(maxInputMB: 160, maxAudioS: 900, bestMaxAudioS: 480, maxLyricsLines: 500,
+                                                 maxLyricsChars: 20_000, maxBodyKB: 256, hostsConfigured: 1))
+        // The worker's defaults are the app's own limits.
+        #expect(Int64(selftest.caps?.maxInputMB ?? 0) * 1_048_576 == CloudLimits.maxInputBytes)
+        #expect(Int64(selftest.caps?.maxAudioS ?? 0) * 1000 == CloudLimits.maxDurationMs)
+        #expect(Int64(selftest.caps?.bestMaxAudioS ?? 0) * 1000 == CloudLimits.bestQualityMaxDurationMs)
+        #expect(selftest.caps?.maxLyricsLines == CloudLimits.maxLyricsLines)
+        #expect(selftest.caps?.maxLyricsChars == CloudLimits.maxLyricsChars)
         #expect(try CloudFixtures.canonical(try CloudJSON.encode(selftest)) == CloudFixtures.canonical(selftestData))
 
         let attemptData = try CloudFixtures.worker("attempt")
@@ -182,6 +191,10 @@ enum CloudFixtures {
         #expect(result.models?.stems4 == nil)
         #expect(result.models?.aligner == "qwen3-forced-aligner-0.6b")
         #expect(result.input?.decodedSamples == 10_628_100)
+        // The worker names the input it verified (its duplicate guard compares it too).
+        #expect(result.input?.sha256 == "b66e21bfd056b5178586fbde94ebdb66c9ba669e7e4504f5da92f154ee9d28be")
+        let process = try CloudJSON.decode(CloudJobInput.self, from: CloudFixtures.worker("job.input.process"))
+        #expect(CloudImportCheck.manifestDescribesUpload(result, uploadedSHA256: process.audio?.sha256))
         let instrumental = try #require(result.outputs?["instrumental"])
         #expect(instrumental.key == "out/\(Self.jobKey)/instrumental.m4a")
         #expect(instrumental.sampleRate == 44_100)
