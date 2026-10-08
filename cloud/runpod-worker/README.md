@@ -61,10 +61,12 @@ Still to do, in this order:
    that's expected.
 5. **Make the package public** (once): your GitHub profile → Packages → `pixl-cloud-worker` → Package settings →
    Change visibility → Public. RunPod pulls it without a password, and public packages cost nothing.
-6. **First deploy**: Actions → `cloud-worker-deploy` → Run workflow (branch `main`), tick **bench**. It creates the
-   endpoint `pixl-cloud-studio`, waits for it, runs the selftest (~1¢) and the bench (a few ¢). Read the job
-   summary: GPU, cold start, seconds per stage, peak VRAM and the peak number of running workers (must be 1).
-   Every later main build deploys itself.
+6. **First deploy**: Actions → `cloud-worker-deploy` → Run workflow (branch `main`), leave `image_tag` empty (it
+   deploys the newest green `cloud-worker-build` on main, even when app commits landed on main since), tick
+   **bench**. It creates the endpoint `pixl-cloud-studio`, waits for it, runs the selftest (~1¢) and the bench
+   (a few ¢). Read the job summary: GPU, cold start, seconds per stage, peak VRAM and the peak number of running
+   workers (must be 1). If no GPU is free for 25 minutes the run fails and cancels its queued jobs, so nothing
+   bills later; run it again. Every later main build deploys itself.
 7. **RunPod console** → Serverless → `pixl-cloud-studio`: copy the **Endpoint ID**. Settings → API Keys → Create
    `pixl-iphone`, permission **Restricted**: `pixl-cloud-studio` → Read/Write, everything else None.
 8. **iPhone** (once the app side ships): Settings → Developer → Experimental → Cloud processing: turn it on,
@@ -82,7 +84,8 @@ workers to 0. Delete the R2 token in Cloudflare. Nothing needs a rebuild.
 ## Runbook
 
 **Deploys.** Automatic after each green `cloud-worker-build` on main (it only updates an existing endpoint). By
-hand: Actions → `cloud-worker-deploy` → Run workflow; `image_tag` redeploys an older `sha-<12>` (rollback),
+hand: Actions → `cloud-worker-deploy` → Run workflow; an empty `image_tag` deploys the newest green main build,
+a `sha-<12>` redeploys that build (rollback),
 `extra_pools` adds e.g. `ADA_24` when the cheap GPUs are scarce. Logs are public, so they show only pass/fail,
 the GPU and timings; the endpoint id is masked and money is never printed.
 
@@ -103,7 +106,10 @@ URLs appear as host/path only; lyrics, titles and job bodies are never logged.
 **When a job fails**: the manifest's `error.code` says which step. `BAD_URL`
 with HTTP 403 means expired or wrong signatures (the phone re-signs); `INPUT_MISSING` means the upload is gone
 (the phone uploads again); `POISONED` means the song crashed the worker twice (look at that worker's log);
-`GPU_OOM` recycles the worker by itself.
+`GPU_OOM` recycles the worker by itself; `UNSUPPORTED_FORMAT` saying "ask for flac output" is a 176.4/192 kHz song
+sent with AAC output (AAC tops out at 96 kHz; the phone resends it with `output.codec: flac`). A job whose only
+task is `lyrics` fails with the lyrics' own code when they fail (there is nothing else to deliver); with stems
+requested it is `partial` instead.
 
 **Measuring re-delivery (W1, optional).** Set the endpoint env `PIXL_ALLOW_CRASH_TEST=1` in the RunPod console
 (test only), send `{"input":{"v":1,"op":"bench","bench":{"crash":true}}}` to `/run`, watch how many times a

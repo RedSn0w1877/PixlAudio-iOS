@@ -763,18 +763,21 @@ Nothing to port: Android has no tests for the full player's toggle row, the tran
 ## Cloud Studio worker (2026-10-07, branch `s19-cloud-worker`, Python, server side)
 Nothing to port: Android's old RunPod worker (`tools/runpod-serverless`) has no tests. The worker's own suite is
 pytest, CPU only (no torch, no weights), run by `cloud-worker-build` inside the image's `test` stage and locally
-with `python -m pytest -q tests` in `cloud/runpod-worker/` (224 tests).
+with `python -m pytest -q tests` in `cloud/runpod-worker/` (231 tests).
 
 - `test_schema.py` — every golden example validates against its JSON Schema; the stdlib validator and jsonschema
   agree on good and broken inputs; caps, URL rules (host allowlist, https, signature, the job's own object keys).
 - `test_storage.py` — streamed download with size and sha256 checks, status mapping (404 → `INPUT_MISSING`, 403 →
   `BAD_URL`), retries, the guard objects, the volume driver and sweep, the real HTTPS transport against a local TLS
-  server (pinned IP, no redirects, wrong certificate refused).
+  server (pinned IP, an unreachable first address falls through to the next, no redirects, wrong certificate
+  refused).
 - `test_audio.py` — ffprobe parsing (cover art ignored, video/hls/concat refused, caps) and real ffmpeg round trips.
 - `test_pipeline.py` — `op: process` end to end with in-memory storage and fake models: uploads in order with the
   manifest last, the input deleted only after a usable result, duplicate and poisoned deliveries, partial results,
-  `DEADLINE`, error manifests, the rejection manifest for jobs that fail validation; every document against its
-  schema; sample counts equal to the decoded input (AAC and FLAC).
+  `DEADLINE`, error manifests, the rejection manifest for jobs that fail validation; a lyrics-only job whose
+  lyrics fail is an error that keeps its input (not `partial`); a 192 kHz input with AAC output fails before the
+  separation, and with FLAC output keeps its rate; every document against its schema; sample counts equal to the
+  decoded input (AAC and FLAC).
 - `test_lyrics_run.py`, `test_lyrics_windows.py`, `test_lyrics_postprocess.py` — VAD, the global offset check,
   synced and plain windows, token → UTF-16 offsets, line-timing fallback, the Whisper hook (a second backend takes
   the languages the first lacks), transcription.
@@ -784,6 +787,7 @@ with `python -m pytest -q tests` in `cloud/runpod-worker/` (224 tests).
   fetcher's size/sha checks and retries, the pip-check allowlist, fixture drift, the lock's base-package filter.
 - `test_deploy.py` — REST v2 client retries and safe errors, desired state and the smallest valid PATCH (complete
   env, pools with exclusions), the deploy flow (auto vs by hand, private package, rollout, selftest gitSha retry),
-  the concurrency check, the keepalive (restore only when healthy, the spend alarm without printing money).
+  the concurrency check, jobs still queued when the deploy stops waiting are cancelled, the keepalive (restore
+  only when healthy, the spend alarm without printing money).
 - `src/pixl_worker/smoke.py` (Docker `smoke` stage on CI, not pytest) — loads the real BS-RoFormer, aligner and
   htdemucs_ft weights on CPU and runs each once.

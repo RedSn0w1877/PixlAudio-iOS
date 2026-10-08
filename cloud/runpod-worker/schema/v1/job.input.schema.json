@@ -115,7 +115,7 @@
     "output": {
       "type": "object",
       "properties": {
-        "codec": {"enum": ["aac", "flac"], "default": "aac"},
+        "codec": {"enum": ["aac", "flac"], "default": "aac", "description": "aac keeps the input's sample rate only up to 96 kHz (the encoder's rates): a stem job with aac output and a 176.4/192 kHz input fails UNSUPPORTED_FORMAT before separating, so ask for flac for those."},
         "kbps": {"type": "integer", "minimum": 128, "maximum": 256, "default": 256},
         "put": {
           "type": "object",

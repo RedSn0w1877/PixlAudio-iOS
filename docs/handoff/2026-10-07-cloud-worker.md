@@ -82,8 +82,9 @@ made with a key, and no money was spent.**
 
 ## Verified how
 
-- CPU pytest locally (Python 3.12 venv, real ffmpeg): **224 passed**; the same suite passed in the image's `test`
-  stage on CI (runs 37711121150 and 37711887788, `test` job). `ci/check_weights.py`, `ci/check_fixtures.py` and
+- CPU pytest locally (Python 3.12 venv, real ffmpeg): **224 passed** before the review, **231** after it (see
+  "Review" below); the same suite passes in the image's `test` stage on CI (runs 37711121150 and 37711887788,
+  `test` job, and the review's run). `ci/check_weights.py`, `ci/check_fixtures.py` and
   `bash ci/check-forbidden.sh` pass.
 - Third-party APIs checked against their released sources, not guessed: msst 0.1.0 `Separator`
   (`config_path/checkpoint_path/model_type/device_ids`, `separate(audio, sample_rate=, channels_first=)`, the
@@ -129,6 +130,34 @@ The earlier attempt (run 37711121150) failed in the dependency check on `spin` v
   (the first main build's log shows both), and everything on RunPod (cold start, seconds per song, VRAM, the
   GPU actually picked, extra workers): the first deploy with **bench** ticked records them.
 
+## Review (adversarial pass, same day)
+
+Fixed on the branch after the implementer finished:
+
+- **A lyrics-only job whose lyrics fail is now an error, not `partial`.** A song that already has its
+  instrumental sends `tasks: ["lyrics"]`; before, a lyrics failure there returned `partial` with no outputs and
+  deleted the input, so the phone had to upload again to retry. Now it fails with the lyrics' own code (or
+  `INTERNAL`), writes the error manifest and keeps the input. With stems requested it stays `partial`, and the
+  warning names what was kept ("the instrumental is complete" / "the other outputs are complete").
+- **176.4/192 kHz input with AAC output fails before the separation.** ffmpeg's AAC encoder silently resamples to
+  96 kHz (checked with ffmpeg), so the manifest's sample rate and count would have been wrong and the phone would
+  have rejected the stem after a billed separation. It now fails `UNSUPPORTED_FORMAT` ("ask for flac output")
+  right after the probe; FLAC output keeps 192 kHz (test).
+- **By-hand deploy with an empty `image_tag` deploys the newest green main build.** Before, it deployed
+  `sha-<the main commit it ran on>`, which doesn't exist whenever an app-only commit landed on main after the
+  last worker build (very likely with the batch merging), and the error blamed package visibility.
+- **The deploy cancels jobs it stops waiting for** (selftest, bench, the 3 concurrency jobs) when no GPU turns up
+  within its timeout, so they can't start and bill later.
+- The storage transport tries every resolved public address in order (an unreachable IPv6 address on a host
+  without IPv6 routing no longer fails the download); `cloud-worker-build` no longer runs on tag pushes (path
+  filters don't apply to tags).
+
+Checked and left as is: the RunPod REST v2 field names and shapes against the live OpenAPI spec (create/update,
+`pools` + `excludedTypes`, releases' `rollout`, workers' `summary`, billing totals, list pagination); msst's chunk
+loop really calls the progress hook (`pbar=detailed_progress`); qwen-asr's `transcribe(audio, language=)` and
+result fields; the runpod SDK pops `error`/`refresh_worker` and logs job outputs only at DEBUG (the image sets
+`RUNPOD_LOG_LEVEL=INFO`). No app code changed on this branch, so there are no screenshots to look at.
+
 ## For Hoa (iPhone and accounts)
 
 There is nothing to test on the iPhone yet: the app side (design 7.7, P1–P5) isn't built. What Hoa does, in order,
@@ -139,8 +168,8 @@ is the checklist in `cloud/runpod-worker/README.md`:
 - [ ] Cloudflare: bucket `pixl-cloud-studio` with the three lifecycle rules (`in/` 7 d, `out/` 30 d, no prefix
       30 d) and a token limited to that bucket.
 - [ ] Merge `s19-cloud-worker` to main; then make the `pixl-cloud-worker` package public (once).
-- [ ] Run `cloud-worker-deploy` by hand with **bench** ticked; copy the summary's numbers into this note
-      (GPU, cold start, seconds per stage, peak VRAM, peak running workers).
+- [ ] Run `cloud-worker-deploy` by hand with **bench** ticked and `image_tag` empty; copy the summary's numbers
+      into this note (GPU, cold start, seconds per stage, peak VRAM, peak running workers).
 - [ ] Make the `pixl-iphone` Restricted key; do the two-minute throwaway-key check (README step 9) and note the result.
 - [ ] Optional: the re-delivery test with `PIXL_ALLOW_CRASH_TEST=1` (README › Runbook).
 
