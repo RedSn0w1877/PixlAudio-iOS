@@ -8,6 +8,20 @@ final class CloudStudioScreenshotTests: XCTestCase {
     func testCloudProcessingLight() throws { try capture("cloud.settings", "light", ready: "screen.cloudProcessing") }
     func testCloudProcessingDark() throws { try capture("cloud.settings", "dark", ready: "screen.cloudProcessing") }
 
+    /// A build with PixlAudio's built-in cloud keys: "Using PixlAudio's built-in cloud keys" and "Use my own keys"
+    /// instead of the fields, the consent switch on by default.
+    func testCloudProcessingBuiltInLight() throws {
+        try capture("cloud.settings.builtin", "light", ready: "screen.cloudProcessing") { app in
+            self.expectBuiltInKeys(app)
+        }
+    }
+
+    func testCloudProcessingBuiltInDark() throws {
+        try capture("cloud.settings.builtin", "dark", ready: "screen.cloudProcessing") { app in
+            self.expectBuiltInKeys(app)
+        }
+    }
+
     /// Scrolled to Test connection: RunPod and storage each with their own result.
     func testCloudProcessingTestedLight() throws {
         try capture("cloud.settings", "light", ready: "screen.cloudProcessing", suffix: "-tested") { app in
@@ -42,6 +56,18 @@ final class CloudStudioScreenshotTests: XCTestCase {
     }
 
     // MARK: - Helpers
+
+    /// The built-in keys panel is up and the own-key fields are not.
+    private func expectBuiltInKeys(_ app: XCUIApplication) {
+        XCTAssertTrue(app.descendants(matching: .any)["cloud.builtInKeys"].firstMatch.waitForExistence(timeout: 10),
+                      "the built-in keys panel is missing")
+        // SwitchSettingRow names itself settings.switch.<title>; the screen's own identifier may sit on top of that.
+        XCTAssertTrue(app.descendants(matching: .any)["cloud.useOwnKeys"].firstMatch.exists
+                      || app.descendants(matching: .any)["settings.switch.Use my own keys"].firstMatch.exists,
+                      "Use my own keys is missing")
+        XCTAssertFalse(app.descendants(matching: .any)["cloud.endpointId"].firstMatch.exists,
+                       "the own-key fields show although the built-in keys are in use")
+    }
 
     /// Scrolls in short, slow, held drags along the leading margin (no momentum, so it can't overshoot; never on a
     /// field or a switch) until `identifier` sits in the upper part of the screen, below the collapsed header.

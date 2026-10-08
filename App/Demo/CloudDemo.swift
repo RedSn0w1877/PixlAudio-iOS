@@ -49,7 +49,9 @@ enum CloudDemo {
         let selftest = CloudCheck(ok: true, message: "The worker answered.",
                                   detail: "Worker 1.0.0 on NVIDIA L4 · songs up to 160 MB and 15 min")
         let settingsScreen = screen == .cloudSettings || builtInScreen
-        studio.loadDemo(jobs: settingsScreen ? Array(jobs().prefix(2)) : jobs(),
+        // The built-in screen has nothing on its way, so "Use my own keys" can be switched (it is locked while
+        // songs are in the cloud).
+        studio.loadDemo(jobs: builtInScreen ? [] : settingsScreen ? Array(jobs().prefix(2)) : jobs(),
                         report: settingsScreen ? report : nil,
                         selftest: settingsScreen ? selftest : nil,
                         progress: [jobKey(1): 0.42],
