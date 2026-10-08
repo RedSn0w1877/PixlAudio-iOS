@@ -885,9 +885,11 @@ and is skipped without it).
   the concurrency check, jobs still queued when the deploy stops waiting are cancelled, the keepalive (restore
   only when healthy and the last deploy that ran passed: failed, cancelled and timed-out deploys block it,
   skipped deploy runs don't count; the spend alarm without printing money); the idle-worker reaper (two reads a
-  minute apart, released by max 0 and back, a job arriving or a worker that never leaves, max never raised, the off
-  switch left alone, the restore after every failure, quiet before setup, the id masked first) and the deploy's
-  release after its selftest/bench; the reaper workflow's schedule, environment, permissions and pinned actions.
+  minute apart, released by max 0 and back, a job arriving or a worker that never leaves, max never raised, min
+  and idle timeout restored as found, the off switch and a warm (min > 0) endpoint left alone, a slow RunPod left
+  alone, the restore after every failure and after a cancel (KeyboardInterrupt), quiet before setup, the id masked
+  first) and the deploy's release after its selftest/bench; the reaper workflow's schedule, environment,
+  permissions, pinned actions, `exec` and timeout, and the deploy step's `exec`.
 - `src/pixl_worker/smoke.py` (Docker `smoke` stage on CI, not pytest) — loads the real BS-RoFormer, aligner and
   htdemucs_ft weights on CPU and runs each once; the htdemucs_ft run goes through the progress hook (one total
   for the bag of models, never going backwards).

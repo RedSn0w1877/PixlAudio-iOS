@@ -727,6 +727,17 @@ def test_deploy_after_a_failed_selftest_still_releases_and_keeps_its_own_error(c
     assert "::error::couldn't set max workers back to 1" in out
 
 
+def test_a_cancelled_deploy_skips_the_idle_check():
+    class Cancelled(Reaped):
+        def runsync(self, endpoint_id, job_input, wait_ms=300000):
+            raise KeyboardInterrupt  # GitHub's SIGINT while the selftest runs
+
+    api = Cancelled(deployed(), [IDLE, IDLE, GONE])
+    with pytest.raises(KeyboardInterrupt):
+        go(api)
+    assert ("health",) not in api.calls and patches(api) == []
+
+
 def test_deploy_fails_when_the_workers_cant_be_put_back():
     api = Reaped(deployed(), [IDLE, IDLE, GONE], fail_patch={1})
     with pytest.raises(D.DeployError, match="back to 1"):

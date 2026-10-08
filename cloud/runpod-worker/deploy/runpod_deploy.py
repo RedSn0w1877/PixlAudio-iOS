@@ -18,9 +18,10 @@ Steps (stdlib only, idempotent):
    once while polling the workers every 5 s for the peak number running (above 1 means "extra workers" exist
    and every max-1 cost bound is off). Each selftest and bench stops its worker afterwards (handler.py), so the
    3 concurrency jobs each start a worker of their own;
-7. after the selftest/bench, whether they passed or not: the idle release of deploy/reaper.py (two /health reads
-   a minute apart; a worker still idle and ready with nothing to do is released by max workers 0 and back), since
-   an idle worker left by the deploy's own jobs bills until something stops it (seen on 2026-10-08).
+7. after the selftest/bench, whether they passed or not (but not when the run is cancelled): the idle release of
+   deploy/reaper.py (two /health reads a minute apart; a worker still idle and ready with nothing to do is
+   released by max workers 0 and back), since an idle worker left by the deploy's own jobs bills until something
+   stops it (seen on 2026-10-08).
 Prints only pass/fail lines, the GPU name and timings: never a key, the endpoint id, a response body or money.
 """
 
@@ -281,6 +282,7 @@ def deploy(api: RunPod | None, *, tag: str, git_sha: str, account_id: str, creat
     if changed and current is not None:
         wait_rollout(api, endpoint_id, sleep=sleep, clock=clock)
     passed = False
+    release = run_selftest or run_bench
     try:
         if run_selftest:
             report_selftest(selftest(api, endpoint_id, git_sha, sleep=sleep, clock=clock))
@@ -288,8 +290,13 @@ def deploy(api: RunPod | None, *, tag: str, git_sha: str, account_id: str, creat
             bench(api, endpoint_id, sleep=sleep, clock=clock)
             concurrency_check(api, endpoint_id, sleep=sleep, clock=clock)
         passed = True
+    except KeyboardInterrupt:
+        # Cancelled (the workflow execs python, so GitHub's SIGINT lands here, with SIGTERM 7.5 s behind it): no
+        # time for a minute-long idle check; cloud-worker-reaper looks within 30 minutes.
+        release = False
+        raise
     finally:
-        if run_selftest or run_bench:
+        if release:
             release_after_jobs(api, endpoint_id, template, strict=passed, sleep=sleep, clock=clock)
     return 0
 

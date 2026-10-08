@@ -117,8 +117,12 @@ Actions tab if that happens (the app also notices a paused endpoint).
 2. *`cloud-worker-reaper`* (every 30 minutes, at :07 and :37, and by hand: Actions → cloud-worker-reaper → Run
    workflow) reads `/health` twice a minute apart. When both show an idle or ready worker and nothing queued, in
    progress or running, it sets max workers to 0 until the worker is gone (2 minutes at most; a job that arrives
-   meanwhile only waits for the restore) and then back to what it was, never above `deploy/endpoint.json`. It
-   leaves an endpoint at max 0 alone (that is the off switch). Most runs only read `/health` and print the counts.
+   meanwhile only waits for the restore) and then back to what it was, never above `deploy/endpoint.json` (min
+   and idle timeout stay as they were). It leaves an endpoint at max 0 alone (that is the off switch), and one with
+   min workers above 0 (a worker you keep warm on purpose). When RunPod answers so slowly that the two reads take
+   well over their minute, it changes nothing and the next run looks again. Most runs only read `/health` and print
+   the counts. A cancelled or timed-out run still puts max workers back (the step `exec`s python, so the cancel
+   reaches it).
 3. *The deploy* does the same release after its selftest/bench, whether they passed or not.
 
 By hand, if a worker ever stays up (RunPod console → Serverless → `pixl-cloud-studio` → Workers shows one *idle*

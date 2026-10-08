@@ -254,7 +254,16 @@ from the first line of defence to the last; nothing was deployed and no RunPod o
      same call the keepalive already makes, rather than REST v1's `workersMax` (v1 retires 2026-11-15).
    - Max goes back to what it found, never above `deploy/endpoint.json` (so it never undoes RunPod's own scale-down
      of a crashing endpoint, which the keepalive also leaves alone); an endpoint already at max 0 (the off switch) is
-     left alone without even a read.
+     left alone without even a read. Min and `idleTimeout` go back as found (`endpoint.json`'s `idleTimeout` when
+     the answer lacks it): only max is touched.
+   - Min workers above 0 (set by hand to keep a worker warm) is left alone without a read: that idle worker is
+     wanted, and releasing it would reset min every half hour.
+   - When retries stretch the two reads past 60 + 90 s, it changes nothing (a warning): a struggling API might not
+     take the restore. The workflow `exec`s python, so GitHub's SIGINT on a cancel or timeout reaches it as
+     `KeyboardInterrupt` and the restore in the `finally` still runs (under bash it stopped at the shell); the job
+     timeout is 25 minutes, above the ~23 a run can take when every RunPod call retries to the end. The deploy step
+     `exec`s `runpod_deploy.py` for the same reason: a deploy cancelled at max 0 would otherwise stay there, since
+     the keepalive restores nothing after a cancelled deploy.
    - The restore always runs, also after a failed read while waiting or a failed PATCH to 0 (it may have been
      applied before the connection dropped). A failed PATCH and a worker still there after 2 minutes fail the run
      (email). A read that fails before anything changed is only a warning: the keepalive reports an unreachable
@@ -266,7 +275,9 @@ from the first line of defence to the last; nothing was deployed and no RunPod o
    - Every run is a deployment of the `runpod` environment, so its history grows by 48 a day (noise only).
 3. **`runpod_deploy.py`** does the same release (`release_after_jobs`) after its selftest/bench, passed or not: a
    failed read is a warning; workers that can't be put back fail a deploy that passed and are an `::error::` line
-   on one that already failed (its own error is kept). A deploy without jobs (`--no-selftest`, no bench) skips it.
+   on one that already failed (its own error is kept). A deploy without jobs (`--no-selftest`, no bench) skips it,
+   and so does a cancelled one (no time for the minute-long check before GitHub's SIGTERM; the reaper looks within
+   30 minutes).
 
 Tests (pytest, CPU): `test_handler.py` (refresh after selftest/bench, also refused ones; after the last job, also a
 failed or refused one; none before it or for a non-boolean flag; the SDK's view of the output equals the manifest;
