@@ -474,6 +474,17 @@
         }
       }
     },
+    "Cloud keys missing — paste them again." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cloud keys missing — paste them again."
+          }
+        }
+      }
+    },
     "Connect a provider to manage it from this screen." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -965,17 +976,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Include music library"
-          }
-        }
-      }
-    },
-    "Instrumental" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Instrumental"
           }
         }
       }
@@ -1574,6 +1574,17 @@
         }
       }
     },
+    "Play on a Spotify Connect speaker, press the volume buttons, then come back here. \"Re-centre\" means presses work at any phone volume; \"Relative\" means they stop at full or silent." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Play on a Spotify Connect speaker, press the volume buttons, then come back here. \"Re-centre\" means presses work at any phone volume; \"Relative\" means they stop at full or silent."
+          }
+        }
+      }
+    },
     "Playback position" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1669,6 +1680,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Prepare lyrics and instrumentals quietly while PixlAudio is open."
+          }
+        }
+      }
+    },
+    "Process all in the cloud" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Process all in the cloud"
           }
         }
       }
@@ -1779,6 +1801,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Remove from queue"
+          }
+        }
+      }
+    },
+    "Remove from the list" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove from the list"
           }
         }
       }
@@ -2076,6 +2109,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Show lyric options"
+          }
+        }
+      }
+    },
+    "Show romanization" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show romanization"
           }
         }
       }
@@ -2421,6 +2465,17 @@
         }
       }
     },
+    "Translate via AI" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Translate via AI"
+          }
+        }
+      }
+    },
     "Try a different search term or check your filters." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2472,6 +2527,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "View"
+          }
+        }
+      }
+    },
+    "Volume Buttons (Spotify Connect)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volume Buttons (Spotify Connect)"
           }
         }
       }
