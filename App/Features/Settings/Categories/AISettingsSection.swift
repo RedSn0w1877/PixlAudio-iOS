@@ -759,7 +759,7 @@ struct MusicIntelligenceCard: View {
         isBusy = true
         let home = env.home, library = env.library
         Task {
-            await home.regenerateDailyMix(snapshot: library.snapshot, libraryRevision: library.revision)
+            await home.regenerateDailyMix(snapshot: library.snapshot, libraryRevision: library.songsRevision)
             message = "Daily Mix and Your Mix were drawn again."
             isBusy = false
         }

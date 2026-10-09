@@ -15,6 +15,9 @@ final class LibraryStore {
     private(set) var snapshot: LibrarySnapshot = .empty
     /// Bumped whenever `snapshot` changes.
     private(set) var revision = 0
+    /// Bumped with `revision` for everything except artist-picture updates (`updateArtists`): what screens that read
+    /// songs, albums and playlists, but never an artist's picture, key their recomputation on (Home).
+    private(set) var songsRevision = 0
     /// True until the first snapshot (cache or store) arrived.
     private(set) var isLoading = true
     private(set) var lastImportProgress: LibraryImportProgress?
@@ -162,6 +165,7 @@ final class LibraryStore {
         }
         snapshot = newSnapshot
         revision &+= 1
+        songsRevision &+= 1
         rebuildDetailIndex()
     }
 

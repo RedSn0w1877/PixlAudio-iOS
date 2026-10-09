@@ -36,7 +36,7 @@ struct HomeView: View {
                                        onRefresh: {
                                            Task {
                                                await home.refresh(snapshot: library.snapshot,
-                                                                  libraryRevision: library.revision, force: true)
+                                                                  libraryRevision: library.songsRevision, force: true)
                                            }
                                        },
                                        onPlay: { section, song in playback.play(song, in: section.songs) })
@@ -90,8 +90,8 @@ struct HomeView: View {
         }
         .background(theme.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
-        .task(id: HomeRefreshKey(libraryRevision: library.revision, revision: home.history.revision)) {
-            await home.refresh(snapshot: library.snapshot, libraryRevision: library.revision)
+        .task(id: HomeRefreshKey(libraryRevision: library.songsRevision, revision: home.history.revision)) {
+            await home.refresh(snapshot: library.snapshot, libraryRevision: library.songsRevision)
         }
         // Cloud Studio's stored jobs (read once, off the main actor): its work may have moved on while the app was closed,
         // and the jobs button should show it.
@@ -114,7 +114,7 @@ struct HomeView: View {
                 YourMixEmptyPlaceholder(onRefresh: {
                     Task {
                         try? await library.refresh()
-                        await env.home.refresh(snapshot: library.snapshot, libraryRevision: library.revision,
+                        await env.home.refresh(snapshot: library.snapshot, libraryRevision: library.songsRevision,
                                                force: true)
                     }
                 })

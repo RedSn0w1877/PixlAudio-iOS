@@ -198,6 +198,24 @@ final class HomeLogicTests: XCTestCase {
         XCTAssertGreaterThan(content.statsOverview?.totalPlayCount ?? 0, 0)
     }
 
+    func testSupersededComputationStopsAndAnActiveOneMatchesCompute() async {
+        let events = DemoListeningHistory.events(songs: DemoLibrary.songs, nowMs: now)
+        let snapshot = DemoLibrary.snapshot, zone = utc, at = now
+        let active = HomeStore.computeIfActive(snapshot: snapshot, events: events, nowMs: at, timeZone: zone,
+                                               savedDaily: [], savedYourMix: [])
+        let plain = HomeStore.compute(snapshot: snapshot, events: events, nowMs: at, timeZone: zone, savedDaily: [],
+                                      savedYourMix: [])
+        XCTAssertEqual(active?.content, plain.content)
+        let cancelled = Task.detached { () -> Bool in
+            // Cancel this task from inside, then compute: the first stage boundary abandons the work.
+            withUnsafeCurrentTask { $0?.cancel() }
+            return HomeStore.computeIfActive(snapshot: snapshot, events: events, nowMs: at, timeZone: zone,
+                                             savedDaily: [], savedYourMix: []) == nil
+        }
+        let abandoned = await cancelled.value
+        XCTAssertTrue(abandoned)
+    }
+
     func testSavedDailyMixIsKeptForTheDay() {
         let saved = Array(DemoLibrary.songs.prefix(3).map(\.id).reversed())
         let result = HomeStore.compute(snapshot: DemoLibrary.snapshot, events: [], nowMs: now, timeZone: utc,
