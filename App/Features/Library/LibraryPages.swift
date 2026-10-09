@@ -310,7 +310,9 @@ struct AlbumSchemeReader<Content: View>: View {
                 let style = settings.appearance.paletteStyle
                 let accuracy = settings.appearance.colorAccuracy
                 if let hit = env.colorExtractor.peek(source, style: style, accuracyLevel: accuracy) {
-                    if pair != hit { pair = hit }
+                    // `body` already reads this hit (`cachedPair`): writing it into a nil `pair` would only re-run the
+                    // whole card with identical output. A stale pair from another artwork is still replaced.
+                    if pair != nil, pair != hit { pair = hit }
                     return
                 }
                 let loaded = await env.colorExtractor.schemePair(for: source, style: style, accuracyLevel: accuracy)
