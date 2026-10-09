@@ -11,7 +11,20 @@ actor ColorExtractor {
     private let persistence: PersistenceActor?
     private var memory: [String: ColorRolesPair] = [:]
     private var order: [String] = []
-    private var inFlight: [String: Task<ColorRolesPair?, Never>] = [:]
+    /// One extraction per artwork and palette, shared by everyone asking; one nobody waits for any more (the card
+    /// scrolled away) is cancelled before its next step.
+    private final class Extraction {
+        let id: Int
+        var waiters = Set<Int>()
+        var task: Task<ColorRolesPair?, Never>?
+        init(id: Int) { self.id = id }
+    }
+
+    private var inFlight: [String: Extraction] = [:]
+    private var nextExtractionID = 0
+    private var nextWaiterID = 0
+    /// At most two extractions run at once (a 128 px decode and a quantiser pass each), newest first.
+    private let gate = LIFOGate(limit: 2)
     private static let memoryLimit = 256
     /// A synchronous mirror of the memory cache (larger, LRU), so a view can start with its album colours on the
     /// first frame instead of the brand theme followed by a 0.25 s re-theme (Android `peekCachedColorScheme`). A pair
@@ -33,24 +46,59 @@ actor ColorExtractor {
         let key = source.cacheKey + "|" + paletteKey
         if let hit = memory[key] { return hit }
         if let hit = mirror.value(for: key) { return hit } // warmed from the store at launch
-        if let task = inFlight[key] { return await task.value }
-        let pipeline = self.pipeline
-        let persistence = self.persistence
-        let artworkKey = source.cacheKey
-        let task = Task.detached(priority: .userInitiated) { () -> ColorRolesPair? in
-            if let stored = try? await persistence?.artworkTheme(key: key) { return stored }
-            guard let pixels = await pipeline.argbPixels(source, maxDimension: ArtworkTheme.extractionMaxDimension),
-                  !pixels.isEmpty else { return nil }
-            let seed = ArtworkTheme.seedColor(argbPixels: pixels, accuracyLevel: accuracyLevel)
-            let pair = ArtworkTheme.schemePair(seed: seed, style: style)
-            try? await persistence?.saveArtworkTheme(key: key, artworkKey: artworkKey, paletteKey: paletteKey, pair: pair)
-            return pair
+        let job: Extraction
+        if let existing = inFlight[key] {
+            job = existing
+        } else {
+            nextExtractionID += 1
+            let created = Extraction(id: nextExtractionID)
+            inFlight[key] = created
+            let id = created.id, gate = self.gate
+            let pipeline = self.pipeline
+            let persistence = self.persistence
+            let artworkKey = source.cacheKey
+            created.task = Task.detached(priority: .userInitiated) { [self] () -> ColorRolesPair? in
+                var result: ColorRolesPair?
+                if let stored = try? await persistence?.artworkTheme(key: key) {
+                    result = stored
+                } else if await gate.acquire() {
+                    if !Task.isCancelled,
+                       let pixels = await pipeline.argbPixels(source, maxDimension: ArtworkTheme.extractionMaxDimension),
+                       !pixels.isEmpty, !Task.isCancelled {
+                        let seed = ArtworkTheme.seedColor(argbPixels: pixels, accuracyLevel: accuracyLevel)
+                        let pair = ArtworkTheme.schemePair(seed: seed, style: style)
+                        try? await persistence?.saveArtworkTheme(key: key, artworkKey: artworkKey,
+                                                                 paletteKey: paletteKey, pair: pair)
+                        result = pair
+                    }
+                    await gate.release()
+                }
+                await self.extractionFinished(key: key, job: id, result: result)
+                return result
+            }
+            job = created
         }
-        inFlight[key] = task
-        let result = await task.value
-        inFlight[key] = nil
-        if let result { remember(result, for: key) }
+        nextWaiterID += 1
+        let waiter = nextWaiterID, jobID = job.id
+        job.waiters.insert(waiter)
+        let result = await withTaskCancellationHandler {
+            await job.task?.value
+        } onCancel: {
+            Task { await self.waiterCancelled(key: key, job: jobID, waiter: waiter) }
+        }
+        job.waiters.remove(waiter)
         return result
+    }
+
+    private func extractionFinished(key: String, job: Int, result: ColorRolesPair?) {
+        if inFlight[key]?.id == job { inFlight[key] = nil }
+        if let result { remember(result, for: key) }
+    }
+
+    private func waiterCancelled(key: String, job jobID: Int, waiter: Int) {
+        guard let job = inFlight[key], job.id == jobID, job.waiters.remove(waiter) != nil, job.waiters.isEmpty else { return }
+        job.task?.cancel()
+        inFlight[key] = nil
     }
 
     /// The cached or stored scheme pair, never generating one: a mirror or memory hit, else the stored theme (one
