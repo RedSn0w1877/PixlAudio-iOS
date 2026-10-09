@@ -124,7 +124,14 @@ struct QuickFillSheet: View {
     }
 
     nonisolated private static func filter(_ songs: [Song], query: String) -> [Song] {
-        songs.filter { $0.title.localizedCaseInsensitiveContains(query) || $0.displayArtist.localizedCaseInsensitiveContains(query) }
+        var matched: [Song] = []
+        for (index, song) in songs.enumerated() {
+            if index & 255 == 0, Task.isCancelled { return [] }
+            if song.title.localizedCaseInsensitiveContains(query) || song.displayArtist.localizedCaseInsensitiveContains(query) {
+                matched.append(song)
+            }
+        }
+        return matched
     }
 
     private func applyQuery(_ query: String) {
@@ -139,7 +146,8 @@ struct QuickFillSheet: View {
             return
         }
         filterTask = Task {
-            let result = await Task.detached(priority: .userInitiated) { Self.filter(all, query: query) }.value
+            let pass = Task.detached(priority: .userInitiated) { Self.filter(all, query: query) }
+            let result = await withTaskCancellationHandler { await pass.value } onCancel: { pass.cancel() }
             guard !Task.isCancelled, query == self.query else { return }
             matches = result
         }
