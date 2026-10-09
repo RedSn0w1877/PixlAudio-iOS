@@ -80,6 +80,11 @@ struct CloudProcessingSettingsView: View {
                                  subtitle: "Off: uploads and downloads wait for Wi-Fi. Low Data Mode always waits.",
                                  isOn: $settings.useCellular, systemImage: "antenna.radiowaves.left.and.right")
             }
+            SettingsSubsection(title: "Notifications") {
+                SwitchSettingRow(title: "Notify me when it's done",
+                                 subtitle: "A notification when songs finish while PixlAudio is closed. iOS asks the first time you send songs.",
+                                 isOn: $settings.notifyWhenDone, systemImage: "bell.badge")
+            }
             costSection(cloud: cloud, settings: settings)
             SettingsSubsection(title: "Queue") {
                 SettingsItemRow(title: "Cloud queue", subtitle: cloud.summaryLine ?? "Send songs and see what comes back.",

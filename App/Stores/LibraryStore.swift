@@ -80,17 +80,21 @@ final class LibraryStore {
         isLoading = false
     }
 
-    /// Runs the importer, then reloads from the store.
+    /// Runs the importer, then reloads from the store. A scan that is running when the app is switched away gets
+    /// iOS's extra ~30 seconds to finish (`BackgroundGrace`); a longer one is suspended and carries on when the app
+    /// returns (the scan writes its result once at the end, so nothing is half-saved).
     func refresh(mode: LibraryImportMode = .incremental) async throws {
         guard let importer, let loader else { return }
-        _ = try await importer.importLibrary(mode: mode) { progress in
-            Task { @MainActor [weak self] in
-                guard let self, self.lastImportProgress != progress else { return }
-                self.lastImportProgress = progress
+        try await BackgroundGrace.run("Library scan") {
+            _ = try await importer.importLibrary(mode: mode) { progress in
+                Task { @MainActor [weak self] in
+                    guard let self, self.lastImportProgress != progress else { return }
+                    self.lastImportProgress = progress
+                }
             }
+            let base = snapshot
+            apply(try await loader.loadFromStoreInBackground(previous: base), base: base)
         }
-        let base = snapshot
-        apply(try await loader.loadFromStoreInBackground(previous: base), base: base)
     }
 
     /// Re-reads the store after another writer changed it (stage 12: Spotify rows merged into the library).
