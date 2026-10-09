@@ -233,6 +233,26 @@ final class HomeLogicTests: XCTestCase {
         XCTAssertNil(result.content.statsOverview)
     }
 
+    func testHistoryWritesAreSharedAndFlushedOnDemand() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let file = ListeningHistoryFile(url: url)
+        let store = ListeningHistoryStore(clock: HomeClock(fixedNowMs: now, timeZone: utc), file: file)
+        await store.ensureLoaded()
+        store.record(songId: "demo:1", durationMs: 120_000)
+        store.record(songId: "demo:2", durationMs: 120_000)
+        // Nothing is written until the delay or a flush.
+        let early = await file.read()
+        XCTAssertTrue(early.isEmpty)
+        store.flush()
+        var stored: [PlaybackEvent] = []
+        for _ in 0..<100 where stored.count < 2 {
+            try await Task.sleep(for: .milliseconds(20))
+            stored = await file.read()
+        }
+        XCTAssertEqual(stored.map(\.songId), ["demo:1", "demo:2"])
+    }
+
     func testRecordingBumpsTheRevision() async {
         let store = ListeningHistoryStore(clock: HomeClock(fixedNowMs: now, timeZone: utc), file: nil)
         await store.ensureLoaded()

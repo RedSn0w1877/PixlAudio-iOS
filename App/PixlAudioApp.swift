@@ -27,7 +27,9 @@ struct PixlAudioApp: App {
                 .onChange(of: scenePhase, initial: true) { _, phase in
                     switch phase {
                     case .active: cloud.resume()
-                    case .background: cloud.didEnterBackground()
+                    case .background:
+                        cloud.didEnterBackground()
+                        environment.home.history.flush()
                     default: break
                     }
                 }

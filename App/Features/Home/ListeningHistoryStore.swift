@@ -17,6 +17,11 @@ final class ListeningHistoryStore {
     @ObservationIgnored private(set) var events: [PlaybackEvent] = []
     @ObservationIgnored private var isLoaded = false
     @ObservationIgnored private var loadTask: Task<Void, Never>?
+    /// The history file is rewritten in full (a few MB at two years of listening): changes within a few seconds share
+    /// one write, and `flush()` writes at once (backgrounding, an import, clearing).
+    @ObservationIgnored private var writeTask: Task<Void, Never>?
+    @ObservationIgnored private var hasPendingWrite = false
+    static let writeDelay: Duration = .seconds(3)
 
     let clock: HomeClock
     private let file: ListeningHistoryFile?
@@ -70,14 +75,35 @@ final class ListeningHistoryStore {
     /// `importEventsFromBackup`.
     func importEvents(_ imported: [PlaybackEvent], clearExisting: Bool = true) {
         replace(with: PlaybackStats.importingEvents(imported, into: events, clearExisting: clearExisting))
+        flush()
     }
 
-    func clear() { replace(with: []) }
+    func clear() {
+        replace(with: [])
+        flush()
+    }
 
     private func replace(with newEvents: [PlaybackEvent]) {
         events = newEvents
         revision += 1
-        if let file { Task { await file.write(newEvents) } }
+        guard file != nil else { return }
+        hasPendingWrite = true
+        guard writeTask == nil else { return }
+        writeTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.writeDelay)
+            if Task.isCancelled { return }
+            self?.flush()
+        }
+    }
+
+    /// Writes the history now if a change is waiting for its write.
+    func flush() {
+        writeTask?.cancel()
+        writeTask = nil
+        guard hasPendingWrite, let file else { return }
+        hasPendingWrite = false
+        let snapshot = events
+        Task { await file.write(snapshot) }
     }
 }
 
