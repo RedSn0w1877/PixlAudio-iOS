@@ -80,7 +80,8 @@ final class PlaybackServices {
     }
 
     /// Restores the saved queue (paused) once the library is loaded. The JSON is decoded off the main actor.
-    func restoreQueue(lookup: (String) -> Song?) async {
+    /// `beforeRestore` gets the song the queue will show first, before the queue is restored (launch themes it then).
+    func restoreQueue(lookup: (String) -> Song?, beforeRestore: ((Song) async -> Void)? = nil) async {
         let loaded: PlaybackQueueSnapshot?
         if let queuePreload {
             self.queuePreload = nil
@@ -90,6 +91,9 @@ final class PlaybackServices {
         }
         guard let snapshot = loaded, !snapshot.items.isEmpty else { return }
         let songs = QueueSnapshotStore.songs(for: snapshot, lookup: lookup)
+        if let beforeRestore, !songs.isEmpty {
+            await beforeRestore(songs[DualDeckEngine.restoredIndex(snapshot, songs: songs)])
+        }
         engine.restore(snapshot, songs: songs)
     }
 

@@ -238,6 +238,11 @@ final class AppEnvironment {
         guard !launch.isUITest else { return }
         library.beginCachedLoad() // decode the snapshot cache and the saved queue alongside the service starts below
         playbackServices?.prepareQueueRestore()
+        // Every stored album theme into the synchronous mirror, so cards and pills start with their colours.
+        let extractor = colorExtractor, appearance = settings.appearance
+        Task(priority: .userInitiated) {
+            await extractor.warm(style: appearance.paletteStyle, accuracyLevel: appearance.colorAccuracy)
+        }
         // First run: PixlAudio's setup (Android shows `SetupScreen` until `initial_setup_done`).
         if !settings.behavior.initialSetupDone, router.cover == nil { router.present(AppCover.setup) }
         playbackServices?.start()
@@ -258,7 +263,8 @@ final class AppEnvironment {
         // store's full read, which only reconciles. Without a cache (first launch) the order stays as it was.
         let hasCache = await library.installCached()
         if !hasCache { await library.reconcileWithStore() }
-        await playbackServices?.restoreQueue(lookup: library.song(id:))
+        let theme = self.theme
+        await playbackServices?.restoreQueue(lookup: library.song(id:), beforeRestore: { await theme.seed(for: $0) })
         if hasCache { await library.reconcileWithStore() }
         artistImages?.prefetchMissing()
         libraryAutoRefresh?.start()

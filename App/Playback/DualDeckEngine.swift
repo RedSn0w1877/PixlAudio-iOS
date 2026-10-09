@@ -326,10 +326,7 @@ final class DualDeckEngine: PlaybackEngine {
     /// resolved against the library, in snapshot order.
     func restore(_ snapshot: PlaybackQueueSnapshot, songs: [Song]) {
         guard queue.isEmpty, !songs.isEmpty else { return }
-        var index = min(max(snapshot.currentIndex, 0), songs.count - 1)
-        if let id = snapshot.currentMediaId, songs[index].id != id, let found = songs.firstIndex(where: { $0.id == id }) {
-            index = found
-        }
+        let index = Self.restoredIndex(snapshot, songs: songs)
         queue.restore(songs: songs, currentIndex: index, originalSongs: nil)
         queue.repeatMode = RepeatMode(rawValue: snapshot.repeatMode) ?? .off
         shuffleEnabled = snapshot.shuffleEnabled
@@ -342,6 +339,16 @@ final class DualDeckEngine: PlaybackEngine {
         onQueueChanged?()
         onItemTransition?(queue.current?.song, nil, false)
         loadCurrent(at: Double(max(snapshot.currentPositionMs, 0)) / 1000)
+    }
+
+    /// The item a restored queue starts at: the saved index, or where the saved current song id now is.
+    static func restoredIndex(_ snapshot: PlaybackQueueSnapshot, songs: [Song]) -> Int {
+        guard !songs.isEmpty else { return 0 }
+        var index = min(max(snapshot.currentIndex, 0), songs.count - 1)
+        if let id = snapshot.currentMediaId, songs[index].id != id, let found = songs.firstIndex(where: { $0.id == id }) {
+            index = found
+        }
+        return index
     }
 
     /// Restores repeat / shuffle preferences at launch (before any queue exists).
