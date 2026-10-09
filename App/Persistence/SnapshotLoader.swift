@@ -44,7 +44,8 @@ nonisolated struct SnapshotLoader: Sendable {
         let snapshot = try await persistence.loadLibrarySnapshot()
         let changed = snapshot != previous
         if changed { writeCache(snapshot) }
-        return LoadedLibrary(snapshot: snapshot, lookups: LibraryLookups(snapshot), changed: changed)
+        // The lookups are only read when the snapshot replaces `previous`; an unchanged one skips building them.
+        return LoadedLibrary(snapshot: snapshot, lookups: LibraryLookups(changed ? snapshot : .empty), changed: changed)
     }
 
     /// The cached snapshot and its lookups, built off the main actor.

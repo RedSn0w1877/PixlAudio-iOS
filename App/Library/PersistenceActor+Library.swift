@@ -62,6 +62,22 @@ extension PersistenceActor {
         return result
     }
 
+    /// A hash of every tag override (song, fields, time of the edit): a rescan whose overrides still hash the same has
+    /// no override edit to apply. Overrides are the user's few hand edits, so reading them is cheap.
+    func tagOverridesSignature() throws -> String {
+        var parts: [String] = []
+        for record in try modelContext.fetch(FetchDescriptor<TagOverrideRecord>()) {
+            parts.append("\(record.songId)|\(record.updatedAt)|\(record.fieldsJSON)")
+        }
+        parts.sort()
+        return "\(parts.count)|" + ScanFingerprint.hash(parts)
+    }
+
+    /// Rows in the song table (every source) — counted by the store, no row is materialised.
+    func librarySongRowCount() throws -> Int {
+        try modelContext.fetchCount(FetchDescriptor<SongRecord>())
+    }
+
     /// Saves (or, for nil / empty fields, removes) the override of one song.
     func setTagOverride(songId: String, fields: TagOverrideFields?, updatedAt: Int64) throws {
         var descriptor = FetchDescriptor<TagOverrideRecord>(predicate: #Predicate { $0.songId == songId })
@@ -88,9 +104,12 @@ extension PersistenceActor {
     /// to any more. Songs of other sources (Spotify, YouTube) are never touched. The user's favourite flag, lyrics
     /// and date added on existing rows are kept (they may have changed while the scan ran). Saves every 500 changes.
     func applyLibraryScan(_ built: BuiltLibrary) throws -> LibraryImportSummary {
+        fullLibraryReads += 1
         var pending = 0
+        var writes = 0
         func tick() throws {
             pending += 1
+            writes += 1
             if pending >= Self.batchSize {
                 try modelContext.save()
                 pending = 0
@@ -111,6 +130,7 @@ extension PersistenceActor {
 
         var summary = LibraryImportSummary(added: 0, updated: 0, removed: 0)
         var newIds = Set<String>()
+        let decoder = JSONDecoder()
         for song in built.songs {
             newIds.insert(song.id)
             if let record = managed[song.id] {
@@ -118,7 +138,7 @@ extension PersistenceActor {
                 merged.isFavorite = record.isFavorite
                 merged.lyrics = record.lyrics
                 merged.dateAdded = record.dateAdded
-                if LibraryRecordMapping.song(record) != merged {
+                if LibraryRecordMapping.song(record, decoder: decoder) != merged {
                     LibraryRecordMapping.update(record, from: merged)
                     summary.updated += 1
                     try tick()
@@ -219,6 +239,8 @@ extension PersistenceActor {
             try tick()
         }
         try modelContext.save()
+        // Album, artist and artist-link rows written or removed (the song rows are counted above).
+        summary.relatedChanges = writes - (summary.added + summary.updated + summary.removed)
         return summary
     }
 }

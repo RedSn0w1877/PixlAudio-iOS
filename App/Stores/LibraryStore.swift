@@ -80,15 +80,17 @@ final class LibraryStore {
         isLoading = false
     }
 
-    /// Runs the importer, then reloads from the store.
+    /// Runs the importer, then reloads from the store — unless the scan wrote nothing (the usual launch and foreground
+    /// rescan), when the store still holds what the snapshot shows.
     func refresh(mode: LibraryImportMode = .incremental) async throws {
         guard let importer, let loader else { return }
-        _ = try await importer.importLibrary(mode: mode) { progress in
+        let summary = try await importer.importLibrary(mode: mode) { progress in
             Task { @MainActor [weak self] in
                 guard let self, self.lastImportProgress != progress else { return }
                 self.lastImportProgress = progress
             }
         }
+        if summary.isNoOp, !isLoading { return }
         let base = snapshot
         apply(try await loader.loadFromStoreInBackground(previous: base), base: base)
     }

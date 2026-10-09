@@ -21,6 +21,11 @@ nonisolated struct LibraryImportSummary: Sendable, Equatable {
     var added: Int
     var updated: Int
     var removed: Int
+    /// Album, artist and artist-link rows written or removed (songs are counted above).
+    var relatedChanges = 0
+
+    /// Nothing was written: the store still holds exactly what it held before the scan.
+    var isNoOp: Bool { added == 0 && updated == 0 && removed == 0 && relatedChanges == 0 }
 }
 
 /// The seam for building the library. Stage 6 implements it (folder bookmarks, the Documents folder, the device

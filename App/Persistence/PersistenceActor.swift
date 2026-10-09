@@ -22,10 +22,16 @@ actor PersistenceActor {
 
     // MARK: Library snapshot
 
+    /// How many times the whole song table was read (a snapshot, a scan's diff). Tests assert that a rescan with
+    /// nothing to do reads it zero times.
+    var fullLibraryReads = 0
+
     /// Reads the whole library into value types (called off the main thread at launch / after a scan).
     func loadLibrarySnapshot() throws -> LibrarySnapshot {
+        fullLibraryReads += 1
+        let decoder = JSONDecoder()
         let songs = try modelContext.fetch(FetchDescriptor<SongRecord>(sortBy: [SortDescriptor(\.title)]))
-            .map(LibraryRecordMapping.song)
+            .map { LibraryRecordMapping.song($0, decoder: decoder) }
         let albums = try modelContext.fetch(FetchDescriptor<AlbumRecord>(sortBy: [SortDescriptor(\.title)]))
             .map(LibraryRecordMapping.album)
         let artists = try modelContext.fetch(FetchDescriptor<ArtistRecord>(sortBy: [SortDescriptor(\.name)]))
@@ -108,8 +114,11 @@ actor PersistenceActor {
 
 /// Conversions between the PixlModel value types and the SwiftData records (pure functions, any thread).
 nonisolated enum LibraryRecordMapping {
-    static func song(_ r: SongRecord) -> Song {
-        let artists = r.artistsJSON.flatMap { try? JSONDecoder().decode([ArtistRef].self, from: Data($0.utf8)) } ?? []
+    static func song(_ r: SongRecord) -> Song { song(r, decoder: JSONDecoder()) }
+
+    /// `song(_:)` with a decoder the caller shares across a fetch (one `JSONDecoder` per row costs more than the row).
+    static func song(_ r: SongRecord, decoder: JSONDecoder) -> Song {
+        let artists = r.artistsJSON.flatMap { try? decoder.decode([ArtistRef].self, from: Data($0.utf8)) } ?? []
         return Song(id: r.id, title: r.title, artist: r.artistName, artistId: r.artistId, artists: artists,
                     album: r.albumName, albumId: r.albumId, albumArtist: r.albumArtist, path: r.path,
                     contentUriString: r.contentUri, albumArtUriString: r.artworkUri, duration: r.duration,

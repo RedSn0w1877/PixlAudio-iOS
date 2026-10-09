@@ -167,6 +167,148 @@ final class LibraryImportTests: XCTestCase {
         XCTAssertEqual(library.albums.first { $0.id == edited.albumId }?.songCount, 3)
     }
 
+    // MARK: Rescans with nothing to do (launch and foreground)
+
+    /// A rescan that finds the library as the last scan left it reads, builds and writes nothing: the song table is
+    /// read zero times (it was read twice per scan, and a third time by the store's reload).
+    func testUnchangedRescanDoesNotReadTheLibrary() async throws {
+        try writeFixture()
+        let importer = makeImporter()
+        _ = try await scan(importer)
+        let afterFirst = await persistence.fullLibraryReads
+        XCTAssertGreaterThan(afterFirst, 0, "the first scan reads the library")
+        let before = try await snapshot()
+
+        for _ in 0..<3 {
+            let summary = try await scan(importer)
+            XCTAssertTrue(summary.isNoOp)
+        }
+        let afterRescans = await persistence.fullLibraryReads
+        XCTAssertEqual(afterRescans, afterFirst + 1, "only the snapshot above read the library")
+        let after = try await snapshot()
+        XCTAssertEqual(after, before, "a rescan with nothing to do changes nothing")
+
+        // A new process: the fresh importer only has the saved scan state to go on.
+        let relaunched = makeImporter()
+        let resumed = try await scan(relaunched)
+        XCTAssertTrue(resumed.isNoOp)
+        let afterRelaunch = await persistence.fullLibraryReads
+        XCTAssertEqual(afterRelaunch, afterRescans + 1, "only the snapshot above read the library")
+    }
+
+    /// The store does not reload an unchanged library after such a scan either.
+    @MainActor
+    func testStoreSkipsTheReloadAfterAScanThatWroteNothing() async throws {
+        try writeFixture()
+        let loader = SnapshotLoader(persistence: persistence, cacheURL: workDirectory.appendingPathComponent("cache.plist"))
+        let store = LibraryStore(loader: loader, importer: makeImporter())
+        await store.load()
+        try await store.refresh()
+        XCTAssertEqual(store.songs.count, 3)
+        let revision = store.revision
+        let reads = await persistence.fullLibraryReads
+        try await store.refresh()
+        let readsAfter = await persistence.fullLibraryReads
+        XCTAssertEqual(readsAfter, reads, "a no-op rescan reads the song table zero times, the reload included")
+        XCTAssertEqual(store.revision, revision)
+        XCTAssertEqual(store.songs.count, 3)
+    }
+
+    /// Every input of a scan still brings the full pass back, and the cheap path resumes after it.
+    func testEveryScanInputStillTriggersTheFullPass() async throws {
+        let files = try writeFixture()
+        let importer = makeImporter()
+        _ = try await scan(importer)
+
+        /// Scans once (the full pass is expected), then once more (the cheap path is expected).
+        func expectFullPassThenQuiet(_ what: String, using importer: LocalLibraryImporter, writes: Bool = true,
+                                     line: UInt = #line) async throws {
+            let before = await persistence.fullLibraryReads
+            let summary = try await scan(importer)
+            let after = await persistence.fullLibraryReads
+            XCTAssertGreaterThan(after, before, "\(what): the scan read the library", line: line)
+            if writes { XCTAssertFalse(summary.isNoOp, "\(what): the scan wrote something", line: line) }
+            let quiet = try await scan(importer)
+            let afterQuiet = await persistence.fullLibraryReads
+            XCTAssertTrue(quiet.isNoOp, "\(what): the next scan has nothing to do", line: line)
+            XCTAssertEqual(afterQuiet, after, "\(what): the next scan reads nothing", line: line)
+        }
+
+        // A new file.
+        try TestAudioFiles.put(TestAudioFiles.mp3(seconds: 15, tags: ["TITLE": ["Song Three"], "ARTIST": ["Carol"],
+                                                                      "ALBUM": ["Album X"]]),
+                               at: "Album X/03.mp3", in: music)
+        try await expectFullPassThenQuiet("new file", using: importer)
+
+        // A changed file.
+        try TestAudioFiles.put(TestAudioFiles.flac(seconds: 12, tags: [
+            "TITLE": ["Song Two (Edit)"], "ARTIST": ["Alice"], "ALBUM": ["Album X"], "TRACKNUMBER": ["2"],
+        ]), at: "Album X/02 Song Two.flac", in: music)
+        try TestAudioFiles.touch(files.flac)
+        try await expectFullPassThenQuiet("changed file", using: importer)
+
+        // A deleted file.
+        try FileManager.default.removeItem(at: files.wav)
+        try await expectFullPassThenQuiet("deleted file", using: importer)
+
+        // A tag override.
+        let id = try song("Song One", in: try await snapshot()).id
+        try await importer.editTags(songId: id, fields: TagOverrideFields(title: "Renamed"))
+        try await expectFullPassThenQuiet("tag override", using: importer)
+        let renamed = try await snapshot()
+        XCTAssertNotNil(renamed.songs.first { $0.title == "Renamed" })
+
+        // A hidden song.
+        HiddenSongs.hide([id])
+        defer { HiddenSongs.unhide([id]) }
+        try await expectFullPassThenQuiet("hidden song", using: importer)
+        let hiddenLibrary = try await snapshot()
+        XCTAssertNil(hiddenLibrary.songs.first { $0.id == id })
+
+        // A scan option: an artist delimiter changes how the same files are split (here it changes no row).
+        var options = LibraryScanOptions.default
+        options.artistDelimiters = ["/", ";"]
+        let withDelimiters = makeImporter(options: options)
+        try await expectFullPassThenQuiet("artist delimiters", using: withDelimiters, writes: false)
+
+        // A scan state that never saw a fingerprint (written by an older build) takes the full pass once.
+        let stateURL = workDirectory.appendingPathComponent("scan-state.plist")
+        var legacy = ScanState.load(from: stateURL)
+        legacy.inputsFingerprint = nil
+        legacy.save(to: stateURL)
+        try await expectFullPassThenQuiet("state without a fingerprint", using: withDelimiters, writes: false)
+    }
+
+    /// Rows in the song table that the last scan did not leave (a restore, another writer) are not trusted.
+    func testADifferentSongTableTriggersTheFullPass() async throws {
+        try writeFixture()
+        let importer = makeImporter()
+        _ = try await scan(importer)
+        let library = try await snapshot()
+        var songs = library.songs
+        songs.removeAll { $0.title == "Song Two" }
+        try await persistence.replaceLibrary(with: LibrarySnapshot(songs: songs, albums: library.albums,
+                                                                   artists: library.artists, playlists: []))
+        let summary = try await scan(importer)
+        XCTAssertEqual(summary.added, 1, "the removed row comes back from its file")
+        XCTAssertEqual(try await snapshot().songs.count, 3)
+    }
+
+    /// Measured on the fixture like `TransitionPerformanceTests`: `perf-metrics.txt` collects the "measured" lines.
+    func testUnchangedRescanTiming() async throws {
+        try writeFixture()
+        let importer = makeImporter()
+        _ = try await scan(importer)
+        var samples: [Double] = []
+        for _ in 0..<5 {
+            let start = ContinuousClock.now
+            _ = try await scan(importer)
+            let elapsed = ContinuousClock.now - start
+            samples.append(Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18)
+        }
+        print("measured [rescan.unchanged.fixture] average \(samples.reduce(0, +) / Double(samples.count)) s")
+    }
+
     func testDeletedFilesLeaveTheLibraryWithTheirArtists() async throws {
         let files = try writeFixture()
         let importer = makeImporter()
@@ -421,6 +563,65 @@ final class LibraryScanLogicTests: XCTestCase {
         let plan = FolderScanPlan.make(rootID: "r", files: [entry("a.mp3")], state: state, storedSongIDs: [],
                                        fullRescan: false)
         XCTAssertEqual(plan.toRead.count, 1)
+    }
+
+    func testRootIsUnchangedOnlyWhenEveryFileIsAsTheLastScanLeftIt() {
+        var state = ScanState()
+        state.stamps["f:r/a.mp3"] = FileStamp(modifiedMs: 1, size: 10)
+        state.stamps["f:r/b.mp3"] = FileStamp(modifiedMs: 1, size: 10)
+        state.rejected["f:r/short.mp3"] = FileStamp(modifiedMs: 1, size: 10)
+        let stamped: Set<String> = ["f:r/a.mp3", "f:r/b.mp3"]
+        let rejected: Set<String> = ["f:r/short.mp3"]
+        func unchanged(_ files: [ScannedFileEntry]) -> Bool {
+            ScanFingerprint.rootIsUnchanged(rootID: "r", files: files, state: state, stampedIDs: stamped,
+                                            rejectedIDs: rejected)
+        }
+        let same = [entry("a.mp3"), entry("b.mp3"), entry("short.mp3")]
+        XCTAssertTrue(unchanged(same))
+        XCTAssertTrue(unchanged(Array(same.reversed())), "listing order does not matter")
+        XCTAssertFalse(unchanged([entry("a.mp3"), entry("b.mp3", modified: 2), entry("short.mp3")]), "a changed file")
+        XCTAssertFalse(unchanged(same + [entry("new.mp3")]), "a new file")
+        XCTAssertFalse(unchanged([entry("a.mp3"), entry("short.mp3")]), "an imported file is gone")
+        XCTAssertFalse(unchanged([entry("a.mp3"), entry("b.mp3")]), "a rejected file is gone")
+        XCTAssertFalse(unchanged([entry("a.mp3"), entry("b.mp3"), entry("short.mp3", size: 11)]), "a rejected file changed")
+        XCTAssertTrue(unchanged(same + [entry("cloud.mp3", placeholder: true)]), "a placeholder without a song is ignored")
+        XCTAssertTrue(unchanged([entry("a.mp3"), entry("b.mp3", modified: 0, size: 0, placeholder: true),
+                                 entry("short.mp3")]), "a placeholder keeps its song")
+        XCTAssertFalse(unchanged([entry("a.mp3"), entry("short.mp3")] + [entry("c.mp3", placeholder: true)]),
+                       "a placeholder that is not a stored song does not stand in for one")
+    }
+
+    func testScanFingerprintSeesEveryInput() {
+        let root = FolderRoot(id: "r", displayName: "Music", url: URL(fileURLWithPath: "/music"))
+        func make(_ options: LibraryScanOptions = .default, roots: [FolderRoot]? = nil, unresolved: Set<String> = [],
+                  hidden: Set<String> = [], overrides: String = "0", media: String = "off",
+                  build: String = "b") -> String {
+            ScanFingerprint.make(options: options, roots: roots ?? [root], unresolved: unresolved, hidden: hidden,
+                                 overrides: overrides, media: media, build: build)
+        }
+        let base = make()
+        XCTAssertEqual(base, make(), "the same inputs give the same fingerprint")
+        var variants: [String] = [
+            make(roots: []), make(roots: [FolderRoot(id: "r", displayName: "Music", url: URL(fileURLWithPath: "/moved"))]),
+            make(roots: [FolderRoot(id: "r", displayName: "Renamed", url: root.url)]),
+            make(unresolved: ["r"]), make(hidden: ["f:r/a.mp3"]), make(overrides: "1|abc"), make(media: "on|1"),
+            make(build: "c"),
+        ]
+        let fields: [(inout LibraryScanOptions) -> Void] = [
+            { $0.artistDelimiters = ["/"] }, { $0.artistWordDelimiters = ["feat"] }, { $0.extractArtistsFromTitle.toggle() },
+            { $0.groupByAlbumArtist.toggle() }, { $0.minSongDurationMs += 1 }, { $0.allowedDirectories = ["/Music/A"] },
+            { $0.blockedDirectories = ["/Music/B"] }, { $0.includeMediaLibrary.toggle() },
+        ]
+        for change in fields {
+            var options = LibraryScanOptions.default
+            change(&options)
+            variants.append(make(options))
+        }
+        XCTAssertFalse(variants.contains(base), "an input the fingerprint ignores")
+        XCTAssertEqual(Set(variants).count, variants.count, "two different inputs share a fingerprint")
+        XCTAssertEqual(ScanFingerprint.mediaLibrarySignature(takesPart: false, lastModified: Date()), "off")
+        XCTAssertNotEqual(ScanFingerprint.mediaLibrarySignature(takesPart: true, lastModified: Date(timeIntervalSince1970: 1)),
+                          ScanFingerprint.mediaLibrarySignature(takesPart: true, lastModified: Date(timeIntervalSince1970: 2)))
     }
 
     func testIdentityHelpers() {

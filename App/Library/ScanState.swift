@@ -20,6 +20,13 @@ nonisolated struct ScanState: Sendable, Codable, Equatable {
     var rejected: [String: FileStamp] = [:]
     /// `LibraryScanOptions.filterFingerprint` of the last scan.
     var filterFingerprint: String?
+    /// `ScanFingerprint.make(...)` of the last scan: every input besides the files themselves (all scan options, the
+    /// roots, hidden songs, tag overrides, the music library's last change, this build). Optional so state files
+    /// written before it existed still load (and take the full path once).
+    var inputsFingerprint: String?
+    /// Rows in the song table (every source) right after the last scan. A rescan that finds a different number
+    /// reads the whole library again instead of trusting the stamps.
+    var songRowCount: Int?
 
     static func defaultURL() -> URL? {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
