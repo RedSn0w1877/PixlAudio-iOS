@@ -203,6 +203,10 @@ final class HomeStore {
               cachedAIGreeting(day: day) == nil else { return }
         hasRequestedAIGreeting = true
         Task { [weak self] in
+            // Not during launch: the model (the downloaded one loads ~900 MB onto the GPU) waits until the first
+            // screens, the library and the restored queue have settled. The local headline shows meanwhile.
+            try? await Task.sleep(for: .seconds(8))
+            if Task.isCancelled { return }
             let text = await greeter(.headline, facts)
             guard let self, let headline = text.flatMap({ HomeLogic.cleanGreeting($0) }) else { return }
             self.content.greeting.headline = headline
