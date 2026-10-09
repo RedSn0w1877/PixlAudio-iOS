@@ -81,6 +81,13 @@ final class HomeStore {
         var tasteRevision: Int
         var exploration: Float
         var learning: Bool
+
+        /// The same library, day and taste: only the listening history moved.
+        func onlyHistoryDiffers(from other: Key) -> Bool {
+            revision != other.revision && libraryRevision == other.libraryRevision && epochDay == other.epochDay
+                && tasteRevision == other.tasteRevision && exploration == other.exploration
+                && learning == other.learning
+        }
     }
 
     init(history: ListeningHistoryStore, defaults: UserDefaults?) {
@@ -116,22 +123,29 @@ final class HomeStore {
         let key = Key(libraryRevision: libraryRevision, revision: history.revision, epochDay: epochDay,
                       tasteRevision: taste?.revision ?? 0, exploration: exploration, learning: !signals.isEmpty)
         if !force, key == lastKey { return }
+        // A finished song or skip changes only the history: wait until the skip, the carousel and the re-theme are
+        // done before the (cancellable) recomputation starts. A newer change cancels this task during the wait.
+        if !force, let last = lastKey, last.onlyHistoryDiffers(from: key) {
+            try? await Task.sleep(for: .milliseconds(1_500))
+            if Task.isCancelled { return }
+        }
         lastKey = key
         computeTask?.cancel()
         if force { isRefreshing = true }
 
         let events = history.events
         let saved = savedMixes(epochDay: epochDay, zone: clock.timeZone)
-        let task = Task.detached(priority: .userInitiated) {
-            HomeStore.compute(snapshot: snapshot, events: events, nowMs: now, timeZone: clock.timeZone,
+        let task = Task.detached(priority: force ? .userInitiated : .utility) { () -> (content: HomeContent, generatedMixes: Bool)? in
+            HomeStore.computeIfActive(snapshot: snapshot, events: events, nowMs: now, timeZone: clock.timeZone,
                               savedDaily: saved.daily, savedYourMix: saved.yourMix, storedSignals: signals,
                               exploration: exploration)
         }
         let stamp = ScreenDataCache.Stamp(historyRevision: history.revision, songCount: snapshot.songs.count)
         let day = ZoneClock(clock.timeZone).localDate(at: now).description
         let computation = Task { [weak self] in
-            let result = await task.value
-            guard let self, !Task.isCancelled else { return }
+            // Cancelling this wrapper (a newer refresh) stops the detached computation at its next stage.
+            let result = await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
+            guard let self, let result, !Task.isCancelled else { return }
             // The overview card's week summary seeds Stats' default range.
             if let overview = result.content.statsOverview, overview.range == .week {
                 ScreenDataCache.storeStats(overview, stamp: stamp)
@@ -189,6 +203,10 @@ final class HomeStore {
               cachedAIGreeting(day: day) == nil else { return }
         hasRequestedAIGreeting = true
         Task { [weak self] in
+            // Not during launch: the model (the downloaded one loads ~900 MB onto the GPU) waits until the first
+            // screens, the library and the restored queue have settled. The local headline shows meanwhile.
+            try? await Task.sleep(for: .seconds(8))
+            if Task.isCancelled { return }
             let text = await greeter(.headline, facts)
             guard let self, let headline = text.flatMap({ HomeLogic.cleanGreeting($0) }) else { return }
             self.content.greeting.headline = headline
@@ -305,6 +323,19 @@ final class HomeStore {
                                     exploration: Float = 0.25)
         -> (content: HomeContent, generatedMixes: Bool)
     {
+        computeIfActive(snapshot: snapshot, events: events, nowMs: nowMs, timeZone: timeZone, savedDaily: savedDaily,
+                        savedYourMix: savedYourMix, storedSignals: storedSignals, exploration: exploration)
+            ?? (HomeContent(), false)
+    }
+
+    /// `compute`, abandoned (nil) at the next stage boundary once the surrounding task is cancelled: a superseded
+    /// computation stops instead of running to completion in the background.
+    nonisolated static func computeIfActive(snapshot: LibrarySnapshot, events: [PlaybackEvent], nowMs: Int64,
+                                            timeZone: TimeZone, savedDaily: [String], savedYourMix: [String],
+                                            storedSignals: [String: MusicRecommendationEngine.Signal] = [:],
+                                            exploration: Float = 0.25)
+        -> (content: HomeContent, generatedMixes: Bool)?
+    {
         let songs = snapshot.songs
         var content = HomeContent()
         let zone = ZoneClock(timeZone)
@@ -322,6 +353,7 @@ final class HomeStore {
                                                   topGenre: HomeLogic.topGenre(allTime),
                                                   totalPlays: allTime?.totalPlayCount ?? 0, librarySize: songs.count)
 
+        if Task.isCancelled { return nil }
         // Newest songs (`ORDER BY date_added DESC, id DESC LIMIT 48`).
         content.recentlyAdded = Array(songs.sorted { a, b in
             if a.dateAdded != b.dateAdded { return a.dateAdded > b.dateAdded }
@@ -333,6 +365,7 @@ final class HomeStore {
         content.recentlyPlayed = HomeLogic.mapRecentlyPlayed(history: content.history, songsById: songsById, nowMs: nowMs,
                                                              timeZone: timeZone, maxItems: recentlyPlayedLimit)
 
+        if Task.isCancelled { return nil }
         // Stats overview card.
         if !songs.isEmpty {
             for range in overviewRanges {
@@ -349,6 +382,7 @@ final class HomeStore {
 
         guard !songs.isEmpty else { return (content, false) }
 
+        if Task.isCancelled { return nil }
         let engagements = engagementStats(events)
         let favorites = Set(songs.filter(\.isFavorite).map(\.id))
         let today = zone.localDate(at: nowMs)
@@ -373,6 +407,7 @@ final class HomeStore {
             generated = true
         }
 
+        if Task.isCancelled { return nil }
         // "Made for your listening" + shelves (`HomeRecommendationPlanner.plan`, seed = today's epoch day).
         let inputs = RecommendationInputs.resolve(library: songs, storedSignals: storedSignals,
                                                   storedHistory: engagements.mapValues(\.history))

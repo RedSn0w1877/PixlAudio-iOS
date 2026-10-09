@@ -123,7 +123,9 @@ struct SongPickerPane: View {
             nil
         }
         filterTask = Task {
-            let result = await Task.detached(priority: .userInitiated) { Self.filter(songs, inputs: inputs) }.value
+            // A newer keystroke cancels the detached pass too (it stops within 256 songs), not only the wrapper.
+            let pass = Task.detached(priority: .userInitiated) { Self.filter(songs, inputs: inputs) }
+            let result = await withTaskCancellationHandler { await pass.value } onCancel: { pass.cancel() }
             guard !Task.isCancelled, token == generation else { return }
             if let animation {
                 withAnimation(animation) { displayed = result }
@@ -138,10 +140,17 @@ struct SongPickerPane: View {
         var result = songs.filter { LibrarySorting.matches($0, filter: inputs.filter) }
         if inputs.favoritesOnly { result = result.filter(\.isFavorite) }
         if !trimmed.isEmpty {
-            result = result.filter {
-                $0.title.localizedCaseInsensitiveContains(trimmed) || $0.displayArtist.localizedCaseInsensitiveContains(trimmed)
-                    || $0.album.localizedCaseInsensitiveContains(trimmed)
+            var matched: [Song] = []
+            for (index, song) in result.enumerated() {
+                // Superseded: the caller discards the result, so stop early.
+                if index & 255 == 0, Task.isCancelled { return [] }
+                if song.title.localizedCaseInsensitiveContains(trimmed)
+                    || song.displayArtist.localizedCaseInsensitiveContains(trimmed)
+                    || song.album.localizedCaseInsensitiveContains(trimmed) {
+                    matched.append(song)
+                }
             }
+            result = matched
         }
         return LibrarySorting.sortSongs(result, by: inputs.favoritesOnly ? .songDateAdded : .songTitleAZ)
     }

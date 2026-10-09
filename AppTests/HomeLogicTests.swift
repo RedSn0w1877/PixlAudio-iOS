@@ -198,6 +198,24 @@ final class HomeLogicTests: XCTestCase {
         XCTAssertGreaterThan(content.statsOverview?.totalPlayCount ?? 0, 0)
     }
 
+    func testSupersededComputationStopsAndAnActiveOneMatchesCompute() async {
+        let events = DemoListeningHistory.events(songs: DemoLibrary.songs, nowMs: now)
+        let snapshot = DemoLibrary.snapshot, zone = utc, at = now
+        let active = HomeStore.computeIfActive(snapshot: snapshot, events: events, nowMs: at, timeZone: zone,
+                                               savedDaily: [], savedYourMix: [])
+        let plain = HomeStore.compute(snapshot: snapshot, events: events, nowMs: at, timeZone: zone, savedDaily: [],
+                                      savedYourMix: [])
+        XCTAssertEqual(active?.content, plain.content)
+        let cancelled = Task.detached { () -> Bool in
+            // Cancel this task from inside, then compute: the first stage boundary abandons the work.
+            withUnsafeCurrentTask { $0?.cancel() }
+            return HomeStore.computeIfActive(snapshot: snapshot, events: events, nowMs: at, timeZone: zone,
+                                             savedDaily: [], savedYourMix: []) == nil
+        }
+        let abandoned = await cancelled.value
+        XCTAssertTrue(abandoned)
+    }
+
     func testSavedDailyMixIsKeptForTheDay() {
         let saved = Array(DemoLibrary.songs.prefix(3).map(\.id).reversed())
         let result = HomeStore.compute(snapshot: DemoLibrary.snapshot, events: [], nowMs: now, timeZone: utc,
@@ -213,6 +231,26 @@ final class HomeLogicTests: XCTestCase {
         XCTAssertEqual(result.content.greeting.subtitle, HomeLogic.defaultSubtitle)
         XCTAssertTrue(result.content.yourMix.isEmpty)
         XCTAssertNil(result.content.statsOverview)
+    }
+
+    func testHistoryWritesAreSharedAndFlushedOnDemand() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let file = ListeningHistoryFile(url: url)
+        let store = ListeningHistoryStore(clock: HomeClock(fixedNowMs: now, timeZone: utc), file: file)
+        await store.ensureLoaded()
+        store.record(songId: "demo:1", durationMs: 120_000)
+        store.record(songId: "demo:2", durationMs: 120_000)
+        // Nothing is written until the delay or a flush.
+        let early = await file.read()
+        XCTAssertTrue(early.isEmpty)
+        store.flush()
+        var stored: [PlaybackEvent] = []
+        for _ in 0..<100 where stored.count < 2 {
+            try await Task.sleep(for: .milliseconds(20))
+            stored = await file.read()
+        }
+        XCTAssertEqual(stored.map(\.songId), ["demo:1", "demo:2"])
     }
 
     func testRecordingBumpsTheRevision() async {

@@ -16,6 +16,9 @@ final class QueueSnapshotStore {
 
     private let defaults: UserDefaults
     private let key: String
+    /// The snapshot's own file (the queue can be ~2 MB of JSON, too much for UserDefaults, which is loaded whole at
+    /// launch and rewritten on the main actor); nil keeps it in `defaults` (tests).
+    private let file: QueueSnapshotFile?
     private var pendingSave: Task<Void, Never>?
     /// Every save takes a number; a finished encode is written only if nothing newer was written first.
     private var issued = 0
@@ -26,20 +29,29 @@ final class QueueSnapshotStore {
     /// saves encode off the main actor.
     var makeCapture: (() -> QueueSnapshotCapture?)?
 
-    init(defaults: UserDefaults = .standard, key: String = PreferenceKeys.playbackQueueSnapshot) {
+    init(defaults: UserDefaults = .standard, key: String = PreferenceKeys.playbackQueueSnapshot,
+         file: QueueSnapshotFile? = nil) {
         self.defaults = defaults
         self.key = key
+        self.file = file
     }
 
     func load() -> PlaybackQueueSnapshot? {
-        guard let text = defaults.string(forKey: key) else { return nil }
+        guard let text = file?.read() ?? defaults.string(forKey: key) else { return nil }
         return QueueSnapshotCoding.decodeNow(text)
     }
 
-    /// `load()` with the JSON decoded off the main actor (launch restore).
+    /// `load()` with the file read and the JSON decoded off the main actor (launch restore). The first launch after
+    /// the queue moved out of UserDefaults copies it over and forgets the old key.
     func loadInBackground() async -> PlaybackQueueSnapshot? {
-        guard let text = defaults.string(forKey: key) else { return nil }
-        return await QueueSnapshotCoding.decode(text)
+        guard let file else {
+            guard let text = defaults.string(forKey: key) else { return nil }
+            return await QueueSnapshotCoding.decode(text)
+        }
+        let legacy = defaults.string(forKey: key)
+        let snapshot = await QueueSnapshotCoding.load(file, legacy: legacy)
+        if legacy != nil { defaults.removeObject(forKey: key) }
+        return snapshot
     }
 
     func scheduleSave() {
@@ -66,7 +78,7 @@ final class QueueSnapshotStore {
         let token = issued
         guard let capture = makeCapture() else {
             written = token
-            defaults.removeObject(forKey: key)
+            remove(token: token)
             completion?()
             return
         }
@@ -74,7 +86,12 @@ final class QueueSnapshotStore {
             let text = await QueueSnapshotCoding.encode(capture)
             if let self, let text, token > self.written {
                 self.written = token
-                self.defaults.set(text, forKey: self.key)
+                if let file = self.file {
+                    // Off the main actor; the file keeps the newest token if two writes cross.
+                    await QueueSnapshotCoding.write(text, token: token, to: file)
+                } else {
+                    self.defaults.set(text, forKey: self.key)
+                }
             }
             completion?()
         }
@@ -87,11 +104,11 @@ final class QueueSnapshotStore {
         issued += 1
         written = issued
         guard let snapshot = makeSnapshot() else {
-            defaults.removeObject(forKey: key)
+            remove(token: issued)
             return
         }
         guard let text = QueueSnapshotCoding.encodeNow(snapshot) else { return }
-        defaults.set(text, forKey: key)
+        if let file { file.write(text, token: issued) } else { defaults.set(text, forKey: key) }
     }
 
     func clear() {
@@ -99,6 +116,11 @@ final class QueueSnapshotStore {
         pendingSave = nil
         issued += 1
         written = issued
+        remove(token: issued)
+    }
+
+    private func remove(token: Int) {
+        file?.remove(token: token)
         defaults.removeObject(forKey: key)
     }
 
@@ -112,6 +134,47 @@ final class QueueSnapshotStore {
                         albumArtUriString: item.artworkUri, duration: item.durationMs ?? 0, mimeType: nil,
                         bitrate: nil, sampleRate: nil)
         }
+    }
+}
+
+/// The queue snapshot's file (Application Support). Writes carry the store's save number: a slower, older write that
+/// arrives after a newer one is dropped, so the file never goes back in time. Blocking calls; keep them off the main
+/// actor except at termination.
+nonisolated final class QueueSnapshotFile: @unchecked Sendable {
+    let url: URL
+    private let lock = NSLock()
+    private var lastToken = 0
+
+    init(url: URL) { self.url = url }
+
+    static func defaultURL() -> URL? {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("playback_queue_snapshot_v1.json")
+    }
+
+    func read() -> String? { try? String(contentsOf: url, encoding: .utf8) }
+
+    func write(_ text: String, token: Int) {
+        lock.lock(); defer { lock.unlock() }
+        guard token > lastToken else { return }
+        lastToken = token
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? Data(text.utf8).write(to: url, options: .atomic)
+    }
+
+    func remove(token: Int) {
+        lock.lock(); defer { lock.unlock() }
+        guard token > lastToken else { return }
+        lastToken = token
+        try? FileManager.default.removeItem(at: url)
+    }
+
+    /// The old UserDefaults text, copied into the file unless a save got there first.
+    func migrate(_ text: String) {
+        lock.lock(); defer { lock.unlock() }
+        guard !FileManager.default.fileExists(atPath: url.path) else { return }
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? Data(text.utf8).write(to: url, options: .atomic)
     }
 }
 
@@ -150,6 +213,20 @@ nonisolated enum QueueSnapshotCoding {
     @concurrent
     static func decode(_ text: String) async -> PlaybackQueueSnapshot? {
         decodeNow(text)
+    }
+
+    /// Reads the file (or, the first time, the old UserDefaults text, which is copied into the file) and decodes it.
+    @concurrent
+    static func load(_ file: QueueSnapshotFile, legacy: String?) async -> PlaybackQueueSnapshot? {
+        if let text = file.read() { return decodeNow(text) }
+        guard let legacy else { return nil }
+        file.migrate(legacy)
+        return decodeNow(legacy)
+    }
+
+    @concurrent
+    static func write(_ text: String, token: Int, to file: QueueSnapshotFile) async {
+        file.write(text, token: token)
     }
 
     static func encodeNow(_ snapshot: PlaybackQueueSnapshot) -> String? {

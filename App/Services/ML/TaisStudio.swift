@@ -280,7 +280,9 @@ final class TaisStudio {
     private func report(_ key: JobKey, _ percent: Int, _ detail: String?, indeterminate: Bool = false) {
         // Late progress (a chunk finishing after a cancel) never revives a finished job.
         guard jobs[key]?.isActive == true, running?.key == key else { return }
-        jobs[key] = JobState(phase: .running, percent: min(max(percent, 0), 100), detail: detail, indeterminate: indeterminate)
+        let state = JobState(phase: .running, percent: min(max(percent, 0), 100), detail: detail, indeterminate: indeterminate)
+        // Equal progress does not re-render the screens that watch the jobs.
+        if jobs[key] != state { jobs[key] = state }
         // Unattended work never shows in the system's progress UI.
         if running?.unattended == false {
             background.update(subtitle: detail ?? Self.title(key.kind), fraction: Double(percent) / 100)

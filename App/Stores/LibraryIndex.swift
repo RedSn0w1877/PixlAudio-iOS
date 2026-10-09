@@ -57,6 +57,30 @@ nonisolated struct LibraryDetailIndex: Sendable {
                                   folderTree: LibraryModel.folderTree(songs))
     }
 
+    /// The same index for a library whose songs did not change (an artist-picture update), under its new revision.
+    func restamped(revision: Int) -> LibraryDetailIndex {
+        LibraryDetailIndex(revision: revision, songsByAlbum: songsByAlbum, songsByArtist: songsByArtist,
+                           songsByGenre: songsByGenre, firstArtworkByArtist: firstArtworkByArtist,
+                           folderTree: folderTree)
+    }
+
+    /// The index with `changed` songs swapped in (their favourite flag), every list in the same order: equal to
+    /// `build` over the edited library.
+    func patched(_ changed: [String: Song], revision: Int) -> LibraryDetailIndex {
+        LibraryDetailIndex(revision: revision,
+                           songsByAlbum: songsByAlbum.mapValues { LibraryModel.patched($0, changed) },
+                           songsByArtist: songsByArtist.mapValues { LibraryModel.patched($0, changed) },
+                           songsByGenre: songsByGenre.mapValues { LibraryModel.patched($0, changed) },
+                           firstArtworkByArtist: firstArtworkByArtist,
+                           folderTree: folderTree.map { LibraryModel.patched($0, changed) })
+    }
+
+    @concurrent
+    static func patchedInBackground(_ base: LibraryDetailIndex, changed: [String: Song], revision: Int) async
+        -> LibraryDetailIndex {
+        base.patched(changed, revision: revision)
+    }
+
     @concurrent
     static func buildInBackground(_ songs: [Song], revision: Int) async -> LibraryDetailIndex {
         build(songs, revision: revision)

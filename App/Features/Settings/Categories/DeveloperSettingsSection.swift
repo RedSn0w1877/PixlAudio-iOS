@@ -75,7 +75,7 @@ struct DeveloperSettingsSection: View {
             Button(L10n.settingsActionRegenerate) {
                 // Android `regenerateDailyMix`: today's saved mixes are dropped and drawn again.
                 let home = environment.home, library = self.library
-                Task { await home.regenerateDailyMix(snapshot: library.snapshot, libraryRevision: library.revision) }
+                Task { await home.regenerateDailyMix(snapshot: library.snapshot, libraryRevision: library.songsRevision) }
                 toast = L10n.settingsToastDailyMixRegenerationStarted
             }
         } message: { Text(L10n.settingsDialogRegenerateDailyMixBody) }
@@ -85,7 +85,7 @@ struct DeveloperSettingsSection: View {
                 // Stats are computed from the listening history: drop the cached summaries and recompute Home's.
                 ScreenDataCache.clearStats()
                 let home = environment.home, library = self.library
-                Task { await home.refresh(snapshot: library.snapshot, libraryRevision: library.revision, force: true) }
+                Task { await home.refresh(snapshot: library.snapshot, libraryRevision: library.songsRevision, force: true) }
                 toast = L10n.settingsToastStatsRegenerationStarted
             }
         } message: { Text(L10n.settingsDialogRegenerateStatsBody) }

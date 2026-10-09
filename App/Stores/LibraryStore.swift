@@ -15,6 +15,9 @@ final class LibraryStore {
     private(set) var snapshot: LibrarySnapshot = .empty
     /// Bumped whenever `snapshot` changes.
     private(set) var revision = 0
+    /// Bumped with `revision` for everything except artist-picture updates (`updateArtists`): what screens that read
+    /// songs, albums and playlists, but never an artist's picture, key their recomputation on (Home).
+    private(set) var songsRevision = 0
     /// True until the first snapshot (cache or store) arrived.
     private(set) var isLoading = true
     private(set) var lastImportProgress: LibraryImportProgress?
@@ -154,15 +157,33 @@ final class LibraryStore {
 
     /// An edit of the in-memory library (favourites, playlists, tags, removals): the caller knows the snapshot
     /// changed and which songs did, so the lookups are patched instead of rebuilt and nothing is compared.
-    func applyEdit(_ newSnapshot: LibrarySnapshot, changedSongs: [Song] = [], removedSongIds: Set<String> = []) {
+    /// `addedAlbums` / `addedArtists`: rows the edit appended to the snapshot (a streamed song's album and artist).
+    func applyEdit(_ newSnapshot: LibrarySnapshot, changedSongs: [Song] = [], removedSongIds: Set<String> = [],
+                   addedAlbums: [Album] = [], addedArtists: [Artist] = []) {
+        // A heart tap changes one field of a few songs: the detail index is patched, not rebuilt.
+        let favoritesOnly = removedSongIds.isEmpty && !changedSongs.isEmpty
+            && newSnapshot.songs.count == snapshot.songs.count
+            && changedSongs.allSatisfy { song in
+                guard var before = songsById[song.id] else { return false }
+                before.isFavorite = song.isFavorite
+                return before == song
+            }
+        let previousRevision = revision
         for song in changedSongs { songsById[song.id] = song }
         for id in removedSongIds { songsById[id] = nil }
+        for album in addedAlbums { albumsById[album.id] = album }
+        for artist in addedArtists { artistsById[artist.id] = artist }
         if newSnapshot.playlists != snapshot.playlists {
             playlistsById = Dictionary(newSnapshot.playlists.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         }
         snapshot = newSnapshot
         revision &+= 1
-        rebuildDetailIndex()
+        songsRevision &+= 1
+        if favoritesOnly, let base = detailIndex, base.revision == previousRevision {
+            patchDetailIndex(base, changed: Dictionary(changedSongs.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last }))
+        } else {
+            rebuildDetailIndex()
+        }
     }
 
     /// Replaces artists by id — their pictures (Deezer, a custom image) — patching the snapshot and the artist lookup
@@ -176,8 +197,14 @@ final class LibraryStore {
         }
         for artist in updated { artistsById[artist.id] = artist }
         snapshot = newSnapshot
+        let previousRevision = revision
         revision &+= 1
-        rebuildDetailIndex()
+        // The songs did not change, so a current index stays valid: it is re-stamped, not rebuilt.
+        if let index = detailIndex, index.revision == previousRevision {
+            detailIndex = index.restamped(revision: revision)
+        } else {
+            rebuildDetailIndex()
+        }
     }
 
     /// Rewrites the launch cache with the current snapshot, off the main actor (after an edit made outside
@@ -196,6 +223,16 @@ final class LibraryStore {
         snapshot = newSnapshot
         revision &+= 1
         rebuildDetailIndex()
+    }
+
+    private func patchDetailIndex(_ base: LibraryDetailIndex, changed: [String: Song]) {
+        detailIndexTask?.cancel()
+        let revision = self.revision
+        detailIndexTask = Task { [weak self] in
+            let index = await LibraryDetailIndex.patchedInBackground(base, changed: changed, revision: revision)
+            guard let self, !Task.isCancelled, self.revision == revision else { return }
+            self.detailIndex = index
+        }
     }
 
     private func rebuildDetailIndex() {
