@@ -70,6 +70,9 @@ struct HomeView: View {
             .padding(.bottom, 38)
         }
         .scrollIndicators(.hidden)
+        // Only the scroll view carries the screen id. Applied after the top-bar inset below, it overwrote the
+        // identifiers of the Beta, jobs, changelog and settings buttons (UI tests saw all four as `screen.home`).
+        .accessibilityIdentifier("screen.home")
         .minimizesTabBarOnScroll()
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top > HomeMetrics.scrolledThreshold
@@ -91,7 +94,6 @@ struct HomeView: View {
         // Cloud Studio's stored jobs (read once, off the main actor): its work may have moved on while the app was closed,
         // and the jobs button should show it.
         .task { await env.cloud.loadForDisplay() }
-        .accessibilityIdentifier("screen.home")
     }
 
     // MARK: Your Mix

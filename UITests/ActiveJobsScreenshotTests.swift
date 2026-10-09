@@ -10,8 +10,8 @@ final class ActiveJobsScreenshotTests: XCTestCase {
 
     func testSheetRunningLight() throws { try capture("jobs", "light", ready: "screen.jobs") }
     func testSheetRunningDark() throws { try capture("jobs", "dark", ready: "screen.jobs") }
-    func testSheetMixedLight() throws { try capture("jobs.mixed", "light", ready: "screen.jobs") }
-    func testSheetMixedDark() throws { try capture("jobs.mixed", "dark", ready: "screen.jobs") }
+    func testSheetMixedLight() throws { try capture("jobs.mixed", "light", ready: "screen.jobs", expand: true) }
+    func testSheetMixedDark() throws { try capture("jobs.mixed", "dark", ready: "screen.jobs", expand: true) }
     func testSheetEmptyLight() throws { try capture("jobs.none", "light", ready: "screen.jobs") }
 
     /// Home with nothing running: the button is not there.
@@ -58,7 +58,8 @@ final class ActiveJobsScreenshotTests: XCTestCase {
         add(attachment)
     }
 
-    private func capture(_ screen: String, _ appearance: String, ready: String, home: Bool = false) throws {
+    private func capture(_ screen: String, _ appearance: String, ready: String, home: Bool = false,
+                         expand: Bool = false) throws {
         continueAfterFailure = false
         let app = launch(screen, appearance)
         XCTAssertTrue(app.descendants(matching: .any)[ready].firstMatch.waitForExistence(timeout: 20),
@@ -71,6 +72,12 @@ final class ActiveJobsScreenshotTests: XCTestCase {
         }
         // Let the glass, the rings and (on Home) the shelves settle.
         Thread.sleep(forTimeInterval: 2.0)
+        if expand {
+            // Pull the sheet up from its grabber so the "Recently finished" part is in the picture.
+            let grabber = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.49))
+            grabber.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08)))
+            Thread.sleep(forTimeInterval: 1.5)
+        }
         attach(app, "\(screen)-\(appearance)")
         app.terminate()
     }
