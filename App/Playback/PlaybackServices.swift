@@ -35,6 +35,7 @@ final class PlaybackServices {
     private let persistence: PersistenceActor?
     private var lifecycleObservers: [any NSObjectProtocol] = []
     private var started = false
+    private var queuePreload: Task<PlaybackQueueSnapshot?, Never>?
 
     /// Settings › Playback › Pause when volume reaches zero.
     private let volumeZero = VolumeZeroPauser()
@@ -70,9 +71,24 @@ final class PlaybackServices {
         Task { await reloadTransitionRules() }
     }
 
+    /// Starts decoding the saved queue off the main actor now (launch), so `restoreQueue` finds it ready once the
+    /// library's cache is installed instead of decoding it then.
+    func prepareQueueRestore() {
+        guard queuePreload == nil else { return }
+        let snapshots = self.snapshots
+        queuePreload = Task { await snapshots.loadInBackground() }
+    }
+
     /// Restores the saved queue (paused) once the library is loaded. The JSON is decoded off the main actor.
     func restoreQueue(lookup: (String) -> Song?) async {
-        guard let snapshot = await snapshots.loadInBackground(), !snapshot.items.isEmpty else { return }
+        let loaded: PlaybackQueueSnapshot?
+        if let queuePreload {
+            self.queuePreload = nil
+            loaded = await queuePreload.value
+        } else {
+            loaded = await snapshots.loadInBackground()
+        }
+        guard let snapshot = loaded, !snapshot.items.isEmpty else { return }
         let songs = QueueSnapshotStore.songs(for: snapshot, lookup: lookup)
         engine.restore(snapshot, songs: songs)
     }

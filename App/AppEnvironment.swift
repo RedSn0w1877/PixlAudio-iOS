@@ -236,6 +236,8 @@ final class AppEnvironment {
     /// automatic incremental rescans (launch, foreground, music-library changes).
     func start() async {
         guard !launch.isUITest else { return }
+        library.beginCachedLoad() // decode the snapshot cache and the saved queue alongside the service starts below
+        playbackServices?.prepareQueueRestore()
         // First run: PixlAudio's setup (Android shows `SetupScreen` until `initial_setup_done`).
         if !settings.behavior.initialSetupDone, router.cover == nil { router.present(AppCover.setup) }
         playbackServices?.start()
@@ -252,9 +254,13 @@ final class AppEnvironment {
         // Before Home's first refresh, which may ask the selected assistant for today's greeting.
         await AIProviderStatus.migrateDefaultProviderIfNeeded(self)
         home.greeter = HomeAIGreeter.make(self)
-        await library.load()
-        artistImages?.prefetchMissing()
+        // The cached snapshot has everything the queue restore needs, so the mini player no longer waits for the
+        // store's full read, which only reconciles. Without a cache (first launch) the order stays as it was.
+        let hasCache = await library.installCached()
+        if !hasCache { await library.reconcileWithStore() }
         await playbackServices?.restoreQueue(lookup: library.song(id:))
+        if hasCache { await library.reconcileWithStore() }
+        artistImages?.prefetchMissing()
         libraryAutoRefresh?.start()
         let home = self.home, playCounts = self.playCounts, editor = libraryEditor
         Task {
