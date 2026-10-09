@@ -44,6 +44,8 @@ struct RootView: View {
             .overlay(alignment: .bottom) {
                 bottomBars
             }
+            // Under the settled, opaque full player nothing of the shell can be seen: it isn't drawn then.
+            .modifier(ShellCoveredByPlayer())
             // Stage 8: the player sheet — the mini player resting in `MiniPlayerSlot` and expanding over everything.
             PlayerSheetHost()
         }
@@ -200,6 +202,22 @@ private struct TabAccessibilityHidden: ViewModifier {
 
     func body(content: Content) -> some View {
         content.accessibilityHidden(!isSelected || environment.playerSheet.isExpanded)
+    }
+}
+
+/// The shell (tabs and bars) is not drawn while the settled full player covers the whole screen with its opaque card
+/// (`PlayerSheetController.coversShell`): the compositor stops drawing about 15–25 Liquid Glass surfaces under every
+/// frame of the player (carousel swipes, scrubbing, ambient styles). Nothing is removed, so state, scroll positions
+/// and the tab bar survive; the shell is back, without animation, in the update that starts any movement of the card.
+/// Its own small view: the flag flips here and not in the shell's body.
+private struct ShellCoveredByPlayer: ViewModifier {
+    @Environment(AppEnvironment.self) private var environment
+
+    func body(content: Content) -> some View {
+        let covered = environment.playerSheet.coversShell
+        content
+            .opacity(covered ? 0 : 1)
+            .animation(nil, value: covered)
     }
 }
 
