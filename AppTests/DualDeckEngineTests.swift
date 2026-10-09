@@ -443,6 +443,34 @@ final class DualDeckEngineTests: XCTestCase {
 
     // MARK: Snapshot
 
+    func testQueueSnapshotMovesFromUserDefaultsToItsFile() async throws {
+        let suite = "pixlaudio.tests.snapshot.file"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defaults.removePersistentDomain(forName: suite)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let file = QueueSnapshotFile(url: directory.appendingPathComponent("queue.json"))
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let snapshot = PlaybackQueueSnapshot(
+            items: [PlaybackQueueItemSnapshot(mediaId: "a", uri: "file:///a", title: "A", artist: "X", albumTitle: "Y",
+                                              artworkUri: nil, durationMs: 1_000)],
+            currentMediaId: "a", currentIndex: 0, currentPositionMs: 5, playWhenReady: false, repeatMode: 0,
+            shuffleEnabled: false, savedAtEpochMs: 1)
+        defaults.set(try XCTUnwrap(QueueSnapshotCoding.encodeNow(snapshot)), forKey: PreferenceKeys.playbackQueueSnapshot)
+
+        let store = QueueSnapshotStore(defaults: defaults, file: file)
+        let migrated = await store.loadInBackground()
+        XCTAssertEqual(migrated?.items.map(\.mediaId), ["a"])
+        XCTAssertNil(defaults.string(forKey: PreferenceKeys.playbackQueueSnapshot))
+        XCTAssertNotNil(file.read())
+
+        // A newer save wins over an older one that arrives later; removing deletes the file.
+        file.write("new", token: 5)
+        file.write("old", token: 4)
+        XCTAssertEqual(file.read(), "new")
+        file.remove(token: 6)
+        XCTAssertNil(file.read())
+    }
+
     func testQueueSnapshotSavesAndRestores() async throws {
         let urls = try (0..<3).map { try TestAudio.sine(frequency: 300 + Double($0) * 100, seconds: 4) }
         let songs = urls.enumerated().map { TestAudio.song($1, id: "f:\($0)", seconds: 4) }

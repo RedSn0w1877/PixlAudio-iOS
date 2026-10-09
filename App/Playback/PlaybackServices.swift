@@ -48,7 +48,9 @@ final class PlaybackServices {
         engine = DualDeckEngine(session: session)
         nowPlaying = NowPlayingController(engine: engine)
         sleepTimer = SleepTimerController(engine: engine)
-        snapshots = QueueSnapshotStore(defaults: defaults)
+        snapshots = QueueSnapshotStore(defaults: defaults,
+                                       file: defaults === UserDefaults.standard
+                                           ? QueueSnapshotFile.defaultURL().map(QueueSnapshotFile.init) : nil)
         history = PlaybackHistoryStore.defaultURL().map { PlaybackHistoryStore(url: $0) }
         wireEngine()
     }
