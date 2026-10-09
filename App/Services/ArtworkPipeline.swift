@@ -41,14 +41,22 @@ nonisolated enum ArtworkSource: Hashable, Sendable {
 
     init?(song: Song) { self.init(uriString: song.albumArtUriString) }
 
-    /// Stable key for caches.
+    /// Stable key for caches. Embedded art is keyed by its picture (`c:<digest>`, `EmbeddedArtworkIdentity`) once the
+    /// file's picture is known, so the tracks of an album share one entry; before that by file (`e:<file url>`).
     var cacheKey: String {
         switch self {
         case .file(let url): "f:" + url.absoluteString
         case .remote(let url): "r:" + url.absoluteString
-        case .embedded(let url): "e:" + url.absoluteString
+        case .embedded(let url):
+            EmbeddedArtworkIdentity.shared.digest(for: url).map { "c:" + $0 } ?? ("e:" + url.absoluteString)
         case .generated(let seed): "g:\(seed)"
         }
+    }
+
+    /// The per-file key embedded art had before it was keyed by picture (caches written by earlier builds).
+    var legacyEmbeddedCacheKey: String? {
+        guard case .embedded(let url) = self else { return nil }
+        return "e:" + url.absoluteString
     }
 }
 
@@ -102,6 +110,8 @@ actor ArtworkPipeline {
         if let diskDirectory {
             try? FileManager.default.createDirectory(at: diskDirectory, withIntermediateDirectories: true)
         }
+        // The picture index is read off the main thread, before the first cover asks for its key.
+        Task.detached(priority: .userInitiated) { EmbeddedArtworkIdentity.shared.preload() }
         let memory = self.memory
         // `UIApplication.didReceiveMemoryWarningNotification`, by name (this initialiser is not on the main actor).
         let memoryWarning = Notification.Name("UIApplicationDidReceiveMemoryWarningNotification")
@@ -291,8 +301,14 @@ actor ArtworkPipeline {
         if let diskDirectory, let derived = largerDiskThumbnail(source, pixelSize: pixelSize, in: diskDirectory) {
             return ArtworkImage(cgImage: derived)
         }
+        // A cover cached by an earlier build under its per-file key: promoted to the picture's key, not decoded again.
+        if let diskDirectory, let diskURL, let legacy = legacyEmbeddedThumbnail(source, pixelSize: pixelSize, in: diskDirectory,
+                                                                                promotingTo: diskURL) {
+            return ArtworkImage(cgImage: legacy)
+        }
         // Nobody waits for this cover any more: stop before the expensive part (the source read and the decode).
         if Task.isCancelled { return nil }
+        var targetURL = diskURL
         var imageSource: CGImageSource?
         switch source {
         case .file(let url):
@@ -305,12 +321,22 @@ actor ArtworkPipeline {
             imageSource = CGImageSourceCreateWithData(result.0 as CFData, nil)
         case .embedded(let url):
             guard let loader = embeddedArtworkLoader, let data = await loader(url), !Task.isCancelled else { return nil }
+            // The bytes are in hand: learn which picture this file has (a library scanned before the index existed),
+            // and if its picture is already on disk under its own key, use that instead of decoding these.
+            EmbeddedArtworkIdentity.shared.record(EmbeddedArtworkIdentity.digest(of: data), for: url)
+            if let diskDirectory {
+                let pictureURL = diskDirectory.appendingPathComponent(diskName(Self.key(source, pixelSize)))
+                if pictureURL != diskURL, let cached = thumbnail(CGImageSourceCreateWithURL(pictureURL as CFURL, nil), pixelSize) {
+                    return ArtworkImage(cgImage: cached)
+                }
+                targetURL = pictureURL
+            }
             imageSource = CGImageSourceCreateWithData(data as CFData, nil)
         case .generated:
             return nil
         }
         guard let image = thumbnail(imageSource, pixelSize) else { return nil }
-        if let diskURL { writeJPEG(image, to: diskURL) }
+        if let targetURL { writeJPEG(image, to: targetURL) }
         return ArtworkImage(cgImage: image)
     }
 
@@ -328,6 +354,20 @@ actor ArtworkPipeline {
             if let image = thumbnail(CGImageSourceCreateWithURL(url as CFURL, nil), pixelSize) { return image }
         }
         return nil
+    }
+
+    /// Embedded art decoded by an earlier build was cached per file (`e:<url>#size`). When the picture's own entry is
+    /// missing, that file is the same pixels: decode it and copy it over, so the first track of an album that was
+    /// already cached costs a file copy, and the others find the entry.
+    private nonisolated static func legacyEmbeddedThumbnail(_ source: ArtworkSource, pixelSize: Int, in directory: URL,
+                                                            promotingTo pictureURL: URL) -> CGImage? {
+        guard let legacyKey = source.legacyEmbeddedCacheKey, source.cacheKey != legacyKey else { return nil }
+        let legacyURL = directory.appendingPathComponent(diskName("\(legacyKey)#\(pixelSize)"))
+        guard let image = thumbnail(CGImageSourceCreateWithURL(legacyURL as CFURL, nil), pixelSize) else { return nil }
+        if !FileManager.default.fileExists(atPath: pictureURL.path) {
+            try? FileManager.default.copyItem(at: legacyURL, to: pictureURL)
+        }
+        return image
     }
 
     private nonisolated static func thumbnail(_ source: CGImageSource?, _ pixelSize: Int) -> CGImage? {

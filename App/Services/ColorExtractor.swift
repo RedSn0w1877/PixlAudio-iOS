@@ -57,10 +57,21 @@ actor ColorExtractor {
             let pipeline = self.pipeline
             let persistence = self.persistence
             let artworkKey = source.cacheKey
+            // A theme stored under the per-file key of embedded art (earlier builds) is the same colours.
+            let legacyKey: String?
+            if let legacy = source.legacyEmbeddedCacheKey, legacy != artworkKey {
+                legacyKey = legacy + "|" + paletteKey
+            } else {
+                legacyKey = nil
+            }
             created.task = Task.detached(priority: .userInitiated) { [self] () -> ColorRolesPair? in
                 var result: ColorRolesPair?
                 if let stored = try? await persistence?.artworkTheme(key: key) {
                     result = stored
+                } else if let legacyKey, let stored = try? await persistence?.artworkTheme(key: legacyKey) {
+                    result = stored
+                    try? await persistence?.saveArtworkTheme(key: key, artworkKey: artworkKey, paletteKey: paletteKey,
+                                                             pair: stored)
                 } else if await gate.acquire() {
                     if !Task.isCancelled,
                        let pixels = await pipeline.argbPixels(source, maxDimension: ArtworkTheme.extractionMaxDimension),
@@ -128,7 +139,16 @@ actor ColorExtractor {
         }.value
         // A theme dropped while the rows were being read stays dropped.
         guard generation == invalidations else { return }
-        for (key, pair) in decoded { mirror.insertIfAbsent(pair, for: key) }
+        let suffix = "|" + paletteKey
+        for (key, pair) in decoded {
+            mirror.insertIfAbsent(pair, for: key)
+            // A theme stored under the per-file key of embedded art also answers for the file's picture key.
+            if key.hasPrefix("e:"), key.hasSuffix(suffix),
+               let url = URL(string: String(key.dropFirst(2).dropLast(suffix.count))),
+               let digest = EmbeddedArtworkIdentity.shared.digest(for: url) {
+                mirror.insertIfAbsent(pair, for: "c:" + digest + suffix)
+            }
+        }
     }
 
     /// A memory-cache hit without generating (Android `peekCachedColorScheme`, memory part).

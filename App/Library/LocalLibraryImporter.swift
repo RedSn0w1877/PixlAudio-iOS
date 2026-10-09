@@ -358,6 +358,8 @@ actor LocalLibraryImporter: LibraryImporting {
 
     private nonisolated static func readOne(_ job: ReadJob) async -> ReadResult {
         let metadata = await AudioMetadataReader.read(url: job.entry.url)
+        // The tracks of an album share one cached cover: the scan, which has the picture in hand, says which.
+        if let digest = metadata.artworkDigest { EmbeddedArtworkIdentity.shared.record(digest, for: job.entry.url) }
         let track = metadata.durationMs > 0
             ? ScannedTrack.file(id: job.id, root: job.root, entry: job.entry, metadata: metadata,
                                 coverImage: job.coverImage)

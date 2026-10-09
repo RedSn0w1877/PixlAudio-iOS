@@ -115,6 +115,18 @@ final class LibraryImportTests: XCTestCase {
         XCTAssertEqual(one.artistId, alice.id)
     }
 
+    /// The scan has the picture in hand, so it says which cover a file has: the tracks of an album then share one
+    /// artwork cache key (`EmbeddedArtworkIdentity`).
+    func testImportRecordsThePictureOfEmbeddedArtwork() async throws {
+        try writeFixture()
+        _ = try await scan(makeImporter())
+        let library = try await snapshot()
+        let one = try song("Song One", in: library)
+        let source = try XCTUnwrap(ArtworkSource(song: one))
+        guard case .embedded = source else { return XCTFail("embedded art expected, got \(source)") }
+        XCTAssertEqual(source.cacheKey, "c:" + EmbeddedArtworkIdentity.digest(of: TestAudioFiles.tinyPNG))
+    }
+
     func testMetadataReaderReturnsReplayGainAndEmbeddedArtwork() async throws {
         let files = try writeFixture()
         let metadata = await AudioMetadataReader.read(url: files.mp3)
