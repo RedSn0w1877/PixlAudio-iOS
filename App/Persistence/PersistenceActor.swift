@@ -137,6 +137,10 @@ actor PersistenceActor {
     }
 
     func deleteArtworkThemes(artworkKey: String) throws {
+        // A batch delete works on the store, not on rows still waiting for their coalesced save: write those first.
+        themeSave?.cancel()
+        themeSave = nil
+        try modelContext.save()
         try modelContext.delete(model: ArtworkThemeRecord.self, where: #Predicate { $0.artworkKey == artworkKey })
         try modelContext.save()
     }

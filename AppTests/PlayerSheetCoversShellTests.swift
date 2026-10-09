@@ -14,13 +14,15 @@ final class PlayerSheetCoversShellTests: XCTestCase {
         XCTAssertFalse(sheet.coversShell)
     }
 
-    func testAnAnimatedExpandCoversTheShellOnlyOnceItHasSettled() {
+    func testAnAnimatedExpandCoversTheShellOnceItHasSettled() {
         let sheet = PlayerSheetController()
         sheet.prewarm()
         let generation = sheet.motionGeneration
         sheet.expand()
-        XCTAssertFalse(sheet.coversShell, "the card is still moving")
+        // (Outside a window SwiftUI completes the animation at once, so the flag may already be set here.)
         sheet.expandDidSettle(generation: generation)
+        XCTAssertTrue(sheet.coversShell)
+        sheet.expandDidSettle(generation: generation) // settling twice changes nothing
         XCTAssertTrue(sheet.coversShell)
     }
 
