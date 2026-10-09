@@ -201,18 +201,24 @@ nonisolated enum LibraryGenres {
                 if !name.isKotlinBlank { names.append(name) }
             }
         }
-        let known = names.map(buildGenre)
-            .kotlinDistinct(by: \.id)
+        // The first name of each id, before the (palette-hashing) `buildGenre`: thousands of songs share a few genres.
+        var seenIds = Set<String>()
+        let unique = names.filter { seenIds.insert(genreId($0)).inserted }
+        let known = unique.map(buildGenre)
             .kotlinSorted { KotlinText.compare(KotlinText.lowercase($0.name), KotlinText.lowercase($1.name)) }
         if hasUnknown, !known.contains(where: { $0.id == unknownId }) { return known + [buildGenre(unknownName)] }
         return known
     }
 
     /// `buildGenre`: id = lower-cased name with spaces and slashes as `_`; colours from the palette.
-    static func buildGenre(_ name: String) -> Genre {
-        let id = KotlinText.equalsIgnoreCase(name, unknownName)
+    static func genreId(_ name: String) -> String {
+        KotlinText.equalsIgnoreCase(name, unknownName)
             ? unknownId
             : KotlinText.replace(KotlinText.replace(KotlinText.lowercase(name), " ", "_"), "/", "_")
+    }
+
+    static func buildGenre(_ name: String) -> Genre {
+        let id = genreId(name)
         let light = GenreCardPalette.color(genreId: id, isDark: false)
         let dark = GenreCardPalette.color(genreId: id, isDark: true)
         return Genre(id: id, name: name,

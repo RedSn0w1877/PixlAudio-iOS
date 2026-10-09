@@ -135,11 +135,13 @@ final class SearchModel {
         indexTask?.cancel()
         let provider = providers[.library] as? LibrarySearchProvider
         indexTask = Task { [weak self] in
-            let genres = await Task.detached(priority: .userInitiated) {
+            let genresPass = Task.detached(priority: .userInitiated) {
                 LibraryGenres.genres(from: snapshot.songs)
-            }.value
+            }
+            let genres = await withTaskCancellationHandler { await genresPass.value } onCancel: { genresPass.cancel() }
             guard let self, !Task.isCancelled else { return }
-            self.genres = genres
+            // Equal lists leave the Search screen alone (a favourite or an artist picture changes no genre).
+            if self.genres != genres { self.genres = genres }
             if let provider {
                 await provider.setMinTracksPerAlbum(minTracksPerAlbum)
                 let rebuilt = await provider.update(snapshot: snapshot)
