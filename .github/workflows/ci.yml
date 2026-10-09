@@ -209,6 +209,59 @@ jobs:
           wait "$REC" || true
           ls -la "build/record/record-$CLASS.mp4" || true
           if [ -d build/Record.xcresult ]; then bash ci/export-shots.sh build/Record.xcresult build/record/shots; fi
+      # "[perf]" in the commit message runs TransitionPerformanceTests on an optimised app. The runs above use the Debug
+      # build (-Onone, a debug dylib), whose CPU numbers say little about the shipped app. This builds the
+      # PixlAudioPerf scheme (UI tests only, Release) next to it and runs them on the same simulator. It never turns
+      # the job red (continue-on-error); its numbers go to the job summary and the perf-<sha> artifact.
+      - name: Performance tests (Release build, [perf])
+        id: perf
+        if: ${{ !cancelled() && steps.boot.outcome == 'success' && contains(github.event.head_commit.message, '[perf]') }}
+        continue-on-error: true
+        timeout-minutes: 60
+        run: |
+          set -o pipefail
+          mkdir -p build/perf
+          xcodebuild build-for-testing \
+            -project PixlAudio.xcodeproj -scheme PixlAudioPerf \
+            -destination "id=$SIM_UDID" \
+            -derivedDataPath build/DerivedData-perf \
+            ONLY_ACTIVE_ARCH=YES \
+            2>&1 | bash ci/timestamp.sh | tee build/perf-build.log | cut -c14- | xcbeautify --quieter
+          # Earlier steps ran the Debug app as this simulator's host: the Release one starts from a fresh data container.
+          app="build/DerivedData-perf/Build/Products/Release-iphonesimulator/PixlAudio.app"
+          bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist")"
+          xcrun simctl terminate "$SIM_UDID" "$bundle_id" 2>/dev/null || true
+          xcrun simctl uninstall "$SIM_UDID" "$bundle_id" || true
+          xcrun simctl keychain "$SIM_UDID" reset || true
+          xcodebuild test-without-building \
+            -project PixlAudio.xcodeproj -scheme PixlAudioPerf \
+            -destination "id=$SIM_UDID" \
+            -derivedDataPath build/DerivedData-perf \
+            -only-testing:PixlAudioUITests/TransitionPerformanceTests \
+            -collect-test-diagnostics never \
+            -resultBundlePath build/Perf.xcresult \
+            2>&1 | bash ci/timestamp.sh | tee build/perf.log | cut -c14- | xcbeautify --quieter
+      - name: Performance metrics (Release build)
+        if: ${{ always() && contains(github.event.head_commit.message, '[perf]') }}
+        run: |
+          mkdir -p build/perf
+          if [ -f build/perf.log ] && grep -q 'measured \[' build/perf.log; then
+            grep 'measured \[' build/perf.log \
+              | sed -E "s/^.*Test Case '-\[PixlAudioUITests\.([A-Za-z]+) ([A-Za-z0-9_]+)\]' measured /\1.\2 /; s/, performanceMetricID.*//" \
+              > build/perf/perf-metrics-release.txt
+            { echo "### Performance metrics (Release build)"; echo '```'; cat build/perf/perf-metrics-release.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload performance results
+        if: ${{ always() && contains(github.event.head_commit.message, '[perf]') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-${{ github.sha }}
+          path: |
+            build/perf
+            build/perf.log
+            build/perf-build.log
+          retention-days: 14
+          if-no-files-found: ignore
       - name: Export screenshots
         if: ${{ always() && env.RUN_SHOTS == 'true' }}
         run: |
