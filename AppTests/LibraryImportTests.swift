@@ -291,7 +291,8 @@ final class LibraryImportTests: XCTestCase {
                                                                    artists: library.artists, playlists: []))
         let summary = try await scan(importer)
         XCTAssertEqual(summary.added, 1, "the removed row comes back from its file")
-        XCTAssertEqual(try await snapshot().songs.count, 3)
+        let restored = try await snapshot()
+        XCTAssertEqual(restored.songs.count, 3)
     }
 
     /// Measured on the fixture like `TransitionPerformanceTests`: `perf-metrics.txt` collects the "measured" lines.
