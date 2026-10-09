@@ -91,6 +91,18 @@ public actor InMemorySpotifyLibraryStore: SpotifyLibraryStore {
         }
     }
 
+    public func updateAutomaticMatches(_ updates: [SpotifyAutoMatchUpdate]) async throws {
+        log.append("updateAutomaticMatches:\(updates.count)")
+        for update in updates {
+            for index in songs.indices where songs[index].spotifyId == update.spotifyId && songs[index].matchState != .manual
+                && (songs[index].matchedVideoId ?? "").isEmpty {
+                songs[index].matchedVideoId = update.videoId
+                songs[index].matchScore = update.score
+                songs[index].matchState = update.state
+            }
+        }
+    }
+
     public func updateMatch(spotifyId: String, videoId: String?, score: Float?, state: SpotifyMatchState) async throws {
         log.append("updateMatch:\(spotifyId):\(state)")
         for index in songs.indices where songs[index].spotifyId == spotifyId {

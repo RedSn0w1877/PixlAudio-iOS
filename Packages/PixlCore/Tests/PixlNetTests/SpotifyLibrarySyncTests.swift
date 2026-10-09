@@ -254,6 +254,26 @@ struct SpotifyMatchRunnerTests {
         #expect(second.totalPending == 2 && second.matched == 2 && !second.retryLater)
     }
 
+    /// Each batch is written once, not once per track (a save per track was ~5,000 commits for a big account).
+    @Test func eachBatchIsOneWriteInSearchOrder() async throws {
+        var songs: [SpotifyTrackRecord] = []
+        for i in 0..<100 { songs.append(SpotifyLibrarySyncTests.record(String(format: "s%03d", i))) }
+        let store = InMemorySpotifyLibraryStore(songs: songs)
+        let runner = SpotifyMatchRunner(store: store, matcher: { track in
+            track.title.hasSuffix("7") ? nil : TrackMatch(videoId: "v-" + track.title, score: 0.8, candidateTitle: "")
+        }, nowMs: { 0 }, sleep: { _ in })
+        let result = try await runner.run()
+        #expect(result.done == 100 && result.matched + result.failed == 100)
+        let log = await store.log
+        #expect(log.filter { $0.hasPrefix("updateAutomaticMatches:") } == ["updateAutomaticMatches:48",
+                                                                           "updateAutomaticMatches:48",
+                                                                           "updateAutomaticMatches:4"])
+        #expect(!log.contains { $0.hasPrefix("updateAutomaticMatch:") })
+        let rows = await store.songs
+        #expect(rows.first { $0.spotifyId == "s007" }?.matchState == .unmatched)
+        #expect(rows.first { $0.spotifyId == "s008" }?.matchedVideoId == "v-T s008")
+    }
+
     @Test func fullyFailedBatchStopsThePass() async throws {
         var songs: [SpotifyTrackRecord] = []
         for i in 0..<100 { songs.append(SpotifyLibrarySyncTests.record(String(format: "s%03d", i))) }

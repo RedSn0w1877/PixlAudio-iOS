@@ -44,6 +44,21 @@ public struct SpotifyMatchInfo: Sendable, Hashable {
     }
 }
 
+/// One automatic match to write (`SpotifyLibraryStore.updateAutomaticMatches`).
+public struct SpotifyAutoMatchUpdate: Sendable, Hashable {
+    public let spotifyId: String
+    public let videoId: String?
+    public let score: Float?
+    public let state: SpotifyMatchState
+
+    public init(spotifyId: String, videoId: String?, score: Float?, state: SpotifyMatchState) {
+        self.spotifyId = spotifyId
+        self.videoId = videoId
+        self.score = score
+        self.state = state
+    }
+}
+
 /// What the Spotify library is stored in (Android `SpotifyDao`). Rows are keyed by `SpotifyTrackRecord.id`
 /// (`<playlistId>_<spotifyId>`); "distinct" queries collapse the rows of one track (`GROUP BY spotify_id`).
 public protocol SpotifyLibraryStore: Sendable {
@@ -64,6 +79,9 @@ public protocol SpotifyLibraryStore: Sendable {
     func pendingSongs(after: String, limit: Int) async throws -> [SpotifyTrackRecord]
     /// `updateAutomaticMatch`: every row of the track, unless MANUAL or already holding a video.
     func updateAutomaticMatch(spotifyId: String, videoId: String?, score: Float?, state: SpotifyMatchState) async throws
+    /// `updateAutomaticMatch` for a whole batch, in order. A store with a transaction writes it with one save; the
+    /// default applies them one by one.
+    func updateAutomaticMatches(_ updates: [SpotifyAutoMatchUpdate]) async throws
     /// `updateMatch`: every row of the track, unconditionally.
     func updateMatch(spotifyId: String, videoId: String?, score: Float?, state: SpotifyMatchState) async throws
     /// `requeueUnmatchedSongs`: UNMATCHED → PENDING (video and score cleared). Returns the rows changed.
@@ -72,6 +90,15 @@ public protocol SpotifyLibraryStore: Sendable {
     func countTracks(in state: SpotifyMatchState) async throws -> Int
     /// Removes every Spotify row and playlist (`clearAllSongs` + `clearAllPlaylists`).
     func clearAll() async throws
+}
+
+extension SpotifyLibraryStore {
+    public func updateAutomaticMatches(_ updates: [SpotifyAutoMatchUpdate]) async throws {
+        for update in updates {
+            try await updateAutomaticMatch(spotifyId: update.spotifyId, videoId: update.videoId, score: update.score,
+                                           state: update.state)
+        }
+    }
 }
 
 /// `BulkSyncResult`.
