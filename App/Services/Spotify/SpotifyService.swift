@@ -88,7 +88,7 @@ final class SpotifyService {
         hasClientId = !preferences.clientId.isEmpty
         clientIdOverride = preferences.clientIdOverride
         if let persistence, !isDemo {
-            let reload: @MainActor @Sendable () async -> Void = { [weak self] in await self?.libraryChanged() }
+            let reload: @MainActor @Sendable () async -> Void = { [weak self] in await self?.libraryChangedByFlush() }
             sync = SpotifyLibrarySync(api: api, store: persistence, sha256: SpotifyPlatform.sha256, flush: {
                 try? await persistence.rebuildSpotifyUnifiedLibrary()
                 await reload()
@@ -123,6 +123,22 @@ final class SpotifyService {
         await refreshLibraryState()
         if pendingMatchCount > 0 { startMatching(retryFailed: false) }
         if isLoggedIn { scheduleBackgroundRefresh() }
+    }
+
+    /// While a one-track import (play / like from the catalogue) is under way its own `libraryChanged()` follows, so the
+    /// import's flush does not reload the whole library a second time.
+    private var flushReloadSuppressions = 0
+
+    private func libraryChangedByFlush() async {
+        guard flushReloadSuppressions == 0 else { return }
+        await libraryChanged()
+    }
+
+    /// Runs `body` (a one-track import) without the flush's own library reload.
+    private func withoutFlushReload<T>(_ body: () async -> T) async -> T {
+        flushReloadSuppressions += 1
+        defer { flushReloadSuppressions -= 1 }
+        return await body()
     }
 
     private func libraryChanged() async {
@@ -419,7 +435,8 @@ final class SpotifyService {
     /// Android `playCatalogTrack`: import, like, match right away (the user is waiting), then the playable song.
     func importAndMatch(_ track: SpotifyTrack, like: Bool) async -> Song? {
         guard let sync, let persistence, let spotifyId = track.id else { return nil }
-        guard (try? await sync.importTracks([track])) != nil else { return nil }
+        let imported = await withoutFlushReload { (try? await sync.importTracks([track])) != nil }
+        guard imported else { return nil }
         let songId = SpotifyUnifiedLibrary.songId(spotifyId)
         if like { try? await persistence.setFavorites([songId], isFavorite: true, timestamp: currentTimeMillis()) }
         guard let record = try? await persistence.spotifySong(spotifyId: spotifyId) else { return nil }
@@ -435,7 +452,8 @@ final class SpotifyService {
     /// Android `likeCatalogTrack`: import and like; the matcher finds the audio later.
     func importAndLike(_ track: SpotifyTrack) async -> Bool {
         guard let sync, let persistence, let spotifyId = track.id else { return false }
-        guard (try? await sync.importTracks([track])) != nil else { return false }
+        let imported = await withoutFlushReload { (try? await sync.importTracks([track])) != nil }
+        guard imported else { return false }
         try? await persistence.setFavorites([SpotifyUnifiedLibrary.songId(spotifyId)], isFavorite: true, timestamp: currentTimeMillis())
         await libraryChanged()
         startMatching(retryFailed: false)
@@ -445,7 +463,8 @@ final class SpotifyService {
     /// Android `playYouTubeMusicTrack`: stored as an already-matched row, playable at once.
     func importYouTubeMusic(_ result: YouTubeSearchResult) async -> Song? {
         guard let sync else { return nil }
-        guard (try? await sync.importYouTubeMusicTracks([result])) != nil else { return nil }
+        let imported = await withoutFlushReload { (try? await sync.importYouTubeMusicTracks([result])) != nil }
+        guard imported else { return nil }
         await libraryChanged()
         let syntheticId = SpotifyLibrary.youTubeMusicSyntheticId(result.videoId, sha256: SpotifyPlatform.sha256)
         return currentSong(id: SpotifyUnifiedLibrary.songId(syntheticId))
