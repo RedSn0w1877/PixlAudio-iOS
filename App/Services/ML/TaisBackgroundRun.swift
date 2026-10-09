@@ -42,12 +42,15 @@ final class TaisBackgroundRun {
         isActive = true
         pendingFraction = 0
         register()
+        // The ordinary ~30 s of background time covers the gap until the system hands over the continued-processing
+        // task (`attach` gives this back), and all of the run when the request is refused.
+        beginAssertion()
         let request = BGContinuedProcessingTaskRequest(identifier: identifier, title: title, subtitle: subtitle)
         request.strategy = .fail
         do {
             try BGTaskScheduler.shared.submit(request)
         } catch {
-            beginAssertion()
+            // Refused (not allowed now, or the simulator): the assertion above is all there is.
         }
     }
 

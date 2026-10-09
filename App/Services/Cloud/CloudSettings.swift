@@ -34,9 +34,14 @@ final class CloudSettings {
         /// What jobs taken off the list spent this month (`[monthStartMs, µ$]`), so Remove and Clear finished don't
         /// lower the month's total.
         static let removedSpend = "cloud_studio_removed_spend"
+        /// "Tell me when it's done" (a local notification when a batch finishes in the background); default on.
+        static let notifyWhenDone = "cloud_studio_notify_done"
+        /// Batches already announced by a notification (newest last, capped), so none is announced twice.
+        static let notifiedBatches = "cloud_studio_notified_batches"
 
         static let all = [enabled, endpointId, r2Endpoint, bucket, instrumental, lyrics, transcribe, quality, cellular,
-                          pricePerSecond, monthlyCap, keysSaved, workerCaps, useOwnKeys, removedSpend]
+                          pricePerSecond, monthlyCap, keysSaved, workerCaps, useOwnKeys, removedSpend, notifyWhenDone,
+                          notifiedBatches]
     }
 
     /// Where the built-in keys stand in this build.
@@ -92,6 +97,9 @@ final class CloudSettings {
     var quality: CloudSeparationQuality { didSet { defaults.set(quality.rawValue, forKey: Keys.quality) } }
     /// "Use cellular data" (off: uploads and downloads wait for Wi-Fi).
     var useCellular: Bool { didSet { defaults.set(useCellular, forKey: Keys.cellular) } }
+    /// "Notify me when it's done": one local notification when a batch finishes while PixlAudio is closed. On by default;
+    /// iOS asks for permission the first time a batch is sent, never at launch.
+    var notifyWhenDone: Bool { didSet { defaults.set(notifyWhenDone, forKey: Keys.notifyWhenDone) } }
     /// The GPU price the estimates use (µ$ per second; default AMPERE_24 $0.000192/s).
     var pricePerSecondMicroUSD: Int64 { didSet { defaults.set(pricePerSecondMicroUSD, forKey: Keys.pricePerSecond) } }
     /// The app's monthly cap (default $3): submissions stop once the month's recorded cost reaches it.
@@ -138,6 +146,7 @@ final class CloudSettings {
         transcribeWhenMissing = defaults.bool(Keys.transcribe, default: true)
         quality = CloudSeparationQuality(rawValue: defaults.string(Keys.quality, default: "")) ?? .standard
         useCellular = defaults.bool(Keys.cellular, default: false)
+        notifyWhenDone = defaults.bool(Keys.notifyWhenDone, default: true)
         let price = (defaults.object(forKey: Keys.pricePerSecond) as? NSNumber)?.int64Value
         pricePerSecondMicroUSD = price.map { min(max($0, 1), 10_000) } ?? CloudCost.defaultPricePerSecondMicroUSD
         let cap = (defaults.object(forKey: Keys.monthlyCap) as? NSNumber)?.int64Value
@@ -193,6 +202,29 @@ final class CloudSettings {
     var effectivePricePerSecondMicroUSD: Int64 {
         CloudKeyChoice.effectivePricePerSecond(pricePerSecondMicroUSD, source: keySource)
     }
+
+    // MARK: Announced batches
+
+    /// The batches a notification was already posted for.
+    var notifiedBatchIds: Set<String> {
+        Set(defaults.stringArray(forKey: Keys.notifiedBatches) ?? [])
+    }
+
+    func markNotified(_ batchId: String) {
+        var ids = defaults.stringArray(forKey: Keys.notifiedBatches) ?? []
+        guard !ids.contains(batchId) else { return }
+        ids.append(batchId)
+        defaults.set(Array(ids.suffix(Self.notifiedBatchLimit)), forKey: Keys.notifiedBatches)
+    }
+
+    /// A batch whose job was retried may be announced again when it finishes.
+    func forgetNotified(_ batchId: String) {
+        let ids = defaults.stringArray(forKey: Keys.notifiedBatches) ?? []
+        guard ids.contains(batchId) else { return }
+        defaults.set(ids.filter { $0 != batchId }, forKey: Keys.notifiedBatches)
+    }
+
+    private static let notifiedBatchLimit = 60
 
     // MARK: Spend of removed jobs
 

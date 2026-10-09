@@ -75,6 +75,8 @@ final class AppEnvironment {
     /// Cloud Studio (iOS-first): instrumentals and word-timed lyrics on the owner's RunPod GPU, results through R2.
     /// Built here because a background relaunch (BGAppRefresh, the transfer session) never runs `start()`.
     let cloud: CloudStudio
+    /// Home's "Active jobs" button and sheet: what is running across the services above (`ActiveJobs`).
+    let activeJobs: ActiveJobs
 
     init(launch: LaunchConfiguration) {
         self.launch = launch
@@ -230,6 +232,13 @@ final class AppEnvironment {
         self.cloud = cloud
         // The automatic studio leaves songs alone while the cloud is working on them (design §7.1).
         automaticStudio.skipsSong = { [weak cloud] songId in cloud?.hasPendingJob(songId: songId) ?? false }
+        activeJobs = isUITest
+            ? ActiveJobsDemo.make(launch: launch)
+            : ActiveJobs(sources: ActiveJobs.Sources(library: library, spotify: spotify, downloads: youtube.downloads,
+                                                     models: tais.models, studio: tais.studio, cloud: cloud))
+        // A tap on "Your instrumentals are ready" opens the Cloud queue (the notification centre's delegate is set
+        // here, early: a launch from the notification reaches it before `start()`).
+        if !isUITest { cloud.installNotificationRouting(router: router) }
     }
 
     /// Launch work, off the first frame: load the library snapshot (cache first, then the store), then start the
@@ -247,6 +256,7 @@ final class AppEnvironment {
         if !settings.behavior.initialSetupDone, router.cover == nil { router.present(AppCover.setup) }
         playbackServices?.start()
         youtube.start()
+        activeJobs.start()
         tais.start()
         automaticStudio.start()
         let library = self.library, playback = self.playback

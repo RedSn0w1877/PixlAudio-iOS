@@ -577,6 +577,8 @@ final class CloudHarness {
     let studio: CloudStudio
     /// The configs RunPod and the bucket clients were made with, and how often the transfer session was made.
     let configs: CloudConfigLog
+    /// The notification the studio would post (a fake); nil unless the test passes one.
+    let notifier: FakeCloudNotifier?
     private let directory: URL
     private var nextKey = 100
     let instrumental = Data(repeating: 7, count: 4_096)
@@ -584,7 +586,7 @@ final class CloudHarness {
     /// `store`: a job list an earlier launch left (a relaunch); empty by default. `builtIn`: the build's built-in
     /// keys (none by default); `ownKeys: false` leaves the person's own fields empty and the switch at its default.
     init(store: CloudJobStore = CloudJobStore(file: nil), builtIn: (any CloudBuiltInKeysProviding)? = nil,
-         ownKeys: Bool = true) {
+         ownKeys: Bool = true, notifier: FakeCloudNotifier? = nil) {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("CloudHarness-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let clock = CloudTestClock(), host = FakeCloudHost(), transfers = FakeCloudTransfers()
@@ -623,7 +625,8 @@ final class CloudHarness {
                 counter += 1
                 return CloudTestValues.key(counter)
             },
-            build: "1.0 (test)", removeStaged: { _ in }, background: nil)
+            build: "1.0 (test)", removeStaged: { _ in }, background: nil, notifier: notifier)
+        self.notifier = notifier
         configs = log
         self.directory = directory
         self.clock = clock
@@ -703,6 +706,20 @@ final class CloudHarness {
             try? await Task.sleep(for: .milliseconds(10))
         }
     }
+}
+
+/// The notification centre's stand-in: what Cloud Studio asked it to show, and how often it asked for permission.
+nonisolated final class FakeCloudNotifier: CloudNotifying, @unchecked Sendable {
+    private let lock = NSLock()
+    private var posted: [CloudBatchOutcome] = []
+    private var permissionAsks = 0
+
+    func requestAuthorizationIfNeeded() async { lock.withLock { permissionAsks += 1 } }
+    func notifyBatchFinished(_ outcome: CloudBatchOutcome) async { lock.withLock { posted.append(outcome) } }
+    func install(onOpen: @escaping @MainActor @Sendable () -> Void) {}
+
+    var outcomes: [CloudBatchOutcome] { lock.withLock { posted } }
+    var permissionRequests: Int { lock.withLock { permissionAsks } }
 }
 
 /// What the harness's client factories were called with.

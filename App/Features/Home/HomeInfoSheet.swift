@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Home's sheets (Android `BetaInfoBottomSheet`, `ChangelogBottomSheet`, `JobsBottomSheet`), presented with the system
+/// Home's sheets (Android `BetaInfoBottomSheet`, `ChangelogBottomSheet`, `JobsBottomSheet` = `ActiveJobsSheet`), presented with the system
 /// sheet (`.pixlSheet()` in `SheetDestination`) with PixlAudio's layout inside.
 struct HomeInfoSheet: View {
     let sheet: AppSheet
@@ -9,7 +9,7 @@ struct HomeInfoSheet: View {
         Group {
             switch sheet {
             case .changelog: ChangelogSheetContent()
-            case .jobs: JobsSheetContent()
+            case .jobs: ActiveJobsSheet()
             default: BetaInfoSheetContent()
             }
         }
@@ -530,92 +530,5 @@ private struct ChangelogSheetContent: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .pixlGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous),
                    tint: theme.surfaceContainerHigh.opacity(GlassTint.surface + 0.1))
-    }
-}
-
-// MARK: - Jobs sheet
-
-/// Android `JobsBottomSheet`: "Active jobs", then each job with a 28 pt progress ring (or spinner / check), its label,
-/// detail or "Queued", and a linear bar when the percentage is known.
-private struct JobsSheetContent: View {
-    @Environment(AppEnvironment.self) private var env
-    @Environment(LibraryStore.self) private var library
-    @Environment(\.appTheme) private var theme
-
-    var body: some View {
-        let jobs = Self.withCloud(env.home.jobs(libraryProgress: library.lastImportProgress), cloud: env.cloud)
-        VStack(alignment: .leading, spacing: 0) {
-            Text("Active jobs")
-                .pixlFont(.titleLarge, weight: .bold)
-                .foregroundStyle(theme.onSurface)
-                .padding(.bottom, 12)
-                .accessibilityAddTraits(.isHeader)
-            if jobs.isEmpty {
-                Text("Nothing running right now.")
-                    .pixlFont(.bodyMedium)
-                    .foregroundStyle(theme.onSurfaceVariant)
-                    .padding(.bottom, 24)
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(jobs) { job in row(job) }
-                    }
-                    .padding(.bottom, 12)
-                }
-                .scrollIndicators(.hidden)
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 28)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    /// Cloud Studio's one summary line ("Cloud: 12 waiting, 1 processing") after Home's own jobs.
-    private static func withCloud(_ jobs: [HomeJob], cloud: CloudStudio) -> [HomeJob] {
-        guard let line = cloud.summaryLine else { return jobs }
-        let running = cloud.activeJobs.contains { $0.state == .running }
-        return jobs + [HomeJob(id: "cloud", label: line, detail: "Cloud processing", percent: nil,
-                               state: running ? .running : .queued)]
-    }
-
-    private func row(_ job: HomeJob) -> some View {
-        HStack(spacing: 14) {
-            Group {
-                if let percent = job.percent {
-                    ZStack {
-                        Circle().stroke(theme.primary.opacity(0.2), lineWidth: 3)
-                        Circle().trim(from: 0, to: CGFloat(percent) / 100)
-                            .stroke(theme.primary, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                            .rotationEffect(.degrees(-90))
-                    }
-                    .padding(1.5)
-                } else if job.state == .running {
-                    ProgressView().tint(theme.primary)
-                } else {
-                    Image(systemName: job.state == .queued ? "clock" : "checkmark.circle.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(theme.onSurfaceVariant)
-                }
-            }
-            .frame(width: 28, height: 28)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(job.label)
-                    .pixlFont(.bodyLarge, weight: .medium)
-                    .foregroundStyle(theme.onSurface)
-                if let subtitle = job.detail ?? (job.state == .queued ? "Queued" : nil) {
-                    Text(subtitle)
-                        .pixlFont(.bodySmall)
-                        .foregroundStyle(theme.onSurfaceVariant)
-                }
-                if let percent = job.percent {
-                    ProgressView(value: Double(percent), total: 100)
-                        .tint(theme.primary)
-                        .padding(.top, 6)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.vertical, 10)
-        .accessibilityElement(children: .combine)
     }
 }

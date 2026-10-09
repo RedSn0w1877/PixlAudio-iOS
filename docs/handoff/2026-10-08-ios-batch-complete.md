@@ -95,6 +95,10 @@ With Apple Intelligence turned on in iPhone Settings:
 - [ ] A playlist's ⋯ › "Process all in the cloud" (about 10 songs): the first is slow, then roughly 20–30 s each.
 - [ ] Set the monthly limit to $0.01: Send is turned off.
 
+### Active jobs on Home and work in the background (added later on 10-08)
+- [ ] Follow the checklist in [2026-10-08-active-jobs-background.md](2026-10-08-active-jobs-background.md): the jobs
+      button on Home, and "Your instrumentals are ready" arriving with the phone locked.
+
 ## Cloud Studio: your remaining steps
 
 1. After main's `cloud-worker-build` finishes pushing the image, make the package public (once): GitHub profile →
@@ -112,5 +116,5 @@ With Apple Intelligence turned on in iPhone Settings:
 - Nothing here has been tried on a real iPhone yet; it was checked only by builds and automated tests.
 - Volume buttons control the speaker only while PixlAudio is open on screen, using an unofficial iOS trick; a press can occasionally be missed.
 - After "Change the words" in Edit song, Edit song shows the old words until you reopen it.
-- Cloud Studio: no "results ready" notification yet, no "Better in the cloud" option in Sing, and only Cloudflare R2 storage.
+- Cloud Studio: no "Better in the cloud" option in Sing, and only Cloudflare R2 storage. (The "results ready" notification now exists: see the active-jobs handoff.)
 - The downloaded AI model is meant for when the app is open; how it behaves in the background is still unknown.

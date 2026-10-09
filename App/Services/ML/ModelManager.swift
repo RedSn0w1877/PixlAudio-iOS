@@ -194,7 +194,8 @@ final class ModelManager {
         let model = ModelCatalog.descriptor(id)
         Task {
             do {
-                let url = try await Self.install(model, archive: archive)
+                // Verifying and compiling can outlast a switch to another app: iOS's ~30 s of grace may finish it.
+                let url = try await BackgroundGrace.run("Model install") { try await Self.install(model, archive: archive) }
                 states[id] = .installed(bytes: Self.installedSize(model) ?? model.bytes)
                 resume(id, with: .success(url))
             } catch {

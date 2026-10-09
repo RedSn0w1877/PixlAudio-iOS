@@ -226,10 +226,8 @@ final class HomeLogicTests: XCTestCase {
         XCTAssertEqual(store.revision, before + 1, "blank ids are not recorded")
     }
 
-    func testUITestStoreHasDemoHistoryAndJobs() {
+    func testUITestStoreHasDemoHistory() {
         let store = HomeStore.make(launch: LaunchConfiguration(arguments: ["-uiTest", "-screen", "home"]))
         XCTAssertFalse(store.history.events.isEmpty)
-        XCTAssertEqual(store.jobs(libraryProgress: nil).count, 2)
-        XCTAssertEqual(store.jobs(libraryProgress: LibraryImportProgress(phase: "Scanning", completed: 1, total: 4)).first?.percent, 25)
     }
 }

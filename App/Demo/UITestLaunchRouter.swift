@@ -44,6 +44,9 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
 
     // Sheets
     case queue, songInfo, sleepTimer, lyricsOptions, changelog, betaInfo, jobs
+    // Active jobs (Home button + sheet): `jobs` shows the running fixture, `jobs.none` an empty sheet, `jobs.mixed` the
+    // running rows plus what finished and what failed; `home.jobs` is Home with the button showing (`ActiveJobsDemo`)
+    case homeJobs = "home.jobs", jobsNone = "jobs.none", jobsMixed = "jobs.mixed"
 
     // Full-screen covers
     case nowPlaying, lyrics, lyricsSync, setup
@@ -142,7 +145,9 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     var route: AppRoute? {
         let demo = DemoLibrary.snapshot
         switch self {
-        case .home, .search, .searchResults, .library, .miniPlayer, .miniPlayerSpotifyConnect: return nil
+        case .home, .homeJobs, .jobsNone, .jobsMixed, .search, .searchResults, .library, .miniPlayer,
+             .miniPlayerSpotifyConnect:
+            return nil
         case .devicesSpotifyConnect, .devicesSpotifyPlaying, .devicesSpotifyReconnect, .devicesSpotifyEmpty,
              .nowPlayingSpotifyConnect, .nowPlayingBluetooth, .lyricsSyncSpotifyConnect,
              .nowPlayingSpotifyVolumeHUD, .lyricsSpotifyVolumeHUD:
@@ -240,7 +245,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .lyricsOptions: return .lyricsOptions(songId: songId)
         case .changelog: return .changelog
         case .betaInfo: return .betaInfo
-        case .jobs: return .jobs
+        case .jobs, .jobsNone, .jobsMixed: return .jobs
         case .devices, .devicesSpotifyConnect, .devicesSpotifyPlaying, .devicesSpotifyReconnect, .devicesSpotifyEmpty:
             return .devices
         case .artistPicker: return .artistPicker(songId: DemoLibrary.songs[DemoLibrary.featuredSongIndex].id)
