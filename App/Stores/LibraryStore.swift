@@ -157,7 +157,9 @@ final class LibraryStore {
 
     /// An edit of the in-memory library (favourites, playlists, tags, removals): the caller knows the snapshot
     /// changed and which songs did, so the lookups are patched instead of rebuilt and nothing is compared.
-    func applyEdit(_ newSnapshot: LibrarySnapshot, changedSongs: [Song] = [], removedSongIds: Set<String> = []) {
+    /// `addedAlbums` / `addedArtists`: rows the edit appended to the snapshot (a streamed song's album and artist).
+    func applyEdit(_ newSnapshot: LibrarySnapshot, changedSongs: [Song] = [], removedSongIds: Set<String> = [],
+                   addedAlbums: [Album] = [], addedArtists: [Artist] = []) {
         // A heart tap changes one field of a few songs: the detail index is patched, not rebuilt.
         let favoritesOnly = removedSongIds.isEmpty && !changedSongs.isEmpty
             && newSnapshot.songs.count == snapshot.songs.count
@@ -169,6 +171,8 @@ final class LibraryStore {
         let previousRevision = revision
         for song in changedSongs { songsById[song.id] = song }
         for id in removedSongIds { songsById[id] = nil }
+        for album in addedAlbums { albumsById[album.id] = album }
+        for artist in addedArtists { artistsById[artist.id] = artist }
         if newSnapshot.playlists != snapshot.playlists {
             playlistsById = Dictionary(newSnapshot.playlists.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         }

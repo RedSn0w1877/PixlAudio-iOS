@@ -61,19 +61,22 @@ final class YouTubeLibraryImporter {
         let now = currentTimeMillis()
         var built = YouTubeSongFactory.song(track, now: now)
         var snapshot = library.snapshot
-        if let index = snapshot.songs.firstIndex(where: { $0.id == built.id }) {
-            guard favorite, !snapshot.songs[index].isFavorite else { return snapshot.songs[index] }
-            snapshot.songs[index].isFavorite = true
-            built = snapshot.songs[index]
+        // Lookups by id, not scans of the whole library on the main actor.
+        if let existing = library.song(id: built.id) {
+            guard favorite, !existing.isFavorite else { return existing }
+            built = existing
+            built.isFavorite = true
+            if let index = snapshot.songs.firstIndex(where: { $0.id == built.id }) { snapshot.songs[index] = built }
         } else {
             built.isFavorite = favorite
             snapshot.songs.append(built)
         }
         let album = YouTubeSongFactory.album(for: built, now: now)
         let artist = YouTubeSongFactory.artist(for: built)
-        if !snapshot.albums.contains(where: { $0.id == album.id }) { snapshot.albums.append(album) }
-        if !snapshot.artists.contains(where: { $0.id == artist.id }) { snapshot.artists.append(artist) }
-        library.apply(snapshot)
+        var addedAlbums: [Album] = [], addedArtists: [Artist] = []
+        if library.album(id: album.id) == nil { snapshot.albums.append(album); addedAlbums = [album] }
+        if library.artist(id: artist.id) == nil { snapshot.artists.append(artist); addedArtists = [artist] }
+        library.applyEdit(snapshot, changedSongs: [built], addedAlbums: addedAlbums, addedArtists: addedArtists)
         if let persistence {
             let song = built, writesCache = self.writesCache, latest = snapshot
             try? await persistence.upsertStreamSong(song, album: album, artist: artist, favoriteAt: favorite ? now : nil)
