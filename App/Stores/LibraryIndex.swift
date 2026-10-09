@@ -57,6 +57,13 @@ nonisolated struct LibraryDetailIndex: Sendable {
                                   folderTree: LibraryModel.folderTree(songs))
     }
 
+    /// The same index for a library whose songs did not change (an artist-picture update), under its new revision.
+    func restamped(revision: Int) -> LibraryDetailIndex {
+        LibraryDetailIndex(revision: revision, songsByAlbum: songsByAlbum, songsByArtist: songsByArtist,
+                           songsByGenre: songsByGenre, firstArtworkByArtist: firstArtworkByArtist,
+                           folderTree: folderTree)
+    }
+
     @concurrent
     static func buildInBackground(_ songs: [Song], revision: Int) async -> LibraryDetailIndex {
         build(songs, revision: revision)

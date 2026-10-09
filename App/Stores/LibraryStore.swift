@@ -180,8 +180,14 @@ final class LibraryStore {
         }
         for artist in updated { artistsById[artist.id] = artist }
         snapshot = newSnapshot
+        let previousRevision = revision
         revision &+= 1
-        rebuildDetailIndex()
+        // The songs did not change, so a current index stays valid: it is re-stamped, not rebuilt.
+        if let index = detailIndex, index.revision == previousRevision {
+            detailIndex = index.restamped(revision: revision)
+        } else {
+            rebuildDetailIndex()
+        }
     }
 
     /// Rewrites the launch cache with the current snapshot, off the main actor (after an edit made outside

@@ -19,6 +19,10 @@ final class ArtistImageService {
     private var running: Task<Void, Never>?
     /// Names already looked up (or being looked up) in this process.
     private var attempted = Set<String>()
+    /// Pictures found but not yet applied to the library: a batch lands every ~2 s at most, not 17 times in a row.
+    private var pending: [Artist] = []
+    private var lastFlush = ContinuousClock.now
+    private static let flushInterval: Duration = .seconds(2)
 
     /// Normalised name → when Deezer last had no picture for it (ms since 1970).
     private static let missesKey = "artist_image_misses_v1"
@@ -62,6 +66,7 @@ final class ArtistImageService {
                 let outcomes = await Self.lookUp(batch, http: self.http)
                 await self.apply(outcomes, now: now)
             }
+            self?.flushPending()
             self?.running = nil
         }
     }
@@ -93,6 +98,16 @@ final class ArtistImageService {
             artist.imageUrl = url
             updated.append(artist)
         }
+        pending.append(contentsOf: updated)
+        if ContinuousClock.now - lastFlush >= Self.flushInterval { flushPending() }
+    }
+
+    /// One library update and one cache write for everything found since the last flush.
+    private func flushPending() {
+        lastFlush = ContinuousClock.now
+        guard !pending.isEmpty else { return }
+        let updated = pending
+        pending = []
         library.updateArtists(updated)
         library.writeSnapshotCache()
     }
