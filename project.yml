@@ -204,3 +204,24 @@ schemes:
       config: Debug
     archive:
       config: Release
+  # Performance runs (CI "[perf]" commits): the UI performance tests against an optimised app. The PixlAudio scheme's
+  # test action is Debug (-Onone, a debug dylib), whose CPU numbers say little about the shipped app.
+  PixlAudioPerf:
+    build:
+      targets:
+        PixlAudio: all
+        PixlAudioUITests: [test]
+    run:
+      config: Release
+    test:
+      config: Release
+      gatherCoverageData: false
+      targets:
+        - name: PixlAudioUITests
+          parallelizable: false
+    profile:
+      config: Release
+    analyze:
+      config: Release
+    archive:
+      config: Release

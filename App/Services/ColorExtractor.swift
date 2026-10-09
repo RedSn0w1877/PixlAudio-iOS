@@ -11,11 +11,28 @@ actor ColorExtractor {
     private let persistence: PersistenceActor?
     private var memory: [String: ColorRolesPair] = [:]
     private var order: [String] = []
-    private var inFlight: [String: Task<ColorRolesPair?, Never>] = [:]
+    /// One extraction per artwork and palette, shared by everyone asking; one nobody waits for any more (the card
+    /// scrolled away) is cancelled before its next step.
+    private final class Extraction {
+        let id: Int
+        var waiters = Set<Int>()
+        var task: Task<ColorRolesPair?, Never>?
+        init(id: Int) { self.id = id }
+    }
+
+    private var inFlight: [String: Extraction] = [:]
+    private var nextExtractionID = 0
+    private var nextWaiterID = 0
+    /// At most two extractions run at once (a 128 px decode and a quantiser pass each), newest first.
+    private let gate = LIFOGate(limit: 2)
     private static let memoryLimit = 256
     /// A synchronous mirror of the memory cache (larger, LRU), so a view can start with its album colours on the
-    /// first frame instead of the brand theme followed by a 0.25 s re-theme (Android `peekCachedColorScheme`).
-    nonisolated let mirror = SchemeMemory(limit: 1024)
+    /// first frame instead of the brand theme followed by a 0.25 s re-theme (Android `peekCachedColorScheme`). A pair
+    /// is a few hundred bytes of roles, so 8,192 of them are a few MB: a 1,300-album library fits whole, and
+    /// `warm(style:accuracyLevel:)` fills it from the stored themes at launch.
+    nonisolated let mirror = SchemeMemory(limit: 8192)
+    /// Counts `invalidate` calls: a warm-up that read the store before one must not put the dropped pairs back.
+    private var invalidations = 0
 
     init(pipeline: ArtworkPipeline, persistence: PersistenceActor?) {
         self.pipeline = pipeline
@@ -28,24 +45,110 @@ actor ColorExtractor {
         let paletteKey = ArtworkTheme.paletteCacheKey(style: style, accuracyLevel: accuracyLevel)
         let key = source.cacheKey + "|" + paletteKey
         if let hit = memory[key] { return hit }
-        if let task = inFlight[key] { return await task.value }
-        let pipeline = self.pipeline
-        let persistence = self.persistence
-        let artworkKey = source.cacheKey
-        let task = Task.detached(priority: .userInitiated) { () -> ColorRolesPair? in
-            if let stored = try? await persistence?.artworkTheme(key: key) { return stored }
-            guard let pixels = await pipeline.argbPixels(source, maxDimension: ArtworkTheme.extractionMaxDimension),
-                  !pixels.isEmpty else { return nil }
-            let seed = ArtworkTheme.seedColor(argbPixels: pixels, accuracyLevel: accuracyLevel)
-            let pair = ArtworkTheme.schemePair(seed: seed, style: style)
-            try? await persistence?.saveArtworkTheme(key: key, artworkKey: artworkKey, paletteKey: paletteKey, pair: pair)
-            return pair
+        if let hit = mirror.value(for: key) { return hit } // warmed from the store at launch
+        let job: Extraction
+        if let existing = inFlight[key] {
+            job = existing
+        } else {
+            nextExtractionID += 1
+            let created = Extraction(id: nextExtractionID)
+            inFlight[key] = created
+            let id = created.id, gate = self.gate
+            let pipeline = self.pipeline
+            let persistence = self.persistence
+            let artworkKey = source.cacheKey
+            // A theme stored under the per-file key of embedded art (earlier builds) is the same colours.
+            let legacyKey: String?
+            if let legacy = source.legacyEmbeddedCacheKey, legacy != artworkKey {
+                legacyKey = legacy + "|" + paletteKey
+            } else {
+                legacyKey = nil
+            }
+            created.task = Task.detached(priority: .userInitiated) { [self] () -> ColorRolesPair? in
+                var result: ColorRolesPair?
+                if let stored = try? await persistence?.artworkTheme(key: key) {
+                    result = stored
+                } else if let legacyKey, let stored = try? await persistence?.artworkTheme(key: legacyKey) {
+                    result = stored
+                    try? await persistence?.saveArtworkTheme(key: key, artworkKey: artworkKey, paletteKey: paletteKey,
+                                                             pair: stored)
+                } else if await gate.acquire() {
+                    if !Task.isCancelled,
+                       let pixels = await pipeline.argbPixels(source, maxDimension: ArtworkTheme.extractionMaxDimension),
+                       !pixels.isEmpty, !Task.isCancelled {
+                        let seed = ArtworkTheme.seedColor(argbPixels: pixels, accuracyLevel: accuracyLevel)
+                        let pair = ArtworkTheme.schemePair(seed: seed, style: style)
+                        try? await persistence?.saveArtworkTheme(key: key, artworkKey: artworkKey,
+                                                                 paletteKey: paletteKey, pair: pair)
+                        result = pair
+                    }
+                    await gate.release()
+                }
+                await self.extractionFinished(key: key, job: id, result: result)
+                return result
+            }
+            job = created
         }
-        inFlight[key] = task
-        let result = await task.value
-        inFlight[key] = nil
-        if let result { remember(result, for: key) }
+        nextWaiterID += 1
+        let waiter = nextWaiterID, jobID = job.id
+        job.waiters.insert(waiter)
+        let result = await withTaskCancellationHandler {
+            await job.task?.value
+        } onCancel: {
+            Task { await self.waiterCancelled(key: key, job: jobID, waiter: waiter) }
+        }
+        job.waiters.remove(waiter)
         return result
+    }
+
+    private func extractionFinished(key: String, job: Int, result: ColorRolesPair?) {
+        if inFlight[key]?.id == job { inFlight[key] = nil }
+        if let result { remember(result, for: key) }
+    }
+
+    private func waiterCancelled(key: String, job jobID: Int, waiter: Int) {
+        guard let job = inFlight[key], job.id == jobID, job.waiters.remove(waiter) != nil, job.waiters.isEmpty else { return }
+        job.task?.cancel()
+        inFlight[key] = nil
+    }
+
+    /// The cached or stored scheme pair, never generating one: a mirror or memory hit, else the stored theme (one
+    /// indexed row). Launch uses it to theme the restored song before it appears.
+    func storedPair(for source: ArtworkSource, style: ArtworkPaletteStyle, accuracyLevel: Int) async -> ColorRolesPair? {
+        let key = source.cacheKey + "|" + ArtworkTheme.paletteCacheKey(style: style, accuracyLevel: accuracyLevel)
+        if let hit = memory[key] ?? mirror.value(for: key) { return hit }
+        guard let stored = try? await persistence?.artworkTheme(key: key) else { return nil }
+        remember(stored, for: key)
+        return stored
+    }
+
+    /// Fills the synchronous mirror with every stored theme of this palette in one batched read, decoded off the actor
+    /// (at launch, once the first frame is up). Without it each album card and pill of a fresh launch was a mirror miss:
+    /// brand tint first, then a fetch and an animated re-theme.
+    func warm(style: ArtworkPaletteStyle, accuracyLevel: Int) async {
+        guard let persistence else { return }
+        let paletteKey = ArtworkTheme.paletteCacheKey(style: style, accuracyLevel: accuracyLevel)
+        let generation = invalidations
+        guard let rows = try? await persistence.artworkThemeRows(paletteKey: paletteKey), !rows.isEmpty else { return }
+        let mirror = self.mirror
+        let decoded = await Task.detached(priority: .userInitiated) { () -> [(key: String, pair: ColorRolesPair)] in
+            let decoder = JSONDecoder()
+            return rows.compactMap { row in
+                (try? decoder.decode(ColorRolesPair.self, from: row.pairJSON)).map { (key: row.key, pair: $0) }
+            }
+        }.value
+        // A theme dropped while the rows were being read stays dropped.
+        guard generation == invalidations else { return }
+        let suffix = "|" + paletteKey
+        for (key, pair) in decoded {
+            mirror.insertIfAbsent(pair, for: key)
+            // A theme stored under the per-file key of embedded art also answers for the file's picture key.
+            if key.hasPrefix("e:"), key.hasSuffix(suffix),
+               let url = URL(string: String(key.dropFirst(2).dropLast(suffix.count))),
+               let digest = EmbeddedArtworkIdentity.shared.digest(for: url) {
+                mirror.insertIfAbsent(pair, for: "c:" + digest + suffix)
+            }
+        }
     }
 
     /// A memory-cache hit without generating (Android `peekCachedColorScheme`, memory part).
@@ -61,6 +164,7 @@ actor ColorExtractor {
 
     /// Drops every cached scheme of an artwork (Android `invalidateScheme`).
     func invalidate(_ source: ArtworkSource) async {
+        invalidations &+= 1
         let prefix = source.cacheKey + "|"
         for key in memory.keys where key.hasPrefix(prefix) { memory[key] = nil }
         order.removeAll { $0.hasPrefix(prefix) }
@@ -107,6 +211,19 @@ nonisolated final class SchemeMemory: Sendable {
             s.entries[key] = (pair, s.tick)
             guard s.entries.count > limit else { return }
             // Drop the least recently used eighth at once, so overflow scans stay rare.
+            let drop = max(1, limit / 8)
+            let oldest = s.entries.sorted { $0.value.tick < $1.value.tick }.prefix(drop).map(\.key)
+            for old in oldest { s.entries[old] = nil }
+        }
+    }
+
+    /// Adds a pair unless the key is already there (a warm-up never replaces what the session produced).
+    func insertIfAbsent(_ pair: ColorRolesPair, for key: String) {
+        state.withLock { s in
+            guard s.entries[key] == nil else { return }
+            s.tick &+= 1
+            s.entries[key] = (pair, s.tick)
+            guard s.entries.count > limit else { return }
             let drop = max(1, limit / 8)
             let oldest = s.entries.sorted { $0.value.tick < $1.value.tick }.prefix(drop).map(\.key)
             for old in oldest { s.entries[old] = nil }

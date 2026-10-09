@@ -3,7 +3,7 @@
 // - Keyset paging (`spotifyId > cursor`), so tracks left PENDING by a failed search don't stall the pass.
 // - A failed search (network, rate limit) leaves the track PENDING; only "searched, nothing acceptable" is UNMATCHED.
 // - A batch where every search failed ends the pass with `retryLater` (something outside is down or limiting).
-// - Writes go after each batch, serially, through `updateAutomaticMatch` (never overriding a manual match).
+// - Writes go after each batch, as one `updateAutomaticMatches` call (never overriding a manual match).
 
 import Foundation
 import PixlFoundation
@@ -78,18 +78,23 @@ public struct SpotifyMatchRunner: Sendable {
             let permits = await isPlaybackActive() ? Self.concurrencyPlaying : Self.concurrencyIdle
             let outcomes = try await Self.search(batch, permits: permits, matcher: matcher)
 
+            // One write for the batch (one transaction in the app's store), in the order of the searches.
+            var updates: [SpotifyAutoMatchUpdate] = []
             for (song, outcome) in outcomes {
                 switch outcome {
                 case .failure:
                     result.errored += 1
                 case .success(let match?):
-                    try await store.updateAutomaticMatch(spotifyId: song.spotifyId, videoId: match.videoId, score: match.score, state: .matched)
+                    updates.append(SpotifyAutoMatchUpdate(spotifyId: song.spotifyId, videoId: match.videoId,
+                                                          score: match.score, state: .matched))
                     result.matched += 1
                 case .success(nil):
-                    try await store.updateAutomaticMatch(spotifyId: song.spotifyId, videoId: nil, score: nil, state: .unmatched)
+                    updates.append(SpotifyAutoMatchUpdate(spotifyId: song.spotifyId, videoId: nil, score: nil,
+                                                          state: .unmatched))
                     result.failed += 1
                 }
             }
+            if !updates.isEmpty { try await store.updateAutomaticMatches(updates) }
             result.done += outcomes.count
             await onProgress?(result.done, result.totalPending)
 

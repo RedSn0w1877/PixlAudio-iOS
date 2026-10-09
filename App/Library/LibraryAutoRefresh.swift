@@ -43,7 +43,8 @@ final class LibraryAutoRefresh {
 
     func schedule(after delay: Duration) {
         pending?.cancel()
-        pending = Task { [library, weak self] in
+        // Utility priority: a rescan nobody asked for must not compete with scrolling and animations.
+        pending = Task(priority: .utility) { [library, weak self] in
             try? await Task.sleep(for: delay)
             guard !Task.isCancelled else { return }
             try? await library.refresh(mode: .incremental)

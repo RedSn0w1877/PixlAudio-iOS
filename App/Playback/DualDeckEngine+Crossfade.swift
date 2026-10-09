@@ -47,8 +47,15 @@ struct ScheduledHandOver {
 extension DualDeckEngine {
     /// How long before the end a hand-over is scheduled on the host clock.
     static let handOverLeadMs: Int64 = 1000
-    /// How long before the transition point the hand-over's incoming item is built and prerolled.
+    /// How long before the transition point the hand-over's incoming item is built and prerolled (streamed targets).
     static let handOverPrepareLeadMs: Int64 = 4500
+
+    /// Whether a hand-over's incoming item is built as soon as the countdown's debounce has run instead of in the last
+    /// `handOverPrepareLeadMs`: songs from the library's files (`f:` / `mp:`) read from the device, so parking the next
+    /// one on the idle deck costs a few MB, no network, and a skip then takes the prepared item over at once. A
+    /// streamed target keeps the late lead: a paused item on the idle deck would pull bytes the owner's data limits
+    /// (Low Data Mode, cellular) decide on.
+    static func preparesHandOverEarly(for target: Song) -> Bool { LibraryIdentity.isManaged(target.id) }
 
     /// The planned crossfade (nil when a gapless hand-over is planned instead).
     var plannedCrossfade: CrossfadePlan? {
@@ -103,17 +110,19 @@ extension DualDeckEngine {
         cancelScheduledHandOver()
         let remainingAtStart = plan.transitionPointMs - currentPositionMs()
         let debounceMs = debounce ? min(CrossfadeScheduler.debounceMs, max(remainingAtStart / 2, 0)) : 0
+        let prepareLeadMs = plan.isHandOver && Self.preparesHandOverEarly(for: plan.targetEntry.song)
+            ? Int64.max : Self.handOverPrepareLeadMs
         crossfadeTask = Task { [weak self] in
             if debounceMs > 0 { try? await Task.sleep(for: .milliseconds(debounceMs)) }
             guard let self, !Task.isCancelled, self.plannedTransition?.id == plan.id else { return }
             if !plan.isHandOver { self.prepareIncoming(plan) }
             while !Task.isCancelled {
                 let remaining = plan.transitionPointMs - self.currentPositionMs()
-                if plan.isHandOver && remaining <= Self.handOverPrepareLeadMs { self.prepareIncoming(plan) }
+                if plan.isHandOver && remaining <= prepareLeadMs { self.prepareIncoming(plan) }
                 if remaining <= 0 { break }
                 var sleepMs = CrossfadeScheduler.countdownSleepMs(remainingMs: remaining, speed: self.rate)
-                if plan.isHandOver && remaining > Self.handOverPrepareLeadMs {
-                    sleepMs = min(sleepMs, max(remaining - Self.handOverPrepareLeadMs, 50))
+                if plan.isHandOver && remaining > prepareLeadMs {
+                    sleepMs = min(sleepMs, max(remaining - prepareLeadMs, 50))
                 }
                 try? await Task.sleep(for: .milliseconds(sleepMs))
             }

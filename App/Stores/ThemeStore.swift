@@ -58,6 +58,20 @@ final class ThemeStore {
         }
     }
 
+    /// Launch: themes the song the queue is about to restore from what is already stored (never extracts), before the
+    /// song appears, so the mini player's first frame has its album colours instead of the accent followed by a 0.45 s
+    /// re-theme. `update(for:)` then finds the key requested and has nothing to do.
+    func seed(for song: Song?) async {
+        guard albumPair == nil, requestedKey == nil, let song, let source = ArtworkSource(song: song) else { return }
+        let style = appearance.paletteStyle
+        let accuracy = appearance.colorAccuracy
+        let key = source.cacheKey + "|" + ArtworkTheme.paletteCacheKey(style: style, accuracyLevel: accuracy)
+        guard let pair = await extractor.storedPair(for: source, style: style, accuracyLevel: accuracy),
+              albumPair == nil, requestedKey == nil else { return }
+        requestedKey = key
+        albumPair = pair
+    }
+
     /// Call when the current song changes (the shell does, from `.task(id:)`). Extraction runs off the main thread.
     func update(for song: Song?) async {
         guard let song, let source = ArtworkSource(song: song) else {
@@ -70,6 +84,11 @@ final class ThemeStore {
         let key = source.cacheKey + "|" + ArtworkTheme.paletteCacheKey(style: style, accuracyLevel: accuracy)
         guard key != requestedKey else { return }
         requestedKey = key
+        // The warmed mirror answers at once: no hop through the extractor, so a mirror hit re-themes in the same frame.
+        if let hit = extractor.peek(source, style: style, accuracyLevel: accuracy) {
+            if hit != albumPair { albumPair = hit }
+            return
+        }
         let pair = await extractor.schemePair(for: source, style: style, accuracyLevel: accuracy)
         guard requestedKey == key else { return }
         if pair != albumPair { albumPair = pair }

@@ -27,6 +27,9 @@ final class LibraryStore {
     @ObservationIgnored private(set) var artistsById: [Int64: Artist] = [:]
     @ObservationIgnored private(set) var playlistsById: [String: Playlist] = [:]
     @ObservationIgnored private var detailIndexTask: Task<Void, Never>?
+    /// Launch: the cache decode (`beginCachedLoad`) and the snapshot it installed (what the store is compared with).
+    @ObservationIgnored private var cachedLoad: Task<LoadedLibrary?, Never>?
+    @ObservationIgnored private var cachedAtLaunch: LibrarySnapshot?
 
     private let loader: SnapshotLoader?
     private let importer: (any LibraryImporting)?
@@ -70,28 +73,57 @@ final class LibraryStore {
 
     /// Launch: show the cached snapshot immediately, then the store's (both off the main thread).
     func load() async {
-        guard let loader else { isLoading = false; return }
-        let cached = await loader.loadCachedInBackground()
+        await installCached()
+        await reconcileWithStore()
+    }
+
+    /// Launch, first half: starts decoding the snapshot cache off the main actor right away (`installCached` awaits it),
+    /// so it runs alongside the services that start on the main actor.
+    func beginCachedLoad() {
+        guard cachedLoad == nil, let loader else { return }
+        cachedLoad = Task.detached(priority: .userInitiated) { await loader.loadCachedInBackground() }
+    }
+
+    /// Launch, first half: installs the cached snapshot (nothing heavy: a plist decode off the main actor). Returns
+    /// whether there was one; `reconcileWithStore()` completes the load. With a cache the library is on screen, and the
+    /// restored queue can be built from it, before the store's full read.
+    @discardableResult
+    func installCached() async -> Bool {
+        guard loader != nil else { return false }
+        beginCachedLoad()
+        let cached = await cachedLoad?.value
+        cachedLoad = nil
+        cachedAtLaunch = cached?.snapshot
         if let cached { install(cached.snapshot, lookups: cached.lookups) }
-        if let fresh = try? await loader.loadFromStoreInBackground(previous: cached?.snapshot) {
+        return cached != nil
+    }
+
+    /// Launch, second half: reads the store (off the main actor) and applies it when it differs from the cache.
+    func reconcileWithStore() async {
+        let cachedSnapshot = cachedAtLaunch
+        cachedAtLaunch = nil
+        guard let loader else { isLoading = false; return }
+        if let fresh = try? await loader.loadFromStoreInBackground(previous: cachedSnapshot) {
             // The store's snapshot equals the cached one on most launches: nothing to apply then.
-            if fresh.changed || cached == nil { install(fresh.snapshot, lookups: fresh.lookups) }
+            if fresh.changed || cachedSnapshot == nil { install(fresh.snapshot, lookups: fresh.lookups) }
         }
         isLoading = false
     }
 
-    /// Runs the importer, then reloads from the store. A scan that is running when the app is switched away gets
-    /// iOS's extra ~30 seconds to finish (`BackgroundGrace`); a longer one is suspended and carries on when the app
-    /// returns (the scan writes its result once at the end, so nothing is half-saved).
+    /// Runs the importer, then reloads from the store — unless the scan wrote nothing (the usual launch and foreground
+    /// rescan), when the store still holds what the snapshot shows. A scan that is running when the app is switched
+    /// away gets iOS's extra ~30 seconds to finish (`BackgroundGrace`); a longer one is suspended and carries on when
+    /// the app returns (the scan writes its result once at the end, so nothing is half-saved).
     func refresh(mode: LibraryImportMode = .incremental) async throws {
         guard let importer, let loader else { return }
         try await BackgroundGrace.run("Library scan") {
-            _ = try await importer.importLibrary(mode: mode) { progress in
+            let summary = try await importer.importLibrary(mode: mode) { progress in
                 Task { @MainActor [weak self] in
                     guard let self, self.lastImportProgress != progress else { return }
                     self.lastImportProgress = progress
                 }
             }
+            if summary.isNoOp, !isLoading { return }
             let base = snapshot
             apply(try await loader.loadFromStoreInBackground(previous: base), base: base)
         }

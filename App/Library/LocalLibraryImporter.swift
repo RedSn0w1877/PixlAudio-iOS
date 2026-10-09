@@ -161,9 +161,48 @@ actor LocalLibraryImporter: LibraryImporting {
         let options = self.options()
         let previous = loadState()
         let fullRescan = mode == .full || previous.filterFingerprint != options.filterFingerprint
+        let (roots, unresolved) = try await resolveRoots()
+
+        // Walk every root once: the "nothing changed" test and the diff below both read these listings.
+        let rules = DirectoryRuleResolver(allowed: options.allowedDirectories, blocked: options.blockedDirectories)
+        var listings: [String: FolderListing] = [:]
+        var allowedFiles: [String: [ScannedFileEntry]] = [:]
+        for root in roots {
+            try Task.checkCancellation()
+            let listing = AudioFileEnumerator.list(root: root.url)
+            listings[root.id] = listing
+            allowedFiles[root.id] = listing.files.filter { entry in
+                let path = LibraryIdentity.libraryPath(root: root, relativePath: entry.relativePath)
+                return !rules.isBlocked(LibraryIdentity.parentDirectory(ofLibraryPath: path))
+            }
+        }
+
+        // Everything besides the files that this scan's result depends on (`ScanFingerprint`), read once: the hidden
+        // songs below are the ones the fingerprint was made from.
+        let hidden = HiddenSongs.ids()
+        let usesMediaLibrary = configuration.allowsMediaLibrary && options.includeMediaLibrary
+            && MediaLibraryImporter.isAuthorized
+        let overridesSignature = try await persistence.tagOverridesSignature()
+        let inputs = ScanFingerprint.make(
+            options: options, roots: roots, unresolved: unresolved, hidden: hidden, overrides: overridesSignature,
+            media: ScanFingerprint.mediaLibrarySignature(
+                takesPart: usesMediaLibrary, lastModified: usesMediaLibrary ? MediaLibraryImporter.lastModified : nil))
+
+        // Nothing to do: same inputs, every file as the last scan left it, the song table as that scan left it. The
+        // snapshot is not read, nothing is built or written (a scan like this ran on every launch and foreground).
+        if mode == .incremental, !fullRescan, previous.inputsFingerprint == inputs, let rows = previous.songRowCount,
+           Self.filesAreUnchanged(roots: roots, unresolved: unresolved, allowedFiles: allowedFiles, state: previous),
+           try await persistence.librarySongRowCount() == rows {
+            let scannedAt = Self.nowMs()
+            for root in roots where root.id != FolderRoot.documentsID && configuration.fixedRoots == nil {
+                try? await persistence.updateFolderSource(id: root.id, lastScanAt: scannedAt)
+            }
+            progress(LibraryImportProgress(phase: LibraryImportPhase.completing, completed: rows, total: rows))
+            return LibraryImportSummary(added: 0, updated: 0, removed: 0)
+        }
+
         let existing = try await persistence.loadLibrarySnapshot()
         let overrides = try await persistence.tagOverrides()
-        let (roots, unresolved) = try await resolveRoots()
 
         var storedById: [String: Song] = [:]
         var storedIdsByRoot: [String: Set<String>] = [:]
@@ -172,18 +211,13 @@ actor LocalLibraryImporter: LibraryImporting {
             if let root = LibraryIdentity.rootID(ofFileSongID: song.id) { storedIdsByRoot[root, default: []].insert(song.id) }
         }
 
-        let rules = DirectoryRuleResolver(allowed: options.allowedDirectories, blocked: options.blockedDirectories)
         var state = ScanState()
         state.filterFingerprint = options.filterFingerprint
         var tracks: [ScannedTrack] = []
         var jobs: [ReadJob] = []
         for root in roots {
             try Task.checkCancellation()
-            let listing = AudioFileEnumerator.list(root: root.url)
-            let files = listing.files.filter { entry in
-                let path = LibraryIdentity.libraryPath(root: root, relativePath: entry.relativePath)
-                return !rules.isBlocked(LibraryIdentity.parentDirectory(ofLibraryPath: path))
-            }
+            guard let listing = listings[root.id], let files = allowedFiles[root.id] else { continue }
             let plan = FolderScanPlan.make(rootID: root.id, files: files, state: previous,
                                            storedSongIDs: storedIdsByRoot[root.id] ?? [], fullRescan: fullRescan)
             for entry in plan.unchanged {
@@ -236,8 +270,7 @@ actor LocalLibraryImporter: LibraryImporting {
         }
 
         // Songs the user deleted that have no file to delete (music-library items) or whose file couldn't be
-        // deleted stay out of the library (`HiddenSongs`).
-        let hidden = HiddenSongs.ids()
+        // deleted stay out of the library (`HiddenSongs`, read before the fingerprint was made).
         if !hidden.isEmpty { tracks.removeAll { hidden.contains($0.id) } }
 
         for index in tracks.indices {
@@ -252,6 +285,8 @@ actor LocalLibraryImporter: LibraryImporting {
 
         for id in pendingInvalidations { state.invalidate(id) }
         pendingInvalidations.removeAll()
+        state.inputsFingerprint = inputs
+        state.songRowCount = try? await persistence.librarySongRowCount()
         saveState(state)
         let scannedAt = Self.nowMs()
         for root in roots where root.id != FolderRoot.documentsID && configuration.fixedRoots == nil {
@@ -259,6 +294,23 @@ actor LocalLibraryImporter: LibraryImporting {
         }
         progress(LibraryImportProgress(phase: LibraryImportPhase.completing, completed: tracks.count, total: tracks.count))
         return summary
+    }
+
+    /// Every resolved root lists exactly what the last scan left behind (`ScanFingerprint.rootIsUnchanged`), and the
+    /// last scan knew no root but these (or a folder that could not be opened, whose songs stay).
+    private nonisolated static func filesAreUnchanged(roots: [FolderRoot], unresolved: Set<String>,
+                                                      allowedFiles: [String: [ScannedFileEntry]],
+                                                      state: ScanState) -> Bool {
+        let stampedByRoot = ScanFingerprint.idsByRoot(state.stamps.keys)
+        let rejectedByRoot = ScanFingerprint.idsByRoot(state.rejected.keys)
+        let known = Set(roots.map(\.id)).union(unresolved)
+        guard stampedByRoot.keys.allSatisfy(known.contains) else { return false }
+        for root in roots {
+            guard ScanFingerprint.rootIsUnchanged(
+                rootID: root.id, files: allowedFiles[root.id] ?? [], state: state,
+                stampedIDs: stampedByRoot[root.id] ?? [], rejectedIDs: rejectedByRoot[root.id] ?? []) else { return false }
+        }
+        return true
     }
 
     nonisolated struct ReadJob: Sendable {
@@ -306,6 +358,8 @@ actor LocalLibraryImporter: LibraryImporting {
 
     private nonisolated static func readOne(_ job: ReadJob) async -> ReadResult {
         let metadata = await AudioMetadataReader.read(url: job.entry.url)
+        // The tracks of an album share one cached cover: the scan, which has the picture in hand, says which.
+        if let digest = metadata.artworkDigest { EmbeddedArtworkIdentity.shared.record(digest, for: job.entry.url) }
         let track = metadata.durationMs > 0
             ? ScannedTrack.file(id: job.id, root: job.root, entry: job.entry, metadata: metadata,
                                 coverImage: job.coverImage)

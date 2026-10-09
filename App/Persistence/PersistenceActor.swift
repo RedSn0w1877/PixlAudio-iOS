@@ -22,10 +22,18 @@ actor PersistenceActor {
 
     // MARK: Library snapshot
 
+    /// How many times the whole song table was read (a snapshot, a scan's diff). Tests assert that a rescan with
+    /// nothing to do reads it zero times.
+    var fullLibraryReads = 0
+    /// The pending coalesced save of album-art themes (`saveArtworkTheme`).
+    private var themeSave: Task<Void, Never>?
+
     /// Reads the whole library into value types (called off the main thread at launch / after a scan).
     func loadLibrarySnapshot() throws -> LibrarySnapshot {
+        fullLibraryReads += 1
+        let decoder = JSONDecoder()
         let songs = try modelContext.fetch(FetchDescriptor<SongRecord>(sortBy: [SortDescriptor(\.title)]))
-            .map(LibraryRecordMapping.song)
+            .map { LibraryRecordMapping.song($0, decoder: decoder) }
         let albums = try modelContext.fetch(FetchDescriptor<AlbumRecord>(sortBy: [SortDescriptor(\.title)]))
             .map(LibraryRecordMapping.album)
         let artists = try modelContext.fetch(FetchDescriptor<ArtistRecord>(sortBy: [SortDescriptor(\.name)]))
@@ -88,6 +96,18 @@ actor PersistenceActor {
         return try? JSONDecoder().decode(ColorRolesPair.self, from: record.pairJSON)
     }
 
+    /// A stored theme as plain data (the warm-up decodes the JSON off the actor).
+    nonisolated struct ArtworkThemeRow: Sendable {
+        let key: String
+        let pairJSON: Data
+    }
+
+    /// Every stored theme of one palette (style + accuracy), for `ColorExtractor.warm`.
+    func artworkThemeRows(paletteKey: String) throws -> [ArtworkThemeRow] {
+        try modelContext.fetch(FetchDescriptor<ArtworkThemeRecord>(predicate: #Predicate { $0.paletteKey == paletteKey }))
+            .map { ArtworkThemeRow(key: $0.key, pairJSON: $0.pairJSON) }
+    }
+
     func saveArtworkTheme(key: String, artworkKey: String, paletteKey: String, pair: ColorRolesPair) throws {
         let data = try JSONEncoder().encode(pair)
         var descriptor = FetchDescriptor<ArtworkThemeRecord>(predicate: #Predicate { $0.key == key })
@@ -97,10 +117,30 @@ actor PersistenceActor {
         } else {
             modelContext.insert(ArtworkThemeRecord(key: key, artworkKey: artworkKey, paletteKey: paletteKey, pairJSON: data))
         }
-        try modelContext.save()
+        scheduleThemeSave()
+    }
+
+    /// Themes are a cache: a burst of extractions (an album grid scrolling past) is saved once, half a second after the
+    /// first of them, instead of one save per card on this serial actor. Reads on the context see the unsaved rows, and
+    /// any other save on this context writes them too.
+    private func scheduleThemeSave() {
+        guard themeSave == nil else { return }
+        themeSave = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(500))
+            await self?.flushThemeSave()
+        }
+    }
+
+    private func flushThemeSave() {
+        themeSave = nil
+        try? modelContext.save()
     }
 
     func deleteArtworkThemes(artworkKey: String) throws {
+        // A batch delete works on the store, not on rows still waiting for their coalesced save: write those first.
+        themeSave?.cancel()
+        themeSave = nil
+        try modelContext.save()
         try modelContext.delete(model: ArtworkThemeRecord.self, where: #Predicate { $0.artworkKey == artworkKey })
         try modelContext.save()
     }
@@ -108,8 +148,11 @@ actor PersistenceActor {
 
 /// Conversions between the PixlModel value types and the SwiftData records (pure functions, any thread).
 nonisolated enum LibraryRecordMapping {
-    static func song(_ r: SongRecord) -> Song {
-        let artists = r.artistsJSON.flatMap { try? JSONDecoder().decode([ArtistRef].self, from: Data($0.utf8)) } ?? []
+    static func song(_ r: SongRecord) -> Song { song(r, decoder: JSONDecoder()) }
+
+    /// `song(_:)` with a decoder the caller shares across a fetch (one `JSONDecoder` per row costs more than the row).
+    static func song(_ r: SongRecord, decoder: JSONDecoder) -> Song {
+        let artists = r.artistsJSON.flatMap { try? decoder.decode([ArtistRef].self, from: Data($0.utf8)) } ?? []
         return Song(id: r.id, title: r.title, artist: r.artistName, artistId: r.artistId, artists: artists,
                     album: r.albumName, albumId: r.albumId, albumArtist: r.albumArtist, path: r.path,
                     contentUriString: r.contentUri, albumArtUriString: r.artworkUri, duration: r.duration,

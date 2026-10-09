@@ -37,6 +37,13 @@ final class PlayerSheetController {
     var hiddenForKeyboard = false
     /// The full player has been built and stays mounted (hidden while collapsed).
     private(set) var hasBuiltFullPlayer = false
+    /// The expanded card has settled: opaque and as big as the screen, so nothing of the shell (tabs, tab bar, their
+    /// glass) can be seen through it and the shell isn't drawn (`RootView`). Set only when an expand has fully come to
+    /// rest; cleared, without animation and first, by everything that moves the card (`beginDrag`, `collapse`,
+    /// `resetFullPlayer`) so the shell is back in the very frame the card starts to move.
+    private(set) var coversShell = false
+    /// Counts the moves that uncover the shell: an expand's completion only counts if nothing moved the card since.
+    @ObservationIgnored private(set) var motionGeneration = 0
     /// The first expand waits one frame for the full player to mount at progress 0 (its fades must interpolate).
     @ObservationIgnored private var pendingExpandVelocity: Double?
     /// A collapse that navigates afterwards is under way (repeat taps are dropped, like Android's job check).
@@ -64,8 +71,21 @@ final class PlayerSheetController {
 
     /// Nothing is loaded any more: the card goes, and so does the built full player (the next song pre-warms again).
     func resetFullPlayer() {
+        uncoverShell()
         pendingExpandVelocity = nil
         if hasBuiltFullPlayer { hasBuiltFullPlayer = false }
+    }
+
+    /// The shell is drawn again, in the same update as whatever moves the card.
+    private func uncoverShell() {
+        motionGeneration &+= 1
+        if coversShell { coversShell = false }
+    }
+
+    /// An expand came to rest. Ignored when the card was moved (or collapsed) since the expand started.
+    func expandDidSettle(generation: Int) {
+        guard generation == motionGeneration, isExpanded, !isDragging, !coversShell else { return }
+        coversShell = true
     }
 
     /// Expands to the full player (Android `expandPlayerSheet`). `animated: false` for launch states.
@@ -79,10 +99,12 @@ final class PlayerSheetController {
             // as an update of its own, and the fades of the player it inserted sometimes missed the expansion set
             // right after: the full player stayed invisible over its background (5–11 % of launches straight into
             // the expanded player on CI, never on main; docs/performance.md).
+            motionGeneration &+= 1
             withoutAnimation {
                 isExpanded = true
                 if !hasBuiltFullPlayer { hasBuiltFullPlayer = true }
                 expansion = 1
+                coversShell = true
             }
             return
         }
@@ -110,12 +132,23 @@ final class PlayerSheetController {
     }
 
     private func startExpand(initialVelocity: Double) {
+        let generation = motionGeneration
+        // `.removed`: after the spring's last sub-point tail, when the card is exactly the screen.
+        let settled: @Sendable () -> Void = { [weak self] in
+            MainActor.assumeIsolated { self?.expandDidSettle(generation: generation) }
+        }
         // Reduce Motion: a short ease, without the spring's travel or the scale bump.
         if PixlAccessibility.reducesMotion {
-            withAnimation(PlayerSheetMotion.reducedMotion) { expansion = 1 }
+            withAnimation(PlayerSheetMotion.reducedMotion, completionCriteria: .removed) { expansion = 1 } completion: {
+                settled()
+            }
             return
         }
-        withAnimation(PlayerSheetMotion.expand(initialVelocity: initialVelocity)) { expansion = 1 }
+        withAnimation(PlayerSheetMotion.expand(initialVelocity: initialVelocity), completionCriteria: .removed) {
+            expansion = 1
+        } completion: {
+            settled()
+        }
         // Android's expand bump: scaleY 1 → 1.05 → 1 over 250 ms.
         withAnimation(.easeOut(duration: 0.125)) { overshootScaleY = 1.05 }
         withAnimation(.easeIn(duration: 0.125).delay(0.125)) { overshootScaleY = 1 }
@@ -138,6 +171,7 @@ final class PlayerSheetController {
 
     /// Collapses to the mini player (Android `collapsePlayerSheet`), with the bouncy squash.
     func collapse(animated: Bool = true, initialVelocity: Double = 0) {
+        uncoverShell()
         let from = expansion
         let wasExpanded = isExpanded
         pendingExpandVelocity = nil
@@ -180,6 +214,7 @@ final class PlayerSheetController {
     @ObservationIgnored private var dragAccumulatedY: CGFloat = 0
 
     func beginDrag() {
+        uncoverShell()
         dragStartExpansion = expansion
         dragAccumulatedY = 0
         if !hasBuiltFullPlayer { hasBuiltFullPlayer = true }

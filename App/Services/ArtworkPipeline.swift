@@ -41,14 +41,22 @@ nonisolated enum ArtworkSource: Hashable, Sendable {
 
     init?(song: Song) { self.init(uriString: song.albumArtUriString) }
 
-    /// Stable key for caches.
+    /// Stable key for caches. Embedded art is keyed by its picture (`c:<digest>`, `EmbeddedArtworkIdentity`) once the
+    /// file's picture is known, so the tracks of an album share one entry; before that by file (`e:<file url>`).
     var cacheKey: String {
         switch self {
         case .file(let url): "f:" + url.absoluteString
         case .remote(let url): "r:" + url.absoluteString
-        case .embedded(let url): "e:" + url.absoluteString
+        case .embedded(let url):
+            EmbeddedArtworkIdentity.shared.digest(for: url).map { "c:" + $0 } ?? ("e:" + url.absoluteString)
         case .generated(let seed): "g:\(seed)"
         }
+    }
+
+    /// The per-file key embedded art had before it was keyed by picture (caches written by earlier builds).
+    var legacyEmbeddedCacheKey: String? {
+        guard case .embedded(let url) = self else { return nil }
+        return "e:" + url.absoluteString
     }
 }
 
@@ -76,7 +84,25 @@ actor ArtworkPipeline {
 
     /// 80 MB of decoded bitmaps (a 540 px cover is 1.1 MB; the previous 400-entry limit could reach several hundred).
     private let memory = MemoryCache(budgetBytes: 80 * 1024 * 1024)
-    private var inFlight: [String: Task<ArtworkImage?, Never>] = [:]
+    /// One decode per cover and size: every view asking for it waits on the same job, and a job nobody waits for any
+    /// more is cancelled (a cell that scrolled away before its cover was decoded).
+    private final class Job {
+        let id: Int
+        var waiters = Set<Int>()
+        var task: Task<ArtworkImage?, Never>?
+        init(id: Int) { self.id = id }
+    }
+
+    private var inFlight: [String: Job] = [:]
+    private var nextJobID = 0
+    private var nextWaiterID = 0
+    /// At most this many file and embedded-art decodes run at once, the newest request first; a fling through a grid
+    /// used to start one per cell, all at once, and fill the cooperative pool with blocking ImageIO and file reads.
+    private let gate = LIFOGate(limit: ArtworkPipeline.maxConcurrentDecodes)
+    nonisolated static let maxConcurrentDecodes = 3
+    /// Loads that actually ran (not cancelled while waiting for a slot). Tests assert a burst of cancelled requests
+    /// runs a few of them, not all.
+    private(set) var decodesRun = 0
     private let diskDirectory: URL?
 
     init(diskDirectory: URL? = ArtworkPipeline.defaultDiskDirectory()) {
@@ -84,6 +110,8 @@ actor ArtworkPipeline {
         if let diskDirectory {
             try? FileManager.default.createDirectory(at: diskDirectory, withIntermediateDirectories: true)
         }
+        // The picture index is read off the main thread, before the first cover asks for its key.
+        Task.detached(priority: .userInitiated) { EmbeddedArtworkIdentity.shared.preload() }
         let memory = self.memory
         // `UIApplication.didReceiveMemoryWarningNotification`, by name (this initialiser is not on the main actor).
         let memoryWarning = Notification.Name("UIApplicationDidReceiveMemoryWarningNotification")
@@ -170,16 +198,75 @@ actor ArtworkPipeline {
     func image(_ source: ArtworkSource, pixelSize: Int, priority: TaskPriority = .userInitiated) async -> ArtworkImage? {
         let key = Self.key(source, pixelSize)
         if let hit = memory.value(source: source.cacheKey, pixelSize: pixelSize) { return hit }
-        if let task = inFlight[key] { return await task.value }
-        let disk = diskDirectory
-        let task = Task.detached(priority: priority) { () -> ArtworkImage? in
-            await Self.load(source, pixelSize: pixelSize, key: key, diskDirectory: disk)
+        let job: Job
+        if let existing = inFlight[key] {
+            job = existing
+        } else {
+            nextJobID += 1
+            let created = Job(id: nextJobID)
+            inFlight[key] = created
+            created.task = startLoad(created.id, key: key, source: source, pixelSize: pixelSize, priority: priority)
+            job = created
         }
-        inFlight[key] = task
-        let result = await task.value
-        inFlight[key] = nil
-        if let result { memory.insert(result, source: source.cacheKey, pixelSize: pixelSize) }
+        nextWaiterID += 1
+        let waiter = nextWaiterID, jobID = job.id
+        job.waiters.insert(waiter)
+        // A caller that is cancelled (its view went away) leaves; the last one to leave cancels the job, which then
+        // stops before its next step, or never starts if it is still waiting for a decode slot.
+        let result = await withTaskCancellationHandler {
+            await job.task?.value
+        } onCancel: {
+            Task { await self.waiterCancelled(key: key, job: jobID, waiter: waiter) }
+        }
+        job.waiters.remove(waiter)
         return result
+    }
+
+    private func startLoad(_ id: Int, key: String, source: ArtworkSource, pixelSize: Int,
+                           priority: TaskPriority) -> Task<ArtworkImage?, Never> {
+        let disk = diskDirectory
+        let gate = self.gate
+        let takesSlot = Self.takesDecodeSlot(source)
+        let high = priority != .utility
+        return Task.detached(priority: priority) { [self] () -> ArtworkImage? in
+            var result: ArtworkImage?
+            var ran = false
+            var gotSlot = true
+            if takesSlot { gotSlot = await gate.acquire(high: high) }
+            if gotSlot {
+                if !Task.isCancelled {
+                    ran = true
+                    result = await Self.load(source, pixelSize: pixelSize, key: key, diskDirectory: disk)
+                }
+                if takesSlot { await gate.release() }
+            }
+            if Task.isCancelled { result = nil }
+            await self.loadFinished(key: key, job: id, source: source, pixelSize: pixelSize, result: result, ran: ran)
+            return result
+        }
+    }
+
+    /// File and embedded art decode on the local disk and take a decode slot; network art waits on the network and
+    /// generated art is a few milliseconds of drawing, so neither holds one.
+    private nonisolated static func takesDecodeSlot(_ source: ArtworkSource) -> Bool {
+        switch source {
+        case .file, .embedded: true
+        case .remote, .generated: false
+        }
+    }
+
+    private func loadFinished(key: String, job: Int, source: ArtworkSource, pixelSize: Int, result: ArtworkImage?,
+                              ran: Bool) {
+        if ran { decodesRun += 1 }
+        // A newer job for the same key (this one was cancelled and the cover asked for again) stays registered.
+        if inFlight[key]?.id == job { inFlight[key] = nil }
+        if let result { memory.insert(result, source: source.cacheKey, pixelSize: pixelSize) }
+    }
+
+    private func waiterCancelled(key: String, job jobID: Int, waiter: Int) {
+        guard let job = inFlight[key], job.id == jobID, job.waiters.remove(waiter) != nil, job.waiters.isEmpty else { return }
+        job.task?.cancel()
+        inFlight[key] = nil
     }
 
     /// Decodes a cover at the size a screen is about to show it (e.g. the album header before its push).
@@ -214,6 +301,14 @@ actor ArtworkPipeline {
         if let diskDirectory, let derived = largerDiskThumbnail(source, pixelSize: pixelSize, in: diskDirectory) {
             return ArtworkImage(cgImage: derived)
         }
+        // A cover cached by an earlier build under its per-file key: promoted to the picture's key, not decoded again.
+        if let diskDirectory, let diskURL, let legacy = legacyEmbeddedThumbnail(source, pixelSize: pixelSize, in: diskDirectory,
+                                                                                promotingTo: diskURL) {
+            return ArtworkImage(cgImage: legacy)
+        }
+        // Nobody waits for this cover any more: stop before the expensive part (the source read and the decode).
+        if Task.isCancelled { return nil }
+        var targetURL = diskURL
         var imageSource: CGImageSource?
         switch source {
         case .file(let url):
@@ -225,13 +320,23 @@ actor ArtworkPipeline {
             if let http = result.1 as? HTTPURLResponse, !(200..<300).contains(http.statusCode) { return nil }
             imageSource = CGImageSourceCreateWithData(result.0 as CFData, nil)
         case .embedded(let url):
-            guard let loader = embeddedArtworkLoader, let data = await loader(url) else { return nil }
+            guard let loader = embeddedArtworkLoader, let data = await loader(url), !Task.isCancelled else { return nil }
+            // The bytes are in hand: learn which picture this file has (a library scanned before the index existed),
+            // and if its picture is already on disk under its own key, use that instead of decoding these.
+            EmbeddedArtworkIdentity.shared.record(EmbeddedArtworkIdentity.digest(of: data), for: url)
+            if let diskDirectory {
+                let pictureURL = diskDirectory.appendingPathComponent(diskName(Self.key(source, pixelSize)))
+                if pictureURL != diskURL, let cached = thumbnail(CGImageSourceCreateWithURL(pictureURL as CFURL, nil), pixelSize) {
+                    return ArtworkImage(cgImage: cached)
+                }
+                targetURL = pictureURL
+            }
             imageSource = CGImageSourceCreateWithData(data as CFData, nil)
         case .generated:
             return nil
         }
         guard let image = thumbnail(imageSource, pixelSize) else { return nil }
-        if let diskURL { writeJPEG(image, to: diskURL) }
+        if let targetURL { writeJPEG(image, to: targetURL) }
         return ArtworkImage(cgImage: image)
     }
 
@@ -249,6 +354,20 @@ actor ArtworkPipeline {
             if let image = thumbnail(CGImageSourceCreateWithURL(url as CFURL, nil), pixelSize) { return image }
         }
         return nil
+    }
+
+    /// Embedded art decoded by an earlier build was cached per file (`e:<url>#size`). When the picture's own entry is
+    /// missing, that file is the same pixels: decode it and copy it over, so the first track of an album that was
+    /// already cached costs a file copy, and the others find the entry.
+    private nonisolated static func legacyEmbeddedThumbnail(_ source: ArtworkSource, pixelSize: Int, in directory: URL,
+                                                            promotingTo pictureURL: URL) -> CGImage? {
+        guard let legacyKey = source.legacyEmbeddedCacheKey, source.cacheKey != legacyKey else { return nil }
+        let legacyURL = directory.appendingPathComponent(diskName("\(legacyKey)#\(pixelSize)"))
+        guard let image = thumbnail(CGImageSourceCreateWithURL(legacyURL as CFURL, nil), pixelSize) else { return nil }
+        if !FileManager.default.fileExists(atPath: pictureURL.path) {
+            try? FileManager.default.copyItem(at: legacyURL, to: pictureURL)
+        }
+        return image
     }
 
     private nonisolated static func thumbnail(_ source: CGImageSource?, _ pixelSize: Int) -> CGImage? {

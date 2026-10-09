@@ -19,6 +19,8 @@ nonisolated struct AudioFileMetadata: Sendable, Equatable {
     var bitrate: Int?
     var sampleRate: Int?
     var hasEmbeddedArtwork = false
+    /// `EmbeddedArtworkIdentity.digest` of the first embedded picture (what `EmbeddedArtworkReader` hands out).
+    var artworkDigest: String?
     /// Unsynced embedded lyrics (`USLT` / `LYRICS` / `©lyr`).
     var lyrics: String?
     /// The first ID3v2 `SYLT` frame as LRC text.
@@ -49,6 +51,7 @@ nonisolated enum AudioMetadataReader {
             m.replayGainTrackDb = mapped.replayGainTrackGainDb
             m.replayGainAlbumDb = mapped.replayGainAlbumGainDb
             m.hasEmbeddedArtwork = tags.pictures.contains { !$0.data.isEmpty }
+            m.artworkDigest = tags.pictures.first { !$0.data.isEmpty }.map { EmbeddedArtworkIdentity.digest(of: $0.data) }
             m.syncedLyricsLRC = tags.syncedLyrics.first?.lrcText()
             if let info = tags.flac?.streamInfo {
                 if let duration = info.durationMs { m.durationMs = duration }

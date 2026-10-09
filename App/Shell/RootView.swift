@@ -22,6 +22,9 @@ struct RootView: View {
     @Environment(SettingsStore.self) private var settings
     @Environment(\.colorScheme) private var colorScheme
     @State private var isKeyboardVisible = false
+    /// Tabs whose stack exists. The selected tab is always built; the other two are built after launch has settled
+    /// (`prebuildHiddenTabs`) or on first selection, and a built tab keeps its stack and scroll position for life.
+    @State private var builtTabs: Set<RootTab> = []
 
     var body: some View {
         @Bindable var router = router
@@ -41,6 +44,8 @@ struct RootView: View {
             .overlay(alignment: .bottom) {
                 bottomBars
             }
+            // Under the settled, opaque full player nothing of the shell can be seen: it isn't drawn then.
+            .modifier(ShellCoveredByPlayer())
             // Stage 8: the player sheet — the mini player resting in `MiniPlayerSlot` and expanding over everything.
             PlayerSheetHost()
         }
@@ -73,6 +78,10 @@ struct RootView: View {
         .task(id: playback.current?.id) {
             await themeStore.update(for: playback.current)
         }
+        .onChange(of: router.selection, initial: true) { _, tab in
+            if !builtTabs.contains(tab) { builtTabs.insert(tab) }
+        }
+        .task { await prebuildHiddenTabs() }
         // Settings › Appearance › Accent Color: UIKit-presented controls (alerts, dialogs, menus) follow the window's
         // tint. The accent snaps (no animation: the root `.animation` is keyed to the album colours only).
         .onChange(of: themeStore.accentPair, initial: true) { _, pair in
@@ -97,31 +106,51 @@ struct RootView: View {
     private func tab<Content: View>(_ tab: RootTab, path: Binding<[AppRoute]>,
                                     @ViewBuilder root: () -> Content) -> some View {
         let isSelected = router.selection == tab
-        return NavigationStack(path: path) {
-            root()
-                .bottomBarsClearance(.tabRoot)
-                .withAppRoutes()
+        // A tab nobody has looked at yet is not built: its stack, lists and tasks used to run at launch under the
+        // visible tab (all three tabs were built behind each other at opacity 0).
+        return Group {
+            if isSelected || builtTabs.contains(tab) {
+                NavigationStack(path: path) {
+                    root()
+                        .bottomBarsClearance(.tabRoot)
+                        .withAppRoutes()
+                }
+                // Room for the floating bars, per page (`BottomBarsClearance`): equal values don't propagate, so only
+                // the mini player appearing, compact mode or the keyboard on this tab change a page's inset.
+                .environment(\.bottomBarsClearance, clearance(isSelected: isSelected))
+                // A song change animates the album colours over 0.45 s (the root `.animation` below): only on the tab
+                // that is on screen. A hidden tab is at opacity 0, so snapping its colours shows nothing and costs no
+                // frames.
+                .transaction(value: themeStore.albumPair) { transaction in
+                    if !isSelected { transaction.animation = nil }
+                }
+                // The cross-fade runs on its own curve — the visible part of the selection spring, ending at 0.21 s —
+                // instead of the spring's 0.6 s tail, during which both full-screen, glass-heavy stacks stayed
+                // composited. The tab bar's pill keeps the spring (`withAnimation(PixlMotion.selection)` below).
+                .animation(PixlMotion.tabFade) { content in
+                    content.opacity(isSelected ? 1 : 0)
+                }
+                .allowsHitTesting(isSelected)
+                // Hidden tabs are out of the accessibility tree, and so is the selected one while the full player
+                // covers it (a modal screen for VoiceOver). One `accessibilityHidden` per stack: an
+                // `accessibilityHidden(false)` around the three stacks overrode the hidden tabs' `true`, so their
+                // invisible rows answered accessibility hit tests over the visible tab's (UI tests found nothing
+                // hittable).
+                .modifier(TabAccessibilityHidden(isSelected: isSelected))
+            }
         }
-        // Room for the floating bars, per page (`BottomBarsClearance`): equal values don't propagate, so only the
-        // mini player appearing, compact mode or the keyboard on this tab change a page's inset.
-        .environment(\.bottomBarsClearance, clearance(isSelected: isSelected))
-        // A song change animates the album colours over 0.45 s (the root `.animation` below): only on the tab that
-        // is on screen. A hidden tab is at opacity 0, so snapping its colours shows nothing and costs no frames.
-        .transaction(value: themeStore.albumPair) { transaction in
-            if !isSelected { transaction.animation = nil }
+    }
+
+    /// Builds the tabs that aren't selected once launch has settled, one per turn with a pause between, so a first
+    /// switch only animates. Until then the selected tab has the launch to itself.
+    private func prebuildHiddenTabs() async {
+        let settle: Duration = environment.launch.isUITest ? .milliseconds(400) : .milliseconds(2000)
+        try? await Task.sleep(for: settle)
+        for tab in HiddenTabPrebuild.order(selected: router.selection, built: builtTabs) {
+            guard !Task.isCancelled else { return }
+            if !builtTabs.contains(tab) { builtTabs.insert(tab) }
+            try? await Task.sleep(for: .milliseconds(350))
         }
-        // The cross-fade runs on its own curve — the visible part of the selection spring, ending at 0.21 s —
-        // instead of the spring's 0.6 s tail, during which both full-screen, glass-heavy stacks stayed composited.
-        // The tab bar's pill keeps the spring (`withAnimation(PixlMotion.selection)` below).
-        .animation(PixlMotion.tabFade) { content in
-            content.opacity(isSelected ? 1 : 0)
-        }
-        .allowsHitTesting(isSelected)
-        // Hidden tabs are out of the accessibility tree, and so is the selected one while the full player covers it
-        // (a modal screen for VoiceOver). One `accessibilityHidden` per stack: an `accessibilityHidden(false)` around
-        // the three stacks overrode the hidden tabs' `true`, so their invisible rows answered accessibility hit
-        // tests over the visible tab's (UI tests found nothing hittable).
-        .modifier(TabAccessibilityHidden(isSelected: isSelected))
     }
 
     /// The bars' height over a tab root and over a pushed page. The keyboard hides both bars, but only the selected
@@ -176,6 +205,22 @@ private struct TabAccessibilityHidden: ViewModifier {
     }
 }
 
+/// The shell (tabs and bars) is not drawn while the settled full player covers the whole screen with its opaque card
+/// (`PlayerSheetController.coversShell`): the compositor stops drawing about 15–25 Liquid Glass surfaces under every
+/// frame of the player (carousel swipes, scrubbing, ambient styles). Nothing is removed, so state, scroll positions
+/// and the tab bar survive; the shell is back, without animation, in the update that starts any movement of the card.
+/// Its own small view: the flag flips here and not in the shell's body.
+private struct ShellCoveredByPlayer: ViewModifier {
+    @Environment(AppEnvironment.self) private var environment
+
+    func body(content: Content) -> some View {
+        let covered = environment.playerSheet.coversShell
+        content
+            .opacity(covered ? 0 : 1)
+            .animation(nil, value: covered)
+    }
+}
+
 /// Hides the tab bar from VoiceOver while the full player covers it (the mini player's own layer hides itself). The
 /// bar's tabs are UIKit segments, which `accessibilityHidden` doesn't reach, so `GlassNavBar` also hides them itself
 /// (`tabBarAccessibilityHidden`): left in the tree, they answered accessibility hit tests under the player's toggle
@@ -188,5 +233,12 @@ private struct HiddenWhilePlayerExpanded: ViewModifier {
         content
             .environment(\.tabBarAccessibilityHidden, isExpanded)
             .accessibilityHidden(isExpanded)
+    }
+}
+
+/// Which tabs to build after launch, in which order: the likelier next tab (Library) before Search.
+nonisolated enum HiddenTabPrebuild {
+    static func order(selected: RootTab, built: Set<RootTab>) -> [RootTab] {
+        [RootTab.home, .library, .search].filter { $0 != selected && !built.contains($0) }
     }
 }

@@ -134,13 +134,12 @@ final class SpotifyService {
     func refreshLibraryState() async {
         guard let persistence else { return }
         let rows = (try? await persistence.allPlaylists()) ?? []
-        let songs = (try? await persistence.allSongs()) ?? []
+        let total = (try? await persistence.distinctSongCount()) ?? 0
         let matched = (try? await persistence.countTracks(in: .matched)) ?? 0
         let manual = (try? await persistence.countTracks(in: .manual)) ?? 0
         let pending = (try? await persistence.countTracks(in: .pending)) ?? 0
         let unmatched = (try? await persistence.countTracks(in: .unmatched)) ?? 0
         if playlists != rows { playlists = rows }
-        let total = Set(songs.map(\.spotifyId)).count
         if totalSongs != total { totalSongs = total }
         if matchedCount != matched + manual { matchedCount = matched + manual }
         if pendingMatchCount != pending { pendingMatchCount = pending }
@@ -310,6 +309,7 @@ final class SpotifyService {
         isMatching = true
         let bridge = self.bridge
         let isPlaying = isPlaybackActive
+        let progressThrottle = RefreshThrottle()
         matchTask = Task {
             // The pass gets iOS's ~30 s of extra time when the app is switched away; the Spotify background refresh runs a
             // short slice later (a pass that is waiting out a retry holds the assertion only until iOS asks for it back).
@@ -323,7 +323,7 @@ final class SpotifyService {
                     do {
                         result = try await runner.run(retryFailed: requeue, isPlaybackActive: { await isPlaying() },
                                                       shouldContinue: { !Task.isCancelled },
-                                                      onProgress: { _, _ in await self.refreshLibraryState() })
+                                                      onProgress: { _, _ in if progressThrottle.allows() { await self.refreshLibraryState() } })
                     } catch {
                         break
                     }

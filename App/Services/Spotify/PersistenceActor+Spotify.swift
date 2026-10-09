@@ -140,13 +140,30 @@ extension PersistenceActor: SpotifyLibraryStore {
         return result
     }
 
+    /// PENDING tracks with `spotifyId > after`, distinct, ascending (the matcher's keyset page). The store sorts and
+    /// stops after a few pages' worth of rows (`spotifyId` is indexed), instead of every pending row being fetched and
+    /// sorted for each 48-track batch; rows are per playlist entry, so a track in several playlists repeats, and the
+    /// page is filled from the next chunk when a chunk holds fewer than `limit` distinct tracks.
     func pendingSongs(after: String, limit: Int) throws -> [SpotifyTrackRecord] {
         let pending = SpotifyMatchState.pending.rawValue
         var seen = Set<String>()
-        let rows = try modelContext.fetch(FetchDescriptor<SpotifySongRecord>(predicate: #Predicate { $0.matchState == pending }))
-            .filter { $0.spotifyId > after && seen.insert($0.spotifyId).inserted }
-            .sorted { $0.spotifyId < $1.spotifyId }
-        return rows.prefix(limit).map(Self.value)
+        var rows: [SpotifySongRecord] = []
+        var cursor = after
+        while rows.count < limit {
+            let boundary = cursor
+            var descriptor = FetchDescriptor<SpotifySongRecord>(
+                predicate: #Predicate { $0.matchState == pending && $0.spotifyId > boundary },
+                sortBy: [SortDescriptor(\.spotifyId)])
+            descriptor.fetchLimit = max(limit, 1) * 4
+            let chunk = try modelContext.fetch(descriptor)
+            for record in chunk where rows.count < limit && seen.insert(record.spotifyId).inserted {
+                rows.append(record)
+            }
+            // A full chunk may have more behind it; a short one was the end.
+            guard chunk.count == descriptor.fetchLimit, rows.count < limit, let last = chunk.last?.spotifyId else { break }
+            cursor = last
+        }
+        return rows.map(Self.value)
     }
 
     func updateAutomaticMatch(spotifyId: String, videoId: String?, score: Float?, state: SpotifyMatchState) throws {
@@ -155,6 +172,21 @@ extension PersistenceActor: SpotifyLibraryStore {
             record.matchedVideoId = videoId
             record.matchScore = score.map(Double.init)
             record.matchState = state.rawValue
+        }
+        try modelContext.save()
+    }
+
+    /// A matcher batch: every update in order, one save (it was one save per track).
+    func updateAutomaticMatches(_ updates: [SpotifyAutoMatchUpdate]) throws {
+        guard !updates.isEmpty else { return }
+        let manual = SpotifyMatchState.manual.rawValue
+        for update in updates {
+            for record in try songRecords(spotifyId: update.spotifyId)
+            where record.matchState != manual && (record.matchedVideoId ?? "").isEmpty {
+                record.matchedVideoId = update.videoId
+                record.matchScore = update.score.map(Double.init)
+                record.matchState = update.state.rawValue
+            }
         }
         try modelContext.save()
     }
@@ -182,8 +214,16 @@ extension PersistenceActor: SpotifyLibraryStore {
 
     func countTracks(in state: SpotifyMatchState) throws -> Int {
         let raw = state.rawValue
-        let records = try modelContext.fetch(FetchDescriptor<SpotifySongRecord>(predicate: #Predicate { $0.matchState == raw }))
-        return Set(records.map(\.spotifyId)).count
+        var descriptor = FetchDescriptor<SpotifySongRecord>(predicate: #Predicate { $0.matchState == raw })
+        descriptor.propertiesToFetch = [\.spotifyId]
+        return Set(try modelContext.fetch(descriptor).map(\.spotifyId)).count
+    }
+
+    /// Distinct tracks over all playlists (reads only the id column).
+    func distinctSongCount() throws -> Int {
+        var descriptor = FetchDescriptor<SpotifySongRecord>()
+        descriptor.propertiesToFetch = [\.spotifyId]
+        return Set(try modelContext.fetch(descriptor).map(\.spotifyId)).count
     }
 
     func clearAll() throws {

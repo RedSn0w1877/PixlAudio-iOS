@@ -196,3 +196,21 @@ config wait 0 ms` / `network: first chunk at … ms (128 KB), N fetches` / `load
    failing VISIONOS resolutions mean turning on `innertube.hedge` in `remote/config.json` (R8).
 4. A skip during a crossfade's prepared window plays at full volume at once (R7), and the gapless hand-over at the end
    of a song still has no gap.
+
+## Launch, library and artwork (2026-10-08, branch `perf-ios-oct8`)
+
+An audit of launch, library, artwork, the player and playback found work the app did for nothing. The look and the
+behaviour stay as they are; the handoff (`docs/handoff/2026-10-08-ios-perf.md`) says what each change is worth and what
+to check on the phone. The rules these changes leave behind:
+
+| Where | What was slow | Rule now |
+|---|---|---|
+| Launch and foreground rescan | Every launch (300 ms in) and return to the app read the whole song table three times, rebuilt the artists and albums, rewrote the scan state and re-queried the music library, even with nothing changed. | An incremental scan compares what the last scan left (`ScanFingerprint`: all scan options, roots and where they live, hidden songs, tag overrides, the music library's last change, this build; the song table's row count; every file's stamp) and returns at once when all of it matches. It reads, builds and writes nothing and `LibraryStore.refresh` skips its reload (`LibraryImportSummary.isNoOp`). Add every new input of a scan to the fingerprint. |
+| Mini player at launch | The restored queue waited for a full SwiftData read although the cached snapshot was already on screen. | `installCached()` → restore the queue → `reconcileWithStore()`; the cache and the queue decode from the first line of `start()`. Without a cache the order is as before. |
+| Hidden tabs | All three tab roots were built at launch, two of them invisible. | A tab is built when first selected or by the idle build 2 s after launch (`prebuildHiddenTabs`, Library then Search); a built tab keeps its stack for life. |
+| Full player | The glass tab bar and the tab's glass rows were composited under every frame of the opaque, settled player. | `PlayerSheetController.coversShell` is set when an expand's animation is gone and cleared first by anything that moves the card; `ShellCoveredByPlayer` fades the shell to 0 without animation. Never leave it set while the card can move. |
+| Artwork | Embedded art was cached per audio file (N tracks, N decodes, N thumbnails, N colour extractions); decodes were never cancelled and all ran at once. | Embedded art is keyed by its picture (`EmbeddedArtworkIdentity`, `c:<digest>`); at most 3 decodes and 2 extractions run, newest first (`LIFOGate`), and a request whose last view is gone is cancelled. Learn a digest wherever the bytes are in hand. |
+| Album colours | The scheme mirror started empty and held 1,024 pairs: every launch showed the brand tint, then fetched and animated a re-theme. | `ColorExtractor.warm` fills the mirror from the stored themes in one read; the restored song is themed before it appears (`ThemeStore.seed`); theme saves are coalesced (a batch delete flushes them first). |
+| Skip in gapless mode | The next song was built in the last 4.5 s only, so almost every Next built it from scratch. | A next song from the library's files is prepared after the countdown's debounce (`preparesHandOverEarly`); streamed songs keep the late lead. |
+| Spotify matcher | Every 48-track batch fetched and sorted every pending row, saved once per track, and the dashboard re-read every row per batch. | Keyset page in the store, one write per batch (`updateAutomaticMatches`), counters read only the id column, dashboard refresh at most every 2 s. |
+| CI numbers | `TransitionPerformanceTests` ran on the Debug build. | `[perf]` in a commit message also builds `PixlAudioPerf` (Release) and runs them; the numbers are in the job summary and the `perf-<sha>` artifact. Compare Release with Release. |
