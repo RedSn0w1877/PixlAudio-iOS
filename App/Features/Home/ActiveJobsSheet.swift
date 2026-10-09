@@ -8,7 +8,7 @@ import SwiftUI
 /// back after jobs moved on while it was closed. A Cloud row opens the Cloud queue, where its songs can be retried or
 /// cancelled (Android's sheet has no actions either).
 ///
-/// Everything it shows is read from `ActiveJobs.snapshot()` in `body`: the sheet tracks the sources while it is up and
+/// Everything it shows is read from `ActiveJobs.active` / `.recent`: the aggregator follows the sources while the sheet is up and
 /// costs nothing when it is closed.
 struct ActiveJobsSheet: View {
     @Environment(AppEnvironment.self) private var env
@@ -16,7 +16,7 @@ struct ActiveJobsSheet: View {
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        let lists = env.activeJobs.snapshot()
+        let jobs = env.activeJobs
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 10) {
                 Text("Active jobs")
@@ -24,21 +24,21 @@ struct ActiveJobsSheet: View {
                     .foregroundStyle(theme.onSurface)
                     .padding(.bottom, 2)
                     .accessibilityAddTraits(.isHeader)
-                if lists.active.isEmpty {
+                if jobs.active.isEmpty {
                     emptyState
                 } else {
-                    ForEach(lists.active) { job in
-                        ActiveJobRow(job: job, onOpen: { open(job) })
+                    ForEach(jobs.active) { job in
+                        ActiveJobRow(job: job, onOpen: { open(job) }).equatable()
                     }
                 }
-                if !lists.recent.isEmpty {
+                if !jobs.recent.isEmpty {
                     Text("Recently finished")
                         .pixlFont(.labelLarge)
                         .foregroundStyle(theme.onSurfaceVariant)
                         .padding(.top, 14)
                         .accessibilityAddTraits(.isHeader)
-                    ForEach(lists.recent) { job in
-                        ActiveJobRow(job: job, onOpen: { open(job) })
+                    ForEach(jobs.recent) { job in
+                        ActiveJobRow(job: job, onOpen: { open(job) }).equatable()
                     }
                 }
             }
@@ -50,6 +50,9 @@ struct ActiveJobsSheet: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         // The stored Cloud jobs, in case the sheet opens before anything else asked for them.
         .task { await env.cloud.loadForDisplay() }
+        // The aggregator follows every row's source (at most 4 Hz) only while this is on screen.
+        .onAppear { env.activeJobs.setSheetVisible(true) }
+        .onDisappear { env.activeJobs.setSheetVisible(false) }
     }
 
     private var emptyState: some View {
@@ -84,9 +87,12 @@ struct ActiveJobsSheet: View {
 }
 
 /// One job: a glass card, tappable when it has somewhere to go.
-private struct ActiveJobRow: View {
+private struct ActiveJobRow: View, Equatable {
     let job: ActiveJob
     let onOpen: () -> Void
+
+    /// The action closure is new on every parent pass: only the job decides whether the row re-renders.
+    nonisolated static func == (lhs: ActiveJobRow, rhs: ActiveJobRow) -> Bool { lhs.job == rhs.job }
 
     @Environment(\.appTheme) private var theme
 

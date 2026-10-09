@@ -44,6 +44,9 @@ final class ModelManager {
     static let sessionIdentifier = "io.github.redsn0w1877.pixlaudio.models"
 
     private(set) var states: [ModelDescriptor.ID: State] = [:]
+    /// Downloaded and verified, but the install (extract + compile, the heaviest memory spike in the app) waits for the
+    /// shared heavy lane (`HeavyJobGovernor`): Active jobs says "Waiting".
+    private(set) var waitingToInstall: Set<ModelDescriptor.ID> = []
 
     @ObservationIgnored private let isDemo: Bool
     @ObservationIgnored private var session: URLSession?
@@ -58,6 +61,8 @@ final class ModelManager {
     }
 
     func state(_ id: ModelDescriptor.ID) -> State { states[id] ?? .notInstalled }
+
+    func isWaitingToInstall(_ id: ModelDescriptor.ID) -> Bool { waitingToInstall.contains(id) }
 
     /// UI-test demo data.
     func setDemoState(_ state: State, for id: ModelDescriptor.ID) { states[id] = state }
@@ -192,8 +197,15 @@ final class ModelManager {
         }
         states[id] = .installing
         let model = ModelCatalog.descriptor(id)
-        Task {
+        Task(priority: .utility) {
+            defer { waitingToInstall.remove(id) }
             do {
+                // Compiling a ~1 GB package next to a running lyric sync or separation is what gets an app ended for
+                // memory: wait for the heavy lane (a lyric batch hands it over between songs).
+                if HeavyJobGovernor.shared.isBusy { waitingToInstall.insert(id) }
+                let lease = try await HeavyJobGovernor.shared.acquire()
+                defer { lease.release() }
+                waitingToInstall.remove(id)
                 // Verifying and compiling can outlast a switch to another app: iOS's ~30 s of grace may finish it.
                 let url = try await BackgroundGrace.run("Model install") { try await Self.install(model, archive: archive) }
                 states[id] = .installed(bytes: Self.installedSize(model) ?? model.bytes)

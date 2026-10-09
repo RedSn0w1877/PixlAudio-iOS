@@ -15,7 +15,8 @@ import PixlNet
 ///
 /// Two readers, two costs. The button needs only a count, so `badgeCount` / `isWorking` are stored and written only
 /// when they change (the button's view re-runs on a real change, not on every progress tick of every source). The
-/// sheet reads `snapshot()` in its body, which tracks every source while it is on screen and nothing otherwise.
+/// sheet reads `active` / `recent`, which are refreshed (every source followed) only while it is on screen. Either way
+/// a burst of changes is re-read at most four times a second (`UpdateCoalescer`), never once per progress tick.
 @Observable
 final class ActiveJobs {
     /// What the services hold. Owned by `AppEnvironment`; the aggregator never outlives them.
@@ -32,6 +33,10 @@ final class ActiveJobs {
     private(set) var badgeCount = 0
     /// Something is running (not just waiting): the button's symbol animates.
     private(set) var isWorking = false
+    /// The sheet's two lists. Refreshed only while the sheet is up (`setSheetVisible`), at most four times a second,
+    /// and written only when they differ, so a row view re-runs for a real change and not for every source's tick.
+    private(set) var active: [ActiveJob] = []
+    private(set) var recent: [ActiveJob] = []
 
     @ObservationIgnored private let sources: Sources?
     @ObservationIgnored private let demoRows: [ActiveJob]
@@ -39,6 +44,12 @@ final class ActiveJobs {
     /// When a finished row was first seen finished (the sources that keep no time of their own).
     @ObservationIgnored private var finishedAt: [String: Int64] = [:]
     @ObservationIgnored private var isTracking = false
+    @ObservationIgnored private var sheetVisible = false
+    /// Bumped on every re-arm: a tracking registration that fires after a newer one was made is ignored, so the
+    /// registrations never multiply.
+    @ObservationIgnored private var generation = 0
+    @ObservationIgnored private var coalescer = UpdateCoalescer(minIntervalMs: 250)
+    @ObservationIgnored private var pendingRearm: Task<Void, Never>?
 
     init(sources: Sources, nowMs: @escaping () -> Int64 = { currentTimeMillis() }) {
         self.sources = sources
@@ -52,6 +63,7 @@ final class ActiveJobs {
         demoRows = rows
         self.nowMs = { nowMs }
         show(count: ActiveJobBoard.badgeCount(rows), working: ActiveJobBoard.isWorking(rows))
+        publish(rows)
     }
 
     /// Starts following the sources (once, at launch; cheap: one pass over a few small collections).
@@ -63,23 +75,74 @@ final class ActiveJobs {
 
     // MARK: Readers
 
-    /// The sheet's two lists, with progress. Reads every source, so call it from a view body that is only alive while
-    /// the sheet is up.
+    /// The sheet's two lists (what it last published).
     func snapshot() -> (active: [ActiveJob], recent: [ActiveJob]) {
-        let rows = allRows()
-        return (ActiveJobBoard.active(rows), ActiveJobBoard.recent(rows, nowMs: nowMs()))
+        (active, recent)
+    }
+
+    /// The sheet came up or went away. While it is up the aggregator follows every property a row shows (at most four
+    /// times a second); otherwise only the few the button needs.
+    func setSheetVisible(_ visible: Bool) {
+        guard sheetVisible != visible else { return }
+        sheetVisible = visible
+        guard sources != nil, isTracking else { return }
+        pendingRearm?.cancel()
+        pendingRearm = nil
+        track()
     }
 
     // MARK: Following the sources
 
+    /// Reads the sources and re-arms the observation. One registration is live at a time (`generation`).
     private func track() {
         guard let sources else { return }
-        let summary = withObservationTracking {
-            Self.summary(sources)
+        generation &+= 1
+        let mine = generation
+        let visible = sheetVisible
+        var rows: [ActiveJob]?
+        let summary = withObservationTracking { () -> (count: Int, working: Bool) in
+            if visible {
+                let all = allRows()
+                rows = all
+                return (count: ActiveJobBoard.badgeCount(all), working: ActiveJobBoard.isWorking(all))
+            }
+            return Self.summary(sources)
         } onChange: { [weak self] in
-            Task { @MainActor in self?.track() }
+            Task { @MainActor in self?.sourceChanged(generation: mine) }
         }
+        coalescer.ran(nowMs: nowMs())
         show(count: summary.count, working: summary.working)
+        if let rows { publish(rows) } else if !active.isEmpty || !recent.isEmpty, !visible {
+            // The sheet is gone: drop its rows so a closed sheet holds nothing.
+            active = []
+            recent = []
+        }
+    }
+
+    /// A source changed. Progress arrives in bursts (a model download, a scan, a cloud upload, a lyric sync all report
+    /// many times a second): the first change after a quiet moment is handled at once, the rest wait out the interval and
+    /// are served by one re-read, because `track()` reads the current values.
+    private func sourceChanged(generation changed: Int) {
+        guard changed == generation else { return }
+        let delay = coalescer.delayMs(nowMs: nowMs())
+        if delay == 0 {
+            track()
+            return
+        }
+        pendingRearm?.cancel()
+        pendingRearm = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(delay))
+            guard !Task.isCancelled, let self else { return }
+            self.pendingRearm = nil
+            self.track()
+        }
+    }
+
+    private func publish(_ rows: [ActiveJob]) {
+        let newActive = ActiveJobBoard.active(rows)
+        let newRecent = ActiveJobBoard.recent(rows, nowMs: nowMs())
+        if active != newActive { active = newActive }
+        if recent != newRecent { recent = newRecent }
     }
 
     private func show(count: Int, working: Bool) {
@@ -108,7 +171,7 @@ final class ActiveJobs {
         for descriptor in ModelCatalog.all where sources.models.state(descriptor.id).isBusy { add(running: true) }
         for kind in TaisStudio.JobKind.allCases {
             let active = sources.studio.jobs.filter { $0.key.kind == kind && $0.value.isActive }
-            if !active.isEmpty { add(running: active.contains { $0.value.phase == .running }) }
+            if !active.isEmpty { add(running: active.contains { $0.value.phase == .running && !$0.value.waiting }) }
         }
         let cloud = CloudActiveJobMapper.activeSummary(sources.cloud.jobs)
         count += cloud.count
@@ -174,8 +237,11 @@ final class ActiveJobs {
                 return ActiveJob(id: "model.\(descriptor.id.rawValue)", kind: .modelDownload, subtitle: descriptor.title,
                                  percent: ActiveJobBoard.percent(fraction: fraction), state: .running)
             case .installing:
+                let waiting = models.isWaitingToInstall(descriptor.id)
                 return ActiveJob(id: "model.\(descriptor.id.rawValue)", kind: .modelDownload,
-                                 subtitle: "Installing the \(descriptor.title.lowercased())…", state: .running)
+                                 subtitle: waiting ? "Waiting for other work to finish…"
+                                     : "Installing the \(descriptor.title.lowercased())…",
+                                 state: waiting ? .queued : .running)
             default:
                 return nil
             }
@@ -194,13 +260,15 @@ final class ActiveJobs {
                 .sorted { $0.key.songId < $1.key.songId }
             let active = jobs.filter { $0.value.isActive }
             if !active.isEmpty {
-                let running = active.first { $0.value.phase == .running }
+                let running = active.first { $0.value.phase == .running && !$0.value.waiting }
+                let blocked = active.first { $0.value.waiting }
                 let waiting = active.count - (running == nil ? 0 : 1)
                 var subtitle = running.map { entry -> String in
                     var line = title(entry.key.songId)
                     if let detail = entry.value.detail, !detail.isEmpty { line += " · \(detail)" }
                     return line
-                } ?? "\(waiting) \(waiting == 1 ? "song" : "songs") waiting"
+                } ?? blocked.map { "\(title($0.key.songId)) · Waiting for other work to finish" }
+                    ?? "\(waiting) \(waiting == 1 ? "song" : "songs") waiting"
                 if running != nil, waiting > 0 { subtitle += " · \(waiting) waiting" }
                 let percent = running.flatMap { $0.value.indeterminate ? nil : $0.value.percent }
                 rows.append(ActiveJob(id: "tais.\(kind.rawValue)", kind: kind, subtitle: subtitle, percent: percent,

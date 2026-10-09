@@ -26,6 +26,9 @@ final class TaisBackgroundRun {
     private var pendingTitle = ""
     private var pendingSubtitle = ""
     private var pendingFraction = 0.0
+    /// The last time the system was told (every update is an IPC round trip to the system's Live Activity).
+    private var lastSent: ContinuousClock.Instant?
+    private static let minUpdateGap: Duration = .milliseconds(500)
 
     init(identifier: String = TaisBackgroundRun.identifier) {
         self.identifier = identifier
@@ -59,6 +62,10 @@ final class TaisBackgroundRun {
         pendingSubtitle = subtitle
         pendingFraction = min(max(fraction, 0), 1)
         guard let task else { return }
+        // Progress arrives many times a second; the system shows it twice a second at most.
+        let now = ContinuousClock.now
+        if let lastSent, now - lastSent < Self.minUpdateGap, pendingFraction < 1 { return }
+        lastSent = now
         task.progress.totalUnitCount = 1000
         task.progress.completedUnitCount = Int64(pendingFraction * 1000)
         task.updateTitle(pendingTitle, subtitle: subtitle)
@@ -67,6 +74,7 @@ final class TaisBackgroundRun {
     /// Ends the run.
     func end(success: Bool) {
         isActive = false
+        lastSent = nil
         if let task {
             task.progress.completedUnitCount = task.progress.totalUnitCount
             task.setTaskCompleted(success: success)
@@ -95,6 +103,7 @@ final class TaisBackgroundRun {
 
     private func attach(_ task: BGContinuedProcessingTask) {
         self.task = task
+        lastSent = nil
         endAssertion()
         task.expirationHandler = { [weak self] in
             DispatchQueue.main.async {

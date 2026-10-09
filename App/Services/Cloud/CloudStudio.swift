@@ -760,12 +760,16 @@ final class CloudStudio {
     private func startPreparations() {
         guard canStartNewWork else { return }
         let now = dependencies.nowMs()
+        // While lyric sync, a separation or a model install holds the heavy lane, preparing songs (a CPU-bound decode)
+        // goes one at a time so the phone is not asked for everything at once.
+        let limit = HeavyJobGovernor.shared.isBusy ? 1 : Self.maxConcurrentPreparations
         for record in jobs where record.state == .queued && record.isDue(nowMs: now) {
-            guard preparing.count < Self.maxConcurrentPreparations else { break }
+            guard preparing.count < limit else { break }
             guard preparing[record.jobKey] == nil else { continue }
             let jobKey = record.jobKey
             update(jobKey) { _ = $0.apply(.prepareStarted, nowMs: now) }
-            preparing[jobKey] = Task { [weak self] in
+            // Utility: the decode and FLAC encode must not take cores from the UI.
+            preparing[jobKey] = Task(priority: .utility) { [weak self] in
                 await self?.prepare(jobKey: jobKey)
                 self?.preparing[jobKey] = nil
                 self?.requestPump()

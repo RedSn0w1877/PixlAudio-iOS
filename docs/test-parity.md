@@ -941,3 +941,5 @@ Android has no tests for a RunPod/R2 pipeline; everything here is new.
 - `AppTests/ActiveJobsTests` — the button's count and the sheet's two lists from the demo rows.
 - `UITests/ActiveJobsScreenshotTests` — Home with the jobs button, the sheet running / mixed / empty (light and dark),
   and the tap from the button to the sheet.
+
+- `JobThrottlingTests` (PixlModel) and `HeavyJobGovernorTests` (AppTests): iOS-only (the many-jobs fix, 2026-10-09); no Android counterpart.

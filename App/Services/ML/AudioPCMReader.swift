@@ -42,9 +42,12 @@ nonisolated enum AudioPCMReader {
         defer { if reader.status == .reading { reader.cancelReading() } }
 
         let maximumFrames = Int(maximumSeconds * sampleRate)
-        var interleaved: [Float] = []
+        // One array per channel, filled buffer by buffer: the whole song is never held twice (an interleaved copy plus
+        // the split one was 2x the audio, ~170 MB more for a 6-minute stereo song at 44.1 kHz).
+        var planes = [[Float]](repeating: [], count: channels)
         if let duration = try? await asset.load(.duration), duration.isNumeric {
-            interleaved.reserveCapacity(min(Int(duration.seconds * sampleRate) + 4096, maximumFrames) * channels)
+            let frames = min(Int(duration.seconds * sampleRate) + 4096, maximumFrames)
+            for c in 0..<channels { planes[c].reserveCapacity(frames) }
         }
         var scratch = [Float]()
         while let buffer = output.copyNextSampleBuffer() {
@@ -59,24 +62,27 @@ nonisolated enum AudioPCMReader {
                                            destination: raw.baseAddress!)
             }
             guard status == kCMBlockBufferNoErr else { throw Failure(message: "Audio decoding failed") }
-            interleaved.append(contentsOf: scratch[0..<count])
-            if interleaved.count / channels > maximumFrames {
+            let frames = count / channels
+            if channels == 1 {
+                planes[0].append(contentsOf: scratch[0..<count])
+            } else {
+                scratch.withUnsafeBufferPointer { source in
+                    for c in 0..<channels {
+                        let lane = [Float](unsafeUninitializedCapacity: frames) { slot, initialized in
+                            for f in 0..<frames { slot[f] = source[f * channels + c] }
+                            initialized = frames
+                        }
+                        planes[c].append(contentsOf: lane)
+                    }
+                }
+            }
+            if planes[0].count > maximumFrames {
                 throw Failure(message: "This song is too long to process on this device")
             }
         }
         if reader.status == .failed {
             throw Failure(message: "Audio decoding stopped (\(reader.error?.localizedDescription ?? "unknown error"))")
         }
-        guard channels > 1 else { return [interleaved] }
-        let frames = interleaved.count / channels
-        var result = [[Float]](repeating: [Float](repeating: 0, count: frames), count: channels)
-        interleaved.withUnsafeBufferPointer { source in
-            for c in 0..<channels {
-                result[c].withUnsafeMutableBufferPointer { destination in
-                    for f in 0..<frames { destination[f] = source[f * channels + c] }
-                }
-            }
-        }
-        return result
+        return planes
     }
 }

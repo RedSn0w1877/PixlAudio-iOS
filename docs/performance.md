@@ -214,3 +214,18 @@ to check on the phone. The rules these changes leave behind:
 | Skip in gapless mode | The next song was built in the last 4.5 s only, so almost every Next built it from scratch. | A next song from the library's files is prepared after the countdown's debounce (`preparesHandOverEarly`); streamed songs keep the late lead. |
 | Spotify matcher | Every 48-track batch fetched and sorted every pending row, saved once per track, and the dashboard re-read every row per batch. | Keyset page in the store, one write per batch (`updateAutomaticMatches`), counters read only the id column, dashboard refresh at most every 2 s. |
 | CI numbers | `TransitionPerformanceTests` ran on the Debug build. | `[perf]` in a commit message also builds `PixlAudioPerf` (Release) and runs them; the numbers are in the job summary and the `perf-<sha>` artifact. Compare Release with Release. |
+
+## Many jobs at once (2026-10-09, branch `fix-many-jobs-ios`)
+
+Report: "when multiple active jobs are working at once it lags up the app and the phone, then crashes". The causes
+(file:line in `docs/handoff/2026-10-09-many-jobs-fix.md`) were the heavy local jobs overlapping in memory (the model
+install's compile next to lyric alignment or stem separation), CPU-bound work at user-initiated priority, and the
+Active jobs aggregator re-reading every source on every progress tick. Rules these changes leave behind:
+
+| Where | Rule now |
+|---|---|
+| Heavy local jobs | Anything that holds hundreds of MB or every core takes a lease from `HeavyJobGovernor.shared` (one at a time, FIFO): the model install, lyric alignment, stem separation. Take it for the compute part only, after the model is in hand — never while waiting for something that needs the lease (the install), or two jobs deadlock. A job queued behind it shows "Waiting for other work to finish" in Active jobs (`JobState.waiting`, `ModelManager.waitingToInstall`). |
+| Priority | Minutes-long CPU work (the TAIS lane, Cloud song preparation, the model install) runs at `.utility`, so the UI keeps the cores. Cloud preparation drops to one song at a time while the lane is busy. |
+| Memory | Core ML models are released when the lane drains, when the other kind starts, and on a memory warning with no job running. `AudioPCMReader` splits channels buffer by buffer (no interleaved copy of the whole song). Whole files are never loaded into `Data` for a job; use mapped or streamed reads. |
+| Active jobs | `ActiveJobs` re-reads its sources at most 4 times a second (`UpdateCoalescer`): the first change after a quiet moment is handled at once, a burst is served by one re-read. The sheet's rows are stored (`active` / `recent`), refreshed only while the sheet is up, written only when they differ, and `ActiveJobRow` is `Equatable` on its job. Home reads only `badgeCount` / `isWorking`. |
+| System progress | `TaisBackgroundRun.update` sends the Live Activity at most twice a second. |
