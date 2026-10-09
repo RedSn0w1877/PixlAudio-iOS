@@ -1,3 +1,4 @@
+import Observation
 import PixlLibrary
 import PixlModel
 import SwiftUI
@@ -12,7 +13,8 @@ struct HomeView: View {
     @Environment(PlaybackStore.self) private var playback
     @Environment(Router.self) private var router
     @Environment(\.appTheme) private var theme
-    @State private var isScrolled = false
+    /// A reference: writing the flag re-renders only the top bar that reads it, never this body (and its sections).
+    @State private var scroll = HomeScrollState()
 
     var body: some View {
         let home = env.home
@@ -77,10 +79,10 @@ struct HomeView: View {
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top > HomeMetrics.scrolledThreshold
         } action: { _, scrolled in
-            isScrolled = scrolled
+            if scroll.isScrolled != scrolled { scroll.isScrolled = scrolled }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            HomeTopBar(isScrolled: isScrolled,
+            HomeTopBar(scroll: scroll,
                        onBeta: { router.present(AppSheet.betaInfo) },
                        onJobs: { router.present(AppSheet.jobs) },
                        onChangelog: { router.present(AppSheet.changelog) },
@@ -165,10 +167,16 @@ nonisolated enum HomeMetrics {
 
 // MARK: - Top bar
 
+/// Whether Home is scrolled past the top bar's threshold; observed only by `HomeTopBar` (like Stats' collapse state).
+@Observable
+final class HomeScrollState {
+    var isScrolled = false
+}
+
 /// Android `HomeGradientTopBar`: transparent over the list; once scrolled, a `surfaceContainerHighest` scrim fades in
 /// behind it (solid to 55 %, 72 % at 80 %, clear at the bottom) reaching the top of the screen.
 private struct HomeTopBar: View {
-    let isScrolled: Bool
+    let scroll: HomeScrollState
     let onBeta: () -> Void
     let onJobs: () -> Void
     let onChangelog: () -> Void
@@ -227,8 +235,8 @@ private struct HomeTopBar: View {
                                    .init(color: scrim.opacity(0), location: 1)],
                            startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea(edges: .top)
-                .opacity(isScrolled ? 1 : 0)
-                .animation(.easeInOut(duration: 0.3), value: isScrolled)
+                .opacity(scroll.isScrolled ? 1 : 0)
+                .animation(.easeInOut(duration: 0.3), value: scroll.isScrolled)
                 .allowsHitTesting(false)
         }
     }
