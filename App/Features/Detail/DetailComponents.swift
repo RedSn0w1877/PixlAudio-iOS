@@ -13,10 +13,12 @@ final class HeaderScrollState {
 }
 
 extension View {
-    /// Feeds a `HeaderScrollState` from this scroll view (distance scrolled from the top, ≥ 0).
-    func trackingHeaderScroll(_ state: HeaderScrollState) -> some View {
+    /// Feeds a `HeaderScrollState` from this scroll view (distance scrolled from the top, 0...`maxOffset`). The headers
+    /// are fully collapsed by their `maxHeight` (300 pt at most), so a larger offset changes nothing they draw: the
+    /// value stops changing there and the header stops re-rendering every frame of the rest of the scroll.
+    func trackingHeaderScroll(_ state: HeaderScrollState, maxOffset: CGFloat = 300) -> some View {
         onScrollGeometryChange(for: CGFloat.self) { geometry in
-            max(0, (geometry.contentOffset.y + geometry.contentInsets.top).rounded())
+            min(maxOffset, max(0, (geometry.contentOffset.y + geometry.contentInsets.top).rounded()))
         } action: { _, newValue in
             state.offset = newValue
         }
