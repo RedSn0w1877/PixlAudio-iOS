@@ -29,9 +29,9 @@ nonisolated final class EmbeddedArtworkIdentity: Sendable {
     init(storeURL: URL?) { self.storeURL = storeURL }
 
     static func defaultStoreURL() -> URL? {
+        // Next to the thumbnail folder, not in it: `ArtworkPipeline.trimDiskCache` trims that folder by age.
         FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?
-            .appendingPathComponent("Artwork", isDirectory: true)
-            .appendingPathComponent("embedded-identity.plist")
+            .appendingPathComponent("embedded-artwork-identity.plist")
     }
 
     /// A short digest of a picture: 16 bytes of its SHA-256, as hex. (Not a security boundary: a cache key.)
