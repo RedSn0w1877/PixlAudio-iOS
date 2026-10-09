@@ -120,8 +120,20 @@ final class LibraryModel {
     nonisolated static func compute(_ inputs: Inputs, previous: Computed?) -> Computed {
         let snapshot = inputs.snapshot
         let filter = inputs.storageFilter
-        // What the previous computation can still give: same library, and per list the same sort / filter.
-        let old = previous.flatMap { $0.inputs.revision == inputs.revision ? $0 : nil }
+        // What the previous computation can still give. Each list is reused when everything it is derived from is
+        // equal: the same revision proves it at once; otherwise the source arrays are compared (cheap next to a sort),
+        // so a playlist edit or an artist picture re-sorts only that list. A heart tap changes songs in one field
+        // (`isFavorite`), which no sort reads: the sorted lists are patched by id instead of sorted again.
+        let old = previous
+        let sameRevision = old?.inputs.revision == inputs.revision
+        let before = old?.inputs.snapshot
+        let songsSame = sameRevision || (before.map { $0.songs == snapshot.songs } ?? false)
+        let favoriteChanges: [String: Song]? = (songsSame || before == nil) ? nil
+            : favoriteOnlyChanges(from: before!.songs, to: snapshot.songs)
+        let songsUsable = songsSame || favoriteChanges != nil
+        let albumsSame = sameRevision || (before.map { $0.albums == snapshot.albums } ?? false)
+        let artistsSame = sameRevision || (before.map { $0.artists == snapshot.artists } ?? false)
+        let playlistsSame = sameRevision || (before.map { $0.playlists == snapshot.playlists } ?? false)
         let sameFilter = old?.inputs.storageFilter == filter
         var visible: [Song]?
         func visibleSongs() -> [Song] {
@@ -132,15 +144,16 @@ final class LibraryModel {
         }
 
         var lists = Lists()
-        if let old, sameFilter, old.inputs.songSort == inputs.songSort {
-            lists.songs = old.lists.songs
+        if let old, sameFilter, songsUsable, old.inputs.songSort == inputs.songSort {
+            lists.songs = songsSame ? old.lists.songs : patched(old.lists.songs, favoriteChanges ?? [:])
             lists.songIds = old.lists.songIds
         } else {
             lists.songs = LibrarySorting.sortSongs(visibleSongs(), by: inputs.songSort)
             lists.songIds = Set(lists.songs.map(\.id))
         }
 
-        if let old, sameFilter, old.inputs.albumSort == inputs.albumSort,
+        // Albums and artists read songs only to filter by storage: a field change cannot move a song in or out.
+        if let old, sameFilter, albumsSame, songsUsable || filter == .all, old.inputs.albumSort == inputs.albumSort,
            old.inputs.minTracksPerAlbum == inputs.minTracksPerAlbum {
             lists.albums = old.lists.albums
         } else {
@@ -151,7 +164,7 @@ final class LibraryModel {
             lists.albums = LibrarySorting.sortAlbums(albums, by: inputs.albumSort)
         }
 
-        if let old, sameFilter, old.inputs.artistSort == inputs.artistSort {
+        if let old, sameFilter, artistsSame, songsUsable || filter == .all, old.inputs.artistSort == inputs.artistSort {
             lists.artists = old.lists.artists
         } else {
             let artistIds = Set(visibleSongs().flatMap { song in
@@ -161,13 +174,13 @@ final class LibraryModel {
             lists.artists = LibrarySorting.sortArtists(artists, by: inputs.artistSort)
         }
 
-        if let old, old.inputs.playlistSort == inputs.playlistSort {
+        if let old, playlistsSame, old.inputs.playlistSort == inputs.playlistSort {
             lists.playlists = old.lists.playlists
         } else {
             lists.playlists = LibrarySorting.sortPlaylists(snapshot.playlists, by: inputs.playlistSort)
         }
 
-        if let old, sameFilter, old.inputs.likedSort == inputs.likedSort, old.inputs.likedAt == inputs.likedAt {
+        if let old, sameFilter, songsSame, old.inputs.likedSort == inputs.likedSort, old.inputs.likedAt == inputs.likedAt {
             lists.liked = old.lists.liked
             lists.likedIds = old.lists.likedIds
         } else {
@@ -176,12 +189,23 @@ final class LibraryModel {
             lists.likedIds = Set(lists.liked.map(\.id))
         }
 
-        // The tree depends on the library only; its sorted views on the folder sort.
-        let tree = old?.tree ?? folderTree(snapshot.songs)
-        if let old, old.inputs.folderSort == inputs.folderSort {
+        // The tree depends on the library's songs only; its sorted views on the folder sort.
+        let tree: [MusicFolder]
+        if let old, songsSame { tree = old.tree }
+        else if let old, let favoriteChanges { tree = old.tree.map { patched($0, favoriteChanges) } }
+        else { tree = folderTree(snapshot.songs) }
+        if let old, old.inputs.folderSort == inputs.folderSort, songsSame {
             lists.folders = old.lists.folders
             lists.folderPlaylists = old.lists.folderPlaylists
             lists.folderContents = old.lists.folderContents
+            lists.folderRoots = old.lists.folderRoots
+        } else if let old, old.inputs.folderSort == inputs.folderSort, let favoriteChanges {
+            lists.folders = old.lists.folders.map { patched($0, favoriteChanges) }
+            lists.folderPlaylists = old.lists.folderPlaylists.map { patched($0, favoriteChanges) }
+            lists.folderContents = old.lists.folderContents.mapValues {
+                FolderContents(subFolders: $0.subFolders.map { patched($0, favoriteChanges) },
+                               songs: patched($0.songs, favoriteChanges))
+            }
             lists.folderRoots = old.lists.folderRoots
         } else {
             lists.folders = LibrarySorting.sortFolders(tree, by: inputs.folderSort)
@@ -190,6 +214,35 @@ final class LibraryModel {
             lists.folderRoots = lists.folders.map(\.path)
         }
         return Computed(inputs: inputs, lists: lists, tree: tree)
+    }
+
+    /// The songs of `new` that differ from `old` in `isFavorite` alone, by id; nil when anything else differs (a song
+    /// added, removed, moved or edited), so the caller falls back to a full computation.
+    nonisolated static func favoriteOnlyChanges(from old: [Song], to new: [Song]) -> [String: Song]? {
+        guard old.count == new.count else { return nil }
+        var changed: [String: Song] = [:]
+        for index in old.indices {
+            let before = old[index], after = new[index]
+            guard before.id == after.id else { return nil }
+            if before == after { continue }
+            var probe = before
+            probe.isFavorite = after.isFavorite
+            guard probe == after else { return nil }
+            changed[after.id] = after
+        }
+        return changed
+    }
+
+    /// `songs` with the changed songs swapped in, order unchanged.
+    nonisolated static func patched(_ songs: [Song], _ changed: [String: Song]) -> [Song] {
+        guard !changed.isEmpty else { return songs }
+        return songs.map { changed[$0.id] ?? $0 }
+    }
+
+    /// A folder (and its subfolders) with the changed songs swapped in.
+    nonisolated static func patched(_ folder: MusicFolder, _ changed: [String: Song]) -> MusicFolder {
+        MusicFolder(path: folder.path, name: folder.name, songs: patched(folder.songs, changed),
+                    subFolders: folder.subFolders.map { patched($0, changed) })
     }
 
     /// Every folder of the tree by path, with its subfolders and own songs sorted as the Folders page shows them.

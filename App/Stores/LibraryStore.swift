@@ -158,6 +158,15 @@ final class LibraryStore {
     /// An edit of the in-memory library (favourites, playlists, tags, removals): the caller knows the snapshot
     /// changed and which songs did, so the lookups are patched instead of rebuilt and nothing is compared.
     func applyEdit(_ newSnapshot: LibrarySnapshot, changedSongs: [Song] = [], removedSongIds: Set<String> = []) {
+        // A heart tap changes one field of a few songs: the detail index is patched, not rebuilt.
+        let favoritesOnly = removedSongIds.isEmpty && !changedSongs.isEmpty
+            && newSnapshot.songs.count == snapshot.songs.count
+            && changedSongs.allSatisfy { song in
+                guard var before = songsById[song.id] else { return false }
+                before.isFavorite = song.isFavorite
+                return before == song
+            }
+        let previousRevision = revision
         for song in changedSongs { songsById[song.id] = song }
         for id in removedSongIds { songsById[id] = nil }
         if newSnapshot.playlists != snapshot.playlists {
@@ -166,7 +175,11 @@ final class LibraryStore {
         snapshot = newSnapshot
         revision &+= 1
         songsRevision &+= 1
-        rebuildDetailIndex()
+        if favoritesOnly, let base = detailIndex, base.revision == previousRevision {
+            patchDetailIndex(base, changed: Dictionary(changedSongs.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last }))
+        } else {
+            rebuildDetailIndex()
+        }
     }
 
     /// Replaces artists by id — their pictures (Deezer, a custom image) — patching the snapshot and the artist lookup
@@ -206,6 +219,16 @@ final class LibraryStore {
         snapshot = newSnapshot
         revision &+= 1
         rebuildDetailIndex()
+    }
+
+    private func patchDetailIndex(_ base: LibraryDetailIndex, changed: [String: Song]) {
+        detailIndexTask?.cancel()
+        let revision = self.revision
+        detailIndexTask = Task { [weak self] in
+            let index = await LibraryDetailIndex.patchedInBackground(base, changed: changed, revision: revision)
+            guard let self, !Task.isCancelled, self.revision == revision else { return }
+            self.detailIndex = index
+        }
     }
 
     private func rebuildDetailIndex() {
