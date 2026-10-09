@@ -34,8 +34,6 @@ struct PlaylistDetailView: View {
     @State private var bottomInset: CGFloat = 0
     /// The playlist written as M3U for the options menu's Export (rewritten when the playlist changes).
     @State private var exportURL: URL?
-    /// Stage 14: the playlist's lyric-sync run, from TAIS Studio's job states.
-    private var lyricSync: PlaylistLyricSyncState { env.tais.studio.lyricSyncState(playlistId: playlistId) }
     @State private var didApplyLaunchState = false
 
     private var prefs: LibraryPreferences { LibraryPreferences.shared(isUITest: env.launch.isUITest) }
@@ -95,11 +93,7 @@ struct PlaylistDetailView: View {
             } else {
                 playRow
                 if !isFolder { editRow }
-                PlaylistLyricSyncCard(state: lyricSync,
-                                      onCancel: { env.tais.studio.cancelLyricBatch(playlistId: playlistId) },
-                                      onRetry: { env.tais.studio.retryLyricBatch(playlistId: playlistId, songs: songs) })
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, lyricSync.total > 0 ? 8 : 0)
+                PlaylistLyricSyncSection(playlistId: playlistId, songs: songs)
                 if songs.isEmpty {
                     emptyState
                 } else {
@@ -461,5 +455,23 @@ private struct PlaylistOptionsSheet: View {
         }
         .buttonStyle(.plain)
         .playlistActionTile(theme)
+    }
+}
+
+/// Stage 14: the playlist's lyric-sync run, from TAIS Studio's job states. The states are read here, not in the page:
+/// every progress tick of a running batch re-renders only this card, never the song list below it.
+private struct PlaylistLyricSyncSection: View {
+    let playlistId: String
+    let songs: [Song]
+
+    @Environment(AppEnvironment.self) private var env
+
+    var body: some View {
+        let state = env.tais.studio.lyricSyncState(playlistId: playlistId)
+        PlaylistLyricSyncCard(state: state,
+                              onCancel: { env.tais.studio.cancelLyricBatch(playlistId: playlistId) },
+                              onRetry: { env.tais.studio.retryLyricBatch(playlistId: playlistId, songs: songs) })
+            .padding(.horizontal, 16)
+            .padding(.vertical, state.total > 0 ? 8 : 0)
     }
 }
