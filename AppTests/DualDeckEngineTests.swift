@@ -309,6 +309,60 @@ final class DualDeckEngineTests: XCTestCase {
         XCTAssertGreaterThan(resolver.calls, resolutions)
     }
 
+    /// Gapless mode (the default): the next song from the library's files is parked on the idle deck as soon as the
+    /// countdown's debounce has run, so a skip anywhere in the song takes it over instead of building it from scratch.
+    func testGaplessModeParksALocalNextSongEarlySoASkipIsInstant() async throws {
+        let urls = try (0..<3).map { try TestAudio.sine(frequency: 320 + Double($0) * 90, seconds: 14) }
+        let songs = urls.enumerated().map { TestAudio.song($1, id: "f:\($0)", seconds: 14) }
+        let engine = makeEngine()
+        defer { engine.stop() }
+        let resolver = CountingPlayableURLResolver(base: engine.factory.resolver)
+        engine.factory.resolver = resolver
+        engine.setQueue(songs, startIndex: 0, startPositionMs: 0, playWhenReady: true)
+        try await waitForAudio(engine)
+        XCTAssertNotNil(engine.plannedHandOver, "the default mode plans a gapless hand-over")
+        // Before, the next item was only built in the last 4.5 s (from about 8.5 s into this song).
+        let early = await waitUntil(timeout: 5) { engine.preparedIncoming != nil }
+        XCTAssertTrue(early, "the next song is prepared after the debounce")
+        XCTAssertLessThan(engine.currentPositionMs(), 6_000, "well before the last 4.5 s")
+        let prepared = try XCTUnwrap(engine.preparedIncoming)
+        XCTAssertEqual(prepared.entry.song.id, "f:1")
+        let resolutions = resolver.calls
+
+        engine.skipToNext()
+        XCTAssertTrue(engine.activeItem === prepared, "the skip takes the prepared item over")
+        XCTAssertEqual(resolver.calls, resolutions, "nothing is resolved or built for the skip")
+        XCTAssertEqual(PlaybackStartTimings.shared.records.first?.kind, .prepared)
+        let playing = await waitUntil(timeout: 3) { prepared.positionSeconds > 0.2 && engine.active.isPlaying }
+        XCTAssertTrue(playing)
+        let measured = await waitUntil(timeout: 2) { PlaybackStartTimings.shared.records.first?.playingMs != nil }
+        XCTAssertTrue(measured)
+        if let playingMs = PlaybackStartTimings.shared.records.first?.playingMs {
+            print("measured [skipNext.gapless.local] playingMs=\(playingMs)")
+        }
+        // The next song after the adopted one is planned and parked again.
+        let again = await waitUntil(timeout: 5) { engine.preparedIncoming?.entry.song.id == "f:2" }
+        XCTAssertTrue(again)
+    }
+
+    /// A streamed target keeps the late lead: nothing is resolved (so nothing could be downloaded) early in the song.
+    func testGaplessModeDoesNotPrepareAStreamedNextSongEarly() async throws {
+        let urls = try (0..<2).map { try TestAudio.sine(frequency: 400 + Double($0) * 100, seconds: 14) }
+        let songs = [TestAudio.song(urls[0], id: "f:0", seconds: 14), TestAudio.song(urls[1], id: "yt:abc", seconds: 14)]
+        let engine = makeEngine()
+        defer { engine.stop() }
+        let resolver = CountingPlayableURLResolver(base: engine.factory.resolver)
+        engine.factory.resolver = resolver
+        engine.setQueue(songs, startIndex: 0, startPositionMs: 0, playWhenReady: true)
+        try await waitForAudio(engine)
+        XCTAssertNotNil(engine.plannedHandOver)
+        let resolutions = resolver.calls
+        try await Task.sleep(for: .milliseconds(3_500))
+        XCTAssertLessThan(engine.currentPositionMs(), 8_000)
+        XCTAssertNil(engine.preparedIncoming)
+        XCTAssertEqual(resolver.calls, resolutions, "no early resolution of a streamed song")
+    }
+
     func testQueueEventsReachThePlaybackStore() async throws {
         let urls = try (0..<5).map { try TestAudio.sine(frequency: 300 + Double($0) * 50, seconds: 2) }
         let songs = urls.enumerated().map { TestAudio.song($1, id: "f:\($0)", seconds: 2) }
