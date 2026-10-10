@@ -110,6 +110,8 @@ jobs:
         env:
           CLOUD_DEFAULTS_KEY: ${{ secrets.CLOUD_DEFAULTS_KEY }}
         run: bash ci/write-cloud-defaults-key.sh
+      - name: Build identity
+        run: bash ci/write-build-identity.sh
       - name: Tune the runner
         run: bash ci/tune-runner.sh
       - name: Select Xcode
@@ -334,6 +336,8 @@ jobs:
         env:
           CLOUD_DEFAULTS_KEY: ${{ secrets.CLOUD_DEFAULTS_KEY }}
         run: bash ci/write-cloud-defaults-key.sh
+      - name: Build identity
+        run: bash ci/write-build-identity.sh
       - name: Tune the runner
         run: bash ci/tune-runner.sh
       - name: Select Xcode

@@ -128,7 +128,14 @@ final class SpotifyService {
         accountEmail = preferences.accountEmail
         publishAccount()
         await refreshLibraryState()
-        if pendingMatchCount > 0 { startMatching(retryFailed: false) }
+        // Not after an abnormal end (safe mode): "Find audio" on the dashboard, or Retry in Active jobs, starts it.
+        if pendingMatchCount > 0 {
+            if HeavyWorkGate.shared.allowsLaunchWork {
+                startMatching(retryFailed: false)
+            } else {
+                DiagnosticsLog.shared.log("safemode", "Spotify matcher held back")
+            }
+        }
         if isLoggedIn { scheduleBackgroundRefresh() }
     }
 
@@ -366,6 +373,8 @@ final class SpotifyService {
         let isPlaying = isPlaybackActive
         let progressThrottle = RefreshThrottle()
         matchTask = Task {
+            JobTelemetry.shared.started("spotifyMatch", id: "match")
+            defer { JobTelemetry.shared.ended("spotifyMatch", id: "match", Task.isCancelled ? .cancelled("cancelled") : .finished) }
             // The pass gets iOS's ~30 s of extra time when the app is switched away; the Spotify background refresh runs a
             // short slice later (a pass that is waiting out a retry holds the assertion only until iOS asks for it back).
             await BackgroundGrace.run("Spotify matching", onExpire: { [weak self] in self?.scheduleBackgroundRefresh() }) {

@@ -10,36 +10,46 @@ import PixlAudioCore
 actor MdxStemSeparator {
     private var model: MLModel?
     private var modelURL: URL?
+    private var modelUnits: MLComputeUnits = .cpuOnly
+    private var forceCPU = false
 
     func unload() {
         model = nil
         modelURL = nil
     }
 
+    /// Neural Engine + CPU in the foreground on a cool phone, CPU otherwise (`ModelCompute`); the parity gate measured
+    /// this model on CPU_ONLY and on ALL.
     private func loadModel(at url: URL) throws -> MLModel {
-        if let model, modelURL == url { return model }
-        let configuration = MLModelConfiguration()
-        configuration.computeUnits = .cpuOnly
-        let loaded = try MLModel(contentsOf: url, configuration: configuration)
-        model = loaded
+        let units = ModelCompute.units(forceCPU: forceCPU)
+        if let model, modelURL == url, modelUnits == units || (units == .cpuOnly && modelUnits == .cpuAndNeuralEngine) {
+            return model
+        }
+        let loaded = try ModelCompute.load(url, units: units, onFallback: { [self] in forceCPU = true })
+        model = loaded.model
         modelURL = url
-        return loaded
+        modelUnits = loaded.units
+        return loaded.model
     }
 
     /// Renders `source`'s instrumental into `destination` (a complete WAV, written through a temporary file).
     /// `progress(framesDone, totalFrames)` follows the model chunks.
     func renderInstrumental(source: URL, destination: URL, modelURL: URL,
+                            pacer: WorkPacer = HeavyWorkGate.shared.makePacer(),
                             progress: @escaping @Sendable (Int, Int) -> Void) async throws {
         let channels = try await AudioPCMReader.read(url: source, sampleRate: Double(MdxSeparation.sampleRate), channels: 2)
         try Task.checkCancellation()
         let left = channels[0], right = channels.count > 1 ? channels[1] : channels[0]
         guard !left.isEmpty else { throw AudioPCMReader.Failure(message: "This song has no audio to separate") }
+        try pacer.checkpoint() // no model load (a compile on first use) while the app is out of the foreground
         let model = try loadModel(at: modelURL)
         let input = try MLMultiArray(shape: [1, 4, NSNumber(value: MdxSeparation.frequencyBins),
                                              NSNumber(value: MdxSeparation.segmentFrames)], dataType: .float32)
         var transform = try VDSPTransform(size: MdxSeparation.fftSize)
         let separated = try MdxSeparation.instrumental(left: left, right: right, transform: &transform, model: { planes, out in
-            try Task.checkCancellation()
+            // Between chunks: cancel, wait while the app is out of the foreground or the phone is hot, and sleep the share
+            // of the time that keeps the average CPU under half a core's worth.
+            try pacer.checkpoint()
             input.withUnsafeMutableBufferPointer(ofType: Float.self) { buffer, _ in
                 _ = buffer.update(fromContentsOf: planes)
             }

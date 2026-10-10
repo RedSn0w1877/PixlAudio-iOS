@@ -48,6 +48,10 @@ final class ModelManager {
     /// Downloaded and verified, but the install (extract + compile, the heaviest memory spike in the app) waits for the
     /// shared heavy lane (`HeavyJobGovernor`): Active jobs says "Waiting".
     private(set) var waitingToInstall: Set<ModelDescriptor.ID> = []
+    /// Downloaded (the background session can finish it while the app is away), but the install waits until PixlAudio is
+    /// in front: compiling a ~900 MB package in the background wrote 1 GB in 18 s at background priority (the
+    /// 2026-10-08 disk-writes report) and is never done there now.
+    private(set) var waitingForForeground: Set<ModelDescriptor.ID> = []
 
     @ObservationIgnored private let isDemo: Bool
     @ObservationIgnored private var session: URLSession?
@@ -60,6 +64,9 @@ final class ModelManager {
     /// background session would wait for connectivity for days and the job would sit at "downloading" for ever.
     @ObservationIgnored let stalls = StallMonitor<ModelDescriptor.ID>()
     @ObservationIgnored private var started = false
+    /// Models whose download the person started in this run (`download`). A transfer a previous run left behind is not
+    /// installed by itself after an abnormal end (safe mode).
+    @ObservationIgnored private var startedThisRun: Set<ModelDescriptor.ID> = []
 
     init(isDemo: Bool) {
         self.isDemo = isDemo
@@ -70,6 +77,8 @@ final class ModelManager {
     func state(_ id: ModelDescriptor.ID) -> State { states[id] ?? .notInstalled }
 
     func isWaitingToInstall(_ id: ModelDescriptor.ID) -> Bool { waitingToInstall.contains(id) }
+
+    func isWaitingForForeground(_ id: ModelDescriptor.ID) -> Bool { waitingForForeground.contains(id) }
 
     /// UI-test demo data.
     func setDemoState(_ state: State, for id: ModelDescriptor.ID) { states[id] = state }
@@ -158,7 +167,16 @@ final class ModelManager {
         default: break
         }
         guard !isDemo else { return }
+        startedThisRun.insert(id)
         let model = ModelCatalog.descriptor(id)
+        // A finished download that was left behind (its install was paused, or the app was closed): install it, never
+        // download ~900 MB twice.
+        if let staging = Self.stagingURL(id),
+           ((try? FileManager.default.attributesOfItem(atPath: staging.path)[.size]) as? NSNumber)?.int64Value == model.bytes {
+            DiagnosticsLog.shared.log("model", "install of a downloaded \(id.rawValue) archive resumes")
+            finished(id, archive: staging, failure: nil)
+            return
+        }
         // The local AI model is ~900 MB: say so up front rather than failing half-way through the install.
         if let free = Self.availableSpace(), free < Self.spaceNeeded(model) {
             let message = "Not enough free space on this iPhone: installing it needs about "
@@ -184,6 +202,7 @@ final class ModelManager {
         tasks.removeValue(forKey: id)?.cancel()
         installTasks.removeValue(forKey: id)?.cancel()
         waitingToInstall.remove(id)
+        waitingForForeground.remove(id)
         if state(id).isBusy { states[id] = .notInstalled }
         resume(id, with: .failure(CancellationError()))
     }
@@ -252,22 +271,61 @@ final class ModelManager {
             resume(id, with: .failure(ModelError(message: message)))
             return
         }
+        // Never twice: an install that is already going (or waiting) for this model is the one that finishes it.
+        guard installTasks[id] == nil else { return }
+        // After an abnormal end, a download from the previous run is not installed by itself (safe mode): the install is
+        // the heaviest thing the app does, and "Retry" on its row is the person's go-ahead.
+        if HeavyWorkGate.shared.automaticStartsBlocked, !startedThisRun.contains(id) {
+            let message = "Paused after PixlAudio closed unexpectedly. Retry to install it."
+            DiagnosticsLog.shared.log("safemode", "install of \(id.rawValue) held back")
+            states[id] = .failed(message)
+            resume(id, with: .failure(ModelError(message: message)))
+            return
+        }
         states[id] = .installing
         let model = ModelCatalog.descriptor(id)
         installTasks[id] = Task(priority: .utility) {
             defer {
                 waitingToInstall.remove(id)
+                waitingForForeground.remove(id)
                 installTasks[id] = nil
             }
             do {
-                // Compiling a ~1 GB package next to a running lyric sync or separation is what gets an app ended for
-                // memory: wait for the heavy lane (a lyric batch hands it over between songs).
-                if HeavyJobGovernor.shared.isBusy { waitingToInstall.insert(id) }
-                let lease = try await HeavyJobGovernor.shared.acquire()
+                // One step, in front of the person: a background session can finish the download while the app is away,
+                // but the compile (a ~1 GB write) waits until PixlAudio is open, then takes its turn in the heavy lane.
+                var lease: HeavyJobGovernor.Lease
+                while true {
+                    if !HeavyWorkGate.shared.isForeground {
+                        if waitingForForeground.insert(id).inserted {
+                            DiagnosticsLog.shared.log("model", "install of \(id.rawValue) waits for the foreground")
+                        }
+                        try await Self.waitForForeground()
+                    }
+                    waitingForForeground.remove(id)
+                    // Compiling a ~1 GB package next to a running lyric sync or separation is what gets an app ended for
+                    // memory: wait for the heavy lane (a lyric batch hands it over between songs).
+                    if HeavyJobGovernor.shared.isBusy { waitingToInstall.insert(id) }
+                    let granted = try await HeavyJobGovernor.shared.acquire()
+                    waitingToInstall.remove(id)
+                    if HeavyWorkGate.shared.isForeground {
+                        lease = granted
+                        break
+                    }
+                    // The app left the foreground while this waited for its turn: give the place back and wait again.
+                    granted.release()
+                }
                 defer { lease.release() }
-                waitingToInstall.remove(id)
+                JobTelemetry.shared.started("modelDownload", id: id.rawValue)
                 // Verifying and compiling can outlast a switch to another app: iOS's ~30 s of grace may finish it.
-                let url = try await BackgroundGrace.run("Model install") { try await Self.install(model, archive: archive) }
+                let url: URL
+                do {
+                    url = try await BackgroundGrace.run("Model install") { try await Self.install(model, archive: archive) }
+                } catch {
+                    JobTelemetry.shared.ended("modelDownload", id: id.rawValue,
+                                              error is CancellationError ? .cancelled("cancelled") : .failed(error.localizedDescription))
+                    throw error
+                }
+                JobTelemetry.shared.ended("modelDownload", id: id.rawValue, .finished)
                 try Task.checkCancellation()
                 states[id] = .installed(bytes: Self.installedSize(model) ?? model.bytes)
                 resume(id, with: .success(url))
@@ -286,6 +344,13 @@ final class ModelManager {
                 states[id] = .failed(message)
                 resume(id, with: .failure(ModelError(message: message)))
             }
+        }
+    }
+
+    /// Returns once the app is in the foreground (polled once a second; throws when the task is cancelled).
+    private static func waitForForeground() async throws {
+        while !HeavyWorkGate.shared.isForeground {
+            try await Task.sleep(for: .seconds(1))
         }
     }
 

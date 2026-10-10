@@ -1,6 +1,7 @@
 import AVFoundation
 import CoreMedia
 import Foundation
+import PixlModel
 
 /// Decodes a whole song to float PCM at a fixed rate and channel count (Android `TaisLyricsAligner.decodeToMono16k`
 /// and `TaisStemSeparator.decodeToStereoFloat` + `resampleTo44100`). `AVAssetReaderTrackOutput` does the decoding,
@@ -17,7 +18,12 @@ nonisolated enum AudioPCMReader {
     /// main-actor caller's call on the main thread).
     @concurrent
     static func read(url: URL, sampleRate: Double, channels: Int,
-                     maximumSeconds: Double = 20 * 60) async throws -> [[Float]] {
+                     maximumSeconds: Double? = nil) async throws -> [[Float]] {
+        // What this phone can hold: a 6-minute stereo song at 44.1 kHz is ~127 MB as Float, and the separator keeps the mix
+        // and its result (3.5 GB phones: ~11 minutes of stereo, 20 minutes of 16 kHz mono).
+        let maximumSeconds = maximumSeconds ?? HeavyWorkPolicy.maxDecodeSeconds(
+            channels: channels, sampleRate: sampleRate, physicalMemoryBytes: ProcessInfo.processInfo.physicalMemory)
+        let pacer = HeavyWorkGate.shared.makePacer()
         let asset = AVURLAsset(url: url)
         guard let track = try await asset.loadTracks(withMediaType: .audio).first else {
             throw Failure(message: "No audio track found in this song")
@@ -51,7 +57,8 @@ nonisolated enum AudioPCMReader {
         }
         var scratch = [Float]()
         while let buffer = output.copyNextSampleBuffer() {
-            try Task.checkCancellation()
+            // Decoding is CPU-bound: it pauses with the rest of the heavy work and leaves the cores half the time.
+            try pacer.checkpoint()
             guard let block = CMSampleBufferGetDataBuffer(buffer) else { continue }
             let length = CMBlockBufferGetDataLength(block)
             let count = length / MemoryLayout<Float>.size

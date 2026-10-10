@@ -9,10 +9,13 @@ struct ActiveJobsButton: View {
     let count: Int
     let isWorking: Bool
     let action: () -> Void
+    /// Long-press menu: "Cancel all" (after a confirmation) stops everything running or waiting.
+    var onCancelAll: (() -> Void)?
 
     @Environment(\.appTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var openTick = 0
+    @State private var confirmsCancelAll = false
 
     var body: some View {
         Button {
@@ -37,6 +40,19 @@ struct ActiveJobsButton: View {
         .buttonStyle(.plain)
         .pixlGlass(in: Capsule(), tint: theme.primaryContainer.opacity(GlassTint.container), interactive: true)
         .pixlHaptic(.impact(weight: .light), trigger: openTick)
+        // Cancel is one long press away, not only inside the sheet.
+        .contextMenu {
+            Button("Open", systemImage: "list.bullet", action: action)
+            if onCancelAll != nil {
+                Button("Cancel all", systemImage: "xmark.circle", role: .destructive) { confirmsCancelAll = true }
+            }
+        }
+        .alert("Cancel all jobs?", isPresented: $confirmsCancelAll) {
+            Button("Cancel all", role: .destructive) { onCancelAll?() }
+            Button("Keep running", role: .cancel) {}
+        } message: {
+            Text("Everything running or waiting stops, and downloads and scans are abandoned. Finished work stays.")
+        }
         .animation(PixlMotion.state, value: count)
         .accessibilityLabel("Active jobs")
         .accessibilityValue(Text(verbatim: ActiveJobBoard.accessibilityValue(count: count)))
