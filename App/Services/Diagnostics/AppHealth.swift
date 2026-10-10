@@ -22,6 +22,9 @@ final class AppHealth {
     private(set) var interrupted: [InFlightEntry]
     /// The previous run ended abnormally (this launch's verdict; the banner reads `safeMode.showsBanner`).
     private(set) var previousRunWasAbnormal = false
+    /// The previous run died with the downloaded AI model in flight: "Use downloaded AI model" was turned off (the owner of
+    /// `AppEnvironment` does that) and Home's banner says so until dismissed.
+    private(set) var localModelBlamed = false
     private(set) var scenePhase: ScenePhase = .active
     private(set) var thermal: ThermalLevel = .nominal
     private(set) var lowPowerMode = false
@@ -87,6 +90,7 @@ final class AppHealth {
             previousRunWasAbnormal = true
             metricKitCountedThisLaunch = true
             interrupted = left
+            localModelBlamed = SafeModePolicy.blamesLocalModel(left)
             log.log("health", "previous run ended abnormally; in flight: \(left.map(\.kind).joined(separator: ","))")
         } else {
             interrupted = []
@@ -182,6 +186,7 @@ final class AppHealth {
     }
 
     func dismissBanner() {
+        localModelBlamed = false
         apply(SafeModePolicy.bannerDismissed(safeMode), reason: "banner dismissed")
     }
 

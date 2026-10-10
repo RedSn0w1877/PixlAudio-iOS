@@ -104,6 +104,12 @@ final class AppEnvironment {
         self.persistence = persistence
         let settings = isUITest ? SettingsStore.ephemeral() : SettingsStore()
         self.settings = settings
+        // The previous run died with the downloaded AI model loaded or writing: it stays off until the person turns it on
+        // again, so a crash loop cannot repeat.
+        if health.localModelBlamed, settings.ai.useDownloadedModel {
+            settings.ai.useDownloadedModel = false
+            DiagnosticsLog.shared.log("safemode", "downloaded AI model turned off after it was in flight at a crash")
+        }
         // The optional cloud rows of Settings › AI features, for their screenshot.
         if launch.screen == .settingsAICloud { settings.ai.setUsesCloudAssistant(true) }
         // The downloaded AI model's rows (its demo states are set in `TaisDemo`).

@@ -9,8 +9,13 @@ import Foundation
 /// The GPU is never used for these: a backgrounded app may not submit GPU work, and the 2026-10-08 crash report shows
 /// what happens to one that does (docs/handoff/2026-10-10-crash-diagnostics.md).
 nonisolated enum ModelCompute {
+    /// Round 2 (a device log showed a crash loop and the Neural Engine path had never run on a phone): back to `.cpuOnly`,
+    /// the configuration the parity gate measured, until a phone shows the Neural Engine is safe and faster. The pacer
+    /// still keeps the CPU under half a core's worth.
+    static let allowsNeuralEngine = false
+
     static func units(forceCPU: Bool) -> MLComputeUnits {
-        !forceCPU && HeavyWorkGate.shared.prefersNeuralEngine ? .cpuAndNeuralEngine : .cpuOnly
+        allowsNeuralEngine && !forceCPU && HeavyWorkGate.shared.prefersNeuralEngine ? .cpuAndNeuralEngine : .cpuOnly
     }
 
     /// Loads the model for `units`; a Neural Engine load that throws falls back to the CPU (`onFallback` tells the

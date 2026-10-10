@@ -273,3 +273,36 @@ import Testing
         #expect(empty.contains("(none received yet"))
     }
 }
+
+@Suite struct LocalModelGateTests {
+    private func decide(_ reason: LocalModelReason = .userRequest, foreground: Bool = true, safe: Bool = false,
+                        low: Bool = false, thermal: ThermalLevel = .nominal, available: Int64 = 2_000_000_000) -> LocalModelDecision {
+        LocalModelGatePolicy.decide(reason: reason, isForeground: foreground, safeModeActive: safe, lowPowerMode: low,
+                                    thermal: thermal, availableBytes: available, modelBytes: 900_000_000)
+    }
+
+    @Test func aUserRequestOnAHealthyPhoneIsAllowed() {
+        #expect(decide() == .allowed)
+    }
+
+    @Test func automaticFeaturesNeverLoadTheModel() {
+        #expect(!decide(.automatic).isAllowed)
+    }
+
+    @Test func safeModeLowPowerHeatBackgroundAndLowMemoryDeny() {
+        #expect(!decide(safe: true).isAllowed)
+        #expect(!decide(low: true).isAllowed)
+        #expect(!decide(thermal: .serious).isAllowed)
+        #expect(!decide(foreground: false).isAllowed)
+        #expect(decide(available: 1_300_000_000) == .denied("Not enough memory on this phone"))
+        #expect(decide(available: 1_350_000_000) == .allowed)
+    }
+
+    @Test func aCrashWithTheModelInFlightBlamesTheModel() {
+        let model = InFlightEntry(kind: "localModel", reference: "request", startedAtMs: 1)
+        let other = InFlightEntry(kind: "lyricsSync", reference: "a", startedAtMs: 1)
+        #expect(SafeModePolicy.blamesLocalModel([other, model]))
+        #expect(!SafeModePolicy.blamesLocalModel([other]))
+        #expect(!SafeModePolicy.blamesLocalModel([]))
+    }
+}

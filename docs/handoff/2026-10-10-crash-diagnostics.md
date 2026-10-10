@@ -171,3 +171,33 @@ Settings › Privacy & Security › Analytics & Improvements › Analytics Data.
 - The duty cycle's effect on total lyric-sync time (it roughly doubles while the app is in front; Low Power Mode and heat
   make it slower on purpose).
 - The 1.5 s grace of the generation stop against a real Control Center pull.
+
+## Round 2: the crash loop on build 629ff5b (device log, 2026-10-10 15:23-15:25)
+
+**Root cause.** The shared log shows `start localModel` exactly 8 s after every launch (15:23:58, 15:24:44, 15:25:25). That is
+Home's AI greeting (`HomeAIGreeter`, "headline waits 8 s after launch"): with "Use downloaded AI model" on it loaded the ~900 MB
+Qwen model on each launch. Footprint went ~100 MB to 924 MB in 20 s, a memory warning arrived, and the process was killed
+(no clean marker, two abnormal ends in a row). Safe mode held back only the library rescan, because the model was not one of
+the things it gated, it had no Active jobs row and Emergency stop only cancelled rows ("active rows: 0").
+
+**Changes.**
+- `LocalModelGate.canLoad(reason:)` (`LocalModelGate.swift`, rules in PixlModel `LocalModelGatePolicy`, tested): the single gate
+  in `LocalModelRuntime.run` and `prewarm`. Denied (and logged as `modelgate`) when the caller is automatic (task-local reason,
+  default is a person's request), safe mode is on (the error text explains how to turn it off), Low Power Mode, thermal
+  serious or worse, the app is not in front, or `os_proc_available_memory()` is under 1.5x the model.
+- Home never loads the downloaded model by itself: `HomeAIGreeter` keeps the local greeting.
+- Active jobs source "AI model" (`LocalModelActivity`): Waiting / Loading / Generating row with Cancel, in Cancel all, a
+  failure row. Emergency stop also runs every registered cancel handle (`HeavyWorkGate.registerCancel`, the model registers one
+  per request) and logs how many it ran.
+- Memory: footprint and available memory are logged before and after the load and at the end of each request; a generation stops
+  and unloads at once when free memory falls under 250 MB (job fails with "Not enough memory on this phone"); the model unloads
+  12 s after the last request (was 180 s).
+- Compute units: the LLM was `.cpuAndGPU` (not the Neural Engine) since the first local-AI phase; now `.cpuOnly`, the measured
+  configuration. The wav2vec2 and MDX models did get the Neural Engine path in round 1 (CI-measured only on a Mac, never on a
+  phone): reverted to `.cpuOnly` (`ModelCompute.allowsNeuralEngine = false`). The duty-cycle pacer stays.
+- Safe mode: when the abnormal end had `localModel` in flight, "Use downloaded AI model" is turned off at launch and Home's
+  banner says "The downloaded AI model closed PixlAudio last time (not enough memory). It's turned off. Turn it on again in
+  Settings > AI features if you want to retry."
+
+**Still unverified:** that CPU-only load stays under the phone's limit (the Oct 8 CPU logs reached 841 MB without a kill); the
+memory floor values; the whole thing on a device.

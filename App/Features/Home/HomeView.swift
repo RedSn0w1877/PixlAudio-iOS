@@ -23,7 +23,7 @@ struct HomeView: View {
             LazyVStack(alignment: .leading, spacing: 24) {
                 // After an unexpected close: heavy jobs are paused until the person reviews them (once, dismissible).
                 if env.health.safeMode.showsBanner {
-                    SafeModeBanner(onReview: {
+                    SafeModeBanner(modelBlamed: env.health.localModelBlamed, onReview: {
                         env.health.dismissBanner()
                         router.present(AppSheet.jobs)
                     }, onDismiss: { env.health.dismissBanner() })

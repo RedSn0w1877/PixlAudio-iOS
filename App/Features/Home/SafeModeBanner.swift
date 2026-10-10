@@ -4,6 +4,8 @@ import SwiftUI
 /// diagnostics.md): heavy jobs are paused until the person reviews them in Active jobs (Retry) or turns safe mode off.
 /// A Liquid Glass card tinted with the error container; its dismiss is a plain fill (no glass on glass).
 struct SafeModeBanner: View {
+    /// The downloaded AI model was the thing in flight: its own wording (the setting was turned off).
+    var modelBlamed = false
     let onReview: () -> Void
     let onDismiss: () -> Void
 
@@ -19,10 +21,12 @@ struct SafeModeBanner: View {
                         .frame(width: 24, height: 24)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("PixlAudio closed unexpectedly while working.")
+                        Text(modelBlamed ? "The downloaded AI model closed PixlAudio last time (not enough memory)."
+                                         : "PixlAudio closed unexpectedly while working.")
                             .pixlFont(.bodyLarge, weight: .semibold)
                             .foregroundStyle(theme.onErrorContainer)
-                        Text("Heavy jobs are paused — tap to review")
+                        Text(modelBlamed ? "It's turned off. Turn it on again in Settings > AI features if you want to retry."
+                                         : "Heavy jobs are paused — tap to review")
                             .pixlFont(.bodyMedium)
                             .foregroundStyle(theme.onErrorContainer.opacity(0.85))
                     }

@@ -112,6 +112,7 @@ final class ActiveJobs {
         sources.downloads.cancelAll()
         sources.models.cancelAll()
         sources.studio.cancelAll()
+        LocalModelActivity.shared.cancel()
         let cloud = sources.cloud
         Task { await cloud.cancelAll() }
         rearm()
@@ -125,6 +126,7 @@ final class ActiveJobs {
             return
         }
         sources.library.dismissScanFailure()
+        LocalModelActivity.shared.dismissFailure()
         sources.spotify.dismissFailures()
         sources.downloads.clearFailures()
         sources.models.clearFailures()
@@ -156,6 +158,9 @@ final class ActiveJobs {
         JobTelemetry.shared.clearJournal()
         sources.studio.releaseModels()
         LocalModelRuntime.shared.unload()
+        // Every registered cancel handle, whatever rows show (the AI model had none).
+        let handles = HeavyWorkGate.shared.cancelAllHandles()
+        DiagnosticsLog.shared.log("emergency", "cancelled \(handles) registered handle(s)")
         let cloud = sources.cloud
         Task {
             await cloud.cancelAll()
@@ -178,6 +183,7 @@ final class ActiveJobs {
         }
         switch Handle(id: job.id) {
         case .libraryFailure?: sources.library.dismissScanFailure()
+        case .localModelFailure?: LocalModelActivity.shared.dismissFailure()
         case .spotifySyncFailure?, .spotifyMatchFailure?: sources.spotify.dismissFailures()
         case .downloadFailure(let videoId)?: sources.downloads.dismissFailure(videoId: videoId)
         case .modelFailure(let raw)?:
@@ -253,7 +259,7 @@ final class ActiveJobs {
             Task { try? await library.refresh() }
         case .spotifyMatch: sources.spotify.startMatching(retryFailed: false)
         case .spotifyImport: sources.spotify.syncNow()
-        case .songDownload, .cloud: break
+        case .songDownload, .cloud, .localModel: break
         }
     }
 
@@ -267,6 +273,7 @@ final class ActiveJobs {
         }
         switch Handle(id: job.id) {
         case .library?: sources.library.cancelScans()
+        case .localModel?: LocalModelActivity.shared.cancel()
         case .spotifySync?: sources.spotify.cancelSync()
         case .spotifyMatch?: sources.spotify.cancelMatching()
         case .download(let videoId)?: sources.downloads.cancel(videoId: videoId)
@@ -296,6 +303,7 @@ final class ActiveJobs {
         /// One finished or failed studio job.
         case studioSong(kind: ActiveJob.Kind, songId: String, failed: Bool)
         case cloud(batchId: String)
+        case localModel, localModelFailure
         /// A job the previous run had in flight when it ended abnormally ("interrupted.<kind>.<reference>").
         case interrupted(kind: String, reference: String)
 
@@ -308,6 +316,8 @@ final class ActiveJobs {
                 id.hasPrefix(prefix) ? String(id.dropFirst(prefix.count)) : nil
             }
             switch id {
+            case "localmodel": self = .localModel
+            case "localmodel.failed": self = .localModelFailure
             case "library": self = .library
             case "library.failed": self = .libraryFailure
             case "spotify.sync": self = .spotifySync
@@ -442,6 +452,7 @@ final class ActiveJobs {
         }
         if sources.spotify.isSyncing { add(running: true) }
         if sources.spotify.isMatching { add(running: true) }
+        if let phase = LocalModelActivity.shared.phase { add(running: phase != .waiting) }
         for state in sources.downloads.states.values {
             if case .downloading = state { add(running: true) }
         }
@@ -464,6 +475,7 @@ final class ActiveJobs {
         var rows: [ActiveJob] = []
         rows += libraryRows(sources.library)
         rows += spotifyRows(sources.spotify)
+        rows += localModelRows()
         rows += downloadRows(sources.downloads)
         rows += modelRows(sources.models)
         rows += studioRows(sources.studio, library: sources.library)
@@ -477,7 +489,8 @@ final class ActiveJobs {
     /// Retry (or Dismiss). Only work the app can start again is listed.
     private func interruptedRows(_ sources: Sources) -> [ActiveJob] {
         sources.health.interrupted.compactMap { entry -> ActiveJob? in
-            guard let kind = ActiveJob.Kind(rawValue: entry.kind), kind != .songDownload, kind != .cloud else { return nil }
+            guard let kind = ActiveJob.Kind(rawValue: entry.kind), kind != .songDownload, kind != .cloud,
+                  kind != .localModel else { return nil }
             var what = kind.label
             switch kind {
             case .lyricsSync, .instrumental, .roformer:
@@ -502,6 +515,21 @@ final class ActiveJobs {
         if let failure = library.scanFailure {
             rows.append(ActiveJob(id: "library.failed", kind: .libraryScan, title: "Library sync failed", subtitle: failure,
                                   state: .failed, canRetry: true))
+        }
+        return rows
+    }
+
+    private func localModelRows() -> [ActiveJob] {
+        let activity = LocalModelActivity.shared
+        var rows: [ActiveJob] = []
+        if let phase = activity.phase {
+            let words = phase == .waiting ? "Waiting" : phase == .loading ? "Loading the model…" : "Writing an answer…"
+            rows.append(ActiveJob(id: "localmodel", kind: .localModel, subtitle: words,
+                                  state: phase == .waiting ? .queued : .running))
+        }
+        if let failure = activity.failure {
+            rows.append(ActiveJob(id: "localmodel.failed", kind: .localModel, title: "AI model stopped", subtitle: failure,
+                                  state: .failed))
         }
         return rows
     }

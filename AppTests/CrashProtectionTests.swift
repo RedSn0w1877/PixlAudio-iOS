@@ -1,6 +1,7 @@
 import Foundation
 import PixlModel
 import SwiftUI
+import Synchronization
 import XCTest
 @testable import PixlAudio
 
@@ -327,5 +328,40 @@ final class CrashProtectionTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(400))
         XCTAssertEqual(studio.activeCount, 0, "the running one stopped too")
         XCTAssertFalse(HeavyJobGovernor.shared.isBusy)
+    }
+
+    // MARK: The downloaded AI model's gate
+
+    func testAutomaticCallersNeverLoadTheDownloadedModel() async {
+        XCTAssertFalse(LocalModelGate.$reason.withValue(.automatic) { LocalModelGate.canLoad(log: false) }.isAllowed)
+        do {
+            _ = try await LocalModelGate.$reason.withValue(.automatic) {
+                try await LocalModelRuntime.shared.run { _ in 1 }
+            }
+            XCTFail("an automatic request must be refused before anything loads")
+        } catch {
+            XCTAssertTrue(error is LocalModelRuntime.LoadError)
+        }
+    }
+
+    func testEmergencyStopRunsEveryRegisteredCancelHandle() {
+        let gate = HeavyWorkGate()
+        let calls = Mutex(0)
+        let first = gate.registerCancel { calls.withLock { $0 += 1 } }
+        _ = gate.registerCancel { calls.withLock { $0 += 1 } }
+        XCTAssertEqual(gate.cancelAllHandles(), 2)
+        XCTAssertEqual(calls.withLock { $0 }, 2)
+        gate.unregisterCancel(first)
+        XCTAssertEqual(gate.cancelAllHandles(), 1)
+    }
+
+    func testACrashWithTheModelInFlightIsBlamedOnTheModel() {
+        let defaults = makeDefaults(), directory = makeDirectory()
+        let first = makeHealth(defaults: defaults, directory: directory)
+        first.telemetry.started("localModel", id: "request")
+        let second = makeHealth(defaults: defaults, directory: directory)
+        XCTAssertTrue(second.health.localModelBlamed)
+        second.health.dismissBanner()
+        XCTAssertFalse(second.health.localModelBlamed)
     }
 }

@@ -23,6 +23,8 @@ nonisolated final class HeavyWorkGate: Sendable {
         var autoSuspendedUntilMs: Int64 = 0
         /// Bumped when everything heavy must stop at its next step (a critical memory event).
         var abortEpoch = 0
+        var handles: [Int: @Sendable () -> Void] = [:]
+        var nextHandle = 0
     }
 
     private let state = Mutex(State())
@@ -67,6 +69,25 @@ nonisolated final class HeavyWorkGate: Sendable {
 
     /// Emergency stop: automatic starts stay off for a while so nothing begins again behind the person's back.
     func suspendAutomaticStarts(forMs duration: Int64) { state.withLock { $0.autoSuspendedUntilMs = Self.nowMs() + duration } }
+
+    /// A way to stop one piece of running work, whatever rows show. Emergency stop calls every handle.
+    func registerCancel(_ handler: @escaping @Sendable () -> Void) -> Int {
+        state.withLock { state in
+            state.nextHandle += 1
+            state.handles[state.nextHandle] = handler
+            return state.nextHandle
+        }
+    }
+
+    func unregisterCancel(_ id: Int) { state.withLock { _ = $0.handles.removeValue(forKey: id) } }
+
+    /// Runs every registered cancel handle; returns how many there were.
+    @discardableResult
+    func cancelAllHandles() -> Int {
+        let handlers = state.withLock { Array($0.handles.values) }
+        for handler in handlers { handler() }
+        return handlers.count
+    }
 
     /// Everything heavy that is running stops at its next step.
     func abortHeavyWork() { state.withLock { $0.abortEpoch += 1 } }
