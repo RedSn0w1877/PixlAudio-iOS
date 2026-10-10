@@ -6,7 +6,12 @@ import SwiftUI
 /// percentage is known — with Liquid Glass cards in place of the plain rows. Below the active ones, what finished in the
 /// last day ("Recently finished": done, or needing you), so the sheet still has something to say when the app comes
 /// back after jobs moved on while it was closed. A Cloud row opens the Cloud queue, where its songs can be retried or
-/// cancelled (Android's sheet has no actions either).
+/// cancelled.
+///
+/// Nothing can get stuck here (docs/handoff/2026-10-09-many-jobs-fix.md): "Cancel all" (with a confirmation) stops every
+/// running and waiting job through its own source, "Clear finished" empties "Recently finished" (done and failed rows,
+/// all of them, not only the few listed), a finished row has its own Dismiss, a failed row Retry where its source can
+/// start the work again, and a running row can be cancelled from its context menu.
 ///
 /// Everything it shows is read from `ActiveJobs.active` / `.recent`: the aggregator follows the sources while the sheet is up and
 /// costs nothing when it is closed.
@@ -14,31 +19,55 @@ struct ActiveJobsSheet: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(Router.self) private var router
     @Environment(\.appTheme) private var theme
+    @State private var confirmsCancelAll = false
 
     var body: some View {
         let jobs = env.activeJobs
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 10) {
-                Text("Active jobs")
-                    .pixlFont(.titleLarge, weight: .bold)
-                    .foregroundStyle(theme.onSurface)
-                    .padding(.bottom, 2)
-                    .accessibilityAddTraits(.isHeader)
+                HStack(alignment: .center, spacing: 12) {
+                    Text("Active jobs")
+                        .pixlFont(.titleLarge, weight: .bold)
+                        .foregroundStyle(theme.onSurface)
+                        .accessibilityAddTraits(.isHeader)
+                    Spacer(minLength: 8)
+                    if !jobs.active.isEmpty {
+                        GlassPillButton(title: "Cancel all", systemImage: "xmark.circle",
+                                        tint: theme.errorContainer.opacity(GlassTint.container),
+                                        foreground: theme.onErrorContainer, style: .labelMedium, iconSize: 15,
+                                        horizontalPadding: 12, verticalPadding: 8) { confirmsCancelAll = true }
+                            .accessibilityHint("Stops everything that is running or waiting")
+                            .accessibilityIdentifier("jobs.cancelAll")
+                    }
+                }
+                .padding(.bottom, 2)
                 if jobs.active.isEmpty {
                     emptyState
                 } else {
-                    ForEach(jobs.active) { job in
-                        ActiveJobRow(job: job, onOpen: { open(job) }).equatable()
-                    }
+                    ForEach(jobs.active) { job in row(job) }
                 }
                 if !jobs.recent.isEmpty {
-                    Text("Recently finished")
-                        .pixlFont(.labelLarge)
-                        .foregroundStyle(theme.onSurfaceVariant)
-                        .padding(.top, 14)
-                        .accessibilityAddTraits(.isHeader)
-                    ForEach(jobs.recent) { job in
-                        ActiveJobRow(job: job, onOpen: { open(job) }).equatable()
+                    HStack(alignment: .center, spacing: 12) {
+                        Text("Recently finished")
+                            .pixlFont(.labelLarge)
+                            .foregroundStyle(theme.onSurfaceVariant)
+                            .accessibilityAddTraits(.isHeader)
+                        Spacer(minLength: 8)
+                        GlassPillButton(title: "Clear finished", systemImage: "trash",
+                                        tint: theme.surfaceContainerHigh.opacity(GlassTint.surface),
+                                        foreground: theme.onSurface, style: .labelMedium, iconSize: 14,
+                                        horizontalPadding: 12, verticalPadding: 8) { jobs.clearFinished() }
+                            .accessibilityHint("Removes every finished and failed job from the list")
+                            .accessibilityIdentifier("jobs.clearFinished")
+                    }
+                    .padding(.top, 14)
+                    ForEach(jobs.recent) { job in row(job) }
+                    if jobs.finishedCount > jobs.recent.count {
+                        Text("and \(jobs.finishedCount - jobs.recent.count) more finished")
+                            .pixlFont(.bodySmall)
+                            .foregroundStyle(theme.onSurfaceVariant.opacity(0.8))
+                            .padding(.horizontal, 4)
+                            .accessibilityIdentifier("jobs.moreFinished")
                     }
                 }
             }
@@ -53,6 +82,19 @@ struct ActiveJobsSheet: View {
         // The aggregator follows every row's source (at most 4 Hz) only while this is on screen.
         .onAppear { env.activeJobs.setSheetVisible(true) }
         .onDisappear { env.activeJobs.setSheetVisible(false) }
+        .alert("Cancel all jobs?", isPresented: $confirmsCancelAll) {
+            Button("Cancel all", role: .destructive) { env.activeJobs.cancelAll() }
+            Button("Keep running", role: .cancel) {}
+        } message: {
+            Text("Everything running or waiting stops, and downloads and scans are abandoned. Finished work stays.")
+        }
+    }
+
+    private func row(_ job: ActiveJob) -> some View {
+        let jobs = env.activeJobs
+        return ActiveJobRow(job: job, onOpen: { open(job) }, onDismiss: { jobs.dismiss(job) },
+                            onRetry: { jobs.retry(job) }, onCancel: { jobs.cancel(job) })
+            .equatable()
     }
 
     private var emptyState: some View {
@@ -86,29 +128,51 @@ struct ActiveJobsSheet: View {
     }
 }
 
-/// One job: a glass card, tappable when it has somewhere to go.
+/// One job: a glass card, tappable when it has somewhere to go, with Retry and Dismiss on the trailing edge once it has
+/// finished (plain fills, not glass: they sit on a glass card) and Cancel in the context menu while it runs.
 private struct ActiveJobRow: View, Equatable {
     let job: ActiveJob
     let onOpen: () -> Void
+    let onDismiss: () -> Void
+    let onRetry: () -> Void
+    let onCancel: () -> Void
 
-    /// The action closure is new on every parent pass: only the job decides whether the row re-renders.
+    /// The action closures are new on every parent pass: only the job decides whether the row re-renders.
     nonisolated static func == (lhs: ActiveJobRow, rhs: ActiveJobRow) -> Bool { lhs.job == rhs.job }
 
     @Environment(\.appTheme) private var theme
 
+    private var canRetry: Bool { job.state == .failed && job.canRetry }
+
     var body: some View {
-        let card = content
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        Group {
-            if job.destination == .none {
-                card.pixlGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous), tint: tint)
+        HStack(spacing: 10) {
+            main
+            if job.isFinished { finishedActions }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .pixlGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous), tint: tint,
+                   interactive: job.destination != .none)
+        .contextMenu {
+            if job.isActive {
+                Button("Cancel", systemImage: "xmark.circle", role: .destructive, action: onCancel)
             } else {
-                Button(action: onOpen) { card }
+                if canRetry { Button("Retry", systemImage: "arrow.clockwise", action: onRetry) }
+                Button("Dismiss", systemImage: "xmark", action: onDismiss)
+            }
+        }
+    }
+
+    /// The row's words, and the tap to wherever the job lives when it has somewhere to go.
+    @ViewBuilder
+    private var main: some View {
+        let element = Group {
+            if job.destination == .none {
+                content
+            } else {
+                Button(action: onOpen) { content.contentShape(Rectangle()) }
                     .buttonStyle(PressScaleButtonStyle(pressedScale: 0.98))
-                    .pixlGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous), tint: tint, interactive: true)
             }
         }
         .accessibilityElement(children: .ignore)
@@ -116,6 +180,45 @@ private struct ActiveJobRow: View, Equatable {
         .accessibilityAddTraits(job.destination == .none ? [] : .isButton)
         .accessibilityHint(job.destination == .cloudQueue ? "Opens the cloud queue" : "")
         .accessibilityIdentifier("jobs.row.\(job.id)")
+        if job.isActive {
+            element.accessibilityAction(named: "Cancel") { onCancel() }
+        } else if canRetry {
+            element
+                .accessibilityAction(named: "Retry") { onRetry() }
+                .accessibilityAction(named: "Dismiss") { onDismiss() }
+        } else {
+            element.accessibilityAction(named: "Dismiss") { onDismiss() }
+        }
+    }
+
+    private var finishedActions: some View {
+        HStack(spacing: 8) {
+            if canRetry {
+                Button(action: onRetry) {
+                    Text("Retry")
+                        .pixlFont(.labelMedium, weight: .semibold)
+                        .foregroundStyle(theme.onSecondaryContainer)
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 32)
+                        .background(theme.secondaryContainer, in: Capsule())
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(PressScaleButtonStyle(pressedScale: 0.94))
+                .accessibilityLabel("Retry")
+                .accessibilityIdentifier("jobs.retry.\(job.id)")
+            }
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(theme.onSurfaceVariant)
+                    .frame(width: 32, height: 32)
+                    .background(theme.surfaceContainerHighest.opacity(0.6), in: Circle())
+                    .contentShape(Circle())
+            }
+            .buttonStyle(PressScaleButtonStyle(pressedScale: 0.9))
+            .accessibilityLabel("Dismiss")
+            .accessibilityIdentifier("jobs.dismiss.\(job.id)")
+        }
     }
 
     private var tint: Color {

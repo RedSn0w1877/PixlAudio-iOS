@@ -54,6 +54,18 @@ struct DownloadedModelRows: View {
             if case .downloading(let fraction) = state {
                 TaisProgressBar(fraction: fraction ?? 0)
             }
+            if isFailed(state) {
+                // A failure never leaves the row stuck: try again, or forget the download and start clean.
+                HStack(spacing: 8) {
+                    Spacer(minLength: 0)
+                    SettingsFillButton(title: "Delete download", systemImage: "trash", style: .outlined,
+                                       fullWidth: false) { env.tais.models.reset(.llm) }
+                        .accessibilityIdentifier("settings.ai.localModel.reset")
+                    SettingsFillButton(title: "Try again", systemImage: "arrow.clockwise", style: .tonal,
+                                       fullWidth: false) { env.tais.models.download(.llm) }
+                        .accessibilityIdentifier("settings.ai.localModel.retry")
+                }
+            }
         }
         .padding(16)
         .settingsRowGlass()
@@ -76,15 +88,20 @@ struct DownloadedModelRows: View {
     private func action(_ state: ModelManager.State) -> some View {
         let models = env.tais.models
         switch state {
-        case .notInstalled, .failed:
-            SettingsFillButton(title: isFailed(state) ? "Retry" : "Download", systemImage: "arrow.down", style: .tonal,
+        case .notInstalled:
+            SettingsFillButton(title: "Download", systemImage: "arrow.down", style: .tonal,
                                fullWidth: false) { models.download(.llm) }
                 .accessibilityIdentifier("settings.ai.localModel.download")
+        case .failed:
+            // "Try again" and "Delete download" sit under the reason (`modelRow`).
+            EmptyView()
         case .downloading:
             SettingsFillButton(title: "Cancel", style: .outlined, fullWidth: false) { models.cancel(.llm) }
                 .accessibilityIdentifier("settings.ai.localModel.cancel")
         case .installing:
-            ProgressView().tint(theme.primary)
+            // Installing can be cancelled too: it used to be a spinner with no way out.
+            SettingsFillButton(title: "Cancel", style: .outlined, fullWidth: false) { models.cancel(.llm) }
+                .accessibilityIdentifier("settings.ai.localModel.cancel")
         case .installed:
             SettingsFillButton(title: "Delete", style: .outlined, fullWidth: false) { confirmsDelete = true }
                 .accessibilityIdentifier("settings.ai.localModel.delete")

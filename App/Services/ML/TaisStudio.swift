@@ -242,8 +242,43 @@ final class TaisStudio {
     func cancelAll() {
         for job in pending { jobs[job.key] = JobState(phase: .cancelled, percent: 0, detail: nil, indeterminate: false) }
         pending.removeAll()
-        running?.task.cancel()
+        if let running {
+            // The row says so at once; the task stops at its next check (late progress never revives it: `report`).
+            if jobs[running.key]?.isActive == true { jobs[running.key] = Self.cancelledState }
+            running.task.cancel()
+        } else {
+            background.end(success: false)
+        }
     }
+
+    /// "Cancel" on Active jobs' row for one kind: every queued or running job of that kind stops.
+    func cancelAll(kind: JobKind) {
+        for job in pending where job.key.kind == kind { jobs[job.key] = Self.cancelledState }
+        pending.removeAll { $0.key.kind == kind }
+        if let running, running.key.kind == kind {
+            if jobs[running.key]?.isActive == true { jobs[running.key] = Self.cancelledState }
+            running.task.cancel()
+        }
+        endBackgroundRunIfNoAttendedWork(success: false)
+    }
+
+    private static let cancelledState = JobState(phase: .cancelled, percent: 0, detail: nil, indeterminate: false)
+
+    /// "Clear finished": forgets every job that is not queued or running (done, failed, cancelled). Active ones stay.
+    func clearFinished() {
+        let active = jobs.filter { $0.value.isActive }
+        if active.count != jobs.count { jobs = active }
+    }
+
+    /// "Dismiss" on one finished or failed job. A queued or running one is not dismissed (cancel it first).
+    func dismiss(_ kind: JobKind, songId: String) {
+        let key = JobKey(kind: kind, songId: songId)
+        guard let state = jobs[key], !state.isActive else { return }
+        jobs[key] = nil
+    }
+
+    /// How many jobs are queued or running.
+    var activeCount: Int { jobs.values.reduce(0) { $0 + ($1.isActive ? 1 : 0) } }
 
     /// A memory warning with no job running: the Core ML models (≈ 190 MB and more) go now, not after the lane drains.
     /// A running job keeps its own reference until it ends and then releases them (`runNextIfIdle`).
@@ -294,9 +329,17 @@ final class TaisStudio {
         } catch is CancellationError {
             jobs[job.key] = JobState(phase: .cancelled, percent: 0, detail: nil, indeterminate: false)
         } catch {
-            let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            // A terminal state with a reason; the lane, the model lease and the background run are released by the
+            // `defer`s of the job's steps and by `runNextIfIdle` right after.
+            let message = Self.failureMessage(error)
             jobs[job.key] = JobState(phase: .failed(String(message.prefix(800))), percent: 0, detail: nil, indeterminate: false)
         }
+    }
+
+    /// The words of a failure: the network's plain wording for a network error, else the error's own text.
+    nonisolated static func failureMessage(_ error: any Error) -> String {
+        if let url = error as? URLError, let words = JobFailureText.urlError(code: url.code.rawValue) { return words }
+        return JobFailureText.short((error as? LocalizedError)?.errorDescription ?? error.localizedDescription, limit: 800)
     }
 
     /// Updates the card and the system's Live Activity together (Android `reportProgress`).

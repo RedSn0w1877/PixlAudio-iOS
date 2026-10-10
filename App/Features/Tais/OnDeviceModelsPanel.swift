@@ -32,7 +32,8 @@ struct OnDeviceModelsPanel: View {
                 ModelRow(model: model, state: models.state(model.id),
                          onDownload: { models.download(model.id) },
                          onCancel: { models.cancel(model.id) },
-                         onDelete: { models.delete(model.id) })
+                         onDelete: { models.delete(model.id) },
+                         onReset: { models.reset(model.id) })
             }
             Rectangle().fill(theme.outlineVariant).frame(height: 1)
             HStack(spacing: 12) {
@@ -80,6 +81,7 @@ private struct ModelRow: View {
     let onDownload: () -> Void
     let onCancel: () -> Void
     let onDelete: () -> Void
+    let onReset: () -> Void
 
     @Environment(\.appTheme) private var theme
 
@@ -98,20 +100,32 @@ private struct ModelRow: View {
             if case .downloading(let fraction) = state {
                 TaisProgressBar(fraction: fraction ?? 0)
             }
+            if isFailed {
+                HStack(spacing: 8) {
+                    Spacer(minLength: 0)
+                    SettingsFillButton(title: "Delete download", systemImage: "trash", style: .outlined, fullWidth: false,
+                                       action: onReset)
+                        .accessibilityIdentifier("tais.model.\(model.id.rawValue).reset")
+                    SettingsFillButton(title: "Try again", systemImage: "arrow.clockwise", style: .tonal, fullWidth: false,
+                                       action: onDownload)
+                        .accessibilityIdentifier("tais.model.\(model.id.rawValue).download")
+                }
+            }
         }
     }
 
     @ViewBuilder private var action: some View {
         switch state {
-        case .notInstalled, .failed:
-            SettingsFillButton(title: isFailed ? "Retry" : "Download", systemImage: "arrow.down", style: .tonal,
+        case .notInstalled:
+            SettingsFillButton(title: "Download", systemImage: "arrow.down", style: .tonal,
                                fullWidth: false, action: onDownload)
                 .accessibilityIdentifier("tais.model.\(model.id.rawValue).download")
-        case .downloading:
+        case .failed:
+            // "Try again" and "Delete download" sit under the reason.
+            EmptyView()
+        case .downloading, .installing:
             SettingsFillButton(title: "Cancel", style: .outlined, fullWidth: false, action: onCancel)
                 .accessibilityIdentifier("tais.model.\(model.id.rawValue).cancel")
-        case .installing:
-            ProgressView().tint(theme.primary)
         case .installed:
             SettingsFillButton(title: "Remove", style: .outlined, fullWidth: false, action: onDelete)
                 .accessibilityIdentifier("tais.model.\(model.id.rawValue).remove")

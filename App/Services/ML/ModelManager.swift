@@ -3,6 +3,7 @@ import CryptoKit
 import Foundation
 import Observation
 import PixlFoundation
+import PixlModel
 
 /// Downloads, verifies, compiles and stores the on-device ML models (`ModelCatalog`). Android ships them inside the
 /// APK; here the first TAIS job that needs one fetches it from the `models-v1` release:
@@ -53,11 +54,17 @@ final class ModelManager {
     @ObservationIgnored private let delegate = ModelDownloadDelegate()
     @ObservationIgnored private var waiters: [ModelDescriptor.ID: [UUID: CheckedContinuation<URL, any Error>]] = [:]
     @ObservationIgnored private var tasks: [ModelDescriptor.ID: URLSessionDownloadTask] = [:]
+    /// The install (verify, extract, compile) of each model that has been downloaded: cancellable, so "Cancel" means it.
+    @ObservationIgnored private var installTasks: [ModelDescriptor.ID: Task<Void, Never>] = [:]
+    /// A download that stops moving (offline, a source that never answers) is failed after a couple of minutes: a
+    /// background session would wait for connectivity for days and the job would sit at "downloading" for ever.
+    @ObservationIgnored let stalls = StallMonitor<ModelDescriptor.ID>()
     @ObservationIgnored private var started = false
 
     init(isDemo: Bool) {
         self.isDemo = isDemo
         for model in ModelCatalog.all { states[model.id] = .notInstalled }
+        stalls.onStall = { [weak self] id in self?.downloadStalled(id) }
     }
 
     func state(_ id: ModelDescriptor.ID) -> State { states[id] ?? .notInstalled }
@@ -84,13 +91,18 @@ final class ModelManager {
         }
         delegate.owner = self
         let session = makeSession()
+        // A previous launch that died mid-install left its archive behind (up to ~900 MB): an hour-old one is nobody's.
+        Task.detached(priority: .utility) { Self.removeStaleStaging(olderThan: 3_600) }
         Task {
             for task in await session.allTasks {
                 guard let raw = task.taskDescription, let id = ModelDescriptor.ID(rawValue: raw),
                       let download = task as? URLSessionDownloadTask else { continue }
                 if task.state == .running || task.state == .suspended {
                     tasks[id] = download
-                    if case .installed = state(id) {} else { states[id] = .downloading(fraction: nil) }
+                    if case .installed = state(id) {} else {
+                        states[id] = .downloading(fraction: nil)
+                        stalls.arm(id)
+                    }
                 }
             }
         }
@@ -160,14 +172,56 @@ final class ModelManager {
         task.taskDescription = id.rawValue
         task.countOfBytesClientExpectsToReceive = model.bytes
         tasks[id] = task
+        stalls.arm(id)
         task.resume()
     }
 
-    /// Cancels a running download.
+    /// Cancels a running download or install for real: the transfer stops, the install task is cancelled, every job
+    /// waiting for the model is released with a cancel, and the row goes back to "not downloaded". A failure is left
+    /// as it is (`reset` clears it).
     func cancel(_ id: ModelDescriptor.ID) {
+        stalls.disarm(id)
         tasks.removeValue(forKey: id)?.cancel()
+        installTasks.removeValue(forKey: id)?.cancel()
+        waitingToInstall.remove(id)
         if state(id).isBusy { states[id] = .notInstalled }
         resume(id, with: .failure(CancellationError()))
+    }
+
+    /// "Delete download" / "Dismiss" after a failure (or a stuck transfer): stops whatever is left, forgets the error and
+    /// takes the half-finished archive off the disk. An installed model is never touched (use `delete`).
+    func reset(_ id: ModelDescriptor.ID) {
+        if case .installed = state(id) { return }
+        cancel(id)
+        states[id] = .notInstalled
+        if let staging = Self.stagingURL(id) { try? FileManager.default.removeItem(at: staging) }
+    }
+
+    /// Every model whose last try failed, with the reason (Active jobs lists them).
+    var failures: [(id: ModelDescriptor.ID, message: String)] {
+        ModelCatalog.all.compactMap { model -> (id: ModelDescriptor.ID, message: String)? in
+            if case .failed(let message) = state(model.id) { return (model.id, message) }
+            return nil
+        }
+    }
+
+    /// "Clear finished": forgets every failure.
+    func clearFailures() {
+        for failure in failures { reset(failure.id) }
+    }
+
+    /// "Cancel all": every download and install that is going.
+    func cancelAll() {
+        for model in ModelCatalog.all where state(model.id).isBusy { cancel(model.id) }
+    }
+
+    /// The watchdog's verdict: nothing arrived for too long. The transfer is cancelled and the job fails with a reason.
+    private func downloadStalled(_ id: ModelDescriptor.ID) {
+        guard case .downloading = state(id) else { return }
+        tasks.removeValue(forKey: id)?.cancel()
+        let message = "The download stopped: no data is arriving. Check your connection and try again."
+        states[id] = .failed(message)
+        resume(id, with: .failure(ModelError(message: message)))
     }
 
     /// Removes an installed model (it downloads again when next needed).
@@ -181,6 +235,7 @@ final class ModelManager {
 
     fileprivate func progress(_ id: ModelDescriptor.ID, written: Int64, expected: Int64) {
         guard case .downloading(let old) = state(id) else { return }
+        stalls.note(id, mark: written)
         let total = expected > 0 ? expected : ModelCatalog.descriptor(id).bytes
         let fraction = min(max(Double(written) / Double(max(total, 1)), 0), 1)
         // Whole percents only: the card re-renders 100 times per download, not per packet.
@@ -190,15 +245,20 @@ final class ModelManager {
 
     fileprivate func finished(_ id: ModelDescriptor.ID, archive: URL?, failure: String?) {
         tasks[id] = nil
+        stalls.disarm(id)
         guard failure == nil, let archive else {
-            states[id] = .failed(failure ?? "The download failed.")
-            resume(id, with: .failure(ModelError(message: failure ?? "The download failed.")))
+            let message = JobFailureText.short(failure ?? "The download failed.")
+            states[id] = .failed(message)
+            resume(id, with: .failure(ModelError(message: message)))
             return
         }
         states[id] = .installing
         let model = ModelCatalog.descriptor(id)
-        Task(priority: .utility) {
-            defer { waitingToInstall.remove(id) }
+        installTasks[id] = Task(priority: .utility) {
+            defer {
+                waitingToInstall.remove(id)
+                installTasks[id] = nil
+            }
             do {
                 // Compiling a ~1 GB package next to a running lyric sync or separation is what gets an app ended for
                 // memory: wait for the heavy lane (a lyric batch hands it over between songs).
@@ -208,10 +268,21 @@ final class ModelManager {
                 waitingToInstall.remove(id)
                 // Verifying and compiling can outlast a switch to another app: iOS's ~30 s of grace may finish it.
                 let url = try await BackgroundGrace.run("Model install") { try await Self.install(model, archive: archive) }
+                try Task.checkCancellation()
                 states[id] = .installed(bytes: Self.installedSize(model) ?? model.bytes)
                 resume(id, with: .success(url))
+            } catch is CancellationError {
+                // `cancel` already said so and released the waiters; only what an install that had finished left on the
+                // disk decides what is true now.
+                if let bytes = Self.installedSize(model) {
+                    states[id] = .installed(bytes: bytes)
+                } else if state(id) == .installing {
+                    states[id] = .notInstalled
+                }
+                resume(id, with: .failure(CancellationError()))
             } catch {
-                let message = (error as? ModelError)?.message ?? "Couldn't install the model (\(error.localizedDescription))."
+                let message = JobFailureText.short(
+                    (error as? ModelError)?.message ?? "Couldn't install the model (\(error.localizedDescription)).")
                 states[id] = .failed(message)
                 resume(id, with: .failure(ModelError(message: message)))
             }
@@ -243,6 +314,19 @@ final class ModelManager {
     /// Where a finished download waits for verification.
     nonisolated static func stagingURL(_ id: ModelDescriptor.ID) -> URL? {
         rootDirectory?.appendingPathComponent(".staging", isDirectory: true).appendingPathComponent("\(id.rawValue).tar")
+    }
+
+    /// Archives in the staging folder older than `seconds` (a launch that died mid-install left them): deleted. A fresh
+    /// one may belong to an install that is about to start, so it stays.
+    nonisolated static func removeStaleStaging(olderThan seconds: TimeInterval) {
+        let fm = FileManager.default
+        guard let folder = rootDirectory?.appendingPathComponent(".staging", isDirectory: true),
+              let files = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.contentModificationDateKey])
+        else { return }
+        for file in files {
+            let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            if let modified, Date().timeIntervalSince(modified) > seconds { try? fm.removeItem(at: file) }
+        }
     }
 
     /// `<id>/<name>`: a file the tar carries next to the package (the local AI model's tokenizer).
@@ -368,7 +452,7 @@ nonisolated final class ModelDownloadDelegate: NSObject, URLSessionDownloadDeleg
         let status = (downloadTask.response as? HTTPURLResponse)?.statusCode ?? 0
         var outcome: (URL?, String?)
         if status != 200 {
-            outcome = (nil, "The model server answered HTTP \(status).")
+            outcome = (nil, JobFailureText.httpStatus(status))
         } else if let staging = ModelManager.stagingURL(id) {
             let fm = FileManager.default
             try? fm.createDirectory(at: staging.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -401,7 +485,10 @@ nonisolated final class ModelDownloadDelegate: NSObject, URLSessionDownloadDeleg
         let outcome = outcomes.removeValue(forKey: task.taskIdentifier)
         lock.unlock()
         if (error as? URLError)?.code == .cancelled { return }
-        let failure = outcome?.failure ?? error.map { "The download failed (\($0.localizedDescription))." }
+        let failure = outcome?.failure ?? error.map { error in
+            (error as? URLError).flatMap { JobFailureText.urlError(code: $0.code.rawValue) }
+                ?? "The download failed (\(error.localizedDescription))."
+        }
         let archive = failure == nil ? outcome?.archive : nil
         Task { @MainActor [weak owner] in
             owner?.finished(id, archive: archive, failure: failure ?? (archive == nil ? "The download failed." : nil))

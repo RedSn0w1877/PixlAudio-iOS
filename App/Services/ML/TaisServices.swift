@@ -55,6 +55,8 @@ final class TaisServices {
                 let state = downloads.state(for: download)
                 if case .downloaded? = state, let file = DownloadFiles.existingFile(videoId: videoId) { return file }
                 if case .failed? = state { break waiting }
+                // The download was cancelled (its row in Active jobs, or Cancel all): the job ends rather than start it again.
+                if state == nil { throw TaisStudio.JobFailure(message: "The download of \(song.title) was cancelled.") }
                 try await Task.sleep(for: .milliseconds(500))
             }
             if attempt < 3 { try await Task.sleep(for: .seconds(Double(attempt * 2))) }

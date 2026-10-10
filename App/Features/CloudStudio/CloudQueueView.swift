@@ -10,6 +10,7 @@ struct CloudQueueView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(Router.self) private var router
     @Environment(\.appTheme) private var theme
+    @State private var confirmsCancelAll = false
 
     var body: some View {
         let cloud = env.cloud
@@ -49,11 +50,20 @@ struct CloudQueueView: View {
                         CloudJobRow(record: record, progress: cloud.transferProgress[record.jobKey])
                     }
                 }
+                SettingsFillButton(title: "Cancel all", systemImage: "xmark", style: .destructive) {
+                    confirmsCancelAll = true
+                }
+                .padding(.bottom, 10)
+                .accessibilityIdentifier("cloud.cancelAll")
             }
             if !attention.isEmpty {
                 SettingsSubsection(title: "Needs you (\(attention.count))") {
                     ForEach(attention) { record in CloudJobRow(record: record, progress: nil) }
                 }
+                // Failed, cancelled and expired jobs can be cleared out without retrying them.
+                SettingsFillButton(title: "Clear failed", systemImage: "trash", style: .outlined) { cloud.clearAttention() }
+                    .padding(.bottom, 10)
+                    .accessibilityIdentifier("cloud.clearFailed")
             }
             if !finished.isEmpty {
                 SettingsSubsection(title: "Done (\(finished.count))") {
@@ -84,6 +94,12 @@ struct CloudQueueView: View {
             }
         }
         .task { await cloud.loadForDisplay() }
+        .alert("Cancel everything in the queue?", isPresented: $confirmsCancelAll) {
+            Button("Cancel all", role: .destructive) { Task { await cloud.cancelAll() } }
+            Button("Keep going", role: .cancel) {}
+        } message: {
+            Text("Songs on their way stop, and their files are removed from the cloud. Finished songs stay.")
+        }
     }
 
     private func addRow(_ title: String, _ subtitle: String, _ systemImage: String, _ kind: CloudBatchKind) -> some View {

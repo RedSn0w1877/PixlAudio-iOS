@@ -21,6 +21,8 @@ final class LibraryStore {
     /// True until the first snapshot (cache or store) arrived.
     private(set) var isLoading = true
     private(set) var lastImportProgress: LibraryImportProgress?
+    /// Why the last scan failed, until it is dismissed or a scan succeeds (Active jobs shows it as a failed row).
+    private(set) var scanFailure: String?
     /// Songs per album, artist and genre for `revision`, or nil / an older revision while it is being built
     /// (callers then filter `songs` as before). Read it through `detailIndexIfCurrent`.
     private(set) var detailIndex: LibraryDetailIndex?
@@ -33,6 +35,12 @@ final class LibraryStore {
     /// Launch: the cache decode (`beginCachedLoad`) and the snapshot it installed (what the store is compared with).
     @ObservationIgnored private var cachedLoad: Task<LoadedLibrary?, Never>?
     @ObservationIgnored private var cachedAtLaunch: LibrarySnapshot?
+    /// The scans that are running (several callers can ask at once), by a number only this store knows: what
+    /// "Cancel" cancels, and what decides whether a late progress report still means anything.
+    @ObservationIgnored private var scanTasks: [Int: Task<Void, any Error>] = [:]
+    @ObservationIgnored private var nextScanToken = 0
+    /// A cancelled scan is still unwinding: its late progress reports are dropped.
+    @ObservationIgnored private var dropsScanProgress = false
 
     private let loader: SnapshotLoader?
     private let importer: (any LibraryImporting)?
@@ -117,12 +125,43 @@ final class LibraryStore {
     /// rescan), when the store still holds what the snapshot shows. A scan that is running when the app is switched
     /// away gets iOS's extra ~30 seconds to finish (`BackgroundGrace`); a longer one is suspended and carries on when
     /// the app returns (the scan writes its result once at the end, so nothing is half-saved).
+    ///
+    /// However it ends — done, failed or cancelled — the scan's progress is cleared (a scan that threw used to leave
+    /// "40 %" behind, so Home's jobs button stayed lit for ever), a failure is kept as `scanFailure` with a short reason,
+    /// and `cancelScans()` stops the work for real.
     func refresh(mode: LibraryImportMode = .incremental) async throws {
+        guard importer != nil, loader != nil else { return }
+        nextScanToken += 1
+        let token = nextScanToken
+        dropsScanProgress = false
+        let work = Task { try await self.runScan(mode: mode) }
+        scanTasks[token] = work
+        defer {
+            scanTasks[token] = nil
+            if scanTasks.isEmpty {
+                lastImportProgress = nil
+                dropsScanProgress = false
+            }
+        }
+        do {
+            try await withTaskCancellationHandler { try await work.value } onCancel: { work.cancel() }
+            scanFailure = nil
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            let code = (error as? URLError)?.code.rawValue
+            scanFailure = JobFailureText.describe(error.localizedDescription, urlErrorCode: code)
+            throw error
+        }
+    }
+
+    private func runScan(mode: LibraryImportMode) async throws {
         guard let importer, let loader else { return }
         try await BackgroundGrace.run("Library scan") {
             let summary = try await importer.importLibrary(mode: mode) { progress in
                 Task { @MainActor [weak self] in
-                    guard let self, self.lastImportProgress != progress else { return }
+                    guard let self, !self.scanTasks.isEmpty, !self.dropsScanProgress,
+                          self.lastImportProgress != progress else { return }
                     self.lastImportProgress = progress
                 }
             }
@@ -130,6 +169,21 @@ final class LibraryStore {
             let base = snapshot
             apply(try await loader.loadFromStoreInBackground(previous: base), base: base)
         }
+    }
+
+    /// A scan is running (what Active jobs shows as "Library sync").
+    var isScanning: Bool { !scanTasks.isEmpty }
+
+    /// "Cancel": every running scan is cancelled (the importer checks between files), and its progress goes at once.
+    func cancelScans() {
+        for task in scanTasks.values { task.cancel() }
+        dropsScanProgress = !scanTasks.isEmpty
+        lastImportProgress = nil
+    }
+
+    /// "Dismiss" on a failed scan.
+    func dismissScanFailure() {
+        scanFailure = nil
     }
 
     /// Re-reads the store after another writer changed it (stage 12: Spotify rows merged into the library).

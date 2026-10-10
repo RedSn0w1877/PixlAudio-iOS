@@ -95,9 +95,11 @@ public struct ActiveJob: Sendable, Hashable, Identifiable {
     public var destination: Destination
     /// When it last changed (Unix ms): orders "Recently finished" newest first.
     public var updatedAtMs: Int64
+    /// A failed row whose source can start the work again ("Retry").
+    public var canRetry: Bool
 
     public init(id: String, kind: Kind, title: String? = nil, subtitle: String? = nil, percent: Int? = nil,
-                state: State, destination: Destination = .none, updatedAtMs: Int64 = 0) {
+                state: State, destination: Destination = .none, updatedAtMs: Int64 = 0, canRetry: Bool = false) {
         self.id = id
         self.kind = kind
         self.title = title ?? kind.label
@@ -106,10 +108,14 @@ public struct ActiveJob: Sendable, Hashable, Identifiable {
         self.state = state
         self.destination = destination
         self.updatedAtMs = updatedAtMs
+        self.canRetry = canRetry
     }
 
     /// Counts toward the button's badge: queued or running.
     public var isActive: Bool { state == .queued || state == .running }
+
+    /// Done or failed: nothing is running for it, so it can be dismissed.
+    public var isFinished: Bool { !isActive }
 }
 
 /// The ordering, counting and wording of the jobs list.
@@ -157,8 +163,25 @@ public enum ActiveJobBoard {
         return sorted.prefix(recentLimit).map(\.element)
     }
 
-    /// The button's badge: how many jobs are queued or running.
+    /// The button's badge: how many jobs are queued or running. A failed or finished row never counts, so leftovers
+    /// cannot keep the button lit.
     public static func badgeCount(_ jobs: [ActiveJob]) -> Int { jobs.reduce(0) { $0 + ($1.isActive ? 1 : 0) } }
+
+    /// "Clear finished": every finished row (done or failed), not only the few "Recently finished" lists.
+    public static func clearable(_ jobs: [ActiveJob]) -> [ActiveJob] { jobs.filter(\.isFinished) }
+
+    /// "Cancel all": everything queued or running.
+    public static func cancellable(_ jobs: [ActiveJob]) -> [ActiveJob] { jobs.filter(\.isActive) }
+
+    /// Failed rows whose source can try again.
+    public static func retryable(_ jobs: [ActiveJob]) -> [ActiveJob] {
+        jobs.filter { $0.state == .failed && $0.canRetry }
+    }
+
+    /// What is left after `ids` were dismissed or cleared.
+    public static func removing(_ ids: Set<String>, from jobs: [ActiveJob]) -> [ActiveJob] {
+        jobs.filter { !ids.contains($0.id) }
+    }
 
     /// The button's symbol animates only while something is actually running.
     public static func isWorking(_ jobs: [ActiveJob]) -> Bool { jobs.contains { $0.state == .running } }

@@ -44,6 +44,7 @@ final class ActiveJobsTests: XCTestCase {
         }
         XCTAssertEqual(fixture("jobs.none"), .none)
         XCTAssertEqual(fixture("jobs.mixed"), .mixed)
+        XCTAssertEqual(fixture("jobs.failed"), .failures)
         XCTAssertEqual(fixture("jobs"), .running)
         XCTAssertEqual(fixture("home.jobs"), .running)
         XCTAssertEqual(fixture("home"), .none, "Home shows the button only while something runs")

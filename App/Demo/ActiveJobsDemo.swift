@@ -11,6 +11,9 @@ enum ActiveJobsDemo {
         case running
         /// The same, plus what finished (a done batch) and what needs attention (a failed one, a failed sync).
         case mixed
+        /// A few things still running, and what went wrong: a model with no source, a download with no connection, a
+        /// cloud batch, a library sync, the matcher and a lyric sync (the Retry / Dismiss / Clear finished state).
+        case failures
     }
 
     /// 2026-10-07 18:00 UTC, the same clock as `CloudDemo`.
@@ -20,6 +23,7 @@ enum ActiveJobsDemo {
         switch screen {
         case .jobsNone: .none
         case .jobsMixed: .mixed
+        case .jobsFailed: .failures
         case .homeJobs, .jobs: .running
         default: .none
         }
@@ -34,6 +38,7 @@ enum ActiveJobsDemo {
         case .none: return []
         case .running: return running
         case .mixed: return running + finished
+        case .failures: return Array(running.prefix(3)) + failures
         }
     }
 
@@ -58,10 +63,32 @@ enum ActiveJobsDemo {
             ActiveJob(id: "cloud.earlier", kind: .cloud, subtitle: "12 songs processed", percent: 100, state: .done,
                       destination: .cloudQueue, updatedAtMs: now - 25 * 60_000),
             ActiveJob(id: "cloud.failed", kind: .cloud, subtitle: "9 of 12 ready · 3 need you", state: .failed,
-                      destination: .cloudQueue, updatedAtMs: now - 3 * 3_600_000),
+                      destination: .cloudQueue, updatedAtMs: now - 3 * 3_600_000, canRetry: true),
             ActiveJob(id: "tais.failed.lyricsSync.demo", kind: .lyricsSync,
                       subtitle: "Glass Hours · The lyric sync model isn't downloaded yet", state: .failed,
-                      updatedAtMs: now - 5 * 3_600_000),
+                      updatedAtMs: now - 5 * 3_600_000, canRetry: true),
+        ]
+    }
+
+    /// Six finished rows (the sheet lists the newest five and says so), five of them failed.
+    private static var failures: [ActiveJob] {
+        [
+            ActiveJob(id: "model.failed.llm", kind: .modelDownload, title: "Model download failed",
+                      subtitle: "Local AI model · There is nothing to download at the source any more (HTTP 404).",
+                      state: .failed, updatedAtMs: now - 2 * 60_000, canRetry: true),
+            ActiveJob(id: "download.failed.demo1", kind: .songDownload, title: "Download failed",
+                      subtitle: "Glass Hours · No internet connection.", state: .failed,
+                      updatedAtMs: now - 3 * 60_000, canRetry: true),
+            ActiveJob(id: "cloud.failed", kind: .cloud, subtitle: "9 of 12 ready · 3 need you", state: .failed,
+                      destination: .cloudQueue, updatedAtMs: now - 9 * 60_000, canRetry: true),
+            ActiveJob(id: "spotify.match.failed", kind: .spotifyMatch, title: "Finding audio failed",
+                      subtitle: "Finding audio gave up: YouTube Music could not be reached. Try again later.",
+                      state: .failed, updatedAtMs: now - 14 * 60_000, canRetry: true),
+            ActiveJob(id: "tais.failed.lyricsSync.demo", kind: .lyricsSync,
+                      subtitle: "Glass Hours · The lyric sync model isn't downloaded yet", state: .failed,
+                      updatedAtMs: now - 20 * 60_000, canRetry: true),
+            ActiveJob(id: "cloud.earlier", kind: .cloud, subtitle: "12 songs processed", percent: 100, state: .done,
+                      destination: .cloudQueue, updatedAtMs: now - 25 * 60_000),
         ]
     }
 }
