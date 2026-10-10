@@ -161,7 +161,7 @@ final class ActiveJobs {
         guard let sources else {
             demoRows = demoRows.map { row in
                 guard row.id == job.id else { return row }
-                return ActiveJob(id: row.id, kind: row.kind, title: row.title, subtitle: "Queued", state: .queued,
+                return ActiveJob(id: row.id, kind: row.kind, subtitle: "Queued", state: .queued,
                                  destination: row.destination, updatedAtMs: nowMs())
             }
             republishDemo()
