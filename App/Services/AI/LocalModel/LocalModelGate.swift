@@ -16,15 +16,21 @@ nonisolated enum LocalModelGate {
         let decision = LocalModelGatePolicy.decide(
             reason: reason, isForeground: conditions.isForeground, safeModeActive: gate.automaticStartsBlocked,
             lowPowerMode: conditions.lowPowerMode, thermal: conditions.thermal,
-            availableBytes: Int64(os_proc_available_memory()), modelBytes: ModelCatalog.llm.bytes)
+            availableBytes: availableBytes(), modelBytes: ModelCatalog.llm.bytes)
         if log, case .denied(let why) = decision {
             DiagnosticsLog.shared.log("modelgate", "denied \(reason.rawValue): \(why)")
         }
         return decision
     }
 
+    /// Free memory for this app; `Int64.max` where the system reports none (the simulator returns 0).
+    static func availableBytes() -> Int64 {
+        let value = Int64(os_proc_available_memory())
+        return value > 0 ? value : Int64.max
+    }
+
     static func memoryText() -> String {
-        "footprint \(AppHealth.footprintText()), available \(os_proc_available_memory() / 1_048_576) MB"
+        "footprint \(AppHealth.footprintText()), available \(availableBytes() == Int64.max ? "unknown" : "\(availableBytes() / 1_048_576) MB")"
     }
 }
 

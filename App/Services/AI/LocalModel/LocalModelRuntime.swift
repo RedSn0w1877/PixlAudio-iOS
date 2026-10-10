@@ -230,7 +230,7 @@ nonisolated final class LocalModelRuntime: @unchecked Sendable {
             // CPU only: the configuration the parity gate measured. The GPU (and its first-use compile) is never used.
             let loaded = try CoreMLCausalModel(compiledURL: url, computeUnits: .cpuOnly)
             DiagnosticsLog.shared.log("memory", "model loaded; \(LocalModelGate.memoryText())")
-            if Int64(os_proc_available_memory()) < LocalModelGatePolicy.floorBytes {
+            if LocalModelGate.availableBytes() < LocalModelGatePolicy.floorBytes {
                 throw LoadError(detail: "Not enough memory on this phone")
             }
             let generator = LocalLLMGenerator(model: loaded)
@@ -298,7 +298,7 @@ nonisolated final class CancelFlag: @unchecked Sendable {
         if cancelled { return true }
         let gate = HeavyWorkGate.shared
         if gate.abortEpoch != epoch { return true }
-        if Int64(os_proc_available_memory()) < LocalModelGatePolicy.floorBytes {
+        if LocalModelGate.availableBytes() < LocalModelGatePolicy.floorBytes {
             lock.lock()
             lowMemoryHit = true
             lock.unlock()
