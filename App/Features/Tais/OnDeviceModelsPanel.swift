@@ -102,12 +102,9 @@ private struct ModelRow: View {
             }
             if isFailed {
                 HStack(spacing: 8) {
-                    Spacer(minLength: 0)
-                    SettingsFillButton(title: "Delete download", systemImage: "trash", style: .outlined, fullWidth: false,
-                                       action: onReset)
+                    SettingsFillButton(title: "Delete download", style: .outlined, action: onReset)
                         .accessibilityIdentifier("tais.model.\(model.id.rawValue).reset")
-                    SettingsFillButton(title: "Try again", systemImage: "arrow.clockwise", style: .tonal, fullWidth: false,
-                                       action: onDownload)
+                    SettingsFillButton(title: "Try again", style: .tonal, action: onDownload)
                         .accessibilityIdentifier("tais.model.\(model.id.rawValue).download")
                 }
             }

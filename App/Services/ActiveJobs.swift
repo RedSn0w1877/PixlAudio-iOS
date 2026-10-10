@@ -216,7 +216,7 @@ final class ActiveJobs {
 
     /// What a row's id points at. The ids are built in `allRows()` and by `CloudActiveJobMapper`; the actions above
     /// read them back here, so the two stay in one file (and one test).
-    enum Handle: Equatable {
+    nonisolated enum Handle: Equatable {
         case library, libraryFailure
         case spotifySync, spotifySyncFailure, spotifyMatch, spotifyMatchFailure
         case download(videoId: String), downloadFailure(videoId: String)

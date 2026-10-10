@@ -145,9 +145,14 @@ private struct ActiveJobRow: View, Equatable {
     private var canRetry: Bool { job.state == .failed && job.canRetry }
 
     var body: some View {
-        HStack(spacing: 10) {
-            main
-            if job.isFinished { finishedActions }
+        // Dismiss at the trailing top, Retry under the words (aligned with them): beside the text they squeezed it into
+        // three lines.
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                main
+                if job.isFinished { dismissButton }
+            }
+            if canRetry { retryButton.padding(.leading, 46) }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -191,34 +196,37 @@ private struct ActiveJobRow: View, Equatable {
         }
     }
 
-    private var finishedActions: some View {
-        HStack(spacing: 8) {
-            if canRetry {
-                Button(action: onRetry) {
-                    Text("Retry")
-                        .pixlFont(.labelMedium, weight: .semibold)
-                        .foregroundStyle(theme.onSecondaryContainer)
-                        .padding(.horizontal, 12)
-                        .frame(minHeight: 32)
-                        .background(theme.secondaryContainer, in: Capsule())
-                        .contentShape(Capsule())
-                }
-                .buttonStyle(PressScaleButtonStyle(pressedScale: 0.94))
-                .accessibilityLabel("Retry")
-                .accessibilityIdentifier("jobs.retry.\(job.id)")
-            }
-            Button(action: onDismiss) {
-                Image(systemName: "xmark")
+    private var retryButton: some View {
+        Button(action: onRetry) {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.clockwise")
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(theme.onSurfaceVariant)
-                    .frame(width: 32, height: 32)
-                    .background(theme.surfaceContainerHighest.opacity(0.6), in: Circle())
-                    .contentShape(Circle())
+                Text("Retry")
+                    .pixlFont(.labelMedium, weight: .semibold)
             }
-            .buttonStyle(PressScaleButtonStyle(pressedScale: 0.9))
-            .accessibilityLabel("Dismiss")
-            .accessibilityIdentifier("jobs.dismiss.\(job.id)")
+            .foregroundStyle(theme.onSecondaryContainer)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 34)
+            .background(theme.secondaryContainer, in: Capsule())
+            .contentShape(Capsule())
         }
+        .buttonStyle(PressScaleButtonStyle(pressedScale: 0.94))
+        .accessibilityLabel("Retry")
+        .accessibilityIdentifier("jobs.retry.\(job.id)")
+    }
+
+    private var dismissButton: some View {
+        Button(action: onDismiss) {
+            Image(systemName: "xmark")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(theme.onSurfaceVariant)
+                .frame(width: 32, height: 32)
+                .background(theme.surfaceContainerHighest.opacity(0.6), in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(PressScaleButtonStyle(pressedScale: 0.9))
+        .accessibilityLabel("Dismiss")
+        .accessibilityIdentifier("jobs.dismiss.\(job.id)")
     }
 
     private var tint: Color {

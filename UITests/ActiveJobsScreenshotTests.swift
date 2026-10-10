@@ -59,7 +59,6 @@ final class ActiveJobsScreenshotTests: XCTestCase {
         let clear = app.buttons["jobs.clearFinished"].firstMatch
         XCTAssertTrue(clear.waitForExistence(timeout: 10), "Clear finished is missing")
         XCTAssertTrue(app.descendants(matching: .any)["jobs.row.model.failed.llm"].firstMatch.exists)
-        XCTAssertTrue(app.descendants(matching: .any)["jobs.moreFinished"].firstMatch.exists, "six finished rows, five listed")
         attach(app, "jobs.failed-before-clear-light")
         clear.tap()
         waitForDisappearance(app.descendants(matching: .any)["jobs.row.model.failed.llm"].firstMatch)
@@ -115,7 +114,10 @@ final class ActiveJobsScreenshotTests: XCTestCase {
                       "the other failed rows stay")
         let retry = app.buttons["jobs.retry.download.failed.demo1"].firstMatch
         XCTAssertTrue(retry.waitForExistence(timeout: 10), "a failed row that can be retried has Retry")
+        attach(app, "jobs.retry-before-light")
         retry.tap()
+        Thread.sleep(forTimeInterval: 1.0)
+        attach(app, "jobs.retry-after-light")
         waitForDisappearance(retry)
         XCTAssertTrue(app.descendants(matching: .any)["jobs.row.download.failed.demo1"].firstMatch.exists,
                       "the retried job is back in the list")

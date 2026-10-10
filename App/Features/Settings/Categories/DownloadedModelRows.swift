@@ -57,12 +57,9 @@ struct DownloadedModelRows: View {
             if isFailed(state) {
                 // A failure never leaves the row stuck: try again, or forget the download and start clean.
                 HStack(spacing: 8) {
-                    Spacer(minLength: 0)
-                    SettingsFillButton(title: "Delete download", systemImage: "trash", style: .outlined,
-                                       fullWidth: false) { env.tais.models.reset(.llm) }
+                    SettingsFillButton(title: "Delete download", style: .outlined) { env.tais.models.reset(.llm) }
                         .accessibilityIdentifier("settings.ai.localModel.reset")
-                    SettingsFillButton(title: "Try again", systemImage: "arrow.clockwise", style: .tonal,
-                                       fullWidth: false) { env.tais.models.download(.llm) }
+                    SettingsFillButton(title: "Try again", style: .tonal) { env.tais.models.download(.llm) }
                         .accessibilityIdentifier("settings.ai.localModel.retry")
                 }
             }
