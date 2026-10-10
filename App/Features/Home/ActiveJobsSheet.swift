@@ -95,6 +95,9 @@ struct ActiveJobsSheet: View {
         return ActiveJobRow(job: job, onOpen: { open(job) }, onDismiss: { jobs.dismiss(job) },
                             onRetry: { jobs.retry(job) }, onCancel: { jobs.cancel(job) })
             .equatable()
+            // A row that moves between "running" and "finished" (a retried job, a batch that just ended) is a new view:
+            // the same id in the other list must not bring the old row's stale content along.
+            .id("\(job.isActive ? "active" : "finished").\(job.id)")
     }
 
     private var emptyState: some View {

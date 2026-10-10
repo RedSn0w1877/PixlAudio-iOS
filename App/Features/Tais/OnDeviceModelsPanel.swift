@@ -101,11 +101,12 @@ private struct ModelRow: View {
                 TaisProgressBar(fraction: fraction ?? 0)
             }
             if isFailed {
-                HStack(spacing: 8) {
-                    SettingsFillButton(title: "Delete download", style: .outlined, action: onReset)
-                        .accessibilityIdentifier("tais.model.\(model.id.rawValue).reset")
-                    SettingsFillButton(title: "Try again", style: .tonal, action: onDownload)
+                VStack(spacing: 8) {
+                    SettingsFillButton(title: "Try again", systemImage: "arrow.clockwise", style: .tonal,
+                                       action: onDownload)
                         .accessibilityIdentifier("tais.model.\(model.id.rawValue).download")
+                    SettingsFillButton(title: "Delete download", systemImage: "trash", style: .outlined, action: onReset)
+                        .accessibilityIdentifier("tais.model.\(model.id.rawValue).reset")
                 }
             }
         }
