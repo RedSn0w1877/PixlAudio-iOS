@@ -484,6 +484,50 @@ final class CloudStudio {
         persist()
     }
 
+    /// "Clear finished" on Active jobs: removes every job nothing more happens to (done, failed, cancelled, expired).
+    /// Jobs still on their way are never touched.
+    func clearAllFinished() {
+        let removed = CloudJobClearing.clearable(jobs)
+        guard !removed.isEmpty else { return }
+        rememberSpend(of: removed)
+        jobs.removeAll { $0.state.isFinished }
+        persist()
+    }
+
+    /// "Clear failed" in the queue: removes the jobs that need the person (failed, cancelled, expired).
+    func clearAttention() {
+        let removed = jobs.filter { $0.state == .failed || $0.state == .cancelled || $0.state == .expired }
+        guard !removed.isEmpty else { return }
+        rememberSpend(of: removed)
+        jobs.removeAll { $0.state == .failed || $0.state == .cancelled || $0.state == .expired }
+        persist()
+    }
+
+    /// Removes one batch's finished jobs (the "Dismiss" of its row in Active jobs).
+    func clearBatch(_ batchId: String) {
+        let removed = CloudJobClearing.clearable(jobs).filter { $0.batchId == batchId }
+        guard !removed.isEmpty else { return }
+        rememberSpend(of: removed)
+        let keys = Set(removed.map(\.jobKey))
+        jobs.removeAll { keys.contains($0.jobKey) }
+        persist()
+    }
+
+    /// Stops every job that is not finished, each wherever it is (the sheet's "Cancel all").
+    func cancelAll() async {
+        for record in CloudJobClearing.cancellable(jobs) { await cancel(record.jobKey) }
+    }
+
+    /// Stops one batch's unfinished jobs (the "Cancel" of its row in Active jobs).
+    func cancelBatch(_ batchId: String) async {
+        for record in CloudJobClearing.cancellable(jobs) where record.batchId == batchId { await cancel(record.jobKey) }
+    }
+
+    /// Starts one batch's failed and expired jobs again (the "Retry" of its row in Active jobs).
+    func retryBatch(_ batchId: String) {
+        for record in CloudJobClearing.retryable(jobs) where record.batchId == batchId { retry(record.jobKey) }
+    }
+
     /// What jobs about to leave the list spent this month stays in the month's total (`CloudSettings.removedSpend`),
     /// so clearing the list never makes room under the monthly cap.
     private func rememberSpend(of removed: [CloudJobRecord]) {
@@ -638,11 +682,15 @@ final class CloudStudio {
         guard !isLoaded else { return }
         let loaded = await dependencies.store.load(nowMs: dependencies.nowMs())
         guard !isLoaded else { return }
+        // A job a dead process left "preparing" goes back to the queue before anything shows it as running.
+        var stored = loaded
+        let recovered = CloudStartupRecovery.recover(&stored, nowMs: dependencies.nowMs())
         // Jobs added while the file was being read (none in practice) stay after the stored ones.
-        jobs = loaded + jobs.filter { added in !loaded.contains { $0.jobKey == added.jobKey } }
+        jobs = stored + jobs.filter { added in !stored.contains { $0.jobKey == added.jobKey } }
         isLoaded = true
         // The baseline for "which batch just finished": what was outstanding when this launch (or background wake) began.
         incompleteBatches = CloudBatchNotifier.incompleteBatchIds(jobs)
+        if recovered > 0 { persist() }
     }
 
     private func prune() {
@@ -760,12 +808,16 @@ final class CloudStudio {
     private func startPreparations() {
         guard canStartNewWork else { return }
         let now = dependencies.nowMs()
+        // While lyric sync, a separation or a model install holds the heavy lane, preparing songs (a CPU-bound decode)
+        // goes one at a time so the phone is not asked for everything at once.
+        let limit = HeavyJobGovernor.shared.isBusy ? 1 : Self.maxConcurrentPreparations
         for record in jobs where record.state == .queued && record.isDue(nowMs: now) {
-            guard preparing.count < Self.maxConcurrentPreparations else { break }
+            guard preparing.count < limit else { break }
             guard preparing[record.jobKey] == nil else { continue }
             let jobKey = record.jobKey
             update(jobKey) { _ = $0.apply(.prepareStarted, nowMs: now) }
-            preparing[jobKey] = Task { [weak self] in
+            // Utility: the decode and FLAC encode must not take cores from the UI.
+            preparing[jobKey] = Task(priority: .utility) { [weak self] in
                 await self?.prepare(jobKey: jobKey)
                 self?.preparing[jobKey] = nil
                 self?.requestPump()

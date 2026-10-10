@@ -73,3 +73,54 @@ import Testing
         #expect(ActiveJobBoard.accessibilityLabel(failed) == "Cloud processing, 2 of 3 ready, needs attention")
     }
 }
+
+/// "Clear finished", "Cancel all" and what the button counts, over a mixed list.
+@Suite struct ActiveJobClearingTests {
+    private func job(_ id: String, _ state: ActiveJob.State, canRetry: Bool = false) -> ActiveJob {
+        ActiveJob(id: id, kind: .modelDownload, state: state, canRetry: canRetry)
+    }
+
+    private var mixed: [ActiveJob] {
+        [job("run", .running), job("wait", .queued), job("done", .done), job("bad", .failed, canRetry: true),
+         job("bad2", .failed)]
+    }
+
+    @Test func failedAndDoneRowsNeverLightTheButton() {
+        let leftovers = [job("done", .done), job("bad", .failed), job("bad2", .failed)]
+        #expect(ActiveJobBoard.badgeCount(leftovers) == 0)
+        #expect(!ActiveJobBoard.isWorking(leftovers))
+        #expect(ActiveJobBoard.badgeCount(mixed) == 2)
+    }
+
+    @Test func clearFinishedTakesEveryFinishedAndFailedRowAndNothingActive() {
+        let cleared = ActiveJobBoard.clearable(mixed)
+        #expect(cleared.map(\.id) == ["done", "bad", "bad2"])
+        let left = ActiveJobBoard.removing(Set(cleared.map(\.id)), from: mixed)
+        #expect(left.map(\.id) == ["run", "wait"])
+        #expect(ActiveJobBoard.clearable(left).isEmpty, "clearing twice finds nothing more")
+    }
+
+    @Test func cancelAllTakesRunningAndWaitingRowsOnly() {
+        #expect(ActiveJobBoard.cancellable(mixed).map(\.id) == ["run", "wait"])
+        #expect(ActiveJobBoard.cancellable([job("done", .done)]).isEmpty)
+    }
+
+    @Test func retryIsOfferedOnlyWhereTheSourceCanDoIt() {
+        #expect(ActiveJobBoard.retryable(mixed).map(\.id) == ["bad"])
+        #expect(!job("done", .done, canRetry: true).isActive)
+        #expect(ActiveJobBoard.retryable([job("done", .done, canRetry: true)]).isEmpty, "only failed rows retry")
+    }
+
+    @Test func aDismissedRowGoesAndTheRestStay() {
+        let left = ActiveJobBoard.removing(["bad"], from: mixed)
+        #expect(left.map(\.id) == ["run", "wait", "done", "bad2"])
+        #expect(ActiveJobBoard.removing([], from: mixed) == mixed)
+    }
+
+    @Test func aFinishedRowIsDismissibleAnActiveOneIsNot() {
+        #expect(job("a", .done).isFinished)
+        #expect(job("b", .failed).isFinished)
+        #expect(!job("c", .running).isFinished)
+        #expect(!job("d", .queued).isFinished)
+    }
+}

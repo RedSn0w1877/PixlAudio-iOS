@@ -123,7 +123,7 @@ public enum CloudActiveJobMapper {
             ? "\(counted[0].title) · \(status(counted[0], transfer: nil))"
             : "\(imported) of \(counted.count) ready · \(attention) \(attention == 1 ? "needs" : "need") you"
         return ActiveJob(id: id, kind: .cloud, subtitle: line, state: .failed, destination: .cloudQueue,
-                         updatedAtMs: updated)
+                         updatedAtMs: updated, canRetry: true)
     }
 
     /// "3 of 12 ready · 5 uploading · 2 waiting for a GPU · 2 processing": only the steps that have jobs.

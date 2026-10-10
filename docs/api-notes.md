@@ -961,3 +961,14 @@ Launch, library, artwork, player and Spotify-matcher speed-ups (docs/performance
 | `View.symbolEffect(_:options:isActive:)` with `.rotate` | 18 | /documentation/swiftui/view/symboleffect(_:options:isactive:) | `ActiveJobsButton` | The jobs button's sync symbol turns while a job runs; inactive with Reduce Motion or when jobs only wait. System-driven. |
 | `UIApplication.beginBackgroundTask(withName:expirationHandler:)`, `endBackgroundTask(_:)` (already in the ledger) | 4 | /documentation/uikit/uiapplication/beginbackgroundtask(withname:expirationhandler:) | `BackgroundGrace` | One helper for the local jobs that can't truly run in the background (library scan, Spotify import and matching, model install): about 30 s to finish, then the expiry handler checkpoints and ends the assertion. Ended exactly once on every path. |
 | `withObservationTracking(_:onChange:)` (already in the ledger) | 17 | /documentation/observation/withobservationtracking(_:onchange:) | `ActiveJobs.track` | Re-arms after each change and writes `badgeCount` / `isWorking` only when they change, so the Home button re-renders on a real change, not on every progress tick. |
+
+## Many jobs at once (2026-10-09)
+
+| API | Min OS | Doc | Used in | Notes |
+|---|---|---|---|---|
+| `Synchronization.Mutex.withLock`, `withTaskCancellationHandler`, `withCheckedThrowingContinuation` | 18 / Swift 6 | /documentation/synchronization/mutex | `HeavyJobGovernor` | A FIFO lane of tickets under a `Mutex`; the waiter's continuation is stored under the same lock that decides "cancelled" so a cancel cannot slip between the check and the queueing. |
+| `Task(priority: .utility)` | 13 | /documentation/swift/task | `TaisStudio`, `CloudStudio`, `ModelManager` | Minutes-long CPU work stays below the UI. |
+| `ContinuousClock.now`, `Duration` comparison | 16 | /documentation/swift/continuousclock | `TaisBackgroundRun` | Gap between Live Activity updates. |
+| `NotificationCenter.addObserver(forName:object:queue:using:)` with `UIApplicationDidReceiveMemoryWarningNotification` (by name) | 4 | /documentation/uikit/uiapplication/didreceivememorywarningnotification | `TaisStudio` | Releases the idle Core ML models. |
+| `URLSessionConfiguration.background(withIdentifier:)` (already in the ledger): waits for connectivity | 8 | /documentation/foundation/urlsessionconfiguration/1407496-background | `ModelManager`, `DownloadManager`, `StallMonitor` | A background session ignores `waitsForConnectivity` and waits for a network without a deadline (`timeoutIntervalForResource`, 7 days), so offline a task never reports an error. `StallMonitor` ticks every 15 s and fails a download whose bytes written have not changed for 6 ticks (`StallWatchdog`). |
+| `URLError.Code.rawValue` (`-1009` not connected, `-1001` timed out, …) | 2 | /documentation/foundation/urlerror/code | `JobFailureText.urlError(code:)` | PixlModel takes the raw `Int` (no networking import); the app passes `error.code.rawValue`. |

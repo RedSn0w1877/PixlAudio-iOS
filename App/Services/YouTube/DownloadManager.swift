@@ -25,12 +25,19 @@ final class DownloadManager {
     /// The title of each download started this launch, for the Home jobs sheet (not observed: it is set just before
     /// the state that makes the sheet read it).
     @ObservationIgnored private(set) var titles: [String: String] = [:]
+    /// The song each download of this launch was asked for, so a failed one can be tried again from Active jobs.
+    @ObservationIgnored private var retrySongs: [String: Song] = [:]
 
     @ObservationIgnored private let service: InnerTubeService?
     @ObservationIgnored private let fetcher: StreamFetcher?
     @ObservationIgnored private var session: URLSession?
     @ObservationIgnored private let delegate = DownloadDelegate()
     @ObservationIgnored private var fallbackTasks: [String: Task<Void, Never>] = [:]
+    /// The step before the transfer (finding a playable stream): cancellable too, or "Cancel" would only hide it.
+    @ObservationIgnored private var resolving: [String: Task<Void, Never>] = [:]
+    /// A download that stops moving (offline, a source that never answers) is failed after a couple of minutes: a
+    /// background session waits for connectivity for days, and the job would sit at "downloading" for ever.
+    @ObservationIgnored let stalls = StallMonitor<String>()
     @ObservationIgnored private var started = false
     /// The song-row badges (kind only, no percentage): rows re-render when a download starts, ends or fails,
     /// never on progress ticks.
@@ -40,6 +47,7 @@ final class DownloadManager {
     init(service: InnerTubeService?, fetcher: StreamFetcher?) {
         self.service = service
         self.fetcher = fetcher
+        stalls.onStall = { [weak self] videoId in self?.stalled(videoId) }
     }
 
     /// Launch: downloaded files and transfers still running from a previous launch.
@@ -57,7 +65,10 @@ final class DownloadManager {
         self.session = session
         Task {
             for task in await session.allTasks where task.state == .running || task.state == .suspended {
-                if let id = task.taskDescription, states[id] != .downloaded { setState(id, .downloading(percent: nil)) }
+                if let id = task.taskDescription, states[id] != .downloaded {
+                    setState(id, .downloading(percent: nil))
+                    stalls.arm(id)
+                }
             }
         }
     }
@@ -85,20 +96,26 @@ final class DownloadManager {
         default: break
         }
         titles[videoId] = song.title
+        retrySongs[videoId] = song
         setState(videoId, .downloading(percent: nil))
+        stalls.arm(videoId)
         guard let service, let fetcher else { return }
-        Task {
+        resolving[videoId] = Task {
+            defer { resolving[videoId] = nil }
             let destination = DownloadFiles.fileURL(videoId: videoId)
             if await fetcher.cache.copyComplete(videoId, to: destination) {
-                setState(videoId, .downloaded)
+                guard !Task.isCancelled else { return }
+                succeed(videoId)
                 return
             }
             guard let stream = await service.resolve(videoId: videoId, validate: true), let url = URL(string: stream.url),
                   CloudStreamSecurity.isSafeRemoteStreamURL(stream.url, allowedHostSuffixes: await service.allowedHosts()),
                   let session else {
-                setState(videoId, .failed("No YouTube client could provide this song's audio."))
+                if !Task.isCancelled { fail(videoId, "No YouTube client could provide this song's audio.") }
                 return
             }
+            // Cancelled while the stream was being found: nothing is started.
+            guard !Task.isCancelled else { return }
             var request = URLRequest(url: url)
             request.setValue(stream.userAgent, forHTTPHeaderField: "User-Agent")
             request.setValue("bytes=0-", forHTTPHeaderField: "Range")
@@ -123,18 +140,95 @@ final class DownloadManager {
     /// Android `removeDownload`.
     func remove(_ song: Song) {
         guard let videoId = YouTubeSongIdentity.videoId(for: song) else { return }
-        fallbackTasks[videoId]?.cancel()
-        fallbackTasks[videoId] = nil
+        stopTransfer(videoId)
+        try? FileManager.default.removeItem(at: DownloadFiles.fileURL(videoId: videoId))
+        setState(videoId, nil)
+    }
+
+    /// Stops everything a download of this video is doing: the stream lookup, the transfer, the foreground fallback and
+    /// the watchdog.
+    private func stopTransfer(_ videoId: String) {
+        stalls.disarm(videoId)
+        resolving.removeValue(forKey: videoId)?.cancel()
+        fallbackTasks.removeValue(forKey: videoId)?.cancel()
         session?.getAllTasks { tasks in
             for task in tasks where task.taskDescription == videoId { task.cancel() }
         }
-        try? FileManager.default.removeItem(at: DownloadFiles.fileURL(videoId: videoId))
+    }
+
+    /// Cancels a running download for real (the song's file, if an earlier download left one, is kept).
+    func cancel(videoId: String) {
+        guard case .downloading? = states[videoId] else { return }
+        stopTransfer(videoId)
         setState(videoId, nil)
+    }
+
+    /// "Cancel all": every download that is going.
+    func cancelAll() {
+        for videoId in downloadingIds { cancel(videoId: videoId) }
+    }
+
+    /// Videos being downloaded now.
+    var downloadingIds: [String] {
+        states.compactMap { videoId, state -> String? in
+            if case .downloading = state { return videoId }
+            return nil
+        }
+    }
+
+    /// Every download that failed, with the reason (Active jobs lists them).
+    var failures: [(videoId: String, message: String)] {
+        states.compactMap { videoId, state -> (videoId: String, message: String)? in
+            if case .failed(let message) = state { return (videoId, message) }
+            return nil
+        }
+    }
+
+    /// A failed download of this launch can be started again (the song is known).
+    func canRetry(videoId: String) -> Bool { retrySongs[videoId] != nil }
+
+    /// "Retry" on a failed download.
+    func retry(videoId: String) {
+        guard let song = retrySongs[videoId] else { return }
+        download(song)
+    }
+
+    /// "Dismiss" on a failed download: forgets the failure (the song row's badge goes with it).
+    func dismissFailure(videoId: String) {
+        guard case .failed? = states[videoId] else { return }
+        setState(videoId, nil)
+    }
+
+    /// "Clear finished": forgets every failure.
+    func clearFailures() {
+        for failure in failures { dismissFailure(videoId: failure.videoId) }
+    }
+
+    /// A download ended well.
+    private func succeed(_ videoId: String) {
+        stalls.disarm(videoId)
+        setState(videoId, .downloaded)
+    }
+
+    /// A download ended badly: a terminal state with a short reason, nothing left running.
+    private func fail(_ videoId: String, _ message: String) {
+        stalls.disarm(videoId)
+        resolving.removeValue(forKey: videoId)?.cancel()
+        setState(videoId, .failed(JobFailureText.short(message)))
+    }
+
+    /// The watchdog's verdict: nothing arrived for too long. Everything this download does is stopped and it fails with
+    /// a reason.
+    private func stalled(_ videoId: String) {
+        guard case .downloading? = states[videoId] else { return }
+        stopTransfer(videoId)
+        fail(videoId, "The download stopped: no data is arriving. Check your connection and try again.")
     }
 
     // MARK: Delegate events
 
     fileprivate func progress(_ videoId: String, written: Int64, expected: Int64) {
+        stalls.note(videoId, mark: written)
         guard expected > 0 else { return }
         let percent = Int(min(100, max(0, written * 100 / expected)))
         if states[videoId] != .downloading(percent: percent) { setState(videoId, .downloading(percent: percent)) }
@@ -142,11 +236,11 @@ final class DownloadManager {
 
     fileprivate func finished(_ videoId: String, failure: String?, retryInForeground: Bool) {
         if failure == nil {
-            setState(videoId, .downloaded)
+            succeed(videoId)
             return
         }
         guard retryInForeground, let fetcher else {
-            setState(videoId, .failed(failure ?? "Download failed"))
+            fail(videoId, failure ?? "Download failed")
             return
         }
         // googlevideo refused the single transfer: ranged fetch through the streaming cache, then copy.
@@ -157,10 +251,11 @@ final class DownloadManager {
                     await manager.progress(videoId, written: written, expected: total)
                 }
                 let copied = await fetcher.cache.copyComplete(videoId, to: DownloadFiles.fileURL(videoId: videoId))
-                manager.setState(videoId, copied ? .downloaded : .failed("Couldn't save the song."))
+                if copied { manager.succeed(videoId) } else { manager.fail(videoId, "Couldn't save the song.") }
             } catch is CancellationError {
             } catch {
-                manager.setState(videoId, .failed(error.localizedDescription))
+                let words = (error as? URLError).flatMap { JobFailureText.urlError(code: $0.code.rawValue) }
+                manager.fail(videoId, words ?? error.localizedDescription)
             }
             manager.fallbackTasks[videoId] = nil
         }
@@ -178,7 +273,7 @@ final class DownloadManager {
             let status = http?.statusCode ?? 0
             let type = http?.value(forHTTPHeaderField: "Content-Type")
             if status != 200 && status != 206 {
-                record(downloadTask.taskIdentifier, "The audio server answered HTTP \(status).", retry: true)
+                record(downloadTask.taskIdentifier, JobFailureText.httpStatus(status), retry: true)
                 return
             }
             if !CloudStreamSecurity.isSupportedAudioContentType(type) {
@@ -211,7 +306,9 @@ final class DownloadManager {
             lock.unlock()
             let cancelled = (error as? URLError)?.code == .cancelled
             if cancelled { return }
-            let failure: String? = recorded?.reason ?? error?.localizedDescription
+            let failure: String? = recorded?.reason
+                ?? (error as? URLError).flatMap { JobFailureText.urlError(code: $0.code.rawValue) }
+                ?? error?.localizedDescription
             let retry = recorded?.retry ?? (error != nil)
             Task { @MainActor [weak owner] in
                 owner?.finished(videoId, failure: failure, retryInForeground: retry)

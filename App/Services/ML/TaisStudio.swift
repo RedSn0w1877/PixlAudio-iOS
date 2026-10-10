@@ -38,6 +38,8 @@ final class TaisStudio {
         var detail: String?
         /// No meaningful percentage yet (waiting, downloading, connecting).
         var indeterminate: Bool
+        /// Started but queued behind other heavy work (`HeavyJobGovernor`): Active jobs shows it as waiting.
+        var waiting = false
 
         var isActive: Bool { phase == .queued || phase == .running }
     }
@@ -60,6 +62,7 @@ final class TaisStudio {
     @ObservationIgnored private let separator = MdxStemSeparator()
     @ObservationIgnored private let background = TaisBackgroundRun()
     @ObservationIgnored private var pending: [Job] = []
+    @ObservationIgnored private var memoryObserver: (any NSObjectProtocol)?
     @ObservationIgnored private var running: (key: JobKey, unattended: Bool, task: Task<Void, Never>)?
 
     /// What the jobs need from the rest of the app. nil = UI tests (states are set by the demo).
@@ -89,6 +92,10 @@ final class TaisStudio {
         self.models = models
         self.dependencies = dependencies
         background.onExpired = { [weak self] in self?.cancelAll() }
+        // By name, like the other memory-warning observers (UIApplication's constant is main-actor).
+        memoryObserver = NotificationCenter.default.addObserver(
+            forName: Notification.Name("UIApplicationDidReceiveMemoryWarningNotification"), object: nil, queue: .main
+        ) { [weak self] _ in MainActor.assumeIsolated { self?.releaseModelsIfIdle() } }
     }
 
     func state(_ kind: JobKind, songId: String) -> JobState? { jobs[JobKey(kind: kind, songId: songId)] }
@@ -235,7 +242,49 @@ final class TaisStudio {
     func cancelAll() {
         for job in pending { jobs[job.key] = JobState(phase: .cancelled, percent: 0, detail: nil, indeterminate: false) }
         pending.removeAll()
-        running?.task.cancel()
+        if let running {
+            // The row says so at once; the task stops at its next check (late progress never revives it: `report`).
+            if jobs[running.key]?.isActive == true { jobs[running.key] = Self.cancelledState }
+            running.task.cancel()
+        } else {
+            background.end(success: false)
+        }
+    }
+
+    /// "Cancel" on Active jobs' row for one kind: every queued or running job of that kind stops.
+    func cancelAll(kind: JobKind) {
+        for job in pending where job.key.kind == kind { jobs[job.key] = Self.cancelledState }
+        pending.removeAll { $0.key.kind == kind }
+        if let running, running.key.kind == kind {
+            if jobs[running.key]?.isActive == true { jobs[running.key] = Self.cancelledState }
+            running.task.cancel()
+        }
+        endBackgroundRunIfNoAttendedWork(success: false)
+    }
+
+    private static let cancelledState = JobState(phase: .cancelled, percent: 0, detail: nil, indeterminate: false)
+
+    /// "Clear finished": forgets every job that is not queued or running (done, failed, cancelled). Active ones stay.
+    func clearFinished() {
+        let active = jobs.filter { $0.value.isActive }
+        if active.count != jobs.count { jobs = active }
+    }
+
+    /// "Dismiss" on one finished or failed job. A queued or running one is not dismissed (cancel it first).
+    func dismiss(_ kind: JobKind, songId: String) {
+        let key = JobKey(kind: kind, songId: songId)
+        guard let state = jobs[key], !state.isActive else { return }
+        jobs[key] = nil
+    }
+
+    /// How many jobs are queued or running.
+    var activeCount: Int { jobs.values.reduce(0) { $0 + ($1.isActive ? 1 : 0) } }
+
+    /// A memory warning with no job running: the Core ML models (≈ 190 MB and more) go now, not after the lane drains.
+    /// A running job keeps its own reference until it ends and then releases them (`runNextIfIdle`).
+    private func releaseModelsIfIdle() {
+        guard running == nil else { return }
+        Task { await aligner.unload(); await separator.unload() }
     }
 
     private func runNextIfIdle() {
@@ -246,7 +295,8 @@ final class TaisStudio {
             return
         }
         let job = pending.removeFirst()
-        let task = Task { [weak self] in
+        // Utility priority: a minutes-long CPU-bound job must not compete with the UI for the cores.
+        let task = Task(priority: .utility) { [weak self] in
             guard let self else { return }
             await self.run(job)
             self.running = nil
@@ -257,6 +307,14 @@ final class TaisStudio {
     }
 
     private func run(_ job: Job) async {
+        // One Core ML model at a time: the other kind's is released before this one loads.
+        switch job.key.kind {
+        case .lyrics: await separator.unload()
+        case .instrumental: await aligner.unload()
+        case .roformer:
+            await aligner.unload()
+            await separator.unload()
+        }
         report(job.key, 0, jobs[job.key]?.detail, indeterminate: true)
         do {
             let outcome: (updated: Bool, detail: String?)
@@ -271,9 +329,17 @@ final class TaisStudio {
         } catch is CancellationError {
             jobs[job.key] = JobState(phase: .cancelled, percent: 0, detail: nil, indeterminate: false)
         } catch {
-            let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            // A terminal state with a reason; the lane, the model lease and the background run are released by the
+            // `defer`s of the job's steps and by `runNextIfIdle` right after.
+            let message = Self.failureMessage(error)
             jobs[job.key] = JobState(phase: .failed(String(message.prefix(800))), percent: 0, detail: nil, indeterminate: false)
         }
+    }
+
+    /// The words of a failure: the network's plain wording for a network error, else the error's own text.
+    nonisolated static func failureMessage(_ error: any Error) -> String {
+        if let url = error as? URLError, let words = JobFailureText.urlError(code: url.code.rawValue) { return words }
+        return JobFailureText.short((error as? LocalizedError)?.errorDescription ?? error.localizedDescription, limit: 800)
     }
 
     /// Updates the card and the system's Live Activity together (Android `reportProgress`).
@@ -295,6 +361,21 @@ final class TaisStudio {
         case .lyrics: "Lyric Sync"
         case .roformer: "BS-RoFormer"
         }
+    }
+
+    // MARK: Heavy lane
+
+    /// A place in the shared heavy lane (`HeavyJobGovernor`) for the compute part of a job, saying "waiting" in the row
+    /// while another heavy job (or the model install) holds it. Taken after the model is in hand, never before: the
+    /// install needs the lane too, and a job waiting for its model while holding the lane would block it for ever.
+    private func acquireHeavy(for key: JobKey) async throws -> HeavyJobGovernor.Lease {
+        let governor = HeavyJobGovernor.shared
+        if governor.isBusy, jobs[key]?.isActive == true {
+            let previous = jobs[key]
+            jobs[key] = JobState(phase: .running, percent: previous?.percent ?? 0,
+                                 detail: "Waiting for other heavy work to finish…", indeterminate: true, waiting: true)
+        }
+        return try await governor.acquire()
     }
 
     // MARK: Models
@@ -364,6 +445,9 @@ final class TaisStudio {
         report(key, 0, "Getting \(song.title) ready…", indeterminate: true)
         let source = try await dependencies.audioSource(song)
         let modelURL = try await model(.wav2vec2, for: key)
+        try Task.checkCancellation()
+        let lease = try await acquireHeavy(for: key)
+        defer { lease.release() }
         try Task.checkCancellation()
         report(key, 5, "Syncing \(song.title) word-by-word…")
         let samples = try await AudioPCMReader.read(url: source, sampleRate: Double(Wav2Vec2Vocabulary.sampleRate),
@@ -441,6 +525,9 @@ final class TaisStudio {
             let reason = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             throw JobFailure(message: "\(reason) Magic Instrumentalize in Experimental settings still reduces vocals live.")
         }
+        let lease = try await acquireHeavy(for: key)
+        defer { lease.release() }
+        try Task.checkCancellation()
         try InstrumentalFiles.prepareDirectory()
         guard let destination = InstrumentalFiles.instrumentalURL(songId: song.id) else {
             throw JobFailure(message: "No storage for instrumentals.")

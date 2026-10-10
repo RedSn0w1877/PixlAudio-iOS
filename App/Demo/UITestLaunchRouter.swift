@@ -30,6 +30,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case settingsAILocalModel = "settingsCategory.ai.localModel"
     /// The same with the model downloaded (its size and Delete).
     case settingsAILocalModelReady = "settingsCategory.ai.localModelReady"
+    /// The same after the download failed (no source, HTTP 404): the reason, "Try again" and "Delete download".
+    case settingsAILocalModelFailed = "settingsCategory.ai.localModelFailed"
     case settingsBackupRestore = "settingsCategory.backup_restore"
     case settingsDeveloper = "settingsCategory.developer"
     case settingsDeviceCapabilities = "settingsCategory.device_capabilities"
@@ -45,8 +47,10 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     // Sheets
     case queue, songInfo, sleepTimer, lyricsOptions, changelog, betaInfo, jobs
     // Active jobs (Home button + sheet): `jobs` shows the running fixture, `jobs.none` an empty sheet, `jobs.mixed` the
-    // running rows plus what finished and what failed; `home.jobs` is Home with the button showing (`ActiveJobsDemo`)
-    case homeJobs = "home.jobs", jobsNone = "jobs.none", jobsMixed = "jobs.mixed"
+    // running rows plus what finished and what failed; `home.jobs` is Home with the button showing (`ActiveJobsDemo`);
+    // `jobs.failed` is a few running rows and six finished ones, most of them failed, with Retry, Dismiss, Clear
+    // finished and Cancel all.
+    case homeJobs = "home.jobs", jobsNone = "jobs.none", jobsMixed = "jobs.mixed", jobsFailed = "jobs.failed"
 
     // Full-screen covers
     case nowPlaying, lyrics, lyricsSync, setup
@@ -145,7 +149,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     var route: AppRoute? {
         let demo = DemoLibrary.snapshot
         switch self {
-        case .home, .homeJobs, .jobsNone, .jobsMixed, .search, .searchResults, .library, .miniPlayer,
+        case .home, .homeJobs, .jobsNone, .jobsMixed, .jobsFailed, .search, .searchResults, .library, .miniPlayer,
              .miniPlayerSpotifyConnect:
             return nil
         case .devicesSpotifyConnect, .devicesSpotifyPlaying, .devicesSpotifyReconnect, .devicesSpotifyEmpty,
@@ -177,7 +181,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .settingsPlayback: return .settingsCategory(.playback)
         case .settingsEqualizer: return .settingsCategory(.equalizer)
         case .settingsBehavior: return .settingsCategory(.behavior)
-        case .settingsAI, .settingsAICloud, .settingsAILocalModel, .settingsAILocalModelReady:
+        case .settingsAI, .settingsAICloud, .settingsAILocalModel, .settingsAILocalModelReady,
+             .settingsAILocalModelFailed:
             return .settingsCategory(.ai)
         case .settingsBackupRestore: return .settingsCategory(.backupRestore)
         case .settingsDeveloper: return .settingsCategory(.developer)
@@ -245,7 +250,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .lyricsOptions: return .lyricsOptions(songId: songId)
         case .changelog: return .changelog
         case .betaInfo: return .betaInfo
-        case .jobs, .jobsNone, .jobsMixed: return .jobs
+        case .jobs, .jobsNone, .jobsMixed, .jobsFailed: return .jobs
         case .devices, .devicesSpotifyConnect, .devicesSpotifyPlaying, .devicesSpotifyReconnect, .devicesSpotifyEmpty:
             return .devices
         case .artistPicker: return .artistPicker(songId: DemoLibrary.songs[DemoLibrary.featuredSongIndex].id)

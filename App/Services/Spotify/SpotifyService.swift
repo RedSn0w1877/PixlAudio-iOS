@@ -28,6 +28,10 @@ final class SpotifyService {
     /// The playlist being imported ("Importing <name>…").
     private(set) var syncStatus: String?
     private(set) var isMatching = false
+    /// Why the last import / the last matching pass gave up (a short line), until dismissed or the next try starts.
+    /// Active jobs shows them as failed rows with Retry.
+    private(set) var syncFailure: String?
+    private(set) var matchFailure: String?
     private(set) var isSigningIn = false
     private(set) var isLoggingOut = false
     private(set) var isTesting = false
@@ -53,6 +57,9 @@ final class SpotifyService {
     @ObservationIgnored private var syncTask: Task<Void, Never>?
     @ObservationIgnored private var matchTask: Task<Void, Never>?
     @ObservationIgnored private var matchRetryFailedPending = false
+    /// Which pass owns `isSyncing` / `isMatching`: a pass that was replaced or cancelled never clears its successor's flag.
+    @ObservationIgnored private var syncGeneration = 0
+    @ObservationIgnored private var matchGeneration = 0
     @ObservationIgnored private var reloadLibrary: @MainActor @Sendable () async -> Void = {}
     @ObservationIgnored private var isPlaybackActive: @MainActor @Sendable () -> Bool = { false }
     @ObservationIgnored private var baseResolver: any PlayableURLResolving = DefaultPlayableURLResolver()
@@ -264,8 +271,11 @@ final class SpotifyService {
     func syncNow() {
         guard !isDemo, isLoggedIn, let sync else { return }
         syncTask?.cancel()
+        syncGeneration += 1
+        let generation = syncGeneration
         isSyncing = true
         syncStatus = nil
+        syncFailure = nil
         syncTask = Task {
             // About 30 s of extra time if the app is switched away mid-import; after that iOS suspends it, and the
             // background refresh (resumeInterrupted) or the next open carries on.
@@ -291,16 +301,42 @@ final class SpotifyService {
                         attempts += 1
                         if attempts >= 3 {
                             message = "Spotify import failed: \(error)"
+                            syncFailure = Self.failureLine(error, subject: "The Spotify import")
                             break
                         }
                         try? await Task.sleep(for: .seconds(30 * Double(attempts)))
                     }
                 }
             }
-            isSyncing = false
-            syncStatus = nil
+            if generation == syncGeneration {
+                isSyncing = false
+                syncStatus = nil
+                syncTask = nil
+            }
             await refreshLibraryState()
         }
+    }
+
+    /// "Cancel": the import stops (its task is cancelled) and the flag clears at once, even if the work was already gone.
+    func cancelSync() {
+        syncGeneration += 1
+        syncTask?.cancel()
+        syncTask = nil
+        isSyncing = false
+        syncStatus = nil
+    }
+
+    /// "Dismiss" on a failed import or matching pass.
+    func dismissFailures() {
+        syncFailure = nil
+        matchFailure = nil
+    }
+
+    /// One short line for a failure: the network's own words when it is a network error, else the error's text.
+    static func failureLine(_ error: any Error, subject: String) -> String {
+        let code = (error as? URLError)?.code.rawValue
+        if let code, let words = JobFailureText.urlError(code: code) { return words }
+        return JobFailureText.short("\(subject) stopped: \(error.localizedDescription)")
     }
 
     private func setSyncStatus(_ name: String) { syncStatus = name }
@@ -322,7 +358,10 @@ final class SpotifyService {
             guard retryFailed else { return }
             matchTask?.cancel()
         }
+        matchGeneration += 1
+        let generation = matchGeneration
         isMatching = true
+        matchFailure = nil
         let bridge = self.bridge
         let isPlaying = isPlaybackActive
         let progressThrottle = RefreshThrottle()
@@ -333,31 +372,49 @@ final class SpotifyService {
                 let matcher = TrackMatcher(search: bridge.search)
                 let runner = SpotifyMatchRunner(store: persistence, matcher: { try await matcher.findMatch($0) })
                 var requeue = retryFailed
-                var backoff = Self.matchBackoffSeconds
+                // Network trouble waits on a ladder of 1, 2, 4, 8 minutes and then gives up: it used to go on for ever
+                // (up to an hour between tries) and the job stayed "running" without anything moving.
+                var budget = RetryBudget()
                 while !Task.isCancelled {
                     let result: SpotifyMatchPassResult
                     do {
                         result = try await runner.run(retryFailed: requeue, isPlaybackActive: { await isPlaying() },
                                                       shouldContinue: { !Task.isCancelled },
                                                       onProgress: { _, _ in if progressThrottle.allows() { await self.refreshLibraryState() } })
+                    } catch is CancellationError {
+                        break
                     } catch {
+                        matchFailure = Self.failureLine(error, subject: "Finding audio")
                         break
                     }
                     requeue = false
                     await refreshLibraryState()
                     if result.retryLater {
-                        try? await Task.sleep(for: .seconds(backoff))
-                        backoff = min(backoff * 2, 3600)
+                        guard let wait = budget.failed() else {
+                            matchFailure = "Finding audio gave up: YouTube Music could not be reached. Try again later."
+                            break
+                        }
+                        try? await Task.sleep(for: .milliseconds(wait))
                         continue
                     }
-                    backoff = Self.matchBackoffSeconds
+                    budget.reset()
                     if !result.moreWork { break }
                 }
             }
-            matchTask = nil
-            isMatching = false
+            if generation == matchGeneration {
+                matchTask = nil
+                isMatching = false
+            }
             await libraryChanged()
         }
+    }
+
+    /// "Cancel": the matching pass stops (its task is cancelled) and the flag clears at once.
+    func cancelMatching() {
+        matchGeneration += 1
+        matchTask?.cancel()
+        matchTask = nil
+        isMatching = false
     }
 
     // MARK: Playback test

@@ -1,4 +1,5 @@
 import Foundation
+import PixlModel
 
 /// Stage 14's UI-test states (no network, no Core ML): the job and model states each `tais.*` screen shows.
 @MainActor
@@ -37,6 +38,8 @@ enum TaisDemo {
             models.setDemoState(.downloading(fraction: 0.42), for: .llm)
         case .settingsAILocalModelReady:
             models.setDemoState(.installed(bytes: ModelCatalog.llm.bytes + 2_400_000), for: .llm)
+        case .settingsAILocalModelFailed:
+            models.setDemoState(.failed(JobFailureText.httpStatus(404)), for: .llm)
         case .taisInstrumental:
             tais.instrumental.setDemo(available: true, active: false)
         case .taisInstrumentalActive:

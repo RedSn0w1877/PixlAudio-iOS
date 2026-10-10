@@ -91,7 +91,8 @@ final class AppEnvironment {
         // The optional cloud rows of Settings › AI features, for their screenshot.
         if launch.screen == .settingsAICloud { settings.ai.setUsesCloudAssistant(true) }
         // The downloaded AI model's rows (its demo states are set in `TaisDemo`).
-        if launch.screen == .settingsAILocalModel || launch.screen == .settingsAILocalModelReady {
+        if launch.screen == .settingsAILocalModel || launch.screen == .settingsAILocalModelReady
+            || launch.screen == .settingsAILocalModelFailed {
             settings.ai.useDownloadedModel = true
         }
         // `-accent RRGGBB` (UI tests): the accent screenshots start with a picked colour, stored normalised.
