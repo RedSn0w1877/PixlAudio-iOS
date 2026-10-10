@@ -306,7 +306,7 @@ final class CrashProtectionTests: XCTestCase {
 
     func testCancelAllThenClearFinishedLeavesTheStudioEmpty() async throws {
         let studio = makeStudio()
-        for song in DemoLibrary.songs.prefix(3) { studio.start(.lyrics, song: song, unattended: true) }
+        for song in DemoLibrary.songs.prefix(3) { studio.start(.instrumental, song: song, unattended: true) }
         try await Task.sleep(for: .milliseconds(150))
         studio.cancelAll()
         XCTAssertEqual(studio.activeCount, 0)
@@ -319,11 +319,11 @@ final class CrashProtectionTests: XCTestCase {
     func testAMemoryWarningStopsTheWorkNobodyAskedFor() async throws {
         let studio = makeStudio()
         let running = DemoLibrary.songs[0], waiting = DemoLibrary.songs[1]
-        studio.start(.lyrics, song: running, unattended: true)
-        studio.start(.lyrics, song: waiting, unattended: true)
+        studio.start(.instrumental, song: running, unattended: true)
+        studio.start(.instrumental, song: waiting, unattended: true)
         try await Task.sleep(for: .milliseconds(150))
         studio.handleMemoryWarning()
-        XCTAssertEqual(studio.state(.lyrics, songId: waiting.id)?.phase, .cancelled, "a waiting job stops at once")
+        XCTAssertEqual(studio.state(.instrumental, songId: waiting.id)?.phase, .cancelled, "a waiting job stops at once")
         try await Task.sleep(for: .milliseconds(400))
         XCTAssertEqual(studio.activeCount, 0, "the running one stopped too")
         XCTAssertFalse(HeavyJobGovernor.shared.isBusy)
