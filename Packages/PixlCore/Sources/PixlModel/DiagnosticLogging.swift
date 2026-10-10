@@ -10,7 +10,7 @@ public enum LogRedactor {
     public static func redact(_ text: String) -> String {
         var result = text
         result = replace("(?i)bearer\\s+[A-Za-z0-9._~+/=-]+", in: result, with: "bearer <redacted>")
-        result = replace("https?://([^/\\s?#\"']+)[^\\s\"']*", in: result, with: "https://$1/…")
+        result = replace("https?://([^/\\s?#\"')]+)[^\\s\"')]*", in: result, with: "https://$1/…")
         result = replace("file://[^\\s\"']*", in: result, with: "<path>")
         result = replace("(?<![A-Za-z0-9])(/(?:private/)?(?:var|Users|Library|tmp|Applications|System|private)/[^\\s\"',;)]*)",
                          in: result, with: "<path>")

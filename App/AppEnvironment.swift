@@ -77,12 +77,28 @@ final class AppEnvironment {
     let cloud: CloudStudio
     /// Home's "Active jobs" button and sheet: what is running across the services above (`ActiveJobs`).
     let activeJobs: ActiveJobs
+    /// Crash protection and diagnostics: how the last run ended, safe mode, memory / thermal conditions, the event log.
+    let health: AppHealth
 
     init(launch: LaunchConfiguration) {
         self.launch = launch
         let isUITest = launch.isUITest
         let router = Router(launch: launch)
         self.router = router
+        // Before anything else starts: how did the last run end? Safe mode (no heavy work by itself) follows from it.
+        let health: AppHealth
+        // A unit-test host is killed between runs: that is not a crash of the app, so it gets the demo variant too.
+        let isUnitTestHost = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        if isUITest || isUnitTestHost {
+            let crashed = launch.screen == .homeSafeMode || launch.screen == .jobsInterrupted
+            health = AppHealth(defaults: UserDefaults(suiteName: "pixlaudio.uitest") ?? .standard,
+                               markerURL: nil,
+                               demo: crashed ? SafeModeState(consecutiveAbnormal: 1, isActive: true, bannerPending: true) : SafeModeState())
+        } else {
+            health = AppHealth()
+            health.launch()
+        }
+        self.health = health
         let container = try? PersistenceActor.makeContainer(inMemory: isUITest)
         let persistence = container.map { PersistenceActor(modelContainer: $0) }
         self.persistence = persistence
@@ -236,16 +252,50 @@ final class AppEnvironment {
         activeJobs = isUITest
             ? ActiveJobsDemo.make(launch: launch)
             : ActiveJobs(sources: ActiveJobs.Sources(library: library, spotify: spotify, downloads: youtube.downloads,
-                                                     models: tais.models, studio: tais.studio, cloud: cloud))
+                                                     models: tais.models, studio: tais.studio, cloud: cloud, health: health))
+        wireHealth(health)
         // A tap on "Your instrumentals are ready" opens the Cloud queue (the notification centre's delegate is set
         // here, early: a launch from the notification reaches it before `start()`).
         if !isUITest { cloud.installNotificationRouting(router: router) }
+    }
+
+    /// How many heavy jobs run and how many wait (lyric sync, separation, a model install), for Diagnostics.
+    func heavyJobCounts() -> (running: Int, waiting: Int) {
+        var running = 0, waiting = 0
+        for job in tais.studio.jobs.values where job.isActive {
+            if job.phase == .running && !job.waiting { running += 1 } else { waiting += 1 }
+        }
+        for model in ModelCatalog.all {
+            guard case .installing = tais.models.state(model.id) else { continue }
+            if tais.models.isWaitingToInstall(model.id) || tais.models.isWaitingForForeground(model.id) {
+                waiting += 1
+            } else {
+                running += 1
+            }
+        }
+        return (running, waiting)
+    }
+
+    /// What the health monitor needs from the services: when nothing heavy is in flight (the clean-exit marker may be
+    /// written) and what to do on a memory warning (release what is idle, stop what nobody asked for) or a critical one.
+    private func wireHealth(_ health: AppHealth) {
+        let studio = tais.studio
+        health.isHeavyWorkIdle = { JobTelemetry.shared.entries().isEmpty }
+        health.onMemoryWarning = {
+            studio.handleMemoryWarning()
+            LocalModelRuntime.shared.unload()
+        }
+        health.onMemoryCritical = { studio.stopForMemory() }
     }
 
     /// Launch work, off the first frame: load the library snapshot (cache first, then the store), then start the
     /// automatic incremental rescans (launch, foreground, music-library changes).
     func start() async {
         guard !launch.isUITest else { return }
+        MetricKitCollector.shared.onDiagnostics = { [weak health] crashLike in
+            Task { @MainActor in health?.metricKitReported(crashLike: crashLike) }
+        }
+        MetricKitCollector.shared.start()
         library.beginCachedLoad() // decode the snapshot cache and the saved queue alongside the service starts below
         playbackServices?.prepareQueueRestore()
         // Every stored album theme into the synchronous mirror, so cards and pills start with their colours.

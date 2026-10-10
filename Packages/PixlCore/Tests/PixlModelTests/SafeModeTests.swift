@@ -182,6 +182,17 @@ import Testing
         #expect(!HeavyWorkPolicy.prefersNeuralEngine(HeavyWorkConditions(isForeground: true, lowPowerMode: true)))
     }
 
+    @Test func aSmallPhoneDecodesShorterSongsThanABigOne() {
+        let small: UInt64 = 3_850_000_000, big: UInt64 = 8_000_000_000
+        let stereoSmall = HeavyWorkPolicy.maxDecodeSeconds(channels: 2, sampleRate: 44_100, physicalMemoryBytes: small)
+        let stereoBig = HeavyWorkPolicy.maxDecodeSeconds(channels: 2, sampleRate: 44_100, physicalMemoryBytes: big)
+        #expect(stereoSmall > 600 && stereoSmall < 720)
+        #expect(stereoBig > stereoSmall)
+        #expect(stereoBig <= 20 * 60)
+        #expect(HeavyWorkPolicy.maxDecodeSeconds(channels: 1, sampleRate: 16_000, physicalMemoryBytes: small) == 20 * 60)
+        #expect(HeavyWorkPolicy.maxDecodeSeconds(channels: 2, sampleRate: 44_100, physicalMemoryBytes: 100_000_000) == 120)
+    }
+
     @Test func automaticStartsNeedAQuietForegroundPhone() {
         #expect(HeavyWorkPolicy.allowsAutomaticStart(HeavyWorkConditions(isForeground: true)))
         #expect(!HeavyWorkPolicy.allowsAutomaticStart(HeavyWorkConditions(isForeground: false)))
@@ -205,6 +216,12 @@ import Testing
         let token = String(repeating: "A1b2", count: 12)
         #expect(!LogRedactor.redact("key \(token) end").contains(token))
         #expect(LogRedactor.redact("Authorization: Bearer abc.def-123").contains("<redacted>"))
+    }
+
+    @Test func redactingTwiceChangesNothingAndKeepsTheClosingBracket() {
+        let once = LogRedactor.redact("fail (no source at https://x.example/p?q=1) after 2s")
+        #expect(once == "fail (no source at https://x.example/…) after 2s")
+        #expect(LogRedactor.redact(once) == once)
     }
 
     @Test func plainJobFactsSurvive() {

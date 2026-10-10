@@ -25,6 +25,9 @@ struct PixlAudioApp: App {
                 .onOpenURL { url in environment.open(url) }
                 // Cloud Studio: catch up and poll while active; ask for a background refresh when leaving.
                 .onChange(of: scenePhase, initial: true) { _, phase in
+                    // First: heavy work yields the moment the app stops being the one in front, and the clean-exit
+                    // marker follows (docs/handoff/2026-10-10-crash-diagnostics.md).
+                    environment.health.scenePhaseChanged(phase)
                     switch phase {
                     case .active: cloud.resume()
                     case .background:

@@ -21,6 +21,15 @@ struct HomeView: View {
         let content = home.content
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 24) {
+                // After an unexpected close: heavy jobs are paused until the person reviews them (once, dismissible).
+                if env.health.safeMode.showsBanner {
+                    SafeModeBanner(onReview: {
+                        env.health.dismissBanner()
+                        router.present(AppSheet.jobs)
+                    }, onDismiss: { env.health.dismissBanner() })
+                        .padding(.horizontal, HomeMetrics.greetingInset)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
                 HomeGreetingCard(greeting: content.greeting, insight: home.aiInsight ?? content.insight,
                                  isExpanded: home.isInsightExpanded, isLoadingInsight: home.isLoadingInsight,
                                  onToggle: { withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { home.toggleInsight() } })
@@ -211,7 +220,8 @@ private struct HomeTopBar: View {
 
                 HStack(spacing: Tokens.TopBar.actionSpacing) {
                     if jobCount > 0 {
-                        ActiveJobsButton(count: jobCount, isWorking: activeJobs.isWorking, action: onJobs)
+                        ActiveJobsButton(count: jobCount, isWorking: activeJobs.isWorking, action: onJobs,
+                                         onCancelAll: { activeJobs.cancelAll() })
                             .transition(.scale(scale: 0.85).combined(with: .opacity))
                     }
                     GlassCircleButton(systemImage: "newspaper", accessibilityLabel: "Changelog",

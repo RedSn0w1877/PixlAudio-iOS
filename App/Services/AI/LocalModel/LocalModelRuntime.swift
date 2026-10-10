@@ -10,8 +10,13 @@ import PixlNet
 ///   prewarm (a sheet opening). Both are released after `idleSeconds` without use, on a memory warning and when the
 ///   app goes to the background (a ~1 GB model must not make the system end background playback).
 /// - **Cancellable:** a cancelled task stops the generation before its next model step (`LocalLLMGenerator`).
-/// - **GPU first:** `.cpuAndGPU`; if a step ever produces NaN there, the model reloads on the CPU (the configuration
-///   the CI parity gate measured) and the request runs again once, and the CPU stays in use until the app restarts.
+/// - **GPU first, foreground only:** `.cpuAndGPU` while the app is in front; if a step ever produces NaN there, the model
+///   reloads on the CPU (the configuration the CI parity gate measured) and the request runs again once, and the CPU stays
+///   in use until the app restarts. A backgrounded app may not submit GPU work, and the 2026-10-08 crash report caught
+///   exactly that: this queue was still inside a Metal Performance Shaders Graph step when the app went to the
+///   background (the unload below used to queue behind the running generation). Now a generation stops at its next
+///   step once the app has been out of the foreground for 1.5 s (a short pull-down of Control Center only pauses it),
+///   and nothing loads or generates while the app is not in front.
 /// - **Prefix reuse:** the cache survives between requests, so Taizo's next turn only feeds the new message.
 nonisolated final class LocalModelRuntime: @unchecked Sendable {
     static let shared = LocalModelRuntime(descriptor: ModelCatalog.llm)
@@ -98,12 +103,17 @@ nonisolated final class LocalModelRuntime: @unchecked Sendable {
                     guard pending.begin() else { return }
                     self.idleUnload?.cancel()
                     defer { self.scheduleIdleUnload() }
+                    JobTelemetry.shared.started("localModel", id: "request")
                     do {
                         let session = Session(tokenizer: try self.loadTokenizer(), runtime: self, flag: flag)
-                        pending.succeed(try body(session))
+                        let value = try body(session)
+                        JobTelemetry.shared.ended("localModel", id: "request", .finished)
+                        pending.succeed(value)
                     } catch let error as LocalGenerationError where error == .cancelled {
+                        JobTelemetry.shared.ended("localModel", id: "request", .cancelled("stopped"))
                         pending.fail(CancellationError())
                     } catch {
+                        JobTelemetry.shared.ended("localModel", id: "request", .failed(error.localizedDescription))
                         pending.fail(error)
                     }
                 }
@@ -117,6 +127,8 @@ nonisolated final class LocalModelRuntime: @unchecked Sendable {
     /// Loads the model ahead of a request (a sheet opening); errors wait for the request itself.
     func prewarm() {
         queue.async {
+            // Not while the app is out of the foreground (a compile / GPU load there is what the system punishes).
+            guard HeavyWorkGate.shared.isForeground else { return }
             self.idleUnload?.cancel()
             _ = try? self.loadTokenizer()
             _ = try? self.loadModel()
@@ -168,9 +180,15 @@ nonisolated final class LocalModelRuntime: @unchecked Sendable {
         guard ModelManager.isInstalled(descriptor), let url = ModelManager.compiledURL(descriptor) else {
             throw OnDeviceFailure.localModelMissing
         }
+        // A load while the app is out of the foreground (a queued request that ran late) is refused: GPU work and the
+        // first-use compile belong to the foreground.
+        guard HeavyWorkGate.shared.isForeground || HeavyWorkGate.shared.hasBackgroundWindow else {
+            throw LoadError(detail: "PixlAudio was not in front")
+        }
         let started = Date()
         do {
-            let loaded = try CoreMLCausalModel(compiledURL: url, computeUnits: prefersCPU ? .cpuOnly : .cpuAndGPU)
+            let useGPU = !prefersCPU && HeavyWorkGate.shared.isForeground
+            let loaded = try CoreMLCausalModel(compiledURL: url, computeUnits: useGPU ? .cpuAndGPU : .cpuOnly)
             let generator = LocalLLMGenerator(model: loaded)
             model = loaded
             self.generator = generator
@@ -211,11 +229,25 @@ nonisolated final class LocalModelRuntime: @unchecked Sendable {
 nonisolated final class CancelFlag: @unchecked Sendable {
     private let lock = NSLock()
     private var value = false
+    /// `HeavyWorkGate`'s abort count when the request began: a critical memory event or an Emergency stop bumps it.
+    private let epoch = HeavyWorkGate.shared.abortEpoch
 
+    /// Whether the generation must stop before its next model step: the task was cancelled, everything heavy was told to
+    /// stop, or the app has not been in the foreground for 1.5 s (a short interruption only pauses it).
     var isSet: Bool {
         lock.lock()
-        defer { lock.unlock() }
-        return value
+        let cancelled = value
+        lock.unlock()
+        if cancelled { return true }
+        let gate = HeavyWorkGate.shared
+        if gate.abortEpoch != epoch { return true }
+        if gate.isForeground { return false }
+        for _ in 0..<30 {
+            Thread.sleep(forTimeInterval: 0.05)
+            if gate.isForeground { return false }
+        }
+        DiagnosticsLog.shared.log("model", "generation stopped: the app left the foreground")
+        return true
     }
 
     func set() {

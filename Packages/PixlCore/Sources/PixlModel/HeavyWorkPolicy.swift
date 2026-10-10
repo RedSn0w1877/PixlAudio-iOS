@@ -74,6 +74,16 @@ public enum HeavyWorkPolicy {
         conditions.isForeground && conditions.thermal <= .fair && !conditions.lowPowerMode
     }
 
+    /// The longest song (seconds) a decode may hold as Float PCM on a phone with this much memory: an eighth of the
+    /// physical memory, counting the mix and its result for stereo (the separator keeps both), never under 2 minutes or
+    /// over 20. A 3.5 GB iPhone: about 11 minutes of 44.1 kHz stereo, 20 minutes of 16 kHz mono.
+    public static func maxDecodeSeconds(channels: Int, sampleRate: Double, physicalMemoryBytes: UInt64) -> Double {
+        let budget = Double(physicalMemoryBytes) / 8
+        let copies = channels > 1 ? 2.0 : 1.0
+        let bytesPerSecond = 4.0 * Double(max(channels, 1)) * max(sampleRate, 1) * copies
+        return min(max(budget / bytesPerSecond, 120), 20 * 60)
+    }
+
     /// Whether automatic heavy work (the automatic studio, a launch rescan) may start: the foreground, not hot, not in
     /// Low Power Mode, no memory pressure.
     public static func allowsAutomaticStart(_ conditions: HeavyWorkConditions) -> Bool {
