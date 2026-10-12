@@ -294,6 +294,9 @@ nonisolated enum CloudAudioPreparer {
     /// trailing silence.
     private static func decode(_ asset: AVURLAsset, track: AVAssetTrack, writingTo output: URL,
                                settings: [String: Any], silence: TrailingSilence) throws -> Written {
+        // The decode is CPU-bound for as long as the song is: it pauses and leaves the cores half the time like the rest
+        // of the heavy work (the 2026-10-08 report showed two decoders in a tight loop for 140 s).
+        let pacer = HeavyWorkGate.shared.makePacer()
         let reader: AVAssetReader
         do {
             reader = try AVAssetReader(asset: asset)
@@ -327,7 +330,7 @@ nonisolated enum CloudAudioPreparer {
             var written: Int64 = 0
             let maximumFrames = (CloudLimits.maxDurationMs / 1000 + 5) * Int64(sampleRate)
             while let sample = readerOutput.copyNextSampleBuffer() {
-                try Task.checkCancellation()
+                try pacer.checkpoint()
                 guard let block = CMSampleBufferGetDataBuffer(sample) else { continue }
                 // The buffer's own sample count (its block may be larger than the samples it holds).
                 let totalFrames = min(CMSampleBufferGetNumSamples(sample),
@@ -412,9 +415,10 @@ nonisolated enum CloudAudioPreparer {
             throw Failure.decode("Couldn't decode the prepared file (\(reader.error?.localizedDescription ?? "unknown error"))")
         }
         defer { if reader.status == .reading { reader.cancelReading() } }
+        let pacer = HeavyWorkGate.shared.makePacer()
         var frames: Int64 = 0
         while let sample = output.copyNextSampleBuffer() {
-            try Task.checkCancellation()
+            try pacer.checkpoint()
             frames += Int64(CMSampleBufferGetNumSamples(sample))
         }
         if reader.status == .failed {

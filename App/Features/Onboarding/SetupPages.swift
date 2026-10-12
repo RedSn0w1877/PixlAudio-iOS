@@ -161,6 +161,9 @@ struct SetupBackupPage: View {
                            tint: theme.surfaceContainerHigh.opacity(GlassTint.container))
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
+            if isScanning {
+                SetupTextButton(title: "Cancel scan", isEnabled: true) { library.cancelScans() }
+            }
             SetupTextButton(title: L10n.setupSkipForNow, isEnabled: !isRestoring, action: onSkip)
         }
         .animation(PixlMotion.state, value: isBusy)

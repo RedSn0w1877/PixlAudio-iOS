@@ -136,7 +136,9 @@ final class LibraryStore {
         dropsScanProgress = false
         let work = Task { try await self.runScan(mode: mode) }
         scanTasks[token] = work
+        JobTelemetry.shared.started("libraryScan", id: "library")
         defer {
+            JobTelemetry.shared.ended("libraryScan", id: "library", work.isCancelled ? .cancelled("cancelled") : .finished)
             scanTasks[token] = nil
             if scanTasks.isEmpty {
                 lastImportProgress = nil

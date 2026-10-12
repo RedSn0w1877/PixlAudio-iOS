@@ -287,6 +287,33 @@ final class TaisStudio {
         Task { await aligner.unload(); await separator.unload() }
     }
 
+    /// Emergency stop: the Core ML models go now (a running job keeps its own reference until it ends).
+    func releaseModels() {
+        Task { await aligner.unload(); await separator.unload() }
+    }
+
+    /// A memory warning: nothing the person did not ask for goes on (unattended jobs stop and are retried later by the
+    /// runner), and idle models are released. A job the person started carries on, slowed by `HeavyWorkGate`.
+    func handleMemoryWarning() {
+        cancelUnattended()
+        releaseModelsIfIdle()
+    }
+
+    /// A critical memory event: every queued and running job stops now, saying why (a Retry stays on its row), before the
+    /// system ends the app for it.
+    func stopForMemory() {
+        let reason = "Stopped: the iPhone ran low on memory. Retry when other apps are closed."
+        let stopped = JobState(phase: .failed(reason), percent: 0, detail: nil, indeterminate: false)
+        for job in pending { jobs[job.key] = stopped }
+        pending.removeAll()
+        if let running {
+            if jobs[running.key]?.isActive == true { jobs[running.key] = stopped }
+            running.task.cancel()
+        }
+        endBackgroundRunIfNoAttendedWork(success: false)
+        releaseModels()
+    }
+
     private func runNextIfIdle() {
         guard running == nil else { return }
         guard !pending.isEmpty else {
@@ -316,6 +343,8 @@ final class TaisStudio {
             await separator.unload()
         }
         report(job.key, 0, jobs[job.key]?.detail, indeterminate: true)
+        let telemetryKind = Self.telemetryKind(job.key.kind)
+        JobTelemetry.shared.started(telemetryKind, id: job.key.songId)
         do {
             let outcome: (updated: Bool, detail: String?)
             switch job.key.kind {
@@ -326,13 +355,29 @@ final class TaisStudio {
             try Task.checkCancellation()
             jobs[job.key] = JobState(phase: .succeeded(updated: outcome.updated), percent: 100, detail: outcome.detail,
                                      indeterminate: false)
+            JobTelemetry.shared.ended(telemetryKind, id: job.key.songId, .finished)
         } catch is CancellationError {
-            jobs[job.key] = JobState(phase: .cancelled, percent: 0, detail: nil, indeterminate: false)
+            // `stopForMemory` already said why (a failed row with a Retry): that stays.
+            var stoppedForMemory = false
+            if case .failed? = jobs[job.key]?.phase { stoppedForMemory = true }
+            if !stoppedForMemory { jobs[job.key] = JobState(phase: .cancelled, percent: 0, detail: nil, indeterminate: false) }
+            JobTelemetry.shared.ended(telemetryKind, id: job.key.songId,
+                                      .cancelled(stoppedForMemory ? "low memory" : "cancelled"))
         } catch {
             // A terminal state with a reason; the lane, the model lease and the background run are released by the
             // `defer`s of the job's steps and by `runNextIfIdle` right after.
             let message = Self.failureMessage(error)
             jobs[job.key] = JobState(phase: .failed(String(message.prefix(800))), percent: 0, detail: nil, indeterminate: false)
+            JobTelemetry.shared.ended(telemetryKind, id: job.key.songId, .failed(message))
+        }
+    }
+
+    /// The `ActiveJob.Kind` raw value of a studio kind (what the in-flight journal and the log call it).
+    nonisolated static func telemetryKind(_ kind: JobKind) -> String {
+        switch kind {
+        case .lyrics: "lyricsSync"
+        case .instrumental: "instrumental"
+        case .roformer: "roformer"
         }
     }
 
@@ -461,7 +506,8 @@ final class TaisStudio {
         let title = song.title
         let timings: [AlignedWordTiming]
         do {
-            timings = try await aligner.align(samples: samples, words: targetWords.map(\.word), modelURL: modelURL) { done, total in
+            timings = try await aligner.align(samples: samples, words: targetWords.map(\.word), modelURL: modelURL,
+                                              pacer: HeavyWorkGate.shared.makePacer()) { done, total in
                 let overall = min(max(5 + Int(Double(done) / Double(max(total, 1)) * 95), 5), 100)
                 await self.report(key, overall, "\(title) — pass \(done) of \(total)…")
             }
@@ -534,7 +580,8 @@ final class TaisStudio {
         }
         let separator = self.separator
         report(key, 0, "Rendering the instrumental — 0% through the track…")
-        try await separator.renderInstrumental(source: source, destination: destination, modelURL: modelURL) { done, total in
+        try await separator.renderInstrumental(source: source, destination: destination, modelURL: modelURL,
+                                               pacer: HeavyWorkGate.shared.makePacer()) { done, total in
             let percent = total > 0 ? min(max(done * 100 / total, 0), 100) : 0
             Task { @MainActor [weak self] in
                 self?.report(key, percent, "Rendering the instrumental — \(percent)% through the track…")

@@ -91,6 +91,9 @@ final class CloudBackground {
 
         static func start(_ task: BGProcessingTask, studio: CloudStudio) {
             let run = ProcessingRun(task: task)
+            // iOS granted a longer window (minutes, often overnight): heavy preparation may run in it.
+            HeavyWorkGate.shared.windowOpened()
+            DiagnosticsLog.shared.log("background", "cloud processing task begins")
             // The next request first: a crash or an expiry in the middle still leaves one in place.
             studio.scheduleBackground()
             task.expirationHandler = { [weak studio] in
@@ -115,6 +118,8 @@ final class CloudBackground {
 
         private func finish(inTime: Bool) {
             guard gate.claim(finishedInTime: inTime) else { return }
+            HeavyWorkGate.shared.windowClosed()
+            DiagnosticsLog.shared.log("background", "cloud processing task ends (\(inTime ? "in time" : "expired"))")
             // The handler holds this run and this run holds the task: break the cycle once the task is reported.
             task.expirationHandler = nil
             work = nil
@@ -130,6 +135,7 @@ final class CloudBackground {
             assertion = UIApplication.shared.beginBackgroundTask(withName: "Cloud processing") { [weak self] in
                 MainActor.assumeIsolated { self?.endAssertion() }
             }
+            if assertion != .invalid { HeavyWorkGate.shared.windowOpened() }
         }
         return Assertion(end: { [weak self] in self?.endAssertion() })
     }
@@ -138,6 +144,7 @@ final class CloudBackground {
         guard assertion != .invalid else { return }
         UIApplication.shared.endBackgroundTask(assertion)
         assertion = .invalid
+        HeavyWorkGate.shared.windowClosed()
     }
 
     // MARK: Preparing a person-started batch

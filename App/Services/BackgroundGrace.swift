@@ -34,6 +34,8 @@ final class BackgroundGrace {
         identifier = UIApplication.shared.beginBackgroundTask(withName: name) { [weak self] in
             MainActor.assumeIsolated { self?.expired() }
         }
+        // iOS's ~30 s of extra time: heavy work may finish inside it (`HeavyWorkGate`).
+        if identifier != .invalid { HeavyWorkGate.shared.windowOpened() }
     }
 
     private func expired() {
@@ -46,5 +48,6 @@ final class BackgroundGrace {
         let finished = identifier
         identifier = .invalid
         UIApplication.shared.endBackgroundTask(finished)
+        HeavyWorkGate.shared.windowClosed()
     }
 }

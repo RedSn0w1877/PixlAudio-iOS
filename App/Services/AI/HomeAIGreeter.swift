@@ -40,6 +40,12 @@ enum HomeAIGreeter {
             // The card's chevron waits for the insight: never longer than this (the downloaded model computes every
             // token on the phone and may have to load first).
             let downloaded = ai.useDownloadedModel
+            // The downloaded model (~900 MB) is never loaded by Home by itself: it killed the app on every launch. Home keeps
+            // its local greeting (the gate logs the refusal).
+            if downloaded {
+                _ = LocalModelGate.canLoad(reason: .automatic)
+                return nil
+            }
             let text = try? await withTimeout(seconds: downloaded ? downloadedTimeoutSeconds : timeoutSeconds) {
                 () async throws -> String in
                 if downloaded {

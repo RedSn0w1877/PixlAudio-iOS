@@ -1,5 +1,7 @@
 import CoreML
 import Foundation
+import PixlModel
+import os
 import PixlNet
 
 /// Where the downloaded AI model runs (2026-10-07, local AI phase 2): one serial queue that owns the tokenizer, the
@@ -10,8 +12,13 @@ import PixlNet
 ///   prewarm (a sheet opening). Both are released after `idleSeconds` without use, on a memory warning and when the
 ///   app goes to the background (a ~1 GB model must not make the system end background playback).
 /// - **Cancellable:** a cancelled task stops the generation before its next model step (`LocalLLMGenerator`).
-/// - **GPU first:** `.cpuAndGPU`; if a step ever produces NaN there, the model reloads on the CPU (the configuration
-///   the CI parity gate measured) and the request runs again once, and the CPU stays in use until the app restarts.
+/// - **GPU first, foreground only:** `.cpuAndGPU` while the app is in front; if a step ever produces NaN there, the model
+///   reloads on the CPU (the configuration the CI parity gate measured) and the request runs again once, and the CPU stays
+///   in use until the app restarts. A backgrounded app may not submit GPU work, and the 2026-10-08 crash report caught
+///   exactly that: this queue was still inside a Metal Performance Shaders Graph step when the app went to the
+///   background (the unload below used to queue behind the running generation). Now a generation stops at its next
+///   step once the app has been out of the foreground for 1.5 s (a short pull-down of Control Center only pauses it),
+///   and nothing loads or generates while the app is not in front.
 /// - **Prefix reuse:** the cache survives between requests, so Taizo's next turn only feeds the new message.
 nonisolated final class LocalModelRuntime: @unchecked Sendable {
     static let shared = LocalModelRuntime(descriptor: ModelCatalog.llm)
@@ -48,7 +55,8 @@ nonisolated final class LocalModelRuntime: @unchecked Sendable {
         }
     }
 
-    static let idleSeconds: Double = 180
+    /// Unloaded this long after the last request (the model is ~900 MB; a chat burst keeps it a moment).
+    static let idleSeconds: Double = 12
 
     let descriptor: ModelDescriptor
     private let queue = DispatchQueue(label: "io.github.redsn0w1877.pixlaudio.localmodel", qos: .userInitiated)
@@ -87,7 +95,32 @@ nonisolated final class LocalModelRuntime: @unchecked Sendable {
     /// `body` before its next model step; a request still waiting for the queue throws `CancellationError` at once
     /// and never runs (so a time-out or a closed sheet doesn't wait behind another request's generation).
     func run<T: Sendable>(_ body: @escaping @Sendable (Session) throws -> T) async throws -> T {
+        // The one gate: automatic callers, safe mode, low memory, Low Power Mode, heat and "not in front" never load it.
+        if case .denied(let why) = LocalModelGate.canLoad() { throw LoadError(detail: why) }
         let flag = CancelFlag()
+        let handle = HeavyWorkGate.shared.registerCancel { flag.set() }
+        defer { HeavyWorkGate.shared.unregisterCancel(handle) }
+        await MainActor.run { LocalModelActivity.shared.requestQueued() }
+        var failure: String?
+        do {
+            let value = try await runGated(flag, body)
+            Task { @MainActor in LocalModelActivity.shared.requestEnded(failure: nil) }
+            return value
+        } catch {
+            if !(error is CancellationError) { failure = (error as? LoadError)?.detail ?? error.localizedDescription }
+            let message = failure
+            Task { @MainActor in LocalModelActivity.shared.requestEnded(failure: message) }
+            throw error
+        }
+    }
+
+    /// Stops every request (Cancel on the row, Cancel all, Emergency stop) and frees the model.
+    func cancelAll() {
+        HeavyWorkGate.shared.abortHeavyWork()
+        unload()
+    }
+
+    private func runGated<T: Sendable>(_ flag: CancelFlag, _ body: @escaping @Sendable (Session) throws -> T) async throws -> T {
         let pending = PendingRequest<T>()
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<T, any Error>) in
@@ -98,12 +131,28 @@ nonisolated final class LocalModelRuntime: @unchecked Sendable {
                     guard pending.begin() else { return }
                     self.idleUnload?.cancel()
                     defer { self.scheduleIdleUnload() }
+                    JobTelemetry.shared.started("localModel", id: "request")
+                    DiagnosticsLog.shared.log("memory", "model request begins; \(LocalModelGate.memoryText())")
+                    Task { @MainActor in LocalModelActivity.shared.set(.loading) }
+                    defer { DiagnosticsLog.shared.log("memory", "model request ends; \(LocalModelGate.memoryText())") }
                     do {
                         let session = Session(tokenizer: try self.loadTokenizer(), runtime: self, flag: flag)
-                        pending.succeed(try body(session))
+                        let value = try body(session)
+                        JobTelemetry.shared.ended("localModel", id: "request", .finished)
+                        pending.succeed(value)
                     } catch let error as LocalGenerationError where error == .cancelled {
-                        pending.fail(CancellationError())
+                        JobTelemetry.shared.ended("localModel", id: "request", .cancelled("stopped"))
+                        if flag.lowMemory {
+                            // Not enough memory: free it at once and say why.
+                            self.model = nil
+                            self.generator = nil
+                            self.tokenizer = nil
+                            pending.fail(LoadError(detail: "Not enough memory on this phone"))
+                        } else {
+                            pending.fail(CancellationError())
+                        }
                     } catch {
+                        JobTelemetry.shared.ended("localModel", id: "request", .failed(error.localizedDescription))
                         pending.fail(error)
                     }
                 }
@@ -117,6 +166,8 @@ nonisolated final class LocalModelRuntime: @unchecked Sendable {
     /// Loads the model ahead of a request (a sheet opening); errors wait for the request itself.
     func prewarm() {
         queue.async {
+            // Not while the app is out of the foreground (a compile / GPU load there is what the system punishes).
+            guard LocalModelGate.canLoad() == .allowed else { return }
             self.idleUnload?.cancel()
             _ = try? self.loadTokenizer()
             _ = try? self.loadModel()
@@ -168,14 +219,29 @@ nonisolated final class LocalModelRuntime: @unchecked Sendable {
         guard ModelManager.isInstalled(descriptor), let url = ModelManager.compiledURL(descriptor) else {
             throw OnDeviceFailure.localModelMissing
         }
+        // A load while the app is out of the foreground (a queued request that ran late) is refused: GPU work and the
+        // first-use compile belong to the foreground.
+        guard HeavyWorkGate.shared.isForeground || HeavyWorkGate.shared.hasBackgroundWindow else {
+            throw LoadError(detail: "PixlAudio was not in front")
+        }
         let started = Date()
+        DiagnosticsLog.shared.log("memory", "model load begins; \(LocalModelGate.memoryText())")
         do {
-            let loaded = try CoreMLCausalModel(compiledURL: url, computeUnits: prefersCPU ? .cpuOnly : .cpuAndGPU)
+            // CPU only: the configuration the parity gate measured. The GPU (and its first-use compile) is never used.
+            let loaded = try CoreMLCausalModel(compiledURL: url, computeUnits: .cpuOnly)
+            DiagnosticsLog.shared.log("memory", "model loaded; \(LocalModelGate.memoryText())")
+            if LocalModelGate.availableBytes() < LocalModelGatePolicy.floorBytes {
+                throw LoadError(detail: "Not enough memory on this phone")
+            }
             let generator = LocalLLMGenerator(model: loaded)
             model = loaded
             self.generator = generator
             pendingLoadSeconds = Date().timeIntervalSince(started)
             return (loaded, generator)
+        } catch let error as LoadError {
+            model = nil
+            generator = nil
+            throw error
         } catch {
             throw LoadError(detail: "it couldn't be loaded")
         }
@@ -184,6 +250,7 @@ nonisolated final class LocalModelRuntime: @unchecked Sendable {
     fileprivate func generate(_ request: LocalGenerationRequest, stopWhen: ([Int]) -> Bool,
                               flag: CancelFlag) throws -> LocalGenerationResult {
         var (model, generator) = try loadModel()
+        Task { @MainActor in LocalModelActivity.shared.set(.generating) }
         let result: LocalGenerationResult
         do {
             result = try generator.generate(request, stopWhen: stopWhen, isCancelled: { flag.isSet })
@@ -211,11 +278,40 @@ nonisolated final class LocalModelRuntime: @unchecked Sendable {
 nonisolated final class CancelFlag: @unchecked Sendable {
     private let lock = NSLock()
     private var value = false
+    /// `HeavyWorkGate`'s abort count when the request began: a critical memory event or an Emergency stop bumps it.
+    private let epoch = HeavyWorkGate.shared.abortEpoch
+    private var lowMemoryHit = false
 
-    var isSet: Bool {
+    /// The generation stopped because free memory fell under the floor.
+    var lowMemory: Bool {
         lock.lock()
         defer { lock.unlock() }
-        return value
+        return lowMemoryHit
+    }
+
+    /// Whether the generation must stop before its next model step: the task was cancelled, everything heavy was told to
+    /// stop, or the app has not been in the foreground for 1.5 s (a short interruption only pauses it).
+    var isSet: Bool {
+        lock.lock()
+        let cancelled = value
+        lock.unlock()
+        if cancelled { return true }
+        let gate = HeavyWorkGate.shared
+        if gate.abortEpoch != epoch { return true }
+        if LocalModelGate.availableBytes() < LocalModelGatePolicy.floorBytes {
+            lock.lock()
+            lowMemoryHit = true
+            lock.unlock()
+            DiagnosticsLog.shared.log("memory", "generation stopped: free memory under the floor; \(LocalModelGate.memoryText())")
+            return true
+        }
+        if gate.isForeground { return false }
+        for _ in 0..<30 {
+            Thread.sleep(forTimeInterval: 0.05)
+            if gate.isForeground { return false }
+        }
+        DiagnosticsLog.shared.log("model", "generation stopped: the app left the foreground")
+        return true
     }
 
     func set() {

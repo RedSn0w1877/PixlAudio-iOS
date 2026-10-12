@@ -403,6 +403,8 @@ final class CloudStudio {
 
     /// The person confirmed the batch: one job per song, then everything runs on its own.
     func send(_ preview: CloudBatchPreview) async {
+        // A person-started batch is the go-ahead that safe mode waits for.
+        HeavyWorkGate.shared.userStartedHeavyWork()
         // Built-in keys that turn out not to open switch the default consent off: know before anything is queued.
         await settings.loadBuiltInKeys()
         guard settings.isEnabled, !preview.isEmpty, preview.estimate.fitsCap else { return }
@@ -807,6 +809,9 @@ final class CloudStudio {
 
     private func startPreparations() {
         guard canStartNewWork else { return }
+        // Safe mode (the app closed unexpectedly) and Emergency stop: the stored queue does not start preparing (the decode
+        // is the heavy part) by itself; sending songs again is the go-ahead (`send`). Uploads and results carry on.
+        guard HeavyWorkGate.shared.allowsLaunchWork else { return }
         let now = dependencies.nowMs()
         // While lyric sync, a separation or a model install holds the heavy lane, preparing songs (a CPU-bound decode)
         // goes one at a time so the phone is not asked for everything at once.

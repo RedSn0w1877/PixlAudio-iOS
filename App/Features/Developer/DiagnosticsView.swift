@@ -22,6 +22,9 @@ struct DiagnosticsView: View {
 
     var body: some View {
         Form {
+            // Build identity, live status, Safe mode, Share logs and Emergency stop come first.
+            DiagnosticsHealthSection()
+
             Section {
                 Button {
                     Task { await model.toggleTone() }
@@ -104,6 +107,8 @@ struct DiagnosticsView: View {
 
             Section("Build") {
                 LabeledContent("Version", value: AppInfo.versionString)
+                LabeledContent("Commit", value: BuildStamp.gitSHA)
+                LabeledContent("Built", value: BuildStamp.builtOn)
                 LabeledContent("Core modules", value: "\(Self.coreModules.count) linked")
                 Text(Self.coreModules.joined(separator: " · "))
                     .font(.caption)

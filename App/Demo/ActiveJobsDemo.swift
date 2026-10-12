@@ -14,6 +14,8 @@ enum ActiveJobsDemo {
         /// A few things still running, and what went wrong: a model with no source, a download with no connection, a
         /// cloud batch, a library sync, the matcher and a lyric sync (the Retry / Dismiss / Clear finished state).
         case failures
+        /// After the app closed unexpectedly: two things still waiting, and what was interrupted (Retry, Dismiss).
+        case interrupted
     }
 
     /// 2026-10-07 18:00 UTC, the same clock as `CloudDemo`.
@@ -24,6 +26,7 @@ enum ActiveJobsDemo {
         case .jobsNone: .none
         case .jobsMixed: .mixed
         case .jobsFailed: .failures
+        case .jobsInterrupted: .interrupted
         case .homeJobs, .jobs: .running
         default: .none
         }
@@ -39,6 +42,7 @@ enum ActiveJobsDemo {
         case .running: return running
         case .mixed: return running + finished
         case .failures: return Array(running.prefix(3)) + failures
+        case .interrupted: return Array(running.suffix(2)) + interrupted
         }
     }
 
@@ -67,6 +71,21 @@ enum ActiveJobsDemo {
             ActiveJob(id: "tais.failed.lyricsSync.demo", kind: .lyricsSync,
                       subtitle: "Glass Hours · The lyric sync model isn't downloaded yet", state: .failed,
                       updatedAtMs: now - 5 * 3_600_000, canRetry: true),
+        ]
+    }
+
+    /// What the previous run had in flight when it ended abnormally: "Interrupted", nothing restarted by itself.
+    private static var interrupted: [ActiveJob] {
+        [
+            ActiveJob(id: "interrupted.lyricsSync.demo1", kind: .lyricsSync, title: "Interrupted",
+                      subtitle: "Lyric sync · Neon Harbor · PixlAudio closed while this was running", state: .failed,
+                      updatedAtMs: now - 4 * 60_000, canRetry: true),
+            ActiveJob(id: "interrupted.modelDownload.wav2vec2", kind: .modelDownload, title: "Interrupted",
+                      subtitle: "Model install · Lyric sync model · PixlAudio closed while this was running",
+                      state: .failed, updatedAtMs: now - 4 * 60_000, canRetry: true),
+            ActiveJob(id: "interrupted.instrumental.demo2", kind: .instrumental, title: "Interrupted",
+                      subtitle: "Instrumental · Glass Hours · PixlAudio closed while this was running", state: .failed,
+                      updatedAtMs: now - 4 * 60_000, canRetry: true),
         ]
     }
 

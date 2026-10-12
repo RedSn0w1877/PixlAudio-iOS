@@ -14,6 +14,10 @@ struct AboutView: View {
         SettingsScaffold(title: L10n.aboutScreenTitle, screenID: screenID, expandedHeight: 118, spacing: 0) {
             AboutHeroCard { router.push(.easterEgg) }
                 .padding(.top, 8)
+            // Which build is installed (commit and day), and the way to the logs: the first things to read when a bug
+            // is reported.
+            AboutBuildCard { router.push(.diagnostics) }
+                .padding(.top, 12)
             AppUpdateCard()
                 .padding(.top, 12)
             AboutSectionHeader(title: L10n.aboutMaintainerTitle, subtitle: L10n.aboutMaintainerSubtitle)
@@ -30,6 +34,44 @@ struct AboutView: View {
         .opacity(appeared ? 1 : 0)
         .offset(y: appeared ? 0 : 40)
         .onAppear { withAnimation(.easeOut(duration: 0.4)) { appeared = true } }
+    }
+}
+
+/// The installed build's identity and the Diagnostics row: "Build 12 · commit 9bbcf8b · 2026-10-10".
+private struct AboutBuildCard: View {
+    let onDiagnostics: () -> Void
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(BuildIdentity.shortLine)
+                .pixlFont(.labelLarge, weight: .semibold)
+                .foregroundStyle(theme.onSurface)
+                .textSelection(.enabled)
+                .accessibilityIdentifier("about.build")
+            Button(action: onDiagnostics) {
+                HStack(spacing: 8) {
+                    Image(systemName: "stethoscope")
+                        .font(.system(size: 15, weight: .semibold))
+                    Text("Diagnostics, logs and emergency stop")
+                        .pixlFont(.labelLarge)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundStyle(theme.onSecondaryContainer)
+                .padding(.horizontal, 14)
+                .frame(minHeight: 40)
+                .background(theme.secondaryContainer, in: Capsule())
+                .contentShape(Capsule())
+            }
+            .buttonStyle(PressScaleButtonStyle(pressedScale: 0.97))
+            .accessibilityIdentifier("about.diagnostics")
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .pixlGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous),
+                   tint: theme.surfaceContainerLow.opacity(GlassTint.surface))
     }
 }
 

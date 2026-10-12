@@ -23,6 +23,9 @@ final class TaisBackgroundRun {
     private var task: BGContinuedProcessingTask?
     private var isActive = false
     private var assertion: UIBackgroundTaskIdentifier = .invalid
+    /// Whether this run has told `HeavyWorkGate` that iOS granted it background time (the continued-processing task, or
+    /// the assertion that covers the gap before it): heavy work may carry on out of the foreground only inside one.
+    private var windowOpen = false
     private var pendingTitle = ""
     private var pendingSubtitle = ""
     private var pendingFraction = 0.0
@@ -81,6 +84,7 @@ final class TaisBackgroundRun {
             self.task = nil
         }
         endAssertion()
+        updateWindow()
     }
 
     private func register() {
@@ -103,6 +107,7 @@ final class TaisBackgroundRun {
 
     private func attach(_ task: BGContinuedProcessingTask) {
         self.task = task
+        updateWindow()
         lastSent = nil
         endAssertion()
         task.expirationHandler = { [weak self] in
@@ -111,6 +116,7 @@ final class TaisBackgroundRun {
                     guard let self else { return }
                     self.task = nil
                     self.isActive = false
+                    self.updateWindow()
                     self.onExpired?()
                 }
             }
@@ -123,11 +129,21 @@ final class TaisBackgroundRun {
         assertion = UIApplication.shared.beginBackgroundTask(withName: "TAIS Studio") { [weak self] in
             MainActor.assumeIsolated { self?.endAssertion() }
         }
+        updateWindow()
     }
 
     private func endAssertion() {
         guard assertion != .invalid else { return }
         UIApplication.shared.endBackgroundTask(assertion)
         assertion = .invalid
+        updateWindow()
+    }
+
+    private func updateWindow() {
+        let wanted = task != nil || assertion != .invalid
+        guard wanted != windowOpen else { return }
+        windowOpen = wanted
+        if wanted { HeavyWorkGate.shared.windowOpened() } else { HeavyWorkGate.shared.windowClosed() }
+        DiagnosticsLog.shared.log("background", "\(identifier.hasSuffix("cloud-prepare") ? "cloud prepare" : "studio") window \(wanted ? "open" : "closed")")
     }
 }

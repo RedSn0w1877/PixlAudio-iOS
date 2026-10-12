@@ -158,7 +158,22 @@ struct SpotifyDashboardView: View {
                     .pixlFont(.bodyMedium)
                     .foregroundStyle(theme.onSurface)
                     .lineLimit(1)
+                Spacer(minLength: 0)
             }
+            SpotifyOutlinedButton(title: "Cancel import", systemImage: "xmark.circle", fullWidth: true,
+                                  identifier: "spotify.cancelSync") { spotify.cancelSync() }
+        }
+        if spotify.isMatching {
+            HStack(spacing: 10) {
+                ProgressView().controlSize(.small).tint(theme.primary)
+                Text("Finding audio for your songs…")
+                    .pixlFont(.bodyMedium)
+                    .foregroundStyle(theme.onSurface)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            SpotifyOutlinedButton(title: "Cancel finding audio", systemImage: "xmark.circle", fullWidth: true,
+                                  identifier: "spotify.cancelMatch") { spotify.cancelMatching() }
         }
 
         HStack(spacing: 8) {

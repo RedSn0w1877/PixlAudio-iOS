@@ -173,6 +173,14 @@ final class AutomaticStudioRunner {
             status = "Prepares songs while PixlAudio is open"
             return
         }
+        // Safe mode (the app closed unexpectedly), a hot phone, Low Power Mode, memory pressure or an Emergency stop: no
+        // automatic heavy work now.
+        guard HeavyWorkGate.shared.allowsAutomaticStart else {
+            status = HeavyWorkGate.shared.automaticStartsBlocked
+                ? "Paused: PixlAudio closed unexpectedly. Review Active jobs, or turn off Safe mode in Developer settings"
+                : "Paused while the phone is busy, hot or saving power"
+            return
+        }
         if let job = activeObservedJob() {
             if playback.isPlaying {
                 // Playback comes first: the unattended job stops and is retried a little later.

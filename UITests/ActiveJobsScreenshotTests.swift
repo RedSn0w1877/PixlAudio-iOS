@@ -17,6 +17,14 @@ final class ActiveJobsScreenshotTests: XCTestCase {
     func testSheetMixedDark() throws { try capture("jobs.mixed", "dark", ready: "screen.jobs", expand: true) }
     func testSheetEmptyLight() throws { try capture("jobs.none", "light", ready: "screen.jobs") }
 
+    /// After the app closed unexpectedly: what was interrupted waits for Retry or Dismiss; nothing restarted by itself.
+    func testSheetInterruptedLight() throws { try capture("jobs.interrupted", "light", ready: "screen.jobs", expand: true) }
+    func testSheetInterruptedDark() throws { try capture("jobs.interrupted", "dark", ready: "screen.jobs", expand: true) }
+
+    /// Home after the app closed unexpectedly: the one-time banner (heavy jobs are paused).
+    func testHomeSafeModeBannerLight() throws { try capture("home.safeMode", "light", ready: "screen.home", banner: true) }
+    func testHomeSafeModeBannerDark() throws { try capture("home.safeMode", "dark", ready: "screen.home", banner: true) }
+
     func testSheetFailedLight() throws { try capture("jobs.failed", "light", ready: "screen.jobs", expand: true) }
     func testSheetFailedDark() throws { try capture("jobs.failed", "dark", ready: "screen.jobs", expand: true) }
 
@@ -124,6 +132,41 @@ final class ActiveJobsScreenshotTests: XCTestCase {
         app.terminate()
     }
 
+    /// An interrupted row has Retry and Dismiss; Retry starts it again, Dismiss forgets it.
+    func testInterruptedRowsCanBeRetriedOrDismissed() throws {
+        continueAfterFailure = false
+        let app = launch("jobs.interrupted", "light")
+        XCTAssertTrue(app.descendants(matching: .any)["screen.jobs"].firstMatch.waitForExistence(timeout: 20))
+        expandSheet(app)
+        let dismiss = app.buttons["jobs.dismiss.interrupted.lyricsSync.demo1"].firstMatch
+        XCTAssertTrue(dismiss.waitForExistence(timeout: 10), "an interrupted row has a Dismiss")
+        let retry = app.buttons["jobs.retry.interrupted.modelDownload.wav2vec2"].firstMatch
+        XCTAssertTrue(retry.waitForExistence(timeout: 10), "an interrupted row has a Retry")
+        retry.tap()
+        waitForDisappearance(retry)
+        dismiss.tap()
+        waitForDisappearance(app.descendants(matching: .any)["jobs.row.interrupted.lyricsSync.demo1"].firstMatch)
+        attach(app, "jobs.interrupted-after-light")
+        app.terminate()
+    }
+
+    /// The banner has a dismiss and opens Active jobs from its text.
+    func testSafeModeBannerDismissesAndOpensTheSheet() throws {
+        continueAfterFailure = false
+        let app = launch("home.safeMode", "light")
+        let banner = app.descendants(matching: .any)["home.safeModeBanner"].firstMatch
+        XCTAssertTrue(banner.waitForExistence(timeout: 20), "the banner is missing")
+        app.buttons["home.safeMode.dismiss"].firstMatch.tap()
+        waitForDisappearance(banner)
+        app.terminate()
+        let again = launch("home.safeMode", "light")
+        XCTAssertTrue(again.descendants(matching: .any)["home.safeModeBanner"].firstMatch.waitForExistence(timeout: 20))
+        again.buttons["home.safeMode.review"].firstMatch.tap()
+        XCTAssertTrue(again.descendants(matching: .any)["screen.jobs"].firstMatch.waitForExistence(timeout: 10),
+                      "the banner did not open Active jobs")
+        again.terminate()
+    }
+
     // MARK: - A failed model download
 
     func testFailedModelDownloadLight() throws { try captureFailedModel("light") }
@@ -190,11 +233,15 @@ final class ActiveJobsScreenshotTests: XCTestCase {
     }
 
     private func capture(_ screen: String, _ appearance: String, ready: String, home: Bool = false,
-                         expand: Bool = false) throws {
+                         expand: Bool = false, banner: Bool = false) throws {
         continueAfterFailure = false
         let app = launch(screen, appearance)
         XCTAssertTrue(app.descendants(matching: .any)[ready].firstMatch.waitForExistence(timeout: 20),
                       "\(ready) did not appear")
+        if banner {
+            XCTAssertTrue(app.descendants(matching: .any)["home.safeModeBanner"].firstMatch.waitForExistence(timeout: 10),
+                          "the safe-mode banner is not visible")
+        }
         if home {
             XCTAssertTrue(app.descendants(matching: .any)["home.jobs"].firstMatch.waitForExistence(timeout: 10),
                           "the jobs button is not visible")

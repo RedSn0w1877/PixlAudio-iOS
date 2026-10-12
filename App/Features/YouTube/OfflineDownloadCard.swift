@@ -53,6 +53,14 @@ struct OfflineDownloadCard: View {
                 }
             }
             .accessibilityIdentifier("songInfo.download")
+            // A download can be stopped here (it used to be a disabled "Downloading…" with no way out).
+            if isDownloading(state), let videoId = YouTubeSongIdentity.videoId(for: song) {
+                YouTubeWideButton(title: "Cancel download", systemImage: "xmark.circle", tint: theme.errorContainer,
+                                  foreground: theme.onErrorContainer, onGlass: true) {
+                    env.youtube.downloads.cancel(videoId: videoId)
+                }
+                .accessibilityIdentifier("songInfo.download.cancel")
+            }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)

@@ -20,7 +20,7 @@ allowed_imports=(
   FoundationModels NaturalLanguage Translation CoreML Vision Speech SoundAnalysis
   AuthenticationServices SafariServices WebKit JavaScriptCore Network BackgroundTasks AppIntents
   Compression CoreHaptics CoreTransferable LinkPresentation PhotosUI Photos StoreKit TipKit
-  SystemConfiguration UserNotifications ActivityKit CoreSpotlight MobileCoreServices GameController
+  SystemConfiguration UserNotifications ActivityKit CoreSpotlight MobileCoreServices GameController MetricKit
 )
 
 swift_dirs=()
@@ -102,6 +102,13 @@ if [ -f "$key_stub" ]; then
   if ! grep -qE 'static let shares: \[\[UInt8\]\] = \[\]' "$key_stub"; then
     err "$key_stub: must be the empty stub (static let shares: [[UInt8]] = [])"
   fi
+fi
+
+# 9. Build identity: the committed file is the stub; CI writes the commit and day after this check
+#    (ci/write-build-identity.sh).
+stamp_stub=App/Generated/BuildStamp.swift
+if [ -f "$stamp_stub" ] && ! grep -qE 'static let gitSHA = "local"' "$stamp_stub"; then
+  err "$stamp_stub: commit only the stub (gitSHA = \"local\"); CI writes the real commit"
 fi
 
 if [ $fail -ne 0 ]; then

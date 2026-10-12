@@ -38,6 +38,20 @@ struct InstrumentalRenderAction: View {
                     .pixlFont(.bodyMedium)
                     .foregroundStyle(.white.opacity(0.85))
                     .accessibilityIdentifier("lyrics.instrumental.detail")
+                Button {
+                    studio.cancel(.instrumental, songId: song.id)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "xmark.circle")
+                        Text("Cancel").pixlFont(.labelLarge)
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .background(Color.white.opacity(0.16), in: Capsule())
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(PressScaleButtonStyle(pressedScale: 0.97))
+                .accessibilityIdentifier("lyrics.instrumental.cancel")
             }
             if !isRunning, !ready, case .failed(let reason)? = job?.phase {
                 Text(reason).pixlFont(.bodyMedium).foregroundStyle(theme.error)

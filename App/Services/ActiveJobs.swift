@@ -31,6 +31,8 @@ final class ActiveJobs {
         let models: ModelManager
         let studio: TaisStudio
         let cloud: CloudStudio
+        /// What the previous run left in flight (the "Interrupted" rows) and safe mode.
+        let health: AppHealth
     }
 
     /// Queued or running jobs: the Home button's badge (0 hides the button).
@@ -110,6 +112,7 @@ final class ActiveJobs {
         sources.downloads.cancelAll()
         sources.models.cancelAll()
         sources.studio.cancelAll()
+        LocalModelActivity.shared.cancel()
         let cloud = sources.cloud
         Task { await cloud.cancelAll() }
         rearm()
@@ -123,14 +126,52 @@ final class ActiveJobs {
             return
         }
         sources.library.dismissScanFailure()
+        LocalModelActivity.shared.dismissFailure()
         sources.spotify.dismissFailures()
         sources.downloads.clearFailures()
         sources.models.clearFailures()
         sources.studio.clearFinished()
         sources.cloud.clearAllFinished()
+        sources.health.clearInterrupted()
         finishedAt.removeAll()
         rearm()
     }
+
+    /// "Emergency stop" (Settings › Developer › Diagnostics): every queued or running job stops through its own source
+    /// (scans, imports, downloads, the model install, lyric sync, separation, the automatic studio, the Spotify matcher,
+    /// Cloud Studio), every finished, failed and interrupted record is forgotten, the Core ML and language models are
+    /// released, and automatic work stays off for ten minutes so nothing starts again behind the person's back. The event
+    /// log is kept: it is the evidence.
+    func emergencyStop() {
+        // UI tests (demo rows): everything goes, no service is touched.
+        guard let sources else {
+            demoRows = []
+            republishDemo()
+            return
+        }
+        DiagnosticsLog.shared.log("emergency", "stop requested; active rows: \(badgeCount)")
+        HeavyWorkGate.shared.suspendAutomaticStarts(forMs: 10 * 60_000)
+        HeavyWorkGate.shared.abortHeavyWork()
+        cancelAll()
+        clearFinished()
+        sources.health.clearInterrupted()
+        JobTelemetry.shared.clearJournal()
+        sources.studio.releaseModels()
+        LocalModelRuntime.shared.unload()
+        // Every registered cancel handle, whatever rows show (the AI model had none).
+        let handles = HeavyWorkGate.shared.cancelAllHandles()
+        DiagnosticsLog.shared.log("emergency", "cancelled \(handles) registered handle(s)")
+        let cloud = sources.cloud
+        Task {
+            await cloud.cancelAll()
+            cloud.clearAllFinished()
+        }
+        DiagnosticsLog.shared.log("emergency", "stop done")
+        rearm()
+    }
+
+    /// What Emergency stop would stop: queued or running rows, plus the work no row shows.
+    var emergencyStopTargets: Int { badgeCount + finishedCount + (sources?.health.interrupted.count ?? 0) }
 
     /// "Dismiss" on one finished or failed row: its source forgets it, so it cannot come back.
     func dismiss(_ job: ActiveJob) {
@@ -142,6 +183,7 @@ final class ActiveJobs {
         }
         switch Handle(id: job.id) {
         case .libraryFailure?: sources.library.dismissScanFailure()
+        case .localModelFailure?: LocalModelActivity.shared.dismissFailure()
         case .spotifySyncFailure?, .spotifyMatchFailure?: sources.spotify.dismissFailures()
         case .downloadFailure(let videoId)?: sources.downloads.dismissFailure(videoId: videoId)
         case .modelFailure(let raw)?:
@@ -149,10 +191,18 @@ final class ActiveJobs {
         case .studioSong(let kind, let songId, _)?:
             if let studioKind = Self.studioKind(kind) { sources.studio.dismiss(studioKind, songId: songId) }
         case .cloud(let batchId)?: sources.cloud.clearBatch(batchId)
+        case .interrupted(let kind, let reference)?:
+            if let entry = Self.interruptedEntry(sources.health, kind: kind, reference: reference) {
+                sources.health.dismissInterrupted(entry)
+            }
         default: break
         }
         finishedAt[job.id] = nil
         rearm()
+    }
+
+    private static func interruptedEntry(_ health: AppHealth, kind: String, reference: String) -> InFlightEntry? {
+        health.interrupted.first { $0.kind == kind && $0.reference == reference }
     }
 
     /// "Retry" on a failed row whose source can start the work again (`ActiveJob.canRetry`).
@@ -181,10 +231,36 @@ final class ActiveJobs {
                 sources.studio.start(studioKind, song: song, forceResync: false)
             }
         case .cloud(let batchId)?: sources.cloud.retryBatch(batchId)
+        case .interrupted(let kind, let reference)?:
+            // Pressing Retry is the person's decision that heavy work may run again (safe mode lifts for this run).
+            if let entry = Self.interruptedEntry(sources.health, kind: kind, reference: reference) {
+                sources.health.userRetried()
+                sources.health.dismissInterrupted(entry)
+                retryInterrupted(kind: kind, reference: reference, sources: sources)
+            }
         default: break
         }
         finishedAt[job.id] = nil
         rearm()
+    }
+
+    /// Starts again what an abnormal end interrupted, through the same entry point the Retry of a failed row uses.
+    private func retryInterrupted(kind: String, reference: String, sources: Sources) {
+        guard let jobKind = ActiveJob.Kind(rawValue: kind) else { return }
+        switch jobKind {
+        case .lyricsSync, .instrumental, .roformer:
+            if let studioKind = Self.studioKind(jobKind), let song = sources.library.song(id: reference) {
+                sources.studio.start(studioKind, song: song, forceResync: false)
+            }
+        case .modelDownload:
+            if let id = ModelDescriptor.ID(rawValue: reference) { sources.models.download(id) }
+        case .libraryScan:
+            let library = sources.library
+            Task { try? await library.refresh() }
+        case .spotifyMatch: sources.spotify.startMatching(retryFailed: false)
+        case .spotifyImport: sources.spotify.syncNow()
+        case .songDownload, .cloud, .localModel: break
+        }
     }
 
     /// "Cancel" on one running or waiting row (its context menu): the work stops through its source.
@@ -197,6 +273,7 @@ final class ActiveJobs {
         }
         switch Handle(id: job.id) {
         case .library?: sources.library.cancelScans()
+        case .localModel?: LocalModelActivity.shared.cancel()
         case .spotifySync?: sources.spotify.cancelSync()
         case .spotifyMatch?: sources.spotify.cancelMatching()
         case .download(let videoId)?: sources.downloads.cancel(videoId: videoId)
@@ -226,12 +303,21 @@ final class ActiveJobs {
         /// One finished or failed studio job.
         case studioSong(kind: ActiveJob.Kind, songId: String, failed: Bool)
         case cloud(batchId: String)
+        case localModel, localModelFailure
+        /// A job the previous run had in flight when it ended abnormally ("interrupted.<kind>.<reference>").
+        case interrupted(kind: String, reference: String)
 
         init?(id: String) {
+            if let parsed = InFlightJournal.parse(rowId: id) {
+                self = .interrupted(kind: parsed.kind, reference: parsed.reference)
+                return
+            }
             func rest(after prefix: String) -> String? {
                 id.hasPrefix(prefix) ? String(id.dropFirst(prefix.count)) : nil
             }
             switch id {
+            case "localmodel": self = .localModel
+            case "localmodel.failed": self = .localModelFailure
             case "library": self = .library
             case "library.failed": self = .libraryFailure
             case "spotify.sync": self = .spotifySync
@@ -366,6 +452,7 @@ final class ActiveJobs {
         }
         if sources.spotify.isSyncing { add(running: true) }
         if sources.spotify.isMatching { add(running: true) }
+        if let phase = LocalModelActivity.shared.phase { add(running: phase != .waiting) }
         for state in sources.downloads.states.values {
             if case .downloading = state { add(running: true) }
         }
@@ -388,12 +475,34 @@ final class ActiveJobs {
         var rows: [ActiveJob] = []
         rows += libraryRows(sources.library)
         rows += spotifyRows(sources.spotify)
+        rows += localModelRows()
         rows += downloadRows(sources.downloads)
         rows += modelRows(sources.models)
         rows += studioRows(sources.studio, library: sources.library)
         rows += CloudActiveJobMapper.rows(sources.cloud.jobs, transfer: sources.cloud.transferProgress)
+        rows += interruptedRows(sources)
         stampFinished(rows)
         return rows.map { stamped($0) }
+    }
+
+    /// What the previous run had in flight when it ended abnormally. Nothing is restarted by itself: each row waits for
+    /// Retry (or Dismiss). Only work the app can start again is listed.
+    private func interruptedRows(_ sources: Sources) -> [ActiveJob] {
+        sources.health.interrupted.compactMap { entry -> ActiveJob? in
+            guard let kind = ActiveJob.Kind(rawValue: entry.kind), kind != .songDownload, kind != .cloud,
+                  kind != .localModel else { return nil }
+            var what = kind.label
+            switch kind {
+            case .lyricsSync, .instrumental, .roformer:
+                what += " · " + (sources.library.song(id: entry.reference)?.title ?? "a song")
+            case .modelDownload:
+                if let id = ModelDescriptor.ID(rawValue: entry.reference) { what = "Installing \(ModelCatalog.descriptor(id).title.lowercased())" }
+            default: break
+            }
+            return ActiveJob(id: InFlightJournal.rowId(entry), kind: kind, title: "Interrupted",
+                             subtitle: "\(what) · PixlAudio closed while this was running", state: .failed,
+                             updatedAtMs: entry.startedAtMs, canRetry: true)
+        }
     }
 
     private func libraryRows(_ library: LibraryStore) -> [ActiveJob] {
@@ -406,6 +515,21 @@ final class ActiveJobs {
         if let failure = library.scanFailure {
             rows.append(ActiveJob(id: "library.failed", kind: .libraryScan, title: "Library sync failed", subtitle: failure,
                                   state: .failed, canRetry: true))
+        }
+        return rows
+    }
+
+    private func localModelRows() -> [ActiveJob] {
+        let activity = LocalModelActivity.shared
+        var rows: [ActiveJob] = []
+        if let phase = activity.phase {
+            let words = phase == .waiting ? "Waiting" : phase == .loading ? "Loading the model…" : "Writing an answer…"
+            rows.append(ActiveJob(id: "localmodel", kind: .localModel, subtitle: words,
+                                  state: phase == .waiting ? .queued : .running))
+        }
+        if let failure = activity.failure {
+            rows.append(ActiveJob(id: "localmodel.failed", kind: .localModel, title: "AI model stopped", subtitle: failure,
+                                  state: .failed))
         }
         return rows
     }
@@ -463,10 +587,12 @@ final class ActiveJobs {
                                  percent: ActiveJobBoard.percent(fraction: fraction), state: .running)
             case .installing:
                 let waiting = models.isWaitingToInstall(descriptor.id)
+                let forForeground = models.isWaitingForForeground(descriptor.id)
                 return ActiveJob(id: "model.\(descriptor.id.rawValue)", kind: .modelDownload,
-                                 subtitle: waiting ? "Waiting for other work to finish…"
+                                 subtitle: forForeground ? "Installs when PixlAudio is open"
+                                     : waiting ? "Waiting for other work to finish…"
                                      : "Installing the \(descriptor.title.lowercased())…",
-                                 state: waiting ? .queued : .running)
+                                 state: waiting || forForeground ? .queued : .running)
             default:
                 return nil
             }

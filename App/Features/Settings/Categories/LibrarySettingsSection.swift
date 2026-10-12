@@ -185,6 +185,12 @@ struct RefreshLibraryRow: View {
                                enabled: !isSyncing, action: onRebuild)
             if isSyncing {
                 Spacer().frame(height: 12)
+                // The scan can be stopped (it is cancelled for real; a stopped rebuild leaves the library to rescan).
+                SettingsFillButton(title: "Cancel", systemImage: "xmark.circle", style: .outlined, fullWidth: false) {
+                    library.cancelScans()
+                }
+                .accessibilityIdentifier("settings.library.cancelScan")
+                Spacer().frame(height: 12)
                 let phase = label ?? progress?.phase ?? L10n.settingsSyncPhasePreparing
                 if let progress, progress.total > 0 {
                     ProgressView(value: progress.fraction).tint(theme.primary)

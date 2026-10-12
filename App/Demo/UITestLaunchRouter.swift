@@ -51,6 +51,9 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     // `jobs.failed` is a few running rows and six finished ones, most of them failed, with Retry, Dismiss, Clear
     // finished and Cancel all.
     case homeJobs = "home.jobs", jobsNone = "jobs.none", jobsMixed = "jobs.mixed", jobsFailed = "jobs.failed"
+    // Crash protection (2026-10-10): `home.safeMode` is Home after the app closed unexpectedly (the banner), and
+    // `jobs.interrupted` the sheet with what was interrupted (Retry, Dismiss) next to what still runs.
+    case homeSafeMode = "home.safeMode", jobsInterrupted = "jobs.interrupted"
 
     // Full-screen covers
     case nowPlaying, lyrics, lyricsSync, setup
@@ -149,7 +152,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     var route: AppRoute? {
         let demo = DemoLibrary.snapshot
         switch self {
-        case .home, .homeJobs, .jobsNone, .jobsMixed, .jobsFailed, .search, .searchResults, .library, .miniPlayer,
+        case .home, .homeJobs, .homeSafeMode, .jobsNone, .jobsMixed, .jobsFailed, .jobsInterrupted, .search, .searchResults, .library, .miniPlayer,
              .miniPlayerSpotifyConnect:
             return nil
         case .devicesSpotifyConnect, .devicesSpotifyPlaying, .devicesSpotifyReconnect, .devicesSpotifyEmpty,
@@ -250,7 +253,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .lyricsOptions: return .lyricsOptions(songId: songId)
         case .changelog: return .changelog
         case .betaInfo: return .betaInfo
-        case .jobs, .jobsNone, .jobsMixed, .jobsFailed: return .jobs
+        case .jobs, .jobsNone, .jobsMixed, .jobsFailed, .jobsInterrupted: return .jobs
         case .devices, .devicesSpotifyConnect, .devicesSpotifyPlaying, .devicesSpotifyReconnect, .devicesSpotifyEmpty:
             return .devices
         case .artistPicker: return .artistPicker(songId: DemoLibrary.songs[DemoLibrary.featuredSongIndex].id)
