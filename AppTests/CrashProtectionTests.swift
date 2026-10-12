@@ -395,6 +395,7 @@ final class CrashProtectionTests: XCTestCase {
     func testACrashWithTheModelInFlightIsBlamedOnTheModel() {
         let defaults = makeDefaults(), directory = makeDirectory()
         let first = makeHealth(defaults: defaults, directory: directory)
+        first.health.scenePhaseChanged(.active)
         first.telemetry.started("localModel", id: "request")
         let second = makeHealth(defaults: defaults, directory: directory)
         XCTAssertTrue(second.health.localModelBlamed)
