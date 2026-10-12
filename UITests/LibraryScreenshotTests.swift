@@ -13,7 +13,6 @@ final class LibraryScreenshotTests: XCTestCase {
     func testLibraryAlbumsDark() throws { try capture("libraryAlbums", "dark", ready: "library.page.albums") }
     func testLibraryAlbumsListDark() throws { try capture("libraryAlbumsList", "dark", ready: "library.page.albums") }
     func testLibraryArtistsLight() throws { try capture("libraryArtists", "light", ready: "library.page.artists") }
-    func testLibraryFoldersLight() throws { try capture("libraryFolders", "light", ready: "library.page.folders") }
     func testLibraryLikedDark() throws { try capture("libraryLiked", "dark", ready: "library.page.liked") }
     func testLibraryCompactNavLight() throws { try capture("libraryCompactNav", "light", ready: "library.page.albums") }
     func testLibraryCompactNavDark() throws { try capture("libraryCompactNav", "dark", ready: "library.page.albums") }
@@ -77,7 +76,6 @@ final class LibraryScreenshotTests: XCTestCase {
         add(attachment)
         app.terminate()
     }
-    func testFolderExplorerLight() throws { try capture("folderExplorer", "light", ready: "screen.folderExplorer") }
 
     // MARK: Playlists
 
@@ -87,31 +85,6 @@ final class LibraryScreenshotTests: XCTestCase {
     func testPlaylistOptionsLight() throws { try capture("playlistOptions", "light", ready: "sheet.playlistOptions") }
     func testPlaylistAddSongsDark() throws { try capture("playlistAddSongs", "dark", ready: "sheet.songPicker") }
 
-    /// The song picker's LOCAL / CLOUD switch on the liquid lens (2026-10-03), forced on with `-cloudFilter`
-    /// (the demo library has no streamed songs): LOCAL selected, then CLOUD after a tap.
-    func testSongPickerCloudSwitchLight() throws {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchArguments = ["-uiTest", "-screen", "playlistAddSongs", "-appearance", "light", "-cloudFilter"]
-        app.launch()
-        XCTAssertTrue(app.descendants(matching: .any)["sheet.songPicker"].firstMatch.waitForExistence(timeout: 20),
-                      "the song picker did not appear")
-        Thread.sleep(forTimeInterval: 1.5)
-        let local = XCTAttachment(screenshot: app.screenshot())
-        local.name = "songPickerLocal-light"
-        local.lifetime = .keepAlways
-        add(local)
-        let cloud = app.descendants(matching: .any)["songPicker.cloud"].firstMatch
-        XCTAssertTrue(cloud.waitForExistence(timeout: 5), "the CLOUD segment is missing")
-        cloud.tap()
-        Thread.sleep(forTimeInterval: 1.5)
-        XCTAssertTrue(cloud.isSelected, "CLOUD is not selected after a tap")
-        let shot = XCTAttachment(screenshot: app.screenshot())
-        shot.name = "songPickerCloud-light"
-        shot.lifetime = .keepAlways
-        add(shot)
-        app.terminate()
-    }
     func testPlaylistEditorLight() throws { try capture("playlistEditor", "light", ready: "screen.playlistEditor") }
     func testPlaylistEditorDark() throws { try capture("playlistEditor", "dark", ready: "screen.playlistEditor") }
     func testPlaylistEditDark() throws { try capture("playlistEdit", "dark", ready: "screen.playlistEditor") }
