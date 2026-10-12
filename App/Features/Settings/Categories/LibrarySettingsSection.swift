@@ -1,56 +1,30 @@
 import SwiftUI
 
-/// Settings › Music Management (Android `SettingsCategoryScreen` LIBRARY): library structure (music folders and
-/// exclusions, artists), filtering sliders, sync and scanning, offline storage, lyrics management.
-///
-/// iOS: Android's storage explorer becomes the music-folder screen (folders the user picks with the system folder
-/// picker plus the app's Documents folder, each browsable to exclude sub-folders).
+/// Settings › Music Management (Android `SettingsCategoryScreen` LIBRARY): filtering sliders, offline storage, lyrics
+/// management. The app is Spotify-only, so the music-folder, rescan and local-lyrics-file rows are gone.
 struct LibrarySettingsSection: View {
     @Environment(SettingsStore.self) private var settings
-    @Environment(LibraryStore.self) private var library
     @Environment(AppEnvironment.self) private var environment
     @Environment(Router.self) private var router
     @Environment(\.appTheme) private var theme
 
-    @State private var minDuration: Double = 10_000
     @State private var minTracks: Double = 1
     @State private var cacheLimit: Double = 200
-    @State private var showsFolders = false
     @State private var showsTapTiming = false
     @State private var showsResetLyrics = false
-    @State private var showsRebuild = false
-    @State private var isSyncing = false
-    @State private var syncLabel: String?
     @State private var storage: OfflineStorageUsage?
     @State private var toast: String?
 
     var body: some View {
         @Bindable var lyrics = settings.lyrics
         SettingsCategoryScaffold(category: .library, toast: $toast) {
-        SettingsSubsection(title: L10n.settingsLibraryStructureSection) {
-            SettingsItemRow(title: L10n.settingsExcludedDirectoriesTitle,
-                            subtitle: L10n.settingsExcludedDirectoriesSubtitle, systemImage: "folder",
-                            showsChevron: true, identifier: "settings.library.folders") { showsFolders = true }
-            SettingsItemRow(title: L10n.settingsArtistsTitle, subtitle: L10n.settingsArtistsSubtitle,
-                            systemImage: "person", showsChevron: true,
-                            identifier: "settings.library.artists") { router.push(.artistSettings) }
-        }
         SettingsSubsection(title: L10n.settingsFilteringSection) {
-            SliderSettingRow(label: L10n.settingsMinSongDuration, value: $minDuration, range: 0...120_000, steps: 23,
-                             onCommit: { settings.library.minSongDurationMs = Int(minDuration) },
-                             valueText: { "\(Int($0 / 1000))s" })
             SliderSettingRow(label: L10n.settingsMinTracksPerAlbum, value: $minTracks, range: 1...5, steps: 3,
                              onCommit: { settings.library.minTracksPerAlbum = Int(minTracks) },
                              valueText: { "\(Int($0))" })
             SliderSettingRow(label: L10n.settingsAlbumArtCacheLimit, value: $cacheLimit, range: 50...1500, steps: 28,
                              onCommit: { settings.library.albumArtCacheLimitMb = Int(cacheLimit) },
                              valueText: { "\(Int($0)) MB" })
-        }
-        SettingsSubsection(title: L10n.settingsSyncScanningSection) {
-            RefreshLibraryRow(isSyncing: isSyncing, label: syncLabel,
-                              onFullSync: startFullRescan, onRebuild: { showsRebuild = true })
-            SwitchSettingRow(title: L10n.settingsAutoScanLrcTitle, subtitle: L10n.settingsAutoScanLrcSubtitle,
-                             isOn: $lyrics.autoScanLrcFiles, systemImage: "folder")
         }
         SettingsSubsection(title: L10n.settingsStorageSection) {
             let reclaimable = storage?.cachedBytes ?? 0
@@ -84,14 +58,10 @@ struct LibrarySettingsSection: View {
         }
         }
         .onAppear {
-            minDuration = Double(settings.library.minSongDurationMs)
             minTracks = Double(settings.library.minTracksPerAlbum)
             cacheLimit = Double(settings.library.albumArtCacheLimitMb)
         }
         .task { storage = await OfflineStorageUsage.measure() }
-        .fullScreenCover(isPresented: $showsFolders) {
-            MusicFoldersView().environment(\.appTheme, theme)
-        }
         .sheet(isPresented: $showsTapTiming) {
             LyricsTapTimingSheet()
         }
@@ -103,41 +73,6 @@ struct LibrarySettingsSection: View {
         } message: {
             Text(L10n.settingsDialogResetImportedLyricsBody)
         }
-        .alert(L10n.settingsDialogRebuildDatabaseTitle, isPresented: $showsRebuild) {
-            Button(L10n.commonCancel, role: .cancel) {}
-            Button(L10n.settingsActionRebuild, role: .destructive) { rebuild() }
-        } message: {
-            Text(L10n.settingsDialogRebuildDatabaseBody)
-        }
-    }
-
-    private func startFullRescan() {
-        guard !isSyncing else { return }
-        syncLabel = L10n.settingsLabelSyncFullRescan
-        toast = L10n.settingsToastFullRescanStarted
-        runSync { try await library.refresh(mode: .full) }
-    }
-
-    private func rebuild() {
-        guard !isSyncing else { return }
-        syncLabel = L10n.settingsLabelSyncRebuilding
-        toast = L10n.settingsToastRebuildingDatabase
-        let persistence = environment.persistence
-        runSync {
-            try await persistence?.settingsClearLibraryForRebuild()
-            try await library.refresh(mode: .full)
-        }
-    }
-
-    private func runSync(_ work: @escaping () async throws -> Void) {
-        isSyncing = true
-        Task {
-            try? await work()
-            settings.library.artistSettingsRescanRequired = false
-            isSyncing = false
-            syncLabel = nil
-            toast = L10n.settingsToastLibrarySyncFinished
-        }
     }
 
     private func clearCache() {
@@ -146,70 +81,6 @@ struct LibrarySettingsSection: View {
             storage = await OfflineStorageUsage.measure()
             toast = L10n.settingsStorageFreed(ByteFormat.short(freed))
         }
-    }
-}
-
-/// Android `RefreshLibraryItem`: the sync icon, title / subtitle, "Full Rescan" (tonal) and "Rebuild Database"
-/// (outlined, error) buttons, and the progress line while a scan runs.
-struct RefreshLibraryRow: View {
-    let isSyncing: Bool
-    let label: String?
-    let onFullSync: () -> Void
-    let onRebuild: () -> Void
-
-    @Environment(LibraryStore.self) private var library
-    @Environment(\.appTheme) private var theme
-
-    var body: some View {
-        // Read here, not by the section: each progress tick of a scan re-runs this row only.
-        let progress = library.lastImportProgress
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 0) {
-                SettingsIcon(systemImage: "arrow.triangle.2.circlepath").padding(.trailing, 16)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(L10n.settingsRefreshLibraryTitle)
-                        .pixlFont(.titleMedium)
-                        .foregroundStyle(theme.onSurface)
-                    Text(L10n.settingsRefreshLibrarySubtitle)
-                        .pixlFont(.bodyMedium)
-                        .foregroundStyle(theme.onSurfaceVariant)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            Spacer().frame(height: 12)
-            SettingsFillButton(title: L10n.settingsActionFullRescan, systemImage: "arrow.clockwise", style: .tonal,
-                               enabled: !isSyncing, action: onFullSync)
-                .accessibilityIdentifier("settings.library.fullRescan")
-            Spacer().frame(height: 8)
-            SettingsFillButton(title: L10n.settingsActionRebuildDatabase, systemImage: "trash", style: .destructive,
-                               enabled: !isSyncing, action: onRebuild)
-            if isSyncing {
-                Spacer().frame(height: 12)
-                // The scan can be stopped (it is cancelled for real; a stopped rebuild leaves the library to rescan).
-                SettingsFillButton(title: "Cancel", systemImage: "xmark.circle", style: .outlined, fullWidth: false) {
-                    library.cancelScans()
-                }
-                .accessibilityIdentifier("settings.library.cancelScan")
-                Spacer().frame(height: 12)
-                let phase = label ?? progress?.phase ?? L10n.settingsSyncPhasePreparing
-                if let progress, progress.total > 0 {
-                    ProgressView(value: progress.fraction).tint(theme.primary)
-                    Spacer().frame(height: 4)
-                    Text(L10n.settingsSyncProgressDetailed(phase, Int(progress.fraction * 100), progress.completed,
-                                                           progress.total))
-                        .pixlFont(.labelMedium)
-                        .foregroundStyle(theme.onSurfaceVariant)
-                } else {
-                    ProgressView().progressViewStyle(.linear).tint(theme.primary)
-                    Spacer().frame(height: 4)
-                    Text(L10n.settingsSyncProgresIndeterminate(phase))
-                        .pixlFont(.labelMedium)
-                        .foregroundStyle(theme.onSurfaceVariant)
-                }
-            }
-        }
-        .padding(16)
-        .settingsRowGlass()
     }
 }
 

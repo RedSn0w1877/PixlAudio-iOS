@@ -15,7 +15,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case miniPlayerAlone
 
     // Pushed routes
-    case albumDetail, artistDetail, genreDetail, playlistDetail, playlistEditor, folderExplorer
+    case albumDetail, artistDetail, genreDetail, playlistDetail, playlistEditor
     case dailyMix, yourMix, recentlyPlayed, stats
     case settings
     case settingsLibrary = "settingsCategory.library"
@@ -59,7 +59,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case nowPlaying, lyrics, lyricsSync, setup
 
     // Stage 7a: Library tabs, sheets and selection; playlist and genre detail states
-    case libraryAlbums, libraryAlbumsList, libraryArtists, libraryPlaylists, libraryFolders, libraryLiked
+    case libraryAlbums, libraryAlbumsList, libraryArtists, libraryPlaylists, libraryLiked
     case librarySelection, librarySort, libraryReorderTabs, libraryMultiSelection, libraryCreatePlaylist
     case libraryAddToPlaylist, songOptionsInfo
     /// The creation sheet when the selected on-device model can't answer (its system switch is off).
@@ -109,7 +109,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case aiPlaylist, taisChat, taisChatConversation, aiPlaylistLab
 
     // Stage 15: the setup pages (cover `setup` opened on a page) and the backup restore steps (cover `backupImport`)
-    case setupPermission, setupFolders, setupBackup, setupTheme, setupLibraryLayout, setupSpotify, setupFinish
+    case setupBackup, setupTheme, setupLibraryLayout, setupSpotify, setupFinish
     case backupRestorePlan, backupImportReport
 
     // Stage 14: TAIS Studio — Experimental's Remaster Song card and on-device models panel, the song sheet's card,
@@ -130,7 +130,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .home: return "screen.home"
         case .search, .searchResults: return "screen.search"
         case .library, .miniPlayer, .miniPlayerSpotifyConnect: return "screen.library"
-        case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryFolders, .libraryLiked,
+        case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryLiked,
              .librarySelection, .librarySort, .libraryReorderTabs, .libraryMultiSelection, .libraryCreatePlaylist,
              .libraryAddToPlaylist, .libraryCompactNav, .libraryCreatePlaylistOnDeviceOff:
             return "screen.library"
@@ -160,7 +160,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
              .nowPlayingSpotifyVolumeHUD, .lyricsSpotifyVolumeHUD:
             return nil
         case .equalizerSpotifyConnect: return .equalizer
-        case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryFolders, .libraryLiked,
+        case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryLiked,
              .librarySelection, .librarySort, .libraryReorderTabs, .libraryMultiSelection, .libraryCreatePlaylist,
              .libraryAddToPlaylist, .songOptionsInfo, .libraryCompactNav, .libraryCreatePlaylistOnDeviceOff:
             return nil
@@ -173,7 +173,6 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .genreDetail: return .genreDetail(genreId: "Indie")
         case .playlistDetail: return .playlistDetail(playlistId: demo.playlists.first?.id ?? "")
         case .playlistEditor: return .playlistEditor(playlistId: nil)
-        case .folderExplorer: return .folderExplorer(path: nil)
         case .dailyMix: return .dailyMix
         case .yourMix: return .yourMix
         case .recentlyPlayed: return .recentlyPlayed
@@ -215,7 +214,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
              .nowPlaying, .lyrics, .lyricsSync, .setup, .devices, .artistPicker, .editSong, .queueSaveAsPlaylist:
             return nil
         case .aiPlaylist, .taisChat, .taisChatConversation, .aiPlaylistLab: return nil
-        case .setupPermission, .setupFolders, .setupBackup, .setupTheme, .setupLibraryLayout, .setupSpotify, .setupFinish:
+        case .setupBackup, .setupTheme, .setupLibraryLayout, .setupSpotify, .setupFinish:
             return nil
         // A full-screen cover: nothing needs to be pushed underneath (one destination per demo screen).
         case .backupRestorePlan, .backupImportReport: return nil
@@ -233,9 +232,9 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         switch self {
         case .search, .searchResults: .search
         case .library, .miniPlayer, .miniPlayerAlone, .albumDetail, .artistDetail, .genreDetail, .playlistDetail,
-             .playlistEditor, .folderExplorer, .miniPlayerSpotifyConnect:
+             .playlistEditor, .miniPlayerSpotifyConnect:
             .library
-        case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryFolders, .libraryLiked,
+        case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryLiked,
              .librarySelection, .librarySort, .libraryReorderTabs, .libraryMultiSelection, .libraryCreatePlaylist,
              .libraryAddToPlaylist, .songOptionsInfo, .playlistEdit, .playlistAddSongs, .playlistOptions,
              .playlistReorder, .genreSort, .libraryCompactNav, .libraryCreatePlaylistOnDeviceOff, .genreQuickFill:
@@ -301,7 +300,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .editSong: .editSong(songId: DemoLibrary.songs.first?.id ?? "")
         case .lyrics, .taisInstrumental, .taisInstrumentalRendering, .taisInstrumentalActive, .lyricsSpotifyVolumeHUD: .lyrics
         case .lyricsSync, .lyricsSyncSpotifyConnect: .lyricsSync(songId: DemoLibrary.songs.first?.id ?? "")
-        case .setup, .setupPermission, .setupFolders, .setupBackup, .setupTheme, .setupLibraryLayout, .setupSpotify,
+        case .setup, .setupBackup, .setupTheme, .setupLibraryLayout, .setupSpotify,
              .setupFinish:
             .setup
         case .aiPlaylistLab: .aiPlaylistLab

@@ -31,8 +31,6 @@ nonisolated struct LibraryDetailIndex: Sendable {
     /// The artwork of the first song whose primary artist is the key (the artist page's theme fallback); no entry
     /// when that song has none, like `library.songs.first { $0.artistId == id }?.albumArtUriString`.
     let firstArtworkByArtist: [Int64: String]
-    /// `LibraryModel.folderTree(songs)` (folder playlists and the folder explorer resolve their folder in it).
-    let folderTree: [MusicFolder]
 
     static func build(_ songs: [Song], revision: Int) -> LibraryDetailIndex {
         var byAlbum: [Int64: [Song]] = [:]
@@ -53,15 +51,13 @@ nonisolated struct LibraryDetailIndex: Sendable {
             }
         }
         return LibraryDetailIndex(revision: revision, songsByAlbum: byAlbum, songsByArtist: byArtist,
-                                  songsByGenre: byGenre, firstArtworkByArtist: firstArtwork,
-                                  folderTree: LibraryModel.folderTree(songs))
+                                  songsByGenre: byGenre, firstArtworkByArtist: firstArtwork)
     }
 
     /// The same index for a library whose songs did not change (an artist-picture update), under its new revision.
     func restamped(revision: Int) -> LibraryDetailIndex {
         LibraryDetailIndex(revision: revision, songsByAlbum: songsByAlbum, songsByArtist: songsByArtist,
-                           songsByGenre: songsByGenre, firstArtworkByArtist: firstArtworkByArtist,
-                           folderTree: folderTree)
+                           songsByGenre: songsByGenre, firstArtworkByArtist: firstArtworkByArtist)
     }
 
     /// The index with `changed` songs swapped in (their favourite flag), every list in the same order: equal to
@@ -71,8 +67,7 @@ nonisolated struct LibraryDetailIndex: Sendable {
                            songsByAlbum: songsByAlbum.mapValues { LibraryModel.patched($0, changed) },
                            songsByArtist: songsByArtist.mapValues { LibraryModel.patched($0, changed) },
                            songsByGenre: songsByGenre.mapValues { LibraryModel.patched($0, changed) },
-                           firstArtworkByArtist: firstArtworkByArtist,
-                           folderTree: folderTree.map { LibraryModel.patched($0, changed) })
+                           firstArtworkByArtist: firstArtworkByArtist)
     }
 
     @concurrent
@@ -111,11 +106,6 @@ extension LibraryStore {
     func firstArtwork(ofArtist id: Int64) -> String? {
         if let index = detailIndexIfCurrent { return index.firstArtworkByArtist[id] }
         return songs.first { $0.artistId == id }?.albumArtUriString
-    }
-
-    /// The folder tree of the library (`LibraryModel.folderTree`), from the detail index when it is current.
-    var folderTree: [MusicFolder] {
-        detailIndexIfCurrent?.folderTree ?? LibraryModel.folderTree(songs)
     }
 }
 

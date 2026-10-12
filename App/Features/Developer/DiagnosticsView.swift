@@ -56,34 +56,6 @@ struct DiagnosticsView: View {
             }
 
             Section {
-                Button("Choose Folder…", systemImage: "folder.badge.plus") {
-                    model.isFolderImporterPresented = true
-                }
-                Button("Resolve Saved Folder", systemImage: "arrow.triangle.2.circlepath") {
-                    model.resolveSavedFolder()
-                }
-                Button("Forget Saved Folder", systemImage: "trash", role: .destructive) {
-                    model.forgetSavedFolder()
-                }
-                Text(model.folderStatus)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            } header: {
-                Text("Folder Access")
-            } footer: {
-                Text("Saves a security-scoped bookmark. Relaunch the app and resolve it to confirm access persists.")
-            }
-
-            Section("Library") {
-                NavigationLink {
-                    LibraryImportDebugView()
-                } label: {
-                    Label("Library Import", systemImage: "music.note.house")
-                }
-                .accessibilityIdentifier("diagnostics.libraryImport")
-            }
-
-            Section {
                 Text(model.lastStreamStart ?? "No start measured yet. Play a song, then come back.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -116,13 +88,6 @@ struct DiagnosticsView: View {
             }
         }
         .navigationTitle("Diagnostics")
-        .fileImporter(
-            isPresented: $model.isFolderImporterPresented,
-            allowedContentTypes: [.folder],
-            allowsMultipleSelection: false
-        ) { result in
-            model.handleFolderImport(result)
-        }
         .onAppear { model.refreshDisplayInfo() }
         .accessibilityIdentifier("screen.diagnostics")
     }

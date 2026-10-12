@@ -12,7 +12,7 @@ import SwiftUI
 /// Android `LibrarySortBottomSheet`: "Sort by" (`headlineMedium` bold), the Order card (descending =
 /// `tertiaryContainer`, ascending = `primaryContainer`, an arrow that flips), the sort methods as 8 pt tiles in a
 /// 20 pt group with radio marks (selected `secondaryContainer`), then per tab: Albums › View (Grid / List),
-/// Folders › View (Playlist View), others › Cloud (Cloud Only).
+/// Albums › View (Grid / List).
 struct LibrarySortSheet: View {
     let tab: LibraryTab
     let prefs: LibraryPreferences
@@ -85,22 +85,6 @@ struct LibrarySortSheet: View {
                         }
                     }
                     .frame(height: 48)
-                }
-                if tab == .folders {
-                    sectionTitle("View")
-                    SheetToggleCard(label: "Playlist View",
-                                    isOn: Binding(get: { prefs.isFoldersPlaylistView },
-                                                  set: { prefs.isFoldersPlaylistView = $0 }))
-                } else {
-                    Spacer().frame(height: 12)
-                    Text("Cloud")
-                        .pixlFont(.headlineSmall, weight: .bold)
-                        .foregroundStyle(theme.onSurface)
-                        .padding(.leading, 2)
-                        .padding(.bottom, 8)
-                    SheetToggleCard(label: "Cloud Only",
-                                    isOn: Binding(get: { settings.library.hideLocalMedia },
-                                                  set: { settings.library.hideLocalMedia = $0 }))
                 }
                 Spacer().frame(height: 16)
             }

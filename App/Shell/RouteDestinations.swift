@@ -12,7 +12,6 @@ struct RouteDestination: View {
         case .genreDetail(let genreId): GenreDetailView(genreId: genreId)
         case .playlistDetail(let playlistId): PlaylistDetailView(playlistId: playlistId)
         case .playlistEditor(let playlistId): PlaylistEditorView(playlistId: playlistId)
-        case .folderExplorer(let path): FolderExplorerView(path: path)
         case .dailyMix: DailyMixView()
         case .yourMix: YourMixView()
         case .recentlyPlayed: RecentlyPlayedView()

@@ -318,7 +318,7 @@ struct AddToPlaylistSheet: View {
     @State private var newName = ""
 
     private var playlists: [Playlist] {
-        let all = library.playlists.filter { FolderPlaylist.path(from: $0.id) == nil }
+        let all = library.playlists
         guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return all }
         return all.filter { $0.name.localizedCaseInsensitiveContains(query) }
     }
