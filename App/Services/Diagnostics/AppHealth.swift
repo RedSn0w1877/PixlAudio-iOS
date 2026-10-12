@@ -42,6 +42,9 @@ final class AppHealth {
     @ObservationIgnored private var metricKitCountedThisLaunch = false
     /// This run has been the foreground app at least once (the first `.active` scene phase).
     @ObservationIgnored private var runWasForeground = false
+    /// `reachedActiveKey` is currently set in the defaults (it is cleared with every clean-exit marker, so every return
+    /// to the front sets it again: a crash in a second stretch in front must still count).
+    @ObservationIgnored private var reachedActiveMarked = false
 
     /// Wired by `AppEnvironment`: a memory warning (release what is idle, stop what is automatic) and a critical
     /// memory event (stop all heavy work, saying why).
@@ -127,10 +130,14 @@ final class AppHealth {
     /// From `PixlAudioApp`'s `onChange(of: scenePhase)`.
     func scenePhaseChanged(_ phase: ScenePhase) {
         if !isDemo { LagMonitor.sceneChanged(phase) }
-        if phase == .active, !runWasForeground, !isDemo {
-            // The first time this run is the app in front: from now on a death with heavy work in flight is abnormal.
+        if phase == .active, !isDemo {
+            // The app is in front: from now on a death with heavy work in flight is abnormal. Set again after every
+            // clean background (`writeMarker` clears it), not only the first time.
             runWasForeground = true
-            defaults.set(true, forKey: Self.reachedActiveKey)
+            if !reachedActiveMarked {
+                reachedActiveMarked = true
+                defaults.set(true, forKey: Self.reachedActiveKey)
+            }
         }
         guard phase != scenePhase else { return }
         let before = scenePhase
@@ -179,6 +186,7 @@ final class AppHealth {
     private func writeMarker() {
         guard let markerURL else { return }
         defaults.set(false, forKey: Self.reachedActiveKey)
+        reachedActiveMarked = false
         try? Data((runWasForeground ? Self.foregroundMarker : "clean-bg").utf8).write(to: markerURL, options: .atomic)
         log.log("health", "clean-exit marker written")
         log.flush()

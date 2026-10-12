@@ -32,9 +32,12 @@ nonisolated final class DiagnosticsLog: Sendable {
     /// Records one event. Returns at once; the write happens on a utility queue.
     func log(_ category: String, _ message: String) {
         let now = Date()
-        let line = LogRing.format(timestamp: now, category: category, message: message)
-        logger.info("\(line, privacy: .public)")
-        queue.async { [self] in append(line) }
+        // Formatting redacts with six regular expressions: it runs on the log queue, not on the caller's (often main) thread.
+        queue.async { [self] in
+            let line = LogRing.format(timestamp: now, category: category, message: message)
+            logger.info("\(line, privacy: .public)")
+            append(line)
+        }
     }
 
     /// The whole log as text (waits for the writes queued before this call).

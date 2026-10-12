@@ -154,6 +154,17 @@ final class CrashProtectionTests: XCTestCase {
         XCTAssertTrue(second.health.previousRunWasAbnormal, "work was still running when the app went away")
     }
 
+    func testACrashInASecondStretchInFrontStillCounts() {
+        let defaults = makeDefaults(), directory = makeDirectory()
+        let first = makeHealth(defaults: defaults, directory: directory)
+        first.health.scenePhaseChanged(.active)
+        first.health.scenePhaseChanged(.background) // clean marker written, the "was in front" flag cleared
+        first.health.scenePhaseChanged(.active)     // back in front: the marker goes, the flag must be set again
+        first.telemetry.started("lyricsSync", id: "song.1")
+        let second = makeHealth(defaults: defaults, directory: directory)
+        XCTAssertTrue(second.health.previousRunWasAbnormal, "it died in front with work in flight, after an earlier clean background")
+    }
+
     /// A run that crashes in front with a lyric sync in flight.
     private func crashedRun(defaults: UserDefaults, directory: URL) {
         let rig = makeHealth(defaults: defaults, directory: directory)
