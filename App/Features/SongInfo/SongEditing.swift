@@ -3,8 +3,8 @@ import PixlModel
 import PixlTags
 import SwiftUI
 
-/// The song editor's fields (Android `EditSongContent` state), filled from the library and — for songs from the
-/// user's folders — the file's own tags (composer, ReplayGain, lyrics), read off the main thread.
+/// The song editor's fields (Android `EditSongContent` state), filled from the library. The editor is only reachable
+/// for demo songs now: it edited the tags of the phone's own audio files, which the app no longer has.
 nonisolated struct SongEditForm: Equatable, Sendable {
     nonisolated enum Cover: Equatable, Sendable {
         case unchanged
@@ -45,27 +45,21 @@ nonisolated struct SongEditForm: Equatable, Sendable {
         return String(format: "%.2f", locale: Locale(identifier: "en_US"), Double(value))
     }
 
-    /// The file's tags the library doesn't keep (composer, ReplayGain, embedded lyrics), for folder songs only.
+    /// The file's tags the library doesn't keep: Spotify songs have no file of their own, so there are none.
     static func embeddedMetadata(for song: Song) async -> TagMetadata? {
-        guard song.id.hasPrefix(LibraryIdentity.filePrefix), let url = URL(string: song.contentUriString),
-              url.isFileURL else { return nil }
-        return await Task.detached(priority: .userInitiated) {
-            guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { return nil }
-            return try? AudioMetadataMapper.read(data, readArtwork: false)
-        }.value
+        return nil
     }
 }
 
 /// Saves an edit (Android `onEditSong` → `editSongMetadata`): the library shows it at once, then the tag override is
-/// stored — and, for songs from the user's folders, written into the file (MP3 / FLAC / M4A) — and the library
-/// reloads. Songs from the device music library can only be overridden; streamed songs aren't editable.
+/// stored. Nothing is written into a file (there are none); streamed songs aren't editable.
 @MainActor
 struct SongTagEditor {
     let env: AppEnvironment
 
-    /// Android shows the edit button only for songs it can edit (local files; the demo library in UI tests).
+    /// The edit button shows only for the demo library in UI tests (it used to be the phone's own audio files).
     static func isEditable(_ song: Song) -> Bool {
-        LibraryIdentity.isManaged(song.id) || song.id.hasPrefix("demo:")
+        song.id.hasPrefix("demo:")
     }
 
     /// Writes a replaced cover's JPEG off the main thread (nil for no new cover, or when the write failed).
@@ -79,17 +73,14 @@ struct SongTagEditor {
     /// `coverURL`: the replaced cover's file, already written by `writeCover` (nil writes it here).
     func save(_ form: SongEditForm, for song: Song, coverURL: URL? = nil) {
         let artworkUri: String?
-        var coverUpdate: CoverArtUpdate?
         switch form.cover {
         case .unchanged:
             artworkUri = nil
         case .deleted:
             artworkUri = ""
-            coverUpdate = CoverArtUpdate(isDeletion: true)
         case .replaced(let data):
             artworkUri = (coverURL ?? SongCoverStore.save(data, songId: song.id, temporary: env.launch.isUITest))?
                 .absoluteString
-            coverUpdate = CoverArtUpdate(bytes: data, mimeType: "image/jpeg")
         }
         let trimmed = { (value: String) in value.trimmingCharacters(in: .whitespacesAndNewlines) }
         let fields = TagOverrideFields(
@@ -97,23 +88,12 @@ struct SongTagEditor {
             albumArtist: trimmed(form.albumArtist), genre: trimmed(form.genre),
             trackNumber: Int(trimmed(form.trackNumber)) ?? song.trackNumber,
             discNumber: Int(trimmed(form.discNumber)), artworkUri: artworkUri)
-        let extras = TagWriteExtras(composer: trimmed(form.composer),
-                                    lyrics: form.lyricsEdited ? form.lyrics : nil,
-                                    replayGainTrackGainDb: trimmed(form.replayGainTrack),
-                                    replayGainAlbumGainDb: trimmed(form.replayGainAlbum),
-                                    coverArt: coverUpdate)
-        applyToSnapshot(fields, lyrics: extras.lyrics, songId: song.id)
 
-        guard let importer = env.libraryImporter else { return }
-        let library = env.library
-        let writesFile = song.id.hasPrefix(LibraryIdentity.filePrefix)
+        applyToSnapshot(fields, lyrics: form.lyricsEdited ? form.lyrics : nil, songId: song.id)
+        guard let persistence = env.persistence else { return }
+        let updatedAt = Int64(Date().timeIntervalSince1970 * 1000)
         Task {
-            do {
-                try await importer.editTags(songId: song.id, fields: fields, writeToFile: writesFile, extras: extras)
-                try await library.refresh()
-            } catch {
-                LibraryToast.shared.show(error.localizedDescription)
-            }
+            try? await persistence.setTagOverride(songId: song.id, fields: fields, updatedAt: updatedAt)
         }
     }
 
