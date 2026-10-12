@@ -128,6 +128,7 @@ private struct SpinningArtwork: View {
             art.rotationEffect(.degrees(spin.angle(at: timeline.date, playing: isPlaying)))
         }
         .frame(width: 54, height: 54)
+        .longRunning("lyrics.spinningArt (60 fps timeline)", active: isPlaying)
     }
 }
 
@@ -177,6 +178,7 @@ struct PlayingBarsIcon: View {
         }
         .animation(.easeInOut(duration: 0.24), value: isPlaying)
         .accessibilityHidden(true)
+        .longRunning("lyrics.equalizerBars (30 fps timeline)", active: isPlaying)
     }
 }
 
@@ -317,6 +319,7 @@ private struct LyricsSeekBar: View {
             let now = clock.positionMs
             onSeek(direction == .increment ? now + step : max(now - step, 0))
         }
+        .longRunning("lyrics.seekBar (4 Hz periodic timeline, even when paused)")
     }
 
     /// Android keeps showing the committed seek until the player catches up (or 5 s pass).
@@ -340,6 +343,7 @@ private struct WavyTrack: View {
         TimelineView(.animation(minimumInterval: 1.0 / 60, paused: !waving)) { timeline in
             wave(phase: timeline.date.timeIntervalSinceReferenceDate * 0.5)
         }
+        .longRunning("lyrics.wavyTrack (60 fps timeline)", active: waving)
     }
 
     private func wave(phase: Double) -> some View {

@@ -44,8 +44,16 @@ struct DiagnosticsHealthSection: View {
         Section {
             Toggle("Safe mode", isOn: Binding(get: { health.safeMode.isActive }, set: { health.setSafeMode($0) }))
                 .accessibilityIdentifier("diagnostics.safeMode")
+            if health.safeMode.isActive {
+                Button {
+                    health.setSafeMode(false)
+                } label: {
+                    Label("Turn off safe mode", systemImage: "shield.slash")
+                }
+                .accessibilityIdentifier("diagnostics.safeMode.turnOff")
+            }
         } footer: {
-            Text("When PixlAudio closes unexpectedly while it works, safe mode keeps heavy jobs (lyric sync, vocal removal, model installs, library rescans, Cloud preparing, Spotify matching) from starting by themselves. After two such endings in a row it stays on until you turn it off here.")
+            Text("When PixlAudio closes unexpectedly while it works, safe mode keeps heavy jobs (lyric sync, vocal removal, model installs, library rescans, Cloud preparing, Spotify matching) from starting by themselves. It ends by itself after one clean session in front; a switch you turned on stays until you turn it off here.")
         }
 
         Section {

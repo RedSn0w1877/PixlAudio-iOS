@@ -40,6 +40,8 @@ final class AppHealth {
     @ObservationIgnored private var memorySource: DispatchSourceMemoryPressure?
     @ObservationIgnored private var markerWatcher: Task<Void, Never>?
     @ObservationIgnored private var metricKitCountedThisLaunch = false
+    /// This run has been the foreground app at least once (the first `.active` scene phase).
+    @ObservationIgnored private var runWasForeground = false
 
     /// Wired by `AppEnvironment`: a memory warning (release what is idle, stop what is automatic) and a critical
     /// memory event (stop all heavy work, saying why).
@@ -50,6 +52,10 @@ final class AppHealth {
 
     private static let stateKey = "diagnostics.safeMode.v1"
     private static let hasRunKey = "diagnostics.hasRun.v1"
+    /// Set on the first `.active` of a run, cleared when the clean-exit marker is written: a run that dies with it set
+    /// was in front and did not end cleanly.
+    private static let reachedActiveKey = "diagnostics.reachedActive.v1"
+    private static let foregroundMarker = "clean-fg"
 
     /// `demo`: a fixed state for UI tests (no files, no observers).
     init(defaults: UserDefaults = .standard, log: DiagnosticsLog = .shared, telemetry: JobTelemetry = .shared,
@@ -73,18 +79,18 @@ final class AppHealth {
         guard !isDemo else { return }
         let stored = defaults.data(forKey: Self.stateKey).flatMap { try? JSONDecoder().decode(SafeModeState.self, from: $0) }
             ?? SafeModeState()
-        let end: PreviousRunEnd
-        if !defaults.bool(forKey: Self.hasRunKey) {
-            end = .firstLaunch
-        } else if let markerURL, FileManager.default.fileExists(atPath: markerURL.path) {
-            end = .clean
-        } else {
-            end = .abnormal(.missingCleanMarker)
-        }
+        let hasRun = defaults.bool(forKey: Self.hasRunKey)
+        let markerData = markerURL.flatMap { try? Data(contentsOf: $0) }
+        let reachedActive = defaults.bool(forKey: Self.reachedActiveKey)
         defaults.set(true, forKey: Self.hasRunKey)
-        // From here on, until the app is backgrounded idle, a kill counts as abnormal.
+        defaults.set(false, forKey: Self.reachedActiveKey)
+        // From here on, until the app is backgrounded idle, a kill while in front counts as abnormal.
         if let markerURL { try? FileManager.default.removeItem(at: markerURL) }
         let left = telemetry.entries()
+        let end = SafeModePolicy.classify(PreviousRunFacts(
+            hasRunBefore: hasRun, cleanMarkerPresent: markerData != nil,
+            markerWasForeground: markerData.map { String(decoding: $0, as: UTF8.self) != "clean-bg" } ?? false,
+            reachedActive: reachedActive, heavyJobsInFlight: left.count))
         let next = SafeModePolicy.launch(previous: stored, end: end, nowMs: nowMs)
         if case .abnormal = end {
             previousRunWasAbnormal = true
@@ -94,7 +100,9 @@ final class AppHealth {
             log.log("health", "previous run ended abnormally; in flight: \(left.map(\.kind).joined(separator: ","))")
         } else {
             interrupted = []
-            if !left.isEmpty { log.log("health", "cleared \(left.count) stale in-flight entries after a clean end") }
+            if case .ignored = end {
+                log.log("health", "previous run not counted (never in front, or ended without heavy work); in flight: \(left.count)")
+            } else if !left.isEmpty { log.log("health", "cleared \(left.count) stale in-flight entries after a clean end") }
         }
         telemetry.clearJournal()
         gate.setUserLiftHandler { [weak self] in
@@ -110,6 +118,7 @@ final class AppHealth {
         case .firstLaunch: "first launch"
         case .clean: "clean end"
         case .abnormal(let source): "abnormal end: \(source.rawValue)"
+        case .ignored: "not counted"
         }
     }
 
@@ -117,6 +126,12 @@ final class AppHealth {
 
     /// From `PixlAudioApp`'s `onChange(of: scenePhase)`.
     func scenePhaseChanged(_ phase: ScenePhase) {
+        if !isDemo { LagMonitor.sceneChanged(phase) }
+        if phase == .active, !runWasForeground, !isDemo {
+            // The first time this run is the app in front: from now on a death with heavy work in flight is abnormal.
+            runWasForeground = true
+            defaults.set(true, forKey: Self.reachedActiveKey)
+        }
         guard phase != scenePhase else { return }
         let before = scenePhase
         scenePhase = phase
@@ -163,7 +178,8 @@ final class AppHealth {
 
     private func writeMarker() {
         guard let markerURL else { return }
-        try? Data("clean".utf8).write(to: markerURL, options: .atomic)
+        defaults.set(false, forKey: Self.reachedActiveKey)
+        try? Data((runWasForeground ? Self.foregroundMarker : "clean-bg").utf8).write(to: markerURL, options: .atomic)
         log.log("health", "clean-exit marker written")
         log.flush()
     }
@@ -268,7 +284,7 @@ final class AppHealth {
         onMemoryWarning?()
     }
 
-    static func level(_ state: ProcessInfo.ThermalState) -> ThermalLevel {
+    nonisolated static func level(_ state: ProcessInfo.ThermalState) -> ThermalLevel {
         switch state {
         case .nominal: .nominal
         case .fair: .fair
@@ -278,7 +294,7 @@ final class AppHealth {
         }
     }
 
-    static func name(_ level: ThermalLevel) -> String {
+    nonisolated static func name(_ level: ThermalLevel) -> String {
         switch level {
         case .nominal: "nominal"
         case .fair: "fair"
@@ -320,7 +336,7 @@ final class AppHealth {
             ("Previous run", previousRunWasAbnormal ? "ended unexpectedly" : "ended normally"),
             ("Device", Self.deviceIdentifier()),
             ("iOS", UIDevice.current.systemVersion),
-        ]
+        ] + LagMonitor.statusRows()
     }
 
     private static func sceneName(_ phase: ScenePhase) -> String {
@@ -342,8 +358,9 @@ final class AppHealth {
 
     var safeModeDescription: String {
         guard safeMode.isActive else { return safeMode.liftedByUser ? "off for this run (retried)" : "off" }
-        return safeMode.isSticky ? "ON, stays on until turned off (\(safeMode.consecutiveAbnormal) abnormal ends in a row)"
-            : "ON (\(safeMode.consecutiveAbnormal) abnormal end)"
+        if safeMode.manual { return "ON (turned on by hand; stays until turned off)" }
+        if safeMode.metricKitConfirmed { return "ON (MetricKit confirmed a crash; ends after two clean sessions in front)" }
+        return "ON (\(safeMode.consecutiveAbnormal) abnormal end(s); ends after one clean session in front)"
     }
 
     /// The text Share logs sends: build identity, status, event log, MetricKit payload summaries.

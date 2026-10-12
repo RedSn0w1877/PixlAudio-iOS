@@ -137,6 +137,9 @@ nonisolated final class JobTelemetry: Sendable {
     private let log: DiagnosticsLog
     private let journalURL: URL?
     private let state = Mutex(State())
+    /// The journal is written here, in order, never on the caller's thread: `started` and `ended` run on the main actor
+    /// (a library scan on every foreground), and an atomic write there was main-thread file I/O.
+    private static let writeQueue = DispatchQueue(label: "io.github.redsn0w1877.pixlaudio.in-flight-journal", qos: .utility)
 
     init(log: DiagnosticsLog, journalURL: URL?) {
         self.log = log
@@ -201,6 +204,12 @@ nonisolated final class JobTelemetry: Sendable {
     /// How many jobs started in this process have not ended yet.
     var runningCount: Int { state.withLock { $0.startedAt.count } }
 
+    /// The kinds of the jobs running now, sorted, for the hang lines ("none" when idle). Callable from any thread.
+    func runningKinds() -> String {
+        let kinds = state.withLock { Set($0.startedAt.keys.compactMap { $0.split(separator: "|").first.map(String.init) }) }
+        return kinds.isEmpty ? "none" : kinds.sorted().joined(separator: ",")
+    }
+
     /// A short opaque tag for a song or model id: the same id always gives the same tag, and it tells nothing.
     static func opaque(_ id: String) -> String {
         var hash: UInt32 = 2_166_136_261
@@ -211,6 +220,8 @@ nonisolated final class JobTelemetry: Sendable {
     private func loadIfNeeded(_ state: inout State) {
         guard !state.loaded else { return }
         state.loaded = true
+        // A write queued by an earlier instance in this process lands before the file is read.
+        Self.writeQueue.sync {}
         guard let journalURL, let data = try? Data(contentsOf: journalURL),
               let decoded = try? JSONDecoder().decode([InFlightEntry].self, from: data) else { return }
         state.entries = decoded
@@ -218,6 +229,6 @@ nonisolated final class JobTelemetry: Sendable {
 
     private func write(_ entries: [InFlightEntry]) {
         guard let journalURL, let data = try? JSONEncoder().encode(entries) else { return }
-        try? data.write(to: journalURL, options: .atomic)
+        Self.writeQueue.async { try? data.write(to: journalURL, options: .atomic) }
     }
 }
