@@ -66,6 +66,7 @@ struct HomeSineWaveLine: View {
             }
         }
         .accessibilityHidden(true)
+        .longRunning("home.sineWave (60 fps timeline)", active: !reduceMotion)
     }
 }
 

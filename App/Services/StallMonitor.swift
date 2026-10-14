@@ -78,6 +78,7 @@ final class StallMonitor<ID: Hashable & Sendable> {
     private func startLoopIfNeeded() {
         guard loop == nil else { return }
         let interval = self.interval
+        LongRunning.shared.begin("stallMonitor (15 s poll while a transfer is armed)")
         loop = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: interval)
@@ -88,6 +89,7 @@ final class StallMonitor<ID: Hashable & Sendable> {
     }
 
     private func stopLoop() {
+        if loop != nil { LongRunning.shared.end("stallMonitor (15 s poll while a transfer is armed)") }
         loop?.cancel()
         loop = nil
     }

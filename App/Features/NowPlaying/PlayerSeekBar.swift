@@ -45,6 +45,7 @@ struct PlayerSeekBar: View {
             heldTarget = nil
         }
         .pixlHaptic(.selection, trigger: hapticStep)
+        .longRunning("player.seekBar (4 Hz timeline)", active: isPlaying && isActive)
     }
 
     private func displayedFraction(durationMs: Int64, now: Date) -> Double {

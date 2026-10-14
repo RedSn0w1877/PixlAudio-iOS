@@ -47,9 +47,10 @@ final class LibraryAutoRefresh {
         pending = Task(priority: .utility) { [library, weak self] in
             try? await Task.sleep(for: delay)
             guard !Task.isCancelled else { return }
-            // Safe mode (the app closed unexpectedly) and Emergency stop: no rescan by itself; Library's own refresh does it.
-            guard HeavyWorkGate.shared.allowsLaunchWork else {
-                DiagnosticsLog.shared.log("safemode", "automatic library rescan held back")
+            // Emergency stop and a very hot phone: no rescan by itself (safe mode alone does not hold back this 0.1 s
+            // incremental scan: it left the library stale after every launch).
+            guard HeavyWorkGate.shared.allowsLibraryRescan else {
+                DiagnosticsLog.shared.log("system", "automatic library rescan held back (emergency stop or hot phone)")
                 return
             }
             try? await library.refresh(mode: .incremental)

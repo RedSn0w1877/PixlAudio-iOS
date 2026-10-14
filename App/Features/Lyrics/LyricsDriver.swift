@@ -72,12 +72,14 @@ final class LyricsDriver: NSObject {
         link.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: 120, preferred: 120)
         link.add(to: .main, forMode: .common)
         self.link = link
+        LongRunning.shared.begin("lyrics.driver (CADisplayLink 60-120 Hz)")
         wake()
     }
 
     /// Off screen: stop everything (the display link retains its target until invalidated).
     func stop() {
         active = false
+        if link != nil { LongRunning.shared.end("lyrics.driver (CADisplayLink 60-120 Hz)") }
         link?.invalidate()
         link = nil
         idlePoll?.invalidate()

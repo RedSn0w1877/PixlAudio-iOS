@@ -43,6 +43,7 @@ struct TaizoOrb: View {
         .aspectRatio(1, contentMode: .fit)
         .animation(.easeInOut(duration: 0.6), value: energy)
         .accessibilityHidden(true)
+        .longRunning("taizo.orb (24 fps timeline)", active: animated && !still)
     }
 }
 

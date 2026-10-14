@@ -387,6 +387,7 @@ private struct SyncMusicBreakOrContext<Context: View>: View {
                         ring(positionMs: session.positionMs())
                     }
                     .frame(width: 72, height: 72)
+                    .longRunning("sync.breakRing (display-rate timeline)", active: session.isPlaying)
                     Spacer().frame(width: 16)
                     Image(systemName: "music.note")
                         .font(.system(size: 20, weight: .medium))

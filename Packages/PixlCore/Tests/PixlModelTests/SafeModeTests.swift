@@ -29,16 +29,49 @@ import Testing
         #expect(next == SafeModeState())
     }
 
-    @Test func twoAbnormalEndsInARowStayOnThroughCleanSessions() {
+    @Test func twoAbnormalEndsInARowDoNotStickAfterACleanForegroundSession() {
         var state = SafeModePolicy.launch(previous: SafeModeState(), end: .abnormal(.missingCleanMarker), nowMs: now)
         state = SafeModePolicy.launch(previous: state, end: .abnormal(.missingCleanMarker), nowMs: now + 1)
         #expect(state.consecutiveAbnormal == 2)
+        #expect(state.isActive)
+        #expect(!state.isSticky)
+        // One clean foreground session resets the count and turns safe mode off.
+        state = SafeModePolicy.launch(previous: state, end: .clean, nowMs: now + 10)
+        #expect(state == SafeModeState())
+    }
+
+    @Test func aMetricKitConfirmedSafeModeNeedsTwoCleanForegroundSessions() {
+        var state = SafeModePolicy.metricKitCrash(SafeModeState(), alreadyCounted: false, nowMs: now)
+        #expect(state.metricKitConfirmed)
         #expect(state.isSticky)
-        for step in 0..<5 {
-            state = SafeModePolicy.launch(previous: state, end: .clean, nowMs: now + 10 + Int64(step))
-            #expect(state.isActive)
-            #expect(state.isSticky)
-        }
+        state = SafeModePolicy.launch(previous: state, end: .clean, nowMs: now + 1)
+        #expect(state.isActive)
+        #expect(state.consecutiveAbnormal == 0)
+        state = SafeModePolicy.launch(previous: state, end: .clean, nowMs: now + 2)
+        #expect(state == SafeModeState())
+    }
+
+    @Test func aSessionThatNeverWasInFrontChangesNothing() {
+        let crashed = SafeModePolicy.launch(previous: SafeModeState(), end: .abnormal(.missingCleanMarker), nowMs: now)
+        #expect(SafeModePolicy.launch(previous: crashed, end: .ignored, nowMs: now + 1) == crashed)
+        #expect(SafeModePolicy.launch(previous: SafeModeState(), end: .ignored, nowMs: now) == SafeModeState())
+    }
+
+    @Test func onlyAForegroundRunThatDiedWithHeavyWorkCountsAsAbnormal() {
+        func end(_ f: PreviousRunFacts) -> PreviousRunEnd { SafeModePolicy.classify(f) }
+        #expect(end(PreviousRunFacts(hasRunBefore: false, cleanMarkerPresent: false)) == .firstLaunch)
+        // Launched in the background, never active, ended by the system while suspended (the 10-12 17:14Z case).
+        #expect(end(PreviousRunFacts(hasRunBefore: true, cleanMarkerPresent: false, reachedActive: false)) == .ignored)
+        #expect(end(PreviousRunFacts(hasRunBefore: true, cleanMarkerPresent: false, reachedActive: false,
+                                     heavyJobsInFlight: 2)) == .ignored)
+        // Foreground, killed with nothing heavy in flight (a force-quit that skipped the background): not counted.
+        #expect(end(PreviousRunFacts(hasRunBefore: true, cleanMarkerPresent: false, reachedActive: true)) == .ignored)
+        // Foreground, died with heavy work in flight.
+        #expect(end(PreviousRunFacts(hasRunBefore: true, cleanMarkerPresent: false, reachedActive: true,
+                                     heavyJobsInFlight: 1)) == .abnormal(.missingCleanMarker))
+        // A clean marker: clean only when that run had been in front, otherwise it proves nothing.
+        #expect(end(PreviousRunFacts(hasRunBefore: true, cleanMarkerPresent: true, markerWasForeground: true)) == .clean)
+        #expect(end(PreviousRunFacts(hasRunBefore: true, cleanMarkerPresent: true, markerWasForeground: false)) == .ignored)
     }
 
     @Test func theSwitchInSettingsClearsAStickySafeMode() {
@@ -48,8 +81,17 @@ import Testing
         let on = SafeModePolicy.setByUser(SafeModeState(), on: true)
         #expect(on.isActive)
         #expect(on.isSticky)
-        // And it survives clean launches until it is turned off.
+        // A manual switch survives clean launches until it is turned off.
         #expect(SafeModePolicy.launch(previous: on, end: .clean, nowMs: now).isActive)
+    }
+
+    @Test func oldStoredStateWithoutTheNewKeysStillDecodes() throws {
+        let json = #"{"consecutiveAbnormal":5,"isActive":true,"bannerPending":false,"liftedByUser":false,"lastAbnormalAtMs":7}"#
+        let state = try JSONDecoder().decode(SafeModeState.self, from: Data(json.utf8))
+        #expect(state.consecutiveAbnormal == 5)
+        #expect(!state.manual)
+        // A leftover "5 in a row" from the false-crash bug ends with one clean foreground session.
+        #expect(SafeModePolicy.launch(previous: state, end: .clean, nowMs: now) == SafeModeState())
     }
 
     @Test func retryLiftsSafeModeForTheRunButAnotherCrashCounts() {
@@ -62,7 +104,7 @@ import Testing
         // The retried work killed the app again: that is the second abnormal end, so safe mode is sticky.
         let again = SafeModePolicy.launch(previous: lifted, end: .abnormal(.missingCleanMarker), nowMs: now + 5)
         #expect(again.isActive)
-        #expect(again.isSticky)
+        #expect(again.consecutiveAbnormal == 2)
         #expect(!again.liftedByUser)
     }
 
