@@ -292,6 +292,7 @@ final class AppEnvironment {
             Task { @MainActor in health?.metricKitReported(crashLike: crashLike) }
         }
         MetricKitCollector.shared.start()
+        LagMonitor.start()
         library.beginCachedLoad() // decode the snapshot cache and the saved queue alongside the service starts below
         playbackServices?.prepareQueueRestore()
         // Every stored album theme into the synchronous mirror, so cards and pills start with their colours.

@@ -118,6 +118,7 @@ final class CrashProtectionTests: XCTestCase {
         let defaults = makeDefaults(), directory = makeDirectory()
         let first = makeHealth(defaults: defaults, directory: directory)
         XCTAssertFalse(first.health.safeMode.isActive, "the first launch has nothing to compare with")
+        first.health.scenePhaseChanged(.active)
         first.health.scenePhaseChanged(.inactive)
         first.health.scenePhaseChanged(.background)
         let second = makeHealth(defaults: defaults, directory: directory)
@@ -129,6 +130,7 @@ final class CrashProtectionTests: XCTestCase {
     func testBeingKilledWhileWorkingIsAbnormalAndNothingResumesByItself() {
         let defaults = makeDefaults(), directory = makeDirectory()
         let first = makeHealth(defaults: defaults, directory: directory)
+        first.health.scenePhaseChanged(.active)
         // A lyric sync is in flight when the process dies: no clean marker, the journal still lists it.
         first.telemetry.started("lyricsSync", id: "song.1")
         let second = makeHealth(defaults: defaults, directory: directory)
@@ -145,31 +147,77 @@ final class CrashProtectionTests: XCTestCase {
     func testBackgroundingWhileHeavyWorkRunsLeavesNoCleanMarker() {
         let defaults = makeDefaults(), directory = makeDirectory()
         let first = makeHealth(defaults: defaults, directory: directory, idle: false)
+        first.health.scenePhaseChanged(.active)
+        first.telemetry.started("lyricsSync", id: "song.1")
         first.health.scenePhaseChanged(.background)
         let second = makeHealth(defaults: defaults, directory: directory)
         XCTAssertTrue(second.health.previousRunWasAbnormal, "work was still running when the app went away")
     }
 
-    func testRetryLiftsSafeModeAndADoubleCrashMakesItStayUntilTurnedOff() {
+    func testACrashInASecondStretchInFrontStillCounts() {
         let defaults = makeDefaults(), directory = makeDirectory()
-        _ = makeHealth(defaults: defaults, directory: directory)
+        let first = makeHealth(defaults: defaults, directory: directory)
+        first.health.scenePhaseChanged(.active)
+        first.health.scenePhaseChanged(.background) // clean marker written, the "was in front" flag cleared
+        first.health.scenePhaseChanged(.active)     // back in front: the marker goes, the flag must be set again
+        first.telemetry.started("lyricsSync", id: "song.1")
+        let second = makeHealth(defaults: defaults, directory: directory)
+        XCTAssertTrue(second.health.previousRunWasAbnormal, "it died in front with work in flight, after an earlier clean background")
+    }
+
+    /// A run that crashes in front with a lyric sync in flight.
+    private func crashedRun(defaults: UserDefaults, directory: URL) {
+        let rig = makeHealth(defaults: defaults, directory: directory)
+        rig.health.scenePhaseChanged(.active)
+        rig.telemetry.started("lyricsSync", id: "song.1")
+    }
+
+    func testRetryLiftsSafeModeAndOneCleanForegroundSessionEndsIt() {
+        let defaults = makeDefaults(), directory = makeDirectory()
+        crashedRun(defaults: defaults, directory: directory)
         var rig = makeHealth(defaults: defaults, directory: directory)
         XCTAssertTrue(rig.health.safeMode.isActive)
         rig.health.userRetried()
         XCTAssertFalse(rig.health.safeMode.isActive)
         XCTAssertFalse(rig.gate.automaticStartsBlocked, "Retry is the go-ahead")
         // The retried work killed the app again.
+        rig.health.scenePhaseChanged(.active)
+        rig.telemetry.started("lyricsSync", id: "song.1")
         rig = makeHealth(defaults: defaults, directory: directory)
-        XCTAssertTrue(rig.health.safeMode.isSticky)
-        // Clean sessions do not clear a sticky safe mode.
+        XCTAssertEqual(rig.health.safeMode.consecutiveAbnormal, 2)
+        XCTAssertTrue(rig.health.safeMode.isActive)
+        // One clean foreground session ends it.
+        rig.health.scenePhaseChanged(.active)
+        rig.health.scenePhaseChanged(.background)
+        rig = makeHealth(defaults: defaults, directory: directory)
+        XCTAssertFalse(rig.health.safeMode.isActive)
+        XCTAssertEqual(rig.health.safeMode.consecutiveAbnormal, 0)
+    }
+
+    func testABackgroundOnlyRunThatTheSystemKilledIsNotAnAbnormalEnd() {
+        let defaults = makeDefaults(), directory = makeDirectory()
+        // Launched in the background (never active), no marker, even a heavy entry in the journal.
+        let first = makeHealth(defaults: defaults, directory: directory)
+        first.telemetry.started("libraryScan", id: "x")
+        let second = makeHealth(defaults: defaults, directory: directory)
+        XCTAssertFalse(second.health.previousRunWasAbnormal)
+        XCTAssertFalse(second.health.safeMode.isActive)
+        XCTAssertTrue(second.health.interrupted.isEmpty)
+    }
+
+    func testTheManualSwitchStaysUntilTurnedOff() {
+        let defaults = makeDefaults(), directory = makeDirectory()
+        var rig = makeHealth(defaults: defaults, directory: directory)
+        rig.health.setSafeMode(true)
+        rig.health.scenePhaseChanged(.active)
         rig.health.scenePhaseChanged(.background)
         rig = makeHealth(defaults: defaults, directory: directory)
         XCTAssertTrue(rig.health.safeMode.isActive)
         XCTAssertTrue(rig.gate.automaticStartsBlocked)
-        // Turning it off in Settings does.
         rig.health.setSafeMode(false)
         XCTAssertFalse(rig.health.safeMode.isActive)
         XCTAssertFalse(rig.gate.automaticStartsBlocked)
+        rig.health.scenePhaseChanged(.active)
         rig.health.scenePhaseChanged(.background)
         rig = makeHealth(defaults: defaults, directory: directory)
         XCTAssertFalse(rig.health.safeMode.isActive)
@@ -177,7 +225,7 @@ final class CrashProtectionTests: XCTestCase {
 
     func testStartingWorkByHandFromTheCloudQueueLiftsSafeMode() async {
         let defaults = makeDefaults(), directory = makeDirectory()
-        _ = makeHealth(defaults: defaults, directory: directory)
+        crashedRun(defaults: defaults, directory: directory)
         let rig = makeHealth(defaults: defaults, directory: directory)
         XCTAssertTrue(rig.gate.automaticStartsBlocked)
         rig.gate.userStartedHeavyWork()
@@ -358,6 +406,7 @@ final class CrashProtectionTests: XCTestCase {
     func testACrashWithTheModelInFlightIsBlamedOnTheModel() {
         let defaults = makeDefaults(), directory = makeDirectory()
         let first = makeHealth(defaults: defaults, directory: directory)
+        first.health.scenePhaseChanged(.active)
         first.telemetry.started("localModel", id: "request")
         let second = makeHealth(defaults: defaults, directory: directory)
         XCTAssertTrue(second.health.localModelBlamed)

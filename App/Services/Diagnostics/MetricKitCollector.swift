@@ -15,6 +15,7 @@ nonisolated final class MetricKitCollector: NSObject, MXMetricManagerSubscriber,
     /// Called on an arbitrary queue with whether a diagnostic payload held a crash, hang or exception.
     var onDiagnostics: (@Sendable (_ crashLike: Bool) -> Void)?
 
+    private static let lastCountedKey = "diagnostics.metrickit.lastCountedEnd.v1"
     private static let keepDiagnostics = 10
     private static let keepMetrics = 5
     private let queue = DispatchQueue(label: "io.github.redsn0w1877.pixlaudio.metrickit", qos: .utility)
@@ -46,7 +47,13 @@ nonisolated final class MetricKitCollector: NSObject, MXMetricManagerSubscriber,
             let hangs = payload.hangDiagnostics?.count ?? 0
             let cpu = payload.cpuExceptionDiagnostics?.count ?? 0
             let disk = payload.diskWriteExceptionDiagnostics?.count ?? 0
-            if crashes + hangs + cpu + disk > 0 { crashLike = true }
+            // Only a payload newer than the last one counted can confirm a crash: the system redelivers old ones.
+            let end = payload.timeStampEnd.timeIntervalSince1970
+            let lastCounted = UserDefaults.standard.double(forKey: Self.lastCountedKey)
+            if crashes + hangs + cpu + disk > 0, end > lastCounted {
+                crashLike = true
+                UserDefaults.standard.set(end, forKey: Self.lastCountedKey)
+            }
             DiagnosticsLog.shared.log("metrickit", "diagnostic payload: crashes \(crashes), hangs \(hangs), cpu \(cpu), disk writes \(disk)")
             items.append((payload.timeStampEnd, payload.jsonRepresentation()))
         }

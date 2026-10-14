@@ -13,6 +13,32 @@ public enum PreviousRunEnd: Sendable, Equatable {
     case clean
     /// The run never wrote it (killed while working), or MetricKit reported a crash for it.
     case abnormal(AbnormalSource)
+    /// The run proves nothing either way: it never became the foreground app (a background launch, a prewarm, a
+    /// background URLSession wake) and the system ended it while it was suspended. Safe mode is left as it was.
+    case ignored
+}
+
+/// What the app can say about the previous process at launch (see `SafeModePolicy.classify`).
+public struct PreviousRunFacts: Sendable, Equatable {
+    /// A run was recorded before this one.
+    public var hasRunBefore: Bool
+    /// The clean-exit marker was on disk.
+    public var cleanMarkerPresent: Bool
+    /// That marker was written by a run that had been in the foreground at least once.
+    public var markerWasForeground: Bool
+    /// The previous run reached the first `.active` scene phase (and never cleared the flag by a clean background).
+    public var reachedActive: Bool
+    /// How many heavy jobs the in-flight journal still listed.
+    public var heavyJobsInFlight: Int
+
+    public init(hasRunBefore: Bool, cleanMarkerPresent: Bool, markerWasForeground: Bool = false,
+                reachedActive: Bool = false, heavyJobsInFlight: Int = 0) {
+        self.hasRunBefore = hasRunBefore
+        self.cleanMarkerPresent = cleanMarkerPresent
+        self.markerWasForeground = markerWasForeground
+        self.reachedActive = reachedActive
+        self.heavyJobsInFlight = heavyJobsInFlight
+    }
 }
 
 public enum AbnormalSource: String, Sendable, Codable, Equatable {
@@ -35,9 +61,19 @@ public struct SafeModeState: Sendable, Equatable, Codable {
     public var liftedByUser: Bool
     /// Unix ms of the last abnormal end.
     public var lastAbnormalAtMs: Int64
+    /// The person turned it on in Settings: it stays until they turn it off.
+    public var manual: Bool
+    /// MetricKit confirmed a crash, hang or exception: it needs two clean foreground sessions to expire, not one.
+    public var metricKitConfirmed: Bool
+    /// Clean foreground sessions seen since the last abnormal end.
+    public var cleanSessions: Int
 
     public init(consecutiveAbnormal: Int = 0, isActive: Bool = false, bannerPending: Bool = false,
-                liftedByUser: Bool = false, lastAbnormalAtMs: Int64 = 0) {
+                liftedByUser: Bool = false, lastAbnormalAtMs: Int64 = 0, manual: Bool = false,
+                metricKitConfirmed: Bool = false, cleanSessions: Int = 0) {
+        self.manual = manual
+        self.metricKitConfirmed = metricKitConfirmed
+        self.cleanSessions = cleanSessions
         self.consecutiveAbnormal = consecutiveAbnormal
         self.isActive = isActive
         self.bannerPending = bannerPending
@@ -45,8 +81,21 @@ public struct SafeModeState: Sendable, Equatable, Codable {
         self.lastAbnormalAtMs = lastAbnormalAtMs
     }
 
-    /// Two abnormal ends in a row: safe mode stays on until the person turns it off in Settings.
-    public var isSticky: Bool { consecutiveAbnormal >= SafeModePolicy.stickyAfter }
+    /// Stays on through a clean session: turned on by hand, or confirmed by MetricKit.
+    public var isSticky: Bool { isActive && (manual || metricKitConfirmed) }
+
+    // Older builds stored fewer keys; decode them with the new ones off.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        consecutiveAbnormal = try c.decode(Int.self, forKey: .consecutiveAbnormal)
+        isActive = try c.decode(Bool.self, forKey: .isActive)
+        bannerPending = try c.decode(Bool.self, forKey: .bannerPending)
+        liftedByUser = try c.decode(Bool.self, forKey: .liftedByUser)
+        lastAbnormalAtMs = try c.decode(Int64.self, forKey: .lastAbnormalAtMs)
+        manual = try c.decodeIfPresent(Bool.self, forKey: .manual) ?? false
+        metricKitConfirmed = try c.decodeIfPresent(Bool.self, forKey: .metricKitConfirmed) ?? false
+        cleanSessions = try c.decodeIfPresent(Int.self, forKey: .cleanSessions) ?? 0
+    }
 
     /// Nothing heavy may start on its own.
     public var blocksAutomaticHeavyWork: Bool { isActive }
@@ -56,30 +105,42 @@ public struct SafeModeState: Sendable, Equatable, Codable {
 }
 
 public enum SafeModePolicy {
-    /// Abnormal ends in a row after which safe mode stays on until it is turned off by hand.
-    public static let stickyAfter = 2
+    /// Clean foreground sessions after which a confirmed (MetricKit) safe mode expires.
+    public static let confirmedExpiresAfter = 2
+
+    /// How the previous run ended. Only a run that became the foreground app and then died with heavy work in flight
+    /// counts as abnormal; a force-quit, the jetsam of a suspended app and a background-only launch never do (MetricKit
+    /// can still confirm a crash later: `metricKitCrash`).
+    public static func classify(_ facts: PreviousRunFacts) -> PreviousRunEnd {
+        guard facts.hasRunBefore else { return .firstLaunch }
+        if facts.cleanMarkerPresent { return facts.markerWasForeground ? .clean : .ignored }
+        guard facts.reachedActive else { return .ignored }
+        return facts.heavyJobsInFlight > 0 ? .abnormal(.missingCleanMarker) : .ignored
+    }
 
     /// The state for this launch, from the state the last launch stored and how that run ended.
     public static func launch(previous: SafeModeState, end: PreviousRunEnd, nowMs: Int64) -> SafeModeState {
         var state = previous
         switch end {
-        case .firstLaunch:
+        case .firstLaunch, .ignored:
             return state
-        case .abnormal:
+        case .abnormal(let source):
             state.consecutiveAbnormal = min(previous.consecutiveAbnormal + 1, 99)
             state.isActive = true
             state.bannerPending = true
             state.liftedByUser = false
             state.lastAbnormalAtMs = nowMs
+            state.cleanSessions = 0
+            if source == .metricKitDiagnostic { state.metricKitConfirmed = true }
         case .clean:
-            // A run that the person had lifted safe mode for, and that ended cleanly, proves the work is fine now.
-            if previous.liftedByUser {
-                return SafeModeState()
+            // One clean foreground session resets the count; a manual switch stays until it is turned off.
+            if previous.manual { return state }
+            if previous.metricKitConfirmed, previous.isActive, !previous.liftedByUser {
+                state.consecutiveAbnormal = 0
+                state.cleanSessions = previous.cleanSessions + 1
+                return state.cleanSessions >= confirmedExpiresAfter ? SafeModeState() : state
             }
-            // A sticky safe mode (two crashes in a row) stays until it is turned off in Settings.
-            if previous.isSticky { return state }
-            // One abnormal end, then a clean session: back to normal.
-            if previous.isActive || previous.consecutiveAbnormal > 0 { return SafeModeState() }
+            if previous.isActive || previous.consecutiveAbnormal > 0 || previous.metricKitConfirmed { return SafeModeState() }
         }
         return state
     }
@@ -113,7 +174,7 @@ public enum SafeModePolicy {
             var next = state
             next.isActive = true
             next.liftedByUser = false
-            next.consecutiveAbnormal = max(next.consecutiveAbnormal, stickyAfter)
+            next.manual = true
             return next
         }
         return SafeModeState()

@@ -59,6 +59,7 @@ struct LyricsArtworkBackground: View {
         }
         .task(id: loadKey) { await load() }
         .accessibilityHidden(true)
+        .longRunning("lyrics.artworkBackground (30 fps timeline)", active: !paused && clock != nil)
     }
 
     @ViewBuilder private func frame(clock: LyricsBackgroundClock) -> some View {

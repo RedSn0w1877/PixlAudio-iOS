@@ -82,6 +82,7 @@ struct RootView: View {
             if !builtTabs.contains(tab) { builtTabs.insert(tab) }
         }
         .task { await prebuildHiddenTabs() }
+        .background { LagContextReporter() }
         // Settings › Appearance › Accent Color: UIKit-presented controls (alerts, dialogs, menus) follow the window's
         // tint. The accent snaps (no animation: the root `.animation` is keyed to the album colours only).
         .onChange(of: themeStore.accentPair, initial: true) { _, pair in

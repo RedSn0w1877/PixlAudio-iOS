@@ -123,6 +123,13 @@ nonisolated final class HeavyWorkGate: Sendable {
         return state.withLock { !$0.autoBlocked && now >= $0.autoSuspendedUntilMs && $0.thermal < .serious }
     }
 
+    /// The incremental library rescan (about 0.1 s of work): safe mode does not hold it back, or the library goes stale
+    /// on every launch; an Emergency stop and a very hot phone still do.
+    var allowsLibraryRescan: Bool {
+        let now = Self.nowMs()
+        return state.withLock { now >= $0.autoSuspendedUntilMs && $0.thermal < .serious }
+    }
+
     /// A model may use the Neural Engine now.
     var prefersNeuralEngine: Bool { HeavyWorkPolicy.prefersNeuralEngine(conditions) }
 

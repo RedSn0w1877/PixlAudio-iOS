@@ -60,6 +60,7 @@ struct PlayerAmbientBackground: View {
             }
         }
         .allowsHitTesting(false)
+        .longRunning("player.ambientBackground (30 fps canvas)", active: isPlaying && isVisible && !reduceMotion)
     }
 }
 
