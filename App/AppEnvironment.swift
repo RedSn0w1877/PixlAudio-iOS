@@ -24,9 +24,6 @@ final class AppEnvironment {
     let persistence: PersistenceActor?
     /// The real playback stack (stage 5); nil for UI tests, which use `DemoPlaybackEngine`.
     let playbackServices: PlaybackServices?
-    /// Stage 6: builds the library from folders, Documents and the music library (nil in UI tests).
-    let libraryImporter: LocalLibraryImporter?
-    private let libraryAutoRefresh: LibraryAutoRefresh?
     /// Artist pictures from Deezer after each load / rescan (nil in UI tests).
     let artistImages: ArtistImageService?
     /// Home's state holder: playback history, mixes, recommendations, stats overview (stage 7b).
@@ -172,8 +169,6 @@ final class AppEnvironment {
             let spotify = SpotifyService(launch: launch, accounts: accounts, persistence: persistence)
             self.spotify = spotify
             spotifyConnect = SpotifyConnectController(launch: launch, spotify: spotify, playback: playback)
-            libraryImporter = nil
-            libraryAutoRefresh = nil
             artistImages = nil
             searchProviders = [.library: LibrarySearchProvider(),
                                .spotify: DemoCatalogSearchProvider(),
@@ -187,16 +182,11 @@ final class AppEnvironment {
             if launch.hasSong { spotifyConnect.startDemoSessionIfNeeded(launch.screen) }
         } else {
             let loader = persistence.map { SnapshotLoader(persistence: $0, cacheURL: SnapshotLoader.defaultCacheURL()) }
-            let importer = persistence.map { LocalLibraryImporter(persistence: $0) }
-            LocalLibraryImporter.installArtworkLoader()
-            let library = LibraryStore(loader: loader, importer: importer)
+            // Spotify-only: nothing scans the phone's own audio files, so the store has no importer.
+            let library = LibraryStore(loader: loader, importer: nil)
             self.library = library
-            libraryImporter = importer
             let artistImages = ArtistImageService(library: library, persistence: persistence)
             self.artistImages = artistImages
-            let autoRefresh = importer == nil ? nil : LibraryAutoRefresh(library: library)
-            autoRefresh?.onRefreshed = { artistImages.prefetchMissing() }
-            libraryAutoRefresh = autoRefresh
             let youtube = YouTubeServices(launch: launch, library: library, persistence: persistence, accounts: accounts)
             self.youtube = youtube
             youtube.install(on: realPlayback)
@@ -295,7 +285,7 @@ final class AppEnvironment {
     }
 
     /// Launch work, off the first frame: load the library snapshot (cache first, then the store), then start the
-    /// automatic incremental rescans (launch, foreground, music-library changes).
+    /// Spotify services.
     func start() async {
         guard !launch.isUITest else { return }
         MetricKitCollector.shared.onDiagnostics = { [weak health] crashLike in
@@ -335,7 +325,6 @@ final class AppEnvironment {
         await playbackServices?.restoreQueue(lookup: library.song(id:), beforeRestore: { await theme.seed(for: $0) })
         if hasCache { await library.reconcileWithStore() }
         artistImages?.prefetchMissing()
-        libraryAutoRefresh?.start()
         let home = self.home, playCounts = self.playCounts, editor = libraryEditor
         Task {
             await home.history.ensureLoaded()
@@ -370,7 +359,6 @@ final class AppEnvironment {
 
     /// A file opened in PixlAudio from Files or the share sheet (the declared document types; Android's external
     /// intents): a `.pxpl` backup, or the Android app's legacy `.json.gz`, opens the restore flow on it; an M3U
-    /// playlist becomes a playlist; LRC / TTML lyrics are imported for the playing song; an audio file joins the
     /// library and plays.
     func open(_ url: URL) {
         guard !launch.isUITest, url.isFileURL else { return }
@@ -379,7 +367,6 @@ final class AppEnvironment {
         case .backup: openBackup(url)
         case .playlist: openPlaylist(url)
         case .lyrics: openLyrics(url)
-        case .audio: openAudio(url)
         case .unsupported: return
         }
     }
@@ -418,42 +405,12 @@ final class AppEnvironment {
         if router.cover == nil { router.present(AppCover.lyrics) }
     }
 
-    /// An audio file: copied into Documents (unless it is already there), scanned into the library and played.
-    private func openAudio(_ url: URL) {
-        let library = self.library, playback = self.playback
-        Task {
-            guard let relativePath = await ExternalFiles.importAudio(url) else {
-                self.showLibraryRoot()
-                LibraryToast.shared.show("Couldn't open this file")
-                return
-            }
-            let id = LibraryIdentity.fileSongID(rootID: FolderRoot.documentsID, relativePath: relativePath)
-            // Opening a file the user once deleted (whose file couldn't be removed) asks for it back.
-            HiddenSongs.unhide([id])
-            // An incremental refresh joins a scan that is already running (the foreground rescan), which may have
-            // listed the folder before the copy: scan once more if the song isn't there yet.
-            for _ in 0..<2 where library.song(id: id) == nil {
-                try? await library.refresh(mode: .incremental)
-            }
-            if let song = library.song(id: id) {
-                playback.play([song], startIndex: 0)
-            } else {
-                self.showLibraryRoot()
-                LibraryToast.shared.show("This file couldn't be added to the library")
-            }
-        }
-    }
-
     /// Library at its root, where the toast of an opened file shows.
     private func showLibraryRoot() {
         router.libraryPath.removeAll()
         router.selection = .library
     }
 
-    /// Call after music-library access was granted so its change notifications start.
-    func libraryAccessChanged() {
-        libraryAutoRefresh?.observeMediaLibraryIfAuthorized()
-    }
 
     /// The colour scheme forced by UI tests, else the user's `app_theme_mode`.
     var preferredColorScheme: ColorScheme? {

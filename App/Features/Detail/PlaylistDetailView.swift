@@ -2,12 +2,12 @@ import PixlLibrary
 import PixlModel
 import SwiftUI
 
-/// Playlist detail (Android `PlaylistDetailScreen`), also used for folder playlists (`folder_playlist:<path>`):
+/// Playlist detail (Android `PlaylistDetailScreen`):
 /// - the top bar: back circle, the name (`headlineMedium`) over "N Songs • duration" (`labelMedium`), the sort and ⋮
-///   circles (no ⋮ for folders);
+///   circles;
 /// - the play row (56 pt): "Play it" (`primary`, 60 / 14 pt corners) and Shuffle (`secondaryContainer`, 14 / 60 pt);
-/// - for real playlists the edit row (42 pt): Add (`tertiaryContainer` capsule), then Remove and Reorder sharing the
-///   rest (12 pt corners, 24 pt and `tertiary` while active);
+/// - the edit row (42 pt): Add (`tertiaryContainer` capsule), then Remove and Reorder sharing the rest (12 pt
+///   corners, 24 pt and `tertiary` while active);
 /// - the lyric-sync progress card, then the songs in a `surfaceContainerHigh` panel (32 pt top corners) as
 ///   `PlaylistSongRow`s, 8 pt apart; drag handles in reorder mode, remove buttons in remove mode;
 /// - sheets: Add songs (`SongPickerSheet`), Sort Songs, Playlist options (edit, delete, default transition, export,
@@ -37,27 +37,11 @@ struct PlaylistDetailView: View {
     @State private var didApplyLaunchState = false
 
     private var prefs: LibraryPreferences { LibraryPreferences.shared(isUITest: env.launch.isUITest) }
-    /// The song picker's starting storage filter (Android: offline when the library has cloud songs, else all).
+    /// The song picker always starts on all songs (every song is a Spotify song; there is no local/cloud split).
     private var songPickerFilter: StorageFilter {
-        library.songs.contains(where: LibrarySorting.isOnline) ? .offline : .all
+        .all
     }
-    private var folderPath: String? { FolderPlaylist.path(from: playlistId) }
-    private var isFolder: Bool { folderPath != nil }
-
-    /// The folder as a read-only pseudo playlist (Android `loadPlaylistDetails`), built when the library changes.
-    @State private var folderPlaylist: Playlist?
-    @State private var didResolveFolder = false
-
-    /// The playlist (or the folder's pseudo playlist).
-    private var playlist: Playlist? { isFolder ? folderPlaylist : library.playlist(id: playlistId) }
-
-    private func resolveFolder() {
-        guard let folderPath else { return }
-        // The library's folder tree is built off the main actor with the detail index.
-        let folder = LibraryModel.folder(at: folderPath, in: library.folderTree)
-        folderPlaylist = folder.map { Playlist(id: playlistId, name: $0.name, songIds: LibraryModel.allSongs($0).map(\.id)) }
-        didResolveFolder = true
-    }
+    private var playlist: Playlist? { library.playlist(id: playlistId) }
 
     nonisolated private struct Inputs: Equatable {
         var songIds: [String]
@@ -79,20 +63,16 @@ struct PlaylistDetailView: View {
                     }
                 }
                 .accessibilityIdentifier("playlist.sort")
-                if !isFolder {
-                    GlassCircleMenu(systemImage: "ellipsis", accessibilityLabel: "More options") {
-                        optionsMenu
-                    }
-                        .accessibilityIdentifier("playlist.more")
+                GlassCircleMenu(systemImage: "ellipsis", accessibilityLabel: "More options") {
+                    optionsMenu
                 }
+                    .accessibilityIdentifier("playlist.more")
             }
-            if isFolder && !didResolveFolder {
-                Spacer()
-            } else if playlist == nil {
+            if playlist == nil {
                 LibraryEmptyState(systemImage: "music.note.list", title: "Playlist not found.", subtitle: "")
             } else {
                 playRow
-                if !isFolder { editRow }
+                editRow
                 PlaylistLyricSyncSection(playlistId: playlistId, songs: songs)
                 if songs.isEmpty {
                     emptyState
@@ -110,14 +90,13 @@ struct PlaylistDetailView: View {
         }
         .onAppear {
             applyLaunchState()
-            if !isFolder { SongPickerDefaults.warm(library: library, filter: songPickerFilter) }
+            SongPickerDefaults.warm(library: library, filter: songPickerFilter)
         }
         // The M3U is built and written off the main actor (`PlaylistExport.writeM3U`).
         .task(id: playlist?.songIds) {
-            guard let playlist, !isFolder else { return }
+            guard let playlist else { return }
             exportURL = await PlaylistExport.writeTemporaryM3U(playlist, library: library)
         }
-        .onChange(of: library.songs.count, initial: true) { _, _ in resolveFolder() }
         .sheet(isPresented: $showsAddSongs) {
             SongPickerSheet(initiallySelected: Set(playlist?.songIds ?? []),
                             initialStorageFilter: songPickerFilter) { selected in
@@ -154,17 +133,12 @@ struct PlaylistDetailView: View {
 
     private func orderedSongs(_ inputs: Inputs) -> [Song] {
         let resolved = inputs.songIds.compactMap { library.song(id: $0) }
-        if isFolder {
-            // Folder playlists are always sorted (Android: `Sorted(currentPlaylistSongsSortOption)`, title A-Z first).
-            let option = inputs.sort == .songDefaultOrder ? SortOption.songTitleAZ : inputs.sort
-            return LibrarySorting.sortPlaylistSongs(resolved, by: option)
-        }
         return inputs.sort == .songDefaultOrder ? resolved : LibrarySorting.sortPlaylistSongs(resolved, by: inputs.sort)
     }
 
     // MARK: Rows
 
-    /// Android: a 62 pt row (20 pt sides, 6 pt bottom; 8 pt for folders) of two 76 pt buttons clipped to it.
+    /// Android: a 62 pt row (20 pt sides, 6 pt bottom) of two 76 pt buttons clipped to it.
     private var playRow: some View {
         let enabled = !songs.isEmpty
         // The two buttons render together (spacing below their 8 pt gap).
@@ -193,7 +167,7 @@ struct PlaylistDetailView: View {
         .disabled(!enabled)
         .opacity(enabled ? 1 : 0.5)
         .padding(.horizontal, 20)
-        .padding(.bottom, isFolder ? 8 : 6)
+        .padding(.bottom, 6)
     }
 
     /// Android: Add (capsule, `tertiaryContainer`), then Remove and Reorder stretched over the rest.
@@ -244,7 +218,7 @@ struct PlaylistDetailView: View {
             Text("This playlist is empty.")
                 .pixlFont(.titleMedium)
                 .foregroundStyle(theme.onSurface)
-            Text(isFolder ? "This folder doesn't contain songs." : "Tap on 'Add Songs' to begin.")
+            Text("Tap on 'Add Songs' to begin.")
                 .pixlFont(.bodyMedium)
                 .foregroundStyle(theme.onSurfaceVariant)
         }
@@ -259,8 +233,8 @@ struct PlaylistDetailView: View {
                 ForEach(songs) { song in
                     PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
                         PlaylistSongRow(song: song, isCurrent: isCurrent, isPlaying: isPlaying,
-                                        showsDragHandle: isReorderMode && !isFolder,
-                                        showsRemove: isRemoveMode && !isFolder,
+                                        showsDragHandle: isReorderMode,
+                                        showsRemove: isRemoveMode,
                                         onTap: { playback.play(song, in: songs) },
                                         onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
                                         onRemove: { env.libraryEditor.removeSong(song.id, fromPlaylist: playlistId) })
@@ -284,7 +258,7 @@ struct PlaylistDetailView: View {
     /// Drop of a dragged song onto another row (Android `ReorderableItem` → `savePlaylistSongOrder`). The playlist
     /// switches to its manual order, like Android.
     private func move(_ sourceId: String?, onto targetId: String) -> Bool {
-        guard isReorderMode, !isFolder, let sourceId, sourceId != targetId,
+        guard isReorderMode, let sourceId, sourceId != targetId,
               let from = songs.firstIndex(where: { $0.id == sourceId }),
               let to = songs.firstIndex(where: { $0.id == targetId }) else { return false }
         var reordered = songs

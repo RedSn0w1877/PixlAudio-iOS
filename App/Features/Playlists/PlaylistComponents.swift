@@ -278,7 +278,7 @@ struct SongPickerSheet: View {
     }
 
     var body: some View {
-        let hasCloud = library.songs.contains(where: LibrarySorting.isOnline) || LaunchConfiguration.current.forcesCloudFilter
+        let hasCloud = false // no local/cloud split: every song is a Spotify song
         VStack(alignment: .leading, spacing: 0) {
             Text("Add songs")
                 .pixlFont(.displaySmall)

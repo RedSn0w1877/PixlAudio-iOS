@@ -182,7 +182,6 @@ PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact ba
 | Beta info / Changelog / Jobs sheets | `AppSheet.betaInfo/.changelog/.jobs` | `HomeInfoSheet` (Features/Home) | 7b |
 | Search | tab `.search` root | `SearchView` (Features/Search) | 7c |
 | Library (tabs, action row, songs/albums/artists/playlists/folders/liked) | tab `.library` root | `LibraryView` (Features/Library) | 7a |
-| Folder explorer | `.folderExplorer(path:)` | `FolderExplorerView` (Features/Library) | 7a |
 | Album / Artist / Genre / Playlist detail | `.albumDetail` `.artistDetail` `.genreDetail` `.playlistDetail` | Features/Detail/*View.swift | 7a |
 | Create / edit playlist | `.playlistEditor(playlistId:)` | `PlaylistEditorView` (Features/Playlists) | 7a |
 | Settings + categories | `.settings`, `.settingsCategory(_:)` | `SettingsView`, `SettingsCategoryView` (Features/Settings) | 7d |
@@ -277,7 +276,7 @@ shots taken with it carry a suffix (`settingsCategory.appearance-dark-accentRed`
 swatches are `settings.accent.<preset id>` / `settings.accent.custom`, the row `settings.accentColor`.
 
 Stage 7a ids (Library tab on screen, ready `screen.library` plus the page/sheet id): `libraryPlaylists`,
-`libraryAlbums` (grid), `libraryAlbumsList`, `libraryArtists`, `libraryFolders`, `libraryLiked`, `librarySelection`
+`libraryAlbums` (grid), `libraryAlbumsList`, `libraryArtists`, `libraryLiked`, `librarySelection`
 (three songs selected), `librarySort`, `libraryReorderTabs`, `libraryMultiSelection`, `libraryCreatePlaylist`,
 `libraryAddToPlaylist`; `songOptionsInfo` (the ⋮ sheet on its Info page); `playlistEdit` (editor on the first demo
 playlist, Icon tab with a star), `playlistAddSongs`, `playlistOptions`, `playlistReorder` (reorder + remove modes),
@@ -312,10 +311,9 @@ How the stages meet now that they share one `main`:
 - **Equalizer and transitions:** `PlaybackServices.applySettings` uses stage 7d's `EqualizerPreferences.engineSettings`
   (saved custom presets, loudness) and the observed `globalTransitionSettingsJSON`; saving a playlist rule calls
   `PlaybackServices.reloadTransitionRules()`.
-- **Music folders:** Settings › Music Management adds and removes folders through `LocalLibraryImporter` (unique
-  display names, security scope kept open). Library paths are `/<root display name>/<relative path>` with the
-  Documents root named `PixlAudio` (`FolderRoot.documentsDisplayName`), so `blocked_directories` entries written by
-  the folder screen match the scanner's paths.
+- **Music folders:** removed. The app is Spotify-only — nothing scans the phone, so Settings › Music Management has
+  no folder, rescan or excluded-directory rows and `LibraryIdentity.parentDirectory` is all that is left of the
+  library-path helpers (a downloaded song's `parentDirectory` column).
 - **Pill row accessory:** `GlassPillRow(accessory:)` is the one trailing action capsule (Library's Edit tab, the
   equalizer's Edit presets).
 - **CI:** the shots job runs every `PixlAudioUITests` class (111 screenshots, ~42 min; timeout 90 min).
@@ -383,8 +381,8 @@ categories, sheets; glass in place of Material; text legible in light and dark. 
   and `Shell/RouteDestinations.swift` (new cases, queue/timer detents), `AppEnvironment.swift` (`playerSheet`,
   `sleepTimer`), `DesignSystem/Components/MiniPlayerBar.swift` (`drawsGlass`), `Demo/*` (screen ids, demo engine queue
   edits, one featured credit on "Slow Burn"), `Features/Library/SongOptionsSheet.swift` (`onEdit`),
-  `Library/TagOverrides.swift` (`artworkUri`), `Library/TagWriteBack.swift` + `LocalLibraryImporter.editTags`
-  (`TagWriteExtras`: composer, lyrics, ReplayGain, cover).
+  `Library/TagOverrides.swift` (`artworkUri`). The file write-back (`TagWriteBack`) went with the local library: an
+  edit is saved as a tag override only.
 
 Stage 8 screenshot ids (`UITests/PlayerScreenshotTests`): `miniPlayer` (collapsed), `nowPlaying` (expanded; `-paused`
 for pp_full), `queue`, `sleepTimer`, `songInfo`, `editSong`, `artistPicker` (song 16, two credits), `devices` —
@@ -758,7 +756,7 @@ Ids: `settingsCategory.ai.localModel` (switch on, downloading 42 %; ready `scree
   English catalog; adding `--with-translations` brings Android's 11 locales back in one step when languages return.
   New strings: English only, `String(localized: "<android key>", defaultValue: "<English>")` (Android's key when
   Android has the string).
-- Screenshot ids: `setup`, `setupPermission`, `setupFolders`, `setupBackup`, `setupTheme`, `setupLibraryLayout`,
+- Screenshot ids: `setup`, `setupBackup`, `setupTheme`, `setupLibraryLayout`,
   `setupSpotify`, `setupFinish` (ready `screen.setup`); `backupRestorePlan` (ready `screen.backupRestorePlan`) and
   `backupImportReport` (ready `screen.backupReport`), both on the `backupImport` cover. Class:
   `UITests/BackupOnboardingScreenshotTests`.

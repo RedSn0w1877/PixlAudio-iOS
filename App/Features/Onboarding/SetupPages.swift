@@ -57,101 +57,29 @@ struct SetupWelcomePage: View {
     }
 }
 
-/// Android `MediaPermissionPage` → the music library (`MPMediaLibrary`). Not a gate on iOS: the library holds only
-/// downloaded DRM-free songs, and folders work without it.
-struct SetupMediaPermissionPage: View {
-    let status: SetupView.MediaStatus
-    let onGrant: () -> Void
-    @Environment(\.appTheme) private var theme
-
-    var body: some View {
-        SetupPermissionPage(title: L10n.setupPermissionMediaTitle, granted: status == .granted,
-                            description: L10n.setupPermissionMediaDescription,
-                            buttonText: status == .granted ? L10n.setupPermissionGranted : L10n.setupGrantMediaPermission,
-                            icons: ["music.note", "opticaldisc", "music.note.house", "music.mic", "play.square.stack"],
-                            buttonEnabled: status != .granted, onGrant: onGrant) {
-            if status == .denied {
-                Text(L10n.setupPermissionDeniedHint)
-                    .pixlFont(.bodySmall)
-                    .foregroundStyle(theme.onSurfaceVariant)
-                    .multilineTextAlignment(.center)
-            }
-        }
-    }
-}
-
-/// Android `DirectorySelectionPage` → picking music folders (`LibraryImporting` bookmarks). Android scans all of
-/// storage and lets you exclude folders; iOS sees only the app's own folder plus the folders you add.
-struct SetupMusicFoldersPage: View {
-    let folders: [String]
-    let onChoose: () -> Void
-    let onSkip: () -> Void
-    @Environment(\.appTheme) private var theme
-
-    var body: some View {
-        SetupPermissionPage(title: L10n.setupMusicFoldersTitle, description: L10n.setupMusicFoldersDescription,
-                            buttonText: L10n.setupChooseFolders,
-                            icons: ["folder", "music.note", "folder.badge.plus", "folder.fill", "waveform"],
-                            onGrant: onChoose) {
-            if !folders.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(L10n.setupFoldersAdded(folders.count))
-                        .pixlFont(.titleSmall, weight: .semibold)
-                        .foregroundStyle(theme.primary)
-                    ForEach(folders, id: \.self) { name in
-                        Label(name, systemImage: "folder.fill")
-                            .pixlFont(.bodyMedium)
-                            .foregroundStyle(theme.onSurface)
-                            .lineLimit(1)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .pixlGlass(in: RoundedRectangle(cornerRadius: 20, style: .continuous),
-                           tint: theme.surfaceContainerHigh.opacity(GlassTint.container))
-                .padding(.bottom, 8)
-            }
-            SetupTextButton(title: L10n.setupSkipForNow, action: onSkip)
-        }
-    }
-}
-
-/// Android `BackupRestorePage`: import a backup, with the "checking" / progress card above "Skip / Not now". iOS
-/// reads the library first (the backup's songs are matched against it), showing the scan in the same card.
+/// Android `BackupRestorePage`: import a backup, with the "checking" / progress card above "Skip / Not now".
 struct SetupBackupPage: View {
     let isInspecting: Bool
     let isRestoring: Bool
-    let isScanning: Bool
     let onImport: () -> Void
     let onSkip: () -> Void
-    @Environment(LibraryStore.self) private var library
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        // The scan's progress is read here, not by SetupView: each tick re-runs this page only, not the pager.
-        let scanProgress = library.lastImportProgress
-        let isBusy = isInspecting || isRestoring || isScanning
+        let isBusy = isInspecting || isRestoring
         SetupPermissionPage(title: L10n.setupBackupHaveTitle, description: L10n.setupBackupHaveDescription,
                             buttonText: isInspecting ? L10n.setupInspectingBackup
                                 : isRestoring ? L10n.setupRestoringBackup : L10n.setupImportBackup,
                             icons: ["doc.badge.arrow.up", "music.note.list", "gearshape", "quote.bubble",
                                     "chart.line.uptrend.xyaxis"],
                             buttonEnabled: !isBusy, onGrant: onImport) {
-            if isInspecting || isScanning {
+            if isInspecting {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 10) {
                         ProgressView().tint(theme.primary)
-                        Text(isInspecting ? L10n.setupCheckingBackup : L10n.setupScanningLibrary)
+                        Text(L10n.setupCheckingBackup)
                             .pixlFont(.bodyMedium)
                             .foregroundStyle(theme.onSurfaceVariant)
-                    }
-                    if isScanning, let scanProgress, scanProgress.total > 0 {
-                        Text(scanProgress.phase)
-                            .pixlFont(.titleSmall, weight: .semibold)
-                            .foregroundStyle(theme.onSurface)
-                        ProgressView(value: scanProgress.fraction)
-                            .tint(theme.primary)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -160,9 +88,6 @@ struct SetupBackupPage: View {
                 .pixlGlass(in: RoundedRectangle(cornerRadius: 20, style: .continuous),
                            tint: theme.surfaceContainerHigh.opacity(GlassTint.container))
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
-            }
-            if isScanning {
-                SetupTextButton(title: "Cancel scan", isEnabled: true) { library.cancelScans() }
             }
             SetupTextButton(title: L10n.setupSkipForNow, isEnabled: !isRestoring, action: onSkip)
         }

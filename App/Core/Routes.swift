@@ -107,8 +107,6 @@ nonisolated enum AppRoute: Hashable, Sendable {
     case playlistDetail(playlistId: String)
     /// Create (`nil`) or edit a playlist (Android `CreatePlaylistScreen` / playlist dialogs).
     case playlistEditor(playlistId: String?)
-    /// Folder browser (Android `FolderExplorerScreen`), at a folder path (`nil` = roots).
-    case folderExplorer(path: String?)
 
     // Home
     case dailyMix
@@ -157,7 +155,6 @@ nonisolated enum AppRoute: Hashable, Sendable {
         case .genreDetail: "genreDetail"
         case .playlistDetail: "playlistDetail"
         case .playlistEditor: "playlistEditor"
-        case .folderExplorer: "folderExplorer"
         case .dailyMix: "dailyMix"
         case .yourMix: "yourMix"
         case .recentlyPlayed: "recentlyPlayed"

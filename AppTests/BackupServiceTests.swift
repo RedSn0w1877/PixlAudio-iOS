@@ -180,7 +180,9 @@ final class BackupServiceTests: XCTestCase {
         XCTAssertEqual(SetupView.initialPage(for: nil), .welcome)
         XCTAssertEqual(SetupView.initialPage(for: .setupBackup), .backupRestore)
         XCTAssertEqual(SetupView.initialPage(for: .setupFinish), .finish)
-        XCTAssertEqual(SetupView.Page.allCases.count, 8)
+        XCTAssertEqual(SetupView.initialPage(for: .setupSpotify), .spotify)
+        // Welcome, Spotify, Backup, Theme, Library layout, Finish: no media-permission or music-folder page.
+        XCTAssertEqual(SetupView.Page.allCases.count, 6)
     }
 
     // MARK: -

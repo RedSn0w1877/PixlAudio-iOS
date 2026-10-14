@@ -50,7 +50,7 @@ final class LibraryPreferences {
         self.defaults = defaults
         playlistSongOrderModes = defaults.string(forKey: Self.playlistSongOrderModesKey)
             .flatMap { try? JSONDecoder().decode([String: String].self, from: Data($0.utf8)) } ?? [:]
-        tabOrder = LibraryTab.decodeOrder(defaults.string(forKey: PreferenceKeys.libraryTabsOrder))
+        tabOrder = Self.visibleTabs(LibraryTab.decodeOrder(defaults.string(forKey: PreferenceKeys.libraryTabsOrder)))
         func sort(_ key: String, _ allowed: [SortOption], _ fallback: SortOption) -> SortOption {
             SortOption.fromStorageKey(defaults.string(forKey: key), allowed: allowed, fallback: fallback)
         }
@@ -63,6 +63,10 @@ final class LibraryPreferences {
         isFoldersPlaylistView = defaults.bool(PreferenceKeys.isFoldersPlaylistView, default: false)
         storageFilter = StorageFilter(rawValue: defaults.int(PreferenceKeys.lastStorageFilter, default: 0)) ?? .all
     }
+
+    /// The Folders tab browsed the phone's own music folders; the app is Spotify-only, so it is never shown (a stored
+    /// order that still lists it is read without it).
+    static func visibleTabs(_ tabs: [LibraryTab]) -> [LibraryTab] { tabs.filter { $0 != .folders } }
 
     /// The process-wide instance.
     static func shared(isUITest: Bool) -> LibraryPreferences {
@@ -123,7 +127,7 @@ final class LibraryPreferences {
     /// Android `resetLibraryTabsOrder` (removes the key: default order).
     func resetTabOrder() {
         defaults.removeObject(forKey: PreferenceKeys.libraryTabsOrder)
-        tabOrder = LibraryTab.defaultOrder
+        tabOrder = Self.visibleTabs(LibraryTab.defaultOrder)
         defaults.removeObject(forKey: PreferenceKeys.libraryTabsOrder)
     }
 }

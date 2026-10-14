@@ -43,7 +43,7 @@ struct SortMenuSections: View {
 }
 
 /// Library › Sort by as a menu (Android `LibrarySortBottomSheet`): sort methods, order, then per tab Albums › View
-/// (Grid / List), Folders › Playlist View, others › Cloud Only.
+/// (Grid / List).
 struct LibrarySortMenuContent: View {
     let tab: LibraryTab
     let prefs: LibraryPreferences
@@ -62,17 +62,6 @@ struct LibrarySortMenuContent: View {
                     Label("List", systemImage: "list.bullet").tag(true)
                 }
                 .pickerStyle(.inline)
-            }
-        }
-        if tab == .folders {
-            Section("View") {
-                Toggle("Playlist View", isOn: Binding(get: { prefs.isFoldersPlaylistView },
-                                                      set: { prefs.isFoldersPlaylistView = $0 }))
-            }
-        } else {
-            Section("Cloud") {
-                Toggle("Cloud Only", isOn: Binding(get: { settings.library.hideLocalMedia },
-                                                   set: { settings.library.hideLocalMedia = $0 }))
             }
         }
     }

@@ -38,8 +38,6 @@ final class LibraryActions {
     @ObservationIgnored var openArtist: (Artist) -> Void = { _ in }
     @ObservationIgnored var openPlaylist: (Playlist) -> Void = { _ in }
     @ObservationIgnored var reorderPlaylists: ([String]) -> Void = { _ in }
-    @ObservationIgnored var openFolder: (String) -> Void = { _ in }
-    @ObservationIgnored var openFolderPlaylist: (MusicFolder) -> Void = { _ in }
 
     func reportCurrentVisible(_ visible: Bool, page: LibraryTab) {
         guard page == visibleTab, currentSongVisible != visible else { return }
@@ -566,148 +564,43 @@ struct OptionalLongPress: ViewModifier {
     }
 }
 
-// MARK: - Folders
-
-struct LibraryFoldersPage: View {
-    let folders: [MusicFolder]
-    let folderPlaylists: [MusicFolder]
-    /// Each folder's sorted subfolders and songs (`LibraryModel`, computed off the main actor).
-    let folderContents: [String: LibraryModel.FolderContents]
-    let folderPath: String?
-    let isPlaylistView: Bool
-    let context: LibraryPageContext
-    let selection: OrderedSelection<String>
-    let actions: LibraryActions
-
-    @Environment(LibraryStore.self) private var library
-    @Environment(PlaybackStore.self) private var playback
-
-    var body: some View {
-        // Precomputed: no tree walk or sort here.
-        let active = folderPath.flatMap { folderContents[$0] }
-        let showsPlaylistCards = isPlaylistView && active == nil
-        let items: [MusicFolder] = showsPlaylistCards ? folderPlaylists : (active?.subFolders ?? folders)
-        let songs = active?.songs ?? []
-        Group {
-            if items.isEmpty && songs.isEmpty {
-                LibraryEmptyState(systemImage: "folder.fill", title: "No folders found",
-                                  subtitle: "Folders with music will appear here.")
-            } else {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(spacing: 8) {
-                            ForEach(items, id: \.path) { folder in
-                                if showsPlaylistCards {
-                                    FolderRow(folder: folder, asPlaylist: true) { actions.openFolderPlaylist(folder) }
-                                } else {
-                                    FolderRow(folder: folder, asPlaylist: false) { actions.openFolder(folder.path) }
-                                }
-                            }
-                            ForEach(songs) { song in
-                                LibrarySongRow(song: song, songs: songs, page: context.page, reportsVisibility: false,
-                                               selection: selection, actions: actions)
-                                    .id(song.id)
-                            }
-                        }
-                        .padding(.leading, 12)
-                        .padding(.trailing, context.trailingPadding)
-                        .padding(.bottom, libraryListExtraBottomGap)
-                    }
-                    .scrollIndicators(context.showsScrollbarGap ? .visible : .hidden)
-                    .minimizesTabBarOnScroll()
-                    .refreshable { try? await library.refresh() }
-                    .onChange(of: context.locateRequest) { _, _ in
-                        guard let id = playback.currentSongId else { return }
-                        withAnimation(PixlMotion.state) { proxy.scrollTo(id, anchor: .center) }
-                    }
-                }
-            }
-        }
-        .id(folderPath ?? "__root__")
-        .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
-                                removal: .move(edge: .leading).combined(with: .opacity)))
-        .accessibilityIdentifier("library.page.folders")
-    }
-}
-
-/// Android `FolderListItem` (folder icon in a 48 pt `primaryContainer` circle) and `FolderPlaylistItem` (the 48 pt
-/// collage of the folder's songs): a 16 pt `surfaceContainerLow` card, 12 pt padding, name + song count.
-struct FolderRow: View {
-    let folder: MusicFolder
-    let asPlaylist: Bool
-    let onTap: () -> Void
-    @Environment(\.appTheme) private var theme
-
-    var body: some View {
-        let shape = RoundedRectangle(cornerRadius: Tokens.Radius.medium, style: .continuous)
-        Button(action: onTap) {
-            HStack(spacing: 16) {
-                if asPlaylist {
-                    ArtCollage(songs: LibraryModel.firstSongs(folder, limit: 9), size: 48)
-                } else {
-                    Image(systemName: "folder.fill")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(theme.onPrimaryContainer)
-                        .frame(width: 48, height: 48)
-                        .background(Circle().fill(theme.primaryContainer))
-                }
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(folder.name)
-                        .pixlFont(.titleMedium, weight: .bold)
-                        .foregroundStyle(theme.onSurface)
-                        .lineLimit(1)
-                    Text(LibraryFormat.songCount(folder.totalSongCount))
-                        .pixlFont(.bodySmall)
-                        .foregroundStyle(theme.onSurfaceVariant)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(12)
-            .contentShape(shape)
-        }
-        .buttonStyle(.plain)
-        .pixlGlass(in: shape, tint: theme.surfaceContainerLow.opacity(GlassTint.surface), interactive: true)
-        .accessibilityIdentifier("folderRow.\(folder.name)")
-    }
-}
-
 // MARK: - Empty copy (Android `libraryEmptySpec`)
 
 nonisolated enum LibraryEmptyCopy {
     static func title(_ tab: LibraryTab, _ filter: StorageFilter) -> String {
         switch (tab, filter) {
         case (.songs, .all): "No songs yet"
-        case (.songs, .offline): "No local songs found"
-        case (.songs, .online): "No cloud songs found"
+        case (.songs, .offline): "No downloaded songs found"
+        case (.songs, .online): "No streamed songs found"
         case (.albums, .all): "No albums available"
-        case (.albums, .offline): "No local albums found"
-        case (.albums, .online): "No cloud albums found"
+        case (.albums, .offline): "No downloaded albums found"
+        case (.albums, .online): "No streamed albums found"
         case (.artists, .all): "No artists available"
-        case (.artists, .offline): "No local artists found"
-        case (.artists, .online): "No cloud artists found"
+        case (.artists, .offline): "No downloaded artists found"
+        case (.artists, .online): "No streamed artists found"
         case (.liked, .all): "No liked songs yet"
-        case (.liked, .offline): "No liked local songs"
-        case (.liked, .online): "No liked cloud songs"
-        case (.folders, _): "No folders found"
+        case (.liked, .offline): "No liked downloaded songs"
+        case (.liked, .online): "No liked streamed songs"
+        case (.folders, _): "Nothing here"
         case (.playlists, _): "No playlists yet"
         }
     }
 
     static func subtitle(_ tab: LibraryTab, _ filter: StorageFilter) -> String {
         switch (tab, filter) {
-        case (.songs, .all): "Add music to your device or sync a cloud source to start listening."
-        case (.songs, .offline): "Try another source filter or rescan your device library."
-        case (.songs, .online): "Sync your cloud songs, or switch to local source."
+        case (.songs, .all): "Connect Spotify to sync your songs and start listening."
+        case (.songs, .offline): "Download a song to keep it here for offline playback."
+        case (.songs, .online): "Sync your Spotify library to see streamed songs here."
         case (.albums, .all): "Albums will appear here as soon as your library has grouped tracks."
-        case (.albums, .offline): "Local songs are required to build local album groups."
-        case (.albums, .online): "Cloud songs with album data will appear here after sync."
-        case (.artists, .all): "Artists are shown after songs are indexed from any source."
-        case (.artists, .offline): "No artist metadata is available for local songs right now."
-        case (.artists, .online): "Cloud artist entries appear when remote songs are synced."
+        case (.albums, .offline): "Download songs to build offline album groups."
+        case (.albums, .online): "Synced songs with album data will appear here."
+        case (.artists, .all): "Artists are shown after your songs are indexed."
+        case (.artists, .offline): "No artist metadata is available for downloaded songs right now."
+        case (.artists, .online): "Artist entries appear when your songs are synced."
         case (.liked, .all): "Tap the heart icon while playing a song to save it here."
-        case (.liked, .offline): "Switch source filter or like songs from your device."
-        case (.liked, .online): "Like cloud tracks to see them in this view."
-        case (.folders, _): "Folders with music will appear here."
+        case (.liked, .offline): "Like a downloaded song to see it in this view."
+        case (.liked, .online): "Like a streamed song to see it in this view."
+        case (.folders, _): "This view is no longer used."
         case (.playlists, _): "Create your first playlist to organize your library."
         }
     }

@@ -1,24 +1,24 @@
 import PixlLibrary
 import PixlModel
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// PixlAudio's Library (Android `LibraryScreen`, default tabs navigation), ported with Liquid Glass:
 /// - the screen background gradient (dark: `primaryContainer` 50 % → clear; light: `onPrimaryContainer` 20 % → clear)
 ///   and the header band tinted `primaryContainer` 40 % holding the "Library" title (40 pt heavy, `primary`) with
 ///   its settings circle, and the category tab row (glass capsules, gliding `primary` selection, an Edit capsule
 ///   that opens the reorder sheet);
-/// - the content panel (`surface`, 34 pt top corners) with the action row (Shuffle / New + Import, locate, storage
-///   filter, instrumental filter, sort — or the folder breadcrumbs, or the selection row) and the swipeable tab
-///   pages (Songs, Albums grid/list, Artists, Playlists, Folders, Liked);
+/// - the content panel (`surface`, 34 pt top corners) with the action row (Shuffle / New, locate, instrumental
+///   filter, sort — or the selection row) and the swipeable tab pages (Songs, Albums grid/list, Artists, Playlists,
+///   Liked); with no Spotify account linked and nothing in the library, a Connect Spotify state instead;
 /// - long press multi-selection for songs, albums (max 6) and playlists, with the floating count pill and the
-///   selection sheets; the sort sheet, the reorder sheet, the playlist creation flow and M3U import.
+///   selection sheets; the sort sheet, the reorder sheet and the playlist creation flow.
 struct LibraryView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(LibraryStore.self) private var library
     @Environment(PlaybackStore.self) private var playback
     @Environment(Router.self) private var router
     @Environment(SettingsStore.self) private var settings
+    @Environment(AccountsStore.self) private var accounts
     @Environment(\.appTheme) private var theme
 
     @State private var model = LibraryModel()
@@ -26,11 +26,9 @@ struct LibraryView: View {
     @State private var songSelection = OrderedSelection<String>()
     @State private var albumSelection = OrderedSelection<Int64>()
     @State private var playlistSelection = OrderedSelection<String>()
-    @State private var folderPath: String?
     @State private var sheet: LibrarySheet?
     @State private var likedAt: [String: Int64] = [:]
     @State private var instrumentalizedOnly = false
-    @State private var showsM3UImporter = false
     @State private var mergeName = ""
     @State private var showsMergeDialog = false
     /// Locate taps per page (only the tapped page scrolls).
@@ -71,9 +69,6 @@ struct LibraryView: View {
         .task { likedAt = await env.libraryEditor.favoriteTimestamps() }
         .sheet(item: $sheet) { sheet in
             sheetContent(sheet, prefs: prefs)
-        }
-        .fileImporter(isPresented: $showsM3UImporter, allowedContentTypes: [.m3uPlaylist, .plainText]) { result in
-            importM3U(result)
         }
         .alert("Merge Playlists", isPresented: $showsMergeDialog) {
             TextField("Merged Playlist", text: $mergeName)
@@ -156,45 +151,22 @@ struct LibraryView: View {
                 .padding(.horizontal, 10)
                 .frame(minHeight: 56)
             ZStack(alignment: .top) {
-                pager(prefs)
+                if library.songs.isEmpty, !library.isLoading, accounts.needsSpotifyConnection {
+                    ConnectSpotifyEmptyState()
+                        .frame(maxHeight: .infinity)
+                } else {
+                    pager(prefs)
+                }
                 if isSelecting {
                     SelectionCountPill(count: selectionCount)
                         .transition(.move(edge: .top).combined(with: .opacity).combined(with: .scale(scale: 0.8)))
                 }
             }
-            .overlay(alignment: .leading) { folderBackEdge }
             .padding(.top, 8)
             .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isSelecting)
         }
         .background(panelShape.fill(theme.surface).ignoresSafeArea(edges: .bottom))
         .background(theme.primaryContainer.opacity(0.4).ignoresSafeArea(edges: .bottom))
-    }
-
-    /// Settings › Behavior › Back gesture controls folders (Android `folderBackGestureNavigation`: the system back
-    /// gesture goes up one folder in the Folders tab): a swipe in from the leading edge, while a folder is open. With
-    /// the setting off the edge belongs to the pager, as before.
-    ///
-    /// The strip has to own its touches: the pages sit in a horizontal paging scroll view, so a gesture the pager
-    /// also sees would page to the previous tab instead (or be cancelled by it). It is therefore only as wide as the
-    /// folder list's leading inset (`LibraryFoldersPage` pads its rows by 12 pt): it never covers a row, so every tap
-    /// on a folder or song reaches it.
-    @ViewBuilder
-    private var folderBackEdge: some View {
-        if settings.behavior.folderBackGestureNavigation, tab == .folders, folderPath != nil {
-            Color.clear
-                .frame(width: 12)
-                .frame(maxHeight: .infinity)
-                .contentShape(.rect)
-                .gesture(
-                    DragGesture(minimumDistance: 10)
-                        .onEnded { value in
-                            if value.translation.width > 60 || value.predictedEndTranslation.width > 120 {
-                                navigateFolderBack()
-                            }
-                        }
-                )
-                .accessibilityHidden(true)
-        }
     }
 
     private var selectionCount: Int {
@@ -214,24 +186,15 @@ struct LibraryView: View {
                     .transition(.move(edge: .leading).combined(with: .opacity))
             } else {
                 let tab = self.tab
-                LibraryLocateState(tab: tab, isInstrumentalizedOnly: instrumentalizedOnly, folderPath: folderPath,
+                LibraryLocateState(tab: tab, isInstrumentalizedOnly: instrumentalizedOnly,
                                    model: model, actions: actions) { showsLocate in
                     LibraryActionRow(tab: tab,
-                                     isFoldersBreadcrumbs: tab == .folders
-                                         && (!prefs.isFoldersPlaylistView || folderPath != nil),
-                                     folderPath: folderPath,
-                                     folderRoots: model.lists.folderRoots,
                                      showsLocate: showsLocate,
-                                     storageFilter: prefs.storageFilter,
                                      isInstrumentalizedOnly: instrumentalizedOnly,
                                      onMainAction: mainAction,
-                                     onImport: { showsM3UImporter = true },
                                      onLocate: { locateRequests[tab, default: 0] += 1 },
-                                     onStorageFilter: { withAnimation(PixlMotion.state) { prefs.cycleStorageFilter() } },
                                      onInstrumentalFilter: { instrumentalizedOnly.toggle() },
-                                     prefs: prefs,
-                                     onFolder: { path in withAnimation(PixlMotion.state) { folderPath = path } },
-                                     onFolderBack: navigateFolderBack)
+                                     prefs: prefs)
                 }
                 .transition(.move(edge: .trailing).combined(with: .opacity))
             }
@@ -276,27 +239,25 @@ struct LibraryView: View {
         switch pageTab {
         case .songs:
             LibrarySongsPage(songs: instrumentalizedOnly ? [] : model.lists.songs, context: context,
-                             selection: songSelection, emptyFilter: prefs.storageFilter, isLiked: false,
+                             selection: songSelection, emptyFilter: .all, isLiked: false,
                              isLoading: library.isLoading, actions: actions)
         case .liked:
             LibrarySongsPage(songs: model.lists.liked, context: context, selection: songSelection,
-                             emptyFilter: prefs.storageFilter, isLiked: true, isLoading: library.isLoading,
+                             emptyFilter: .all, isLiked: true, isLoading: library.isLoading,
                              actions: actions)
         case .albums:
             LibraryAlbumsPage(albums: model.lists.albums, isListView: settings.library.isAlbumsListView,
-                              selection: albumSelection, emptyFilter: prefs.storageFilter,
+                              selection: albumSelection, emptyFilter: .all,
                               showsScrollbarGap: settings.appearance.showScrollbar, actions: actions)
         case .artists:
-            LibraryArtistsPage(artists: model.lists.artists, emptyFilter: prefs.storageFilter,
+            LibraryArtistsPage(artists: model.lists.artists, emptyFilter: .all,
                                showsScrollbarGap: settings.appearance.showScrollbar, actions: actions)
         case .playlists:
             LibraryPlaylistsPage(playlists: model.lists.playlists, selection: playlistSelection,
                                  showsScrollbarGap: settings.appearance.showScrollbar, actions: actions)
         case .folders:
-            LibraryFoldersPage(folders: model.lists.folders, folderPlaylists: model.lists.folderPlaylists,
-                               folderContents: model.lists.folderContents, folderPath: folderPath,
-                               isPlaylistView: prefs.isFoldersPlaylistView, context: context,
-                               selection: songSelection, actions: actions)
+            // The Folders tab browsed the phone's own music folders; it is never in the tab order.
+            EmptyView()
         }
     }
 
@@ -319,18 +280,14 @@ struct LibraryView: View {
             env.libraryEditor.savePlaylistOrder(ids)
             prefs.playlistSort = .playlistCustomOrder
         }
-        actions.openFolder = { path in withAnimation(PixlMotion.state) { folderPath = path } }
-        actions.openFolderPlaylist = { folder in
-            router.push(.playlistDetail(playlistId: FolderPlaylist.id(for: folder.path)))
-        }
     }
 
-    /// "Cloud Only" (`hide_local_media`) forces the online filter, as Android's `effectiveStorageFilter` does.
+    /// Every song is a Spotify song now, so the storage filter is always "all".
     private func inputs(_ prefs: LibraryPreferences) -> LibraryModel.Inputs {
         LibraryModel.Inputs(snapshot: library.snapshot, songSort: prefs.songSort, albumSort: prefs.albumSort,
                             artistSort: prefs.artistSort, playlistSort: prefs.playlistSort,
-                            folderSort: prefs.folderSort, likedSort: prefs.likedSort,
-                            storageFilter: settings.library.hideLocalMedia ? .online : prefs.storageFilter,
+                            likedSort: prefs.likedSort,
+                            storageFilter: .all,
                             likedAt: likedAt, revision: library.revision,
                             minTracksPerAlbum: settings.library.minTracksPerAlbum)
     }
@@ -375,10 +332,7 @@ struct LibraryView: View {
             let candidates = model.lists.albums.map(\.id).filter { !albumSelection.contains($0) }
             albumSelection.selectAll(Array(candidates.prefix(remaining)))
         case .liked: songSelection.selectAll(model.lists.liked.map(\.id))
-        case .folders:
-            if let folderPath, let contents = model.lists.folderContents[folderPath] {
-                songSelection.selectAll(contents.songs.map(\.id))
-            }
+        case .folders: break
         case .songs: songSelection.selectAll(model.lists.songs.map(\.id))
         case .artists: break
         }
@@ -396,25 +350,6 @@ struct LibraryView: View {
         case .albums: sheet = .albumSelection
         default: sheet = .songSelection
         }
-    }
-
-    private func navigateFolderBack() {
-        guard let folderPath else { return }
-        let parent = (folderPath as NSString).deletingLastPathComponent
-        let isRoot = model.lists.folders.contains { $0.path == folderPath }
-        withAnimation(PixlMotion.state) {
-            self.folderPath = isRoot || LibraryModel.folder(at: parent, in: model.lists.folders) == nil ? nil : parent
-        }
-    }
-
-    private func importM3U(_ result: Result<URL, any Error>) {
-        guard case .success(let url) = result else { return }
-        let scoped = url.startAccessingSecurityScopedResource()
-        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-        guard let data = try? Data(contentsOf: url) else { return }
-        let parsed = M3U.parse(utf8: Array(data), fileName: url.lastPathComponent, library: library.songs)
-        env.libraryEditor.createPlaylist(name: parsed.name, songIds: parsed.songIds)
-        LibraryToast.shared.show("Playlist created")
     }
 
     /// Restores the last tab; UI tests (`-screen libraryAlbums` …) open a tab, a sheet or a selection straight away.
@@ -435,7 +370,6 @@ struct LibraryView: View {
                 settings.library.isAlbumsListView = true
             case .libraryArtists: selectedTab = .artists
             case .libraryPlaylists: selectedTab = .playlists
-            case .libraryFolders: selectedTab = .folders
             case .libraryLiked: selectedTab = .liked
             case .librarySelection:
                 selectedTab = .songs
@@ -538,17 +472,6 @@ nonisolated enum LibrarySheet: Identifiable, Hashable, Sendable {
     }
 }
 
-/// Folder playlists (Android `PlaylistViewModel.FOLDER_PLAYLIST_PREFIX`): a folder opened as a read-only playlist.
-nonisolated enum FolderPlaylist {
-    static let prefix = "folder_playlist:"
-
-    static func id(for path: String) -> String { prefix + path }
-
-    static func path(from playlistId: String) -> String? {
-        playlistId.hasPrefix(prefix) ? String(playlistId.dropFirst(prefix.count)) : nil
-    }
-}
-
 extension LibraryTab {
     /// English titles (Android `library_tab_*`); localised titles arrive with the String Catalog.
     var tabTitle: String {
@@ -568,7 +491,6 @@ extension LibraryTab {
 private struct LibraryLocateState<Content: View>: View {
     let tab: LibraryTab
     let isInstrumentalizedOnly: Bool
-    let folderPath: String?
     let model: LibraryModel
     let actions: LibraryActions
     @ViewBuilder let content: (Bool) -> Content
@@ -584,9 +506,6 @@ private struct LibraryLocateState<Content: View>: View {
         switch tab {
         case .songs: return !isInstrumentalizedOnly && model.lists.songIds.contains(current)
         case .liked: return model.lists.likedIds.contains(current)
-        case .folders:
-            guard let folderPath, let contents = model.lists.folderContents[folderPath] else { return false }
-            return contents.songs.contains { $0.id == current }
         default: return false
         }
     }

@@ -90,12 +90,10 @@ targets:
         UIBackgroundModes: [audio, fetch, processing]
         BGTaskSchedulerPermittedIdentifiers:
           - io.github.redsn0w1877.pixlaudio.refresh
-          - io.github.redsn0w1877.pixlaudio.library-sync
           - io.github.redsn0w1877.pixlaudio.spotify-sync
           - io.github.redsn0w1877.pixlaudio.tais-studio
           - io.github.redsn0w1877.pixlaudio.cloud-prepare
           - io.github.redsn0w1877.pixlaudio.cloud-processing
-        NSAppleMusicUsageDescription: PixlAudio plays the DRM-free songs in your music library.
         NSLocalNetworkUsageDescription: PixlAudio connects to AI servers you run on your local network.
         # Only NSAllowsArbitraryLoads: iOS ignores it when NSAllowsLocalNetworking is also present
         # (developer.apple.com/documentation/bundleresources/information-property-list/nsapptransportsecurity).
@@ -107,14 +105,9 @@ targets:
           - CFBundleURLName: io.github.redsn0w1877.pixlaudio
             CFBundleTypeRole: Viewer
             CFBundleURLSchemes: [pixlaudio]
-        # Files app: expose Documents, open files in place.
-        UIFileSharingEnabled: true
+        # Files app: open backups / playlists / lyrics in place (no audio, no shared Documents folder).
         LSSupportsOpeningDocumentsInPlace: true
         CFBundleDocumentTypes:
-          - CFBundleTypeName: Audio
-            CFBundleTypeRole: Viewer
-            LSHandlerRank: Alternate
-            LSItemContentTypes: [public.audio, public.mp3, public.mpeg-4-audio, org.xiph.flac, com.microsoft.waveform-audio, public.aiff-audio]
           - CFBundleTypeName: Lyrics
             CFBundleTypeRole: Editor
             LSHandlerRank: Alternate
