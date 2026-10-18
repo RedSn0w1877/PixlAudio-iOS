@@ -8,16 +8,16 @@ import XCTest
 final class FeaturesScreenshotTests: XCTestCase {
     // MARK: Find in playlist
 
-    func testFindLight() throws { try capture("playlistFind", "light", ready: "find.bar") }
-    func testFindDark() throws { try capture("playlistFind", "dark", ready: "find.bar") }
-    func testFindNoMatchesLight() throws { try capture("playlistFindEmpty", "light", ready: "find.noMatches") }
-    func testFindNoMatchesDark() throws { try capture("playlistFindEmpty", "dark", ready: "find.noMatches") }
+    func testFindLight() throws { try capture("playlistFind", "light", ready: "find.field") }
+    func testFindDark() throws { try capture("playlistFind", "dark", ready: "find.field") }
+    func testFindNoMatchesLight() throws { try capture("playlistFindEmpty", "light", ready: "find.field") }
+    func testFindNoMatchesDark() throws { try capture("playlistFindEmpty", "dark", ready: "find.field") }
 
     /// Three songs match "sora"; tapping one plays it (the mini player shows its title) and Cancel clears the field.
     func testTappingAResultPlaysAndCancelClears() throws {
         continueAfterFailure = false
         let app = launch("playlistFind", "light")
-        XCTAssertTrue(element(app, "find.bar").waitForExistence(timeout: 20))
+        XCTAssertTrue(element(app, "find.field").waitForExistence(timeout: 20))
         let result = row(app, "Cloud Atlas Drive")
         XCTAssertTrue(result.waitForExistence(timeout: 10), "the matching song is missing")
         XCTAssertFalse(row(app, "Chromatic").exists, "a song that does not match is still listed")
@@ -28,7 +28,7 @@ final class FeaturesScreenshotTests: XCTestCase {
         app.buttons["find.cancel"].firstMatch.tap()
         XCTAssertTrue(row(app, "Chromatic").waitForExistence(timeout: 10),
                       "Cancel did not bring the whole list back")
-        XCTAssertFalse(element(app, "find.bar").exists)
+        XCTAssertFalse(element(app, "find.field").exists)
         app.terminate()
     }
 
@@ -72,7 +72,9 @@ final class FeaturesScreenshotTests: XCTestCase {
         search.tap()
         search.typeText("pixel")
         XCTAssertTrue(app.staticTexts["Pixel Parade"].firstMatch.waitForExistence(timeout: 5))
-        XCTAssertFalse(app.staticTexts["Hollow Pines"].firstMatch.exists, "the search did not narrow the list")
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"),
+                                             object: app.staticTexts["Hollow Pines"].firstMatch)
+        XCTAssertEqual(XCTWaiter().wait(for: [gone], timeout: 8), .completed, "the search did not narrow the list")
         Thread.sleep(forTimeInterval: 0.6)
         attach(app, "blockedArtists-search-light")
         app.buttons["Unblock Pixel Parade"].firstMatch.tap()
@@ -91,7 +93,7 @@ final class FeaturesScreenshotTests: XCTestCase {
 
     private func behavior(_ appearance: String) throws {
         continueAfterFailure = false
-        let app = launch("settingsBehavior", appearance)
+        let app = launch("settingsCategory.behavior", appearance)
         XCTAssertTrue(element(app, "screen.settingsCategory.behavior").waitForExistence(timeout: 20))
         XCTAssertTrue(element(app, "settings.behavior.gestures").waitForExistence(timeout: 10))
         Thread.sleep(forTimeInterval: 1.2)
