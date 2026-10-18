@@ -350,6 +350,27 @@ struct SearchPlaylistCover: View {
     }
 }
 
+/// Shown while a search is still on its way and nothing has arrived yet (instead of "no results").
+struct SearchingResultsView: View {
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .controlSize(.large)
+                .tint(theme.primary)
+            Text("Searching…")
+                .pixlFont(.titleMedium, weight: .semibold)
+                .foregroundStyle(theme.onSurfaceVariant)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 48)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Searching")
+        .accessibilityIdentifier("search.loading")
+    }
+}
+
 /// Android `EmptySearchResults`: an 80 pt search glyph (`primary` 60 %), the title and the hint, centred.
 struct EmptySearchResultsView: View {
     let query: String

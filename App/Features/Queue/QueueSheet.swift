@@ -54,11 +54,11 @@ struct QueueSheet: View {
         let currentDisplay = current - offset
         ZStack(alignment: .bottom) {
             VStack(spacing: 0) {
-                header(count: displayCount)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 24)
-                    .padding(.bottom, 12)
                 if displayCount == 0 {
+                    header(count: displayCount)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 24)
+                        .padding(.bottom, 12)
                     Text("Queue is empty.")
                         .pixlFont(.bodyLarge)
                         .foregroundStyle(theme.onSurface)
@@ -204,7 +204,16 @@ struct QueueSheet: View {
                 .padding(.bottom, 120)
             }
             .scrollDisabled(reorder.draggingIndex != nil)
-            .clipShape(UnevenRoundedRectangle(topLeadingRadius: 26, topTrailingRadius: 26, style: .continuous))
+            // The header is the list's top inset, so rows scroll up under it (the cut-off sits at the top of the sheet,
+            // not right below the title) and the system blurs the edge softly; the same soft edge at the bottom.
+            .safeAreaInset(edge: .top, spacing: 0) {
+                header(count: count)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 24)
+                    .padding(.bottom, 12)
+            }
+            .scrollEdgeEffectStyle(.soft, for: .top)
+            .scrollEdgeEffectStyle(.soft, for: .bottom)
             .onChange(of: locateRequest) { _, _ in
                 guard currentDisplay >= 0 else { return }
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.9)) {
@@ -627,8 +636,10 @@ private struct QueueSongRow<Handle: Gesture>: View {
         .padding(.vertical, 16)
         .contentShape(shape)
         .onTapGesture { if swipe == 0 { onTap() } }
+        // Not `interactive`: interactive glass takes the touch for its press highlight and starved the scroll view of
+        // pans that began on a row (only the margins around the rows scrolled).
         .pixlGlass(in: shape, tint: (isCurrent ? theme.tertiaryContainer : theme.surfaceContainerLowest)
-            .opacity(isCurrent ? GlassTint.container : GlassTint.surface), interactive: true)
+            .opacity(isCurrent ? GlassTint.container : GlassTint.surface), interactive: false)
         .scaleEffect(isDragging ? 1.015 : 1)
         .animation(.spring(response: 0.3, dampingFraction: 1), value: isDragging)
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: isCurrent)
