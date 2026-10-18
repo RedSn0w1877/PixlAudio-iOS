@@ -81,8 +81,8 @@ nonisolated final class HapticEnginePlayer: @unchecked Sendable {
             try? rumblePlayer?.stop(atTime: CHHapticTimeImmediate)
             rumblePlayer = nil
             if let engine {
-                engine.stoppedHandler = nil
-                engine.resetHandler = nil
+                engine.stoppedHandler = { _ in }
+                engine.resetHandler = {}
                 engine.stop(completionHandler: { _ in })
             }
             engine = nil
