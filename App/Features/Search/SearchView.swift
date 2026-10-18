@@ -147,6 +147,9 @@ struct SearchView: View {
                 if model.showsEmptyState {
                     EmptySearchResultsView(query: router.searchText)
                         .transition(.opacity)
+                } else if model.showsLoadingState {
+                    SearchingResultsView()
+                        .transition(.opacity)
                 } else {
                     resultsList
                         .transition(.opacity)
@@ -154,6 +157,7 @@ struct SearchView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .animation(.easeInOut(duration: 0.19), value: model.showsEmptyState)
+            .animation(.easeInOut(duration: 0.19), value: model.showsLoadingState)
         }
         .padding(.horizontal, 16)
     }

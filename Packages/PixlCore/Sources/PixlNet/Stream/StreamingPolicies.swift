@@ -73,10 +73,20 @@ public enum StreamPrefetchPolicy {
     /// The next song's first MiB is cached this long before the current one ends (the gapless hand-over's bytes).
     public static let topUpBytes: Int64 = 1 << 20
     public static let topUpLeadMs: Int64 = 30_000
-    /// Matching and resolution start this long after playback starts or the queue changes (Android's 1.5 s settle).
-    public static let prepareDelayMs: Int64 = 1_500
-    /// Head bytes are fetched once the current song has played this far.
-    public static let headStartPositionMs: Int64 = 3_000
+    /// Matching and resolution start this long after playback starts or the queue changes. It was Android's 1.5 s
+    /// settle; shorter now (a quick skip lands on a prepared song), still long enough that a song which is skipped
+    /// straight away costs nothing: the plan is cancelled with the queue change.
+    public static let prepareDelayMs: Int64 = 500
+    /// Head bytes are fetched once the current song has played this far (its own first bytes are in by then).
+    public static let headStartPositionMs: Int64 = 1_000
+
+    /// Whether the early preparation (match, resolve, head bytes of the next songs) may run now. Only a foreground app
+    /// on a phone that is not saving power or short of memory prepares ahead; the gapless hand-over's own top-up
+    /// (30 s before the end) is separate and not subject to this.
+    public static func allowsEarlyPreparation(isForeground: Bool, lowPowerMode: Bool, recentMemoryPressure: Bool,
+                                              launchWorkAllowed: Bool) -> Bool {
+        isForeground && !lowPowerMode && !recentMemoryPressure && launchWorkAllowed
+    }
 
     /// How many upcoming songs to prepare early: none while paused, offline or in Low Data Mode; two on Wi-Fi or
     /// Ethernet (unless the path is metered, e.g. a personal hotspot); one on cellular and anything else.

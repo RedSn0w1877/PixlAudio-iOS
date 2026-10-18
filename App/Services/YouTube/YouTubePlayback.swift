@@ -15,6 +15,10 @@ nonisolated struct StreamingPlayableURLResolver: PlayableURLResolving {
         if let cached = await cache.completeFileURL(videoId) { return cached }
         return YouTubeSongIdentity.streamURL(videoId: videoId)
     }
+
+    func recoverPlayableURL(for song: Song, afterFailedURL failedURL: URL) async -> URL? {
+        await base.recoverPlayableURL(for: song, afterFailedURL: failedURL)
+    }
 }
 
 /// Downloaded songs: `Application Support/Downloads/<videoId>.m4a` (the folder Settings › Offline storage measures).
@@ -116,7 +120,14 @@ final class YouTubePrefetcher {
             // 1. Settle, then match and resolve the next songs (how many depends on the network now).
             try? await Task.sleep(for: .milliseconds(StreamPrefetchPolicy.prepareDelayMs))
             guard !Task.isCancelled else { return }
-            let depth = StreamPrefetchPolicy.depth(network.conditions, isPlaying: self?.engine.playWhenReady == true)
+            // Not in the background, in Low Power Mode, under memory pressure or in safe mode: only the hand-over's top-up.
+            let gate = HeavyWorkGate.shared
+            let conditions = gate.conditions
+            let mayPrepare = StreamPrefetchPolicy.allowsEarlyPreparation(
+                isForeground: conditions.isForeground, lowPowerMode: conditions.lowPowerMode,
+                recentMemoryPressure: conditions.recentMemoryPressure, launchWorkAllowed: gate.allowsLaunchWork)
+            let depth = mayPrepare
+                ? StreamPrefetchPolicy.depth(network.conditions, isPlaying: self?.engine.playWhenReady == true) : 0
             var prepared: [(songId: String, videoId: String)] = []
             for song in earlySongs.prefix(depth) {
                 guard !Task.isCancelled else { return }

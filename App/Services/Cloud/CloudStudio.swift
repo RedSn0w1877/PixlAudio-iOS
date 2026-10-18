@@ -169,6 +169,8 @@ final class CloudStudio {
     @ObservationIgnored private var notifyChain: Task<Void, Never>?
     /// The foreground polling interval (tests shorten it).
     @ObservationIgnored var pollInterval: Duration = .seconds(15)
+    /// While a job is at RunPod (a few minutes at most, foreground only): a 7-second job used to wait up to 15 s to be seen.
+    @ObservationIgnored var activePollInterval: Duration = .milliseconds(CloudTiming.statusPollIntervalMs)
     /// Between two checks of RunPod inside one long background pass (tests shorten it).
     @ObservationIgnored var processingPollInterval: Duration = .milliseconds(CloudBackgroundPlanner.processingPollMs)
 
@@ -659,15 +661,19 @@ final class CloudStudio {
 
     private func startPollLoopIfNeeded() {
         guard isActive, pollLoop == nil, needsPolling, settings.isEnabled, !isDemo else { return }
-        let interval = pollInterval
         pollLoop = Task { [weak self] in
             while !Task.isCancelled {
+                guard let interval = self?.currentPollInterval else { break }
                 try? await Task.sleep(for: interval)
                 guard let self, !Task.isCancelled, self.isActive, self.needsPolling else { break }
                 await self.pump()
             }
             self?.pollLoop = nil
         }
+    }
+
+    private var currentPollInterval: Duration {
+        jobs.contains { $0.state.isAtRunPod } ? activePollInterval : pollInterval
     }
 
     /// Something can change without the person or a transfer event: jobs at RunPod, a batch gate, a retry wait.
@@ -1133,7 +1139,7 @@ final class CloudStudio {
                 }
             }
         }
-        // /status for running jobs and the two oldest waiting ones, each at most every 15 s.
+        // /status for running jobs and the two oldest waiting ones, each at most every `statusPollIntervalMs`.
         let running = jobs.filter { $0.state == .running }
         let waiting = jobs.filter { $0.state == .submitted }
             .sorted { ($0.submittedAtMs ?? 0) < ($1.submittedAtMs ?? 0) }
