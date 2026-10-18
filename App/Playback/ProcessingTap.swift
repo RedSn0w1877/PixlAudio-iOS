@@ -113,6 +113,9 @@ nonisolated final class TapContext: @unchecked Sendable {
     private var currentReplayGain: Float = 1
     private var currentFixedGain: Float = 1
     private var framesSincePrepare = 0
+    /// Music Haptics detector (scalars only: no allocation on the render thread). Re-created in `prepare` for the rate.
+    private var hapticAnalyzer = MusicHapticAnalyzer(sampleRate: 44_100)
+    private var hapticAnalyzerRunning = false
 
     init(effects: AudioEffectsParameters, item: TapItemParameters) {
         self.effects = effects
@@ -150,6 +153,8 @@ nonisolated final class TapContext: @unchecked Sendable {
         isFloat32 = format.mFormatID == kAudioFormatLinearPCM && format.mFormatFlags & kAudioFormatFlagIsFloat != 0
             && format.mBitsPerChannel == 32
         item.sampleRate.store(sampleRate)
+        hapticAnalyzer = MusicHapticAnalyzer(sampleRate: sampleRate)
+        hapticAnalyzerRunning = false
         framesSincePrepare = 0
         currentReplayGain = effectiveReplayGain()
         currentFixedGain = item.fixedGain.load()
@@ -302,10 +307,32 @@ nonisolated final class TapContext: @unchecked Sendable {
         currentFixedGain = fixed
 
         item.lastPeak.store(peak(frames: frames))
+        runHapticAnalysis(frames: frames)
         if let log = item.log, mediaFrames > 0 {
             log.append(.init(mediaTime: firstTime, frames: mediaFrames, rmsIn: rmsIn, rmsOut: rms(frames: frames),
                              hostTime: mach_absolute_time()))
         }
+    }
+
+    /// Music Haptics (render thread: no allocation, locks or logging). Listens to what this tap just produced while the
+    /// controller has the analysis switched on; otherwise one relaxed atomic load per buffer.
+    @inline(__always)
+    private func runHapticAnalysis(frames: Int) {
+        let bus = effects.haptics
+        guard bus.isActive.load(ordering: .relaxed) else {
+            if hapticAnalyzerRunning {
+                hapticAnalyzerRunning = false
+                hapticAnalyzer.reset()
+            }
+            return
+        }
+        hapticAnalyzerRunning = true
+        let left = UnsafePointer(channelStarts[0])
+        let right: UnsafePointer<Float>? = channels > 1 ? UnsafePointer(channelStarts[1]) : nil
+        hapticAnalyzer.process(left: left, right: right, stride: stride, frames: frames) { onset in
+            bus.publish(onset)
+        }
+        bus.setBass(hapticAnalyzer.bassLevel)
     }
 
     /// Points the channel tables at the buffers: interleaved → `base + c` with stride = channels; planar → one

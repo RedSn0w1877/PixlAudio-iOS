@@ -346,9 +346,13 @@ struct PlaylistSongRow: View {
     let onRemove: () -> Void
 
     @Environment(\.appTheme) private var theme
+    /// Blocked artists: dimmed and tagged "Blocked" (absent in previews).
+    @Environment(BlockedArtistsStore.self) private var blockedArtists: BlockedArtistsStore?
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: isCurrent ? 37 : 22, style: .continuous)
+        let isBlocked = blockedArtists?.isBlocked(song) ?? false
+        let dim = isBlocked ? BlockedRowStyle.dimmedOpacity : 1
         HStack(spacing: 0) {
             if showsDragHandle {
                 Image(systemName: "line.3.horizontal")
@@ -364,16 +368,22 @@ struct PlaylistSongRow: View {
             // Art, title, artist and indicator read as one button that plays the song.
             HStack(spacing: 0) {
                 ArtworkView(song: song, size: 42, cornerRadius: isCurrent ? 21 : 8)
+                    .opacity(dim)
                 Spacer().frame(width: 16)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(song.title)
                         .pixlFont(.bodyLarge, weight: isCurrent ? .bold : .regular)
                         .foregroundStyle(isCurrent ? theme.primary : theme.onSurface)
                         .lineLimit(1)
-                    Text(song.displayArtist)
-                        .pixlFont(.bodyMedium)
-                        .foregroundStyle(isCurrent ? theme.primary.opacity(0.8) : theme.onSurfaceVariant)
-                        .lineLimit(1)
+                        .opacity(dim)
+                    HStack(spacing: 6) {
+                        Text(song.displayArtist)
+                            .pixlFont(.bodyMedium)
+                            .foregroundStyle(isCurrent ? theme.primary.opacity(0.8) : theme.onSurfaceVariant)
+                            .lineLimit(1)
+                            .opacity(dim)
+                        if isBlocked { BlockedBadge() }
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if isCurrent {

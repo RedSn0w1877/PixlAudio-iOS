@@ -20,6 +20,7 @@ struct SongOptionsSheet: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(LibraryStore.self) private var library
     @Environment(PlaybackStore.self) private var playback
+    @Environment(BlockedArtistsStore.self) private var blocked
     @Environment(Router.self) private var router
     @Environment(\.appTheme) private var theme
     @Environment(\.dismiss) private var dismiss
@@ -163,6 +164,22 @@ struct SongOptionsSheet: View {
                     confirmsDelete = true
                 }
             }
+            // Blocked artists: one tile per credited artist (Block X / Unblock X).
+            ForEach(creditedArtists(of: song).prefix(3), id: \.id) { artist in
+                let isBlocked = blocked.isBlocked(artistId: artist.id, name: artist.name)
+                ActionTile(title: isBlocked ? "Unblock \(artist.name)" : "Block \(artist.name)",
+                           systemImage: isBlocked ? "checkmark.circle" : "nosign",
+                           tint: theme.surfaceContainerHigh, foreground: theme.onSurface) {
+                    if isBlocked {
+                        blocked.unblock(artistId: artist.id, name: artist.name)
+                        LibraryToast.shared.show("\(artist.name) unblocked")
+                    } else {
+                        blocked.block(artistId: artist.id, name: artist.name)
+                        LibraryToast.shared.show("\(artist.name) blocked. Their songs won't play by themselves.")
+                    }
+                }
+                .accessibilityIdentifier("songInfo.block.\(artist.id)")
+            }
             // Stage 14: Android's Remaster Song card (BS-RoFormer stays in Experimental, as on Android).
             TaisStudioProgressCard(song: song,
                                    onInstrumentalReady: {
@@ -172,6 +189,11 @@ struct SongOptionsSheet: View {
             // Stage 11: streamed songs only (Android `OfflineDownloadCard`).
             OfflineDownloadCard(song: song)
         }
+    }
+
+    /// The artists a song credits (the primary one when none are listed).
+    private func creditedArtists(of song: Song) -> [ArtistRef] {
+        song.artists.isEmpty ? [song.primaryArtist] : song.artists
     }
 
     /// Android weights the queue row 0.6 / 0.4.

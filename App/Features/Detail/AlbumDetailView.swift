@@ -25,6 +25,7 @@ private struct AlbumDetailContent: View {
 
     @Environment(LibraryStore.self) private var library
     @Environment(PlaybackStore.self) private var playback
+    @Environment(BlockedArtistsStore.self) private var blocked
     @Environment(Router.self) private var router
     @Environment(\.appTheme) private var theme
     @State private var scroll = HeaderScrollState()
@@ -77,9 +78,10 @@ private struct AlbumDetailContent: View {
                     ForEach(byDisc[disc] ?? []) { song in
                         PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
                             SongCard(song: song, isCurrent: isCurrent, isPlaying: isPlaying,
-                                     onTap: { playback.play(song, in: songs) },
+                                     onTap: { blocked.playTapped(song, in: songs, using: playback) },
                                      onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
                                      showsArtwork: false)
+                            .swipeToQueue(song: song)
                         }
                     }
                 }

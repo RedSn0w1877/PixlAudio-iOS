@@ -35,6 +35,8 @@ struct SongCard: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Stage 11: the offline badge of streamed songs (absent in previews / contexts without downloads).
     @Environment(DownloadBadges.self) private var downloadBadges: DownloadBadges?
+    /// Blocked artists: the row is dimmed and tagged "Blocked" (absent in previews).
+    @Environment(BlockedArtistsStore.self) private var blockedArtists: BlockedArtistsStore?
 
     var body: some View {
         let t = Tokens.SongCard.self
@@ -43,6 +45,8 @@ struct SongCard: View {
         let content = isSelected ? theme.onSecondaryContainer : (highlighted ? theme.onPrimaryContainer : theme.onSurface)
         let showsIndicator = isCurrent && !isSelectionMode
         let showsTrailing = showsMoreButton && !isSelectionMode
+        let isBlocked = blockedArtists?.isBlocked(song) ?? false
+        let dim = isBlocked ? BlockedRowStyle.dimmedOpacity : 1
         HStack(spacing: 0) {
             // Art, title, artist, badge and indicator are one VoiceOver element — a button (selected in
             // multi-selection) whose activation does what the tap does; the long press is its Select action. The ⋮
@@ -50,6 +54,7 @@ struct SongCard: View {
             HStack(spacing: 0) {
                 if showsArtwork {
                     artwork
+                        .opacity(dim)
                     Spacer().frame(width: t.artSpacing)
                 } else {
                     Spacer().frame(width: 4)
@@ -58,10 +63,14 @@ struct SongCard: View {
                     Text(song.title)
                         .pixlFont(.bodyLarge, weight: .semibold)
                         .lineLimit(1)
-                    Text(song.displayArtist)
-                        .pixlFont(.bodyMedium)
-                        .opacity(0.7)
-                        .lineLimit(1)
+                        .opacity(dim)
+                    HStack(spacing: 6) {
+                        Text(song.displayArtist)
+                            .pixlFont(.bodyMedium)
+                            .opacity(0.7 * dim)
+                            .lineLimit(1)
+                        if isBlocked { BlockedBadge() }
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if !isSelectionMode, let badge = downloadBadges?.kind(for: song) {

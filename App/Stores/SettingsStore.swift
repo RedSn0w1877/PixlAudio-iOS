@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import PixlAudioCore
 import PixlLibrary
 import PixlNet
 
@@ -174,6 +175,20 @@ nonisolated enum PreferenceKeys {
     /// Settings › Appearance › Accent Color: a `"#RRGGBB"` seed, `""` = PixlAudio's violet (owner request 2026-10-07).
     /// A string, not an Int: an ARGB above `Int32.max` would flip sign as an Android `int` on a round trip.
     static let accentColor = "accent_color_v1"
+    /// Blocked artists (Settings › Behavior › Blocked artists): a JSON array of `BlockedArtist`.
+    static let blockedArtists = "blocked_artists_json"
+    // Gestures (Settings › Behavior › Gestures). All on by default.
+    static let gesturePlayerArtworkSwipe = "gesture_player_artwork_swipe"
+    static let gesturePlayerArtworkDoubleTapLike = "gesture_player_artwork_double_tap_like"
+    static let gesturePlayerArtworkLongPress = "gesture_player_artwork_long_press"
+    static let gestureMiniSwipeSkip = "gesture_mini_swipe_skip"
+    static let gestureMiniSwipeUpOpen = "gesture_mini_swipe_up_open"
+    static let gestureMiniLongPress = "gesture_mini_long_press"
+    static let gestureListSwipeQueue = "gesture_list_swipe_queue"
+    // Music Haptics (Settings › Behavior › Music Haptics). Off by default.
+    static let musicHapticsEnabled = "music_haptics_enabled"
+    static let musicHapticsStrength = "music_haptics_strength"
+    static let musicHapticsMode = "music_haptics_mode"
 }
 
 /// Android `AppThemeMode`.
@@ -208,6 +223,8 @@ final class SettingsStore {
     let ai: AISettings
     /// Stage 7d: Developer › Experimental (full-player loading tweaks, TAIS tools) and diagnostics.
     let experimental: ExperimentalSettings
+    /// Blocked artists (iOS-first, 2026-10-18): the list, its matcher, and what the playback side is told.
+    let blocked: BlockedArtistsStore
 
     init(defaults: UserDefaults = .standard) {
         appearance = AppearanceSettings(defaults: defaults)
@@ -218,6 +235,7 @@ final class SettingsStore {
         equalizer = EqualizerPreferences(defaults: defaults)
         ai = AISettings(defaults: defaults)
         experimental = ExperimentalSettings(defaults: defaults)
+        blocked = BlockedArtistsStore(defaults: defaults)
     }
 
     /// An isolated store for UI tests and previews (its own suite, wiped on creation).
@@ -326,9 +344,56 @@ final class BehaviorSettings {
         didSet { defaults.set(folderBackGestureNavigation, forKey: PreferenceKeys.folderBackGestureNavigationKey) }
     }
 
+    // Gestures (iOS-first, 2026-10-18): one switch each, all on by default.
+    var gesturePlayerArtworkSwipe: Bool {
+        didSet { defaults.set(gesturePlayerArtworkSwipe, forKey: PreferenceKeys.gesturePlayerArtworkSwipe) }
+    }
+    var gesturePlayerArtworkDoubleTapLike: Bool {
+        didSet { defaults.set(gesturePlayerArtworkDoubleTapLike, forKey: PreferenceKeys.gesturePlayerArtworkDoubleTapLike) }
+    }
+    var gesturePlayerArtworkLongPress: Bool {
+        didSet { defaults.set(gesturePlayerArtworkLongPress, forKey: PreferenceKeys.gesturePlayerArtworkLongPress) }
+    }
+    var gestureMiniSwipeSkip: Bool {
+        didSet { defaults.set(gestureMiniSwipeSkip, forKey: PreferenceKeys.gestureMiniSwipeSkip) }
+    }
+    var gestureMiniSwipeUpOpen: Bool {
+        didSet { defaults.set(gestureMiniSwipeUpOpen, forKey: PreferenceKeys.gestureMiniSwipeUpOpen) }
+    }
+    var gestureMiniLongPress: Bool {
+        didSet { defaults.set(gestureMiniLongPress, forKey: PreferenceKeys.gestureMiniLongPress) }
+    }
+    var gestureListSwipeQueue: Bool {
+        didSet { defaults.set(gestureListSwipeQueue, forKey: PreferenceKeys.gestureListSwipeQueue) }
+    }
+
+    // Music Haptics (iOS-first, 2026-10-18): off by default.
+    var musicHapticsEnabled: Bool {
+        didSet { defaults.set(musicHapticsEnabled, forKey: PreferenceKeys.musicHapticsEnabled) }
+    }
+    /// 20…200 %, 100 default.
+    var musicHapticsStrength: Int {
+        didSet { defaults.set(MusicHapticsMapper.clampedStrength(musicHapticsStrength), forKey: PreferenceKeys.musicHapticsStrength) }
+    }
+    var musicHapticsMode: MusicHapticsMode {
+        didSet { defaults.set(musicHapticsMode.rawValue, forKey: PreferenceKeys.musicHapticsMode) }
+    }
+
     init(defaults: UserDefaults) {
         self.defaults = defaults
         folderBackGestureNavigation = defaults.bool(PreferenceKeys.folderBackGestureNavigationKey, default: true)
+        gesturePlayerArtworkSwipe = defaults.bool(PreferenceKeys.gesturePlayerArtworkSwipe, default: true)
+        gesturePlayerArtworkDoubleTapLike = defaults.bool(PreferenceKeys.gesturePlayerArtworkDoubleTapLike, default: true)
+        gesturePlayerArtworkLongPress = defaults.bool(PreferenceKeys.gesturePlayerArtworkLongPress, default: true)
+        gestureMiniSwipeSkip = defaults.bool(PreferenceKeys.gestureMiniSwipeSkip, default: true)
+        gestureMiniSwipeUpOpen = defaults.bool(PreferenceKeys.gestureMiniSwipeUpOpen, default: true)
+        gestureMiniLongPress = defaults.bool(PreferenceKeys.gestureMiniLongPress, default: true)
+        gestureListSwipeQueue = defaults.bool(PreferenceKeys.gestureListSwipeQueue, default: true)
+        musicHapticsEnabled = defaults.bool(PreferenceKeys.musicHapticsEnabled, default: false)
+        musicHapticsStrength = MusicHapticsMapper.clampedStrength(
+            defaults.int(PreferenceKeys.musicHapticsStrength, default: MusicHapticsMapper.defaultStrength))
+        musicHapticsMode = MusicHapticsMode(rawValue: defaults.string(PreferenceKeys.musicHapticsMode, default: "everything"))
+            ?? .everything
         let haptics = defaults.bool(PreferenceKeys.hapticsEnabled, default: true)
         hapticsEnabled = haptics
         HapticsPreference.isEnabled = haptics

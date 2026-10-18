@@ -108,38 +108,47 @@ nonisolated struct PlaybackQueue: Sendable {
 
     // MARK: Navigation (Media3 rules)
 
+    /// Blocked artists (2026-10-18): entries whose song has a blocked artist are never moved on to by themselves.
+    /// The current entry is not affected (a blocked song can be played on purpose: "Play anyway").
+    var blocklist: BlockedArtistMatcher = .empty
+
+    @inline(__always)
+    private func isBlocked(at index: Int) -> Bool {
+        !blocklist.isEmpty && blocklist.isBlocked(entries[index].song)
+    }
+
     /// The index that follows the current one when the song ends on its own: the same index under repeat-one, the
-    /// next one, wrapping under repeat-all; nil at the end with repeat off.
+    /// next one that is not blocked, wrapping under repeat-all; nil at the end with repeat off.
     var nextIndexForAutoAdvance: Int? {
         guard let currentIndex, !entries.isEmpty else { return nil }
         switch repeatMode {
         case .one: return currentIndex
-        case .all: return currentIndex + 1 < entries.count ? currentIndex + 1 : 0
-        case .off: return currentIndex + 1 < entries.count ? currentIndex + 1 : nil
+        case .all: return BlockedNavigation.next(after: currentIndex, count: entries.count, wraps: true, isBlocked: isBlocked(at:))
+        case .off: return BlockedNavigation.next(after: currentIndex, count: entries.count, wraps: false, isBlocked: isBlocked(at:))
         }
     }
 
-    /// `seekToNext`: the next index ignoring repeat-one, wrapping under repeat-all; nil at the end with repeat off
-    /// (Media3 then does nothing).
+    /// `seekToNext`: the next index that is not blocked, ignoring repeat-one, wrapping under repeat-all; nil at the
+    /// end with repeat off (Media3 then does nothing).
     var nextIndexForSkip: Int? {
         guard let currentIndex, !entries.isEmpty else { return nil }
-        if currentIndex + 1 < entries.count { return currentIndex + 1 }
-        return repeatMode == .all ? 0 : nil
+        return BlockedNavigation.next(after: currentIndex, count: entries.count, wraps: repeatMode == .all,
+                                      isBlocked: isBlocked(at:))
     }
 
-    /// `seekToPrevious` target when the position is within the restart threshold: the previous index, wrapping to the
-    /// last one under repeat-all; nil means "restart the current song".
+    /// `seekToPrevious` target when the position is within the restart threshold: the previous index that is not
+    /// blocked, wrapping to the last one under repeat-all; nil means "restart the current song".
     var previousIndex: Int? {
         guard let currentIndex, !entries.isEmpty else { return nil }
-        if currentIndex > 0 { return currentIndex - 1 }
-        return repeatMode == .all && entries.count > 1 ? entries.count - 1 : nil
+        return BlockedNavigation.previous(before: currentIndex, count: entries.count,
+                                          wraps: repeatMode == .all && entries.count > 1, isBlocked: isBlocked(at:))
     }
 
-    /// The crossfade target (`CrossfadeScheduler.nextTargetIndex`: no wrap-around).
+    /// The crossfade target (`CrossfadeScheduler.nextTargetIndex`: no wrap-around; blocked songs are skipped).
     var crossfadeTargetIndex: Int? {
         guard let currentIndex else { return nil }
-        let target = repeatMode == .one ? currentIndex : currentIndex + 1
-        return target < entries.count ? target : nil
+        if repeatMode == .one { return currentIndex < entries.count ? currentIndex : nil }
+        return BlockedNavigation.next(after: currentIndex, count: entries.count, wraps: false, isBlocked: isBlocked(at:))
     }
 
     mutating func setCurrentIndex(_ index: Int?) {

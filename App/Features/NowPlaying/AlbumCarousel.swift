@@ -44,13 +44,20 @@ struct AlbumCarousel: View {
     let isPlaying: Bool
     let onSelect: (Int) -> Void
     let onAlbumTap: (Song) -> Void
+    /// Gestures (Settings › Behavior › Gestures): swiping the covers and double-tap to like (the long-press quick actions
+    /// are a context menu the full player puts around the whole carousel).
+    var allowsSwipe = true
+    var onDoubleTap: (() -> Void)?
 
     /// Starts at the width the player lays it out at (when known), so the covers are there on the first pass instead
     /// of after a measuring pass; measuring still follows later changes.
     @State private var width: CGFloat
 
     init(queue: [Song], currentIndex: Int?, style: PlayerCarouselStyle, isPlaying: Bool, initialWidth: CGFloat = 0,
+         allowsSwipe: Bool = true, onDoubleTap: (() -> Void)? = nil,
          onSelect: @escaping (Int) -> Void, onAlbumTap: @escaping (Song) -> Void) {
+        self.allowsSwipe = allowsSwipe
+        self.onDoubleTap = onDoubleTap
         self.queue = queue
         self.currentIndex = currentIndex
         self.style = style
@@ -62,6 +69,9 @@ struct AlbumCarousel: View {
     @State private var position: Int?
     @State private var userDragged = false
     @State private var settleHaptic = 0
+    /// The "Next" / "Previous" hint after a swipe changed the song.
+    @State private var hint: SwipeDirection?
+    @State private var hintToken = 0
 
     var body: some View {
         let item = style.itemSize(width: width)
@@ -74,6 +84,8 @@ struct AlbumCarousel: View {
                     let song = queue[index]
                     ArtworkView(song: song, size: max(singleStyle == .noPeek ? width : item, 1), cornerRadius: 18)
                         .contentShape(.rect)
+                        // Double-tap goes first, so the single tap (open the album) waits for it to fail.
+                        .modifier(CarouselDoubleTap(action: index == (position ?? currentIndex) ? onDoubleTap : nil))
                         .onTapGesture {
                             if index == (position ?? currentIndex), song.albumId != -1 { onAlbumTap(song) }
                         }
@@ -86,6 +98,7 @@ struct AlbumCarousel: View {
             .scrollTargetLayout()
         }
         .scrollIndicators(.hidden)
+        .scrollDisabled(!allowsSwipe)
         .scrollTargetBehavior(.viewAligned)
         .contentMargins(.leading, singleStyle == .noPeek ? 0 : margins.leading, for: .scrollContent)
         .contentMargins(.trailing, singleStyle == .noPeek ? 0 : margins.trailing, for: .scrollContent)
@@ -96,6 +109,8 @@ struct AlbumCarousel: View {
                 userDragged = false
                 if let settled = position, settled != currentIndex, queue.indices.contains(settled) {
                     settleHaptic += 1
+                    hint = (currentIndex ?? settled) < settled ? .left : .right
+                    hintToken += 1
                     onSelect(settled)
                 }
             }
@@ -115,5 +130,34 @@ struct AlbumCarousel: View {
             if position != currentIndex { position = currentIndex }
         }
         .pixlHaptic(.impact(weight: .medium), trigger: settleHaptic)
+        .overlay(alignment: .top) {
+            if let hint {
+                SwipeHint(direction: hint)
+                    .padding(.top, 10)
+                    .transition(.opacity.combined(with: .scale(scale: 0.92)))
+            }
+        }
+        .task(id: hintToken) {
+            guard hintToken > 0 else { return }
+            try? await Task.sleep(for: .milliseconds(850))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.2)) { hint = nil }
+        }
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: hint)
+    }
+}
+
+/// Double-tap on a cover (like / unlike) when the gesture is on; no gesture at all otherwise, so the single tap that
+/// opens the album does not wait for a second tap that can never come.
+private struct CarouselDoubleTap: ViewModifier {
+    let action: (() -> Void)?
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let action {
+            content.onTapGesture(count: 2, perform: action)
+        } else {
+            content
+        }
     }
 }

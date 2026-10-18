@@ -15,6 +15,7 @@ extension SettingsStore {
         equalizer.reload(from: EqualizerPreferences(defaults: defaults))
         ai.reload(from: AISettings(defaults: defaults))
         experimental.reload(from: ExperimentalSettings(defaults: defaults))
+        blocked.reloadFromDefaults()
     }
 }
 
@@ -52,6 +53,16 @@ extension BehaviorSettings {
         sync(\.tapBackgroundClosesPlayer, self, f)
         sync(\.launchTab, self, f)
         sync(\.folderBackGestureNavigation, self, f)
+        sync(\.gesturePlayerArtworkSwipe, self, f)
+        sync(\.gesturePlayerArtworkDoubleTapLike, self, f)
+        sync(\.gesturePlayerArtworkLongPress, self, f)
+        sync(\.gestureMiniSwipeSkip, self, f)
+        sync(\.gestureMiniSwipeUpOpen, self, f)
+        sync(\.gestureMiniLongPress, self, f)
+        sync(\.gestureListSwipeQueue, self, f)
+        sync(\.musicHapticsEnabled, self, f)
+        sync(\.musicHapticsStrength, self, f)
+        sync(\.musicHapticsMode, self, f)
     }
 }
 

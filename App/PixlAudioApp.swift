@@ -16,6 +16,7 @@ struct PixlAudioApp: App {
                 .environment(environment.library)
                 .environment(environment.playback)
                 .environment(environment.settings)
+                .environment(environment.settings.blocked)
                 .environment(environment.accounts)
                 .environment(environment.lyrics)
                 .environment(environment.theme)

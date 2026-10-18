@@ -252,6 +252,13 @@ final class DualDeckEngine: PlaybackEngine {
         }
     }
 
+    /// Blocked artists: the queue skips their songs when moving on; what is already planned is re-planned.
+    func setBlocklist(_ matcher: BlockedArtistMatcher) {
+        guard queue.blocklist != matcher else { return }
+        queue.blocklist = matcher
+        rescheduleNext()
+    }
+
     /// Pitch-preserving playback rate (0.25…2; the sync editor uses 1 / 0.75 / 0.5).
     func setPlaybackRate(_ newRate: Float) {
         rate = min(max(newRate, 0.25), 2)

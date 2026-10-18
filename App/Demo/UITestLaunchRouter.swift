@@ -67,6 +67,9 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     /// Library Navigation › Compact pill & grid (final review).
     case libraryCompactNav
     case playlistEdit, playlistAddSongs, playlistOptions, playlistReorder, genreSort
+    // 2026-10-18 features: Find in playlist (open with a query / no matches), a playlist with a blocked artist, the
+    // Blocked artists and Gestures settings pages.
+    case playlistFind, playlistFindEmpty, playlistBlocked, blockedArtists, blockedArtistsEmpty, gestureSettings
 
     // Stage 8: the player's sheets (presented over the expanded player) and the song editor
     case devices, artistPicker, editSong
@@ -165,7 +168,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
              .libraryAddToPlaylist, .songOptionsInfo, .libraryCompactNav, .libraryCreatePlaylistOnDeviceOff:
             return nil
         case .playlistEdit: return .playlistEditor(playlistId: demo.playlists.first?.id)
-        case .playlistAddSongs, .playlistOptions, .playlistReorder:
+        case .playlistAddSongs, .playlistOptions, .playlistReorder, .playlistFind, .playlistFindEmpty, .playlistBlocked:
             return .playlistDetail(playlistId: demo.playlists.first?.id ?? "")
         case .genreSort, .genreQuickFill: return .genreDetail(genreId: "Indie")
         case .miniPlayerAlone, .albumDetail: return .albumDetail(albumId: demo.albums.first?.id ?? 1)
@@ -193,6 +196,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .paletteStyle: return .paletteStyle
         case .experimental: return .experimental
         case .artistSettings: return .artistSettings
+        case .blockedArtists, .blockedArtistsEmpty: return .blockedArtists
+        case .gestureSettings: return .gestureSettings
         case .delimiterConfig: return .delimiterConfig
         case .wordDelimiterConfig: return .wordDelimiterConfig
         case .equalizer: return .equalizer
@@ -237,7 +242,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .libraryAlbums, .libraryAlbumsList, .libraryArtists, .libraryPlaylists, .libraryLiked,
              .librarySelection, .librarySort, .libraryReorderTabs, .libraryMultiSelection, .libraryCreatePlaylist,
              .libraryAddToPlaylist, .songOptionsInfo, .playlistEdit, .playlistAddSongs, .playlistOptions,
-             .playlistReorder, .genreSort, .libraryCompactNav, .libraryCreatePlaylistOnDeviceOff, .genreQuickFill:
+             .playlistReorder, .genreSort, .libraryCompactNav, .libraryCreatePlaylistOnDeviceOff, .genreQuickFill,
+             .playlistFind, .playlistFindEmpty, .playlistBlocked:
             .library
         default: .home
         }
@@ -393,7 +399,8 @@ nonisolated enum UITestLaunchRouter {
 
     /// Settings screens open on top of Settings (and the account screens on top of Accounts), as when navigated.
     private static let underSettings: Set<String> = [
-        "paletteStyle", "experimental", "artistSettings", "delimiterConfig", "wordDelimiterConfig", "equalizer",
+        "paletteStyle", "experimental", "artistSettings", "blockedArtists", "gestureSettings", "delimiterConfig",
+        "wordDelimiterConfig", "equalizer",
         "editTransition", "deviceCapabilities", "about", "openSourceLicenses", "easterEgg", "quickFill",
         "diagnostics", "accounts", "cloudProcessing", "cloudQueue",
     ]

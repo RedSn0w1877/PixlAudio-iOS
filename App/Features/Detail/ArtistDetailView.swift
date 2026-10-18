@@ -87,6 +87,7 @@ private struct ArtistDetailContent: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(LibraryStore.self) private var library
     @Environment(PlaybackStore.self) private var playback
+    @Environment(BlockedArtistsStore.self) private var blocked
     @Environment(Router.self) private var router
     @Environment(\.appTheme) private var theme
     @State private var scroll = HeaderScrollState()
@@ -123,7 +124,7 @@ private struct ArtistDetailContent: View {
                     list(topPadding: metrics.maxHeight - safeTop + 8)
                     CollapsingArtworkHeader(title: artist.name, subtitle: LibraryFormat.songCount(allSongs.count),
                                             artwork: artist.effectiveImageUrl.flatMap { ArtworkSource(uriString: $0) },
-                                            scroll: scroll, metrics: metrics, safeTop: safeTop, collapsedTitleEnd: 88,
+                                            scroll: scroll, metrics: metrics, safeTop: safeTop, collapsedTitleEnd: 136,
                                             placeholderSymbol: "music.mic",
                                             onBack: { router.pop() },
                                             onShuffle: { playback.playShuffled(allSongs) }) {
@@ -133,6 +134,21 @@ private struct ArtistDetailContent: View {
                             if (artist.customImageUri ?? "").isEmpty { showsPhotoPicker = true } else { showsImageOptions = true }
                         }
                         .accessibilityIdentifier("artist.editImage")
+                        let isBlocked = blocked.isBlocked(artistId: artist.id, name: artist.name)
+                        GlassCircleMenu(systemImage: "ellipsis", accessibilityLabel: "More options") {
+                            if isBlocked {
+                                Button("Unblock artist", systemImage: "checkmark.circle") {
+                                    blocked.unblock(artistId: artist.id, name: artist.name)
+                                    LibraryToast.shared.show("\(artist.name) unblocked")
+                                }
+                            } else {
+                                Button("Block artist", systemImage: "nosign", role: .destructive) {
+                                    blocked.block(artistId: artist.id, name: artist.name)
+                                    LibraryToast.shared.show("\(artist.name) blocked. Their songs won't play by themselves.")
+                                }
+                            }
+                        }
+                        .accessibilityIdentifier("artist.more")
                     }
                     .ignoresSafeArea(edges: .top)
                 } else {
@@ -245,9 +261,10 @@ private struct ArtistDetailContent: View {
             if index > 0 { Spacer().frame(height: 2) }
             PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
                 SongCard(song: song, isCurrent: isCurrent, isPlaying: isPlaying,
-                         onTap: { playback.play(song, in: context) },
+                         onTap: { blocked.playTapped(song, in: context, using: playback) },
                          onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
                          showsArtwork: false, corners: .grouped(index: index, count: count))
+                    .swipeToQueue(song: song)
             }
             if isLast { Spacer().frame(height: 8) }
         }

@@ -70,6 +70,7 @@ private struct LibrarySongRow: View {
                             isSelectionMode: selection.isActive, isSelected: selection.contains(song.id),
                             selectionIndex: selection.index(of: song.id),
                             onLongPress: { selection.toggle(song.id) })
+            .swipeToQueue(song: song, isEnabled: !selection.isActive)
         if isCurrent && reportsVisibility {
             card.onScrollVisibilityChange(threshold: 0.5) { visible in actions.reportCurrentVisible(visible, page: page) }
         } else {

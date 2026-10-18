@@ -29,7 +29,12 @@ struct NowPlayingView: View {
     @Environment(PlaybackStore.self) private var playback
     @Environment(SettingsStore.self) private var settings
     @Environment(Router.self) private var router
+    @Environment(LibraryStore.self) private var library
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
     @Environment(\.playerTheme) private var theme
+    /// Double-tap to like: bumped per tap; `burstIsLike` says which heart the burst draws.
+    @State private var burstCount = 0
+    @State private var burstIsLike = true
 
     var body: some View {
         if let song = playback.current {
@@ -53,9 +58,20 @@ struct NowPlayingView: View {
                                   style: PlayerCarouselStyle(storageKey: settings.appearance.carouselStyle),
                                   isPlaying: playback.isPlaying,
                                   initialWidth: max(width - 48, 0),
+                                  allowsSwipe: settings.behavior.gesturePlayerArtworkSwipe,
+                                  onDoubleTap: settings.behavior.gesturePlayerArtworkDoubleTapLike && !voiceOver
+                                      ? { toggleLike(song) } : nil,
                                   onSelect: { index in playback.skipToQueueItem(at: index) },
                                   onAlbumTap: { tapped in openAlbum(tapped) })
                         .padding(.vertical, 8)
+                        .overlay { HeartBurst(trigger: burstCount, isLike: burstIsLike) }
+                        .songQuickActions(song: song, isEnabled: settings.behavior.gesturePlayerArtworkLongPress)
+                        .pixlHaptic(.success, trigger: burstCount)
+                        .accessibilityActions {
+                            Button("Next song") { playback.skipToNext() }
+                            Button("Previous song") { playback.skipToPrevious() }
+                            Button("Like or unlike") { toggleLike(song) }
+                        }
                         .playerSectionFade(start: 0.08)
                     VStack(alignment: .leading, spacing: 4) {
                         PlayerMetadataRow(song: song)
@@ -111,6 +127,14 @@ struct NowPlayingView: View {
                 .padding(.horizontal, 26)
                 .padding(.bottom, 6)
         }
+    }
+
+    /// Double-tap on the artwork (and VoiceOver's "Like or unlike"): toggles the favourite and shows the heart.
+    private func toggleLike(_ song: Song) {
+        let wasFavorite = library.song(id: song.id)?.isFavorite ?? song.isFavorite
+        env.libraryEditor.toggleFavorite(song.id)
+        burstIsLike = !wasFavorite
+        burstCount += 1
     }
 
     /// Android `cycleRepeatMode`: off → all → one → off.
