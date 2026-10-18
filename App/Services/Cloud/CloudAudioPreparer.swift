@@ -276,6 +276,16 @@ nonisolated enum CloudAudioPreparer {
         throw Failure(message: "Couldn't write the song for upload (\(lastError?.localizedDescription ?? "unknown error"))")
     }
 
+    /// The packet size the trailing silence rounds up to. CoreAudio reports `mFramesPerPacket` 0 for FLAC (variable block
+    /// size) although Apple's encoder always pads the last block to 4,608 frames; with 0 the first pass padded nothing,
+    /// the read-back found the encoder's padding, and the whole song was decoded and encoded a second time.
+    nonisolated static func wholePacketFrames(framesPerPacket: UInt32, isFLAC: Bool) -> Int64 {
+        if framesPerPacket > 1 { return Int64(framesPerPacket) }
+        return isFLAC ? flacBlockFrames : 0
+    }
+
+    nonisolated static let flacBlockFrames: Int64 = 4_608
+
     /// Silence written after the song (see `decodeToLossless`).
     nonisolated private enum TrailingSilence: Sendable {
         /// Up to the next whole packet of the file's format (none for PCM, or when the format doesn't say).
@@ -363,7 +373,9 @@ nonisolated enum CloudAudioPreparer {
             let padding: Int64
             switch silence {
             case .wholePacket:
-                let framesPerPacket = Int64(file.fileFormat.streamDescription.pointee.mFramesPerPacket)
+                let description = file.fileFormat.streamDescription.pointee
+                let framesPerPacket = wholePacketFrames(framesPerPacket: description.mFramesPerPacket,
+                                                        isFLAC: description.mFormatID == kAudioFormatFLAC)
                 let remainder = framesPerPacket > 1 ? written % framesPerPacket : 0
                 padding = remainder == 0 ? 0 : framesPerPacket - remainder
             case .frames(let count):

@@ -160,4 +160,14 @@ final class CloudAudioPreparerTests: XCTestCase {
                            .lastPathComponent, "\(key)-instrumental.m4a")
         XCTAssertNil(try CloudTransfers.stagedURL(jobKey: "bad", slot: "instrumental", sourceURL: nil))
     }
+
+    /// FLAC reports no frames per packet; the first pass must still round up to the encoder's 4,608-frame block, or the
+    /// song is decoded and encoded again after the read-back.
+    func testFLACRoundsUpToItsBlockEvenWhenCoreAudioReportsNoPacketSize() {
+        XCTAssertEqual(CloudAudioPreparer.wholePacketFrames(framesPerPacket: 0, isFLAC: true), 4_608)
+        XCTAssertEqual(CloudAudioPreparer.wholePacketFrames(framesPerPacket: 1, isFLAC: true), 4_608)
+        XCTAssertEqual(CloudAudioPreparer.wholePacketFrames(framesPerPacket: 4_096, isFLAC: true), 4_096)
+        XCTAssertEqual(CloudAudioPreparer.wholePacketFrames(framesPerPacket: 0, isFLAC: false), 0)
+        XCTAssertEqual(CloudAudioPreparer.wholePacketFrames(framesPerPacket: 1_024, isFLAC: false), 1_024)
+    }
 }
