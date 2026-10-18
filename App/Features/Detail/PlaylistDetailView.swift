@@ -388,7 +388,7 @@ struct PlaylistDetailView: View {
         case .playlistAddSongs?: showsAddSongs = true
         case .playlistOptions?: showsOptions = true
         case .playlistFind?, .playlistFindEmpty?:
-            // UI tests: the field open on a query ('sora' matches two songs, 'zzz' none).
+            // UI tests: the field open on a query ('sora' matches three songs, 'zzz' none).
             let base = songs.isEmpty ? orderedSongs(Inputs(songIds: playlist?.songIds ?? [], librarySongCount: library.songs.count, sort: sortOption)) : songs
             find.setSongs(base)
             find.open()

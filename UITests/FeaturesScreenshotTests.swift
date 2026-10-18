@@ -96,13 +96,14 @@ final class FeaturesScreenshotTests: XCTestCase {
         XCTAssertTrue(element(app, "settings.behavior.gestures").waitForExistence(timeout: 10))
         Thread.sleep(forTimeInterval: 1.2)
         attach(app, "settingsBehavior-top-\(appearance)")
-        let toggle = app.switches["Music Haptics"].firstMatch
+        let toggle = app.descendants(matching: .any)["settings.switch.Music Haptics"].firstMatch
         for _ in 0..<6 where !toggle.exists || toggle.frame.maxY > app.windows.firstMatch.frame.maxY - 160 {
             app.swipeUp(velocity: .slow)
             Thread.sleep(forTimeInterval: 0.3)
         }
         XCTAssertTrue(toggle.waitForExistence(timeout: 5), "the Music Haptics switch is missing")
-        toggle.tap()
+        // The switch sits at the row's trailing end (the row is one combined element).
+        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
         XCTAssertTrue(element(app, "settings.musicHaptics.status").waitForExistence(timeout: 5))
         Thread.sleep(forTimeInterval: 1.0)
         attach(app, "settingsBehavior-musicHaptics-\(appearance)")

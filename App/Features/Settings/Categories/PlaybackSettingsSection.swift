@@ -155,6 +155,7 @@ struct BehaviorSettingsSection: View {
                         identifier: "settings.musicHaptics.status") {}
             .allowsHitTesting(false)
             .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("settings.musicHaptics.status")
     }
 
     private func statusText(_ status: MusicHapticsStatus) -> String {
