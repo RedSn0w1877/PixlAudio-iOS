@@ -1,5 +1,6 @@
 import PixlModel
 import SwiftUI
+import UIKit
 
 /// The queue (Android `QueueBottomSheet`), presented over the player with the system sheet:
 /// - header: "Next up" (`headlineLarge` semibold; tap = locate the current song) over "N tracks lined up.", and the
@@ -644,7 +645,7 @@ private struct QueueSongRow<Handle: Gesture>: View {
         .animation(.spring(response: 0.3, dampingFraction: 1), value: isDragging)
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: isCurrent)
         .padding(.horizontal, 12)
-        .simultaneousGesture(canReorder ? swipeGesture : nil)
+        .gesture(HorizontalRowSwipe(isEnabled: canReorder, onChanged: swipeChanged, onEnded: swipeEnded))
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityAction(named: "More options") { onMore() }
@@ -664,36 +665,72 @@ private struct QueueSongRow<Handle: Gesture>: View {
 
     /// Android `QueueItemDismissGestureHandler`: left only; up to 60 pt the row moves at most 20 pt (tension), then
     /// it follows the finger; released past 40 % of the width it slides out and is removed.
-    private var swipeGesture: some Gesture {
-        DragGesture(minimumDistance: 16)
-            .onChanged { value in
-                if !isSwiping {
-                    guard abs(value.translation.width) > abs(value.translation.height) else { return }
-                    isSwiping = true
-                }
-                rawSwipe = min(value.translation.width, 0)
-                let distance = -rawSwipe
-                let visual = distance < 60 ? -20 * distance / 60 : rawSwipe
-                withAnimation(.interactiveSpring(response: 0.2, dampingFraction: 0.9)) { swipe = visual }
-                let zone = distance > width * 0.4
-                if zone != inZone { inZone = zone }
+    private func swipeChanged(_ dx: CGFloat) {
+        isSwiping = true
+        rawSwipe = min(dx, 0)
+        let distance = -rawSwipe
+        let visual = distance < 60 ? -20 * distance / 60 : rawSwipe
+        withAnimation(.interactiveSpring(response: 0.2, dampingFraction: 0.9)) { swipe = visual }
+        let zone = distance > width * 0.4
+        if zone != inZone { inZone = zone }
+    }
+
+    private func swipeEnded() {
+        guard isSwiping else { return }
+        isSwiping = false
+        if -rawSwipe > width * 0.4 {
+            withAnimation(.easeOut(duration: 0.18)) { swipe = -width }
+            Task {
+                try? await Task.sleep(for: .milliseconds(180))
+                onDismiss()
+                try? await Task.sleep(for: .seconds(1))
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) { swipe = 0 }
             }
-            .onEnded { _ in
-                guard isSwiping else { return }
-                isSwiping = false
-                if -rawSwipe > width * 0.4 {
-                    withAnimation(.easeOut(duration: 0.18)) { swipe = -width }
-                    Task {
-                        try? await Task.sleep(for: .milliseconds(180))
-                        onDismiss()
-                        try? await Task.sleep(for: .seconds(1))
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) { swipe = 0 }
-                    }
-                } else {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) { swipe = 0 }
-                }
-                rawSwipe = 0
-                inZone = false
-            }
+        } else {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) { swipe = 0 }
+        }
+        rawSwipe = 0
+        inZone = false
+    }
+}
+
+/// Horizontal-only pan for the row's swipe-to-remove. A SwiftUI `DragGesture` claims a drag in any direction after
+/// its minimum distance and cancels the scroll view's pan, so touches that started on a row could not scroll. This
+/// UIKit recognizer refuses to begin unless the finger is moving mostly sideways, so vertical drags always scroll.
+private struct HorizontalRowSwipe: UIGestureRecognizerRepresentable {
+    var isEnabled: Bool
+    var onChanged: (CGFloat) -> Void
+    var onEnded: () -> Void
+
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
+
+    func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
+        let pan = UIPanGestureRecognizer()
+        pan.delegate = context.coordinator
+        pan.maximumNumberOfTouches = 1
+        return pan
+    }
+
+    func updateUIGestureRecognizer(_ recognizer: UIPanGestureRecognizer, context: Context) {
+        recognizer.isEnabled = isEnabled
+    }
+
+    func handleUIGestureRecognizerAction(_ recognizer: UIPanGestureRecognizer, context: Context) {
+        switch recognizer.state {
+        case .began, .changed:
+            onChanged(recognizer.translation(in: recognizer.view).x)
+        case .ended, .cancelled, .failed:
+            onEnded()
+        default:
+            break
+        }
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            guard let pan = gestureRecognizer as? UIPanGestureRecognizer else { return false }
+            let v = pan.velocity(in: pan.view)
+            return abs(v.x) > abs(v.y) * 1.2
+        }
     }
 }
