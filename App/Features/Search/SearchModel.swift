@@ -85,6 +85,13 @@ final class SearchModel {
     @ObservationIgnored private var youtubeMusicResults: [SearchResultItem] = []
     private(set) var isCatalogSearching = false
     private(set) var isYoutubeMusicSearching = false
+    /// True from a typed query until all three sources (library, catalogue, YouTube Music) have answered or given up.
+    /// `isCatalogSearching` / `isYoutubeMusicSearching` only turn on after each source's debounce, so without this
+    /// the screen showed "no results" for the first moments of every search.
+    private var pendingLibrary = false
+    private var pendingCatalog = false
+    private var pendingYoutubeMusic = false
+    var isSearchPending: Bool { pendingLibrary || pendingCatalog || pendingYoutubeMusic }
     /// Results grouped for the list (rebuilt only when a result list changes, never in `body`).
     private(set) var sections: [SearchResultSection] = []
     /// The library's genres for the browse grid.
@@ -117,7 +124,12 @@ final class SearchModel {
     /// Results empty and nothing still on its way (Android only declares "no results" once the network searches
     /// have answered, so the screen doesn't flash the empty state).
     var showsEmptyState: Bool {
-        sections.isEmpty && !isCatalogSearching && !isYoutubeMusicSearching
+        sections.isEmpty && !isCatalogSearching && !isYoutubeMusicSearching && !isSearchPending
+    }
+
+    /// Nothing to show yet, but a search is on its way: the screen says it is loading instead of "no results".
+    var showsLoadingState: Bool {
+        sections.isEmpty && (isCatalogSearching || isYoutubeMusicSearching || isSearchPending)
     }
 
     /// All library song results, the queue a tapped song plays in (Android `songResultsQueue`).
@@ -168,6 +180,10 @@ final class SearchModel {
         let id = requestID
         lastQuery = query
         if query.isEmpty, !libraryResults.isEmpty { setLibraryResults([]) }
+        let pending = !query.isKotlinBlank
+        pendingLibrary = pending
+        pendingCatalog = pending
+        pendingYoutubeMusic = pending
 
         libraryTask?.cancel()
         libraryTask = Task { [weak self] in
@@ -185,14 +201,16 @@ final class SearchModel {
     private func searchLibrary(_ query: String, id: Int) {
         guard !query.isKotlinBlank else {
             if !libraryResults.isEmpty { setLibraryResults([]) }
+            pendingLibrary = false
             return
         }
-        guard let provider = providers[.library] else { return }
+        guard let provider = providers[.library] else { pendingLibrary = false; return }
         let filter = filter
         Task { [weak self] in
             let results = (try? await provider.search(query, filter: filter, limit: .max)) ?? []
             guard let self, id == self.requestID else { return }
             if self.libraryResults != results { self.setLibraryResults(results) }
+            self.pendingLibrary = false
         }
     }
 
@@ -203,6 +221,7 @@ final class SearchModel {
             guard query.utf16.count >= Self.minRemoteQueryLength, let provider = self.providers[source] else {
                 self.setSearching(false, source: source)
                 if !self.remoteResults(source).isEmpty { self.setRemoteResults([], source: source) }
+                if id == self.requestID { self.setPending(false, source: source) }
                 return
             }
             self.setSearching(true, source: source)
@@ -216,8 +235,15 @@ final class SearchModel {
             } catch {
                 if id == self.requestID { self.setRemoteResults([], source: source) }
             }
-            if id == self.requestID { self.setSearching(false, source: source) }
+            if id == self.requestID {
+                self.setSearching(false, source: source)
+                self.setPending(false, source: source)
+            }
         }
+    }
+
+    private func setPending(_ value: Bool, source: SearchSource) {
+        if source == .spotify { pendingCatalog = value } else { pendingYoutubeMusic = value }
     }
 
     private func remoteResults(_ source: SearchSource) -> [SearchResultItem] {
