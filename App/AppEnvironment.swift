@@ -254,7 +254,7 @@ final class AppEnvironment {
             : ActiveJobs(sources: ActiveJobs.Sources(library: library, spotify: spotify, downloads: youtube.downloads,
                                                      models: tais.models, studio: tais.studio, cloud: cloud, health: health))
         musicHaptics = MusicHapticsController(behavior: settings.behavior, playback: playback, health: health,
-                                              bus: playbackServices?.effects.haptics, isDemo: isUITest)
+                                              bus: playbackServices?.engine.effects.haptics, isDemo: isUITest)
         wireHealth(health)
         wireBlockedArtists(settings.blocked)
         // A tap on "Your instrumentals are ready" opens the Cloud queue (the notification centre's delegate is set
