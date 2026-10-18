@@ -3,7 +3,7 @@ import XCTest
 /// The 2026-10-18 features, on demo data: Find in playlist (open on a query, no matches, tapping a result), blocked
 /// artists (the dimmed rows with their badge, "Play anyway", the settings page), the Gestures page and the Behavior
 /// settings with Music Haptics, plus the gestures themselves (swipe a row to queue it, swipe the mini player, double-tap
-/// the artwork). Tag: `[shots:FeaturesScreenshotTests]`.
+/// the artwork). Tag the commit message with `[shots:FeaturesScreenshotTests]` to run them.
 @MainActor
 final class FeaturesScreenshotTests: XCTestCase {
     // MARK: Find in playlist
