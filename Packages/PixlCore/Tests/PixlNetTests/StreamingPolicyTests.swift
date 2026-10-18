@@ -80,8 +80,13 @@ struct StreamPrefetchPolicyTests {
         #expect(Policy.headBytes == 524_288)
         #expect(Policy.topUpBytes == 1_048_576)
         #expect(Policy.topUpLeadMs == 30_000)
-        #expect(Policy.prepareDelayMs == 1_500)
-        #expect(Policy.headStartPositionMs == 3_000)
+        #expect(Policy.prepareDelayMs == 500)
+        #expect(Policy.headStartPositionMs == 1_000)
+        #expect(Policy.allowsEarlyPreparation(isForeground: true, lowPowerMode: false, recentMemoryPressure: false, launchWorkAllowed: true))
+        #expect(!Policy.allowsEarlyPreparation(isForeground: false, lowPowerMode: false, recentMemoryPressure: false, launchWorkAllowed: true))
+        #expect(!Policy.allowsEarlyPreparation(isForeground: true, lowPowerMode: true, recentMemoryPressure: false, launchWorkAllowed: true))
+        #expect(!Policy.allowsEarlyPreparation(isForeground: true, lowPowerMode: false, recentMemoryPressure: true, launchWorkAllowed: true))
+        #expect(!Policy.allowsEarlyPreparation(isForeground: true, lowPowerMode: false, recentMemoryPressure: false, launchWorkAllowed: false))
         #expect(Policy.maxDepth == 2)
     }
 
