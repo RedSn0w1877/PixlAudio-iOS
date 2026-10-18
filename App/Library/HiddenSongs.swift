@@ -3,7 +3,7 @@ import PixlModel
 
 /// Songs the user deleted that have no file of their own to delete (Android deletes the file through MediaStore, so
 /// the next scan can't find it): music-library items, Spotify songs, and files the app couldn't delete. Every scan
-/// skips these ids (`LocalLibraryImporter`, the Spotify library rebuild), so a deleted song stays deleted instead of
+/// skips these ids (the Spotify library rebuild), so a deleted song stays deleted instead of
 /// coming back — un-liked and out of its playlists — on the next launch.
 nonisolated enum HiddenSongs {
     static let key = "hidden_song_ids_v1"

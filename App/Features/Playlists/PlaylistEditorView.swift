@@ -101,7 +101,7 @@ struct PlaylistEditorView: View {
     private var bottomControls: some View {
         if step == 1 {
             SongPickerBottomBar(storageFilter: $storageFilter,
-                                showsCloudFilter: library.songs.contains(where: LibrarySorting.isOnline),
+                                showsCloudFilter: false,
                                 title: "Create", confirmLabel: "Create") { save() }
         } else {
             HStack {
@@ -154,7 +154,7 @@ struct PlaylistEditorView: View {
             form.tab = .icon
             form.shape = .star
         }
-        storageFilter = library.songs.contains(where: LibrarySorting.isOnline) ? .offline : .all
+        storageFilter = .all
         // The song step's list, computed off the main actor while the cover step is on screen.
         SongPickerDefaults.warm(library: library, filter: storageFilter)
     }

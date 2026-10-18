@@ -115,7 +115,7 @@ final class LibraryScreensTests: XCTestCase {
         let snapshot = DemoLibrary.snapshot
         let inputs = LibraryModel.Inputs(snapshot: snapshot, songSort: .songTitleZA, albumSort: .albumTitleAZ,
                                          artistSort: .artistNumSongsDesc, playlistSort: .playlistNameAZ,
-                                         folderSort: .folderNameAZ, likedSort: .likedSongTitleAZ,
+                                         likedSort: .likedSongTitleAZ,
                                          storageFilter: .all, likedAt: [:])
         let lists = LibraryModel.compute(inputs)
         XCTAssertEqual(lists.songs.count, snapshot.songs.count)
@@ -123,22 +123,10 @@ final class LibraryScreensTests: XCTestCase {
         XCTAssertEqual(lists.albums.first?.title, "Aurora")
         XCTAssertEqual(lists.playlists.map(\.name), ["Indie Favourites", "Late Night Drive", "Sunday Morning"])
         XCTAssertEqual(lists.liked.count, snapshot.songs.filter(\.isFavorite).count)
-        // The tree lists the root's folders (one per demo artist), name A-Z, holding every song between them.
-        XCTAssertEqual(lists.folders.map(\.name), Set(snapshot.songs.map(\.artist)).sorted())
-        XCTAssertEqual(lists.folders.reduce(0) { $0 + $1.totalSongCount }, snapshot.songs.count)
-        XCTAssertFalse(lists.folderPlaylists.isEmpty)
-        XCTAssertTrue(lists.folderPlaylists.allSatisfy { !$0.songs.isEmpty })
 
         var online = inputs
         online.storageFilter = .online
         XCTAssertTrue(LibraryModel.compute(online).songs.isEmpty, "demo songs are local files")
-    }
-
-    func testFolderPlaylistIds() {
-        let id = FolderPlaylist.id(for: "/Demo/Luma Vale")
-        XCTAssertEqual(id, "folder_playlist:/Demo/Luma Vale")
-        XCTAssertEqual(FolderPlaylist.path(from: id), "/Demo/Luma Vale")
-        XCTAssertNil(FolderPlaylist.path(from: "demo-playlist-1"))
     }
 
     func testArtistAlbumSectionsNewestFirst() {

@@ -90,18 +90,13 @@ struct PlaybackSettingsSection: View {
     }
 }
 
-/// Settings › Behavior (Android `SettingsCategoryScreen` BEHAVIOR): folders, player gestures, haptics.
+/// Settings › Behavior (Android `SettingsCategoryScreen` BEHAVIOR): player gestures, haptics.
 struct BehaviorSettingsSection: View {
     @Environment(SettingsStore.self) private var settings
 
     var body: some View {
         @Bindable var behavior = settings.behavior
         SettingsCategoryScaffold(category: .behavior) {
-            SettingsSubsection(title: L10n.settingsFoldersSection) {
-                SwitchSettingRow(title: L10n.settingsFolderBackGestureTitle,
-                                 subtitle: L10n.settingsFolderBackGestureSubtitle,
-                                 isOn: $behavior.folderBackGestureNavigation, systemImage: "hand.tap")
-            }
             SettingsSubsection(title: L10n.settingsPlayerGesturesSection) {
                 SwitchSettingRow(title: L10n.settingsTapBgClosesTitle, subtitle: L10n.settingsTapBgClosesSubtitle,
                                  isOn: $behavior.tapBackgroundClosesPlayer, systemImage: "hand.tap")

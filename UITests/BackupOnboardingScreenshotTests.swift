@@ -9,8 +9,6 @@ final class BackupOnboardingScreenshotTests: XCTestCase {
 
     func testSetupWelcomeLight() throws { try capture("setup", "light", ready: "screen.setup") }
     func testSetupWelcomeDark() throws { try capture("setup", "dark", ready: "screen.setup") }
-    func testSetupPermissionLight() throws { try capture("setupPermission", "light", ready: "screen.setup") }
-    func testSetupFoldersDark() throws { try capture("setupFolders", "dark", ready: "screen.setup") }
     func testSetupBackupLight() throws { try capture("setupBackup", "light", ready: "screen.setup") }
     func testSetupThemeLight() throws { try capture("setupTheme", "light", ready: "screen.setup") }
     func testSetupThemeDark() throws { try capture("setupTheme", "dark", ready: "screen.setup") }
@@ -41,24 +39,6 @@ final class BackupOnboardingScreenshotTests: XCTestCase {
             button.tap()
             XCTAssertTrue(app.descendants(matching: .any)["screen.backupExport"].firstMatch.waitForExistence(timeout: 10),
                           "screen.backupExport did not appear")
-        }
-    }
-
-    /// Diagnostic for a cover attached inside Settings' lazy list (Library › Music folders, stage 7d's code): does a
-    /// tap present it? Recorded as a screenshot, never fails the run.
-    func testLibraryFoldersCoverProbeLight() throws {
-        try capture("settingsCategory.library", "light", ready: "screen.settingsCategory.library") { app in
-            // By identifier or label: settings rows share a glass container, whose children keep only their labels.
-            let row = app.descendants(matching: .any)
-                .matching(NSPredicate(format: "identifier == %@ OR label BEGINSWITH[c] %@", "settings.library.folders",
-                                      "Excluded Directories"))
-                .firstMatch
-            guard row.waitForExistence(timeout: 5) else { return }
-            row.tap()
-            let shown = app.descendants(matching: .any)["screen.musicFolders"].firstMatch.waitForExistence(timeout: 8)
-            let note = XCTAttachment(string: "musicFolders cover presented: \(shown)")
-            note.lifetime = .keepAlways
-            self.add(note)
         }
     }
 

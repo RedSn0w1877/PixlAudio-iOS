@@ -10,9 +10,8 @@ final class GlassAccessibilityTests: XCTestCase {
     /// is still a switch.
     func testSettingsGroupsKeepControlTraits() {
         let app = launch("settingsCategory.library", ready: "screen.settingsCategory.library")
-        let folders = app.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Excluded Directories"))
-            .firstMatch
-        XCTAssertTrue(folders.waitForExistence(timeout: 10), "the Excluded Directories row is not a button")
+        let itemRow = app.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Tap timing")).firstMatch
+        XCTAssertTrue(itemRow.waitForExistence(timeout: 10), "the Tap timing row is not a button")
         XCTAssertTrue(app.sliders.firstMatch.waitForExistence(timeout: 5), "the filtering rows have no slider")
         // A Toggle combined into its row reports as a switch (or, on newer runtimes, a toggle).
         let switchRow = app.descendants(matching: .any).matching(NSPredicate(

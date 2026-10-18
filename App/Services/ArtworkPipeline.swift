@@ -14,7 +14,8 @@ nonisolated enum ArtworkSource: Hashable, Sendable {
     case file(URL)
     /// An http(s) image (Spotify / YouTube art).
     case remote(URL)
-    /// Embedded artwork of an audio file, read by `ArtworkPipeline.embeddedArtworkLoader` (stage 6 installs it).
+    /// Embedded artwork of an audio file, read by `ArtworkPipeline.embeddedArtworkLoader`. Only rows written by a
+    /// build that still scanned the phone carry one; the Spotify-only app installs no loader, so it resolves to nil.
     case embedded(URL)
     /// Generated gradient artwork (demo library, UI tests). `seed` picks the colours.
     case generated(seed: Int)
@@ -79,7 +80,8 @@ nonisolated final class ArtworkImage: @unchecked Sendable {
 actor ArtworkPipeline {
     static let shared = ArtworkPipeline()
 
-    /// Reads embedded artwork bytes of an audio file. Stage 6 (library import) installs the AVAsset-based loader.
+    /// Reads embedded artwork bytes of an audio file. Nothing installs one since the library scanner went: an
+    /// `embedded://` source (an old row) simply has no artwork.
     nonisolated(unsafe) static var embeddedArtworkLoader: (@Sendable (URL) async -> Data?)?
 
     /// 80 MB of decoded bitmaps (a 540 px cover is 1.1 MB; the previous 400-entry limit could reach several hundred).

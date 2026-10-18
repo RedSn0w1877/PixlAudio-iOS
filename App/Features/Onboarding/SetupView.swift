@@ -1,6 +1,5 @@
 import PixlBackup
 import SwiftUI
-import UIKit
 import UniformTypeIdentifiers
 
 /// First-run setup (Android `SetupScreen`): a pager with PixlAudio's bottom bar ("Let's Go!" / "Step n of m" and the
@@ -9,39 +8,31 @@ import UniformTypeIdentifiers
 /// | Android | iOS |
 /// |---|---|
 /// | Welcome | Welcome (same) |
-/// | Media permission (`READ_MEDIA_AUDIO`) | Music library access (`MPMediaLibrary`); not a gate — folders work without it |
+/// | Media permission (`READ_MEDIA_AUDIO`) | removed: the app is Spotify-only and never reads the phone's audio files |
 /// | Notifications, Alarms, Battery optimisation | dropped (iOS needs none of them for playback or the sleep timer) |
-/// | Backup restore | Backup restore — after the folders, because the backup's songs are matched against the library |
-/// | Excluded folders | Music folders: add folders with the system picker (`LibraryImporting` bookmarks) |
+/// | Backup restore | Backup restore (after the Spotify step) |
+/// | Excluded folders | removed (no local files) |
 /// | Theme, Library layout | same (`app_theme_mode`, `library_navigation_mode`) |
 /// | Nav bar layout | dropped (the iOS shell has one bar style; nav-bar radius is Material-only) |
-/// | Spotify link, Finish | same |
+/// | Spotify link, Finish | Spotify comes first (it is the library); Finish is the same |
 ///
 /// After a successful restore the pager jumps to Finish, as Android does. Finishing writes `initial_setup_done`.
 struct SetupView: View {
     nonisolated enum Page: Int, CaseIterable, Sendable {
-        case welcome, mediaPermission, musicFolders, backupRestore, theme, libraryLayout, spotify, finish
+        case welcome, spotify, backupRestore, theme, libraryLayout, finish
     }
-
-    nonisolated enum MediaStatus: Sendable { case unknown, granted, denied }
 
     @Environment(AppEnvironment.self) private var env
     @Environment(Router.self) private var router
     @Environment(SettingsStore.self) private var settings
     @Environment(AccountsStore.self) private var accounts
-    @Environment(LibraryStore.self) private var library
     @Environment(\.appTheme) private var theme
     @Environment(\.openURL) private var openURL
 
     @State private var page: Page = .welcome
     @State private var isForward = true
-    @State private var mediaStatus: MediaStatus = .unknown
-    @State private var folders: [String] = []
-    @State private var showsFolderPicker = false
     @State private var showsBackupPicker = false
     @State private var isInspecting = false
-    @State private var isScanning = false
-    @State private var didScan = false
     @State private var restoreBackup: InspectedBackup?
     @State private var showsSpotify = false
     @State private var toast: String?
@@ -92,20 +83,9 @@ struct SetupView: View {
         switch page {
         case .welcome:
             SetupWelcomePage()
-        case .mediaPermission:
-            SetupMediaPermissionPage(status: mediaStatus, onGrant: requestMediaAccess)
-        case .musicFolders:
-            // Each picker sits on its own page: SwiftUI honours one `fileImporter` per view.
-            SetupMusicFoldersPage(folders: folders, onChoose: { showsFolderPicker = true }, onSkip: next)
-                .fileImporter(isPresented: $showsFolderPicker, allowedContentTypes: [.folder],
-                              allowsMultipleSelection: true) { result in
-                    if case .success(let urls) = result { addFolders(urls) }
-                }
         case .backupRestore:
             SetupBackupPage(isInspecting: isInspecting, isRestoring: restoreBackup != nil && env.backup.isBusy,
-                            isScanning: isScanning,
                             onImport: { showsBackupPicker = true }, onSkip: next)
-                .task { await scanBeforeRestore() }
                 .fileImporter(isPresented: $showsBackupPicker, allowedContentTypes: UTType.backupImportTypes) { result in
                     if case .success(let url) = result { inspect(url) }
                 }
@@ -146,19 +126,11 @@ struct SetupView: View {
         guard !started else { return }
         started = true
         page = Self.initialPage(for: env.launch.screen)
-        guard !env.launch.isUITest else { return }
-        mediaStatus = MediaLibraryImporter.isAuthorized ? .granted
-            : (MediaLibraryImporter.canRequestAccess ? .unknown : .denied)
-        Task {
-            if let sources = try? await env.libraryImporter?.folderSources() { folders = sources.map(\.displayName) }
-        }
     }
 
     /// UI tests open a page directly (`-screen setupTheme` …).
     static func initialPage(for screen: DemoScreen?) -> Page {
         switch screen {
-        case .setupPermission: .mediaPermission
-        case .setupFolders: .musicFolders
         case .setupBackup: .backupRestore
         case .setupTheme: .theme
         case .setupLibraryLayout: .libraryLayout
@@ -176,60 +148,13 @@ struct SetupView: View {
         withAnimation(.spring(response: 0.45, dampingFraction: 0.9)) { page = target }
     }
 
-    /// Android `setSetupComplete` + `onSetupComplete`: never shown again; the library scan picks up new folders.
+    /// Android `setSetupComplete` + `onSetupComplete`: never shown again.
     private func finish() {
         settings.behavior.initialSetupDone = true
-        if !didScan, !env.launch.isUITest, !folders.isEmpty || mediaStatus == .granted {
-            let library = self.library
-            Task { try? await library.refresh() }
-        }
         router.dismissCover()
     }
 
     // MARK: Steps
-
-    private func requestMediaAccess() {
-        guard !env.launch.isUITest else { return }
-        if mediaStatus == .denied {
-            if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
-            return
-        }
-        Task {
-            let granted = await MediaLibraryImporter.requestAccess()
-            withAnimation(PixlMotion.state) { mediaStatus = granted ? .granted : .denied }
-            if granted {
-                env.libraryAccessChanged()
-                didScan = false
-            }
-        }
-    }
-
-    private func addFolders(_ urls: [URL]) {
-        guard let importer = env.libraryImporter else {
-            folders.append(contentsOf: urls.map(\.lastPathComponent))
-            return
-        }
-        Task {
-            for url in urls {
-                do {
-                    let source = try await importer.addFolder(url)
-                    withAnimation(PixlMotion.state) { folders.append(source.displayName) }
-                    didScan = false
-                } catch {
-                    toast = error.localizedDescription
-                }
-            }
-        }
-    }
-
-    /// The backup's songs are matched against the library, so read it once before restoring.
-    private func scanBeforeRestore() async {
-        guard !didScan, !isScanning, !env.launch.isUITest, !folders.isEmpty || mediaStatus == .granted else { return }
-        isScanning = true
-        try? await library.refresh()
-        isScanning = false
-        didScan = true
-    }
 
     private func inspect(_ url: URL) {
         guard !isInspecting else { return }

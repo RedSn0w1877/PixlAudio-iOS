@@ -41,7 +41,6 @@ final class LibraryRevisionTests: XCTestCase {
         XCTAssertEqual(patched.songsByArtist, fresh.songsByArtist)
         XCTAssertEqual(patched.songsByGenre, fresh.songsByGenre)
         XCTAssertEqual(patched.firstArtworkByArtist, fresh.firstArtworkByArtist)
-        XCTAssertEqual(patched.folderTree, fresh.folderTree)
     }
 
     func testAHeartTapPatchesTheDetailIndexForTheNewRevision() async throws {
@@ -71,7 +70,7 @@ final class LibraryModelPatchTests: XCTestCase {
     private func inputs(_ snapshot: LibrarySnapshot, revision: Int, filter: StorageFilter) -> LibraryModel.Inputs {
         LibraryModel.Inputs(snapshot: snapshot, songSort: .songTitleZA, albumSort: .albumTitleAZ,
                             artistSort: .artistNumSongsDesc, playlistSort: .playlistNameAZ,
-                            folderSort: .folderNameAZ, likedSort: .likedSongTitleAZ,
+                            likedSort: .likedSongTitleAZ,
                             storageFilter: filter, likedAt: [:], revision: revision)
     }
 
@@ -82,16 +81,8 @@ final class LibraryModelPatchTests: XCTestCase {
         XCTAssertEqual(a.artists, b.artists, file: file, line: line)
         XCTAssertEqual(a.playlists, b.playlists, file: file, line: line)
         XCTAssertEqual(a.liked, b.liked, file: file, line: line)
-        XCTAssertEqual(a.folders, b.folders, file: file, line: line)
-        XCTAssertEqual(a.folderPlaylists, b.folderPlaylists, file: file, line: line)
-        XCTAssertEqual(a.folderRoots, b.folderRoots, file: file, line: line)
         XCTAssertEqual(a.songIds, b.songIds, file: file, line: line)
         XCTAssertEqual(a.likedIds, b.likedIds, file: file, line: line)
-        XCTAssertEqual(Set(a.folderContents.keys), Set(b.folderContents.keys), file: file, line: line)
-        for (path, contents) in a.folderContents {
-            XCTAssertEqual(contents.songs, b.folderContents[path]?.songs, file: file, line: line)
-            XCTAssertEqual(contents.subFolders, b.folderContents[path]?.subFolders, file: file, line: line)
-        }
     }
 
     func testPatchedListsEqualFreshOnesAfterHeartsPlaylistsAndPictures() {

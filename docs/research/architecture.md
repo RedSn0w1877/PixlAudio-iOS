@@ -24,7 +24,7 @@ App/
             Accounts,Spotify,YouTube,AI,Stats,Onboarding,Backup,Developer}
   Playback/ (AudioSessionController, Deck, ProcessingTap, DualDeckEngine, NowPlayingController,
              StreamingResourceLoader, SleepTimerController, PlaybackClock)
-  Library/ (FolderSources+Bookmarks, LibraryScanner, MetadataReader(AVAsset), MediaLibraryImporter, TagWriteBack)
+  Library/ (TagRegionReader, TagOverrides, HiddenSongs)  # the scanner, folder sources and tag write-back were dropped: Spotify-only
   Persistence/ (SchemaV1 @Models, PersistenceActor(@ModelActor), SnapshotLoader, MigrationPlan)
   Services/ (URLSessionHTTPClient, KeychainStore, LyricsService, YouTube/{InnerTubeService, CipherJS(JSContext),
              PoTokenWebView}, SpotifyAuth(ASWebAuthenticationSession), AIService(+FoundationModels),
@@ -55,7 +55,7 @@ docs/ (research/*, specs/karaoke-lyrics-ios.md, parity.md, test-parity.md, api-n
 remote/config.json (InnerTube client profiles, announcements; fetched from raw.githubusercontent)
 ```
 **project.yml essentials:** deploymentTarget iOS 26.1, iPhone family, local package only (CI-enforced). `SWIFT_VERSION 6`, `SWIFT_APPROACHABLE_CONCURRENCY YES`, `SPOTIFY_CLIENT_ID $(inherited)` (CI secret, overridable in-app). Targets: PixlAudio (app), PixlAudioTests, PixlAudioUITests. **No extensions.**
-**Info.plist:** `UIBackgroundModes [audio, fetch, processing]` + `BGTaskSchedulerPermittedIdentifiers`; `NSAppleMusicUsageDescription`; `NSLocalNetworkUsageDescription` (Ollama on LAN); `NSAppTransportSecurity {NSAllowsArbitraryLoads: YES, NSAllowsLocalNetworking: YES}` (user-typed AI endpoints may be HTTP; built-ins are HTTPS); `CFBundleURLTypes [pixlaudio]`; `UIFileSharingEnabled` + `LSSupportsOpeningDocumentsInPlace`; `CFBundleDocumentTypes`/`UTImportedTypeDeclarations` for audio, .lrc, .ttml, .m3u/.m3u8, .pxpl; `CADisableMinimumFrameDurationOnPhone YES` (120 Hz); `UILaunchScreen`; generated scene manifest.
+**Info.plist:** `UIBackgroundModes [audio, fetch, processing]` + `BGTaskSchedulerPermittedIdentifiers`; `NSLocalNetworkUsageDescription` (Ollama on LAN); `NSAppTransportSecurity {NSAllowsArbitraryLoads: YES, NSAllowsLocalNetworking: YES}` (user-typed AI endpoints may be HTTP; built-ins are HTTPS); `CFBundleURLTypes [pixlaudio]`; `UIFileSharingEnabled` + `LSSupportsOpeningDocumentsInPlace`; `CFBundleDocumentTypes`/`UTImportedTypeDeclarations` for audio, .lrc, .ttml, .m3u/.m3u8, .pxpl; `CADisableMinimumFrameDurationOnPhone YES` (120 Hz); `UILaunchScreen`; generated scene manifest.
 
 ## 2. Architecture
 - **State:** `AppEnvironment` built in `App.init`, passed with `.environment(...)`; small `@Observable @MainActor` stores: `LibraryStore` (snapshot + cached sorted views), `PlaybackStore` (current item, isPlaying, queue IDs, shuffle/repeat — **never position**), `PlaybackClock` (read on demand from `CMTimebaseGetTime(item.timebase)`; scrubber via `TimelineView(.periodic(by: 0.25))`, lyrics via display link), `SettingsStore` (per-category objects on UserDefaults), `AccountsStore`, `LyricsStore`. Services are actors (persistence, scanner, lyrics, YouTube, Spotify, AI, model manager, artwork cache). Playback behind `PlaybackEngine` protocol (real + `DemoPlaybackEngine` for UI tests).

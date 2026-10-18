@@ -14,18 +14,6 @@ extension L10n {
     static let setupBetaLabel = String(localized: "setup_beta_label", defaultValue: "Beta")
     static let setupIntroBody = String(localized: "setup_intro_body", defaultValue: "Let's get everything set up for you.")
 
-    static let setupPermissionMediaTitle = String(localized: "setup_permission_media_title", defaultValue: "Media Permission")
-    static let setupPermissionMediaDescription = String(localized: "setup_permission_media_description", defaultValue: "PixlAudio can play the downloaded, DRM-free songs in your music library. Allow access to add them to your library.")
-    static let setupPermissionGranted = String(localized: "setup_permission_granted", defaultValue: "Permission Granted")
-    static let setupGrantMediaPermission = String(localized: "setup_grant_media_permission", defaultValue: "Grant Media Permission")
-    static let setupPermissionDeniedHint = String(localized: "setup_permission_media_denied_hint", defaultValue: "Access was declined. You can allow it later in the Settings app; your music folders work without it.")
-
-    static let setupMusicFoldersTitle = String(localized: "setup_music_folders_title", defaultValue: "Music folders")
-    static let setupMusicFoldersDescription = String(localized: "setup_music_folders_description", defaultValue: "PixlAudio reads the music in its own folder (Files › On My iPhone › PixlAudio). Add any other folders that hold your music.")
-    static let setupChooseFolders = String(localized: "setup_choose_folders", defaultValue: "Choose folders")
-    static func setupFoldersAdded(_ a1: Int) -> String {
-        String(format: String(localized: "setup_folders_added", defaultValue: "%1$lld folders added"), a1)
-    }
     static let setupSkipForNow = String(localized: "setup_skip_for_now", defaultValue: "Skip / Not now")
 
     static let setupBackupHaveTitle = String(localized: "setup_backup_have_title", defaultValue: "Do you have a backup?")
@@ -34,7 +22,6 @@ extension L10n {
     static let setupInspectingBackup = String(localized: "setup_inspecting_backup", defaultValue: "Inspecting backup")
     static let setupCheckingBackup = String(localized: "setup_checking_backup", defaultValue: "Checking backup package…")
     static let setupRestoringBackup = String(localized: "setup_restoring_backup", defaultValue: "Restoring backup")
-    static let setupScanningLibrary = String(localized: "setup_scanning_library", defaultValue: "Reading your library first, so the backup's songs can be matched…")
 
     static let setupThemeTitle = String(localized: "setup_theme_title", defaultValue: "App Theme")
     static let setupThemeSubtitle = String(localized: "setup_theme_subtitle", defaultValue: "Pick the look you want before you start exploring your library.")

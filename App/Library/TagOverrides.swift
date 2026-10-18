@@ -1,8 +1,8 @@
 import Foundation
 
-/// A tag edit kept in the library (`TagOverrideRecord.fieldsJSON`): every non-nil field replaces what the file says.
-/// Overrides apply on every scan, before artist splitting and album grouping, so an edited artist splits and groups
-/// exactly like a tagged one. Media-library songs can only be overridden (their files are not ours to rewrite).
+/// A tag edit kept in the library (`TagOverrideRecord.fieldsJSON`): every non-nil field replaces what the library
+/// row says. Nothing is written into a file — the app is Spotify-only, so a song has no tags of its own to rewrite;
+/// the override is what the song editor saves and what a backup carries.
 nonisolated struct TagOverrideFields: Sendable, Codable, Equatable {
     var title: String?
     var artist: String?
@@ -39,18 +39,5 @@ nonisolated struct TagOverrideFields: Sendable, Codable, Equatable {
 
     static func decode(_ json: String) -> TagOverrideFields? {
         try? JSONDecoder().decode(TagOverrideFields.self, from: Data(json.utf8))
-    }
-
-    /// Applies the override to a track read from a file or the media library (idempotent).
-    func apply(to track: inout ScannedTrack) {
-        if let title, !title.isEmpty { track.title = title }
-        if let artist, !artist.isEmpty { track.artist = artist }
-        if let album, !album.isEmpty { track.album = album }
-        if let albumArtist { track.albumArtist = albumArtist.isEmpty ? nil : albumArtist }
-        if let genre { track.genre = genre.isEmpty ? nil : genre }
-        if let trackNumber { track.trackNumber = trackNumber }
-        if let discNumber { track.discNumber = discNumber > 0 ? discNumber : nil }
-        if let year { track.year = year }
-        if let artworkUri { track.artworkUri = artworkUri.isEmpty ? nil : artworkUri }
     }
 }

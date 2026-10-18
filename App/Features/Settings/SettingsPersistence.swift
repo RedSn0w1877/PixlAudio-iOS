@@ -2,15 +2,6 @@ import Foundation
 import PixlModel
 import SwiftData
 
-/// A music folder the user picked (a `FolderSourceRecord`), as a value.
-nonisolated struct MusicFolderSource: Identifiable, Hashable, Sendable {
-    let id: String
-    let displayName: String
-    let bookmark: Data
-    let isEnabled: Bool
-    let lastScanAt: Int64?
-}
-
 /// One AI request (Android `AiUsageEntity`), for the usage report.
 nonisolated struct AIUsageEntry: Identifiable, Hashable, Sendable {
     let id: String
@@ -25,25 +16,6 @@ nonisolated struct AIUsageEntry: Identifiable, Hashable, Sendable {
 
 /// Stage 7d's queries. Names carry a `settings` prefix so they never collide with other stages' extensions.
 extension PersistenceActor {
-    // MARK: Music folders (FolderSourceRecord)
-
-    func settingsFolderSources() throws -> [MusicFolderSource] {
-        try modelContext.fetch(FetchDescriptor<FolderSourceRecord>(sortBy: [SortDescriptor(\.addedAt)])).map {
-            MusicFolderSource(id: $0.id, displayName: $0.displayName, bookmark: $0.bookmark, isEnabled: $0.isEnabled,
-                              lastScanAt: $0.lastScanAt)
-        }
-    }
-
-    func settingsAddFolderSource(displayName: String, bookmark: Data, addedAt: Int64) throws {
-        modelContext.insert(FolderSourceRecord(displayName: displayName, bookmark: bookmark, addedAt: addedAt))
-        try modelContext.save()
-    }
-
-    func settingsRemoveFolderSource(id: String) throws {
-        try modelContext.delete(model: FolderSourceRecord.self, where: #Predicate { $0.id == id })
-        try modelContext.save()
-    }
-
     // MARK: Library maintenance
 
     /// Android `resetAllLyrics`: forget every stored / imported lyric.
