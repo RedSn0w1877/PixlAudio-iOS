@@ -7,6 +7,13 @@ import PixlModel
 nonisolated protocol PlayableURLResolving: Sendable {
     /// The URL to play, or nil when the song can't be played (missing file, no stream yet).
     func playableURL(for song: Song) async -> URL?
+    /// Another URL for `song` after the player failed to load `failedURL` (a matched video that cannot be streamed:
+    /// removed, region-locked, age-gated), or nil when there is nothing else to try. Asked at most once per load.
+    func recoverPlayableURL(for song: Song, afterFailedURL failedURL: URL) async -> URL?
+}
+
+extension PlayableURLResolving {
+    nonisolated func recoverPlayableURL(for song: Song, afterFailedURL failedURL: URL) async -> URL? { nil }
 }
 
 /// The default resolver: `contentUriString` when it parses as a URL with a scheme (file, ipod-library, http(s) or a

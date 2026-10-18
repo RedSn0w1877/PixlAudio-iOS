@@ -120,6 +120,8 @@ final class SpotifyService {
 
     // MARK: Launch
 
+    private static let matcherVersionKey = "spotify.matcherVersion"
+
     /// Reads the session and the stored library, then resumes unfinished matching (Android's repository `init`).
     func start() async {
         guard !isDemo else { return }
@@ -129,9 +131,14 @@ final class SpotifyService {
         publishAccount()
         await refreshLibraryState()
         // Not after an abnormal end (safe mode): "Find audio" on the dashboard, or Retry in Active jobs, starts it.
-        if pendingMatchCount > 0 {
+        // Songs the old matcher gave up on (titles with "(feat. X)" / "- 2011 Remaster" scored 0) get one more pass after
+        // the matcher improved; the version is only recorded once that pass has been started.
+        let retryVersion = 2
+        let retryUnmatched = isLoggedIn && UserDefaults.standard.integer(forKey: Self.matcherVersionKey) < retryVersion
+        if pendingMatchCount > 0 || retryUnmatched {
             if HeavyWorkGate.shared.allowsLaunchWork {
-                startMatching(retryFailed: false)
+                if retryUnmatched { UserDefaults.standard.set(retryVersion, forKey: Self.matcherVersionKey) }
+                startMatching(retryFailed: retryUnmatched)
             } else {
                 DiagnosticsLog.shared.log("safemode", "Spotify matcher held back")
             }

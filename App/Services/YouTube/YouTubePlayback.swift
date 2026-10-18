@@ -15,6 +15,10 @@ nonisolated struct StreamingPlayableURLResolver: PlayableURLResolving {
         if let cached = await cache.completeFileURL(videoId) { return cached }
         return YouTubeSongIdentity.streamURL(videoId: videoId)
     }
+
+    func recoverPlayableURL(for song: Song, afterFailedURL failedURL: URL) async -> URL? {
+        await base.recoverPlayableURL(for: song, afterFailedURL: failedURL)
+    }
 }
 
 /// Downloaded songs: `Application Support/Downloads/<videoId>.m4a` (the folder Settings › Offline storage measures).

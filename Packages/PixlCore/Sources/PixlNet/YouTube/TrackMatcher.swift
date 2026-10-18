@@ -72,7 +72,7 @@ public struct TrackMatcher: Sendable {
 
     /// `findMatch`: song searches per query (stopping early at 0.88), then the video shelf of the first query when
     /// nothing scored that high. Throws when nothing acceptable was found and a search failed.
-    public func findMatch(_ song: MatchableTrack) async throws -> TrackMatch? {
+    public func findMatch(_ song: MatchableTrack, excludingVideoIds: Set<String> = []) async throws -> TrackMatch? {
         let queries = Self.buildQueries(song)
         var best: TrackMatch?
         var lastFailure: (any Error)?
@@ -89,8 +89,8 @@ public struct TrackMatcher: Sendable {
                 lastFailure = error
                 return
             }
-            for candidate in candidates {
-                let score = Self.score(song, candidate)
+            for candidate in candidates where !excludingVideoIds.contains(candidate.videoId) {
+                let score = Self.matchScore(song, candidate)
                 if best == nil || score > best!.score {
                     best = TrackMatch(videoId: candidate.videoId, score: score, candidateTitle: candidate.title)
                 }
@@ -116,7 +116,7 @@ public struct TrackMatcher: Sendable {
     /// video search run at the same time and are judged in `findMatch`'s order with its early accept — the same
     /// result, sooner, at the cost of searches `findMatch` might have skipped. Failures count only for searches
     /// `findMatch` would have reached.
-    public func findMatchFanOut(_ song: MatchableTrack) async throws -> TrackMatch? {
+    public func findMatchFanOut(_ song: MatchableTrack, excludingVideoIds: Set<String> = []) async throws -> TrackMatch? {
         let queries = Self.buildQueries(song)
         var best: TrackMatch?
         var lastFailure: (any Error)?
@@ -126,8 +126,8 @@ public struct TrackMatcher: Sendable {
             case .failed(let error):
                 lastFailure = error
             case .results(let candidates):
-                for candidate in candidates {
-                    let score = Self.score(song, candidate)
+                for candidate in candidates where !excludingVideoIds.contains(candidate.videoId) {
+                    let score = Self.matchScore(song, candidate)
                     if best == nil || score > best!.score {
                         best = TrackMatch(videoId: candidate.videoId, score: score, candidateTitle: candidate.title)
                     }

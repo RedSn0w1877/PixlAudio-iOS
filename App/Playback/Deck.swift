@@ -49,9 +49,16 @@ final class DeckItem {
     }
 }
 
-nonisolated enum DeckItemError: Error, Equatable {
+nonisolated enum DeckItemError: LocalizedError, Equatable {
     case unresolvable(songId: String)
     case noAudioTrack(songId: String)
+
+    var errorDescription: String? {
+        switch self {
+        case .unresolvable: "no audio source was found for this song"
+        case .noAudioTrack: "the stream has no playable audio"
+        }
+    }
 }
 
 /// Builds `DeckItem`s: resolves the URL, attaches a registered streaming resource loader (stage 11's hook), loads
@@ -80,9 +87,30 @@ final class DeckItemFactory {
             throw DeckItemError.unresolvable(songId: entry.song.id)
         }
         if let timing { PlaybackStartTimings.shared.urlResolved(timing, url: url) }
-        let asset = AVURLAsset(url: url)
+        var activeURL = url
+        var asset = AVURLAsset(url: activeURL)
         streaming.attach(to: asset)
-        let tracks = try await asset.loadTracks(withMediaType: .audio)
+        let tracks: [AVAssetTrack]
+        do {
+            tracks = try await asset.loadTracks(withMediaType: .audio)
+        } catch {
+            streaming.detach(from: asset)
+            // A matched video that cannot be streamed is dropped for another candidate, once, instead of the song
+            // being skipped for good (never for a rendered override, never when cancelled).
+            guard overrideURL == nil, !Task.isCancelled, !(error is CancellationError),
+                  let recovered = await resolver.recoverPlayableURL(for: entry.song, afterFailedURL: activeURL),
+                  recovered != activeURL else { throw error }
+            if let timing { PlaybackStartTimings.shared.urlResolved(timing, url: recovered) }
+            activeURL = recovered
+            asset = AVURLAsset(url: activeURL)
+            streaming.attach(to: asset)
+            do {
+                tracks = try await asset.loadTracks(withMediaType: .audio)
+            } catch {
+                streaming.detach(from: asset)
+                throw error
+            }
+        }
         guard let track = tracks.first else {
             streaming.detach(from: asset)
             throw DeckItemError.noAudioTrack(songId: entry.song.id)
@@ -99,7 +127,7 @@ final class DeckItemFactory {
         item.audioMix = ProcessingTap.makeAudioMix(for: track, effects: effects, item: parameters)
         if let timing { PlaybackStartTimings.shared.itemBuilt(timing) }
         return DeckItem(entry: entry, playerItem: item, asset: asset, tap: parameters, durationSeconds: seconds,
-                        isLocalFile: url.isFileURL)
+                        isLocalFile: activeURL.isFileURL)
     }
 
     func discard(_ item: DeckItem) {
