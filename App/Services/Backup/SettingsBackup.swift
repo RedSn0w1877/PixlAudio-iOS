@@ -14,6 +14,18 @@ nonisolated enum SettingsBackup {
     /// Android's declared type per DataStore key (every `*PreferencesKey("…")` in the Android app).
     static let androidTypes: [String: Kind] = [
         "advanced_performance_diagnostics_enabled": .bool,
+        // iOS-only (2026-10-18): blocked artists, gestures, Music Haptics.
+        "blocked_artists_json": .string,
+        "gesture_player_artwork_swipe": .bool,
+        "gesture_player_artwork_double_tap_like": .bool,
+        "gesture_player_artwork_long_press": .bool,
+        "gesture_mini_swipe_skip": .bool,
+        "gesture_mini_swipe_up_open": .bool,
+        "gesture_mini_long_press": .bool,
+        "gesture_list_swipe_queue": .bool,
+        "music_haptics_enabled": .bool,
+        "music_haptics_strength": .int,
+        "music_haptics_mode": .string,
         "advanced_performance_diagnostics_expires_at_epoch_ms": .long,
         "advanced_performance_diagnostics_started_at_epoch_ms": .long,
         "ai_digest_mode": .string,

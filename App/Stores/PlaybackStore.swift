@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import PixlLibrary
 import PixlModel
 
 /// What is playing — never *where* in the song. Position is read on demand (`positionMs()`) from the engine's
@@ -59,8 +60,24 @@ final class PlaybackStore {
     // MARK: Commands
 
     /// Plays `songs` from `startIndex` (Android `showAndPlaySong` / `playSongs`).
-    func play(_ songs: [Song], startIndex: Int = 0, startPositionMs: Int64 = 0, playWhenReady: Bool = true) {
+    ///
+    /// Blocked artists: a list that would start on a blocked song starts on the nearest song that is not blocked
+    /// (nothing plays when every song is); `allowsBlockedStart` is "Play anyway", and a one-song list is an explicit
+    /// choice, so both play as asked.
+    func play(_ songs: [Song], startIndex: Int = 0, startPositionMs: Int64 = 0, playWhenReady: Bool = true,
+              allowsBlockedStart: Bool = false) {
         guard !songs.isEmpty else { return }
+        var startIndex = startIndex
+        if !allowsBlockedStart, songs.count > 1, !blocklist.isEmpty {
+            let list = blocklist
+            let clamped = min(max(startIndex, 0), songs.count - 1)
+            guard let first = BlockedNavigation.firstPlayable(from: clamped, count: songs.count,
+                                                              isBlocked: { list.isBlocked(songs[$0]) }) else {
+                lastError = "Every song here is by a blocked artist."
+                return
+            }
+            startIndex = first
+        }
         queue = songs
         queueRevision &+= 1
         currentIndex = min(max(startIndex, 0), songs.count - 1)
@@ -76,10 +93,26 @@ final class PlaybackStore {
     }
 
     /// Plays one song within `context` (defaults to just that song).
-    func play(_ song: Song, in context: [Song]? = nil) {
+    func play(_ song: Song, in context: [Song]? = nil, allowsBlockedStart: Bool = false) {
         let list = context ?? [song]
-        play(list, startIndex: list.firstIndex(where: { $0.id == song.id }) ?? 0)
+        play(list, startIndex: list.firstIndex(where: { $0.id == song.id }) ?? 0, allowsBlockedStart: allowsBlockedStart)
     }
+
+    // MARK: Blocked artists
+
+    /// The blocked artists (set by `AppEnvironment`; the engine skips their songs when it moves on by itself).
+    @ObservationIgnored private(set) var blocklist: BlockedArtistMatcher = .empty
+
+    /// Hands the engine the new list. A blocked song that is playing right now is left alone unless it is the
+    /// artist just blocked: then playback moves on, which is what blocking the playing artist means.
+    func setBlocklist(_ matcher: BlockedArtistMatcher) {
+        guard matcher != blocklist else { return }
+        blocklist = matcher
+        engine.setBlocklist(matcher)
+        if let current, isPlaying, matcher.isBlocked(current), remote == nil { skipToNext() }
+    }
+
+    func isBlocked(_ song: Song) -> Bool { blocklist.isBlocked(song) }
 
     func togglePlayPause() {
         guard hasItem else { return }

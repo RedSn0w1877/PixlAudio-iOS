@@ -1,4 +1,5 @@
 import Foundation
+import PixlLibrary
 import PixlModel
 
 /// What an engine reports back to `PlaybackStore`. Never position: that is read on demand (`currentPositionMs()`).
@@ -64,6 +65,8 @@ protocol PlaybackEngine: AnyObject {
     func skipToQueueItem(at index: Int)
     /// Pitch-preserving playback rate (1 = normal).
     func setPlaybackRate(_ rate: Float)
+    /// Blocked artists: the songs the engine skips when it moves on (auto-advance, next / previous, crossfade).
+    func setBlocklist(_ matcher: BlockedArtistMatcher)
 }
 
 extension PlaybackEngine {
@@ -73,4 +76,5 @@ extension PlaybackEngine {
     func removeQueueItem(at index: Int) {}
     func skipToQueueItem(at index: Int) {}
     func setPlaybackRate(_ rate: Float) {}
+    func setBlocklist(_ matcher: BlockedArtistMatcher) {}
 }

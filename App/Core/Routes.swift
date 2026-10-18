@@ -120,6 +120,9 @@ nonisolated enum AppRoute: Hashable, Sendable {
     case paletteStyle
     case experimental
     case artistSettings
+    /// Blocked artists and Gestures (iOS-first, 2026-10-18): pages of Settings › Behavior.
+    case blockedArtists
+    case gestureSettings
     case delimiterConfig
     case wordDelimiterConfig
     case equalizer
@@ -164,6 +167,8 @@ nonisolated enum AppRoute: Hashable, Sendable {
         case .paletteStyle: "paletteStyle"
         case .experimental: "experimental"
         case .artistSettings: "artistSettings"
+        case .blockedArtists: "blockedArtists"
+        case .gestureSettings: "gestureSettings"
         case .delimiterConfig: "delimiterConfig"
         case .wordDelimiterConfig: "wordDelimiterConfig"
         case .equalizer: "equalizer"

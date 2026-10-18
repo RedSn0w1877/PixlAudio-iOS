@@ -21,6 +21,8 @@ struct RouteDestination: View {
         case .paletteStyle: PaletteStyleView()
         case .experimental: ExperimentalSettingsView()
         case .artistSettings: ArtistSettingsView()
+        case .blockedArtists: BlockedArtistsView()
+        case .gestureSettings: GestureSettingsView()
         case .delimiterConfig: DelimiterConfigView()
         case .wordDelimiterConfig: WordDelimiterConfigView()
         case .equalizer: EqualizerView()

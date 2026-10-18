@@ -16,6 +16,7 @@ struct LibraryView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(LibraryStore.self) private var library
     @Environment(PlaybackStore.self) private var playback
+    @Environment(BlockedArtistsStore.self) private var blocked
     @Environment(Router.self) private var router
     @Environment(SettingsStore.self) private var settings
     @Environment(AccountsStore.self) private var accounts
@@ -264,7 +265,8 @@ struct LibraryView: View {
     /// The pages' actions, set once (they capture this view's stores and state, which live as long as it does).
     private func configureActions() {
         let prefs = self.prefs
-        actions.play = { song, list in playback.play(song, in: list) }
+        let blocked = self.blocked
+        actions.play = { song, list in blocked.playTapped(song, in: list, using: playback) }
         actions.showSongOptions = { song in router.present(AppSheet.songInfo(songId: song.id)) }
         actions.openAlbum = { album in
             // Start decoding the header's cover now, so the page's first frames have it.

@@ -16,6 +16,7 @@ struct PlayerSheetHost: View {
     @Environment(PlaybackStore.self) private var playback
     @Environment(Router.self) private var router
     @Environment(\.playerTheme) private var theme
+    @Environment(SettingsStore.self) private var settings
 
     /// Locks a drag to one axis on its first movement (vertical moves the sheet).
     @State private var dragAxis: Axis?
@@ -98,8 +99,10 @@ struct PlayerSheetHost: View {
                 let sheet = env.playerSheet
                 if dragAxis == nil {
                     dragAxis = abs(value.translation.height) >= abs(value.translation.width) ? .vertical : .horizontal
+                    // Settings › Gestures › Mini player › Swipe up to open: off, the collapsed bar ignores the drag.
                     if dragAxis == .vertical, !sheet.isScrubbing, !edgeDragActive,
-                       !(sheet.isExpanded && value.translation.height < 0) {
+                       !(sheet.isExpanded && value.translation.height < 0),
+                       sheet.isExpanded || settings.behavior.gestureMiniSwipeUpOpen {
                         sheet.beginDrag()
                     }
                 }
@@ -229,6 +232,11 @@ private struct MiniPlayerLayer: View {
 
     @Environment(AppEnvironment.self) private var env
     @Environment(PlaybackStore.self) private var playback
+    @Environment(SettingsStore.self) private var settings
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
+    /// Swipe to skip: the bar follows the finger a little and springs back.
+    @State private var dragX: CGFloat = 0
+    @State private var skipCount = 0
 
     var body: some View {
         MiniPlayerBar(song: song, isPlaying: playback.isPlaying, isPreparing: playback.isPreparing,
@@ -237,6 +245,21 @@ private struct MiniPlayerLayer: View {
                       onPrevious: { playback.skipToPrevious() },
                       onPlayPause: { playback.togglePlayPause() },
                       onNext: { playback.skipToNext() })
+            .offset(x: dragX)
+            .horizontalSwipe(isEnabled: settings.behavior.gestureMiniSwipeSkip && !voiceOver, onChange: { dx in
+                dragX = CGFloat(GesturePolicy.rubberBand(Double(dx), limit: 36))
+            }, onEnd: { direction in
+                withAnimation(PixlMotion.state) { dragX = 0 }
+                guard let direction else { return }
+                skipCount += 1
+                if direction == .left { playback.skipToNext() } else { playback.skipToPrevious() }
+            })
+            .songQuickActions(song: song, isEnabled: settings.behavior.gestureMiniLongPress)
+            .pixlHaptic(.impact(weight: .medium), trigger: skipCount)
+            .accessibilityActions {
+                Button("Next song") { playback.skipToNext() }
+                Button("Previous song") { playback.skipToPrevious() }
+            }
             .modifier(MiniLayerFade())
             // Build the full player while nothing moves, a second after the mini player appears (not inside its own
             // appear animation): the first expand then only animates.

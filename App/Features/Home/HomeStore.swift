@@ -71,6 +71,24 @@ final class HomeStore {
     /// set by `AppEnvironment` (nil / 0.25 for previews).
     @ObservationIgnored var taste: MusicTasteStore?
     @ObservationIgnored var explorationFraction: () -> Float = { 0.25 }
+    /// Blocked artists: their songs are left out of every mix, shelf and list Home computes.
+    @ObservationIgnored private(set) var blockedMatcher: BlockedArtistMatcher = .empty
+    @ObservationIgnored private var blockedRevision = 0
+
+    /// Settings › Blocked artists changed: the next `refresh` recomputes without those songs.
+    func setBlocked(_ matcher: BlockedArtistMatcher) {
+        guard matcher != blockedMatcher else { return }
+        blockedMatcher = matcher
+        blockedRevision &+= 1
+    }
+
+    /// `snapshot` without the blocked artists' songs (the same value when nothing is blocked).
+    private func unblocked(_ snapshot: LibrarySnapshot) -> LibrarySnapshot {
+        guard !blockedMatcher.isEmpty else { return snapshot }
+        var copy = snapshot
+        copy.songs = blockedMatcher.allowed(snapshot.songs)
+        return copy
+    }
 
     /// What a computation depends on; a refresh with the same key is skipped (Android throttles repeat passes).
     /// The library by its revision (comparing two snapshots walked the whole library on the main actor).
@@ -81,11 +99,12 @@ final class HomeStore {
         var tasteRevision: Int
         var exploration: Float
         var learning: Bool
+        var blocked = 0
 
         /// The same library, day and taste: only the listening history moved.
         func onlyHistoryDiffers(from other: Key) -> Bool {
             revision != other.revision && libraryRevision == other.libraryRevision && epochDay == other.epochDay
-                && tasteRevision == other.tasteRevision && exploration == other.exploration
+                && tasteRevision == other.tasteRevision && exploration == other.exploration && blocked == other.blocked
                 && learning == other.learning
         }
     }
@@ -113,6 +132,7 @@ final class HomeStore {
     /// Recomputes when the library (`libraryRevision`), the history or the day changed (`force` = the refresh
     /// button).
     func refresh(snapshot: LibrarySnapshot, libraryRevision: Int, force: Bool = false) async {
+        let snapshot = unblocked(snapshot)
         await history.ensureLoaded()
         await taste?.ensureLoaded()
         let clock = history.clock
@@ -121,7 +141,8 @@ final class HomeStore {
         let signals = taste?.learnedSignals ?? [:]
         let exploration = explorationFraction()
         let key = Key(libraryRevision: libraryRevision, revision: history.revision, epochDay: epochDay,
-                      tasteRevision: taste?.revision ?? 0, exploration: exploration, learning: !signals.isEmpty)
+                      tasteRevision: taste?.revision ?? 0, exploration: exploration, learning: !signals.isEmpty,
+                      blocked: blockedRevision)
         if !force, key == lastKey { return }
         // A finished song or skip changes only the history: wait until the skip, the carousel and the re-theme are
         // done before the (cancellable) recomputation starts. A newer change cancels this task during the wait.
@@ -217,6 +238,7 @@ final class HomeStore {
 
     /// Android `regenerateYourMix`: a fresh, non-day-seeded draw, so repeated taps give a different mix.
     func regenerateYourMix(snapshot: LibrarySnapshot) async {
+        let snapshot = unblocked(snapshot)
         await history.ensureLoaded()
         await taste?.ensureLoaded()
         let events = history.events
@@ -249,6 +271,7 @@ final class HomeStore {
     /// Music intelligence › Preview recommendations (Android `MusicIntelligenceViewModel.preview`): ranks the real
     /// library with the real inputs — playback and the queue are untouched — and saves the report.
     func previewRecommendations(snapshot: LibrarySnapshot) async {
+        let snapshot = unblocked(snapshot)
         await history.ensureLoaded()
         await taste?.ensureLoaded()
         let events = history.events
@@ -275,7 +298,8 @@ final class HomeStore {
 
     /// Stage 13: an AI-curated mix replaces today's Daily Mix (Android `DailyMixStateHolder.setDailyMixSongs`):
     /// shown at once and saved as today's picks.
-    func setDailyMix(_ songs: [Song]) {
+    func setDailyMix(_ allSongs: [Song]) {
+        let songs = blockedMatcher.allowed(allSongs)
         content.dailyMix = songs
         defaults?.set(songs.map(\.id), forKey: PreferenceKeys.dailyMixSongIds)
         defaults?.set(Double(history.clock.nowMs()), forKey: PreferenceKeys.lastDailyMixUpdate)

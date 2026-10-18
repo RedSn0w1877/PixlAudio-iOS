@@ -102,7 +102,16 @@ public enum AndroidPreferenceCatalog {
     /// iOS → Android → iOS round trip untouched. A backup without them (older iOS backups, Android backups) restores
     /// cleanly: the global-settings restore clears them like every portable key, so the iOS default comes back.
     /// - `accent_color_v1`: Settings › Appearance › Accent Color, a `"#RRGGBB"` string (`""` = PixlAudio's violet).
-    public static let iosOnly: [String] = ["accent_color_v1"]
+    public static let iosOnly: [String] = [
+        "accent_color_v1",
+        // Blocked artists (Settings › Behavior › Blocked artists): a JSON array string.
+        "blocked_artists_json",
+        // Gestures (Settings › Behavior › Gestures): one switch each.
+        "gesture_player_artwork_swipe", "gesture_player_artwork_double_tap_like", "gesture_player_artwork_long_press",
+        "gesture_mini_swipe_skip", "gesture_mini_swipe_up_open", "gesture_mini_long_press", "gesture_list_swipe_queue",
+        // Music Haptics (Settings › Behavior › Music Haptics).
+        "music_haptics_enabled", "music_haptics_strength", "music_haptics_mode",
+    ]
 
     /// Never exported or imported (`backupExcludedKeyNames`).
     public static let backupExcludedKeys: Set<String> = ["initial_setup_done"]

@@ -19,7 +19,7 @@ allowed_imports=(
   UniformTypeIdentifiers Security CryptoKit LocalAuthentication SwiftData CoreData Combine Charts
   FoundationModels NaturalLanguage Translation CoreML Vision Speech SoundAnalysis
   AuthenticationServices SafariServices WebKit JavaScriptCore Network BackgroundTasks AppIntents
-  Compression CoreHaptics CoreTransferable LinkPresentation PhotosUI Photos StoreKit TipKit
+  Compression CoreHaptics CallKit CoreTransferable LinkPresentation PhotosUI Photos StoreKit TipKit
   SystemConfiguration UserNotifications ActivityKit CoreSpotlight MobileCoreServices GameController MetricKit
 )
 

@@ -82,6 +82,15 @@ struct RootView: View {
             if !builtTabs.contains(tab) { builtTabs.insert(tab) }
         }
         .task { await prebuildHiddenTabs() }
+        // Blocked artists: a tap on a blocked song asks first (it is never played by itself).
+        .confirmationDialog("Blocked artist", isPresented: Binding(get: { settings.blocked.pendingPlay != nil },
+                                                                   set: { if !$0 { settings.blocked.cancelPendingPlay() } }),
+                            titleVisibility: .visible, presenting: settings.blocked.pendingPlay) { pending in
+            Button("Play anyway") { settings.blocked.confirmPlay(pending, using: playback) }
+            Button("Cancel", role: .cancel) {}
+        } message: { pending in
+            Text("\(pending.song.title) is by an artist you blocked, so it is skipped when music plays by itself.")
+        }
         .background { LagContextReporter() }
         // Settings › Appearance › Accent Color: UIKit-presented controls (alerts, dialogs, menus) follow the window's
         // tint. The accent snaps (no animation: the root `.animation` is keyed to the album colours only).

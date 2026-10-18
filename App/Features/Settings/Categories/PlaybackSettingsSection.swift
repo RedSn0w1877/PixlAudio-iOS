@@ -1,3 +1,4 @@
+import PixlAudioCore
 import SwiftUI
 
 /// Settings › Playback (Android `SettingsCategoryScreen` PLAYBACK): background playback, ReplayGain, volume,
@@ -90,21 +91,91 @@ struct PlaybackSettingsSection: View {
     }
 }
 
-/// Settings › Behavior (Android `SettingsCategoryScreen` BEHAVIOR): player gestures, haptics.
+/// Settings › Behavior (Android `SettingsCategoryScreen` BEHAVIOR): player gestures, haptics. iOS-first additions
+/// (2026-10-18): the Gestures page, Blocked artists and Music Haptics.
 struct BehaviorSettingsSection: View {
     @Environment(SettingsStore.self) private var settings
+    @Environment(AppEnvironment.self) private var env
+    @Environment(BlockedArtistsStore.self) private var blocked
+    @Environment(Router.self) private var router
+    @State private var strength: Double = 100
 
     var body: some View {
         @Bindable var behavior = settings.behavior
+        let haptics = env.musicHaptics
         SettingsCategoryScaffold(category: .behavior) {
             SettingsSubsection(title: L10n.settingsPlayerGesturesSection) {
                 SwitchSettingRow(title: L10n.settingsTapBgClosesTitle, subtitle: L10n.settingsTapBgClosesSubtitle,
                                  isOn: $behavior.tapBackgroundClosesPlayer, systemImage: "hand.tap")
+                SettingsItemRow(title: "Gestures", subtitle: gesturesSubtitle, systemImage: "hand.draw",
+                                showsChevron: true, identifier: "settings.behavior.gestures") {
+                    router.push(.gestureSettings)
+                }
             }
-            SettingsSubsection(title: L10n.settingsHapticsSection, addBottomSpace: false) {
+            SettingsSubsection(title: "Blocked artists") {
+                SettingsItemRow(title: "Blocked artists", subtitle: blockedSubtitle, systemImage: "nosign",
+                                showsChevron: true, identifier: "settings.behavior.blockedArtists") {
+                    router.push(.blockedArtists)
+                }
+            }
+            SettingsSubsection(title: L10n.settingsHapticsSection, addBottomSpace: haptics.isSupported) {
                 SwitchSettingRow(title: L10n.settingsHapticFeedbackTitle, subtitle: L10n.settingsHapticFeedbackSubtitle,
                                  isOn: $behavior.hapticsEnabled, systemImage: "hand.tap")
             }
+            if haptics.isSupported {
+                SettingsSubsection(title: "Music Haptics", addBottomSpace: false) {
+                    SwitchSettingRow(title: "Music Haptics",
+                                     subtitle: "Feel the beat: the Taptic Engine plays along with the music.",
+                                     isOn: $behavior.musicHapticsEnabled, systemImage: "waveform.path")
+                    if behavior.musicHapticsEnabled {
+                        SliderSettingRow(label: "Strength", value: $strength, range: 20...200, steps: 17,
+                                         onCommit: { behavior.musicHapticsStrength = Int(strength) },
+                                         valueText: { "\(Int($0))%" })
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                        ThemeSelectorRow(label: "Follows", description: "What the haptics follow in the music.",
+                                         options: [SettingsOption(key: "everything", label: "Everything"),
+                                                   SettingsOption(key: "beat", label: "Beat"),
+                                                   SettingsOption(key: "bass", label: "Bass")],
+                                         selectedKey: behavior.musicHapticsMode.rawValue, systemImage: "waveform") { key in
+                            behavior.musicHapticsMode = MusicHapticsMode(rawValue: key) ?? .everything
+                        }
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+                    statusRow(haptics.status)
+                }
+            }
+        }
+        .animation(PixlMotion.state, value: behavior.musicHapticsEnabled)
+        .onAppear { strength = Double(behavior.musicHapticsStrength) }
+    }
+
+    /// The status line: On / Off / Not available, with the reason when something blocks it.
+    private func statusRow(_ status: MusicHapticsStatus) -> some View {
+        SettingsItemRow(title: "Status", subtitle: statusText(status), systemImage: "info.circle",
+                        identifier: "settings.musicHaptics.status") {}
+            .allowsHitTesting(false)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("settings.musicHaptics.status")
+    }
+
+    private func statusText(_ status: MusicHapticsStatus) -> String {
+        if let reason = status.reason { return "\(status.title) · \(reason.rawValue)" }
+        return status.title
+    }
+
+    private var gesturesSubtitle: String {
+        let b = settings.behavior
+        let on = [b.gesturePlayerArtworkSwipe, b.gesturePlayerArtworkDoubleTapLike, b.gesturePlayerArtworkLongPress,
+                  b.gestureMiniSwipeSkip, b.gestureMiniSwipeUpOpen, b.gestureMiniLongPress, b.gestureListSwipeQueue]
+            .filter { $0 }.count
+        return "\(on) of 7 on"
+    }
+
+    private var blockedSubtitle: String {
+        switch blocked.count {
+        case 0: "No blocked artists"
+        case 1: "1 blocked artist"
+        default: "\(blocked.count) blocked artists"
         }
     }
 }

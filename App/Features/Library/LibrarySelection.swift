@@ -65,7 +65,7 @@ extension PlaybackStore {
     /// Plays a shuffled copy (Android `playSongsShuffled(startAtZero = true)`).
     func playShuffled(_ songs: [Song]) {
         guard !songs.isEmpty else { return }
-        play(QueueUtils.fisherYatesCopy(songs))
+        play(QueueUtils.fisherYatesCopy(blocklist.allowed(songs)))
     }
 
     // `playNext` / `addToQueue` are native engine inserts on `PlaybackStore` (stage 5).

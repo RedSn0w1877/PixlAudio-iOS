@@ -18,10 +18,13 @@ struct PlaylistDetailView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(LibraryStore.self) private var library
     @Environment(PlaybackStore.self) private var playback
+    @Environment(BlockedArtistsStore.self) private var blocked
     @Environment(Router.self) private var router
     @Environment(\.appTheme) private var theme
 
     @State private var songs: [Song] = []
+    /// Find in playlist: pull the list down past its top (or More options › Find in playlist).
+    @State private var find = ListFindModel()
     @State private var sortOption: SortOption = .songDefaultOrder
     @State private var isReorderMode = false
     @State private var isRemoveMode = false
@@ -52,6 +55,10 @@ struct PlaylistDetailView: View {
     var body: some View {
         let playlist = self.playlist
         VStack(spacing: 0) {
+            if find.isOpen {
+                ListFindField(model: find)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
             DetailTopBar(title: playlist?.name ?? "Playlist",
                          subtitle: "\(LibraryFormat.songCount(songs.count)) • \(LibraryFormat.totalDuration(songs))",
                          onBack: { router.pop() }) {
@@ -76,8 +83,10 @@ struct PlaylistDetailView: View {
                 PlaylistLyricSyncSection(playlistId: playlistId, songs: songs)
                 if songs.isEmpty {
                     emptyState
+                } else if find.hasNoMatches {
+                    ListFindNoMatches(query: find.query)
                 } else {
-                    songList
+                    songList(find.isOpen ? (find.results ?? songs) : songs)
                 }
             }
         }
@@ -87,6 +96,7 @@ struct PlaylistDetailView: View {
         .onChange(of: Inputs(songIds: playlist?.songIds ?? [], librarySongCount: library.songs.count, sort: sortOption),
                   initial: true) { _, inputs in
             songs = orderedSongs(inputs)
+            find.setSongs(songs)
         }
         .onAppear {
             applyLaunchState()
@@ -181,10 +191,12 @@ struct PlaylistDetailView: View {
                                      foreground: theme.onTertiaryContainer) { showsAddSongs = true }
                     .accessibilityIdentifier("playlist.add")
                 modeButton("Remove", systemImage: "minus.circle", isOn: isRemoveMode) {
+                    find.close()
                     withAnimation(PixlMotion.state) { isRemoveMode.toggle() }
                 }
                 .accessibilityIdentifier("playlist.remove")
                 modeButton("Reorder", systemImage: "arrow.up.arrow.down", isOn: isReorderMode) {
+                    find.close()
                     withAnimation(PixlMotion.state) { isReorderMode.toggle() }
                 }
                 .accessibilityIdentifier("playlist.reorder")
@@ -225,20 +237,21 @@ struct PlaylistDetailView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var songList: some View {
+    private func songList(_ list: [Song]) -> some View {
         let panel = UnevenRoundedRectangle(topLeadingRadius: 32, bottomLeadingRadius: 0, bottomTrailingRadius: 0,
                                            topTrailingRadius: 32, style: .continuous)
         return ScrollView {
             LazyVStack(spacing: 8) {
-                ForEach(songs) { song in
+                ForEach(list) { song in
                     PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
                         PlaylistSongRow(song: song, isCurrent: isCurrent, isPlaying: isPlaying,
                                         showsDragHandle: isReorderMode,
                                         showsRemove: isRemoveMode,
-                                        onTap: { playback.play(song, in: songs) },
+                                        onTap: { blocked.playTapped(song, in: list, using: playback) },
                                         onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
                                         onRemove: { env.libraryEditor.removeSong(song.id, fromPlaylist: playlistId) })
                     }
+                    .swipeToQueue(song: song, isEnabled: !isReorderMode && !isRemoveMode)
                     .dropDestination(for: String.self) { items, _ in
                         move(items.first, onto: song.id)
                     }
@@ -250,9 +263,26 @@ struct PlaylistDetailView: View {
             .padding(.bottom, 16 + max(bottomInset, playback.miniPlayerClearance))
         }
         .scrollIndicators(.hidden)
+        // Pulling down past the top reveals Find in playlist; it bounces even when the list is shorter than the page.
+        .scrollBounceBehavior(.always, axes: .vertical)
+        .scrollDismissesKeyboard(.interactively)
+        .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { _, offset in
+            scrolled(to: offset)
+        }
+        .accessibilityAction(named: "Find in playlist") { withAnimation(PixlMotion.state) { find.open() } }
         .background(panel.fill(theme.surfaceContainerHigh))
         .clipShape(panel)
         .ignoresSafeArea(edges: .bottom)
+    }
+
+    /// The list was pulled down past its top: reveal the find field. It goes away again when the list is scrolled
+    /// up with nothing typed (a query keeps it until Cancel, so the results stay reachable).
+    private func scrolled(to offset: CGFloat) {
+        if offset < -72, !find.isOpen, !isReorderMode, !isRemoveMode {
+            withAnimation(PixlMotion.state) { find.open() }
+        } else if offset > 60, find.isOpen, find.query.isEmpty {
+            withAnimation(PixlMotion.state) { find.close() }
+        }
     }
 
     /// Drop of a dragged song onto another row (Android `ReorderableItem` → `savePlaylistSongOrder`). The playlist
@@ -277,6 +307,7 @@ struct PlaylistDetailView: View {
     @ViewBuilder
     private var optionsMenu: some View {
         Section {
+            Button("Find in playlist", systemImage: "magnifyingglass") { withAnimation(PixlMotion.state) { find.open() } }
             Button("Edit playlist", systemImage: "pencil") { router.push(.playlistEditor(playlistId: playlistId)) }
             Button("Set default transition", systemImage: "point.topleft.down.to.point.bottomright.curvepath") {
                 router.push(.editTransition(playlistId: playlistId))
@@ -356,6 +387,12 @@ struct PlaylistDetailView: View {
         switch env.launch.screen {
         case .playlistAddSongs?: showsAddSongs = true
         case .playlistOptions?: showsOptions = true
+        case .playlistFind?, .playlistFindEmpty?:
+            // UI tests: the field open on a query ('sora' matches three songs, 'zzz' none).
+            let base = songs.isEmpty ? orderedSongs(Inputs(songIds: playlist?.songIds ?? [], librarySongCount: library.songs.count, sort: sortOption)) : songs
+            find.setSongs(base)
+            find.open()
+            find.query = env.launch.screen == .playlistFind ? "sora" : "zzz"
         case .playlistReorder?:
             isReorderMode = true
             isRemoveMode = true

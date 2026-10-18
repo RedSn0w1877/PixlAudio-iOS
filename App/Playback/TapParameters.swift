@@ -86,6 +86,8 @@ nonisolated final class AudioEffectsParameters: @unchecked Sendable {
     let allowReplayGainBoost = Atomic<Bool>(false)
     /// The rate the published coefficients were designed for.
     let designSampleRate = AtomicDouble(44_100)
+    /// Music Haptics: the shared signal the taps publish onsets and the bass level to (inactive unless switched on).
+    let haptics = HapticSignalBus()
 
     init() {
         blocks = .allocate(capacity: Self.blockSize * Self.slotCount)

@@ -76,6 +76,8 @@ final class AppEnvironment {
     let activeJobs: ActiveJobs
     /// Crash protection and diagnostics: how the last run ended, safe mode, memory / thermal conditions, the event log.
     let health: AppHealth
+    /// Music Haptics (iOS-first, 2026-10-18): the Taptic Engine plays along with the music while the switch is on.
+    let musicHaptics: MusicHapticsController
 
     init(launch: LaunchConfiguration) {
         self.launch = launch
@@ -101,6 +103,8 @@ final class AppEnvironment {
         self.persistence = persistence
         let settings = isUITest ? SettingsStore.ephemeral() : SettingsStore()
         self.settings = settings
+        // Blocked-artist demo states (UI tests): the artists the screenshots show as blocked.
+        if isUITest { Self.seedBlockedDemo(settings.blocked, screen: launch.screen) }
         // The previous run died with the downloaded AI model loaded or writing: it stays off until the person turns it on
         // again, so a crash loop cannot repeat.
         if health.localModelBlamed, settings.ai.useDownloadedModel {
@@ -249,10 +253,38 @@ final class AppEnvironment {
             ? ActiveJobsDemo.make(launch: launch)
             : ActiveJobs(sources: ActiveJobs.Sources(library: library, spotify: spotify, downloads: youtube.downloads,
                                                      models: tais.models, studio: tais.studio, cloud: cloud, health: health))
+        musicHaptics = MusicHapticsController(behavior: settings.behavior, playback: playback, health: health,
+                                              bus: playbackServices?.engine.effects.haptics, isDemo: isUITest)
         wireHealth(health)
+        wireBlockedArtists(settings.blocked)
         // A tap on "Your instrumentals are ready" opens the Cloud queue (the notification centre's delegate is set
         // here, early: a launch from the notification reaches it before `start()`).
         if !isUITest { cloud.installNotificationRouting(router: router) }
+    }
+
+    /// `-screen playlistBlocked` blocks Pixel Parade (two songs of "Late Night Drive"); `blockedArtists` lists three.
+    private static func seedBlockedDemo(_ blocked: BlockedArtistsStore, screen: DemoScreen?) {
+        let names: [String]
+        switch screen {
+        case .playlistBlocked?: names = ["Pixel Parade"]
+        case .blockedArtists?: names = ["Pixel Parade", "The Quiet Arcade", "Hollow Pines"]
+        default: return
+        }
+        for artist in DemoLibrary.snapshot.artists where names.contains(artist.name) {
+            blocked.block(artistId: artist.id, name: artist.name)
+        }
+    }
+
+    /// Blocked artists: the engine skips their songs when it moves on, Home leaves them out of its mixes and lists.
+    private func wireBlockedArtists(_ blocked: BlockedArtistsStore) {
+        let playback = self.playback, home = self.home, library = self.library
+        playback.setBlocklist(blocked.matcher)
+        home.setBlocked(blocked.matcher)
+        blocked.onChange = { matcher in
+            playback.setBlocklist(matcher)
+            home.setBlocked(matcher)
+            Task { await home.refresh(snapshot: library.snapshot, libraryRevision: library.songsRevision) }
+        }
     }
 
     /// How many heavy jobs run and how many wait (lyric sync, separation, a model install), for Diagnostics.
@@ -305,6 +337,7 @@ final class AppEnvironment {
         playbackServices?.start()
         youtube.start()
         activeJobs.start()
+        musicHaptics.start()
         tais.start()
         automaticStudio.start()
         let library = self.library, playback = self.playback
