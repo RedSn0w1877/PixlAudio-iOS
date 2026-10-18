@@ -106,16 +106,114 @@ nonisolated struct SpotifyPlayableURLResolver: PlayableURLResolving {
         return await bridge.playableURL(videoId: videoId, base: base)
     }
 
+    /// Another video for the song after the player could not load `failedURL`: that video is set aside for half an
+    /// hour, the next-best search candidate replaces it (once found, for good), and the player retries with it.
+    /// Nil when the failure was not a matched video, or no other acceptable candidate exists.
+    func recoverPlayableURL(for song: Song, afterFailedURL failedURL: URL) async -> URL? {
+        guard let spotifyId = Self.spotifyId(of: song),
+              let failedVideoId = YouTubeSongIdentity.videoId(from: failedURL) else {
+            return await base.recoverPlayableURL(for: song, afterFailedURL: failedURL)
+        }
+        let coordinator = SpotifyMatchCoordinator.shared
+        await coordinator.exclude(videoId: failedVideoId, for: spotifyId)
+        guard let videoId = await videoId(for: spotifyId), videoId != failedVideoId,
+              CloudStreamSecurity.validateYouTubeVideoId(videoId) else { return nil }
+        return await bridge.playableURL(videoId: videoId, base: base)
+    }
+
     func videoId(for spotifyId: String) async -> String? {
-        if let stored = try? await persistence.matchedVideoId(spotifyId: spotifyId) { return stored }
-        guard let record = try? await persistence.spotifySong(spotifyId: spotifyId), record.matchState != .manual else { return nil }
+        let coordinator = SpotifyMatchCoordinator.shared
+        let excluded = await coordinator.excludedIds(for: spotifyId)
+        if let stored = try? await persistence.matchedVideoId(spotifyId: spotifyId), !excluded.contains(stored) { return stored }
+        return await coordinator.match(spotifyId: spotifyId) { await rematch(spotifyId: spotifyId, excluding: excluded) }
+    }
+
+    private func rematch(spotifyId: String, excluding excluded: Set<String>) async -> SpotifyMatchCoordinator.Outcome {
+        guard let record = try? await persistence.spotifySong(spotifyId: spotifyId) else { return .failed }
+        if record.matchState == .manual { return .failed }
         let matcher = TrackMatcher(search: bridge.search)
         let track = record.matchable
         // Streaming speed R11: on the play-time path the searches after the first run at once (same result as the
         // background matcher's sequential `findMatch`, sooner).
-        guard let found = try? await withTimeout(seconds: Self.onDemandMatchTimeoutSeconds, { try await matcher.findMatchFanOut(track) }),
-              let match = found else { return nil }
-        try? await persistence.updateAutomaticMatch(spotifyId: spotifyId, videoId: match.videoId, score: match.score, state: .matched)
-        return (try? await persistence.matchedVideoId(spotifyId: spotifyId)) ?? match.videoId
+        let found: TrackMatch??
+        do {
+            found = try await withTimeout(seconds: Self.onDemandMatchTimeoutSeconds, {
+                try await matcher.findMatchFanOut(track, excludingVideoIds: excluded)
+            })
+        } catch {
+            return .failed
+        }
+        // A timeout or a failed search is not "no match": only a finished search that found nothing is remembered.
+        guard let found else { return .failed }
+        guard let match = found else { return .none }
+        if excluded.isEmpty {
+            try? await persistence.updateAutomaticMatch(spotifyId: spotifyId, videoId: match.videoId, score: match.score, state: .matched)
+            return .found((try? await persistence.matchedVideoId(spotifyId: spotifyId)) ?? match.videoId)
+        }
+        try? await persistence.replaceAutomaticMatch(spotifyId: spotifyId, videoId: match.videoId, score: match.score)
+        return .found(match.videoId)
+    }
+}
+
+/// Play-time matching bookkeeping shared by the engine and the prefetcher (Android `SpotifyStreamProxy` match locks
+/// and `noMatchUntil`): one search per song at a time, a finished search that found nothing is not repeated for ten
+/// minutes, and a video the player could not load is set aside for half an hour (memory only: YouTube's blocks
+/// change, so the video gets another chance after that and after a relaunch).
+actor SpotifyMatchCoordinator {
+    nonisolated enum Outcome: Sendable {
+        case found(String)
+        /// The search finished without an acceptable candidate.
+        case none
+        /// Timeout, network trouble or an unknown song: try again next time.
+        case failed
+    }
+
+    static let shared = SpotifyMatchCoordinator()
+    static let exclusionTTL: Duration = .seconds(30 * 60)
+    static let noMatchTTL: Duration = .seconds(10 * 60)
+    private static let maxEntries = 400
+
+    private var excluded: [String: [String: ContinuousClock.Instant]] = [:]
+    private var noMatchUntil: [String: ContinuousClock.Instant] = [:]
+    private var inFlight: [String: Task<Outcome, Never>] = [:]
+
+    func exclude(videoId: String, for spotifyId: String) {
+        if excluded.count > Self.maxEntries { excluded = excluded.filter { !$0.value.values.allSatisfy { $0 <= ContinuousClock.now } } }
+        excluded[spotifyId, default: [:]][videoId] = ContinuousClock.now.advanced(by: Self.exclusionTTL)
+        noMatchUntil[spotifyId] = nil
+    }
+
+    func excludedIds(for spotifyId: String) -> Set<String> {
+        guard var entries = excluded[spotifyId] else { return [] }
+        let now = ContinuousClock.now
+        entries = entries.filter { $0.value > now }
+        excluded[spotifyId] = entries.isEmpty ? nil : entries
+        return Set(entries.keys)
+    }
+
+    func match(spotifyId: String, work: @escaping @Sendable () async -> Outcome) async -> String? {
+        if let until = noMatchUntil[spotifyId] {
+            if ContinuousClock.now < until { return nil }
+            noMatchUntil[spotifyId] = nil
+        }
+        let task: Task<Outcome, Never>
+        if let running = inFlight[spotifyId] {
+            task = running
+        } else {
+            task = Task { await work() }
+            inFlight[spotifyId] = task
+        }
+        let outcome = await task.value
+        inFlight[spotifyId] = nil
+        switch outcome {
+        case .found(let id):
+            return id
+        case .none:
+            if noMatchUntil.count > Self.maxEntries { noMatchUntil = noMatchUntil.filter { $0.value > ContinuousClock.now } }
+            noMatchUntil[spotifyId] = ContinuousClock.now.advanced(by: Self.noMatchTTL)
+            return nil
+        case .failed:
+            return nil
+        }
     }
 }

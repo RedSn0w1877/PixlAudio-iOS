@@ -36,6 +36,9 @@ struct LyricsArtworkBackground: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var sets: [String: LyricsSpriteSet] = [:]
     @State private var clock: LyricsBackgroundClock?
+    /// Bumped when a bake finishes or the timeline pauses: the clock is a plain class (the timeline drives redraws), so
+    /// while the timeline is paused (Low Power Mode, a transition) nothing else tells SwiftUI the sprites arrived.
+    @State private var revision = 0
     @State private var size: CGSize = .zero
 
     private var loadKey: String {
@@ -43,6 +46,7 @@ struct LyricsArtworkBackground: View {
     }
 
     var body: some View {
+        let _ = revision
         ZStack {
             Color.black
             if let clock, size.width > 0 {
@@ -57,12 +61,20 @@ struct LyricsArtworkBackground: View {
         .onAppear {
             if clock == nil { clock = LyricsBackgroundClock(reducedMotion: reduceMotion) }
         }
+        .onChange(of: paused) { _, isPaused in
+            // A fade cut short by pausing would stay at alpha 0 until the timeline runs again.
+            if isPaused {
+                clock?.motion.finishFade()
+                revision &+= 1
+            }
+        }
         .task(id: loadKey) { await load() }
         .accessibilityHidden(true)
         .longRunning("lyrics.artworkBackground (30 fps timeline)", active: !paused && clock != nil)
     }
 
     @ViewBuilder private func frame(clock: LyricsBackgroundClock) -> some View {
+        let _ = revision
         let motion = clock.motion
         let alphas = motion.setAlphas
         ZStack {
@@ -119,7 +131,13 @@ struct LyricsArtworkBackground: View {
             image = ArtworkImage(cgImage: overrideImage)
             key = "override"
         } else if let artSource {
-            image = await ArtworkPipeline.shared.image(artSource, pixelSize: ArtworkSprites.artTexels)
+            // The baker shrinks any image to `artTexels` (96), but 96 is not one of the pipeline's cached sizes: asking
+            // for it missed both caches and downloaded the cover again. Use what is decoded already, else a cached size.
+            if let cached = ArtworkPipeline.shared.cachedImageOrVariant(artSource, pixelSize: ArtworkSprites.artTexels) {
+                image = cached
+            } else {
+                image = await ArtworkPipeline.shared.image(artSource, pixelSize: ArtworkPipeline.displayBuckets.first ?? ArtworkSprites.artTexels)
+            }
             key = artSource.cacheKey
         } else {
             image = nil
@@ -141,6 +159,7 @@ struct LyricsArtworkBackground: View {
             sets = sets.filter { keep.contains($0.key) }
         }
         if paused { clock?.motion.finishFade() }
+        revision &+= 1
         onBrightArtChange(set?.isBright ?? false)
     }
 }

@@ -114,8 +114,9 @@ public enum InnerTubeParsing {
         let title = titleRuns.joined()
         if NetText.isBlank(title) { return nil }
 
-        // The second column is "Artist • Album • 3:07" split into runs; separators arrive as lone "•" runs.
-        let details = (columnTexts.count > 1 ? columnTexts[1] : []).map(NetText.trim).filter { !NetText.isBlank($0) && $0 != "•" }
+        // The second column is "Artist • Album • 3:07" split into runs; separators arrive as lone "•" runs. Only those
+        // split the segments: "Lady Gaga", " & ", "Bruno Mars" are one artist credit, not three details.
+        let details = splitBulletSegments(columnTexts.count > 1 ? columnTexts[1] : [])
         let duration = details.lazy.compactMap(parseDurationSeconds).first
         let meaningful = details.filter { parseDurationSeconds($0) == nil }
         let withoutType = meaningful.filter { !NetText.equalsIgnoreCase($0, "Song") && !NetText.equalsIgnoreCase($0, "Video") }
@@ -146,6 +147,24 @@ public enum InnerTubeParsing {
         }
         return YouTubeSearchResult(videoId: videoId, title: title, artist: withoutType.first ?? "", album: album,
                                    durationSeconds: duration, thumbnailUrl: thumbnailUrl)
+    }
+
+    /// Joins the runs between "•" separators ("Lady Gaga" + " & " + "Bruno Mars" -> "Lady Gaga & Bruno Mars").
+    static func splitBulletSegments(_ runs: [String]) -> [String] {
+        var segments: [String] = []
+        var current = ""
+        for run in runs {
+            if NetText.trim(run) == "•" {
+                let segment = NetText.trim(current)
+                if !NetText.isBlank(segment) { segments.append(segment) }
+                current = ""
+            } else {
+                current += run
+            }
+        }
+        let tail = NetText.trim(current)
+        if !NetText.isBlank(tail) { segments.append(tail) }
+        return segments
     }
 
     /// `collectRuns`: the `text` of every run (missing texts read "", as `optString` does).

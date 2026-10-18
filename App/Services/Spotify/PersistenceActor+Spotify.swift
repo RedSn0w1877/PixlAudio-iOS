@@ -176,6 +176,16 @@ extension PersistenceActor: SpotifyLibraryStore {
         try modelContext.save()
     }
 
+    /// Replaces an automatic match whose video cannot be streamed with the next-best candidate (never a manual pick).
+    func replaceAutomaticMatch(spotifyId: String, videoId: String, score: Float?) throws {
+        for record in try songRecords(spotifyId: spotifyId) where record.matchState != SpotifyMatchState.manual.rawValue {
+            record.matchedVideoId = videoId
+            record.matchScore = score.map(Double.init)
+            record.matchState = SpotifyMatchState.matched.rawValue
+        }
+        try modelContext.save()
+    }
+
     /// A matcher batch: every update in order, one save (it was one save per track).
     func updateAutomaticMatches(_ updates: [SpotifyAutoMatchUpdate]) throws {
         guard !updates.isEmpty else { return }

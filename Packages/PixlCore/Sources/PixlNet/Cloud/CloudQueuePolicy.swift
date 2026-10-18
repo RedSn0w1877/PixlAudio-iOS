@@ -111,8 +111,9 @@ public enum CloudTiming {
     public static let maxInputAgeAtSubmitMs: Int64 = 3 * 86_400_000
     /// A batch is submitted when all its uploads are done, or this long after the first one finished.
     public static let batchGateMs: Int64 = 120_000
-    /// `/status` for running jobs at most this often in the foreground.
-    public static let statusPollIntervalMs: Int64 = 15_000
+    /// `/status` (and the `out/` listing) for jobs at RunPod at most this often in the foreground. `/status` is free and
+    /// a listing is one cheap bucket operation; 15 s made a job of a few seconds wait up to 15 s to be noticed.
+    public static let statusPollIntervalMs: Int64 = 2_500
     /// RunPod keeps a finished job's `/status` for 30 minutes.
     public static let statusRetentionMs: Int64 = 30 * 60_000
     /// Retry ladder after a failure: 1 → 5 → 15 → 60 minutes, then every hour.

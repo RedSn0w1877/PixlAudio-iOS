@@ -87,6 +87,14 @@ final class YouTubeServices {
         started = true
         downloads.start()
         Task { await refreshAccountState() }
+        // The first play after launch otherwise waits for YouTube's visitor id (one small request, fetched once per
+        // process) before it can ask for the stream. Quietly, a little after launch.
+        if let account, HeavyWorkGate.shared.allowsLaunchWork, !ProcessInfo.processInfo.isLowPowerModeEnabled {
+            Task(priority: .utility) {
+                try? await Task.sleep(for: .seconds(3))
+                _ = await account.anonymousVisitorData()
+            }
+        }
         if let cache { Task.detached(priority: .utility) { await cache.evictIfNeeded(keeping: nil) } }
     }
 
