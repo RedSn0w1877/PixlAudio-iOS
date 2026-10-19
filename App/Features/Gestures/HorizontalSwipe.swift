@@ -1,10 +1,13 @@
 import PixlModel
 import SwiftUI
+import UIKit
 
 // Gestures (iOS-first, owner request 2026-10-18). Every horizontal gesture here decides once, at the first movement
 // past a small slop, whether the drag is clearly sideways (`GesturePolicy.intent`); only then does it follow the finger
 // or act. A vertical or diagonal drag is never touched, so lists keep scrolling and the player sheet keeps its drag.
-// They attach with `simultaneousGesture`, so the scroll view's own pan is never blocked.
+// They are a UIKit pan recognizer that refuses to begin unless the finger is moving mostly sideways. A SwiftUI
+// `DragGesture` (even via `simultaneousGesture`) claims a drag in ANY direction after its minimum distance and cancels
+// the scroll view's pan, so lists whose rows carry it stopped scrolling when the touch began on a row.
 
 /// A horizontal swipe on a view: reports the sideways movement while the drag is clearly horizontal, and the committed
 /// direction (or nil: not far or fast enough) when it ends.
@@ -13,28 +16,55 @@ struct HorizontalSwipeModifier: ViewModifier {
     var onChange: (CGFloat) -> Void = { _ in }
     let onEnd: (SwipeDirection?) -> Void
 
-    @State private var intent: PanIntent = .undecided
-
     func body(content: Content) -> some View {
-        content.simultaneousGesture(drag, including: isEnabled ? .all : .none)
+        content.gesture(HorizontalPanRecognizer(isEnabled: isEnabled, onChange: onChange, onEnd: onEnd))
+    }
+}
+
+/// The UIKit pan behind `horizontalSwipe`. `gestureRecognizerShouldBegin` only says yes when the finger is moving
+/// clearly sideways, so a vertical or diagonal drag never reaches this recognizer and the scroll view (or the player
+/// sheet's drag) gets it untouched.
+struct HorizontalPanRecognizer: UIGestureRecognizerRepresentable {
+    var isEnabled: Bool
+    var onChange: (CGFloat) -> Void
+    var onEnd: (SwipeDirection?) -> Void
+
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
+
+    func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
+        let pan = UIPanGestureRecognizer()
+        pan.delegate = context.coordinator
+        pan.maximumNumberOfTouches = 1
+        return pan
     }
 
-    private var drag: some Gesture {
-        DragGesture(minimumDistance: 10, coordinateSpace: .local)
-            .onChanged { value in
-                if intent == .undecided {
-                    intent = GesturePolicy.intent(dx: value.translation.width, dy: value.translation.height)
-                }
-                guard intent == .horizontal else { return }
-                onChange(value.translation.width)
-            }
-            .onEnded { value in
-                let decided = intent
-                intent = .undecided
-                guard decided == .horizontal else { return }
-                onChange(0)
-                onEnd(GesturePolicy.swipe(dx: value.translation.width, velocityX: value.velocity.width))
-            }
+    func updateUIGestureRecognizer(_ recognizer: UIPanGestureRecognizer, context: Context) {
+        recognizer.isEnabled = isEnabled
+    }
+
+    func handleUIGestureRecognizerAction(_ recognizer: UIPanGestureRecognizer, context: Context) {
+        let translation = recognizer.translation(in: recognizer.view).x
+        switch recognizer.state {
+        case .began, .changed:
+            onChange(translation)
+        case .ended:
+            let velocity = recognizer.velocity(in: recognizer.view).x
+            onChange(0)
+            onEnd(GesturePolicy.swipe(dx: translation, velocityX: velocity))
+        case .cancelled, .failed:
+            onChange(0)
+            onEnd(nil)
+        default:
+            break
+        }
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            guard let pan = gestureRecognizer as? UIPanGestureRecognizer else { return false }
+            let v = pan.velocity(in: pan.view)
+            return abs(v.x) > abs(v.y) * 1.2
+        }
     }
 }
 
