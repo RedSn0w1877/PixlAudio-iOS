@@ -104,12 +104,12 @@ public enum AndroidPreferenceCatalog {
     /// - `accent_color_v1`: Settings › Appearance › Accent Color, a `"#RRGGBB"` string (`""` = PixlAudio's violet).
     public static let iosOnly: [String] = [
         "accent_color_v1",
-        // Blocked artists (Settings › Behavior › Blocked artists): a JSON array string.
+        // Blocked artists (Settings › Library & storage › Blocked artists): a JSON array string.
         "blocked_artists_json",
-        // Gestures (Settings › Behavior › Gestures): one switch each.
+        // Gestures (Settings › Gestures & haptics): one switch each.
         "gesture_player_artwork_swipe", "gesture_player_artwork_double_tap_like", "gesture_player_artwork_long_press",
         "gesture_mini_swipe_skip", "gesture_mini_swipe_up_open", "gesture_mini_long_press", "gesture_list_swipe_queue",
-        // Music Haptics (Settings › Behavior › Music Haptics).
+        // Music Haptics (Settings › Gestures & haptics › Vibrate with the music).
         "music_haptics_enabled", "music_haptics_strength", "music_haptics_mode",
     ]
 
@@ -169,6 +169,8 @@ public enum AndroidPreferenceCatalog {
         "advanced_performance_diagnostics_started_at_epoch_ms", "advanced_performance_diagnostics_expires_at_epoch_ms",
         "last_playlist_id", "last_playlist_name", "artist_settings_rescan_required", "lyrics_sync_intro_seen_count",
         "backup_info_dismissed", "bass_boost_dismissed", "virtualizer_dismissed", "loudness_dismissed",
+        // Settings › Developer mode: per device, neither exported nor reset by a restore.
+        "developer_mode_enabled",
     ]
 
     static let deviceIds: [String] = [

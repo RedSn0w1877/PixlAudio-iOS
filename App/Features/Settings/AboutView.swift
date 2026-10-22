@@ -8,6 +8,7 @@ struct AboutView: View {
     var screenID = "about"
 
     @Environment(Router.self) private var router
+    @Environment(SettingsStore.self) private var settings
     @State private var appeared = false
 
     var body: some View {
@@ -15,9 +16,11 @@ struct AboutView: View {
             AboutHeroCard { router.push(.easterEgg) }
                 .padding(.top, 8)
             // Which build is installed (commit and day), and the way to the logs: the first things to read when a bug
-            // is reported.
-            AboutBuildCard { router.push(.diagnostics) }
-                .padding(.top, 12)
+            // is reported. Developer mode only.
+            if settings.experimental.developerMode {
+                AboutBuildCard { router.push(.diagnostics) }
+                    .padding(.top, 12)
+            }
             AppUpdateCard()
                 .padding(.top, 12)
             AboutSectionHeader(title: L10n.aboutMaintainerTitle, subtitle: L10n.aboutMaintainerSubtitle)

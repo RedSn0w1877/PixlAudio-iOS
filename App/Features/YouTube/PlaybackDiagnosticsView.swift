@@ -121,10 +121,14 @@ struct PlaybackDiagnosticsView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(PlaybackStore.self) private var playback
     @Environment(LibraryStore.self) private var library
+    @Environment(SettingsStore.self) private var settings
     @Environment(\.appTheme) private var theme
     @State private var model = PlaybackDiagnosticsModel()
 
     var body: some View {
+        // The screen is a developer tool (Settings › Developer, the YouTube account): the deep probe and the timings
+        // show only in developer mode.
+        let developerMode = settings.experimental.developerMode
         VStack(spacing: 0) {
             YouTubeTopBar(title: "Playback test")
             ScrollView {
@@ -134,24 +138,26 @@ struct PlaybackDiagnosticsView: View {
                         model.run(env.youtube, track: PlaybackDiagnosticsModel.track(playback: playback, library: library))
                     }
                     .accessibilityIdentifier("diagnostics.run")
-                    YouTubeWideButton(title: "Deep probe (debug)", systemImage: "ladybug", enabled: !model.isProbing) {
-                        model.deepProbe(env.youtube)
+                    if developerMode {
+                        YouTubeWideButton(title: "Deep probe (debug)", systemImage: "ladybug", enabled: !model.isProbing) {
+                            model.deepProbe(env.youtube)
+                        }
+                        // iOS only (streaming speed): how long the last starts took, step by step.
+                        YouTubeWideButton(title: "Stream start timings", systemImage: "stopwatch") {
+                            model.showTimings()
+                        }
+                        .accessibilityIdentifier("diagnostics.showTimings")
                     }
-                    // iOS only (streaming speed): how long the last starts took, step by step.
-                    YouTubeWideButton(title: "Stream start timings", systemImage: "stopwatch") {
-                        model.showTimings()
-                    }
-                    .accessibilityIdentifier("diagnostics.showTimings")
                     if model.isRunning || model.didRun {
                         DiagnosticsCard(isRunning: model.isRunning, report: model.report) {
                             model.report = nil
                             model.didRun = false
                         }
                     }
-                    if model.isProbing || model.probeReport != nil {
+                    if developerMode, model.isProbing || model.probeReport != nil {
                         DeepProbeCard(isRunning: model.isProbing, report: model.probeReport) { model.probeReport = nil }
                     }
-                    if let timings = model.timingsReport {
+                    if developerMode, let timings = model.timingsReport {
                         DeepProbeCard(title: "Stream start timings", isRunning: false, report: timings) {
                             model.timingsReport = nil
                         }

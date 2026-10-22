@@ -145,6 +145,41 @@ final class CloudStudioTests: XCTestCase {
         XCTAssertTrue(h.transfers.uploads.isEmpty)
     }
 
+    // MARK: Direct start (no confirm sheet)
+
+    func testStartNowQueuesTheSongOnceAndSaysSoWhenItIsAlreadyThere() async {
+        let h = CloudHarness()
+        let song = h.addSong("f:root/a.m4a")
+        let first = await h.studio.startNow(songs: [song], title: "Test")
+        XCTAssertEqual(first, .started(1))
+        XCTAssertEqual(h.studio.jobs.count, 1)
+        let again = await h.studio.startNow(songs: [song], title: "Test")
+        XCTAssertEqual(again, .nothingToDo("Nothing to process — \(CloudSkipReason.pendingJob.label)"))
+        XCTAssertEqual(h.studio.jobs.count, 1, "a song already waiting is not queued twice")
+    }
+
+    func testStartNowStopsWhenTheCloudIsOffOrOverTheCap() async {
+        let h = CloudHarness()
+        let song = h.addSong("f:root/a.m4a")
+        h.settings.isEnabled = false
+        let off = await h.studio.startNow(songs: [song], title: "Test")
+        XCTAssertEqual(off, .off)
+        h.settings.isEnabled = true
+        h.settings.monthlyCapMicroUSD = 1
+        let over = await h.studio.startNow(songs: [song], title: "Test")
+        XCTAssertEqual(over, .overCap)
+        XCTAssertTrue(h.studio.jobs.isEmpty)
+    }
+
+    func testStartNowWords() {
+        XCTAssertEqual(CloudStartOutcome.started(1).message(useCellular: false),
+                       "Processing 1 song in the cloud — it uploads when you're on Wi-Fi.")
+        XCTAssertEqual(CloudStartOutcome.started(3).message(useCellular: true), "Processing 3 songs in the cloud")
+        XCTAssertEqual(CloudStartOutcome.off.message(useCellular: false),
+                       "Cloud processing is off. Turn it on in Settings › Sing › Cloud processing.")
+        XCTAssertEqual(CloudStartOutcome.overCap.message(useCellular: false), CloudStudio.Notice.capReached.message)
+    }
+
     func testTheMonthlyCapStopsSubmissions() async throws {
         let h = CloudHarness()
         let song = h.addSong("f:root/a.m4a")

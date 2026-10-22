@@ -22,7 +22,6 @@ struct RouteDestination: View {
         case .experimental: ExperimentalSettingsView()
         case .artistSettings: ArtistSettingsView()
         case .blockedArtists: BlockedArtistsView()
-        case .gestureSettings: GestureSettingsView()
         case .delimiterConfig: DelimiterConfigView()
         case .wordDelimiterConfig: WordDelimiterConfigView()
         case .equalizer: EqualizerView()
@@ -61,7 +60,6 @@ struct SheetDestination: View {
             case .artistPicker(let songId): PlayerArtistPickerSheet(songId: songId) // sizes its own detent
             case .aiPlaylist: AiPlaylistSheet().pixlSheet(detents: [.tallGlass])
             case .taisChat: TaisChatSheet().pixlSheet(detents: [.tallGlass])
-            case .cloudConfirm: CloudConfirmSheet().pixlSheet(detents: [.tallGlass])
             }
         }
         // The Connect volume pop-up: the shell's copy doesn't reach into a sheet.

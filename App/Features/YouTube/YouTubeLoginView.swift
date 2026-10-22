@@ -12,6 +12,7 @@ struct YouTubeLoginView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(AccountsStore.self) private var accounts
     @Environment(Router.self) private var router
+    @Environment(SettingsStore.self) private var settings
     @Environment(\.appTheme) private var theme
     @Environment(\.dismiss) private var dismiss
     @State private var model = YouTubeLoginModel()
@@ -127,10 +128,12 @@ struct YouTubeLoginView: View {
                 YouTubeAccountCard(isSignedIn: true, onConnect: {}, onDisconnect: {
                     Task { await env.youtube.signOut() }
                 })
-                YouTubeWideButton(title: "Test playback", systemImage: "ladybug") {
-                    router.push(.playbackDiagnostics)
+                if settings.experimental.developerMode {
+                    YouTubeWideButton(title: "Test playback", systemImage: "ladybug") {
+                        router.push(.playbackDiagnostics)
+                    }
+                    .accessibilityIdentifier("youtube.testPlayback")
                 }
-                .accessibilityIdentifier("youtube.testPlayback")
             }
             .padding(.horizontal, YouTubeMetrics.screenPadding)
             .padding(.top, 12)

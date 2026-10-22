@@ -203,7 +203,7 @@ PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact ba
 | AI Playlist Lab (Library › Create playlist › With AI) | `AppCover.aiPlaylistLab` | `AiPlaylistLabView` (Features/AI) | 13 |
 | TAIS DJ chat (Experimental › TAIS DJ; player's Taizo button) | `AppSheet.taisChat` | `TaisChatSheet` (Features/AI) | 13 |
 | Setup | `AppCover.setup` | `SetupView` (Features/Onboarding) | 15 |
-| TAIS Studio "Remaster Song" card (Experimental, song sheet), on-device models panel (iOS only) | inside `ExperimentalSettingsView` / `SongOptionsSheet` | `TaisStudioProgressCard`, `OnDeviceModelsPanel` (Features/Tais) | 14 |
+| TAIS Studio "Make an instrumental" card (was "Remaster Song"; Experimental, song sheet), on-device models panel (iOS only) | inside `ExperimentalSettingsView` / `SongOptionsSheet` | `TaisStudioProgressCard`, `OnDeviceModelsPanel` (Features/Tais) | 14 |
 | Lyrics screen instrumental card + the toolbar's Sing segment (replaced the floating instrumental toggle, owner 2026-10-07) | inside `LyricsView` | `InstrumentalRenderAction` (Features/Tais), `LyricsSingSegment` (Features/Lyrics/LyricsChrome) | 14, lyrics page |
 | Backup export / restore | `AppCover.backupExport`, `.backupImport` | `BackupExportCover`, `BackupImportCover` (Features/Backup) | 15 |
 | Plus / license debug, nav-bar corner radius | — (dropped: everything unlocked; Material-only setting) | — | — |
@@ -214,6 +214,19 @@ group), 2 pt apart (`Features/Settings/Components/SettingsRows.swift`); every se
 its view: album-art palette style, nav-bar corner radius, smooth corners, the visual-style switch, the Plus card and
 licence debug tools, battery optimisation, Chromecast autoplay, Hi-Fi float output, offload-ready formats and the
 ExoPlayer tile. TAIS tools in Experimental are UI shells until the TAIS stages.
+
+Settings reorganisation (owner request 2026-10-22, both apps, same structure and texts): the main list is Accounts,
+Appearance, Playback, Equalizer, Lyrics, Sing, Gestures & haptics (`behavior`), Library & storage (`library`), AI
+features, Backup & Restore, About — then a last group with the **Developer mode** switch
+(`ExperimentalSettings.developerMode`, key `developer_mode_enabled`, per device and out of backups) and, while it is on,
+the Developer and Device capabilities rows. `SettingsMainEntry.everyday` / `.developerOnly` /
+`ordered(developerMode:)` give the order. A category's technical rows form an "Advanced" block at its bottom
+(`SettingsAdvancedSubsection`, or `SettingsAdvancedHeader` + its own groups on AI features), drawn only in developer
+mode and never resetting what it holds; the same switch gates the Spotify dashboard's testing side, About's build
+line, the lyrics sheet's "Lyrics debug info", the player's file-info text, the backup picker's technical sections and
+the restore "Schema" line. The Gestures page is gone (its switches are inline, under Android's wording); Lyrics and
+Sing are categories of their own (`LyricsSettingsSection`, `SingSettingsSection`); texts are the NEW keys of
+`SettingsReorgStrings.swift`. `SettingsStore.ephemeral()` (UI tests) starts with developer mode on.
 
 Dropped settings (final review, 2026-10-03), because iOS can't honour them:
 - Playback › "Keep playing after closing": iOS ends the app — and its playback — when it is swiped away from the app
@@ -311,7 +324,7 @@ How the stages meet now that they share one `main`:
 - **Equalizer and transitions:** `PlaybackServices.applySettings` uses stage 7d's `EqualizerPreferences.engineSettings`
   (saved custom presets, loudness) and the observed `globalTransitionSettingsJSON`; saving a playlist rule calls
   `PlaybackServices.reloadTransitionRules()`.
-- **Music folders:** removed. The app is Spotify-only — nothing scans the phone, so Settings › Music Management has
+- **Music folders:** removed. The app is Spotify-only — nothing scans the phone, so Settings › Library & storage has
   no folder, rescan or excluded-directory rows and `LibraryIdentity.parentDirectory` is all that is left of the
   library-path helpers (a downloaded song's `parentDirectory` column).
 - **Pill row accessory:** `GlassPillRow(accessory:)` is the one trailing action capsule (Library's Edit tab, the
@@ -604,7 +617,7 @@ syncConnectBlocked. Test ids: `lyrics.syncChip`, `lyricsMore.syncYourself`, `syn
 - **Sign-in:** the web page (Android's flow) with two glass-capsule fallbacks under it — the device-code flow (Android's
   `YouTubeSignInDialog`, as a sheet; the token authenticates TVHTML5 through `GoogleBearerHTTPClient`) and a pasted cookie.
   Signed in, the screen shows Android's `YouTubeAccountCard` (from the Spotify dashboard) + "Test playback". Until the
-  Accounts screen (stage 15) exists, Settings › Developer Options has rows for both screens.
+  Accounts screen (stage 15) exists, Settings › Developer (developer mode) has rows for both screens.
 - **Downloads:** `DownloadManager` (background `URLSession`; foreground ranged fallback; complete cache files are copied),
   files in `Application Support/Downloads/<videoId>.m4a`. UI: `OfflineDownloadCard` in the song sheet, the playlist sheet's
   "Download all songs". Song rows (`SongCard`) show Android's `SongAvailabilityBadge` (downloaded / downloading / failed)
@@ -787,7 +800,12 @@ Ids: `settingsCategory.ai.localModel` (switch on, downloading 42 %; ready `scree
   Instrumentalize (Experimental slider) drives the tap's mid/side reducer (`PlaybackServices.applySettings`).
 - **UI** (`App/Features/Tais/`): `TaisStudioProgressCard` (Android's, a 10 pt `surfaceContainer` glass panel; bars,
   buttons and dividers are fills) in Experimental (with the BS-RoFormer row) and in the song sheet above the offline
-  card; `OnDeviceModelsPanel` (iOS only, under it in Experimental): each model's state, size, Download / Cancel /
+  card. Since 2026-10-22 it reads "Make an instrumental" — "Cloud yields better results but requires a Wi-Fi
+  connection." — over two equal buttons, "Process on-device" (`studio.start(.instrumental)`) and "Process in cloud"
+  (`CloudStudio.startNow`, always shown; with the cloud off it says "Cloud processing is off. Turn it on in Settings ›
+  Sing › Cloud processing."); the on-device job's progress and the song's "Cloud: …" line sit under them. The "Sync /
+  resync lyrics" row is gone (lyric sync stays in the studio lane for the automatic runner and Active jobs).
+  `OnDeviceModelsPanel` (iOS only, under it in Experimental): each model's state, size, Download / Cancel /
   Remove, and the rendered instrumentals' size with Delete; the lyrics screen's `InstrumentalRenderAction` (no lyrics:
   Render → Rendering… → Play instrumental → Play original, on the 28 pt clear-glass card) and Android's
   `FloatingInstrumentalToggle` (44 pt clear-glass circle growing to a 172 pt "Instrumental" pill) above the controls —
@@ -800,7 +818,7 @@ Ids: `settingsCategory.ai.localModel` (switch on, downloading 42 %; ready `scree
   `project.yml` (`BGTaskSchedulerPermittedIdentifiers` += `io.github.redsn0w1877.pixlaudio.tais-studio`).
 
 Stage 14 screenshot ids (`UITests/TaisScreenshotTests`; demo states, no network or Core ML): `tais.studio`
-(Experimental scrolled to Remaster Song: lyric sync running, instrumental ready, BS-RoFormer failed), `tais.models`
+(Experimental scrolled to the instrumental card: on-device render running, BS-RoFormer failed), `tais.models`
 (the models panel with wav2vec2 downloading), `tais.songSheet` (the song sheet's card mid-render),
 `tais.instrumental`, `tais.instrumentalRendering`, `tais.instrumentalActive` (the lyrics screen with `-lyricsDemo none`;
 no floating toggle since 2026-10-07 — with lyrics, the same states show the Sing segment: lyricsSingActive,
@@ -870,7 +888,9 @@ an image).
   and TAIS Studio (catalog check, Save as source `tais`, "Replace" for a user sync). A TAIS save reloads the lyrics
   screen when it shows that song.
 - **Song sheet:** the Remaster Song card (stage 14) now fills the space wave A's review noted under the buttons.
-- **Playlist:** "Sync lyrics for all songs" / "Instrumentalize all" and `PlaylistLyricSyncCard` run on TAIS Studio's lane.
+- **Playlist:** "Sync lyrics for all songs" / "Instrumentalize all" and `PlaylistLyricSyncCard` run on TAIS Studio's lane
+  (2026-10-22: the lyric sync and its card are gone; the menu offers "Process all on-device" and "Process all in
+  cloud").
 
 
 ### Visual review (Integrate B, `main` 1d22211, CI run 37008732905: 235 shots, every class green)
@@ -1167,21 +1187,26 @@ monochrome silhouette (play triangle, lens cut-out, note) as a white frosted-gla
 Android has no RunPod screens, so these use the settings design system as it is (decision 10 still holds: nothing
 Material, glass where Android would fill a surface).
 
-- **Cloud processing** (`CloudProcessingSettingsView`, route `.cloudProcessing`, from Experimental's "Cloud processing"
-  panel): `SettingsScaffold` + `SettingsSubsection`s — Consent (switch + one explanatory panel), RunPod (Endpoint ID,
-  Restricted key), Storage (R2 endpoint or account ID with the detected account under it, bucket, access key ID,
-  secret), Test connection (what is still missing, the filled button, one `CloudCheckLine` per check, the tonal
-  selftest button), Outputs (three switches + a two-pill Standard/Best `GlassPillRow`), Network, Cost (price, cap,
-  "This month: …"), Queue (a chevron row), the promise text and a destructive "Forget keys". Fields are
-  `SettingsTextField`s on a `SettingsPanel` (fills on one glass row; no glass on glass).
+- **Cloud processing** (`CloudProcessingSettingsView`, route `.cloudProcessing`, from Settings › Sing; it was
+  Experimental's panel until 2026-10-22): `SettingsScaffold` + `SettingsSubsection`s. Everyone sees Consent (the
+  switch "Process songs in the cloud" — "Nothing leaves this phone until you tap Process in cloud." — and one plain
+  panel), Network ("Use cellular data"), Notifications and Queue (a chevron row). Developer mode adds the rest: the
+  keys-missing banner, Keys / "Use my own keys", RunPod (Endpoint ID, Restricted key), Storage (R2 endpoint or account
+  ID with the detected account under it, bucket, access key ID, secret), Test connection (what is still missing, the
+  filled button, one `CloudCheckLine` per check, the tonal selftest button), Outputs (three switches + a two-pill
+  Standard/Best `GlassPillRow`), Cost (price, cap, "This month: …"), the promise text and a destructive "Forget
+  keys". Fields are `SettingsTextField`s on a `SettingsPanel` (fills on one glass row; no glass on glass).
 - **Cloud queue** (`CloudQueueView`, route `.cloudQueue`): an optional notice panel (error / tertiary container tint),
-  the three Add rows, then "On its way", "Needs you", "Done" groups of `CloudJobRow`s (one glass row each in the
-  scaffold's lazy stack; state symbol, title, artist, a primary-coloured status line, a detail line; trailing: a
-  plain-fill cancel circle, a tonal Retry, or nothing), "Clear done", the month line and the promise.
-- **Confirm sheet** (`CloudConfirmSheet`, `AppSheet.cloudConfirm`): `SheetScaffold("Send to the cloud")` at the
-  see-through `.tallGlass` detent; a 2×2 grid of figures on `surfaceContainerHigh` fills, plain lines for the cap,
-  streamed songs, Wi-Fi and skips, then Cancel (outlined) and "Send N songs" (filled; disabled over the cap or with the
-  switch off).
+  in developer mode the three Add rows (each sends at once and toasts the outcome), then "On its way", "Needs you",
+  "Done" groups of `CloudJobRow`s (one glass row each in the scaffold's lazy stack; state symbol, title, artist, a
+  primary-coloured status line, a detail line; trailing: a plain-fill cancel circle, a tonal Retry, or nothing),
+  "Clear done", the promise (and, in developer mode, the month line).
+- **Starting a batch** (2026-10-22): the "Send to the cloud" confirm sheet (`CloudConfirmSheet`,
+  `AppSheet.cloudConfirm`) is gone. "Process in cloud" on the song card, "Process all in cloud" in the playlist menu
+  and the queue's Add rows call `CloudStudio.startNow`, which keeps what the sheet gated — consent on, something to
+  send, inside the month's cap — and answers with a `CloudStartOutcome` the caller shows as a toast ("Processing N
+  songs in the cloud — it uploads when you're on Wi-Fi.", the cloud-off hint, the first skip reason, the used-up
+  budget). `preview(songs:title:)` and `send(_:)` stay for the orchestrator's tests.
 - Performance: nothing is formatted or sorted in `body` beyond the store's small filters; upload/download progress
   reaches the rows at whole percents (`CloudTransfers.onProgress`); worker progress only from `/status` every ≥ 15 s
   while jobs are at RunPod; no timer runs while nothing is in flight; hashing, decoding and file checks are detached

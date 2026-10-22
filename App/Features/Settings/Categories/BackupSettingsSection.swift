@@ -41,12 +41,30 @@ struct BackupSettingsSection: View {
         }
     }
 
+    /// "n of m sections" counts the sections the picker lists: the technical ones stay selected (and are exported) but
+    /// are not counted outside developer mode.
     private var selectionSummary: String {
-        let selection = env.backup.exportSelection
-        if selection.isEmpty { return L10n.settingsExportBackupNone }
-        let total = BackupSection.allCases.count
-        return selection.count == total ? L10n.settingsExportBackupAll
-            : L10n.settingsExportBackupPartial(selection.count, total)
+        let listed = BackupSection.listed(developerMode: settings.experimental.developerMode)
+        let chosen = listed.filter { env.backup.exportSelection.contains($0) }.count
+        if chosen == 0 { return L10n.settingsExportBackupNone }
+        return chosen == listed.count ? L10n.settingsExportBackupAll
+            : L10n.settingsExportBackupPartial(chosen, listed.count)
+    }
+}
+
+extension BackupSection {
+    /// Sections only developer mode lists, in the export picker and the restore list (their selection stays as it is,
+    /// default included): transition rules, engagement stats, QuickFill genres, artist images, AI activity logs.
+    var isTechnical: Bool {
+        switch self {
+        case .transitions, .engagementStats, .quickFill, .artistImages, .aiUsageLogs: true
+        default: false
+        }
+    }
+
+    /// The sections a list shows, in the model's order.
+    static func listed(developerMode: Bool) -> [BackupSection] {
+        developerMode ? allCases : allCases.filter { !$0.isTechnical }
     }
 }
 
@@ -121,10 +139,13 @@ struct BackupSectionPicker: View {
     @Binding var selection: Set<BackupSection>
     let onConfirm: () -> Void
 
+    @Environment(SettingsStore.self) private var settings
     @Environment(\.appTheme) private var theme
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
+        // The technical sections show only in developer mode; hidden ones keep their selection (default included).
+        let listed = BackupSection.listed(developerMode: settings.experimental.developerMode)
         VStack(spacing: 0) {
             BackupDialogTopBar(title: L10n.settingsExportBackupTitle) { dismiss() }
             ScrollView {
@@ -133,7 +154,8 @@ struct BackupSectionPicker: View {
                         Text(L10n.settingsExportBackupHint)
                             .pixlFont(.bodyLarge)
                             .foregroundStyle(theme.onSurfaceVariant)
-                        Text(L10n.settingsBackupSectionsSelected(selection.count, BackupSection.allCases.count))
+                        Text(L10n.settingsBackupSectionsSelected(listed.filter { selection.contains($0) }.count,
+                                                                  listed.count))
                             .pixlFont(.titleSmall, weight: .semibold)
                             .foregroundStyle(theme.primary)
                     }
@@ -142,7 +164,7 @@ struct BackupSectionPicker: View {
                     .pixlGlass(in: RoundedRectangle(cornerRadius: 18, style: .continuous),
                                tint: theme.surfaceContainerHighest.opacity(GlassTint.container))
                     .padding(.top, 12)
-                    ForEach(BackupSection.allCases, id: \.self) { section in
+                    ForEach(listed, id: \.self) { section in
                         BackupSectionCard(section: section, isSelected: selection.contains(section)) {
                             if selection.contains(section) { selection.remove(section) } else { selection.insert(section) }
                         }

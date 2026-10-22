@@ -2,7 +2,7 @@ import PixlLibrary
 import PixlModel
 import SwiftUI
 
-/// Settings › Behavior › Blocked artists (iOS-first, 2026-10-18): the artists whose songs never play by themselves.
+/// Settings › Library & storage › Blocked artists (iOS-first, 2026-10-18): the artists whose songs never play by themselves.
 /// A search field over the list, each artist with an Unblock button (a long press or VoiceOver's actions do the same),
 /// and Unblock all at the end. Songs by a blocked artist stay visible in playlists and albums, dimmed and tagged.
 struct BlockedArtistsView: View {

@@ -8,10 +8,10 @@ import SwiftUI
 /// - the play row (56 pt): "Play it" (`primary`, 60 / 14 pt corners) and Shuffle (`secondaryContainer`, 14 / 60 pt);
 /// - the edit row (42 pt): Add (`tertiaryContainer` capsule), then Remove and Reorder sharing the rest (12 pt
 ///   corners, 24 pt and `tertiary` while active);
-/// - the lyric-sync progress card, then the songs in a `surfaceContainerHigh` panel (32 pt top corners) as
-///   `PlaylistSongRow`s, 8 pt apart; drag handles in reorder mode, remove buttons in remove mode;
+/// - the songs in a `surfaceContainerHigh` panel (32 pt top corners) as `PlaylistSongRow`s, 8 pt apart; drag handles
+///   in reorder mode, remove buttons in remove mode;
 /// - sheets: Add songs (`SongPickerSheet`), Sort Songs, Playlist options (edit, delete, default transition, export,
-///   download / sync lyrics / instrumentalize all).
+///   download all, process all on-device / in cloud).
 struct PlaylistDetailView: View {
     let playlistId: String
 
@@ -80,7 +80,6 @@ struct PlaylistDetailView: View {
             } else {
                 playRow
                 editRow
-                PlaylistLyricSyncSection(playlistId: playlistId, songs: songs)
                 if songs.isEmpty {
                     emptyState
                 } else if find.hasNoMatches {
@@ -303,6 +302,22 @@ struct PlaylistDetailView: View {
 
     // MARK: Options menu
 
+    /// "Process all on-device": an instrumental for every song that has none, one after another.
+    private func processAllOnDevice() {
+        let queued = env.tais.studio.renderInstrumentals(songs)
+        LibraryToast.shared.show(queued == 0 ? "Every song here already has an instrumental."
+                                             : "Making instrumentals for \(queued) \(queued == 1 ? "song" : "songs")")
+    }
+
+    /// "Process all in cloud": starts at once (no confirm sheet); the toast says how many went, or why none did.
+    private func processAllInCloud() {
+        let cloud = env.cloud, batch = songs, title = playlist?.name ?? "Playlist"
+        Task {
+            let outcome = await cloud.startNow(songs: batch, title: title)
+            LibraryToast.shared.show(outcome.message(useCellular: cloud.settings.useCellular))
+        }
+    }
+
     /// Android's playlist options as a menu: edit, transition, export, batch actions, then delete.
     @ViewBuilder
     private var optionsMenu: some View {
@@ -322,23 +337,15 @@ struct PlaylistDetailView: View {
                 LibraryToast.shared.show(queued == 0 ? "No streamed songs in this playlist to download."
                                                      : "Downloading \(queued) songs")
             }
-            Button("Sync lyrics for all songs", systemImage: "text.quote") {
-                env.tais.studio.syncLyrics(playlistId: playlistId, songs: songs)
-            }
-            Button("Instrumentalize all songs", systemImage: "sparkles") {
-                let queued = env.tais.studio.renderInstrumentals(songs)
-                LibraryToast.shared.show(queued == 0 ? "Every song here already has an instrumental."
-                                                     : "Rendering instrumentals for \(queued) songs")
-            }
-            // Cloud Studio (iOS-first): only once Cloud processing is switched on; the confirm sheet comes first.
-            if env.cloud.settings.isEnabled {
-                Button("Process all in the cloud", systemImage: "icloud.and.arrow.up") {
-                    let cloud = env.cloud, router = self.router, batch = songs, title = playlist?.name ?? "Playlist"
-                    Task {
-                        await cloud.requestBatch(songs: batch, title: title)
-                        if cloud.pendingBatch != nil { router.present(AppSheet.cloudConfirm) }
-                    }
-                }
+            Button("Process all on-device", systemImage: "sparkles") { processAllOnDevice() }
+            // Cloud Studio (iOS-first), always offered: with the cloud off it says where to turn it on. In a menu the
+            // second Text is the item's subtitle.
+            Button {
+                processAllInCloud()
+            } label: {
+                Text("Process all in cloud")
+                Text("Cloud yields better results but requires a Wi-Fi connection.")
+                Image(systemName: "icloud.and.arrow.up")
             }
         }
         Button("Delete playlist", systemImage: "trash", role: .destructive) { confirmsDelete = true }
@@ -367,16 +374,13 @@ struct PlaylistDetailView: View {
                                  LibraryToast.shared.show(queued == 0 ? "No streamed songs in this playlist to download."
                                                                       : "Downloading \(queued) songs")
                              },
-                             onSyncLyricsAll: {
+                             onProcessAllOnDevice: {
                                  showsOptions = false
-                                 // Stage 14: one lyric-sync job per song through TAIS Studio's lane.
-                                 env.tais.studio.syncLyrics(playlistId: playlistId, songs: songs)
+                                 processAllOnDevice()
                              },
-                             onInstrumentalizeAll: {
+                             onProcessAllInCloud: {
                                  showsOptions = false
-                                 let queued = env.tais.studio.renderInstrumentals(songs)
-                                 LibraryToast.shared.show(queued == 0 ? "Every song here already has an instrumental."
-                                                                      : "Rendering instrumentals for \(queued) songs")
+                                 processAllInCloud()
                              })
     }
 
@@ -409,8 +413,8 @@ private struct PlaylistOptionsSheet: View {
     let onDelete: () -> Void
     let onTransition: () -> Void
     let onDownloadAll: () -> Void
-    let onSyncLyricsAll: () -> Void
-    let onInstrumentalizeAll: () -> Void
+    let onProcessAllOnDevice: () -> Void
+    let onProcessAllInCloud: () -> Void
 
     @Environment(LibraryStore.self) private var library
     @Environment(\.appTheme) private var theme
@@ -446,8 +450,9 @@ private struct PlaylistOptionsSheet: View {
                         .playlistActionTile(theme, interactive: false)
                 }
                 action("Download all songs", "arrow.down.circle", onDownloadAll)
-                action("Sync lyrics for all songs", "text.quote", onSyncLyricsAll)
-                action("Instrumentalize all songs", "sparkles", onInstrumentalizeAll)
+                action("Process all on-device", "sparkles", onProcessAllOnDevice)
+                action("Process all in cloud", "icloud.and.arrow.up", onProcessAllInCloud,
+                       subtitle: "Cloud yields better results but requires a Wi-Fi connection.")
             }
             .padding(.vertical, 12)
             .padding(.top, 12)
@@ -460,29 +465,12 @@ private struct PlaylistOptionsSheet: View {
         .accessibilityIdentifier("sheet.playlistOptions")
     }
 
-    private func action(_ title: String, _ systemImage: String, _ onTap: @escaping () -> Void) -> some View {
+    private func action(_ title: String, _ systemImage: String, _ onTap: @escaping () -> Void,
+                        subtitle: String? = nil) -> some View {
         Button(action: onTap) {
-            PlaylistActionRow(title, systemImage: systemImage)
+            PlaylistActionRow(title, subtitle: subtitle, systemImage: systemImage)
         }
         .buttonStyle(.plain)
         .playlistActionTile(theme)
-    }
-}
-
-/// Stage 14: the playlist's lyric-sync run, from TAIS Studio's job states. The states are read here, not in the page:
-/// every progress tick of a running batch re-renders only this card, never the song list below it.
-private struct PlaylistLyricSyncSection: View {
-    let playlistId: String
-    let songs: [Song]
-
-    @Environment(AppEnvironment.self) private var env
-
-    var body: some View {
-        let state = env.tais.studio.lyricSyncState(playlistId: playlistId)
-        PlaylistLyricSyncCard(state: state,
-                              onCancel: { env.tais.studio.cancelLyricBatch(playlistId: playlistId) },
-                              onRetry: { env.tais.studio.retryLyricBatch(playlistId: playlistId, songs: songs) })
-            .padding(.horizontal, 16)
-            .padding(.vertical, state.total > 0 ? 8 : 0)
     }
 }

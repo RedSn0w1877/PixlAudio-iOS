@@ -3,11 +3,12 @@ import PixlNet
 import SwiftUI
 
 /// The "process later" queue (design §7.3; iOS-first): what is on its way to the cloud, what came back, and what
-/// needs the person. Songs are added from here (Current song / Songs without word-timed lyrics / Songs without an
-/// instrumental) through the confirm sheet. Rows are one glass shape each in a lazy stack; progress comes from the
-/// orchestrator (whole percents), never from a timer.
+/// needs the person. In developer mode songs can also be added from here (Current song / Songs without word-timed
+/// lyrics / Songs without an instrumental), each row sending at once. Rows are one glass shape each in a lazy stack;
+/// progress comes from the orchestrator (whole percents), never from a timer.
 struct CloudQueueView: View {
     @Environment(AppEnvironment.self) private var env
+    @Environment(SettingsStore.self) private var appSettings
     @Environment(Router.self) private var router
     @Environment(\.appTheme) private var theme
     @State private var confirmsCancelAll = false
@@ -17,6 +18,7 @@ struct CloudQueueView: View {
         let active = cloud.activeJobs
         let attention = cloud.attentionJobs
         let finished = cloud.finishedJobs
+        let developerMode = appSettings.experimental.developerMode
         SettingsScaffold(title: "Cloud queue", screenID: "cloudQueue") {
             if let notice = cloud.notice {
                 SettingsPanel(tint: notice == .capReached || notice == .endpointPaused ? theme.tertiaryContainer : theme.errorContainer) {
@@ -30,15 +32,18 @@ struct CloudQueueView: View {
                 .padding(.bottom, 10)
                 .accessibilityIdentifier("cloud.notice")
             }
-            SettingsSubsection(title: "Add songs") {
-                addRow("Current song", "The song that's playing now.", "music.note", .current)
-                addRow("Songs without word-timed lyrics", "Up to 200 songs from your library.", "text.word.spacing",
-                       .missingLyrics)
-                addRow("Songs without an instrumental", "Up to 200 songs from your library.", "waveform", .missingInstrumental)
+            if developerMode {
+                SettingsSubsection(title: "Add songs") {
+                    addRow("Current song", "The song that's playing now.", "music.note", .current)
+                    addRow("Songs without word-timed lyrics", "Up to 200 songs from your library.", "text.word.spacing",
+                           .missingLyrics)
+                    addRow("Songs without an instrumental", "Up to 200 songs from your library.", "waveform",
+                           .missingInstrumental)
+                }
             }
             if active.isEmpty && attention.isEmpty && finished.isEmpty {
                 SettingsPanel {
-                    Text(verbatim: "Nothing in the queue yet. Songs you send come back here with their instrumental and word-timed lyrics.")
+                    Text(verbatim: "Nothing in the queue yet. Songs you process in the cloud show up here until they come back.")
                         .pixlFont(.bodyMedium)
                         .foregroundStyle(theme.onSurfaceVariant)
                 }
@@ -74,10 +79,13 @@ struct CloudQueueView: View {
                     .accessibilityIdentifier("cloud.clearDone")
             }
             SettingsPanel {
-                Text(verbatim: CloudProcessingCopy.monthLine(committed: cloud.committedThisMonthMicroUSD,
-                                                             cap: cloud.settings.effectiveMonthlyCapMicroUSD))
-                    .pixlFont(.bodyMedium)
-                    .foregroundStyle(theme.onSurface)
+                // What this month's jobs cost is a developer's figure.
+                if developerMode {
+                    Text(verbatim: CloudProcessingCopy.monthLine(committed: cloud.committedThisMonthMicroUSD,
+                                                                 cap: cloud.settings.effectiveMonthlyCapMicroUSD))
+                        .pixlFont(.bodyMedium)
+                        .foregroundStyle(theme.onSurface)
+                }
                 Text(verbatim: CloudProcessingCopy.promise(builtIn: cloud.settings.usesBuiltInKeys))
                     .pixlFont(.bodySmall)
                     .foregroundStyle(theme.onSurfaceVariant)
@@ -100,16 +108,18 @@ struct CloudQueueView: View {
         } message: {
             Text("Songs on their way stop, and their files are removed from the cloud. Finished songs stay.")
         }
+        .libraryToast()
     }
 
+    /// An Add row sends its songs at once; the toast says how many went, or why none did.
     private func addRow(_ title: String, _ subtitle: String, _ systemImage: String, _ kind: CloudBatchKind) -> some View {
         let cloud = env.cloud
         return SettingsItemRow(title: title, subtitle: subtitle, systemImage: systemImage, showsChevron: true,
                                identifier: "cloud.add.\(kind.rawValue)") {
             guard !cloud.isPreviewing else { return }
             Task {
-                await cloud.requestBatch(kind)
-                if cloud.pendingBatch != nil { router.present(AppSheet.cloudConfirm) }
+                let outcome = await cloud.startNow(kind)
+                LibraryToast.shared.show(outcome.message(useCellular: cloud.settings.useCellular))
             }
         }
     }

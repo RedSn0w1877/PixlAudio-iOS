@@ -4,7 +4,7 @@
 import Foundation
 import PixlModel
 
-/// What Music Haptics follows (Settings › Behavior › Music Haptics › Follows).
+/// What Music Haptics follows (Settings › Gestures & haptics › Follows).
 public enum MusicHapticsMode: String, Sendable, CaseIterable, Equatable {
     /// A tap on each kick and snare, plus a soft rumble under the bass.
     case everything

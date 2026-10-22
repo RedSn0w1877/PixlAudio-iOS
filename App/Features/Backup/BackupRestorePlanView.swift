@@ -12,9 +12,17 @@ struct BackupRestorePlanView: View {
     let onBack: () -> Void
     let onConfirm: () -> Void
 
+    @Environment(SettingsStore.self) private var settings
     @Environment(\.appTheme) private var theme
 
     private var plan: RestorePlan { backup.plan }
+
+    /// The modules the list shows: the technical ones (transition rules, engagement stats, QuickFill genres, artist
+    /// images, AI activity logs) only in developer mode. A hidden module keeps its selection and is still restored.
+    private var listedModules: [BackupSection] {
+        let developerMode = settings.experimental.developerMode
+        return plan.availableModules.filter { developerMode || !$0.isTechnical }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -27,7 +35,7 @@ struct BackupRestorePlanView: View {
                     ForEach(plan.warnings, id: \.self) { warning in
                         BackupWarningCard(text: warning)
                     }
-                    ForEach(plan.availableModules, id: \.self) { section in
+                    ForEach(listedModules, id: \.self) { section in
                         BackupModuleCard(section: section, detail: plan.moduleDetails[section],
                                          isSelected: selection.contains(section), isEnabled: !inProgress) {
                             if selection.contains(section) { selection.remove(section) } else { selection.insert(section) }
@@ -52,14 +60,17 @@ struct BackupRestorePlanView: View {
             HStack(alignment: .top, spacing: 16) {
                 detail(L10n.settingsBackupAppVersionLabel,
                        (plan.manifest.appVersion ?? "").isEmpty ? L10n.settingsBackupUnknown : plan.manifest.appVersion ?? "")
-                detail(L10n.settingsBackupSchemaLabel, L10n.settingsBackupManifestSchemaV(Int(plan.manifest.schemaVersion)))
+                if settings.experimental.developerMode {
+                    detail(L10n.settingsBackupSchemaLabel, L10n.settingsBackupManifestSchemaV(Int(plan.manifest.schemaVersion)))
+                }
                 if let device = plan.manifest.deviceInfo, let model = device.model, !model.isEmpty {
                     detail(L10n.settingsBackupDeviceLabel,
                            L10n.settingsBackupManifestDeviceLine(device.manufacturer ?? "", model)
                                .trimmingCharacters(in: .whitespaces))
                 }
             }
-            Text(L10n.settingsRestoreModulesSelected(selection.count, plan.availableModules.count))
+            Text(L10n.settingsRestoreModulesSelected(listedModules.filter { selection.contains($0) }.count,
+                                                     listedModules.count))
                 .pixlFont(.titleSmall, weight: .semibold)
                 .foregroundStyle(theme.primary)
             if inProgress {

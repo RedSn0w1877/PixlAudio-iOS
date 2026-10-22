@@ -16,9 +16,8 @@ enum TaisDemo {
         }
         switch screen {
         case .taisStudio:
-            studio.setDemoState(TaisStudio.JobState(phase: .succeeded(updated: true), percent: 100, detail: "Instrumental ready.",
-                                                    indeterminate: false), kind: .instrumental, songId: song.id)
-            studio.setDemoState(running(63, "\(song.title) — pass 5 of 8…"), kind: .lyrics, songId: song.id)
+            studio.setDemoState(running(63, "Rendering the instrumental — 63% through the track…"), kind: .instrumental,
+                                songId: song.id)
             studio.setDemoState(TaisStudio.JobState(
                 phase: .failed("BS-RoFormer render failed — check the backend URL/route in Experimental Settings and try again."),
                 percent: 0, detail: nil, indeterminate: false), kind: .roformer, songId: song.id)
@@ -27,13 +26,9 @@ enum TaisDemo {
         case .taisModels:
             models.setDemoState(.downloading(fraction: 0.42), for: .wav2vec2)
             models.setDemoState(.installed(bytes: 33_200_000), for: .mdxnet)
-            studio.setDemoState(running(0, "Downloading the lyric sync model — 42%"), kind: .lyrics, songId: song.id)
         case .taisSongSheet:
             studio.setDemoState(running(37, "Rendering the instrumental — 37% through the track…"), kind: .instrumental,
                                 songId: sheetSong.id)
-            studio.setDemoState(TaisStudio.JobState(phase: .succeeded(updated: true), percent: 100,
-                                                    detail: "Word-synced lyrics from LRCLIB", indeterminate: false),
-                                kind: .lyrics, songId: sheetSong.id)
         case .settingsAILocalModel:
             models.setDemoState(.downloading(fraction: 0.42), for: .llm)
         case .settingsAILocalModelReady:

@@ -20,7 +20,7 @@ struct OnDeviceModelsPanel: View {
                 SettingsIcon(systemImage: "cpu")
                 VStack(alignment: .leading, spacing: 0) {
                     Text(verbatim: "On-device models").pixlFont(.titleMedium).foregroundStyle(theme.onSurface)
-                    Text("Lyric Sync and Render Instrumental run on this iPhone. Their models download the first time you use them.")
+                    Text("Lyric sync and on-device instrumentals run on this iPhone. Their models download the first time you use them.")
                         .pixlFont(.bodyMedium)
                         .foregroundStyle(theme.onSurfaceVariant)
                         .fixedSize(horizontal: false, vertical: true)

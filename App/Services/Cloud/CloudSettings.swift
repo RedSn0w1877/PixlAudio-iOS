@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import PixlNet
 
-/// Settings › Developer › Experimental › Cloud processing (design §3.5 E, §7.2): the consent switch, where to send
+/// Settings › Sing › Cloud processing (design §3.5 E, §7.2): the consent switch, where to send
 /// songs, what to ask for, and the money guards. Non-secret values live in `UserDefaults` under `cloud_studio_*`
 /// (keys PixlBackup's catalogue doesn't know, so backups never carry them); the three keys are in the Keychain
 /// (`CloudKeychain`), held here only while the screen edits them.

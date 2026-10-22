@@ -3,7 +3,7 @@ import Observation
 import PixlModel
 import PixlNet
 
-/// Where a batch comes from (the queue's Add menu).
+/// Where a batch comes from (the queue's Add rows, shown in developer mode).
 nonisolated enum CloudBatchKind: String, Sendable, CaseIterable {
     case current
     case missingLyrics
@@ -18,8 +18,8 @@ nonisolated enum CloudBatchKind: String, Sendable, CaseIterable {
     }
 }
 
-/// One batch the person is about to send (the confirm sheet, design §7.3): what goes, what is skipped and why, and
-/// the estimate against the month's cap.
+/// One batch the person is about to send (`CloudStudio.startNow` checks it first, design §7.3): what goes, what is
+/// skipped and why, and the estimate against the month's cap.
 nonisolated struct CloudBatchPreview: Identifiable, Equatable, Sendable {
     nonisolated struct Skip: Equatable, Sendable, Identifiable {
         let reason: CloudSkipReason
@@ -40,13 +40,42 @@ nonisolated struct CloudBatchPreview: Identifiable, Equatable, Sendable {
     var isEmpty: Bool { plans.isEmpty }
 }
 
-/// Cloud Studio's orchestrator (design §1, §7): the per-song jobs from "Send" to the imported instrumental and
-/// word-timed lyrics. It only sequences I/O; every rule (states, retries, caps, gates, checks) is PixlNet's
+/// What starting a batch straight away did (`CloudStudio.startNow`); the callers show `message(useCellular:)` as a toast.
+nonisolated enum CloudStartOutcome: Equatable, Sendable {
+    /// This many songs are queued.
+    case started(Int)
+    /// The consent switch is off, so nothing was sent.
+    case off
+    /// Nothing to send, in words ("Nothing to process — Already has an instrumental and word-timed lyrics").
+    case nothingToDo(String)
+    /// The batch would go over this month's cloud budget.
+    case overCap
+
+    var didStart: Bool {
+        if case .started = self { return true }
+        return false
+    }
+
+    /// Uploads wait for Wi-Fi unless cellular data is allowed, so a start says when it will go.
+    func message(useCellular: Bool) -> String {
+        switch self {
+        case .started(let count):
+            let text = count == 1 ? "Processing 1 song in the cloud" : "Processing \(count) songs in the cloud"
+            return useCellular ? text : text + " — it uploads when you're on Wi-Fi."
+        case .off: return CloudStudio.Notice.off.message
+        case .nothingToDo(let reason): return reason
+        case .overCap: return CloudStudio.Notice.capReached.message
+        }
+    }
+}
+
+/// Cloud Studio's orchestrator (design §1, §7): the per-song jobs from "Process in cloud" to the imported instrumental
+/// and word-timed lyrics. It only sequences I/O; every rule (states, retries, caps, gates, checks) is PixlNet's
 /// (`CloudQueuePolicy`, `CloudJobBuilder`), and every side effect goes through `Dependencies`, so AppTests drive it
 /// with fakes.
 ///
 /// - Nothing is sent while the consent switch is off, and the cloud is never used automatically or as a fallback:
-///   only batches the person confirmed run.
+///   only songs the person started run.
 /// - Foreground: uploads start at once; `/run` goes out when the batch's uploads are done (or 2 minutes after the
 ///   first); `/status` is asked at most every 15 s and only while jobs are at RunPod (no timer while idle).
 /// - Background: transfers continue in the system's daemon; BGAppRefresh and URL-session wakes run `pump()` once
@@ -73,7 +102,7 @@ final class CloudStudio {
 
         var message: String {
             switch self {
-            case .off: "Cloud processing is off. Nothing leaves this iPhone until you switch it on."
+            case .off: "Cloud processing is off. Turn it on in Settings › Sing › Cloud processing."
             case .notConfigured: "Fill in the RunPod and storage fields in Cloud processing first."
             case .keysMissing: "Cloud keys missing — paste them again in Cloud processing."
             case .runpodKeyRefused: "RunPod refused the key. Check the Restricted key in Cloud processing."
@@ -131,8 +160,6 @@ final class CloudStudio {
     private(set) var notice: Notice?
     /// Upload or download progress (0…1) of a job's running transfer.
     private(set) var transferProgress: [String: Double] = [:]
-    /// The batch waiting on the confirm sheet.
-    var pendingBatch: CloudBatchPreview?
     /// The last "Test connection" and selftest.
     private(set) var connectionReport: CloudConnectionReport?
     private(set) var selftestCheck: CloudCheck?
@@ -180,16 +207,15 @@ final class CloudStudio {
         self.isDemo = isDemo
     }
 
-    /// UI tests: the demo's jobs, last test and pending batch (no pass ever runs in the demo).
+    /// UI tests: the demo's jobs and last test (no pass ever runs in the demo).
     func loadDemo(jobs: [CloudJobRecord], report: CloudConnectionReport?, selftest: CloudCheck? = nil,
-                  progress: [String: Double], batch: CloudBatchPreview?) {
+                  progress: [String: Double]) {
         guard isDemo else { return }
         self.jobs = jobs
         isLoaded = true
         connectionReport = report
         selftestCheck = selftest
         transferProgress = progress
-        pendingBatch = batch
     }
 
     // MARK: Queries
@@ -339,9 +365,9 @@ final class CloudStudio {
 
     // MARK: Person's actions
 
-    /// What sending `songs` would do (the confirm sheet). Selection runs here, off the main actor's hot path: the
-    /// lyrics store and the file checks are actor and detached calls.
-    /// `onlyMissing` keeps the songs that lack that output (the Add menu's filters); gathering stops once a full
+    /// What sending `songs` would do (`startNow` checks it before sending). Selection runs here, off the main actor's
+    /// hot path: the lyrics store and the file checks are actor and detached calls.
+    /// `onlyMissing` keeps the songs that lack that output (the queue's Add rows); gathering stops once a full
     /// batch of such songs is found, so a large library isn't read end to end.
     func preview(songs: [Song], title: String, onlyMissing: CloudTask? = nil,
                  replaceUserSynced: Bool = false) async -> CloudBatchPreview {
@@ -380,30 +406,41 @@ final class CloudStudio {
                                  replaceUserSynced: replaceUserSynced, title: title)
     }
 
-    /// Prepares the confirm sheet for `songs` (a playlist's ⋯, the song sheet).
-    func requestBatch(songs: [Song], title: String) async {
-        pendingBatch = await preview(songs: songs, title: title)
+    /// "Process in cloud" (the song card, a playlist's ⋯): sends `songs` at once, with no sheet to confirm. What that
+    /// sheet gated still holds — the consent switch on, something to send, inside this month's cap — and the outcome
+    /// says which one stopped it, for the caller's toast.
+    func startNow(songs: [Song], title: String, onlyMissing: CloudTask? = nil) async -> CloudStartOutcome {
+        // The consent defaults to on only while the built-in keys look available: know whether they open first.
+        await settings.loadBuiltInKeys()
+        guard settings.isEnabled else { return .off }
+        let batch = await preview(songs: songs, title: title, onlyMissing: onlyMissing)
+        guard !batch.isEmpty else {
+            guard let reason = batch.skipped.first?.reason else { return .nothingToDo("Nothing to process") }
+            return .nothingToDo("Nothing to process — \(reason.label)")
+        }
+        guard batch.estimate.fitsCap else { return .overCap }
+        let known = Set(jobs.map(\.jobKey))
+        await send(batch)
+        // `send` skips a song that got a pending job meanwhile: count what was really queued.
+        let started = jobs.filter { !known.contains($0.jobKey) }.count
+        return started > 0 ? .started(started) : .nothingToDo("Nothing to process — \(CloudSkipReason.pendingJob.label)")
     }
 
-    /// Prepares the confirm sheet for one of the queue's Add choices.
-    func requestBatch(_ kind: CloudBatchKind) async {
+    /// One of the queue's Add rows (developer mode), sent at once.
+    func startNow(_ kind: CloudBatchKind) async -> CloudStartOutcome {
         let host = dependencies.host
         switch kind {
         case .current:
-            guard let song = host.currentSong else {
-                pendingBatch = nil
-                notice = nil
-                return
-            }
-            pendingBatch = await preview(songs: [song], title: kind.title)
+            guard let song = host.currentSong else { return .nothingToDo("Play a song first") }
+            return await startNow(songs: [song], title: kind.title)
         case .missingLyrics:
-            pendingBatch = await preview(songs: host.librarySongs, title: kind.title, onlyMissing: .lyrics)
+            return await startNow(songs: host.librarySongs, title: kind.title, onlyMissing: .lyrics)
         case .missingInstrumental:
-            pendingBatch = await preview(songs: host.librarySongs, title: kind.title, onlyMissing: .instrumental)
+            return await startNow(songs: host.librarySongs, title: kind.title, onlyMissing: .instrumental)
         }
     }
 
-    /// The person confirmed the batch: one job per song, then everything runs on its own.
+    /// The batch was checked (`startNow`, or a test): one job per song, then everything runs on its own.
     func send(_ preview: CloudBatchPreview) async {
         // A person-started batch is the go-ahead that safe mode waits for.
         HeavyWorkGate.shared.userStartedHeavyWork()
@@ -425,7 +462,6 @@ final class CloudStudio {
             record.songDurationMs = song.duration
             jobs.append(record)
         }
-        if pendingBatch?.id == preview.id { pendingBatch = nil }
         persist()
         // A person-started batch keeps preparing in the background (continued processing, design §7.4).
         dependencies.background?.beginPreparing(count: preview.plans.count)
@@ -1534,7 +1570,7 @@ final class CloudStudio {
         YouTubeSongIdentity.videoId(for: song) != nil || SpotifyPlayableURLResolver.spotifyId(of: song) != nil
     }
 
-    /// AAC-LC files go up as they are; everything else as FLAC (the confirm sheet's upload size).
+    /// AAC-LC files go up as they are; everything else as FLAC (a batch's upload size).
     nonisolated static func estimatedUploadBytes(_ song: Song) -> Int64 {
         let ext = (song.path.isEmpty ? song.contentUriString : song.path).split(separator: ".").last.map { $0.lowercased() } ?? ""
         let aac = !isStreamed(song) && (ext == "m4a" || ext == "mp4") && (song.mimeType?.lowercased().contains("alac") != true)

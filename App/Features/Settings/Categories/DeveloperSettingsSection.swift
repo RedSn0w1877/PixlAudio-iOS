@@ -1,8 +1,9 @@
 import PixlModel
 import SwiftUI
 
-/// Settings › Developer Options (Android `SettingsCategoryScreen` DEVELOPER): experiments (Experimental screen, test
-/// setup flow), maintenance (daily mix, stats, album palettes), diagnostics (the iOS diagnostics screen, test crash).
+/// Settings › Developer (Android `SettingsCategoryScreen` DEVELOPER; shown only in developer mode): experiments
+/// (Experimental screen, test setup flow), maintenance (daily mix, stats, album palettes), diagnostics (the iOS
+/// diagnostics screen, the YouTube account, the playback test, test crash).
 struct DeveloperSettingsSection: View {
     @Environment(SettingsStore.self) private var settings
     @Environment(LibraryStore.self) private var library

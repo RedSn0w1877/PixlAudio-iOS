@@ -179,7 +179,8 @@ final class ActiveJobsScreenshotTests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["screen.settingsCategory.ai"].firstMatch.waitForExistence(timeout: 20))
         let row = app.descendants(matching: .any)["settings.ai.localModel"].firstMatch
         let limit = app.windows.firstMatch.frame.maxY - 130
-        for _ in 0..<8 {
+        // The row sits in the Advanced block (developer mode, on in the UI tests), under the music card and the personality.
+        for _ in 0..<12 {
             if row.exists && row.frame.maxY <= limit { break }
             let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.03, dy: 0.7))
             let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.03, dy: 0.4))
