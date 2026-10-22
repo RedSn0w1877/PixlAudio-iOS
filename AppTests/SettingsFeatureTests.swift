@@ -1,4 +1,5 @@
 import PixlAudioCore
+import PixlBackup
 import PixlModel
 import XCTest
 @testable import PixlAudio
@@ -15,11 +16,80 @@ final class SettingsFeatureTests: XCTestCase {
 
     // MARK: Main list
 
+    /// The everyday rows, Accounts first and About last; Developer and Device capabilities come only with developer
+    /// mode (under its switch, the list's last group).
     func testMainListOrderMatchesAndroid() {
-        XCTAssertEqual(SettingsMainEntry.ordered.map(\.id), [
-            "library", "appearance", "playback", "equalizer", "behavior", "ai", "backup_restore",
-            "accounts", "developer", "device_capabilities", "about",
-        ])
+        let everyday = [
+            "accounts", "appearance", "playback", "equalizer", "lyrics", "sing", "behavior", "library", "ai",
+            "backup_restore", "about",
+        ]
+        XCTAssertEqual(SettingsMainEntry.ordered(developerMode: false).map(\.id), everyday)
+        XCTAssertEqual(SettingsMainEntry.ordered(developerMode: true).map(\.id),
+                       everyday + ["developer", "device_capabilities"])
+    }
+
+    /// The plain-English names and subtitles of the rows whose text changed (or is new).
+    func testMainListTitlesAndSubtitles() {
+        let entries = SettingsMainEntry.ordered(developerMode: true)
+        let titles = Dictionary(uniqueKeysWithValues: entries.map { ($0.id, $0.title) })
+        let subtitles = Dictionary(uniqueKeysWithValues: entries.map { ($0.id, $0.subtitle) })
+        XCTAssertEqual(titles["lyrics"], "Lyrics")
+        XCTAssertEqual(titles["sing"], "Sing")
+        XCTAssertEqual(titles["behavior"], "Gestures & haptics")
+        XCTAssertEqual(titles["library"], "Library & storage")
+        XCTAssertEqual(titles["developer"], "Developer")
+        XCTAssertEqual(titles["device_capabilities"], "Device capabilities")
+        XCTAssertEqual(subtitles["accounts"], "Connect Spotify and sync your playlists")
+        XCTAssertEqual(subtitles["sing"], "Make instrumentals to sing along")
+        XCTAssertEqual(subtitles["developer"], "Experiments and debugging tools")
+    }
+
+    // MARK: Developer mode
+
+    /// Off by default, kept per device, and on in the UI tests' throwaway settings.
+    func testDeveloperModeDefaultsOffAndPersists() {
+        let defaults = freshDefaults()
+        let experimental = ExperimentalSettings(defaults: defaults)
+        XCTAssertFalse(experimental.developerMode)
+        experimental.developerMode = true
+        XCTAssertTrue(defaults.bool(forKey: PreferenceKeys.developerMode))
+        XCTAssertTrue(ExperimentalSettings(defaults: defaults).developerMode)
+        XCTAssertEqual(PreferenceKeys.developerMode, "developer_mode_enabled")
+        XCTAssertTrue(SettingsStore.ephemeral().experimental.developerMode)
+    }
+
+    /// Turning developer mode off hides the advanced rows; what they set keeps applying.
+    func testTurningDeveloperModeOffKeepsAdvancedValues() {
+        let defaults = freshDefaults()
+        let settings = SettingsStore(defaults: defaults)
+        settings.experimental.developerMode = true
+        settings.playback.replayGainEnabled = true
+        settings.appearance.fullPlayerShowFileInfo = false
+        settings.experimental.developerMode = false
+        XCTAssertTrue(SettingsStore(defaults: defaults).playback.replayGainEnabled)
+        XCTAssertFalse(SettingsStore(defaults: defaults).appearance.fullPlayerShowFileInfo)
+    }
+
+    /// A restore reloads the running store from the defaults, developer mode included.
+    func testReloadFollowsDeveloperMode() {
+        let defaults = freshDefaults()
+        let running = SettingsStore(defaults: defaults)
+        defaults.set(true, forKey: PreferenceKeys.developerMode)
+        running.reload(from: defaults)
+        XCTAssertTrue(running.experimental.developerMode)
+    }
+
+    /// The export picker and the restore list hide the technical sections outside developer mode.
+    func testBackupListsHideTechnicalSectionsOutsideDeveloperMode() {
+        let everyday = BackupSection.listed(developerMode: false)
+        XCTAssertEqual(everyday.count, 7)
+        XCTAssertFalse(everyday.contains(.transitions))
+        XCTAssertFalse(everyday.contains(.engagementStats))
+        XCTAssertFalse(everyday.contains(.quickFill))
+        XCTAssertFalse(everyday.contains(.artistImages))
+        XCTAssertFalse(everyday.contains(.aiUsageLogs))
+        XCTAssertTrue(everyday.contains(.playlists) && everyday.contains(.globalSettings))
+        XCTAssertEqual(BackupSection.listed(developerMode: true), BackupSection.allCases)
     }
 
     // MARK: Equalizer (Android EqualizerViewModel)

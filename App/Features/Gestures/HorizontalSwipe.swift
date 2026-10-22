@@ -48,7 +48,7 @@ extension View {
 
 // MARK: - Swipe a song row to queue it
 
-/// Swipe a song row right to "Play next", left to "Add to queue" (Settings › Behavior › Gestures › Lists). The row
+/// Swipe a song row right to "Play next", left to "Add to queue" (Settings › Gestures & haptics › Song lists). The row
 /// follows the finger on a rubber band, the action shows behind it, a release past the commit distance does it with a
 /// haptic and a toast. Off for VoiceOver (the same actions are in the row's actions menu) and while the page edits
 /// its list. Not used by the queue itself (its rows keep their own gestures).

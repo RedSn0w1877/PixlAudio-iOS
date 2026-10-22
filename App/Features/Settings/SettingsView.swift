@@ -1,24 +1,40 @@
 import SwiftUI
 
-/// Settings (Android `SettingsScreen`, Material 3 mode): the collapsing "Settings" header and one group of category
-/// rows — the everyday categories, Accounts, then Developer Options and Device Capabilities, About last. Each row is
+/// Settings (Android `SettingsScreen`, Material 3 mode): the collapsing "Settings" header and two groups of rows. The
+/// first is the everyday categories — Accounts first (the app is Spotify-only), About last. The second is the
+/// "Developer mode" switch and, while it is on, the Developer and Device capabilities rows right under it. Each row is
 /// 88 pt: a 56 pt coloured circle with the category icon, the title (`titleMedium` semibold) and a two-line subtitle
-/// (`bodyMedium`, 65 %). Rows are glass shapes 2 pt apart; the group's first row has 24 pt top corners, the last
-/// 24 pt bottom corners, the rest 4 pt.
+/// (`bodyMedium`, 65 %). Rows are glass shapes 2 pt apart; a group's first row has 24 pt top corners, the last 24 pt
+/// bottom corners, the rest 4 pt.
 ///
 /// Dropped from Android: the "PixelPlayer Plus" card at the top (everything is unlocked on iOS).
 struct SettingsView: View {
     @Environment(Router.self) private var router
+    @Environment(SettingsStore.self) private var settings
 
     var body: some View {
+        @Bindable var experimental = settings.experimental
+        let developerMode = experimental.developerMode
         SettingsScaffold(title: L10n.commonSettings, screenID: "settings", spacing: 0) {
             SettingsGroup(outer: 24, inner: 4) {
-                ForEach(SettingsMainEntry.ordered) { entry in
+                ForEach(SettingsMainEntry.everyday) { entry in
                     SettingsCategoryRow(entry: entry) { open(entry) }
+                }
+            }
+            Spacer().frame(height: 16)
+            SettingsGroup(outer: 24, inner: 4) {
+                SwitchSettingRow(title: L10n.settingsMainDeveloperModeTitle,
+                                 subtitle: L10n.settingsMainDeveloperModeSubtitle,
+                                 isOn: $experimental.developerMode, systemImage: "wrench.and.screwdriver")
+                if developerMode {
+                    ForEach(SettingsMainEntry.developerOnly) { entry in
+                        SettingsCategoryRow(entry: entry) { open(entry) }
+                    }
                 }
             }
             Spacer().frame(height: 32)
         }
+        .animation(PixlMotion.state, value: developerMode)
     }
 
     private func open(_ entry: SettingsMainEntry) {
@@ -44,13 +60,21 @@ nonisolated enum SettingsMainEntry: Hashable, Identifiable, Sendable {
         }
     }
 
-    /// Android order: everyday categories, Accounts, Developer Options, Device Capabilities, About.
-    static let ordered: [SettingsMainEntry] = {
-        let advanced: [SettingsCategory] = [.developer, .deviceCapabilities]
-        let main = SettingsCategory.allCases.filter { $0 != .about && !advanced.contains($0) }
-        return main.map(SettingsMainEntry.category) + [.accounts] + advanced.map(SettingsMainEntry.category)
-            + [.category(.about)]
-    }()
+    /// The everyday rows, top to bottom: Accounts, Appearance, Playback, Equalizer, Lyrics, Sing, Gestures & haptics,
+    /// Library & storage, AI features, Backup & Restore, About.
+    static let everyday: [SettingsMainEntry] = [
+        .accounts, .category(.appearance), .category(.playback), .category(.equalizer), .category(.lyrics),
+        .category(.sing), .category(.behavior), .category(.library), .category(.ai), .category(.backupRestore),
+        .category(.about),
+    ]
+
+    /// The rows only developer mode shows, under its switch.
+    static let developerOnly: [SettingsMainEntry] = [.category(.developer), .category(.deviceCapabilities)]
+
+    /// Every row the list shows, in order (the switch sits between the two blocks).
+    static func ordered(developerMode: Bool) -> [SettingsMainEntry] {
+        developerMode ? everyday + developerOnly : everyday
+    }
 
     /// SF Symbols for Android's category icons.
     var systemImage: String {
@@ -62,6 +86,8 @@ nonisolated enum SettingsMainEntry: Hashable, Identifiable, Sendable {
             case .appearance: "paintpalette.fill"
             case .playback: "music.note"
             case .equalizer: "waveform"
+            case .lyrics: "quote.bubble.fill"
+            case .sing: "music.mic"
             case .behavior: "hand.tap"
             case .ai: "sparkles"
             case .backupRestore: "doc.badge.arrow.up"
@@ -81,6 +107,8 @@ nonisolated enum SettingsMainEntry: Hashable, Identifiable, Sendable {
             case .library: return dark ? (0xFF004A77, 0xFFC2E7FF) : (0xFFD7E3FF, 0xFF005AC1)
             case .appearance: return dark ? (0xFF7D5260, 0xFFFFD8E4) : (0xFFFFD8E4, 0xFF631835)
             case .playback: return dark ? (0xFF633B48, 0xFFFFD8EC) : (0xFFFFD8EC, 0xFF631B4B)
+            case .lyrics: return dark ? (0xFF4A4458, 0xFFE8DEF8) : (0xFFE8DEF8, 0xFF1D192B)
+            case .sing: return dark ? (0xFF5E3A22, 0xFFFFDBC9) : (0xFFFFDBC9, 0xFF3A1900)
             case .behavior: return dark ? (0xFF3E4C63, 0xFFD7E3FF) : (0xFFD7E3FF, 0xFF253347)
             case .ai: return dark ? (0xFF004F58, 0xFF88FAFF) : (0xFFCCE8EA, 0xFF004F58)
             case .backupRestore: return dark ? (0xFF3B4869, 0xFFD9E2FF) : (0xFFD9E2FF, 0xFF27304E)
@@ -103,41 +131,45 @@ extension SettingsMainEntry {
 
     var subtitle: String {
         switch self {
-        case .accounts: L10n.settingsCategoryAccountsSubtitle
+        case .accounts: L10n.settingsMainAccountsSubtitle
         case .category(let c): c.localizedSubtitle
         }
     }
 }
 
 extension SettingsCategory {
-    /// Android `settings_category_*_title` (localised).
+    /// Android `settings_category_*_title` (localised); the plain-English names of 2026-10-22.
     var localizedTitle: String {
         switch self {
-        case .library: L10n.settingsCategoryMusicManagementTitle
+        case .library: L10n.settingsMainLibraryTitle
         case .appearance: L10n.settingsCategoryAppearanceTitle
         case .playback: L10n.settingsCategoryPlaybackTitle
         case .equalizer: L10n.settingsCategoryEqualizerTitle
-        case .behavior: L10n.settingsCategoryBehaviorTitle
+        case .lyrics: L10n.settingsMainLyricsTitle
+        case .sing: L10n.settingsMainSingTitle
+        case .behavior: L10n.settingsMainBehaviorTitle
         case .ai: L10n.settingsCategoryAiTitle
         case .backupRestore: L10n.settingsCategoryBackupTitle
-        case .developer: L10n.settingsCategoryDeveloperTitle
-        case .deviceCapabilities: L10n.settingsCategoryDeviceCapabilitiesTitle
+        case .developer: L10n.settingsMainDeveloperTitle
+        case .deviceCapabilities: L10n.settingsMainDeviceCapabilitiesTitle
         case .about: L10n.settingsCategoryAboutTitle
         }
     }
 
     var localizedSubtitle: String {
         switch self {
-        case .library: L10n.settingsCategoryMusicManagementSubtitle
-        case .appearance: L10n.settingsCategoryAppearanceSubtitle
-        case .playback: L10n.settingsCategoryPlaybackSubtitle
-        case .equalizer: L10n.settingsCategoryEqualizerSubtitle
-        case .behavior: L10n.settingsCategoryBehaviorSubtitle
-        case .ai: L10n.settingsCategoryAiSubtitle
-        case .backupRestore: L10n.settingsCategoryBackupSubtitle
-        case .developer: L10n.settingsCategoryDeveloperSubtitle
-        case .deviceCapabilities: L10n.settingsCategoryDeviceCapabilitiesSubtitle
-        case .about: L10n.settingsCategoryAboutSubtitle
+        case .library: L10n.settingsMainLibrarySubtitle
+        case .appearance: L10n.settingsMainAppearanceSubtitle
+        case .playback: L10n.settingsMainPlaybackSubtitle
+        case .equalizer: L10n.settingsMainEqualizerSubtitle
+        case .lyrics: L10n.settingsMainLyricsSubtitle
+        case .sing: L10n.settingsMainSingSubtitle
+        case .behavior: L10n.settingsMainBehaviorSubtitle
+        case .ai: L10n.settingsMainAiSubtitle
+        case .backupRestore: L10n.settingsMainBackupSubtitle
+        case .developer: L10n.settingsMainDeveloperSubtitle
+        case .deviceCapabilities: L10n.settingsMainDeviceCapabilitiesSubtitle
+        case .about: L10n.settingsMainAboutSubtitle
         }
     }
 }
@@ -187,7 +219,7 @@ struct SettingsCategoryRow: View {
     }
 }
 
-/// One settings category (Android `SettingsCategoryScreen`). Equalizer, Device Capabilities and About have their own
+/// One settings category (Android `SettingsCategoryScreen`). Equalizer, Device capabilities and About have their own
 /// screens on Android too; their category routes show those screens.
 struct SettingsCategoryView: View {
     let category: SettingsCategory
@@ -238,6 +270,8 @@ struct SettingsCategoryContent: View {
         case .library: LibrarySettingsSection()
         case .appearance: AppearanceSettingsSection()
         case .playback: PlaybackSettingsSection()
+        case .lyrics: LyricsSettingsSection()
+        case .sing: SingSettingsSection()
         case .behavior: BehaviorSettingsSection()
         case .ai: AISettingsSection()
         case .backupRestore: BackupSettingsSection()

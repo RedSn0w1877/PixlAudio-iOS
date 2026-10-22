@@ -1,8 +1,8 @@
 import XCTest
 
-/// Cloud Studio screenshots (iOS-first; demo data from `CloudDemo`, no network): Settings › Developer › Experimental ›
-/// Cloud processing filled in, with a passed Test connection further down; the queue in every state; the confirm sheet
-/// for a 12-song batch. Each in light and dark.
+/// Cloud Studio screenshots (iOS-first; demo data from `CloudDemo`, no network): Settings › Sing › Cloud processing
+/// filled in, with a passed Test connection further down; the queue in every state. Each in light and dark. UI tests
+/// start with developer mode on, so the keys, test and cost sections are there.
 @MainActor
 final class CloudStudioScreenshotTests: XCTestCase {
     func testCloudProcessingLight() throws { try capture("cloud.settings", "light", ready: "screen.cloudProcessing") }
@@ -45,13 +45,11 @@ final class CloudStudioScreenshotTests: XCTestCase {
         }
     }
 
-    func testConfirmLight() throws { try capture("cloud.confirm", "light", ready: "screen.cloudConfirm") }
-    func testConfirmDark() throws { try capture("cloud.confirm", "dark", ready: "screen.cloudConfirm") }
-
-    /// The Experimental row that opens Cloud processing.
-    func testExperimentalRowLight() throws {
-        try capture("experimental", "light", ready: "screen.experimental", suffix: "-cloudRow") { app in
-            self.scroll(app, until: "experimental.cloudProcessing")
+    /// The Sing row that opens Cloud processing (right under "Ready when you play", so no scrolling).
+    func testSingCloudRowLight() throws {
+        try capture("settingsCategory.sing", "light", ready: "screen.settingsCategory.sing", suffix: "-cloudRow") { app in
+            XCTAssertTrue(app.descendants(matching: .any)["settings.sing.cloudProcessing"].firstMatch.waitForExistence(timeout: 10),
+                          "the Cloud processing row is missing")
         }
     }
 

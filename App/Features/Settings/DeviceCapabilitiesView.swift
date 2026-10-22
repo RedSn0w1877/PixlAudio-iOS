@@ -24,7 +24,7 @@ struct DeviceCapabilitiesView: View {
     @State private var toast: String?
 
     var body: some View {
-        SettingsScaffold(title: L10n.settingsCategoryDeviceCapabilitiesTitle, screenID: screenID,
+        SettingsScaffold(title: L10n.settingsMainDeviceCapabilitiesTitle, screenID: screenID,
                          expandedHeight: SettingsMetrics.headerExpandedLong, titleMaxLines: 2, spacing: 12) {
             if let state = model.state {
                 CapabilitiesReadinessCard(state: state)

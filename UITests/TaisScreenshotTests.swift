@@ -1,9 +1,9 @@
 import XCTest
 
-/// Stage 14 screenshots (demo states from `TaisDemo`, no network or Core ML): Experimental's Remaster Song card
-/// (Android `TaisStudioProgressCard` with a running lyric sync, a finished instrumental and a failed BS-RoFormer render)
-/// and the iOS on-device models panel mid-download; the song sheet's Remaster card; the lyrics screen's instrumental
-/// UI (Android `InstrumentalRenderAction` + `FloatingInstrumentalToggle`): ready, rendering, and playing.
+/// Stage 14 screenshots (demo states from `TaisDemo`, no network or Core ML): Experimental's "Make an instrumental" card
+/// (Android `TaisStudioProgressCard` with a running on-device render and a failed BS-RoFormer render) and the iOS
+/// on-device models panel mid-download; the song sheet's card; the lyrics screen's instrumental UI (Android
+/// `InstrumentalRenderAction` + `FloatingInstrumentalToggle`): ready, rendering, and playing.
 @MainActor
 final class TaisScreenshotTests: XCTestCase {
     // MARK: Experimental
@@ -56,7 +56,7 @@ final class TaisScreenshotTests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["screen.songInfo"].firstMatch.waitForExistence(timeout: 20),
                       "the song sheet did not appear")
         Thread.sleep(forTimeInterval: 1.0)
-        let card = app.descendants(matching: .any)["tais.lyrics.start"].firstMatch
+        let card = app.descendants(matching: .any)["tais.instrumental.start"].firstMatch
         let height = app.windows.firstMatch.frame.height
         for _ in 0..<4 {
             if card.exists, card.isHittable, card.frame.maxY < height * 0.95 { break }

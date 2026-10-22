@@ -23,6 +23,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case settingsPlayback = "settingsCategory.playback"
     case settingsEqualizer = "settingsCategory.equalizer"
     case settingsBehavior = "settingsCategory.behavior"
+    case settingsLyrics = "settingsCategory.lyrics"
+    case settingsSing = "settingsCategory.sing"
     case settingsAI = "settingsCategory.ai"
     /// AI features with a cloud assistant switched on (Gemini, the demo key): the optional "Cloud assistants" rows.
     case settingsAICloud = "settingsCategory.ai.cloud"
@@ -68,8 +70,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case libraryCompactNav
     case playlistEdit, playlistAddSongs, playlistOptions, playlistReorder, genreSort
     // 2026-10-18 features: Find in playlist (open with a query / no matches), a playlist with a blocked artist, the
-    // Blocked artists and Gestures settings pages.
-    case playlistFind, playlistFindEmpty, playlistBlocked, blockedArtists, blockedArtistsEmpty, gestureSettings
+    // Blocked artists settings page (the gestures are switches of Settings › Gestures & haptics, `settingsBehavior`).
+    case playlistFind, playlistFindEmpty, playlistBlocked, blockedArtists, blockedArtistsEmpty
 
     // Stage 8: the player's sheets (presented over the expanded player) and the song editor
     case devices, artistPicker, editSong
@@ -115,16 +117,16 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case setupBackup, setupTheme, setupLibraryLayout, setupSpotify, setupFinish
     case backupRestorePlan, backupImportReport
 
-    // Stage 14: TAIS Studio — Experimental's Remaster Song card and on-device models panel, the song sheet's card,
+    // Stage 14: TAIS Studio — Experimental's "Make an instrumental" card and on-device models panel, the song sheet's card,
     // and the lyrics screen's instrumental UI (`TaisDemo` sets the job / model states)
     case taisStudio = "tais.studio", taisModels = "tais.models", taisSongSheet = "tais.songSheet"
     case taisInstrumental = "tais.instrumental", taisInstrumentalRendering = "tais.instrumentalRendering"
     case taisInstrumentalActive = "tais.instrumentalActive"
 
-    // Cloud Studio (iOS-first): Cloud processing filled in with a passed Test connection, the queue in every state,
-    // and the confirm sheet for a 12-song batch (`CloudDemo`, no network); `cloud.settings.builtin` is the same screen
-    // in a build with PixlAudio's built-in cloud keys (2026-10-08: no fields, "Use my own keys")
-    case cloudSettings = "cloud.settings", cloudQueue = "cloud.queue", cloudConfirm = "cloud.confirm"
+    // Cloud Studio (iOS-first): Cloud processing filled in with a passed Test connection and the queue in every state
+    // (`CloudDemo`, no network); `cloud.settings.builtin` is the same screen in a build with PixlAudio's built-in
+    // cloud keys (2026-10-08: no fields, "Use my own keys")
+    case cloudSettings = "cloud.settings", cloudQueue = "cloud.queue"
     case cloudSettingsBuiltIn = "cloud.settings.builtin"
 
     /// The accessibility identifier present once the screen is up (`screen.<id>`).
@@ -142,7 +144,6 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .aiPlaylist: return "screen.aiPlaylist"
         case .taisChat, .taisChatConversation: return "screen.taisChat"
         case .aiPlaylistLab: return "screen.aiPlaylistLab"
-        case .cloudConfirm: return "screen.cloudConfirm"
         default:
             if let route { return "screen.\(route.screenID)" }
             if let sheet { return "screen.\(sheet.id.split(separator: ".").first ?? "")" }
@@ -186,6 +187,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .settingsPlayback: return .settingsCategory(.playback)
         case .settingsEqualizer: return .settingsCategory(.equalizer)
         case .settingsBehavior: return .settingsCategory(.behavior)
+        case .settingsLyrics: return .settingsCategory(.lyrics)
+        case .settingsSing: return .settingsCategory(.sing)
         case .settingsAI, .settingsAICloud, .settingsAILocalModel, .settingsAILocalModelReady,
              .settingsAILocalModelFailed:
             return .settingsCategory(.ai)
@@ -197,7 +200,6 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .experimental: return .experimental
         case .artistSettings: return .artistSettings
         case .blockedArtists, .blockedArtistsEmpty: return .blockedArtists
-        case .gestureSettings: return .gestureSettings
         case .delimiterConfig: return .delimiterConfig
         case .wordDelimiterConfig: return .wordDelimiterConfig
         case .equalizer: return .equalizer
@@ -226,8 +228,6 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .taisStudio, .taisModels: return .experimental
         case .cloudSettings, .cloudSettingsBuiltIn: return .cloudProcessing
         case .cloudQueue: return .cloudQueue
-        // A sheet: one destination per demo screen (it opens over Home; in the app the queue presents it).
-        case .cloudConfirm: return nil
         case .taisSongSheet, .taisInstrumental, .taisInstrumentalRendering, .taisInstrumentalActive: return nil
         }
     }
@@ -264,7 +264,6 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .artistPicker: return .artistPicker(songId: DemoLibrary.songs[DemoLibrary.featuredSongIndex].id)
         case .aiPlaylist: return .aiPlaylist
         case .taisChat, .taisChatConversation: return .taisChat
-        case .cloudConfirm: return .cloudConfirm
         default: return nil
         }
     }
@@ -399,7 +398,7 @@ nonisolated enum UITestLaunchRouter {
 
     /// Settings screens open on top of Settings (and the account screens on top of Accounts), as when navigated.
     private static let underSettings: Set<String> = [
-        "paletteStyle", "experimental", "artistSettings", "blockedArtists", "gestureSettings", "delimiterConfig",
+        "paletteStyle", "experimental", "artistSettings", "blockedArtists", "delimiterConfig",
         "wordDelimiterConfig", "equalizer",
         "editTransition", "deviceCapabilities", "about", "openSourceLicenses", "easterEgg", "quickFill",
         "diagnostics", "accounts", "cloudProcessing", "cloudQueue",

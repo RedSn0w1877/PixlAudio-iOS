@@ -1,8 +1,8 @@
 import PixlModel
 import SwiftUI
 
-/// The quick actions a long press on the full player's artwork or on the mini player offers (Settings › Behavior ›
-/// Gestures): add to playlist, share, go to the artist. A context menu (the system's), so it needs no drag and cannot
+/// The quick actions a long press on the full player's artwork or on the mini player offers (Settings › Gestures &
+/// haptics): add to playlist, share, go to the artist. A context menu (the system's), so it needs no drag and cannot
 /// fight scrolling or the sheet; the add-to-playlist sheet is presented from the view the menu is attached to.
 struct SongQuickActionsModifier: ViewModifier {
     let song: Song

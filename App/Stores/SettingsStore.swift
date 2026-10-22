@@ -119,6 +119,10 @@ nonisolated enum PreferenceKeys {
     static let safeTokenLimit = "safe_token_limit"
     // Developer
     static let advancedPerformanceDiagnosticsEnabled = "advanced_performance_diagnostics_enabled"
+    /// Settings › Developer mode (the last switch of the main list): shows the Developer and Device capabilities
+    /// rows and every category's "Advanced" block. Per device: `AndroidPreferenceCatalog.deviceState`, so backups
+    /// neither export nor reset it.
+    static let developerMode = "developer_mode_enabled"
 
     // Stage 7d (settings screens) — appended, Android names and types.
     static let disableBlurAllOver = "disable_blur_all_over"
@@ -175,9 +179,9 @@ nonisolated enum PreferenceKeys {
     /// Settings › Appearance › Accent Color: a `"#RRGGBB"` seed, `""` = PixlAudio's violet (owner request 2026-10-07).
     /// A string, not an Int: an ARGB above `Int32.max` would flip sign as an Android `int` on a round trip.
     static let accentColor = "accent_color_v1"
-    /// Blocked artists (Settings › Behavior › Blocked artists): a JSON array of `BlockedArtist`.
+    /// Blocked artists (Settings › Library & storage › Blocked artists): a JSON array of `BlockedArtist`.
     static let blockedArtists = "blocked_artists_json"
-    // Gestures (Settings › Behavior › Gestures). All on by default.
+    // Gestures (Settings › Gestures & haptics). All on by default.
     static let gesturePlayerArtworkSwipe = "gesture_player_artwork_swipe"
     static let gesturePlayerArtworkDoubleTapLike = "gesture_player_artwork_double_tap_like"
     static let gesturePlayerArtworkLongPress = "gesture_player_artwork_long_press"
@@ -185,7 +189,7 @@ nonisolated enum PreferenceKeys {
     static let gestureMiniSwipeUpOpen = "gesture_mini_swipe_up_open"
     static let gestureMiniLongPress = "gesture_mini_long_press"
     static let gestureListSwipeQueue = "gesture_list_swipe_queue"
-    // Music Haptics (Settings › Behavior › Music Haptics). Off by default.
+    // Music Haptics (Settings › Gestures & haptics › Vibrate with the music). Off by default.
     static let musicHapticsEnabled = "music_haptics_enabled"
     static let musicHapticsStrength = "music_haptics_strength"
     static let musicHapticsMode = "music_haptics_mode"
@@ -243,7 +247,10 @@ final class SettingsStore {
         let name = "pixlaudio.uitest"
         let defaults = UserDefaults(suiteName: name) ?? .standard
         defaults.removePersistentDomain(forName: name)
-        return SettingsStore(defaults: defaults)
+        let store = SettingsStore(defaults: defaults)
+        // UI tests reach the Developer, Experimental, Diagnostics and cloud screens: developer mode starts on.
+        store.experimental.developerMode = true
+        return store
     }
 }
 
@@ -771,12 +778,15 @@ final class AISettings {
     }
 }
 
-/// Developer › Experimental (Android `FullPlayerLoadingTweaks`, TAIS tools) plus the diagnostics session and the
-/// backup notice. Defaults are Android's.
+/// Developer › Experimental (Android `FullPlayerLoadingTweaks`, TAIS tools) plus the diagnostics session, the
+/// backup notice and developer mode. Defaults are Android's.
 @Observable
 final class ExperimentalSettings {
     private let defaults: UserDefaults
 
+    /// Developer mode (off by default, per device): the advanced settings and testing tools. Turning it off hides
+    /// them; it never resets what they set.
+    var developerMode: Bool { didSet { defaults.set(developerMode, forKey: PreferenceKeys.developerMode) } }
     var delayAlbumCarousel: Bool { didSet { defaults.set(delayAlbumCarousel, forKey: PreferenceKeys.fullPlayerDelayAlbum) } }
     var delaySongMetadata: Bool { didSet { defaults.set(delaySongMetadata, forKey: PreferenceKeys.fullPlayerDelayMetadata) } }
     var delayProgressBar: Bool { didSet { defaults.set(delayProgressBar, forKey: PreferenceKeys.fullPlayerDelayProgress) } }
@@ -832,6 +842,7 @@ final class ExperimentalSettings {
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
+        developerMode = defaults.bool(PreferenceKeys.developerMode, default: false)
         delayAlbumCarousel = defaults.bool(PreferenceKeys.fullPlayerDelayAlbum, default: true)
         delaySongMetadata = defaults.bool(PreferenceKeys.fullPlayerDelayMetadata, default: true)
         delayProgressBar = defaults.bool(PreferenceKeys.fullPlayerDelayProgress, default: true)

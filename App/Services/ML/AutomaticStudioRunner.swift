@@ -232,7 +232,7 @@ final class AutomaticStudioRunner {
             }
             if !isModelInstalled(for: kind) {
                 reasons.append(kind == .lyrics
-                    ? "Starts once the lyric sync model is on this iPhone (sync one song by hand)"
+                    ? "Starts once the lyric sync model is on this iPhone (download it under On-device models)"
                     : "Starts once the instrumental model is on this iPhone (make one instrumental by hand)")
                 return false
             }

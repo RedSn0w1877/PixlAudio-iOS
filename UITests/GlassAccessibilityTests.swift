@@ -6,23 +6,23 @@ import XCTest
 /// controls up by label), which VoiceOver never reads.
 @MainActor
 final class GlassAccessibilityTests: XCTestCase {
-    /// Settings › Music Management: an item row is a button, the filtering rows keep their sliders and the switch row
-    /// is still a switch.
+    /// Settings › Lyrics: the lyric blur's strength keeps its slider, Immersive lyrics is still a switch, and the Tap
+    /// timing row (in the Advanced block, which the UI tests' developer mode shows) is a button.
     func testSettingsGroupsKeepControlTraits() {
-        let app = launch("settingsCategory.library", ready: "screen.settingsCategory.library")
-        let itemRow = app.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Tap timing")).firstMatch
-        XCTAssertTrue(itemRow.waitForExistence(timeout: 10), "the Tap timing row is not a button")
-        XCTAssertTrue(app.sliders.firstMatch.waitForExistence(timeout: 5), "the filtering rows have no slider")
+        let app = launch("settingsCategory.lyrics", ready: "screen.settingsCategory.lyrics")
+        XCTAssertTrue(app.sliders.firstMatch.waitForExistence(timeout: 10), "the blur strength has no slider")
         // A Toggle combined into its row reports as a switch (or, on newer runtimes, a toggle).
         let switchRow = app.descendants(matching: .any).matching(NSPredicate(
             format: "elementType == %lu OR elementType == %lu",
             XCUIElement.ElementType.switch.rawValue, XCUIElement.ElementType.toggle.rawValue)).firstMatch
+        XCTAssertTrue(switchRow.waitForExistence(timeout: 5), "the switch row is not a switch")
+        let itemRow = app.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Tap timing")).firstMatch
         var swipes = 0
-        while !switchRow.exists, swipes < 3 {
+        while !itemRow.exists, swipes < 3 {
             app.swipeUp()
             swipes += 1
         }
-        XCTAssertTrue(switchRow.waitForExistence(timeout: 5), "the switch row is not a switch")
+        XCTAssertTrue(itemRow.waitForExistence(timeout: 10), "the Tap timing row is not a button")
     }
 
     /// The full player's top bar: the collapse circle is a button with its label.

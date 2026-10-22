@@ -1,78 +1,55 @@
 import SwiftUI
 
-/// Settings › Music Management (Android `SettingsCategoryScreen` LIBRARY): filtering sliders, offline storage, lyrics
-/// management. The app is Spotify-only, so the music-folder, rescan and local-lyrics-file rows are gone.
+/// Settings › Library & storage (the `library` category; Android `SettingsCategoryScreen` LIBRARY): Blocked artists
+/// (moved here from Behavior) and the offline storage — and, in developer mode, an "Advanced" block (minimum tracks
+/// per album, album art cache limit). The app is Spotify-only, so the music-folder, rescan and local-lyrics-file rows
+/// are gone; the lyrics rows moved to Lyrics.
 struct LibrarySettingsSection: View {
     @Environment(SettingsStore.self) private var settings
-    @Environment(AppEnvironment.self) private var environment
+    @Environment(BlockedArtistsStore.self) private var blocked
     @Environment(Router.self) private var router
-    @Environment(\.appTheme) private var theme
 
     @State private var minTracks: Double = 1
     @State private var cacheLimit: Double = 200
-    @State private var showsTapTiming = false
-    @State private var showsResetLyrics = false
     @State private var storage: OfflineStorageUsage?
     @State private var toast: String?
 
     var body: some View {
-        @Bindable var lyrics = settings.lyrics
+        let developerMode = settings.experimental.developerMode
         SettingsCategoryScaffold(category: .library, toast: $toast) {
-        SettingsSubsection(title: L10n.settingsFilteringSection) {
-            SliderSettingRow(label: L10n.settingsMinTracksPerAlbum, value: $minTracks, range: 1...5, steps: 3,
-                             onCommit: { settings.library.minTracksPerAlbum = Int(minTracks) },
-                             valueText: { "\(Int($0))" })
-            SliderSettingRow(label: L10n.settingsAlbumArtCacheLimit, value: $cacheLimit, range: 50...1500, steps: 28,
-                             onCommit: { settings.library.albumArtCacheLimitMb = Int(cacheLimit) },
-                             valueText: { "\(Int($0)) MB" })
-        }
-        SettingsSubsection(title: L10n.settingsStorageSection) {
-            let reclaimable = storage?.cachedBytes ?? 0
-            ActionSettingRow(
-                title: L10n.settingsStorageTitle,
-                subtitle: storage.map {
-                    L10n.settingsStorageSubtitle(ByteFormat.short($0.downloadedBytes), $0.downloadedCount,
-                                                 ByteFormat.short($0.cachedBytes))
-                } ?? L10n.settingsStorageSubtitleLoading,
-                systemImage: "arrow.down.circle",
-                primaryLabel: reclaimable > 0 ? L10n.settingsStorageActionFree(ByteFormat.short(reclaimable))
-                                              : L10n.settingsStorageActionNothing,
-                onPrimary: clearCache,
-                enabled: reclaimable > 0)
-        }
-        SettingsSubsection(title: L10n.settingsLyricsManagementSection, addBottomSpace: false) {
-            ThemeSelectorRow(label: L10n.settingsLyricsSourcePriorityTitle,
-                             description: L10n.settingsLyricsSourcePrioritySubtitle,
-                             options: [SettingsOption(key: "EMBEDDED_FIRST", label: L10n.settingsLyricsEmbeddedFirst),
-                                       SettingsOption(key: "API_FIRST", label: L10n.settingsLyricsOnlineFirst),
-                                       SettingsOption(key: "LOCAL_FIRST", label: L10n.settingsLyricsLocalFirst)],
-                             selectedKey: lyrics.sourcePreference, systemImage: "quote.bubble") {
-                lyrics.sourcePreference = $0
+            SettingsSubsection(title: L10n.settingsSectionBlockedArtists) {
+                SettingsItemRow(title: L10n.settingsSectionBlockedArtists, subtitle: blockedSubtitle,
+                                systemImage: "nosign", showsChevron: true,
+                                identifier: "settings.library.blockedArtists") { router.push(.blockedArtists) }
             }
-            SettingsItemRow(title: L10n.settingsLyricsTapTiming,
-                            subtitle: L10n.settingsLyricsTapTimingSub(lyrics.tapOffsetSpeakerMs),
-                            systemImage: "hand.tap", identifier: "settings.library.tapTiming") { showsTapTiming = true }
-            SettingsItemRow(title: L10n.settingsResetImportedLyricsTitle,
-                            subtitle: L10n.settingsResetImportedLyricsSubtitle, systemImage: "text.badge.xmark",
-                            identifier: "settings.library.resetLyrics") { showsResetLyrics = true }
-        }
+            SettingsSubsection(title: L10n.settingsStorageSection, addBottomSpace: developerMode) {
+                let reclaimable = storage?.cachedBytes ?? 0
+                ActionSettingRow(
+                    title: L10n.settingsStorageTitle,
+                    subtitle: storage.map {
+                        L10n.settingsStorageSubtitle(ByteFormat.short($0.downloadedBytes), $0.downloadedCount,
+                                                     ByteFormat.short($0.cachedBytes))
+                    } ?? L10n.settingsStorageSubtitleLoading,
+                    systemImage: "arrow.down.circle",
+                    primaryLabel: reclaimable > 0 ? L10n.settingsStorageActionFree(ByteFormat.short(reclaimable))
+                                                  : L10n.settingsStorageActionNothing,
+                    onPrimary: clearCache,
+                    enabled: reclaimable > 0)
+            }
+            SettingsAdvancedSubsection {
+                SliderSettingRow(label: L10n.settingsMinTracksPerAlbum, value: $minTracks, range: 1...5, steps: 3,
+                                 onCommit: { settings.library.minTracksPerAlbum = Int(minTracks) },
+                                 valueText: { "\(Int($0))" })
+                SliderSettingRow(label: L10n.settingsAlbumArtCacheLimit, value: $cacheLimit, range: 50...1500, steps: 28,
+                                 onCommit: { settings.library.albumArtCacheLimitMb = Int(cacheLimit) },
+                                 valueText: { "\(Int($0)) MB" })
+            }
         }
         .onAppear {
             minTracks = Double(settings.library.minTracksPerAlbum)
             cacheLimit = Double(settings.library.albumArtCacheLimitMb)
         }
         .task { storage = await OfflineStorageUsage.measure() }
-        .sheet(isPresented: $showsTapTiming) {
-            LyricsTapTimingSheet()
-        }
-        .alert(L10n.settingsDialogResetImportedLyricsTitle, isPresented: $showsResetLyrics) {
-            Button(L10n.commonCancel, role: .cancel) {}
-            Button(L10n.commonConfirm, role: .destructive) {
-                Task { try? await environment.persistence?.settingsDeleteAllLyrics() }
-            }
-        } message: {
-            Text(L10n.settingsDialogResetImportedLyricsBody)
-        }
     }
 
     private func clearCache() {
@@ -80,6 +57,14 @@ struct LibrarySettingsSection: View {
             let freed = await OfflineStorageUsage.clearCaches()
             storage = await OfflineStorageUsage.measure()
             toast = L10n.settingsStorageFreed(ByteFormat.short(freed))
+        }
+    }
+
+    private var blockedSubtitle: String {
+        switch blocked.count {
+        case 0: L10n.settingsBlockedArtistsNone
+        case 1: L10n.settingsBlockedArtistsOne
+        default: L10n.settingsBlockedArtistsMany(blocked.count)
         }
     }
 }

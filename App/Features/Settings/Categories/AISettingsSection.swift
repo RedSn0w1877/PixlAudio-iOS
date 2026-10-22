@@ -2,10 +2,10 @@ import PixlNet
 import SwiftUI
 import UIKit
 
-/// Settings › AI features (Android `SettingsCategoryScreen` AI_INTEGRATION): the automatic-studio and
-/// music-intelligence cards, the assistant, sign-in (API key, Keychain), model, base URL for configurable providers,
-/// personality (system prompt + presets), and the collapsed "Advanced" block (generation parameters, song data,
-/// usage report).
+/// Settings › AI features (Android `SettingsCategoryScreen` AI_INTEGRATION): the music-intelligence card and the
+/// personality (system prompt + presets). Developer mode adds the "Advanced" block: the music intelligence tools, the
+/// assistant, sign-in (API key, Keychain), model, base URL for configurable providers, and a collapsed disclosure
+/// (generation parameters, song data, usage report). The automatic studio card moved to Sing.
 ///
 /// iOS: the on-device provider uses the system's on-device language model (Foundation Models) instead of importing
 /// a MediaPipe file. The model picker lists the provider's chat models (stage 13, `AIService.availableModels`).
@@ -30,75 +30,15 @@ struct AISettingsSection: View {
     private var provider: AiProvider { AiProvider.fromString(settings.ai.provider) }
 
     var body: some View {
-        @Bindable var ai = settings.ai
-        let cloud = ai.usesCloudAssistant
+        let developerMode = settings.experimental.developerMode
         SettingsCategoryScaffold(category: .ai) {
-            AutomaticStudioCard()
-            Spacer().frame(height: 20)
             MusicIntelligenceCard()
             Spacer().frame(height: 20)
-            SettingsSubsection(title: L10n.settingsAiProviderTitle) {
-                OnDeviceModelRow(isSelected: !cloud && !ai.useDownloadedModel,
-                                 downloadedModelOn: !cloud && ai.useDownloadedModel)
-                DownloadedModelRows()
-            }
-            SettingsSubsection(title: "Cloud assistants (optional)") {
-                SwitchSettingRow(title: "Use a cloud assistant",
-                                 subtitle: cloud ? "AI requests go to \(provider.displayName) with your own key."
-                                     : "Off: every AI feature runs on this iPhone, privately. Nothing goes to the cloud.",
-                                 isOn: Binding(get: { ai.usesCloudAssistant }, set: { ai.setUsesCloudAssistant($0) }),
-                                 systemImage: "cloud", iconColor: cloud ? theme.primary : theme.tertiary)
-                    .accessibilityIdentifier("settings.ai.cloud")
-                if cloud {
-                    ThemeSelectorRow(label: L10n.settingsAiProviderTitle, description: L10n.settingsAiProviderSubtitle,
-                                     options: Self.cloudProviders.map { SettingsOption(key: $0.rawValue, label: $0.displayName) },
-                                     selectedKey: ai.provider, systemImage: "flask") { ai.provider = $0 }
-                    SwitchSettingRow(title: L10n.settingsSafeTokenTitle,
-                                     subtitle: ai.safeTokenLimit ? L10n.settingsSafeTokenOn : L10n.settingsSafeTokenOff,
-                                     isOn: $ai.safeTokenLimit, systemImage: "chart.line.uptrend.xyaxis",
-                                     iconColor: ai.safeTokenLimit ? theme.primary : theme.tertiary)
-                }
-            }
-            if cloud {
-                SettingsSubsection(title: L10n.settingsCredentialsSection) {
-                    if provider == .gemini && apiKey.isEmpty {
-                        SettingsItemRow(title: L10n.settingsAiGetFreeKey, subtitle: L10n.settingsAiGetFreeKeySubtitle,
-                                        systemImage: "arrow.up.right.square", iconColor: theme.primary) {
-                            if let url = URL(string: "https://aistudio.google.com/apikey") { UIApplication.shared.open(url) }
-                        }
-                    }
-                    AITextSaveRow(value: apiKey, title: L10n.settingsAiApiKeyTitle(provider.displayName),
-                                  subtitle: L10n.settingsAiApiKeySubtitle(sourceLabel),
-                                  placeholder: L10n.settingsEnterApiKeyPlaceholder, secure: true) { saveKey($0) }
-                }
-                if !apiKey.isEmpty {
-                    SettingsSubsection(title: L10n.settingsModelSelectionSection) {
-                        modelSelection
-                    }
-                }
-                if provider.hasConfigurableUrl {
-                    SettingsSubsection(title: "API Base URL") {
-                        AITextSaveRow(value: ai.baseUrl(for: provider.rawValue), title: "Base URL",
-                                      subtitle: provider == .ollama
-                                          ? "e.g. http://192.168.1.50:11434/v1 (your Ollama server's LAN address)"
-                                          : "e.g. https://api.example.com/v1",
-                                      placeholder: "https://", secure: false) {
-                            ai.setBaseUrl($0, for: provider.rawValue)
-                            // Ollama counts as set up with a base URL alone ("New playlist" › With AI reads this).
-                            let environment = self.environment
-                            Task { await AIProviderStatus.refresh(environment) }
-                        }
-                    }
-                }
-            }
-            SettingsSubsection(title: L10n.settingsPromptBehaviorSection, addBottomSpace: false) {
+            SettingsSubsection(title: L10n.settingsPromptBehaviorSection, addBottomSpace: developerMode) {
                 AISystemPromptRow(providerName: provider.rawValue)
             }
-            Spacer().frame(height: 8)
-            advancedToggle
-            Spacer().frame(height: 8)
-            if showsAdvanced {
-                advanced(cloud: cloud)
+            if developerMode {
+                advancedBlock
             }
         }
         .animation(PixlMotion.state, value: showsAdvanced)
@@ -111,6 +51,77 @@ struct AISettingsSection: View {
         .task(id: showsAdvanced) {
             guard showsAdvanced, let persistence = environment.persistence else { return }
             if let loaded = try? await persistence.settingsAiUsage() { usage = loaded }
+        }
+    }
+
+    /// Developer mode's "Advanced" block: the music intelligence tools, the assistant (the on-device model, the
+    /// downloaded one, the optional cloud assistants with their sign-in, model and base URL) and the generation
+    /// parameters, song data and usage report disclosure.
+    @ViewBuilder
+    private var advancedBlock: some View {
+        @Bindable var ai = settings.ai
+        let cloud = ai.usesCloudAssistant
+        SettingsAdvancedHeader()
+        MusicIntelligenceToolsPanel()
+        SettingsSubsection(title: L10n.settingsAiProviderTitle) {
+            OnDeviceModelRow(isSelected: !cloud && !ai.useDownloadedModel,
+                             downloadedModelOn: !cloud && ai.useDownloadedModel)
+            DownloadedModelRows()
+        }
+        SettingsSubsection(title: "Cloud assistants (optional)") {
+            SwitchSettingRow(title: "Use a cloud assistant",
+                             subtitle: cloud ? "AI requests go to \(provider.displayName) with your own key."
+                                 : "Off: every AI feature runs on this iPhone, privately. Nothing goes to the cloud.",
+                             isOn: Binding(get: { ai.usesCloudAssistant }, set: { ai.setUsesCloudAssistant($0) }),
+                             systemImage: "cloud", iconColor: cloud ? theme.primary : theme.tertiary)
+                .accessibilityIdentifier("settings.ai.cloud")
+            if cloud {
+                ThemeSelectorRow(label: L10n.settingsAiProviderTitle, description: L10n.settingsAiProviderSubtitle,
+                                 options: Self.cloudProviders.map { SettingsOption(key: $0.rawValue, label: $0.displayName) },
+                                 selectedKey: ai.provider, systemImage: "flask") { ai.provider = $0 }
+                SwitchSettingRow(title: L10n.settingsSafeTokenTitle,
+                                 subtitle: ai.safeTokenLimit ? L10n.settingsSafeTokenOn : L10n.settingsSafeTokenOff,
+                                 isOn: $ai.safeTokenLimit, systemImage: "chart.line.uptrend.xyaxis",
+                                 iconColor: ai.safeTokenLimit ? theme.primary : theme.tertiary)
+            }
+        }
+        if cloud {
+            SettingsSubsection(title: L10n.settingsCredentialsSection) {
+                if provider == .gemini && apiKey.isEmpty {
+                    SettingsItemRow(title: L10n.settingsAiGetFreeKey, subtitle: L10n.settingsAiGetFreeKeySubtitle,
+                                    systemImage: "arrow.up.right.square", iconColor: theme.primary) {
+                        if let url = URL(string: "https://aistudio.google.com/apikey") { UIApplication.shared.open(url) }
+                    }
+                }
+                AITextSaveRow(value: apiKey, title: L10n.settingsAiApiKeyTitle(provider.displayName),
+                              subtitle: L10n.settingsAiApiKeySubtitle(sourceLabel),
+                              placeholder: L10n.settingsEnterApiKeyPlaceholder, secure: true) { saveKey($0) }
+            }
+            if !apiKey.isEmpty {
+                SettingsSubsection(title: L10n.settingsModelSelectionSection) {
+                    modelSelection
+                }
+            }
+            if provider.hasConfigurableUrl {
+                SettingsSubsection(title: "API Base URL") {
+                    AITextSaveRow(value: ai.baseUrl(for: provider.rawValue), title: "Base URL",
+                                  subtitle: provider == .ollama
+                                      ? "e.g. http://192.168.1.50:11434/v1 (your Ollama server's LAN address)"
+                                      : "e.g. https://api.example.com/v1",
+                                  placeholder: "https://", secure: false) {
+                        ai.setBaseUrl($0, for: provider.rawValue)
+                        // Ollama counts as set up with a base URL alone ("New playlist" › With AI reads this).
+                        let environment = self.environment
+                        Task { await AIProviderStatus.refresh(environment) }
+                    }
+                }
+            }
+        }
+        Spacer().frame(height: 8)
+        advancedToggle
+        Spacer().frame(height: 8)
+        if showsAdvanced {
+            advanced(cloud: cloud)
         }
     }
 
@@ -169,7 +180,7 @@ struct AISettingsSection: View {
     private var advancedToggle: some View {
         Button { showsAdvanced.toggle() } label: {
             HStack {
-                Text("Advanced")
+                Text(L10n.settingsAiAdvancedDisclosure)
                     .pixlFont(.titleMedium)
                     .foregroundStyle(theme.onSurface)
                 Spacer()
@@ -608,70 +619,9 @@ struct AIUsageItem: View {
     }
 }
 
-/// Android `AutomaticStudioSettingsCard` (tertiary-container card): automatic lyric sync and instrumentals, run by
-/// `AutomaticStudioRunner` while PixlAudio is open (iOS gives apps no dependable background processing time).
-struct AutomaticStudioCard: View {
-    @Environment(AppEnvironment.self) private var env
-    @Environment(SettingsStore.self) private var settings
-    @Environment(\.appTheme) private var theme
-    @State private var showsDetails = false
-
-    var body: some View {
-        @Bindable var lyrics = settings.lyrics
-        @Bindable var playback = settings.playback
-        GlassCard(cornerRadius: 28, tint: theme.tertiaryContainer) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Ready when you play").pixlFont(.headlineSmall).foregroundStyle(theme.onTertiaryContainer)
-                Text("Prepare lyrics and instrumentals quietly while PixlAudio is open.")
-                    .pixlFont(.bodyMedium).foregroundStyle(theme.onTertiaryContainer)
-                cardToggle("Automatic lyric sync", "Looks for word timings first.", $lyrics.automaticLyrics)
-                cardToggle("Automatic instrumentals", "Processes songs already on your device, one at a time.",
-                           $playback.automaticInstrumentals)
-                Text("No automatic notifications. Manual sync and instrumental buttons remain available.")
-                    .pixlFont(.bodySmall).foregroundStyle(theme.onTertiaryContainer)
-                Text(lyrics.automaticLyrics || playback.automaticInstrumentals ? env.automaticStudio.status : "Off")
-                    .pixlFont(.bodyMedium)
-                    .foregroundStyle(theme.onSurface)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(theme.surfaceContainerHighest.opacity(0.8),
-                                in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .accessibilityIdentifier("ai.automaticStudio.status")
-                SettingsFillButton(title: showsDetails ? "Hide queue details" : "Queue and diagnostics", style: .tonal) {
-                    showsDetails.toggle()
-                }
-                if showsDetails {
-                    Text("Runs while PixlAudio is open and nothing is playing, one song at a time, at most 8 songs every 6 hours. It waits during playback, below 40% battery unless charging, while the phone is hot or short of storage, and while you process songs by hand; songs over 6 minutes stay manual. It starts once the lyric sync or instrumental model is on this iPhone.")
-                        .pixlFont(.bodySmall).foregroundStyle(theme.onTertiaryContainer)
-                    SettingsFillButton(title: "Check queue now", style: .outlined,
-                                       enabled: lyrics.automaticLyrics || playback.automaticInstrumentals) {
-                        env.automaticStudio.scanNow()
-                    }
-                }
-            }
-            .padding(20)
-        }
-        .animation(PixlMotion.state, value: showsDetails)
-        .onChange(of: lyrics.automaticLyrics) { _, _ in env.automaticStudio.scanNow() }
-        .onChange(of: playback.automaticInstrumentals) { _, _ in env.automaticStudio.scanNow() }
-    }
-
-    private func cardToggle(_ title: String, _ detail: String, _ isOn: Binding<Bool>) -> some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading) {
-                Text(title).pixlFont(.titleMedium).foregroundStyle(theme.onTertiaryContainer)
-                Text(detail).pixlFont(.bodySmall).foregroundStyle(theme.onTertiaryContainer)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            Toggle(title, isOn: isOn).labelsHidden().tint(theme.tertiary)
-        }
-        .frame(minHeight: 64)
-    }
-}
-
-/// Android `MusicIntelligenceSettingsCard` (secondary-container card): learning, exploration and the debug tools,
-/// on `MusicTasteStore` and Home's recommendations.
+/// Android `MusicIntelligenceSettingsCard` (secondary-container card): learning, exploration, what it has learned and
+/// "Reset learned taste", on `MusicTasteStore` and Home's recommendations. The preview and refresh tools sit in
+/// Advanced (`MusicIntelligenceToolsPanel`).
 ///
 /// Dropped: "Discover beyond my library" — on Android it adds online catalog songs to Home's discovery shelves;
 /// the iOS Home has no catalog source, so the switch would do nothing (docs/design.md › Dropped settings). The
@@ -680,11 +630,8 @@ struct MusicIntelligenceCard: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(SettingsStore.self) private var settings
     @Environment(\.appTheme) private var theme
-    @State private var expanded = false
     @State private var exploration = 0.25
     @State private var showsReset = false
-    @State private var isBusy = false
-    @State private var message: String?
 
     var body: some View {
         @Bindable var ai = settings.ai
@@ -703,11 +650,49 @@ struct MusicIntelligenceCard: View {
                 Text(L10n.musicIntelligenceLearningCount(taste.learnedSongs, taste.completions, taste.skips))
                     .pixlFont(.bodySmall).foregroundStyle(theme.onSecondaryContainer)
                     .accessibilityIdentifier("ai.musicIntelligence.count")
+                SettingsFillButton(title: L10n.musicIntelligenceReset, style: .outlined) { showsReset = true }
+            }
+            .padding(20)
+        }
+        .onAppear { exploration = ai.musicExploration }
+        .alert(L10n.musicIntelligenceReset, isPresented: $showsReset) {
+            Button(L10n.commonCancel, role: .cancel) {}
+            Button(L10n.musicIntelligenceResetConfirm, role: .destructive) {
+                taste.reset()
+            }
+        } message: {
+            Text(L10n.musicIntelligenceResetDescription)
+        }
+    }
+
+    private func toggle(_ title: String, _ isOn: Binding<Bool>) -> some View {
+        HStack(spacing: 12) {
+            Text(title).pixlFont(.titleSmall).foregroundStyle(theme.onSecondaryContainer)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Toggle(title, isOn: isOn).labelsHidden().tint(theme.primary)
+        }
+        .frame(minHeight: 48)
+    }
+}
+
+/// Android's music intelligence "Debug and testing tools" (developer mode, minus Reset learned taste): preview the
+/// ranked picks, draw the mixes again, and read or copy the recommendation report.
+struct MusicIntelligenceToolsPanel: View {
+    @Environment(AppEnvironment.self) private var env
+    @Environment(\.appTheme) private var theme
+    @State private var expanded = false
+    @State private var isBusy = false
+    @State private var message: String?
+
+    var body: some View {
+        let taste = env.musicTaste
+        SettingsSubsection(title: L10n.musicIntelligenceTitle) {
+            SettingsPanel {
                 SettingsFillButton(title: expanded ? L10n.musicIntelligenceHideTools : L10n.musicIntelligenceTools,
                                    style: .filled) { expanded.toggle() }
                 if expanded {
                     Text(L10n.musicIntelligenceToolsDescription)
-                        .pixlFont(.bodySmall).foregroundStyle(theme.onSecondaryContainer)
+                        .pixlFont(.bodySmall).foregroundStyle(theme.onSurfaceVariant)
                     SettingsFillButton(title: L10n.musicIntelligencePreview, style: .filled, enabled: !isBusy) {
                         preview()
                     }
@@ -715,32 +700,20 @@ struct MusicIntelligenceCard: View {
                         refresh()
                     }
                     if let message {
-                        Text(message).pixlFont(.bodySmall).foregroundStyle(theme.onSecondaryContainer)
+                        Text(message).pixlFont(.bodySmall).foregroundStyle(theme.onSurfaceVariant)
                     }
                     Text(taste.lastReport)
                         .pixlFont(.bodySmall)
-                        .foregroundStyle(theme.onSecondaryContainer)
+                        .foregroundStyle(theme.onSurfaceVariant)
                         .textSelection(.enabled)
                     SettingsFillButton(title: L10n.musicIntelligenceCopyReport, style: .outlined) {
                         UIPasteboard.general.string = taste.lastReport
                         message = "Report copied."
                     }
-                    SettingsFillButton(title: L10n.musicIntelligenceReset, style: .outlined) { showsReset = true }
                 }
             }
-            .padding(20)
         }
         .animation(PixlMotion.state, value: expanded)
-        .onAppear { exploration = ai.musicExploration }
-        .alert(L10n.musicIntelligenceReset, isPresented: $showsReset) {
-            Button(L10n.commonCancel, role: .cancel) {}
-            Button(L10n.musicIntelligenceResetConfirm, role: .destructive) {
-                taste.reset()
-                message = nil
-            }
-        } message: {
-            Text(L10n.musicIntelligenceResetDescription)
-        }
     }
 
     /// Android `preview`: ranks the real library with the real inputs; playback and the queue are untouched.
@@ -763,14 +736,5 @@ struct MusicIntelligenceCard: View {
             message = "Daily Mix and Your Mix were drawn again."
             isBusy = false
         }
-    }
-
-    private func toggle(_ title: String, _ isOn: Binding<Bool>) -> some View {
-        HStack(spacing: 12) {
-            Text(title).pixlFont(.titleSmall).foregroundStyle(theme.onSecondaryContainer)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Toggle(title, isOn: isOn).labelsHidden().tint(theme.primary)
-        }
-        .frame(minHeight: 48)
     }
 }

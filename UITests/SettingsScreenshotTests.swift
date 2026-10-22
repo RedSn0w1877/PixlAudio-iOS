@@ -18,11 +18,16 @@ final class SettingsScreenshotTests: XCTestCase {
     func testEqualizerCategoryDark() throws { try capture("settingsCategory.equalizer", "dark") }
     func testBehaviorCategoryLight() throws { try capture("settingsCategory.behavior", "light") }
     func testBehaviorCategoryDark() throws { try capture("settingsCategory.behavior", "dark") }
+    /// The Lyrics and Sing categories (2026-10-22 settings reorganisation).
+    func testLyricsCategoryLight() throws { try capture("settingsCategory.lyrics", "light") }
+    func testLyricsCategoryDark() throws { try capture("settingsCategory.lyrics", "dark") }
+    func testSingCategoryLight() throws { try capture("settingsCategory.sing", "light") }
+    func testSingCategoryDark() throws { try capture("settingsCategory.sing", "dark") }
     func testAICategoryLight() throws { try capture("settingsCategory.ai", "light") }
     func testAICategoryDark() throws { try capture("settingsCategory.ai", "dark") }
     /// AI features with the optional cloud assistant switched on (Gemini, the demo key): the on-device row, then the
-    /// cloud switch, provider picker and sign-in. Scrolled to them: they sit below the two cards, so the unscrolled
-    /// shot looked the same as the on-device one.
+    /// cloud switch, provider picker and sign-in. Scrolled to them: they sit in the Advanced block, below the two
+    /// cards, so the unscrolled shot looked the same as the on-device one.
     func testAICategoryCloudLight() throws {
         try capture("settingsCategory.ai.cloud", "light", ready: "screen.settingsCategory.ai", suffix: "",
                     interact: Self.scrollToAssistant)
@@ -50,12 +55,13 @@ final class SettingsScreenshotTests: XCTestCase {
                     suffix: "", interact: Self.scrollToLocalModel)
     }
 
-    /// Scrolls until the whole downloaded model's row is above the mini player (it sits under the two AI cards):
-    /// short drags along the leading margin, so a drag never starts on a switch or the discovery slider.
+    /// Scrolls until the whole downloaded model's row is above the mini player (it sits in the Advanced block, under
+    /// the music intelligence card and the personality): short drags along the leading margin, so a drag never starts
+    /// on a switch or the discovery slider.
     private static func scrollToLocalModel(_ app: XCUIApplication) {
         let row = app.descendants(matching: .any)["settings.ai.localModel"].firstMatch
         let limit = app.windows.firstMatch.frame.maxY - 130
-        for _ in 0..<8 {
+        for _ in 0..<12 {
             if row.exists && row.frame.maxY <= limit { break }
             let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.03, dy: 0.7))
             let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.03, dy: 0.4))
@@ -86,6 +92,36 @@ final class SettingsScreenshotTests: XCTestCase {
     func testDeviceCapabilitiesCategoryDark() throws { try capture("settingsCategory.device_capabilities", "dark") }
     func testAboutCategoryLight() throws { try capture("settingsCategory.about", "light") }
     func testAboutCategoryDark() throws { try capture("settingsCategory.about", "dark") }
+
+    // MARK: Developer mode (2026-10-22)
+
+    /// The UI tests start with developer mode on: the Developer and Device capabilities rows sit under its switch. Off,
+    /// they are gone (the everyday list stays); on again, they come back.
+    func testDeveloperModeSwitchShowsAndHidesTheDeveloperRows() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTest", "-screen", "settings", "-appearance", "light"]
+        app.launch()
+        XCTAssertTrue(app.descendants(matching: .any)["screen.settings"].firstMatch.waitForExistence(timeout: 20))
+        let toggle = app.descendants(matching: .any)["settings.switch.Developer mode"].firstMatch
+        let developer = app.descendants(matching: .any)["settings.developer"].firstMatch
+        let capabilities = app.descendants(matching: .any)["settings.device_capabilities"].firstMatch
+        for _ in 0..<5 where !(toggle.exists && toggle.isHittable) { app.swipeUp() }
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5), "the Developer mode switch is missing")
+        XCTAssertTrue(developer.waitForExistence(timeout: 5), "developer mode starts on in the UI tests")
+        Thread.sleep(forTimeInterval: 1.0)
+        attach(app, "settings-developerModeOn-light")
+        // The switch sits at the row's trailing end (the row is one combined element).
+        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
+        XCTAssertTrue(developer.waitForNonExistence(timeout: 10), "the Developer row stayed after turning it off")
+        XCTAssertTrue(capabilities.waitForNonExistence(timeout: 10), "the Device capabilities row stayed")
+        XCTAssertTrue(app.descendants(matching: .any)["settings.about"].firstMatch.exists, "the everyday rows go on")
+        Thread.sleep(forTimeInterval: 1.0)
+        attach(app, "settings-developerModeOff-light")
+        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
+        XCTAssertTrue(developer.waitForExistence(timeout: 10), "the Developer row did not come back")
+        app.terminate()
+    }
 
     // MARK: Accent colour (iOS-only, owner request 2026-10-07)
 
@@ -173,13 +209,24 @@ final class SettingsScreenshotTests: XCTestCase {
 
     // MARK: - Helper
 
-    /// Swipes AI features up until the on-device model row (`settings.ai.onDevice`, first row of the assistant
-    /// section) can be tapped, so the section and the cloud rows under it fill the screen.
+    private func attach(_ app: XCUIApplication, _ name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    /// Drags AI features up until the on-device model row (`settings.ai.onDevice`, first row of the assistant section,
+    /// in the Advanced block) can be tapped, so the section and the cloud rows under it fill the screen: short drags
+    /// along the leading margin, so a drag never starts on a switch or the discovery slider.
     private static func scrollToAssistant(_ app: XCUIApplication) {
         let row = app.descendants(matching: .any)["settings.ai.onDevice"].firstMatch
-        for _ in 0..<4 {
+        for _ in 0..<12 {
             if row.exists && row.isHittable { break }
-            app.swipeUp()
+            let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.03, dy: 0.7))
+            let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.03, dy: 0.4))
+            start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.2)
+            Thread.sleep(forTimeInterval: 0.4)
         }
     }
 

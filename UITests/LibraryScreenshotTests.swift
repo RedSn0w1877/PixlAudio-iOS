@@ -83,6 +83,11 @@ final class LibraryScreenshotTests: XCTestCase {
     func testPlaylistDetailDark() throws { try capture("playlistDetail", "dark", ready: "screen.playlistDetail") }
     func testPlaylistReorderLight() throws { try capture("playlistReorder", "light", ready: "screen.playlistDetail") }
     func testPlaylistOptionsLight() throws { try capture("playlistOptions", "light", ready: "sheet.playlistOptions") }
+    /// The options sheet pulled up to its large detent: "Process all on-device" and "Process all in cloud" under
+    /// "Download all songs".
+    func testPlaylistOptionsExpandedLight() throws {
+        try capture("playlistOptions", "light", ready: "sheet.playlistOptions", suffix: "-expanded") { $0.swipeUp() }
+    }
     func testPlaylistAddSongsDark() throws { try capture("playlistAddSongs", "dark", ready: "sheet.songPicker") }
 
     func testPlaylistEditorLight() throws { try capture("playlistEditor", "light", ready: "screen.playlistEditor") }
@@ -91,7 +96,8 @@ final class LibraryScreenshotTests: XCTestCase {
 
     // MARK: - Helper
 
-    private func capture(_ screen: String, _ appearance: String, ready: String, tap: String? = nil) throws {
+    private func capture(_ screen: String, _ appearance: String, ready: String, tap: String? = nil, suffix: String = "",
+                         interact: ((XCUIApplication) -> Void)? = nil) throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = ["-uiTest", "-screen", screen, "-appearance", appearance]
@@ -104,12 +110,13 @@ final class LibraryScreenshotTests: XCTestCase {
             XCTAssertTrue(button.waitForExistence(timeout: 10), "\(tap) is missing on \(screen)")
             button.tap()
         }
+        interact?(app)
 
         // Let artwork decoding, album colour extraction, glass and sheet presentations settle.
         Thread.sleep(forTimeInterval: 2.0)
 
         let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = "\(screen)-\(appearance)"
+        attachment.name = "\(screen)-\(appearance)\(suffix)"
         attachment.lifetime = .keepAlways
         add(attachment)
 

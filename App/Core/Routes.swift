@@ -56,6 +56,9 @@ nonisolated enum SettingsCategory: String, Hashable, Sendable, CaseIterable, Ide
     case appearance = "appearance"
     case playback = "playback"
     case equalizer = "equalizer"
+    /// Lyrics and Sing (2026-10-22 settings reorganisation): categories of their own, on Android too.
+    case lyrics = "lyrics"
+    case sing = "sing"
     case behavior = "behavior"
     case ai = "ai"
     case backupRestore = "backup_restore"
@@ -65,18 +68,21 @@ nonisolated enum SettingsCategory: String, Hashable, Sendable, CaseIterable, Ide
 
     var id: String { rawValue }
 
-    /// Android `settings_category_*_title`.
+    /// Android `settings_category_*_title` (the ids `library` and `behavior` keep their keys: Library & storage,
+    /// Gestures & haptics).
     var title: String {
         switch self {
-        case .library: "Music Management"
+        case .library: "Library & storage"
         case .appearance: "Appearance"
         case .playback: "Playback"
         case .equalizer: "Equalizer"
-        case .behavior: "Behavior"
+        case .lyrics: "Lyrics"
+        case .sing: "Sing"
+        case .behavior: "Gestures & haptics"
         case .ai: "AI features"
         case .backupRestore: "Backup & Restore"
-        case .developer: "Developer Options"
-        case .deviceCapabilities: "Device Capabilities"
+        case .developer: "Developer"
+        case .deviceCapabilities: "Device capabilities"
         case .about: "About"
         }
     }
@@ -88,6 +94,8 @@ nonisolated enum SettingsCategory: String, Hashable, Sendable, CaseIterable, Ide
         case .appearance: "paintpalette"
         case .playback: "music.note"
         case .equalizer: "waveform"
+        case .lyrics: "quote.bubble"
+        case .sing: "music.mic"
         case .behavior: "hand.tap"
         case .ai: "sparkles"
         case .backupRestore: "externaldrive"
@@ -120,9 +128,9 @@ nonisolated enum AppRoute: Hashable, Sendable {
     case paletteStyle
     case experimental
     case artistSettings
-    /// Blocked artists and Gestures (iOS-first, 2026-10-18): pages of Settings › Behavior.
+    /// Blocked artists (iOS-first, 2026-10-18): a page of Settings › Library & storage. The Gestures page is gone: its
+    /// switches sit in Settings › Gestures & haptics.
     case blockedArtists
-    case gestureSettings
     case delimiterConfig
     case wordDelimiterConfig
     case equalizer
@@ -134,7 +142,7 @@ nonisolated enum AppRoute: Hashable, Sendable {
     case easterEgg
     case quickFill
     case diagnostics
-    /// Cloud Studio (iOS-first, design §7.2): Settings › Developer › Experimental › Cloud processing, and its queue.
+    /// Cloud Studio (iOS-first, design §7.2): Settings › Sing › Cloud processing, and its queue.
     case cloudProcessing
     case cloudQueue
 
@@ -168,7 +176,6 @@ nonisolated enum AppRoute: Hashable, Sendable {
         case .experimental: "experimental"
         case .artistSettings: "artistSettings"
         case .blockedArtists: "blockedArtists"
-        case .gestureSettings: "gestureSettings"
         case .delimiterConfig: "delimiterConfig"
         case .wordDelimiterConfig: "wordDelimiterConfig"
         case .equalizer: "equalizer"
@@ -208,8 +215,6 @@ nonisolated enum AppSheet: Hashable, Sendable, Identifiable {
     case aiPlaylist
     /// Stage 13: the TAIS DJ chat (Android `TaisChatSheet`) — from the player's sparkles circle and Experimental.
     case taisChat
-    /// Cloud Studio's confirm sheet for a batch (`CloudStudio.pendingBatch`).
-    case cloudConfirm
 
     var id: String {
         switch self {
@@ -224,7 +229,6 @@ nonisolated enum AppSheet: Hashable, Sendable, Identifiable {
         case .artistPicker(let id): "artistPicker.\(id)"
         case .aiPlaylist: "aiPlaylist"
         case .taisChat: "taisChat"
-        case .cloudConfirm: "cloudConfirm"
         }
     }
 }
