@@ -145,7 +145,10 @@ def encode(samples: np.ndarray, sample_rate: int, out_path: str, *, codec: str, 
     try:
         args = [FFMPEG, *BASE, "-f", "f32le", "-ar", str(sample_rate), "-ac", "2", "-i", raw]
         if codec == "aac":
-            args += ["-c:a", "aac", "-b:a", f"{int(kbps)}k", "-movflags", "+faststart", "-f", "mp4"]
+            # `-aac_coder fast`: ffmpeg's default two-loop search took 13.8 s of the 38 s a 4-minute song costs on an
+            # A4500 (bench 2026-10-22); the fast coder is a few times quicker and transparent at 256 kbps. Same encoder,
+            # same 1024-sample priming, so the phone's sample-count check is unchanged.
+            args += ["-c:a", "aac", "-aac_coder", "fast", "-b:a", f"{int(kbps)}k", "-movflags", "+faststart", "-f", "mp4"]
         else:
             args += ["-c:a", "flac", "-sample_fmt", "s16", "-f", "flac"]
         args += ["-y", out_path]
