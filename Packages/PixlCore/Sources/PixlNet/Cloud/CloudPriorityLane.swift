@@ -2,8 +2,8 @@
 // rest. The orchestrator (`CloudStudio.prioritizeQueue`) only sequences the I/O around them.
 //
 // How it works. A job that RunPod has not started is cancelled there (never a running one), goes back to `uploaded`
-// with its upload kept, and is sent again right after the priority job in the same burst, so only the final job of the
-// burst carries `last_in_batch`. Nothing is cancelled while the priority job is still preparing or uploading: the GPU
+// with its upload kept, and is sent again right after the priority job in the same burst, so only the burst's final
+// jobs (one per worker, `CloudSubmitBurst`) carry `last_in_batch`. Nothing is cancelled while the priority job is still preparing or uploading: the GPU
 // keeps working through the queue until the priority job is really ready to go.
 //
 // Who is a priority job: a `sing` job, and a manual job that is the only one of its batch (one song sent by hand).

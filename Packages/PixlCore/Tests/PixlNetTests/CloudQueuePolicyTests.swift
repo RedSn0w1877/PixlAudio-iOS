@@ -72,50 +72,41 @@ import PixlModel
 
     // MARK: Selection
 
-    static func facts(_ id: String, duration: Int64 = 240_000, instrumental: Bool = false,
-                      lyrics: CloudLyricsState = .textOrLineSynced, audio: Bool = true, streamed: Bool = false,
-                      pending: Bool = false) -> CloudSongFacts {
-        CloudSongFacts(songId: id, durationMs: duration, hasInstrumental: instrumental, lyrics: lyrics,
-                       hasAudioSource: audio, isStreamed: streamed, hasPendingJob: pending)
+    static func facts(_ id: String, duration: Int64 = 240_000, instrumental: Bool = false, audio: Bool = true,
+                      streamed: Bool = false, pending: Bool = false) -> CloudSongFacts {
+        CloudSongFacts(songId: id, durationMs: duration, hasInstrumental: instrumental, hasAudioSource: audio,
+                       isStreamed: streamed, hasPendingJob: pending)
     }
 
-    @Test func oneJobCoversEveryMissingTask() throws {
-        let plan = try CloudSelector.plan(Self.facts("a"), options: CloudSelectionOptions()).get()
-        #expect(plan.tasks == [.instrumental, .lyrics])
-        #expect(plan.lyricsMode == .align)
-        let none = try CloudSelector.plan(Self.facts("b", lyrics: .none), options: CloudSelectionOptions()).get()
-        #expect(none.lyricsMode == .transcribe)
-        let instrumentalOnly = try CloudSelector.plan(Self.facts("c", lyrics: .wordSynced), options: CloudSelectionOptions()).get()
-        #expect(instrumentalOnly.tasks == [.instrumental])
-        #expect(instrumentalOnly.lyricsMode == nil)
+    @Test func aJobAsksForTheInstrumentalOnly() throws {
+        // 2026-10-23: no word-timed lyrics and no AI transcription from the cloud, whatever lyrics the song has.
+        let plan = try CloudSelector.plan(Self.facts("a")).get()
+        #expect(plan.tasks == [.instrumental])
+        #expect(plan.lyricsMode == nil)
+        #expect(plan.durationMs == 240_000 && !plan.isStreamed)
     }
 
     @Test func skipReasons() {
-        let options = CloudSelectionOptions()
-        func reason(_ facts: CloudSongFacts, _ options: CloudSelectionOptions = CloudSelectionOptions()) -> CloudSkipReason? {
-            if case .failure(let reason) = CloudSelector.plan(facts, options: options) { return reason }
+        func reason(_ facts: CloudSongFacts) -> CloudSkipReason? {
+            if case .failure(let reason) = CloudSelector.plan(facts) { return reason }
             return nil
         }
-        #expect(reason(Self.facts("a", instrumental: true, lyrics: .wordSynced)) == .alreadyDone)
+        #expect(reason(Self.facts("a", instrumental: true)) == .alreadyDone)
+        #expect(CloudSkipReason.alreadyDone.label == "Already has an instrumental")
         #expect(reason(Self.facts("a", pending: true)) == .pendingJob)
         #expect(reason(Self.facts("a", duration: 900_001)) == .tooLong)
         #expect(reason(Self.facts("a", duration: 900_000)) == nil)
         #expect(reason(Self.facts("a", audio: false)) == .noAudio)
-        #expect(reason(Self.facts("a", instrumental: true, lyrics: .userSynced)) == .userSynced)
-        #expect(reason(Self.facts("a", instrumental: true, lyrics: .userSynced),
-                       CloudSelectionOptions(replaceUserSynced: true)) == nil)
-        #expect(reason(Self.facts("a", instrumental: true, lyrics: .none),
-                       CloudSelectionOptions(transcribeWhenMissing: false)) == .alreadyDone)
-        _ = options
+        #expect(reason(Self.facts("a", instrumental: true, audio: false)) == .alreadyDone)
     }
 
     @Test func batchCaps() {
         var songs = (0..<210).map { Self.facts("s\($0)") }
         songs.insert(Self.facts("s0"), at: 5) // duplicates count once
-        let selection = CloudSelector.select(songs, options: CloudSelectionOptions())
+        let selection = CloudSelector.select(songs)
         #expect(selection.plans.count == 200)
         #expect(selection.skipped.filter { $0.reason == .batchFull }.count == 10)
-        let streamed = CloudSelector.select((0..<60).map { Self.facts("y\($0)", streamed: true) }, options: CloudSelectionOptions())
+        let streamed = CloudSelector.select((0..<60).map { Self.facts("y\($0)", streamed: true) })
         #expect(streamed.plans.count == 50)
         #expect(streamed.skipCounts.first?.reason == .tooManyStreamed)
         #expect(streamed.skipCounts.first?.count == 10)
@@ -153,23 +144,41 @@ import PixlModel
     }
 
     @Test func batchGate() {
-        #expect(!CloudBatchGate.shouldSubmit(uploadsPending: 3, uploadsDone: 0, firstUploadDoneAtMs: nil, nowMs: 0))
-        #expect(CloudBatchGate.shouldSubmit(uploadsPending: 0, uploadsDone: 3, firstUploadDoneAtMs: 0, nowMs: 1))
-        #expect(!CloudBatchGate.shouldSubmit(uploadsPending: 2, uploadsDone: 1, firstUploadDoneAtMs: 1_000, nowMs: 120_999))
-        #expect(CloudBatchGate.shouldSubmit(uploadsPending: 2, uploadsDone: 1, firstUploadDoneAtMs: 1_000, nowMs: 121_000))
+        // One worker (own keys): the first upload is enough to start.
+        #expect(!CloudBatchGate.shouldSubmit(uploadsPending: 3, uploadsDone: 0, firstUploadDoneAtMs: nil, nowMs: 0,
+                                             parallelWorkers: 1))
+        #expect(CloudBatchGate.shouldSubmit(uploadsPending: 2, uploadsDone: 1, firstUploadDoneAtMs: 1_000, nowMs: 1_000,
+                                            parallelWorkers: 1))
+        // Every upload done.
+        #expect(CloudBatchGate.shouldSubmit(uploadsPending: 0, uploadsDone: 2, firstUploadDoneAtMs: 0, nowMs: 1,
+                                            parallelWorkers: 3))
+        // Three workers: the gate waits for three uploads, or two minutes after the first.
+        #expect(!CloudBatchGate.shouldSubmit(uploadsPending: 2, uploadsDone: 1, firstUploadDoneAtMs: 1_000, nowMs: 120_999,
+                                             parallelWorkers: 3))
+        #expect(!CloudBatchGate.shouldSubmit(uploadsPending: 5, uploadsDone: 2, firstUploadDoneAtMs: 1_000, nowMs: 2_000,
+                                             parallelWorkers: 3))
+        #expect(CloudBatchGate.shouldSubmit(uploadsPending: 5, uploadsDone: 3, firstUploadDoneAtMs: 1_000, nowMs: 2_000,
+                                            parallelWorkers: 3))
+        #expect(CloudBatchGate.shouldSubmit(uploadsPending: 2, uploadsDone: 1, firstUploadDoneAtMs: 1_000, nowMs: 121_000,
+                                            parallelWorkers: 3))
+        // Once open, each further upload goes in the next pass on its own.
+        #expect(CloudBatchGate.shouldSubmit(uploadsPending: 4, uploadsDone: 1, alreadySent: 3, firstUploadDoneAtMs: 9_000,
+                                            nowMs: 9_000, parallelWorkers: 3))
+        #expect(!CloudBatchGate.shouldSubmit(uploadsPending: 4, uploadsDone: 0, alreadySent: 3, firstUploadDoneAtMs: nil,
+                                             nowMs: 9_000, parallelWorkers: 3))
     }
 
     /// Runs a submit pass through `CloudSubmitBurst` the way `CloudStudio.submitReadyBatches` does: nil in `items` is
     /// a job that turned out not to be sendable (skipped, unsigned); the pass stops early at `stopAt` (the cap).
-    static func sends(_ items: [String?], stopAt: Int? = nil) -> [(String, Bool)] {
-        var burst = CloudSubmitBurst<String>()
+    static func sends(_ items: [String?], stopAt: Int? = nil, workers: Int = 1) -> [(String, Bool)] {
+        var burst = CloudSubmitBurst<String>(lastCount: workers)
         var sent: [(String, Bool)] = []
         for (index, item) in items.enumerated() {
             if index == stopAt { break }
             guard let item else { continue }
             if let previous = burst.ready(item) { sent.append((previous, false)) }
         }
-        if let last = burst.end() { sent.append((last, true)) }
+        for last in burst.end() { sent.append((last, true)) }
         return sent
     }
 
@@ -184,6 +193,23 @@ import PixlModel
         #expect(Self.sends([nil, nil]).isEmpty)
     }
 
+    @Test func submitBurstMarksItsLastJobForEveryWorker() {
+        // Three workers drain RunPod's queue: the final three jobs may each run on a worker of its own.
+        let five = Self.sends(["a", "b", "c", "d", "e"], workers: 3)
+        #expect(five.map { $0.0 } == ["a", "b", "c", "d", "e"])
+        #expect(five.map { $0.1 } == [false, false, true, true, true])
+        // A burst smaller than the workers: every job is one of the last.
+        let two = Self.sends(["a", "b"], workers: 3)
+        #expect(two.map { $0.0 } == ["a", "b"] && two.map { $0.1 } == [true, true])
+        let one = Self.sends(["a"], workers: 3)
+        #expect(one.map { $0.1 } == [true])
+        // The monthly cap stops the pass at the fourth job: the three held go out as the last.
+        let capped = Self.sends(["a", "b", "c", "d", "e"], stopAt: 3, workers: 3)
+        #expect(capped.map { $0.0 } == ["a", "b", "c"] && capped.map { $0.1 } == [true, true, true])
+        // A worker count below one still marks the final job.
+        #expect(Self.sends(["a", "b"], workers: 0).map { $0.1 } == [false, true])
+    }
+
     @Test func submitBurstsLastIsTheLastJobThatActuallyGoesOut() {
         // The final job can't be sent (its URLs didn't sign): the one before it is the last.
         let skippedEnd = Self.sends(["a", "b", nil])
@@ -194,19 +220,65 @@ import PixlModel
         // The monthly cap stops the pass at the third job: the second, already held, goes out as the last.
         let capped = Self.sends(["a", "b", "c", "d"], stopAt: 2)
         #expect(capped.map { $0.0 } == ["a", "b"] && capped.map { $0.1 } == [false, true])
+        // With three workers, a job skipped at the end leaves the three before it as the last.
+        let skippedEndOfThree = Self.sends(["a", "b", "c", "d", nil], workers: 3)
+        #expect(skippedEndOfThree.map { $0.1 } == [false, true, true, true])
     }
 
-    @Test func submitBurstHoldsOneJobAtATime() {
+    @Test func submitBurstHoldsAsManyJobsAsItMarks() {
         var burst = CloudSubmitBurst<Int>()
-        #expect(burst.holding == nil)
+        #expect(burst.holding.isEmpty)
         let first = burst.ready(1)
-        #expect(first == nil && burst.holding == 1)
+        #expect(first == nil && burst.holding == [1])
         let second = burst.ready(2)
-        #expect(second == 1 && burst.holding == 2)
+        #expect(second == 1 && burst.holding == [2])
         let last = burst.end()
-        #expect(last == 2 && burst.holding == nil)
+        #expect(last == [2] && burst.holding.isEmpty)
         let again = burst.end()
-        #expect(again == nil)
+        #expect(again.isEmpty)
+
+        var three = CloudSubmitBurst<Int>(lastCount: 3)
+        var handedBack: [Int?] = []
+        for n in 1...4 { handedBack.append(three.ready(n)) }
+        #expect(handedBack == [nil, nil, nil, 1])
+        #expect(three.holding == [2, 3, 4], "the budget check counts every held job")
+        let finals = three.end()
+        #expect(finals == [2, 3, 4])
+    }
+
+    // MARK: Burst end
+
+    static func record(_ n: Int, _ state: CloudJobState, origin: CloudJobOrigin? = nil,
+                       nextAttemptAtMs: Int64? = nil) -> CloudJobRecord {
+        var r = CloudJobRecord(jobKey: "k\(n)", songId: "s\(n)", title: "", artist: "", batchId: "b",
+                               tasks: [.instrumental], lyricsMode: nil, quality: .standard, createdAtMs: 0)
+        r.state = state
+        r.origin = origin
+        r.nextAttemptAtMs = nextAttemptAtMs
+        return r
+    }
+
+    @Test func moreJobsComingKeepTheLastOnesUnmarked() {
+        // Jobs still being queued, prepared or uploaded will be sent in a later pass.
+        for state in [CloudJobState.queued, .preparing, .uploading] {
+            #expect(CloudBurstEnd.moreComing([Self.record(1, .submitted), Self.record(2, state)], nowMs: 10,
+                                             autoBlocked: false), "\(state)")
+        }
+        // Nothing on its way: the burst's last jobs stop their workers.
+        let settled = [Self.record(1, .submitted), Self.record(2, .running), Self.record(3, .uploaded),
+                       Self.record(4, .resultsReady), Self.record(5, .imported), Self.record(6, .failed)]
+        #expect(!CloudBurstEnd.moreComing(settled, nowMs: 10, autoBlocked: false))
+        // A job waiting out a retry is not coming soon.
+        #expect(!CloudBurstEnd.moreComing([Self.record(1, .queued, nextAttemptAtMs: 60_000)], nowMs: 10,
+                                          autoBlocked: false))
+        #expect(CloudBurstEnd.moreComing([Self.record(1, .queued, nextAttemptAtMs: 60_000)], nowMs: 60_000,
+                                         autoBlocked: false))
+        // Songs prepared ahead wait for a phone that is ready (Wi-Fi, charge…); their uploads already under way go on.
+        #expect(!CloudBurstEnd.moreComing([Self.record(1, .queued, origin: .auto)], nowMs: 10, autoBlocked: true))
+        #expect(!CloudBurstEnd.moreComing([Self.record(1, .preparing, origin: .auto)], nowMs: 10, autoBlocked: true))
+        #expect(CloudBurstEnd.moreComing([Self.record(1, .uploading, origin: .auto)], nowMs: 10, autoBlocked: true))
+        #expect(CloudBurstEnd.moreComing([Self.record(1, .queued, origin: .sing)], nowMs: 10, autoBlocked: true))
+        #expect(CloudBurstEnd.moreComing([Self.record(1, .queued, origin: .auto)], nowMs: 10, autoBlocked: false))
     }
 
     // MARK: Cost
@@ -221,22 +293,37 @@ import PixlModel
     }
 
     @Test func estimatesMatchTheMeasuredBench() {
-        let plan = CloudSongPlan(songId: "a", tasks: [.instrumental, .lyrics], lyricsMode: .align, isStreamed: false,
+        let plan = CloudSongPlan(songId: "a", tasks: [.instrumental], lyricsMode: nil, isStreamed: false,
                                  durationMs: 240_000)
-        // The 2026-10-22 bench (RTX A4500): 38 warm seconds per 4-minute song, a 15 s cold start.
-        #expect(CloudCost.warmSecondsStandard == 38 && CloudCost.coldStartSeconds == 15)
-        // One song on its own: cold (15 s) + warm (38 s) = 53 s × $0.000192 ≈ $0.0102.
-        #expect(CloudCost.estimateMicroUSD([plan], quality: .standard, pricePerSecondMicroUSD: 192) == 10_176)
-        // 100 songs in one burst: 15 + 3,800 s ≈ $0.73 on 24 GB.
+        // The 2026-10-22 bench (RTX A4500) less the lyric alignment: 33 warm seconds per 4-minute song, a 15 s cold
+        // start for each worker that starts.
+        #expect(CloudCost.warmSecondsStandard == 33 && CloudCost.coldStartSeconds == 15)
+        // One song on its own: cold (15 s) + warm (33 s) = 48 s × $0.000192 ≈ $0.0092, however many workers.
+        #expect(CloudCost.estimateMicroUSD([plan], quality: .standard, pricePerSecondMicroUSD: 192,
+                                           parallelWorkers: 1) == 9_216)
+        #expect(CloudCost.estimateMicroUSD([plan], quality: .standard, pricePerSecondMicroUSD: 192,
+                                           parallelWorkers: 3) == 9_216)
+        // 100 songs in one burst: on one worker 15 + 3,300 s ≈ $0.64; on three, three cold starts (45 + 3,300 s).
         let hundred = Array(repeating: plan, count: 100)
-        #expect(CloudCost.estimateMicroUSD(hundred, quality: .standard, pricePerSecondMicroUSD: 192) == 732_480)
-        #expect(CloudCost.format(microUSD: 732_480) == "$0.73")
-        #expect(CloudCost.estimateMicroUSD([], quality: .standard, pricePerSecondMicroUSD: 192) == 0)
-        let transcribeBest = CloudSongPlan(songId: "b", tasks: [.lyrics], lyricsMode: .transcribe, isStreamed: false,
-                                           durationMs: 240_000)
-        #expect(CloudCost.estimatedSeconds(transcribeBest, quality: .best) == 60)
+        #expect(CloudCost.estimateMicroUSD(hundred, quality: .standard, pricePerSecondMicroUSD: 192,
+                                           parallelWorkers: 1) == 636_480)
+        #expect(CloudCost.estimateMicroUSD(hundred, quality: .standard, pricePerSecondMicroUSD: 192,
+                                           parallelWorkers: 3) == 642_240)
+        #expect(CloudCost.format(microUSD: 642_240) == "$0.64")
+        // Two songs on three workers wake two of them.
+        #expect(CloudCost.estimateMicroUSD([plan, plan], quality: .standard, pricePerSecondMicroUSD: 192,
+                                           parallelWorkers: 3) == (2 * 15 + 2 * 33) * 192)
+        #expect(CloudCost.coldStarts(count: 2, parallelWorkers: 3) == 2)
+        #expect(CloudCost.coldStarts(count: 5, parallelWorkers: 3) == 3)
+        #expect(CloudCost.coldStarts(count: 5, parallelWorkers: 0) == 1)
+        #expect(CloudCost.coldStarts(count: 0, parallelWorkers: 3) == 0)
+        #expect(CloudCost.estimateMicroUSD([], quality: .standard, pricePerSecondMicroUSD: 192, parallelWorkers: 3) == 0)
+        // A job stored before 2026-10-23 with lyrics is estimated like its instrumental: no alignment seconds.
+        let legacy = CloudSongPlan(songId: "b", tasks: [.instrumental, .lyrics], lyricsMode: .transcribe,
+                                   isStreamed: false, durationMs: 240_000)
+        #expect(CloudCost.estimatedSeconds(legacy, quality: .best) == 45)
         let long = CloudSongPlan(songId: "c", tasks: [.instrumental], lyricsMode: nil, isStreamed: false, durationMs: 600_000)
-        #expect(CloudCost.estimatedSeconds(long, quality: .best) == 95) // 10 min: best falls back, scaled 2.5×
+        #expect(CloudCost.estimatedSeconds(long, quality: .best) == 83) // 10 min: best falls back, scaled 2.5×
     }
 
     @Test func actualCostFromTimings() {
@@ -430,9 +517,9 @@ import PixlModel
         finishedRun.completedAtMs = 4_000
         finishedRun.submittedAtMs = 3_000
         let records = [done, running, waiting, queued, redo, finishedRun]
-        // 38 s warm each at 192 µ$/s for a 4-minute song: running, waiting and the redo.
+        // 33 s warm each at 192 µ$/s for a 4-minute song: running, waiting and the redo.
         #expect(CloudBudget.committedMicroUSD(records, monthStartMs: 0, pricePerSecondMicroUSD: 192)
-            == 5_000 + 3 * 38 * 192)
+            == 5_000 + 3 * 33 * 192)
         #expect(running.isRunningAtRunPod && waiting.isRunningAtRunPod && redo.isRunningAtRunPod)
         #expect(!finishedRun.isRunningAtRunPod && !queued.isRunningAtRunPod)
     }
@@ -458,22 +545,27 @@ import PixlModel
     }
 
     @Test func batchEstimateForTheConfirmSheet() {
-        let plans = [CloudSongPlan(songId: "a", tasks: [.instrumental, .lyrics], lyricsMode: .align, isStreamed: false,
+        let plans = [CloudSongPlan(songId: "a", tasks: [.instrumental], lyricsMode: nil, isStreamed: false,
                                    durationMs: 240_000),
                      CloudSongPlan(songId: "b", tasks: [.instrumental], lyricsMode: nil, isStreamed: true,
                                    durationMs: 120_000)]
         let estimate = CloudBatchEstimate.make(plans: plans, uploadBytes: ["a": 8_000_000], quality: .standard,
-                                               pricePerSecondMicroUSD: 192, committedMicroUSD: 2_990_000,
-                                               capMicroUSD: 3_000_000)
+                                               pricePerSecondMicroUSD: 192, parallelWorkers: 1,
+                                               committedMicroUSD: 2_990_000, capMicroUSD: 3_000_000)
         #expect(estimate.songs == 2 && estimate.streamedSongs == 1)
         #expect(estimate.minutes == 6)
         // "b" as FLAC: 120 s × 176,400 B/s × 0.6.
         #expect(estimate.uploadBytes == 8_000_000 + 12_700_800)
         #expect(estimate.uploadMB == 20)
-        // One cold start (15 s) + 38 s for the 4-minute song + 19 s for the 2-minute one (half of 38).
-        #expect(estimate.costMicroUSD == (15 + 38 + 19) * 192)
+        // One cold start (15 s) + 33 s for the 4-minute song + 17 s for the 2-minute one (half of 33, rounded up).
+        #expect(estimate.costMicroUSD == (15 + 33 + 17) * 192)
         #expect(estimate.remainingMicroUSD == 10_000)
         #expect(!estimate.fitsCap)
+        // On three workers the two songs run side by side: two cold starts.
+        let parallel = CloudBatchEstimate.make(plans: plans, uploadBytes: [:], quality: .standard,
+                                               pricePerSecondMicroUSD: 192, parallelWorkers: 3, committedMicroUSD: 0,
+                                               capMicroUSD: 3_000_000)
+        #expect(parallel.costMicroUSD == (2 * 15 + 33 + 17) * 192)
         #expect(CloudUploadEstimate.bytes(durationMs: 240_000, passthroughBitsPerSecond: 256_000) == 7_680_000)
     }
 }

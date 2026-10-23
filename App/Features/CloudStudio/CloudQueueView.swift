@@ -3,8 +3,8 @@ import PixlNet
 import SwiftUI
 
 /// The "process later" queue (design §7.3; iOS-first): what is on its way to the cloud, what came back, and what
-/// needs the person. In developer mode songs can also be added from here (Current song / Songs without word-timed
-/// lyrics / Songs without an instrumental), each row sending at once. Rows are one glass shape each in a lazy stack;
+/// needs the person. In developer mode songs can also be added from here (Current song / Songs without an
+/// instrumental), each row sending at once. Rows are one glass shape each in a lazy stack;
 /// progress comes from the orchestrator (whole percents), never from a timer.
 struct CloudQueueView: View {
     @Environment(AppEnvironment.self) private var env
@@ -35,8 +35,6 @@ struct CloudQueueView: View {
             if developerMode {
                 SettingsSubsection(title: "Add songs") {
                     addRow("Current song", "The song that's playing now.", "music.note", .current)
-                    addRow("Songs without word-timed lyrics", "Up to 200 songs from your library.", "text.word.spacing",
-                           .missingLyrics)
                     addRow("Songs without an instrumental", "Up to 200 songs from your library.", "waveform",
                            .missingInstrumental)
                 }

@@ -17,6 +17,8 @@ final class CloudSettings {
         static let endpointId = "cloud_studio_endpoint_id"
         static let r2Endpoint = "cloud_studio_r2_endpoint"
         static let bucket = "cloud_studio_bucket"
+        /// The Outputs switches (Instrumental, Word-timed lyrics, AI transcription) removed on 2026-10-23: a cloud job is
+        /// the instrumental only. Their stored values stay unread; the keys stay listed so backups never carry them.
         static let instrumental = "cloud_studio_out_instrumental"
         static let lyrics = "cloud_studio_out_lyrics"
         static let transcribe = "cloud_studio_out_transcribe"
@@ -99,10 +101,6 @@ final class CloudSettings {
     /// As typed: `https://<account-id>.r2.cloudflarestorage.com` or the bare account ID.
     var r2Endpoint: String { didSet { defaults.set(r2Endpoint, forKey: Keys.r2Endpoint) } }
     var bucket: String { didSet { defaults.set(bucket, forKey: Keys.bucket) } }
-    var wantsInstrumental: Bool { didSet { defaults.set(wantsInstrumental, forKey: Keys.instrumental) } }
-    var wantsLyrics: Bool { didSet { defaults.set(wantsLyrics, forKey: Keys.lyrics) } }
-    /// "Write lyrics when none are found (AI transcription)".
-    var transcribeWhenMissing: Bool { didSet { defaults.set(transcribeWhenMissing, forKey: Keys.transcribe) } }
     var quality: CloudSeparationQuality { didSet { defaults.set(quality.rawValue, forKey: Keys.quality) } }
     /// "Use cellular data" (off: uploads and downloads wait for Wi-Fi).
     var useCellular: Bool { didSet { defaults.set(useCellular, forKey: Keys.cellular) } }
@@ -172,9 +170,6 @@ final class CloudSettings {
         endpointId = savedEndpointId
         r2Endpoint = defaults.string(Keys.r2Endpoint, default: "")
         bucket = defaults.string(Keys.bucket, default: CloudConfig.defaultBucket)
-        wantsInstrumental = defaults.bool(Keys.instrumental, default: true)
-        wantsLyrics = defaults.bool(Keys.lyrics, default: true)
-        transcribeWhenMissing = defaults.bool(Keys.transcribe, default: true)
         quality = CloudSeparationQuality(rawValue: defaults.string(Keys.quality, default: "")) ?? .standard
         useCellular = defaults.bool(Keys.cellular, default: false)
         notifyWhenDone = defaults.bool(Keys.notifyWhenDone, default: true)
@@ -241,6 +236,9 @@ final class CloudSettings {
     var effectivePricePerSecondMicroUSD: Int64 {
         CloudKeyChoice.effectivePricePerSecond(pricePerSecondMicroUSD, source: keySource)
     }
+
+    /// How many jobs may run at RunPod at once: 3 on PixlAudio's endpoint, 1 on the person's own.
+    var parallelWorkers: Int { CloudKeyChoice.parallelWorkers(source: keySource) }
 
     // MARK: Announced batches
 
@@ -337,12 +335,6 @@ final class CloudSettings {
     var ownConfigInput: CloudConfigInput {
         CloudConfigInput(endpointId: endpointId, runpodKey: secrets.runpodKey, endpoint: r2Endpoint, bucket: bucket,
                          accessKeyId: secrets.accessKeyId, secretAccessKey: secrets.secretAccessKey)
-    }
-
-    /// The selection rules' options.
-    var selectionOptions: CloudSelectionOptions {
-        CloudSelectionOptions(instrumental: wantsInstrumental, lyrics: wantsLyrics,
-                              transcribeWhenMissing: transcribeWhenMissing)
     }
 
     /// Switched on and every field filled in.

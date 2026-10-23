@@ -169,6 +169,16 @@ public enum CloudKeyChoice {
     public static func effectivePricePerSecond(_ priceMicroUSD: Int64, source: CloudKeySource) -> Int64 {
         source == .builtIn ? max(priceMicroUSD, CloudCost.defaultPricePerSecondMicroUSD) : priceMicroUSD
     }
+
+    /// How many GPU workers PixlAudio's own endpoint runs at once (`workers.max` in the worker's
+    /// `deploy/endpoint.json`, 3 since 2026-10-23): that many jobs run at RunPod side by side.
+    public static let builtInParallelWorkers = 3
+
+    /// How many jobs may run at RunPod at once (the batch gate, the bursts' last jobs and the cold starts in the
+    /// estimates follow it): 3 on PixlAudio's endpoint, 1 on the person's own (its `workers.max` is unknown).
+    public static func parallelWorkers(source: CloudKeySource) -> Int {
+        source == .builtIn ? builtInParallelWorkers : 1
+    }
 }
 
 extension CloudConfigInput {

@@ -24,6 +24,24 @@ public enum CloudStartupRecovery {
     public static func staleClips(_ jobs: [CloudJobRecord]) -> [String] {
         jobs.filter { $0.isClip && $0.state.isPending }.map(\.jobKey)
     }
+
+    /// The cloud no longer times or writes lyrics (2026-10-23). Jobs stored before that which RunPod doesn't have yet
+    /// (queued, preparing, uploading or uploaded) go without the lyrics task: an instrumental job just drops it; the
+    /// keys of lyrics-only jobs are returned, to be cancelled (nothing is left for the cloud to make). Jobs RunPod
+    /// already has finish as they are, and whatever lyrics they bring may be imported. Returns how many records changed.
+    @discardableResult
+    public static func retireCloudLyrics(_ jobs: inout [CloudJobRecord], nowMs: Int64) -> (changed: Int, lyricsOnly: [String]) {
+        var changed = 0
+        var lyricsOnly: [String] = []
+        for index in jobs.indices where jobs[index].state.isBeforeSubmit && jobs[index].tasks.contains(.lyrics) {
+            if jobs[index].dropLyricsTask(nowMs: nowMs) {
+                changed += 1
+            } else {
+                lyricsOnly.append(jobs[index].jobKey)
+            }
+        }
+        return (changed, lyricsOnly)
+    }
 }
 
 public enum CloudJobClearing {

@@ -15,7 +15,7 @@ final class CloudSingAndAutoTests: XCTestCase {
         return try await h.submittedBatch(songs, origin: .auto)
     }
 
-    /// RunPod finishes the job, its lyrics come in, and the downloaded instrumental is checked and installed.
+    /// RunPod finishes the job, and the downloaded instrumental is checked and installed.
     private func finishAndImport(_ h: CloudHarness, key: String, runpodId: String) async throws {
         await h.runpod.setStatus(runpodId, RunPodJob(id: runpodId, status: "COMPLETED", result: h.finish(key)))
         h.clock.advance(16_000)
@@ -25,10 +25,8 @@ final class CloudSingAndAutoTests: XCTestCase {
 
     // MARK: Sing's job
 
-    func testASingTapAsksForTheInstrumentalEvenWhenItsOutputIsOff() async throws {
+    func testASingTapAsksForTheInstrumental() async throws {
         let h = CloudHarness()
-        h.settings.wantsInstrumental = false
-        h.settings.wantsLyrics = false
         let song = h.addSong("f:root/a.m4a")
         let started = await h.studio.startSing(song: song)
         XCTAssertEqual(started, .started(1))
@@ -36,19 +34,21 @@ final class CloudSingAndAutoTests: XCTestCase {
         XCTAssertEqual(job.tasks, [.instrumental])
         XCTAssertEqual(job.origin, .sing)
         XCTAssertNotNil(job.priorityAtMs)
-        // The same settings with a tap on "Process in cloud" find nothing to do.
+        // A song that already has its instrumental has nothing to send.
         let other = h.addSong("f:root/b.m4a")
+        h.host.instrumentals.insert(other.id)
         let manual = await h.studio.startNow(songs: [other], title: "Test")
         XCTAssertEqual(manual, .nothingToDo("Nothing to process — \(CloudSkipReason.alreadyDone.label)"))
     }
 
-    func testSingKeepsTheLyricsTheSettingsAskFor() async throws {
+    func testSingNeverAsksTheCloudForLyrics() async throws {
         let h = CloudHarness()
         let song = h.addSong("f:root/a.m4a")
         h.host.facts[song.id] = CloudHarness.lineSyncedFacts
         let started = await h.studio.startSing(song: song)
         XCTAssertEqual(started, .started(1))
-        XCTAssertEqual(h.studio.job(forSong: song.id)?.tasks, [.instrumental, .lyrics])
+        XCTAssertEqual(h.studio.job(forSong: song.id)?.tasks, [.instrumental])
+        XCTAssertNil(h.studio.job(forSong: song.id)?.lyricsMode)
     }
 
     func testTheOriginIsKeptOnDisk() async throws {
@@ -148,14 +148,17 @@ final class CloudSingAndAutoTests: XCTestCase {
         XCTAssertEqual(availability, .alreadyPending(jobKey: autoJob.jobKey))
     }
 
-    func testASongWhoseJobMakesOnlyLyricsIsNotJoinedForTheInstrumental() async throws {
-        let h = CloudHarness()
-        h.settings.wantsInstrumental = false
+    func testASongWhoseStoredJobMakesOnlyLyricsIsNotJoinedForTheInstrumental() async throws {
+        // A lyrics-only job from before 2026-10-23 that RunPod already has: it finishes as it is.
+        var record = CloudHarness.storedRecord(1, song: "f:root/a.m4a", state: .submitted)
+        record.tasks = [.lyrics]
+        record.lyricsMode = .align
+        record.runpodJobId = "rp-old"
+        record.submittedAtMs = CloudHarness.clockStartMs - 5_000
+        let store = CloudJobStore(file: nil)
+        await store.save([record])
+        let h = CloudHarness(store: store)
         let song = h.addSong("f:root/a.m4a")
-        h.host.facts[song.id] = CloudHarness.lineSyncedFacts
-        let manual = await h.studio.startNow(songs: [song], title: "Test")
-        XCTAssertEqual(manual, .started(1))
-        XCTAssertEqual(h.studio.jobs.first?.tasks, [.lyrics])
         // That job will never make the instrumental a Sing tap waits for: the phone makes it.
         let availability = await h.studio.singAvailability(for: song)
         XCTAssertEqual(availability, .nothingToDo)
@@ -365,7 +368,7 @@ final class CloudSingAndAutoTests: XCTestCase {
         XCTAssertEqual(runs.compactMap(\.input.jobKey).filter { $0 == keys[1] }.count, 1, "never sent a second time")
         let second = try XCTUnwrap(h.studio.job(keys[1]))
         XCTAssertTrue([CloudJobState.resultsReady, .downloading].contains(second.state), "\(second.state)")
-        XCTAssertTrue(h.host.savedLyrics.contains { $0.songId == "f:root/b.m4a" })
+        XCTAssertNotNil(second.outputs?["instrumental"], "its result was taken")
     }
 
     func testAnotherSingJobIsNeverPausedForASingJob() async throws {
@@ -494,7 +497,7 @@ final class CloudSingAndAutoTests: XCTestCase {
         // The batch gate holds a batch for the songs prepared with it; a song somebody is waiting for does not wait.
         let runs = await h.runpod.runs
         XCTAssertEqual(runs.compactMap(\.input.jobKey), [key])
-        XCTAssertEqual(runs.first?.input.isLastInBatch, true)
+        XCTAssertEqual(runs.first?.input.isLastInBatch, false, "the rest of its batch is still uploading, right behind it")
         XCTAssertEqual(h.studio.job(key)?.state, .submitted)
     }
 

@@ -5,7 +5,7 @@ import SwiftUI
 /// switch with one plain panel, cellular data, the notification switch and the way to the queue. Developer mode adds
 /// the rest: the RunPod endpoint and Restricted key, the R2 bucket and its key pair (fields in the order of the
 /// owner's setup steps), Test connection (RunPod and storage reported on their own) with the optional selftest, the
-/// outputs, the GPU price and monthly cap, and the promise text. Built from the settings rows; the keys are edited in
+/// instrumental's quality (the only output since 2026-10-23), the GPU price and monthly cap, and the promise text. Built from the settings rows; the keys are edited in
 /// a local draft and written to the Keychain (this iPhone only) off the main actor.
 /// A build with PixlAudio's built-in cloud keys (2026-10-08) shows "Using PixlAudio's built-in cloud keys" instead of
 /// the fields, with "Use my own keys" bringing them back; Test connection works with either.
@@ -37,8 +37,8 @@ struct CloudProcessingSettingsView: View {
                         .foregroundStyle(theme.onSurfaceVariant)
                     if developerMode {
                         Text(verbatim: builtIn
-                             ? "Separates vocals with BS-RoFormer and times lyrics word by word on PixlAudio's RunPod GPU. Songs go to PixlAudio's Cloudflare R2 bucket and are deleted after import."
-                             : "Separates vocals with BS-RoFormer and times lyrics word by word on your own RunPod GPU. Songs go to your Cloudflare R2 bucket and are deleted after import.")
+                             ? "Separates vocals with BS-RoFormer on PixlAudio's RunPod GPUs, up to three songs at once. Songs go to PixlAudio's Cloudflare R2 bucket and are deleted after import."
+                             : "Separates vocals with BS-RoFormer on your own RunPod GPU. Songs go to your Cloudflare R2 bucket and are deleted after import.")
                             .pixlFont(.bodySmall)
                             .foregroundStyle(theme.onSurfaceVariant)
                     }
@@ -63,15 +63,8 @@ struct CloudProcessingSettingsView: View {
                     ownKeyFields(settings)
                 }
                 connectionSection(cloud: cloud, settings: settings)
-                SettingsSubsection(title: "Outputs") {
-                    SwitchSettingRow(title: "Instrumental", subtitle: "For Sing: the song without its vocals.",
-                                     isOn: $settings.wantsInstrumental, systemImage: "waveform")
-                    SwitchSettingRow(title: "Word-timed lyrics", subtitle: "Times your lyrics word by word against the vocals.",
-                                     isOn: $settings.wantsLyrics, systemImage: "text.word.spacing")
-                    SwitchSettingRow(title: "Write lyrics when none are found (AI transcription)",
-                                     subtitle: "Saved as \"AI-written lyrics\". Line timing only outside the 11 languages the aligner knows.",
-                                     isOn: $settings.transcribeWhenMissing, systemImage: "sparkles",
-                                     enabled: settings.wantsLyrics)
+                // The cloud makes the instrumental only (2026-10-23): no output switches, just its quality.
+                SettingsSubsection(title: "Instrumental") {
                     SettingsPanel {
                         Text(verbatim: "Quality").pixlFont(.titleMedium).foregroundStyle(theme.onSurface)
                         GlassPillRow(items: [GlassPillRow<String>.Item(id: CloudSeparationQuality.standard.rawValue, title: "Standard"),
@@ -273,7 +266,7 @@ struct CloudProcessingSettingsView: View {
                         .pixlFont(.bodySmall)
                         .foregroundStyle(theme.onSurfaceVariant)
                 }
-                Text(verbatim: "Estimates: about $0.004 a song once a GPU is awake, plus about $0.007 to wake one. The RunPod balance itself is the hard limit.")
+                Text(verbatim: CloudProcessingCopy.estimatesLine(pricePerSecondMicroUSD: settings.effectivePricePerSecondMicroUSD))
                     .pixlFont(.bodySmall)
                     .foregroundStyle(theme.onSurfaceVariant)
             }
@@ -341,6 +334,21 @@ nonisolated enum CloudProcessingCopy {
 
     static func monthLine(committed: Int64, cap: Int64) -> String {
         "This month: \(CloudCost.format(microUSD: committed)) of \(CloudCost.format(microUSD: cap)) used or on its way."
+    }
+
+    /// The Cost panel's rule of thumb, from the cost model at the price in force (a 4-minute song).
+    static func estimatesLine(pricePerSecondMicroUSD: Int64) -> String {
+        let price = max(pricePerSecondMicroUSD, 0)
+        let warm = mills(CloudCost.warmSecondsStandard * price)
+        let cold = mills(CloudCost.coldStartSeconds * price)
+        return "Estimates: about \(warm) a song once a GPU is awake, plus about \(cold) for each GPU that wakes up. The RunPod balance itself is the hard limit."
+    }
+
+    /// µ$ as dollars to a tenth of a cent ("$0.006").
+    static func mills(_ microUSD: Int64) -> String {
+        let mills = (max(microUSD, 0) + 500) / 1_000
+        let fraction = String(mills % 1_000)
+        return "$\(mills / 1_000)." + String(repeating: "0", count: max(0, 3 - fraction.count)) + fraction
     }
 }
 

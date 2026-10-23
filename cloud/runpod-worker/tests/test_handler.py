@@ -120,6 +120,59 @@ def test_bench_never_inherits_a_finished_jobs_deadline(tmp_path):
     assert "align" in out["stagesMs"] and out["stagesMs"]["alignWindows"] == 2
 
 
+class FakeAlignerModel:
+    """Stands in for QwenAligner behind handler._LazyAligner: counts loads, records the deadline of each call."""
+    loads: list = []
+
+    def __init__(self, path):
+        FakeAlignerModel.loads.append(path)
+        self.deadline = None
+        self.seen = []
+
+    def align(self, requests):
+        self.seen.append(self.deadline)
+        return [[] for _ in requests]
+
+
+def test_the_aligner_loads_only_when_a_job_asks_for_word_timing():
+    from pixl_worker.deadline import Deadline
+
+    FakeAlignerModel.loads = []
+    aligner = handler._LazyAligner("/models/aligner", factory=FakeAlignerModel)
+    assert aligner.model_id == "qwen3-forced-aligner-0.6b"
+    # Routing a line needs no model: the boot, and every instrumental-only job, never load it (2026-10-23).
+    assert aligner.supports("en") and not aligner.supports("vi")
+    assert not aligner.loaded and FakeAlignerModel.loads == []
+    deadline = Deadline(600)
+    aligner.deadline = deadline  # what lyrics.run._with_deadline does for a job
+    assert aligner.align(["a", "b"]) == [[], []]
+    assert aligner.loaded and FakeAlignerModel.loads == ["/models/aligner"]
+    aligner.deadline = None
+    assert aligner.align(["c"]) == [[]]
+    assert FakeAlignerModel.loads == ["/models/aligner"], "loaded once per process"
+    model = aligner.load()
+    assert model.seen == [deadline, None] and model.deadline is None  # handed over per call, never left behind
+
+
+def test_the_bench_loads_a_lazy_aligner_on_demand_and_times_the_load_apart(tmp_path):
+    from pixl_worker.lyrics import languages
+
+    FakeAlignerModel.loads = []
+    aligner = handler._LazyAligner("/models/aligner", factory=FakeAlignerModel)
+    languages.clear_backends()
+    languages.register_backend(aligner)
+    try:
+        worker, _ = make_worker(tmp_path)
+        selftest = worker.handle({"id": "s", "input": {"v": 1, "op": "selftest"}})
+        assert "en" in selftest["wordTimingLanguages"] and not aligner.loaded, "the selftest never loads it"
+        out = worker.handle({"id": "j", "input": {"v": 1, "op": "bench",
+                                                  "bench": {"seconds": 10, "stages": ["align"]}}})
+    finally:
+        languages.clear_backends()
+    assert out.get("status") == "ok", out
+    assert aligner.loaded and "aligner" in out["lazyLoadMs"] and out["stagesMs"]["alignWindows"] == 2
+
+
 # ---- stopping the worker after the jobs nothing follows (refresh_worker) -----------------------------------
 
 RESULT = jsonschema.Draft202012Validator(load_schema("job.result"))

@@ -178,7 +178,7 @@ final class SingPrepareRunnerTests: XCTestCase {
         let runner = makeRunner(h, songs: fiveFavorites(h))
         // The person turns the switch off just as the batch is being put together: the switch's own cancel would find no
         // job yet, so the runner stops what it just sent.
-        h.host.whileLyricsAreRead = { h.settings.autoPrepareEnabled = false }
+        h.host.whileSongsAreChecked = { h.settings.autoPrepareEnabled = false }
         await runner.evaluate()
         XCTAssertTrue(h.studio.outstandingAutoJobs.isEmpty, "nothing keeps going behind the person's back")
         XCTAssertEqual(runner.statusLine, "")

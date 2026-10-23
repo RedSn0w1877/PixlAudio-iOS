@@ -84,14 +84,18 @@ import Testing
     }
 
     @Test func songsAMonthComesFromTheCostModel() {
-        // A 4-minute song: 38 s of GPU plus a third of a 15 s cold start (batches of three), at $0.000192 a second.
-        #expect(CloudAutoBudget.songsPerMonth(budgetMicroUSD: 1_000_000) == 121)
-        #expect(CloudAutoBudget.songsPerMonth(budgetMicroUSD: 250_000) == 30)
-        #expect(CloudAutoBudget.songsPerMonth(budgetMicroUSD: 3_000_000) == 363)
-        #expect(CloudAutoBudget.songsPerMonth(budgetMicroUSD: 8_255) == 0)
-        #expect(CloudAutoBudget.songsPerMonth(budgetMicroUSD: 8_256) == 1)
-        #expect(CloudAutoBudget.songsPerMonth(budgetMicroUSD: 0) == 0)
-        #expect(CloudAutoBudget.songsPerMonth(budgetMicroUSD: -5) == 0)
+        // A 4-minute song: 33 s of GPU, at $0.000192 a second. A batch of three on PixlAudio's three workers runs side by
+        // side and pays three 15 s cold starts (a whole one per song); on one worker it shares a single one.
+        #expect(CloudAutoBudget.songsPerMonth(budgetMicroUSD: 1_000_000, parallelWorkers: 3) == 108)
+        #expect(CloudAutoBudget.songsPerMonth(budgetMicroUSD: 250_000, parallelWorkers: 3) == 27)
+        #expect(CloudAutoBudget.songsPerMonth(budgetMicroUSD: 3_000_000, parallelWorkers: 3) == 325)
+        #expect(CloudAutoBudget.songsPerMonth(budgetMicroUSD: 9_215, parallelWorkers: 3) == 0)
+        #expect(CloudAutoBudget.songsPerMonth(budgetMicroUSD: 9_216, parallelWorkers: 3) == 1)
+        #expect(CloudAutoBudget.songsPerMonth(budgetMicroUSD: 1_000_000, parallelWorkers: 1) == 137)
+        #expect(CloudAutoBudget.songsPerMonth(budgetMicroUSD: 7_295, parallelWorkers: 1) == 0)
+        #expect(CloudAutoBudget.songsPerMonth(budgetMicroUSD: 7_296, parallelWorkers: 1) == 1)
+        #expect(CloudAutoBudget.songsPerMonth(budgetMicroUSD: 0, parallelWorkers: 3) == 0)
+        #expect(CloudAutoBudget.songsPerMonth(budgetMicroUSD: -5, parallelWorkers: 3) == 0)
     }
 
     @Test func theDefaultsAreAnAffordableDozenADay() {

@@ -300,6 +300,19 @@ public struct CloudJobRecord: Codable, Sendable, Hashable, Identifiable {
         progressPercent = nil
     }
 
+    /// Takes the lyrics task off a job stored before the cloud stopped timing lyrics (2026-10-23), so it goes out for
+    /// its instrumental only. False (and nothing changed) when lyrics were all it asked for: the caller cancels it.
+    @discardableResult
+    public mutating func dropLyricsTask(nowMs: Int64) -> Bool {
+        guard tasks.contains(.lyrics) else { return true }
+        let rest = tasks.filter { $0 != .lyrics }
+        guard !rest.isEmpty else { return false }
+        tasks = rest
+        lyricsMode = nil
+        updatedAtMs = nowMs
+        return true
+    }
+
     /// The job as a selection plan (cost estimates): its tasks at its prepared, else asked-for (a clip), else library,
     /// length.
     public var plan: CloudSongPlan {
