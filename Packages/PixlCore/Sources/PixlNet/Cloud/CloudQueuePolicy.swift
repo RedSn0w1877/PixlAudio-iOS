@@ -109,7 +109,8 @@ public enum CloudTiming {
     /// An input older than this is uploaded again instead of being submitted (upload age + ttl < the 7-day `in/`
     /// lifecycle).
     public static let maxInputAgeAtSubmitMs: Int64 = 3 * 86_400_000
-    /// A batch is submitted when all its uploads are done, or this long after the first one finished.
+    /// A batch is submitted once enough of its uploads are done (`CloudBatchGate`), or this long after the first one
+    /// finished.
     public static let batchGateMs: Int64 = 120_000
     /// `/status` (and the `out/` listing) for jobs at RunPod at most this often in the foreground. `/status` is free and
     /// a listing is one cheap bucket operation; 15 s made a job of a few seconds wait up to 15 s to be noticed.
@@ -259,39 +260,19 @@ public struct CloudSongFacts: Sendable, Hashable {
     public var songId: String
     public var durationMs: Int64
     public var hasInstrumental: Bool
-    public var lyrics: CloudLyricsState
     /// A local file, a music-library item or a stream that can be downloaded.
     public var hasAudioSource: Bool
     public var isStreamed: Bool
     public var hasPendingJob: Bool
 
-    public init(songId: String, durationMs: Int64, hasInstrumental: Bool, lyrics: CloudLyricsState,
-                hasAudioSource: Bool, isStreamed: Bool, hasPendingJob: Bool) {
+    public init(songId: String, durationMs: Int64, hasInstrumental: Bool, hasAudioSource: Bool, isStreamed: Bool,
+                hasPendingJob: Bool) {
         self.songId = songId
         self.durationMs = durationMs
         self.hasInstrumental = hasInstrumental
-        self.lyrics = lyrics
         self.hasAudioSource = hasAudioSource
         self.isStreamed = isStreamed
         self.hasPendingJob = hasPendingJob
-    }
-}
-
-/// The person's choices (Settings › Cloud processing › Outputs, or the confirm sheet).
-public struct CloudSelectionOptions: Sendable, Hashable {
-    public var instrumental: Bool
-    public var lyrics: Bool
-    /// "Write lyrics when none are found (AI transcription)".
-    public var transcribeWhenMissing: Bool
-    /// Re-time lyrics the person synced themselves.
-    public var replaceUserSynced: Bool
-
-    public init(instrumental: Bool = true, lyrics: Bool = true, transcribeWhenMissing: Bool = true,
-                replaceUserSynced: Bool = false) {
-        self.instrumental = instrumental
-        self.lyrics = lyrics
-        self.transcribeWhenMissing = transcribeWhenMissing
-        self.replaceUserSynced = replaceUserSynced
     }
 }
 
@@ -301,17 +282,15 @@ public enum CloudSkipReason: String, Sendable, Hashable, CaseIterable, Error {
     case pendingJob
     case noAudio
     case tooLong
-    case userSynced
     case batchFull
     case tooManyStreamed
 
     public var label: String {
         switch self {
-        case .alreadyDone: "Already has an instrumental and word-timed lyrics"
+        case .alreadyDone: "Already has an instrumental"
         case .pendingJob: "Already waiting in the cloud queue"
         case .noAudio: "No audio this iPhone can fetch"
         case .tooLong: "Longer than 15 minutes"
-        case .userSynced: "You synced these lyrics yourself"
         case .batchFull: "More than 200 songs in one batch"
         case .tooManyStreamed: "More than 50 streamed songs in one batch"
         }
@@ -322,7 +301,8 @@ public enum CloudSkipReason: String, Sendable, Hashable, CaseIterable, Error {
 public struct CloudSongPlan: Sendable, Hashable {
     public var songId: String
     public var tasks: [CloudTask]
-    /// `align` when the song has lyrics, `transcribe` when it has none.
+    /// Always nil for a new job (2026-10-23: the cloud no longer times or writes lyrics; the lyrics sources and the
+    /// phone do). Kept for jobs stored before that, whose records still carry `align` or `transcribe`.
     public var lyricsMode: CloudLyricsMode?
     public var isStreamed: Bool
     public var durationMs: Int64
@@ -368,41 +348,25 @@ public struct CloudSelection: Sendable, Hashable {
 }
 
 public enum CloudSelector {
-    /// One song's plan, or why it is skipped. One job per song covers every missing task.
-    public static func plan(_ facts: CloudSongFacts, options: CloudSelectionOptions) -> Result<CloudSongPlan, CloudSkipReason> {
+    /// One song's plan, or why it is skipped. A cloud job asks for the instrumental only (2026-10-23: no word-timed
+    /// lyrics and no AI transcription any more; BiniLyrics and the other lyrics sources cover the lyrics).
+    public static func plan(_ facts: CloudSongFacts) -> Result<CloudSongPlan, CloudSkipReason> {
         if facts.hasPendingJob { return .failure(.pendingJob) }
         if facts.durationMs > CloudLimits.maxDurationMs { return .failure(.tooLong) }
-        var tasks: [CloudTask] = []
-        if options.instrumental && !facts.hasInstrumental { tasks.append(.instrumental) }
-        var mode: CloudLyricsMode?
-        var userSyncedSkip = false
-        if options.lyrics {
-            switch facts.lyrics {
-            case .none:
-                if options.transcribeWhenMissing { mode = .transcribe }
-            case .textOrLineSynced:
-                mode = .align
-            case .wordSynced:
-                break
-            case .userSynced:
-                if options.replaceUserSynced { mode = .align } else { userSyncedSkip = true }
-            }
-        }
-        if mode != nil { tasks.append(.lyrics) }
-        guard !tasks.isEmpty else { return .failure(userSyncedSkip ? .userSynced : .alreadyDone) }
+        guard !facts.hasInstrumental else { return .failure(.alreadyDone) }
         guard facts.hasAudioSource else { return .failure(.noAudio) }
-        return .success(CloudSongPlan(songId: facts.songId, tasks: tasks, lyricsMode: mode, isStreamed: facts.isStreamed,
-                                      durationMs: facts.durationMs))
+        return .success(CloudSongPlan(songId: facts.songId, tasks: [.instrumental], lyricsMode: nil,
+                                      isStreamed: facts.isStreamed, durationMs: facts.durationMs))
     }
 
     /// A batch in the given order, with the 200-song and 50-streamed caps.
-    public static func select(_ songs: [CloudSongFacts], options: CloudSelectionOptions) -> CloudSelection {
+    public static func select(_ songs: [CloudSongFacts]) -> CloudSelection {
         var plans: [CloudSongPlan] = []
         var skipped: [(songId: String, reason: CloudSkipReason)] = []
         var streamed = 0
         var seen = Set<String>()
         for facts in songs where seen.insert(facts.songId).inserted {
-            switch plan(facts, options: options) {
+            switch plan(facts) {
             case .failure(let reason):
                 skipped.append((facts.songId, reason))
             case .success(let plan):
@@ -436,10 +400,14 @@ public enum CloudSelector {
 // MARK: - Batch gate
 
 public enum CloudBatchGate {
-    /// Submit a batch's uploaded jobs when every upload is done, or 2 minutes after the first one finished.
-    public static func shouldSubmit(uploadsPending: Int, uploadsDone: Int, firstUploadDoneAtMs: Int64?, nowMs: Int64) -> Bool {
+    /// Submit a batch's uploaded jobs as soon as there is enough to keep every GPU busy: `parallelWorkers` of its
+    /// uploads are done, or all of them, or 2 minutes have passed since the first one finished. Once the gate has
+    /// opened (`alreadySent`: a job of the batch went to RunPod before) every further upload goes in the next pass, so
+    /// the GPUs start while the phone is still uploading the rest.
+    public static func shouldSubmit(uploadsPending: Int, uploadsDone: Int, alreadySent: Int = 0,
+                                    firstUploadDoneAtMs: Int64?, nowMs: Int64, parallelWorkers: Int) -> Bool {
         guard uploadsDone > 0 else { return false }
-        if uploadsPending == 0 { return true }
+        if uploadsPending == 0 || alreadySent > 0 || uploadsDone >= max(parallelWorkers, 1) { return true }
         guard let first = firstUploadDoneAtMs else { return false }
         return nowMs - first >= CloudTiming.batchGateMs
     }
@@ -447,34 +415,59 @@ public enum CloudBatchGate {
 
 // MARK: - Submit burst
 
-/// One submit pass sends the ready jobs in order, and the last of them carries `policy.last_in_batch`: the worker then
-/// stops itself after that job instead of staying up, idle and billed (on 2026-10-08 one sat idle for 7+ minutes past
-/// its 10 s idle timeout). Which job is the last is only known once the next one is ready to go (a later one may be
-/// skipped, fail to sign or stop at the monthly cap), so each job is held until the next one is ready, or until the
-/// pass ends, and only then sent: `ready` hands back the job before it (not the last), `end` the final one (the last).
+/// One submit pass sends the ready jobs in order, and its last jobs carry `policy.last_in_batch`: each worker that runs
+/// one stops itself after it instead of staying up, idle and billed (on 2026-10-08 one sat idle for 7+ minutes past
+/// its 10 s idle timeout). With N workers draining RunPod's queue, the final N jobs run on up to N different workers,
+/// so the last `min(N, burst size)` jobs are marked (`lastCount`). Which jobs are the last is only known once later
+/// ones are ready to go (a later one may be skipped, fail to sign or stop at the monthly cap), so the newest
+/// `lastCount` jobs are held until the next one is ready, or until the pass ends, and only then sent: `ready` hands
+/// back the oldest held job once more than `lastCount` wait (not a last one), `end` the held ones (the last ones).
 /// A single song is a burst of one.
 public struct CloudSubmitBurst<Item> {
-    private var held: Item?
+    /// How many of the burst's final jobs are marked: the number of workers that may run at once.
+    public let lastCount: Int
+    private var held: [Item] = []
 
-    public init() {}
-
-    /// The job waiting to be sent: the next budget check counts it as already at RunPod.
-    public var holding: Item? { held }
-
-    /// `item` is ready to send: hold it, and hand back the job held before it, to send as not the last.
-    public mutating func ready(_ item: Item) -> Item? {
-        defer { held = item }
-        return held
+    public init(lastCount: Int = 1) {
+        self.lastCount = max(lastCount, 1)
     }
 
-    /// The pass is over (or stopped at the cap): hand back the held job, to send as the burst's last.
-    public mutating func end() -> Item? {
-        defer { held = nil }
+    /// The jobs waiting to be sent, oldest first: the next budget check counts them as already at RunPod.
+    public var holding: [Item] { held }
+
+    /// `item` is ready to send: hold it, and hand back the oldest job held before it once more than `lastCount` are
+    /// waiting, to send as not one of the last.
+    public mutating func ready(_ item: Item) -> Item? {
+        held.append(item)
+        return held.count > lastCount ? held.removeFirst() : nil
+    }
+
+    /// The pass is over (or stopped at the cap): hand back the held jobs, oldest first, to send as the burst's last.
+    public mutating func end() -> [Item] {
+        defer { held = [] }
         return held
     }
 }
 
 extension CloudSubmitBurst: Sendable where Item: Sendable {}
+
+/// Whether a burst's final jobs may tell their workers to stop.
+public enum CloudBurstEnd {
+    /// More of this phone's jobs are about to go to RunPod in a later pass: due jobs still being queued, prepared or
+    /// uploaded (not ones waiting out a retry, nor — while the phone isn't ready for work done ahead — songs prepared
+    /// ahead that haven't started). While they come, a burst's final jobs are sent unmarked: their workers stay up for
+    /// them instead of stopping and starting cold again. (At the monthly cap nothing more goes: the caller marks then.)
+    public static func moreComing(_ jobs: [CloudJobRecord], nowMs: Int64, autoBlocked: Bool) -> Bool {
+        jobs.contains { record in
+            switch record.state {
+            case .uploading: return record.isDue(nowMs: nowMs)
+            case .queued, .preparing:
+                return record.isDue(nowMs: nowMs) && !(autoBlocked && record.effectiveOrigin == .auto)
+            default: return false
+            }
+        }
+    }
+}
 
 // MARK: - Cost
 
@@ -489,13 +482,14 @@ public enum CloudCost {
     /// The default app cap: $3 a month.
     public static let defaultMonthlyCapMicroUSD: Int64 = 3_000_000
 
-    /// Billed GPU seconds per warm 4-minute song: instrumental + aligned lyrics. Measured on 2026-10-22 on an RTX A4500
-    /// (the design's 20 s was a guess).
-    public static let warmSecondsStandard: Int64 = 38
-    public static let extraSecondsTranscribe: Int64 = 10
+    /// Billed GPU seconds per warm 4-minute song: the instrumental only. The 2026-10-22 bench on an RTX A4500 measured
+    /// 38 s with aligned lyrics (the design's 20 s was a guess); the cloud no longer aligns lyrics (2026-10-23), which
+    /// leaves about 33 s (the alignment's ~5 s is an estimate until the next bench).
+    public static let warmSecondsStandard: Int64 = 33
     public static let extraSecondsBest: Int64 = 12
     public static let extraSecondsStems: Int64 = 5
-    /// One cold start per batch: model load plus the 10 s idle timeout (measured on 2026-10-22).
+    /// One cold start per worker that starts: model load plus the 10 s idle timeout (measured on 2026-10-22). A burst
+    /// of n jobs starts up to `min(parallelWorkers, n)` workers.
     public static let coldStartSeconds: Int64 = 15
     /// The song length §6's figures are for (4 minutes).
     public static let referenceSongMs: Int64 = 240_000
@@ -514,18 +508,23 @@ public enum CloudCost {
     /// Estimated GPU seconds for one song's plan (scaled by length: the figures are for a 4-minute song).
     public static func estimatedSeconds(_ plan: CloudSongPlan, quality: CloudSeparationQuality) -> Int64 {
         var seconds = warmSecondsStandard
-        if plan.lyricsMode == .transcribe { seconds += extraSecondsTranscribe }
         if plan.tasks.contains(.stems4) { seconds += extraSecondsStems }
         if CloudSelector.quality(quality, durationMs: plan.durationMs) == .best { seconds += extraSecondsBest }
         let scale = max(Double(plan.durationMs) / Double(referenceSongMs), 0.25)
         return Int64((Double(seconds) * scale).rounded(.up))
     }
 
-    /// A batch's estimate: one cold start plus every song warm.
+    /// The cold starts a burst of `count` jobs pays: one per worker it wakes, `min(parallelWorkers, count)`.
+    public static func coldStarts(count: Int, parallelWorkers: Int) -> Int {
+        max(min(max(parallelWorkers, 1), count), 0)
+    }
+
+    /// A batch's estimate: a cold start for every worker it wakes plus every song warm.
     public static func estimateMicroUSD(_ plans: [CloudSongPlan], quality: CloudSeparationQuality,
-                                        pricePerSecondMicroUSD: Int64) -> Int64 {
+                                        pricePerSecondMicroUSD: Int64, parallelWorkers: Int) -> Int64 {
         guard !plans.isEmpty else { return 0 }
-        let seconds = coldStartSeconds + plans.reduce(0) { $0 + estimatedSeconds($1, quality: quality) }
+        let cold = coldStartSeconds * Int64(coldStarts(count: plans.count, parallelWorkers: parallelWorkers))
+        let seconds = cold + plans.reduce(0) { $0 + estimatedSeconds($1, quality: quality) }
         return seconds * max(pricePerSecondMicroUSD, 0)
     }
 
@@ -626,7 +625,7 @@ public struct CloudBatchEstimate: Sendable, Hashable {
     public var uploadMB: Int64 { (uploadBytes + 1_048_575) / 1_048_576 }
 
     public static func make(plans: [CloudSongPlan], uploadBytes: [String: Int64], quality: CloudSeparationQuality,
-                            pricePerSecondMicroUSD: Int64, committedMicroUSD: Int64,
+                            pricePerSecondMicroUSD: Int64, parallelWorkers: Int, committedMicroUSD: Int64,
                             capMicroUSD: Int64) -> CloudBatchEstimate {
         var duration: Int64 = 0
         var bytes: Int64 = 0
@@ -637,7 +636,8 @@ public struct CloudBatchEstimate: Sendable, Hashable {
                 ?? CloudUploadEstimate.bytes(durationMs: plan.durationMs, passthroughBitsPerSecond: nil)
             if plan.isStreamed { streamed += 1 }
         }
-        let cost = CloudCost.estimateMicroUSD(plans, quality: quality, pricePerSecondMicroUSD: pricePerSecondMicroUSD)
+        let cost = CloudCost.estimateMicroUSD(plans, quality: quality, pricePerSecondMicroUSD: pricePerSecondMicroUSD,
+                                              parallelWorkers: parallelWorkers)
         let remaining = CloudBudget.remainingMicroUSD(capMicroUSD: capMicroUSD, spentMicroUSD: committedMicroUSD)
         return CloudBatchEstimate(songs: plans.count, streamedSongs: streamed, totalDurationMs: duration,
                                   uploadBytes: bytes, costMicroUSD: cost, remainingMicroUSD: remaining,

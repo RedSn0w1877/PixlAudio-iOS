@@ -31,7 +31,7 @@ final class CloudBackgroundTests: XCTestCase {
         XCTAssertEqual(notifier.outcomes.count, 1)
         XCTAssertEqual(notifier.outcomes.first?.imported, 1)
         XCTAssertEqual(notifier.outcomes.first?.instrumentals, 1)
-        XCTAssertEqual(notifier.outcomes.first?.lyrics, 1)
+        XCTAssertEqual(notifier.outcomes.first?.lyrics, 0, "the cloud no longer times lyrics")
         XCTAssertEqual(notifier.permissionRequests, 1, "asked when the person sent the batch, once")
         // Later passes don't announce it again.
         await h.studio.pump()
@@ -99,7 +99,7 @@ final class CloudBackgroundTests: XCTestCase {
         await pass.value
         XCTAssertEqual(h.studio.job(key)?.state, .downloading)
         XCTAssertEqual(h.transfers.downloads.map(\.slot), ["instrumental"])
-        XCTAssertEqual(h.host.savedLyrics.count, 1, "the lyrics were imported in the same wake")
+        XCTAssertTrue(h.host.savedLyrics.isEmpty, "a lyrics file the manifest names is not asked for, so not imported")
     }
 
     func testAfterIOSTakesTheTimeBackNothingStartsUntilTheAppOpens() async throws {

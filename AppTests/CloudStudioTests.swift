@@ -16,7 +16,7 @@ final class CloudStudioTests: XCTestCase {
         h.host.facts[song.id] = CloudHarness.lineSyncedFacts
 
         let preview = await h.studio.preview(songs: [song], title: "Test")
-        XCTAssertEqual(preview.plans.map(\.tasks), [[.instrumental, .lyrics]])
+        XCTAssertEqual(preview.plans.map(\.tasks), [[.instrumental]], "the instrumental only, though the song has lyrics")
         XCTAssertTrue(preview.estimate.fitsCap)
         await h.studio.send(preview)
         await h.studio.pump()
@@ -41,8 +41,7 @@ final class CloudStudioTests: XCTestCase {
         XCTAssertEqual(input.jobKey, key)
         XCTAssertEqual(input.audio?.ext, "flac")
         XCTAssertEqual(input.audio?.sha256, CloudHarness.uploadSHA)
-        XCTAssertEqual(input.lyrics?.mode, "align")
-        XCTAssertEqual(input.lyrics?.lines?.first?.text, "hello world")
+        XCTAssertNil(input.lyrics, "the cloud no longer times lyrics")
         XCTAssertEqual(input.guard?.attemptPut.contains("/out/\(key)/attempt.json"), true)
         XCTAssertEqual(runs.first?.policy, CloudJobPolicy(ttl: CloudTiming.ttlMs, executionTimeout: CloudTiming.executionTimeoutMs))
         // A single song is a burst of one: the worker stops itself after it instead of idling, billed.
@@ -50,13 +49,13 @@ final class CloudStudioTests: XCTestCase {
         XCTAssertEqual(h.studio.job(key)?.state, .submitted)
         XCTAssertEqual(h.studio.job(key)?.runpodJobId, "rp-1")
 
-        // RunPod finishes: lyrics import at once, the instrumental downloads in the background.
+        // RunPod finishes: the instrumental downloads in the background. A lyrics file the manifest still names (an
+        // older worker) was not asked for and is not imported.
         let result = h.finish(key)
         await h.runpod.setStatus("rp-1", RunPodJob(id: "rp-1", status: "COMPLETED", result: result))
         h.clock.advance(16_000)
         await h.studio.pump()
-        XCTAssertEqual(h.host.savedLyrics.map { $0.songId }, [song.id])
-        XCTAssertEqual(h.host.savedLyrics.first?.doc.lines.first?.syllables.map(\.text), ["hello ", "world"])
+        XCTAssertTrue(h.host.savedLyrics.isEmpty)
         XCTAssertEqual(h.studio.job(key)?.state, .downloading)
         XCTAssertEqual(h.transfers.downloads.map { $0.slot }, ["instrumental"])
 
@@ -64,7 +63,8 @@ final class CloudStudioTests: XCTestCase {
         await h.studio.handle(.downloaded(jobKey: key, slot: "instrumental", stagedFile: try h.stagedInstrumental()))
         let job = try XCTUnwrap(h.studio.job(key))
         XCTAssertEqual(job.state, .imported)
-        XCTAssertTrue(job.importedInstrumental && job.importedLyrics)
+        XCTAssertTrue(job.importedInstrumental)
+        XCTAssertFalse(job.importedLyrics)
         XCTAssertEqual(h.host.installed.map { $0.songId }, [song.id])
         XCTAssertEqual(h.host.installed.first?.flac, false)
         XCTAssertEqual(job.costMicroUSD, (18_000 + 20_000) * 192 / 1000)
@@ -204,23 +204,59 @@ final class CloudStudioTests: XCTestCase {
         XCTAssertEqual(h.studio.job(key)?.state, .uploaded)
     }
 
-    func testABatchWaitsForAllItsUploads() async throws {
-        let h = CloudHarness()
+    func testABatchWaitsUntilItCanKeepEveryWorkerBusy() async throws {
+        // PixlAudio's own endpoint: three workers, so the gate waits for three uploads (or all, or two minutes).
+        let h = CloudHarness(builtIn: CloudHarness.builtInKeys, ownKeys: false)
         let a = h.addSong("f:root/a.m4a"), b = h.addSong("f:root/b.m4a")
         await h.studio.send(await h.studio.preview(songs: [a, b], title: "Two"))
         await h.studio.pump()
         await h.studio.settle()
+        XCTAssertEqual(h.settings.parallelWorkers, 3)
         let keys = h.studio.jobs.map(\.jobKey)
         XCTAssertEqual(keys.count, 2)
         await h.studio.handle(.uploaded(jobKey: keys[0]))
         await h.studio.pump()
-        var runs = await h.runpod.runs.count
-        XCTAssertEqual(runs, 0, "the gate holds the first song while the second uploads")
-        // Two minutes after the first upload the gate opens anyway.
+        var runs = await h.runpod.runs
+        XCTAssertEqual(runs.count, 0, "the gate holds the first song while the second uploads")
+        // Two minutes after the first upload the gate opens anyway; the second song is still on its way, so the first
+        // doesn't stop its worker.
         h.clock.advance(CloudTiming.batchGateMs + 1)
         await h.studio.pump()
-        runs = await h.runpod.runs.count
-        XCTAssertEqual(runs, 1)
+        runs = await h.runpod.runs
+        XCTAssertEqual(runs.compactMap(\.input.jobKey), [keys[0]])
+        XCTAssertEqual(runs.map(\.input.isLastInBatch), [false])
+    }
+
+    func testThreeWorkersStartOnceThreeUploadsAreInAndTheRestFollowOneByOne() async throws {
+        let h = CloudHarness(builtIn: CloudHarness.builtInKeys, ownKeys: false)
+        let songs = ["a", "b", "c", "d"].map { h.addSong("f:root/\($0).m4a") }
+        await h.studio.send(await h.studio.preview(songs: songs, title: "Four"))
+        await h.studio.pump()
+        await h.studio.settle()
+        let keys = h.studio.jobs.map(\.jobKey)
+        XCTAssertEqual(h.studio.jobs.map(\.state), [.uploading, .uploading, .uploading, .uploading],
+                       "three prepared at once, then the fourth")
+        for key in keys.prefix(3) { await h.studio.handle(.uploaded(jobKey: key)) }
+        await h.studio.pump()
+        var runs = await h.runpod.runs
+        XCTAssertEqual(runs.compactMap(\.input.jobKey), Array(keys.prefix(3)), "the GPUs start while the phone uploads")
+        XCTAssertEqual(runs.map(\.input.isLastInBatch), [false, false, false], "the fourth is still coming")
+        // The gate is open: the fourth goes as soon as it is up, and it is the last.
+        await h.studio.handle(.uploaded(jobKey: keys[3]))
+        await h.studio.pump()
+        runs = await h.runpod.runs
+        XCTAssertEqual(runs.compactMap(\.input.jobKey), keys)
+        XCTAssertEqual(runs.map(\.input.isLastInBatch), [false, false, false, true])
+    }
+
+    func testThreeWorkersMarkTheLastThreeJobsOfABurst() async throws {
+        let h = CloudHarness(builtIn: CloudHarness.builtInKeys, ownKeys: false)
+        let songs = ["a", "b", "c", "d"].map { h.addSong("f:root/\($0).m4a") }
+        let keys = try await h.submittedBatch(songs)
+        let runs = await h.runpod.runs
+        XCTAssertEqual(runs.compactMap(\.input.jobKey), keys)
+        // The final three may each run on a worker of its own: each stops its worker.
+        XCTAssertEqual(runs.map(\.input.isLastInBatch), [false, true, true, true])
     }
 
     // MARK: Idle workers (last_in_batch)
@@ -248,22 +284,42 @@ final class CloudStudioTests: XCTestCase {
         XCTAssertEqual(h.studio.jobs.map(\.state), [.submitted, .submitted, .submitted])
     }
 
-    func testAJobSentLaterIsTheLastOfItsOwnBurst() async throws {
+    func testWithOneWorkerTheFirstUploadGoesAtOnceAndKeepsItsWorkerForTheNext() async throws {
+        // Own keys: one worker, so one upload is enough to start it.
         let h = CloudHarness()
+        XCTAssertEqual(h.settings.parallelWorkers, 1)
         let a = h.addSong("f:root/a.m4a"), b = h.addSong("f:root/b.m4a")
         await h.studio.send(await h.studio.preview(songs: [a, b], title: "Two"))
         await h.studio.pump()
         await h.studio.settle()
         let keys = h.studio.jobs.map(\.jobKey)
         await h.studio.handle(.uploaded(jobKey: keys[0]))
-        h.clock.advance(CloudTiming.batchGateMs + 1)
         await h.studio.pump()
-        // The gate let the first song go alone; the second follows when its upload is done.
+        var runs = await h.runpod.runs
+        XCTAssertEqual(runs.compactMap(\.input.jobKey), [keys[0]], "no waiting for the second upload")
+        XCTAssertEqual(runs.map(\.input.isLastInBatch), [false], "the second song is still coming")
+        // The second follows when its upload is done, as the last.
         await h.studio.handle(.uploaded(jobKey: keys[1]))
         await h.studio.pump()
-        let runs = await h.runpod.runs
+        runs = await h.runpod.runs
         XCTAssertEqual(runs.compactMap(\.input.jobKey), keys)
-        XCTAssertEqual(runs.map(\.input.isLastInBatch), [true, true])
+        XCTAssertEqual(runs.map(\.input.isLastInBatch), [false, true])
+    }
+
+    func testAJobWhoseBatchMateWaitsOutARetryIsTheLast() async throws {
+        let h = CloudHarness()
+        let a = h.addSong("f:root/a.m4a"), b = h.addSong("f:root/b.m4a")
+        await h.studio.send(await h.studio.preview(songs: [a, b], title: "Two"))
+        await h.studio.pump()
+        await h.studio.settle()
+        let keys = h.studio.jobs.map(\.jobKey)
+        // The second upload failed: it waits a minute before trying again, so nothing is right behind the first.
+        await h.studio.handle(.uploadFailed(jobKey: keys[1], message: "offline", httpStatus: nil))
+        await h.studio.handle(.uploaded(jobKey: keys[0]))
+        await h.studio.pump()
+        let runs = await h.runpod.runs
+        XCTAssertEqual(runs.compactMap(\.input.jobKey), [keys[0]])
+        XCTAssertEqual(runs.map(\.input.isLastInBatch), [true])
     }
 
     func testTheCapEndsABurstWithTheLastJobThatWentOut() async throws {
@@ -439,7 +495,7 @@ final class CloudStudioTests: XCTestCase {
         XCTAssertTrue([.queued, .preparing, .uploading].contains(job.state), "\(job.state)")
         XCTAssertEqual(job.outputCodec, .flac)
         XCTAssertTrue(job.flacRedone)
-        XCTAssertEqual(job.tasks, [.instrumental], "the lyrics were already imported")
+        XCTAssertEqual(job.tasks, [.instrumental])
         XCTAssertTrue(h.host.installed.isEmpty)
         await h.waitUntil { h.objects.deleted.contains("out/\(key)/instrumental.m4a") }
         XCTAssertTrue(h.objects.deleted.contains("out/\(key)/instrumental.m4a"), "the AAC result is removed")
@@ -552,7 +608,63 @@ final class CloudStudioTests: XCTestCase {
         XCTAssertEqual(settings.monthlyCapMicroUSD, 3_000_000)
         XCTAssertEqual(settings.pricePerSecondMicroUSD, 192)
         XCTAssertEqual(settings.quality, .standard)
-        XCTAssertTrue(settings.wantsInstrumental && settings.wantsLyrics && settings.transcribeWhenMissing)
+        XCTAssertEqual(settings.parallelWorkers, 1, "own keys: their endpoint's worker count is unknown")
+    }
+
+    func testTheCostPanelsRuleOfThumbComesFromTheCostModel() {
+        // 33 s warm and a 15 s cold start at $0.000192 a second.
+        XCTAssertEqual(CloudProcessingCopy.mills(33 * 192), "$0.006")
+        XCTAssertEqual(CloudProcessingCopy.mills(15 * 192), "$0.003")
+        XCTAssertEqual(CloudProcessingCopy.mills(1_234_567), "$1.235")
+        XCTAssertEqual(CloudProcessingCopy.mills(0), "$0.000")
+        let line = CloudProcessingCopy.estimatesLine(pricePerSecondMicroUSD: 192)
+        XCTAssertTrue(line.contains("about $0.006 a song") && line.contains("about $0.003 for each GPU"), line)
+    }
+
+    func testAStoredJobStopsAskingTheCloudForLyrics() async throws {
+        // Stored before 2026-10-23: one job for the instrumental and the lyrics, one for the lyrics alone.
+        var both = CloudHarness.storedRecord(1, song: "f:root/a.m4a", state: .uploaded)
+        both.tasks = [.instrumental, .lyrics]
+        both.lyricsMode = .align
+        var lyricsOnly = CloudHarness.storedRecord(2, song: "f:root/b.m4a", state: .uploaded, batch: "other")
+        lyricsOnly.tasks = [.lyrics]
+        lyricsOnly.lyricsMode = .align
+        let store = CloudJobStore(file: nil)
+        await store.save([both, lyricsOnly])
+        let h = CloudHarness(store: store)
+        h.addSong("f:root/a.m4a")
+        h.addSong("f:root/b.m4a")
+        await h.studio.pump()
+        let runs = await h.runpod.runs
+        XCTAssertEqual(runs.compactMap(\.input.jobKey), [both.jobKey], "the lyrics-only job has nothing left to send")
+        XCTAssertEqual(runs.first?.input.tasks, ["instrumental"])
+        XCTAssertNil(runs.first?.input.lyrics)
+        XCTAssertEqual(h.studio.job(both.jobKey)?.tasks, [.instrumental])
+        XCTAssertEqual(h.studio.job(both.jobKey)?.state, .submitted)
+        XCTAssertEqual(h.studio.job(lyricsOnly.jobKey)?.state, .cancelled)
+        await h.waitUntil { h.objects.deleted.contains("in/\(lyricsOnly.jobKey).flac") }
+        XCTAssertTrue(h.objects.deleted.contains("in/\(lyricsOnly.jobKey).flac"), "its upload is cleared")
+    }
+
+    func testAStoredJobAlreadyAtRunPodStillBringsItsInstrumentalAndLyricsIn() async throws {
+        var record = CloudHarness.storedRecord(1, song: "f:root/a.m4a", state: .submitted)
+        record.tasks = [.instrumental, .lyrics]
+        record.lyricsMode = .align
+        record.runpodJobId = "rp-old"
+        record.submittedAtMs = CloudHarness.clockStartMs - 5_000
+        let store = CloudJobStore(file: nil)
+        await store.save([record])
+        let h = CloudHarness(store: store)
+        let song = h.addSong("f:root/a.m4a")
+        await h.runpod.setStatus("rp-old", RunPodJob(id: "rp-old", status: "COMPLETED", result: h.finish(record.jobKey)))
+        h.clock.advance(16_000)
+        await h.studio.pump()
+        XCTAssertEqual(h.host.savedLyrics.map { $0.songId }, [song.id], "lyrics it asked for still come in")
+        await h.studio.handle(.downloaded(jobKey: record.jobKey, slot: "instrumental",
+                                          stagedFile: try h.stagedInstrumental()))
+        let job = try XCTUnwrap(h.studio.job(record.jobKey))
+        XCTAssertEqual(job.state, .imported, "nothing is left waiting")
+        XCTAssertTrue(job.importedInstrumental && job.importedLyrics)
     }
 
     func testLyricsFactsFromStoredLyrics() {
@@ -600,6 +712,11 @@ final class CloudHarness {
     static let sourceFrames = CloudTestValues.sourceFrames
     static let lineSyncedFacts = CloudTestValues.lineSyncedFacts
     static func key(_ n: Int) -> String { CloudTestValues.key(n) }
+    /// Built-in keys (PixlAudio's own endpoint, three workers) with the same values as the own-key fields; pass with
+    /// `ownKeys: false`.
+    static let builtInKeys = CloudFixedBuiltInKeys(config: CloudConfigInput(
+        endpointId: "abc123xyz", runpodKey: "rpa_TEST", endpoint: "0123456789abcdef0123456789abcdef",
+        bucket: "pixl-cloud-studio", accessKeyId: "AKID", secretAccessKey: "SECRET"))
 
     let clock: CloudTestClock
     let host: FakeCloudHost
@@ -861,8 +978,8 @@ final class FakeCloudHost: CloudStudioHost {
     var saveOutcome: CloudLyricsSaveOutcome = .saved
     /// Runs while a song's audio "comes down" (a streamed song's download), before the preparer gets it.
     var whileAudioComesDown: (() -> Void)?
-    /// Runs while a song's lyrics facts are read (the first thing a batch's selection does).
-    var whileLyricsAreRead: (() -> Void)?
+    /// Runs while a song's instrumental is looked up for a batch's selection (the first thing it does).
+    var whileSongsAreChecked: (() -> Void)?
 
     func song(id: String) -> Song? { songs[id] }
     var currentSong: Song? { current }
@@ -872,11 +989,13 @@ final class FakeCloudHost: CloudStudioHost {
         return URL(fileURLWithPath: "/music/\(song.id)")
     }
     func streamIdentity(for song: Song) async -> String? { identity[song.id] }
-    func lyricsFacts(for song: Song) async -> CloudLyricsFacts {
-        whileLyricsAreRead?()
-        return facts[song.id] ?? .none
+    func lyricsFacts(for song: Song) async -> CloudLyricsFacts { facts[song.id] ?? .none }
+    func hasInstrumental(songId: String) async -> Bool {
+        whileSongsAreChecked?()
+        return instrumentals.contains(songId)
     }
-    func hasInstrumental(songId: String) async -> Bool { instrumentals.contains(songId) }
+    /// One look, like the live host's (and without the hook: that is Prepare ahead's look, not a batch's selection).
+    func songIdsWithInstrumental(among songIds: [String]) async -> Set<String> { instrumentals.intersection(songIds) }
 
     func installInstrumental(from staged: URL, songId: String, flac: Bool) throws {
         installed.append((songId, flac))

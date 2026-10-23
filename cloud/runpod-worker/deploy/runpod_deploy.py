@@ -14,10 +14,11 @@ Steps (stdlib only, idempotent):
 4. wait for the rollout (GET .../releases until no worker runs an older version);
 5. selftest through /runsync: the answering worker's gitSha must be this build's (old workers may still answer
    while they drain, so it retries); the storage host allowlist must not be empty;
-6. --bench: one `op: bench` (per-stage seconds, peak VRAM), then the W1 concurrency check: 3 bench jobs at
-   once while polling the workers every 5 s for the peak number running (above 1 means "extra workers" exist
-   and every max-1 cost bound is off). Each selftest and bench stops its worker afterwards (handler.py), so the
-   3 concurrency jobs each start a worker of their own;
+6. --bench: one `op: bench` (per-stage seconds, peak VRAM), then the W1 concurrency check: workers.max + 1
+   bench jobs at once (deploy/endpoint.json's max, 3 since 2026-10-23) while polling the workers every 5 s for
+   the peak number running (above workers.max means "extra workers" exist and every cost bound that assumes the
+   max is off). Each selftest and bench stops its worker afterwards (handler.py), so the concurrency jobs each
+   start a worker of their own;
 7. after the selftest/bench, whether they passed or not (but not when the run is cancelled): the idle release of
    deploy/reaper.py (two /health reads a minute apart; a worker still idle and ready with nothing to do is
    released by max workers 0 and back), since an idle worker left by the deploy's own jobs bills until something
@@ -191,9 +192,13 @@ def bench(api: RunPod, endpoint_id: str, *, sleep: Callable[[float], None] = tim
     return out
 
 
-def concurrency_check(api: RunPod, endpoint_id: str, *, jobs: int = 3, poll_s: float = 5, timeout_s: float = 1800,
-                      sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.monotonic) -> int:
-    """W1: queue `jobs` short bench jobs at once and record the peak number of running workers."""
+def concurrency_check(api: RunPod, endpoint_id: str, *, max_workers: int, jobs: int | None = None, poll_s: float = 5,
+                      timeout_s: float = 1800, sleep: Callable[[float], None] = time.sleep,
+                      clock: Callable[[], float] = time.monotonic) -> int:
+    """W1: queue `jobs` short bench jobs at once (one more than `max_workers`, deploy/endpoint.json's workers.max, so
+    a worker beyond the max would show) and record the peak number of running workers."""
+    if jobs is None:
+        jobs = max_workers + 1
     ids = [api.run(endpoint_id, {"v": 1, "op": "bench", "bench": {"seconds": 60, "stages": ["separate"]}}).get("id")
            for _ in range(jobs)]
     peak_running = peak_total = 0
@@ -210,8 +215,10 @@ def concurrency_check(api: RunPod, endpoint_id: str, *, jobs: int = 3, poll_s: f
             sleep(poll_s)
     for job_id in sorted(pending):  # still queued at the timeout
         cancel_unfinished(api, endpoint_id, job_id, None)
-    say(f"concurrency (W1): peak running workers {peak_running}, peak allocated {peak_total} (workers.max is 1)"
-        + ("" if peak_running <= 1 else " - EXTRA WORKERS: every max-1 cost bound in the design is off"))
+    say(f"concurrency (W1): peak running workers {peak_running}, peak allocated {peak_total} "
+        f"(workers.max is {max_workers})"
+        + ("" if peak_running <= max_workers
+           else f" - EXTRA WORKERS: every cost bound that assumes at most {max_workers} is off"))
     return peak_running
 
 
@@ -288,7 +295,7 @@ def deploy(api: RunPod | None, *, tag: str, git_sha: str, account_id: str, creat
             report_selftest(selftest(api, endpoint_id, git_sha, sleep=sleep, clock=clock))
         if run_bench:
             bench(api, endpoint_id, sleep=sleep, clock=clock)
-            concurrency_check(api, endpoint_id, sleep=sleep, clock=clock)
+            concurrency_check(api, endpoint_id, max_workers=int(template["workers"]["max"]), sleep=sleep, clock=clock)
         passed = True
     except KeyboardInterrupt:
         # Cancelled (the workflow execs python, so GitHub's SIGINT lands here, with SIGTERM 7.5 s behind it): no

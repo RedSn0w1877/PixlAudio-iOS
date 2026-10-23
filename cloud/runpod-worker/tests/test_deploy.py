@@ -22,6 +22,7 @@ import runpod_api as R  # noqa: E402
 import runpod_deploy as D  # noqa: E402
 
 TEMPLATE = json.loads((ROOT / "deploy" / "endpoint.json").read_text(encoding="utf-8"))
+MAX = TEMPLATE["workers"]["max"]  # 3 since 2026-10-23: three songs at once
 ACCOUNT = "0123456789abcdef0123456789abcdef"
 SHA = "abc1234def56" + "0" * 28
 TAG = "sha-abc1234def56"
@@ -120,7 +121,7 @@ def test_desired_state_pins_the_allowlist_to_the_account():
     assert body["env"]["PIXL_ALLOWED_HOST_SUFFIXES"] == f"{ACCOUNT}.r2.cloudflarestorage.com"
     assert body["env"]["PIXL_MAX_INPUT_MB"] == "160"
     assert body["gpu"]["pools"] == ["AMPERE_16", "AMPERE_24", "ADA_24"]
-    assert body["flashboot"] == "FLASHBOOT" and body["workers"] == {"min": 0, "max": 1, "idleTimeout": 10}
+    assert body["flashboot"] == "FLASHBOOT" and body["workers"] == {"min": 0, "max": 3, "idleTimeout": 10}
     assert "RUNPOD_INIT_TIMEOUT" not in body["env"]  # design 2.4: the override is dropped
     for bad in ("", "not-hex", ACCOUNT.upper()[:31]):
         with pytest.raises(D.DeployError):
@@ -150,7 +151,7 @@ def test_patch_sends_the_complete_env_and_pools_with_exclusions():
 def test_patch_restores_scaled_down_workers_and_refuses_a_type_change():
     current = deployed()
     current["workers"] = {"min": 0, "max": 0, "idleTimeout": 10}
-    assert D.patch_for(current, D.desired_state(TEMPLATE, current["image"], ACCOUNT, []))["workers"]["max"] == 1
+    assert D.patch_for(current, D.desired_state(TEMPLATE, current["image"], ACCOUNT, []))["workers"]["max"] == MAX
     current["type"] = "LOAD_BALANCER"
     with pytest.raises(D.DeployError, match="LOAD_BALANCER"):
         D.patch_for(current, D.desired_state(TEMPLATE, current["image"], ACCOUNT, []))
@@ -215,12 +216,18 @@ def test_selftest_never_from_this_build_fails():
 
 
 def test_bench_and_concurrency_check(capsys):
-    api = FakeRunPod(deployed(), running=(1, 2, 1))
+    api = FakeRunPod(deployed(), running=(MAX,))
     assert go(api, run_bench=True) == 0
-    assert len(api.jobs) == 3
+    assert len(api.jobs) == MAX + 1  # one more than the max, so a worker beyond it would show
     out = capsys.readouterr().out
     assert "bench (240 s synthetic song): decode 0.7 s, separate 12.0 s" in out
-    assert "peak running workers 1" in out or "peak running workers 2" in out
+    assert f"peak running workers {MAX}, peak allocated {MAX} (workers.max is {MAX})" in out and "EXTRA" not in out
+
+
+def test_the_concurrency_check_reports_workers_beyond_the_max(capsys):
+    api = FakeRunPod(deployed(), running=(MAX + 1,))
+    assert D.concurrency_check(api, "ep123456", max_workers=MAX, sleep=lambda s: None) == MAX + 1
+    assert "EXTRA WORKERS" in capsys.readouterr().out
 
 
 class NoGpu(FakeRunPod):
@@ -253,8 +260,8 @@ def test_bench_and_concurrency_jobs_still_queued_are_cancelled():
         D.bench(api, "ep123456", sleep=lambda s: None, clock=ticking())
     assert ("cancel", "q-bench") in api.calls
     api = NoGpu(deployed())
-    D.concurrency_check(api, "ep123456", sleep=lambda s: None, clock=ticking(1000))
-    assert sorted(c[1] for c in api.calls if c[0] == "cancel") == ["r0", "r1", "r2"]
+    D.concurrency_check(api, "ep123456", max_workers=MAX, sleep=lambda s: None, clock=ticking(1000))
+    assert sorted(c[1] for c in api.calls if c[0] == "cancel") == [f"r{i}" for i in range(MAX + 1)]
 
 
 def test_bad_tags_are_refused():
@@ -274,8 +281,8 @@ def scaled_down(max_workers=0):
 def test_keepalive_restores_an_idle_scale_down(capsys):
     api = FakeRunPod(scaled_down(0))
     assert K.keepalive(api, TEMPLATE, alarm=2.0, last_deploy="success") == 0
-    assert ("patch", {"workers": {"min": 0, "max": 1, "idleTimeout": 10}}) in api.calls
-    assert "restored to 1" in capsys.readouterr().out
+    assert ("patch", {"workers": {"min": 0, "max": MAX, "idleTimeout": 10}}) in api.calls
+    assert f"restored to {MAX}" in capsys.readouterr().out
 
 
 def test_keepalive_never_restores_a_crash_loop():
@@ -476,7 +483,7 @@ def patches(api):
 
 
 ZERO = {"workers": {"min": 0, "max": 0, "idleTimeout": 10}}
-BACK = {"workers": {"min": 0, "max": 1, "idleTimeout": 10}}
+BACK = {"workers": {"min": 0, "max": MAX, "idleTimeout": 10}}
 
 
 def release(api, clock=None, template=TEMPLATE):
@@ -491,9 +498,9 @@ def test_reaper_releases_a_worker_idle_on_both_reads_and_puts_max_back(capsys):
     assert release(api, clock) == RP.RELEASED
     assert patches(api) == [ZERO, BACK]
     assert clock.slept[0] == RP.CONFIRM_S  # the two reads are a minute apart
-    assert api.endpoint["workers"] == {"min": 0, "max": 1, "idleTimeout": 10}
+    assert api.endpoint["workers"] == {"min": 0, "max": MAX, "idleTimeout": 10}
     out = capsys.readouterr().out
-    assert "idle worker is gone after 20 s" in out and "max workers back to 1" in out
+    assert "idle worker is gone after 20 s" in out and f"max workers back to {MAX}" in out
     assert "ep123456" not in out and "$" not in out
 
 
@@ -575,7 +582,7 @@ def test_reaper_puts_min_and_idle_timeout_back_as_it_found_them():
     assert patches(api) == [{"workers": {"min": 0, "max": 0, "idleTimeout": 45}},
                             {"workers": {"min": 0, "max": 1, "idleTimeout": 45}}]
     # An answer without idleTimeout (REST v2 only promises min and max), or a nonsense one: endpoint.json's.
-    for workers in ({"min": 0, "max": 1}, {"max": 1, "idleTimeout": 0}, {"max": 1, "idleTimeout": True}):
+    for workers in ({"min": 0, "max": MAX}, {"max": MAX, "idleTimeout": 0}, {"max": MAX, "idleTimeout": True}):
         endpoint["workers"] = workers
         api = Reaped(endpoint, [IDLE, IDLE, GONE])
         assert release(api) == RP.RELEASED, workers
@@ -638,13 +645,12 @@ def test_reaper_without_max_workers_in_the_answer_changes_nothing(capsys):
 
 
 def test_reaper_never_raises_max_above_what_it_found_or_endpoint_json():
-    template = copy.deepcopy(TEMPLATE)
-    template["workers"]["max"] = 3
-    api = Reaped(deployed(), [IDLE, IDLE, GONE])  # found max 1
-    assert release(api, template=template) == RP.RELEASED
-    assert patches(api)[-1] == BACK
     endpoint = deployed()
-    endpoint["workers"] = {"min": 0, "max": 2, "idleTimeout": 10}  # raised by hand above endpoint.json's 1
+    endpoint["workers"] = {"min": 0, "max": 1, "idleTimeout": 10}  # lowered by hand (or by RunPod) below endpoint.json's
+    api = Reaped(endpoint, [IDLE, IDLE, GONE])
+    assert release(api) == RP.RELEASED
+    assert patches(api)[-1] == {"workers": {"min": 0, "max": 1, "idleTimeout": 10}}
+    endpoint["workers"] = {"min": 0, "max": MAX + 2, "idleTimeout": 10}  # raised by hand above endpoint.json's
     api = Reaped(endpoint, [IDLE, IDLE, GONE])
     assert release(api) == RP.RELEASED
     assert patches(api)[-1] == BACK
@@ -652,7 +658,7 @@ def test_reaper_never_raises_max_above_what_it_found_or_endpoint_json():
 
 def test_reaper_a_failed_restore_fails_loudly():
     api = Reaped(deployed(), [IDLE, IDLE, GONE], fail_patch={1})
-    with pytest.raises(RP.ReaperError, match="back to 1"):
+    with pytest.raises(RP.ReaperError, match=f"back to {MAX}"):
         release(api)
     assert patches(api) == [ZERO]
 
@@ -724,7 +730,7 @@ def test_deploy_after_a_failed_selftest_still_releases_and_keeps_its_own_error(c
     with pytest.raises(D.DeployError, match="selftest FAILED"):
         go(api)
     out = capsys.readouterr().out
-    assert "::error::couldn't set max workers back to 1" in out
+    assert f"::error::couldn't set max workers back to {MAX}" in out
 
 
 def test_a_cancelled_deploy_skips_the_idle_check():
@@ -740,7 +746,7 @@ def test_a_cancelled_deploy_skips_the_idle_check():
 
 def test_deploy_fails_when_the_workers_cant_be_put_back():
     api = Reaped(deployed(), [IDLE, IDLE, GONE], fail_patch={1})
-    with pytest.raises(D.DeployError, match="back to 1"):
+    with pytest.raises(D.DeployError, match=f"back to {MAX}"):
         go(api)
 
 

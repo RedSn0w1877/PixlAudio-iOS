@@ -69,7 +69,7 @@ enum CloudDemo {
         func record(_ n: Int, _ state: CloudJobState) -> CloudJobRecord {
             let song = songs[n % songs.count]
             var r = CloudJobRecord(jobKey: jobKey(n), songId: song.id, title: song.title, artist: song.displayArtist,
-                                   batchId: "demo-batch", tasks: [.instrumental, .lyrics], lyricsMode: .align,
+                                   batchId: "demo-batch", tasks: [.instrumental], lyricsMode: nil,
                                    quality: .standard, createdAtMs: now - Int64(n) * 60_000)
             r.songDurationMs = song.duration
             r.durationMs = song.duration
@@ -83,8 +83,7 @@ enum CloudDemo {
         let uploading = record(1, .uploading)
         var waiting = record(2, .submitted)
         waiting.submittedAtMs = now - 60_000
-        var transcribe = record(3, .queued)
-        transcribe.lyricsMode = .transcribe
+        let queued = record(3, .queued)
         var lowQuality = record(4, .uploaded)
         lowQuality.isStreamed = true
         lowQuality.lowQualitySource = true
@@ -97,19 +96,15 @@ enum CloudDemo {
         done.completedAtMs = now - 3_600_000
         done.importedAtMs = now - 3_500_000
         done.importedInstrumental = true
-        done.importedLyrics = true
         done.costMicroUSD = 7_258
         done.gpu = "NVIDIA L4"
-        var aiLyrics = record(7, .imported)
-        aiLyrics.lyricsMode = .transcribe
-        aiLyrics.lyricsTranscribed = true
-        aiLyrics.completedAtMs = now - 7_200_000
-        aiLyrics.importedAtMs = now - 7_100_000
-        aiLyrics.importedInstrumental = true
-        aiLyrics.importedLyrics = true
-        aiLyrics.costMicroUSD = 9_120
-        aiLyrics.gpu = "NVIDIA RTX A4000"
-        return [running, uploading, waiting, transcribe, lowQuality, failed, done, aiLyrics]
+        var earlier = record(7, .imported)
+        earlier.completedAtMs = now - 7_200_000
+        earlier.importedAtMs = now - 7_100_000
+        earlier.importedInstrumental = true
+        earlier.costMicroUSD = 6_336
+        earlier.gpu = "NVIDIA RTX A4000"
+        return [running, uploading, waiting, queued, lowQuality, failed, done, earlier]
     }
 }
 

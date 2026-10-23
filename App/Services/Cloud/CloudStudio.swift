@@ -6,13 +6,11 @@ import PixlNet
 /// Where a batch comes from (the queue's Add rows, shown in developer mode).
 nonisolated enum CloudBatchKind: String, Sendable, CaseIterable {
     case current
-    case missingLyrics
     case missingInstrumental
 
     var title: String {
         switch self {
         case .current: "Current song"
-        case .missingLyrics: "Songs without word-timed lyrics"
         case .missingInstrumental: "Songs without an instrumental"
         }
     }
@@ -33,7 +31,6 @@ nonisolated struct CloudBatchPreview: Identifiable, Equatable, Sendable {
     let plans: [CloudSongPlan]
     let skipped: [Skip]
     let estimate: CloudBatchEstimate
-    let replaceUserSynced: Bool
     /// Where the songs came from ("Current song", "Songs without an instrumental", a playlist's name).
     let title: String
     /// Who is sending them: a tap on "Process in cloud", a tap on Sing, or songs prepared ahead.
@@ -62,7 +59,7 @@ nonisolated enum CloudStartOutcome: Equatable, Sendable {
     case started(Int)
     /// The consent switch is off, so nothing was sent.
     case off
-    /// Nothing to send, in words ("Nothing to process — Already has an instrumental and word-timed lyrics").
+    /// Nothing to send, in words ("Nothing to process — Already has an instrumental").
     case nothingToDo(String)
     /// The batch would go over this month's cloud budget.
     case overCap
@@ -89,7 +86,8 @@ nonisolated enum CloudStartOutcome: Equatable, Sendable {
 typealias SingCloudAvailability = CloudStudio.SingCloudAvailability
 
 /// Cloud Studio's orchestrator (design §1, §7): the per-song jobs from "Process in cloud" to the imported instrumental
-/// and word-timed lyrics. It only sequences I/O; every rule (states, retries, caps, gates, checks) is PixlNet's
+/// (since 2026-10-23 the cloud makes nothing else: lyrics come from the lyrics sources and the phone; a job stored
+/// before that still brings its lyrics in). It only sequences I/O; every rule (states, retries, caps, gates, checks) is PixlNet's
 /// (`CloudQueuePolicy`, `CloudJobBuilder`), and every side effect goes through `Dependencies`, so AppTests drive it
 /// with fakes.
 ///
@@ -102,8 +100,10 @@ typealias SingCloudAvailability = CloudStudio.SingCloudAvailability
 /// - A Sing tap also sends a preview piece (`CloudSingClip`): a minute of the song around the playhead, first in the
 ///   same burst, its result kept in the caches folder (`clips`) for the Sing controller to play until the whole
 ///   instrumental lands. It never has a row, a notification or a retry of its own.
-/// - Foreground: uploads start at once; `/run` goes out when the batch's uploads are done (or 2 minutes after the
-///   first); `/status` is asked at most every 15 s and only while jobs are at RunPod (no timer while idle).
+/// - Foreground: uploads start at once (preparations three at a time); `/run` goes out once as many of the batch's
+///   uploads are done as there are GPU workers (3 on PixlAudio's endpoint, `CloudKeyChoice.parallelWorkers`), or all of
+///   them, or 2 minutes after the first, and each later upload follows in the next pass; `/status` is asked at most
+///   every 15 s and only while jobs are at RunPod (no timer while idle).
 /// - Background: transfers continue in the system's daemon; BGAppRefresh and URL-session wakes run `pump()` once
 ///   (R2 listing, lyrics import, downloads queued, pending submissions). A force-quit stops everything until launch.
 @MainActor
@@ -205,7 +205,7 @@ final class CloudStudio {
         let objects: any CloudObjectStoring
     }
 
-    /// A job of the current submit pass that is ready to go out, held until the next one is ready (`CloudSubmitBurst`).
+    /// A job of the current submit pass that is ready to go out, held until later ones are ready (`CloudSubmitBurst`).
     nonisolated struct PendingSubmit: Sendable {
         let jobKey: String
         let request: CloudJobRequest
@@ -213,8 +213,10 @@ final class CloudStudio {
     }
 
     static let instrumentalSlot = "instrumental"
-    static let maxConcurrentPreparations = 2
-    /// Priority jobs (Sing, one song sent by hand) prepare in a place of their own, on top of the ordinary two.
+    /// Songs prepared (downloaded, decoded) at once, so the uploads keep up with three GPU workers. One while the heavy
+    /// lane is busy. The uploads themselves run side by side in the background session.
+    static let maxConcurrentPreparations = 3
+    /// Priority jobs (Sing, one song sent by hand) prepare in a place of their own, on top of the ordinary three.
     static let reservedPrioritySlots = 1
     /// …and Sing's preview piece in one more, beside its song's whole job.
     static let reservedClipSlots = 1
@@ -265,6 +267,9 @@ final class CloudStudio {
     @ObservationIgnored private var lastHealthAtMs: Int64 = 0
     /// Preview pieces an earlier launch left on their way: stopped by the first pass that can reach RunPod.
     @ObservationIgnored private var staleClipKeys: [String] = []
+    /// Stored jobs that asked the cloud for lyrics alone (before 2026-10-23): stopped by the first pass that can reach
+    /// RunPod.
+    @ObservationIgnored private var lyricsOnlyKeys: [String] = []
     /// Set while a background wake runs: nothing new (a transfer, a submission, an import) starts in its last seconds.
     @ObservationIgnored private var backgroundWindow: BackgroundWorkWindow?
     /// iOS took a background pass's time back: nothing starts until the next wake or the app is opened.
@@ -462,11 +467,12 @@ final class CloudStudio {
     // MARK: Person's actions
 
     /// What sending `songs` would do (`startNow` checks it before sending). Selection runs here, off the main actor's
-    /// hot path: the lyrics store and the file checks are actor and detached calls.
+    /// hot path: the file checks are actor and detached calls. A cloud job is the instrumental only, so the lyrics store
+    /// is not read.
     /// `onlyMissing` keeps the songs that lack that output (the queue's Add rows); gathering stops once a full
     /// batch of such songs is found, so a large library isn't read end to end.
     func preview(songs: [Song], title: String, onlyMissing: CloudTask? = nil,
-                 replaceUserSynced: Bool = false, origin: CloudJobOrigin = .manual) async -> CloudBatchPreview {
+                 origin: CloudJobOrigin = .manual) async -> CloudBatchPreview {
         isPreviewing = true
         defer { isPreviewing = false }
         await settings.loadBuiltInKeys()
@@ -478,31 +484,24 @@ final class CloudStudio {
         var uploadBytes: [String: Int64] = [:]
         for song in songs where byId[song.id] == nil {
             if onlyMissing != nil, facts.count >= CloudLimits.maxSongsPerBatch { break }
-            let lyrics = await host.lyricsFacts(for: song)
             let instrumental = await host.hasInstrumental(songId: song.id)
-            if onlyMissing == .lyrics, lyrics.state == .wordSynced || lyrics.state == .userSynced { continue }
             if onlyMissing == .instrumental, instrumental { continue }
             if onlyMissing != nil, pending.contains(song.id) { continue }
             byId[song.id] = song
             facts.append(CloudSongFacts(songId: song.id, durationMs: song.duration, hasInstrumental: instrumental,
-                                        lyrics: lyrics.state, hasAudioSource: Self.hasAudioSource(song),
-                                        isStreamed: Self.isStreamed(song), hasPendingJob: pending.contains(song.id)))
+                                        hasAudioSource: Self.hasAudioSource(song), isStreamed: Self.isStreamed(song),
+                                        hasPendingJob: pending.contains(song.id)))
             uploadBytes[song.id] = Self.estimatedUploadBytes(song)
         }
-        var options = settings.selectionOptions
-        options.replaceUserSynced = replaceUserSynced
-        // Sing and songs prepared ahead exist for the instrumental: it is asked for even when the Outputs switch for it
-        // (Developer) is off. The lyrics follow the settings.
-        if origin != .manual { options.instrumental = true }
-        let selection = CloudSelector.select(facts, options: options)
+        let selection = CloudSelector.select(facts)
         let skips = selection.skipCounts.map { CloudBatchPreview.Skip(reason: $0.reason, count: $0.count) }
         let estimate = CloudBatchEstimate.make(plans: selection.plans, uploadBytes: uploadBytes, quality: settings.quality,
                                                pricePerSecondMicroUSD: settings.effectivePricePerSecondMicroUSD,
+                                               parallelWorkers: settings.parallelWorkers,
                                                committedMicroUSD: committedThisMonthMicroUSD,
                                                capMicroUSD: settings.effectiveMonthlyCapMicroUSD)
         return CloudBatchPreview(id: dependencies.newJobKey(), songs: selection.plans.compactMap { byId[$0.songId] },
-                                 plans: selection.plans, skipped: skips, estimate: estimate,
-                                 replaceUserSynced: replaceUserSynced, title: title, origin: origin)
+                                 plans: selection.plans, skipped: skips, estimate: estimate, title: title, origin: origin)
     }
 
     /// "Process in cloud" (the song card, a playlist's ⋯): sends `songs` at once, with no sheet to confirm. What that
@@ -517,10 +516,6 @@ final class CloudStudio {
         guard !batch.isEmpty else {
             guard let reason = batch.skipped.first?.reason else { return .nothingToDo("Nothing to process") }
             return .nothingToDo("Nothing to process — \(reason.label)")
-        }
-        // A Sing tap exists for the instrumental: lyrics alone to add is not what it was asked for.
-        if origin == .sing, !batch.plans.contains(where: { $0.tasks.contains(.instrumental) }) {
-            return .nothingToDo("Nothing to process — \(CloudSkipReason.alreadyDone.label)")
         }
         guard batch.estimate.fitsCap else { return .overCap }
         // A Sing tap's preview piece is one more (short) job in the month's budget: without room for it the song goes as
@@ -552,8 +547,6 @@ final class CloudStudio {
         case .current:
             guard let song = host.currentSong else { return .nothingToDo("Play a song first") }
             return await startNow(songs: [song], title: kind.title)
-        case .missingLyrics:
-            return await startNow(songs: host.librarySongs, title: kind.title, onlyMissing: .lyrics)
         case .missingInstrumental:
             return await startNow(songs: host.librarySongs, title: kind.title, onlyMissing: .instrumental)
         }
@@ -593,7 +586,8 @@ final class CloudStudio {
         let plan = CloudSongPlan(songId: song.id, tasks: [.instrumental], lyricsMode: nil, isStreamed: Self.isStreamed(song),
                                  durationMs: song.duration > 0 ? song.duration : CloudCost.referenceSongMs)
         let estimate = CloudCost.estimateMicroUSD([plan], quality: settings.quality,
-                                                  pricePerSecondMicroUSD: settings.effectivePricePerSecondMicroUSD)
+                                                  pricePerSecondMicroUSD: settings.effectivePricePerSecondMicroUSD,
+                                                  parallelWorkers: settings.parallelWorkers)
         guard CloudBudget.allows(estimateMicroUSD: estimate, capMicroUSD: settings.effectiveMonthlyCapMicroUSD,
                                  spentMicroUSD: committedThisMonthMicroUSD) else { return .overCap }
         guard networkAllowsUpload() else { return .notOnWiFi }
@@ -701,13 +695,13 @@ final class CloudStudio {
         await settings.loadBuiltInKeys()
         guard settings.isEnabled else { return 0 }
         let batch = await preview(songs: songs, title: title, origin: .auto)
-        // Prepared ahead means the instrumental: a song that only lacks word-timed lyrics is not worth a cold start here.
-        let wanted = batch.plans.filter { $0.tasks.contains(.instrumental) }
+        let wanted = batch.plans
         guard !wanted.isEmpty else { return 0 }
         let price = settings.effectivePricePerSecondMicroUSD
         var estimates = wanted.map { CloudCost.estimatedSeconds($0, quality: settings.quality) * price }
-        // One cold start for the batch, on its first song.
-        estimates[0] += CloudCost.coldStartSeconds * price
+        // A cold start for every worker the batch wakes, on its first songs (they run side by side).
+        let workers = CloudCost.coldStarts(count: estimates.count, parallelWorkers: settings.parallelWorkers)
+        for index in 0..<workers { estimates[index] += CloudCost.coldStartSeconds * price }
         let count = min(limit, CloudAutoBudget.affordableCount(
             estimates: estimates, ledger: projectedAutoLedger(), budgetMicroUSD: settings.effectiveAutoBudgetMicroUSD,
             dailyCap: settings.autoPrepareDailyCap, committedMicroUSD: committedThisMonthMicroUSD,
@@ -718,9 +712,10 @@ final class CloudStudio {
         let trimmed = CloudBatchPreview(
             id: batch.id, songs: plans.compactMap { songsById[$0.songId] }, plans: plans, skipped: batch.skipped,
             estimate: CloudBatchEstimate.make(plans: plans, uploadBytes: [:], quality: settings.quality,
-                                              pricePerSecondMicroUSD: price, committedMicroUSD: committedThisMonthMicroUSD,
+                                              pricePerSecondMicroUSD: price, parallelWorkers: settings.parallelWorkers,
+                                              committedMicroUSD: committedThisMonthMicroUSD,
                                               capMicroUSD: settings.effectiveMonthlyCapMicroUSD),
-            replaceUserSynced: false, title: title, origin: .auto)
+            title: title, origin: .auto)
         let known = Set(jobs.map(\.jobKey))
         await send(trimmed)
         return jobs.filter { !known.contains($0.jobKey) }.count
@@ -882,8 +877,7 @@ final class CloudStudio {
                                         tasks: plan.tasks, lyricsMode: plan.lyricsMode,
                                         quality: CloudSelector.quality(settings.quality, durationMs: plan.durationMs),
                                         createdAtMs: now, isStreamed: plan.isStreamed,
-                                        videoId: YouTubeSongIdentity.videoId(for: song),
-                                        replaceUserSynced: preview.replaceUserSynced)
+                                        videoId: YouTubeSongIdentity.videoId(for: song))
             record.songDurationMs = song.duration
             // A record without an origin is a manual one; a Sing tap goes to the front of the queue from the start.
             if origin != .manual { record.origin = origin }
@@ -1131,6 +1125,11 @@ final class CloudStudio {
             staleClipKeys = []
             for key in stale { await cancel(key) }
         }
+        if !lyricsOnlyKeys.isEmpty {
+            let lyricsOnly = lyricsOnlyKeys
+            lyricsOnlyKeys = []
+            for key in lyricsOnly { await retireLyricsOnlyJob(key) }
+        }
         startPreparations()
         restartStalledUploads(clients)
         // A priority job that is ready to go gets the GPU ahead of the jobs RunPod holds but has not started.
@@ -1186,12 +1185,15 @@ final class CloudStudio {
         var stored = loaded
         let recovered = CloudStartupRecovery.recover(&stored, nowMs: dependencies.nowMs())
         staleClipKeys = CloudStartupRecovery.staleClips(stored)
+        // Jobs stored before the cloud stopped timing lyrics go for their instrumental only (lyrics-only ones stop).
+        let retired = CloudStartupRecovery.retireCloudLyrics(&stored, nowMs: dependencies.nowMs())
+        lyricsOnlyKeys = retired.lyricsOnly
         // Jobs added while the file was being read (none in practice) stay after the stored ones.
         jobs = stored + jobs.filter { added in !stored.contains { $0.jobKey == added.jobKey } }
         isLoaded = true
         // The baseline for "which batch just finished": what was outstanding when this launch (or background wake) began.
         incompleteBatches = CloudBatchNotifier.incompleteBatchIds(jobs)
-        if recovered > 0 { persist() }
+        if recovered > 0 || retired.changed > 0 { persist() }
     }
 
     private func prune() {
@@ -1702,16 +1704,19 @@ final class CloudStudio {
 
     private func submitReadyBatches(_ clients: Clients) async {
         let now = dependencies.nowMs()
-        let open = jobs.filter { !$0.state.isFinished }
         let priorityKeys = CloudPriorityLane.priorityJobKeys(jobs)
+        let workers = settings.parallelWorkers
         var ready: [String] = []
-        for (_, members) in Dictionary(grouping: open, by: \.batchId) {
+        // Finished members count too: a batch whose first jobs already went (and maybe came back) has an open gate.
+        for (_, members) in Dictionary(grouping: jobs, by: \.batchId) {
             let uploaded = members.filter { $0.state == .uploaded }
             guard !uploaded.isEmpty else { continue }
             let pendingUploads = members.filter { $0.state == .queued || $0.state == .preparing || $0.state == .uploading }.count
+            let alreadySent = members.filter { $0.submittedAtMs != nil }.count
             let firstDone = uploaded.compactMap(\.uploadedAtMs).min()
             if CloudBatchGate.shouldSubmit(uploadsPending: pendingUploads, uploadsDone: uploaded.count,
-                                           firstUploadDoneAtMs: firstDone, nowMs: now) {
+                                           alreadySent: alreadySent, firstUploadDoneAtMs: firstDone, nowMs: now,
+                                           parallelWorkers: workers) {
                 ready += uploaded.map(\.jobKey)
             } else {
                 // A job sent before (lost at RunPod, a retry) doesn't wait for the rest of its batch, and neither does a
@@ -1726,11 +1731,11 @@ final class CloudStudio {
         ready = CloudPriorityLane.submitOrder(ready: ready, jobs: jobs)
         let held = CloudPriorityLane.heldBack(ready: ready, jobs: jobs, nowMs: now)
         if !held.isEmpty { ready.removeAll { held.contains($0) } }
-        // The pass is one burst: its last job carries `policy.last_in_batch`, so the worker stops itself after it
-        // instead of staying up, idle and billed. Each job waits until the next one is ready (or the pass ends) to go
-        // out, since only then is it known whether it is the last (`CloudSubmitBurst`). The priority job and the jobs
-        // that stepped aside for it are ONE burst, so only the final one of them asks the worker to stop.
-        var burst = CloudSubmitBurst<PendingSubmit>()
+        // The pass is one burst: its last jobs, one per worker that may run them, carry `policy.last_in_batch`, so each
+        // of those workers stops itself afterwards instead of staying up, idle and billed. The newest jobs wait until
+        // later ones are ready (or the pass ends) to go out, since only then is it known whether they are the last
+        // (`CloudSubmitBurst`). The priority job and the jobs that stepped aside for it are ONE burst.
+        var burst = CloudSubmitBurst<PendingSubmit>(lastCount: workers)
         var outOfTime = false
         var stoppedAtCap = false
         // Auto jobs accepted in this pass but not yet in the ledger (a job is only reserved once RunPod has taken it).
@@ -1742,23 +1747,32 @@ final class CloudStudio {
                 outOfTime = true
                 break
             }
-            guard let record = job(jobKey), record.state == .uploaded, record.isDue(nowMs: now) else { continue }
+            guard var record = job(jobKey), record.state == .uploaded, record.isDue(nowMs: now) else { continue }
             if CloudRetention.inputTooOldToSubmit(uploadedAtMs: record.uploadedAtMs, nowMs: now) {
                 update(jobKey) { _ = $0.apply(.requeue, nowMs: now) }
                 continue
             }
+            // A job stored before the cloud stopped timing lyrics (2026-10-23) goes for its instrumental only; one that
+            // asked for lyrics alone has nothing left to ask for.
+            if record.tasks.contains(.lyrics) {
+                guard record.dropLyricsTask(nowMs: now) else {
+                    await retireLyricsOnlyJob(jobKey)
+                    continue
+                }
+                update(jobKey) { _ = $0.dropLyricsTask(nowMs: now) }
+            }
             let price = settings.effectivePricePerSecondMicroUSD
             let monthStart = dependencies.monthStartMs(now)
-            // The held job isn't at RunPod yet, but it will be: count it.
+            // The held jobs aren't at RunPod yet, but they will be: count them.
             let committed = CloudBudget.committedMicroUSD(jobs, monthStartMs: monthStart, pricePerSecondMicroUSD: price)
                 + settings.removedSpendMicroUSD(monthStartMs: monthStart)
-                + (burst.holding?.estimateMicroUSD ?? 0)
+                + burst.holding.reduce(0) { $0 + $1.estimateMicroUSD }
             let estimate = CloudCost.estimatedSeconds(record.plan, quality: record.quality) * price
             guard CloudBudget.allows(estimateMicroUSD: estimate, capMicroUSD: settings.effectiveMonthlyCapMicroUSD,
                                      spentMicroUSD: committed) else {
                 notice = .capReached
                 stoppedAtCap = true
-                break  // the job held so far still goes out, as the burst's last
+                break  // the jobs held so far still go out, as the burst's last
             }
             if notice == .capReached { notice = nil }
             // Songs prepared ahead also stay inside their own budget and today's count (a job already reserved, one that
@@ -1773,20 +1787,9 @@ final class CloudStudio {
                                              dailyCap: settings.autoPrepareDailyCap, committedMicroUSD: committed,
                                              totalCapMicroUSD: settings.effectiveMonthlyCapMicroUSD) else { continue }
             }
-            var lyrics: CloudLyricsRequest?
-            if record.tasks.contains(.lyrics) {
-                let song = dependencies.host.song(id: record.songId)
-                let facts: CloudLyricsFacts
-                if let song { facts = await dependencies.host.lyricsFacts(for: song) } else { facts = .none }
-                lyrics = CloudJobBuilder.lyricsRequest(mode: record.lyricsMode ?? .auto, lines: facts.lines,
-                                                       hasLineTimes: facts.hasLineTimes,
-                                                       language: record.language ?? facts.language,
-                                                       lyricsReferenceDurationMs: facts.referenceDurationMs,
-                                                       audioDurationMs: record.durationMs ?? 0)
-            }
             let objects = clients.objects
             let presign: CloudPresign = { method, key, seconds in objects.presignedURL(method, key: key, expiresSeconds: seconds) }
-            guard let request = CloudJobBuilder.request(for: record, build: dependencies.build, lyrics: lyrics,
+            guard let request = CloudJobBuilder.request(for: record, build: dependencies.build, lyrics: nil,
                                                         presign: presign) else {
                 update(jobKey) { _ = $0.apply(.requeue, nowMs: now) }
                 fail(jobKey, "This job lost its upload details; it will be uploaded again.", code: nil, retryable: true)
@@ -1824,17 +1827,29 @@ final class CloudStudio {
                 guard await submit(previous, lastInBatch: false, clients) else { return }
             }
         }
-        // The job held for the next one is not the batch's last when time ran out: it stays "uploaded" for the next wake,
-        // so the worker is not told to stop itself while more jobs are still to come.
-        if let last = burst.end(), !outOfTime {
-            // A Sing preview piece that would end the burst while its song's whole job is still being prepared or
-            // uploaded goes out as not the last: the whole job follows within seconds as the last of the same burst, so
-            // the worker stays up for it instead of stopping after the piece and starting cold again
-            // (`CloudSingClip.fullJobFollows`). At the cap nothing follows: the piece is the last.
-            let followed = !stoppedAtCap
-                && (job(last.jobKey).map { CloudSingClip.fullJobFollows($0, jobs: jobs, nowMs: now) } ?? false)
-            await submit(last, lastInBatch: !followed, clients)
+        // The jobs held for later ones are not the batch's last when time ran out: they stay "uploaded" for the next
+        // wake, so no worker is told to stop itself while more jobs are still to come.
+        let finals = burst.end()
+        guard !finals.isEmpty, !outOfTime else { return }
+        // More of this phone's jobs are about to follow (still being prepared or uploaded): the final jobs go out
+        // unmarked, so their workers stay up for them instead of stopping and starting cold again
+        // (`CloudBurstEnd.moreComing`). A Sing preview piece whose song's whole job is right behind it is one such case
+        // (`CloudSingClip.fullJobFollows`). At the cap nothing follows: the held jobs are the last.
+        let moreComing = !stoppedAtCap
+            && CloudBurstEnd.moreComing(jobs, nowMs: now, autoBlocked: autoBlockedReason != nil)
+        for pending in finals {
+            let followed = moreComing || (!stoppedAtCap
+                && (job(pending.jobKey).map { CloudSingClip.fullJobFollows($0, jobs: jobs, nowMs: now) } ?? false))
+            guard await submit(pending, lastInBatch: !followed, clients) else { return }
         }
+    }
+
+    /// A job stored before the cloud stopped timing lyrics (2026-10-23) that asked for lyrics alone: nothing is left for
+    /// the cloud to make, so it stops (its upload is deleted). The lyrics sources and the phone cover the lyrics.
+    private func retireLyricsOnlyJob(_ jobKey: String) async {
+        await cancel(jobKey)
+        update(jobKey) { $0.lastError = "The cloud no longer times lyrics: they come from the lyrics sources instead." }
+        persist()
     }
 
     /// Sends one job of a burst. False when the pass should stop (the key, the Endpoint ID, rate limiting, missing

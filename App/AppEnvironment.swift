@@ -69,7 +69,7 @@ final class AppEnvironment {
     let backup: BackupService
     /// Stage 15: the notify-only GitHub release check.
     let updates: UpdateNotifier
-    /// Cloud Studio (iOS-first): instrumentals and word-timed lyrics on the owner's RunPod GPU, results through R2.
+    /// Cloud Studio (iOS-first): instrumentals on the owner's RunPod GPUs, results through R2.
     /// Built here because a background relaunch (BGAppRefresh, the transfer session) never runs `start()`.
     let cloud: CloudStudio
     /// Home's "Active jobs" button and sheet: what is running across the services above (`ActiveJobs`).

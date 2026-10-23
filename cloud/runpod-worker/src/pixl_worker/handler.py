@@ -1,7 +1,9 @@
 """RunPod Serverless entry point: `python -u -m pixl_worker.handler`.
 
-At start the process loads the separator and the aligner once (their load is billed once per process, then
-FlashBoot keeps the worker warm); Qwen3-ASR and htdemucs_ft load lazily on first use. Each job is validated
+At start the process loads the separator once (its load is billed once per process, then FlashBoot keeps the
+worker warm); Qwen3-ForcedAligner, Qwen3-ASR and htdemucs_ft load lazily on first use. The apps stopped asking
+for lyrics on 2026-10-23, so a cold start no longer pays for the aligner; a lyrics job (an older app, a job queued
+before then) still works and loads it then. Each job is validated
 (schema v1 + server caps) and dispatched to pipeline.process, selftest or bench. Nothing here ever logs or
 returns a URL, a signature or lyrics.
 
@@ -157,14 +159,58 @@ class _LazyTranscriber:
             return self._instance
 
 
+class _LazyAligner:
+    """Qwen3-ForcedAligner as a WordTimingBackend that loads the model on the first job that asks for word timing
+    (billed only for those jobs), once, thread-safely. `supports` needs no model, so routing a line to it (or to the
+    line-timing fallback) never loads it; `deadline` is handed to the model for each call and taken off again."""
+
+    def __init__(self, path: str, factory: Callable[[str], Any] | None = None):
+        from .lyrics.align import MODEL_ID  # no torch at import: the model itself is imported on first use
+
+        self.model_id = MODEL_ID
+        self.path = path
+        self._factory = factory
+        self._lock = threading.Lock()
+        self._instance = None
+        self.deadline = None  # set per job by the pipeline (lyrics.run._with_deadline)
+
+    @property
+    def loaded(self) -> bool:
+        return self._instance is not None
+
+    def supports(self, language: str | None) -> bool:
+        from .lyrics.languages import ALIGNER_LANGUAGES
+
+        return language in ALIGNER_LANGUAGES
+
+    def load(self):
+        """The model, loaded now if it isn't yet (the bench times this apart from the alignment)."""
+        with self._lock:
+            if self._instance is None:
+                factory = self._factory
+                if factory is None:
+                    from .lyrics.align import QwenAligner as factory
+                t0 = time.monotonic()
+                self._instance = factory(self.path)
+                log.info("aligner_loaded", ms=int((time.monotonic() - t0) * 1000))
+            return self._instance
+
+    def align(self, requests):
+        model = self.load()
+        model.deadline = self.deadline
+        try:
+            return model.align(requests)
+        finally:
+            model.deadline = None
+
+
 def load_models() -> tuple[pipeline.Models, Callable[[], dict]]:
-    from .lyrics.align import MODEL_ID as ALIGNER_ID, QwenAligner
     from .lyrics.languages import register_backend
     from .lyrics.transcribe import MODEL_ID as ASR_ID
     from .separate import SEPARATOR_ID, STEMS4_ID, RoformerSeparator, Stems4
 
     separator = RoformerSeparator(SEP_CONFIG, SEP_CKPT)
-    aligner = QwenAligner(ALIGNER_DIR)
+    aligner = _LazyAligner(ALIGNER_DIR)
     register_backend(aligner)
     stems4 = Stems4(DEMUCS_DIR)
     transcriber = _LazyTranscriber(ASR_DIR) if os.path.isdir(ASR_DIR) else None
@@ -174,7 +220,7 @@ def load_models() -> tuple[pipeline.Models, Callable[[], dict]]:
     def state() -> dict:
         return {
             SEPARATOR_ID: True,
-            ALIGNER_ID: True,
+            aligner.model_id: True if aligner.loaded else "lazy",
             ASR_ID: (True if transcriber.loaded else "lazy") if transcriber else False,
             STEMS4_ID: (True if stems4.loaded else "lazy") if stems4.available() else False,
         }

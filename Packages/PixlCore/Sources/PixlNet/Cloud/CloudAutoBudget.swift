@@ -88,13 +88,15 @@ public enum CloudAutoBudget {
         return count
     }
 
-    /// "About N songs a month" for a budget: a typical 4-minute song, with a cold start shared by a batch of
-    /// `maxBatchSongs`, at the default GPU price.
-    public static func songsPerMonth(budgetMicroUSD: Int64) -> Int {
-        let seconds = CloudCost.warmSecondsStandard + CloudCost.coldStartSeconds / Int64(maxBatchSongs)
-        let perSong = seconds * CloudCost.defaultPricePerSecondMicroUSD
-        guard perSong > 0, budgetMicroUSD > 0 else { return 0 }
-        return Int(budgetMicroUSD / perSong)
+    /// "About N songs a month" for a budget: a typical 4-minute song in a batch of `maxBatchSongs`, which wakes
+    /// `min(parallelWorkers, maxBatchSongs)` workers (a cold start each, shared by the batch), at the default GPU price.
+    public static func songsPerMonth(budgetMicroUSD: Int64, parallelWorkers: Int) -> Int {
+        let batch = Int64(maxBatchSongs)
+        let cold = CloudCost.coldStartSeconds
+            * Int64(CloudCost.coldStarts(count: maxBatchSongs, parallelWorkers: parallelWorkers))
+        let perBatch = (CloudCost.warmSecondsStandard * batch + cold) * CloudCost.defaultPricePerSecondMicroUSD
+        guard perBatch > 0, budgetMicroUSD > 0 else { return 0 }
+        return Int(budgetMicroUSD * batch / perBatch)
     }
 }
 

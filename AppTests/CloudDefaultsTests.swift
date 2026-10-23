@@ -155,6 +155,7 @@ final class CloudDefaultsTests: XCTestCase {
         XCTAssertTrue(settings.isReady)
         XCTAssertEqual(settings.keySource, .builtIn)
         XCTAssertFalse(settings.keysMissing)
+        XCTAssertEqual(settings.parallelWorkers, 3, "PixlAudio's endpoint runs three workers")
     }
 
     func testOwnKeysWinOverBuiltInOnes() async throws {
@@ -166,6 +167,7 @@ final class CloudDefaultsTests: XCTestCase {
         XCTAssertEqual(settings.configInput, Self.payload.configInput, "built-in until the person chooses their own")
         settings.useOwnKeys = true
         XCTAssertEqual(settings.keySource, .own)
+        XCTAssertEqual(settings.parallelWorkers, 1, "an own endpoint's worker count is unknown")
         XCTAssertEqual(settings.configInput.trimmedEndpointId, "own0endpoint")
         XCTAssertEqual(settings.configInput.trimmedRunpodKey, "rpa_OWN")
         XCTAssertEqual(settings.configInput.credentials.accessKeyId, "OWNKEY")

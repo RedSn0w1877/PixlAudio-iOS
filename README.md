@@ -34,7 +34,7 @@ Contributors: read [`AGENTS.md`](AGENTS.md) first.
 
 ## Built-in cloud keys
 
-Cloud processing (instrumentals and word-timed lyrics on a RunPod GPU, songs through a Cloudflare R2 bucket) works
+Cloud processing (instrumentals on RunPod GPUs, up to three songs at once, songs through a Cloudflare R2 bucket) works
 without any setup in builds made by this repository's CI: the app ships PixlAudio's own keys, encrypted, in
 `App/Resources/CloudDefaults.enc`. The key that unlocks them is the `CLOUD_DEFAULTS_KEY` Actions secret, written into
 the build just before it compiles (`ci/write-cloud-defaults-key.sh`) and never committed.

@@ -142,7 +142,8 @@ struct SingPrepareAheadSection: View {
                                range: 0...SingPrepareControls.dollars(ceiling),
                                steps: SingPrepareControls.budgetSliderSteps(ceilingMicroUSD: ceiling),
                                help: L10n.settingsSingPrepareSongsPerMonth(
-                                   CloudAutoBudget.songsPerMonth(budgetMicroUSD: budget))) {
+                                   CloudAutoBudget.songsPerMonth(budgetMicroUSD: budget,
+                                                                 parallelWorkers: prepare.parallelWorkers))) {
                     CloudCost.format(microUSD: SingPrepareControls.snappedBudget(dollars: $0, ceilingMicroUSD: ceiling))
                 }
                 .transition(.move(edge: .top).combined(with: .opacity))

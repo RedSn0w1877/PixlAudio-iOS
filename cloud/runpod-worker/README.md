@@ -1,10 +1,12 @@
 # Cloud Studio worker (RunPod Serverless)
 
 The server half of PixlAudio's "Cloud processing": for each song it separates the vocals with **BS-RoFormer**
-(anvuew ft1), returns the **instrumental**, and writes **word-timed lyrics** with Qwen3-ForcedAligner, or
-transcribes songs that have no lyrics with Qwen3-ASR (the app labels those "AI-written lyrics"). 4 stems
-(htdemucs_ft) are available but off in the app for now. It runs on Hoa's own RunPod account, scales to zero and
-bills per second. The full design, with every decision and its reasons, is
+(anvuew ft1) and returns the **instrumental**. It can also write **word-timed lyrics** with Qwen3-ForcedAligner, or
+transcribe songs that have no lyrics with Qwen3-ASR (labelled "AI-written lyrics"), but since 2026-10-23 neither
+app asks for that (BiniLyrics and the other lyrics sources cover lyrics): the aligner now loads only when a job
+asks for lyrics, so cold starts don't pay for it. 4 stems (htdemucs_ft) are available but off in the app for now.
+It runs on Hoa's own RunPod account, up to **3 workers at once** (`deploy/endpoint.json`, since 2026-10-23: three
+songs process side by side), scales to zero and bills per second, so a batch costs the same per song, only sooner. The full design, with every decision and its reasons, is
 [`docs/handoff/2026-10-07-plans/cloud-studio-design.md`](../../docs/handoff/2026-10-07-plans/cloud-studio-design.md).
 
 ## How one song travels
@@ -15,8 +17,9 @@ bills per second. The full design, with every decision and its reasons, is
 2. A GPU worker starts (FlashBoot makes a recently used one resume in about a second), runs the guard (a finished
    manifest is returned at once; a job RunPod re-delivered twice is refused), downloads and checks the input,
    separates, aligns or transcribes, encodes AAC 256k (or FLAC), uploads each output and then `manifest.json`
-   **last**. It deletes the input only after a usable result. After the last song of a batch (the phone marks it
-   `policy.last_in_batch`) the worker asks RunPod to stop it, so nothing stays up idle and billed.
+   **last**. It deletes the input only after a usable result. After the last songs of a batch (the phone marks the
+   final one per worker, up to 3, `policy.last_in_batch`) each worker asks RunPod to stop it, so nothing stays up
+   idle and billed.
 3. The phone reads `/status` while it's open (results stay there 30 minutes) or finds `manifest.json` in R2 any
    time in the next 30 days, downloads, verifies sizes, sha256 and sample counts, and imports.
 
@@ -27,15 +30,20 @@ decode). Errors always come back as a code (`BAD_URL`, `INPUT_MISSING`, `POISONE
 
 | | 16 GB GPU | 24 GB GPU |
 |---|---|---|
-| One warm song (instrumental + aligned lyrics) | ~$0.003 | ~$0.004 |
+| One warm song (instrumental) | ~$0.003 | ~$0.004 |
 | 100 songs sent as one batch | ~$0.33 | ~$0.39 |
 | A song on its own (cold start) | ~$0.008 | ~$0.010 |
 | Doing nothing | $0 * | $0 * |
 
+(The 2026-10-22 bench on an RTX A4500 measured more: about 38 s for a warm 4-minute song with aligned lyrics,
+about 33 s for the instrumental alone, and a 15 s cold start, which the apps' estimates use. With up to 3 workers
+a batch pays up to three cold starts instead of one, a few tenths of a cent.)
+
 \* Only while no worker stays up idle. RunPod bills an idle worker like a busy one (about $0.58–0.69 an hour on
 these pools), and on 2026-10-08 one sat idle and ready for 7+ minutes after the first deploy's selftest although
 `idleTimeout` is 10 s. So the worker now stops itself after the jobs nothing follows, and `cloud-worker-reaper`
-releases one that stays anyway within 30 minutes (~$0.35 at worst); see "Idle workers" in the runbook.
+releases any that stay anyway within 30 minutes (~$0.35 a worker at worst, up to 3); see "Idle workers" in the
+runbook.
 
 The real ceiling is the **prepaid balance**: auto-pay stays off. The keepalive emails when a week costs more
 than `CLOUD_WEEKLY_ALARM_USD` ($2). A job that hangs is cut at 15 minutes (~$0.17); the guard stops a job that
@@ -71,10 +79,10 @@ Still to do, in this order:
    deploys the newest green `cloud-worker-build` on main, even when app commits landed on main since), tick
    **bench**. It creates the endpoint `pixl-cloud-studio`, waits for it, runs the selftest (~1¢) and the bench
    (a few ¢). Read the job summary: GPU, cold start, seconds per stage, peak VRAM and the peak number of running
-   workers (must be 1). If no GPU is free for 25 minutes the run fails and cancels its queued jobs, so nothing
+   workers (never above workers.max, 3 since 2026-10-23; the check queues one job more than that). If no GPU is free for 25 minutes the run fails and cancels its queued jobs, so nothing
    bills later; run it again. Every later main build deploys itself. (The endpoint was created on 2026-10-08.
-   Each selftest and bench job now stops its worker afterwards, so the bench's three concurrency jobs each start
-   a worker of their own: a cent or two more than before. The deploy then checks that no worker stays idle.)
+   Each selftest and bench job now stops its worker afterwards, so the bench's concurrency jobs each start a
+   worker of their own: a cent or two more than before. The deploy then checks that no worker stays idle.)
 6. **RunPod console** → Serverless → `pixl-cloud-studio`: copy the **Endpoint ID**. Settings → API Keys → Create
    `pixl-iphone`, permission **Restricted**: `pixl-cloud-studio` → Read/Write, everything else None.
 7. **iPhone** (once the app side ships): Settings → Developer → Experimental → Cloud processing: turn it on,
@@ -109,8 +117,9 @@ GitHub stops scheduled workflows in public repositories after 60 days without ac
 Actions tab if that happens (the app also notices a paused endpoint).
 
 **Idle workers** (they bill like busy ones). Three layers, from the first to the last resort:
-1. *The worker stops itself* after the jobs nothing follows: every `selftest` and `bench`, and the process job the
-   phone marks `policy.last_in_batch: true` (the last song of each submit burst; a single song is a burst of one).
+1. *The worker stops itself* after the jobs nothing follows: every `selftest` and `bench`, and the process jobs the
+   phone marks `policy.last_in_batch: true` (the last song of each submit burst for each worker that may run it, up
+   to 3, and none while more of the phone's songs are still on their way; a single song is a burst of one).
    It returns runpod's per-job `refresh_worker`, so RunPod stops it once the result is in; the next job starts a
    fresh worker (a cold start, FlashBoot makes it short). Songs in the middle of a batch keep the worker warm. Its
    log says `worker_refresh` with the reason.
@@ -127,11 +136,11 @@ Actions tab if that happens (the app also notices a paused endpoint).
 
 By hand, if a worker ever stays up (RunPod console → Serverless → `pixl-cloud-studio` → Workers shows one *idle*
 for minutes with nothing queued): Edit → Max workers 0 → Save, wait until the worker is gone, then Max workers
-back to 1. Or run `cloud-worker-reaper` by hand.
+back to 3. Or run `cloud-worker-reaper` by hand.
 
 **Emails from `cloud-worker-reaper`** (it fails only when something needs a look): *max workers 0 didn't release
 the idle worker* (stop it in the console under Workers, and tell RunPod support: it bills), or *couldn't set max
-workers back* / *couldn't set max workers to 0* (a RunPod API error: put Max workers back to 1 in the console, or
+workers back* / *couldn't set max workers to 0* (a RunPod API error: put Max workers back to 3 in the console, or
 run `cloud-worker-keepalive`, which restores it). A `/health` that can't be read is only a warning there: the
 keepalive's daily run reports an unreachable RunPod or a revoked key.
 
@@ -175,8 +184,8 @@ python ci/lock.py               # regenerate requirements.lock / requirements-te
 - **A branch build**: put `[image]` in the commit message to build the whole image and run the CPU smoke test
   (real weights on CPU) without pushing anything. On main the image is pushed.
 - **Adding word timing for more languages** (Whisper later): implement `WordTimingBackend` in
-  `src/pixl_worker/lyrics/` and register it after the Qwen aligner in `handler.load_models`; `backend_for()`
-  then routes the languages Qwen lacks to it. Nothing else changes.
+  `src/pixl_worker/lyrics/` and register it after the Qwen aligner in `handler.load_models` (load it lazily, like
+  `_LazyAligner`, so cold starts don't pay for it); `backend_for()` then routes the languages Qwen lacks to it.
 
 ## Server-side caps (endpoint env, set by `deploy/endpoint.json`; the app cannot raise them)
 

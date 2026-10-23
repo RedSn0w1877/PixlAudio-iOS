@@ -21,6 +21,48 @@ import Testing
         #expect(jobs[1...].map(\.state) == [.queued, .uploading, .failed], "everything else survives a launch")
     }
 
+    @Test func storedJobsStopAskingTheCloudForLyrics() {
+        // Stored before 2026-10-23, when the cloud still timed lyrics.
+        func legacy(_ n: Int, _ state: CloudJobState, tasks: [CloudTask] = [.instrumental, .lyrics]) -> CloudJobRecord {
+            var r = record(n, state)
+            r.tasks = tasks
+            r.lyricsMode = .align
+            return r
+        }
+        var jobs = [legacy(1, .queued), legacy(2, .uploaded), legacy(3, .uploading, tasks: [.lyrics]),
+                    legacy(4, .submitted), legacy(5, .running, tasks: [.lyrics]), legacy(6, .imported),
+                    record(7, .queued)]
+        let result = CloudStartupRecovery.retireCloudLyrics(&jobs, nowMs: 5_000)
+        // Not sent yet: the instrumental goes alone; a lyrics-only job is handed back to be cancelled.
+        #expect(result.changed == 2)
+        #expect(result.lyricsOnly == ["job3"])
+        #expect(jobs[0].tasks == [.instrumental] && jobs[0].lyricsMode == nil && jobs[0].updatedAtMs == 5_000)
+        #expect(jobs[1].tasks == [.instrumental] && jobs[1].state == .uploaded)
+        #expect(jobs[2].tasks == [.lyrics], "left for the caller to cancel")
+        // RunPod already has these, or they are done: they finish as they are.
+        #expect(jobs[3].tasks == [.instrumental, .lyrics] && jobs[4].tasks == [.lyrics])
+        #expect(jobs[5].tasks == [.instrumental, .lyrics])
+        #expect(jobs[6].tasks == [.instrumental])
+        // A second launch finds nothing more to change.
+        let again = CloudStartupRecovery.retireCloudLyrics(&jobs, nowMs: 6_000)
+        #expect(again.changed == 0 && again.lyricsOnly == ["job3"])
+    }
+
+    @Test func droppingTheLyricsTaskKeepsTheInstrumental() {
+        var both = record(1, .uploaded)
+        both.tasks = [.instrumental, .lyrics]
+        both.lyricsMode = .transcribe
+        let dropped = both.dropLyricsTask(nowMs: 7)
+        #expect(dropped && both.tasks == [.instrumental] && both.lyricsMode == nil)
+        var lyricsOnly = record(2, .queued)
+        lyricsOnly.tasks = [.lyrics]
+        let kept = lyricsOnly.dropLyricsTask(nowMs: 7)
+        #expect(!kept && lyricsOnly.tasks == [.lyrics], "nothing would be left to ask for")
+        var plain = record(3, .queued)
+        let unchanged = plain.dropLyricsTask(nowMs: 7)
+        #expect(unchanged && plain.updatedAtMs == nil)
+    }
+
     @Test func recoveringTwiceChangesNothingMore() {
         var jobs = [record(1, .preparing)]
         #expect(CloudStartupRecovery.recover(&jobs, nowMs: 1) == 1)

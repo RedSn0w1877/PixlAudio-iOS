@@ -149,6 +149,11 @@ def bench(spec, *, caps: Caps, worker: dict, separator, stems4, transcriber_fact
                                                  audio=clip, offset_s=start))
                 if hasattr(backend, "deadline"):
                     backend.deadline = None  # the bench has no deadline; never inherit a finished job's
+                if getattr(backend, "loaded", True) is False:
+                    # Loaded on demand since 2026-10-23 (handler._LazyAligner): its load is timed apart.
+                    t0 = time.monotonic()
+                    backend.load()
+                    loads["aligner"] = int(round((time.monotonic() - t0) * 1000))
                 timed("align", lambda: backend.align(requests))
                 stages["alignWindows"] = len(requests)
         if "transcribe" in spec.stages and transcriber_factory is not None:
