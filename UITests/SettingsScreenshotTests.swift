@@ -71,11 +71,20 @@ final class SettingsScreenshotTests: XCTestCase {
             app.swipeUp()
         }
         XCTAssertTrue(toggle.waitForExistence(timeout: 5), "the Prepare songs ahead switch is missing")
-        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
+        // The last rows of the page can sit under the floating tab bar and mini player, which would take the tap.
+        let screenHeight = app.windows.firstMatch.frame.height
+        for _ in 0..<2 where toggle.frame.maxY > screenHeight * 0.7 { app.swipeUp() }
         let predicate = NSPredicate(format: "identifier == %@ OR label CONTAINS[c] %@",
                                     "settings.slider.Monthly budget", "Monthly budget")
         let budget = app.descendants(matching: .any).matching(predicate).firstMatch
-        XCTAssertTrue(budget.waitForExistence(timeout: 5), "the Monthly budget did not appear after turning the switch on")
+        // A tap while the list still glides after the swipes only stops the scroll: let it settle first, and tap once
+        // more if the switch didn't take it.
+        for _ in 0..<2 where !budget.exists {
+            Thread.sleep(forTimeInterval: 1.0)
+            toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
+            _ = budget.waitForExistence(timeout: 4)
+        }
+        XCTAssertTrue(budget.waitForExistence(timeout: 2), "the Monthly budget did not appear after turning the switch on")
     }
 
     /// Scrolls until the whole downloaded model's row is above the mini player (it sits in the Advanced block, under
