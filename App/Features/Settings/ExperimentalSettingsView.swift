@@ -1,12 +1,13 @@
 import SwiftUI
 
-/// Experimental (Android `ExperimentalSettingsScreen`): "Player UI tweaks" — lyrics blur (+ strength), Magic
-/// Instrumentalize, the BS-RoFormer render backend, Remaster Song, TAIS DJ, Cloud processing (iOS-first), and the
-/// full-player loading steps
-/// (delay, placeholders, trigger mode, thresholds) — then "Visual Quality" with the album-art resolution list. Rows
-/// are 10 pt glass panels 4 pt apart.
+/// Experimental (Android `ExperimentalSettingsScreen`, under Developer): "Player UI tweaks" — Magic Instrumentalize,
+/// the BS-RoFormer render backend, the "Make an instrumental" card, the on-device models, TAIS DJ, and the full-player
+/// loading steps (delay, placeholders, trigger mode, thresholds). Rows are 10 pt glass panels 4 pt apart.
 ///
-/// Remaster Song is stage 14's `TaisStudioProgressCard` (followed by the iOS-only on-device models panel); the
+/// The lyric blur moved to Lyrics, the album-art resolution to Appearance › Advanced and the Cloud processing row to
+/// Sing (2026-10-22 settings reorganisation).
+///
+/// The instrumental card is stage 14's `TaisStudioProgressCard` (followed by the iOS-only on-device models panel); the
 /// BS-RoFormer fields feed its cloud render. TAIS DJ opens the DJ chat (stage 13). Dropped: the visual-style switch (Liquid Glass / Material — iOS is glass only) and
 /// the Plus licence debug tools (everything is unlocked).
 struct ExperimentalSettingsView: View {
@@ -19,27 +20,18 @@ struct ExperimentalSettingsView: View {
 
     var body: some View {
         @Bindable var experimental = settings.experimental
-        @Bindable var lyrics = settings.lyrics
         let anyDelay = experimental.delayAlbumCarousel || experimental.delaySongMetadata
             || experimental.delayProgressBar || experimental.delayControls
         let canUseTrigger = anyDelay && experimental.showPlaceholders
         SettingsScaffold(title: L10n.settingsExpScreenTitle, screenID: "experimental", horizontalPadding: 0) {
             ExperimentalSection(title: L10n.settingsExpPlayerUiTweaksSection) {
-                SwitchSettingRow(title: L10n.settingsExpLyricsBlurTitle, subtitle: L10n.settingsExpLyricsBlurSubtitle,
-                                 isOn: $lyrics.animatedBlurEnabled, systemImage: "circle.dotted")
-                if lyrics.animatedBlurEnabled {
-                    ExperimentalSliderPanel(systemImage: "line.3.horizontal", title: L10n.settingsExpLyricsBlurStrengthTitle,
-                                            chip: L10n.settingsExpLyricsBlurStrengthValue(lyrics.animatedBlurStrength),
-                                            subtitle: L10n.settingsExpLyricsBlurStrengthSubtitle,
-                                            value: $lyrics.animatedBlurStrength, range: 0.1...2.0, steps: 10)
-                }
                 ExperimentalSliderPanel(systemImage: "waveform", title: "Magic Instrumentalize",
                                         chip: "\(Int((experimental.vocalAttenuation * 100).rounded()))%",
                                         subtitle: String(localized: "settings_exp_magic_instrumentalize_body",
-                                                         defaultValue: "TAIS Engine 2's zero-latency vocal reducer — attenuates the center-panned mix instantly. This is separate from the real AI separation model (see \"Remaster Song\" below), which separates vocal and instrumental tracks. The active processor and benchmark are shown in Music Intelligence settings."),
+                                                         defaultValue: "TAIS Engine 2's zero-latency vocal reducer — attenuates the center-panned mix instantly. This is separate from the real AI separation model (see \"Make an instrumental\" below), which separates vocal and instrumental tracks. The active processor and benchmark are shown in Music Intelligence settings."),
                                         value: $experimental.vocalAttenuation, range: 0...1, steps: 19)
                 RoformerBackendPanel(experimental: experimental)
-                // Stage 14: the real Remaster Song card (Android `TaisStudioProgressCard(showRoformerTools = true)`);
+                // Stage 14: the real "Make an instrumental" card (Android `TaisStudioProgressCard(showRoformerTools = true)`);
                 // a finished render plays at once, like Android's `switchToStudioInstrumental`.
                 TaisStudioProgressCard(song: playback.current, showRoformerTools: true, tintStrength: SettingsTint.row,
                                        onInstrumentalReady: { env.tais.instrumental.playInstrumental() })
@@ -63,29 +55,6 @@ struct ExperimentalSettingsView: View {
                 .buttonStyle(.plain)
                 .experimentalPanelGlass(interactive: true)
                 .accessibilityIdentifier("experimental.taisDJ")
-                // Cloud Studio (iOS-first): the owner's RunPod GPU for instrumentals and word-timed lyrics.
-                Button {
-                    router.push(.cloudProcessing)
-                } label: {
-                    HStack(spacing: 12) {
-                        SettingsIcon(systemImage: "icloud.and.arrow.up")
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text(verbatim: "Cloud processing").pixlFont(.titleMedium).foregroundStyle(theme.onSurface)
-                            Text(verbatim: CloudProcessingCopy.experimentalRow(settings: env.cloud.settings,
-                                                                               summary: env.cloud.summaryLine))
-                                .pixlFont(.bodyMedium).foregroundStyle(theme.onSurfaceVariant)
-                        }
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(theme.onSurfaceVariant)
-                    }
-                    .padding(16)
-                }
-                .buttonStyle(.plain)
-                .experimentalPanelGlass(interactive: true)
-                .accessibilityIdentifier("experimental.cloudProcessing")
 
                 header(L10n.settingsExpStep1DelayHeader)
                 SwitchSettingRow(title: L10n.settingsExpDelayEverythingTitle, subtitle: L10n.settingsExpDelayEverythingSubtitle,
@@ -136,25 +105,9 @@ struct ExperimentalSettingsView: View {
                                      isOn: $experimental.transparentPlaceholders, systemImage: "eye")
                 }
             }
-            HStack(spacing: 8) {
-                Text(L10n.settingsExpVisualQuality)
-                    .pixlFont(.labelMedium)
-                    .foregroundStyle(theme.primary)
-                    .layoutPriority(1)
-                Rectangle().fill(theme.outlineVariant).frame(height: 1)
-            }
-            .padding(.horizontal, 24)
-            .padding(.top, 16)
-            .padding(.bottom, 8)
-            ExperimentalSection(title: L10n.settingsExpAlbumArtResolution) {
-                ForEach(["LOW", "MEDIUM", "HIGH", "ORIGINAL"], id: \.self) { quality in
-                    qualityRow(quality, selected: settings.appearance.albumArtQuality == quality)
-                }
-            }
             Spacer().frame(height: 36)
         }
         .settingsToast($toast)
-        .animation(PixlMotion.state, value: lyrics.animatedBlurEnabled)
         .animation(PixlMotion.state, value: experimental.delayAll)
         .animation(PixlMotion.state, value: experimental.showPlaceholders)
         .animation(PixlMotion.state, value: experimental.switchOnDragRelease)
@@ -229,41 +182,6 @@ struct ExperimentalSettingsView: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    /// Android's album-art quality options (12 pt corners; selected = `primaryContainer`).
-    private func qualityRow(_ quality: String, selected: Bool) -> some View {
-        let line = switch quality {
-        case "LOW": L10n.settingsExpAlbumArtQualityLowLine
-        case "HIGH": L10n.settingsExpAlbumArtQualityHighLine
-        case "ORIGINAL": L10n.settingsExpAlbumArtQualityOriginalLine
-        default: L10n.settingsExpAlbumArtQualityMediumLine
-        }
-        let parts = line.components(separatedBy: " - ")
-        return Button { settings.appearance.albumArtQuality = quality } label: {
-            HStack {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(parts.first ?? line).pixlFont(.bodyLarge, weight: selected ? .bold : .regular)
-                        .foregroundStyle(theme.onSurface)
-                    if parts.count > 1 {
-                        Text(parts.dropFirst().joined(separator: " - ")).pixlFont(.bodySmall)
-                            .foregroundStyle(theme.onSurfaceVariant)
-                    }
-                }
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                if selected {
-                    Image(systemName: "checkmark").font(.system(size: 16, weight: .bold)).foregroundStyle(theme.primary)
-                        .accessibilityLabel(L10n.commonSelected)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(selected ? theme.primaryContainer : .clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(selected ? .isSelected : [])
-        .accessibilityIdentifier("experimental.quality.\(quality)")
-    }
 }
 
 /// Android `SettingsSection` with its rows 4 pt apart.

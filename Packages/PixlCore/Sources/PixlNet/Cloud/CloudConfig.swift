@@ -1,4 +1,4 @@
-// Settings › Developer › Experimental › Cloud processing (design §3.5 E, §7.2): what the person types, checked and
+// Settings › Sing › Cloud processing (design §3.5 E, §7.2): what the person types, checked and
 // normalised before anything is signed or sent. The six fields, in screen order: Endpoint ID, RunPod key (Restricted),
 // R2 endpoint or account ID, bucket, access key ID, secret access key.
 

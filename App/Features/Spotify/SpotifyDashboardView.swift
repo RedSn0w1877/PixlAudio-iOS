@@ -3,19 +3,22 @@ import PixlNet
 import SwiftUI
 
 /// Spotify dashboard (Android `presentation/spotify/dashboard/SpotifyDashboardScreen`): the account card (sign in /
-/// sync / find audio / test playback / disconnect), the YouTube account card, the browse button, the reconnect and
-/// last-error notices, the playback test report and the imported playlists — in Android's order and geometry
-/// (16 pt side padding, 12 pt gaps, 24 pt account cards, 20 pt notice cards and rows). Material cards are glass tinted
-/// with their container colour; buttons on a card are fills.
+/// sync / find audio / disconnect), the browse button, the reconnect notice and the imported playlists — in Android's
+/// order and geometry (16 pt side padding, 12 pt gaps, 24 pt account cards, 20 pt notice cards and rows). Material
+/// cards are glass tinted with their container colour; buttons on a card are fills.
+///
+/// Developer mode adds the testing side in place: "Test playback" and its report, the YouTube account card, the last
+/// playback error, and the "Use your own client ID" link (a sideloaded build may ship without one; Android reads it
+/// from local.properties only). Outside it none of them shows.
 ///
 /// Dropped from Android: the "Deep probe (debug)" tool (a temporary googlevideo 403 hunt; stage 11's diagnostics
-/// cover the stream chain). iOS adds a client-ID link under the sign-in button, since a sideloaded build may ship
-/// without one (Android reads it from local.properties only).
+/// cover the stream chain — iOS keeps it on the playback test screen).
 struct SpotifyDashboardView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(Router.self) private var router
     @Environment(AccountsStore.self) private var accounts
     @Environment(PlaybackStore.self) private var playback
+    @Environment(SettingsStore.self) private var settings
     @Environment(\.appTheme) private var theme
     @Environment(\.webAuthenticationSession) private var webAuthenticationSession
 
@@ -25,12 +28,15 @@ struct SpotifyDashboardView: View {
     @State private var clientIdDraft = ""
 
     private var spotify: SpotifyService { env.spotify }
+    private var developerMode: Bool { settings.experimental.developerMode }
 
     var body: some View {
         SpotifyScaffold(title: "Spotify", screenID: "spotifyDashboard") {
             accountCard
 
-            youTubeCard
+            if developerMode {
+                youTubeCard
+            }
 
             if spotify.isLoggedIn {
                 browseButton
@@ -40,11 +46,12 @@ struct SpotifyDashboardView: View {
                 reconnectCard
             }
 
-            if let error = playback.lastError, error != dismissedPlaybackError, playback.current?.spotifyId != nil {
+            if developerMode, let error = playback.lastError, error != dismissedPlaybackError,
+               playback.current?.spotifyId != nil {
                 playbackErrorCard(error)
             }
 
-            if spotify.isTesting || spotify.testReport != nil {
+            if developerMode && (spotify.isTesting || spotify.testReport != nil) {
                 SpotifyPlaybackTestCard(isRunning: spotify.isTesting, report: spotify.testReport,
                                         onDismiss: spotify.dismissTestReport)
             }
@@ -68,9 +75,10 @@ struct SpotifyDashboardView: View {
             spotify.clearMessage()
         }
         .task { await spotify.refreshLibraryState() }
-        // Signed out of YouTube: prepare the sign-in page's web view once this push has settled.
-        .task(id: youTubeSignedIn) {
-            guard !youTubeSignedIn, !env.youtube.isDemo else {
+        // Signed out of YouTube, with its card showing (developer mode): prepare the sign-in page's web view once this
+        // push has settled.
+        .task(id: wantsYouTubeWarmup) {
+            guard wantsYouTubeWarmup, !env.youtube.isDemo else {
                 YouTubeSignInWebViewWarmup.discard()
                 return
             }
@@ -116,17 +124,19 @@ struct SpotifyDashboardView: View {
                             isEnabled: !spotify.isSigningIn, identifier: "spotify.signIn") {
             Task { await spotify.signIn(authenticate: authenticate) }
         }
-        Button {
-            clientIdDraft = spotify.clientIdOverride
-            isEditingClientId = true
-        } label: {
-            Text(spotify.hasClientId ? "Use your own client ID" : "No client ID in this build — set one")
-                .pixlFont(.labelMedium)
-                .foregroundStyle(spotify.hasClientId ? theme.primary : theme.error)
-                .padding(.vertical, 4)
+        if developerMode {
+            Button {
+                clientIdDraft = spotify.clientIdOverride
+                isEditingClientId = true
+            } label: {
+                Text(spotify.hasClientId ? "Use your own client ID" : "No client ID in this build — set one")
+                    .pixlFont(.labelMedium)
+                    .foregroundStyle(spotify.hasClientId ? theme.primary : theme.error)
+                    .padding(.vertical, 4)
+            }
+            .buttonStyle(PressScaleButtonStyle())
+            .accessibilityIdentifier("spotify.clientId")
         }
-        .buttonStyle(PressScaleButtonStyle())
-        .accessibilityIdentifier("spotify.clientId")
     }
 
     @ViewBuilder
@@ -184,8 +194,11 @@ struct SpotifyDashboardView: View {
                                   identifier: "spotify.findAudio") { spotify.startMatching(retryFailed: true) }
         }
 
-        SpotifyOutlinedButton(title: "Test playback", systemImage: "ladybug", fullWidth: true, isEnabled: !spotify.isTesting,
-                              identifier: "spotify.testPlayback") { spotify.runPlaybackTest() }
+        if developerMode {
+            SpotifyOutlinedButton(title: "Test playback", systemImage: "ladybug", fullWidth: true,
+                                  isEnabled: !spotify.isTesting,
+                                  identifier: "spotify.testPlayback") { spotify.runPlaybackTest() }
+        }
 
         SpotifyOutlinedButton(title: "Disconnect Spotify", systemImage: "rectangle.portrait.and.arrow.right", fullWidth: true,
                               isEnabled: !spotify.isLoggingOut, isBusy: spotify.isLoggingOut,
@@ -198,6 +211,8 @@ struct SpotifyDashboardView: View {
         if case .signedIn = accounts.youtube { return true }
         return false
     }
+
+    private var wantsYouTubeWarmup: Bool { developerMode && !youTubeSignedIn }
 
     private var youTubeCard: some View {
         SpotifyCard(cornerRadius: 24, tint: theme.surfaceContainer) {
@@ -255,7 +270,7 @@ struct SpotifyDashboardView: View {
             Text("Reconnect Spotify to import playlists")
                 .pixlFont(.titleMedium, weight: .bold)
                 .foregroundStyle(theme.onErrorContainer)
-            Text("Spotify is refusing to hand over the songs inside your playlists (HTTP 403). Your login is from before the app asked for that permission, so the saved token never got it — which is why every playlist imports empty while Liked Songs works fine.\n\nSigning in again fixes it. This keeps your library and the audio already matched — it only replaces the login.")
+            Text("Spotify stopped sharing the songs inside your playlists. Reconnect to fix it.\n\nYour library and the songs already matched stay as they are.")
                 .pixlFont(.bodyMedium)
                 .foregroundStyle(theme.onErrorContainer)
             SpotifyFilledButton(title: "Sign in to Spotify again", fill: theme.error, foreground: theme.onError,

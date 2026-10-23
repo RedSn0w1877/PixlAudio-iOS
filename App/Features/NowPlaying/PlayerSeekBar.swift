@@ -143,7 +143,10 @@ struct PlayerSeekBar: View {
             .pixlFont(.custom(size: 12, weight: .semibold, lineHeight: 16, tracking: 0.4))
             .monospacedDigit()
             .foregroundStyle(color)
-            if settings.appearance.fullPlayerShowFileInfo, let label = PlayerFormat.audioMetaLabel(song: song) {
+            // "Show player file info" (Settings › Appearance › Advanced) counts only in developer mode: the format
+            // text (codec, bitrate, sample rate) is not for everyone.
+            if settings.appearance.fullPlayerShowFileInfo, settings.experimental.developerMode,
+               let label = PlayerFormat.audioMetaLabel(song: song) {
                 Text(label)
                     .pixlFont(.custom(size: 11, weight: .medium, lineHeight: 16, tracking: 0.5))
                     .lineLimit(1)

@@ -1,55 +1,76 @@
 import PixlModel
+import PixlNet
 import SwiftUI
 
-/// Android `TaisStudioProgressCard` — "Remaster Song": an AutoAwesome header, then one row per job (Render
-/// Instrumental, Sync / resync lyrics, and in Experimental also Render Studio Master (BS-RoFormer)) separated by
-/// `outlineVariant` dividers. Each row shows its job's live progress bar + "detail · N%", the ready line (check) or
-/// the failure (error), and a full-width tonal button. Android: a 10 dp `surfaceContainer` surface, 16 dp padding,
-/// 12 dp spacing → a 10 pt glass panel tinted `surfaceContainer`; the buttons and bars sit on it as fills.
+/// Android `TaisStudioProgressCard` — "Make an instrumental": a sparkles header with the one line that helps choose,
+/// then two equal buttons side by side, "Process on-device" and "Process in cloud". Under them come the on-device
+/// job's live progress bar + "detail · N%" (and Cancel), its ready line (check) or failure (error), and the song's
+/// cloud job as "Cloud: <status>". In Experimental the Render Studio Master (BS-RoFormer) row follows, separated by an
+/// `outlineVariant` divider. Android: a 10 dp `surfaceContainer` surface, 16 dp padding, 12 dp spacing → a 10 pt glass
+/// panel tinted `surfaceContainer`; the buttons and bars sit on it as fills.
 ///
 /// iOS additions: a running job can be cancelled from its row (Android cancels from the notification), a job
-/// whose model isn't on the phone yet shows the model download inside its row, and — once Cloud processing is on —
-/// a Cloud row sends the song to the owner's RunPod GPU.
+/// whose model isn't on the phone yet shows the model download inside its row, and the cloud button starts at once
+/// (no confirm sheet) and says when it cannot (cloud off, nothing to process, over the month's budget).
 struct TaisStudioProgressCard: View {
     let song: Song?
     var showRoformerTools = false
     /// Glass tint strength (the Experimental panels use their own row strength).
     var tintStrength: Double = GlassTint.surface
-    /// Android's toasts: called once when a job of this card finishes with an update.
+    /// Android's toasts: called once when the instrumental of this card finishes with an update.
     var onInstrumentalReady: (() -> Void)?
+    /// The card no longer syncs lyrics; kept (and ignored) so the call sites written for it still compile.
     var onLyricsReady: (() -> Void)?
 
     @Environment(AppEnvironment.self) private var env
     @Environment(\.appTheme) private var theme
-    @State private var confirmsReplace = false
+    @State private var isStartingCloud = false
+    /// Why "Process in cloud" did nothing. The toast says it too, but the song sheet this card sits in can cover it.
+    @State private var cloudNotice: String?
 
     var body: some View {
         let studio = env.tais.studio
+        let cloud = env.cloud
+        let instrumental = song.flatMap { studio.state(.instrumental, songId: $0.id) }
+        let cloudJob = song.flatMap { song in cloud.jobs.last { $0.songId == song.id } }
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .center, spacing: 12) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(theme.secondary)
-                    .frame(width: 24, height: 24)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(verbatim: "Remaster Song").pixlFont(.titleMedium).foregroundStyle(theme.onSurface)
-                    Text("Render an instrumental or sync the lyrics word-by-word for this track — each runs on its own, so you don't have to wait on one to get the other.")
-                        .pixlFont(.bodyMedium)
+            header
+            if let song {
+                // Equal widths, and equal heights should a large text size wrap one label.
+                HStack(spacing: 8) {
+                    TaisStartButton(title: "Process on-device", enabled: instrumental?.isActive != true) {
+                        studio.start(.instrumental, song: song)
+                    }
+                    .accessibilityIdentifier("tais.instrumental.start")
+                    TaisStartButton(title: "Process in cloud",
+                                    enabled: cloudJob?.state.isPending != true && !cloud.isPreviewing && !isStartingCloud) {
+                        startInCloud(song)
+                    }
+                    .accessibilityIdentifier("tais.cloud.start")
+                }
+                .fixedSize(horizontal: false, vertical: true)
+            } else {
+                SettingsFillButton(title: "Play a song first", style: .tonal, enabled: false) {}
+                    .accessibilityIdentifier("tais.instrumental.start")
+            }
+            if let instrumental {
+                TaisJobStatus(song: song, kind: .instrumental, readyLabel: "Instrumental ready.", state: instrumental,
+                              onCancel: { studio.cancel(.instrumental, songId: $0.id) })
+            }
+            if let cloudJob {
+                cloudStatus(cloudJob, progress: cloud.transferProgress[cloudJob.jobKey])
+            }
+            if let cloudNotice {
+                Label {
+                    Text(verbatim: cloudNotice)
+                        .pixlFont(.bodySmall)
                         .foregroundStyle(theme.onSurfaceVariant)
                         .fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                    Image(systemName: "info.circle").foregroundStyle(theme.onSurfaceVariant)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("tais.cloud.notice")
             }
-            TaisJobRow(song: song, kind: .instrumental, buttonLabel: "Render Instrumental", readyLabel: "Instrumental ready.",
-                       state: song.flatMap { studio.state(.instrumental, songId: $0.id) },
-                       onStart: { studio.start(.instrumental, song: $0) },
-                       onCancel: { studio.cancel(.instrumental, songId: $0.id) })
-            divider
-            TaisJobRow(song: song, kind: .lyrics, buttonLabel: "Sync / resync lyrics", readyLabel: "Lyrics synced.",
-                       state: song.flatMap { studio.state(.lyrics, songId: $0.id) },
-                       onStart: { startLyrics($0) },
-                       onCancel: { studio.cancel(.lyrics, songId: $0.id) })
             if showRoformerTools {
                 divider
                 TaisJobRow(song: song, kind: .roformer, buttonLabel: "Render Studio Master (BS-RoFormer)",
@@ -58,94 +79,100 @@ struct TaisStudioProgressCard: View {
                            onStart: { studio.start(.roformer, song: $0) },
                            onCancel: { studio.cancel(.roformer, songId: $0.id) })
             }
-            // Cloud Studio (iOS-first): once Cloud processing is on, the song can go to the RunPod GPU from here.
-            if env.cloud.settings.isEnabled {
-                divider
-                CloudSongRow(song: song)
-            }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .pixlGlass(in: RoundedRectangle(cornerRadius: 10, style: .continuous),
                    tint: theme.surfaceContainer.opacity(tintStrength))
-        .animation(PixlMotion.state, value: song.flatMap { studio.state(.lyrics, songId: $0.id)?.phase })
-        .animation(PixlMotion.state, value: song.flatMap { studio.state(.instrumental, songId: $0.id)?.phase })
-        .alert("Replace your timing?", isPresented: $confirmsReplace) {
-            Button("Replace") { if let song { studio.start(.lyrics, song: song, overrideUser: true) } }
-            Button("Keep mine", role: .cancel) {}
-        } message: {
-            Text("You synced this song yourself. Replace your timing with the automatic one?")
-        }
-        .onChange(of: song.flatMap { studio.state(.instrumental, songId: $0.id)?.phase }) { _, phase in
+        .animation(PixlMotion.state, value: instrumental?.phase)
+        .animation(PixlMotion.state, value: cloudNotice)
+        .onChange(of: instrumental?.phase) { _, phase in
             if phase == .succeeded(updated: true) { onInstrumentalReady?() }
         }
-        .onChange(of: song.flatMap { studio.state(.lyrics, songId: $0.id)?.phase }) { _, phase in
-            if phase == .succeeded(updated: true) { onLyricsReady?() }
-        }
+        .onChange(of: song?.id) { _, _ in cloudNotice = nil }
         // `.contain` keeps the rows' own identifiers (an identifier on a plain stack would replace them).
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("tais.studio")
+    }
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(theme.secondary)
+                .frame(width: 24, height: 24)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(verbatim: "Make an instrumental").pixlFont(.titleMedium).foregroundStyle(theme.onSurface)
+                Text("Cloud yields better results but requires a Wi-Fi connection.")
+                    .pixlFont(.bodyMedium)
+                    .foregroundStyle(theme.onSurfaceVariant)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     private var divider: some View {
         Rectangle().fill(theme.outlineVariant).frame(height: 1)
     }
 
-    /// A song the user synced themselves asks first ("Replace" passes the override).
-    private func startLyrics(_ song: Song) {
-        let studio = env.tais.studio
-        guard let service = env.lyricsController.lyricsService else {
-            studio.start(.lyrics, song: song)
-            return
+    /// The song's cloud job, once it has one.
+    private func cloudStatus(_ job: CloudJobRecord, progress: Double?) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: CloudJobStateIcon.symbol(job.state))
+                .foregroundStyle(job.state == .failed ? theme.error : theme.primary)
+            Text(verbatim: "Cloud: " + CloudJobRowText.status(job, progress: progress))
+                .pixlFont(.bodySmall)
+                .foregroundStyle(job.state == .failed ? theme.error : theme.onSurfaceVariant)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .accessibilityIdentifier("tais.cloud.status")
+    }
+
+    /// Sends the song to the cloud at once and says what happened; the card keeps the words when nothing started.
+    private func startInCloud(_ song: Song) {
+        let cloud = env.cloud
+        isStartingCloud = true
+        cloudNotice = nil
         Task {
-            if await service.isUserSyncedStored(song) {
-                confirmsReplace = true
-            } else {
-                studio.start(.lyrics, song: song)
-            }
+            let outcome = await cloud.startNow(songs: [song], title: song.title)
+            let message = outcome.message(useCellular: cloud.settings.useCellular)
+            isStartingCloud = false
+            cloudNotice = outcome.didStart ? nil : message
+            LibraryToast.shared.show(message)
         }
     }
 }
 
-/// The card's Cloud row: the song's cloud job, or the button that sends it (through the confirm sheet).
-private struct CloudSongRow: View {
-    let song: Song?
+/// One of the card's two start buttons: tonal, text only, filling its half of the row.
+private struct TaisStartButton: View {
+    let title: String
+    var enabled = true
+    let action: () -> Void
 
-    @Environment(AppEnvironment.self) private var env
-    @Environment(Router.self) private var router
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        let cloud = env.cloud
-        let job = song.flatMap { song in cloud.jobs.last { $0.songId == song.id } }
-        let pending = job?.state.isPending == true
-        VStack(alignment: .leading, spacing: 8) {
-            if let job {
-                HStack(spacing: 8) {
-                    Image(systemName: CloudJobStateIcon.symbol(job.state))
-                        .foregroundStyle(job.state == .failed ? theme.error : theme.primary)
-                    Text(verbatim: "Cloud: " + CloudJobRowText.status(job, progress: cloud.transferProgress[job.jobKey]))
-                        .pixlFont(.bodySmall)
-                        .foregroundStyle(job.state == .failed ? theme.error : theme.onSurfaceVariant)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .accessibilityIdentifier("tais.cloud.status")
-            }
-            SettingsFillButton(title: song == nil ? "Play a song first" : "Process in the cloud", style: .tonal,
-                               enabled: song != nil && !pending && !cloud.isPreviewing) {
-                guard let song else { return }
-                Task {
-                    await cloud.requestBatch(songs: [song], title: song.title)
-                    if cloud.pendingBatch != nil { router.present(AppSheet.cloudConfirm) }
-                }
-            }
-            .accessibilityIdentifier("tais.cloud.start")
+        Button(action: action) {
+            Text(title)
+                .pixlFont(.labelLarge)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(theme.onSecondaryContainer)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, minHeight: 44, maxHeight: .infinity)
+                .background(theme.secondaryContainer, in: Capsule())
+                .contentShape(Capsule())
+                .opacity(enabled ? 1 : 0.38)
         }
+        .buttonStyle(PressScaleButtonStyle(pressedScale: 0.97))
+        .disabled(!enabled)
     }
 }
 
-/// One job's button + progress / result (Android `TaisJobRow`).
+/// A job with a button of its own (Android `TaisJobRow`): its status, then the tonal button.
 private struct TaisJobRow: View {
     let song: Song?
     let kind: TaisStudio.JobKind
@@ -155,12 +182,34 @@ private struct TaisJobRow: View {
     let onStart: (Song) -> Void
     let onCancel: (Song) -> Void
 
-    @Environment(\.appTheme) private var theme
-
     var body: some View {
         let running = state?.isActive == true
         VStack(alignment: .leading, spacing: 8) {
-            if running, let state {
+            if let state {
+                TaisJobStatus(song: song, kind: kind, readyLabel: readyLabel, state: state, onCancel: onCancel)
+            }
+            SettingsFillButton(title: song == nil ? "Play a song first" : buttonLabel, style: .tonal,
+                               enabled: song != nil && !running) {
+                if let song { onStart(song) }
+            }
+            .accessibilityIdentifier("tais.\(kind.rawValue).start")
+        }
+    }
+}
+
+/// What a job is doing or did: the progress bar + "detail · N%" with Cancel, the ready line, or the failure.
+private struct TaisJobStatus: View {
+    let song: Song?
+    let kind: TaisStudio.JobKind
+    let readyLabel: String
+    let state: TaisStudio.JobState
+    let onCancel: (Song) -> Void
+
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if state.isActive {
                 VStack(alignment: .leading, spacing: 6) {
                     TaisProgressBar(fraction: Double(state.percent) / 100)
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -180,10 +229,10 @@ private struct TaisJobRow: View {
                 }
                 .transition(.opacity)
             }
-            if case .succeeded = state?.phase {
+            if case .succeeded = state.phase {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(theme.primary)
-                    Text(state?.detail ?? readyLabel)
+                    Text(state.detail ?? readyLabel)
                         .pixlFont(.bodySmall)
                         .foregroundStyle(theme.onSurfaceVariant)
                         .fixedSize(horizontal: false, vertical: true)
@@ -199,18 +248,13 @@ private struct TaisJobRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            SettingsFillButton(title: song == nil ? "Play a song first" : buttonLabel, style: .tonal,
-                               enabled: song != nil && !running) {
-                if let song { onStart(song) }
-            }
-            .accessibilityIdentifier("tais.\(kind.rawValue).start")
         }
     }
 
     private var failure: String? {
-        switch state?.phase {
+        switch state.phase {
         case .failed(let reason): reason
-        case .cancelled: "Cancelled — tap below to try again."
+        case .cancelled: "Cancelled — you can start it again."
         default: nil
         }
     }

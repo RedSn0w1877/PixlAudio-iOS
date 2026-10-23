@@ -137,7 +137,7 @@ public enum CloudKeySource: String, Sendable, Hashable {
     case own
 }
 
-/// The rules between built-in and own keys (Settings › Developer › Experimental › Cloud processing).
+/// The rules between built-in and own keys (Settings › Sing › Cloud processing).
 public enum CloudKeyChoice {
     /// Built-in keys may spend at most this much a month on one phone, whatever the cap field says (the app's $3
     /// monthly cap stays; own keys keep the person's own cap).

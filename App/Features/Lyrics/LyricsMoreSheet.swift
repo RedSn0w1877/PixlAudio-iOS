@@ -44,6 +44,7 @@ struct LyricsMoreSheet: View {
     @Environment(\.playerTheme) private var theme
     @Environment(\.dismiss) private var dismiss
     @Environment(LibraryStore.self) private var library
+    @Environment(SettingsStore.self) private var settings
     @State private var showResetDialog = false
     @State private var showDebugDialog = false
 
@@ -133,8 +134,11 @@ struct LyricsMoreSheet: View {
                 row("Reset imported lyrics", systemImage: "arrow.counterclockwise") {
                     showResetDialog = true
                 }
-                row("Lyrics debug info", systemImage: "ladybug") {
-                    showDebugDialog = true
+                // A developer tool: where these lyrics came from. Developer mode only.
+                if settings.experimental.developerMode {
+                    row("Lyrics debug info", systemImage: "ladybug") {
+                        showDebugDialog = true
+                    }
                 }
             }
         }

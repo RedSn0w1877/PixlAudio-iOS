@@ -19,7 +19,7 @@ enum CloudDemo {
     static func make(launch: LaunchConfiguration, defaults: UserDefaults) -> CloudStudio {
         let screen = launch.screen
         let builtInScreen = screen == .cloudSettingsBuiltIn
-        let isCloudScreen = screen == .cloudSettings || screen == .cloudQueue || screen == .cloudConfirm || builtInScreen
+        let isCloudScreen = screen == .cloudSettings || screen == .cloudQueue || builtInScreen
         let ownSecrets = isCloudScreen && !builtInScreen ? secrets : .empty
         let settings = CloudSettings(defaults: defaults, secrets: CloudMemorySecrets(ownSecrets),
                                      builtIn: builtInScreen ? CloudFixedBuiltInKeys(config: builtInConfig) : nil)
@@ -54,8 +54,7 @@ enum CloudDemo {
         studio.loadDemo(jobs: builtInScreen ? [] : settingsScreen ? Array(jobs().prefix(2)) : jobs(),
                         report: settingsScreen ? report : nil,
                         selftest: settingsScreen ? selftest : nil,
-                        progress: [jobKey(1): 0.42],
-                        batch: screen == .cloudConfirm ? batch() : nil)
+                        progress: [jobKey(1): 0.42])
         return studio
     }
 
@@ -111,23 +110,6 @@ enum CloudDemo {
         aiLyrics.costMicroUSD = 9_120
         aiLyrics.gpu = "NVIDIA RTX A4000"
         return [running, uploading, waiting, transcribe, lowQuality, failed, done, aiLyrics]
-    }
-
-    /// The confirm sheet for a 12-song playlist.
-    static func batch() -> CloudBatchPreview {
-        let songs = Array(DemoLibrary.songs.prefix(12))
-        let plans = songs.enumerated().map { index, song in
-            CloudSongPlan(songId: song.id, tasks: index % 4 == 0 ? [.instrumental] : [.instrumental, .lyrics],
-                          lyricsMode: index % 4 == 0 ? nil : (index % 5 == 0 ? .transcribe : .align),
-                          isStreamed: index % 6 == 0, durationMs: max(song.duration, 180_000))
-        }
-        let estimate = CloudBatchEstimate.make(plans: plans, uploadBytes: [:], quality: .standard,
-                                               pricePerSecondMicroUSD: CloudCost.defaultPricePerSecondMicroUSD,
-                                               committedMicroUSD: 16_378, capMicroUSD: CloudCost.defaultMonthlyCapMicroUSD)
-        return CloudBatchPreview(id: "demo-batch-2", songs: songs, plans: plans,
-                                 skipped: [CloudBatchPreview.Skip(reason: .alreadyDone, count: 3),
-                                           CloudBatchPreview.Skip(reason: .tooLong, count: 1)],
-                                 estimate: estimate, replaceUserSynced: false, title: "Late Night Drive")
     }
 }
 

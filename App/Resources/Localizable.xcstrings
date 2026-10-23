@@ -980,17 +980,6 @@
         }
       }
     },
-    "Instrumentalize all songs" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Instrumentalize all songs"
-          }
-        }
-      }
-    },
     "Just added" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1156,13 +1145,13 @@
         }
       }
     },
-    "Lyric Sync and Render Instrumental run on this iPhone. Their models download the first time you use them." : {
+    "Lyric sync and on-device instrumentals run on this iPhone. Their models download the first time you use them." : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lyric Sync and Render Instrumental run on this iPhone. Their models download the first time you use them."
+            "value" : "Lyric sync and on-device instrumentals run on this iPhone. Their models download the first time you use them."
           }
         }
       }
@@ -1684,13 +1673,24 @@
         }
       }
     },
-    "Process all in the cloud" : {
+    "Process all in cloud" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Process all in the cloud"
+            "value" : "Process all in cloud"
+          }
+        }
+      }
+    },
+    "Process all on-device" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Process all on-device"
           }
         }
       }
@@ -2274,17 +2274,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Spotify is refusing to hand over the songs inside your playlists (HTTP 403). Your login is from before the app asked for that permission, so the saved token never got it — which is why every playlist imports empty while Liked Songs works fine.\n\nSigning in again fixes it. This keeps your library and the audio already matched — it only replaces the login."
-          }
-        }
-      }
-    },
-    "Sync lyrics for all songs" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sync lyrics for all songs"
           }
         }
       }
@@ -9115,7 +9104,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "TAIS Engine 2's zero-latency vocal reducer — attenuates the center-panned mix instantly. This is separate from the real AI separation model (see \"Remaster Song\" below), which separates vocal and instrumental tracks. The active processor and benchmark are shown in Music Intelligence settings."
+            "value" : "TAIS Engine 2's zero-latency vocal reducer — attenuates the center-panned mix instantly. This is separate from the real AI separation model (see \"Make an instrumental\" below), which separates vocal and instrumental tracks. The active processor and benchmark are shown in Music Intelligence settings."
           }
         }
       }

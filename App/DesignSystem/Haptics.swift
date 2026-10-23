@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Settings › Behavior › Haptic feedback (Android `haptics_enabled`: "Enable vibration feedback across the app"),
+/// Settings › Gestures & haptics › Haptic feedback (Android `haptics_enabled`: "Enable vibration feedback across the app"),
 /// readable when a haptic fires without putting the setting in every view's environment. `BehaviorSettings` keeps
 /// it current.
 enum HapticsPreference {

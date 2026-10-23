@@ -78,6 +78,44 @@ struct SettingsSubsection<Content: View>: View {
     }
 }
 
+/// The "Advanced" block developer mode adds at the bottom of a category: one group of rows under an "Advanced"
+/// caption, and nothing at all outside developer mode. Whatever it holds keeps applying when it is hidden.
+struct SettingsAdvancedSubsection<Content: View>: View {
+    var addBottomSpace = false
+    @ViewBuilder var content: Content
+
+    @Environment(SettingsStore.self) private var settings
+
+    var body: some View {
+        if settings.experimental.developerMode {
+            SettingsSubsection(title: L10n.settingsSectionAdvanced, addBottomSpace: addBottomSpace) { content }
+        }
+    }
+}
+
+/// Just the "Advanced" caption (with a rule), for a category whose advanced block has groups of its own; nothing
+/// outside developer mode.
+struct SettingsAdvancedHeader: View {
+    @Environment(SettingsStore.self) private var settings
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        if settings.experimental.developerMode {
+            HStack(spacing: 8) {
+                Text(L10n.settingsSectionAdvanced)
+                    .pixlFont(.labelMedium, weight: .bold)
+                    .foregroundStyle(theme.primary)
+                    .layoutPriority(1)
+                    .accessibilityAddTraits(.isHeader)
+                Rectangle().fill(theme.outlineVariant).frame(height: 1)
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
+        }
+    }
+}
+
 /// The glass behind one row, shaped by its group position.
 struct SettingsRowBackground: ViewModifier {
     var tint: Color?

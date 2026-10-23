@@ -1,8 +1,8 @@
 import XCTest
 
 /// The 2026-10-18 features, on demo data: Find in playlist (open on a query, no matches, tapping a result), blocked
-/// artists (the dimmed rows with their badge, "Play anyway", the settings page), the Gestures page and the Behavior
-/// settings with Music Haptics, plus the gestures themselves (swipe a row to queue it, swipe the mini player, double-tap
+/// artists (the dimmed rows with their badge, "Play anyway", the settings page), the Gestures & haptics settings with
+/// Music Haptics, plus the gestures themselves (swipe a row to queue it, swipe the mini player, double-tap
 /// the artwork). Tag the commit message with `[shots:FeaturesScreenshotTests]` to run them.
 @MainActor
 final class FeaturesScreenshotTests: XCTestCase {
@@ -79,10 +79,9 @@ final class FeaturesScreenshotTests: XCTestCase {
         attach(app, "blockedArtists-unblocked-light")
         app.terminate()
     }
-    func testGestureSettingsLight() throws { try capture("gestureSettings", "light", ready: "screen.gestureSettings") }
-    func testGestureSettingsDark() throws { try capture("gestureSettings", "dark", ready: "screen.gestureSettings") }
 
-    /// The Behavior page with its new rows: Gestures, Blocked artists, and (scrolled) Music Haptics with its switch on.
+    /// Gestures & haptics (the former Behavior and Gestures pages in one): the gesture switches at the top and, scrolled,
+    /// Vibrate with the music with its switch on (Strength and Follows open; Status sits under Advanced).
     func testBehaviorWithMusicHapticsLight() throws { try behavior("light") }
     func testBehaviorWithMusicHapticsDark() throws { try behavior("dark") }
 
@@ -90,18 +89,24 @@ final class FeaturesScreenshotTests: XCTestCase {
         continueAfterFailure = false
         let app = launch("settingsCategory.behavior", appearance)
         XCTAssertTrue(element(app, "screen.settingsCategory.behavior").waitForExistence(timeout: 20))
-        XCTAssertTrue(element(app, "settings.behavior.gestures").waitForExistence(timeout: 10))
+        XCTAssertTrue(element(app, "settings.switch.Swipe the cover to change song").waitForExistence(timeout: 10))
         Thread.sleep(forTimeInterval: 1.2)
         attach(app, "settingsBehavior-top-\(appearance)")
-        let toggle = app.descendants(matching: .any)["settings.switch.Music Haptics"].firstMatch
+        let toggle = app.descendants(matching: .any)["settings.switch.Vibrate with the music"].firstMatch
         for _ in 0..<6 where !toggle.exists || toggle.frame.maxY > app.windows.firstMatch.frame.maxY - 160 {
             app.swipeUp(velocity: .slow)
             Thread.sleep(forTimeInterval: 0.3)
         }
-        XCTAssertTrue(toggle.waitForExistence(timeout: 5), "the Music Haptics switch is missing")
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5), "the Vibrate with the music switch is missing")
         // The switch sits at the row's trailing end (the row is one combined element).
         toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
-        XCTAssertTrue(element(app, "settings.musicHaptics.status").waitForExistence(timeout: 5))
+        // The status row is in the Advanced block, a lazy row of its own: scroll until it is built.
+        let status = element(app, "settings.musicHaptics.status")
+        for _ in 0..<4 where !status.exists {
+            app.swipeUp(velocity: .slow)
+            Thread.sleep(forTimeInterval: 0.3)
+        }
+        XCTAssertTrue(status.waitForExistence(timeout: 5))
         Thread.sleep(forTimeInterval: 1.0)
         attach(app, "settingsBehavior-musicHaptics-\(appearance)")
         app.terminate()

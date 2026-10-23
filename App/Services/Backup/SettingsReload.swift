@@ -156,6 +156,8 @@ extension AISettings {
 
 extension ExperimentalSettings {
     func reload(from f: ExperimentalSettings) {
+        // Per device, so a restore never changes it; synced so the running app always matches its stored value.
+        sync(\.developerMode, self, f)
         sync(\.delayAlbumCarousel, self, f)
         sync(\.delaySongMetadata, self, f)
         sync(\.delayProgressBar, self, f)

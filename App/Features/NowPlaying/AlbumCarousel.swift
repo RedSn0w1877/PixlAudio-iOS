@@ -44,7 +44,7 @@ struct AlbumCarousel: View {
     let isPlaying: Bool
     let onSelect: (Int) -> Void
     let onAlbumTap: (Song) -> Void
-    /// Gestures (Settings › Behavior › Gestures): swiping the covers and double-tap to like (the long-press quick actions
+    /// Gestures (Settings › Gestures & haptics): swiping the covers and double-tap to like (the long-press quick actions
     /// are a context menu the full player puts around the whole carousel).
     var allowsSwipe = true
     var onDoubleTap: (() -> Void)?

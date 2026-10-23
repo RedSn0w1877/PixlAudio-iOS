@@ -3,8 +3,8 @@ import PixlModel
 import SwiftUI
 
 // Pieces of the playlist screens: the song picker (Android `SongPickerBottomSheet` / `SongPickerSelectionPane`),
-// the playlist song row (`QueuePlaylistSongItem` with `isFromPlaylist = true`), the playlist lyric-sync progress card
-// (`PlaylistLyricSyncCard`), the song sort sheet (`LibrarySortBottomSheet` with the playlist's song options) and the
+// the playlist song row (`QueuePlaylistSongItem` with `isFromPlaylist = true`), the lyric-sync run's counts
+// (`PlaylistLyricSyncState`), the song sort sheet (`LibrarySortBottomSheet` with the playlist's song options) and the
 // options sheet rows (`PlaylistActionItem`). Material fills become tinted Liquid Glass.
 
 // MARK: - Song picker
@@ -443,10 +443,11 @@ struct PlaylistSongRow: View {
     }
 }
 
-// MARK: - Lyric sync card
+// MARK: - Lyric sync state
 
 /// Progress of a "sync lyrics for all songs" run (Android `PlaylistLyricSyncState`), from stage 14's TAIS Studio lane
-/// (`TaisStudio.lyricSyncState(playlistId:)`). Empty — and the card hidden — while no run exists, as on Android.
+/// (`TaisStudio.lyricSyncState(playlistId:)`). No screen shows it since the playlist's "Sync lyrics for all songs"
+/// and its progress card went (2026-10-22); the engine still counts.
 nonisolated struct PlaylistLyricSyncState: Sendable, Equatable {
     var total = 0
     var completed = 0
@@ -459,52 +460,6 @@ nonisolated struct PlaylistLyricSyncState: Sendable, Equatable {
     var progress: Double { total > 0 ? Double(completed) / Double(total) : 0 }
 
     static let idle = PlaylistLyricSyncState()
-}
-
-/// Android `PlaylistLyricSyncCard`: a 28 pt `secondaryContainer` card, 20 pt padding, title, counts, progress,
-/// detail and Cancel remaining / Retry unfinished songs. Hidden while no run exists.
-struct PlaylistLyricSyncCard: View {
-    let state: PlaylistLyricSyncState
-    let onCancel: () -> Void
-    let onRetry: () -> Void
-
-    @Environment(\.appTheme) private var theme
-
-    var body: some View {
-        if state.total > 0 {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(state.isRunning ? "Syncing your playlist" : "Playlist lyric sync")
-                    .pixlFont(.titleMedium)
-                Text("\(state.completed) of \(state.total) finished · \(state.synced) synced · \(state.skipped) skipped"
-                     + (state.failedSongIds.isEmpty ? "" : " · \(state.failedSongIds.count) need a retry"))
-                    .pixlFont(.bodySmall)
-                if state.isRunning {
-                    ProgressView(value: state.progress)
-                        .tint(theme.primary)
-                }
-                if let detail = state.detail {
-                    Text(detail).pixlFont(.bodySmall).lineLimit(2)
-                }
-                HStack {
-                    Spacer()
-                    if state.isRunning {
-                        Button("Cancel remaining", action: onCancel)
-                            .buttonStyle(.plain)
-                            .pixlFont(.labelLarge)
-                            .foregroundStyle(theme.primary)
-                    } else if !state.failedSongIds.isEmpty {
-                        GlassPillButton(title: "Retry unfinished songs", tint: theme.secondaryContainer.opacity(0.5),
-                                        foreground: theme.onSecondaryContainer, action: onRetry)
-                    }
-                }
-            }
-            .foregroundStyle(theme.onSecondaryContainer)
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .pixlGlass(in: RoundedRectangle(cornerRadius: 28, style: .continuous),
-                       tint: theme.secondaryContainer.opacity(GlassTint.container))
-        }
-    }
 }
 
 // MARK: - Song sort sheet
@@ -574,13 +529,16 @@ struct PlaylistSongSortSheet: View {
 // MARK: - Options sheet row
 
 /// Android `PlaylistActionItem`: an 18 pt `surfaceContainerHigh` row (16 pt sides, 6 pt apart, 16×14 padding) with
-/// the icon in a 40 pt `surfaceContainerHighest` circle (`primary`) and the label (`titleMedium`).
+/// the icon in a 40 pt `surfaceContainerHighest` circle (`primary`) and the label (`titleMedium`), with an optional
+/// supporting line under it (`bodyMedium`, `onSurfaceVariant`).
 struct PlaylistActionRow: View {
     let title: String
+    let subtitle: String?
     let systemImage: String
 
-    init(_ title: String, systemImage: String) {
+    init(_ title: String, subtitle: String? = nil, systemImage: String) {
         self.title = title
+        self.subtitle = subtitle
         self.systemImage = systemImage
     }
 
@@ -593,9 +551,17 @@ struct PlaylistActionRow: View {
                 .foregroundStyle(theme.primary)
                 .frame(width: 40, height: 40)
                 .background(Circle().fill(theme.surfaceContainerHighest))
-            Text(title)
-                .pixlFont(.titleMedium)
-                .foregroundStyle(theme.onSurface)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .pixlFont(.titleMedium)
+                    .foregroundStyle(theme.onSurface)
+                if let subtitle {
+                    Text(subtitle)
+                        .pixlFont(.bodyMedium)
+                        .foregroundStyle(theme.onSurfaceVariant)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 16)
