@@ -10,6 +10,8 @@ extension CloudStudio {
                      tais: TaisServices, lyricsService: LyricsService?, persistence: PersistenceActor?,
                      playbackServices: PlaybackServices?, youtube: YouTubeServices) -> CloudStudio {
         if launch.isUITest { return CloudDemo.make(launch: launch, defaults: defaults) }
+        // Sing's preview pieces belong to the process that played them: a launch starts without any.
+        Task.detached(priority: .utility) { InstrumentalFiles.removeAllClips() }
         // PixlAudio's built-in keys when this build carries them (CI, from the CLOUD_DEFAULTS_KEY secret); decrypted on
         // first use, off the main actor.
         let settings = CloudSettings(defaults: defaults, secrets: CloudKeychain(), builtIn: CloudBuiltInKeys())

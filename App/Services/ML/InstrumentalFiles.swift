@@ -63,4 +63,39 @@ nonisolated enum InstrumentalFiles {
         guard let directory else { return }
         try? FileManager.default.removeItem(at: directory)
     }
+
+    // MARK: Sing's preview pieces
+
+    /// `Caches/SingClips/`: Sing's preview pieces (`<song>_clip_<startMs>.m4a`), a minute of a song's instrumental
+    /// played until the whole one lands. Never in `Stems/`, so nothing above (`bestAvailable`, the cloud's "has an
+    /// instrumental") counts them; deleted when the whole instrumental lands, when the song changes and at launch.
+    static var clipsDirectory: URL? {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("SingClips", isDirectory: true)
+    }
+
+    static func clipURL(songId: String, startMs: Int64, flac: Bool) -> URL? {
+        clipsDirectory?.appendingPathComponent(StemFiles.clipFileName(songId: songId, startMs: startMs, flac: flac))
+    }
+
+    static func prepareClipsDirectory() throws {
+        guard let clipsDirectory else { return }
+        try FileManager.default.createDirectory(at: clipsDirectory, withIntermediateDirectories: true)
+    }
+
+    /// Deletes a song's preview pieces.
+    static func removeClips(songId: String) {
+        guard let clipsDirectory,
+              let names = try? FileManager.default.contentsOfDirectory(atPath: clipsDirectory.path) else { return }
+        let prefix = StemFiles.clipPrefix(songId: songId)
+        for name in names where name.hasPrefix(prefix) {
+            try? FileManager.default.removeItem(at: clipsDirectory.appendingPathComponent(name))
+        }
+    }
+
+    /// Deletes every preview piece (launch: what they were for ended with the last process).
+    static func removeAllClips() {
+        guard let clipsDirectory else { return }
+        try? FileManager.default.removeItem(at: clipsDirectory)
+    }
 }

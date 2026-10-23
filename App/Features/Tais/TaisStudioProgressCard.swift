@@ -32,7 +32,8 @@ struct TaisStudioProgressCard: View {
         let studio = env.tais.studio
         let cloud = env.cloud
         let instrumental = song.flatMap { studio.state(.instrumental, songId: $0.id) }
-        let cloudJob = song.flatMap { song in cloud.jobs.last { $0.songId == song.id } }
+        // The song's own job, not a Sing preview piece of it.
+        let cloudJob = song.flatMap { song in cloud.job(forSong: song.id) }
         VStack(alignment: .leading, spacing: 12) {
             header
             if let song {

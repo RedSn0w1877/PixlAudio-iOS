@@ -130,6 +130,42 @@ final class DeckItemFactory {
                         isLocalFile: activeURL.isFileURL)
     }
 
+    /// Sing's preview piece: `clipURL` holds a stretch of the song's instrumental that starts `offsetSeconds` into the
+    /// song. It is placed at that point of a composition as long as the song (`songSeconds`), silent before and after,
+    /// so the item's timeline IS the song's: the position, seeks, the lyrics clock, Now Playing and the in-sync switch
+    /// all work exactly as for a whole instrumental, and nothing else in the engine needs to know about the offset.
+    /// The start is placed on the same 44.1 kHz frame the phone cut the clip at.
+    func makeClipItem(for entry: QueueEntry, clipURL: URL, offsetSeconds: Double, songSeconds: Double) async throws
+        -> DeckItem {
+        let asset = AVURLAsset(url: clipURL)
+        guard let clipTrack = try await asset.loadTracks(withMediaType: .audio).first else {
+            throw DeckItemError.noAudioTrack(songId: entry.song.id)
+        }
+        let clipRange = try await clipTrack.load(.timeRange)
+        let timescale: CMTimeScale = 44_100
+        let start = CMTime(value: CMTimeValue((max(offsetSeconds, 0) * Double(timescale)).rounded(.down)),
+                           timescale: timescale)
+        let composition = AVMutableComposition()
+        guard let track = composition.addMutableTrack(withMediaType: .audio,
+                                                      preferredTrackID: kCMPersistentTrackID_Invalid) else {
+            throw DeckItemError.noAudioTrack(songId: entry.song.id)
+        }
+        if CMTimeCompare(start, .zero) > 0 { track.insertEmptyTimeRange(CMTimeRange(start: .zero, duration: start)) }
+        try track.insertTimeRange(clipRange, of: clipTrack, at: start)
+        let clipEnd = CMTimeAdd(start, clipRange.duration)
+        var seconds = songSeconds > 0 ? songSeconds : Double(entry.song.duration) / 1000
+        let songEnd = CMTime(seconds: seconds, preferredTimescale: timescale)
+        if CMTimeCompare(songEnd, clipEnd) > 0 { track.insertEmptyTimeRange(CMTimeRange(start: clipEnd, end: songEnd)) }
+        seconds = max(seconds, clipEnd.seconds)
+        let parameters = TapItemParameters(logCapacity: tapLogCapacity)
+        parameters.mediaDuration.store(seconds)
+        let item = AVPlayerItem(asset: composition)
+        item.audioTimePitchAlgorithm = .spectral
+        item.audioMix = ProcessingTap.makeAudioMix(for: track, effects: effects, item: parameters)
+        return DeckItem(entry: entry, playerItem: item, asset: asset, tap: parameters, durationSeconds: seconds,
+                        isLocalFile: true)
+    }
+
     func discard(_ item: DeckItem) {
         streaming.detach(from: item.asset)
     }

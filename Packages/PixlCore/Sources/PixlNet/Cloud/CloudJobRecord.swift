@@ -109,7 +109,24 @@ public struct CloudJobRecord: Codable, Sendable, Hashable, Identifiable {
     /// replaces it.
     public var autoReservedMicroUSD: Int64?
 
+    // Sing's preview piece ("clip job", `CloudSingClip`): a minute of the song around the playhead, separated ahead of
+    // the full job so the instrumental starts sooner. To the worker it is just a short song. Optional like the rest.
+    /// Where the clip starts in the song (ms). Set only on a clip job.
+    public var clipStartMs: Int64?
+    /// The clip's length (ms): as asked for, then as the phone decoded it.
+    public var clipDurationMs: Int64?
+
     public var id: String { jobKey }
+
+    /// A preview piece of a Sing, not a whole song: its result is played for a while and thrown away, never kept as the
+    /// song's instrumental, and it has no row of its own in the queue or Active jobs.
+    public var isClip: Bool { clipStartMs != nil }
+
+    /// The clip's place in the song (nil for a whole-song job).
+    public var clipRange: CloudClipRange? {
+        guard let start = clipStartMs, let length = clipDurationMs, length > 0 else { return nil }
+        return CloudClipRange(startMs: start, endMs: start + length)
+    }
 
     public init(jobKey: String, songId: String, title: String, artist: String, batchId: String, tasks: [CloudTask],
                 lyricsMode: CloudLyricsMode?, quality: CloudSeparationQuality, createdAtMs: Int64,
@@ -283,10 +300,11 @@ public struct CloudJobRecord: Codable, Sendable, Hashable, Identifiable {
         progressPercent = nil
     }
 
-    /// The job as a selection plan (cost estimates): its tasks at its prepared, else library, length.
+    /// The job as a selection plan (cost estimates): its tasks at its prepared, else asked-for (a clip), else library,
+    /// length.
     public var plan: CloudSongPlan {
         CloudSongPlan(songId: songId, tasks: tasks, lyricsMode: lyricsMode, isStreamed: isStreamed,
-                      durationMs: durationMs ?? songDurationMs ?? CloudCost.referenceSongMs)
+                      durationMs: durationMs ?? clipDurationMs ?? songDurationMs ?? CloudCost.referenceSongMs)
     }
 
     /// RunPod holds this job now and hasn't finished the run (a redo after an earlier result counts again).

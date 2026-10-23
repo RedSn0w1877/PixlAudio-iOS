@@ -34,7 +34,8 @@ public struct CloudBatchOutcome: Sendable, Equatable {
 public enum CloudBatchNotifier {
     /// The batches that still have a job outstanding.
     public static func incompleteBatchIds(_ jobs: [CloudJobRecord]) -> Set<String> {
-        Set(jobs.filter { $0.state.isPending }.map(\.batchId))
+        // A Sing's preview piece never holds back, or makes, an announcement: only whole songs count.
+        Set(jobs.filter { $0.state.isPending && !$0.isClip }.map(\.batchId))
     }
 
     /// Batches from `previouslyIncomplete` that are finished now and worth a notification: at least one song came back
@@ -43,7 +44,7 @@ public enum CloudBatchNotifier {
                                    alreadyNotified: Set<String>) -> [CloudBatchOutcome] {
         var order: [String] = []
         var groups: [String: [CloudJobRecord]] = [:]
-        for record in jobs {
+        for record in jobs where !record.isClip {
             if groups[record.batchId] == nil { order.append(record.batchId) }
             groups[record.batchId, default: []].append(record)
         }

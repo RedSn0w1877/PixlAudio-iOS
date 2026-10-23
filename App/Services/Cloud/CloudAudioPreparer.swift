@@ -131,10 +131,12 @@ nonisolated enum CloudAudioPreparer {
     /// Prepares `source` (a file URL or an `ipod-library://` URL) as job `jobKey`'s upload. Replaces an earlier
     /// prepared file of the same job. `forceDecode` decodes to FLAC even an AAC-LC source that could go up as it is
     /// (a streamed song's download, design §7.3). `paced: false` leaves out the heavy-work duty cycle (a song somebody
-    /// is waiting for: Sing). `@concurrent`: never runs on the caller's actor.
+    /// is waiting for: Sing). `clip` decodes only that stretch of the song (Sing's preview piece), always to FLAC, cut
+    /// at the exact sample frames of the song's own decode timeline, so the result can be played at its place in the
+    /// song. `@concurrent`: never runs on the caller's actor.
     @concurrent
     static func prepare(source: URL, jobKey: String, forceDecode: Bool = false,
-                        paced: Bool = true) async throws -> CloudPreparedAudio {
+                        paced: Bool = true, clip: CloudClipRange? = nil) async throws -> CloudPreparedAudio {
         guard CloudKeys.isValidJobKey(jobKey) else { throw Failure(message: "Bad job key") }
         let scoped = source.startAccessingSecurityScopedResource()
         defer { if scoped { source.stopAccessingSecurityScopedResource() } }
@@ -151,10 +153,12 @@ nonisolated enum CloudAudioPreparer {
             sourceRate = basic.pointee.mSampleRate
         }
         let isLibraryItem = source.scheme?.lowercased() == "ipod-library"
-        let route: Route = forceDecode ? .decode
+        // A clip is always cut from the decode: the file's own bytes can't be cut at a sample.
+        let route: Route = forceDecode || clip != nil ? .decode
             : Self.route(isLibraryItem: isLibraryItem, fileExtension: source.pathExtension,
                          audioTrackCount: audioTracks.count, videoTrackCount: videoTracks.count,
                          formatID: formatID, sourceSampleRate: sourceRate)
+        let frameRange = clip.map(Self.frameRange(of:))
         removeUpload(jobKey: jobKey)
 
         var output: URL
@@ -175,10 +179,12 @@ nonisolated enum CloudAudioPreparer {
             } catch {
                 // Some library items refuse a passthrough export: decode them instead.
                 try? FileManager.default.removeItem(at: output)
-                (output, frames) = try await decodeToLossless(asset, track: track, jobKey: jobKey, paced: paced)
+                (output, frames) = try await decodeToLossless(asset, track: track, jobKey: jobKey, paced: paced,
+                                                              frameRange: frameRange)
             }
         case .decode:
-            (output, frames) = try await decodeToLossless(asset, track: track, jobKey: jobKey, paced: paced)
+            (output, frames) = try await decodeToLossless(asset, track: track, jobKey: jobKey, paced: paced,
+                                                          frameRange: frameRange)
         }
 
         do {
@@ -225,8 +231,8 @@ nonisolated enum CloudAudioPreparer {
     /// 133,632 frames, 1,332 more than were written). So the file always ends on a whole packet of silence: then no
     /// decoder has anything to trim, the phone and the worker's ffmpeg decode the same length, and the import's
     /// sample check compares like with like. At most one packet (~0.1 s) of silence is added at the end.
-    private static func decodeToLossless(_ asset: AVURLAsset, track: AVAssetTrack,
-                                         jobKey: String, paced: Bool) async throws -> (URL, Int64) {
+    private static func decodeToLossless(_ asset: AVURLAsset, track: AVAssetTrack, jobKey: String, paced: Bool,
+                                         frameRange: FrameRange? = nil) async throws -> (URL, Int64) {
         let flacHinted: [String: Any] = [
             AVFormatIDKey: kAudioFormatFLAC,
             AVSampleRateKey: sampleRate,
@@ -254,7 +260,7 @@ nonisolated enum CloudAudioPreparer {
             do {
                 // Pass 1 pads to a whole packet as the file's format describes it.
                 let written = try decode(asset, track: track, writingTo: output, settings: settings, silence: .wholePacket,
-                                         paced: paced)
+                                         paced: paced, frameRange: frameRange)
                 let readBack = try await readBackFrames(of: output, paced: paced)
                 guard readBack > written.total else { return (output, readBack) }
                 // The encoder still padded (its packet size wasn't in the format): write it again with exactly
@@ -262,7 +268,7 @@ nonisolated enum CloudAudioPreparer {
                 try Task.checkCancellation()
                 try? FileManager.default.removeItem(at: output)
                 _ = try decode(asset, track: track, writingTo: output, settings: settings,
-                               silence: .frames(readBack - written.source), paced: paced)
+                               silence: .frames(readBack - written.source), paced: paced, frameRange: frameRange)
                 return (output, try await readBackFrames(of: output, paced: paced))
             } catch is CancellationError {
                 try? FileManager.default.removeItem(at: output)
@@ -303,10 +309,28 @@ nonisolated enum CloudAudioPreparer {
         var total: Int64
     }
 
+    /// A stretch of the song in sample frames of its decode at 44.1 kHz, `[start, end)` (Sing's preview piece).
+    nonisolated struct FrameRange: Sendable, Equatable {
+        var start: Int64
+        var end: Int64
+    }
+
+    /// The clip's frames on the decode timeline, from the same ms → frame rule the player uses to place it
+    /// (`CloudSingClip.frame(ms:)`).
+    static func frameRange(of clip: CloudClipRange) -> FrameRange {
+        FrameRange(start: CloudSingClip.frame(ms: clip.startMs), end: CloudSingClip.frame(ms: clip.endMs))
+    }
+
+    /// The reader starts this far ahead of a clip (the decoder's pre-roll); the frames before the clip are dropped.
+    private static let clipPrerollSeconds = 0.5
+
     /// One decode pass: interleaved float32 from the reader, deinterleaved into the file's processing format, then the
-    /// trailing silence.
+    /// trailing silence. With `frameRange` only those frames are written: the reader is limited to a little more than
+    /// the clip, and every buffer is placed by its presentation time, so the cut falls on the same frame as in a decode
+    /// of the whole song.
     private static func decode(_ asset: AVURLAsset, track: AVAssetTrack, writingTo output: URL,
-                               settings: [String: Any], silence: TrailingSilence, paced: Bool) throws -> Written {
+                               settings: [String: Any], silence: TrailingSilence, paced: Bool,
+                               frameRange: FrameRange? = nil) throws -> Written {
         // The decode is CPU-bound for as long as the song is: it pauses and leaves the cores half the time like the rest
         // of the heavy work (the 2026-10-08 report showed two decoders in a tight loop for 140 s). A song somebody is
         // waiting for (Sing) is the exception: it runs at full speed.
@@ -321,6 +345,12 @@ nonisolated enum CloudAudioPreparer {
         readerOutput.alwaysCopiesSampleData = false
         guard reader.canAdd(readerOutput) else { throw Failure.decode("This song's audio can't be decoded") }
         reader.add(readerOutput)
+        if let frameRange {
+            let start = max(Double(frameRange.start) / sampleRate - clipPrerollSeconds, 0)
+            let end = Double(frameRange.end) / sampleRate + clipPrerollSeconds
+            reader.timeRange = CMTimeRange(start: CMTime(seconds: start, preferredTimescale: 44_100),
+                                           end: CMTime(seconds: end, preferredTimescale: 44_100))
+        }
         guard reader.startReading() else {
             throw Failure.decode("Couldn't decode this song (\(reader.error?.localizedDescription ?? "unknown error"))")
         }
@@ -343,6 +373,8 @@ nonisolated enum CloudAudioPreparer {
             var scratch = [Float](repeating: 0, count: capacity * channels)
             var written: Int64 = 0
             let maximumFrames = (CloudLimits.maxDurationMs / 1000 + 5) * Int64(sampleRate)
+            // Where the next buffer starts on the song's timeline when one carries no usable time (clips only).
+            var expectedStart = frameRange.map { max($0.start - Int64(clipPrerollSeconds * sampleRate), 0) } ?? 0
             while let sample = readerOutput.copyNextSampleBuffer() {
                 if let pacer { try pacer.checkpoint() } else { try Task.checkCancellation() }
                 guard let block = CMSampleBufferGetDataBuffer(sample) else { continue }
@@ -350,8 +382,19 @@ nonisolated enum CloudAudioPreparer {
                 let totalFrames = min(CMSampleBufferGetNumSamples(sample),
                                       CMBlockBufferGetDataLength(block) / (MemoryLayout<Float>.size * channels))
                 var frameOffset = 0
-                while frameOffset < totalFrames {
-                    let chunk = min(totalFrames - frameOffset, capacity)
+                var frameLimit = totalFrames
+                if let frameRange {
+                    let time = CMSampleBufferGetPresentationTimeStamp(sample)
+                    let bufferStart = time.isValid && time.isNumeric
+                        ? Int64((time.seconds * sampleRate).rounded()) : expectedStart
+                    expectedStart = bufferStart + Int64(totalFrames)
+                    if bufferStart >= frameRange.end { break }
+                    frameOffset = Int(min(max(frameRange.start - bufferStart, 0), Int64(totalFrames)))
+                    frameLimit = Int(min(max(frameRange.end - bufferStart, 0), Int64(totalFrames)))
+                    if frameLimit <= frameOffset { continue }
+                }
+                while frameOffset < frameLimit {
+                    let chunk = min(frameLimit - frameOffset, capacity)
                     let status = scratch.withUnsafeMutableBytes { raw in
                         CMBlockBufferCopyDataBytes(block, atOffset: frameOffset * channels * MemoryLayout<Float>.size,
                                                    dataLength: chunk * channels * MemoryLayout<Float>.size,

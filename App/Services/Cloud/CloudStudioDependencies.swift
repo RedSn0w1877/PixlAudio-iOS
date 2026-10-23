@@ -37,6 +37,9 @@ nonisolated protocol CloudAudioPreparing: Sendable {
     func prepare(source: URL, jobKey: String, forceDecode: Bool) async throws -> CloudPreparedAudio
     /// `paced: false` skips the heavy-work duty cycle: a song somebody is waiting for (Sing) is decoded at full speed.
     func prepare(source: URL, jobKey: String, forceDecode: Bool, paced: Bool) async throws -> CloudPreparedAudio
+    /// Only `clip` of the song (Sing's preview piece), decoded to FLAC; nil is the whole song.
+    func prepare(source: URL, jobKey: String, forceDecode: Bool, paced: Bool,
+                 clip: CloudClipRange?) async throws -> CloudPreparedAudio
     func removeUpload(jobKey: String)
     /// The prepared file of a job, if it is still on disk (an upload restarted after a relaunch).
     func uploadFile(jobKey: String, ext: String) -> URL?
@@ -45,6 +48,12 @@ nonisolated protocol CloudAudioPreparing: Sendable {
 nonisolated extension CloudAudioPreparing {
     func prepare(source: URL, jobKey: String, forceDecode: Bool, paced: Bool) async throws -> CloudPreparedAudio {
         try await prepare(source: source, jobKey: jobKey, forceDecode: forceDecode)
+    }
+
+    /// A preparer that can't cut (the demo's) prepares the whole song.
+    func prepare(source: URL, jobKey: String, forceDecode: Bool, paced: Bool,
+                 clip: CloudClipRange?) async throws -> CloudPreparedAudio {
+        try await prepare(source: source, jobKey: jobKey, forceDecode: forceDecode, paced: paced)
     }
 }
 
@@ -55,6 +64,12 @@ nonisolated struct LiveCloudAudioPreparer: CloudAudioPreparing {
 
     func prepare(source: URL, jobKey: String, forceDecode: Bool, paced: Bool) async throws -> CloudPreparedAudio {
         try await CloudAudioPreparer.prepare(source: source, jobKey: jobKey, forceDecode: forceDecode, paced: paced)
+    }
+
+    func prepare(source: URL, jobKey: String, forceDecode: Bool, paced: Bool,
+                 clip: CloudClipRange?) async throws -> CloudPreparedAudio {
+        try await CloudAudioPreparer.prepare(source: source, jobKey: jobKey, forceDecode: forceDecode, paced: paced,
+                                             clip: clip)
     }
 
     func removeUpload(jobKey: String) { CloudAudioPreparer.removeUpload(jobKey: jobKey) }
@@ -123,12 +138,24 @@ protocol CloudStudioHost: AnyObject {
     func songIdsWithInstrumental(among songIds: [String]) async -> Set<String>
     /// Moves a verified result into `Stems/` atomically (and drops the other cloud variant).
     func installInstrumental(from staged: URL, songId: String, flac: Bool) throws
+    /// Moves a verified Sing preview piece into the caches folder (never `Stems/`: it is not the song's instrumental)
+    /// and returns where it is.
+    func installClip(from staged: URL, songId: String, startMs: Int64, flac: Bool) throws -> URL
+    /// Deletes a song's preview pieces (every song's when nil).
+    func removeClips(songId: String?)
     func saveLyrics(_ doc: LyricsDoc, for song: Song, replaceUserSynced: Bool) async -> CloudLyricsSaveOutcome
     func instrumentalImported(songId: String)
     func lyricsImported(song: Song)
 }
 
 extension CloudStudioHost {
+    /// A host with nowhere to keep them (the demo's) takes no preview pieces.
+    func installClip(from staged: URL, songId: String, startMs: Int64, flac: Bool) throws -> URL {
+        throw CloudStudio.Failure("No storage for preview pieces")
+    }
+
+    func removeClips(songId: String?) {}
+
     /// One song at a time (a host with a cheaper way, like the live one's single look at `Stems/`, replaces this).
     func songIdsWithInstrumental(among songIds: [String]) async -> Set<String> {
         var found = Set<String>()
@@ -227,6 +254,26 @@ final class LiveCloudStudioHost: CloudStudioHost {
         }
         try CloudStudio.moveAtomically(staged, to: destination)
         try? FileManager.default.removeItem(at: other)
+    }
+
+    func installClip(from staged: URL, songId: String, startMs: Int64, flac: Bool) throws -> URL {
+        try InstrumentalFiles.prepareClipsDirectory()
+        guard let destination = InstrumentalFiles.clipURL(songId: songId, startMs: startMs, flac: flac) else {
+            throw CloudStudio.Failure("No storage for preview pieces")
+        }
+        try CloudStudio.moveAtomically(staged, to: destination)
+        return destination
+    }
+
+    /// Off the main actor: it can run on a song change.
+    func removeClips(songId: String?) {
+        Task.detached(priority: .utility) {
+            if let songId {
+                InstrumentalFiles.removeClips(songId: songId)
+            } else {
+                InstrumentalFiles.removeAllClips()
+            }
+        }
     }
 
     func saveLyrics(_ doc: LyricsDoc, for song: Song, replaceUserSynced: Bool) async -> CloudLyricsSaveOutcome {

@@ -52,11 +52,14 @@ public enum CloudPriorityLane {
         }
     }
 
-    /// `records` by tier, each tier in the order it came (the list is oldest first).
+    /// `records` by tier, each tier in the order it came (the list is oldest first). Inside a tier a Sing's preview piece
+    /// (`CloudSingClip`) comes before whole songs: it is what the person hears first.
     public static func ordered(_ records: [CloudJobRecord], priorityKeys: Set<String>) -> [CloudJobRecord] {
         records.enumerated().sorted { lhs, rhs in
             let a = tier(of: lhs.element, priorityKeys: priorityKeys), b = tier(of: rhs.element, priorityKeys: priorityKeys)
-            return a != b ? a < b : lhs.offset < rhs.offset
+            if a != b { return a < b }
+            if lhs.element.isClip != rhs.element.isClip { return lhs.element.isClip }
+            return lhs.offset < rhs.offset
         }.map(\.element)
     }
 
@@ -80,6 +83,19 @@ public enum CloudPriorityLane {
     /// The jobs that can step aside: waiting at RunPod (never a running one) and not priority jobs themselves.
     public static func pausable(_ jobs: [CloudJobRecord], priorityKeys: Set<String>) -> [CloudJobRecord] {
         jobs.filter { $0.state == .submitted && $0.runpodJobId != nil && !priorityKeys.contains($0.jobKey) }
+    }
+
+    /// The jobs that step aside for `priority`: `pausable`, and — when `priority` is a Sing's preview piece — the song's
+    /// own full job too while it only waits in RunPod's queue (a Sing tap that joined a job already sent): the minute
+    /// the person is about to sing goes first, the whole song right behind it.
+    public static func pausable(_ jobs: [CloudJobRecord], priorityKeys: Set<String>,
+                                for priority: CloudJobRecord) -> [CloudJobRecord] {
+        guard priority.isClip else { return pausable(jobs, priorityKeys: priorityKeys) }
+        return jobs.filter { record in
+            guard record.state == .submitted, record.runpodJobId != nil, record.jobKey != priority.jobKey else { return false }
+            if !priorityKeys.contains(record.jobKey) { return true }
+            return !record.isClip && record.songId == priority.songId
+        }
     }
 
     /// Cancelled from the tail of the queue to its head: the newest submission first.
@@ -161,8 +177,8 @@ public enum CloudPriorityLane {
         }
     }
 
-    /// The order of one burst: the priority jobs first, then the jobs that stepped aside in the order they were
-    /// first sent, then everything else in queue order.
+    /// The order of one burst: the priority jobs first (a Sing's preview piece ahead of its full job), then the jobs
+    /// that stepped aside in the order they were first sent, then everything else in queue order.
     public static func submitOrder(ready: [String], jobs: [CloudJobRecord]) -> [String] {
         var position: [String: Int] = [:]
         var byKey: [String: CloudJobRecord] = [:]
@@ -171,20 +187,25 @@ public enum CloudPriorityLane {
             byKey[record.jobKey] = record
         }
         let priorityKeys = priorityJobKeys(jobs)
-        var first: [(tier: Int, index: Int, key: String)] = []
+        var first: [(tier: Int, clip: Bool, index: Int, key: String)] = []
         var paused: [(index: Int, key: String)] = []
         var rest: [(index: Int, key: String)] = []
         for key in ready {
             guard let record = byKey[key], let index = position[key] else { continue }
             if priorityKeys.contains(key) {
-                first.append((tier(of: record, priorityKeys: priorityKeys), index, key))
+                first.append((tier(of: record, priorityKeys: priorityKeys), record.isClip, index, key))
             } else if record.isPaused {
                 paused.append((index, key))
             } else {
                 rest.append((index, key))
             }
         }
-        first.sort { $0.tier != $1.tier ? $0.tier < $1.tier : $0.index < $1.index }
+        // A Sing's preview piece before its song's full job (and any other job of the same tier).
+        first.sort { lhs, rhs in
+            if lhs.tier != rhs.tier { return lhs.tier < rhs.tier }
+            if lhs.clip != rhs.clip { return lhs.clip }
+            return lhs.index < rhs.index
+        }
         paused.sort { $0.index < $1.index }
         rest.sort { $0.index < $1.index }
         return first.map(\.key) + paused.map(\.key) + rest.map(\.key)

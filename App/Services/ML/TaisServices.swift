@@ -23,6 +23,10 @@ final class TaisServices {
         studio = TaisStudio(models: models, dependencies: dependencies)
         instrumental = InstrumentalController(playback: playback, engine: playbackServices?.engine, studio: studio,
                                               lyrics: lyricsController)
+        // Sing's preview piece needs where the song is (read on demand, never observed).
+        if let engine = playbackServices?.engine {
+            instrumental.playheadMs = { [weak engine] in engine?.currentPositionMs() ?? 0 }
+        }
         if isUITest { TaisDemo.apply(launch: launch, to: self) }
     }
 

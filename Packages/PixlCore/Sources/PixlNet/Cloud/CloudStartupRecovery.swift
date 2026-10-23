@@ -17,6 +17,13 @@ public enum CloudStartupRecovery {
         }
         return changed
     }
+
+    /// Sing's preview pieces still on their way from an earlier launch: what they were for (a minute of a song playing
+    /// then, and the wish to sing it) did not survive the process, and their files are cleared at launch, so they are
+    /// stopped instead of being separated for nothing.
+    public static func staleClips(_ jobs: [CloudJobRecord]) -> [String] {
+        jobs.filter { $0.isClip && $0.state.isPending }.map(\.jobKey)
+    }
 }
 
 public enum CloudJobClearing {
@@ -32,8 +39,9 @@ public enum CloudJobClearing {
     }
 
     /// The jobs a failed batch row's "Retry" starts again: the ones that "need you" (failed or expired). A job the
-    /// person cancelled stays cancelled until they retry it themselves in the Cloud queue.
+    /// person cancelled stays cancelled until they retry it themselves in the Cloud queue. A Sing's preview piece is never
+    /// retried: the minute it was for has gone by.
     public static func retryable(_ jobs: [CloudJobRecord]) -> [CloudJobRecord] {
-        jobs.filter { $0.state == .failed || $0.state == .expired }
+        jobs.filter { ($0.state == .failed || $0.state == .expired) && !$0.isClip }
     }
 }
