@@ -122,6 +122,10 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case taisStudio = "tais.studio", taisModels = "tais.models", taisSongSheet = "tais.songSheet"
     case taisInstrumental = "tais.instrumental", taisInstrumentalRendering = "tais.instrumentalRendering"
     case taisInstrumentalActive = "tais.instrumentalActive"
+    // Sing's in-flight states on the lyrics screen (`TaisDemo`): the cloud making the instrumental, the cloud waiting
+    // for Wi-Fi, and the switch waiting for a gap between sung words
+    case taisSingPreparingCloud = "tais.singPreparingCloud", taisSingWaitingForWiFi = "tais.singWaitingForWiFi"
+    case taisSingWaitingGap = "tais.singWaitingGap"
 
     // Cloud Studio (iOS-first): Cloud processing filled in with a passed Test connection and the queue in every state
     // (`CloudDemo`, no network); `cloud.settings.builtin` is the same screen in a build with PixlAudio's built-in
@@ -228,7 +232,9 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .taisStudio, .taisModels: return .experimental
         case .cloudSettings, .cloudSettingsBuiltIn: return .cloudProcessing
         case .cloudQueue: return .cloudQueue
-        case .taisSongSheet, .taisInstrumental, .taisInstrumentalRendering, .taisInstrumentalActive: return nil
+        case .taisSongSheet, .taisInstrumental, .taisInstrumentalRendering, .taisInstrumentalActive,
+             .taisSingPreparingCloud, .taisSingWaitingForWiFi, .taisSingWaitingGap:
+            return nil
         }
     }
 
@@ -303,7 +309,9 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         switch self {
         case .nowPlaying, .nowPlayingSpotifyConnect, .nowPlayingBluetooth, .nowPlayingSpotifyVolumeHUD: .nowPlaying
         case .editSong: .editSong(songId: DemoLibrary.songs.first?.id ?? "")
-        case .lyrics, .taisInstrumental, .taisInstrumentalRendering, .taisInstrumentalActive, .lyricsSpotifyVolumeHUD: .lyrics
+        case .lyrics, .taisInstrumental, .taisInstrumentalRendering, .taisInstrumentalActive, .lyricsSpotifyVolumeHUD,
+             .taisSingPreparingCloud, .taisSingWaitingForWiFi, .taisSingWaitingGap:
+            .lyrics
         case .lyricsSync, .lyricsSyncSpotifyConnect: .lyricsSync(songId: DemoLibrary.songs.first?.id ?? "")
         case .setup, .setupBackup, .setupTheme, .setupLibraryLayout, .setupSpotify,
              .setupFinish:

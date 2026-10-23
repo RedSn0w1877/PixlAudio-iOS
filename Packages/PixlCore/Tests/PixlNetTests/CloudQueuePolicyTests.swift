@@ -220,21 +220,23 @@ import PixlModel
         #expect(CloudCost.pricePerSecondMicroUSD(gpu: "Mystery", fallback: 175) == 175)
     }
 
-    @Test func estimatesMatchTheDesignTable() {
+    @Test func estimatesMatchTheMeasuredBench() {
         let plan = CloudSongPlan(songId: "a", tasks: [.instrumental, .lyrics], lyricsMode: .align, isStreamed: false,
                                  durationMs: 240_000)
-        // One song on its own: cold (35 s) + warm (20 s) = 55 s × $0.000192 ≈ $0.0106 (design: 45–55 s, $0.009–0.011).
-        #expect(CloudCost.estimateMicroUSD([plan], quality: .standard, pricePerSecondMicroUSD: 192) == 10_560)
-        // 100 songs in one burst: 35 + 2000 s ≈ $0.39 on 24 GB (design: ~2,035 s, $0.39).
+        // The 2026-10-22 bench (RTX A4500): 38 warm seconds per 4-minute song, a 15 s cold start.
+        #expect(CloudCost.warmSecondsStandard == 38 && CloudCost.coldStartSeconds == 15)
+        // One song on its own: cold (15 s) + warm (38 s) = 53 s × $0.000192 ≈ $0.0102.
+        #expect(CloudCost.estimateMicroUSD([plan], quality: .standard, pricePerSecondMicroUSD: 192) == 10_176)
+        // 100 songs in one burst: 15 + 3,800 s ≈ $0.73 on 24 GB.
         let hundred = Array(repeating: plan, count: 100)
-        #expect(CloudCost.estimateMicroUSD(hundred, quality: .standard, pricePerSecondMicroUSD: 192) == 390_720)
-        #expect(CloudCost.format(microUSD: 390_720) == "$0.39")
+        #expect(CloudCost.estimateMicroUSD(hundred, quality: .standard, pricePerSecondMicroUSD: 192) == 732_480)
+        #expect(CloudCost.format(microUSD: 732_480) == "$0.73")
         #expect(CloudCost.estimateMicroUSD([], quality: .standard, pricePerSecondMicroUSD: 192) == 0)
         let transcribeBest = CloudSongPlan(songId: "b", tasks: [.lyrics], lyricsMode: .transcribe, isStreamed: false,
                                            durationMs: 240_000)
-        #expect(CloudCost.estimatedSeconds(transcribeBest, quality: .best) == 42)
+        #expect(CloudCost.estimatedSeconds(transcribeBest, quality: .best) == 60)
         let long = CloudSongPlan(songId: "c", tasks: [.instrumental], lyricsMode: nil, isStreamed: false, durationMs: 600_000)
-        #expect(CloudCost.estimatedSeconds(long, quality: .best) == 50) // 10 min: best falls back, scaled 2.5×
+        #expect(CloudCost.estimatedSeconds(long, quality: .best) == 95) // 10 min: best falls back, scaled 2.5×
     }
 
     @Test func actualCostFromTimings() {
@@ -428,9 +430,9 @@ import PixlModel
         finishedRun.completedAtMs = 4_000
         finishedRun.submittedAtMs = 3_000
         let records = [done, running, waiting, queued, redo, finishedRun]
-        // 20 s warm each at 192 µ$/s for a 4-minute song: running, waiting and the redo.
+        // 38 s warm each at 192 µ$/s for a 4-minute song: running, waiting and the redo.
         #expect(CloudBudget.committedMicroUSD(records, monthStartMs: 0, pricePerSecondMicroUSD: 192)
-            == 5_000 + 3 * 20 * 192)
+            == 5_000 + 3 * 38 * 192)
         #expect(running.isRunningAtRunPod && waiting.isRunningAtRunPod && redo.isRunningAtRunPod)
         #expect(!finishedRun.isRunningAtRunPod && !queued.isRunningAtRunPod)
     }
@@ -468,8 +470,8 @@ import PixlModel
         // "b" as FLAC: 120 s × 176,400 B/s × 0.6.
         #expect(estimate.uploadBytes == 8_000_000 + 12_700_800)
         #expect(estimate.uploadMB == 20)
-        // One cold start (35 s) + 20 s + 10 s.
-        #expect(estimate.costMicroUSD == (35 + 20 + 10) * 192)
+        // One cold start (15 s) + 38 s for the 4-minute song + 19 s for the 2-minute one (half of 38).
+        #expect(estimate.costMicroUSD == (15 + 38 + 19) * 192)
         #expect(estimate.remainingMicroUSD == 10_000)
         #expect(!estimate.fitsCap)
         #expect(CloudUploadEstimate.bytes(durationMs: 240_000, passthroughBitsPerSecond: 256_000) == 7_680_000)

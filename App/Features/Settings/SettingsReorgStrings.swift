@@ -112,6 +112,43 @@ nonisolated extension L10n {
     static let settingsSingQueueFallback = String(localized: "settings_sing_queue_fallback",
                                                   defaultValue: "Songs you sent to the cloud")
 
+    // MARK: Sing — prepare songs ahead (2026-10-22; the one opt-in way the cloud is used without a tap)
+
+    static let settingsSectionPrepareAhead = String(localized: "settings_section_prepare_ahead",
+                                                    defaultValue: "Prepare ahead")
+    static let settingsSingPrepareTitle = String(localized: "settings_sing_prepare_title",
+                                                 defaultValue: "Prepare songs ahead in the cloud")
+    static let settingsSingPrepareSubtitle = String(localized: "settings_sing_prepare_subtitle",
+                                                    defaultValue: "Picks songs you're likely to sing and gets them ready on Wi-Fi.")
+    static let settingsSingPrepareBudgetTitle = String(localized: "settings_sing_prepare_budget_title",
+                                                       defaultValue: "Monthly budget")
+    static let settingsSingPrepareSongsNone = String(localized: "settings_sing_prepare_songs_none",
+                                                     defaultValue: "No songs a month")
+    static let settingsSingPrepareSongsOne = String(localized: "settings_sing_prepare_songs_one",
+                                                    defaultValue: "About 1 song a month")
+    static func settingsSingPrepareSongsMany(_ count: Int) -> String {
+        String(format: String(localized: "settings_sing_prepare_songs_many", defaultValue: "About %1$lld songs a month"), count)
+    }
+    /// The caption under the budget slider: how many songs a month the budget pays for.
+    static func settingsSingPrepareSongsPerMonth(_ count: Int) -> String {
+        switch count {
+        case ..<1: settingsSingPrepareSongsNone
+        case 1: settingsSingPrepareSongsOne
+        default: settingsSingPrepareSongsMany(count)
+        }
+    }
+    static let settingsSingPrepareDailyCapTitle = String(localized: "settings_sing_prepare_daily_cap_title",
+                                                         defaultValue: "Songs per day")
+    static let settingsSingPrepareDailyCapHelp = String(localized: "settings_sing_prepare_daily_cap_help",
+                                                        defaultValue: "The most songs it prepares in one day.")
+    static let settingsSingPrepareWhyTitle = String(localized: "settings_sing_prepare_why_title",
+                                                    defaultValue: "Why these songs")
+    static let settingsSingPrepareWhyEmpty = String(localized: "settings_sing_prepare_why_empty",
+                                                    defaultValue: "No songs picked yet.")
+    /// The Cloud processing switch's subtitle (the consent screen): the two taps and the one switch that send a song.
+    static let settingsCloudConsentSubtitle = String(localized: "settings_cloud_consent_subtitle",
+                                                     defaultValue: "Nothing leaves this phone until you tap Process in cloud or Sing, or turn on Prepare songs ahead.")
+
     // MARK: Gestures & haptics
 
     static let settingsRowTapBackgroundSubtitle = String(localized: "settings_row_tap_background_subtitle_v2",

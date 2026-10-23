@@ -29,7 +29,7 @@ struct CloudProcessingSettingsView: View {
         SettingsScaffold(title: "Cloud processing", screenID: "cloudProcessing") {
             SettingsSubsection(title: "Consent") {
                 SwitchSettingRow(title: builtIn ? "Process songs in the cloud" : "Send songs to my RunPod account",
-                                 subtitle: "Nothing leaves this phone until you tap Process in cloud.",
+                                 subtitle: L10n.settingsCloudConsentSubtitle,
                                  isOn: $settings.isEnabled, systemImage: "icloud.and.arrow.up")
                 SettingsPanel {
                     Text(verbatim: "Vocals are removed on a fast computer in the cloud. Songs are deleted from the cloud after they come back.")

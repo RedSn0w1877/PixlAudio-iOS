@@ -610,6 +610,9 @@ final class CloudHarness {
     let objects: FakeCloudObjects
     let settings: CloudSettings
     let studio: CloudStudio
+    /// What the phone reports to the studio: the network (Sing's Wi-Fi check) and its state for work done ahead of time
+    /// (Wi-Fi, battery, heat…). Wi-Fi and a full battery until a test changes them.
+    let phone: CloudTestPhone
     /// The configs RunPod and the bucket clients were made with, and how often the transfer session was made.
     let configs: CloudConfigLog
     /// The notification the studio would post (a fake); nil unless the test passes one.
@@ -640,6 +643,7 @@ final class CloudHarness {
         }
         var counter = 0
         let log = CloudConfigLog()
+        let phone = CloudTestPhone()
         let dependencies = CloudStudio.Dependencies(
             store: store, host: host,
             makeTransfers: {
@@ -660,8 +664,10 @@ final class CloudHarness {
                 counter += 1
                 return CloudTestValues.key(counter)
             },
-            build: "1.0 (test)", removeStaged: { _ in }, background: nil, notifier: notifier)
+            build: "1.0 (test)", removeStaged: { _ in }, background: nil, notifier: notifier,
+            networkConditions: { phone.network }, autoConditions: { phone.auto })
         self.notifier = notifier
+        self.phone = phone
         configs = log
         self.directory = directory
         self.clock = clock
@@ -700,6 +706,57 @@ final class CloudHarness {
         await studio.pump()
         XCTAssertEqual(studio.job(key)?.state, .submitted)
         return key
+    }
+
+    /// `songs` sent together from `origin`, prepared, uploaded and sent to RunPod as one burst (`rp-1`, `rp-2`… in order
+    /// when nothing was sent before). Returns their job keys.
+    func submittedBatch(_ songs: [Song], origin: CloudJobOrigin = .manual) async throws -> [String] {
+        for song in songs where host.facts[song.id] == nil { host.facts[song.id] = Self.lineSyncedFacts }
+        await studio.send(await studio.preview(songs: songs, title: "Test", origin: origin))
+        await studio.pump()
+        await studio.settle()
+        let keys = studio.jobs.suffix(songs.count).map(\.jobKey)
+        XCTAssertEqual(keys.count, songs.count)
+        for key in keys { await studio.handle(.uploaded(jobKey: key)) }
+        await studio.pump()
+        for key in keys { XCTAssertEqual(studio.job(key)?.state, .submitted, "\(key)") }
+        return keys
+    }
+
+    /// A Sing tap on `song`: its job is prepared and its upload handed to the background session (`uploading`); the test
+    /// decides when the upload finishes (`studio.handle(.uploaded(jobKey:))`). Returns the job's key.
+    func singJobPrepared(_ song: Song) async throws -> String {
+        if host.facts[song.id] == nil { host.facts[song.id] = Self.lineSyncedFacts }
+        let outcome = await studio.startSing(song: song)
+        XCTAssertEqual(outcome, .started(1))
+        await studio.pump()
+        await studio.settle()
+        let key = try XCTUnwrap(studio.job(forSong: song.id)?.jobKey)
+        XCTAssertEqual(studio.job(key)?.state, .uploading)
+        return key
+    }
+
+    /// The harness clock when it starts (what `CloudTestClock` begins at).
+    static let clockStartMs: Int64 = 1_790_000_000_000
+
+    /// A job as an earlier launch could have left it: with its upload details, `uploaded` ten seconds before the clock
+    /// starts, and (when it was sent before) sent five seconds before it.
+    static func storedRecord(_ n: Int, song: String, state: CloudJobState, origin: CloudJobOrigin? = nil,
+                             batch: String = "stored") -> CloudJobRecord {
+        var record = CloudJobRecord(jobKey: key(n), songId: song, title: "Song \(n)", artist: "Artist", batchId: batch,
+                                    tasks: [.instrumental], lyricsMode: nil, quality: .standard,
+                                    createdAtMs: clockStartMs - 3_600_000)
+        record.state = state
+        record.origin = origin
+        record.inputExt = "flac"
+        record.sha256 = uploadSHA
+        record.bytes = 1_024
+        record.durationMs = 240_000
+        record.songDurationMs = 240_000
+        record.decodedFrames = sourceFrames
+        record.sampleRate = 44_100
+        if state != .queued && state != .preparing && state != .uploading { record.uploadedAtMs = clockStartMs - 10_000 }
+        return record
     }
 
     /// The worker's ok manifest for `key` (and its lyrics.json put in the bucket).
@@ -757,6 +814,27 @@ nonisolated final class FakeCloudNotifier: CloudNotifying, @unchecked Sendable {
     var permissionRequests: Int { lock.withLock { permissionAsks } }
 }
 
+/// The phone as the studio sees it in a test: Wi-Fi and a full battery until a test says otherwise.
+@MainActor
+final class CloudTestPhone {
+    /// What Sing's "is this a connection the upload may use" reads (unknown counts as fine).
+    var network = StreamPrefetchPolicy.Conditions.unknown
+    /// What work done ahead of time reads (`blockedReason`).
+    var auto = CloudAutoConditions(network: .wifi, batteryPercent: 100)
+
+    func goOffWiFi() {
+        network = StreamPrefetchPolicy.Conditions(network: .cellular, isExpensive: true)
+        auto.network = .cellular
+        auto.isExpensive = true
+    }
+
+    func goOnWiFi() {
+        network = StreamPrefetchPolicy.Conditions(network: .wifi)
+        auto.network = .wifi
+        auto.isExpensive = false
+    }
+}
+
 /// What the harness's client factories were called with.
 final class CloudConfigLog {
     var runpod: [CloudConfigInput] = []
@@ -781,13 +859,23 @@ final class FakeCloudHost: CloudStudioHost {
     var installed: [(songId: String, flac: Bool)] = []
     var savedLyrics: [(songId: String, doc: LyricsDoc)] = []
     var saveOutcome: CloudLyricsSaveOutcome = .saved
+    /// Runs while a song's audio "comes down" (a streamed song's download), before the preparer gets it.
+    var whileAudioComesDown: (() -> Void)?
+    /// Runs while a song's lyrics facts are read (the first thing a batch's selection does).
+    var whileLyricsAreRead: (() -> Void)?
 
     func song(id: String) -> Song? { songs[id] }
     var currentSong: Song? { current }
     var librarySongs: [Song] { Array(songs.values).sorted { $0.id < $1.id } }
-    func audioSource(for song: Song) async throws -> URL { URL(fileURLWithPath: "/music/\(song.id)") }
+    func audioSource(for song: Song) async throws -> URL {
+        whileAudioComesDown?()
+        return URL(fileURLWithPath: "/music/\(song.id)")
+    }
     func streamIdentity(for song: Song) async -> String? { identity[song.id] }
-    func lyricsFacts(for song: Song) async -> CloudLyricsFacts { facts[song.id] ?? .none }
+    func lyricsFacts(for song: Song) async -> CloudLyricsFacts {
+        whileLyricsAreRead?()
+        return facts[song.id] ?? .none
+    }
     func hasInstrumental(songId: String) async -> Bool { instrumentals.contains(songId) }
 
     func installInstrumental(from staged: URL, songId: String, flac: Bool) throws {
@@ -809,20 +897,43 @@ nonisolated final class FakeCloudTransfers: CloudTransferring, @unchecked Sendab
     private var storedUploads: [(jobKey: String, url: String)] = []
     private var storedDownloads: [(jobKey: String, slot: String)] = []
     private var storedCancelled: [String] = []
+    private var storedPriorities: [String: Float] = [:]
+    private var storedUploadCellular: [String: Bool] = [:]
+    private var storedDownloadCellular: [String: Bool] = [:]
+    private var cellular = false
     var onEvent: (@Sendable (CloudTransferEvent) -> Void)?
     var onProgress: (@Sendable (_ jobKey: String, _ slot: String, _ fraction: Double) -> Void)?
-    var allowsCellular = false
+    var allowsCellular: Bool {
+        get { lock.withLock { cellular } }
+        set { lock.withLock { cellular = newValue } }
+    }
 
     var uploads: [(jobKey: String, url: String)] { lock.withLock { storedUploads } }
     var downloads: [(jobKey: String, slot: String)] { lock.withLock { storedDownloads } }
     var cancelled: [String] { lock.withLock { storedCancelled } }
+    /// The `URLSessionTask.priority` each upload was handed (the job key's last upload).
+    var priorities: [String: Float] { lock.withLock { storedPriorities } }
+    /// Whether mobile data was allowed when each job's upload / result download was created.
+    var uploadAllowedCellular: [String: Bool] { lock.withLock { storedUploadCellular } }
+    var downloadAllowedCellular: [String: Bool] { lock.withLock { storedDownloadCellular } }
 
     func upload(fileURL: URL, to url: URL, jobKey: String, contentType: String) {
-        lock.withLock { storedUploads.append((jobKey, url.absoluteString)) }
+        lock.withLock {
+            storedUploads.append((jobKey, url.absoluteString))
+            storedUploadCellular[jobKey] = cellular
+        }
+    }
+
+    func upload(fileURL: URL, to url: URL, jobKey: String, contentType: String, priority: Float) {
+        upload(fileURL: fileURL, to: url, jobKey: jobKey, contentType: contentType)
+        lock.withLock { storedPriorities[jobKey] = priority }
     }
 
     func download(from url: URL, jobKey: String, slot: String) {
-        lock.withLock { storedDownloads.append((jobKey, slot)) }
+        lock.withLock {
+            storedDownloads.append((jobKey, slot))
+            storedDownloadCellular[jobKey] = cellular
+        }
     }
 
     func cancel(jobKey: String) async { lock.withLock { storedCancelled.append(jobKey) } }
@@ -835,8 +946,17 @@ nonisolated final class FakeCloudPreparer: CloudAudioPreparing, @unchecked Senda
     private var storedPrepared: [String] = []
     private var storedForced: [Bool] = []
     private var storedRemoved: [String] = []
+    private var storedPaced: [String: Bool] = [:]
 
     init(directory: URL) { self.directory = directory }
+
+    /// Whether each job's decode was paced (left the cores half idle); false for a song somebody is waiting for.
+    var pacedByJob: [String: Bool] { lock.withLock { storedPaced } }
+
+    func prepare(source: URL, jobKey: String, forceDecode: Bool, paced: Bool) async throws -> CloudPreparedAudio {
+        lock.withLock { storedPaced[jobKey] = paced }
+        return try await prepare(source: source, jobKey: jobKey, forceDecode: forceDecode)
+    }
 
     var prepared: [String] { lock.withLock { storedPrepared } }
     /// `forceDecode` of each `prepare` call, in order.
@@ -877,11 +997,18 @@ nonisolated final class FakeCloudInspector: CloudFileInspecting, @unchecked Send
     func sha256Hex(_ data: Data) -> String { CloudPlatform.sha256Hex(data) }
 }
 
+/// RunPod as a queue a test can steer: `/run` puts a job `IN_QUEUE`, `/status` answers what was set, `/cancel` removes a
+/// job that is still in the queue (and says `CANCELLED`) and says what the job is when it is not.
 actor FakeRunPod: RunPodJobsAPI {
     private(set) var runs: [CloudJobRequest] = []
     private(set) var cancelled: [String] = []
+    /// Every `/status` call, in order.
+    private(set) var statusCalls: [String] = []
     private var statuses: [String: RunPodJob] = [:]
     private var missing: Set<String> = []
+    private var cancelAnswers: [String: RunPodJob] = [:]
+    private var failingCancels: Set<String> = []
+    private var lostCancelAnswers: Set<String> = []
 
     func setStatus(_ id: String, _ job: RunPodJob) {
         statuses[id] = job
@@ -893,6 +1020,15 @@ actor FakeRunPod: RunPodJobsAPI {
         missing.insert(id)
     }
 
+    /// `/cancel` for `id` answers this, whatever the job is.
+    func setCancelAnswer(_ id: String, _ job: RunPodJob) { cancelAnswers[id] = job }
+
+    /// `/cancel` for `id` fails before it reaches RunPod: the job stays as it was.
+    func failCancel(_ id: String) { failingCancels.insert(id) }
+
+    /// `/cancel` for `id` takes effect at RunPod but the answer never arrives.
+    func loseCancelAnswer(_ id: String) { lostCancelAnswers.insert(id) }
+
     func run(_ request: CloudJobRequest) async throws -> RunPodJob {
         runs.append(request)
         let id = "rp-\(runs.count)"
@@ -901,12 +1037,25 @@ actor FakeRunPod: RunPodJobsAPI {
     }
 
     func status(jobId: String) async throws -> RunPodJob {
+        statusCalls.append(jobId)
         if missing.contains(jobId) { throw RunPodError.jobNotFound }
         guard let job = statuses[jobId] else { throw RunPodError.jobNotFound }
         return job
     }
 
-    func cancel(jobId: String) async throws { cancelled.append(jobId) }
+    func cancel(jobId: String) async throws -> RunPodJob {
+        cancelled.append(jobId)
+        if failingCancels.contains(jobId) { throw RunPodError.network("offline") }
+        // The test decides what RunPod says, and the job stays as it is (the worker got there first).
+        if let answer = cancelAnswers[jobId] { return answer }
+        let current = statuses[jobId]
+        // A job still waiting in the queue is removed from it; one the worker has keeps going (the test's answer rules).
+        if current?.status == "IN_QUEUE" || current == nil {
+            statuses[jobId] = RunPodJob(id: jobId, status: "CANCELLED")
+        }
+        if lostCancelAnswers.contains(jobId) { throw RunPodError.network("the answer was lost") }
+        return statuses[jobId] ?? RunPodJob(id: jobId, status: "CANCELLED")
+    }
     func health() async throws -> RunPodHealth { RunPodHealth(idleWorkers: 1) }
     func selftest(build: String) async throws -> RunPodJob { RunPodJob(id: "s", status: "COMPLETED") }
 }

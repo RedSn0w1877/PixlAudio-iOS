@@ -247,6 +247,8 @@ final class AppEnvironment {
                                      tais: tais, lyricsService: lyricsController.lyricsService,
                                      persistence: persistence, playbackServices: playbackServices, youtube: youtube)
         self.cloud = cloud
+        // Sing starts its cloud job through Cloud Studio, which is created after the instrumental controller.
+        tais.instrumental.cloud = cloud
         // The automatic studio leaves songs alone while the cloud is working on them (design §7.1).
         automaticStudio.skipsSong = { [weak cloud] songId in cloud?.hasPendingJob(songId: songId) ?? false }
         activeJobs = isUITest
@@ -259,7 +261,26 @@ final class AppEnvironment {
         wireBlockedArtists(settings.blocked)
         // A tap on "Your instrumentals are ready" opens the Cloud queue (the notification centre's delegate is set
         // here, early: a launch from the notification reaches it before `start()`).
-        if !isUITest { cloud.installNotificationRouting(router: router) }
+        if !isUITest {
+            cloud.installNotificationRouting(router: router)
+            wireAutoPrepare()
+        }
+    }
+
+    /// Settings › Sing › "Prepare songs ahead in the cloud": the runner that picks songs from the listening and the library
+    /// and has Cloud Studio send them (never in UI tests). It follows its settings by itself; `start()` turns it on.
+    private func wireAutoPrepare() {
+        let library = self.library, home = self.home, taste = self.musicTaste, blocked = settings.blocked
+        let runner = SingPrepareRunner(cloud: cloud, sources: SingPrepareRunner.Sources(
+            songs: { library.songs },
+            playlists: { library.playlists },
+            events: { home.history.events },
+            signals: { taste.learnedSignals },
+            blocked: { blocked.matcher },
+            isAppActive: { UIApplication.shared.applicationState == .active }))
+        cloud.autoPrepare = runner
+        // The phone's own automatic studio leaves an instrumental the cloud is getting ready to the cloud.
+        automaticStudio.cloudPreparesInstrumental = { [weak runner] songId in runner?.owns(songId: songId) ?? false }
     }
 
     /// `-screen playlistBlocked` blocks Pixel Parade (two songs of "Late Night Drive"); `blockedArtists` lists three.
@@ -367,7 +388,13 @@ final class AppEnvironment {
         let reloadPlayCounts: () -> Void = {
             Task { await playCounts.reload(editor: editor, revision: home.history.revision) }
         }
-        playbackServices?.onEngagementRecorded = reloadPlayCounts
+        // A finished listening session also tells "Prepare songs ahead" that its picks may have changed.
+        let autoPrepare = cloud.autoPrepare
+        playbackServices?.onEngagementRecorded = {
+            reloadPlayCounts()
+            autoPrepare?.engagementRecorded()
+        }
+        autoPrepare?.start()
         backup.onRestored = { [weak self] in
             reloadPlayCounts()
             // A restore may write AI keys and base URLs (it dropped the cached answer): re-check off the main actor.

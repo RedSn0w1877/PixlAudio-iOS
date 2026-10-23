@@ -21,7 +21,8 @@ final class TaisServices {
                                            downloads: youtube?.downloads)
             })
         studio = TaisStudio(models: models, dependencies: dependencies)
-        instrumental = InstrumentalController(playback: playback, engine: playbackServices?.engine, studio: studio)
+        instrumental = InstrumentalController(playback: playback, engine: playbackServices?.engine, studio: studio,
+                                              lyrics: lyricsController)
         if isUITest { TaisDemo.apply(launch: launch, to: self) }
     }
 

@@ -943,3 +943,12 @@ Android has no tests for a RunPod/R2 pipeline; everything here is new.
 - `JobFailuresTests`, `ActiveJobClearingTests` (PixlModel), `CloudStartupRecoveryTests` (PixlNet), `JobFailureHandlingTests`
   (AppTests) and the failure cases of `UITests/ActiveJobsScreenshotTests`: iOS-only (failed jobs end with a reason and can be
   cleared, cancelled and retried; 2026-10-09, `docs/handoff/2026-10-09-many-jobs-fix.md`). Android's jobs sheet has no actions.
+
+- Sing and Prepare songs ahead (2026-10-22): `PixlLyricsTests/SingGapPlannerTests` (gap index and switch planner),
+  `PixlLibraryTests/SingPrepareRankerTests` (the ranker's formula and hard excludes), `PixlNetTests/CloudPriorityLaneTests`,
+  `CloudAutoBudgetTests` and the origin / pause cases in `CloudActiveJobsTests`, `CloudBackgroundPlannerTests`,
+  `CloudBatchNotificationTests`, `RunPodJobsClientTests`; `AppTests/CloudSingAndAutoTests` (the lane, the ledger and auto manners
+  through the orchestrator with fakes), `SingPrepareRunnerTests`, `SingPrepareSettingsTests`, `InstrumentalControllerTests`
+  (the Sing wish, the cloud / phone fallback table and the button's words), `DualDeckEngineInstrumentalTests` (placement,
+  clamping, seek and alignment guards on the real engine) and `UITests/LyricsSingStatesTests`. Android's ranker test is
+  `CloudAutoPrepareTest`.

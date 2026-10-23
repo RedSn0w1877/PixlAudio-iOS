@@ -36,6 +36,8 @@ nonisolated struct CloudBatchPreview: Identifiable, Equatable, Sendable {
     let replaceUserSynced: Bool
     /// Where the songs came from ("Current song", "Songs without an instrumental", a playlist's name).
     let title: String
+    /// Who is sending them: a tap on "Process in cloud", a tap on Sing, or songs prepared ahead.
+    let origin: CloudJobOrigin
 
     var isEmpty: Bool { plans.isEmpty }
 }
@@ -69,13 +71,20 @@ nonisolated enum CloudStartOutcome: Equatable, Sendable {
     }
 }
 
+/// Whether a Sing tap can use the cloud for a song right now (`CloudStudio.singAvailability(for:)`).
+typealias SingCloudAvailability = CloudStudio.SingCloudAvailability
+
 /// Cloud Studio's orchestrator (design §1, §7): the per-song jobs from "Process in cloud" to the imported instrumental
 /// and word-timed lyrics. It only sequences I/O; every rule (states, retries, caps, gates, checks) is PixlNet's
 /// (`CloudQueuePolicy`, `CloudJobBuilder`), and every side effect goes through `Dependencies`, so AppTests drive it
 /// with fakes.
 ///
-/// - Nothing is sent while the consent switch is off, and the cloud is never used automatically or as a fallback:
-///   only songs the person started run.
+/// - Nothing is sent while the consent switch is off, and the cloud is never used as a fallback: a song goes up
+///   because the person tapped "Process in cloud" or Sing, or turned on "Prepare songs ahead in the cloud" in Settings ›
+///   Sing — the one opt-in exception, whose jobs (origin `auto`) never use mobile data, post no notification, don't lift
+///   safe mode and stay inside their own monthly budget.
+/// - A priority job (Sing, or one song sent by hand) goes to the GPU first: the jobs RunPod has not started step aside
+///   and follow it (`CloudPriorityLane`).
 /// - Foreground: uploads start at once; `/run` goes out when the batch's uploads are done (or 2 minutes after the
 ///   first); `/status` is asked at most every 15 s and only while jobs are at RunPod (no timer while idle).
 /// - Background: transfers continue in the system's daemon; BGAppRefresh and URL-session wakes run `pump()` once
@@ -114,6 +123,36 @@ final class CloudStudio {
         }
     }
 
+    /// Whether a Sing tap can use the cloud for this song now. Anything but `usable` and `alreadyPending` sends the tap
+    /// to the phone's own renderer, with `fallbackMessage` as the reason.
+    nonisolated enum SingCloudAvailability: Equatable, Sendable {
+        /// Cloud on, set up, within the month's budget, a song of up to 15 minutes, and a connection uploads may use.
+        case usable
+        /// The song already has a job on its way: the tap joins it.
+        case alreadyPending(jobKey: String)
+        case off
+        case notConfigured
+        case keysMissing
+        case overCap
+        case notOnWiFi
+        case tooLong
+        /// Nothing for the cloud to add (the song already has an instrumental, or there is no audio to send).
+        case nothingToDo
+
+        /// Why the phone renders instead, in words for a toast; nil when the cloud takes the tap.
+        var fallbackMessage: String? {
+            switch self {
+            case .usable, .alreadyPending: nil
+            case .off: "Cloud processing is off — removing vocals on this phone instead."
+            case .notConfigured, .keysMissing: "Cloud processing isn't set up — removing vocals on this phone instead."
+            case .overCap: "This month's cloud budget is used up — removing vocals on this phone instead."
+            case .notOnWiFi: "Not on Wi-Fi — removing vocals on this phone instead."
+            case .tooLong: "This song is too long for the cloud — removing vocals on this phone instead."
+            case .nothingToDo: "Removing vocals on this phone instead."
+            }
+        }
+    }
+
     /// Everything the orchestrator talks to.
     struct Dependencies {
         var store: CloudJobStore
@@ -134,6 +173,14 @@ final class CloudStudio {
         var background: CloudBackground?
         /// "Your instrumentals are ready" (nil in tests unless a fake is given, and in the UI-test demo).
         var notifier: (any CloudNotifying)?
+        /// Start of the local day containing a time (auto-prepare's daily count starts over then).
+        var dayStartMs: (Int64) -> Int64 = { $0 - $0 % 86_400_000 }
+        /// The network now. nil (tests, the demo) counts as an unmetered Wi-Fi.
+        var networkConditions: (() -> StreamPrefetchPolicy.Conditions)?
+        /// The phone's state for work done ahead of time (Wi-Fi, battery, heat, free space, power saving, the heavy lane,
+        /// safe mode): `CloudAutoConditions.blockedReason` says why it must wait ("Waiting for Wi-Fi"…). nil (tests, the
+        /// demo) means nothing holds it back.
+        var autoConditions: (@MainActor () -> CloudAutoConditions)?
     }
 
     nonisolated struct Clients: Sendable {
@@ -150,6 +197,8 @@ final class CloudStudio {
 
     static let instrumentalSlot = "instrumental"
     static let maxConcurrentPreparations = 2
+    /// Priority jobs (Sing, one song sent by hand) prepare in a place of their own, on top of the ordinary two.
+    static let reservedPrioritySlots = 1
 
     // MARK: Observable state
 
@@ -167,6 +216,12 @@ final class CloudStudio {
     private(set) var isPreviewing = false
     /// UI tests: demo jobs, nothing runs.
     let isDemo: Bool
+    /// Settings › Sing › "Prepare songs ahead in the cloud": picks the songs and sends them with the auto origin
+    /// (set once, when the app is put together).
+    var autoPrepare: SingPrepareRunner?
+    /// The phone's network and power facts for work done ahead of time (set once by `CloudStudio.make`; nil in tests and
+    /// the demo, where `Dependencies.autoConditions` stands in).
+    @ObservationIgnored var deviceConditions: CloudDeviceConditions?
 
     // MARK: Plumbing
 
@@ -222,6 +277,9 @@ final class CloudStudio {
 
     func job(_ jobKey: String) -> CloudJobRecord? { jobs.first { $0.jobKey == jobKey } }
 
+    /// The latest job for a song, whatever its state (the Sing button follows its progress).
+    func job(forSong songId: String) -> CloudJobRecord? { jobs.last { $0.songId == songId } }
+
     /// The song has a job that isn't finished (the automatic studio skips it; the song sheet says so).
     func hasPendingJob(songId: String) -> Bool { jobs.contains { $0.songId == songId && $0.state.isPending } }
 
@@ -244,6 +302,9 @@ final class CloudStudio {
         return "Cloud: " + parts.joined(separator: ", ")
     }
 
+    /// The studio's clock (Unix ms): the one its rules use, so the runner that works with it agrees.
+    var nowMs: Int64 { dependencies.nowMs() }
+
     /// The month's committed spend (recorded costs plus estimates of jobs at RunPod, and what jobs since removed from
     /// the list spent this month).
     var committedThisMonthMicroUSD: Int64 {
@@ -263,6 +324,8 @@ final class CloudStudio {
         backgroundWindow = nil
         backgroundExpired = false
         guard settings.isEnabled else { return }
+        // Sing asks whether the phone is on Wi-Fi before it picks the cloud: the path monitor runs while the cloud is on.
+        deviceConditions?.start()
         requestPump()
     }
 
@@ -370,7 +433,7 @@ final class CloudStudio {
     /// `onlyMissing` keeps the songs that lack that output (the queue's Add rows); gathering stops once a full
     /// batch of such songs is found, so a large library isn't read end to end.
     func preview(songs: [Song], title: String, onlyMissing: CloudTask? = nil,
-                 replaceUserSynced: Bool = false) async -> CloudBatchPreview {
+                 replaceUserSynced: Bool = false, origin: CloudJobOrigin = .manual) async -> CloudBatchPreview {
         isPreviewing = true
         defer { isPreviewing = false }
         await settings.loadBuiltInKeys()
@@ -395,6 +458,9 @@ final class CloudStudio {
         }
         var options = settings.selectionOptions
         options.replaceUserSynced = replaceUserSynced
+        // Sing and songs prepared ahead exist for the instrumental: it is asked for even when the Outputs switch for it
+        // (Developer) is off. The lyrics follow the settings.
+        if origin != .manual { options.instrumental = true }
         let selection = CloudSelector.select(facts, options: options)
         let skips = selection.skipCounts.map { CloudBatchPreview.Skip(reason: $0.reason, count: $0.count) }
         let estimate = CloudBatchEstimate.make(plans: selection.plans, uploadBytes: uploadBytes, quality: settings.quality,
@@ -403,20 +469,25 @@ final class CloudStudio {
                                                capMicroUSD: settings.effectiveMonthlyCapMicroUSD)
         return CloudBatchPreview(id: dependencies.newJobKey(), songs: selection.plans.compactMap { byId[$0.songId] },
                                  plans: selection.plans, skipped: skips, estimate: estimate,
-                                 replaceUserSynced: replaceUserSynced, title: title)
+                                 replaceUserSynced: replaceUserSynced, title: title, origin: origin)
     }
 
     /// "Process in cloud" (the song card, a playlist's ⋯): sends `songs` at once, with no sheet to confirm. What that
     /// sheet gated still holds — the consent switch on, something to send, inside this month's cap — and the outcome
-    /// says which one stopped it, for the caller's toast.
-    func startNow(songs: [Song], title: String, onlyMissing: CloudTask? = nil) async -> CloudStartOutcome {
+    /// says which one stopped it, for the caller's toast. `origin` is who is sending (`.sing` for a tap on Sing).
+    func startNow(songs: [Song], title: String, onlyMissing: CloudTask? = nil,
+                  origin: CloudJobOrigin = .manual) async -> CloudStartOutcome {
         // The consent defaults to on only while the built-in keys look available: know whether they open first.
         await settings.loadBuiltInKeys()
         guard settings.isEnabled else { return .off }
-        let batch = await preview(songs: songs, title: title, onlyMissing: onlyMissing)
+        let batch = await preview(songs: songs, title: title, onlyMissing: onlyMissing, origin: origin)
         guard !batch.isEmpty else {
             guard let reason = batch.skipped.first?.reason else { return .nothingToDo("Nothing to process") }
             return .nothingToDo("Nothing to process — \(reason.label)")
+        }
+        // A Sing tap exists for the instrumental: lyrics alone to add is not what it was asked for.
+        if origin == .sing, !batch.plans.contains(where: { $0.tasks.contains(.instrumental) }) {
+            return .nothingToDo("Nothing to process — \(CloudSkipReason.alreadyDone.label)")
         }
         guard batch.estimate.fitsCap else { return .overCap }
         let known = Set(jobs.map(\.jobKey))
@@ -440,10 +511,256 @@ final class CloudStudio {
         }
     }
 
+    // MARK: Sing and songs prepared ahead
+
+    /// Can anything be sent: the switch on, the fields filled in, the keys readable. `usable` when so (the same check
+    /// Sing and "Prepare songs ahead" start from).
+    func cloudReadiness() async -> SingCloudAvailability {
+        await settings.loadBuiltInKeys()
+        guard settings.isEnabled else { return .off }
+        await settings.loadSecrets()
+        // A built-in blob that didn't open switches the default consent off.
+        guard settings.isEnabled else { return .off }
+        if settings.keysMissing { return .keysMissing }
+        guard settings.configInput.isComplete else { return .notConfigured }
+        return .usable
+    }
+
+    /// Whether a Sing tap can use the cloud for `song` now: the switch on and set up, a song of up to 15 minutes that
+    /// has no instrumental yet, room in this month's budget and a connection uploads may use (Wi-Fi, or "Use cellular
+    /// data" on). A song with a job on its way is `alreadyPending`: the tap joins it.
+    func singAvailability(for song: Song) async -> SingCloudAvailability {
+        let readiness = await cloudReadiness()
+        guard readiness == .usable else { return readiness }
+        await loadIfNeeded()
+        if let pending = jobs.last(where: { $0.songId == song.id && $0.state.isPending }) {
+            // A job that only makes lyrics can't give this tap its instrumental: the phone does that.
+            return pending.tasks.contains(.instrumental) ? .alreadyPending(jobKey: pending.jobKey) : .nothingToDo
+        }
+        if song.duration > CloudLimits.maxDurationMs { return .tooLong }
+        guard Self.hasAudioSource(song), !(await dependencies.host.hasInstrumental(songId: song.id)) else {
+            return .nothingToDo
+        }
+        // The instrumental alone is what this tap asks for: its cost must fit what is left of the month.
+        let plan = CloudSongPlan(songId: song.id, tasks: [.instrumental], lyricsMode: nil, isStreamed: Self.isStreamed(song),
+                                 durationMs: song.duration > 0 ? song.duration : CloudCost.referenceSongMs)
+        let estimate = CloudCost.estimateMicroUSD([plan], quality: settings.quality,
+                                                  pricePerSecondMicroUSD: settings.effectivePricePerSecondMicroUSD)
+        guard CloudBudget.allows(estimateMicroUSD: estimate, capMicroUSD: settings.effectiveMonthlyCapMicroUSD,
+                                 spentMicroUSD: committedThisMonthMicroUSD) else { return .overCap }
+        guard networkAllowsUpload() else { return .notOnWiFi }
+        return .usable
+    }
+
+    /// A tap on Sing: the instrumental of `song` is made in the cloud, ahead of everything else in the queue. A song that
+    /// already has a job on its way joins it (an auto job becomes the person's), instead of a second one.
+    func startSing(song: Song) async -> CloudStartOutcome {
+        await settings.loadBuiltInKeys()
+        guard settings.isEnabled else { return .off }
+        await loadIfNeeded()
+        if let pending = jobs.last(where: { $0.songId == song.id && $0.state.isPending }) {
+            guard pending.tasks.contains(.instrumental) else {
+                return .nothingToDo("Nothing to process — \(CloudSkipReason.pendingJob.label)")
+            }
+            joinWithSing(pending.jobKey)
+            return .started(1)
+        }
+        return await startNow(songs: [song], title: "Sing", origin: .sing)
+    }
+
+    /// A Sing tap on a song whose job is already on its way: that job is a Sing job from now on (prepared and sent first).
+    private func joinWithSing(_ jobKey: String) {
+        guard let record = job(jobKey), record.state.isPending else { return }
+        // The person asked: safe mode waits for exactly this.
+        HeavyWorkGate.shared.userStartedHeavyWork()
+        if record.effectiveOrigin != .sing {
+            let now = dependencies.nowMs()
+            update(jobKey) { r in
+                r.promote(nowMs: now)
+                // It was waiting for a good moment (off Wi-Fi, low battery…) or stepped aside for another song: not any more.
+                if r.state == .queued, r.lastError == nil { r.nextAttemptAtMs = nil }
+                if r.isPaused { r.release() }
+            }
+            persist()
+        }
+        if record.state == .queued || record.state == .preparing {
+            dependencies.background?.beginPreparing(count: 1)
+            if settings.notifyWhenDone, let notifier = dependencies.notifier {
+                Task { await notifier.requestAuthorizationIfNeeded() }
+            }
+        }
+        requestPump()
+    }
+
+    /// "Prepare songs ahead": the first `limit` of `songs` the cloud can still do something for, sent as one batch of
+    /// auto jobs, as many as the auto budget, today's count and the shared monthly cap allow. Returns how many went.
+    func startAuto(songs: [Song], limit: Int, title: String = "Prepared ahead") async -> Int {
+        guard limit > 0 else { return 0 }
+        await settings.loadBuiltInKeys()
+        guard settings.isEnabled else { return 0 }
+        let batch = await preview(songs: songs, title: title, origin: .auto)
+        // Prepared ahead means the instrumental: a song that only lacks word-timed lyrics is not worth a cold start here.
+        let wanted = batch.plans.filter { $0.tasks.contains(.instrumental) }
+        guard !wanted.isEmpty else { return 0 }
+        let price = settings.effectivePricePerSecondMicroUSD
+        var estimates = wanted.map { CloudCost.estimatedSeconds($0, quality: settings.quality) * price }
+        // One cold start for the batch, on its first song.
+        estimates[0] += CloudCost.coldStartSeconds * price
+        let count = min(limit, CloudAutoBudget.affordableCount(
+            estimates: estimates, ledger: projectedAutoLedger(), budgetMicroUSD: settings.effectiveAutoBudgetMicroUSD,
+            dailyCap: settings.autoPrepareDailyCap, committedMicroUSD: committedThisMonthMicroUSD,
+            totalCapMicroUSD: settings.effectiveMonthlyCapMicroUSD))
+        guard count > 0 else { return 0 }
+        let plans = Array(wanted.prefix(count))
+        let songsById = Dictionary(batch.songs.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let trimmed = CloudBatchPreview(
+            id: batch.id, songs: plans.compactMap { songsById[$0.songId] }, plans: plans, skipped: batch.skipped,
+            estimate: CloudBatchEstimate.make(plans: plans, uploadBytes: [:], quality: settings.quality,
+                                              pricePerSecondMicroUSD: price, committedMicroUSD: committedThisMonthMicroUSD,
+                                              capMicroUSD: settings.effectiveMonthlyCapMicroUSD),
+            replaceUserSynced: false, title: title, origin: .auto)
+        let known = Set(jobs.map(\.jobKey))
+        await send(trimmed)
+        return jobs.filter { !known.contains($0.jobKey) }.count
+    }
+
+    /// "Prepare songs ahead" was switched off: auto jobs the worker doesn't have stop and clear out; ones already
+    /// running or coming down finish and land. A song the person has since asked for (a Sing tap made its job theirs) is
+    /// not an auto job any more and is left alone.
+    func cancelAutoJobs() async {
+        for record in jobs where record.effectiveOrigin == .auto && (record.state.isBeforeSubmit || record.state == .submitted) {
+            await cancel(record.jobKey)
+        }
+    }
+
+    /// Which of `songs` already have an instrumental, in one look: a song that has one is not worth a cold start.
+    func songIdsWithInstrumental(among songs: [Song]) async -> Set<String> {
+        await dependencies.host.songIdsWithInstrumental(among: songs.map(\.id))
+    }
+
+    /// Songs whose auto job failed or expired since `sinceMs`: they rest before being picked again.
+    func recentAutoFailureSongIds(sinceMs: Int64) -> Set<String> {
+        Set(jobs.filter { record in
+            record.effectiveOrigin == .auto && (record.state == .failed || record.state == .expired)
+                && (record.updatedAtMs ?? record.createdAtMs) >= sinceMs
+        }.map(\.songId))
+    }
+
+    /// The phone's state for work done ahead of time (nil: nothing holds it back, as in tests).
+    func autoConditions() -> CloudAutoConditions? { dependencies.autoConditions?() }
+
+    /// Why work done ahead of time must wait now, in plain words ("Waiting for Wi-Fi"…), or nil.
+    var autoBlockedReason: String? { autoConditions()?.blockedReason }
+
+    /// Songs prepared ahead come down only on an unmetered connection (never on mobile data, whatever the switch says).
+    private func autoMayUseNetwork() -> Bool { autoConditions()?.isUnmetered ?? true }
+
+    /// An auto job finds the phone not ready (off Wi-Fi, low battery, a hot phone…): it goes back to the queue for a
+    /// while, without counting as a failure. True when it did.
+    private func deferAutoJob(_ jobKey: String) -> Bool {
+        guard autoBlockedReason != nil, job(jobKey)?.state == .preparing else { return false }
+        let now = dependencies.nowMs()
+        update(jobKey) { r in
+            r.apply(.requeue, nowMs: now)
+            r.nextAttemptAtMs = now + CloudTiming.autoDeferMs
+        }
+        persist()
+        return true
+    }
+
+    /// A job stopped before RunPod's worker had it gives its reserved estimate back to the auto budget (it still counts
+    /// for today). A job that may have started keeps what it reserved.
+    private func refundUnstartedAutoReservation(_ record: CloudJobRecord) {
+        guard let reserved = record.autoReservedMicroUSD else { return }
+        let neverStarted = record.state == .submitted || (record.state == .uploaded && record.pausedNeverStarted == true)
+        if neverStarted { refundAutoSpend(reserved) }
+    }
+
+    /// Tells the runner a job it sent has ended (imported, failed, cancelled, expired): room for the next batch.
+    private func noteAutoJobEnded(_ record: CloudJobRecord) {
+        guard record.effectiveOrigin == .auto else { return }
+        autoPrepare?.autoJobFinished()
+    }
+
+    /// Auto jobs waiting out a "not ready" pause (off Wi-Fi, low battery…) are looked at again now: the phone just
+    /// became ready for them.
+    func wakeAutoJobs() {
+        var woke = false
+        for record in jobs where record.effectiveOrigin == .auto && record.state == .queued && record.lastError == nil
+            && record.nextAttemptAtMs != nil {
+            update(record.jobKey) { $0.nextAttemptAtMs = nil }
+            woke = true
+        }
+        if woke {
+            persist()
+            requestPump()
+        } else if jobs.contains(where: { $0.effectiveOrigin == .auto && $0.state == .resultsReady }) {
+            requestPump()
+        }
+    }
+
+    /// The auto jobs that have not finished.
+    var outstandingAutoJobs: [CloudJobRecord] { jobs.filter { $0.effectiveOrigin == .auto && $0.state.isPending } }
+
+    /// Auto-prepare's spending this month and count today, rolled to the clock.
+    var autoLedger: CloudAutoLedger {
+        let now = dependencies.nowMs()
+        return settings.rolledAutoLedger(monthStartMs: dependencies.monthStartMs(now), dayStartMs: dependencies.dayStartMs(now))
+    }
+
+    /// The ledger plus the auto jobs on their way that have not been sent yet (they will spend and count).
+    func projectedAutoLedger() -> CloudAutoLedger {
+        var ledger = autoLedger
+        let price = settings.effectivePricePerSecondMicroUSD
+        for record in outstandingAutoJobs where record.autoReservedMicroUSD == nil {
+            ledger.spentMicroUSD += CloudCost.estimatedSeconds(record.plan, quality: record.quality) * price
+            ledger.dayCount += 1
+        }
+        return ledger
+    }
+
+    private func reserveAutoSpend(_ estimateMicroUSD: Int64) {
+        let now = dependencies.nowMs()
+        settings.updateAutoLedger(monthStartMs: dependencies.monthStartMs(now), dayStartMs: dependencies.dayStartMs(now)) {
+            $0.reserve(estimateMicroUSD)
+        }
+        autoPrepare?.refreshStatus()
+    }
+
+    private func settleAutoSpend(reserved: Int64, actual: Int64) {
+        let now = dependencies.nowMs()
+        settings.updateAutoLedger(monthStartMs: dependencies.monthStartMs(now), dayStartMs: dependencies.dayStartMs(now)) {
+            $0.settle(reservedMicroUSD: reserved, actualMicroUSD: actual)
+        }
+        autoPrepare?.refreshStatus()
+    }
+
+    private func refundAutoSpend(_ reserved: Int64) {
+        let now = dependencies.nowMs()
+        settings.updateAutoLedger(monthStartMs: dependencies.monthStartMs(now), dayStartMs: dependencies.dayStartMs(now)) {
+            $0.refund(reserved)
+        }
+        autoPrepare?.refreshStatus()
+    }
+
+    /// The phone is on a connection uploads may use: any, with "Use cellular data"; else Wi-Fi or Ethernet that is not
+    /// metered. Low Data Mode and no connection never. Unknown (the monitor hasn't reported yet) counts as fine.
+    private func networkAllowsUpload() -> Bool {
+        guard let conditions = dependencies.networkConditions?() else { return true }
+        switch conditions.network {
+        case .unknown: return true
+        case .offline: return false
+        case .wifi, .wired: return !conditions.isConstrained && (!conditions.isExpensive || settings.useCellular)
+        case .cellular, .other: return settings.useCellular && !conditions.isConstrained
+        }
+    }
+
     /// The batch was checked (`startNow`, or a test): one job per song, then everything runs on its own.
     func send(_ preview: CloudBatchPreview) async {
-        // A person-started batch is the go-ahead that safe mode waits for.
-        HeavyWorkGate.shared.userStartedHeavyWork()
+        let origin = preview.origin
+        let isAuto = origin == .auto
+        // A person-started batch is the go-ahead that safe mode waits for. Songs prepared ahead are not: nobody asked.
+        if !isAuto { HeavyWorkGate.shared.userStartedHeavyWork() }
         // Built-in keys that turn out not to open switch the default consent off: know before anything is queued.
         await settings.loadBuiltInKeys()
         guard settings.isEnabled, !preview.isEmpty, preview.estimate.fitsCap else { return }
@@ -460,14 +777,20 @@ final class CloudStudio {
                                         videoId: YouTubeSongIdentity.videoId(for: song),
                                         replaceUserSynced: preview.replaceUserSynced)
             record.songDurationMs = song.duration
+            // A record without an origin is a manual one; a Sing tap goes to the front of the queue from the start.
+            if origin != .manual { record.origin = origin }
+            if origin == .sing { record.priorityAtMs = now }
             jobs.append(record)
         }
         persist()
-        // A person-started batch keeps preparing in the background (continued processing, design §7.4).
-        dependencies.background?.beginPreparing(count: preview.plans.count)
-        // The one moment iOS may ask about notifications: the person just sent songs and will probably leave the app.
-        if settings.notifyWhenDone, let notifier = dependencies.notifier {
-            Task { await notifier.requestAuthorizationIfNeeded() }
+        // Songs prepared ahead are quiet: no continued-processing task, no permission prompt (and no notification later).
+        if !isAuto {
+            // A person-started batch keeps preparing in the background (continued processing, design §7.4).
+            dependencies.background?.beginPreparing(count: preview.plans.count)
+            // The one moment iOS may ask about notifications: the person just sent songs and will probably leave the app.
+            if settings.notifyWhenDone, let notifier = dependencies.notifier {
+                Task { await notifier.requestAuthorizationIfNeeded() }
+            }
         }
         requestPump()
     }
@@ -483,12 +806,21 @@ final class CloudStudio {
         let keys = CloudJobBuilder.objectKeys(for: record)
         let clients = currentClients()
         if record.state.isAtRunPod, let id = record.runpodJobId, let clients {
-            try? await clients.runpod.cancel(jobId: id)
+            _ = try? await clients.runpod.cancel(jobId: id)
         }
-        update(jobKey) { _ = $0.apply(.cancelled, nowMs: self.dependencies.nowMs()) }
+        // The reservation in the auto budget goes back when RunPod had not started the job.
+        refundUnstartedAutoReservation(record)
+        update(jobKey) { r in
+            r.apply(.cancelled, nowMs: self.dependencies.nowMs())
+            r.autoReservedMicroUSD = nil
+            r.clearPause()
+        }
+        // Songs that stepped aside for this one carry on without it.
+        releasePauses(of: jobKey)
         persist()
         cleanUpLocal(jobKey)
         if let clients { await deleteRemote(keys, clients) }
+        noteAutoJobEnded(record)
     }
 
     /// Starts a failed, cancelled or expired job again from the upload.
@@ -681,13 +1013,17 @@ final class CloudStudio {
         await reconcileTransfers()
         startPreparations()
         restartStalledUploads(clients)
+        // A priority job that is ready to go gets the GPU ahead of the jobs RunPod holds but has not started.
+        await prioritizeQueue(clients)
         await submitReadyBatches(clients)
         await watchRunPod(clients)
         await collectResults(clients)
         // Continued processing lasts while songs are being prepared or are due to be; a song waiting out a retry
-        // (up to an hour) doesn't hold the system's progress UI open.
+        // (up to an hour) doesn't hold the system's progress UI open. Songs prepared ahead are not part of it.
         let now = dependencies.nowMs()
-        let toPrepare = jobs.filter { $0.state == .preparing || ($0.state == .queued && $0.isDue(nowMs: now)) }.count
+        let toPrepare = jobs.filter {
+            $0.effectiveOrigin != .auto && ($0.state == .preparing || ($0.state == .queued && $0.isDue(nowMs: now)))
+        }.count
         if toPrepare == 0 {
             dependencies.background?.endPreparing()
         } else {
@@ -858,13 +1194,27 @@ final class CloudStudio {
         // While lyric sync, a separation or a model install holds the heavy lane, preparing songs (a CPU-bound decode)
         // goes one at a time so the phone is not asked for everything at once.
         let limit = HeavyJobGovernor.shared.isBusy ? 1 : Self.maxConcurrentPreparations
-        for record in jobs where record.state == .queued && record.isDue(nowMs: now) {
-            guard preparing.count < limit else { break }
+        // A song somebody is waiting for (Sing, one song sent by hand) is prepared first, in a place of its own.
+        let priorityKeys = CloudPriorityLane.priorityJobKeys(jobs)
+        let due = jobs.filter { $0.state == .queued && $0.isDue(nowMs: now) }
+        // Songs prepared ahead wait for a phone that is ready for them (Wi-Fi, charge, cool…); nothing starts otherwise.
+        let autoWaits = due.contains { $0.effectiveOrigin == .auto } && autoBlockedReason != nil
+        for record in CloudPriorityLane.ordered(due, priorityKeys: priorityKeys) {
             guard preparing[record.jobKey] == nil else { continue }
+            let isPriority = priorityKeys.contains(record.jobKey)
+            let priorityBusy = preparing.keys.filter { priorityKeys.contains($0) }.count
+            if isPriority {
+                guard priorityBusy < Self.reservedPrioritySlots else { continue }
+            } else {
+                guard preparing.count - priorityBusy < limit else { break }
+                if record.effectiveOrigin == .auto, autoWaits { continue }
+            }
             let jobKey = record.jobKey
             update(jobKey) { _ = $0.apply(.prepareStarted, nowMs: now) }
-            // Utility: the decode and FLAC encode must not take cores from the UI.
-            preparing[jobKey] = Task(priority: .utility) { [weak self] in
+            // Utility: the decode and FLAC encode must not take cores from the UI. A song somebody waits for is the
+            // exception.
+            let taskPriority: TaskPriority = isPriority ? .userInitiated : .utility
+            preparing[jobKey] = Task(priority: taskPriority) { [weak self] in
                 await self?.prepare(jobKey: jobKey)
                 self?.preparing[jobKey] = nil
                 self?.requestPump()
@@ -878,15 +1228,23 @@ final class CloudStudio {
             fail(jobKey, "This song is no longer in your library.", code: nil, retryable: false)
             return
         }
+        let isAuto = record.effectiveOrigin == .auto
+        // A song somebody is waiting for is decoded at full speed; everything else leaves the cores half idle.
+        let isPriority = CloudPriorityLane.priorityJobKeys(jobs).contains(jobKey)
+        // Songs prepared ahead start only on a phone that is ready for them (the audio download below ignores the
+        // cellular switch, so it is checked before it begins).
+        if isAuto, deferAutoJob(jobKey) { return }
         do {
             let source = try await dependencies.host.audioSource(for: song)
             try Task.checkCancellation()
+            // Wi-Fi, the charger or the heat may have changed while the audio came down.
+            if isAuto, deferAutoJob(jobKey) { return }
             var identity: String?
             if record.isStreamed { identity = await dependencies.host.streamIdentity(for: song) }
             // A streamed song's download (YouTube's DASH AAC) always goes up decoded as FLAC (design §7.3): the worker
             // then sees exactly the samples this phone plays, whatever priming the download's container declares.
             let prepared = try await dependencies.preparer.prepare(source: source, jobKey: jobKey,
-                                                                   forceDecode: record.isStreamed)
+                                                                   forceDecode: record.isStreamed, paced: !isPriority)
             guard job(jobKey)?.state == .preparing else {
                 dependencies.preparer.removeUpload(jobKey: jobKey)
                 return
@@ -942,16 +1300,21 @@ final class CloudStudio {
         }
         update(jobKey) { $0.uploadURLExpiresAtMs = now + Int64(CloudTiming.uploadPresignSeconds) * 1000 }
         let transfers = connectTransfers()
-        transfers.allowsCellular = settings.useCellular
+        // Songs prepared ahead never use mobile data, whatever the switch says: their upload waits for Wi-Fi.
+        transfers.allowsCellular = settings.useCellular && record.effectiveOrigin != .auto
         activeTransfers.insert(CloudTransfers.taskDescription(jobKey: jobKey, slot: CloudTransfers.uploadSlot))
-        transfers.upload(fileURL: file, to: url, jobKey: jobKey, contentType: CloudKeys.contentType(ext: ext))
+        // When uploads share the connection, the song somebody waits for goes first and prepared-ahead work last.
+        let priority = CloudPriorityLane.transferPriority(for: record, priorityKeys: CloudPriorityLane.priorityJobKeys(jobs))
+        transfers.upload(fileURL: file, to: url, jobKey: jobKey, contentType: CloudKeys.contentType(ext: ext), priority: priority)
     }
 
     /// Uploads with no transfer running (after a relaunch, a failure's wait, an expired link) start again.
     private func restartStalledUploads(_ clients: Clients) {
         guard canStartNewWork else { return }
         let now = dependencies.nowMs()
-        for record in jobs where record.state == .uploading && record.isDue(nowMs: now) {
+        // The priority job's upload starts first.
+        let uploading = jobs.filter { $0.state == .uploading && $0.isDue(nowMs: now) }
+        for record in CloudPriorityLane.ordered(uploading, priorityKeys: CloudPriorityLane.priorityJobKeys(jobs)) {
             let description = CloudTransfers.taskDescription(jobKey: record.jobKey, slot: CloudTransfers.uploadSlot)
             let expired = CloudRetention.uploadURLExpired(expiresAtMs: record.uploadURLExpiresAtMs, nowMs: now)
             guard !activeTransfers.contains(description) || expired else { continue }
@@ -1009,11 +1372,205 @@ final class CloudStudio {
         }
     }
 
+    // MARK: The priority lane
+
+    /// What became of one job the lane tried to step aside.
+    private enum StepAside {
+        /// Cancelled in RunPod's queue: back to `uploaded`, held for the priority job.
+        case paused
+        /// The worker has it (or it ended): it carries on as it was, and the intent is forgotten.
+        case notPaused
+        /// The cancel may or may not have gone through (the answer never came): the intent stays, polling settles it.
+        case unknown
+        /// Nothing was cancelled and RunPod can't be asked now: the pass stops.
+        case stopPass
+    }
+
+    /// A priority job (Sing, or one song sent by hand) that is uploaded and about to go gets the GPU first. The jobs
+    /// RunPod holds but the worker has not started are cancelled there — never a running one — go back to `uploaded`
+    /// with their upload kept, and are sent again right behind it in the same burst, so only the final job of the burst
+    /// asks the worker to stop (`CloudPriorityLane`, `submitReadyBatches`). Nothing is cancelled while the priority job
+    /// is still preparing or uploading: the GPU keeps working through the queue until it is really ready to go.
+    ///
+    /// The order for every job, so a lost answer can't leave a job in two places: write the intent and save it, ask
+    /// RunPod for a fresh status (only a job still `IN_QUEUE` goes on), cancel (only a `CANCELLED` answer counts), and
+    /// only then move the job back to `uploaded`. Any failure leaves the job `submitted`: a later `CANCELLED` seen by
+    /// polling completes the pause (`apply(_:to:_:)`), a job that started carries on.
+    private func prioritizeQueue(_ clients: Clients) async {
+        let now = dependencies.nowMs()
+        endPausesWithoutPriorityJob()
+        guard canStartNewWork else { return }
+        let priorityKeys = CloudPriorityLane.priorityJobKeys(jobs)
+        guard !priorityKeys.isEmpty,
+              let priority = CloudPriorityLane.readyPriorityJob(jobs, priorityKeys: priorityKeys, nowMs: now) else { return }
+        let candidates = CloudPriorityLane.newestFirst(CloudPriorityLane.pausable(jobs, priorityKeys: priorityKeys))
+        guard !candidates.isEmpty else { return }
+        // The month's cap would hold the priority job back anyway: cancelling the others for it would cost them their place.
+        guard priorityFitsCap(priority, steppingAside: candidates) else { return }
+
+        // The intent first, on disk: from here on a RunPod CANCELLED for these jobs is ours.
+        var group: [(jobKey: String, runpodJobId: String)] = []
+        for candidate in candidates {
+            guard let runpodJobId = candidate.runpodJobId else { continue }
+            update(candidate.jobKey) { $0.beginPause(runpodJobId: runpodJobId, by: priority.jobKey, nowMs: now) }
+            group.append((candidate.jobKey, runpodJobId))
+        }
+        guard !group.isEmpty else { return }
+        await persistNow()
+
+        var paused: [String] = []
+        var stopped = false
+        for item in group {
+            if stopped {
+                // Never asked: forget the intent.
+                update(item.jobKey) { $0.abortPause() }
+                continue
+            }
+            guard let current = job(item.jobKey), current.state == .submitted,
+                  current.runpodJobId == item.runpodJobId else {
+                // It moved on while the others were being cancelled (it started, ended, or the person cancelled it).
+                update(item.jobKey) { $0.abortPause() }
+                continue
+            }
+            switch await stepAside(item.jobKey, runpodJobId: item.runpodJobId, by: priority.jobKey, clients) {
+            case .paused: paused.append(item.jobKey)
+            case .notPaused: break
+            case .unknown, .stopPass: stopped = true
+            }
+        }
+
+        // The worker writes out/<jobKey>/attempt.json when it starts a job: a folder there says the cancel came too
+        // late, and the job must look in the bucket for its result before it is sent again.
+        if !paused.isEmpty, let listing = try? await clients.objects.list(prefix: "out/", delimiter: "/") {
+            let started = Set(listing.commonPrefixes.compactMap(CloudKeys.jobKey(fromOutputKey:)))
+            for key in paused {
+                update(key) { r in if r.isPaused { r.pausedNeverStarted = !started.contains(key) } }
+            }
+        }
+        await persistNow()
+    }
+
+    /// One job of the lane: fresh status, cancel, pause (see `prioritizeQueue`).
+    private func stepAside(_ jobKey: String, runpodJobId: String, by priorityKey: String,
+                           _ clients: Clients) async -> StepAside {
+        let fresh: RunPodJob
+        do {
+            fresh = try await clients.runpod.status(jobId: runpodJobId)
+        } catch RunPodError.jobNotFound {
+            update(jobKey) { $0.abortPause() }
+            await handleMissingAtRunPod(jobKey, clients)
+            return .notPaused
+        } catch RunPodError.unauthorized {
+            notice = .runpodKeyRefused
+            update(jobKey) { $0.abortPause() }
+            return .stopPass
+        } catch {
+            // Offline or a RunPod hiccup: nothing was cancelled, the next pass asks again.
+            update(jobKey) { $0.abortPause() }
+            return .stopPass
+        }
+        guard job(jobKey)?.state == .submitted else {
+            update(jobKey) { $0.abortPause() }
+            return .notPaused
+        }
+        switch CloudPriorityLane.outcome(afterStatus: fresh) {
+        case nil:
+            break  // still waiting in the queue: cancel it
+        case .cancelledFromQueue?:
+            // The cancel already went through (an earlier pass died before it could say so).
+            return completePause(jobKey, by: priorityKey)
+        case .alreadyStarted?:
+            // The worker has it, or it ended: the ordinary handling takes it from here.
+            update(jobKey) { $0.abortPause() }
+            await apply(fresh, to: jobKey, clients)
+            return .notPaused
+        case .failed?:
+            update(jobKey) { $0.abortPause() }
+            return .notPaused
+        }
+        do {
+            let answer = try await clients.runpod.cancel(jobId: runpodJobId)
+            guard job(jobKey)?.state == .submitted else {
+                update(jobKey) { $0.abortPause() }
+                return .notPaused
+            }
+            switch CloudPriorityLane.outcome(afterCancel: answer) {
+            case .cancelledFromQueue:
+                return completePause(jobKey, by: priorityKey)
+            case .alreadyStarted:
+                // Too late: the worker took it. Polling shows it running.
+                update(jobKey) { $0.abortPause() }
+                return .notPaused
+            case .failed:
+                return .unknown
+            }
+        } catch RunPodError.jobNotFound {
+            update(jobKey) { $0.abortPause() }
+            await handleMissingAtRunPod(jobKey, clients)
+            return .notPaused
+        } catch RunPodError.unauthorized {
+            notice = .runpodKeyRefused
+            return .unknown
+        } catch {
+            // The cancel may have gone through without an answer: the intent stays on disk.
+            return .unknown
+        }
+    }
+
+    /// RunPod cancelled the job while it waited in the queue: it goes back to `uploaded` (its upload kept).
+    private func completePause(_ jobKey: String, by priorityKey: String) -> StepAside {
+        let now = dependencies.nowMs()
+        var done = false
+        update(jobKey) { r in done = r.completePause(by: priorityKey, neverStarted: nil, nowMs: now) }
+        guard done else {
+            update(jobKey) { $0.abortPause() }
+            return .notPaused
+        }
+        return .paused
+    }
+
+    /// Whether the priority job still fits what is left of the month once the jobs stepping aside are out of the count.
+    private func priorityFitsCap(_ priority: CloudJobRecord, steppingAside candidates: [CloudJobRecord]) -> Bool {
+        let price = settings.effectivePricePerSecondMicroUSD
+        let monthStart = dependencies.monthStartMs(dependencies.nowMs())
+        var committed = CloudBudget.committedMicroUSD(jobs, monthStartMs: monthStart, pricePerSecondMicroUSD: price)
+            + settings.removedSpendMicroUSD(monthStartMs: monthStart)
+        for candidate in candidates where candidate.isRunningAtRunPod {
+            committed -= CloudCost.estimatedSeconds(candidate.plan, quality: candidate.quality) * price
+        }
+        let estimate = CloudCost.estimatedSeconds(priority.plan, quality: priority.quality) * price
+        return CloudBudget.allows(estimateMicroUSD: estimate, capMicroUSD: settings.effectiveMonthlyCapMicroUSD,
+                                  spentMicroUSD: max(committed, 0))
+    }
+
+    /// Pauses whose priority job is gone (cancelled, failed, removed) end: the jobs are sent with the next batch as
+    /// they are. A cancel that was never answered, for a priority job that has started since, is forgotten.
+    private func endPausesWithoutPriorityJob() {
+        let keys = CloudPriorityLane.pausesToEnd(jobs)
+        guard !keys.isEmpty else { return }
+        for key in keys {
+            update(key) { r in
+                if r.state == .uploaded { r.release() } else { r.abortPause() }
+            }
+        }
+        persist()
+    }
+
+    /// The priority job went away: the jobs that stepped aside for it are sent as they are, without waiting.
+    private func releasePauses(of priorityKey: String) {
+        for record in jobs where record.pausedBy == priorityKey {
+            update(record.jobKey) { r in
+                if r.state == .uploaded { r.release() } else { r.abortPause() }
+            }
+        }
+    }
+
     // MARK: Submit
 
     private func submitReadyBatches(_ clients: Clients) async {
         let now = dependencies.nowMs()
         let open = jobs.filter { !$0.state.isFinished }
+        let priorityKeys = CloudPriorityLane.priorityJobKeys(jobs)
         var ready: [String] = []
         for (_, members) in Dictionary(grouping: open, by: \.batchId) {
             let uploaded = members.filter { $0.state == .uploaded }
@@ -1024,18 +1581,27 @@ final class CloudStudio {
                                            firstUploadDoneAtMs: firstDone, nowMs: now) {
                 ready += uploaded.map(\.jobKey)
             } else {
-                // A job sent before (lost at RunPod, a retry) doesn't wait for the rest of its batch.
-                ready += uploaded.filter { $0.submittedAtMs != nil }.map(\.jobKey)
+                // A job sent before (lost at RunPod, a retry) doesn't wait for the rest of its batch, and neither does a
+                // song somebody is waiting for (a Sing tap joined a job whose batch is still uploading).
+                ready += uploaded.filter { $0.submittedAtMs != nil || priorityKeys.contains($0.jobKey) }.map(\.jobKey)
             }
         }
-        var order: [String: Int] = [:]
-        for (index, record) in jobs.enumerated() where order[record.jobKey] == nil { order[record.jobKey] = index }
-        ready.sort { (order[$0] ?? 0) < (order[$1] ?? 0) }
+        // The priority jobs first, then the jobs that stepped aside for them in their old order, then the rest in queue
+        // order. Jobs waiting for a priority job that is still getting ready — and new auto jobs behind it — stay for a
+        // later pass (`CloudPriorityLane.heldBack`; the hold ends after a few minutes so a Sing job that never gets
+        // uploaded can't freeze the queue).
+        ready = CloudPriorityLane.submitOrder(ready: ready, jobs: jobs)
+        let held = CloudPriorityLane.heldBack(ready: ready, jobs: jobs, nowMs: now)
+        if !held.isEmpty { ready.removeAll { held.contains($0) } }
         // The pass is one burst: its last job carries `policy.last_in_batch`, so the worker stops itself after it
         // instead of staying up, idle and billed. Each job waits until the next one is ready (or the pass ends) to go
-        // out, since only then is it known whether it is the last (`CloudSubmitBurst`).
+        // out, since only then is it known whether it is the last (`CloudSubmitBurst`). The priority job and the jobs
+        // that stepped aside for it are ONE burst, so only the final one of them asks the worker to stop.
         var burst = CloudSubmitBurst<PendingSubmit>()
         var outOfTime = false
+        // Auto jobs accepted in this pass but not yet in the ledger (a job is only reserved once RunPod has taken it).
+        var passAutoCount = 0
+        var passAutoMicroUSD: Int64 = 0
         for jobKey in ready {
             // A background wake with no time left sends nothing more (a request cut off half-way is wasted).
             guard canStartNewWork else {
@@ -1060,6 +1626,18 @@ final class CloudStudio {
                 break  // the job held so far still goes out, as the burst's last
             }
             if notice == .capReached { notice = nil }
+            // Songs prepared ahead also stay inside their own budget and today's count (a job already reserved, one that
+            // went out before and stepped aside or is sent again, is counted once).
+            let needsReservation = record.effectiveOrigin == .auto && record.autoReservedMicroUSD == nil
+            if needsReservation {
+                var projected = autoLedger
+                projected.spentMicroUSD += passAutoMicroUSD
+                projected.dayCount += passAutoCount
+                guard CloudAutoBudget.allows(estimateMicroUSD: estimate, ledger: projected,
+                                             budgetMicroUSD: settings.effectiveAutoBudgetMicroUSD,
+                                             dailyCap: settings.autoPrepareDailyCap, committedMicroUSD: committed,
+                                             totalCapMicroUSD: settings.effectiveMonthlyCapMicroUSD) else { continue }
+            }
             var lyrics: CloudLyricsRequest?
             if record.tasks.contains(.lyrics) {
                 let song = dependencies.host.song(id: record.songId)
@@ -1079,7 +1657,15 @@ final class CloudStudio {
                 fail(jobKey, "This job lost its upload details; it will be uploaded again.", code: nil, retryable: true)
                 continue
             }
-            if record.submittedAtMs != nil {
+            // A job that stepped aside while RunPod's queue still held it never reached the worker: nothing of it is in
+            // the bucket, so there is nothing to clear and nothing to read.
+            if record.submittedAtMs != nil && record.pausedNeverStarted != true {
+                if record.wasPaused {
+                    // The cancel may have come after the worker started (or even finished) the job: the bucket decides.
+                    // Its result first; a job sent again into a missing input would only be uploaded all over.
+                    if await takeManifestIfPresent(jobKey, clients) { continue }
+                    guard self.job(jobKey)?.state == .uploaded else { continue }
+                }
                 // Sent before (a worker error, a lost job, a re-upload, Retry): the earlier run's manifest and guard
                 // marker are still in the bucket, and the worker doesn't clear them. Left there, the next listing would
                 // read the old error as this run's answer and send the job again and again.
@@ -1094,6 +1680,10 @@ final class CloudStudio {
                     continue
                 }
                 guard self.job(jobKey)?.state == .uploaded else { continue }
+            }
+            if needsReservation {
+                passAutoCount += 1
+                passAutoMicroUSD += estimate
             }
             if let previous = burst.ready(PendingSubmit(jobKey: jobKey, request: request, estimateMicroUSD: estimate)) {
                 guard await submit(previous, lastInBatch: false, clients) else { return }
@@ -1117,17 +1707,23 @@ final class CloudStudio {
             let job = try await clients.runpod.run(pending.request.markingLastInBatch(lastInBatch))
             guard self.job(jobKey)?.state == .uploaded else {
                 // Cancelled while the request was out: stop it at RunPod too.
-                try? await clients.runpod.cancel(jobId: job.id)
+                _ = try? await clients.runpod.cancel(jobId: job.id)
                 return true
             }
             let sentAt = dependencies.nowMs()
+            // A song prepared ahead reserves its estimate in the auto budget the first time RunPod takes it (a job that
+            // stepped aside and is sent again keeps its reservation); the real cost replaces it when the result lands.
+            let reserves = self.job(jobKey).map { $0.effectiveOrigin == .auto && $0.autoReservedMicroUSD == nil } ?? false
             update(jobKey) { r in
                 r.runpodJobId = job.id
                 r.lastError = nil
                 r.lastErrorCode = nil
                 r.nextAttemptAtMs = nil
+                // Sending ends any pause: it goes out, with the priority job it stepped aside for.
                 r.apply(.submitted, nowMs: sentAt)
+                if reserves { r.autoReservedMicroUSD = pending.estimateMicroUSD }
             }
+            if reserves { reserveAutoSpend(pending.estimateMicroUSD) }
             // The id is on disk before the next POST (design §7.4).
             await persistNow()
             return true
@@ -1170,17 +1766,29 @@ final class CloudStudio {
                 let folders = Set(listing.commonPrefixes.compactMap(CloudKeys.jobKey(fromOutputKey:)))
                 for record in jobs where record.state.isAtRunPod && folders.contains(record.jobKey) {
                     if await takeManifestIfPresent(record.jobKey, clients) { continue }
-                    // attempt.json is there but no manifest yet: the worker has the job.
-                    update(record.jobKey) { _ = $0.apply(.started, nowMs: now) }
+                    // attempt.json is there but no manifest yet: the worker has the job (and a cancel we were about to
+                    // send, or had sent, came too late: that job is not stepping aside any more).
+                    update(record.jobKey) { r in
+                        r.apply(.started, nowMs: now)
+                        if r.hasPauseIntent { r.abortPause() }
+                    }
                 }
             }
         }
-        // /status for running jobs and the two oldest waiting ones, each at most every `statusPollIntervalMs`.
+        // /status for running jobs and the two oldest waiting ones, each at most every `statusPollIntervalMs`. The
+        // priority job is always asked after (a Sing tap waits on it), and so is a job whose cancel is unanswered.
+        let priorityKeys = CloudPriorityLane.priorityJobKeys(jobs)
         let running = jobs.filter { $0.state == .running }
-        let waiting = jobs.filter { $0.state == .submitted }
-            .sorted { ($0.submittedAtMs ?? 0) < ($1.submittedAtMs ?? 0) }
-            .prefix(2)
-        for record in running + Array(waiting) where now - (record.lastPolledAtMs ?? 0) >= CloudTiming.statusPollIntervalMs {
+        // Oldest first; jobs sent in the same instant (one burst) in queue order.
+        let waitingInOrder = jobs.enumerated().filter { $0.element.state == .submitted }
+            .sorted { lhs, rhs in
+                let sentLeft = lhs.element.submittedAtMs ?? 0, sentRight = rhs.element.submittedAtMs ?? 0
+                return sentLeft != sentRight ? sentLeft < sentRight : lhs.offset < rhs.offset
+            }
+            .map(\.element)
+        let waiting = Array(waitingInOrder.prefix(2))
+            + waitingInOrder.dropFirst(2).filter { priorityKeys.contains($0.jobKey) || $0.hasPauseIntent }
+        for record in running + waiting where now - (record.lastPolledAtMs ?? 0) >= CloudTiming.statusPollIntervalMs {
             guard job(record.jobKey)?.state.isAtRunPod == true else { continue }
             guard let jobId = record.runpodJobId else {
                 update(record.jobKey) { _ = $0.apply(.resubmit, nowMs: now) }
@@ -1211,6 +1819,8 @@ final class CloudStudio {
         case .inProgress?:
             update(jobKey) { r in
                 r.apply(.started, nowMs: now)
+                // The worker has it: it is not stepping aside for anybody.
+                if r.hasPauseIntent { r.abortPause() }
                 if let progress = status.progress {
                     r.progressStage = progress.stage
                     r.progressPercent = progress.percent
@@ -1224,6 +1834,15 @@ final class CloudStudio {
             let found = await takeManifestIfPresent(jobKey, clients)
             if !found { retryAtRunPod(jobKey, "RunPod finished the job without a result.") }
         case .failed?, .timedOut?, .cancelled?:
+            // A CANCELLED for a job this app was stepping aside is the pause, not a failure: the cancel went through (its
+            // answer was lost, or the pass that sent it ended first). No attempt is counted and nothing waits; the bucket
+            // decides, when the job is sent again, whether the worker ever started it.
+            if status.typedStatus == .cancelled, let record = job(jobKey), record.state == .submitted,
+               let intent = record.pauseIntentRunpodJobId, intent == record.runpodJobId, let priorityKey = record.pausedBy {
+                update(jobKey) { _ = $0.completePause(by: priorityKey, neverStarted: nil, nowMs: now) }
+                persist()
+                return
+            }
             // The manifest in R2 has the details when the worker wrote one.
             if await takeManifestIfPresent(jobKey, clients) { return }
             if let code = status.errorCode {
@@ -1252,6 +1871,8 @@ final class CloudStudio {
                 r.lastError = "RunPod lost this job twice."
                 r.apply(.expired, nowMs: now)
             }
+            releasePauses(of: jobKey)
+            noteAutoJobEnded(record)
             cleanUpLocal(jobKey)
             await deleteRemote(keys, clients)
         }
@@ -1273,7 +1894,13 @@ final class CloudStudio {
         guard let record = job(jobKey), record.state.isAtRunPod || record.state == .uploaded else { return }
         let now = dependencies.nowMs()
         let price = settings.effectivePricePerSecondMicroUSD
-        update(jobKey) { $0.takeResult(result, fallbackPricePerSecondMicroUSD: price, nowMs: now) }
+        let costBefore = record.costMicroUSD ?? 0
+        update(jobKey) { r in
+            r.takeResult(result, fallbackPricePerSecondMicroUSD: price, nowMs: now)
+            // The run is over; whatever pause the job was in is moot.
+            r.clearPause()
+        }
+        settleAutoReservation(jobKey, costBefore: costBefore)
         if result.hasResults {
             update(jobKey) { r in
                 r.lastError = nil
@@ -1284,6 +1911,15 @@ final class CloudStudio {
         } else {
             handleError(result.errorCode ?? .internal, message: result.error?.message, jobKey, clients)
         }
+    }
+
+    /// A song prepared ahead reserved its estimate in the auto budget when RunPod took it; what the run really cost
+    /// replaces that now (the cost of this run only: a redo adds its own run to the job's total).
+    private func settleAutoReservation(_ jobKey: String, costBefore: Int64) {
+        guard let record = job(jobKey), let reserved = record.autoReservedMicroUSD else { return }
+        let actual = max((record.costMicroUSD ?? 0) - costBefore, 0)
+        update(jobKey) { $0.autoReservedMicroUSD = nil }
+        settleAutoSpend(reserved: reserved, actual: actual)
     }
 
     /// A worker error (design §2.3): upload again, send again, or stop.
@@ -1329,6 +1965,8 @@ final class CloudStudio {
         let now = dependencies.nowMs()
         for record in jobs where record.state == .resultsReady && record.isDue(nowMs: now) {
             guard canStartNewWork else { return }
+            // Songs prepared ahead come down only on an unmetered connection; off Wi-Fi they wait, not fail.
+            if record.effectiveOrigin == .auto, !autoMayUseNetwork() { continue }
             await collect(record.jobKey, clients)
         }
     }
@@ -1368,7 +2006,7 @@ final class CloudStudio {
             update(jobKey) { _ = $0.apply(.downloadStarted, nowMs: self.dependencies.nowMs()) }
             persist()
             let transfers = connectTransfers()
-            transfers.allowsCellular = settings.useCellular
+            transfers.allowsCellular = settings.useCellular && current.effectiveOrigin != .auto
             activeTransfers.insert(CloudTransfers.taskDescription(jobKey: jobKey, slot: Self.instrumentalSlot))
             transfers.download(from: url, jobKey: jobKey, slot: Self.instrumentalSlot)
             return
@@ -1529,6 +2167,7 @@ final class CloudStudio {
         persist()
         cleanUpLocal(jobKey)
         await deleteRemote(keys, clients)
+        noteAutoJobEnded(record)
     }
 
     // MARK: Failures and cleanup
@@ -1538,6 +2177,11 @@ final class CloudStudio {
         let now = dependencies.nowMs()
         update(jobKey) { $0.recordFailure(message, code: code, retryable: retryable, nowMs: now) }
         if job(jobKey)?.state == .failed {
+            if let record = job(jobKey) {
+                // Songs that stepped aside for this one carry on without it.
+                releasePauses(of: jobKey)
+                noteAutoJobEnded(record)
+            }
             cleanUpLocal(jobKey)
             if let clients = currentClients(), let record = job(jobKey) {
                 let keys = CloudJobBuilder.objectKeys(for: record)
