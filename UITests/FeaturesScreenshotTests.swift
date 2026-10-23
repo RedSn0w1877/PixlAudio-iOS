@@ -128,9 +128,39 @@ final class FeaturesScreenshotTests: XCTestCase {
         let shown = toast.waitForExistence(timeout: 5)
         attach(app, "swipeToQueue-light")
         XCTAssertTrue(shown, "swiping right did not play next")
-        app.swipeUp()
-        app.swipeDown()
-        XCTAssertTrue(target.waitForExistence(timeout: 5), "the list stopped scrolling")
+
+        // Vertical drags that start on a row still scroll the list, up and back down: the row's pan only takes
+        // sideways drags. Each drag starts inside the list, on a row, and holds before lifting (no momentum), so
+        // the list ends exactly where the finger left it. (`app.swipeUp()` / `swipeDown()` started wherever the
+        // app's frame put them: on a short screen, 386 × 678 pt in CI since 2026-10-23, the list is scrollable and
+        // a swipe that starts outside it, on the fixed header, cannot bring it back.)
+        let list = app.scrollViews.matching(identifier: "screen.playlistDetail").firstMatch
+        XCTAssertTrue(list.waitForExistence(timeout: 5), "the song list is missing")
+        let top = target.frame.minY
+        let box = list.frame
+        let lastRow = row(app, "Blue Hour")
+        // Only a list taller than its frame can move; on a tall screen the five songs and their padding fit.
+        let overflows = !lastRow.exists || lastRow.frame.maxY > box.maxY - 80
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        let distance = box.height * 0.5
+        let up = origin.withOffset(CGVector(dx: box.midX, dy: box.minY + box.height * 0.55))
+        up.press(forDuration: 0.05, thenDragTo: up.withOffset(CGVector(dx: 0, dy: -distance)),
+                 withVelocity: .default, thenHoldForDuration: 0.3)
+        if overflows {
+            XCTAssertTrue(!target.exists || target.frame.minY < top - 20,
+                          "a drag up that started on a row did not scroll the list (row at \(target.frame.minY), was \(top))")
+        }
+        let down = origin.withOffset(CGVector(dx: box.midX, dy: box.minY + box.height * 0.2))
+        down.press(forDuration: 0.05, thenDragTo: down.withOffset(CGVector(dx: 0, dy: distance)),
+                   withVelocity: .default, thenHoldForDuration: 0.3)
+        let deadline = Date().addingTimeInterval(5)
+        var back = false
+        repeat {
+            back = target.exists && abs(target.frame.minY - top) < 2
+            if !back { Thread.sleep(forTimeInterval: 0.25) }
+        } while !back && Date() < deadline
+        XCTAssertTrue(back, "a drag down that started on a row did not scroll the list back (row at "
+                       + "\(target.exists ? "\(target.frame.minY)" : "none"), was \(top))")
         app.terminate()
     }
 

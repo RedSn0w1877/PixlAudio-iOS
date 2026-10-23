@@ -313,7 +313,7 @@ private struct FullPlayerLayer: View {
         let sheet = env.playerSheet
         let isShown = sheet.isExpanded || sheet.isDragging || sheet.expansion > 0.001
         if sheet.hasBuiltFullPlayer || isShown {
-            NowPlayingView(safeArea: safeArea, width: screenSize.width)
+            NowPlayingView(safeArea: safeArea, width: screenSize.width, height: screenSize.height)
                 .frame(width: screenSize.width, height: screenSize.height)
                 // The progress comes from this body, which already follows the expansion: a modifier inserted with
                 // the player and reading the expansion itself could keep a stale first read (the player stayed

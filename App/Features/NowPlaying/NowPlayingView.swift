@@ -19,10 +19,14 @@ struct NowPlayingView: View {
     /// The screen width the player is laid out at (0 = unknown): seeds the carousel and the transport with their
     /// final widths, so a fresh build lays out once instead of measuring first.
     var width: CGFloat
+    /// The screen height the player is laid out at (0 = unknown): on a short screen the artwork shrinks so the top
+    /// bar and the shuffle · repeat · favourite row stay on screen (`carouselWidth`).
+    var height: CGFloat
 
-    init(safeArea: EdgeInsets = EdgeInsets(), width: CGFloat = 0) {
+    init(safeArea: EdgeInsets = EdgeInsets(), width: CGFloat = 0, height: CGFloat = 0) {
         self.safeArea = safeArea
         self.width = width
+        self.height = height
     }
 
     @Environment(AppEnvironment.self) private var env
@@ -35,6 +39,10 @@ struct NowPlayingView: View {
     /// Double-tap to like: bumped per tap; `burstIsLike` says which heart the burst draws.
     @State private var burstCount = 0
     @State private var burstIsLike = true
+    /// The measured heights of the sections around the artwork (seeded with their default-text-size heights, so the
+    /// first pass already fits): they decide how much height the artwork may take on a short screen.
+    @State private var detailsHeight: CGFloat = 136
+    @State private var controlsHeight: CGFloat = 174
 
     var body: some View {
         if let song = playback.current {
@@ -46,6 +54,10 @@ struct NowPlayingView: View {
 
     private func content(_ song: Song) -> some View {
         let isVisible = env.playerSheet.isExpanded || env.playerSheet.isDragging
+        let carouselStyle = PlayerCarouselStyle(storageKey: settings.appearance.carouselStyle)
+        let fullCarouselWidth = max(width - 48, 0)
+        let carouselWidth = carouselWidth(full: fullCarouselWidth, style: carouselStyle,
+                                          queueCount: playback.queue.count)
         // The background never takes part in layout (a filled cover is wider than the screen).
         return VStack(spacing: 0) {
             PlayerTopBar()
@@ -55,14 +67,16 @@ struct NowPlayingView: View {
                 Spacer(minLength: 0)
                 VStack(spacing: 0) {
                     AlbumCarousel(queue: playback.queue, currentIndex: playback.currentIndex,
-                                  style: PlayerCarouselStyle(storageKey: settings.appearance.carouselStyle),
+                                  style: carouselStyle,
                                   isPlaying: playback.isPlaying,
-                                  initialWidth: max(width - 48, 0),
+                                  initialWidth: carouselWidth,
                                   allowsSwipe: settings.behavior.gesturePlayerArtworkSwipe,
                                   onDoubleTap: settings.behavior.gesturePlayerArtworkDoubleTapLike && !voiceOver
                                       ? { toggleLike(song) } : nil,
                                   onSelect: { index in playback.skipToQueueItem(at: index) },
                                   onAlbumTap: { tapped in openAlbum(tapped) })
+                        // Narrower (centred) only where the screen is too short for the full-width artwork.
+                        .frame(width: carouselWidth < fullCarouselWidth ? carouselWidth : nil)
                         .padding(.vertical, 8)
                         .overlay { HeartBurst(trigger: burstCount, isLike: burstIsLike) }
                         .songQuickActions(song: song, isEnabled: settings.behavior.gesturePlayerArtworkLongPress)
@@ -82,10 +96,12 @@ struct NowPlayingView: View {
                                       onScrubbingChange: { env.playerSheet.isScrubbing = $0 })
                             .playerSectionFade(start: 0.08)
                     }
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { detailsHeight = $0 }
                 }
                 Spacer(minLength: 0)
                 Spacer(minLength: 0)
                 controls(song)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { controlsHeight = $0 }
                     .playerSectionFade(start: 0.42)
                 Spacer(minLength: 0)
             }
@@ -127,6 +143,22 @@ struct NowPlayingView: View {
                 .padding(.horizontal, 26)
                 .padding(.bottom, 6)
         }
+    }
+
+    /// The carousel's width: the full width (24 pt margins) unless the screen is too short for the artwork that width
+    /// gives, as on a compact iPhone (386 × 678 pt, CI 2026-10-23). The player is laid out at screen size, and an
+    /// artwork taller than the room the top bar, the title and seek bar and the controls leave pushed the collapse
+    /// circle and the output pill above the screen and the shuffle · repeat · favourite row below it, out of a
+    /// finger's reach. The cover keeps its shape; the carousel narrows until its height fits.
+    private func carouselWidth(full: CGFloat, style: PlayerCarouselStyle, queueCount: Int) -> CGFloat {
+        guard height > 0, full > 0 else { return full }
+        // 64: the top bar; 16: the carousel's vertical padding; 8: the least room the spacers keep. Every current
+        // full-size iPhone (the mini included) has room for the full width, so only shorter screens change.
+        let room = height - safeArea.top - safeArea.bottom - 64 - detailsHeight - controlsHeight - 16 - 8
+        // The cover's side per point of carousel width (one song: no peek, the cover takes the full width).
+        let ratio = queueCount <= 1 ? 1 : style.itemSize(width: 1)
+        guard ratio > 0 else { return full }
+        return min(full, max(room, 160) / ratio)
     }
 
     /// Double-tap on the artwork (and VoiceOver's "Like or unlike"): toggles the favourite and shows the heart.

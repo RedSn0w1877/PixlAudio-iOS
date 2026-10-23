@@ -28,6 +28,10 @@ preferred = ["iPhone 18 Pro", "iPhone 17 Pro", "iPhone 17", "iPhone 16 Pro"]
 def rank(d):
     return preferred.index(d["name"]) if d["name"] in preferred else len(preferred)
 device = sorted(iphones, key=rank)[0]
+# The candidates, for the log: a runner image whose newest runtime lacks every preferred name falls back to the first
+# iPhone it has (2026-10-23: the iOS 27.1 runtime had none of them, "iPhone Duo", 386 x 678 pt, was picked and the UI tests
+# ran on a short screen).
+print("iPhones on " + runtime + ": " + ", ".join(d["name"] for d in iphones), file=sys.stderr)
 print(device["udid"], ".".join(map(str, version)), device["name"], sep="|")
 PY
 )"
