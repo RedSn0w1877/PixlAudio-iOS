@@ -11,17 +11,29 @@ private final class FakeSwitcher: InstrumentalSwitching {
         let url: URL?
         let hadPlacement: Bool
         let requireAligned: Bool
-        /// What the placement answered when it was asked (the earliest start the fake offers is 10 s).
+        /// What the placement answered when it was asked (the earliest start the fake offers is 10 s, or `earliest`).
         let placed: (startSeconds: Double, fadeSeconds: Double)?
+        /// A preview piece's place in the song (seconds), nil for a whole file or the song's own audio.
+        var clipOffsetSeconds: Double?
     }
 
     var rate: Float = 1
     var outcome: DualDeckEngine.SwitchOutcome = .switched
+    /// The earliest start the fake offers a placement.
+    var earliest: Double = 10
     private(set) var calls: [Call] = []
 
     func switchCurrentAudio(to url: URL?, placement: DualDeckEngine.SwitchPlacement?, requireAligned: Bool) async
         -> DualDeckEngine.SwitchOutcome {
-        calls.append(Call(url: url, hadPlacement: placement != nil, requireAligned: requireAligned, placed: placement?(10)))
+        calls.append(Call(url: url, hadPlacement: placement != nil, requireAligned: requireAligned,
+                          placed: placement?(earliest)))
+        return outcome
+    }
+
+    func switchCurrentAudio(toClip url: URL, offsetSeconds: Double, placement: DualDeckEngine.SwitchPlacement?) async
+        -> DualDeckEngine.SwitchOutcome {
+        calls.append(Call(url: url, hadPlacement: placement != nil, requireAligned: false, placed: placement?(earliest),
+                          clipOffsetSeconds: offsetSeconds))
         return outcome
     }
 }
@@ -390,6 +402,180 @@ final class InstrumentalControllerTests: XCTestCase {
         XCTAssertEqual(rig.lyrics.message, SingRoute.offReason)
         XCTAssertEqual(rig.studio.state(.instrumental, songId: song.id)?.phase, .queued)
         XCTAssertTrue(h.studio.jobs.isEmpty, "nothing was sent")
+    }
+
+    // MARK: The preview piece
+
+    /// Where the fake song is playing (the controller reads it on demand).
+    private final class Playhead {
+        var ms: Int64 = 90_000
+    }
+
+    /// A cloud Sing at 1:30 into a 4-minute song, with the controller reading `playhead`: the piece's job and the song's.
+    private func cloudSingWithPiece(_ h: CloudHarness, song: Song, rig: Rig,
+                                    playhead: Playhead) async throws -> (clip: String, full: String) {
+        rig.controller.cloud = h.studio
+        rig.controller.playheadMs = { playhead.ms }
+        await rig.controller.requestSing(for: song)
+        guard case .preparingCloud(let fullKey) = rig.controller.singPhase else {
+            XCTFail("expected a cloud job, the phase is \(rig.controller.singPhase)")
+            throw CancellationError()
+        }
+        let clipKey = try XCTUnwrap(h.studio.pendingClip(forSong: song.id)?.jobKey)
+        return (clipKey, fullKey)
+    }
+
+    /// The piece goes through the cloud and lands (the song's job stays at RunPod).
+    private func landPiece(_ h: CloudHarness, keys: (clip: String, full: String)) async throws {
+        await h.studio.pump()
+        await h.studio.settle()
+        await h.studio.handle(.uploaded(jobKey: keys.clip))
+        await h.studio.handle(.uploaded(jobKey: keys.full))
+        await h.studio.pump()
+        let range = try XCTUnwrap(h.studio.job(keys.clip)?.clipRange)
+        let frames = FakeCloudPreparer.clipFrames(range)
+        let result = CloudJobResult(
+            jobKey: keys.clip, status: .ok,
+            outputs: ["instrumental": CloudOutputFile(key: "out/\(keys.clip)/instrumental.flac",
+                                                      bytes: Int64(h.instrumental.count),
+                                                      sha256: CloudPlatform.sha256Hex(h.instrumental), codec: "flac",
+                                                      kbps: nil, sampleRate: 44_100, samples: frames)],
+            timings: CloudTimings(totalMs: 5_000))
+        await h.runpod.setStatus("rp-1", RunPodJob(id: "rp-1", status: "COMPLETED", result: result))
+        h.clock.advance(16_000)
+        await h.studio.pump()
+        h.inspector.decodedFrames = frames
+        await h.studio.handle(.downloaded(jobKey: keys.clip, slot: "instrumental", stagedFile: try h.stagedInstrumental()))
+    }
+
+    func testAPieceThatLandsFirstPlaysAtItsPlaceAndTheButtonSaysVocalsOff() async throws {
+        let h = CloudHarness()
+        h.settings.useCellular = true
+        let song = h.addSong("f:root/a.m4a")
+        let rig = makeRig(songs: [song])
+        let playhead = Playhead()
+        let keys = try await cloudSingWithPiece(h, song: song, rig: rig, playhead: playhead)
+        XCTAssertEqual(h.studio.job(keys.clip)?.clipRange, CloudClipRange(startMs: 87_000, endMs: 150_000))
+        XCTAssertTrue(rig.switcher.calls.isEmpty)
+
+        playhead.ms = 100_000
+        try await landPiece(h, keys: keys)
+        let on = await waitUntil(timeout: 3) { rig.controller.isActive }
+        XCTAssertTrue(on)
+        let call = try XCTUnwrap(rig.switcher.calls.first)
+        XCTAssertEqual(call.clipOffsetSeconds ?? -1, 87, accuracy: 0.0001, "instrumental time = song time − 87 s")
+        XCTAssertTrue(call.hadPlacement, "the same gap placement as Sing's switch")
+        XCTAssertEqual(rig.controller.singPhase, .on, "Vocals off while the piece plays")
+        let face = SingButtonFace.make(phase: rig.controller.singPhase, cloudStatus: rig.controller.cloudStatus,
+                                       rendering: false, renderPercent: nil, active: rig.controller.isActive)
+        XCTAssertEqual(face.title, "Vocals off")
+        XCTAssertEqual(h.studio.job(keys.full)?.state, .submitted, "the song is still coming")
+    }
+
+    func testTheWholeInstrumentalTakesOverFromThePieceWithAShortCrossfade() async throws {
+        let h = CloudHarness()
+        h.settings.useCellular = true
+        let song = h.addSong("f:root/a.m4a")
+        let rig = makeRig(songs: [song])
+        let playhead = Playhead()
+        let keys = try await cloudSingWithPiece(h, song: song, rig: rig, playhead: playhead)
+        try await landPiece(h, keys: keys)
+        let onPiece = await waitUntil(timeout: 3) { rig.controller.isActive && rig.switcher.calls.count == 1 }
+        XCTAssertTrue(onPiece)
+
+        land(song.id, in: rig)
+        let swapped = await waitUntil(timeout: 3) { rig.switcher.calls.count == 2 && !rig.controller.isSwitching }
+        XCTAssertTrue(swapped)
+        let swap = rig.switcher.calls[1]
+        XCTAssertEqual(swap.url, rig.files.url(song.id), "the whole instrumental")
+        XCTAssertNil(swap.clipOffsetSeconds)
+        XCTAssertTrue(swap.requireAligned)
+        let placed = try XCTUnwrap(swap.placed)
+        XCTAssertEqual(placed.startSeconds, 10, accuracy: 0.001, "no gap to wait for")
+        XCTAssertEqual(placed.fadeSeconds, 0.3, accuracy: 0.001)
+        XCTAssertTrue(rig.controller.isActive)
+        XCTAssertEqual(rig.controller.singPhase, .on)
+        XCTAssertTrue(h.host.removedClips.contains(song.id), "the piece is thrown away")
+    }
+
+    func testBeforeThePieceRunsOutTheSongComesBackAndTheWishWaitsForTheWholeOne() async throws {
+        let h = CloudHarness()
+        h.settings.useCellular = true
+        let song = h.addSong("f:root/a.m4a")
+        let rig = makeRig(songs: [song])
+        let playhead = Playhead()
+        let keys = try await cloudSingWithPiece(h, song: song, rig: rig, playhead: playhead)
+        try await landPiece(h, keys: keys)
+        let onPiece = await waitUntil(timeout: 3) { rig.controller.isActive && rig.switcher.calls.count == 1 }
+        XCTAssertTrue(onPiece)
+
+        rig.switcher.earliest = 148.95
+        playhead.ms = 148_500
+        let back = await waitUntil(timeout: 3) { rig.switcher.calls.count == 2 && !rig.controller.isActive }
+        XCTAssertTrue(back)
+        let call = rig.switcher.calls[1]
+        XCTAssertNil(call.url, "the song's own audio")
+        XCTAssertTrue(call.hadPlacement, "at a gap between words")
+        let placed = try XCTUnwrap(call.placed)
+        XCTAssertLessThanOrEqual(placed.startSeconds + placed.fadeSeconds, 149.9 + 0.0001, "over before the piece ends")
+        XCTAssertEqual(rig.controller.singPhase, .preparingCloud(jobKey: keys.full), "the wish waits for the whole one")
+
+        // The whole one lands: the usual Sing switch.
+        land(song.id, in: rig)
+        let on = await waitUntil(timeout: 3) { rig.controller.isActive }
+        XCTAssertTrue(on)
+        XCTAssertEqual(rig.switcher.calls.count, 3)
+        XCTAssertTrue(rig.switcher.calls[2].requireAligned)
+    }
+
+    func testASeekOutOfThePieceBringsTheSongBackAtOnce() async throws {
+        let h = CloudHarness()
+        h.settings.useCellular = true
+        let song = h.addSong("f:root/a.m4a")
+        let rig = makeRig(songs: [song])
+        let playhead = Playhead()
+        let keys = try await cloudSingWithPiece(h, song: song, rig: rig, playhead: playhead)
+        try await landPiece(h, keys: keys)
+        let onPiece = await waitUntil(timeout: 3) { rig.controller.isActive && rig.switcher.calls.count == 1 }
+        XCTAssertTrue(onPiece)
+
+        playhead.ms = 20_000
+        let back = await waitUntil(timeout: 3) { rig.switcher.calls.count == 2 && !rig.controller.isActive }
+        XCTAssertTrue(back)
+        XCTAssertNil(rig.switcher.calls[1].url)
+        XCTAssertFalse(rig.switcher.calls[1].hadPlacement, "at once")
+        if case .preparingCloud = rig.controller.singPhase {} else {
+            XCTFail("the wish stays on, the phase is \(rig.controller.singPhase)")
+        }
+    }
+
+    func testAPieceThatLandsAfterThePlayheadLeftItIsNotPlayed() async throws {
+        let h = CloudHarness()
+        h.settings.useCellular = true
+        let song = h.addSong("f:root/a.m4a")
+        let rig = makeRig(songs: [song])
+        let playhead = Playhead()
+        let keys = try await cloudSingWithPiece(h, song: song, rig: rig, playhead: playhead)
+        playhead.ms = 146_000
+        try await landPiece(h, keys: keys)
+        try await Task.sleep(for: .milliseconds(600))
+        XCTAssertTrue(rig.switcher.calls.isEmpty, "too little of it left to be worth two fades")
+        XCTAssertFalse(rig.controller.isActive)
+    }
+
+    func testANewSongThrowsTheLastSongsPieceAway() async throws {
+        let h = CloudHarness()
+        h.settings.useCellular = true
+        let song = h.addSong("f:root/a.m4a")
+        let other = h.addSong("f:root/b.m4a")
+        let rig = makeRig(songs: [song, other])
+        let playhead = Playhead()
+        let keys = try await cloudSingWithPiece(h, song: song, rig: rig, playhead: playhead)
+        rig.playback.play([song, other], startIndex: 1, playWhenReady: false)
+        let gone = await waitUntil(timeout: 3) { h.studio.job(keys.clip)?.state == .cancelled }
+        XCTAssertTrue(gone, "a piece still on its way is stopped")
+        XCTAssertTrue(h.host.removedClips.contains(song.id))
+        XCTAssertTrue(h.studio.job(keys.full)?.state.isPending == true, "the song's own job carries on")
     }
 
     // MARK: The button's words

@@ -72,7 +72,8 @@ public enum CloudActiveJobMapper {
     public static func activeSummary(_ jobs: [CloudJobRecord]) -> (count: Int, working: Bool) {
         var batches = Set<String>()
         var working = false
-        for record in jobs where record.state.isPending {
+        // A Sing's preview piece is part of its song's row, not a job of its own.
+        for record in jobs where record.state.isPending && !record.isClip {
             batches.insert(record.batchId)
             if !working, isWorking(record) { working = true }
         }
@@ -80,11 +81,12 @@ public enum CloudActiveJobMapper {
     }
 
     /// Every batch as a row: active ones (queued or running) and, for the "Recently finished" part, done and
-    /// needs-attention ones. A batch that was only cancelled leaves no row.
+    /// needs-attention ones. A batch that was only cancelled leaves no row. A Sing's preview piece (`isClip`) has no row:
+    /// its song's row stands for both.
     public static func rows(_ jobs: [CloudJobRecord], transfer: [String: Double]) -> [ActiveJob] {
         var order: [String] = []
         var groups: [String: [CloudJobRecord]] = [:]
-        for record in jobs {
+        for record in jobs where !record.isClip {
             if groups[record.batchId] == nil { order.append(record.batchId) }
             groups[record.batchId, default: []].append(record)
         }

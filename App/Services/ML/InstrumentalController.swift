@@ -173,6 +173,9 @@ protocol InstrumentalSwitching: AnyObject {
     var rate: Float { get }
     func switchCurrentAudio(to url: URL?, placement: DualDeckEngine.SwitchPlacement?, requireAligned: Bool) async
         -> DualDeckEngine.SwitchOutcome
+    /// Sing's preview piece, a stretch of the instrumental starting `offsetSeconds` into the song, at the same position.
+    func switchCurrentAudio(toClip url: URL, offsetSeconds: Double, placement: DualDeckEngine.SwitchPlacement?) async
+        -> DualDeckEngine.SwitchOutcome
 }
 
 extension DualDeckEngine: InstrumentalSwitching {}
@@ -187,6 +190,12 @@ extension DualDeckEngine: InstrumentalSwitching {}
 /// the queue), else this phone renders one; either way the wish is kept here, so it survives closing the lyrics screen,
 /// and when the instrumental lands the song is still current the switch is made at the next gap between sung words.
 /// Taps while it waits only cancel the waiting.
+///
+/// A cloud Sing also gets a preview piece (`SingClip`): about a minute of the instrumental around where the song was,
+/// made ahead of the whole song. When it lands first it plays at its place in the song (same gap placement), the button
+/// says "Vocals off", and the wish stays on for the whole instrumental: shortly before the piece runs out the song comes
+/// back at a gap, a seek outside it brings the song back at once, and when the whole instrumental lands it takes over
+/// from the piece at the same position with a short crossfade. The piece is then thrown away.
 @MainActor
 @Observable
 final class InstrumentalController {
@@ -227,6 +236,19 @@ final class InstrumentalController {
     /// Only the latest observation chain re-arms itself.
     @ObservationIgnored private var observationEpoch = 0
     @ObservationIgnored private let network = SingNetworkWatcher()
+    /// Where the song is playing (ms), read on demand — never observed (wired to the engine; nil in UI tests and in the
+    /// tests that don't need it, which then never make or play a preview piece).
+    @ObservationIgnored var playheadMs: (@MainActor () -> Int64)?
+    /// The preview piece that plays now, in place of the song's own audio, until the whole instrumental takes over.
+    @ObservationIgnored private var playingClip: SingClip?
+    /// Watches the playhead (4×/s) only while a preview piece plays or waits to be played.
+    @ObservationIgnored private var clipWatch: Task<Void, Never>?
+    /// Preview pieces the engine could not play: not tried again.
+    @ObservationIgnored private var refusedClips: Set<URL> = []
+    /// The whole instrumental would not take over from the piece (it does not line up, or kept failing): the piece
+    /// plays out and the song comes back.
+    @ObservationIgnored private var fullSwapRefused = false
+    @ObservationIgnored private var fullSwapAttempts = 0
 
     private enum SwitchStage {
         /// The instrumental has not landed.
@@ -246,6 +268,11 @@ final class InstrumentalController {
         var cloudJob: CloudJobRecord?
         var transfer: Double?
         var deviceJob: TaisStudio.JobState?
+        /// The song's preview piece on its way (the button follows it until it plays), and its transfer.
+        var clipJob: CloudJobRecord?
+        var clipTransfer: Double?
+        /// Preview pieces that have landed, by song.
+        var clips: [String: SingClip] = [:]
     }
 
     init(playback: PlaybackStore, engine: (any InstrumentalSwitching)?, studio: TaisStudio,
@@ -282,11 +309,16 @@ final class InstrumentalController {
     private func readSnapshot() -> Snapshot {
         _ = studio?.instrumentalRevision
         var snapshot = Snapshot(songId: playback.current?.id, remoteOutput: playback.remoteOutputName != nil)
+        snapshot.clips = cloud?.clips ?? [:]
         if let intent {
             switch intent.backend {
             case .cloud(let jobKey):
                 snapshot.cloudJob = cloud?.job(jobKey)
                 snapshot.transfer = cloud?.transferProgress[jobKey]
+                if let clipJob = cloud?.pendingClip(forSong: intent.songId) {
+                    snapshot.clipJob = clipJob
+                    snapshot.clipTransfer = cloud?.transferProgress[clipJob.jobKey]
+                }
             case .device:
                 snapshot.deviceJob = studio?.state(.instrumental, songId: intent.songId)
             }
@@ -297,12 +329,21 @@ final class InstrumentalController {
     private func apply(_ snapshot: Snapshot) {
         if snapshot.songId != songId {
             // A new song always starts with its own audio, and the wish was for the last one.
+            let previous = songId
             songId = snapshot.songId
             isActive = false
             restoreOnResume = false
+            forgetClip()
             endIntent()
+            // The last song's preview piece has nothing left to play (and one still on its way is stopped).
+            if let previous, let cloud, cloud.clips[previous] != nil || cloud.pendingClip(forSong: previous) != nil {
+                cloud.discardClip(songId: previous)
+            }
         }
         isAvailable = songId.map { demoAvailableSongIds.contains($0) || instrumentalURL($0) != nil } ?? false
+        tidyClips(snapshot.clips)
+        // The whole instrumental landed while the preview piece plays: it takes over, wish or not.
+        if playingClip != nil, isAvailable { swapClipToFull() }
         guard let intent else {
             refreshPhase()
             return
@@ -313,7 +354,7 @@ final class InstrumentalController {
             return
         }
         if isAvailable {
-            startSwitchIfReady()
+            if playingClip == nil { startSwitchIfReady() }
             refreshPhase()
             return
         }
@@ -323,8 +364,17 @@ final class InstrumentalController {
                 endIntent()
                 return
             }
-            updateCloudStatus(job, transfer: snapshot.transfer)
-            if let end = SingJobEnd.end(of: job.state) { cloudJobEnded(end, songId: intent.songId) }
+            // Until the preview piece plays, the button follows it: it is what comes first.
+            if let clipJob = snapshot.clipJob, playingClip == nil {
+                updateCloudStatus(clipJob, transfer: snapshot.clipTransfer)
+            } else {
+                updateCloudStatus(job, transfer: snapshot.transfer)
+            }
+            if let end = SingJobEnd.end(of: job.state) {
+                cloudJobEnded(end, songId: intent.songId)
+            } else if let clip = snapshot.clips[intent.songId] {
+                considerClip(clip)
+            }
         case .device:
             switch snapshot.deviceJob?.phase {
             case .failed(let reason)?:
@@ -351,6 +401,8 @@ final class InstrumentalController {
             case .held: phase = .readyToSwitch
             case .waiting:
                 switch intent.backend {
+                // The preview piece plays: the vocals are off, while the wish waits on for the whole instrumental.
+                case .cloud where playingClip != nil: phase = .on
                 case .cloud(let jobKey): phase = .preparingCloud(jobKey: jobKey)
                 case .device: phase = .preparingDevice
                 }
@@ -369,6 +421,11 @@ final class InstrumentalController {
         guard playback.current?.id == song.id, playback.remoteOutputName == nil, !isSwitching, !isStartingSing else { return }
         // A song change this very moment may not have reached the observation yet.
         if song.id != songId { reapply() }
+        // The preview piece plays (the button says "Vocals off"): a tap brings the vocals back, as with any instrumental.
+        if playingClip != nil {
+            playOriginal()
+            return
+        }
         if intent?.songId == song.id {
             cancelSing()
             return
@@ -422,7 +479,8 @@ final class InstrumentalController {
     /// (with the cloud's answer) when it didn't start.
     private func startCloudSing(_ song: Song, availability: SingCloudAvailability?) async -> (String?, CloudStartOutcome?) {
         guard let cloud else { return (nil, nil) }
-        let outcome = await cloud.startSing(song: song)
+        // Where the song is now decides the preview piece's minute.
+        let outcome = await cloud.startSing(song: song, playheadMs: playheadMs?())
         var jobKey: String?
         if case .alreadyPending(let key)? = availability {
             jobKey = key
@@ -580,6 +638,202 @@ final class InstrumentalController {
         }
     }
 
+    // MARK: The preview piece
+
+    /// The song playing now, in ms (the preview piece's rules need its end).
+    private var currentSongDurationMs: Int64 { playback.current?.duration ?? 0 }
+
+    /// Preview pieces nobody will play are thrown away: another song's (it landed after the song changed), and the
+    /// current song's once its whole instrumental is here (a piece that plays is thrown away by the swap).
+    private func tidyClips(_ clips: [String: SingClip]) {
+        guard let cloud, !clips.isEmpty else { return }
+        for (id, clip) in clips {
+            if id != songId {
+                cloud.discardClip(songId: id)
+            } else if isAvailable, playingClip?.url != clip.url {
+                cloud.discardClip(songId: id)
+            }
+        }
+    }
+
+    /// The song's preview piece is here: it plays now when the playhead is inside it with enough of it left; else the
+    /// watch looks again (a seek back into it).
+    private func considerClip(_ clip: SingClip) {
+        guard engine != nil, playheadMs != nil, playingClip == nil, !refusedClips.contains(clip.url) else { return }
+        ensureClipWatch()
+        guard let intent, intent.songId == clip.songId, songId == clip.songId, stage == .waiting, !isSwitching,
+              suspendedBy.isEmpty, !isAvailable, let position = playheadMs?() else { return }
+        guard SingClipPolicy.canStart(positionMs: position, clipStartMs: clip.range.startMs, clipEndMs: clip.range.endMs,
+                                      songDurationMs: currentSongDurationMs) else { return }
+        startClipSwitch(clip)
+    }
+
+    /// Switches to the preview piece at its place in the song, at the next gap between sung words (as Sing's switch).
+    private func startClipSwitch(_ clip: SingClip) {
+        guard let engine else { return }
+        stage = .switching
+        let index = gapIndex(forSong: clip.songId)
+        let placement: DualDeckEngine.SwitchPlacement = { [weak self] earliest in
+            self?.placeSwitch(earliestSeconds: earliest, index: index, rate: Double(engine.rate))
+                ?? (startSeconds: earliest, fadeSeconds: Double(DualDeckEngine.instrumentalCrossfadeMs) / 1000)
+        }
+        isSwitching = true
+        refreshPhase()
+        Task {
+            let outcome = await engine.switchCurrentAudio(toClip: clip.url, offsetSeconds: Double(clip.range.startMs) / 1000,
+                                                          placement: placement)
+            isSwitching = false
+            clipSwitchEnded(outcome, clip: clip)
+        }
+    }
+
+    private func clipSwitchEnded(_ outcome: DualDeckEngine.SwitchOutcome, clip: SingClip) {
+        if stage == .switching || stage == .waitingForGap { stage = .waiting }
+        guard songId == clip.songId else {
+            refreshPhase()
+            return
+        }
+        switch outcome {
+        case .switched:
+            playingClip = clip
+            isActive = true
+            fullSwapRefused = false
+            fullSwapAttempts = 0
+            ensureClipWatch()
+            // The lyrics editor opened while the switch ran: it needs the vocals.
+            if !suspendedBy.isEmpty { leaveClip(placed: false) }
+        case .failed, .misaligned:
+            // Nothing to say: the whole instrumental is still coming.
+            refusedClips.insert(clip.url)
+        case .abortedBySeek:
+            // The watch tries again while the playhead is inside the piece.
+            break
+        }
+        refreshPhase()
+        // The whole instrumental may have landed meanwhile.
+        reapply()
+    }
+
+    /// Back to the song's own audio from the preview piece, the wish staying on: at a gap between sung words when the
+    /// piece is about to run out (finished before its end), at once after a seek outside it.
+    private func leaveClip(placed: Bool) {
+        guard let engine, let clip = playingClip, !isSwitching else { return }
+        var placement: DualDeckEngine.SwitchPlacement?
+        if placed {
+            let index = gapIndex(forSong: clip.songId)
+            let offsetMs = Int64(lyrics?.store.offsetMs ?? 0)
+            let rate = Double(engine.rate)
+            let clipEndMs = clip.range.endMs
+            placement = { earliest in
+                let earliestMs = Int64((earliest * 1000).rounded())
+                let planned = SingSwitchPlanner.plan(index: index, earliestPlayerMs: earliestMs, offsetMs: offsetMs, rate: rate)
+                let fitted = SingClipPolicy.fallbackPlacement(planned, earliestPlayerMs: earliestMs, clipEndMs: clipEndMs)
+                return (startSeconds: Double(fitted.startPlayerMs) / 1000, fadeSeconds: Double(fitted.fadeMs) / 1000)
+            }
+        }
+        isSwitching = true
+        Task {
+            let outcome = await engine.switchCurrentAudio(to: nil, placement: placement, requireAligned: false)
+            isSwitching = false
+            guard songId == clip.songId else { return }
+            if outcome == .switched {
+                playingClip = nil
+                isActive = false
+            }
+            // Not switched: the watch tries again on its next look.
+            refreshPhase()
+            reapply()
+        }
+    }
+
+    /// The whole instrumental takes over from the preview piece at the same position: instrumental to instrumental, a
+    /// short linear crossfade with no gap to wait for. The piece is thrown away after.
+    private func swapClipToFull() {
+        guard let engine, let clip = playingClip, !isSwitching, !fullSwapRefused,
+              let url = instrumentalURL(clip.songId) else { return }
+        let fadeSeconds = Double(SingClipPolicy.swapFadeMs) / 1000
+        let placement: DualDeckEngine.SwitchPlacement = { earliest in (startSeconds: earliest, fadeSeconds: fadeSeconds) }
+        isSwitching = true
+        Task {
+            let outcome = await engine.switchCurrentAudio(to: url, placement: placement, requireAligned: true)
+            isSwitching = false
+            guard songId == clip.songId else { return }
+            switch outcome {
+            case .switched:
+                playingClip = nil
+                isActive = true
+                stopClipWatch()
+                // The wish is granted.
+                endIntent()
+                cloud?.discardClip(songId: clip.songId)
+            case .misaligned:
+                // The piece plays out and the song comes back; a tap can still switch to the whole one.
+                fullSwapRefused = true
+                say(String(localized: "The instrumental is ready, but it may not line up with this version of the song. Tap Sing to switch anyway."))
+                endIntent()
+            case .failed, .abortedBySeek:
+                fullSwapAttempts += 1
+                if fullSwapAttempts >= 3 { fullSwapRefused = true }
+            }
+            refreshPhase()
+        }
+    }
+
+    /// The watch has something to do: a preview piece plays, or one waits for the playhead to be inside it.
+    private var needsClipWatch: Bool {
+        if playingClip != nil { return true }
+        guard let intent, case .cloud = intent.backend else { return false }
+        return cloud?.clips[intent.songId] != nil
+    }
+
+    @ObservationIgnored private var clipWatchEpoch = 0
+
+    /// Looks at the playhead 4× a second while a preview piece plays or waits (a cheap timebase read, no observation):
+    /// the end of the piece, a seek out of it or back into it.
+    private func ensureClipWatch() {
+        guard clipWatch == nil, playheadMs != nil else { return }
+        clipWatchEpoch &+= 1
+        let epoch = clipWatchEpoch
+        clipWatch = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(250))
+                guard let self, !Task.isCancelled, self.clipWatchEpoch == epoch, self.needsClipWatch else { break }
+                self.clipTick()
+            }
+            if let self, self.clipWatchEpoch == epoch { self.clipWatch = nil }
+        }
+    }
+
+    private func stopClipWatch() {
+        clipWatchEpoch &+= 1
+        clipWatch?.cancel()
+        clipWatch = nil
+    }
+
+    private func clipTick() {
+        guard !isSwitching, let position = playheadMs?() else { return }
+        if let clip = playingClip {
+            switch SingClipPolicy.step(positionMs: position, clipStartMs: clip.range.startMs, clipEndMs: clip.range.endMs,
+                                       songDurationMs: currentSongDurationMs, fullReady: isAvailable && !fullSwapRefused) {
+            case .stay: break
+            case .swapToFull: swapClipToFull()
+            case .leaveAtGap: leaveClip(placed: true)
+            case .leaveNow: leaveClip(placed: false)
+            }
+        } else if let intent, let clip = cloud?.clips[intent.songId] {
+            considerClip(clip)
+        }
+    }
+
+    /// A new song: nothing of the last one's preview piece carries over.
+    private func forgetClip() {
+        playingClip = nil
+        refusedClips = []
+        fullSwapRefused = false
+        fullSwapAttempts = 0
+        stopClipWatch()
+    }
+
     // MARK: Manual switching
 
     /// UI-test demo: the current song has a render (and it plays).
@@ -634,7 +888,10 @@ final class InstrumentalController {
         Task {
             let outcome = await engine.switchCurrentAudio(to: nil, placement: nil, requireAligned: false)
             isSwitching = false
-            if outcome == .switched || self.songId != songId { isActive = false }
+            if outcome == .switched || self.songId != songId {
+                isActive = false
+                playingClip = nil
+            }
             refreshPhase()
         }
     }
@@ -643,6 +900,11 @@ final class InstrumentalController {
     func suspend(owner: String) {
         let wasEmpty = suspendedBy.isEmpty
         suspendedBy.insert(owner)
+        if wasEmpty, playingClip != nil {
+            // The preview piece makes way; the wish stays, and it plays again when the editor closes.
+            leaveClip(placed: false)
+            return
+        }
         if wasEmpty, isActive {
             restoreOnResume = true
             playOriginal()

@@ -62,6 +62,28 @@ extension DualDeckEngine {
     /// switched. Whatever the outcome other than `.switched`, the song plays on and its own plan for what comes next
     /// is made again.
     func switchCurrentAudio(to url: URL?, placement: SwitchPlacement?, requireAligned: Bool = false) async -> SwitchOutcome {
+        await switchAudio(to: .file(url), placement: placement, requireAligned: requireAligned)
+    }
+
+    /// Sing's preview piece: plays `url` — a stretch of the instrumental that starts `offsetSeconds` into the song — in
+    /// place of the current audio, at the same position (the clip's own time is the song's minus the offset). The clip
+    /// goes on the idle deck inside a composition as long as the song (`DeckItemFactory.makeClipItem`), so the placed
+    /// crossfade, seeks, the lyrics clock and the way back work as for a whole instrumental. Outside the clip that item
+    /// is silent: the caller goes back before the clip runs out, or as soon as a seek leaves it.
+    func switchCurrentAudio(toClip url: URL, offsetSeconds: Double, placement: SwitchPlacement?) async -> SwitchOutcome {
+        await switchAudio(to: .clip(url, offsetSeconds: offsetSeconds), placement: placement, requireAligned: false)
+    }
+
+    /// What a switch plays.
+    private enum SwitchSource {
+        /// A whole file for the entry (an instrumental), or its own audio when nil.
+        case file(URL?)
+        /// A preview piece starting this far into the song.
+        case clip(URL, offsetSeconds: Double)
+    }
+
+    private func switchAudio(to source: SwitchSource, placement: SwitchPlacement?, requireAligned: Bool) async
+        -> SwitchOutcome {
         guard let outgoing = activeItem else { return .failed }
         let seekGeneration = outgoing.seekGeneration
         let startedAt = outgoing.positionSeconds
@@ -98,7 +120,13 @@ extension DualDeckEngine {
 
         let incoming: DeckItem
         do {
-            incoming = try await factory.makeItem(for: outgoing.entry, overrideURL: url)
+            switch source {
+            case .file(let url):
+                incoming = try await factory.makeItem(for: outgoing.entry, overrideURL: url)
+            case .clip(let url, let offsetSeconds):
+                incoming = try await factory.makeClipItem(for: outgoing.entry, clipURL: url, offsetSeconds: offsetSeconds,
+                                                          songSeconds: outgoing.durationSeconds)
+            }
         } catch {
             return leave(.failed)
         }

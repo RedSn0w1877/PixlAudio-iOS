@@ -297,6 +297,18 @@ public enum StemFiles {
         return nil
     }
 
+    /// Sing's preview piece (iOS Cloud Studio's clip job): `<songId>_clip_<startMs>.m4a` (or `.flac`), kept in the
+    /// caches folder for a few minutes at most and never next to the instrumentals above: no "has an instrumental" check
+    /// (`candidates`, `songId(fileName:)`) ever sees one.
+    public static let clipInfix = "_clip_"
+
+    public static func clipFileName(songId: String, startMs: Int64, flac: Bool) -> String {
+        safeName(songId) + clipInfix + String(max(startMs, 0)) + (flac ? ".flac" : ".m4a")
+    }
+
+    /// The prefix every clip file of a song starts with (to remove them all).
+    public static func clipPrefix(songId: String) -> String { safeName(songId) + clipInfix }
+
     /// Song ids as file names (iOS ids contain ':' and '/', e.g. `f:<root>/<path>`): anything outside
     /// `[A-Za-z0-9._-]` becomes `_` followed by its scalar value in hex, so the mapping stays one-to-one.
     public static func safeName(_ songId: String) -> String {

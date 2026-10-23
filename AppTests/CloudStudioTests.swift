@@ -883,6 +883,18 @@ final class FakeCloudHost: CloudStudioHost {
         try? FileManager.default.removeItem(at: staged)
     }
 
+    /// Sing preview pieces "kept" (song, start), and the songs whose pieces were removed ("*" for all).
+    var installedClips: [(songId: String, startMs: Int64)] = []
+    var removedClips: [String] = []
+
+    func installClip(from staged: URL, songId: String, startMs: Int64, flac: Bool) throws -> URL {
+        installedClips.append((songId, startMs))
+        try? FileManager.default.removeItem(at: staged)
+        return URL(fileURLWithPath: "/clips/\(songId)_clip_\(startMs).m4a")
+    }
+
+    func removeClips(songId: String?) { removedClips.append(songId ?? "*") }
+
     func saveLyrics(_ doc: LyricsDoc, for song: Song, replaceUserSynced: Bool) async -> CloudLyricsSaveOutcome {
         if saveOutcome == .saved { savedLyrics.append((song.id, doc)) }
         return saveOutcome
@@ -956,6 +968,26 @@ nonisolated final class FakeCloudPreparer: CloudAudioPreparing, @unchecked Senda
     func prepare(source: URL, jobKey: String, forceDecode: Bool, paced: Bool) async throws -> CloudPreparedAudio {
         lock.withLock { storedPaced[jobKey] = paced }
         return try await prepare(source: source, jobKey: jobKey, forceDecode: forceDecode)
+    }
+
+    private var storedClips: [String: CloudClipRange] = [:]
+
+    /// The stretch each Sing preview piece was cut from.
+    var clipsByJob: [String: CloudClipRange] { lock.withLock { storedClips } }
+
+    /// A clip "decodes" to exactly its own frames (`clipFrames(_:)`), so the import's sample check compares against them.
+    func prepare(source: URL, jobKey: String, forceDecode: Bool, paced: Bool,
+                 clip: CloudClipRange?) async throws -> CloudPreparedAudio {
+        let whole = try await prepare(source: source, jobKey: jobKey, forceDecode: forceDecode, paced: paced)
+        guard let clip else { return whole }
+        lock.withLock { storedClips[jobKey] = clip }
+        return CloudPreparedAudio(fileURL: whole.fileURL, ext: "flac", bytes: whole.bytes, sha256: whole.sha256,
+                                  durationMs: clip.durationMs, frames: Self.clipFrames(clip), sampleRate: 44_100,
+                                  passthrough: false)
+    }
+
+    static func clipFrames(_ clip: CloudClipRange) -> Int64 {
+        CloudSingClip.frame(ms: clip.endMs) - CloudSingClip.frame(ms: clip.startMs)
     }
 
     var prepared: [String] { lock.withLock { storedPrepared } }

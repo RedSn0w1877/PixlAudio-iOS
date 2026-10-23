@@ -38,8 +38,22 @@ nonisolated struct CloudBatchPreview: Identifiable, Equatable, Sendable {
     let title: String
     /// Who is sending them: a tap on "Process in cloud", a tap on Sing, or songs prepared ahead.
     let origin: CloudJobOrigin
+    /// A Sing tap's preview piece: this stretch of the (one) song goes up as a job of its own, ahead of the whole song
+    /// (`CloudSingClip`). Never set for "Process in cloud" or songs prepared ahead.
+    var singClip: CloudClipRange?
 
     var isEmpty: Bool { plans.isEmpty }
+}
+
+/// A Sing preview piece that has landed (`CloudStudio.clips`): a minute of the song's instrumental, kept in the caches
+/// folder and played at its place in the song until the whole instrumental is here.
+nonisolated struct SingClip: Equatable, Sendable {
+    let songId: String
+    /// The clip job it came from.
+    let jobKey: String
+    let url: URL
+    /// Its place in the song.
+    let range: CloudClipRange
 }
 
 /// What starting a batch straight away did (`CloudStudio.startNow`); the callers show `message(useCellular:)` as a toast.
@@ -85,6 +99,9 @@ typealias SingCloudAvailability = CloudStudio.SingCloudAvailability
 ///   safe mode and stay inside their own monthly budget.
 /// - A priority job (Sing, or one song sent by hand) goes to the GPU first: the jobs RunPod has not started step aside
 ///   and follow it (`CloudPriorityLane`).
+/// - A Sing tap also sends a preview piece (`CloudSingClip`): a minute of the song around the playhead, first in the
+///   same burst, its result kept in the caches folder (`clips`) for the Sing controller to play until the whole
+///   instrumental lands. It never has a row, a notification or a retry of its own.
 /// - Foreground: uploads start at once; `/run` goes out when the batch's uploads are done (or 2 minutes after the
 ///   first); `/status` is asked at most every 15 s and only while jobs are at RunPod (no timer while idle).
 /// - Background: transfers continue in the system's daemon; BGAppRefresh and URL-session wakes run `pump()` once
@@ -199,6 +216,8 @@ final class CloudStudio {
     static let maxConcurrentPreparations = 2
     /// Priority jobs (Sing, one song sent by hand) prepare in a place of their own, on top of the ordinary two.
     static let reservedPrioritySlots = 1
+    /// …and Sing's preview piece in one more, beside its song's whole job.
+    static let reservedClipSlots = 1
 
     // MARK: Observable state
 
@@ -214,6 +233,9 @@ final class CloudStudio {
     private(set) var selftestCheck: CloudCheck?
     private(set) var isTesting = false
     private(set) var isPreviewing = false
+    /// Sing's preview pieces that have landed, by song (the Sing controller plays them until the whole instrumental is
+    /// here, and discards them).
+    private(set) var clips: [String: SingClip] = [:]
     /// UI tests: demo jobs, nothing runs.
     let isDemo: Bool
     /// Settings › Sing › "Prepare songs ahead in the cloud": picks the songs and sends them with the auto origin
@@ -241,6 +263,8 @@ final class CloudStudio {
     @ObservationIgnored private var isActive = false
     @ObservationIgnored private var lastListAtMs: Int64 = 0
     @ObservationIgnored private var lastHealthAtMs: Int64 = 0
+    /// Preview pieces an earlier launch left on their way: stopped by the first pass that can reach RunPod.
+    @ObservationIgnored private var staleClipKeys: [String] = []
     /// Set while a background wake runs: nothing new (a transfer, a submission, an import) starts in its last seconds.
     @ObservationIgnored private var backgroundWindow: BackgroundWorkWindow?
     /// iOS took a background pass's time back: nothing starts until the next wake or the app is opened.
@@ -277,18 +301,27 @@ final class CloudStudio {
 
     func job(_ jobKey: String) -> CloudJobRecord? { jobs.first { $0.jobKey == jobKey } }
 
-    /// The latest job for a song, whatever its state (the Sing button follows its progress).
-    func job(forSong songId: String) -> CloudJobRecord? { jobs.last { $0.songId == songId } }
+    /// The latest whole-song job for a song, whatever its state (the Sing button follows its progress). A Sing's preview
+    /// piece is never it.
+    func job(forSong songId: String) -> CloudJobRecord? { jobs.last { $0.songId == songId && !$0.isClip } }
+
+    /// The song's preview piece on its way (the Sing button follows it until it plays).
+    func pendingClip(forSong songId: String) -> CloudJobRecord? {
+        jobs.last { $0.songId == songId && $0.isClip && $0.state.isPending }
+    }
 
     /// The song has a job that isn't finished (the automatic studio skips it; the song sheet says so).
     func hasPendingJob(songId: String) -> Bool { jobs.contains { $0.songId == songId && $0.state.isPending } }
 
     var pendingSongIds: Set<String> { Set(jobs.filter { $0.state.isPending }.map(\.songId)) }
 
-    /// Jobs in flight / done / needing the person, for the queue screen and Home's job line.
-    var activeJobs: [CloudJobRecord] { jobs.filter { $0.state.isPending } }
-    var finishedJobs: [CloudJobRecord] { jobs.filter { $0.state == .imported }.reversed() }
-    var attentionJobs: [CloudJobRecord] { jobs.filter { $0.state == .failed || $0.state == .cancelled || $0.state == .expired } }
+    /// Jobs in flight / done / needing the person, for the queue screen and Home's job line. A Sing's preview piece is
+    /// part of its song's job there, not a row of its own.
+    var activeJobs: [CloudJobRecord] { jobs.filter { $0.state.isPending && !$0.isClip } }
+    var finishedJobs: [CloudJobRecord] { jobs.filter { $0.state == .imported && !$0.isClip }.reversed() }
+    var attentionJobs: [CloudJobRecord] {
+        jobs.filter { ($0.state == .failed || $0.state == .cancelled || $0.state == .expired) && !$0.isClip }
+    }
 
     /// "Cloud: 12 waiting, 1 processing" (nil when nothing is pending).
     var summaryLine: String? {
@@ -476,11 +509,11 @@ final class CloudStudio {
     /// sheet gated still holds — the consent switch on, something to send, inside this month's cap — and the outcome
     /// says which one stopped it, for the caller's toast. `origin` is who is sending (`.sing` for a tap on Sing).
     func startNow(songs: [Song], title: String, onlyMissing: CloudTask? = nil,
-                  origin: CloudJobOrigin = .manual) async -> CloudStartOutcome {
+                  origin: CloudJobOrigin = .manual, singClip: CloudClipRange? = nil) async -> CloudStartOutcome {
         // The consent defaults to on only while the built-in keys look available: know whether they open first.
         await settings.loadBuiltInKeys()
         guard settings.isEnabled else { return .off }
-        let batch = await preview(songs: songs, title: title, onlyMissing: onlyMissing, origin: origin)
+        var batch = await preview(songs: songs, title: title, onlyMissing: onlyMissing, origin: origin)
         guard !batch.isEmpty else {
             guard let reason = batch.skipped.first?.reason else { return .nothingToDo("Nothing to process") }
             return .nothingToDo("Nothing to process — \(reason.label)")
@@ -490,11 +523,26 @@ final class CloudStudio {
             return .nothingToDo("Nothing to process — \(CloudSkipReason.alreadyDone.label)")
         }
         guard batch.estimate.fitsCap else { return .overCap }
+        // A Sing tap's preview piece is one more (short) job in the month's budget: without room for it the song goes as
+        // a whole only.
+        if origin == .sing, let singClip, batch.plans.count == 1, let plan = batch.plans.first,
+           plan.tasks.contains(.instrumental),
+           batch.estimate.costMicroUSD + clipEstimateMicroUSD(singClip, isStreamed: plan.isStreamed)
+               <= batch.estimate.remainingMicroUSD {
+            batch.singClip = singClip
+        }
         let known = Set(jobs.map(\.jobKey))
         await send(batch)
-        // `send` skips a song that got a pending job meanwhile: count what was really queued.
-        let started = jobs.filter { !known.contains($0.jobKey) }.count
+        // `send` skips a song that got a pending job meanwhile: count what was really queued (songs, not preview pieces).
+        let started = jobs.filter { !known.contains($0.jobKey) && !$0.isClip }.count
         return started > 0 ? .started(started) : .nothingToDo("Nothing to process — \(CloudSkipReason.pendingJob.label)")
+    }
+
+    /// What a Sing preview piece is estimated to cost (instrumental only, standard quality, its own length).
+    private func clipEstimateMicroUSD(_ clip: CloudClipRange, isStreamed: Bool) -> Int64 {
+        let plan = CloudSongPlan(songId: "", tasks: [.instrumental], lyricsMode: nil, isStreamed: isStreamed,
+                                 durationMs: clip.durationMs)
+        return CloudCost.estimatedSeconds(plan, quality: .standard) * settings.effectivePricePerSecondMicroUSD
     }
 
     /// One of the queue's Add rows (developer mode), sent at once.
@@ -533,7 +581,7 @@ final class CloudStudio {
         let readiness = await cloudReadiness()
         guard readiness == .usable else { return readiness }
         await loadIfNeeded()
-        if let pending = jobs.last(where: { $0.songId == song.id && $0.state.isPending }) {
+        if let pending = jobs.last(where: { $0.songId == song.id && $0.state.isPending && !$0.isClip }) {
             // A job that only makes lyrics can't give this tap its instrumental: the phone does that.
             return pending.tasks.contains(.instrumental) ? .alreadyPending(jobKey: pending.jobKey) : .nothingToDo
         }
@@ -554,25 +602,43 @@ final class CloudStudio {
 
     /// A tap on Sing: the instrumental of `song` is made in the cloud, ahead of everything else in the queue. A song that
     /// already has a job on its way joins it (an auto job becomes the person's), instead of a second one.
-    func startSing(song: Song) async -> CloudStartOutcome {
+    ///
+    /// `playheadMs` (where the song is playing) adds Sing's preview piece (`CloudSingClip`): about a minute around the
+    /// playhead goes up as a short job of its own, first in the same burst, so the vocals can go off long before the
+    /// whole song is done. None for a short song, near its end, or when the month's budget has no room for it.
+    func startSing(song: Song, playheadMs: Int64? = nil) async -> CloudStartOutcome {
         await settings.loadBuiltInKeys()
         guard settings.isEnabled else { return .off }
         await loadIfNeeded()
-        if let pending = jobs.last(where: { $0.songId == song.id && $0.state.isPending }) {
+        var clip = playheadMs.flatMap { CloudSingClip.range(playheadMs: $0, songDurationMs: song.duration) }
+        // A piece that already landed and still covers the playhead serves this tap too.
+        if let playheadMs, let landed = clips[song.id]?.range, landed.contains(playheadMs),
+           landed.endMs - playheadMs > CloudSingClip.minimumRemainingMs / 4 {
+            clip = nil
+        }
+        if let pending = jobs.last(where: { $0.songId == song.id && $0.state.isPending && !$0.isClip }) {
             guard pending.tasks.contains(.instrumental) else {
                 return .nothingToDo("Nothing to process — \(CloudSkipReason.pendingJob.label)")
             }
-            joinWithSing(pending.jobKey)
+            joinWithSing(pending.jobKey, song: song, clip: clip)
             return .started(1)
         }
-        return await startNow(songs: [song], title: "Sing", origin: .sing)
+        return await startNow(songs: [song], title: "Sing", origin: .sing, singClip: clip)
     }
 
-    /// A Sing tap on a song whose job is already on its way: that job is a Sing job from now on (prepared and sent first).
-    private func joinWithSing(_ jobKey: String) {
+    /// A Sing tap on a song whose job is already on its way: that job is a Sing job from now on (prepared and sent first),
+    /// and — while the worker has not started it — `clip` goes ahead of it as a preview piece.
+    private func joinWithSing(_ jobKey: String, song: Song? = nil, clip: CloudClipRange? = nil) {
         guard let record = job(jobKey), record.state.isPending else { return }
         // The person asked: safe mode waits for exactly this.
         HeavyWorkGate.shared.userStartedHeavyWork()
+        if let song, let clip, CloudSingClip.mayAddClip(to: record, jobs: jobs), clipFitsBudget(clip, record) {
+            let now = dependencies.nowMs()
+            jobs.append(makeClipRecord(song: song, clip: clip, batchId: record.batchId, isStreamed: record.isStreamed,
+                                       videoId: record.videoId, nowMs: now))
+            persist()
+            dependencies.background?.beginPreparing(count: 1)
+        }
         if record.effectiveOrigin != .sing {
             let now = dependencies.nowMs()
             update(jobKey) { r in
@@ -590,6 +656,42 @@ final class CloudStudio {
             }
         }
         requestPump()
+    }
+
+    /// A Sing preview piece of `song` (instrumental only, standard quality, origin sing): to the worker a short song,
+    /// to the phone a job with no row of its own whose result is played and thrown away. It comes back as FLAC: no
+    /// encoder delay, so it lines up with the song to the sample (it is crossfaded against the original, and has no
+    /// second chance to be asked for again), and a minute of it is only a few MB.
+    private func makeClipRecord(song: Song, clip: CloudClipRange, batchId: String, isStreamed: Bool, videoId: String?,
+                                nowMs: Int64) -> CloudJobRecord {
+        var record = CloudJobRecord(jobKey: CloudKeys.jobKey(uuid: dependencies.newJobKey()), songId: song.id,
+                                    title: song.title, artist: song.displayArtist, batchId: batchId,
+                                    tasks: [.instrumental], lyricsMode: nil, quality: .standard, createdAtMs: nowMs,
+                                    isStreamed: isStreamed, videoId: videoId, outputCodec: .flac)
+        record.songDurationMs = song.duration
+        record.clipStartMs = clip.startMs
+        record.clipDurationMs = clip.durationMs
+        record.origin = .sing
+        record.priorityAtMs = nowMs
+        return record
+    }
+
+    /// The month's budget has room for a preview piece next to what is already committed.
+    private func clipFitsBudget(_ clip: CloudClipRange, _ record: CloudJobRecord) -> Bool {
+        CloudBudget.allows(estimateMicroUSD: clipEstimateMicroUSD(clip, isStreamed: record.isStreamed),
+                           capMicroUSD: settings.effectiveMonthlyCapMicroUSD, spentMicroUSD: committedThisMonthMicroUSD)
+    }
+
+    /// The Sing controller is done with a song's preview piece (the whole instrumental plays, the song changed, the
+    /// clip came too late): its file goes, and a piece still on its way is stopped (nothing would play it).
+    func discardClip(songId: String) {
+        clips[songId] = nil
+        dependencies.host.removeClips(songId: songId)
+        let pending = jobs.filter { $0.isClip && $0.songId == songId && $0.state.isPending }.map(\.jobKey)
+        guard !pending.isEmpty else { return }
+        Task {
+            for key in pending { await self.cancel(key) }
+        }
     }
 
     /// "Prepare songs ahead": the first `limit` of `songs` the cloud can still do something for, sent as one batch of
@@ -769,6 +871,12 @@ final class CloudStudio {
         let byId = Dictionary(preview.songs.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         for plan in preview.plans {
             guard let song = byId[plan.songId], !hasPendingJob(songId: song.id) else { continue }
+            // A Sing tap's preview piece goes in first, in the same batch: it is prepared, uploaded and sent ahead of the
+            // whole song, which follows it in the same burst.
+            if origin == .sing, let clip = preview.singClip, preview.plans.count == 1, plan.tasks.contains(.instrumental) {
+                jobs.append(makeClipRecord(song: song, clip: clip, batchId: preview.id, isStreamed: plan.isStreamed,
+                                           videoId: YouTubeSongIdentity.videoId(for: song), nowMs: now))
+            }
             var record = CloudJobRecord(jobKey: CloudKeys.jobKey(uuid: dependencies.newJobKey()), songId: song.id,
                                         title: song.title, artist: song.displayArtist, batchId: preview.id,
                                         tasks: plan.tasks, lyricsMode: plan.lyricsMode,
@@ -821,6 +929,12 @@ final class CloudStudio {
         cleanUpLocal(jobKey)
         if let clients { await deleteRemote(keys, clients) }
         noteAutoJobEnded(record)
+        // A song's preview piece only exists for its whole job: stopping the song stops the piece.
+        if !record.isClip {
+            for clip in jobs where clip.isClip && clip.songId == record.songId && clip.state.isPending {
+                await cancel(clip.jobKey)
+            }
+        }
     }
 
     /// Starts a failed, cancelled or expired job again from the upload.
@@ -1011,6 +1125,12 @@ final class CloudStudio {
         guard !jobs.isEmpty || transfersStorage != nil else { return }
         _ = connectTransfers()
         await reconcileTransfers()
+        // Preview pieces an earlier launch left on their way have nothing to play them any more.
+        if !staleClipKeys.isEmpty {
+            let stale = staleClipKeys
+            staleClipKeys = []
+            for key in stale { await cancel(key) }
+        }
         startPreparations()
         restartStalledUploads(clients)
         // A priority job that is ready to go gets the GPU ahead of the jobs RunPod holds but has not started.
@@ -1065,6 +1185,7 @@ final class CloudStudio {
         // A job a dead process left "preparing" goes back to the queue before anything shows it as running.
         var stored = loaded
         let recovered = CloudStartupRecovery.recover(&stored, nowMs: dependencies.nowMs())
+        staleClipKeys = CloudStartupRecovery.staleClips(stored)
         // Jobs added while the file was being read (none in practice) stay after the stored ones.
         jobs = stored + jobs.filter { added in !stored.contains { $0.jobKey == added.jobKey } }
         isLoaded = true
@@ -1199,14 +1320,20 @@ final class CloudStudio {
         let due = jobs.filter { $0.state == .queued && $0.isDue(nowMs: now) }
         // Songs prepared ahead wait for a phone that is ready for them (Wi-Fi, charge, cool…); nothing starts otherwise.
         let autoWaits = due.contains { $0.effectiveOrigin == .auto } && autoBlockedReason != nil
+        // A Sing's preview piece decodes a minute of the song beside its whole job (one place of its own): the two go up
+        // together instead of one after the other.
+        let clipKeys = Set(jobs.filter(\.isClip).map(\.jobKey))
         for record in CloudPriorityLane.ordered(due, priorityKeys: priorityKeys) {
             guard preparing[record.jobKey] == nil else { continue }
             let isPriority = priorityKeys.contains(record.jobKey)
-            let priorityBusy = preparing.keys.filter { priorityKeys.contains($0) }.count
-            if isPriority {
+            let clipBusy = preparing.keys.filter { clipKeys.contains($0) }.count
+            let priorityBusy = preparing.keys.filter { priorityKeys.contains($0) && !clipKeys.contains($0) }.count
+            if record.isClip {
+                guard clipBusy < Self.reservedClipSlots else { continue }
+            } else if isPriority {
                 guard priorityBusy < Self.reservedPrioritySlots else { continue }
             } else {
-                guard preparing.count - priorityBusy < limit else { break }
+                guard preparing.count - priorityBusy - clipBusy < limit else { break }
                 if record.effectiveOrigin == .auto, autoWaits { continue }
             }
             let jobKey = record.jobKey
@@ -1243,8 +1370,10 @@ final class CloudStudio {
             if record.isStreamed { identity = await dependencies.host.streamIdentity(for: song) }
             // A streamed song's download (YouTube's DASH AAC) always goes up decoded as FLAC (design §7.3): the worker
             // then sees exactly the samples this phone plays, whatever priming the download's container declares.
+            // A Sing preview piece is only its stretch of the song, cut out of the same decode the whole job uses.
             let prepared = try await dependencies.preparer.prepare(source: source, jobKey: jobKey,
-                                                                   forceDecode: record.isStreamed, paced: !isPriority)
+                                                                   forceDecode: record.isStreamed || record.isClip,
+                                                                   paced: !isPriority, clip: record.clipRange)
             guard job(jobKey)?.state == .preparing else {
                 dependencies.preparer.removeUpload(jobKey: jobKey)
                 return
@@ -1267,6 +1396,8 @@ final class CloudStudio {
                 r.sampleRate = prepared.sampleRate
                 if let identity { r.videoId = identity }
                 r.lowQualitySource = r.isStreamed && prepared.lowQuality
+                // A clip that came out shorter than asked (the song ends sooner than its tags said) is as long as it is.
+                if let asked = r.clipDurationMs { r.clipDurationMs = min(asked, prepared.durationMs) }
                 r.apply(.prepared, nowMs: now)
             }
             persist()
@@ -1403,7 +1534,9 @@ final class CloudStudio {
         let priorityKeys = CloudPriorityLane.priorityJobKeys(jobs)
         guard !priorityKeys.isEmpty,
               let priority = CloudPriorityLane.readyPriorityJob(jobs, priorityKeys: priorityKeys, nowMs: now) else { return }
-        let candidates = CloudPriorityLane.newestFirst(CloudPriorityLane.pausable(jobs, priorityKeys: priorityKeys))
+        // A Sing preview piece also has its own song's whole job step aside while that one only waits in RunPod's queue.
+        let candidates = CloudPriorityLane.newestFirst(CloudPriorityLane.pausable(jobs, priorityKeys: priorityKeys,
+                                                                                  for: priority))
         guard !candidates.isEmpty else { return }
         // The month's cap would hold the priority job back anyway: cancelling the others for it would cost them their place.
         guard priorityFitsCap(priority, steppingAside: candidates) else { return }
@@ -1599,6 +1732,7 @@ final class CloudStudio {
         // that stepped aside for it are ONE burst, so only the final one of them asks the worker to stop.
         var burst = CloudSubmitBurst<PendingSubmit>()
         var outOfTime = false
+        var stoppedAtCap = false
         // Auto jobs accepted in this pass but not yet in the ledger (a job is only reserved once RunPod has taken it).
         var passAutoCount = 0
         var passAutoMicroUSD: Int64 = 0
@@ -1623,6 +1757,7 @@ final class CloudStudio {
             guard CloudBudget.allows(estimateMicroUSD: estimate, capMicroUSD: settings.effectiveMonthlyCapMicroUSD,
                                      spentMicroUSD: committed) else {
                 notice = .capReached
+                stoppedAtCap = true
                 break  // the job held so far still goes out, as the burst's last
             }
             if notice == .capReached { notice = nil }
@@ -1692,7 +1827,13 @@ final class CloudStudio {
         // The job held for the next one is not the batch's last when time ran out: it stays "uploaded" for the next wake,
         // so the worker is not told to stop itself while more jobs are still to come.
         if let last = burst.end(), !outOfTime {
-            await submit(last, lastInBatch: true, clients)
+            // A Sing preview piece that would end the burst while its song's whole job is still being prepared or
+            // uploaded goes out as not the last: the whole job follows within seconds as the last of the same burst, so
+            // the worker stays up for it instead of stopping after the piece and starting cold again
+            // (`CloudSingClip.fullJobFollows`). At the cap nothing follows: the piece is the last.
+            let followed = !stoppedAtCap
+                && (job(last.jobKey).map { CloudSingClip.fullJobFollows($0, jobs: jobs, nowMs: now) } ?? false)
+            await submit(last, lastInBatch: !followed, clients)
         }
     }
 
@@ -2099,12 +2240,20 @@ final class CloudStudio {
                 try? FileManager.default.removeItem(at: staged)
                 return
             }
+            if record.isClip {
+                await importClip(jobKey, record: record, staged: staged)
+                return
+            }
             try dependencies.host.installInstrumental(from: staged, songId: record.songId,
                                                       flac: record.outputCodec == .flac)
             update(jobKey) { $0.importedInstrumental = true }
             persist()
             dependencies.host.instrumentalImported(songId: record.songId)
             if let clients = currentClients() { await finishIfDone(jobKey, clients) }
+            // The whole instrumental is here: a preview piece still on its way has nothing left to do.
+            for clip in jobs where clip.isClip && clip.songId == record.songId && clip.state.isPending {
+                await cancel(clip.jobKey)
+            }
         } catch is CancellationError {
             try? FileManager.default.removeItem(at: staged)
         } catch {
@@ -2113,6 +2262,39 @@ final class CloudStudio {
             let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             fail(jobKey, "Import: \(CloudRedaction.redact(message))", code: nil, retryable: true)
         }
+    }
+
+    /// A Sing preview piece that passed the checks (its sample count against the clip's own decode): it goes to the
+    /// caches folder — never `Stems/`, it is not the song's instrumental — the Sing controller finds it in `clips`, and
+    /// the job ends. A piece for a song whose whole instrumental is already here is simply dropped.
+    private func importClip(_ jobKey: String, record: CloudJobRecord, staged: URL) async {
+        guard let range = record.clipRange else {
+            try? FileManager.default.removeItem(at: staged)
+            fail(jobKey, "The preview piece lost its place in the song.", code: nil, retryable: false)
+            return
+        }
+        let wholeIsHere = await dependencies.host.hasInstrumental(songId: record.songId)
+        guard job(jobKey)?.state == .downloading else {
+            try? FileManager.default.removeItem(at: staged)
+            return
+        }
+        if wholeIsHere {
+            try? FileManager.default.removeItem(at: staged)
+        } else {
+            do {
+                let url = try dependencies.host.installClip(from: staged, songId: record.songId, startMs: range.startMs,
+                                                            flac: record.outputCodec == .flac)
+                clips[record.songId] = SingClip(songId: record.songId, jobKey: jobKey, url: url, range: range)
+            } catch {
+                try? FileManager.default.removeItem(at: staged)
+                let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                fail(jobKey, "Import: \(CloudRedaction.redact(message))", code: nil, retryable: false)
+                return
+            }
+        }
+        update(jobKey) { $0.importedInstrumental = true }
+        persist()
+        if let clients = currentClients() { await finishIfDone(jobKey, clients) }
     }
 
     /// The result's length equals the phone's own decode of the uploaded audio within ±1 AAC frame — both the
@@ -2135,7 +2317,8 @@ final class CloudStudio {
         guard let record = job(jobKey) else { return }
         let keys = CloudJobBuilder.objectKeys(for: record)
         let clients = currentClients()
-        if record.outputCodec == .aac && !record.flacRedone {
+        // A preview piece is not worth a second upload: by the time it came back the minute would have gone by.
+        if record.outputCodec == .aac && !record.flacRedone && !record.isClip {
             let now = dependencies.nowMs()
             update(jobKey) { r in
                 r.flacRedone = true
@@ -2175,6 +2358,9 @@ final class CloudStudio {
     /// Records a failure: retryable ones wait on the backoff ladder; the rest (and exhausted ones) stop as Failed.
     private func fail(_ jobKey: String, _ message: String, code: String?, retryable: Bool) {
         let now = dependencies.nowMs()
+        // A Sing preview piece never waits out a retry (the first step of the ladder is a minute, by which time its
+        // minute of the song has gone by): it stops, and the whole job carries on without it.
+        let retryable = retryable && job(jobKey)?.isClip != true
         update(jobKey) { $0.recordFailure(message, code: code, retryable: retryable, nowMs: now) }
         if job(jobKey)?.state == .failed {
             if let record = job(jobKey) {
