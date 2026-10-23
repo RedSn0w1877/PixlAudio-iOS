@@ -4,7 +4,9 @@ import SwiftUI
 /// Android `InstrumentalRenderAction` (lyrics screen, no lyrics): the waveform icon, "No lyrics for this song yet",
 /// the explanation, then one primary button — Render instrumental → Rendering instrumental… (with the job's detail
 /// and a bar) → Play instrumental → Play original — and "Find or import lyrics". On the lyrics screen's artwork:
-/// a 28 pt clear-glass card; the buttons are fills on it (the primary one `primaryFixedDim`, Android `Button`).
+/// a 28 pt clear-glass card; the buttons are fills on it (the primary one `primaryFixedDim`, Android `Button`). The
+/// button asks `InstrumentalController.requestSing` like the Sing segment does, so the cloud makes the instrumental
+/// when it can (the bar then shows the cloud job's step) and this phone otherwise.
 struct InstrumentalRenderAction: View {
     let song: Song
     let onFindLyrics: () -> Void
@@ -16,7 +18,9 @@ struct InstrumentalRenderAction: View {
         let studio = env.tais.studio
         let instrumental = env.tais.instrumental
         let job = studio.state(.instrumental, songId: song.id)
-        let isRunning = job?.isActive == true
+        let inCloud = instrumental.singPhase.isCloud
+        let cloudStatus = inCloud ? instrumental.cloudStatus : nil
+        let isRunning = job?.isActive == true || inCloud
         let ready = instrumental.isAvailable
         VStack(alignment: .leading, spacing: 16) {
             Image(systemName: "waveform")
@@ -32,14 +36,15 @@ struct InstrumentalRenderAction: View {
                 .fixedSize(horizontal: false, vertical: true)
             if isRunning {
                 // Android's indicator in the lyrics sheet takes the song's scheme (the chrome accent here).
-                TaisProgressBar(fraction: Double(job?.percent ?? 0) / 100,
+                TaisProgressBar(fraction: cloudStatus?.weight ?? Double(job?.percent ?? 0) / 100,
                                 colors: (theme.primaryFixedDim, theme.primaryFixedDim.opacity(0.26)))
-                Text(job?.detail ?? "Instrumental queued…")
+                Text(inCloud ? cloudStatus?.text ?? "Preparing in the cloud…" : job?.detail ?? "Instrumental queued…")
                     .pixlFont(.bodyMedium)
                     .foregroundStyle(.white.opacity(0.85))
                     .accessibilityIdentifier("lyrics.instrumental.detail")
                 Button {
-                    studio.cancel(.instrumental, songId: song.id)
+                    // The cloud's job keeps going (its file is kept for next time); only the waiting stops.
+                    if inCloud { instrumental.cancelSing() } else { studio.cancel(.instrumental, songId: song.id) }
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "xmark.circle")
@@ -59,15 +64,14 @@ struct InstrumentalRenderAction: View {
             Button {
                 if instrumental.isActive {
                     instrumental.playOriginal()
-                } else if ready {
-                    instrumental.playInstrumental()
                 } else {
-                    studio.start(.instrumental, song: song)
+                    Task { await instrumental.requestSing(for: song) }
                 }
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "waveform")
-                    Text(title(isRunning: isRunning, ready: ready, active: instrumental.isActive)).pixlFont(.labelLarge)
+                    Text(title(isRunning: isRunning, inCloud: inCloud, ready: ready, active: instrumental.isActive))
+                        .pixlFont(.labelLarge)
                 }
                 .foregroundStyle(theme.onPrimaryFixed)
                 .frame(maxWidth: .infinity, minHeight: 56)
@@ -94,10 +98,10 @@ struct InstrumentalRenderAction: View {
         .animation(PixlMotion.state, value: ready)
     }
 
-    private func title(isRunning: Bool, ready: Bool, active: Bool) -> String {
+    private func title(isRunning: Bool, inCloud: Bool, ready: Bool, active: Bool) -> String {
         if active { return "Play original" }
         if ready { return "Play instrumental" }
-        if isRunning { return "Rendering instrumental…" }
+        if isRunning { return inCloud ? "Preparing instrumental…" : "Rendering instrumental…" }
         return "Render instrumental"
     }
 }

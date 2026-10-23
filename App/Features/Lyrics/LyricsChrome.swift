@@ -487,12 +487,15 @@ private struct LyricsTranslateSegment: View {
     }
 }
 
-/// Sing: the vocals off and on through the song's studio instrumental (the MDX-Net render and its in-sync 700 ms
-/// crossfade, `InstrumentalController`; owner, 2026-10-07: replaces Android's floating instrumental toggle). Active
-/// while the instrumental plays ("Vocals off"). Without a render a tap starts one ("Removing vocals 48 %", the
-/// progress filling the segment) and switches to it when it lands, if the song is still playing. Off while the
-/// player switches and while Spotify Connect plays (nothing would be heard). Per song: a new song starts with its
-/// vocals. Reads the studio and the controller itself, so progress redraws only this segment.
+/// Sing: the vocals off and on through the song's studio instrumental (the in-sync crossfade of
+/// `InstrumentalController`; owner, 2026-10-07: replaces Android's floating instrumental toggle). Active while the
+/// instrumental plays ("Vocals off"). Without one a tap asks for it: the cloud makes it when it can take the song
+/// ("Preparing…", the job's progress filling the segment; "Waiting for Wi-Fi" while an upload cannot start), else this
+/// phone does ("Removing vocals 48 %"). The controller keeps that wish, so the switch happens at the next gap between
+/// sung words when the instrumental lands, even after this screen is closed; a tap while it waits stops the waiting.
+/// Off while the player switches and while Spotify Connect plays (nothing would be heard). Per song: a new song starts
+/// with its vocals. The accessibility label stays "Sing" (the UI tests look for it); the state is its value. Reads the
+/// studio and the controller itself, so progress redraws only this segment.
 private struct LyricsSingSegment: View {
     let song: Song?
     let chrome: LyricsChromeColors
@@ -502,71 +505,31 @@ private struct LyricsSingSegment: View {
 
     @Environment(AppEnvironment.self) private var env
     @Environment(PlaybackStore.self) private var playback
-    /// The song a tap started a render for: it switches to the instrumental when the render lands.
-    @State private var pendingSongId: String?
     /// Taps, for the haptic: it answers the finger, not a new song resetting the instrumental.
     @State private var taps = 0
 
     var body: some View {
         let instrumental = env.tais.instrumental
         let job = song.flatMap { env.tais.studio.state(.instrumental, songId: $0.id) }
+        // This phone's render counts also when the automatic studio started it.
         let rendering = job?.isActive == true
-        let determinate = rendering && job?.indeterminate == false
-        let percent = job?.percent ?? 0
+        let renderPercent: Int? = rendering && job?.indeterminate == false ? job?.percent : nil
         let active = instrumental.isActive
         let remote = playback.remoteOutputName != nil
-        let title: LocalizedStringKey = determinate ? "Removing vocals \(percent) %"
-            : rendering ? "Removing vocals…" : active ? "Vocals off" : "Sing"
-        let value: LocalizedStringKey = determinate ? "Removing vocals \(percent) %"
-            : rendering ? "Removing vocals" : active ? "Vocals off" : "Vocals on"
+        // The cloud job's weight fills the segment and its step is the value; the words live in `SingButtonFace`.
+        let face = SingButtonFace.make(phase: instrumental.singPhase, cloudStatus: instrumental.cloudStatus,
+                                       rendering: rendering, renderPercent: renderPercent, active: active)
         LyricsToggleSegment(
-            title: title, systemImage: rendering ? nil : "music.mic", active: active,
-            enabled: song != nil && !instrumental.isSwitching && !remote,
-            progress: determinate ? Double(percent) / 100 : nil, accessibilityLabel: "Sing",
-            accessibilityValue: value, chrome: chrome, brightArt: brightArt) {
+            title: LocalizedStringKey(face.title), systemImage: face.showsIcon ? "music.mic" : nil, active: active,
+            enabled: song != nil && !instrumental.isSwitching && !remote, busy: face.busy,
+            progress: face.progress, accessibilityLabel: "Sing",
+            accessibilityValue: LocalizedStringKey(face.value), chrome: chrome, brightArt: brightArt) {
             onTap()
             taps += 1
-            tap(rendering: rendering, detail: job?.detail)
+            guard let song else { return }
+            Task { await instrumental.requestSing(for: song) }
         }
         .pixlHaptic(.selection, trigger: taps)
-        .onChange(of: instrumental.isAvailable) { _, available in
-            guard available, let pendingSongId, pendingSongId == song?.id else { return }
-            self.pendingSongId = nil
-            // Not onto this iPhone's player while a Connect speaker plays: the render waits for the next tap.
-            guard playback.remoteOutputName == nil else { return }
-            instrumental.playInstrumental()
-        }
-        .onChange(of: job?.phase) { _, phase in
-            guard let pendingSongId, pendingSongId == song?.id else { return }
-            switch phase {
-            case .failed(let reason)?:
-                self.pendingSongId = nil
-                env.lyricsController.message = reason
-            case .cancelled?:
-                self.pendingSongId = nil
-            default:
-                break
-            }
-        }
-        .onChange(of: song?.id) { _, _ in pendingSongId = nil }
-    }
-
-    private func tap(rendering: Bool, detail: String?) {
-        guard let song else { return }
-        let instrumental = env.tais.instrumental
-        if instrumental.isAvailable {
-            instrumental.toggle()
-        } else if rendering {
-            pendingSongId = song.id
-            // A render already queued or running is kept; if it is the automatic studio's, this makes it the
-            // person's own, so starting playback no longer cancels it (`TaisStudio.start` adopts it).
-            env.tais.studio.start(.instrumental, song: song)
-            env.lyricsController.message = detail ?? String(localized: "Removing the vocals…")
-        } else {
-            pendingSongId = song.id
-            env.tais.studio.start(.instrumental, song: song)
-            env.lyricsController.message = String(localized: "Removing the vocals on this iPhone. The first time takes a few minutes.")
-        }
     }
 }
 

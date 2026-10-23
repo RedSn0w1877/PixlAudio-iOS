@@ -248,6 +248,8 @@ nonisolated enum CloudJobRowText {
             if record.importedLyrics { parts.append(record.lyricsTranscribed ? "AI-written lyrics" : "word-timed lyrics") }
             return parts.count == 1 ? "Done" : parts[0] + " · " + parts.dropFirst().joined(separator: " + ")
         default:
+            // A job that stepped aside for a song being sung says so, in place of "Uploaded".
+            if record.isPaused { return CloudPriorityLane.pausedLabel }
             if record.nextAttemptAtMs != nil, let error = record.lastError, !error.isEmpty { return "Trying again soon" }
             return record.state.label
         }
@@ -255,6 +257,10 @@ nonisolated enum CloudJobRowText {
 
     static func detail(_ record: CloudJobRecord) -> String? {
         var lines: [String] = []
+        // A song prepared ahead (Settings › Sing › Prepare songs ahead) says whose idea it was until it is done.
+        if record.effectiveOrigin == .auto, !record.state.isFinished {
+            lines.append("Picked ahead of time because you may sing it soon.")
+        }
         if record.state == .failed || record.state == .expired || record.nextAttemptAtMs != nil,
            let error = record.lastError, !error.isEmpty {
             lines.append(error)

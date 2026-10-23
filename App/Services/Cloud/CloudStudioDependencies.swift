@@ -14,10 +14,19 @@ nonisolated protocol CloudTransferring: AnyObject, Sendable {
     var onProgress: (@Sendable (_ jobKey: String, _ slot: String, _ fraction: Double) -> Void)? { get set }
     var allowsCellular: Bool { get set }
     func upload(fileURL: URL, to url: URL, jobKey: String, contentType: String)
+    /// The same upload with a `URLSessionTask.priority` (0…1): the priority job's goes first, auto work's last.
+    func upload(fileURL: URL, to url: URL, jobKey: String, contentType: String, priority: Float)
     func download(from url: URL, jobKey: String, slot: String)
     func cancel(jobKey: String) async
     /// `"<jobKey>|<slot>"` of every transfer still running or waiting.
     func pendingTaskDescriptions() async -> [String]
+}
+
+nonisolated extension CloudTransferring {
+    /// A transfer layer with no notion of priority (the demo's) uploads as it always did.
+    func upload(fileURL: URL, to url: URL, jobKey: String, contentType: String, priority: Float) {
+        upload(fileURL: fileURL, to: url, jobKey: jobKey, contentType: contentType)
+    }
 }
 
 nonisolated extension CloudTransfers: CloudTransferring {}
@@ -26,14 +35,26 @@ nonisolated extension CloudTransfers: CloudTransferring {}
 nonisolated protocol CloudAudioPreparing: Sendable {
     /// `forceDecode`: decode to FLAC even when the source could go up as it is (streamed songs, design §7.3).
     func prepare(source: URL, jobKey: String, forceDecode: Bool) async throws -> CloudPreparedAudio
+    /// `paced: false` skips the heavy-work duty cycle: a song somebody is waiting for (Sing) is decoded at full speed.
+    func prepare(source: URL, jobKey: String, forceDecode: Bool, paced: Bool) async throws -> CloudPreparedAudio
     func removeUpload(jobKey: String)
     /// The prepared file of a job, if it is still on disk (an upload restarted after a relaunch).
     func uploadFile(jobKey: String, ext: String) -> URL?
 }
 
+nonisolated extension CloudAudioPreparing {
+    func prepare(source: URL, jobKey: String, forceDecode: Bool, paced: Bool) async throws -> CloudPreparedAudio {
+        try await prepare(source: source, jobKey: jobKey, forceDecode: forceDecode)
+    }
+}
+
 nonisolated struct LiveCloudAudioPreparer: CloudAudioPreparing {
     func prepare(source: URL, jobKey: String, forceDecode: Bool) async throws -> CloudPreparedAudio {
         try await CloudAudioPreparer.prepare(source: source, jobKey: jobKey, forceDecode: forceDecode)
+    }
+
+    func prepare(source: URL, jobKey: String, forceDecode: Bool, paced: Bool) async throws -> CloudPreparedAudio {
+        try await CloudAudioPreparer.prepare(source: source, jobKey: jobKey, forceDecode: forceDecode, paced: paced)
     }
 
     func removeUpload(jobKey: String) { CloudAudioPreparer.removeUpload(jobKey: jobKey) }
@@ -98,11 +119,25 @@ protocol CloudStudioHost: AnyObject {
     func streamIdentity(for song: Song) async -> String?
     func lyricsFacts(for song: Song) async -> CloudLyricsFacts
     func hasInstrumental(songId: String) async -> Bool
+    /// Which of `songIds` have an instrumental, in one look (Prepare songs ahead asks about the whole library).
+    func songIdsWithInstrumental(among songIds: [String]) async -> Set<String>
     /// Moves a verified result into `Stems/` atomically (and drops the other cloud variant).
     func installInstrumental(from staged: URL, songId: String, flac: Bool) throws
     func saveLyrics(_ doc: LyricsDoc, for song: Song, replaceUserSynced: Bool) async -> CloudLyricsSaveOutcome
     func instrumentalImported(songId: String)
     func lyricsImported(song: Song)
+}
+
+extension CloudStudioHost {
+    /// One song at a time (a host with a cheaper way, like the live one's single look at `Stems/`, replaces this).
+    func songIdsWithInstrumental(among songIds: [String]) async -> Set<String> {
+        var found = Set<String>()
+        for songId in songIds {
+            let hasOne = await hasInstrumental(songId: songId)
+            if hasOne { found.insert(songId) }
+        }
+        return found
+    }
 }
 
 /// The live host: the library, TAIS's audio source, the lyrics service and `Stems/`.
@@ -166,6 +201,22 @@ final class LiveCloudStudioHost: CloudStudioHost {
 
     func hasInstrumental(songId: String) async -> Bool {
         await Task.detached(priority: .utility) { InstrumentalFiles.bestAvailable(songId: songId) != nil }.value
+    }
+
+    /// One listing of `Stems/` for all of them; a file that is there is checked to be complete.
+    func songIdsWithInstrumental(among songIds: [String]) async -> Set<String> {
+        await Task.detached(priority: .utility) { () -> Set<String> in
+            guard let directory = InstrumentalFiles.directory,
+                  let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path), !names.isEmpty else {
+                return []
+            }
+            let present = Set(names)
+            var found = Set<String>()
+            for songId in songIds where StemFiles.candidates(songId: songId).contains(where: present.contains) {
+                if InstrumentalFiles.bestAvailable(songId: songId) != nil { found.insert(songId) }
+            }
+            return found
+        }.value
     }
 
     func installInstrumental(from staged: URL, songId: String, flac: Bool) throws {

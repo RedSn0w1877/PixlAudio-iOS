@@ -110,6 +110,12 @@ nonisolated final class CloudTransfers: NSObject, URLSessionDownloadDelegate, @u
     /// Uploads `fileURL` (inside the app's container) with a presigned PUT. A transfer already running for the same
     /// job and slot is left alone.
     func upload(fileURL: URL, to url: URL, jobKey: String, contentType: String) {
+        upload(fileURL: fileURL, to: url, jobKey: jobKey, contentType: contentType, priority: URLSessionTask.defaultPriority)
+    }
+
+    /// The same, with a task priority (0…1; `URLSessionTask.defaultPriority` is 0.5): when several uploads share the
+    /// connection, the one somebody is waiting for goes first and work done ahead of time last.
+    func upload(fileURL: URL, to url: URL, jobKey: String, contentType: String, priority: Float) {
         let description = Self.taskDescription(jobKey: jobKey, slot: Self.uploadSlot)
         guard url.scheme?.lowercased() == "https" else {
             emit(.uploadFailed(jobKey: jobKey, message: "Upload links must be HTTPS", httpStatus: nil))
@@ -128,6 +134,7 @@ nonisolated final class CloudTransfers: NSObject, URLSessionDownloadDelegate, @u
             guard !tasks.contains(where: { $0.taskDescription == description && $0.state != .completed }) else { return }
             let task = session.uploadTask(with: request, fromFile: fileURL)
             task.taskDescription = description
+            task.priority = min(max(priority, 0), 1)
             task.resume()
         }
     }

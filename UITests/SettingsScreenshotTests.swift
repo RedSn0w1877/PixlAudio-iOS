@@ -23,6 +23,14 @@ final class SettingsScreenshotTests: XCTestCase {
     func testLyricsCategoryDark() throws { try capture("settingsCategory.lyrics", "dark") }
     func testSingCategoryLight() throws { try capture("settingsCategory.sing", "light") }
     func testSingCategoryDark() throws { try capture("settingsCategory.sing", "dark") }
+    /// "Prepare songs ahead in the cloud" switched on: the monthly budget with its "About N songs a month" caption (and,
+    /// in developer mode, which the UI tests start with, the daily cap and "Why these songs" in Advanced).
+    func testSingCategoryPrepareAheadLight() throws {
+        try capture("settingsCategory.sing", "light", suffix: "-prepareAhead", interact: Self.switchOnPrepareAhead)
+    }
+    func testSingCategoryPrepareAheadDark() throws {
+        try capture("settingsCategory.sing", "dark", suffix: "-prepareAhead", interact: Self.switchOnPrepareAhead)
+    }
     func testAICategoryLight() throws { try capture("settingsCategory.ai", "light") }
     func testAICategoryDark() throws { try capture("settingsCategory.ai", "dark") }
     /// AI features with the optional cloud assistant switched on (Gemini, the demo key): the on-device row, then the
@@ -53,6 +61,25 @@ final class SettingsScreenshotTests: XCTestCase {
     func testAICategoryLocalModelReadyDark() throws {
         try capture("settingsCategory.ai.localModelReady", "dark", ready: "screen.settingsCategory.ai",
                     suffix: "", interact: Self.scrollToLocalModel)
+    }
+
+    /// Turns "Prepare songs ahead in the cloud" on (its switch sits at the row's trailing end; the row is one combined
+    /// element) and waits for the monthly budget that comes with it.
+    private static func switchOnPrepareAhead(_ app: XCUIApplication) {
+        let toggle = app.descendants(matching: .any)["settings.switch.Prepare songs ahead in the cloud"].firstMatch
+        // The page's ready id appears as the push starts; a tap during the push (or while a swipe still glides) is
+        // dropped, so let it settle first, as the Developer mode test does. The row sits mid-page on every phone.
+        Thread.sleep(forTimeInterval: 1.5)
+        for _ in 0..<5 where !(toggle.exists && toggle.isHittable) {
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 1.0)
+        }
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5), "the Prepare songs ahead switch is missing")
+        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
+        let predicate = NSPredicate(format: "identifier == %@ OR label CONTAINS[c] %@",
+                                    "settings.slider.Monthly budget", "Monthly budget")
+        let budget = app.descendants(matching: .any).matching(predicate).firstMatch
+        XCTAssertTrue(budget.waitForExistence(timeout: 8), "the Monthly budget did not appear after turning the switch on")
     }
 
     /// Scrolls until the whole downloaded model's row is above the mini player (it sits in the Advanced block, under

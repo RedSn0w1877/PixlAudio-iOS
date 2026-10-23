@@ -42,6 +42,8 @@ public enum CloudActiveJobMapper {
             if let code = record.lastErrorCode, !code.isEmpty { return "Failed · \(code)" }
             return record.state.label
         default:
+            // A job that stepped aside for a song being sung says so, in place of "Uploaded".
+            if record.isPaused { return CloudPriorityLane.pausedLabel }
             if record.nextAttemptAtMs != nil, let error = record.lastError, !error.isEmpty { return "Trying again soon" }
             return record.state.label
         }
@@ -126,19 +128,22 @@ public enum CloudActiveJobMapper {
                          updatedAtMs: updated, canRetry: true)
     }
 
-    /// "3 of 12 ready · 5 uploading · 2 waiting for a GPU · 2 processing": only the steps that have jobs.
+    /// "3 of 12 ready · 5 uploading · 2 waiting for a GPU · 2 processing · 1 paused": only the steps that have jobs.
     static func batchSummary(_ members: [CloudJobRecord]) -> String {
         var parts = ["\(members.filter { $0.state == .imported }.count) of \(members.count) ready"]
         func count(_ states: Set<CloudJobState>) -> Int { members.filter { states.contains($0.state) }.count }
+        let paused = members.filter(\.isPaused).count
         let steps: [(Set<CloudJobState>, String)] = [
             ([.queued], "waiting"), ([.preparing], "preparing"), ([.uploading], "uploading"),
             ([.uploaded, .submitted], "waiting for a GPU"), ([.running], "processing"),
             ([.resultsReady, .downloading], "downloading"),
         ]
         for (states, label) in steps {
-            let n = count(states)
+            // A paused job is not waiting for a GPU: it stepped aside (counted below).
+            let n = states.contains(.uploaded) ? count(states) - paused : count(states)
             if n > 0 { parts.append("\(n) \(label)") }
         }
+        if paused > 0 { parts.append("\(paused) paused") }
         let attention = count([.failed, .expired])
         if attention > 0 { parts.append("\(attention) \(attention == 1 ? "needs" : "need") you") }
         return parts.joined(separator: " · ")

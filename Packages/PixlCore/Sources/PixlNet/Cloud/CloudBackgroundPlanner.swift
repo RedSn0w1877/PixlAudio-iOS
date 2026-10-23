@@ -14,10 +14,14 @@ public struct CloudBackgroundPlan: Sendable, Equatable {
     public var refreshNotBeforeMs: Int64?
     /// The same for the BGProcessingTask.
     public var processingNotBeforeMs: Int64?
+    /// The BGProcessingTask asks for external power: everything outstanding is auto-prepare, which only needs to run
+    /// while the phone is charging (iOS may never grant it; nothing depends on it).
+    public var processingRequiresPower: Bool
 
-    public init(refreshNotBeforeMs: Int64? = nil, processingNotBeforeMs: Int64? = nil) {
+    public init(refreshNotBeforeMs: Int64? = nil, processingNotBeforeMs: Int64? = nil, processingRequiresPower: Bool = false) {
         self.refreshNotBeforeMs = refreshNotBeforeMs
         self.processingNotBeforeMs = processingNotBeforeMs
+        self.processingRequiresPower = processingRequiresPower
     }
 
     public static let none = CloudBackgroundPlan()
@@ -56,6 +60,8 @@ public enum CloudBackgroundPlanner {
         } else {
             plan.processingNotBeforeMs = soonest
         }
+        // Songs the person is waiting for need every chance to run; songs prepared ahead can wait for the charger.
+        plan.processingRequiresPower = pending.allSatisfy { $0.origin == .auto }
         return plan
     }
 

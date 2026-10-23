@@ -104,7 +104,7 @@ public enum CloudTiming {
     public static let executionTimeoutMs: Int64 = 900_000
     /// The upload PUT the phone presigns for itself: 24 h.
     public static let uploadPresignSeconds = 86_400
-    /// The worker's URLs, signed at submission: `ttl + executionTimeout + 1 h` (≈ 76 h; R2's maximum is 7 d).
+    /// The worker's URLs, signed at submission: `ttl + executionTimeout + 1 h` (73.25 h; R2's maximum is 7 d).
     public static var workerPresignSeconds: Int { Int((ttlMs + executionTimeoutMs) / 1000) + 3_600 }
     /// An input older than this is uploaded again instead of being submitted (upload age + ttl < the 7-day `in/`
     /// lifecycle).
@@ -124,6 +124,13 @@ public enum CloudTiming {
     public static let refreshEarliestMs: Int64 = 15 * 60_000
     /// Jobs queued this long while the endpoint shows no workers at all suggest a paused endpoint.
     public static let pausedEndpointAfterMs: Int64 = 30 * 60_000
+    /// `/cancel` calls are at least this far apart (RunPod allows 100 per 10 s and 20 at once).
+    public static let cancelMinIntervalMs: Int64 = 120
+    /// A priority job holds back new auto jobs, and the jobs it paused, for no longer than this: a Sing job that never
+    /// gets uploaded must not freeze the rest of the queue.
+    public static let priorityHoldMaxMs: Int64 = 5 * 60_000
+    /// An auto job that finds the phone not ready (off Wi-Fi, low battery…) waits this long, without counting as a failure.
+    public static let autoDeferMs: Int64 = 15 * 60_000
 
     /// The wait before attempt `attempts + 1` (attempts already made ≥ 1).
     public static func backoffMs(afterAttempts attempts: Int) -> Int64 {
@@ -195,6 +202,9 @@ public enum CloudJobEvent: Sendable, Hashable {
     case requeue
     /// The input is in R2 but the job must be sent again (lost at RunPod, or a FLAC redo).
     case resubmit
+    /// A job RunPod had not started was cancelled there so a priority job can go first: back to uploaded, to be sent
+    /// again right after it. Only a waiting job pauses; a running one never does.
+    case pause
 }
 
 public enum CloudJobMachine {
@@ -225,6 +235,7 @@ public enum CloudJobMachine {
         case (.submitted, .resubmit), (.running, .resubmit), (.expired, .resubmit), (.failed, .resubmit),
              (.resultsReady, .resubmit), (.downloading, .resubmit):
             .uploaded
+        case (.submitted, .pause): .uploaded
         default: nil
         }
     }
@@ -478,13 +489,14 @@ public enum CloudCost {
     /// The default app cap: $3 a month.
     public static let defaultMonthlyCapMicroUSD: Int64 = 3_000_000
 
-    /// Billed GPU seconds per warm song (§6): instrumental + aligned lyrics.
-    public static let warmSecondsStandard: Int64 = 20
+    /// Billed GPU seconds per warm 4-minute song: instrumental + aligned lyrics. Measured on 2026-10-22 on an RTX A4500
+    /// (the design's 20 s was a guess).
+    public static let warmSecondsStandard: Int64 = 38
     public static let extraSecondsTranscribe: Int64 = 10
     public static let extraSecondsBest: Int64 = 12
     public static let extraSecondsStems: Int64 = 5
-    /// One cold start per batch: model load plus the 10 s idle timeout.
-    public static let coldStartSeconds: Int64 = 35
+    /// One cold start per batch: model load plus the 10 s idle timeout (measured on 2026-10-22).
+    public static let coldStartSeconds: Int64 = 15
     /// The song length §6's figures are for (4 minutes).
     public static let referenceSongMs: Int64 = 240_000
 
