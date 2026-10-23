@@ -67,24 +67,19 @@ final class SettingsScreenshotTests: XCTestCase {
     /// element) and waits for the monthly budget that comes with it.
     private static func switchOnPrepareAhead(_ app: XCUIApplication) {
         let toggle = app.descendants(matching: .any)["settings.switch.Prepare songs ahead in the cloud"].firstMatch
+        // The page's ready id appears as the push starts; a tap during the push (or while a swipe still glides) is
+        // dropped, so let it settle first, as the Developer mode test does. The row sits mid-page on every phone.
+        Thread.sleep(forTimeInterval: 1.5)
         for _ in 0..<5 where !(toggle.exists && toggle.isHittable) {
             app.swipeUp()
+            Thread.sleep(forTimeInterval: 1.0)
         }
         XCTAssertTrue(toggle.waitForExistence(timeout: 5), "the Prepare songs ahead switch is missing")
-        // The last rows of the page can sit under the floating tab bar and mini player, which would take the tap.
-        let screenHeight = app.windows.firstMatch.frame.height
-        for _ in 0..<2 where toggle.frame.maxY > screenHeight * 0.7 { app.swipeUp() }
+        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
         let predicate = NSPredicate(format: "identifier == %@ OR label CONTAINS[c] %@",
                                     "settings.slider.Monthly budget", "Monthly budget")
         let budget = app.descendants(matching: .any).matching(predicate).firstMatch
-        // A tap while the list still glides after the swipes only stops the scroll: let it settle first, and tap once
-        // more if the switch didn't take it.
-        for _ in 0..<2 where !budget.exists {
-            Thread.sleep(forTimeInterval: 1.0)
-            toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
-            _ = budget.waitForExistence(timeout: 4)
-        }
-        XCTAssertTrue(budget.waitForExistence(timeout: 2), "the Monthly budget did not appear after turning the switch on")
+        XCTAssertTrue(budget.waitForExistence(timeout: 8), "the Monthly budget did not appear after turning the switch on")
     }
 
     /// Scrolls until the whole downloaded model's row is above the mini player (it sits in the Advanced block, under
