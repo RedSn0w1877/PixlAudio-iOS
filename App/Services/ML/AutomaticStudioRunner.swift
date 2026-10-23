@@ -46,6 +46,10 @@ final class AutomaticStudioRunner {
     @ObservationIgnored private var observers: [any NSObjectProtocol] = []
     /// Songs another worker owns right now (Cloud Studio's pending jobs): treated as done, so nothing runs twice.
     @ObservationIgnored var skipsSong: (String) -> Bool = { _ in false }
+    /// Songs whose instrumental the cloud's "Prepare songs ahead" is getting ready (it is on, the cloud is usable, and the
+    /// song is one of its picks or has its job on the way): left to it while it is on, so the phone's own renderer does
+    /// not make the same instrumental a second time. Lyrics are not the cloud's to prepare here, so they are not skipped.
+    @ObservationIgnored var cloudPreparesInstrumental: (String) -> Bool = { _ in false }
 
     private static let ledgerKey = "automatic_studio_cooldowns_v1"
     private static let windowStartKey = "automatic_studio_window_start_ms"
@@ -248,6 +252,9 @@ final class AutomaticStudioRunner {
             for kind in allowed {
                 let key = AutomaticStudioPolicy.ledgerKey(kind, songId: song.id)
                 if cooldowns.until(key) > now { continue }
+                // The cloud is making this instrumental (not a cooldown: if "Prepare songs ahead" is switched off, or
+                // drops the song, the phone picks it up again at once).
+                if kind == .instrumental, cloudPreparesInstrumental(song.id) { continue }
                 if await isComplete(kind, song: song) {
                     record(key, now + AutomaticStudioPolicy.completedCooldownMs)
                     continue

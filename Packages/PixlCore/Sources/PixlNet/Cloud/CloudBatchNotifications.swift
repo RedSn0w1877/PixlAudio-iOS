@@ -3,7 +3,7 @@
 //
 // A batch is only announced when it was outstanding at the previous check and is finished now, so batches that were
 // already done at launch (or whose jobs the person cancelled themselves) never produce one, and a batch is announced
-// once (`alreadyNotified` is kept by the app).
+// once (`alreadyNotified` is kept by the app). A batch made only of auto jobs (Prepare songs ahead) is never announced.
 
 import Foundation
 
@@ -51,6 +51,8 @@ public enum CloudBatchNotifier {
         for batchId in order where previouslyIncomplete.contains(batchId) && !alreadyNotified.contains(batchId) {
             let members = groups[batchId] ?? []
             guard !members.isEmpty, members.allSatisfy({ $0.state.isFinished }) else { continue }
+            // Songs prepared ahead on their own are not news: nobody asked, so nothing interrupts them.
+            guard !members.allSatisfy({ $0.origin == .auto }) else { continue }
             let counted = members.filter { $0.state != .cancelled }
             let imported = counted.filter { $0.state == .imported }
             let attention = counted.filter { $0.state == .failed || $0.state == .expired }.count

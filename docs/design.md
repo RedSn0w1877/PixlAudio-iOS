@@ -455,7 +455,9 @@ Screenshot ids (`UITests/LyricsScreenshotTests`, `-screen lyrics` + `-lyricsDemo
 lyricsEmphasis (47 600), lyricsInterlude (61 000), lyricsDuet, lyricsBrightArt, lyricsHighContrast, lyricsLineSynced,
 lyricsPlain, lyricsNone, lyricsImmersive, lyricsLight, lyricsMoreSheet, lyricsFetchDialog, lyricsOptions,
 lyricsCascade.f0…f7 (first-show cascade frames, live clock); since 2026-10-07 also lyricsSingActive and
-lyricsSingRendering (`-screen tais.instrumentalActive|tais.instrumentalRendering -lyricsDemo words`),
+lyricsSingRendering (`-screen tais.instrumentalActive|tais.instrumentalRendering -lyricsDemo words`); since
+2026-10-22 also lyricsSingPreparingCloud, lyricsSingWaitingForWiFi and lyricsSingWaitingGap (`-screen
+tais.singPreparingCloud|tais.singWaitingForWiFi|tais.singWaitingGap -lyricsDemo words`, `UITests/LyricsSingStatesTests`),
 lyricsTranslateMenu (Translate held) and lyricsShowAsPlainText.
 
 ### Lyrics page (2026-10-07, owner items 1 + 11; branch `s16-lyrics-page`)
@@ -822,7 +824,8 @@ Stage 14 screenshot ids (`UITests/TaisScreenshotTests`; demo states, no network 
 (the models panel with wav2vec2 downloading), `tais.songSheet` (the song sheet's card mid-render),
 `tais.instrumental`, `tais.instrumentalRendering`, `tais.instrumentalActive` (the lyrics screen with `-lyricsDemo none`;
 no floating toggle since 2026-10-07 — with lyrics, the same states show the Sing segment: lyricsSingActive,
-lyricsSingRendering).
+lyricsSingRendering), and since 2026-10-22 `tais.singPreparingCloud`, `tais.singWaitingForWiFi`, `tais.singWaitingGap`
+(Sing's cloud and gap-waiting states; the button's label stays "Sing", its value carries the state).
 
 ## Integration notes (wave A: stages 8, 9, 11, 12, 13, 15 merged — tag `stage-13`)
 
@@ -1189,8 +1192,9 @@ Material, glass where Android would fill a surface).
 
 - **Cloud processing** (`CloudProcessingSettingsView`, route `.cloudProcessing`, from Settings › Sing; it was
   Experimental's panel until 2026-10-22): `SettingsScaffold` + `SettingsSubsection`s. Everyone sees Consent (the
-  switch "Process songs in the cloud" — "Nothing leaves this phone until you tap Process in cloud." — and one plain
-  panel), Network ("Use cellular data"), Notifications and Queue (a chevron row). Developer mode adds the rest: the
+  switch "Process songs in the cloud" — "Nothing leaves this phone until you tap Process in cloud or Sing, or turn on
+  Prepare songs ahead." — and one plain panel), Network ("Use cellular data"), Notifications and Queue (a chevron
+  row). Developer mode adds the rest: the
   keys-missing banner, Keys / "Use my own keys", RunPod (Endpoint ID, Restricted key), Storage (R2 endpoint or account
   ID with the detected account under it, bucket, access key ID, secret), Test connection (what is still missing, the
   filled button, one `CloudCheckLine` per check, the tonal selftest button), Outputs (three switches + a two-pill

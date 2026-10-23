@@ -4,6 +4,12 @@
 
 import Foundation
 
+/// Who started a job. `manual` is "Process in cloud" (a record without an origin is a manual one), `sing` is a tap on
+/// Sing, `auto` is "Prepare songs ahead in the cloud" (the one thing that sends songs without a tap).
+public enum CloudJobOrigin: String, Codable, Sendable {
+    case manual, sing, auto
+}
+
 public struct CloudJobRecord: Codable, Sendable, Hashable, Identifiable {
     // Identity
     public var jobKey: String
@@ -84,6 +90,25 @@ public struct CloudJobRecord: Codable, Sendable, Hashable, Identifiable {
     /// Last `/status` call, for the 15 s polling floor.
     public var lastPolledAtMs: Int64?
 
+    // Origin and the priority lane. Every field here is optional on purpose: the job list is one Codable file, and a
+    // field that older stored records lack would make the whole list unreadable (`CloudJobStore.load` then starts
+    // empty). A record without them decodes as a plain manual job.
+    /// Who started the job (nil = manual).
+    public var origin: CloudJobOrigin?
+    /// When the job was given priority (a Sing tap, or an auto job a Sing tap joined).
+    public var priorityAtMs: Int64?
+    /// The priority job this one stepped aside for (its job key). Set from the moment the pause begins.
+    public var pausedBy: String?
+    public var pausedAtMs: Int64?
+    /// The cancel reached RunPod before the worker had started the job, so nothing of it is in the bucket yet.
+    public var pausedNeverStarted: Bool?
+    /// RunPod job id whose `/cancel` was about to be sent: written before the call, so a lost answer is still known as
+    /// ours (a CANCELLED status for it completes the pause instead of counting as a failure).
+    public var pauseIntentRunpodJobId: String?
+    /// The estimate this auto job reserved in the auto-prepare ledger when it first went to RunPod, until its real cost
+    /// replaces it.
+    public var autoReservedMicroUSD: Int64?
+
     public var id: String { jobKey }
 
     public init(jobKey: String, songId: String, title: String, artist: String, batchId: String, tasks: [CloudTask],
@@ -126,14 +151,24 @@ public struct CloudJobRecord: Codable, Sendable, Hashable, Identifiable {
         updatedAtMs = nowMs
         switch event {
         case .uploadFinished: uploadedAtMs = nowMs
-        case .submitted: submittedAtMs = nowMs
+        case .submitted:
+            submittedAtMs = nowMs
+            // Sent again after stepping aside: the pause is over.
+            clearPause()
         case .imported: importedAtMs = nowMs
         case .requeue:
             runpodJobId = nil
             progressStage = nil
             progressPercent = nil
             nextAttemptAtMs = nil
+            clearPause()
         case .resubmit:
+            runpodJobId = nil
+            progressStage = nil
+            progressPercent = nil
+            clearPause()
+        case .pause:
+            // The fields that say why are set by `completePause`.
             runpodJobId = nil
             progressStage = nil
             progressPercent = nil
@@ -141,6 +176,70 @@ public struct CloudJobRecord: Codable, Sendable, Hashable, Identifiable {
         }
         return true
     }
+
+    // MARK: Origin and the priority lane
+
+    /// The origin, a record without one being a manual job.
+    public var effectiveOrigin: CloudJobOrigin { origin ?? .manual }
+
+    /// Stepped aside for a priority job: uploaded again, waiting to be sent after it.
+    public var isPaused: Bool { state == .uploaded && pausedBy != nil }
+
+    /// The cancel for this job was started and its outcome isn't known yet.
+    public var hasPauseIntent: Bool { pauseIntentRunpodJobId != nil }
+
+    /// Gives the job priority: a Sing tap (a job already waiting for the song is joined, not duplicated).
+    public mutating func promote(nowMs: Int64) {
+        origin = .sing
+        priorityAtMs = nowMs
+        updatedAtMs = nowMs
+    }
+
+    /// About to cancel this job at RunPod so `priorityJobKey` goes first. Written (and saved) before the cancel.
+    public mutating func beginPause(runpodJobId: String, by priorityJobKey: String, nowMs: Int64) {
+        pauseIntentRunpodJobId = runpodJobId
+        pausedBy = priorityJobKey
+        pausedAtMs = nowMs
+        updatedAtMs = nowMs
+    }
+
+    /// The job was cancelled at RunPod: back to `uploaded` (its upload stays), held until the priority job has gone
+    /// out. `neverStarted` nil = not known yet.
+    @discardableResult
+    public mutating func completePause(by priorityJobKey: String, neverStarted: Bool?, nowMs: Int64) -> Bool {
+        guard apply(.pause, nowMs: nowMs) else { return false }
+        pausedBy = priorityJobKey
+        pausedAtMs = pausedAtMs ?? nowMs
+        pausedNeverStarted = neverStarted
+        pauseIntentRunpodJobId = nil
+        return true
+    }
+
+    /// The pause did not happen (the job had started, or the priority job went away): the job carries on as it was.
+    public mutating func abortPause() {
+        pauseIntentRunpodJobId = nil
+        if state != .uploaded { clearPause() }
+    }
+
+    /// The hold ends (the priority job is gone): the job is sent with the next batch. What is known about whether it
+    /// ever started stays, so the send can skip clearing a bucket that holds nothing of it; what is not known counts as
+    /// "may have started", so the send still looks in the bucket for its result first.
+    public mutating func release() {
+        pausedBy = nil
+        pausedAtMs = nil
+        pausedNeverStarted = pausedNeverStarted ?? false
+    }
+
+    /// Forgets every trace of a pause.
+    public mutating func clearPause() {
+        pausedBy = nil
+        pausedAtMs = nil
+        pausedNeverStarted = nil
+        pauseIntentRunpodJobId = nil
+    }
+
+    /// The job was paused (and not sent since): its earlier run may or may not have left objects in the bucket.
+    public var wasPaused: Bool { pausedBy != nil || pausedNeverStarted != nil }
 
     /// Records a failure: retryable ones wait on the backoff ladder (up to `maxAutomaticAttempts`), others stop.
     public mutating func recordFailure(_ message: String, code: String?, retryable: Bool, nowMs: Int64) {

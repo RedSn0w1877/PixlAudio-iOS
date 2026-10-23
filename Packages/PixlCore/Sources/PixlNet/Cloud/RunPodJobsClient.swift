@@ -8,7 +8,7 @@
 // - Reads (`/status`, `/health`) retry a 5xx or a dropped connection twice with backoff. `/run` is never retried here:
 //   a lost response may still have queued the job, so the orchestrator decides (the worker's guard makes a duplicate
 //   harmless).
-// - `/run` calls are at least 100 ms apart (§5, app guards).
+// - `/run` calls are at least 100 ms apart (§5, app guards), `/cancel` calls at least 120 ms apart.
 // - A `/status` 404 is `.jobNotFound` ("expired or never existed"; results then come from R2), a 404 anywhere else is
 //   `.endpointNotFound`.
 
@@ -216,7 +216,10 @@ public enum RunPodError: Error, Sendable, Hashable, CustomStringConvertible {
 public protocol RunPodJobsAPI: Sendable {
     func run(_ request: CloudJobRequest) async throws -> RunPodJob
     func status(jobId: String) async throws -> RunPodJob
-    func cancel(jobId: String) async throws
+    /// `/cancel`: the job as RunPod answers (`CANCELLED` when it was still waiting in the queue and is gone now). The
+    /// answer matters to the priority lane, which only counts a job as stepped aside when RunPod says so.
+    @discardableResult
+    func cancel(jobId: String) async throws -> RunPodJob
     func health() async throws -> RunPodHealth
     /// `/runsync` with `op: "selftest"` (about one cold start, ~1¢).
     func selftest(build: String) async throws -> RunPodJob
@@ -226,6 +229,8 @@ public actor RunPodJobsClient: RunPodJobsAPI {
     public static let baseURL = "https://api.runpod.ai/v2"
     /// §5: one `/run` per 100 ms or slower.
     public static let minimumRunIntervalMs: Int64 = 100
+    /// `/cancel` calls are spaced too: RunPod allows 100 per 10 s and 20 at once, and a priority job can cancel a lot.
+    public static let minimumCancelIntervalMs: Int64 = CloudTiming.cancelMinIntervalMs
     /// Backoff before the 2nd and 3rd try of a read.
     public static let readRetryDelaysMs: [Int64] = [1_000, 3_000]
 
@@ -236,6 +241,7 @@ public actor RunPodJobsClient: RunPodJobsAPI {
     private let sleep: @Sendable (Int64) async throws -> Void
     private var notBeforeMs: Int64 = 0
     private var lastRunAtMs: Int64?
+    private var lastCancelAtMs: Int64?
 
     public init(http: any HTTPClient, endpointId: String, apiKey: String,
                 nowMs: @escaping @Sendable () -> Int64 = { currentTimeMillis() },
@@ -286,9 +292,17 @@ public actor RunPodJobsClient: RunPodJobsAPI {
         return job
     }
 
-    public func cancel(jobId: String) async throws {
+    @discardableResult
+    public func cancel(jobId: String) async throws -> RunPodJob {
         guard Self.isSafeIdentifier(jobId, maxLength: 128) else { throw RunPodError.jobNotFound }
-        _ = try await send(.post, path: "cancel/\(jobId)", retries: true, notFound: .jobNotFound)
+        if let last = lastCancelAtMs {
+            let wait = Self.minimumCancelIntervalMs - (nowMs() - last)
+            if wait > 0 { try await sleep(wait) }
+        }
+        lastCancelAtMs = nowMs()
+        let response = try await send(.post, path: "cancel/\(jobId)", retries: true, notFound: .jobNotFound)
+        guard let job = RunPodJob.parse(response.body) else { throw RunPodError.badResponse("unreadable cancel answer") }
+        return job
     }
 
     public func health() async throws -> RunPodHealth {

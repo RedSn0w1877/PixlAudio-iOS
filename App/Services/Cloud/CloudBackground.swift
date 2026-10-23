@@ -9,8 +9,9 @@ import UIKit
 /// - BGAppRefresh (`…refresh`): a short, opportunistic wake (about 30 s, maybe a few times a day, never in Low Power
 ///   Mode or with Background App Refresh off). One `CloudStudio.backgroundRefresh()` per wake.
 /// - BGProcessing (`…cloud-processing`): a longer wake when iOS finds the phone idle (minutes, often overnight),
-///   needing the network but not power. `CloudStudio.backgroundProcessing()` polls RunPod and imports results inside a
-///   self-imposed window, and stops starting anything new in its last seconds.
+///   needing the network but not power (unless everything outstanding is "Prepare songs ahead", which asks for the
+///   charger). `CloudStudio.backgroundProcessing()` polls RunPod and imports results inside a self-imposed window, and
+///   stops starting anything new in its last seconds.
 /// - A background-task assertion (about 30 s) around submissions made during a wake.
 /// - Continued processing (`…cloud-prepare`) for a person-started batch, so preparing songs keeps going after the
 ///   app is swiped to the background; the system shows its progress and lets the person stop it.
@@ -52,7 +53,8 @@ final class CloudBackground {
             let request = BGProcessingTaskRequest(identifier: Self.processingIdentifier)
             request.earliestBeginDate = Date(timeIntervalSince1970: TimeInterval(at) / 1000)
             request.requiresNetworkConnectivity = true
-            request.requiresExternalPower = false
+            // Only songs prepared ahead outstanding: iOS may hold the pass until the phone charges (a bonus path).
+            request.requiresExternalPower = plan.processingRequiresPower
             try? BGTaskScheduler.shared.submit(request)
         } else {
             BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.processingIdentifier)

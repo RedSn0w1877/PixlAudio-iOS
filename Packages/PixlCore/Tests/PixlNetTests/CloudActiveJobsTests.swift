@@ -94,6 +94,25 @@ import PixlModel
         #expect(weights.first == 0 && weights.last == 1)
     }
 
+    @Test func aJobThatSteppedAsideSaysSoAndLeavesTheGpuQueueCount() {
+        var paused = record(2, .uploaded)
+        paused.pausedBy = "job9"
+        paused.submittedAtMs = 500
+        #expect(CloudActiveJobMapper.status(paused, transfer: nil) == "Paused for a song you're singing")
+        let row = CloudActiveJobMapper.rows([paused], transfer: [:])[0]
+        #expect(row.subtitle == "Song 2 · Paused for a song you're singing")
+        #expect(row.state == .queued && row.percent == nil)
+        // In a batch it is counted on its own, not as waiting for a GPU.
+        let batch = CloudActiveJobMapper.rows([record(1, .running), paused, record(3, .submitted), record(4, .uploaded)],
+                                              transfer: [:])[0]
+        #expect(batch.subtitle == "0 of 4 ready · 2 waiting for a GPU · 1 processing · 1 paused")
+        // The bar keeps the uploaded step's weight.
+        #expect(CloudActiveJobMapper.weight(paused, transfer: nil) == 0.4)
+        // Once it goes out again it is a job like any other.
+        paused.pausedBy = nil
+        #expect(CloudActiveJobMapper.status(paused, transfer: nil) == "Uploaded")
+    }
+
     @Test func theButtonsSummaryMatchesTheRows() {
         var retry = record(9, .queued, batch: "r")
         retry.nextAttemptAtMs = 9_999

@@ -42,6 +42,15 @@ enum TaisDemo {
         case .taisInstrumentalRendering:
             studio.setDemoState(running(48, "Rendering the instrumental — 48% through the track…"), kind: .instrumental,
                                 songId: song.id)
+        case .taisSingPreparingCloud:
+            // Uploading, 40 %: Cloud Studio's weight for that step is 0.1 + 0.3 × 0.4.
+            tais.instrumental.setDemoSing(.preparingCloud(jobKey: "demo"),
+                                          status: SingCloudStatus(weight: 0.22, text: "Uploading 40%", waitingForWiFi: false))
+        case .taisSingWaitingForWiFi:
+            tais.instrumental.setDemoSing(.preparingCloud(jobKey: "demo"),
+                                          status: SingCloudStatus(weight: 0.1, text: "Waiting for Wi-Fi", waitingForWiFi: true))
+        case .taisSingWaitingGap:
+            tais.instrumental.setDemoSing(.waitingForGap)
         default:
             break
         }

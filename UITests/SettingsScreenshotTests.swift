@@ -23,6 +23,14 @@ final class SettingsScreenshotTests: XCTestCase {
     func testLyricsCategoryDark() throws { try capture("settingsCategory.lyrics", "dark") }
     func testSingCategoryLight() throws { try capture("settingsCategory.sing", "light") }
     func testSingCategoryDark() throws { try capture("settingsCategory.sing", "dark") }
+    /// "Prepare songs ahead in the cloud" switched on: the monthly budget with its "About N songs a month" caption (and,
+    /// in developer mode, which the UI tests start with, the daily cap and "Why these songs" in Advanced).
+    func testSingCategoryPrepareAheadLight() throws {
+        try capture("settingsCategory.sing", "light", suffix: "-prepareAhead", interact: Self.switchOnPrepareAhead)
+    }
+    func testSingCategoryPrepareAheadDark() throws {
+        try capture("settingsCategory.sing", "dark", suffix: "-prepareAhead", interact: Self.switchOnPrepareAhead)
+    }
     func testAICategoryLight() throws { try capture("settingsCategory.ai", "light") }
     func testAICategoryDark() throws { try capture("settingsCategory.ai", "dark") }
     /// AI features with the optional cloud assistant switched on (Gemini, the demo key): the on-device row, then the
@@ -53,6 +61,30 @@ final class SettingsScreenshotTests: XCTestCase {
     func testAICategoryLocalModelReadyDark() throws {
         try capture("settingsCategory.ai.localModelReady", "dark", ready: "screen.settingsCategory.ai",
                     suffix: "", interact: Self.scrollToLocalModel)
+    }
+
+    /// Turns "Prepare songs ahead in the cloud" on (its switch sits at the row's trailing end; the row is one combined
+    /// element) and waits for the monthly budget that comes with it.
+    private static func switchOnPrepareAhead(_ app: XCUIApplication) {
+        let toggle = app.descendants(matching: .any)["settings.switch.Prepare songs ahead in the cloud"].firstMatch
+        for _ in 0..<5 where !(toggle.exists && toggle.isHittable) {
+            app.swipeUp()
+        }
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5), "the Prepare songs ahead switch is missing")
+        // The last rows of the page can sit under the floating tab bar and mini player, which would take the tap.
+        let screenHeight = app.windows.firstMatch.frame.height
+        for _ in 0..<2 where toggle.frame.maxY > screenHeight * 0.7 { app.swipeUp() }
+        let predicate = NSPredicate(format: "identifier == %@ OR label CONTAINS[c] %@",
+                                    "settings.slider.Monthly budget", "Monthly budget")
+        let budget = app.descendants(matching: .any).matching(predicate).firstMatch
+        // A tap while the list still glides after the swipes only stops the scroll: let it settle first, and tap once
+        // more if the switch didn't take it.
+        for _ in 0..<2 where !budget.exists {
+            Thread.sleep(forTimeInterval: 1.0)
+            toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
+            _ = budget.waitForExistence(timeout: 4)
+        }
+        XCTAssertTrue(budget.waitForExistence(timeout: 2), "the Monthly budget did not appear after turning the switch on")
     }
 
     /// Scrolls until the whole downloaded model's row is above the mini player (it sits in the Advanced block, under

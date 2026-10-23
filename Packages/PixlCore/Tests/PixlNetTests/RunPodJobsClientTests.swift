@@ -50,6 +50,40 @@ import PixlFoundation
         #expect(http.requests.count == 1)
     }
 
+    @Test func cancelReturnsWhatRunPodAnswered() async throws {
+        let http = FixtureHTTPClient { _ in HTTPResponse(statusCode: 200, text: #"{"id":"job-1","status":"CANCELLED"}"#) }
+        let job = try await Self.client(http).cancel(jobId: "job-1")
+        #expect(job.id == "job-1")
+        #expect(job.typedStatus == .cancelled)
+        #expect(http.requests.first?.method == .post)
+        #expect(http.requests.first?.url == "https://api.runpod.ai/v2/abc123xyz/cancel/job-1")
+        // A job the worker had already taken is answered with its own status.
+        let late = FixtureHTTPClient { _ in HTTPResponse(statusCode: 200, text: #"{"id":"job-2","status":"IN_PROGRESS"}"#) }
+        #expect(try await Self.client(late).cancel(jobId: "job-2").typedStatus == .inProgress)
+    }
+
+    @Test func cancelsAreAtLeast120msApart() async throws {
+        let http = FixtureHTTPClient { _ in HTTPResponse(statusCode: 200, text: #"{"id":"j","status":"CANCELLED"}"#) }
+        let slept = Box<[Int64]>([])
+        let client = Self.client(http, slept: slept)
+        _ = try await client.cancel(jobId: "a")
+        _ = try await client.cancel(jobId: "b")
+        // Runs keep their own 100 ms pace; the two gates do not wait for each other.
+        _ = try await client.run(Self.sampleRequest())
+        #expect(slept.value == [120])
+        #expect(http.requests.count == 3)
+        #expect(CloudTiming.cancelMinIntervalMs == 120)
+    }
+
+    @Test func aCancelAnswerThatCannotBeReadOrAJobThatIsGoneIsReported() async throws {
+        let garbled = FixtureHTTPClient { _ in HTTPResponse(statusCode: 200, text: "ok") }
+        await #expect(throws: RunPodError.badResponse("unreadable cancel answer")) {
+            try await Self.client(garbled).cancel(jobId: "j")
+        }
+        let gone = FixtureHTTPClient { _ in HTTPResponse(statusCode: 404, text: "") }
+        await #expect(throws: RunPodError.jobNotFound) { try await Self.client(gone).cancel(jobId: "j") }
+    }
+
     @Test func statusReadsProgress() async throws {
         let body = try CloudFixtures.text("runpod.status.inprogress")
         let http = FixtureHTTPClient { _ in HTTPResponse(statusCode: 200, text: body) }

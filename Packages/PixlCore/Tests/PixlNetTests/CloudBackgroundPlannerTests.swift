@@ -56,6 +56,27 @@ import Testing
         #expect(plan.processingNotBeforeMs == now + 15 * minute)
     }
 
+    @Test func theLongPassNeedsTheChargerOnlyWhenEveryJobIsPreparedAhead() {
+        func auto(_ n: Int, _ state: CloudJobState) -> CloudJobRecord {
+            var r = record(n, state)
+            r.origin = .auto
+            return r
+        }
+        let onlyAuto = CloudBackgroundPlanner.plan(jobs: [auto(1, .queued), auto(2, .submitted)], nowMs: now, isEnabled: true)
+        #expect(onlyAuto.processingRequiresPower)
+        #expect(onlyAuto.processingNotBeforeMs == now + 15 * minute, "the request itself is unchanged")
+        // One song somebody is waiting for and the pass runs without it.
+        let mixed = CloudBackgroundPlanner.plan(jobs: [auto(1, .queued), record(2, .queued)], nowMs: now, isEnabled: true)
+        #expect(!mixed.processingRequiresPower)
+        var sing = record(3, .queued)
+        sing.origin = .sing
+        #expect(!CloudBackgroundPlanner.plan(jobs: [auto(1, .queued), sing], nowMs: now, isEnabled: true).processingRequiresPower)
+        // Finished auto jobs do not count; nothing outstanding asks for nothing.
+        let finished = CloudBackgroundPlanner.plan(jobs: [auto(1, .imported), record(2, .running)], nowMs: now, isEnabled: true)
+        #expect(!finished.processingRequiresPower)
+        #expect(CloudBackgroundPlanner.plan(jobs: [], nowMs: now, isEnabled: true) == .none)
+    }
+
     // MARK: Window
 
     @Test func theRefreshWindowStartsNothingInItsLastSeconds() {

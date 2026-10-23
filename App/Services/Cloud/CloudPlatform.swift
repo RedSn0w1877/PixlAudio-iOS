@@ -56,6 +56,12 @@ nonisolated enum CloudPlatform {
         return Int64((start.timeIntervalSince1970 * 1000).rounded(.down))
     }
 
+    /// Start of the local calendar day containing `ms` (Prepare songs ahead counts its songs per day from here).
+    static func localDayStartMs(_ ms: Int64) -> Int64 {
+        let start = Calendar.current.startOfDay(for: Date(timeIntervalSince1970: Double(ms) / 1000))
+        return Int64((start.timeIntervalSince1970 * 1000).rounded(.down))
+    }
+
     /// `CFBundleShortVersionString (CFBundleVersion)` for `client.build`.
     static var build: String {
         let info = Bundle.main.infoDictionary ?? [:]

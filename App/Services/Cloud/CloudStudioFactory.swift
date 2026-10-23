@@ -23,6 +23,8 @@ extension CloudStudio {
             videoIdForSpotify: { spotifyId in
                 (try? await persistence?.matchedVideoId(spotifyId: spotifyId)) ?? nil
             })
+        // The network and power facts for Sing's "is this a connection the upload may use" and for Prepare songs ahead.
+        let device = CloudDeviceConditions()
         let dependencies = Dependencies(
             store: CloudJobStore(file: CloudJobStore.defaultFile()),
             host: host,
@@ -45,8 +47,12 @@ extension CloudStudio {
             build: CloudPlatform.build,
             removeStaged: { CloudTransfers.removeStaged(jobKey: $0) },
             background: CloudBackground(),
-            notifier: LiveCloudNotifier())
+            notifier: LiveCloudNotifier(),
+            dayStartMs: { CloudPlatform.localDayStartMs($0) },
+            networkConditions: { device.network },
+            autoConditions: { device.autoConditions() })
         let studio = CloudStudio(settings: settings, dependencies: dependencies)
+        studio.deviceConditions = device
         // BGProcessing handlers must be registered before the app finishes launching: this runs in AppEnvironment.init.
         CloudBackground.registerProcessing(for: studio)
         return studio

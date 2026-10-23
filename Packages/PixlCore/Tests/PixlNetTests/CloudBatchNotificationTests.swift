@@ -44,6 +44,26 @@ import Testing
         #expect(CloudBatchNotifier.completions(previouslyIncomplete: ["b1"], jobs: jobs, alreadyNotified: []).isEmpty)
     }
 
+    @Test func songsPreparedAheadAreNeverAnnounced() {
+        var one = record(1, .imported, batch: "auto", instrumental: true)
+        var two = record(2, .imported, batch: "auto", instrumental: true)
+        one.origin = .auto
+        two.origin = .auto
+        #expect(CloudBatchNotifier.completions(previouslyIncomplete: ["auto"], jobs: [one, two], alreadyNotified: []).isEmpty)
+        // A failed auto job is not news either: nobody asked for it.
+        var failed = record(3, .failed, batch: "auto2")
+        failed.origin = .auto
+        #expect(CloudBatchNotifier.completions(previouslyIncomplete: ["auto2"], jobs: [failed], alreadyNotified: []).isEmpty)
+        // A batch with a song somebody did ask for still is.
+        var sing = record(4, .imported, batch: "mixed", instrumental: true)
+        sing.origin = .sing
+        var helper = record(5, .imported, batch: "mixed", instrumental: true)
+        helper.origin = .auto
+        #expect(CloudBatchNotifier.completions(previouslyIncomplete: ["mixed"], jobs: [sing, helper], alreadyNotified: []).count == 1)
+        // A Sing tap is announced like any other song.
+        #expect(CloudBatchNotifier.completions(previouslyIncomplete: ["mixed"], jobs: [sing], alreadyNotified: []).count == 1)
+    }
+
     @Test func failuresCountAsNewsAndCancelledSongsDoNotCount() {
         let jobs = [record(1, .imported, instrumental: true), record(2, .failed), record(3, .cancelled)]
         let outcome = CloudBatchNotifier.completions(previouslyIncomplete: ["b1"], jobs: jobs, alreadyNotified: [])[0]

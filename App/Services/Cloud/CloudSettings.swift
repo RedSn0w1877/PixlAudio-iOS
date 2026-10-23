@@ -38,10 +38,19 @@ final class CloudSettings {
         static let notifyWhenDone = "cloud_studio_notify_done"
         /// Batches already announced by a notification (newest last, capped), so none is announced twice.
         static let notifiedBatches = "cloud_studio_notified_batches"
+        /// "Prepare songs ahead in the cloud" (Settings › Sing): off by default.
+        static let autoEnabled = "cloud_studio_auto_enabled"
+        /// The monthly budget of the songs it sends on its own (µ$).
+        static let autoBudget = "cloud_studio_auto_budget_micro_usd"
+        /// The most songs it sends in a day.
+        static let autoDailyCap = "cloud_studio_auto_daily_cap"
+        /// What it has spent this month and sent today (JSON). Kept apart from the job list on purpose, so removing
+        /// finished jobs never makes room under the budget.
+        static let autoLedger = "cloud_studio_auto_ledger"
 
         static let all = [enabled, endpointId, r2Endpoint, bucket, instrumental, lyrics, transcribe, quality, cellular,
                           pricePerSecond, monthlyCap, keysSaved, workerCaps, useOwnKeys, removedSpend, notifyWhenDone,
-                          notifiedBatches]
+                          notifiedBatches, autoEnabled, autoBudget, autoDailyCap, autoLedger]
     }
 
     /// Where the built-in keys stand in this build.
@@ -104,6 +113,26 @@ final class CloudSettings {
     var pricePerSecondMicroUSD: Int64 { didSet { defaults.set(pricePerSecondMicroUSD, forKey: Keys.pricePerSecond) } }
     /// The app's monthly cap (default $3): submissions stop once the month's recorded cost reaches it.
     var monthlyCapMicroUSD: Int64 { didSet { defaults.set(monthlyCapMicroUSD, forKey: Keys.monthlyCap) } }
+    /// "Prepare songs ahead in the cloud": PixlAudio picks songs you're likely to sing and has the cloud get their
+    /// instrumentals ready on Wi-Fi. Off until the person turns it on; the one way songs are sent without a tap on them.
+    var autoPrepareEnabled: Bool { didSet { defaults.set(autoPrepareEnabled, forKey: Keys.autoEnabled) } }
+    /// What those songs may cost in a month (µ$, default $1): never more than the monthly cap above.
+    var autoPrepareBudgetMicroUSD: Int64 {
+        didSet {
+            let clamped = min(max(autoPrepareBudgetMicroUSD, 0), effectiveMonthlyCapMicroUSD)
+            if clamped != autoPrepareBudgetMicroUSD { autoPrepareBudgetMicroUSD = clamped }
+            defaults.set(autoPrepareBudgetMicroUSD, forKey: Keys.autoBudget)
+        }
+    }
+    /// The most songs it sends in a day (1…30, default 12).
+    var autoPrepareDailyCap: Int {
+        didSet {
+            let clamped = min(max(autoPrepareDailyCap, CloudAutoBudget.dailyCapRange.lowerBound),
+                              CloudAutoBudget.dailyCapRange.upperBound)
+            if clamped != autoPrepareDailyCap { autoPrepareDailyCap = clamped }
+            defaults.set(autoPrepareDailyCap, forKey: Keys.autoDailyCap)
+        }
+    }
     /// The endpoint's own limits as its last selftest reported them (nil until one ran): prepared songs over them are
     /// stopped before the upload (`CloudLimits.workerRefusal`).
     var workerCaps: CloudWorkerCaps? {
@@ -125,6 +154,8 @@ final class CloudSettings {
     /// The month (its start) and the recorded cost of the jobs removed from the list in it.
     private var removedSpendMonthMs: Int64
     private var removedSpendTotalMicroUSD: Int64
+    /// What auto-prepare spent this month and sent today (as last written; `CloudStudio` rolls it to the clock).
+    private(set) var autoLedger: CloudAutoLedger
 
     /// `builtIn`: this build's built-in keys (nil: none, as in tests and the UI-test demo by default).
     init(defaults: UserDefaults, secrets: any CloudSecretStoring, builtIn: (any CloudBuiltInKeysProviding)? = nil) {
@@ -156,6 +187,14 @@ final class CloudSettings {
         removedSpendMonthMs = removed?[0].int64Value ?? 0
         removedSpendTotalMicroUSD = max(removed?[1].int64Value ?? 0, 0)
         workerCaps = defaults.data(forKey: Keys.workerCaps).flatMap { try? CloudJSON.decode(CloudWorkerCaps.self, from: $0) }
+        autoPrepareEnabled = defaults.bool(Keys.autoEnabled, default: false)
+        let autoBudget = (defaults.object(forKey: Keys.autoBudget) as? NSNumber)?.int64Value
+        autoPrepareBudgetMicroUSD = autoBudget.map { min(max($0, 0), 1_000_000_000) } ?? CloudAutoBudget.defaultMonthlyMicroUSD
+        let autoCap = (defaults.object(forKey: Keys.autoDailyCap) as? NSNumber)?.intValue
+        autoPrepareDailyCap = autoCap.map { min(max($0, CloudAutoBudget.dailyCapRange.lowerBound), CloudAutoBudget.dailyCapRange.upperBound) }
+            ?? CloudAutoBudget.defaultDailyCap
+        autoLedger = defaults.data(forKey: Keys.autoLedger).flatMap { try? JSONDecoder().decode(CloudAutoLedger.self, from: $0) }
+            ?? CloudAutoLedger()
     }
 
     /// Reads the Keychain off the main actor (once; `force` after a restore or a test), and opens the built-in keys
@@ -240,6 +279,30 @@ final class CloudSettings {
         removedSpendMonthMs = monthStartMs
         removedSpendTotalMicroUSD = total
         defaults.set([NSNumber(value: monthStartMs), NSNumber(value: total)], forKey: Keys.removedSpend)
+    }
+
+    // MARK: Auto-prepare
+
+    /// The auto budget the guards use: the setting, but never above the monthly cap in force.
+    var effectiveAutoBudgetMicroUSD: Int64 {
+        min(max(autoPrepareBudgetMicroUSD, 0), effectiveMonthlyCapMicroUSD)
+    }
+
+    /// The ledger rolled to the month and day in force.
+    func rolledAutoLedger(monthStartMs: Int64, dayStartMs: Int64) -> CloudAutoLedger {
+        var ledger = autoLedger
+        ledger.roll(monthStartMs: monthStartMs, dayStartMs: dayStartMs)
+        return ledger
+    }
+
+    /// Changes the ledger (after rolling it to the month and day in force) and writes it.
+    func updateAutoLedger(monthStartMs: Int64, dayStartMs: Int64, _ change: (inout CloudAutoLedger) -> Void) {
+        var ledger = autoLedger
+        ledger.roll(monthStartMs: monthStartMs, dayStartMs: dayStartMs)
+        change(&ledger)
+        guard ledger != autoLedger else { return }
+        autoLedger = ledger
+        if let data = try? JSONEncoder().encode(ledger) { defaults.set(data, forKey: Keys.autoLedger) }
     }
 
     /// Saves edited secrets to the Keychain (off the main actor).
