@@ -131,6 +131,8 @@ nonisolated enum AppRoute: Hashable, Sendable {
     /// Blocked artists (iOS-first, 2026-10-18): a page of Settings › Library & storage. The Gestures page is gone: its
     /// switches sit in Settings › Gestures & haptics.
     case blockedArtists
+    /// Listening history (spec B2): Settings › Library & storage › Import from a file, and Home's one-time card.
+    case listeningHistory
     case delimiterConfig
     case wordDelimiterConfig
     case equalizer
@@ -176,6 +178,7 @@ nonisolated enum AppRoute: Hashable, Sendable {
         case .experimental: "experimental"
         case .artistSettings: "artistSettings"
         case .blockedArtists: "blockedArtists"
+        case .listeningHistory: "listeningHistory"
         case .delimiterConfig: "delimiterConfig"
         case .wordDelimiterConfig: "wordDelimiterConfig"
         case .equalizer: "equalizer"

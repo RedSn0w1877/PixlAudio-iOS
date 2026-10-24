@@ -1,0 +1,35 @@
+[{
+  "header": "YouTube Music",
+  "title": "Watched Get Lucky (feat. Pharrell Williams)",
+  "titleUrl": "https://music.youtube.com/watch?v=5NV6Rdv1a3I",
+  "subtitles": [{"name": "Daft Punk - Topic", "url": "https://www.youtube.com/channel/UCx"}],
+  "time": "2024-04-10T20:15:30.123Z",
+  "products": ["YouTube"],
+  "activityControls": ["YouTube watch history"]
+},{
+  "header": "YouTube",
+  "title": "Watched How to fix a bike [part 1, \"easy\"]",
+  "titleUrl": "https://www.youtube.com/watch?v=abcdefghijk",
+  "subtitles": [{"name": "Bike Channel", "url": "https://www.youtube.com/channel/UCy"}],
+  "time": "2024-04-10T19:00:00.000Z",
+  "products": ["YouTube"]
+},{
+  "header": "YouTube",
+  "title": "Watched The Weeknd - Blinding Lights (Official Video)",
+  "titleUrl": "https://www.youtube.com/watch?v=4NRXx6U8ABQ",
+  "subtitles": [{"name": "TheWeekndVEVO", "url": "https://www.youtube.com/channel/UCz"}],
+  "time": "2024-04-09T10:00:00Z",
+  "products": ["YouTube"]
+},{
+  "header": "YouTube Music",
+  "title": "Watched a video that has been removed",
+  "time": "2024-04-08T10:00:00Z",
+  "products": ["YouTube"]
+},{
+  "header": "YouTube",
+  "title": "Watched Some ad",
+  "titleUrl": "https://www.youtube.com/watch?v=zzzzzzzzzzz",
+  "subtitles": [{"name": "Brand - Topic"}],
+  "time": "2024-04-07T10:00:00Z",
+  "details": [{"name": "From Google Ads"}]
+}]

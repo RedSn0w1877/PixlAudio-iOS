@@ -23,8 +23,9 @@ public enum SpotifyAuth {
     public static let androidRedirectURI = "pixelplay://spotify-callback"
 
     /// `user-top-read` (most-played) was added after the first release, `user-read-playback-state` and
-    /// `user-modify-playback-state` (Spotify Connect output) after 1.0.0: accounts linked before must reconnect once.
-    public static let scopes = "user-library-read playlist-read-private playlist-read-collaborative user-read-private user-top-read user-read-playback-state user-modify-playback-state"
+    /// `user-modify-playback-state` (Spotify Connect output) after 1.0.0, `user-read-recently-played` and
+    /// `user-follow-read` (listening-history sync) after that: accounts linked before must reconnect once.
+    public static let scopes = "user-library-read playlist-read-private playlist-read-collaborative user-read-private user-top-read user-read-playback-state user-modify-playback-state user-read-recently-played user-follow-read"
 
     public static let expiryMarginMs: Int64 = 300_000
     public static let defaultExpiresInSeconds: Int64 = 3600
