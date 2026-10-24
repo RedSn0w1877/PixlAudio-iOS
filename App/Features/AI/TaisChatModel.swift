@@ -213,6 +213,9 @@ final class TaisChatModel {
                                                            TaizoAssistant.userMessage(now: now.context, text: pending.prompt))
         let tools = toolbox ?? assistant.toolbox()
         toolbox = tools
+        // The user's own words for this turn: the only thing that may justify a taste change (`TasteChangeGuard`).
+        tools.turn.begin(userMessage: pending.prompt)
+        defer { tools.turn.end() }
         let progress = ClaudeTurnProgress()
         let loop = ClaudeToolLoop(
             client: client, system: record.system, tools: tools, serverTools: TaizoAssistant.serverTools,
@@ -306,6 +309,11 @@ final class TaisChatModel {
         case .getLyrics?: return "Getting the lyrics…"
         case .startSing?: return "Getting Sing ready…"
         case .likeSong?: return "Saving your like…"
+        case .getTasteProfile?: return "Reading your taste…"
+        case .getLibraryOverview?: return "Looking at your library…"
+        case .adjustTaste?: return "Updating your taste…"
+        case .listTasteAdjustments?: return "Checking your taste changes…"
+        case .removeTasteAdjustment?: return "Undoing a taste change…"
         case nil: return "Working on it…"
         }
     }

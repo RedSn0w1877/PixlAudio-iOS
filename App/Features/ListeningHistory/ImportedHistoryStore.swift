@@ -285,6 +285,22 @@ final class ImportedHistoryStore {
         return (plays, taste)
     }
 
+    /// What the taste profile and the library stats read (Ask Taizo): every play, the app's and the imported ones, as
+    /// listening plays; the imported plays themselves (they carry completions and skips); Spotify's own lists. Gathered
+    /// off the main thread.
+    func tasteSources() async -> TasteSources {
+        await ensureLoaded()
+        let local = localSource()
+        let (imported, taste) = await box.contents()
+        return await Task.detached(priority: .userInitiated) { () -> TasteSources in
+            let songsById = Dictionary(local.songs.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            let mapper = ImportedHistoryMapper(library: local.songs)
+            let plays = ListeningHistoryInsights.plays(events: local.events, songsById: songsById)
+                + ListeningHistoryInsights.plays(imported: imported, mapper: mapper)
+            return TasteSources(plays: plays, imported: imported, taste: taste)
+        }.value
+    }
+
     /// The strongest artists of a period (a Spotify or in-app play counts 1, a YouTube Music play 0.35).
     func topArtists(_ period: ListeningPeriod, limit: Int = 20) async -> [ArtistInsight] {
         let (plays, _) = await allPlays()
@@ -316,6 +332,13 @@ final class ImportedHistoryStore {
         await ensureLoaded()
         return await box.contents().taste
     }
+}
+
+/// Every play there is, for the taste profile.
+nonisolated struct TasteSources: Sendable {
+    var plays: [ListeningPlay]
+    var imported: [ImportedPlay]
+    var taste: ExternalTasteSnapshot
 }
 
 /// The imported plays and taste on disk (`imported_history.tsv`, `imported_taste.json` in Application Support).

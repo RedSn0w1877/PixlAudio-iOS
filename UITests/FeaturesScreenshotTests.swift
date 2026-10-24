@@ -57,6 +57,10 @@ final class FeaturesScreenshotTests: XCTestCase {
 
     func testBlockedArtistsLight() throws { try capture("blockedArtists", "light", ready: "screen.blockedArtists") }
     func testBlockedArtistsDark() throws { try capture("blockedArtists", "dark", ready: "screen.blockedArtists") }
+
+    func testTasteChangesLight() throws { try capture("tasteChanges", "light", ready: "screen.tasteChanges") }
+    func testTasteChangesDark() throws { try capture("tasteChanges", "dark", ready: "screen.tasteChanges") }
+    func testTasteChangesEmptyLight() throws { try capture("tasteChangesEmpty", "light", ready: "screen.tasteChanges") }
     func testBlockedArtistsEmptyLight() throws {
         try capture("blockedArtistsEmpty", "light", ready: "screen.blockedArtists")
     }

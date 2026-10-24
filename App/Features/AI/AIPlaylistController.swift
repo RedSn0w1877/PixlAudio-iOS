@@ -90,7 +90,9 @@ final class AIPlaylistController {
     }
 
     private func runGeneration(prompt: String, minLength: Int, maxLength: Int, saveAsPlaylist: Bool, playlistName: String?) async {
-        let allSongs = library.songs
+        // Muted and blocked songs (Ask Taizo's taste changes) are not candidates.
+        let adjustmentSet = await home.tasteSet()
+        let allSongs = adjustmentSet.allowed(library.songs)
         isGenerating = true
         error = nil
         isSuccess = false
@@ -103,7 +105,7 @@ final class AIPlaylistController {
         let existingNames = Set(library.playlists.map { $0.name.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty })
 
         status = "Selecting best candidates..."
-        let context = await requestContext(allSongs: allSongs, candidateLimit: 120)
+        let context = await requestContext(allSongs: allSongs, candidateLimit: 120, adjustments: adjustmentSet)
 
         status = "Consulting the Daily Mix guide..."
         let result = await curate(prompt: prompt, allSongs: allSongs, minLength: minLength, maxLength: maxLength,
@@ -148,7 +150,8 @@ final class AIPlaylistController {
     @discardableResult
     func refineDailyMix(prompt: String) async -> String {
         guard !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return "Write an idea for your Daily Mix" }
-        let allSongs = library.songs
+        let adjustmentSet = await home.tasteSet()
+        let allSongs = adjustmentSet.allowed(library.songs)
         let current = home.content.dailyMix
         isGenerating = true
         error = nil
@@ -161,7 +164,7 @@ final class AIPlaylistController {
         let minLength = max(Int(Double(desiredSize) * 0.6), 10)
         let maxLength = max(desiredSize, 20)
         status = "Scanning for vibes..."
-        let context = await requestContext(allSongs: allSongs, candidateLimit: 100)
+        let context = await requestContext(allSongs: allSongs, candidateLimit: 100, adjustments: adjustmentSet)
         status = "Applying AI filters..."
         let result = await curate(prompt: prompt, allSongs: allSongs, minLength: minLength, maxLength: maxLength,
                                   context: context, type: .dailyMix)
@@ -222,7 +225,7 @@ final class AIPlaylistController {
     /// The candidate pool (`DailyMixManager.generateDailyMix`, today's seed), the AI ranking fallback
     /// (`getTopCandidatesForAi`, seed + 42), per-song play counts and the listening-profile digest — computed off the
     /// main thread from the library and the playback history.
-    private func requestContext(allSongs: [Song], candidateLimit: Int) async -> RequestContext {
+    private func requestContext(allSongs: [Song], candidateLimit: Int, adjustments: TasteAdjustmentSet) async -> RequestContext {
         await home.history.ensureLoaded()
         let events = home.history.events
         let clock = home.history.clock
@@ -233,22 +236,25 @@ final class AIPlaylistController {
         return await Task.detached(priority: .userInitiated) {
             Self.computeContext(allSongs: allSongs, events: events, nowMs: clock.nowMs(), timeZone: clock.timeZone,
                                 playlistNames: playlistNames, candidateLimit: candidateLimit, safeTokenLimit: safe,
-                                digestMode: digestMode, includeExtendedFields: extended)
+                                digestMode: digestMode, includeExtendedFields: extended, adjustments: adjustments)
         }.value
     }
 
     nonisolated static func computeContext(allSongs: [Song], events: [PlaybackEvent], nowMs: Int64, timeZone: TimeZone,
                                            playlistNames: [String], candidateLimit: Int, safeTokenLimit: Bool,
-                                           digestMode: String, includeExtendedFields: Bool) -> RequestContext {
+                                           digestMode: String, includeExtendedFields: Bool,
+                                           adjustments: TasteAdjustmentSet = .empty) -> RequestContext {
         let engagements = HomeStore.engagementStats(events)
         let favorites = Set(allSongs.filter(\.isFavorite).map(\.id))
         let epochDay = ZoneClock(timeZone).localDate(at: nowMs).epochDay
         let candidates = DailyMix.personalizedPicks(allSongs: allSongs, favoriteSongIds: favorites, engagements: engagements,
                                                     storedSignals: [:], nowMs: nowMs, limit: candidateLimit,
-                                                    seed: DailyMix.dailySeed(epochDay: epochDay)).map(\.song)
+                                                    seed: DailyMix.dailySeed(epochDay: epochDay),
+                                                    adjustments: adjustments).map(\.song)
         let ranked = candidates.isEmpty
             ? DailyMix.personalizedPicks(allSongs: allSongs, favoriteSongIds: [], engagements: engagements, storedSignals: [:],
-                                         nowMs: nowMs, limit: 100, seed: DailyMix.aiCandidatesSeed(epochDay: epochDay)).map(\.song)
+                                         nowMs: nowMs, limit: 100, seed: DailyMix.aiCandidatesSeed(epochDay: epochDay),
+                                         adjustments: adjustments).map(\.song)
             : []
         let summary = PlaybackStats.buildSummary(range: .all, songs: allSongs, nowMillis: nowMs, events: events, timeZone: timeZone)
         let listening = AiListeningSummary(

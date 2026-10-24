@@ -105,9 +105,29 @@ enum TaizoContextBuilder {
         let playlists = env.library.playlists.sorted { $0.sortOrder < $1.sortOrder }.map(\.name)
         let events = env.home.history.events
         let nowMs = currentTimeMillis()
-        return await Task.detached(priority: .userInitiated) {
-            compute(songs: songs, artistCount: artistCount, playlists: playlists, events: events, nowMs: nowMs).render()
+        var context = await Task.detached(priority: .userInitiated) {
+            compute(songs: songs, artistCount: artistCount, playlists: playlists, events: events, nowMs: nowMs)
         }.value
+        // The taste digest, built by code from every play (the app's and the imported ones): top artists and genres, the
+        // last plays, the artists the user skips, the taste changes in force and how many plays it all rests on.
+        let profile = await TaizoTaste.profile(env, period: .sixMonths)
+        context.tasteDigest = profile.digestLines()
+        if profile.totalPlays > 0 {
+            context.periodLabel = profile.periodUsed == .allTime ? "of all time" : "in the last 6 months"
+            context.totalListeningHours = nil
+            context.topArtists = []
+            context.topGenres = []
+            context.recentPlays = []
+            context.topSongs = profile.topTracks.prefix(TaizoListeningContext.maxTopSongs).map {
+                TaizoSongLine(title: $0.title, artist: $0.artist, detail: $0.plays == 1 ? "1 play" : "\($0.plays) plays")
+            }
+            let imported = profile.spotifyPlays + profile.youTubeMusicPlays
+            if imported > 0 {
+                context.importedHistory = "\(imported.formatted()) plays imported (\(profile.spotifyPlays.formatted()) Spotify, "
+                    + "\(profile.youTubeMusicPlays.formatted()) YouTube Music)"
+            }
+        }
+        return context.render()
     }
 
     nonisolated static func compute(songs: [Song], artistCount: Int, playlists: [String], events: [PlaybackEvent],
