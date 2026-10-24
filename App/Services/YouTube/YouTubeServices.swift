@@ -18,6 +18,8 @@ final class YouTubeServices {
     @ObservationIgnored let deviceAuth: GoogleDeviceAuthClient?
     @ObservationIgnored let poTokens: PoTokenGenerator?
     @ObservationIgnored let searchProvider: (any SearchProviding)?
+    /// YouTube Music's history page (listening-history import; cookie sessions only).
+    @ObservationIgnored let historyClient: YouTubeMusicHistoryClient?
     @ObservationIgnored private let loader: YouTubeResourceLoader?
     @ObservationIgnored private var prefetcher: YouTubePrefetcher?
     @ObservationIgnored private let accounts: AccountsStore
@@ -34,6 +36,7 @@ final class YouTubeServices {
             deviceAuth = nil
             poTokens = nil
             searchProvider = nil
+            historyClient = nil
             loader = nil
             downloads = DownloadManager(service: nil, fetcher: nil)
             return
@@ -50,6 +53,7 @@ final class YouTubeServices {
         self.poTokens = poTokens
         let account = YouTubeAccount(http: plain, poTokens: poTokens)
         self.account = account
+        historyClient = YouTubeMusicHistoryClient(http: plain, session: account)
         let deviceAuth = GoogleDeviceAuthClient(http: plain, store: account)
         self.deviceAuth = deviceAuth
         let innerTube = GoogleBearerHTTPClient(inner: plain, accessToken: { await deviceAuth.validAccessToken() })
@@ -114,6 +118,12 @@ final class YouTubeServices {
         await service?.invalidateAll()
         await refreshAccountState()
         return true
+    }
+
+    /// The signed-in YouTube Music history as plays; nil when not signed in with a cookie or YouTube refused.
+    func fetchMusicHistory(nowMs: Int64, timeZone: TimeZone) async -> [ImportedPlay]? {
+        guard let historyClient, let account, await account.hasCookie else { return nil }
+        return await historyClient.fetchPlays(nowMs: nowMs, timeZone: timeZone)
     }
 
     func signOut() async {

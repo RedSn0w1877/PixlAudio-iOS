@@ -131,14 +131,18 @@ public enum MusicRecommendationEngine {
     /// song id itself, i.e. every entry is a separate record).
     public static func rank(songs: [Song], favorites: Set<String>, signals: [String: Signal],
                             history: [String: History], nowMs: Int64, seed: Int64,
-                            signalSources: [String: String] = [:], historySources: [String: String] = [:]) -> [Pick] {
+                            signalSources: [String: String] = [:], historySources: [String: String] = [:],
+                            artistAffinity: [String: Double] = [:]) -> [Pick] {
         rankKeyed(songs: songs, favorites: favorites, signals: signals, history: history, nowMs: nowMs, seed: seed,
-                  signalSources: signalSources, historySources: historySources).map(\.pick)
+                  signalSources: signalSources, historySources: historySources, artistAffinity: artistAffinity).map(\.pick)
     }
 
+    /// `artistAffinity` (imported listening history, an addition shared with Android): extra taste weight per
+    /// normalised first artist, added to the artist weights before they are scaled. Empty = the plain port, bit for bit.
     static func rankKeyed(songs: [Song], favorites: Set<String>, signals: [String: Signal],
                           history: [String: History], nowMs: Int64, seed: Int64,
-                          signalSources: [String: String], historySources: [String: String]) -> [KeyedPick] {
+                          signalSources: [String: String], historySources: [String: String],
+                          artistAffinity: [String: Double] = [:]) -> [KeyedPick] {
         let favoriteKeys = Set(favorites.map(KotlinKey.init))
         let signalMap = keyed(signals), historyMap = keyed(history)
         let signalSourceMap = keyed(signalSources), historySourceMap = keyed(historySources)
@@ -186,6 +190,15 @@ public enum MusicRecommendationEngine {
             artistWeights[artist] = artistWeights[artist].map { $0 + weight } ?? weight
             if let genre = candidate.keys.genre {
                 genreWeights[genre] = genreWeights[genre].map { $0 + weight } ?? weight
+            }
+        }
+        if !artistAffinity.isEmpty {
+            var applied = Set<KotlinKey>()
+            for candidate in candidates {
+                let artist = candidate.keys.artist
+                guard applied.insert(KotlinKey(artist)).inserted else { continue }
+                let prior = artistAffinity[artist] ?? artistAffinity[ImportedPlayIdentity.primaryArtistKey(artist)]
+                if let prior, prior != 0 { artistWeights[artist] = (artistWeights[artist] ?? 0) + prior }
             }
         }
         let artistScale = maxAbs(artistWeights.values).map { max($0, 1.0) } ?? 1.0
@@ -388,17 +401,19 @@ public enum Muselle {
     static func rankKeyed(_ variant: MuselleVariant, songs: [Song], favorites: Set<String>,
                           signals: [String: MusicRecommendationEngine.Signal],
                           history: [String: MusicRecommendationEngine.History], nowMs: Int64, seed: Int64,
-                          signalSources: [String: String], historySources: [String: String])
+                          signalSources: [String: String], historySources: [String: String],
+                          artistAffinity: [String: Double] = [:])
         -> [MusicRecommendationEngine.KeyedPick]
     {
         switch variant {
         case .basic:
             MusicRecommendationEngine.rankKeyed(songs: songs, favorites: favorites, signals: signals, history: history,
                                                 nowMs: nowMs, seed: seed, signalSources: signalSources,
-                                                historySources: historySources)
+                                                historySources: historySources, artistAffinity: artistAffinity)
         case .plus:
             Muselle2.rankKeyed(songs: songs, favorites: favorites, signals: signals, history: history, nowMs: nowMs,
-                               seed: seed, signalSources: signalSources, historySources: historySources)
+                               seed: seed, signalSources: signalSources, historySources: historySources,
+                               artistAffinity: artistAffinity)
         }
     }
 }
@@ -416,12 +431,14 @@ public enum Muselle2 {
 
     static func rankKeyed(songs: [Song], favorites: Set<String>, signals: [String: MusicRecommendationEngine.Signal],
                           history: [String: MusicRecommendationEngine.History], nowMs: Int64, seed: Int64,
-                          signalSources: [String: String], historySources: [String: String])
+                          signalSources: [String: String], historySources: [String: String],
+                          artistAffinity: [String: Double] = [:])
         -> [MusicRecommendationEngine.KeyedPick]
     {
         let baseline = MusicRecommendationEngine.rankKeyed(songs: songs, favorites: favorites, signals: signals,
                                                            history: history, nowMs: nowMs, seed: seed,
-                                                           signalSources: signalSources, historySources: historySources)
+                                                           signalSources: signalSources, historySources: historySources,
+                                                           artistAffinity: artistAffinity)
         if baseline.count < 2 { return baseline }
         var artistCounts: [KotlinKey: Int] = [:]
         var genreCounts: [KotlinKey: Int] = [:]
@@ -567,7 +584,7 @@ public enum DailyMix {
                                          engagements: [String: EngagementStats],
                                          storedSignals: [String: MusicRecommendationEngine.Signal],
                                          exploration: Float = 0.25, nowMs: Int64, limit: Int = 30,
-                                         seed: Int64) -> [MusicRecommendationEngine.Pick] {
+                                         seed: Int64, artistAffinity: [String: Double] = [:]) -> [MusicRecommendationEngine.Pick] {
         if allSongs.isEmpty || limit <= 0 { return [] }
         let inputs = RecommendationInputs.resolve(library: allSongs, storedSignals: storedSignals,
                                                   storedHistory: engagements.mapValues(\.history))
@@ -579,7 +596,8 @@ public enum DailyMix {
         let ranked = MusicRecommendationEngine.rankKeyed(songs: allSongs, favorites: favorites, signals: inputs.signals,
                                                     history: inputs.history, nowMs: nowMs, seed: seed,
                                                     signalSources: inputs.signalSources,
-                                                    historySources: inputs.historySources)
+                                                    historySources: inputs.historySources,
+                                                    artistAffinity: artistAffinity)
         return MusicRecommendationEngine.selectKeyed(ranked, limit: limit, explorationFraction: exploration).map(\.pick)
     }
 }
@@ -628,14 +646,16 @@ public enum HomeRecommendationPlanner {
                             signals: [String: MusicRecommendationEngine.Signal],
                             history: [String: MusicRecommendationEngine.History], discoveries: [Song] = [],
                             releases: [Song] = [], nowMs: Int64, seed: Int64, variant: MuselleVariant = .basic,
-                            signalSources: [String: String] = [:], historySources: [String: String] = [:])
+                            signalSources: [String: String] = [:], historySources: [String: String] = [:],
+                            artistAffinity: [String: Double] = [:])
         -> HomeRecommendations
     {
         typealias Item = MusicRecommendationEngine.KeyedPick
         let key = MusicRecommendationEngine.recordingKey
         let rank = Muselle.rankKeyed(variant, songs: library + discoveries + releases, favorites: favorites,
                                      signals: signals, history: history, nowMs: nowMs, seed: seed,
-                                     signalSources: signalSources, historySources: historySources)
+                                     signalSources: signalSources, historySources: historySources,
+                                     artistAffinity: artistAffinity)
         let localKeys = Set(library.map { KotlinKey(key($0)) })
         let local = rank.filter { localKeys.contains(KotlinKey($0.keys.recording)) }
         let favoriteKeys = Set(favorites.map(KotlinKey.init))

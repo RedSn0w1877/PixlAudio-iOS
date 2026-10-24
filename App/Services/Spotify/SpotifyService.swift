@@ -66,6 +66,9 @@ final class SpotifyService {
     @ObservationIgnored private let demo: SpotifyDemo?
     /// The last catalogue search results by id (`SpotifyCatalogSearchProvider`).
     @ObservationIgnored var catalogCache: [String: SpotifyTrack] = [:]
+    /// Listening history (`ListeningHistorySync`): a sign-in finished, and a slice of the background refresh.
+    @ObservationIgnored var onConnected: (@MainActor () -> Void)?
+    @ObservationIgnored var onBackgroundRefresh: (@MainActor () async -> Void)?
 
     static let backgroundTaskIdentifier = "io.github.redsn0w1877.pixlaudio.spotify-sync"
     /// Background refresh: at most every 6 hours, and only when the last full sync is older than 12 hours.
@@ -241,6 +244,7 @@ final class SpotifyService {
             message = "Connected to Spotify. Importing your library…"
             syncNow()
             scheduleBackgroundRefresh()
+            onConnected?()
         case .failure(let error):
             message = "Spotify sign-in failed: \(error.message)"
         }
@@ -578,7 +582,20 @@ final class SpotifyService {
             let runner = SpotifyMatchRunner(store: persistence, matcher: { try await matcher.findMatch($0) })
             _ = try? await runner.run(shouldContinue: { Date().timeIntervalSince(started) < budget })
         }
+        // Listening history: a handful of small requests, when there is still time.
+        if budget - Date().timeIntervalSince(started) > 5 { await onBackgroundRefresh?() }
         await refreshLibraryState()
+    }
+
+    // MARK: Listening history (spec B1)
+
+    /// Recent plays, top lists and followed artists (nil when signed out or in UI tests). `needsReconnect`: the login
+    /// predates the history scopes (Spotify said 403, or the granted scope lacks them).
+    func fetchListeningHistory(nowMs: Int64) async -> (fetch: SpotifyListeningFetch?, needsReconnect: Bool)? {
+        guard !isDemo, isLoggedIn else { return nil }
+        let lacks = SpotifyListeningHistoryClient.lacksScopes(granted: await session.grantedScope())
+        let fetch = try? await SpotifyListeningHistoryClient(api: api).fetch(nowMs: nowMs)
+        return (fetch, lacks || (fetch?.needsReconnect ?? false))
     }
 
     // MARK: Demo (UI tests)

@@ -30,17 +30,21 @@ final class SingPrepareRunner {
         var signals: () -> [String: MusicRecommendationEngine.Signal]
         var blocked: () -> BlockedArtistMatcher
         var isAppActive: () -> Bool
+        /// Imported Spotify / YouTube Music listening (plays and signals join the app's own).
+        var imported: () -> ImportedHistoryAggregate
 
         init(songs: @escaping () -> [Song], playlists: @escaping () -> [Playlist],
              events: @escaping () -> [PlaybackEvent],
              signals: @escaping () -> [String: MusicRecommendationEngine.Signal],
-             blocked: @escaping () -> BlockedArtistMatcher, isAppActive: @escaping () -> Bool) {
+             blocked: @escaping () -> BlockedArtistMatcher, isAppActive: @escaping () -> Bool,
+             imported: @escaping () -> ImportedHistoryAggregate = { .empty }) {
             self.songs = songs
             self.playlists = playlists
             self.events = events
             self.signals = signals
             self.blocked = blocked
             self.isAppActive = isAppActive
+            self.imported = imported
         }
     }
 
@@ -258,7 +262,7 @@ final class SingPrepareRunner {
 
         let now = cloud.nowMs
         let songs = sources.songs(), playlists = sources.playlists(), events = sources.events()
-        let signals = sources.signals(), blocked = sources.blocked()
+        let signals = sources.signals(), blocked = sources.blocked(), imported = sources.imported()
         // Not candidates: songs that already have an instrumental (one look at the folder), songs with a job on their way,
         // and songs whose last auto job failed lately. They still count for the ranking's album and playlist terms.
         let haveInstrumental = await cloud.songIdsWithInstrumental(among: songs)
@@ -266,7 +270,8 @@ final class SingPrepareRunner {
             .union(cloud.recentAutoFailureSongIds(sinceMs: now - Self.failureCooldownMs))
         let limit = Self.candidateLimit
         let ranked = await Task.detached(priority: .utility) { () -> [SingPrepareRanker.Candidate] in
-            let inputs = SingPrepareInputs(songs: songs, engagements: HomeStore.engagementStats(events), signals: signals,
+            let merged = HomeStore.recommendationInputs(songs: songs, events: events, signals: signals, imported: imported)
+            let inputs = SingPrepareInputs(songs: songs, engagements: merged.engagements, signals: merged.signals,
                                            recentEvents: events, playlists: playlists, excluded: excluded,
                                            blocked: blocked, nowMs: now)
             return SingPrepareRanker.rank(inputs, limit: limit)
