@@ -348,8 +348,7 @@ enum TaizoToolRunner {
         if case .loaded(let songId, let loaded, _) = env.lyrics.state, songId == song.id {
             text = TaizoContextBuilder.plainText(loaded)
         }
-        if text?.isEmpty ?? true {
-            let service = env.lyricsController.lyricsService
+        if text?.isEmpty ?? true, let service = env.lyricsController.lyricsService {
             if let stored = await service.storedLyricsAsync(for: song) {
                 text = TaizoContextBuilder.plainText(stored.lyrics)
             } else if case .success(let fetched) = await service.fetchFromRemote(song: song) {
