@@ -14,6 +14,10 @@ import UIKit
 /// default and comes first; cloud providers sit in an optional "Cloud assistants" section behind a switch that is
 /// off by default, with no automatic fallback to the cloud. With the on-device model selected, Advanced shows only
 /// Temperature (the on-device paths size their own prompts and answers), and "Save on usage" is a cloud setting.
+///
+/// Claude everywhere (2026-10-23): normal users see one assistant row at the top — Ask Taizo, with the router's
+/// status line ("Claude (cloud) — switches to this phone when offline"). Developer mode adds the built-in Claude key's
+/// monthly cap ($0–$200, default $50) and this month's spend; the own-key cloud assistants stay as an override.
 struct AISettingsSection: View {
     @Environment(SettingsStore.self) private var settings
     @Environment(AppEnvironment.self) private var environment
@@ -26,12 +30,22 @@ struct AISettingsSection: View {
     @State private var models: [GeminiModel] = []
     @State private var isLoadingModels = false
     @State private var selectedModel = ""
+    /// The router's answer when the screen opened (cheap; refreshed on every appearance).
+    @State private var route: AIRoute?
+    @State private var claudeSpent = 0.0
 
     private var provider: AiProvider { AiProvider.fromString(settings.ai.provider) }
 
     var body: some View {
         let developerMode = settings.experimental.developerMode
         SettingsCategoryScaffold(category: .ai) {
+            SettingsSubsection(title: "Assistant") {
+                SettingsItemRow(title: "Ask Taizo", subtitle: AIRouter.statusLine(route ?? .claude), systemImage: "sparkles",
+                                iconColor: theme.primary) {
+                    environment.router.present(AppSheet.taisChat)
+                }
+                .accessibilityIdentifier("ai.taizo.settings")
+            }
             MusicIntelligenceCard()
             Spacer().frame(height: 20)
             SettingsSubsection(title: L10n.settingsPromptBehaviorSection, addBottomSpace: developerMode) {
@@ -42,6 +56,11 @@ struct AISettingsSection: View {
             }
         }
         .animation(PixlMotion.state, value: showsAdvanced)
+        .task {
+            // UI tests show the normal state (a build with the key, online) so screenshots don't depend on CI secrets.
+            route = environment.launch.isUITest ? .claude : ClaudeCloud.shared.route()
+            claudeSpent = environment.launch.isUITest ? 3.42 : ClaudeBudgetStore.spentDollars(.standard)
+        }
         // The Keychain read runs off the main actor (it ran synchronously during the push, and on every return).
         .task(id: provider) {
             apiKey = await Self.loadStoredKey(provider, isUITest: environment.launch.isUITest)
@@ -63,6 +82,20 @@ struct AISettingsSection: View {
         let cloud = ai.usesCloudAssistant
         SettingsAdvancedHeader()
         MusicIntelligenceToolsPanel()
+        SettingsSubsection(title: "Claude (built-in)") {
+            AIParameterRow(label: "Monthly limit", value: $ai.claudeMonthlyCap, range: 0...ClaudeBudget.maxCapDollars, steps: 39,
+                           help: "This device's monthly spend cap for the built-in Claude key. Over it, AI runs on this iPhone until next month. $0 turns cloud AI off.") {
+                String(format: "$%.0f", $0)
+            }
+            Text(verbatim: "Spent this month: " + String(format: "$%.2f of $%.0f", claudeSpent, ai.claudeMonthlyCap) + " · "
+                     + (environment.launch.isUITest || ClaudeCloud.shared.hasKey ? "built-in key present" : "no built-in key in this build"))
+                .pixlFont(.bodySmall)
+                .foregroundStyle(theme.onSurfaceVariant)
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .settingsRowGlass()
+                .accessibilityIdentifier("settings.ai.claudeSpend")
+        }
         SettingsSubsection(title: L10n.settingsAiProviderTitle) {
             OnDeviceModelRow(isSelected: !cloud && !ai.useDownloadedModel,
                              downloadedModelOn: !cloud && ai.useDownloadedModel)
@@ -206,7 +239,7 @@ struct AISettingsSection: View {
         @Bindable var ai = settings.ai
         SettingsSubsection(title: "Generation Parameters", addBottomSpace: cloud) {
             AIParameterRow(label: "Temperature", value: $ai.temperature, range: 0...2, steps: 20,
-                           help: "Controls randomness. Lower = more deterministic, higher = more creative.") {
+                           help: "Controls randomness. Lower = more deterministic, higher = more creative. Used by this iPhone's AI and your own cloud assistant only (Claude sets its own).") {
                 String(format: "%.2f", $0)
             }
             if cloud {
@@ -506,7 +539,7 @@ struct OnDeviceModelRow: View {
             return ("Language not supported yet", "The on-device model doesn't support your device language yet.", false)
         }
         if isSelected {
-            return ("On-device model · in use", "Playlists, Taizo, translation and Home's greeting run privately on this iPhone.", true)
+            return ("On-device model · ready", "Answers when you're offline or cloud AI isn't available — privately, on this iPhone.", true)
         }
         if downloadedModelOn {
             return ("On-device model", "Ready. Turn off \"Use downloaded AI model\" to use it instead.", true)

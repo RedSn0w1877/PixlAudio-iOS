@@ -20,6 +20,11 @@ import SwiftUI
 /// Glass: the composer, chips, bubbles and the queue card are each one glass shape; buttons and rows on them are fills
 /// (no glass on glass). Performance: the orb is the only thing that animates continuously (≤ 24 fps, paused off
 /// screen, when the sheet is gone, in the background and with Reduce Motion); typing re-renders only the composer.
+///
+/// Ask Taizo (2026-10-23, spec A4): online, Claude answers — streamed, with the song's context, tools (search, play,
+/// queue, playlists, likes, insights, lyrics, Sing) and the web (sources listed under the answer); large actions show
+/// a Confirm / Cancel card. The header's menu starts a new chat or reopens one of the last five. Reached from Home's
+/// sparkles button, the full player's sparkles circle and Settings › AI features.
 struct TaisChatSheet: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(\.appTheme) private var theme
@@ -39,6 +44,9 @@ struct TaisChatSheet: View {
     /// The UI tests' scripted conversation (`-screen taisChatConversation`): a genre request answered from the
     /// demo library with the AI intro line, then a music question answered by the scripted provider.
     static let demoScript = ["Play some indie songs", "Who produced Random Access Memories?"]
+    /// `-screen taisChatCloud`: the scripted Claude — a streamed answer with a source, then a 60-song playlist waiting
+    /// for its Confirm tap.
+    static let cloudDemoScript = ["What's this song about?", "Make me a road-trip playlist from my library"]
 
     var body: some View {
         let isEmpty = model.messages.isEmpty
@@ -63,6 +71,7 @@ struct TaisChatSheet: View {
         .animation(.spring(response: 0.55, dampingFraction: 0.86), value: isEmpty)
         .onAppear {
             sheetVisible = true
+            model.restoreIfNeeded()
             // The on-device model loads while the user types (nothing in UI tests or with a cloud assistant).
             env.ai.prewarm(.chat)
             if personalSuggestions.isEmpty {
@@ -71,8 +80,9 @@ struct TaisChatSheet: View {
         }
         .onDisappear { sheetVisible = false }
         .task {
-            guard env.launch.screen == .taisChatConversation, model.messages.isEmpty else { return }
-            await model.runScript(Self.demoScript)
+            guard model.messages.isEmpty else { return }
+            if env.launch.screen == .taisChatConversation { await model.runScript(Self.demoScript) }
+            if env.launch.screen == .taisChatCloud { await model.runScript(Self.cloudDemoScript) }
         }
     }
 
@@ -82,28 +92,34 @@ struct TaisChatSheet: View {
 
     /// The orb the hero collapsed into, "Taizo" and a status line ("Thinking…" while a prompt is in flight).
     private func header(thinking: Bool) -> some View {
-        HStack(spacing: 12) {
-            TaizoOrb(energy: thinking ? 1 : 0, animated: thinking && orbAnimates, sparkleSize: 0.42)
-                .matchedGeometryEffect(id: "taizo.orb", in: orbSpace)
-                .frame(width: 38, height: 38)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(verbatim: "Taizo")
-                    .pixlFont(.titleMedium, weight: .bold)
-                    .foregroundStyle(theme.onSurface)
-                Text(thinking ? LocalizedStringKey("Thinking…") : LocalizedStringKey("Your on-device AI DJ"))
-                    .pixlFont(.bodySmall)
-                    .foregroundStyle(thinking ? theme.primary : theme.onSurfaceVariant)
-                    .contentTransition(.opacity)
-                    .animation(.easeInOut(duration: 0.25), value: thinking)
+        // The last answer's route (the router is asked once, before the first prompt).
+        let cloud = model.lastRoute.map { $0 == .claude } ?? model.routesToCloud
+        return HStack(spacing: 12) {
+            HStack(spacing: 12) {
+                TaizoOrb(energy: thinking ? 1 : 0, animated: thinking && orbAnimates, sparkleSize: 0.42)
+                    .matchedGeometryEffect(id: "taizo.orb", in: orbSpace)
+                    .frame(width: 38, height: 38)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(verbatim: "Taizo")
+                        .pixlFont(.titleMedium, weight: .bold)
+                        .foregroundStyle(theme.onSurface)
+                    Text(thinking ? LocalizedStringKey("Thinking…")
+                             : (cloud ? LocalizedStringKey("Your AI music assistant") : LocalizedStringKey("On this iPhone")))
+                        .pixlFont(.bodySmall)
+                        .foregroundStyle(thinking ? theme.primary : theme.onSurfaceVariant)
+                        .contentTransition(.opacity)
+                        .animation(.easeInOut(duration: 0.25), value: thinking)
+                }
+                .transition(.opacity.combined(with: .offset(x: -8)))
             }
-            .transition(.opacity.combined(with: .offset(x: -8)))
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
             Spacer(minLength: 0)
+            TaizoChatsMenu(model: model)
         }
         .padding(.horizontal, 20)
         .padding(.top, 22)
         .padding(.bottom, 8)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
     }
 
     // MARK: Empty state
@@ -120,7 +136,7 @@ struct TaisChatSheet: View {
                     Text(greeting)
                         .pixlFont(.headlineMedium, weight: .bold)
                         .foregroundStyle(theme.onSurface)
-                    Text("I'm Taizo, your on-device AI DJ.\nPick a vibe, or ask me anything.")
+                    Text("I'm Taizo, your music assistant.\nAsk about this song, or tell me what to play.")
                         .pixlFont(.bodyLarge)
                         .foregroundStyle(theme.onSurfaceVariant)
                         .multilineTextAlignment(.center)
@@ -163,7 +179,8 @@ struct TaisChatSheet: View {
                                            onQueue: { model.queue($0) },
                                            onResolve: { items, source, play in
                                                model.resolveOnlineTracks(items, source: source, thenPlay: play) { dismiss() }
-                                           })
+                                           },
+                                           onConfirm: { id, approved in model.resolveConfirmation(id: id, approved: approved) })
                             .id(message.id)
                             .transition(message.insertionTransition)
                     }
@@ -243,6 +260,41 @@ struct TaizoComposer: View {
         .padding(.horizontal, 16)
         .padding(.top, 6)
         .padding(.bottom, 10)
+    }
+}
+
+/// The header's menu: "New chat" and the last five conversations (a glass circle; the menu is the system's).
+struct TaizoChatsMenu: View {
+    let model: TaisChatModel
+
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        Menu {
+            Button("New chat", systemImage: "square.and.pencil") {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) { model.newChat() }
+            }
+            .accessibilityIdentifier("ai.taizo.newChat")
+            let others = model.recentConversations.filter { $0.id != model.conversation?.id }
+            if !others.isEmpty {
+                Section("Recent chats") {
+                    ForEach(others) { record in
+                        Button(record.title.isEmpty ? "Chat" : record.title) {
+                            withAnimation(PixlMotion.state) { model.open(record.id) }
+                        }
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(theme.onSurface)
+                .frame(width: 40, height: 40)
+                .contentShape(Circle())
+        }
+        .pixlGlass(in: Circle(), tint: theme.surfaceContainerHigh.opacity(GlassTint.surface), interactive: true)
+        .accessibilityLabel("Chats")
+        .accessibilityIdentifier("ai.taizo.menu")
     }
 }
 

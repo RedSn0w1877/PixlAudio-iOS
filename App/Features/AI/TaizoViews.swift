@@ -255,6 +255,8 @@ struct TaisChatMessageRow: View {
     let onPlay: ([Song]) -> Void
     let onQueue: ([Song]) -> Void
     let onResolve: ([SearchResultItem], SearchSource, Bool) -> Void
+    /// A confirmation card's Confirm (true) / Cancel (false).
+    var onConfirm: (Int, Bool) -> Void = { _, _ in }
 
     @Environment(\.appTheme) private var theme
 
@@ -311,6 +313,23 @@ struct TaisChatMessageRow: View {
                 TaizoQueueCard(prompt: prompt, result: result, intro: intro, isResolving: isResolvingOnlineTracks,
                                onPlay: onPlay, onQueue: onQueue, onResolve: onResolve)
             }
+        case .assistant(_, let text, let sources, let activity, let streaming):
+            taizoTurn {
+                TaizoAnswerBubble(text: text, sources: sources, activity: activity, isStreaming: streaming)
+            }
+        case .confirm(let id, let question, let state):
+            taizoTurn {
+                TaizoConfirmCard(question: question, state: state,
+                                 onConfirm: { onConfirm(id, true) }, onCancel: { onConfirm(id, false) })
+            }
+        case .note(_, let text):
+            Label(text, systemImage: "info.circle")
+                .pixlFont(.bodySmall)
+                .foregroundStyle(theme.onSurfaceVariant)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 24)
+                .accessibilityIdentifier("ai.taizo.note")
         }
     }
 
@@ -322,6 +341,155 @@ struct TaisChatMessageRow: View {
             content()
             Spacer(minLength: 12)
         }
+    }
+}
+
+// MARK: - Ask Taizo (Claude)
+
+/// Claude's answer: the text as it streams in (three dots until the first words), what Taizo is doing ("Searching the
+/// web…") and the cited pages as small links. One glass shape; the source links on it are fills.
+struct TaizoAnswerBubble: View {
+    let text: String
+    let sources: [ClaudeSource]
+    let activity: String?
+    let isStreaming: Bool
+
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if text.isEmpty && isStreaming {
+                ThinkingDots(color: theme.primary)
+                    .padding(.vertical, 4)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Taizo is thinking")
+            } else if !text.isEmpty {
+                Text(text)
+                    .pixlFont(.bodyLarge)
+                    .foregroundStyle(theme.onSurface)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let activity, isStreaming {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.mini).tint(theme.primary)
+                    Text(activity)
+                        .pixlFont(.labelMedium)
+                        .foregroundStyle(theme.primary)
+                }
+                .transition(.opacity)
+                .accessibilityElement(children: .combine)
+            }
+            if !sources.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Sources")
+                        .pixlFont(.labelSmall, weight: .bold)
+                        .foregroundStyle(theme.onSurfaceVariant)
+                    ForEach(sources.prefix(6)) { source in
+                        TaizoSourceLink(source: source)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 11)
+        .pixlGlass(in: TaisChatMessageRow.taizoShape, tint: theme.surfaceContainerHigh.opacity(GlassTint.surface))
+        .animation(PixlMotion.state, value: activity)
+    }
+}
+
+/// One cited page: its title (or site) and site, opening in the browser.
+struct TaizoSourceLink: View {
+    let source: ClaudeSource
+
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        if let url = URL(string: source.url) {
+            Link(destination: url) {
+                HStack(spacing: 8) {
+                    Image(systemName: "link")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(theme.onSecondaryContainer)
+                        .frame(width: 22, height: 22)
+                        .background(theme.secondaryContainer, in: Circle())
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(source.title)
+                            .pixlFont(.labelMedium, weight: .semibold)
+                            .foregroundStyle(theme.onSurface)
+                            .lineLimit(1)
+                        Text(url.host ?? source.url)
+                            .pixlFont(.labelSmall)
+                            .foregroundStyle(theme.onSurfaceVariant)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(theme.surfaceContainerHighest.opacity(0.55), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .contentShape(.rect(cornerRadius: 12))
+            }
+            .buttonStyle(PressScaleButtonStyle(pressedScale: 0.97))
+            .accessibilityLabel("Source: \(source.title)")
+            .accessibilityIdentifier("ai.taizo.source")
+        }
+    }
+}
+
+/// A large or destructive action waiting for a tap: the question, Confirm (accent) and Cancel (tonal); afterwards the
+/// answer. One glass shape; the buttons are fills.
+struct TaizoConfirmCard: View {
+    let question: String
+    let state: TaizoConfirmState
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(question, systemImage: "hand.raised.fill")
+                .pixlFont(.bodyLarge, weight: .semibold)
+                .foregroundStyle(theme.onSurface)
+            switch state {
+            case .pending:
+                HStack(spacing: 8) {
+                    Button(action: onConfirm) {
+                        Text("Confirm")
+                            .pixlFont(.labelLarge, weight: .semibold)
+                            .foregroundStyle(theme.onPrimary)
+                            .padding(.horizontal, 22)
+                            .frame(minHeight: 44)
+                            .background(theme.primary, in: Capsule())
+                            .contentShape(.capsule)
+                    }
+                    .buttonStyle(PressScaleButtonStyle(pressedScale: 0.95))
+                    .accessibilityIdentifier("ai.taizo.confirm.approve")
+                    Button(action: onCancel) {
+                        Text("Cancel")
+                            .pixlFont(.labelLarge, weight: .semibold)
+                            .foregroundStyle(theme.onSecondaryContainer)
+                            .padding(.horizontal, 22)
+                            .frame(minHeight: 44)
+                            .background(theme.secondaryContainer, in: Capsule())
+                            .contentShape(.capsule)
+                    }
+                    .buttonStyle(PressScaleButtonStyle(pressedScale: 0.95))
+                    .accessibilityIdentifier("ai.taizo.confirm.cancel")
+                }
+            case .approved:
+                Label("Confirmed", systemImage: "checkmark.circle.fill")
+                    .pixlFont(.labelLarge)
+                    .foregroundStyle(theme.primary)
+            case .declined:
+                Label("Cancelled", systemImage: "xmark.circle")
+                    .pixlFont(.labelLarge)
+                    .foregroundStyle(theme.onSurfaceVariant)
+            }
+        }
+        .padding(14)
+        .pixlGlass(in: TaisChatMessageRow.taizoShape, tint: theme.surfaceContainerHigh.opacity(GlassTint.surface))
     }
 }
 

@@ -150,6 +150,11 @@ nonisolated enum PreferenceKeys {
     /// suffix): the backup catalogue treats such keys as portable AI settings, so it would export the switch and
     /// clear it on every restore.
     static let aiUseDownloadedModel = "ai_downloaded_model_enabled"
+    /// Claude everywhere (2026-10-23): the monthly cap of the built-in Claude key in dollars (developer mode, $0–$200,
+    /// default $50) and this month's spend (`ClaudeBudgetStore`). Per device, never in backups.
+    static let aiClaudeMonthlyCap = "ai_claude_cap_usd"
+    static let aiClaudeSpendMonth = "ai_claude_spend_month"
+    static let aiClaudeSpendUnits = "ai_claude_spend_units"
     /// Per-provider AI keys (Android `AiPreferencesRepository.Keys.get…`): `<provider lowercased>_model` etc.
     /// API keys themselves live in the Keychain under `<provider lowercased>_api_key`.
     static func aiModel(_ providerName: String) -> String { "\(providerName.lowercased())_model" }
@@ -719,6 +724,10 @@ final class AISettings {
     var musicExploration: Double {
         didSet { defaults.set(musicExploration, forKey: PreferenceKeys.musicExplorationFraction) }
     }
+    /// The built-in Claude key's monthly cap in dollars (developer mode slider, $0–$200; default $50).
+    var claudeMonthlyCap: Double {
+        didSet { defaults.set(ClaudeBudget.clampCap(claudeMonthlyCap), forKey: PreferenceKeys.aiClaudeMonthlyCap) }
+    }
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
@@ -741,6 +750,8 @@ final class AISettings {
         musicLearningEnabled = defaults.bool(PreferenceKeys.musicLearningEnabled, default: true)
         musicDiscoveryEnabled = defaults.bool(PreferenceKeys.musicDiscoveryEnabled, default: true)
         musicExploration = defaults.double(PreferenceKeys.musicExplorationFraction, default: 0.25)
+        claudeMonthlyCap = ClaudeBudget.clampCap(defaults.double(PreferenceKeys.aiClaudeMonthlyCap,
+                                                                 default: ClaudeBudget.defaultCapDollars))
     }
 
     func model(for providerName: String) -> String { defaults.string(PreferenceKeys.aiModel(providerName), default: "") }

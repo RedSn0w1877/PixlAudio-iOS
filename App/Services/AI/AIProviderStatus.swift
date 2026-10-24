@@ -30,6 +30,9 @@ enum AIProviderStatus {
 
     static func isConfigured(_ env: AppEnvironment) -> Bool {
         if env.launch.screen == .libraryCreatePlaylistOnDeviceOff { return false }
+        // Claude first (2026-10-23): online with the built-in key, every AI feature can answer (a cheap, thread-safe
+        // check: UserDefaults and the network flag, no Keychain).
+        if !env.launch.isUITest, ClaudeCloud.shared.route() == .claude { return true }
         let providerName = env.settings.ai.provider
         // The downloaded model: the model manager's state, always current (a download may finish while Settings is
         // closed).
@@ -48,6 +51,7 @@ enum AIProviderStatus {
     /// back to.
     static func onDeviceIssue(_ env: AppEnvironment) -> OnDeviceFailure? {
         if env.launch.screen == .libraryCreatePlaylistOnDeviceOff { return .intelligenceOff }
+        if !env.launch.isUITest, ClaudeCloud.shared.route() == .claude { return nil }
         let providerName = env.settings.ai.provider
         guard AiProvider.fromString(providerName) == .onDevice, !env.launch.isUITest else { return nil }
         if env.settings.ai.useDownloadedModel { return downloadedModelInstalled(env) ? nil : .localModelMissing }

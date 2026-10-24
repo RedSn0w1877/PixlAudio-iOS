@@ -9,10 +9,16 @@ import PixlNet
 ///
 /// With the on-device model selected (the default since 2026-10-07), `onDevice` translates line by line instead
 /// (`OnDeviceLyricsTranslator`): same API, same outcomes, same stored LRC.
+///
+/// Claude first (2026-10-23): `cloud` ("Claude or an error", `AIService.claudeFirst`) translates the whole text in one
+/// request while the router sends requests to Claude; an answer that doesn't validate, or no answer, falls through to
+/// the paths above.
 nonisolated struct AILyricsTranslator: LyricsTranslating {
-    let orchestrator: AiOrchestrator
+    let orchestrator: any AiContentGenerating
     /// The on-device path (nil: the orchestrator only — UI tests and unit tests).
     var onDevice: OnDeviceLyricsTranslator? = nil
+    /// Claude (nil: unit tests).
+    var cloud: (any AiContentGenerating)? = nil
 
     /// The device language's display name (Android `locales[0].displayLanguage`).
     static var deviceLanguageName: String {
@@ -25,6 +31,14 @@ nonisolated struct AILyricsTranslator: LyricsTranslating {
             return .alreadyTranslated
         }
         guard let rawLyrics, !rawLyrics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return .notFound }
+        if let cloud, let response = try? await cloud.generateContent(prompt: Self.prompt(lyrics: rawLyrics, targetLanguage: targetLanguage),
+                                                                      type: .general, temperature: 0.1) {
+            let outcome = Self.outcome(forResponse: response)
+            switch outcome {
+            case .translated, .alreadyInTargetLanguage: return outcome
+            default: break
+            }
+        }
         if let onDevice, await onDevice.isActive() {
             return await onDevice.translate(rawLyrics: rawLyrics, current: current, targetLanguage: targetLanguage)
         }

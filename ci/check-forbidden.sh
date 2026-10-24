@@ -104,6 +104,22 @@ if [ -f "$key_stub" ]; then
   fi
 fi
 
+# 8b. Built-in Claude key: the same rule for the Anthropic key's shares (ci/write-anthropic-key.sh writes them on CI
+#     from the ANTHROPIC_API_KEY secret, after this check).
+anthropic_stub=App/Generated/AnthropicKey.swift
+if [ -f "$anthropic_stub" ]; then
+  if grep -vE '^[[:space:]]*//' "$anthropic_stub" | grep -qE '0x[0-9A-Fa-f]{2}|[0-9]{1,3}[[:space:]]*,'; then
+    err "$anthropic_stub: holds key shares; commit only the empty stub (static let shares: [[UInt8]] = [])"
+  fi
+  if ! grep -qE 'static let shares: \[\[UInt8\]\] = \[\]' "$anthropic_stub"; then
+    err "$anthropic_stub: must be the empty stub (static let shares: [[UInt8]] = [])"
+  fi
+fi
+# No Anthropic key literal anywhere in the sources.
+if grep -rnE --include='*.swift' --include='*.sh' --include='*.yml' 'sk-ant-[A-Za-z0-9]{2,}-[A-Za-z0-9_-]{20,}' App ci .github Packages/PixlCore/Sources 2>/dev/null | grep -q .; then
+  err "an Anthropic API key literal is committed; keys come only from the ANTHROPIC_API_KEY secret"
+fi
+
 # 9. Build identity: the committed file is the stub; CI writes the commit and day after this check
 #    (ci/write-build-identity.sh).
 stamp_stub=App/Generated/BuildStamp.swift
