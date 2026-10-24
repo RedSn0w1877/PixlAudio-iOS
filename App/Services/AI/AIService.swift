@@ -85,12 +85,19 @@ final class AIService {
         let cloud = ClaudeCloud.shared
         self.cloud = cloud
         let demoCloud = isDemo && launch.screen == .taisChatCloud
-        let route: @Sendable () -> AIRoute = isDemo
-            ? { demoCloud ? .claude : .onDevice(.noBuiltInKey) }
-            : { cloud.route() }
-        let claudeClient: @Sendable () -> (any ClaudeMessaging)? = isDemo
-            ? { demoCloud ? DemoClaudeClient() : nil }
-            : { cloud.client() }
+        // if/else, not a ternary of closures: Xcode 27's type checker gives up on those.
+        let route: @Sendable () -> AIRoute
+        let claudeClient: @Sendable () -> (any ClaudeMessaging)?
+        if isDemo {
+            route = { @Sendable () -> AIRoute in demoCloud ? AIRoute.claude : AIRoute.onDevice(.noBuiltInKey) }
+            claudeClient = { @Sendable () -> (any ClaudeMessaging)? in
+                if demoCloud { return DemoClaudeClient() }
+                return nil
+            }
+        } else {
+            route = { @Sendable () -> AIRoute in cloud.route() }
+            claudeClient = { @Sendable () -> (any ClaudeMessaging)? in cloud.client() }
+        }
         currentRoute = route
         self.claudeClient = claudeClient
         let personaSource = bridge
