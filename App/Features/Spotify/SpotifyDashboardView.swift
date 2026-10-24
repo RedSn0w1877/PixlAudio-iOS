@@ -43,7 +43,14 @@ struct SpotifyDashboardView: View {
             }
 
             if spotify.playlistAccessDenied {
-                reconnectCard
+                reconnectCard(title: "Reconnect Spotify to import playlists",
+                              reason: "Spotify stopped sharing the songs inside your playlists. Reconnect to fix it.",
+                              identifier: "spotify.reconnect")
+            } else if spotify.isLoggedIn && env.importedHistory.needsSpotifyReconnect {
+                // A login from before the listening-history permissions (recently played, followed artists).
+                reconnectCard(title: "Reconnect Spotify to bring in your listening history",
+                              reason: "PixlAudio can now learn from what you play on Spotify to make your mixes smarter. Spotify needs you to sign in once more to allow it.",
+                              identifier: "spotify.reconnectHistory")
             }
 
             if developerMode, let error = playback.lastError, error != dismissedPlaybackError,
@@ -265,16 +272,17 @@ struct SpotifyDashboardView: View {
 
     // MARK: Notices
 
-    private var reconnectCard: some View {
+    /// The "Reconnect Spotify" notice, with the reason a new sign-in is needed.
+    private func reconnectCard(title: String, reason: String, identifier: String) -> some View {
         SpotifyCard(cornerRadius: 20, tint: theme.errorContainer, strength: GlassTint.container, padding: 16, spacing: 8) {
-            Text("Reconnect Spotify to import playlists")
+            Text(title)
                 .pixlFont(.titleMedium, weight: .bold)
                 .foregroundStyle(theme.onErrorContainer)
-            Text("Spotify stopped sharing the songs inside your playlists. Reconnect to fix it.\n\nYour library and the songs already matched stay as they are.")
+            Text("\(reason)\n\nYour library and the songs already matched stay as they are.")
                 .pixlFont(.bodyMedium)
                 .foregroundStyle(theme.onErrorContainer)
             SpotifyFilledButton(title: "Sign in to Spotify again", fill: theme.error, foreground: theme.onError,
-                                identifier: "spotify.reconnect") {
+                                identifier: identifier) {
                 Task { await spotify.reconnect(authenticate: authenticate) }
             }
         }

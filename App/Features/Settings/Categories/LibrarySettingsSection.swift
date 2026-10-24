@@ -3,11 +3,15 @@ import SwiftUI
 /// Settings › Library & storage (the `library` category; Android `SettingsCategoryScreen` LIBRARY): Blocked artists
 /// (moved here from Behavior) and the offline storage — and, in developer mode, an "Advanced" block (minimum tracks
 /// per album, album art cache limit). The app is Spotify-only, so the music-folder, rescan and local-lyrics-file rows
-/// are gone; the lyrics rows moved to Lyrics.
+/// are gone; the lyrics rows moved to Lyrics. "Listening history" (spec B3) brings in Spotify and YouTube Music
+/// listening for the recommendations: two switches, Import from a file, the status and Clear imported history.
 struct LibrarySettingsSection: View {
     @Environment(SettingsStore.self) private var settings
     @Environment(BlockedArtistsStore.self) private var blocked
     @Environment(Router.self) private var router
+    @Environment(AppEnvironment.self) private var env
+    @Environment(AccountsStore.self) private var accounts
+    @State private var confirmsClear = false
 
     @State private var minTracks: Double = 1
     @State private var cacheLimit: Double = 200
@@ -22,6 +26,7 @@ struct LibrarySettingsSection: View {
                                 systemImage: "nosign", showsChevron: true,
                                 identifier: "settings.library.blockedArtists") { router.push(.blockedArtists) }
             }
+            listeningHistory
             SettingsSubsection(title: L10n.settingsStorageSection, addBottomSpace: developerMode) {
                 let reclaimable = storage?.cachedBytes ?? 0
                 ActionSettingRow(
@@ -50,6 +55,54 @@ struct LibrarySettingsSection: View {
             cacheLimit = Double(settings.library.albumArtCacheLimitMb)
         }
         .task { storage = await OfflineStorageUsage.measure() }
+    }
+
+    // MARK: Listening history
+
+    private var spotifySignedIn: Bool {
+        if case .signedIn = accounts.spotify { return true }
+        return false
+    }
+
+    private var youTubeSignedIn: Bool {
+        if case .signedIn = accounts.youtube { return true }
+        return false
+    }
+
+    @ViewBuilder
+    private var listeningHistory: some View {
+        @Bindable var history = env.importedHistory
+        SettingsSubsection(title: "Listening history") {
+            SwitchSettingRow(title: "Spotify listening history",
+                             subtitle: spotifySignedIn ? "Your Spotify plays and favourites shape your mixes (they count the most)"
+                                                       : "Connect Spotify to bring in what you play there",
+                             isOn: $history.spotifyEnabled, systemImage: "music.note.list", enabled: spotifySignedIn)
+            SwitchSettingRow(title: "YouTube Music history",
+                             subtitle: youTubeSignedIn ? "Your YouTube Music history counts too, a little less than Spotify"
+                                                       : "Sign in to YouTube to bring in your YouTube Music history",
+                             isOn: $history.youTubeEnabled, systemImage: "play.circle", enabled: youTubeSignedIn)
+            SettingsItemRow(title: "Import from a file",
+                            subtitle: "Your Spotify or Google data download — years of listening",
+                            systemImage: "square.and.arrow.down", showsChevron: true,
+                            identifier: "settings.library.historyImport") { router.push(.listeningHistory) }
+            ActionSettingRow(title: ListeningHistoryText.totals(plays: history.playCount, artists: history.artistCount),
+                             subtitle: ListeningHistoryText.status(store: history),
+                             systemImage: "clock.arrow.circlepath",
+                             primaryLabel: "Clear imported history", onPrimary: { confirmsClear = true },
+                             enabled: history.playCount > 0)
+        }
+        .task { await history.ensureLoaded() }
+        .confirmationDialog("Clear imported history?", isPresented: $confirmsClear, titleVisibility: .visible) {
+            Button("Clear imported history", role: .destructive) {
+                Task {
+                    await history.clear()
+                    toast = "Imported history cleared"
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Plays brought in from Spotify, YouTube Music and data downloads are removed from this phone. Your library and what you played in PixlAudio stay.")
+        }
     }
 
     private func clearCache() {
