@@ -19,8 +19,10 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 printf '%s' "$ANTHROPIC_API_KEY" | tr -d ' \t\r\n' > "$work/key.txt"
 # Anthropic keys are printable ASCII without spaces (sk-ant-...); anything else is a pasting mistake.
-# LC_ALL=C: in a UTF-8 locale BSD grep's [!-~] range follows collation order and rejects a valid key.
-if ! LC_ALL=C grep -Eq '^[[:graph:]]{20,400}$' "$work/key.txt"; then
+# LC_ALL=C: in a UTF-8 locale BSD grep's ranges follow collation order. The length is checked in bash because BSD
+# grep caps a {m,n} bound at 255 (RE_DUP_MAX) and rejects {20,400} as an invalid pattern.
+len=$(wc -c < "$work/key.txt" | tr -d ' ')
+if [ "$len" -lt 20 ] || [ "$len" -gt 400 ] || LC_ALL=C grep -q '[^[:graph:]]' "$work/key.txt"; then
   echo "::error::ANTHROPIC_API_KEY doesn't look like an API key (printable ASCII, 20-400 characters); set it again"
   exit 1
 fi
