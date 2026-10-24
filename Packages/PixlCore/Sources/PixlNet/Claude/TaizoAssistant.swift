@@ -435,7 +435,9 @@ public enum TaizoTool: String, Sendable, Hashable, CaseIterable {
                     ("sort", Schema.enumeration(Self.searchSorts, "Order of the results (default relevance, or title without a query).")),
                     ("limit", Schema.integer("How many songs to return, 1 to 200 (default 20).")),
                     ("offset", Schema.integer("Skip this many results, to read the next page (default 0).")),
-                ], required: ["query"]))
+                ], required: ["query"]),
+                // 12 optional parameters: with every other strict tool that is over the API's 24 (a 400 on every request).
+                strict: false)
         case .searchSpotifyCatalog:
             return ClaudeToolDefinition(
                 name: rawValue,

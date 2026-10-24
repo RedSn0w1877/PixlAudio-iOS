@@ -106,7 +106,8 @@ private struct FixtureStreamer: ClaudeLineStreaming {
         #expect(tools.count == clientCount + 2)
         #expect(tools.prefix(clientCount).map { $0["name"]?.stringValue ?? "" } == TaizoTool.allCases.map(\.rawValue))
         for tool in tools.prefix(clientCount) {
-            #expect(tool["strict"]?.boolValue == true)
+            // search_library opts out of strict (its 12 optional filters would break the API's budget of 24).
+            #expect((tool["strict"]?.boolValue == true) == (tool["name"]?.stringValue != "search_library"))
             #expect(tool["eager_input_streaming"]?.boolValue == true)
             #expect(tool["input_schema"]?["additionalProperties"]?.boolValue == false)
         }
@@ -133,9 +134,20 @@ private struct FixtureStreamer: ClaudeLineStreaming {
     }
 
     @Test func nonStreamedToolsHaveNoEagerFlag() {
-        let json = TaizoTool.searchLibrary.definition.json(streaming: false)
+        let json = TaizoTool.searchSpotifyCatalog.definition.json(streaming: false)
         #expect(json["eager_input_streaming"] == nil)
         #expect(json["strict"]?.boolValue == true)
+    }
+
+    @Test func strictToolsStayWithinTheApisOptionalParameterBudget() {
+        // The API refuses the whole request when the strict tools together have more than 24 optional parameters.
+        var optional = 0
+        for tool in TaizoTool.definitions where tool.strict {
+            let properties = tool.inputSchema["properties"]?.objectValue?.members.count ?? 0
+            let required = tool.inputSchema["required"]?.arrayValue?.count ?? 0
+            optional += properties - required
+        }
+        #expect(optional <= 24, "strict tools have \(optional) optional parameters; the API limit is 24")
     }
 
     @Test func invalidJsonResultIsBuiltWithTheWriter() throws {
