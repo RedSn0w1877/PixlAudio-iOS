@@ -213,7 +213,8 @@ nonisolated enum AppSheet: Hashable, Sendable, Identifiable {
 
     /// Stage 13: the AI playlist sheet (Android `AiPlaylistSheet`, Daily Mix's sparkle button).
     case aiPlaylist
-    /// Stage 13: the TAIS DJ chat (Android `TaisChatSheet`) — from the player's sparkles circle and Experimental.
+    /// Stage 13: the TAIS DJ chat (Android `TaisChatSheet`), Ask Taizo since 2026-10-23 — from Home's sparkles button,
+    /// the player's sparkles circle, Settings › AI features and Experimental.
     case taisChat
 
     var id: String {

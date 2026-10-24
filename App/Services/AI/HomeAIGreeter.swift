@@ -10,6 +10,8 @@ import PixlNet
 ///   while the insight asks for two or three.
 /// - A cloud assistant: the orchestrator's GREETING request, as on Android, and only with a key (Ollama: a base URL).
 ///   Android skips the headline for providers without a key, the on-device one included; iOS asks the on-device model.
+/// - Claude first (2026-10-23): while the router sends requests to Claude, Claude writes both (the insight at high
+///   effort); when it doesn't answer, the paths above run.
 enum HomeAIGreeter {
     static let insightInstructions = """
         You write a short listening insight for a music app's home screen. From the facts given, write 2 to 3 warm \
@@ -31,6 +33,19 @@ enum HomeAIGreeter {
         let provider = AiProvider.fromString(ai.provider)
         let prompt = kind == .headline ? HomeLogic.greetingPrompt(facts) : HomeLogic.insightPrompt(facts)
         let limit = kind == .headline ? 140 : 600
+        if env.ai.currentRoute() == .claude, let client = env.ai.claudeClient() {
+            let persona = ai.systemPrompt(for: provider.rawValue) ?? AiPromptEngine.defaultSystemPrompt
+            let system = kind == .headline
+                ? ClaudeRoutedGenerator.system(persona: persona, type: .greeting, context: "")
+                : [ClaudeSystemBlock(insightInstructions, cacheBreakpoint: true)]
+            let recordUsage = env.ai.recordClaudeUsage
+            let text = try? await withTimeout(seconds: timeoutSeconds) {
+                try await ClaudeCompletion.text(client: client, system: system, prompt: prompt,
+                                                effort: kind == .headline ? .medium : .high, onUsage: recordUsage)
+            }
+            if let cleaned = text.flatMap({ HomeLogic.cleanGreeting($0, limit: limit) }) { return cleaned }
+            env.ai.cloud.logFallback("home \(kind == .headline ? "headline" : "insight") had no answer")
+        }
         if provider == .onDevice {
             let persona = ai.systemPrompt(for: provider.rawValue) ?? AiPromptEngine.defaultSystemPrompt
             let instructions = kind == .headline

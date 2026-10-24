@@ -1,6 +1,7 @@
 import Foundation
 import os
 import PixlModel
+import PixlNet
 import Synchronization
 
 /// The in-app event log (Settings › Developer › Diagnostics › Share logs): app lifecycle, job lifecycle, abnormal-end
@@ -34,7 +35,9 @@ nonisolated final class DiagnosticsLog: Sendable {
         let now = Date()
         // Formatting redacts with six regular expressions: it runs on the log queue, not on the caller's (often main) thread.
         queue.async { [self] in
-            let line = LogRing.format(timestamp: now, category: category, message: message)
+            // The built-in Claude key never reaches the log, whatever a caller passed.
+            let line = LogRing.format(timestamp: now, category: category,
+                                      message: ClaudeKeyShares.redact(message, key: ClaudeCloud.shared.apiKey))
             logger.info("\(line, privacy: .public)")
             append(line)
         }

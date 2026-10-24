@@ -112,6 +112,9 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
 
     // Stage 13: AI playlist sheet (from Daily Mix), TAIS DJ chat (empty, and a scripted conversation), AI Playlist Lab
     case aiPlaylist, taisChat, taisChatConversation, aiPlaylistLab
+    /// Ask Taizo with the scripted Claude (`DemoClaudeClient`, 2026-10-23): a streamed answer citing a page, then a
+    /// 60-song playlist waiting for its Confirm tap.
+    case taisChatCloud
 
     // Stage 15: the setup pages (cover `setup` opened on a page) and the backup restore steps (cover `backupImport`)
     case setupBackup, setupTheme, setupLibraryLayout, setupSpotify, setupFinish
@@ -146,7 +149,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .songOptionsInfo: return "screen.songInfo"
         case .miniPlayerAlone: return "screen.albumDetail"
         case .aiPlaylist: return "screen.aiPlaylist"
-        case .taisChat, .taisChatConversation: return "screen.taisChat"
+        case .taisChat, .taisChatConversation, .taisChatCloud: return "screen.taisChat"
         case .aiPlaylistLab: return "screen.aiPlaylistLab"
         default:
             if let route { return "screen.\(route.screenID)" }
@@ -224,7 +227,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .queue, .songInfo, .sleepTimer, .lyricsOptions, .changelog, .betaInfo, .jobs,
              .nowPlaying, .lyrics, .lyricsSync, .setup, .devices, .artistPicker, .editSong, .queueSaveAsPlaylist:
             return nil
-        case .aiPlaylist, .taisChat, .taisChatConversation, .aiPlaylistLab: return nil
+        case .aiPlaylist, .taisChat, .taisChatConversation, .taisChatCloud, .aiPlaylistLab: return nil
         case .setupBackup, .setupTheme, .setupLibraryLayout, .setupSpotify, .setupFinish:
             return nil
         // A full-screen cover: nothing needs to be pushed underneath (one destination per demo screen).
@@ -269,7 +272,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
             return .devices
         case .artistPicker: return .artistPicker(songId: DemoLibrary.songs[DemoLibrary.featuredSongIndex].id)
         case .aiPlaylist: return .aiPlaylist
-        case .taisChat, .taisChatConversation: return .taisChat
+        case .taisChat, .taisChatConversation, .taisChatCloud: return .taisChat
         default: return nil
         }
     }

@@ -80,6 +80,29 @@ final class AIScreenshotTests: XCTestCase {
         }
     }
 
+    // MARK: Ask Taizo with Claude (scripted, no network)
+
+    /// The scripted Claude: a streamed answer with its source link, then a 60-song playlist waiting for Confirm.
+    func testTaisChatCloudLight() throws {
+        try capture("taisChatCloud", "light", name: "taisChat-cloud", wait: "Road Trip")
+    }
+
+    func testTaisChatCloudDark() throws {
+        try capture("taisChatCloud", "dark", name: "taisChat-cloud", wait: "Road Trip")
+    }
+
+    /// Confirm runs the tool: the playlist is created in the demo library and Taizo says so.
+    func testTaisChatCloudConfirmLight() throws {
+        try capture("taisChatCloud", "light", name: "taisChat-cloudConfirmed", wait: "Road Trip") { app in
+            let confirm = app.buttons["ai.taizo.confirm.approve"].firstMatch
+            XCTAssertTrue(confirm.waitForExistence(timeout: 5), "the Confirm button is missing")
+            confirm.tap()
+            let done = NSPredicate(format: "label CONTAINS %@", "is in your library")
+            XCTAssertTrue(app.staticTexts.containing(done).firstMatch.waitForExistence(timeout: 15),
+                          "Taizo did not report the playlist")
+        }
+    }
+
     // MARK: AI Playlist Lab
 
     func testAiPlaylistLabLight() throws { try capture("aiPlaylistLab", "light") }
@@ -94,7 +117,7 @@ final class AIScreenshotTests: XCTestCase {
         app.launchArguments = ["-uiTest", "-screen", screen, "-appearance", appearance, "-noSong"]
         app.launch()
 
-        let ready = screen == "taisChatConversation" ? "screen.taisChat" : "screen.\(screen)"
+        let ready = screen.hasPrefix("taisChat") ? "screen.taisChat" : "screen.\(screen)"
         let element = app.descendants(matching: .any)[ready].firstMatch
         XCTAssertTrue(element.waitForExistence(timeout: 20), "\(ready) did not appear")
         // Let the sheet settle and the glass render.

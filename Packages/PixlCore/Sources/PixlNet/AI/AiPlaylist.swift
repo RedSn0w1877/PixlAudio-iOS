@@ -320,9 +320,10 @@ public struct AiPlaylistGenerator: Sendable {
         }
     }
 
-    public let orchestrator: AiOrchestrator
+    /// The orchestrator, or the app's router in front of it (Claude first, the orchestrator as the fallback).
+    public let orchestrator: any AiContentGenerating
 
-    public init(orchestrator: AiOrchestrator) {
+    public init(orchestrator: any AiContentGenerating) {
         self.orchestrator = orchestrator
     }
 
