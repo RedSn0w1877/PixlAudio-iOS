@@ -11,7 +11,8 @@ import Synchronization
 /// - The router (`PixlNet.AIRouter`): any working internet connection + the key + budget left → Claude Sonnet 5.5;
 ///   otherwise the on-device model. In developer mode a cloud assistant of the user's own overrides it.
 /// - Thread-safe reads only (UserDefaults, a lock-protected network flag), so actors and background tasks ask freely.
-nonisolated final class ClaudeCloud: Sendable {
+// @unchecked: UserDefaults is thread-safe but not marked Sendable.
+nonisolated final class ClaudeCloud: @unchecked Sendable {
     static let shared = ClaudeCloud()
 
     let apiKey: String?

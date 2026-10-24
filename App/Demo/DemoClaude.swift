@@ -6,7 +6,7 @@ import PixlNet
 /// UI. A question about the song gets a streamed answer citing a web page; a playlist request searches the demo library
 /// with `search_library`, then asks to create a 60-song playlist, which waits for the tap to confirm.
 nonisolated struct DemoClaudeClient: ClaudeMessaging {
-    func send(_ request: ClaudeRequest, onUpdate: @escaping @Sendable (ClaudeStreamUpdate) async -> Void) async throws -> ClaudeMessage {
+    func send(_ request: ClaudeRequest, onUpdate: @escaping @concurrent @Sendable (ClaudeStreamUpdate) async -> Void) async throws -> ClaudeMessage {
         let last = request.messages.last
         let blocks = last?["content"]?.arrayValue ?? []
         let lastText = blocks.compactMap { $0["text"]?.stringValue }.joined().lowercased()
@@ -39,7 +39,7 @@ nonisolated struct DemoClaudeClient: ClaudeMessaging {
     }
 
     /// After the library search: a playlist of 60 picks (the demo library repeated), which needs a tap to confirm.
-    private func afterSearch(_ result: JSONValue, onUpdate: @escaping @Sendable (ClaudeStreamUpdate) async -> Void) async -> ClaudeMessage {
+    private func afterSearch(_ result: JSONValue, onUpdate: @escaping @concurrent @Sendable (ClaudeStreamUpdate) async -> Void) async -> ClaudeMessage {
         if let content = result["content"]?.stringValue, content.contains("\"declined\"") || content.contains("\"created\"") {
             let reply = content.contains("\"created\"") ? "Done — “Road Trip” is in your library." : "No problem, I left it."
             await onUpdate(.text(reply))
