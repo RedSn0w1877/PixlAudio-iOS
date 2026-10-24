@@ -34,12 +34,14 @@ public struct SingPrepareInputs: Sendable {
     /// Songs that are not candidates: those with an instrumental, those with a pending cloud job.
     public var excluded: Set<String>
     public var blocked: BlockedArtistMatcher
+    /// Ask Taizo's taste changes: a mute / block leaves a song out, a boost / reduce moves its score.
+    public var adjustments: TasteAdjustmentSet
     public var nowMs: Int64
 
     public init(songs: [Song], engagements: [String: EngagementStats] = [:],
                 signals: [String: MusicRecommendationEngine.Signal] = [:], recentEvents: [PlaybackEvent] = [],
                 playlists: [Playlist] = [], excluded: Set<String> = [], blocked: BlockedArtistMatcher = .empty,
-                nowMs: Int64) {
+                adjustments: TasteAdjustmentSet = .empty, nowMs: Int64) {
         self.songs = songs
         self.engagements = engagements
         self.signals = signals
@@ -47,6 +49,7 @@ public struct SingPrepareInputs: Sendable {
         self.playlists = playlists
         self.excluded = excluded
         self.blocked = blocked
+        self.adjustments = adjustments
         self.nowMs = nowMs
     }
 }
@@ -74,6 +77,8 @@ public enum SingPrepareRanker {
     public static let maxDurationMs: Int64 = 8 * 60_000
     /// More than this share of early skips and the song is left alone.
     public static let maxSkipRate = 0.4
+    /// A taste factor moves the score by ln(factor) × this (×2.2 → +1.6; ×0.45 → −1.6).
+    public static let tasteScale = 2.0
 
     /// What lifted a song, for the developer's "Why these songs" list.
     public enum Reason: Sendable, Hashable {
@@ -137,6 +142,10 @@ public enum SingPrepareRanker {
         score += added
         if added >= addedWeight * 0.5 { reasons.append(.addedRecently) }
         if let signal { score -= skipWeight * skipRate(signal) }
+        if !inputs.adjustments.isEmpty {
+            let factor = inputs.adjustments.factor(for: song)
+            if factor != 1.0 { score += tasteScale * log(factor) }
+        }
         return (score, reasons)
     }
 
@@ -178,6 +187,7 @@ public enum SingPrepareRanker {
         if inputs.excluded.contains(song.id) { return true }
         if song.duration <= minDurationMs || song.duration > maxDurationMs { return true }
         if let signal = inputs.signals[song.id], skipRate(signal) > maxSkipRate { return true }
+        if inputs.adjustments.isExcluded(song) { return true }
         return inputs.blocked.isBlocked(song)
     }
 
