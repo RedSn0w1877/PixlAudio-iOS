@@ -56,14 +56,15 @@ final class AppEnvironment {
 
     @ObservationIgnored private var aiStorage: AIService?
 
-    /// Stage 13: AI providers (cloud, local and on-device), the AI playlist and TAIS DJ state, lyric translation.
-    /// Built on first use, so nothing AI-related runs at launch.
+    /// Stage 13: AI providers (cloud, local and on-device), the AI playlist and Ask Taizo state, lyric translation;
+    /// Claude first for all of them (2026-10-23). Built on first use, so nothing AI-related runs at launch.
     var ai: AIService {
         if let aiStorage { return aiStorage }
         let library = self.library, persistence = self.persistence, writesCache = !launch.isUITest
         let service = AIService(launch: launch, settings: settings, persistence: persistence, library: library, home: home,
                                 playback: playback, router: router, searchProviders: searchProviders,
-                                libraryEditor: { LibraryEditor(store: library, persistence: persistence, writesCache: writesCache) })
+                                libraryEditor: { LibraryEditor(store: library, persistence: persistence, writesCache: writesCache) },
+                                environment: { [weak self] in self })
         aiStorage = service
         return service
     }

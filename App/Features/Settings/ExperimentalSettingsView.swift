@@ -42,7 +42,7 @@ struct ExperimentalSettingsView: View {
                     HStack(spacing: 12) {
                         SettingsIcon(systemImage: "music.note")
                         VStack(alignment: .leading, spacing: 0) {
-                            Text(verbatim: "TAIS DJ").pixlFont(.titleMedium).foregroundStyle(theme.onSurface)
+                            Text(verbatim: "Ask Taizo").pixlFont(.titleMedium).foregroundStyle(theme.onSurface)
                             Text(String(localized: "settings_exp_tais_dj_body",
                                         defaultValue: "TAIS Engine 3 — tell it a mood or genre and it finds songs, offline from your library or online via Spotify."))
                                 .pixlFont(.bodyMedium).foregroundStyle(theme.onSurfaceVariant)

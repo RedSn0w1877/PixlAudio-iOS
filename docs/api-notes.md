@@ -997,3 +997,12 @@ Launch, library, artwork, player and Spotify-matcher speed-ups (docs/performance
 |---|---|---|---|---|
 | `UTType.zip`, `UTType.json` with `fileImporter(isPresented:allowedContentTypes:allowsMultipleSelection:onCompletion:)` | 14 | /documentation/uniformtypeidentifiers/uttype-swift.struct/zip | `ListeningHistoryView` | The Spotify / Google Takeout ZIP or the JSON files inside it; read with PixlBackup's own ZIP reader (no new dependency). |
 | `RelativeDateTimeFormatter` (`unitsStyle = .abbreviated`, `localizedString(for:relativeTo:)`) | 13 | /documentation/foundation/relativedatetimeformatter | `ListeningHistoryText.status` | "Last synced 2 hr. ago"; one cached formatter. |
+||||||| 7c50e28
+## Claude everywhere and Ask Taizo (2026-10-23)
+| API | Min OS | Doc | Used in | Notes |
+|---|---|---|---|---|
+| `URLSession.bytes(for:delegate:)`, `URLSession.AsyncBytes.lines` | 15 | /documentation/foundation/urlsession/bytes(for:delegate:) | `URLSessionClaudeStreamer` | Server-sent events of the Messages API, read line by line; each event's `data:` line is parsed on its own (blank lines aren't needed, so a line splitter that drops them is fine). A non-2xx status reads up to 64 KB of the body for the API's error. |
+| `NWPathMonitor`, `NWPath.status == .satisfied` | 12 | /documentation/network/nwpathmonitor | `AIConnectivity` | Already in the ledger (stage 11); here a second passive monitor started the first time an AI feature asks, for the router's "online" input. |
+| `Data.WritingOptions.completeFileProtectionUntilFirstUserAuthentication`, `URLResourceValues.isExcludedFromBackup` | 4 / 5.1 | /documentation/foundation/nsdata/writingoptions | `TaizoConversationStore` | The saved conversations stay on the phone and out of device backups. |
+| `Menu` with `Section` and `Button(_:systemImage:action:)` | 14 / 15 | /documentation/swiftui/menu | `TaizoChatsMenu` | Ask Taizo's header menu: New chat and the last five conversations. |
+| `Link(destination:label:)` | 14 | /documentation/swiftui/link | `TaizoSourceLink` | A cited page opens in the browser. |

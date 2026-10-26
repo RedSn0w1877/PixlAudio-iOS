@@ -34,10 +34,17 @@ final class AIPlaylistController {
     @ObservationIgnored private let curator: OnDevicePlaylistCurator?
     /// The on-device model is the selected provider.
     @ObservationIgnored private let usesOnDeviceCurator: @MainActor () -> Bool
+    /// Claude first (2026-10-23): the generator on "Claude or an error", tried before the paths above while the router
+    /// sends requests to Claude; when it doesn't answer, the selected provider's path runs for that request.
+    @ObservationIgnored private let cloudGenerator: AiPlaylistGenerator?
+    @ObservationIgnored private let prefersCloud: @MainActor () -> Bool
 
     init(generator: AiPlaylistGenerator, settings: SettingsStore, library: LibraryStore, home: HomeStore,
          playback: PlaybackStore, router: Router, libraryEditor: @escaping @MainActor () -> LibraryEditor,
-         curator: OnDevicePlaylistCurator? = nil, usesOnDeviceCurator: @escaping @MainActor () -> Bool = { false }) {
+         curator: OnDevicePlaylistCurator? = nil, usesOnDeviceCurator: @escaping @MainActor () -> Bool = { false },
+         cloudGenerator: AiPlaylistGenerator? = nil, prefersCloud: @escaping @MainActor () -> Bool = { false }) {
+        self.cloudGenerator = cloudGenerator
+        self.prefersCloud = prefersCloud
         self.generator = generator
         self.settings = settings
         self.library = library
@@ -173,6 +180,17 @@ final class AIPlaylistController {
     /// The on-device curator when the on-device model is selected, else PixlNet's generator (Android's prompt).
     private func curate(prompt: String, allSongs: [Song], minLength: Int, maxLength: Int, context: RequestContext,
                         type: AiSystemPromptType) async -> Result<[Song], AiPlaylistGenerationError> {
+        if let cloudGenerator, prefersCloud() {
+            // Claude has the room for the whole candidate pool and the digest (Android's full prompt).
+            let cloudSettings = AiPlaylistGenerator.Settings(safeTokenLimit: false, sampleSize: max(settings.ai.sampleSize, 120),
+                                                             includeExtendedFields: true)
+            let result = await cloudGenerator.generate(userPrompt: prompt, allSongs: allSongs, minLength: minLength,
+                                                       maxLength: maxLength, candidateSongs: context.candidates,
+                                                       rankedCandidates: context.ranked, playCounts: context.playCounts,
+                                                       userDigest: context.digest, settings: cloudSettings, type: type)
+            if case .success(let songs) = result, !songs.isEmpty { return result }
+            if Task.isCancelled { return result }
+        }
         if let curator, usesOnDeviceCurator() {
             let candidates = context.candidates.isEmpty ? context.ranked : context.candidates
             return await curator.curate(OnDevicePlaylistCurator.Request(

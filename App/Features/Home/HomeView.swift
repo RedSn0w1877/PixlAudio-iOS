@@ -102,6 +102,7 @@ struct HomeView: View {
             HomeTopBar(scroll: scroll,
                        onBeta: { router.present(AppSheet.betaInfo) },
                        onJobs: { router.present(AppSheet.jobs) },
+                       onAskTaizo: { router.present(AppSheet.taisChat) },
                        onChangelog: { router.present(AppSheet.changelog) },
                        onSettings: { router.push(.settings) })
         }
@@ -205,6 +206,8 @@ private struct HomeTopBar: View {
     let scroll: HomeScrollState
     let onBeta: () -> Void
     let onJobs: () -> Void
+    /// Ask Taizo (2026-10-23): the assistant, one tap from Home.
+    let onAskTaizo: () -> Void
     let onChangelog: () -> Void
     let onSettings: () -> Void
 
@@ -241,6 +244,9 @@ private struct HomeTopBar: View {
                                          onCancelAll: { activeJobs.cancelAll() })
                             .transition(.scale(scale: 0.85).combined(with: .opacity))
                     }
+                    GlassCircleButton(systemImage: "sparkles", accessibilityLabel: "Ask Taizo",
+                                      tint: theme.surfaceContainerHigh.opacity(GlassTint.surface), action: onAskTaizo)
+                        .accessibilityIdentifier("ai.taizo.home")
                     GlassCircleButton(systemImage: "newspaper", accessibilityLabel: "Changelog",
                                       tint: theme.surfaceContainerHigh.opacity(GlassTint.surface), action: onChangelog)
                         .accessibilityIdentifier("home.changelog")
