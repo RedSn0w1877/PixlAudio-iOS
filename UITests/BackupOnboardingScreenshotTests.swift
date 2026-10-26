@@ -10,13 +10,17 @@ final class BackupOnboardingScreenshotTests: XCTestCase {
     func testSetupWelcomeLight() throws { try capture("setup", "light", ready: "screen.setup") }
     func testSetupWelcomeDark() throws { try capture("setup", "dark", ready: "screen.setup") }
     func testSetupBackupLight() throws { try capture("setupBackup", "light", ready: "screen.setup") }
+    func testSetupBackupDark() throws { try capture("setupBackup", "dark", ready: "screen.setup") }
     func testSetupThemeLight() throws { try capture("setupTheme", "light", ready: "screen.setup") }
     func testSetupThemeDark() throws { try capture("setupTheme", "dark", ready: "screen.setup") }
     func testSetupLibraryLayoutLight() throws { try capture("setupLibraryLayout", "light", ready: "screen.setup") }
+    func testSetupLibraryLayoutDark() throws { try capture("setupLibraryLayout", "dark", ready: "screen.setup") }
+    func testSetupSpotifyLight() throws { try capture("setupSpotify", "light", ready: "screen.setup") }
     func testSetupSpotifyDark() throws { try capture("setupSpotify", "dark", ready: "screen.setup") }
     func testSetupFinishLight() throws { try capture("setupFinish", "light", ready: "screen.setup") }
+    func testSetupFinishDark() throws { try capture("setupFinish", "dark", ready: "screen.setup") }
 
-    /// Next moves to the following page (the step counter and the button's shape change).
+    /// The big bottom button moves to the following page (the progress and the page change).
     func testSetupNextLight() throws {
         try capture("setup", "light", ready: "screen.setup") { app in
             let next = app.descendants(matching: .any)["setup.next"].firstMatch
