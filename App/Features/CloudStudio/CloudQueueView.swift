@@ -129,6 +129,7 @@ struct CloudJobRow: View {
     let progress: Double?
 
     @Environment(AppEnvironment.self) private var env
+    @Environment(SettingsStore.self) private var appSettings
     @Environment(\.appTheme) private var theme
 
     var body: some View {
@@ -143,11 +144,12 @@ struct CloudJobRow: View {
                     .pixlFont(.bodySmall)
                     .foregroundStyle(theme.onSurfaceVariant)
                     .lineLimit(1)
-                Text(verbatim: CloudJobRowText.status(record, progress: progress))
+                Text(verbatim: CloudJobRowText.status(record, progress: progress,
+                                                      developerMode: appSettings.experimental.developerMode))
                     .pixlFont(.bodySmall, weight: .semibold)
                     .foregroundStyle(record.state == .failed ? theme.error : theme.primary)
                     .lineLimit(2)
-                if let detail = CloudJobRowText.detail(record) {
+                if let detail = CloudJobRowText.detail(record, developerMode: appSettings.experimental.developerMode) {
                     Text(verbatim: detail)
                         .pixlFont(.bodySmall)
                         .foregroundStyle(theme.onSurfaceVariant)
@@ -226,7 +228,8 @@ struct CloudJobStateIcon: View {
 
 /// A row's words, built once per change (no formatting work in the views' bodies beyond these calls).
 nonisolated enum CloudJobRowText {
-    static func status(_ record: CloudJobRecord, progress: Double?) -> String {
+    /// `developerMode` adds the worker's raw failure code; everyone else reads what to do about it.
+    static func status(_ record: CloudJobRecord, progress: Double?, developerMode: Bool = false) -> String {
         switch record.state {
         case .uploading, .downloading:
             if let progress { return "\(record.state.label) \(Int((progress * 100).rounded(.down)))%" }
@@ -238,7 +241,10 @@ nonisolated enum CloudJobRowText {
             }
             return record.state.label
         case .failed:
-            if let code = record.lastErrorCode { return "Failed · \(code)" }
+            if let code = record.lastErrorCode {
+                if developerMode { return "Failed · \(code)" }
+                return CloudErrorCode(rawValue: code)?.plainMessage ?? CloudErrorCode.internal.plainMessage
+            }
             return record.state.label
         case .imported:
             var parts = ["Done"]
@@ -253,13 +259,14 @@ nonisolated enum CloudJobRowText {
         }
     }
 
-    static func detail(_ record: CloudJobRecord) -> String? {
+    /// The raw error text and the cost / GPU line are developer-mode only.
+    static func detail(_ record: CloudJobRecord, developerMode: Bool = false) -> String? {
         var lines: [String] = []
         // A song prepared ahead (Settings › Sing › Prepare songs ahead) says whose idea it was until it is done.
         if record.effectiveOrigin == .auto, !record.state.isFinished {
             lines.append("Picked ahead of time because you may sing it soon.")
         }
-        if record.state == .failed || record.state == .expired || record.nextAttemptAtMs != nil,
+        if developerMode, record.state == .failed || record.state == .expired || record.nextAttemptAtMs != nil,
            let error = record.lastError, !error.isEmpty {
             lines.append(error)
         }
@@ -269,8 +276,10 @@ nonisolated enum CloudJobRowText {
         }
         if record.state == .imported {
             var cost: [String] = []
-            if let microUSD = record.costMicroUSD { cost.append(CloudCost.format(microUSD: microUSD)) }
-            if let gpu = record.gpu { cost.append(gpu) }
+            if developerMode {
+                if let microUSD = record.costMicroUSD { cost.append(CloudCost.format(microUSD: microUSD)) }
+                if let gpu = record.gpu { cost.append(gpu) }
+            }
             if !cost.isEmpty { lines.append(cost.joined(separator: " · ")) }
             lines.append(contentsOf: record.warnings)
         }

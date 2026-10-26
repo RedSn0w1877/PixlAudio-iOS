@@ -11953,7 +11953,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Once you're signed in, reach out to me with your Name and Email!"
+            "value" : "Beta: Spotify only lets invited testers sign in. Before you sign in, send the email address of your Spotify account to the person who invited you."
           }
         }
       }

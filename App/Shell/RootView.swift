@@ -51,6 +51,8 @@ struct RootView: View {
         }
         // Spotify Connect's messages (skipped songs, takeovers, errors) over whatever is on screen, above the bars.
         .libraryToast(environment.spotifyConnect.toast, bottomPadding: Tokens.Shell.miniPlayerHeight + 96)
+        // A song that can't play says so to everyone (the detailed error stays on the developer-mode dashboard).
+        .libraryToast(playback.notices, bottomPadding: Tokens.Shell.miniPlayerHeight + 96)
         // The Connect device's volume pop-up (the volume buttons), over the tabs and the full player; sheets and covers
         // show their own copy.
         .spotifyConnectVolumeHUD(followsPresentations: true)

@@ -34,6 +34,8 @@ struct PixlAudioApp: App {
                     case .background:
                         cloud.didEnterBackground()
                         environment.home.history.flush()
+                        // Partly cached songs keep no file open while the app is away (reopened on the next read).
+                        if let cache = environment.youtube.cache { Task { await cache.closeAllHandles() } }
                     default: break
                     }
                 }

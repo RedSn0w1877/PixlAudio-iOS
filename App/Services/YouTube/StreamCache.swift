@@ -21,6 +21,10 @@ actor StreamCache {
     let directory: URL
     private var metas: [String: Meta] = [:]
     private var handles: [String: FileHandle] = [:]
+    /// Open handles, least recently used first. Partial files (skipped songs, the prefetcher's heads) used to keep
+    /// their descriptor for the life of the process; past `maxOpenHandles` the oldest one is closed.
+    private var handleOrder: [String] = []
+    static let maxOpenHandles = 6
 
     init(directory: URL = YouTubeNetwork.cachesDirectory("streams")) {
         self.directory = directory
@@ -151,16 +155,32 @@ actor StreamCache {
 
     // MARK: Private
 
+    /// Closes every open file (the app went to the background; the next read or write reopens its file).
+    func closeAllHandles() {
+        for id in Array(handles.keys) { closeHandle(id) }
+    }
+
     private func handle(_ videoId: String) -> FileHandle? {
-        if let handle = handles[videoId] { return handle }
+        if let handle = handles[videoId] {
+            if handleOrder.last != videoId {
+                handleOrder.removeAll { $0 == videoId }
+                handleOrder.append(videoId)
+            }
+            return handle
+        }
+        while handles.count >= Self.maxOpenHandles, let oldest = handleOrder.first(where: { $0 != videoId }) {
+            closeHandle(oldest)
+        }
         guard let handle = try? FileHandle(forUpdating: dataURL(videoId)) else { return nil }
         handles[videoId] = handle
+        handleOrder.append(videoId)
         return handle
     }
 
     private func closeHandle(_ videoId: String) {
         try? handles[videoId]?.close()
         handles[videoId] = nil
+        handleOrder.removeAll { $0 == videoId }
     }
 
     private func touch(_ videoId: String) {

@@ -338,13 +338,17 @@ public actor SpotifyLibrarySync {
             }
             if alreadyDone(playlist.lastSyncTime) { continue }
             await onProgress?(index + 1, playlists.count, playlist.name)
-            var count = 0
+            let count: Int
             do {
                 count = try await syncPlaylistSongs(playlist.id, known: known)
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
+                // The row keeps what `syncUserPlaylists` gave it (Spotify's track total, the previous sync time), not
+                // "0 songs, synced now": its stored songs are still there. Not `complete = false` either: a playlist
+                // that always fails (403) would make the caller's resume loop run forever.
                 failed += 1
+                continue
             }
             synced += count
             var updated = playlist

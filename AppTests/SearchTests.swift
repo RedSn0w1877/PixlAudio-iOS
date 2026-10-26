@@ -123,9 +123,9 @@ final class SearchTests: XCTestCase {
         XCTAssertEqual(sections.map(\.title), ["Songs", "Albums", "Playlists", "More on Spotify", "From YouTube Music"])
         XCTAssertEqual(sections[2].rows.map(\.id), ["playlist_demo-playlist-1_0", "playlist_demo-playlist-1_1"])
         XCTAssertEqual(sections[0].rows.first?.id, "song_demo:0")
-        XCTAssertEqual(SearchFormat.songCount(0), "0 Song")
-        XCTAssertEqual(SearchFormat.songCount(1), "1 Song")
-        XCTAssertEqual(SearchFormat.songCount(7), "7 Songs")
+        XCTAssertEqual(SearchFormat.songCount(0), "0 songs")
+        XCTAssertEqual(SearchFormat.songCount(1), "1 song")
+        XCTAssertEqual(SearchFormat.songCount(7), "7 songs")
     }
 
     func testModelRunsLibraryAndRemoteSearches() async throws {

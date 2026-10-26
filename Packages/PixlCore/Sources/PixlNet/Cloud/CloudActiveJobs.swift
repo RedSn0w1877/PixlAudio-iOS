@@ -26,8 +26,9 @@ public enum CloudActiveJobMapper {
         }
     }
 
-    /// The step the job is in, in plain words, with a percentage only when one is real.
-    public static func status(_ record: CloudJobRecord, transfer: Double?) -> String {
+    /// The step the job is in, in plain words, with a percentage only when one is real. A failure says what to do;
+    /// the worker's raw code (`GPU_OOM`, `POISONED`…) shows only with `developerMode`.
+    public static func status(_ record: CloudJobRecord, transfer: Double?, developerMode: Bool = false) -> String {
         switch record.state {
         case .uploading, .downloading:
             if let transfer { return "\(record.state.label) \(Int((min(max(transfer, 0), 1) * 100).rounded(.down)))%" }
@@ -39,7 +40,10 @@ public enum CloudActiveJobMapper {
             }
             return record.state.label
         case .failed:
-            if let code = record.lastErrorCode, !code.isEmpty { return "Failed · \(code)" }
+            if let code = record.lastErrorCode, !code.isEmpty {
+                if developerMode { return "Failed · \(code)" }
+                return CloudErrorCode(rawValue: code)?.plainMessage ?? CloudErrorCode.internal.plainMessage
+            }
             return record.state.label
         default:
             // A job that stepped aside for a song being sung says so, in place of "Uploaded".

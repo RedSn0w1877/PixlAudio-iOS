@@ -44,6 +44,10 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: bash ci/write-anthropic-key.sh
+      # The commit and build date in About and in exported diagnostics (as in ci.yml), so a tester's report can be
+      # matched to the code it came from.
+      - name: Build identity
+        run: bash ci/write-build-identity.sh
       - name: Tune the runner
         run: bash ci/tune-runner.sh
       - name: Select Xcode
@@ -80,10 +84,18 @@ jobs:
             tag="build-${GITHUB_RUN_NUMBER}"; flags="--prerelease"
           fi
           case "$tag" in *-beta*|*-rc*|*-alpha*) flags="--prerelease" ;; esac
+          # Hand-written notes go above GitHub's generated list: docs/release-notes-<suffix>.md for a suffixed tag
+          # (v1.1.0-beta1 → docs/release-notes-beta1.md), else docs/release-notes-<version>.md.
+          notes=()
+          case "$tag" in
+            *-*) notes_file="docs/release-notes-${tag#*-}.md" ;;
+            *) notes_file="docs/release-notes-${tag#v}.md" ;;
+          esac
+          if [ -f "$notes_file" ]; then notes=(--notes-file "$notes_file"); fi
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" build/PixlAudio-unsigned.ipa --clobber
           else
             gh release create "$tag" build/PixlAudio-unsigned.ipa --target "$GITHUB_SHA" \
-              --title "PixlAudio $tag" --generate-notes $flags
+              --title "PixlAudio $tag" ${notes[@]+"${notes[@]}"} --generate-notes --draft $flags
           fi
           echo "Released $tag" >> "$GITHUB_STEP_SUMMARY"

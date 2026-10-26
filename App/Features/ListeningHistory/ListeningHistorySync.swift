@@ -53,9 +53,15 @@ final class ListeningHistorySync {
 
         if wantsSpotify, let result = await spotify.fetchListeningHistory(nowMs: now) {
             store.setNeedsSpotifyReconnect(result.needsReconnect)
-            let added = await store.addSynced(result.fetch?.plays ?? [], taste: result.fetch?.taste, source: .spotifyAPI)
-            DiagnosticsLog.shared.log("history", "Spotify sync: \(added) new plays"
-                                      + (result.needsReconnect ? ", reconnect needed" : ""))
+            // A fetch that threw, or that Spotify never answered (offline), is not a sync: `addSynced` would stamp the
+            // time and nothing would be tried again for 6 hours, losing plays that fall out of the last 50 meanwhile.
+            if let fetch = result.fetch, fetch.anyResponded {
+                let added = await store.addSynced(fetch.plays, taste: fetch.taste, source: .spotifyAPI)
+                DiagnosticsLog.shared.log("history", "Spotify sync: \(added) new plays"
+                                          + (result.needsReconnect ? ", reconnect needed" : ""))
+            } else {
+                DiagnosticsLog.shared.log("history", "Spotify sync: no answer, trying again later")
+            }
         }
         if wantsYouTube, let plays = await youtube.fetchMusicHistory(nowMs: now, timeZone: store.clock.timeZone) {
             let added = await store.addSynced(plays, source: .ytmusic)

@@ -399,6 +399,10 @@ struct SliderSettingRow: View {
             }
             slider
                 .tint(theme.primary)
+                // VoiceOver names the setting and reads its real value, not a bare "slider, 36 percent". The two
+                // Texts stay in the tree: UI tests find rows by them.
+                .accessibilityLabel(Text(label))
+                .accessibilityValue(Text(valueText(value)))
         }
         .padding(16)
         .settingsRowGlass()

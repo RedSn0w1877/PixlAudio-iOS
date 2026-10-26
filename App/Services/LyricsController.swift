@@ -146,8 +146,12 @@ final class LyricsController {
                 case .success(let loaded):
                     let saved = await service.saveOnline(song: song, lyrics: loaded.lyrics, source: loaded.source,
                                                         rawContent: loaded.rawContent)
-                    self.apply(saved ?? loaded, songId: song.id)
-                    self.searchState = .success
+                    // The track may have changed during the search: the lyrics are saved for their song, but only
+                    // shown if it is still the one loaded (as `pick` does).
+                    if self.loadedSongId == song.id {
+                        self.apply(saved ?? loaded, songId: song.id)
+                        self.searchState = .success
+                    }
                 case .failure(let failure):
                     self.searchState = Self.state(for: failure)
                 }

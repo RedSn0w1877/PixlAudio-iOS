@@ -283,6 +283,18 @@ final class SpotifyService {
 
     func clearMessage() { message = nil }
 
+    /// Spotify refused the refresh token (`invalid_grant`): `SpotifySession` has cleared itself, but this store still
+    /// showed a linked account. Shows the account as signed out and asks to reconnect. Returns whether that happened.
+    @discardableResult
+    func handleExpiredSession() async -> Bool {
+        guard !isDemo, isLoggedIn, !(await session.isLoggedIn()) else { return false }
+        isLoggedIn = false
+        publishAccount()
+        message = "Your Spotify sign-in expired — reconnect"
+        syncFailure = "Your Spotify sign-in expired. Reconnect in Settings › Accounts."
+        return true
+    }
+
     // MARK: Sync (Android `SpotifySyncWorker`)
 
     /// A user's sync: replaces a running one (Android `ExistingWorkPolicy.REPLACE`), never skips "fresh" playlists.
@@ -308,6 +320,10 @@ final class SpotifyService {
                             await self.cacheProfile(profile)
                         })
                         if result.syncedSongCount > 0 { startMatching(retryFailed: false) }
+                        if result.failedPlaylistCount > 0 {
+                            let n = result.failedPlaylistCount
+                            message = n == 1 ? "1 playlist couldn't be imported" : "\(n) playlists couldn't be imported"
+                        }
                         if result.isComplete {
                             preferences.setLastFullSync(currentTimeMillis())
                             break
@@ -316,6 +332,8 @@ final class SpotifyService {
                     } catch is CancellationError {
                         break
                     } catch {
+                        // A revoked sign-in is not retried: the session is already gone.
+                        if await handleExpiredSession() { break }
                         attempts += 1
                         if attempts >= 3 {
                             message = "Spotify import failed: \(error)"
@@ -475,7 +493,12 @@ final class SpotifyService {
     func searchCatalog(_ query: String, types: String = "track,artist,album", limit: Int = 20) async throws -> SpotifyCatalogResults {
         if let demo { return demo.search(query) }
         guard let sync else { return SpotifyCatalogResults() }
-        return try await sync.searchCatalog(query: query, types: types, limit: limit)
+        do {
+            return try await sync.searchCatalog(query: query, types: types, limit: limit)
+        } catch {
+            if !(error is CancellationError) { await handleExpiredSession() }
+            throw error
+        }
     }
 
     func artistTopTracks(_ artistId: String) async -> [SpotifyTrack] {
@@ -518,13 +541,31 @@ final class SpotifyService {
         if like { try? await persistence.setFavorites([songId], isFavorite: true, timestamp: currentTimeMillis()) }
         guard let record = try? await persistence.spotifySong(spotifyId: spotifyId) else { return nil }
         let matcher = TrackMatcher(search: bridge.search)
-        let match: TrackMatch? = (try? await matcher.findMatch(record.matchable)) ?? nil
-        try? await persistence.updateMatch(spotifyId: spotifyId, videoId: match?.videoId, score: match?.score,
-                                           state: match == nil ? .unmatched : .matched)
+        let track = record.matchable
+        // The play-time matcher (searches at once) under the play-time limit. A thrown or timed-out search is not
+        // "no match": the row stays pending, the song is returned and the player's own resolver tries again when it
+        // loads it. Only a search that finished and found nothing marks the song unmatched.
+        let found: TrackMatch??
+        do {
+            found = try await withTimeout(seconds: Self.catalogMatchTimeoutSeconds, {
+                try await matcher.findMatchFanOut(track)
+            })
+        } catch {
+            found = nil
+        }
+        guard let found else {
+            await libraryChanged()
+            return currentSong(id: songId) ?? record.toSong()
+        }
+        try? await persistence.updateMatch(spotifyId: spotifyId, videoId: found?.videoId, score: found?.score,
+                                           state: found == nil ? .unmatched : .matched)
         await libraryChanged()
-        guard match != nil else { return nil }
+        guard found != nil else { return nil }
         return currentSong(id: songId) ?? record.toSong()
     }
+
+    /// How long a catalogue tap waits for its match (the player's on-demand limit).
+    static let catalogMatchTimeoutSeconds: Double = 25
 
     /// Android `likeCatalogTrack`: import and like; the matcher finds the audio later.
     func importAndLike(_ track: SpotifyTrack) async -> Bool {

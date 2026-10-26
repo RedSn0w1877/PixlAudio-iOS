@@ -23,7 +23,10 @@ final class PlaybackStore {
     private(set) var isPreparing = false
     private(set) var repeatMode: RepeatMode = .off
     private(set) var isShuffleEnabled = false
+    /// The full failure text (with the underlying error), for the developer-mode Spotify dashboard.
     private(set) var lastError: String?
+    /// The short, plain message every user sees when a song can't play (the shell shows it as a toast).
+    let notices = LibraryToast()
     /// The device a remote output plays on ("Playing on <device>"), nil while this phone plays.
     private(set) var remoteOutputName: String?
 
@@ -74,6 +77,7 @@ final class PlaybackStore {
             guard let first = BlockedNavigation.firstPlayable(from: clamped, count: songs.count,
                                                               isBlocked: { list.isBlocked(songs[$0]) }) else {
                 lastError = "Every song here is by a blocked artist."
+                notices.show("Every song here is by an artist you blocked")
                 return
             }
             startIndex = first
@@ -255,6 +259,8 @@ final class PlaybackStore {
             if remote == nil, isPlaying { isPlaying = false }
         case .failed(let message):
             lastError = message
+            // The engine emits this before it moves on, so `current` is still the song that failed.
+            notices.show(current.map { "Couldn't play \"\($0.title)\"" } ?? "Couldn't play this song")
         case .queueChanged(let songs, let index):
             // The engine's queue holds the songs it was given (it never edits metadata), so the order of ids says
             // whether anything changed. Equal Strings compare by storage: the usual case (the engine echoing the

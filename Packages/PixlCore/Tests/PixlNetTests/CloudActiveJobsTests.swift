@@ -113,6 +113,18 @@ import PixlModel
         #expect(CloudActiveJobMapper.status(paused, transfer: nil) == "Uploaded")
     }
 
+    @Test func aFailureSaysWhatToDoAndKeepsTheRawCodeForDeveloperMode() {
+        var failed = record(5, .failed)
+        failed.lastErrorCode = CloudErrorCode.gpuOOM.rawValue
+        #expect(CloudActiveJobMapper.status(failed, transfer: nil) == "Couldn't finish this song — tap Retry")
+        #expect(CloudActiveJobMapper.status(failed, transfer: nil, developerMode: true) == "Failed · GPU_OOM")
+        failed.lastErrorCode = CloudErrorCode.tooLong.rawValue
+        #expect(CloudActiveJobMapper.status(failed, transfer: nil) == "Song too long for the cloud")
+        // A code this version doesn't know still reads as plain words.
+        failed.lastErrorCode = "SOMETHING_NEW"
+        #expect(CloudActiveJobMapper.status(failed, transfer: nil) == "Couldn't finish this song — tap Retry")
+    }
+
     @Test func theButtonsSummaryMatchesTheRows() {
         var retry = record(9, .queued, batch: "r")
         retry.nextAttemptAtMs = 9_999

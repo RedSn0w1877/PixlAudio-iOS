@@ -29,13 +29,22 @@ nonisolated enum KeychainStore {
     /// Stores `data` for `account`, replacing any existing item. `thisDeviceOnly` keeps the item out of
     /// device-to-device migration and encrypted backups (`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`; Cloud
     /// Studio's keys); it stays readable by background work after the first unlock either way.
+    ///
+    /// Updated in place, never deleted first: Spotify rotates its refresh token on every refresh, and a delete followed
+    /// by a failed add (or the app suspended between the two) lost the only valid token and signed the user out.
     static func set(_ data: Data, for account: String, thisDeviceOnly: Bool = false) throws {
         let query = baseQuery(account: account)
-        SecItemDelete(query as CFDictionary)
+        let accessible = thisDeviceOnly ? kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly : kSecAttrAccessibleAfterFirstUnlock
+        let changes: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: accessible,
+        ]
+        let updated = SecItemUpdate(query as CFDictionary, changes as CFDictionary)
+        if updated == errSecSuccess { return }
+        guard updated == errSecItemNotFound else { throw KeychainError.status(updated) }
         var attributes = query
         attributes[kSecValueData as String] = data
-        attributes[kSecAttrAccessible as String] = thisDeviceOnly ? kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-            : kSecAttrAccessibleAfterFirstUnlock
+        attributes[kSecAttrAccessible as String] = accessible
         let status = SecItemAdd(attributes as CFDictionary, nil)
         guard status == errSecSuccess else { throw KeychainError.status(status) }
     }

@@ -19,6 +19,8 @@ final class TasteAdjustmentStore {
     @ObservationIgnored private var list = TasteAdjustmentList()
     @ObservationIgnored private var isLoaded: Bool
     @ObservationIgnored private var loadTask: Task<Void, Never>?
+    /// The last write: each save waits for the one before, so an older snapshot never lands after a newer one.
+    @ObservationIgnored private var lastSave: Task<Void, Never>?
     @ObservationIgnored private let file: URL?
 
     /// `file == nil` keeps everything in memory (UI tests); `seed` fills it for a demo screen.
@@ -132,7 +134,9 @@ final class TasteAdjustmentStore {
     private func save() {
         guard let file, isLoaded else { return }
         let snapshot = list
-        Task.detached(priority: .utility) {
+        let previous = lastSave
+        lastSave = Task.detached(priority: .utility) {
+            await previous?.value
             let data = snapshot.encoded()
             guard !data.isEmpty else { return }
             try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)

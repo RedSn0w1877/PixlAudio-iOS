@@ -40,6 +40,8 @@ nonisolated struct TaizoToolbox: ClaudeToolExecuting {
 /// Catalogue results by id, shared by the calls of one conversation.
 nonisolated final class TaizoCatalogCache: Sendable {
     private let tracks = Mutex<[String: CatalogTrack]>([:])
+    /// The seed of `search_library`'s "random" sort for this conversation, so paging with `offset` walks one shuffle.
+    let randomSeed = Int64.random(in: Int64.min...Int64.max)
 
     func remember(_ track: CatalogTrack) -> String {
         let id = "spotify:track:\(track.spotifyId)"
@@ -73,7 +75,7 @@ enum TaizoToolRunner {
         // Blocked music is left out of what Taizo plays and queues, so the changes must be read first.
         await env.tasteAdjustments.ensureLoaded()
         switch tool {
-        case .searchLibrary: return await searchLibrary(env, input)
+        case .searchLibrary: return await searchLibrary(env, input, seen: seen)
         case .searchSpotifyCatalog: return await searchCatalog(env, input, catalog: catalog, seen: seen)
         case .playSongs: return await playSongs(env, input, catalog: catalog, seen: seen)
         case .addToQueue: return await addToQueue(env, input, catalog: catalog, seen: seen)
@@ -94,7 +96,7 @@ enum TaizoToolRunner {
 
     // MARK: Search
 
-    private static func searchLibrary(_ env: AppEnvironment, _ input: JSONObject) async -> ClaudeToolOutput {
+    private static func searchLibrary(_ env: AppEnvironment, _ input: JSONObject, seen: TaizoCatalogCache) async -> ClaudeToolOutput {
         let songs = env.library.songs
         guard !songs.isEmpty else {
             return .json(ClaudeJSON.object([("count", .integer(0)), ("songs", .array([])), ("note", .string("The library is empty."))]))
@@ -115,7 +117,8 @@ enum TaizoToolRunner {
         await TaizoTaste.prepare(env)
         let stats = await TaizoTaste.playStats(env)
         let index = TaizoTaste.cache.index(revision: env.library.songsRevision)
-        let seed = Int64.random(in: Int64.min...Int64.max)
+        // One shuffle per conversation: "random" pages (offset) are cut from the same order, so they don't repeat songs.
+        let seed = seen.randomSeed
         let result = await Task.detached(priority: .userInitiated) { () -> (page: LibraryPage, index: SearchIndex?) in
             var index = index
             if index == nil, !query.text.isEmpty { index = SearchIndex(songs: songs) }
@@ -202,7 +205,7 @@ enum TaizoToolRunner {
                 let spotifyId = String(id.dropFirst("spotify:track:".count))
                 if let song = librarySong(spotifyId: spotifyId) {
                     songs.append(song)
-                } else if let track = seen.track(id), let catalog, let song = await catalog.importAndPlay(.catalog(track)) {
+                } else if let track = seen.track(id), let catalog, let song = await catalog.importForPlayback(.catalog(track)) {
                     songs.append(song)
                 } else {
                     missing.append(id)
@@ -213,10 +216,20 @@ enum TaizoToolRunner {
         }
         if !queries.isEmpty {
             let library = env.library.songs
-            for query in queries.prefix(max(maxSongsPerCall - songs.count, 0)) {
-                let hit = await Task.detached(priority: .userInitiated) {
-                    SearchIndex(songs: library).searchSongs(query, limit: 1).first
-                }.value
+            let revision = env.library.songsRevision
+            let wanted = Array(queries.prefix(max(maxSongsPerCall - songs.count, 0)))
+            // One index for every query, the one `search_library` keeps (built once per library revision): a fresh index
+            // per query made a 200-query call rebuild it over the whole library 200 times.
+            let cached = TaizoTaste.cache.index(revision: revision)
+            let lookup = await Task.detached(priority: .userInitiated) { () -> (hits: [Song?], built: SearchIndex?) in
+                let index = cached ?? SearchIndex(songs: library)
+                return (wanted.map { index.searchSongs($0, limit: 1).first }, cached == nil ? index : nil)
+            }.value
+            if let built = lookup.built, env.library.songsRevision == revision,
+               TaizoTaste.cache.index(revision: revision) == nil {
+                TaizoTaste.cache.setIndex(built, revision: revision)
+            }
+            for (query, hit) in zip(wanted, lookup.hits) {
                 if let hit {
                     songs.append(hit)
                     continue
@@ -225,7 +238,7 @@ enum TaizoToolRunner {
                    case .catalog(let track)? = items.first(where: { if case .catalog = $0 { true } else { false } }) {
                     if let song = librarySong(spotifyId: track.spotifyId) {
                         songs.append(song)
-                    } else if let song = await catalog.importAndPlay(.catalog(track)) {
+                    } else if let song = await catalog.importForPlayback(.catalog(track)) {
                         songs.append(song)
                     } else {
                         missing.append(query)
