@@ -11557,7 +11557,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "You're ready to enjoy your music."
+            "value" : "Smart picks and lyrics are already on. You can tweak anything in Settings."
           }
         }
       }
@@ -11568,7 +11568,62 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "All Set!"
+            "value" : "You're all set"
+          }
+        }
+      }
+    },
+    "setup_back" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back"
+          }
+        }
+      }
+    },
+    "setup_backup_chip_lyrics" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lyrics"
+          }
+        }
+      }
+    },
+    "setup_backup_chip_playlists" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playlists"
+          }
+        }
+      }
+    },
+    "setup_backup_chip_settings" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Settings"
+          }
+        }
+      }
+    },
+    "setup_backup_chip_stats" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stats"
           }
         }
       }
@@ -11579,7 +11634,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "If you already have a PixlAudio backup, restore it now and skip most of the remaining setup on this device."
+            "value" : "Got a PixlAudio backup? Bring everything back in one go and we'll skip the rest."
           }
         }
       }
@@ -11590,7 +11645,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Do you have a backup?"
+            "value" : "Have a backup?"
           }
         }
       }
@@ -11623,29 +11678,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Checking backup package…"
-          }
-        }
-      }
-    },
-    "setup_choose_folders" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choose folders"
-          }
-        }
-      }
-    },
-    "setup_compact_mode" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Compact Mode"
+            "value" : "Taking a look at your backup…"
           }
         }
       }
@@ -11656,7 +11689,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Using minimal pill navigation"
+            "value" : "One small button that opens the menu."
           }
         }
       }
@@ -11667,29 +11700,18 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Using standard tab row"
+            "value" : "Songs, Albums and Artists in a row at the top."
           }
         }
       }
     },
-    "setup_folders_added" : {
+    "setup_continue" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld folders added"
-          }
-        }
-      }
-    },
-    "setup_grant_media_permission" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Grant Media Permission"
+            "value" : "Continue"
           }
         }
       }
@@ -11711,7 +11733,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Inspecting backup"
+            "value" : "Checking backup"
           }
         }
       }
@@ -11722,7 +11744,29 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Let's get everything set up for you."
+            "value" : "Your Spotify music, your way. Setup takes about a minute."
+          }
+        }
+      }
+    },
+    "setup_layout_pill" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pill"
+          }
+        }
+      }
+    },
+    "setup_layout_tabs" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tabs"
           }
         }
       }
@@ -11733,7 +11777,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Let's Go!"
+            "value" : "Let's go"
           }
         }
       }
@@ -11744,7 +11788,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "You can change this later in Settings > Appearance > Library Navigation."
+            "value" : "You can change this any time in Settings > Appearance."
           }
         }
       }
@@ -11755,7 +11799,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose your preferred way to navigate your library."
+            "value" : "Pick how you move around your songs."
           }
         }
       }
@@ -11766,73 +11810,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Library Layout"
-          }
-        }
-      }
-    },
-    "setup_music_folders_description" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PixlAudio reads the music in its own folder (Files › On My iPhone › PixlAudio). Add any other folders that hold your music."
-          }
-        }
-      }
-    },
-    "setup_music_folders_title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Music folders"
-          }
-        }
-      }
-    },
-    "setup_permission_granted" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Permission Granted"
-          }
-        }
-      }
-    },
-    "setup_permission_media_denied_hint" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Access was declined. You can allow it later in the Settings app; your music folders work without it."
-          }
-        }
-      }
-    },
-    "setup_permission_media_description" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PixlAudio can play the downloaded, DRM-free songs in your music library. Allow access to add them to your library."
-          }
-        }
-      }
-    },
-    "setup_permission_media_title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Media Permission"
+            "value" : "Shape your library"
           }
         }
       }
@@ -11848,13 +11826,68 @@
         }
       }
     },
+    "setup_recap_connected" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connected"
+          }
+        }
+      }
+    },
+    "setup_recap_library" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Library"
+          }
+        }
+      }
+    },
+    "setup_recap_look" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Look"
+          }
+        }
+      }
+    },
+    "setup_recap_not_yet" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not yet"
+          }
+        }
+      }
+    },
+    "setup_recap_spotify" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spotify"
+          }
+        }
+      }
+    },
     "setup_recommended" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Recommended"
+            "value" : "Our pick"
           }
         }
       }
@@ -11870,35 +11903,13 @@
         }
       }
     },
-    "setup_scanning_library" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reading your library first, so the backup's songs can be matched…"
-          }
-        }
-      }
-    },
     "setup_skip_for_now" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Skip / Not now"
-          }
-        }
-      }
-    },
-    "setup_spotify_arrow_hint" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tap the button below"
+            "value" : "Skip for now"
           }
         }
       }
@@ -11910,17 +11921,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sign in with Spotify"
-          }
-        }
-      }
-    },
-    "setup_spotify_cd_arrow" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Arrow pointing at the sign-in button"
           }
         }
       }
@@ -11942,18 +11942,51 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Please sign in with Spotify right here. Your liked songs and playlists come straight into PixlAudio."
+            "value" : "Sign in and your music shows up here, ready to play."
           }
         }
       }
     },
-    "setup_spotify_reach_out" : {
+    "setup_spotify_later" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beta: Spotify only lets invited testers sign in. Before you sign in, send the email address of your Spotify account to the person who invited you."
+            "value" : "No rush, you can do this later in Settings."
+          }
+        }
+      }
+    },
+    "setup_spotify_perk_liked" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your liked songs"
+          }
+        }
+      }
+    },
+    "setup_spotify_perk_mixes" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mixes made from what you play"
+          }
+        }
+      }
+    },
+    "setup_spotify_perk_playlists" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your playlists"
           }
         }
       }
@@ -11964,7 +11997,18 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Spotify users, listen up!"
+            "value" : "Connect Spotify"
+          }
+        }
+      }
+    },
+    "setup_start_listening" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start listening"
           }
         }
       }
@@ -12019,7 +12063,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The default dark look for PixlAudio."
+            "value" : "Easy on the eyes, great at night."
           }
         }
       }
@@ -12041,7 +12085,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Match your phone's current appearance setting."
+            "value" : "Switches when your phone does."
           }
         }
       }
@@ -12052,7 +12096,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Follow system"
+            "value" : "Match my phone"
           }
         }
       }
@@ -12063,7 +12107,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "You can change this later in Settings > Appearance > App Theme."
+            "value" : "You can change this any time in Settings > Appearance."
           }
         }
       }
@@ -12074,7 +12118,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A brighter look across the app."
+            "value" : "Bright, clean and crisp."
           }
         }
       }
@@ -12096,7 +12140,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pick the look you want before you start exploring your library."
+            "value" : "Tap one. The app changes right away."
           }
         }
       }
@@ -12107,7 +12151,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "App Theme"
+            "value" : "Pick your look"
           }
         }
       }
@@ -12118,7 +12162,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Welcome to "
+            "value" : "Welcome to"
           }
         }
       }

@@ -764,11 +764,14 @@ Ids: `settingsCategory.ai.localModel` (switch on, downloading 42 %; ready `scree
   describe songs only inside playlists, so favourites / plays / history / lyrics / rules of other songs can't be
   matched, and the report says so. Settings go to `UserDefaults` under the Android keys (typed by Android's declared
   key types on export), API keys to the Keychain; `SettingsStore.reload(from:)` refreshes the observable stores.
-- **Setup** (`Features/Onboarding`): Android `SetupScreen` page by page — `SetupPermissionPage` (Android
-  `PermissionPageLayout`), `SetupIconCollage` (glass tiles in one container; the star tile is a circle),
-  `SetupBottomBar` (glass bar, 80 pt next button turning and changing shape per page), `WelcomeArt` (the Android vector
-  drawable's paths filled with palette roles). Order: welcome, music library, music folders, backup, theme, library
-  layout, Spotify, finish. `AppEnvironment.start()` presents it while `initial_setup_done` is false.
+- **Setup** (`Features/Onboarding`, revamped 2026-10-26): a glass-first pager. `SetupBackdrop` (a drifting mesh at 20 fps
+  plus three glows that move per page; flat tint under Reduce Transparency, still under Reduce Motion and in UI
+  tests), a back button and `SetupProgress` (segmented, springs) on top, `SetupPageScroll` pages in the middle
+  (staggered `setupReveal`, `SetupHero` glass tile, `setupGlassCard`), and one wide glass `SetupFilledButton`
+  (`setup.next`) at the bottom that reads "Skip for now" where the page has its own action. `WelcomeArt` (the Android
+  vector drawable's paths filled with palette roles) and the logo open the welcome page. Order: welcome, Spotify,
+  backup, theme, library layout, finish. The page is remembered in UserDefaults (`setup_resume_page`) so a killed app
+  resumes; `AppEnvironment.start()` presents it while `initial_setup_done` is false.
 - **Updates**: `env.updates` (`UpdateNotifier`) checks GitHub at most every 12 h; `RootView` shows the banner.
 - **Localisation — English only for now (owner decision 12):** `App/Resources/Localizable.xcstrings` holds only the
   English source strings (the 11 Android locales stage 15 converted were stripped when it merged; `project.yml`
