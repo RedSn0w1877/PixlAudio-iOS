@@ -26,29 +26,35 @@ final class HomeLogicTests: XCTestCase {
         XCTAssertEqual(HomeLogic.dayPhase(hour: 4), "night")
     }
 
-    func testLocalHeadlinePrefersArtistThenGenre() {
-        XCTAssertEqual(HomeLogic.localHeadline(hour: 19, topArtist: "Luma Vale", topGenre: "Indie"),
-                       "Good evening — ready for more Luma Vale?")
-        XCTAssertEqual(HomeLogic.localHeadline(hour: 8, topArtist: nil, topGenre: "Indie"),
-                       "Good morning — in the mood for some Indie?")
-        XCTAssertEqual(HomeLogic.localHeadline(hour: 2, topArtist: nil, topGenre: nil),
-                       "Still up? — let's find something to play.")
+    func testSummaryFactsDescribeTheDay() {
+        let songs = DemoLibrary.songs
+        let events = DemoListeningHistory.events(songs: songs, nowMs: now)
+        let facts = HomeLogic.summaryFacts(nowMs: now, timeZone: utc, songs: songs, events: events, allTime: nil,
+                                           importedTopArtist: "Luma Vale")
+        XCTAssertTrue(facts.hasLibrary)
+        XCTAssertEqual(facts.hour, 18)
+        XCTAssertEqual(facts.weekday, 3) // Thursday
+        XCTAssertEqual(facts.topArtist, "Luma Vale")
+        XCTAssertNotNil(facts.lastPlayedTitle)
+        XCTAssertFalse(HomeLogic.greeting(facts).subtitle.isEmpty)
+        let empty = HomeLogic.summaryFacts(nowMs: now, timeZone: utc, songs: [], events: [], allTime: nil, importedTopArtist: nil)
+        XCTAssertFalse(empty.hasLibrary)
+        XCTAssertEqual(HomeLogic.greeting(empty).subtitle, HomeLogic.defaultSubtitle)
     }
 
-    func testStatsSubtitleBranches() {
-        XCTAssertEqual(HomeLogic.statsSubtitle(librarySize: 490, totalPlayCount: 200, topGenre: nil),
-                       "200 plays across 490 songs in your library")
-        XCTAssertEqual(HomeLogic.statsSubtitle(librarySize: 490, totalPlayCount: 12, topGenre: "Rock"),
-                       "12 plays logged · mostly Rock lately")
-        XCTAssertEqual(HomeLogic.statsSubtitle(librarySize: 3, totalPlayCount: 0, topGenre: nil),
-                       "3 songs in your library, ready to explore")
-        XCTAssertEqual(HomeLogic.statsSubtitle(librarySize: 0, totalPlayCount: 0, topGenre: nil),
-                       HomeLogic.defaultSubtitle)
-    }
-
-    func testExpandedFallback() {
-        XCTAssertEqual(HomeLogic.expandedFallback(librarySize: 24, totalPlayCount: 7, topArtist: "Mira Okafor", topGenre: nil),
-                       "You've logged 7 plays across 24 songs in your library. Mira Okafor has been getting the most plays.")
+    func testTheSummaryNeverSoundsLikeAStatistic() {
+        let songs = DemoLibrary.songs
+        let events = DemoListeningHistory.events(songs: songs, nowMs: now)
+        let allTime = PlaybackStats.buildSummary(range: .all, songs: songs, nowMillis: now, events: events, timeZone: utc)
+        let facts = HomeLogic.summaryFacts(nowMs: now, timeZone: utc, songs: songs, events: events, allTime: allTime,
+                                           importedTopArtist: nil)
+        let greeting = HomeLogic.greeting(facts)
+        for text in [greeting.headline, greeting.subtitle, HomeSummary.insight(facts)] {
+            XCTAssertFalse(HomeSummary.isStatPhrasing(text), text)
+            XCTAssertFalse(text.localizedCaseInsensitiveContains("in your library"), text)
+        }
+        XCTAssertLessThanOrEqual(greeting.headline.count, HomeSummary.headlineLimit)
+        XCTAssertLessThanOrEqual(greeting.subtitle.count, HomeSummary.subtitleLimit)
     }
 
     // MARK: Formats

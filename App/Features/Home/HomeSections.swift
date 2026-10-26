@@ -8,8 +8,8 @@ import SwiftUI
 
 // MARK: - Greeting card (HomeGreetingCard)
 
-/// 32 pt glass card (`navBarCornerRadius`), 20×18 padding: headline `titleLarge` bold (2 lines) with the expand
-/// chevron (32 pt target, 22 pt icon), the stats line in `bodyMedium`, and the expanded insight. Android's glass
+/// 32 pt glass card (`navBarCornerRadius`), 20×18 padding: headline `titleLarge` bold (one short line) with the expand
+/// chevron (32 pt target, 22 pt icon), the one-line context in `bodyMedium`, and the expanded insight. Android's glass
 /// mode draws two static washes of the scheme's primary / tertiary (0.26 top-left, 0.16 bottom-right) instead of the
 /// Material colour sweep loop — the port does the same (no animation ticking on the screen the app opens to).
 struct HomeGreetingCard: View {
@@ -29,7 +29,10 @@ struct HomeGreetingCard: View {
                 Text(greeting.headline)
                     .pixlFont(.titleLarge, weight: .bold)
                     .foregroundStyle(theme.onSurface)
-                    .lineLimit(2)
+                    // One short line (`HomeSummary.headlineLimit`); the scale factor is a safety net for a long
+                    // name or a big text size, so a word is never cut.
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentTransition(.opacity)
                     .animation(.easeOut(duration: 0.45), value: greeting.headline)
@@ -52,6 +55,7 @@ struct HomeGreetingCard: View {
                 .pixlFont(.bodyMedium)
                 .foregroundStyle(theme.onSurfaceVariant)
                 .lineLimit(1)
+                .minimumScaleFactor(0.9)
             if isExpanded && isLoadingInsight {
                 ProgressView()
                     .controlSize(.small)
