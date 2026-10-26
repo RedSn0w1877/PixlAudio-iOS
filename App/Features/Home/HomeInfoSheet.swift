@@ -42,6 +42,13 @@ nonisolated enum HomeProjectLinks {
         return suffix.isEmpty ? nil : String(suffix)
     }
 
+    /// "Beta 1" for a tag suffix like "beta1", else the suffix as is (nil for a stable build).
+    static var betaLabel: String? {
+        guard let suffix = preReleaseSuffix else { return nil }
+        guard suffix.lowercased().hasPrefix("beta"), let number = Int(suffix.dropFirst(4)) else { return suffix }
+        return "Beta \(number)"
+    }
+
     /// Builds before 1.0 were betas; after that, a build from a tag with a suffix (v1.1.0-beta1) is one.
     static var isPreRelease: Bool { shortVersion.hasPrefix("0.") || preReleaseSuffix != nil }
 }
@@ -220,7 +227,7 @@ private struct BetaInfoSheetContent: View {
                 .background(Circle().fill(LinearGradient(colors: [theme.primary, theme.primary.opacity(0.65)],
                                                          startPoint: .topLeading, endPoint: .bottomTrailing)))
             VStack(alignment: .leading, spacing: 4) {
-                Text(HomeProjectLinks.isPreRelease ? "Welcome to PixlAudio \(version)-\(HomeProjectLinks.preReleaseSuffix ?? "beta")"
+                Text(HomeProjectLinks.isPreRelease ? "Welcome to PixlAudio \(HomeProjectLinks.betaLabel ?? "\(version) beta")"
                                                     : "Welcome to PixlAudio \(version)")
                     .pixlFont(.titleMedium)
                     .foregroundStyle(theme.onSurface)
@@ -432,7 +439,7 @@ nonisolated struct HomeChangelogVersion: Sendable, Identifiable {
 /// its own versions).
 nonisolated enum HomeChangelog {
     static let versions: [HomeChangelogVersion] = [
-        HomeChangelogVersion(version: "1.1.0-beta1", date: "2026-10-26", sections: [
+        HomeChangelogVersion(version: "Beta 1", date: "2026-10-26", sections: [
             ("new stuff", [
                 "claude runs all the ai stuff now whenever youre online, and if youre offline your iphones own ai just takes over",
                 "ask taizo is here ye, you can chat about music, play songs, build playlists, or say like play less of this artist and it actually tunes your recs",
