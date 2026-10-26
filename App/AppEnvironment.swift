@@ -30,6 +30,11 @@ final class AppEnvironment {
     let home: HomeStore
     /// Settings › AI › Music intelligence: what listening teaches the recommendations.
     let musicTaste: MusicTasteStore
+    /// Listening history imported from Spotify / YouTube Music (automatic and from data downloads), fed to the
+    /// recommendations; its read API (`topArtists`, `topTracks`, `recentPlays`, `listeningSummary`) serves the assistant.
+    let importedHistory: ImportedHistoryStore
+    /// The automatic Spotify / YouTube Music history sync (app start, after connecting, background refresh).
+    let historySync: ListeningHistorySync
     /// Settings › AI › "Ready when you play": automatic lyric sync and instrumentals while the app is open.
     let automaticStudio: AutomaticStudioRunner
     /// Search providers by source: the library on `SearchIndex` (stage 7c); stages 11/12 replace the YouTube Music
@@ -141,6 +146,9 @@ final class AppEnvironment {
         self.musicTaste = musicTaste
         home.taste = musicTaste
         home.explorationFraction = { Float(settings.ai.musicExploration) }
+        let importedHistory = ImportedHistoryStore.make(launch: launch)
+        self.importedHistory = importedHistory
+        home.imported = importedHistory
 
         // Stage 5: the dual-deck AVPlayer engine for real launches; UI tests keep the demo engine.
         var realPlayback: PlaybackServices?
@@ -233,6 +241,9 @@ final class AppEnvironment {
         }
 
         self.spotifyConnect = spotifyConnect
+        historySync = ListeningHistorySync(store: importedHistory, spotify: spotify, youtube: youtube)
+        let historyLibrary = library
+        importedHistory.localSource = { (home.history.events, historyLibrary.songs) }
         tais = TaisServices(launch: launch, settings: settings, lyricsController: lyricsController, playback: playback,
                             playbackServices: playbackServices, youtube: youtube)
         automaticStudio = AutomaticStudioRunner(studio: tais.studio, models: tais.models, settings: settings,
@@ -272,13 +283,15 @@ final class AppEnvironment {
     /// and has Cloud Studio send them (never in UI tests). It follows its settings by itself; `start()` turns it on.
     private func wireAutoPrepare() {
         let library = self.library, home = self.home, taste = self.musicTaste, blocked = settings.blocked
+        let imported = self.importedHistory
         let runner = SingPrepareRunner(cloud: cloud, sources: SingPrepareRunner.Sources(
             songs: { library.songs },
             playlists: { library.playlists },
             events: { home.history.events },
             signals: { taste.learnedSignals },
             blocked: { blocked.matcher },
-            isAppActive: { UIApplication.shared.applicationState == .active }))
+            isAppActive: { UIApplication.shared.applicationState == .active },
+            imported: { imported.aggregate }))
         cloud.autoPrepare = runner
         // The phone's own automatic studio leaves an instrumental the cloud is getting ready to the cloud.
         automaticStudio.cloudPreparesInstrumental = { [weak runner] songId in runner?.owns(songId: songId) ?? false }
@@ -414,7 +427,16 @@ final class AppEnvironment {
         // not in the full player's first frame.
         _ = AudioRouteMonitor.shared
         await AIProviderStatus.refresh(self)
+        historySync.attach()
         await spotify.start()
+        // Listening history: a little after launch, quietly (at most every 6 hours per source).
+        let historySync = self.historySync
+        if HeavyWorkGate.shared.allowsLaunchWork {
+            Task(priority: .utility) {
+                try? await Task.sleep(for: .seconds(12))
+                historySync.syncIfDue()
+            }
+        }
         await updates.checkIfDue()
     }
 

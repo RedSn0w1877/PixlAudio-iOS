@@ -30,6 +30,14 @@ struct HomeView: View {
                         .padding(.horizontal, HomeMetrics.greetingInset)
                         .transition(.opacity.combined(with: .move(edge: .top)))
                 }
+                // Once, until a data download is imported or the card is closed: the listening-history import.
+                if showsHistoryCard {
+                    ListeningHistoryHomeCard(onOpen: { router.push(.listeningHistory) }, onDismiss: {
+                        withAnimation(PixlMotion.state) { env.importedHistory.homeCardDismissed = true }
+                    })
+                    .padding(.horizontal, HomeMetrics.greetingInset)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
                 HomeGreetingCard(greeting: content.greeting, insight: home.aiInsight ?? content.insight,
                                  isExpanded: home.isInsightExpanded, isLoadingInsight: home.isLoadingInsight,
                                  onToggle: { withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { home.toggleInsight() } })
@@ -100,12 +108,19 @@ struct HomeView: View {
         }
         .background(theme.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
-        .task(id: HomeRefreshKey(libraryRevision: library.songsRevision, revision: home.history.revision)) {
+        .task(id: HomeRefreshKey(libraryRevision: library.songsRevision, revision: home.history.revision,
+                                 importedRevision: env.importedHistory.revision)) {
             await home.refresh(snapshot: library.snapshot, libraryRevision: library.songsRevision)
         }
         // Cloud Studio's stored jobs (read once, off the main actor): its work may have moved on while the app was closed,
         // and the jobs button should show it.
         .task { await env.cloud.loadForDisplay() }
+    }
+
+    /// Not in UI tests (screenshots stay as they were), and only once there is a library to make mixes from.
+    private var showsHistoryCard: Bool {
+        let history = env.importedHistory
+        return !env.launch.isUITest && !history.homeCardDismissed && !history.hasFileImport && !library.songs.isEmpty
     }
 
     // MARK: Your Mix
@@ -161,6 +176,8 @@ struct HomeView: View {
 private struct HomeRefreshKey: Equatable {
     var libraryRevision: Int
     var revision: Int
+    /// Imported listening history (Spotify / YouTube Music) changed.
+    var importedRevision = 0
 }
 
 /// Home geometry from the Compose code.

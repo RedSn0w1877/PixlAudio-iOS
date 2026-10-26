@@ -13,3 +13,7 @@ classes (and, for search, the real songs_fts SQL through SQLite) on a desktop JV
 - stats-golden.jsonl           PlaybackStatsRepository.buildSummaryFromEvents in six time zones
 - history-codec-golden.jsonl   playback_history.json parse/serialize (Gson)
 - search-golden.jsonl          songs_fts MATCH + LIKE queries, album/artist LIKE, playlist contains
+
+history/ holds small hand-written samples of the listening-history files people download (Spotify extended and basic
+streaming history, Google Takeout watch-history.json), in the exact shape those services export; ListeningHistoryTests
+reads them. Edit by hand.

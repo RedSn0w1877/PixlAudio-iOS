@@ -70,6 +70,9 @@ final class HomeStore {
     /// Music intelligence: the learned signals (Android `tasteRepository.signals()`) and the exploration setting,
     /// set by `AppEnvironment` (nil / 0.25 for previews).
     @ObservationIgnored var taste: MusicTasteStore?
+    /// Listening history imported from Spotify / YouTube Music (spec B3): its plays, signals and artist affinity join
+    /// the app's own in every mix and shelf. Set by `AppEnvironment` (nil for previews).
+    @ObservationIgnored var imported: ImportedHistoryStore?
     @ObservationIgnored var explorationFraction: () -> Float = { 0.25 }
     /// Blocked artists: their songs are left out of every mix, shelf and list Home computes.
     @ObservationIgnored private(set) var blockedMatcher: BlockedArtistMatcher = .empty
@@ -100,12 +103,13 @@ final class HomeStore {
         var exploration: Float
         var learning: Bool
         var blocked = 0
+        var importedRevision = 0
 
         /// The same library, day and taste: only the listening history moved.
         func onlyHistoryDiffers(from other: Key) -> Bool {
             revision != other.revision && libraryRevision == other.libraryRevision && epochDay == other.epochDay
                 && tasteRevision == other.tasteRevision && exploration == other.exploration && blocked == other.blocked
-                && learning == other.learning
+                && learning == other.learning && importedRevision == other.importedRevision
         }
     }
 
@@ -135,6 +139,8 @@ final class HomeStore {
         let snapshot = unblocked(snapshot)
         await history.ensureLoaded()
         await taste?.ensureLoaded()
+        await imported?.ensureLoaded()
+        let importedAggregate = imported?.aggregate ?? .empty
         let clock = history.clock
         let now = clock.nowMs()
         let epochDay = ZoneClock(clock.timeZone).localDate(at: now).epochDay
@@ -142,7 +148,7 @@ final class HomeStore {
         let exploration = explorationFraction()
         let key = Key(libraryRevision: libraryRevision, revision: history.revision, epochDay: epochDay,
                       tasteRevision: taste?.revision ?? 0, exploration: exploration, learning: !signals.isEmpty,
-                      blocked: blockedRevision)
+                      blocked: blockedRevision, importedRevision: imported?.revision ?? 0)
         if !force, key == lastKey { return }
         // A finished song or skip changes only the history: wait until the skip, the carousel and the re-theme are
         // done before the (cancellable) recomputation starts. A newer change cancels this task during the wait.
@@ -159,7 +165,7 @@ final class HomeStore {
         let task = Task.detached(priority: force ? .userInitiated : .utility) { () -> (content: HomeContent, generatedMixes: Bool)? in
             HomeStore.computeIfActive(snapshot: snapshot, events: events, nowMs: now, timeZone: clock.timeZone,
                               savedDaily: saved.daily, savedYourMix: saved.yourMix, storedSignals: signals,
-                              exploration: exploration)
+                              exploration: exploration, importedHistory: importedAggregate)
         }
         let stamp = ScreenDataCache.Stamp(historyRevision: history.revision, songCount: snapshot.songs.count)
         let day = ZoneClock(clock.timeZone).localDate(at: now).description
@@ -246,13 +252,17 @@ final class HomeStore {
         let seed = Int64.random(in: Int64.min...Int64.max)
         let signals = taste?.learnedSignals ?? [:]
         let exploration = explorationFraction()
+        await imported?.ensureLoaded()
+        let importedAggregate = imported?.aggregate ?? .empty
         let mix = await Task.detached(priority: .userInitiated) { () -> [Song] in
             let songs = snapshot.songs
             guard !songs.isEmpty else { return [] }
+            let inputs = HomeStore.recommendationInputs(songs: songs, events: events, signals: signals,
+                                                        imported: importedAggregate)
             return DailyMix.personalizedPicks(
                 allSongs: songs, favoriteSongIds: Set(songs.filter(\.isFavorite).map(\.id)),
-                engagements: HomeStore.engagementStats(events), storedSignals: signals, exploration: exploration,
-                nowMs: now, limit: 60, seed: seed).map(\.song)
+                engagements: inputs.engagements, storedSignals: inputs.signals, exploration: exploration,
+                nowMs: now, limit: 60, seed: seed, artistAffinity: inputs.artistAffinity).map(\.song)
         }.value
         guard !mix.isEmpty else { return }
         content.curatedYourMix = mix
@@ -279,13 +289,18 @@ final class HomeStore {
         let signals = taste?.learnedSignals ?? [:]
         let exploration = explorationFraction()
         let epochDay = ZoneClock(history.clock.timeZone).localDate(at: now).epochDay
+        await imported?.ensureLoaded()
+        let importedAggregate = imported?.aggregate ?? .empty
         let report = await Task.detached(priority: .userInitiated) { () -> String in
             let songs = snapshot.songs
             let start = Date()
+            let inputs = HomeStore.recommendationInputs(songs: songs, events: events, signals: signals,
+                                                        imported: importedAggregate)
             let picks = DailyMix.personalizedPicks(
                 allSongs: songs, favoriteSongIds: Set(songs.filter(\.isFavorite).map(\.id)),
-                engagements: HomeStore.engagementStats(events), storedSignals: signals, exploration: exploration,
-                nowMs: now, limit: 30, seed: DailyMix.dailySeed(epochDay: epochDay))
+                engagements: inputs.engagements, storedSignals: inputs.signals, exploration: exploration,
+                nowMs: now, limit: 30, seed: DailyMix.dailySeed(epochDay: epochDay),
+                artistAffinity: inputs.artistAffinity)
             let elapsed = Int(Date().timeIntervalSince(start) * 1000)
             let artists = Set(picks.map(\.song.artist)).count
             let unheard = picks.filter(\.unheard).count
@@ -303,6 +318,21 @@ final class HomeStore {
         content.dailyMix = songs
         defaults?.set(songs.map(\.id), forKey: PreferenceKeys.dailyMixSongIds)
         defaults?.set(Double(history.clock.nowMs()), forKey: PreferenceKeys.lastDailyMixUpdate)
+    }
+
+    /// The recommendation inputs: the app's own engagement and learned signals, plus imported listening history
+    /// (Spotify 1.0 / YouTube Music 0.35, 180-day fade) mapped to `songs`, and the artist affinity from listening
+    /// outside the library and Spotify's top / followed artists.
+    nonisolated static func recommendationInputs(songs: [Song], events: [PlaybackEvent],
+                                                 signals: [String: MusicRecommendationEngine.Signal],
+                                                 imported: ImportedHistoryAggregate)
+        -> (engagements: [String: EngagementStats], signals: [String: MusicRecommendationEngine.Signal],
+            artistAffinity: [String: Double])
+    {
+        let local = engagementStats(events)
+        guard !imported.isEmpty else { return (local, signals, [:]) }
+        let extra = imported.recommendationInputs(library: songs)
+        return (extra.mergedEngagements(local), extra.mergedSignals(signals), extra.artistAffinity)
     }
 
     /// Per-song engagement from the history (Android `SongEngagementEntity`: plays, listened time, last play).
@@ -344,11 +374,12 @@ final class HomeStore {
     nonisolated static func compute(snapshot: LibrarySnapshot, events: [PlaybackEvent], nowMs: Int64,
                                     timeZone: TimeZone, savedDaily: [String], savedYourMix: [String],
                                     storedSignals: [String: MusicRecommendationEngine.Signal] = [:],
-                                    exploration: Float = 0.25)
+                                    exploration: Float = 0.25, importedHistory: ImportedHistoryAggregate = .empty)
         -> (content: HomeContent, generatedMixes: Bool)
     {
         computeIfActive(snapshot: snapshot, events: events, nowMs: nowMs, timeZone: timeZone, savedDaily: savedDaily,
-                        savedYourMix: savedYourMix, storedSignals: storedSignals, exploration: exploration)
+                        savedYourMix: savedYourMix, storedSignals: storedSignals, exploration: exploration,
+                        importedHistory: importedHistory)
             ?? (HomeContent(), false)
     }
 
@@ -356,8 +387,9 @@ final class HomeStore {
     /// computation stops instead of running to completion in the background.
     nonisolated static func computeIfActive(snapshot: LibrarySnapshot, events: [PlaybackEvent], nowMs: Int64,
                                             timeZone: TimeZone, savedDaily: [String], savedYourMix: [String],
-                                            storedSignals: [String: MusicRecommendationEngine.Signal] = [:],
-                                            exploration: Float = 0.25)
+                                            storedSignals storedLocalSignals: [String: MusicRecommendationEngine.Signal] = [:],
+                                            exploration: Float = 0.25,
+                                            importedHistory: ImportedHistoryAggregate = .empty)
         -> (content: HomeContent, generatedMixes: Bool)?
     {
         let songs = snapshot.songs
@@ -373,9 +405,12 @@ final class HomeStore {
         content.insight = HomeLogic.expandedFallback(librarySize: songs.count, totalPlayCount: allTime?.totalPlayCount ?? 0,
                                                      topArtist: allTime?.topArtists.first?.artist,
                                                      topGenre: HomeLogic.topGenre(allTime))
-        content.greetingFacts = HomeGreetingFacts(hour: hour, topArtist: allTime?.topArtists.first?.artist,
+        // Imported listening speaks for the listener while the app's own history is still thin.
+        content.greetingFacts = HomeGreetingFacts(hour: hour,
+                                                  topArtist: allTime?.topArtists.first?.artist ?? importedHistory.artists.first?.name,
                                                   topGenre: HomeLogic.topGenre(allTime),
-                                                  totalPlays: allTime?.totalPlayCount ?? 0, librarySize: songs.count)
+                                                  totalPlays: (allTime?.totalPlayCount ?? 0) + importedHistory.totalPlays,
+                                                  librarySize: songs.count)
 
         if Task.isCancelled { return nil }
         // Newest songs (`ORDER BY date_added DESC, id DESC LIMIT 48`).
@@ -407,7 +442,11 @@ final class HomeStore {
         guard !songs.isEmpty else { return (content, false) }
 
         if Task.isCancelled { return nil }
-        let engagements = engagementStats(events)
+        let recommendation = recommendationInputs(songs: songs, events: events, signals: storedLocalSignals,
+                                                  imported: importedHistory)
+        let engagements = recommendation.engagements
+        let storedSignals = recommendation.signals
+        let affinity = recommendation.artistAffinity
         let favorites = Set(songs.filter(\.isFavorite).map(\.id))
         let today = zone.localDate(at: nowMs)
         let epochDay = today.epochDay
@@ -422,12 +461,12 @@ final class HomeStore {
             content.dailyMix = DailyMix.personalizedPicks(
                 allSongs: songs, favoriteSongIds: favorites, engagements: engagements, storedSignals: storedSignals,
                 exploration: exploration, nowMs: nowMs, limit: 30,
-                seed: DailyMix.dailySeed(epochDay: epochDay)).map(\.song)
+                seed: DailyMix.dailySeed(epochDay: epochDay), artistAffinity: affinity).map(\.song)
             let dayOfYear = Int(epochDay - LocalDate(year: today.year, month: 1, day: 1).epochDay) + 1
             content.curatedYourMix = DailyMix.personalizedPicks(
                 allSongs: songs, favoriteSongIds: favorites, engagements: engagements, storedSignals: storedSignals,
                 exploration: exploration, nowMs: nowMs, limit: 60,
-                seed: DailyMix.yourMixSeed(year: today.year, dayOfYear: dayOfYear)).map(\.song)
+                seed: DailyMix.yourMixSeed(year: today.year, dayOfYear: dayOfYear), artistAffinity: affinity).map(\.song)
             generated = true
         }
 
@@ -438,7 +477,7 @@ final class HomeStore {
         let plan = HomeRecommendationPlanner.plan(library: songs, favorites: favorites, signals: inputs.signals,
                                                   history: inputs.history, nowMs: nowMs, seed: epochDay,
                                                   signalSources: inputs.signalSources,
-                                                  historySources: inputs.historySources)
+                                                  historySources: inputs.historySources, artistAffinity: affinity)
         content.mixes = plan.mixes
         content.shelves = plan.shelves
         return (content, generated)

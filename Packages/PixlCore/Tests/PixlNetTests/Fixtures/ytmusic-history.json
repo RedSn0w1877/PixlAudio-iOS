@@ -1,0 +1,16 @@
+{"responseContext":{"visitorData":"Cgt2"},"contents":{"singleColumnBrowseResultsRenderer":{"tabs":[{"tabRenderer":{"content":{"sectionListRenderer":{"contents":[
+{"musicShelfRenderer":{"title":{"runs":[{"text":"Today"}]},"contents":[
+ {"musicResponsiveListItemRenderer":{"flexColumns":[
+   {"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Get Lucky"}]}}},
+   {"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Daft Punk"},{"text":" • "},{"text":"Random Access Memories"},{"text":" • "},{"text":"6:10"}]}}}],
+   "playlistItemData":{"videoId":"5NV6Rdv1a3I"}}},
+ {"musicResponsiveListItemRenderer":{"flexColumns":[
+   {"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Blinding Lights"}]}}},
+   {"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"The Weeknd"},{"text":" • "},{"text":"After Hours"},{"text":" • "},{"text":"3:20"}]}}}],
+   "playlistItemData":{"videoId":"4NRXx6U8ABQ"}}}]}},
+{"musicShelfRenderer":{"title":{"runs":[{"text":"Last week"}]},"contents":[
+ {"musicResponsiveListItemRenderer":{"flexColumns":[
+   {"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"One More Time"}]}}},
+   {"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Daft Punk"},{"text":" • "},{"text":"Discovery"},{"text":" • "},{"text":"5:21"}]}}}],
+   "playlistItemData":{"videoId":"FGBhQbmPwH8"}}}]}}],
+"continuations":[{"nextContinuationData":{"continuation":"NEXT_TOKEN","clickTrackingParams":"x"}}]}}}}]}}}
