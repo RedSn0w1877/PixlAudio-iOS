@@ -2,8 +2,8 @@ import PixlNet
 import SwiftUI
 import UIKit
 
-/// Settings › AI features (Android `SettingsCategoryScreen` AI_INTEGRATION): the music-intelligence card and the
-/// personality (system prompt + presets). Developer mode adds the "Advanced" block: the music intelligence tools, the
+/// Settings › AI features (Android `SettingsCategoryScreen` AI_INTEGRATION): the assistant rows and the
+/// personality (system prompt + presets). Developer mode adds the "Advanced" block: the
 /// assistant, sign-in (API key, Keychain), model, base URL for configurable providers, and a collapsed disclosure
 /// (generation parameters, song data, usage report). The automatic studio card moved to Sing.
 ///
@@ -49,7 +49,6 @@ struct AISettingsSection: View {
                     claudeCloudSwitch
                 }
             }
-            MusicIntelligenceCard()
             Spacer().frame(height: 20)
             // The raw system-prompt editor is a developer tool (normal users get the defaults).
             if developerMode {
@@ -94,7 +93,7 @@ struct AISettingsSection: View {
             .accessibilityIdentifier("settings.ai.claudeCloud")
     }
 
-    /// Developer mode's "Advanced" block: the music intelligence tools, the assistant (the on-device model, the
+    /// Developer mode's "Advanced" block: the assistant (the on-device model, the
     /// downloaded one, the optional cloud assistants with their sign-in, model and base URL) and the generation
     /// parameters, song data and usage report disclosure.
     @ViewBuilder
@@ -102,7 +101,6 @@ struct AISettingsSection: View {
         @Bindable var ai = settings.ai
         let cloud = ai.usesCloudAssistant
         SettingsAdvancedHeader()
-        MusicIntelligenceToolsPanel()
         SettingsSubsection(title: "Claude (built-in)") {
             AIParameterRow(label: "Monthly limit", value: $ai.claudeMonthlyCap, range: 0...ClaudeBudget.maxCapDollars, steps: 39,
                            help: "This device's monthly spend cap for the built-in Claude key. Over it, AI runs on this iPhone until next month. $0 turns cloud AI off.") {
@@ -670,125 +668,5 @@ struct AIUsageItem: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(fill.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
-    }
-}
-
-/// Android `MusicIntelligenceSettingsCard` (secondary-container card): learning, exploration, what it has learned and
-/// "Reset learned taste", on `MusicTasteStore` and Home's recommendations. The preview and refresh tools sit in
-/// Advanced (`MusicIntelligenceToolsPanel`).
-///
-/// Dropped: "Discover beyond my library" — on Android it adds online catalog songs to Home's discovery shelves;
-/// the iOS Home has no catalog source, so the switch would do nothing (docs/design.md › Dropped settings). The
-/// instrumental-engine benchmark (Android's model status and timing) is not part of the iOS card either.
-struct MusicIntelligenceCard: View {
-    @Environment(AppEnvironment.self) private var env
-    @Environment(SettingsStore.self) private var settings
-    @Environment(\.appTheme) private var theme
-    @State private var exploration = 0.25
-    @State private var showsReset = false
-
-    var body: some View {
-        @Bindable var ai = settings.ai
-        let taste = env.musicTaste
-        GlassCard(cornerRadius: 28, tint: theme.secondaryContainer) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(L10n.musicIntelligenceTitle).pixlFont(.headlineSmall).foregroundStyle(theme.onSecondaryContainer)
-                Text(L10n.musicIntelligenceDescription).pixlFont(.bodyMedium).foregroundStyle(theme.onSecondaryContainer)
-                toggle(L10n.musicIntelligenceLearning, $ai.musicLearningEnabled)
-                Text(L10n.musicIntelligenceExploration(Int(exploration * 100)))
-                    .pixlFont(.titleSmall).foregroundStyle(theme.onSecondaryContainer)
-                Slider(value: $exploration, in: 0...0.6, step: 0.05) { editing in
-                    if !editing { ai.musicExploration = exploration }
-                }
-                .tint(theme.primary)
-                Text(L10n.musicIntelligenceLearningCount(taste.learnedSongs, taste.completions, taste.skips))
-                    .pixlFont(.bodySmall).foregroundStyle(theme.onSecondaryContainer)
-                    .accessibilityIdentifier("ai.musicIntelligence.count")
-                SettingsFillButton(title: L10n.musicIntelligenceReset, style: .outlined) { showsReset = true }
-            }
-            .padding(20)
-        }
-        .onAppear { exploration = ai.musicExploration }
-        .alert(L10n.musicIntelligenceReset, isPresented: $showsReset) {
-            Button(L10n.commonCancel, role: .cancel) {}
-            Button(L10n.musicIntelligenceResetConfirm, role: .destructive) {
-                taste.reset()
-            }
-        } message: {
-            Text(L10n.musicIntelligenceResetDescription)
-        }
-    }
-
-    private func toggle(_ title: String, _ isOn: Binding<Bool>) -> some View {
-        HStack(spacing: 12) {
-            Text(title).pixlFont(.titleSmall).foregroundStyle(theme.onSecondaryContainer)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Toggle(title, isOn: isOn).labelsHidden().tint(theme.primary)
-        }
-        .frame(minHeight: 48)
-    }
-}
-
-/// Android's music intelligence "Debug and testing tools" (developer mode, minus Reset learned taste): preview the
-/// ranked picks, draw the mixes again, and read or copy the recommendation report.
-struct MusicIntelligenceToolsPanel: View {
-    @Environment(AppEnvironment.self) private var env
-    @Environment(\.appTheme) private var theme
-    @State private var expanded = false
-    @State private var isBusy = false
-    @State private var message: String?
-
-    var body: some View {
-        let taste = env.musicTaste
-        SettingsSubsection(title: L10n.musicIntelligenceTitle) {
-            SettingsPanel {
-                SettingsFillButton(title: expanded ? L10n.musicIntelligenceHideTools : L10n.musicIntelligenceTools,
-                                   style: .filled) { expanded.toggle() }
-                if expanded {
-                    Text(L10n.musicIntelligenceToolsDescription)
-                        .pixlFont(.bodySmall).foregroundStyle(theme.onSurfaceVariant)
-                    SettingsFillButton(title: L10n.musicIntelligencePreview, style: .filled, enabled: !isBusy) {
-                        preview()
-                    }
-                    SettingsFillButton(title: L10n.musicIntelligenceRefresh, style: .outlined, enabled: !isBusy) {
-                        refresh()
-                    }
-                    if let message {
-                        Text(message).pixlFont(.bodySmall).foregroundStyle(theme.onSurfaceVariant)
-                    }
-                    Text(taste.lastReport)
-                        .pixlFont(.bodySmall)
-                        .foregroundStyle(theme.onSurfaceVariant)
-                        .textSelection(.enabled)
-                    SettingsFillButton(title: L10n.musicIntelligenceCopyReport, style: .outlined) {
-                        UIPasteboard.general.string = taste.lastReport
-                        message = "Report copied."
-                    }
-                }
-            }
-        }
-        .animation(PixlMotion.state, value: expanded)
-    }
-
-    /// Android `preview`: ranks the real library with the real inputs; playback and the queue are untouched.
-    private func preview() {
-        isBusy = true
-        let home = env.home, snapshot = env.library.snapshot
-        Task {
-            await home.previewRecommendations(snapshot: snapshot)
-            message = "Preview complete. Playback is unchanged."
-            isBusy = false
-        }
-    }
-
-    /// Android `refreshDiscovery` (it queues the Daily Mix refresh): today's mixes are drawn again.
-    private func refresh() {
-        isBusy = true
-        let home = env.home, library = env.library
-        Task {
-            await home.regenerateDailyMix(snapshot: library.snapshot, libraryRevision: library.songsRevision)
-            message = "Daily Mix and Your Mix were drawn again."
-            isBusy = false
-        }
     }
 }

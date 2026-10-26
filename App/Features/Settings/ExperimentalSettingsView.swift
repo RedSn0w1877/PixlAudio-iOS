@@ -28,7 +28,7 @@ struct ExperimentalSettingsView: View {
                 ExperimentalSliderPanel(systemImage: "waveform", title: "Magic Instrumentalize",
                                         chip: "\(Int((experimental.vocalAttenuation * 100).rounded()))%",
                                         subtitle: String(localized: "settings_exp_magic_instrumentalize_body",
-                                                         defaultValue: "TAIS Engine 2's zero-latency vocal reducer — attenuates the center-panned mix instantly. This is separate from the real AI separation model (see \"Make an instrumental\" below), which separates vocal and instrumental tracks. The active processor and benchmark are shown in Music Intelligence settings."),
+                                                         defaultValue: "TAIS Engine 2's zero-latency vocal reducer — attenuates the center-panned mix instantly. This is separate from the real AI separation model (see \"Make an instrumental\" below), which separates vocal and instrumental tracks."),
                                         value: $experimental.vocalAttenuation, range: 0...1, steps: 19)
                 RoformerBackendPanel(experimental: experimental)
                 // Stage 14: the real "Make an instrumental" card (Android `TaisStudioProgressCard(showRoformerTools = true)`);

@@ -1,6 +1,7 @@
 import PixlAudioCore
 import PixlBackup
 import PixlModel
+import PixlNet
 import XCTest
 @testable import PixlAudio
 
@@ -138,18 +139,48 @@ final class SettingsFeatureTests: XCTestCase {
         XCTAssertEqual(model.tabPresets.count, EqualizerPreset.allPresets.count + 1)
     }
 
-    func testEngineSettingsFollowThePreferences() {
-        let prefs = EqualizerPreferences(defaults: freshDefaults())
+    /// The equalizer is marked broken (owner, 2026-10-26): the engine gets everything off whatever the preferences say,
+    /// and a store that finds effects stored on switches them off.
+    func testEqualizerIsLockedOffWhileItIsBroken() {
+        let defaults = freshDefaults()
+        defaults.set(true, forKey: PreferenceKeys.equalizerEnabled)
+        defaults.set(true, forKey: PreferenceKeys.bassBoostEnabled)
+        defaults.set(true, forKey: PreferenceKeys.virtualizerEnabled)
+        defaults.set(true, forKey: PreferenceKeys.loudnessEnhancerEnabled)
+        let prefs = EqualizerPreferences(defaults: defaults)
+        XCTAssertFalse(prefs.isEnabled || prefs.bassBoostEnabled || prefs.virtualizerEnabled || prefs.loudnessEnhancerEnabled)
+        XCTAssertFalse(defaults.bool(forKey: PreferenceKeys.equalizerEnabled))
+        XCTAssertFalse(defaults.bool(forKey: PreferenceKeys.virtualizerEnabled))
+        // Even switched on afterwards (a restored backup), the engine stays flat.
         let model = EqualizerModel(prefs: prefs)
         model.toggleEnabled()
         model.select(.bassBoost)
         prefs.virtualizerEnabled = true
         prefs.virtualizerStrength = 500
-        let engine = prefs.engineSettings
-        XCTAssertTrue(engine.isEnabled)
-        XCTAssertEqual(engine.bandLevels, EqualizerPreset.bassBoost.bandLevels)
-        XCTAssertTrue(engine.virtualizerEnabled)
-        XCTAssertEqual(engine.virtualizerStrength, 500)
+        XCTAssertFalse(prefs.engineSettings.hasAnyEnabledEffects)
+        XCTAssertEqual(prefs.engineSettings.bandLevels, EqualizerSettings().bandLevels)
+        // The Settings list keeps the row, marked, and it does not open.
+        let row = SettingsMainEntry.category(.equalizer)
+        XCTAssertEqual(row.brokenFeature, .equalizer)
+        XCTAssertNil(SettingsMainEntry.category(.lyrics).brokenFeature)
+        XCTAssertNil(SettingsMainEntry.accounts.brokenFeature)
+    }
+
+    /// Smart features start on and nothing in a fresh store or in setup turns them off (owner, 2026-10-26).
+    func testSmartFeaturesStartOn() {
+        let settings = SettingsStore(defaults: freshDefaults())
+        XCTAssertTrue(settings.ai.musicLearningEnabled)
+        XCTAssertTrue(settings.ai.musicDiscoveryEnabled)
+        XCTAssertTrue(settings.lyrics.automaticLyrics)
+        XCTAssertTrue(settings.playback.automaticInstrumentals)
+        XCTAssertGreaterThan(settings.ai.claudeMonthlyCap, 0, "cloud AI is on until the monthly limit is set to $0")
+        XCTAssertEqual(settings.ai.provider, AiProvider.onDevice.rawValue, "the on-device model is always the fallback")
+        // Finishing setup only records that setup ran.
+        settings.behavior.initialSetupDone = true
+        XCTAssertTrue(settings.ai.musicLearningEnabled)
+        XCTAssertTrue(settings.ai.musicDiscoveryEnabled)
+        XCTAssertTrue(settings.lyrics.automaticLyrics)
+        XCTAssertGreaterThan(settings.ai.claudeMonthlyCap, 0)
     }
 
     // MARK: Transitions (Android TransitionViewModel / globalTransitionSettingsFlow)

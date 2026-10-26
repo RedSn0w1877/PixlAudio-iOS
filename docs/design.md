@@ -458,7 +458,7 @@ lyricsCascade.f0…f7 (first-show cascade frames, live clock); since 2026-10-07 
 lyricsSingRendering (`-screen tais.instrumentalActive|tais.instrumentalRendering -lyricsDemo words`); since
 2026-10-22 also lyricsSingPreparingCloud, lyricsSingWaitingForWiFi and lyricsSingWaitingGap (`-screen
 tais.singPreparingCloud|tais.singWaitingForWiFi|tais.singWaitingGap -lyricsDemo words`, `UITests/LyricsSingStatesTests`),
-lyricsTranslateMenu (Translate held) and lyricsShowAsPlainText.
+lyricsTranslateMenu (Translate held) and lyricsAdjustSyncLocked (2026-10-26: replaced lyricsShowAsPlainText).
 
 ### Lyrics page (2026-10-07, owner items 1 + 11; branch `s16-lyrics-page`)
 

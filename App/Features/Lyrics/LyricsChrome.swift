@@ -199,16 +199,13 @@ struct LyricsControlCluster: View {
     let hasLyrics: Bool
     /// The song the segments act on.
     let song: Song?
-    /// On-device translation works on synced lines (`LyricsView.startTranslation`).
-    let canTranslateOnDevice: Bool
-    /// An on-device translation is running.
-    let translating: Bool
+    /// Lyrics are on screen to translate (Translate via AI works from any lyrics, synced or plain).
+    let canTranslate: Bool
     let clock: PlaybackClock
     let onOffsetChange: (Int) -> Void
     let onPlayPause: () -> Void
     let onSeek: (Int64) -> Void
     let onSeekPreview: (Int64?) -> Void
-    let onTranslate: () -> Void
     let onTranslateViaAI: () -> Void
     /// Any tap on Translate or Sing (it restarts the immersive timer, as the Synced / Static segments did).
     let onSegmentTap: () -> Void
@@ -230,10 +227,9 @@ struct LyricsControlCluster: View {
                         .frame(height: LyricsChromeMetrics.seekBarHeight)
                 }
                 Spacer().frame(height: 16)
-                LyricsToolbar(hasLyrics: hasLyrics, song: song, canTranslateOnDevice: canTranslateOnDevice,
-                              translating: translating, chrome: chrome, brightArt: brightArt, onTranslate: onTranslate,
-                              onTranslateViaAI: onTranslateViaAI, onSegmentTap: onSegmentTap, onBack: onBack,
-                              onMore: onMore)
+                LyricsToolbar(hasLyrics: hasLyrics, song: song, canTranslate: canTranslate, chrome: chrome,
+                              brightArt: brightArt, onTranslateViaAI: onTranslateViaAI, onSegmentTap: onSegmentTap,
+                              onBack: onBack, onMore: onMore)
             }
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.9), value: showSyncControls)
@@ -379,15 +375,13 @@ private struct WavyTrack: View {
 }
 
 /// Back · Translate · Sing · more (Android `LyricsFloatingToolbar`; the owner swapped Synced · Static for Translate ·
-/// Sing on 2026-10-07: synced vs plain is now automatic, with "Show as plain text" in the More sheet).
+/// Sing on 2026-10-07: synced vs plain is now automatic).
 private struct LyricsToolbar: View {
     let hasLyrics: Bool
     let song: Song?
-    let canTranslateOnDevice: Bool
-    let translating: Bool
+    let canTranslate: Bool
     let chrome: LyricsChromeColors
     let brightArt: Bool
-    let onTranslate: () -> Void
     let onTranslateViaAI: () -> Void
     let onSegmentTap: () -> Void
     let onBack: () -> Void
@@ -398,8 +392,7 @@ private struct LyricsToolbar: View {
             toolbarCircle(systemImage: "arrow.left", label: "Back", action: onBack)
             if hasLyrics {
                 HStack(spacing: 8) {
-                    LyricsTranslateSegment(canTranslateOnDevice: canTranslateOnDevice, translating: translating,
-                                           chrome: chrome, brightArt: brightArt, onTranslate: onTranslate,
+                    LyricsTranslateSegment(canTranslate: canTranslate, chrome: chrome, brightArt: brightArt,
                                            onTranslateViaAI: onTranslateViaAI, onTap: onSegmentTap)
                     LyricsSingSegment(song: song, chrome: chrome, brightArt: brightArt, onTap: onSegmentTap)
                 }
@@ -427,20 +420,18 @@ private struct LyricsToolbar: View {
     }
 }
 
-/// Translate: on-device translation into the phone's language (the system translator; owner, 2026-10-07). Active
-/// while translations show. A tap shows or hides the lyrics' translations, or (when they have none) translates them
-/// on this iPhone. Touch and hold: Translate via AI, and Show romanization when the lyrics need it. Reads the lyrics
-/// controller itself, so a translation landing redraws only this segment.
+/// Translate (the on-device translator was removed, owner 2026-10-26; Translate via AI stays). Active while
+/// translations show. A tap shows or hides the lyrics' translations, or (when they have none) asks the AI assistant
+/// to translate them. Touch and hold: the same AI action, and Show romanization when the lyrics need it. Reads the
+/// lyrics controller itself, so a translation landing redraws only this segment.
 ///
 /// A `Menu` with a primary action, not a `contextMenu` on a button: inside the cluster's glass container the context
 /// menu never opened (CI, 2026-10-07: holding the segment ran its tap instead). The menu's own long press opens it, and
 /// on iOS 26 it morphs out of the segment's glass like the app's other small menus (`ShapedGlassMenu`).
 private struct LyricsTranslateSegment: View {
-    let canTranslateOnDevice: Bool
-    let translating: Bool
+    let canTranslate: Bool
     let chrome: LyricsChromeColors
     let brightArt: Bool
-    let onTranslate: () -> Void
     let onTranslateViaAI: () -> Void
     /// Every tap (the immersive timer restarts).
     let onTap: () -> Void
@@ -453,8 +444,7 @@ private struct LyricsTranslateSegment: View {
         let controller = env.lyricsController
         let hasTranslation = controller.hasTranslatedLyrics
         let active = hasTranslation && controller.preferences.showTranslation
-        let value: LocalizedStringKey = translating ? "Translating" : active ? "Showing translations"
-            : hasTranslation ? "Translations hidden" : "Off"
+        let value: LocalizedStringKey = active ? "Showing translations" : hasTranslation ? "Translations hidden" : "Off"
         Menu {
             Button("Translate via AI", systemImage: "sparkles", action: onTranslateViaAI)
             if controller.hasRomanizedLyrics {
@@ -463,20 +453,16 @@ private struct LyricsTranslateSegment: View {
                                      set: { controller.preferences.showRomanization = $0 }))
             }
         } label: {
-            LyricsSegmentLabel(title: translating ? "Translating…" : "Translate", systemImage: "translate",
-                               active: active, faded: !hasTranslation && !canTranslateOnDevice && !translating,
-                               busy: translating, chrome: chrome)
+            LyricsSegmentLabel(title: "Translate", systemImage: "translate",
+                               active: active, faded: !hasTranslation && !canTranslate,
+                               busy: false, chrome: chrome)
         } primaryAction: {
             onTap()
             taps += 1
             if hasTranslation {
                 controller.preferences.showTranslation.toggle()
-            } else if translating {
-                return
-            } else if canTranslateOnDevice {
-                onTranslate()
-            } else {
-                controller.message = String(localized: "On-device translation needs synced lyrics. Touch and hold Translate for Translate via AI.")
+            } else if canTranslate {
+                onTranslateViaAI()
             }
         }
         .menuStyle(.button)

@@ -66,7 +66,8 @@ final class LyricsController {
     func load(_ song: Song, forceRefresh: Bool) {
         loadTask?.cancel()
         loadedSongId = song.id
-        store.offsetMs = preferences.offset(for: song.id)
+        // Adjust sync is locked as broken (owner, 2026-10-26): whatever offset was stored is not applied (it is kept).
+        store.offsetMs = BrokenFeature.lyricsOffsetMs(stored: preferences.offset(for: song.id))
         if isUITest {
             if let demo = LyricsDemoContent.lyrics(LyricsLaunchOptions.current.demo) {
                 apply(LoadedLyrics(lyrics: demo, source: "demo"), songId: song.id)
@@ -118,6 +119,8 @@ final class LyricsController {
     // MARK: Offset
 
     func setOffset(_ ms: Int, songId: String) {
+        // Locked while Adjust sync is broken: nothing changes the offset, in memory or stored.
+        guard !BrokenFeature.lyricsAdjustSync.isLocked else { return }
         store.offsetMs = ms
         preferences.setOffset(ms, for: songId)
     }
@@ -259,28 +262,5 @@ final class LyricsController {
             }
             self?.message = outcome.message
         }
-    }
-
-    /// Attaches translations (index into `synced` → text) to the current lyrics and keeps them: line-synced lyrics are
-    /// stored as LRC with a duplicate timestamp per translation (how Android pairs translations); word-synced and
-    /// document lyrics keep them for this session.
-    func applyTranslations(_ translations: [Int: String], song: Song) {
-        guard var lyrics = store.currentLyrics, var synced = lyrics.synced, !translations.isEmpty else { return }
-        for (index, text) in translations where synced.indices.contains(index) {
-            synced[index].translation = text
-        }
-        lyrics.synced = synced
-        let source = store.currentSource
-        store.set(.loaded(songId: song.id, lyrics: lyrics, source: source))
-        setLyrics(lyrics, songId: song.id)
-        message = "Lyrics translated successfully!"
-        guard let service, lyrics.document == nil, !synced.contains(where: { !($0.words ?? []).isEmpty }) else { return }
-        var raw = ""
-        for line in synced {
-            let stamp = "[\(LyricsRepositoryLogic.formatTimestamp(line.time))]"
-            raw += stamp + line.line + "\n"
-            if let t = line.translation, !t.isEmpty { raw += stamp + t + "\n" }
-        }
-        Task { await service.save(song: song, rawContent: raw, source: source ?? "manual") }
     }
 }

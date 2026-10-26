@@ -9104,7 +9104,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "TAIS Engine 2's zero-latency vocal reducer — attenuates the center-panned mix instantly. This is separate from the real AI separation model (see \"Make an instrumental\" below), which separates vocal and instrumental tracks. The active processor and benchmark are shown in Music Intelligence settings."
+            "value" : "TAIS Engine 2's zero-latency vocal reducer — attenuates the center-panned mix instantly. This is separate from the real AI separation model (see \"Make an instrumental\" below), which separates vocal and instrumental tracks."
           }
         }
       }

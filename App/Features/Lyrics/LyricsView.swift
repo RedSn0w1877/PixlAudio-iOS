@@ -1,7 +1,6 @@
 import PixlLyrics
 import PixlModel
 import SwiftUI
-import Translation
 import UIKit
 import UniformTypeIdentifiers
 
@@ -9,8 +8,8 @@ import UniformTypeIdentifiers
 /// karaoke lines (or plain lyrics, or the loading / no-lyrics state), the track pill on top, and the control cluster
 /// at the bottom (play/pause, seek bar, back · Translate · Sing · more) that hides in immersive mode. Swipe sideways
 /// for the previous / next song. Always dark, and the screen never locks while it is open (owner, 2026-10-07: always
-/// on, paused too; the "Keep screen on" switch is gone). Synced vs plain is automatic; the More sheet's "Show as
-/// plain text" overrides it for the song.
+/// on, paused too; the "Keep screen on" switch is gone). Synced vs plain is automatic (the "Show as plain text" switch
+/// was removed, owner 2026-10-26).
 struct LyricsView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(Router.self) private var router
@@ -27,8 +26,6 @@ struct LyricsView: View {
     @State private var swipe = LyricsSwipeState()
     @State private var interaction = LyricsInteractionClock()
     @State private var brightArt = false
-    @State private var syncedOverride: Bool?
-    @State private var overrideSongId: String?
     @State private var immersive = LyricsLaunchOptions.current.immersive && LaunchConfiguration.current.isUITest
     @State private var immersiveTemporarilyDisabled = false
     @State private var controlsHeight: CGFloat = 0
@@ -43,11 +40,6 @@ struct LyricsView: View {
     @State private var syncRequest: LyricsSyncRequest?
     /// The More sheet's sync row: opened from the sheet's `onDismiss`, once the sheet has gone.
     @State private var syncAfterMoreSheet: LyricsSyncRequest?
-    @State private var translationConfig: TranslationSession.Configuration?
-    @State private var translationLines: [String] = []
-    @State private var translationSongId: String?
-    /// An on-device translation is running (the Translate segment's spinner).
-    @State private var translating = false
     @State private var shownPrepared: PreparedLyrics?
     @State private var shownPreparedSong: String?
 
@@ -70,10 +62,6 @@ struct LyricsView: View {
     private var showSyncedLyrics: Bool? {
         let hasSynced = !(lyrics?.synced ?? []).isEmpty
         let hasPlain = !(lyrics?.plain ?? []).isEmpty
-        if let syncedOverride, overrideSongId == song?.id {
-            if syncedOverride && hasSynced { return true }
-            if !syncedOverride && (hasPlain || hasSynced) { return false }
-        }
         if hasSynced { return true }
         if hasPlain { return false }
         return nil
@@ -185,8 +173,6 @@ struct LyricsView: View {
         .onDisappear(perform: stopDriver)
         .task(id: song?.id) {
             controller.ensureLoaded(for: song)
-            if overrideSongId != song?.id { syncedOverride = nil }
-            if translationSongId != song?.id { translating = false }
         }
         .onChange(of: controller.prepared, initial: true) { _, _ in updateShownPrepared() }
         .onChange(of: controller.preparedSongId) { _, _ in updateShownPrepared() }
@@ -231,14 +217,6 @@ struct LyricsView: View {
                       document: exportDocument, contentType: .plainText,
                       defaultFilename: song.map { "\($0.displayArtist) - \($0.title).lrc" } ?? "lyrics.lrc") { result in
             if case .success = result { controller.message = "Lyrics file saved" }
-        }
-        .translationTask(translationConfig) { session in
-            // The session is not Sendable: it is only ever used inside LyricsTranslator (one @concurrent
-            // call, awaited here, never shared), so it is handed over unchecked; plain values come back.
-            nonisolated(unsafe) let session = session
-            let songId = translationSongId
-            let map = await LyricsTranslator.translate(lines: translationLines, session: session)
-            finishTranslation(map, songId: songId)
         }
     }
 
@@ -326,9 +304,11 @@ struct LyricsView: View {
         // Android's floating instrumental toggle is the toolbar's Sing segment now (owner, 2026-10-07).
         LyricsControlCluster(
             chrome: chrome, brightArt: brightArt, isPlaying: playback.isPlaying,
-            showSyncControls: showSyncedLyrics == true && lyrics?.synced != nil && showSyncControls,
+            // Adjust sync is locked as broken (owner, 2026-10-26): its offset row never shows.
+            showSyncControls: !BrokenFeature.lyricsAdjustSync.isLocked && showSyncedLyrics == true && lyrics?.synced != nil
+                && showSyncControls,
             offsetMs: lyricsStore.offsetMs, hasLyrics: showSyncedLyrics != nil, song: song,
-            canTranslateOnDevice: !(lyrics?.synced ?? []).isEmpty, translating: translating, clock: playback.clock,
+            canTranslate: lyrics != nil, clock: playback.clock,
             onOffsetChange: { ms in
                 if let song { controller.setOffset(ms, songId: song.id) }
                 resetImmersive()
@@ -344,10 +324,6 @@ struct LyricsView: View {
             onSeekPreview: { ms in
                 seekPreview.positionMs = ms
                 driver.wake()
-            },
-            onTranslate: {
-                startTranslation()
-                resetImmersive()
             },
             onTranslateViaAI: {
                 translateViaAI()
@@ -399,7 +375,6 @@ struct LyricsView: View {
             actions: LyricsMoreActions(
                 onSyncYourself: syncAfterMoreSheetAction,
                 onSave: { showSaveDialog = true },
-                onTranslate: { startTranslation() },
                 onTranslateViaAI: { translateViaAI() },
                 onReset: { if let song { controller.reset(song: song) } },
                 onToggleSyncControls: {
@@ -409,12 +384,7 @@ struct LyricsView: View {
                 },
                 onShuffle: { playback.setShuffleEnabled(!playback.isShuffleEnabled) },
                 onRepeat: { playback.setRepeatMode(LyricsView.nextRepeatMode(playback.repeatMode)) },
-                onFavorite: { if let song { env.libraryEditor.toggleFavorite(song.id) } }),
-            plainText: Binding(get: { syncedOverride == false && overrideSongId == song?.id },
-                               set: { plain in
-                                   syncedOverride = plain ? false : nil
-                                   overrideSongId = song?.id
-                               }))
+                onFavorite: { if let song { env.libraryEditor.toggleFavorite(song.id) } }))
             .environment(\.appTheme, theme)
             .environment(\.playerTheme, theme)
             .preferredColorScheme(.dark)
@@ -423,7 +393,7 @@ struct LyricsView: View {
             .pixlSheet(detents: [.medium, .tallGlass])
     }
 
-    /// "Translate via AI" (the Translate segment's long press and the More sheet), through the swappable provider.
+    /// "Translate via AI" (the Translate segment and the More sheet), through the swappable provider.
     private func translateViaAI() {
         if let song { controller.translateViaAI(song: song, translator: env.ai.lyricsTranslator) }
     }
@@ -437,7 +407,7 @@ struct LyricsView: View {
         }
     }
 
-    // MARK: Fetch dialog, save, translate
+    // MARK: Fetch dialog, save
 
     private func openFetchDialog() {
         controller.dismissSearch()
@@ -454,41 +424,6 @@ struct LyricsView: View {
         let text = synced ? LyricsUtils.syncedToLrcString(lyrics.synced ?? [])
                           : LyricsUtils.plainToString(lyrics.plain ?? [])
         exportDocument = LyricsTextDocument(text: text)
-    }
-
-    private func startTranslation() {
-        if controller.hasTranslatedLyrics {
-            controller.message = "These lyrics already have a translation"
-            return
-        }
-        guard let synced = lyrics?.synced, !synced.isEmpty, !translating else { return }
-        translationLines = synced.map(\.line)
-        translationSongId = song?.id
-        translating = true
-        controller.message = "Translating lyrics..."
-        if translationConfig == nil {
-            translationConfig = TranslationSession.Configuration(source: nil, target: Locale.current.language)
-        } else {
-            translationConfig?.invalidate()
-        }
-    }
-
-    private func finishTranslation(_ map: [Int: String]?, songId: String?) {
-        // Cleared before the song guard, so the spinner never sticks; but only by the run it belongs to, so a late
-        // result for an earlier song can't clear the spinner of a translation started since (a song change already
-        // cleared it, `.task(id:)`).
-        if songId == translationSongId { translating = false }
-        guard let song = playback.current, song.id == songId else { return }
-        guard let map else {
-            controller.message = "Translation isn't available for these lyrics"
-            return
-        }
-        if map.isEmpty {
-            controller.message = "These lyrics are already in this language"
-        } else {
-            controller.applyTranslations(map, song: song)
-            controller.preferences.showTranslation = true
-        }
     }
 
     // MARK: Driver
@@ -600,31 +535,6 @@ private struct LyricsSwipeOverlay: View {
     }
 }
 
-/// On-device translation of lyric lines (the session is not Sendable, so this stays off the main actor).
-nonisolated enum LyricsTranslator {
-    /// index → translated text for the lines that changed; nil when the session failed.
-    @concurrent
-    static func translate(lines: [String], session: TranslationSession) async -> [Int: String]? {
-        let requests = lines.enumerated().compactMap { index, line -> TranslationSession.Request? in
-            let text = line.trimmingCharacters(in: .whitespaces)
-            return text.isEmpty ? nil : TranslationSession.Request(sourceText: text, clientIdentifier: String(index))
-        }
-        guard !requests.isEmpty else { return [:] }
-        do {
-            let responses = try await session.translations(from: requests)
-            var map: [Int: String] = [:]
-            for response in responses {
-                guard let id = response.clientIdentifier, let index = Int(id), lines.indices.contains(index) else { continue }
-                let original = lines[index].trimmingCharacters(in: .whitespaces)
-                if response.targetText.trimmingCharacters(in: .whitespaces) != original { map[index] = response.targetText }
-            }
-            return map
-        } catch {
-            return nil
-        }
-    }
-}
-
 /// A short message under the header (Android toasts).
 private struct LyricsToast: View {
     let text: String
@@ -682,7 +592,7 @@ struct LyricsOptionsSheet: View {
             preferences: controller.preferences, isShuffleEnabled: playback.isShuffleEnabled,
             repeatMode: playback.repeatMode, isFavorite: env.libraryEditor.isFavorite(songId),
             actions: LyricsMoreActions(
-                onSyncYourself: nil, onSave: nil, onTranslate: nil,
+                onSyncYourself: nil, onSave: nil,
                 onReset: { if let song { controller.reset(song: song) } },
                 onToggleSyncControls: nil,
                 onShuffle: { playback.setShuffleEnabled(!playback.isShuffleEnabled) },

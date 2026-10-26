@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import PixlAudioCore
 import PixlLibrary
+import PixlModel
 import PixlNet
 
 /// Android preference keys (`data/preferences/UserPreferencesRepository.kt` `PreferencesKeys`,
@@ -180,6 +181,9 @@ nonisolated enum PreferenceKeys {
     static let musicLearningEnabled = "learning_enabled"
     static let musicDiscoveryEnabled = "discovery_enabled"
     static let musicExplorationFraction = "exploration_fraction"
+    /// iOS only (2026-10-26): the one-time switch of learning and discovery to on, run when their Settings screen
+    /// (Music intelligence) was removed, so a switch an older build left off cannot stay off with nowhere to undo it.
+    static let smartFeaturesOnMigrated = "smart_features_on_v1"
     // iOS-only (owner requests). Backed up by name through PixlBackup's `AndroidPreferenceCatalog.iosOnly`.
     /// Settings › Appearance › Accent Color: a `"#RRGGBB"` seed, `""` = PixlAudio's violet (owner request 2026-10-07).
     /// A string, not an Int: an ARGB above `Int32.max` would flip sign as an Android `int` on a round trip.
@@ -657,6 +661,17 @@ final class EqualizerPreferences {
         bassBoostStrength = defaults.int(PreferenceKeys.bassBoostStrength, default: 0)
         virtualizerEnabled = defaults.bool(PreferenceKeys.virtualizerEnabled, default: false)
         virtualizerStrength = defaults.int(PreferenceKeys.virtualizerStrength, default: 0)
+        lockOffWhileBroken()
+    }
+
+    /// Locked while the equalizer is marked broken (owner, 2026-10-26): every effect is stored off, whatever an old
+    /// build or a restored backup left behind (the strengths and presets are kept for the fix).
+    private func lockOffWhileBroken() {
+        guard BrokenFeature.equalizer.isLocked else { return }
+        if isEnabled { isEnabled = false }
+        if bassBoostEnabled { bassBoostEnabled = false }
+        if virtualizerEnabled { virtualizerEnabled = false }
+        if loudnessEnhancerEnabled { loudnessEnhancerEnabled = false }
     }
 }
 
@@ -731,6 +746,13 @@ final class AISettings {
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
+        // Smart features are on (owner, 2026-10-26). Their Settings screen is gone, so once, a switch an older build
+        // left off is turned back on; the defaults below are on already for a new install, and setup never touches them.
+        if !defaults.bool(forKey: PreferenceKeys.smartFeaturesOnMigrated) {
+            defaults.set(true, forKey: PreferenceKeys.musicLearningEnabled)
+            defaults.set(true, forKey: PreferenceKeys.musicDiscoveryEnabled)
+            defaults.set(true, forKey: PreferenceKeys.smartFeaturesOnMigrated)
+        }
         let provider = defaults.string(PreferenceKeys.aiProvider, default: AiProvider.onDevice.rawValue)
         self.provider = provider
         cloudProvider = defaults.string(forKey: PreferenceKeys.aiCloudProvider)
