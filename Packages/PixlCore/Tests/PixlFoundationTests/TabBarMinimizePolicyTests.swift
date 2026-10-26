@@ -14,8 +14,8 @@ import Testing
     }
 
     @Test func minimizesAfterThresholdOfDownTravel() {
-        #expect(run([0, 10, 30, 60]).state == false)
-        #expect(run([0, 10, 30, 70]).state == true)
+        #expect(run([0, 10, 30, 40]).state == false)
+        #expect(run([0, 10, 30, 50]).state == true)
     }
 
     @Test func staysFullInsideTopZone() {
