@@ -4,7 +4,8 @@ PixlAudio isn't on the App Store. Every release on GitHub comes with one file, `
 gets signed with your own Apple ID (or your installer's certificate) when you install it. It needs **iOS 26.1 or
 later**.
 
-Get it from the latest release: <https://github.com/RedSn0w1877/PixlAudio-iOS/releases/latest>
+Get it from the releases page (betas are the ones marked **Pre-release**):
+<https://github.com/RedSn0w1877/PixlAudio-iOS/releases>
 
 ## Option A: an IPA installer app on the iPhone
 
@@ -47,43 +48,38 @@ same way; with the same bundle ID nothing is lost.
 
 ## First run
 
-A short setup walks you through music access, folders, restoring a backup, theme, library layout and Spotify.
-Everything it asks can be changed later in Settings (the gear on Home, Library or Search).
+A short setup walks you through connecting Spotify, restoring a backup, theme and library layout. Everything it asks
+can be changed later in Settings (the gear on Home, Library or Search).
 
-### Adding your music
+### Your music comes from Spotify
 
-- **PixlAudio's own folder:** Files › On My iPhone › PixlAudio. Copy or move songs there from iCloud Drive, a USB
-  drive or AirDrop, or from Windows with iTunes or the Apple Devices app (your iPhone › File Sharing ›
-  PixlAudio).
-- **Other folders:** pick them on the setup's "Music folders" page or later in Settings › Music Management. They
-  can be anywhere the Files app reaches.
-- **Music library:** allow media access to play the songs downloaded to the phone's music library. Only DRM-free
-  songs play (your own synced or purchased files); songs downloaded from a streaming subscription are protected
-  and can't.
-- **Coming from Android:** a PixlAudio backup (`.pxpl`) from the Android app restores here too, on the setup's
-  backup page or in Settings › Backup & Restore. Songs are matched to the ones on the iPhone.
+PixlAudio's library is your Spotify account: your liked songs and playlists. Connecting Spotify is required; until you
+do, Home and Library show a **Connect Spotify** button. Songs stored on the phone aren't used.
 
-MP3, AAC/M4A, ALAC, FLAC, WAV and AIFF all play.
+- Spotify gives the app song details only, not audio. Each song plays through a matching track on YouTube Music,
+  found automatically. Streamed audio tops out around 256 kbps.
+- **Beta: Spotify only lets invited testers sign in.** Before you sign in, send the email address of your Spotify
+  account to the person who invited you, so they can add it.
+- Connect on the setup's Spotify page or in Settings › Accounts.
+- **Coming from Android:** a PixlAudio backup (`.pxpl`) from the Android app restores your settings and listening
+  history here too, on the setup's backup page or in Settings › Backup & Restore.
 
-### Spotify (optional)
-
-Spotify brings in your liked songs and playlists, and each song plays through a YouTube Music match, as on Android.
+### Spotify setup (for whoever builds the IPA)
 
 - The IPA is built with the Spotify client ID from the repo secret **`SPOTIFY_CLIENT_ID`** (GitHub › the repo ›
   Settings › Secrets and variables › Actions). If it was empty when the IPA was built, the Spotify screen says
   "No client ID in this build — set one" and you can paste one there.
 - In the [Spotify developer dashboard](https://developer.spotify.com/dashboard), the app's redirect URIs must
   include **`pixlaudio://spotify-callback`** exactly (the Android app's `pixelplay://spotify-callback` can stay).
-- Spotify apps in development mode only let listed users in: add each friend's name and Spotify email under
-  User Management in the dashboard. That's why the setup asks friends to send theirs.
-- Connect on the setup's Spotify page or in Settings › Accounts.
+- Spotify apps in development mode only let listed users in: add each tester's name and Spotify email under
+  User Management in the dashboard.
 
 ### YouTube sign-in (optional)
 
 Streamed songs play without an account. If YouTube starts refusing songs ("confirm you're not a bot"), sign in
 with a Google account: **Connect YouTube** on the Spotify screen, or Settings › Developer Options › YouTube
 account. You type a short code on Google's own page, so the app never sees your password. **Test playback** (same
-places) walks one song through every step and shows which one failed. Streamed audio tops out around 256 kbps.
+places) walks one song through every step and shows which one failed.
 
 ## What's different from the Android app
 

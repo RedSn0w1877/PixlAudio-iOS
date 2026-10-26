@@ -14,6 +14,9 @@ if [ "${GITHUB_REF_TYPE:-}" = tag ]; then
   tag_version="${tag_version%%-*}"
   if [[ "$tag_version" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; then
     version_args+=("MARKETING_VERSION=$tag_version")
+    # The whole tag (suffix included) goes into Info.plist's PixlReleaseTag: a `-beta1` build calls itself a beta and
+    # the update check can tell beta1 from beta2 and from the stable release.
+    version_args+=("PIXL_RELEASE_TAG=$GITHUB_REF_NAME")
   else
     echo "::warning::tag ${GITHUB_REF_NAME} has no numeric version; keeping project.yml's MARKETING_VERSION"
   fi

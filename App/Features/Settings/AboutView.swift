@@ -396,10 +396,17 @@ final class AppUpdateChecker {
 
     static let installedVersion: String =
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
-    private static let latestReleaseURL = URL(string: "https://api.github.com/repos/RedSn0w1877/PixlAudio-iOS/releases/latest")
+    /// The installed release with its suffix ("1.1.0-beta1") on tag builds, else the plain version.
+    static var installedRelease: String {
+        let tag = HomeProjectLinks.releaseTag.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
+        return tag.isEmpty ? installedVersion : tag
+    }
+    /// The newest releases, prereleases included: `/releases/latest` never returns a beta, so a beta was never offered
+    /// (to stable users or to the previous beta's).
+    private static let releasesURL = URL(string: "https://api.github.com/repos/RedSn0w1877/PixlAudio-iOS/releases?per_page=10")
 
     func check() async {
-        guard let url = Self.latestReleaseURL else { return }
+        guard let url = Self.releasesURL else { return }
         state = .checking
         do {
             var request = URLRequest(url: url)
@@ -408,9 +415,18 @@ final class AppUpdateChecker {
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             if code == 404 { state = .upToDate; return }
             guard (200..<300).contains(code) else { throw URLError(.badServerResponse) }
-            let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
+            // Newest first. Skipped: drafts (the anonymous API lists none, but just in case) and manual CI builds
+            // ("build-123"), which carry no version.
+            let releases = try JSONDecoder().decode([GitHubRelease].self, from: data)
+            guard let release = releases.first(where: { candidate in
+                candidate.draft != true
+                    && candidate.tagName.trimmingCharacters(in: CharacterSet(charactersIn: "vV")).first?.isNumber == true
+            }) else {
+                state = .upToDate
+                return
+            }
             let latest = release.tagName.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
-            if Self.isNewer(latest, than: Self.installedVersion) {
+            if Self.isNewerRelease(latest, than: Self.installedRelease) {
                 let ipaSize = release.assets?.first { $0.name.hasSuffix(".ipa") }?.size
                 let size = ipaSize.map { ByteFormat.short(Int64($0)) } ?? "GitHub"
                 state = .available(Release(version: L10n.appUpdateStatusAvailable(latest, size),
@@ -420,6 +436,28 @@ final class AppUpdateChecker {
             }
         } catch {
             state = .failed(error.localizedDescription)
+        }
+    }
+
+    /// Release tags without the "v": the numbers first ("1.1.0" > "1.0.0"); for equal numbers a stable release is newer
+    /// than its betas ("1.1.0" > "1.1.0-beta2") and a later beta newer than an earlier one ("1.1.0-beta2" > "1.1.0-beta1").
+    nonisolated static func isNewerRelease(_ candidate: String, than installed: String) -> Bool {
+        func split(_ tag: String) -> (number: String, suffix: String?) {
+            guard let dash = tag.firstIndex(of: "-") else { return (tag, nil) }
+            let suffix = String(tag[tag.index(after: dash)...])
+            return (String(tag[..<dash]), suffix.isEmpty ? nil : suffix)
+        }
+        let a = split(candidate), b = split(installed)
+        if isNewer(a.number, than: b.number) { return true }
+        if isNewer(b.number, than: a.number) { return false }
+        switch (a.suffix, b.suffix) {
+        case (nil, .some): return true
+        case (.some(let x), .some(let y)):
+            // "beta10" > "beta9": the trailing number decides when the words match.
+            let wordX = x.prefix { !$0.isNumber }, wordY = y.prefix { !$0.isNumber }
+            let numX = Int(x.drop { !$0.isNumber }) ?? 0, numY = Int(y.drop { !$0.isNumber }) ?? 0
+            return wordX == wordY ? numX > numY : x > y
+        default: return false
         }
     }
 
@@ -441,6 +479,7 @@ final class AppUpdateChecker {
         let body: String?
         let htmlURL: String
         let assets: [Asset]?
+        let draft: Bool?
 
         nonisolated struct Asset: Decodable {
             let name: String
@@ -449,7 +488,7 @@ final class AppUpdateChecker {
 
         enum CodingKeys: String, CodingKey {
             case tagName = "tag_name"
-            case name, body, assets
+            case name, body, assets, draft
             case htmlURL = "html_url"
         }
     }

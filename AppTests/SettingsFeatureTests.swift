@@ -200,6 +200,14 @@ final class SettingsFeatureTests: XCTestCase {
         XCTAssertTrue(AppUpdateChecker.isNewer("2", than: "1.99"))
         XCTAssertFalse(AppUpdateChecker.isNewer("1.0", than: "1.0.0"))
         XCTAssertFalse(AppUpdateChecker.isNewer("0.9-beta", than: "1.0"))
+        // Betas: the number first, then stable over beta, then the beta's number.
+        XCTAssertTrue(AppUpdateChecker.isNewerRelease("1.1.0-beta1", than: "1.0.0"))
+        XCTAssertTrue(AppUpdateChecker.isNewerRelease("1.1.0-beta2", than: "1.1.0-beta1"))
+        XCTAssertTrue(AppUpdateChecker.isNewerRelease("1.1.0-beta10", than: "1.1.0-beta9"))
+        XCTAssertTrue(AppUpdateChecker.isNewerRelease("1.1.0", than: "1.1.0-beta2"))
+        XCTAssertFalse(AppUpdateChecker.isNewerRelease("1.1.0-beta1", than: "1.1.0"))
+        XCTAssertFalse(AppUpdateChecker.isNewerRelease("1.1.0-beta1", than: "1.1.0-beta1"))
+        XCTAssertFalse(AppUpdateChecker.isNewerRelease("1.0.0", than: "1.1.0-beta1"))
     }
 
     // MARK: Delimiters (Android ArtistSettingsViewModel)

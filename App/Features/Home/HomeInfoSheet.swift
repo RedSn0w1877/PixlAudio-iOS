@@ -29,8 +29,21 @@ nonisolated enum HomeProjectLinks {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
     }
 
-    /// Builds before 1.0 were betas; from 1.0 on the version is shown as it is.
-    static var isPreRelease: Bool { shortVersion.hasPrefix("0.") }
+    /// The tag a release build was made from ("v1.1.0-beta1"; `PixlReleaseTag`, set by ci/make-ipa.sh), empty for
+    /// other builds. CFBundleShortVersionString can't carry the "-beta1", so this is where a beta says it is one.
+    static var releaseTag: String {
+        Bundle.main.object(forInfoDictionaryKey: "PixlReleaseTag") as? String ?? ""
+    }
+
+    /// The tag's suffix ("beta1"), nil for a stable tag or a build without one.
+    static var preReleaseSuffix: String? {
+        guard let dash = releaseTag.firstIndex(of: "-") else { return nil }
+        let suffix = releaseTag[releaseTag.index(after: dash)...]
+        return suffix.isEmpty ? nil : String(suffix)
+    }
+
+    /// Builds before 1.0 were betas; after that, a build from a tag with a suffix (v1.1.0-beta1) is one.
+    static var isPreRelease: Bool { shortVersion.hasPrefix("0.") || preReleaseSuffix != nil }
 }
 
 // MARK: - Sine wave (Android HomeSineWaveLine)
@@ -207,7 +220,8 @@ private struct BetaInfoSheetContent: View {
                 .background(Circle().fill(LinearGradient(colors: [theme.primary, theme.primary.opacity(0.65)],
                                                          startPoint: .topLeading, endPoint: .bottomTrailing)))
             VStack(alignment: .leading, spacing: 4) {
-                Text(HomeProjectLinks.isPreRelease ? "Welcome to PixlAudio \(version)-beta" : "Welcome to PixlAudio \(version)")
+                Text(HomeProjectLinks.isPreRelease ? "Welcome to PixlAudio \(version)-\(HomeProjectLinks.preReleaseSuffix ?? "beta")"
+                                                    : "Welcome to PixlAudio \(version)")
                     .pixlFont(.titleMedium)
                     .foregroundStyle(theme.onSurface)
                 Text(HomeProjectLinks.isPreRelease
@@ -418,12 +432,33 @@ nonisolated struct HomeChangelogVersion: Sendable, Identifiable {
 /// its own versions).
 nonisolated enum HomeChangelog {
     static let versions: [HomeChangelogVersion] = [
+        HomeChangelogVersion(version: "1.1.0-beta1", date: "2026-10-26", sections: [
+            ("What's New", [
+                "Claude runs the AI features whenever you're online. Offline, your iPhone's own AI takes over.",
+                "Ask Taizo: chat about music, play songs and build playlists, or say \"play less of this artist\" to tune your recommendations.",
+                "Bring in your listening history from Spotify and YouTube Music, so your mixes know your taste from day one.",
+                "Sing: instrumentals made in the cloud in seconds, with smooth fades between lines. \"Prepare songs ahead\" gets your favourites ready.",
+                "Cloud processing needs no setup, handles three songs at once and keeps going in the background. Active jobs on Home lets you cancel, retry or clear them.",
+                "Block artists, Find in playlist, gesture shortcuts and Music Haptics.",
+                "An optional AI model you can download to run on your iPhone.",
+                "Reorganised Settings, with new Lyrics and Sing sections and a Developer mode that hides the technical options.",
+            ]),
+            ("Changes", [
+                "Your library now comes from Spotify. Songs stored on the phone are no longer used.",
+            ]),
+            ("Improvements", [
+                "Songs start faster: the next song is ready before you get to it.",
+                "Fewer skipped songs, thanks to better matching of featured-artist and remastered titles.",
+                "Smoother scrolling on Home and in lists, and lower memory use.",
+                "Crash protection and a built-in Diagnostics screen.",
+                "The full player fits smaller screens.",
+            ]),
+        ]),
         HomeChangelogVersion(version: "1.0.0", date: "2026-10-03", sections: [
             ("What's New", [
                 "The whole PixlAudio app on iOS: Library, Search, the player and karaoke lyrics, the lyric sync editor, AI features, Spotify and YouTube Music, backups and setup.",
                 "The tab bar sits on the system's liquid lens, and small menus open right out of their buttons.",
                 "Library Navigation's compact pill, artist photos and custom artist images.",
-                "Open audio files, playlists and lyrics in PixlAudio from the Files app.",
                 "Music intelligence learns from the songs you finish and skip.",
             ]),
             ("Improvements", [
@@ -434,14 +469,14 @@ nonisolated enum HomeChangelog {
         ]),
         HomeChangelogVersion(version: "0.1.0-beta", date: "2026-10-01", sections: [
             ("What's New", [
-                "PixlAudio on iOS: the Android app's screens rebuilt natively in Liquid Glass.",
+                "PixlAudio on iOS, built for Liquid Glass.",
                 "Home: greeting, quick actions, mixes made for your listening, Your Mix, discovery shelves, Just added, Recently Played and your listening stats.",
-                "Daily Mix and Your Mix, picked by the same recommendation engine as on Android.",
+                "Daily Mix and Your Mix, picked from what you actually listen to.",
                 "Listening stats for today, this week, month, year and all time.",
             ]),
             ("Improvements", [
-                "Album-art colours are extracted exactly like on Android, so every song tints the app the same way.",
-                "Playback history uses the Android file format, so stats carry over from a backup.",
+                "Every song tints the app with its album colours.",
+                "Your listening stats carry over when you restore a backup.",
             ]),
         ]),
     ]

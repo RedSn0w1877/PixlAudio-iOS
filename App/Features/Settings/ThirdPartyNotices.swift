@@ -35,6 +35,24 @@ own Swift. Some of that Swift is a port of open-source code, listed here with it
   vocabulary and merges repacked as `qwen2_5.pxbpe`). PixlAudio runs it with its own Swift tokenizer and sampler.
 - Copyright 2024 Alibaba Cloud. Licensed under the Apache License, Version 2.0 (full text below).
 
+## wav2vec2 base 960h (the downloadable Lyric Sync model)
+
+- Upstream: https://huggingface.co/facebook/wav2vec2-base-960h (the default branch at conversion time; the revision is
+  not pinned), by Facebook AI Research (Meta).
+- Not part of the app: Sing and lyric sync download it on request from PixlAudio's `models-v1` release, converted to
+  Core ML by `ci/ml/convert_wav2vec2.py`. PixlAudio uses it to time lyrics word by word.
+- Copyright Meta Platforms, Inc. Licensed under the Apache License, Version 2.0 (full text below).
+
+## UVR-MDX-NET-Voc_FT (the downloadable Instrumental model)
+
+- Upstream: https://github.com/TRvlvr/model_repo/releases/tag/all_public_uvr_models (`UVR-MDX-NET-Voc_FT.onnx`), the
+  public model set of Ultimate Vocal Remover (https://github.com/Anjok07/ultimatevocalremovergui), built on Kuielab's
+  MDX-Net.
+- Not part of the app: Sing downloads it on request from PixlAudio's `models-v1` release, converted to Core ML by
+  `ci/ml/convert_mdx.py`. PixlAudio uses it to separate vocals for instrumentals on the iPhone.
+- By the Ultimate Vocal Remover authors. Ultimate Vocal Remover is MIT-licensed; the model release names no separate
+  licence for the weights.
+
 ## FabBar (technique for the bottom tab bar)
 
 - Upstream: https://github.com/ryanashcraft/FabBar (Swift, MIT).
@@ -75,6 +93,12 @@ MIT-licensed — see the Android repository's `THIRD_PARTY_NOTICES.md`.
   the client and the TTML reader are PixlAudio's own Swift (`BiniLyricsClient`, `BiniLyricsMatching`,
   `TtmlDocumentParser`). Lyrics shown from this source are labelled "BiniLyrics". This notice does not grant rights
   to lyric content, which belongs to its rights holders.
+
+## BotGuard glue page (`po_token.html`)
+
+- Copied from the Android PixlAudio app's `po_token.html`, which comes from NewPipe's PoToken support
+  (https://github.com/TeamNewPipe/NewPipe, GPL-3.0), whose BotGuard client functions follow LuanRT's BgUtils
+  (https://github.com/LuanRT/BgUtils, MIT). It is a small HTML/JavaScript file run in an off-screen web view.
 
 ---
 
