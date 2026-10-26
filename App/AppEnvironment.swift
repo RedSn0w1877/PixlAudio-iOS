@@ -222,7 +222,12 @@ final class AppEnvironment {
                     nowPlaying.remote = active ? spotifyConnect : nil
                     nowPlaying.update()
                 }
-                spotifyConnect.onRemoteStateChanged = { nowPlaying.update() }
+                // A seek or restart made on the lock screen must move a paused progress bar here too.
+                let playbackStore = playback
+                spotifyConnect.onRemoteStateChanged = {
+                    nowPlaying.update()
+                    playbackStore.notePositionJumped()
+                }
                 // The phone's volume buttons drive the Connect device while the app is open (not in UI tests: the
                 // simulator can't change the volume).
                 let volumeButtons = SpotifyConnectVolumeButtons(session: realPlayback.session)
