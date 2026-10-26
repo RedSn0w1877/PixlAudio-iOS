@@ -77,10 +77,14 @@ struct LibrarySettingsSection: View {
                              subtitle: spotifySignedIn ? "Your Spotify plays and favourites shape your mixes (they count the most)"
                                                        : "Connect Spotify to bring in what you play there",
                              isOn: $history.spotifyEnabled, systemImage: "music.note.list", enabled: spotifySignedIn)
-            SwitchSettingRow(title: "YouTube Music history",
-                             subtitle: youTubeSignedIn ? "Your YouTube Music history counts too, a little less than Spotify"
-                                                       : "Sign in to YouTube to bring in your YouTube Music history",
-                             isOn: $history.youTubeEnabled, systemImage: "play.circle", enabled: youTubeSignedIn)
+            // YouTube sign-in lives in developer mode only (the cookie breaks the clients that return playable audio),
+            // so everyone else would only ever see this switch disabled.
+            if youTubeSignedIn || settings.experimental.developerMode {
+                SwitchSettingRow(title: "YouTube Music history",
+                                 subtitle: youTubeSignedIn ? "Your YouTube Music history counts too, a little less than Spotify"
+                                                           : "Sign in to YouTube to bring in your YouTube Music history",
+                                 isOn: $history.youTubeEnabled, systemImage: "play.circle", enabled: youTubeSignedIn)
+            }
             SettingsItemRow(title: "Import from a file",
                             subtitle: "Your Spotify or Google data download — years of listening",
                             systemImage: "square.and.arrow.down", showsChevron: true,

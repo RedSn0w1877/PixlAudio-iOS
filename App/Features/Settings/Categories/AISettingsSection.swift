@@ -45,13 +45,17 @@ struct AISettingsSection: View {
                     environment.router.present(AppSheet.taisChat)
                 }
                 .accessibilityIdentifier("ai.taizo.settings")
+                if hasBuiltInClaude {
+                    claudeCloudSwitch
+                }
             }
             MusicIntelligenceCard()
             Spacer().frame(height: 20)
-            SettingsSubsection(title: L10n.settingsPromptBehaviorSection, addBottomSpace: developerMode) {
-                AISystemPromptRow(providerName: provider.rawValue)
-            }
+            // The raw system-prompt editor is a developer tool (normal users get the defaults).
             if developerMode {
+                SettingsSubsection(title: L10n.settingsPromptBehaviorSection, addBottomSpace: true) {
+                    AISystemPromptRow(providerName: provider.rawValue)
+                }
                 advancedBlock
             }
         }
@@ -71,6 +75,23 @@ struct AISettingsSection: View {
             guard showsAdvanced, let persistence = environment.persistence else { return }
             if let loaded = try? await persistence.settingsAiUsage() { usage = loaded }
         }
+    }
+
+    /// Whether this build carries the built-in Claude key (UI tests show the normal state).
+    private var hasBuiltInClaude: Bool { environment.launch.isUITest || ClaudeCloud.shared.hasKey }
+
+    /// For everyone: what goes to the cloud, and a way to stop it. Off is the $0 monthly limit (everything then runs on
+    /// this iPhone); on restores the default limit.
+    private var claudeCloudSwitch: some View {
+        let ai = settings.ai
+        let on = ai.claudeMonthlyCap > 0
+        return SwitchSettingRow(title: "Use Claude in the cloud",
+                                subtitle: on ? "When you're online, AI requests (with the library and listening details they need) go to Anthropic's Claude. Offline, this iPhone answers."
+                                    : "Off: every AI feature runs on this iPhone. Nothing goes to Anthropic.",
+                                isOn: Binding(get: { ai.claudeMonthlyCap > 0 },
+                                              set: { ai.claudeMonthlyCap = $0 ? ClaudeBudget.defaultCapDollars : 0 }),
+                                systemImage: "cloud", iconColor: on ? theme.primary : theme.tertiary)
+            .accessibilityIdentifier("settings.ai.claudeCloud")
     }
 
     /// Developer mode's "Advanced" block: the music intelligence tools, the assistant (the on-device model, the
@@ -104,7 +125,7 @@ struct AISettingsSection: View {
         SettingsSubsection(title: "Cloud assistants (optional)") {
             SwitchSettingRow(title: "Use a cloud assistant",
                              subtitle: cloud ? "AI requests go to \(provider.displayName) with your own key."
-                                 : "Off: every AI feature runs on this iPhone, privately. Nothing goes to the cloud.",
+                                 : "Off: AI uses Claude (built-in) when online, this iPhone when offline.",
                              isOn: Binding(get: { ai.usesCloudAssistant }, set: { ai.setUsesCloudAssistant($0) }),
                              systemImage: "cloud", iconColor: cloud ? theme.primary : theme.tertiary)
                 .accessibilityIdentifier("settings.ai.cloud")

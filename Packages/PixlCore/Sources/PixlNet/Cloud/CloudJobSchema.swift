@@ -349,6 +349,16 @@ public enum CloudErrorCode: String, Sendable, CaseIterable {
         case .downloadFailed: "The cloud worker couldn't fetch the uploaded song."
         }
     }
+
+    /// One short line for everyone (no worker or GPU words); `message` and the raw code are for developer mode.
+    public var plainMessage: String {
+        switch self {
+        case .tooLong: "Song too long for the cloud"
+        case .uploadFailed: "Couldn't upload — check your connection"
+        case .inputTooLarge: "File too large"
+        default: "Couldn't finish this song — tap Retry"
+        }
+    }
 }
 
 /// The result manifest (`pixl.cloudstudio.result` v1): identical to the RunPod job output and to `manifest.json`.

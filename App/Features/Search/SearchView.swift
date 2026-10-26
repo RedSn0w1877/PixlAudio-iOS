@@ -144,7 +144,11 @@ struct SearchView: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 8)
             ZStack(alignment: .top) {
-                if model.showsEmptyState {
+                if model.showsEmptyState, model.remoteFailed.contains(.spotify) {
+                    // Spotify didn't answer (offline, signed out on its side, rate limited): not "no results".
+                    SearchUnavailableView { model.performSearch(router.searchText) }
+                        .transition(.opacity)
+                } else if model.showsEmptyState {
                     EmptySearchResultsView(query: router.searchText)
                         .transition(.opacity)
                 } else if model.showsLoadingState {
@@ -254,9 +258,13 @@ struct SearchView: View {
     }
 
     private func importRemote(_ item: SearchResultItem, play: Bool) {
+        guard !isBusy(item) else { return }
         Task {
-            if let song = await model.importRemote(item, play: play), play {
-                playback.play(song)
+            if let song = await model.importRemote(item, play: play) {
+                if play { playback.play(song) }
+            } else if play {
+                // The row has left its section: say why nothing plays.
+                playback.notices.show("Couldn't find this song to play. Try again later.")
             }
         }
     }

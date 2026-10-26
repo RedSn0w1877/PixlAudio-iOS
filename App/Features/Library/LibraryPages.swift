@@ -414,8 +414,8 @@ struct LibraryPlaylistsPage: View {
 
     var body: some View {
         if playlists.isEmpty && !library.isLoading {
-            LibraryEmptyState(systemImage: "music.note.list", title: "No playlist has been created.",
-                              subtitle: "Touch the 'New Playlist' button to start.")
+            LibraryEmptyState(systemImage: "music.note.list", title: "No playlists yet",
+                              subtitle: "Tap New to make your first playlist.")
         } else {
             ScrollView {
                 LazyVStack(spacing: 8) {

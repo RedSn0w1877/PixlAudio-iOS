@@ -400,6 +400,40 @@ struct EmptySearchResultsView: View {
     }
 }
 
+/// The empty state when Spotify's search failed (offline, 401 / 429): the same layout as `EmptySearchResultsView`, with
+/// a Retry button that runs the query again.
+struct SearchUnavailableView: View {
+    let onRetry: () -> Void
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 54, weight: .medium))
+                .foregroundStyle(theme.primary.opacity(0.6))
+                .frame(width: 64, height: 64)
+                .padding(.bottom, 16)
+                .accessibilityHidden(true)
+            Text("Can't reach Spotify right now")
+                .pixlFont(.titleLarge, weight: .bold)
+                .foregroundStyle(theme.onSurface)
+                .multilineTextAlignment(.center)
+            Spacer().frame(height: 8)
+            Text("Check your connection and try again.")
+                .pixlFont(.bodyLarge)
+                .foregroundStyle(theme.onBackground.opacity(0.7))
+                .multilineTextAlignment(.center)
+            Spacer().frame(height: 20)
+            Button("Retry", action: onRetry)
+                .buttonStyle(.glassProminent)
+                .accessibilityIdentifier("search.retry")
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 32)
+        .accessibilityIdentifier("search.unavailable")
+    }
+}
+
 nonisolated enum SearchMetrics {
     /// `AbsoluteSmoothCornerShape(26 dp, 60 %)` of the album / artist / playlist rows.
     static let resultCardRadius: CGFloat = 26
@@ -408,8 +442,8 @@ nonisolated enum SearchMetrics {
 }
 
 nonisolated enum SearchFormat {
-    /// Android `formatSongCount`: "1 Song" for 0 or 1, else "N Songs".
+    /// "1 song", else "N songs" (Android's `formatSongCount` said "0 Song").
     static func songCount(_ count: Int) -> String {
-        count <= 1 ? "\(count) Song" : "\(count) Songs"
+        count == 1 ? "1 song" : "\(count) songs"
     }
 }

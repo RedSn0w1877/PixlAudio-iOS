@@ -49,7 +49,7 @@ extension L10n {
     static let setupSpotifyDescription = String(localized: "setup_spotify_description", defaultValue: "Please sign in with Spotify right here. Your liked songs and playlists come straight into PixlAudio.")
     static let setupSpotifyButton = String(localized: "setup_spotify_button", defaultValue: "Sign in with Spotify")
     static let setupSpotifyConnected = String(localized: "setup_spotify_connected", defaultValue: "Spotify connected")
-    static let setupSpotifyReachOut = String(localized: "setup_spotify_reach_out", defaultValue: "Once you're signed in, reach out to me with your Name and Email!")
+    static let setupSpotifyReachOut = String(localized: "setup_spotify_reach_out", defaultValue: "Beta: Spotify only lets invited testers sign in. Before you sign in, send the email address of your Spotify account to the person who invited you.")
     static let setupSpotifyArrowHint = String(localized: "setup_spotify_arrow_hint", defaultValue: "Tap the button below")
     static let setupSpotifyCdArrow = String(localized: "setup_spotify_cd_arrow", defaultValue: "Arrow pointing at the sign-in button")
 

@@ -98,6 +98,9 @@ final class SearchModel {
     private(set) var genres: [Genre] = []
     /// Remote rows being imported (spinner on the row).
     private(set) var busyItems: Set<String> = []
+    /// Remote sources whose last search failed (offline, Spotify 401 / 429): the screen says it couldn't reach them
+    /// instead of "no results".
+    private(set) var remoteFailed: Set<SearchSource> = []
 
     @ObservationIgnored private var providers: [SearchSource: any SearchProviding] = [:]
     @ObservationIgnored private var persistence: PersistenceActor?
@@ -221,7 +224,10 @@ final class SearchModel {
             guard query.utf16.count >= Self.minRemoteQueryLength, let provider = self.providers[source] else {
                 self.setSearching(false, source: source)
                 if !self.remoteResults(source).isEmpty { self.setRemoteResults([], source: source) }
-                if id == self.requestID { self.setPending(false, source: source) }
+                if id == self.requestID {
+                    self.setFailed(false, source: source)
+                    self.setPending(false, source: source)
+                }
                 return
             }
             self.setSearching(true, source: source)
@@ -229,16 +235,28 @@ final class SearchModel {
                 let results = try await provider.search(query, filter: source == .spotify ? .catalog : .youtubeMusic,
                                                         limit: Self.remoteResultLimit)
                 guard id == self.requestID, !Task.isCancelled else { return }
+                self.setFailed(false, source: source)
                 self.setRemoteResults(Array(results.prefix(Self.remoteResultLimit)), source: source)
             } catch is CancellationError {
                 // Superseded by a newer query.
             } catch {
-                if id == self.requestID { self.setRemoteResults([], source: source) }
+                if id == self.requestID {
+                    self.setFailed(true, source: source)
+                    self.setRemoteResults([], source: source)
+                }
             }
             if id == self.requestID {
                 self.setSearching(false, source: source)
                 self.setPending(false, source: source)
             }
+        }
+    }
+
+    private func setFailed(_ failed: Bool, source: SearchSource) {
+        if failed, !remoteFailed.contains(source) {
+            remoteFailed.insert(source)
+        } else if !failed, remoteFailed.contains(source) {
+            remoteFailed.remove(source)
         }
     }
 

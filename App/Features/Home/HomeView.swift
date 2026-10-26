@@ -136,6 +136,9 @@ struct HomeView: View {
                     .tint(theme.primary)
                     .frame(maxWidth: .infinity)
                     .frame(height: 256)
+            } else if env.accounts.needsSpotifyConnection {
+                // No account linked: nothing will ever sync, so Home asks to connect (as Library does).
+                ConnectSpotifyEmptyState()
             } else {
                 YourMixEmptyPlaceholder(onRefresh: {
                     Task {
