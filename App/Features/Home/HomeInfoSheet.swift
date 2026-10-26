@@ -433,25 +433,29 @@ nonisolated struct HomeChangelogVersion: Sendable, Identifiable {
 nonisolated enum HomeChangelog {
     static let versions: [HomeChangelogVersion] = [
         HomeChangelogVersion(version: "1.1.0-beta1", date: "2026-10-26", sections: [
-            ("What's New", [
-                "Claude runs the AI features whenever you're online. Offline, your iPhone's own AI takes over.",
-                "Ask Taizo: chat about music, play songs and build playlists, or say \"play less of this artist\" to tune your recommendations.",
-                "Bring in your listening history from Spotify and YouTube Music, so your mixes know your taste from day one.",
-                "Sing: instrumentals made in the cloud in seconds, with smooth fades between lines. \"Prepare songs ahead\" gets your favourites ready.",
-                "Cloud processing needs no setup, handles three songs at once and keeps going in the background. Active jobs on Home lets you cancel, retry or clear them.",
-                "Block artists, Find in playlist, gesture shortcuts and Music Haptics.",
-                "An optional AI model you can download to run on your iPhone.",
-                "Reorganised Settings, with new Lyrics and Sing sections and a Developer mode that hides the technical options.",
+            ("new stuff", [
+                "claude runs all the ai stuff now whenever youre online, and if youre offline your iphones own ai just takes over",
+                "ask taizo is here ye, you can chat about music, play songs, build playlists, or say like play less of this artist and it actually tunes your recs",
+                "you can bring in your listening history from spotify and youtube music so your mixes know your taste from day one",
+                "sing: instrumentals get made in the cloud in like seconds with smooth fades between lines, and prepare songs ahead gets your favs ready early",
+                "cloud processing needs zero setup, does three songs at once and keeps going in the background. active jobs on home lets you cancel, retry or clear them",
+                "block artists, find in playlist, gesture shortcuts and music haptics",
+                "theres an optional ai model you can download to run on your iphone",
+                "settings got reorganised with new lyrics and sing sections, and developer mode hides all the technical stuff",
             ]),
-            ("Changes", [
-                "Your library now comes from Spotify. Songs stored on the phone are no longer used.",
+            ("changed", [
+                "your library comes from spotify now, songs stored on the phone arent used anymore",
             ]),
-            ("Improvements", [
-                "Songs start faster: the next song is ready before you get to it.",
-                "Fewer skipped songs, thanks to better matching of featured-artist and remastered titles.",
-                "Smoother scrolling on Home and in lists, and lower memory use.",
-                "Crash protection and a built-in Diagnostics screen.",
-                "The full player fits smaller screens.",
+            ("fixed + faster", [
+                "songs start faster cause the next one is ready before you get to it",
+                "way fewer skipped songs, matching featured artist and remastered titles works better now",
+                "if a song cant play it actually tells you now instead of just skipping",
+                "smoother scrolling on home and in lists, and it uses less memory",
+                "crash protection and a diagnostics screen built in",
+                "the full player fits smaller screens now",
+            ]),
+            ("good to know", [
+                "you might need to reconnect spotify once to import your history",
             ]),
         ]),
         HomeChangelogVersion(version: "1.0.0", date: "2026-10-03", sections: [
