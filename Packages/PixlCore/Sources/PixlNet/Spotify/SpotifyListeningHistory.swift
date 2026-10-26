@@ -75,6 +75,9 @@ public struct SpotifyListeningFetch: Sendable {
     /// Spotify refused the recent plays / followed artists with 403: the login predates their scopes.
     public var recentlyPlayedDenied = false
     public var followedDenied = false
+    /// Whether Spotify answered any of the requests (recent plays, a top list, followed artists). False when offline
+    /// or every call failed: nothing was read, so the sync must not count as done.
+    public var anyResponded = false
 
     public init() {}
 
@@ -127,6 +130,7 @@ public struct SpotifyListeningHistoryClient: Sendable {
                                         decode: SpotifyRecentlyPlayedPage.init(json:))
         result.recentlyPlayedDenied = recentDenied.isRaised
         result.plays = (recent?.items ?? []).compactMap(SpotifyListeningHistoryMapping.play)
+        if recent != nil { result.anyResponded = true }
 
         var taste = ExternalTasteSnapshot(fetchedAtMs: nowMs)
         var anyTaste = false
@@ -164,7 +168,10 @@ public struct SpotifyListeningHistoryClient: Sendable {
             taste.followedArtists = followed
             anyTaste = true
         }
-        if anyTaste { result.taste = taste }
+        if anyTaste {
+            result.taste = taste
+            result.anyResponded = true
+        }
         return result
     }
 

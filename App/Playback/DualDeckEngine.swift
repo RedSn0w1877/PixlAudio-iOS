@@ -334,7 +334,9 @@ final class DualDeckEngine: PlaybackEngine {
     func restore(_ snapshot: PlaybackQueueSnapshot, songs: [Song]) {
         guard queue.isEmpty, !songs.isEmpty else { return }
         let index = Self.restoredIndex(snapshot, songs: songs)
-        queue.restore(songs: songs, currentIndex: index, originalSongs: nil)
+        // The snapshot keeps no unshuffled order: a restored shuffled queue takes its current order as the original,
+        // so turning shuffle off afterwards keeps the order and the button's state agrees with the queue.
+        queue.restore(songs: songs, currentIndex: index, originalSongs: snapshot.shuffleEnabled ? songs : nil)
         queue.repeatMode = RepeatMode(rawValue: snapshot.repeatMode) ?? .off
         shuffleEnabled = snapshot.shuffleEnabled
         playWhenReady = false
