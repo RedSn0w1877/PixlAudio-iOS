@@ -96,6 +96,6 @@ jobs:
             gh release upload "$tag" build/PixlAudio-unsigned.ipa --clobber
           else
             gh release create "$tag" build/PixlAudio-unsigned.ipa --target "$GITHUB_SHA" \
-              --title "PixlAudio $tag" ${notes[@]+"${notes[@]}"} --generate-notes $flags
+              --title "PixlAudio $tag" ${notes[@]+"${notes[@]}"} --generate-notes --draft $flags
           fi
           echo "Released $tag" >> "$GITHUB_STEP_SUMMARY"
