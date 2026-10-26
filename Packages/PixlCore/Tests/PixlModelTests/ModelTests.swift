@@ -109,6 +109,14 @@ struct LibraryTabTests {
         #expect(LibraryTabId.fromStorageKey("ARTIST") == .artists)
         #expect(LibraryTabId.fromStorageKey("nope") == .songs)
         #expect(LibraryTabId.liked.defaultSort == .likedSongDateLiked)
+        // Owner decision 2026-10-26: newest first wherever a date exists.
+        #expect(LibraryTabId.songs.defaultSort == .songDateAdded)
+        #expect(LibraryTabId.albums.defaultSort == .albumDateAdded)
+        #expect(LibraryTabId.playlists.defaultSort == .playlistDateCreated)
+        #expect(LibraryTabId.songs.defaultSort.direction == .descending)
+        for id in LibraryTabId.allCases where id != .folders {
+            #expect(LibraryTab(rawValue: id.rawValue)!.sortOptions.contains(id.defaultSort))
+        }
         #expect(LibraryTabId.albums.titleKey == "library_tab_albums")
         #expect(LibraryTab.albums.sortOptions.count == 7)
     }

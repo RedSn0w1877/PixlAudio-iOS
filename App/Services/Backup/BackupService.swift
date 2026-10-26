@@ -120,7 +120,7 @@ final class BackupService {
         let orderModes = (defaults.string(forKey: LibraryPreferences.playlistSongOrderModesKey)
             .flatMap { try? JSONDecoder().decode([String: String].self, from: Data($0.utf8)) } ?? [:])
             .sorted { $0.key < $1.key }.map { ($0.key, $0.value) }
-        let sortOption = defaults.string(forKey: PreferenceKeys.playlistsSortOption) ?? SortOption.playlistNameAZ.storageKey
+        let sortOption = defaults.string(forKey: PreferenceKeys.playlistsSortOption) ?? SortOption.playlistDateCreated.storageKey
         await history.ensureLoaded()
         let events = sections.contains(.playbackHistory) ? history.events : []
         let persistence = self.persistence
