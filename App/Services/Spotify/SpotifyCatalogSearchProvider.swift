@@ -30,6 +30,13 @@ nonisolated struct SpotifyCatalogSearchProvider: SearchProviding {
         return await service.importAndMatch(track, like: true)
     }
 
+    /// Ask Taizo's plays, queues and playlists: imported and matched like a tap, but not liked.
+    func importForPlayback(_ item: SearchResultItem) async -> Song? {
+        guard case .catalog(let catalog) = item else { return nil }
+        let track = await service.catalogTrack(id: catalog.spotifyId) ?? Self.spotifyTrack(catalog)
+        return await service.importAndMatch(track, like: false)
+    }
+
     func like(_ item: SearchResultItem) async -> Bool {
         guard case .catalog(let catalog) = item else { return false }
         let track = await service.catalogTrack(id: catalog.spotifyId) ?? Self.spotifyTrack(catalog)

@@ -75,6 +75,9 @@ final class TaisChatModel {
     /// Streamed text not yet shown (flushed at most every 50 ms, so a fast stream doesn't re-render per token).
     @ObservationIgnored private var pendingText: [Int: String] = [:]
     @ObservationIgnored private var flushTask: Task<Void, Never>?
+    /// The turn in flight. One at a time: two turns would share the toolbox (and its taste-change guard) and the
+    /// conversation record, and drive playback against each other. "New chat" and opening another chat cancel it.
+    @ObservationIgnored private var turnTask: Task<Void, Never>?
 
     /// Android `TAIZO_SUGGESTIONS` (sent as "Play some <x> songs"; the chips are `TaizoSuggestion.moods`).
     static let suggestions = ["Chill acoustic", "Energetic rock", "Sad indie", "Party anthems", "Focus beats", "Feel-good pop"]
@@ -95,8 +98,8 @@ final class TaisChatModel {
 
     /// `sendPrompt`: appends the prompt and a thinking row, then replaces the thinking row with Taizo's turn.
     func sendPrompt() {
-        guard let pending = enqueue() else { return }
-        Task { [weak self] in await self?.respond(to: pending) }
+        guard !isThinking, let pending = enqueue() else { return }
+        turnTask = Task { [weak self] in await self?.respond(to: pending) }
     }
 
     /// Sends a prompt as if typed (suggestion chips).
@@ -144,6 +147,8 @@ final class TaisChatModel {
 
     private func respondOnDevice(to pending: (prompt: String, thinkingId: Int)) async {
         let turn = await engine.respond(pending.prompt)
+        // The chat was cleared or switched meanwhile: this answer belongs to a conversation that is gone.
+        guard !Task.isCancelled else { return }
         let replyId = finish(thinkingId: pending.thinkingId, prompt: pending.prompt, turn: turn)
         // On-device, the card is already up; its intro line follows when the model has written it.
         var intro: String?
@@ -226,6 +231,8 @@ final class TaisChatModel {
         do {
             let result = try await loop.run(history: ClaudeConversation.forRequest(history))
             flushPendingText()
+            // Cleared or switched while the loop finished: don't write the old chat back over the new one.
+            if Task.isCancelled { return true }
             switch result.outcome {
             case .refused:
                 let text = "I can't help with that one — ask me anything else about music."
@@ -253,6 +260,7 @@ final class TaisChatModel {
             return true
         } catch {
             flushPendingText()
+            if Task.isCancelled { return true }
             await assistant.onFallback("assistant: \(error)")
             if progress.ranTool || !progress.text.isEmpty {
                 // Something already happened (text shown, a tool ran): keep it rather than answer twice.
@@ -396,6 +404,8 @@ final class TaisChatModel {
 
     /// "New chat": the next prompt starts a new conversation.
     func newChat() {
+        turnTask?.cancel()
+        turnTask = nil
         resolveAllConfirmations(false)
         messages.removeAll()
         conversation = nil
@@ -406,6 +416,8 @@ final class TaisChatModel {
     /// Opens a saved conversation from the menu.
     func open(_ id: String) {
         guard let record = recentConversations.first(where: { $0.id == id }) else { return }
+        turnTask?.cancel()
+        turnTask = nil
         resolveAllConfirmations(false)
         show(record)
     }

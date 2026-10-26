@@ -224,7 +224,8 @@ struct TaizoComposer: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        let canSend = !model.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        // One turn at a time: Send waits for Taizo's answer (`TaisChatModel.sendPrompt` refuses a second one too).
+        let canSend = !model.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !model.isThinking
         HStack(spacing: 8) {
             TextField("", text: $model.inputText,
                       prompt: Text("Ask Taizo anything").foregroundStyle(theme.onSurfaceVariant))

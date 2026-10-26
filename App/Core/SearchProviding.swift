@@ -27,6 +27,9 @@ nonisolated protocol SearchProviding: Sendable {
     /// Brings a remote result into the library and returns the playable song (Android `playCatalogTrack` /
     /// `playYouTubeMusicTrack`); nil when it couldn't be imported or matched.
     func importAndPlay(_ item: SearchResultItem) async -> Song?
+    /// Brings a remote result into the library for playback chosen by someone other than the user (Ask Taizo's
+    /// tools), without liking it: only the user's own taps add to Liked songs.
+    func importForPlayback(_ item: SearchResultItem) async -> Song?
     /// Imports a catalogue result as a liked song without playing it (Android `likeCatalogTrack`).
     func like(_ item: SearchResultItem) async -> Bool
 }
@@ -34,6 +37,8 @@ nonisolated protocol SearchProviding: Sendable {
 extension SearchProviding {
     /// Library results are already playable; remote providers override this.
     nonisolated func importAndPlay(_ item: SearchResultItem) async -> Song? { nil }
+    /// Providers whose import doesn't like anything (YouTube Music's) import the same way for both.
+    nonisolated func importForPlayback(_ item: SearchResultItem) async -> Song? { await importAndPlay(item) }
     nonisolated func like(_ item: SearchResultItem) async -> Bool { false }
 }
 
