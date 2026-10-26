@@ -393,7 +393,8 @@ private struct PlayerMetadataRow: View {
                     circle(systemImage: "quote.bubble", label: "Lyrics", identifier: "player.lyrics") {
                         router.present(AppCover.lyrics)
                     }
-                    circle(systemImage: "sparkles", label: "Ask the AI DJ", identifier: "player.aiDJ", iconSize: 20) {
+                    // Ask Taizo (2026-10-23): the assistant knows the song that's playing.
+                    circle(systemImage: "sparkles", label: "Ask Taizo", identifier: "player.aiDJ", iconSize: 20) {
                         router.present(AppSheet.taisChat)
                     }
                 }

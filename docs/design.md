@@ -689,6 +689,11 @@ Stage 12 screenshot ids (signed out on the plain ids; demo data, no network): `a
 
 Stage 13 ids: `aiPlaylist` (sheet over Home), `taisChat` (empty), `taisChatConversation` (a scripted genre request
 and question; ready `screen.taisChat`), `aiPlaylistLab` (cover). Shots: `UITests/AIScreenshotTests`.
+Ask Taizo (2026-10-23, Claude everywhere): `taisChatCloud` — the same sheet driven by the scripted Claude
+(`DemoClaudeClient`): a streamed answer with a source link, then a 60-song playlist waiting on its Confirm card
+(ids `ai.taizo.confirm.approve` / `.cancel`, `ai.taizo.menu`, `ai.taizo.newChat`, `ai.taizo.source`). Entry points:
+Home's sparkles circle (`ai.taizo.home`), the full player's sparkles circle (`player.aiDJ`, unchanged) and Settings › AI
+features › Assistant (`ai.taizo.settings`).
 
 ### On-device AI by default (2026-10-07, local AI phase 1; owner decisions, a departure from Android)
 

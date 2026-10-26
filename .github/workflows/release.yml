@@ -38,6 +38,12 @@ jobs:
         env:
           CLOUD_DEFAULTS_KEY: ${{ secrets.CLOUD_DEFAULTS_KEY }}
         run: bash ci/write-cloud-defaults-key.sh
+      # The ANTHROPIC_API_KEY secret becomes XOR shares in App/Generated/AnthropicKey.swift (the same pattern). Without
+      # it the stub stays: no built-in Claude key, and every AI feature runs on the device.
+      - name: Built-in Claude key
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: bash ci/write-anthropic-key.sh
       - name: Tune the runner
         run: bash ci/tune-runner.sh
       - name: Select Xcode

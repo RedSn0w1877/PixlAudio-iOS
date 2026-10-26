@@ -24,7 +24,13 @@ import PixlNet
 ///   of the on-device paths run there (CI simulators have no system language model).
 ///
 /// Feature state lives in two process-scoped holders, like Android's `@Singleton`s: `playlist` (the AI playlist
-/// sheet and the AI Playlist Lab) and `chat` (the TAIS DJ chat).
+/// sheet and the AI Playlist Lab) and `chat` (Ask Taizo, the assistant).
+///
+/// Claude everywhere (2026-10-23, spec A2): every AI feature asks `claudeFirst` before its own path — Claude Sonnet 5.5
+/// with the built-in key whenever the phone is online and the month's budget isn't used up (`ClaudeCloud.route()`),
+/// and the feature's existing on-device path otherwise or when the Claude call fails. In developer mode a cloud
+/// assistant with the user's own key overrides the router. UI tests never reach the network: only
+/// `-screen taisChatCloud` routes to Claude, and there a scripted client (`DemoClaudeClient`) answers.
 @Observable
 final class AIService {
     let orchestrator: AiOrchestrator
@@ -35,6 +41,14 @@ final class AIService {
     let isDemo: Bool
     /// The on-device sessions and the settings they read (nil in UI tests).
     let onDevice: OnDeviceContext?
+    /// The built-in Claude key, the router's inputs and the budget.
+    let cloud: ClaudeCloud
+    /// "Claude or an error": the features try it first and run their own on-device path when it doesn't answer.
+    let claudeFirst: ClaudeRoutedGenerator
+    /// Who answers right now (thread-safe).
+    let currentRoute: @Sendable () -> AIRoute
+    /// A Claude client for the built-in key (nil without one; the scripted one in the cloud UI test).
+    let claudeClient: @Sendable () -> (any ClaudeMessaging)?
 
     @ObservationIgnored private let http: any HTTPClient
     @ObservationIgnored private let settings: SettingsStore
@@ -44,7 +58,8 @@ final class AIService {
 
     init(launch: LaunchConfiguration, settings: SettingsStore, persistence: PersistenceActor?, library: LibraryStore,
          home: HomeStore, playback: PlaybackStore, router: Router, searchProviders: [SearchSource: any SearchProviding],
-         libraryEditor: @escaping @MainActor () -> LibraryEditor) {
+         libraryEditor: @escaping @MainActor () -> LibraryEditor,
+         environment: @escaping @MainActor @Sendable () -> AppEnvironment? = { nil }) {
         let isDemo = launch.isUITest
         self.isDemo = isDemo
         self.settings = settings
@@ -65,6 +80,41 @@ final class AIService {
                                           sha256: AIService.sha256, onDeviceClient: onDeviceClient,
                                           clientFactory: factory, providerChain: chain)
         self.orchestrator = orchestrator
+        // Claude first (2026-10-23). The scripted cloud answers only the cloud UI test; other UI tests stay on the demo
+        // provider, so their screenshots never depend on a key or the network.
+        let cloud = ClaudeCloud.shared
+        self.cloud = cloud
+        let demoCloud = isDemo && launch.screen == .taisChatCloud
+        // if/else, not a ternary of closures: Xcode 27's type checker gives up on those.
+        let route: @Sendable () -> AIRoute
+        let claudeClient: @Sendable () -> (any ClaudeMessaging)?
+        if isDemo {
+            route = { @Sendable () -> AIRoute in demoCloud ? AIRoute.claude : AIRoute.onDevice(.noBuiltInKey) }
+            claudeClient = { @Sendable () -> (any ClaudeMessaging)? in
+                if demoCloud { return DemoClaudeClient() }
+                return nil
+            }
+        } else {
+            route = { @Sendable () -> AIRoute in cloud.route() }
+            claudeClient = { @Sendable () -> (any ClaudeMessaging)? in cloud.client() }
+        }
+        currentRoute = route
+        self.claudeClient = claudeClient
+        let personaSource = bridge
+        let recordUsage: @Sendable (ClaudeUsage) async -> Void = { used in
+            guard !isDemo else { return }
+            cloud.record(used)
+            await usage?.record(AiUsageRecord(timestamp: currentTimeMillis(), provider: "Claude", model: ClaudeAPI.model,
+                                              promptType: "CLAUDE", promptTokens: Int(used.inputTokens + used.cacheReadInputTokens
+                                                  + used.cacheCreationInputTokens),
+                                              outputTokens: Int(used.outputTokens), thoughtTokens: 0))
+        }
+        self.recordClaudeUsage = recordUsage
+        claudeFirst = ClaudeRoutedGenerator(
+            route: { route() }, claude: { claudeClient() }, fallback: ClaudeUnavailableGenerator(),
+            persona: { await personaSource.systemPrompt(for: await personaSource.selectedProvider()) },
+            onUsage: recordUsage,
+            onFallback: { message in if !isDemo { cloud.logFallback(message) } })
         // "Use downloaded AI model" (off by default) moves every on-device feature to the downloaded model.
         let onDevice = realBridge.map {
             OnDeviceContext(ai: .shared, settings: $0, local: LocalModelAI.shared,
@@ -73,23 +123,38 @@ final class AIService {
         self.onDevice = onDevice
         let generator = AiPlaylistGenerator(orchestrator: orchestrator)
         playlistGenerator = generator
-        lyricsTranslator = AILyricsTranslator(orchestrator: orchestrator, onDevice: onDevice.map(OnDeviceLyricsTranslator.live))
+        lyricsTranslator = AILyricsTranslator(orchestrator: orchestrator, onDevice: onDevice.map(OnDeviceLyricsTranslator.live),
+                                              cloud: claudeFirst)
         playlist = AIPlaylistController(generator: generator, settings: settings, library: library, home: home,
                                         playback: playback, router: router, libraryEditor: libraryEditor,
                                         curator: onDevice.map(OnDevicePlaylistCurator.live),
-                                        usesOnDeviceCurator: { AiProvider.fromString(settings.ai.provider) == .onDevice })
+                                        usesOnDeviceCurator: { AiProvider.fromString(settings.ai.provider) == .onDevice },
+                                        cloudGenerator: AiPlaylistGenerator(orchestrator: claudeFirst),
+                                        prefersCloud: { route() == .claude })
         let remote: [any SearchProviding] = [searchProviders[.spotify], searchProviders[.youtubeMusic]].compactMap { $0 }
         let librarySongs: @MainActor @Sendable () -> [Song] = { library.songs }
         self.librarySongs = librarySongs
         let mediaRouter = TaisMediaRouter(songs: librarySongs, remoteProviders: remote)
+        let store: TaizoConversationStore? = isDemo ? nil : TaizoConversationStore(url: TaizoConversationStore.defaultURL())
+        let assistant = TaizoCloudAssistant(route: route, client: claudeClient, store: store,
+                                            context: { await TaizoContextBuilder.listeningContext(environment()) },
+                                            now: { previousSongKey in await TaizoContextBuilder.now(environment(), lyricsSentFor: previousSongKey) },
+                                            toolbox: { TaizoToolbox(environment: environment, catalog: searchProviders[.spotify]) },
+                                            onUsage: recordUsage,
+                                            onFallback: { message in if !isDemo { cloud.logFallback(message) } })
         chat = TaisChatModel(engine: TaisDjEngine(router: mediaRouter, orchestrator: orchestrator, onDevice: onDevice),
-                             playback: playback)
+                             playback: playback, assistant: assistant)
     }
+
+    /// Charges a Claude response (the budget and the developer usage report).
+    @ObservationIgnored let recordClaudeUsage: @Sendable (ClaudeUsage) async -> Void
 
     /// Loads the on-device model for a sheet that is opening (fire and forget): nothing in UI tests or with a cloud
     /// assistant selected.
     func prewarm(_ feature: OnDeviceAI.Feature) {
         guard let onDevice, AiProvider.fromString(settings.ai.provider) == .onDevice else { return }
+        // Claude answers while the phone is online: don't load a model that would sit unused.
+        guard currentRoute() != .claude else { return }
         if settings.ai.useDownloadedModel {
             // Loading the downloaded model (and, the first time, specialising it for the GPU) takes seconds.
             if feature == .chat || feature == .playlist { onDevice.local?.prewarm() }
@@ -115,6 +180,7 @@ final class AIService {
     /// model. UI tests always have the scripted provider.
     var isProviderConfigured: Bool {
         if isDemo { return true }
+        if currentRoute() == .claude { return true }
         let provider = AiProvider.fromString(settings.ai.provider)
         switch provider {
         case .onDevice:
