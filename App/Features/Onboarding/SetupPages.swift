@@ -1,25 +1,47 @@
 import SwiftUI
 
-// The setup pages, ported from Android `SetupScreen.kt` (same order of elements, sizes and text styles).
+// The setup's pages. Each one is a `SetupPageScroll` (so it scrolls on small phones and at big text sizes) of a hero,
+// a title, glass content and staggered reveals. The bottom button and the progress live in `SetupView`.
 
-/// Android `WelcomePage`: "Welcome to" (42 pt) over "PixlAudio" (46 pt, `primary`), the β Beta chip, the 240 pt
-/// welcome art with its two sine waves, and the intro line.
+// MARK: - Welcome
+
+/// The first page: the logo, "Welcome to PixlAudio", the welcome illustration in a glass-rimmed frame with three
+/// floating chips, and one line of intro.
 struct SetupWelcomePage: View {
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(L10n.setupWelcomePrefix.trimmingCharacters(in: .whitespaces))
-                    .pixlFont(.custom(size: 42, weight: .bold, lineHeight: 46))
-                    .foregroundStyle(theme.onSurface)
-                Text(L10n.appName)
-                    .pixlFont(.custom(size: 46, weight: .bold, lineHeight: 51))
-                    .foregroundStyle(theme.primary)
+        SetupPageScroll { compact in
+            VStack(spacing: compact ? 12 : 20) {
+                SetupLogo(size: compact ? 64 : 92)
+                    .setupReveal(0)
+                titles(compact: compact)
+                    .setupReveal(1)
+                SetupWelcomeArtCard(maxHeight: compact ? 150 : 260)
+                    .setupReveal(2)
+                Text(L10n.setupIntroBody)
+                    .pixlFont(.bodyLarge)
+                    .foregroundStyle(theme.onSurfaceVariant)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 8)
+                    .setupReveal(3)
             }
-            .padding(.horizontal, 8)
-            .padding(.top, 12)
-            Spacer(minLength: 10)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 12)
+        }
+    }
+
+    private func titles(compact: Bool) -> some View {
+        VStack(spacing: 2) {
+            Text(L10n.setupWelcomePrefix.trimmingCharacters(in: .whitespaces))
+                .pixlFont(.custom(size: compact ? 22 : 26, weight: .semibold, lineHeight: 32))
+                .foregroundStyle(theme.onSurfaceVariant)
+            Text(L10n.appName)
+                .pixlFont(.custom(size: compact ? 42 : 52, weight: .heavy, lineHeight: compact ? 48 : 58))
+                .foregroundStyle(theme.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
             HStack(spacing: 6) {
                 Text(L10n.setupBetaSymbol).pixlFont(.labelLarge, weight: .black)
                 Text(L10n.setupBetaLabel).pixlFont(.labelLarge, weight: .semibold)
@@ -28,243 +50,491 @@ struct SetupWelcomePage: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .pixlGlass(in: Capsule(), tint: theme.surface.opacity(GlassTint.surface))
-            Spacer(minLength: 16)
-            ZStack(alignment: .bottom) {
-                WelcomeArt()
-                HomeSineWaveLine(color: theme.surface.opacity(0.95), amplitude: 4, lineWidth: 16)
-                    .frame(height: 32)
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 4)
-                theme.surface
-                    .frame(height: 22)
-                    .padding(.bottom, 0)
-                HomeSineWaveLine(color: theme.primary.opacity(0.95), amplitude: 4, lineWidth: 4)
-                    .frame(height: 32)
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 4)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 240)
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            Spacer(minLength: 16)
-            Text(L10n.setupIntroBody)
-                .pixlFont(.bodyLarge)
-                .foregroundStyle(theme.onSurface)
-                .multilineTextAlignment(.center)
+            .padding(.top, 8)
         }
-        .frame(maxHeight: .infinity)
-        .padding(16)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 }
 
-/// Android `BackupRestorePage`: import a backup, with the "checking" / progress card above "Skip / Not now".
+/// The app icon, breathing slowly over a soft coloured glow.
+private struct SetupLogo: View {
+    let size: CGFloat
+    @Environment(\.appTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        let still = SetupMotion.isStill(reduceMotion: reduceMotion)
+        logo
+            .phaseAnimator(still ? [false] : [false, true]) { view, big in
+                view.scaleEffect(big ? 1.04 : 1)
+            } animation: { _ in
+                Animation.easeInOut(duration: 2.6)
+            }
+    }
+
+    private var logo: some View {
+        BrandMark()
+            .frame(width: size, height: size)
+            .shadow(color: theme.primary.opacity(0.35), radius: 22, y: 10)
+    }
+}
+
+/// The welcome illustration (the 16-path vector in the palette's colours) with its two sine waves, framed by a
+/// hairline rim, and three glass chips floating over its corners.
+private struct SetupWelcomeArtCard: View {
+    let maxHeight: CGFloat
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        art
+            .aspectRatio(1536.0 / 1024.0, contentMode: .fit)
+            .frame(maxWidth: maxHeight * 1536.0 / 1024.0)
+            .overlay(alignment: .topLeading) {
+                SetupFloatingChip(symbol: "music.note", color: theme.primary, period: 2.4)
+                    .offset(x: -8, y: -14)
+            }
+            .overlay(alignment: .topTrailing) {
+                SetupFloatingChip(symbol: "heart.fill", color: theme.tertiary, period: 2.9)
+                    .offset(x: 8, y: 18)
+            }
+            .overlay(alignment: .bottomTrailing) {
+                SetupFloatingChip(symbol: "waveform", color: theme.secondary, period: 3.3)
+                    .offset(x: 6, y: 16)
+            }
+            .accessibilityHidden(true)
+    }
+
+    private var art: some View {
+        ZStack(alignment: .bottom) {
+            WelcomeArt()
+            HomeSineWaveLine(color: theme.surface.opacity(0.95), amplitude: 4, lineWidth: 16)
+                .frame(height: 32)
+                .padding(.horizontal, 8)
+                .padding(.bottom, 4)
+            theme.surface
+                .frame(height: 22)
+            HomeSineWaveLine(color: theme.primary.opacity(0.95), amplitude: 4, lineWidth: 4)
+                .frame(height: 32)
+                .padding(.horizontal, 8)
+                .padding(.bottom, 4)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(LinearGradient(colors: [.white.opacity(0.55), .white.opacity(0.05), .white.opacity(0.25)],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
+        }
+    }
+}
+
+/// A glass circle with one symbol that bobs gently up and down.
+private struct SetupFloatingChip: View {
+    let symbol: String
+    let color: Color
+    let period: Double
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        let still = SetupMotion.isStill(reduceMotion: reduceMotion)
+        chip
+            .phaseAnimator(still ? [false] : [false, true]) { view, up in
+                view.offset(y: up ? -7 : 7)
+            } animation: { _ in
+                Animation.easeInOut(duration: period)
+            }
+    }
+
+    private var chip: some View {
+        Image(systemName: symbol)
+            .font(.system(size: 18, weight: .semibold))
+            .foregroundStyle(color)
+            .symbolEffect(.variableColor.iterative, isActive: symbol == "waveform" && !SetupMotion.isStill(reduceMotion: reduceMotion))
+            .frame(width: 46, height: 46)
+            .pixlGlass(in: Circle(), tint: color.opacity(0.18))
+    }
+}
+
+// MARK: - Spotify
+
+/// Connect Spotify: what you get, the green sign-in button (it turns into "Spotify connected").
+struct SetupSpotifyPage: View {
+    let isLoggedIn: Bool
+    let onSignIn: () -> Void
+    @Environment(\.appTheme) private var theme
+
+    /// The Spotify brand green.
+    static let spotifyGreen = Color(argb: 0xFF1DB954)
+
+    var body: some View {
+        SetupPageScroll { compact in
+            VStack(spacing: compact ? 14 : 20) {
+                SetupHero(symbol: isLoggedIn ? "checkmark" : "music.note.house.fill", size: compact ? 52 : 88)
+                    .setupReveal(0)
+                SetupPageHeader(title: L10n.setupSpotifyTitle, subtitle: L10n.setupSpotifyDescription)
+                    .setupReveal(1)
+                perks
+                    .setupReveal(2)
+                    .setupScrollFade()
+                VStack(spacing: 10) {
+                    SetupFilledButton(title: isLoggedIn ? L10n.setupSpotifyConnected : L10n.setupSpotifyButton,
+                                      systemImage: isLoggedIn ? "checkmark" : "music.note", kind: .spotify,
+                                      action: signInTapped)
+                        .allowsHitTesting(!isLoggedIn)
+                        .accessibilityIdentifier("setup.spotify")
+                    if !isLoggedIn {
+                        SetupFootnote(text: L10n.setupSpotifyLater)
+                    }
+                }
+                .setupReveal(3)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 12)
+            .animation(PixlMotion.state, value: isLoggedIn)
+        }
+    }
+
+    private func signInTapped() {
+        if !isLoggedIn { onSignIn() }
+    }
+
+    private var perks: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            perk("heart.fill", L10n.setupSpotifyPerkLiked)
+            perk("music.note.list", L10n.setupSpotifyPerkPlaylists)
+            perk("sparkles", L10n.setupSpotifyPerkMixes)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 18)
+        .setupGlassCard()
+        .accessibilityElement(children: .combine)
+    }
+
+    private func perk(_ symbol: String, _ text: String) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: symbol)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(theme.onSecondaryContainer)
+                .frame(width: 36, height: 36)
+                .background(theme.secondaryContainer, in: Circle())
+            Text(text)
+                .pixlFont(.bodyLarge, weight: .medium)
+                .foregroundStyle(theme.onSurface)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+// MARK: - Backup
+
+/// Restore a backup: what a backup holds, the import button and a card while the file is being checked.
 struct SetupBackupPage: View {
     let isInspecting: Bool
     let isRestoring: Bool
     let onImport: () -> Void
-    let onSkip: () -> Void
     @Environment(\.appTheme) private var theme
+
+    private let columns = [GridItem(.adaptive(minimum: 140), spacing: 10)]
 
     var body: some View {
         let isBusy = isInspecting || isRestoring
-        SetupPermissionPage(title: L10n.setupBackupHaveTitle, description: L10n.setupBackupHaveDescription,
-                            buttonText: isInspecting ? L10n.setupInspectingBackup
-                                : isRestoring ? L10n.setupRestoringBackup : L10n.setupImportBackup,
-                            icons: ["doc.badge.arrow.up", "music.note.list", "gearshape", "quote.bubble",
-                                    "chart.line.uptrend.xyaxis"],
-                            buttonEnabled: !isBusy, onGrant: onImport) {
-            if isInspecting {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 10) {
+        SetupPageScroll { compact in
+            VStack(spacing: compact ? 14 : 20) {
+                SetupHero(symbol: "arrow.down.doc.fill", size: compact ? 52 : 88)
+                    .setupReveal(0)
+                SetupPageHeader(title: L10n.setupBackupHaveTitle, subtitle: L10n.setupBackupHaveDescription)
+                    .setupReveal(1)
+                LazyVGrid(columns: columns, spacing: 10) {
+                    chip("music.note.list", L10n.setupBackupChipPlaylists)
+                    chip("gearshape.fill", L10n.setupBackupChipSettings)
+                    chip("quote.bubble.fill", L10n.setupBackupChipLyrics)
+                    chip("chart.line.uptrend.xyaxis", L10n.setupBackupChipStats)
+                }
+                .setupReveal(2)
+                .setupScrollFade()
+                if isInspecting {
+                    HStack(spacing: 12) {
                         ProgressView().tint(theme.primary)
                         Text(L10n.setupCheckingBackup)
                             .pixlFont(.bodyMedium)
                             .foregroundStyle(theme.onSurfaceVariant)
+                        Spacer(minLength: 0)
                     }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 14)
+                    .setupGlassCard(cornerRadius: 20, tint: theme.surfaceContainerHigh.opacity(GlassTint.container))
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .pixlGlass(in: RoundedRectangle(cornerRadius: 20, style: .continuous),
-                           tint: theme.surfaceContainerHigh.opacity(GlassTint.container))
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                SetupFilledButton(title: buttonTitle, systemImage: "square.and.arrow.down", isEnabled: !isBusy,
+                                  action: onImport)
+                    .accessibilityIdentifier("setup.import")
+                    .setupReveal(3)
             }
-            SetupTextButton(title: L10n.setupSkipForNow, isEnabled: !isRestoring, action: onSkip)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 12)
+            .animation(PixlMotion.state, value: isBusy)
         }
-        .animation(PixlMotion.state, value: isBusy)
+    }
+
+    private var buttonTitle: String {
+        if isInspecting { return L10n.setupInspectingBackup }
+        if isRestoring { return L10n.setupRestoringBackup }
+        return L10n.setupImportBackup
+    }
+
+    private func chip(_ symbol: String, _ title: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: symbol)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(theme.primary)
+                .frame(width: 24)
+            Text(title)
+                .pixlFont(.labelLarge)
+                .foregroundStyle(theme.onSurface)
+                .lineLimit(2)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .setupGlassCard(cornerRadius: 20)
+        .accessibilityElement(children: .combine)
     }
 }
 
-/// Android `ThemeSelectionPage`: title and subtitle, the three option cards (Dark — recommended —, Light, Follow
-/// system) and the footer.
+// MARK: - Theme
+
+/// Pick the look: three glass cards with a little preview of each, and a ring that slides to the one you tap.
 struct SetupThemePage: View {
     let selected: AppThemeMode
     let onSelect: (AppThemeMode) -> Void
     @Environment(\.appTheme) private var theme
+    @Namespace private var ring
 
     private struct Option: Identifiable {
         let mode: AppThemeMode
         let title: String
         let description: String
-        let symbol: String
         var recommended = false
         var id: String { mode.rawValue }
     }
 
     private var options: [Option] {
         [Option(mode: .dark, title: L10n.setupThemeDarkTitle, description: L10n.setupThemeDarkDescription,
-                symbol: "moon.fill", recommended: true),
-         Option(mode: .light, title: L10n.setupThemeLightTitle, description: L10n.setupThemeLightDescription,
-                symbol: "sun.max"),
-         Option(mode: .followSystem, title: L10n.setupThemeFollowTitle, description: L10n.setupThemeFollowDescription,
-                symbol: "iphone")]
+                recommended: true),
+         Option(mode: .light, title: L10n.setupThemeLightTitle, description: L10n.setupThemeLightDescription),
+         Option(mode: .followSystem, title: L10n.setupThemeFollowTitle, description: L10n.setupThemeFollowDescription)]
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            SetupPageHeader(title: L10n.setupThemeTitle, subtitle: L10n.setupThemeSubtitle, topSpacing: 12)
-            Spacer(minLength: 16)
-            VStack(spacing: 10) {
-                ForEach(options) { option in
-                    SetupThemeOptionCard(title: option.title, description: option.description, symbol: option.symbol,
-                                         recommended: option.recommended, isSelected: selected == option.mode) {
-                        onSelect(option.mode)
+        SetupPageScroll { compact in
+            VStack(spacing: compact ? 14 : 20) {
+                SetupPageHeader(title: L10n.setupThemeTitle, subtitle: L10n.setupThemeSubtitle)
+                    .setupReveal(0)
+                VStack(spacing: 12) {
+                    ForEach(Array(options.enumerated()), id: \.element.id) { index, option in
+                        card(option)
+                            .setupReveal(index + 1)
+                            .setupScrollFade()
                     }
                 }
-                Text(L10n.setupThemeFooter)
-                    .pixlFont(.labelMedium)
-                    .foregroundStyle(theme.onSurfaceVariant.opacity(0.7))
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+                SetupFootnote(text: L10n.setupThemeFooter)
+                    .setupReveal(4)
             }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 12)
+            .pixlHaptic(.selection, trigger: selected)
         }
-        .padding(24)
     }
-}
 
-/// Android `ThemeModeOptionCard`: 24 pt corners (`primaryContainer` 70 % when selected, else `surfaceContainer`),
-/// the 46 pt icon tile (16 pt corners), title, the "Recommended" pill, description, and the 28 pt selection dot.
-private struct SetupThemeOptionCard: View {
-    let title: String
-    let description: String
-    let symbol: String
-    let recommended: Bool
-    let isSelected: Bool
-    let onTap: () -> Void
-    @Environment(\.appTheme) private var theme
+    private func traits(_ isSelected: Bool) -> AccessibilityTraits {
+        if isSelected { return [.isButton, .isSelected] }
+        return .isButton
+    }
 
-    var body: some View {
-        Button(action: onTap) {
-            HStack(alignment: .top, spacing: 14) {
-                Image(systemName: symbol)
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(isSelected ? theme.onPrimary : theme.onSecondaryContainer)
-                    .frame(width: 46, height: 46)
-                    .background(isSelected ? theme.primary : theme.secondaryContainer,
-                                in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(title).pixlFont(.titleMedium, weight: .bold).foregroundStyle(theme.onSurface)
-                    if recommended {
+    private func card(_ option: Option) -> some View {
+        let isSelected = selected == option.mode
+        return Button { onSelect(option.mode) } label: {
+            HStack(spacing: 16) {
+                SetupThemeSwatch(mode: option.mode)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(option.title)
+                        .pixlFont(.titleMedium, weight: .bold)
+                        .foregroundStyle(theme.onSurface)
+                    if option.recommended {
                         Text(L10n.setupRecommended)
                             .pixlFont(.labelSmall, weight: .semibold)
                             .foregroundStyle(isSelected ? theme.onPrimary : theme.onPrimaryContainer)
                             .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
+                            .padding(.vertical, 4)
                             .background(isSelected ? theme.primary : theme.primaryContainer, in: Capsule())
                     }
-                    Text(description)
+                    Text(option.description)
                         .pixlFont(.bodyMedium)
                         .foregroundStyle(theme.onSurfaceVariant)
                         .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                ZStack {
-                    Circle().fill(isSelected ? theme.primary : theme.surfaceContainerHighest)
-                    if isSelected {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(theme.onPrimary)
-                    } else {
-                        Circle().fill(theme.onSurfaceVariant.opacity(0.35)).frame(width: 8, height: 8)
-                    }
-                }
-                .frame(width: 28, height: 28)
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 26, weight: .regular))
+                    .foregroundStyle(isSelected ? theme.primary : theme.onSurfaceVariant.opacity(0.5))
+                    .contentTransition(.symbolEffect(.replace))
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 16)
-            .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         }
         .buttonStyle(.plain)
-        .pixlGlass(in: RoundedRectangle(cornerRadius: 24, style: .continuous),
-                   tint: isSelected ? theme.primaryContainer.opacity(GlassTint.container)
-                       : theme.surfaceContainer.opacity(SettingsTint.row),
-                   interactive: true)
-        .animation(PixlMotion.state, value: isSelected)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .setupGlassCard(cornerRadius: 26,
+                        tint: isSelected ? theme.primaryContainer.opacity(GlassTint.container)
+                            : theme.surfaceContainer.opacity(SettingsTint.row),
+                        interactive: true)
+        .overlay {
+            if isSelected {
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .strokeBorder(theme.primary, lineWidth: 2.5)
+                    .matchedGeometryEffect(id: "ring", in: ring)
+                    .allowsHitTesting(false)
+            }
+        }
+        .animation(PixlMotion.selection, value: isSelected)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(traits(isSelected))
+        .accessibilityIdentifier("setup.theme.\(option.mode.rawValue)")
     }
 }
 
-/// Android `LibraryLayoutPage`: title and subtitle, the library-header preview (standard tab row or the compact
-/// pill), the "Compact Mode" card with its switch, and the footer.
+/// A tiny phone screen in the mode's colours: two text lines and a mini player bar. "Match my phone" is split in two.
+private struct SetupThemeSwatch: View {
+    let mode: AppThemeMode
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        Group {
+            switch mode {
+            case .dark:
+                scene(dark: true)
+            case .light:
+                scene(dark: false)
+            default:
+                scene(dark: false)
+                    .overlay {
+                        scene(dark: true)
+                            .mask { HStack(spacing: 0) { Color.clear; Color.black } }
+                    }
+            }
+        }
+        .frame(width: 56, height: 72)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(theme.onSurface.opacity(0.2), lineWidth: 1)
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func scene(dark: Bool) -> some View {
+        let ink = dark ? Color.white : Color.black
+        return ZStack(alignment: .topLeading) {
+            Color(argb: dark ? 0xFF14121A : 0xFFFBF8FF)
+            VStack(alignment: .leading, spacing: 5) {
+                Capsule().fill(ink.opacity(0.7)).frame(width: 28, height: 5)
+                Capsule().fill(ink.opacity(0.25)).frame(width: 40, height: 4)
+                Capsule().fill(ink.opacity(0.25)).frame(width: 34, height: 4)
+            }
+            .padding(.leading, 8)
+            .padding(.top, 10)
+            Capsule()
+                .fill(theme.primary)
+                .frame(height: 12)
+                .padding(.horizontal, 6)
+                .frame(maxHeight: .infinity, alignment: .bottom)
+                .padding(.bottom, 6)
+        }
+    }
+}
+
+// MARK: - Library layout
+
+/// Choose the library header: a live preview that switches between the tab row and the compact pill, and a glass
+/// two-way picker whose highlight slides.
 struct SetupLibraryLayoutPage: View {
     let isCompact: Bool
     let onChange: (Bool) -> Void
     @Environment(\.appTheme) private var theme
+    @Namespace private var pick
 
     var body: some View {
-        VStack(spacing: 0) {
-            SetupPageHeader(title: L10n.setupLibraryLayoutTitle, subtitle: L10n.setupLibraryLayoutSubtitle)
-            SetupLibraryHeaderPreview(isCompact: isCompact)
-                .frame(maxHeight: .infinity)
-            VStack(spacing: 0) {
-                Button { onChange(!isCompact) } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text(L10n.setupCompactMode)
-                                .pixlFont(.titleMedium, weight: .bold)
-                                .foregroundStyle(theme.onSurface)
-                            Text(isCompact ? L10n.setupCompactModePillHint : L10n.setupCompactModeTabHint)
-                                .pixlFont(.bodyMedium)
-                                .foregroundStyle(theme.onSurfaceVariant)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        Toggle(L10n.setupCompactMode, isOn: Binding(get: { isCompact }, set: onChange))
-                            .labelsHidden()
-                            .tint(theme.primary)
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 16)
-                    .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .pixlGlass(in: RoundedRectangle(cornerRadius: 24, style: .continuous),
-                           tint: theme.surfaceContainer.opacity(SettingsTint.row), interactive: true)
-                Spacer().frame(height: 16)
-                Text(L10n.setupLibraryLayoutFooter)
-                    .pixlFont(.labelMedium)
-                    .foregroundStyle(theme.onSurfaceVariant.opacity(0.7))
+        SetupPageScroll { compact in
+            VStack(spacing: compact ? 14 : 20) {
+                SetupPageHeader(title: L10n.setupLibraryLayoutTitle, subtitle: L10n.setupLibraryLayoutSubtitle)
+                    .setupReveal(0)
+                SetupLibraryHeaderPreview(isCompact: isCompact, height: compact ? 140 : 180)
+                    .setupReveal(1)
+                    .accessibilityHidden(true)
+                picker
+                    .setupReveal(2)
+                Text(isCompact ? L10n.setupCompactModePillHint : L10n.setupCompactModeTabHint)
+                    .pixlFont(.bodyMedium)
+                    .foregroundStyle(theme.onSurfaceVariant)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 16)
-                Spacer().frame(height: 24)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .contentTransition(.opacity)
+                    .animation(PixlMotion.state, value: isCompact)
+                    .setupReveal(3)
+                SetupFootnote(text: L10n.setupLibraryLayoutFooter)
+                    .setupReveal(4)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 12)
+            .pixlHaptic(.selection, trigger: isCompact)
+        }
+    }
+
+    private var picker: some View {
+        HStack(spacing: 4) {
+            option(L10n.setupLayoutTabs, symbol: "rectangle.split.3x1.fill", compactValue: false)
+            option(L10n.setupLayoutPill, symbol: "capsule.fill", compactValue: true)
+        }
+        .padding(4)
+        .pixlGlass(in: Capsule(), tint: theme.surfaceContainer.opacity(SettingsTint.row))
+    }
+
+    private func option(_ title: String, symbol: String, compactValue: Bool) -> some View {
+        let isSelected = isCompact == compactValue
+        return Button { onChange(compactValue) } label: {
+            HStack(spacing: 8) {
+                Image(systemName: symbol).font(.system(size: 14, weight: .semibold))
+                Text(title).pixlFont(.labelLarge).lineLimit(1)
+            }
+            .foregroundStyle(isSelected ? theme.onPrimary : theme.onSurface)
+            .frame(maxWidth: .infinity, minHeight: 46)
+            .contentShape(Capsule())
+            .background {
+                if isSelected {
+                    Capsule().fill(theme.primary).matchedGeometryEffect(id: "selection", in: pick)
+                }
             }
         }
-        .padding(24)
+        .buttonStyle(.plain)
+        .animation(PixlMotion.selection, value: isSelected)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier(compactValue ? "setup.layout.pill" : "setup.layout.tabs")
     }
 }
 
-/// Android `LibraryHeaderPreview`: a card with 24 pt top corners, 180 pt tall, a `primaryContainer` gradient
-/// (50 % → 25 % → clear), showing either the "Library" title over three tab chips or the compact pill.
+/// The library header as a glass card: either the "Library" title over three tab chips, or the compact pill.
 private struct SetupLibraryHeaderPreview: View {
     let isCompact: Bool
+    let height: CGFloat
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        let shape = UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0,
-                                           topTrailingRadius: 24, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 28, style: .continuous)
         ZStack(alignment: .topLeading) {
-            LinearGradient(colors: [theme.primaryContainer.opacity(0.5), theme.primaryContainer.opacity(0.25), .clear],
+            LinearGradient(colors: [theme.primaryContainer.opacity(0.5), theme.primaryContainer.opacity(0.2), .clear],
                            startPoint: .top, endPoint: .bottom)
             if isCompact {
                 compactPill
@@ -279,17 +549,19 @@ private struct SetupLibraryHeaderPreview: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 180)
+        .frame(height: height, alignment: .topLeading)
         .clipShape(shape)
         .glassEffect(Glass.regular.tint(theme.surface.opacity(GlassTint.surface)), in: shape)
         .animation(PixlMotion.state, value: isCompact)
     }
 
     private var standard: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 16) {
             Text(L10n.settingsDefaultTabLibrary)
-                .pixlFont(.custom(size: 40, weight: .heavy, tracking: 1))
+                .pixlFont(.custom(size: 38, weight: .heavy, tracking: 1))
                 .foregroundStyle(theme.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
             HStack(spacing: 6) {
                 tab(L10n.setupTabSongs, selected: true)
                 tab(L10n.setupTabAlbums, selected: false)
@@ -303,8 +575,9 @@ private struct SetupLibraryHeaderPreview: View {
             Text(title)
                 .pixlFont(.custom(size: 13, weight: selected ? .bold : .medium))
                 .foregroundStyle(selected ? theme.primary : theme.onSurfaceVariant)
+                .lineLimit(1)
                 .padding(.vertical, 10)
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 12)
                 .background(theme.surfaceContainerLowest, in: Capsule())
             Capsule()
                 .fill(selected ? theme.primary : .clear)
@@ -312,8 +585,7 @@ private struct SetupLibraryHeaderPreview: View {
         }
     }
 
-    /// Android `LibraryNavigationPillSetupShow`: the title half (26 pt left corners, 4 pt right) and the arrow half
-    /// (4 pt left corners, 26 pt right), both `primaryContainer`, 4 pt apart.
+    /// The compact pill: the title half (rounded left, tight right) and the arrow half, 4 pt apart.
     private var compactPill: some View {
         HStack(spacing: 4) {
             HStack(spacing: 12) {
@@ -343,89 +615,90 @@ private struct SetupLibraryHeaderPreview: View {
     }
 }
 
-/// Android `SpotifyLinkPage`: title and description, the collage, the "reach out" card, the bouncing arrow with
-/// "Tap the button below" (until signed in), the Spotify-green sign-in button and "Skip / Not now".
-struct SetupSpotifyPage: View {
-    let isLoggedIn: Bool
-    let onSignIn: () -> Void
-    let onSkip: () -> Void
+// MARK: - Finish
+
+/// The last page: a ring that draws itself around a check, and a recap of what was picked.
+struct SetupFinishPage: View {
+    let isSpotifyLinked: Bool
+    let themeTitle: String
+    let layoutTitle: String
     @Environment(\.appTheme) private var theme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.colorSchemeContrast) private var contrast
-    @Environment(\.colorScheme) private var colorScheme
-    @State private var arrowDown = false
-
-    /// Android `SpotifyBrandGreen`.
-    static let spotifyGreen = Color(argb: 0xFF1DB954)
-    /// The hint's green under Increase Contrast in light mode: Spotify green is about 2.5:1 on the light background.
-    static let spotifyGreenHighContrast = Color(argb: 0xFF117A3D)
-
-    private var hintGreen: Color {
-        contrast == .increased && colorScheme == .light ? Self.spotifyGreenHighContrast : Self.spotifyGreen
-    }
 
     var body: some View {
-        VStack(spacing: 0) {
-            SetupPageHeader(title: L10n.setupSpotifyTitle, subtitle: L10n.setupSpotifyDescription)
-            SetupIconCollage(icons: ["music.note", "heart.fill", "music.note.list", "music.note.house", "opticaldisc"])
-                .frame(maxHeight: 200)
-                .frame(maxHeight: .infinity)
-            VStack(spacing: 0) {
-                Text(L10n.setupSpotifyReachOut)
-                    .pixlFont(.bodyMedium)
-                    .foregroundStyle(theme.onSecondaryContainer)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 14)
-                    .frame(maxWidth: .infinity)
-                    .pixlGlass(in: RoundedRectangle(cornerRadius: 20, style: .continuous),
-                               tint: theme.secondaryContainer.opacity(GlassTint.container))
-                Spacer().frame(height: 14)
-                if !isLoggedIn {
-                    Text(L10n.setupSpotifyArrowHint)
-                        .pixlFont(.labelLarge)
-                        .foregroundStyle(hintGreen)
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(Self.spotifyGreen)
-                        .frame(width: 42, height: 42)
-                        .offset(y: arrowDown ? 14 : 0)
-                        .animation(reduceMotion ? nil : .easeInOut(duration: 0.75).repeatForever(autoreverses: true),
-                                   value: arrowDown)
-                        .onAppear { arrowDown = true }
-                        .accessibilityLabel(L10n.setupSpotifyCdArrow)
+        SetupPageScroll { compact in
+            VStack(spacing: compact ? 14 : 22) {
+                SetupSuccessMark(size: compact ? 112 : 148)
+                    .setupReveal(0)
+                SetupPageHeader(title: L10n.setupAllSetTitle, subtitle: L10n.setupAllSetBody)
+                    .setupReveal(1)
+                VStack(spacing: 0) {
+                    row(L10n.setupRecapSpotify, isSpotifyLinked ? L10n.setupRecapConnected : L10n.setupRecapNotYet)
+                    divider
+                    row(L10n.setupRecapLook, themeTitle)
+                    divider
+                    row(L10n.setupRecapLibrary, layoutTitle)
                 }
-                Spacer().frame(height: 4)
-                SetupFilledButton(title: isLoggedIn ? L10n.setupSpotifyConnected : L10n.setupSpotifyButton,
-                                  systemImage: isLoggedIn ? "checkmark" : "music.note", isEnabled: !isLoggedIn,
-                                  tint: Self.spotifyGreen, foreground: .black, action: onSignIn)
-                    .accessibilityIdentifier("setup.spotify")
-                SetupTextButton(title: L10n.setupSkipForNow, action: onSkip)
-                Spacer().frame(height: 8)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 6)
+                .setupGlassCard()
+                .setupReveal(2)
+                .setupScrollFade()
             }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 12)
         }
-        .padding(24)
+    }
+
+    private var divider: some View {
+        Rectangle().fill(theme.onSurface.opacity(0.1)).frame(height: 1)
+    }
+
+    private func row(_ label: String, _ value: String) -> some View {
+        HStack(spacing: 12) {
+            Text(label)
+                .pixlFont(.bodyLarge)
+                .foregroundStyle(theme.onSurfaceVariant)
+            Spacer(minLength: 8)
+            Text(value)
+                .pixlFont(.bodyLarge, weight: .semibold)
+                .foregroundStyle(theme.onSurface)
+                .multilineTextAlignment(.trailing)
+        }
+        .padding(.vertical, 14)
+        .accessibilityElement(children: .combine)
     }
 }
 
-/// Android `FinishPage`: "All Set!" (`headlineLarge`), the 230 pt collage and the closing line, centred.
-struct SetupFinishPage: View {
+/// A glass disc with a ring that draws around a check, which hops once when the ring closes.
+private struct SetupSuccessMark: View {
+    let size: CGFloat
     @Environment(\.appTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var drawn = false
 
     var body: some View {
-        VStack(spacing: 16) {
-            Text(L10n.setupAllSetTitle)
-                .pixlFont(.headlineLarge)
-                .foregroundStyle(theme.onSurface)
-            SetupIconCollage(icons: ["checkmark.circle", "heart.fill", "party.popper", "heart.fill", "sparkles"])
-                .frame(height: 230)
-            Text(L10n.setupAllSetBody)
-                .pixlFont(.bodyLarge)
-                .foregroundStyle(theme.onSurface)
-                .multilineTextAlignment(.center)
+        ZStack {
+            Circle().stroke(theme.primary.opacity(0.18), lineWidth: 8)
+            Circle()
+                .trim(from: 0, to: drawn ? 1 : 0)
+                .stroke(theme.primary, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            Image(systemName: "checkmark")
+                .font(.system(size: size * 0.36, weight: .bold))
+                .foregroundStyle(theme.primary)
+                .symbolEffect(.bounce, options: .nonRepeating, value: drawn)
         }
-        .frame(maxHeight: .infinity)
-        .padding(16)
+        .padding(18)
+        .frame(width: size, height: size)
+        .pixlGlass(in: Circle(), tint: theme.primaryContainer.opacity(GlassTint.container))
+        .accessibilityHidden(true)
+        .task {
+            if reduceMotion || LaunchConfiguration.current.isUITest {
+                drawn = true
+            } else {
+                try? await Task.sleep(for: .milliseconds(250))
+                withAnimation(.easeInOut(duration: 0.9)) { drawn = true }
+            }
+        }
     }
 }

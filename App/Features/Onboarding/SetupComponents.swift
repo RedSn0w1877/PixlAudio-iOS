@@ -1,42 +1,115 @@
 import SwiftUI
 
-/// Android `PermissionPageLayout`: 24 pt padding, the title (32 pt, `displayMedium` weight) and the description
-/// (`bodyLarge`, `onSurfaceVariant`) centred at the top, the icon collage filling the middle, then the page's extra
-/// content and the filled primary button (32 × 16 padding, `titleMedium`; a check and "Permission Granted" once granted).
-struct SetupPermissionPage<Content: View>: View {
-    let title: String
-    var granted = false
-    let description: String
-    let buttonText: String
-    let icons: [String]
-    var buttonEnabled = true
-    let onGrant: () -> Void
-    @ViewBuilder var content: () -> Content
+// The setup's building blocks: the scrolling page frame, the staggered reveal, the glass hero tile, the title block,
+// the glass card, the buttons and the segmented progress. Every page is built from these so they all move alike.
+
+/// A page's frame: scrolls when the content is taller than the screen (small phones, big Dynamic Type), otherwise the
+/// content is centred. `content` receives `true` on short screens so a page can shrink its artwork.
+struct SetupPageScroll<Content: View>: View {
+    @ViewBuilder var content: (_ isCompact: Bool) -> Content
 
     var body: some View {
-        VStack(spacing: 0) {
-            SetupPageHeader(title: title, subtitle: description, topSpacing: 16)
-            SetupIconCollage(icons: icons)
-                .frame(maxHeight: 220)
-                .frame(maxHeight: .infinity)
-            VStack(spacing: 0) {
-                content()
-                Spacer().frame(height: 16)
-                SetupFilledButton(title: buttonText, systemImage: granted ? "checkmark" : nil,
-                                  isEnabled: buttonEnabled, action: onGrant)
-                Spacer().frame(height: 16)
+        GeometryReader { proxy in
+            ScrollView {
+                content(proxy.size.height < 560)
+                    .frame(maxWidth: 560)
+                    .frame(maxWidth: .infinity, minHeight: proxy.size.height)
             }
-            .frame(maxWidth: .infinity)
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollIndicators(.hidden)
         }
-        .padding(24)
     }
 }
 
-extension SetupPermissionPage where Content == EmptyView {
-    init(title: String, granted: Bool = false, description: String, buttonText: String, icons: [String],
-         buttonEnabled: Bool = true, onGrant: @escaping () -> Void) {
-        self.init(title: title, granted: granted, description: description, buttonText: buttonText, icons: icons,
-                  buttonEnabled: buttonEnabled, onGrant: onGrant, content: { EmptyView() })
+// MARK: Motion
+
+private struct SetupReveal: ViewModifier {
+    let index: Int
+    @State private var shown = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(shown ? 1 : 0)
+            .offset(y: shown || reduceMotion ? 0 : 18)
+            .scaleEffect(shown || reduceMotion ? 1 : 0.97)
+            .onAppear {
+                guard !shown else { return }
+                if reduceMotion {
+                    shown = true
+                } else {
+                    withAnimation(.spring(response: 0.55, dampingFraction: 0.82).delay(0.08 + 0.07 * Double(index))) {
+                        shown = true
+                    }
+                }
+            }
+    }
+}
+
+private struct SetupScrollFade: ViewModifier {
+    func body(content: Content) -> some View {
+        content.scrollTransition(.animated(.snappy)) { view, phase in
+            view
+                .opacity(phase.isIdentity ? 1 : 0.35)
+                .scaleEffect(phase.isIdentity ? 1 : 0.94)
+        }
+    }
+}
+
+extension View {
+    /// Fades and lifts the view in when its page appears, `index` places in a row (each one a beat after the last).
+    func setupReveal(_ index: Int) -> some View {
+        modifier(SetupReveal(index: index))
+    }
+
+    /// Cards that scroll under the page's edges shrink and fade a little.
+    func setupScrollFade() -> some View {
+        modifier(SetupScrollFade())
+    }
+
+    /// A rounded glass card: the scheme's container colour as a light tint on real Liquid Glass.
+    func setupGlassCard(cornerRadius: CGFloat = 24, tint: Color? = nil, interactive: Bool = false) -> some View {
+        modifier(SetupGlassCard(cornerRadius: cornerRadius, tint: tint, interactive: interactive))
+    }
+}
+
+private struct SetupGlassCard: ViewModifier {
+    let cornerRadius: CGFloat
+    let tint: Color?
+    let interactive: Bool
+    @Environment(\.appTheme) private var theme
+
+    func body(content: Content) -> some View {
+        content.pixlGlass(in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous),
+                          tint: tint ?? theme.surfaceContainer.opacity(SettingsTint.row), interactive: interactive)
+    }
+}
+
+// MARK: Header
+
+/// The big glass tile at the top of a page with one symbol in it. The symbol hops once as the page arrives.
+struct SetupHero: View {
+    let symbol: String
+    var size: CGFloat = 88
+    @Environment(\.appTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var hops = 0
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: size * 0.42, weight: .semibold))
+            .foregroundStyle(theme.onPrimaryContainer)
+            .contentTransition(.symbolEffect(.replace))
+            .symbolEffect(.bounce, options: .nonRepeating, value: hops)
+            .frame(width: size, height: size)
+            .pixlGlass(in: RoundedRectangle(cornerRadius: size * 0.32, style: .continuous),
+                       tint: theme.primaryContainer.opacity(GlassTint.container))
+            .accessibilityHidden(true)
+            .task {
+                guard !SetupMotion.isStill(reduceMotion: reduceMotion) else { return }
+                try? await Task.sleep(for: .milliseconds(380))
+                hops += 1
+            }
     }
 }
 
@@ -44,18 +117,16 @@ extension SetupPermissionPage where Content == EmptyView {
 struct SetupPageHeader: View {
     let title: String
     let subtitle: String
-    var topSpacing: CGFloat = 16
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        VStack(spacing: 0) {
-            Spacer().frame(height: topSpacing)
+        VStack(spacing: 10) {
             Text(title)
-                .pixlFont(.custom(size: 32, weight: .bold, lineHeight: 44))
+                .pixlFont(.custom(size: 34, weight: .bold, lineHeight: 40))
                 .foregroundStyle(theme.onSurface)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-            Spacer().frame(height: 16)
+                .accessibilityAddTraits(.isHeader)
             Text(subtitle)
                 .pixlFont(.bodyLarge)
                 .foregroundStyle(theme.onSurfaceVariant)
@@ -66,208 +137,129 @@ struct SetupPageHeader: View {
     }
 }
 
-/// Android's filled `Button` on the setup pages, as prominent glass in `primary` (disabled: untinted glass with
-/// Material's 38 % content).
-struct SetupFilledButton: View {
-    let title: String
-    var systemImage: String?
-    var isEnabled = true
-    var tint: Color?
-    var foreground: Color?
-    let action: () -> Void
+/// A small line under the content ("You can change this any time…").
+struct SetupFootnote: View {
+    let text: String
     @Environment(\.appTheme) private var theme
 
     var body: some View {
+        Text(text)
+            .pixlFont(.labelMedium)
+            .foregroundStyle(theme.onSurfaceVariant.opacity(0.8))
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 8)
+    }
+}
+
+// MARK: Buttons
+
+/// The setup's wide capsule button, in glass. `primary` is the app's accent, `plain` is untinted glass (skips and
+/// secondary choices), `spotify` is Spotify's green with black content.
+struct SetupFilledButton: View {
+    enum Kind: Equatable {
+        case primary, plain, spotify
+    }
+
+    let title: String
+    var systemImage: String?
+    var kind: Kind = .primary
+    var isEnabled = true
+    let action: () -> Void
+    @Environment(\.appTheme) private var theme
+
+    private var foreground: Color {
+        if !isEnabled { return theme.onSurface.opacity(0.38) }
+        switch kind {
+        case .primary: return theme.onPrimary
+        case .plain: return theme.onSurface
+        case .spotify: return .black
+        }
+    }
+
+    private var tint: Color? {
+        if !isEnabled { return nil }
+        switch kind {
+        case .primary: return theme.primary.opacity(GlassTint.prominent)
+        case .plain: return theme.surfaceContainerHigh.opacity(GlassTint.container)
+        case .spotify: return SetupSpotifyPage.spotifyGreen.opacity(GlassTint.prominent)
+        }
+    }
+
+    var body: some View {
         Button(action: action) {
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 if let systemImage {
-                    Image(systemName: systemImage).font(.system(size: 18, weight: .semibold))
+                    Image(systemName: systemImage)
+                        .font(.system(size: 18, weight: .semibold))
+                        .contentTransition(.symbolEffect(.replace))
                 }
                 Text(title)
                     .pixlFont(.titleMedium)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
             }
-            .foregroundStyle(isEnabled ? (foreground ?? theme.onPrimary) : theme.onSurface.opacity(0.38))
-            .padding(.horizontal, 32)
-            .padding(.vertical, 16)
+            .foregroundStyle(foreground)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, minHeight: 56)
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)
-        .pixlGlass(in: Capsule(), tint: isEnabled ? (tint ?? theme.primary).opacity(GlassTint.prominent) : nil,
-                   interactive: isEnabled)
+        .pixlGlass(in: Capsule(), tint: tint, interactive: isEnabled)
     }
 }
 
-/// Android `TextButton(…) { Text("Skip / Not now") }`: plain `labelLarge` text in `primary`.
-struct SetupTextButton: View {
-    let title: String
-    var isEnabled = true
+/// The round glass back button at the top left.
+struct SetupBackButton: View {
     let action: () -> Void
     @Environment(\.appTheme) private var theme
 
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .pixlFont(.labelLarge)
-                .foregroundStyle(isEnabled ? theme.primary : theme.onSurface.opacity(0.38))
-                .lineLimit(1)
-                .padding(.horizontal, 12)
-                .frame(minHeight: 40)
-                .contentShape(Rectangle())
+            Image(systemName: "chevron.left")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(theme.onSurface)
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
         }
-        .buttonStyle(PressScaleButtonStyle(pressedScale: 0.96))
-        .disabled(!isEnabled)
+        .buttonStyle(.plain)
+        .pixlGlass(in: Circle(), tint: theme.surfaceContainer.opacity(GlassTint.surface), interactive: true)
+        .accessibilityLabel(L10n.setupBack)
+        .accessibilityIdentifier("setup.back")
     }
 }
 
-/// Android `PermissionIconCollage`: five icons on tiles scattered over the box — a large rounded tile in the centre
-/// (−15°), circles at the top-left (15°) and bottom-right (5°), a rounded tile at the top-right (−20°) and a small one
-/// at the bottom-left (10°), tinted `secondary`, `onSurface` 80 %, `primary`, `onSurface` 50 % and `tertiary`, each with
-/// 16 pt padding. The tiles stay `surfaceContainerHigh` fills: it's an illustration whose tiles overlap, and
-/// overlapping glass melts into one blob and drops the rotations (CI shots); the star tile becomes a circle.
-struct SetupIconCollage: View {
-    let icons: [String]
-    @Environment(\.appTheme) private var theme
+// MARK: Progress
 
-    private struct Slot {
-        let scale: CGFloat
-        let alignment: Alignment
-        let rotation: Double
-        let isCircle: Bool
-        let offset: (CGFloat, CGFloat) -> CGSize
-    }
-
-    var body: some View {
-        GeometryReader { proxy in
-            let height = proxy.size.height
-            // Android: `min = minOf(200.dp, height)` with the collage's default 200 dp height.
-            let base = min(200, height)
-            let slots: [Slot] = [
-                Slot(scale: 0.8, alignment: .center, rotation: -15, isCircle: false) { _, _ in .zero },
-                Slot(scale: 0.4, alignment: .topLeading, rotation: 15, isCircle: true) { _, h in CGSize(width: 15, height: h * 0.05) },
-                Slot(scale: 0.4, alignment: .bottomTrailing, rotation: 5, isCircle: true) { _, h in CGSize(width: -15, height: -h * 0.05) },
-                Slot(scale: 0.5, alignment: .topTrailing, rotation: -20, isCircle: false) { _, h in CGSize(width: -30, height: h * 0.1) },
-                Slot(scale: 0.35, alignment: .bottomLeading, rotation: 10, isCircle: true) { _, h in CGSize(width: 30, height: -h * 0.1) },
-            ]
-            let colors: [Color] = [theme.secondary, theme.onSurface.opacity(0.8), theme.primary,
-                                   theme.onSurface.opacity(0.5), theme.tertiary]
-            ZStack {
-                ForEach(Array(icons.prefix(5).enumerated()), id: \.offset) { index, symbol in
-                    let slot = slots[index]
-                    let size = base * slot.scale
-                    tile(symbol, size: size, color: colors[index], isCircle: slot.isCircle)
-                        .rotationEffect(.degrees(slot.rotation))
-                        .offset(slot.offset(proxy.size.width, height))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: slot.alignment)
-                }
-            }
-        }
-        .accessibilityHidden(true)
-    }
-
-    @ViewBuilder
-    private func tile(_ symbol: String, size: CGFloat, color: Color, isCircle: Bool) -> some View {
-        let icon = Image(systemName: symbol)
-            .resizable()
-            .scaledToFit()
-            .fontWeight(.medium)
-            .foregroundStyle(color)
-            .padding(16)
-            .frame(width: size, height: size)
-        if isCircle {
-            icon.background(theme.surfaceContainerHigh, in: Circle())
-        } else {
-            icon.background(theme.surfaceContainerHigh, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        }
-    }
-}
-
-/// Android `SetupBottomBar`: a bar with 36 pt top corners and square bottom corners (`surfaceContainer`) — "Let's
-/// Go!" (`titleLarge` bold, `primary`) on the first page, "Step n of m" (`bodyLarge`) after, sliding vertically on
-/// change — and the 80 pt next / finish button (`primaryContainer`) that turns a full circle and changes shape on
-/// every page (circle → 26 pt rounded square → leaf). The bar and the button are glass.
-struct SetupBottomBar: View {
-    let page: Int
-    let pageCount: Int
-    var isNextEnabled = true
-    var isFinishEnabled = true
-    let onNext: () -> Void
-    let onFinish: () -> Void
-
+/// The segmented progress at the top: one capsule per step. Done steps are filled, the current one is longer and
+/// bright, the next ones are faint. It springs as the step changes.
+struct SetupProgress: View {
+    /// Zero-based index of the current step.
+    let current: Int
+    let count: Int
     @Environment(\.appTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var isLastPage: Bool { page == pageCount - 1 }
-
     var body: some View {
-        let enabled = isLastPage ? isFinishEnabled : isNextEnabled
-        HStack(spacing: 0) {
-            ZStack(alignment: .leading) {
-                if page == 0 {
-                    Text(L10n.setupLetsGo)
-                        .pixlFont(.titleLarge, weight: .bold)
-                        .foregroundStyle(theme.primary)
-                        .transition(stepTransition)
-                        .id("letsgo")
-                } else {
-                    Text(L10n.setupStepFormat(page, pageCount - 1))
-                        .pixlFont(.bodyLarge)
-                        .foregroundStyle(theme.onSurfaceVariant)
-                        .transition(stepTransition)
-                        .id("step\(page)")
-                }
+        HStack(spacing: 6) {
+            ForEach(0..<count, id: \.self) { index in
+                Capsule()
+                    .fill(fill(for: index))
+                    .frame(width: index == current ? 36 : 12, height: 6)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.leading, 16)
-            .clipped()
-
-            Button(action: isLastPage ? onFinish : onNext) {
-                Image(systemName: isLastPage ? (isFinishEnabled ? "checkmark" : "xmark") : "arrow.right")
-                    .font(.system(size: 26, weight: .semibold))
-                    .contentTransition(.symbolEffect(.replace))
-                    .foregroundStyle(enabled ? theme.onPrimaryContainer : theme.onSurface.opacity(0.58))
-                    .rotationEffect(.degrees(reduceMotion ? 0 : -Double(page) * 360))
-                    .frame(width: 80, height: 80)
-                    .contentShape(shape)
-            }
-            .buttonStyle(.plain)
-            .glassEffect(Glass.regular.tint((enabled ? theme.primaryContainer : theme.surfaceContainerHighest)
-                                                .opacity(GlassTint.prominent)).interactive(), in: shape)
-            .rotationEffect(.degrees(reduceMotion ? 0 : Double(page) * 360))
-            .animation(.spring(response: 0.9, dampingFraction: 0.82), value: page)
-            .accessibilityLabel(isLastPage ? L10n.commonFinish : L10n.commonNext)
-            .accessibilityIdentifier("setup.next")
         }
-        .padding(12)
-        .padding(.bottom, 14)
-        .frame(maxWidth: .infinity)
-        .background {
-            Color.clear
-                .glassEffect(Glass.regular.tint(theme.surfaceContainer.opacity(GlassTint.bar)),
-                             in: UnevenRoundedRectangle(topLeadingRadius: 36, bottomLeadingRadius: 0,
-                                                        bottomTrailingRadius: 0, topTrailingRadius: 36,
-                                                        style: .continuous))
-                .ignoresSafeArea(edges: .bottom)
-        }
-        .animation(PixlMotion.state, value: page)
+        .animation(reduceMotion ? nil : PixlMotion.selection, value: current)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(L10n.setupStepFormat(current + 1, count))
     }
 
-    /// Android's corner values per `page % 3` (dp, clamped to half the 80 pt button): 50 → circle, 26, 18/50 leaf.
-    private var shape: UnevenRoundedRectangle {
-        switch page % 3 {
-        case 0: UnevenRoundedRectangle(cornerRadii: .init(topLeading: 40, bottomLeading: 40, bottomTrailing: 40,
-                                                          topTrailing: 40), style: .continuous)
-        case 1: UnevenRoundedRectangle(cornerRadii: .init(topLeading: 26, bottomLeading: 26, bottomTrailing: 26,
-                                                          topTrailing: 26), style: .continuous)
-        default: UnevenRoundedRectangle(cornerRadii: .init(topLeading: 18, bottomLeading: 18, bottomTrailing: 40,
-                                                           topTrailing: 40), style: .continuous)
-        }
-    }
-
-    private var stepTransition: AnyTransition {
-        .asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
-                    removal: .move(edge: .top).combined(with: .opacity))
+    private func fill(for index: Int) -> Color {
+        if index == current { return theme.primary }
+        if index < current { return theme.primary.opacity(0.5) }
+        return theme.onSurface.opacity(0.16)
     }
 }
