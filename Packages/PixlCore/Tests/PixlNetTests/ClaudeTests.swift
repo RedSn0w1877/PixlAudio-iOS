@@ -99,19 +99,22 @@ private struct FixtureStreamer: ClaudeLineStreaming {
         #expect(system.count == 2)
         #expect(system[0]["cache_control"] == nil)
         #expect(system[1]["cache_control"]?["type"]?.stringValue == "ephemeral")
-        // Tools: the 11 client tools (strict, eager), then web search and fetch with max_uses 10.
+        // Tools: the client tools (strict, eager), then web search and fetch with max_uses 10.
         let tools = try #require(body["tools"]?.arrayValue)
-        #expect(tools.count == 13)
-        #expect(tools.prefix(11).map { $0["name"]?.stringValue ?? "" } == TaizoTool.allCases.map(\.rawValue))
-        for tool in tools.prefix(11) {
-            #expect(tool["strict"]?.boolValue == true)
+        let clientCount = TaizoTool.allCases.count
+        #expect(clientCount == 16)
+        #expect(tools.count == clientCount + 2)
+        #expect(tools.prefix(clientCount).map { $0["name"]?.stringValue ?? "" } == TaizoTool.allCases.map(\.rawValue))
+        for tool in tools.prefix(clientCount) {
+            // search_library opts out of strict (its 12 optional filters would break the API's budget of 24).
+            #expect((tool["strict"]?.boolValue == true) == (tool["name"]?.stringValue != "search_library"))
             #expect(tool["eager_input_streaming"]?.boolValue == true)
             #expect(tool["input_schema"]?["additionalProperties"]?.boolValue == false)
         }
-        #expect(tools[11]["type"]?.stringValue == "web_search_20260209")
-        #expect(tools[12]["type"]?.stringValue == "web_fetch_20260209")
-        #expect(tools[12]["max_uses"]?.int64Value == 10)
-        #expect(tools[11]["eager_input_streaming"] == nil)
+        #expect(tools[clientCount]["type"]?.stringValue == "web_search_20260209")
+        #expect(tools[clientCount + 1]["type"]?.stringValue == "web_fetch_20260209")
+        #expect(tools[clientCount + 1]["max_uses"]?.int64Value == 10)
+        #expect(tools[clientCount]["eager_input_streaming"] == nil)
     }
 
     @Test func nonStreamingDefaultsAndHeaders() throws {
@@ -131,9 +134,20 @@ private struct FixtureStreamer: ClaudeLineStreaming {
     }
 
     @Test func nonStreamedToolsHaveNoEagerFlag() {
-        let json = TaizoTool.searchLibrary.definition.json(streaming: false)
+        let json = TaizoTool.searchSpotifyCatalog.definition.json(streaming: false)
         #expect(json["eager_input_streaming"] == nil)
         #expect(json["strict"]?.boolValue == true)
+    }
+
+    @Test func strictToolsStayWithinTheApisOptionalParameterBudget() {
+        // The API refuses the whole request when the strict tools together have more than 24 optional parameters.
+        var optional = 0
+        for tool in TaizoTool.definitions where tool.strict {
+            let properties = tool.inputSchema["properties"]?.objectValue?.members.count ?? 0
+            let required = tool.inputSchema["required"]?.arrayValue?.count ?? 0
+            optional += properties - required
+        }
+        #expect(optional <= 24, "strict tools have \(optional) optional parameters; the API limit is 24")
     }
 
     @Test func invalidJsonResultIsBuiltWithTheWriter() throws {

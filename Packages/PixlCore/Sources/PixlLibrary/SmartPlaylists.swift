@@ -61,7 +61,8 @@ public enum PremiumSmartPlaylistEngine {
     public static func build(_ preset: SmartPlaylistPreset, songs: [Song], favorites: Set<String> = [],
                              history: [String: MusicRecommendationEngine.History] = [:],
                              signals: [String: MusicRecommendationEngine.Signal] = [:], nowMs: Int64 = currentTimeMillis(),
-                             seed: Int64? = nil, limit: Int = 30) -> SmartPlaylistResult {
+                             seed: Int64? = nil, limit: Int = 30,
+                             adjustments: TasteAdjustmentSet = .empty) -> SmartPlaylistResult {
         let clean = songs.filter { !$0.title.isKotlinBlank }.kotlinDistinct(by: MusicRecommendationEngine.recordingKey)
         if limit <= 0 || clean.isEmpty { return SmartPlaylistResult(preset: preset, songs: [], explanation: preset.explanation) }
         let favoriteKeys = Set(favorites.map(KotlinKey.init))
@@ -83,7 +84,8 @@ public enum PremiumSmartPlaylistEngine {
             selected = clean.kotlinSorted { cmp($1.duration, $0.duration) }
         case .artistRadio, .discover:
             let ranked = Muselle2.rankKeyed(songs: clean, favorites: favorites, signals: signals, history: history,
-                                       nowMs: nowMs, seed: seed ?? nowMs, signalSources: [:], historySources: [:])
+                                       nowMs: nowMs, seed: seed ?? nowMs, signalSources: [:], historySources: [:],
+                                       adjustments: adjustments)
             selected = MusicRecommendationEngine.selectKeyed(ranked, limit: limit,
                                                         explorationFraction: preset == .discover ? 0.5 : 0.2).map(\.pick.song)
         }

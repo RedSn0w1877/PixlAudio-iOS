@@ -74,6 +74,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case playlistFind, playlistFindEmpty, playlistBlocked, blockedArtists, blockedArtistsEmpty
     /// Listening history import (spec B2): the screen with a few demo imported plays.
     case listeningHistory
+    /// Ask Taizo's taste changes: a few demo changes / none.
+    case tasteChanges, tasteChangesEmpty
 
     // Stage 8: the player's sheets (presented over the expanded player) and the song editor
     case devices, artistPicker, editSong
@@ -210,6 +212,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .artistSettings: return .artistSettings
         case .blockedArtists, .blockedArtistsEmpty: return .blockedArtists
         case .listeningHistory: return .listeningHistory
+        case .tasteChanges, .tasteChangesEmpty: return .tasteChanges
         case .delimiterConfig: return .delimiterConfig
         case .wordDelimiterConfig: return .wordDelimiterConfig
         case .equalizer: return .equalizer
@@ -412,7 +415,7 @@ nonisolated enum UITestLaunchRouter {
 
     /// Settings screens open on top of Settings (and the account screens on top of Accounts), as when navigated.
     private static let underSettings: Set<String> = [
-        "paletteStyle", "experimental", "artistSettings", "blockedArtists", "listeningHistory", "delimiterConfig",
+        "paletteStyle", "experimental", "artistSettings", "blockedArtists", "listeningHistory", "tasteChanges", "delimiterConfig",
         "wordDelimiterConfig", "equalizer",
         "editTransition", "deviceCapabilities", "about", "openSourceLicenses", "easterEgg", "quickFill",
         "diagnostics", "accounts", "cloudProcessing", "cloudQueue",

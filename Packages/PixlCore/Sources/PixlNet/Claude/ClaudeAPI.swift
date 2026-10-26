@@ -63,11 +63,15 @@ public struct ClaudeToolDefinition: Sendable, Hashable {
     public var description: String
     /// A JSON Schema object (`additionalProperties: false` on every object, for `strict`).
     public var inputSchema: JSONValue
+    /// `strict` tools share one budget of 24 optional parameters per request (more is a 400 for the whole request), so a
+    /// tool with many optional filters opts out and the app validates its input itself.
+    public var strict: Bool
 
-    public init(name: String, description: String, inputSchema: JSONValue) {
+    public init(name: String, description: String, inputSchema: JSONValue, strict: Bool = true) {
         self.name = name
         self.description = description
         self.inputSchema = inputSchema
+        self.strict = strict
     }
 
     /// The `tools[]` entry. `streaming` adds `eager_input_streaming` (only valid, and only useful, on streamed requests).
@@ -76,7 +80,7 @@ public struct ClaudeToolDefinition: Sendable, Hashable {
         object.append("name", .string(name))
         object.append("description", .string(description))
         object.append("input_schema", inputSchema)
-        object.append("strict", .bool(true))
+        if strict { object.append("strict", .bool(true)) }
         if streaming { object.append("eager_input_streaming", .bool(true)) }
         return .object(object)
     }

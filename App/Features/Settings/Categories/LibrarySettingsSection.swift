@@ -85,13 +85,20 @@ struct LibrarySettingsSection: View {
                             subtitle: "Your Spotify or Google data download — years of listening",
                             systemImage: "square.and.arrow.down", showsChevron: true,
                             identifier: "settings.library.historyImport") { router.push(.listeningHistory) }
+            SettingsItemRow(title: "Ask Taizo's taste changes",
+                            subtitle: TasteChangeText.summary(count: env.tasteAdjustments.count),
+                            systemImage: "slider.horizontal.3", showsChevron: true,
+                            identifier: "settings.library.tasteChanges") { router.push(.tasteChanges) }
             ActionSettingRow(title: ListeningHistoryText.totals(plays: history.playCount, artists: history.artistCount),
                              subtitle: ListeningHistoryText.status(store: history),
                              systemImage: "clock.arrow.circlepath",
                              primaryLabel: "Clear imported history", onPrimary: { confirmsClear = true },
                              enabled: history.playCount > 0)
         }
-        .task { await history.ensureLoaded() }
+        .task {
+            await history.ensureLoaded()
+            await env.tasteAdjustments.ensureLoaded()
+        }
         .confirmationDialog("Clear imported history?", isPresented: $confirmsClear, titleVisibility: .visible) {
             Button("Clear imported history", role: .destructive) {
                 Task {

@@ -23,6 +23,7 @@ struct RouteDestination: View {
         case .artistSettings: ArtistSettingsView()
         case .blockedArtists: BlockedArtistsView()
         case .listeningHistory: ListeningHistoryView()
+        case .tasteChanges: TasteChangesView()
         case .delimiterConfig: DelimiterConfigView()
         case .wordDelimiterConfig: WordDelimiterConfigView()
         case .equalizer: EqualizerView()

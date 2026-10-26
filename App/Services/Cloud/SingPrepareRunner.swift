@@ -32,12 +32,15 @@ final class SingPrepareRunner {
         var isAppActive: () -> Bool
         /// Imported Spotify / YouTube Music listening (plays and signals join the app's own).
         var imported: () -> ImportedHistoryAggregate
+        /// Ask Taizo's taste changes: mutes and blocks leave songs out, boosts and reductions move the ranking.
+        var adjustments: () -> TasteAdjustmentSet
 
         init(songs: @escaping () -> [Song], playlists: @escaping () -> [Playlist],
              events: @escaping () -> [PlaybackEvent],
              signals: @escaping () -> [String: MusicRecommendationEngine.Signal],
              blocked: @escaping () -> BlockedArtistMatcher, isAppActive: @escaping () -> Bool,
-             imported: @escaping () -> ImportedHistoryAggregate = { .empty }) {
+             imported: @escaping () -> ImportedHistoryAggregate = { .empty },
+             adjustments: @escaping () -> TasteAdjustmentSet = { .empty }) {
             self.songs = songs
             self.playlists = playlists
             self.events = events
@@ -45,6 +48,7 @@ final class SingPrepareRunner {
             self.blocked = blocked
             self.isAppActive = isAppActive
             self.imported = imported
+            self.adjustments = adjustments
         }
     }
 
@@ -263,6 +267,7 @@ final class SingPrepareRunner {
         let now = cloud.nowMs
         let songs = sources.songs(), playlists = sources.playlists(), events = sources.events()
         let signals = sources.signals(), blocked = sources.blocked(), imported = sources.imported()
+        let adjustments = sources.adjustments()
         // Not candidates: songs that already have an instrumental (one look at the folder), songs with a job on their way,
         // and songs whose last auto job failed lately. They still count for the ranking's album and playlist terms.
         let haveInstrumental = await cloud.songIdsWithInstrumental(among: songs)
@@ -273,7 +278,7 @@ final class SingPrepareRunner {
             let merged = HomeStore.recommendationInputs(songs: songs, events: events, signals: signals, imported: imported)
             let inputs = SingPrepareInputs(songs: songs, engagements: merged.engagements, signals: merged.signals,
                                            recentEvents: events, playlists: playlists, excluded: excluded,
-                                           blocked: blocked, nowMs: now)
+                                           blocked: blocked, adjustments: adjustments, nowMs: now)
             return SingPrepareRanker.rank(inputs, limit: limit)
         }.value
         guard settings.autoPrepareEnabled else {

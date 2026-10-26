@@ -109,7 +109,8 @@ struct HomeView: View {
         .background(theme.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .task(id: HomeRefreshKey(libraryRevision: library.songsRevision, revision: home.history.revision,
-                                 importedRevision: env.importedHistory.revision)) {
+                                 importedRevision: env.importedHistory.revision,
+                                 adjustmentsRevision: env.tasteAdjustments.revision)) {
             await home.refresh(snapshot: library.snapshot, libraryRevision: library.songsRevision)
         }
         // Cloud Studio's stored jobs (read once, off the main actor): its work may have moved on while the app was closed,
@@ -178,6 +179,8 @@ private struct HomeRefreshKey: Equatable {
     var revision: Int
     /// Imported listening history (Spotify / YouTube Music) changed.
     var importedRevision = 0
+    /// Ask Taizo's taste changes were made or undone.
+    var adjustmentsRevision = 0
 }
 
 /// Home geometry from the Compose code.

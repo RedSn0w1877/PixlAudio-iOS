@@ -133,6 +133,8 @@ nonisolated enum AppRoute: Hashable, Sendable {
     case blockedArtists
     /// Listening history (spec B2): Settings › Library & storage › Import from a file, and Home's one-time card.
     case listeningHistory
+    /// Ask Taizo's taste changes (Settings › Library & storage › Listening history): the list, with Remove and Clear all.
+    case tasteChanges
     case delimiterConfig
     case wordDelimiterConfig
     case equalizer
@@ -179,6 +181,7 @@ nonisolated enum AppRoute: Hashable, Sendable {
         case .artistSettings: "artistSettings"
         case .blockedArtists: "blockedArtists"
         case .listeningHistory: "listeningHistory"
+        case .tasteChanges: "tasteChanges"
         case .delimiterConfig: "delimiterConfig"
         case .wordDelimiterConfig: "wordDelimiterConfig"
         case .equalizer: "equalizer"

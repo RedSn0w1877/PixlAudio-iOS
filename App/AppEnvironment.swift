@@ -33,6 +33,9 @@ final class AppEnvironment {
     /// Listening history imported from Spotify / YouTube Music (automatic and from data downloads), fed to the
     /// recommendations; its read API (`topArtists`, `topTracks`, `recentPlays`, `listeningSummary`) serves the assistant.
     let importedHistory: ImportedHistoryStore
+    /// Ask Taizo's taste changes (Settings › Library & storage): explicit boosts, reductions, mutes and blocks above the
+    /// learned signals. Taizo's tools change them; Settings lists and undoes them.
+    let tasteAdjustments: TasteAdjustmentStore
     /// The automatic Spotify / YouTube Music history sync (app start, after connecting, background refresh).
     let historySync: ListeningHistorySync
     /// Settings › AI › "Ready when you play": automatic lyric sync and instrumentals while the app is open.
@@ -149,6 +152,9 @@ final class AppEnvironment {
         let importedHistory = ImportedHistoryStore.make(launch: launch)
         self.importedHistory = importedHistory
         home.imported = importedHistory
+        let tasteAdjustments = TasteAdjustmentStore.make(launch: launch)
+        self.tasteAdjustments = tasteAdjustments
+        home.adjustments = tasteAdjustments
 
         // Stage 5: the dual-deck AVPlayer engine for real launches; UI tests keep the demo engine.
         var realPlayback: PlaybackServices?
@@ -283,7 +289,7 @@ final class AppEnvironment {
     /// and has Cloud Studio send them (never in UI tests). It follows its settings by itself; `start()` turns it on.
     private func wireAutoPrepare() {
         let library = self.library, home = self.home, taste = self.musicTaste, blocked = settings.blocked
-        let imported = self.importedHistory
+        let imported = self.importedHistory, adjustments = self.tasteAdjustments
         let runner = SingPrepareRunner(cloud: cloud, sources: SingPrepareRunner.Sources(
             songs: { library.songs },
             playlists: { library.playlists },
@@ -291,7 +297,8 @@ final class AppEnvironment {
             signals: { taste.learnedSignals },
             blocked: { blocked.matcher },
             isAppActive: { UIApplication.shared.applicationState == .active },
-            imported: { imported.aggregate }))
+            imported: { imported.aggregate },
+            adjustments: { adjustments.activeSet(nowMs: currentTimeMillis()) }))
         cloud.autoPrepare = runner
         // The phone's own automatic studio leaves an instrumental the cloud is getting ready to the cloud.
         automaticStudio.cloudPreparesInstrumental = { [weak runner] songId in runner?.owns(songId: songId) ?? false }
