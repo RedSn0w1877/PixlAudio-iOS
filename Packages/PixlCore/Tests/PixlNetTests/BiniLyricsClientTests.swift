@@ -58,7 +58,7 @@ struct BiniLyricsClientTests {
         let match = try #require(await client.find(song: Self.song(), isrc: "qz-aa1-25-00042"))
         #expect(match.candidate.isrc == Self.isrc && match.document == Self.ttml)
         let doc = try #require(match.lyrics.document)
-        #expect(doc.metadata.source == "BiniLyrics" && doc.lines.map(\.text) == ["Salt on the glass", "Harbor lights"])
+        #expect(doc.metadata.source == "Pixel Master Lyrics" && doc.lines.map(\.text) == ["Salt on the glass", "Harbor lights"])
         #expect(match.lyrics.synced?[1].words?.map(\.startsNewWord) == [true, false, true])
         #expect(http.requests.map(\.url) == ["https://lyrics-api.binimum.org/?isrc=QZAA12500042",
                                               "https://lrc.red/api/v1?isrc=QZAA12500042",
@@ -176,7 +176,7 @@ struct BiniLyricsClientTests {
                                        netease: NeteaseLyricsClient(http: nothing), lrclib: LrcLibClient(http: slowLrclib, sleep: { _ in }))
         let started = Date()
         let result = try #require(await race.find(song: Self.song(), isrc: Self.isrc, syncedOnly: false))
-        #expect(result.source == "BiniLyrics" && result.rawContent == Self.ttml)
+        #expect(result.source == "Pixel Master Lyrics" && result.rawContent == Self.ttml)
         // Word-synced BiniLyrics ends the race without waiting for the slow catalog.
         #expect(Date().timeIntervalSince(started) < 2.5)
 
@@ -196,7 +196,7 @@ struct BiniLyricsClientTests {
         #expect(await wordElsewhere.find(song: Self.song(), isrc: Self.isrc, syncedOnly: false)?.source == "NetEase YRC")
         let lineEverywhere = LyricsCatalogSearch(bini: BiniLyricsClient(http: lineBini), amll: AmllLyricsClient(http: nothing),
                                                  netease: NeteaseLyricsClient(http: nothing), lrclib: LrcLibClient(http: lrclib, sleep: { _ in }))
-        #expect(await lineEverywhere.find(song: Self.song(), isrc: Self.isrc, syncedOnly: false)?.source == "BiniLyrics")
+        #expect(await lineEverywhere.find(song: Self.song(), isrc: Self.isrc, syncedOnly: false)?.source == "Pixel Master Lyrics")
         // Without BiniLyrics the race is the old one.
         let withoutBini = LyricsCatalogSearch(amll: AmllLyricsClient(http: nothing), netease: NeteaseLyricsClient(http: nothing),
                                               lrclib: LrcLibClient(http: lrclib, sleep: { _ in }))

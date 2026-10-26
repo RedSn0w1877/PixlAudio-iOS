@@ -84,9 +84,9 @@ struct AISettingsSection: View {
     private var claudeCloudSwitch: some View {
         let ai = settings.ai
         let on = ai.claudeMonthlyCap > 0
-        return SwitchSettingRow(title: "Use Claude in the cloud",
-                                subtitle: on ? "When you're online, AI requests (with the library and listening details they need) go to Anthropic's Claude. Offline, this iPhone answers."
-                                    : "Off: every AI feature runs on this iPhone. Nothing goes to Anthropic.",
+        return SwitchSettingRow(title: "Use cloud AI",
+                                subtitle: on ? "When you're online, AI requests (with the library and listening details they need) go to a cloud AI service. Offline, this iPhone answers."
+                                    : "Off: every AI feature runs on this iPhone. Nothing leaves this iPhone.",
                                 isOn: Binding(get: { ai.claudeMonthlyCap > 0 },
                                               set: { ai.claudeMonthlyCap = $0 ? ClaudeBudget.defaultCapDollars : 0 }),
                                 systemImage: "cloud", iconColor: on ? theme.primary : theme.tertiary)
@@ -101,9 +101,9 @@ struct AISettingsSection: View {
         @Bindable var ai = settings.ai
         let cloud = ai.usesCloudAssistant
         SettingsAdvancedHeader()
-        SettingsSubsection(title: "Claude (built-in)") {
+        SettingsSubsection(title: "Cloud AI (built-in)") {
             AIParameterRow(label: "Monthly limit", value: $ai.claudeMonthlyCap, range: 0...ClaudeBudget.maxCapDollars, steps: 39,
-                           help: "This device's monthly spend cap for the built-in Claude key. Over it, AI runs on this iPhone until next month. $0 turns cloud AI off.") {
+                           help: "This device's monthly spend cap for the built-in cloud AI. Over it, AI runs on this iPhone until next month. $0 turns cloud AI off.") {
                 String(format: "$%.0f", $0)
             }
             Text(verbatim: "Spent this month: " + String(format: "$%.2f of $%.0f", claudeSpent, ai.claudeMonthlyCap) + " · "
@@ -123,7 +123,7 @@ struct AISettingsSection: View {
         SettingsSubsection(title: "Cloud assistants (optional)") {
             SwitchSettingRow(title: "Use a cloud assistant",
                              subtitle: cloud ? "AI requests go to \(provider.displayName) with your own key."
-                                 : "Off: AI uses Claude (built-in) when online, this iPhone when offline.",
+                                 : "Off: AI uses the built-in cloud AI when online, this iPhone when offline.",
                              isOn: Binding(get: { ai.usesCloudAssistant }, set: { ai.setUsesCloudAssistant($0) }),
                              systemImage: "cloud", iconColor: cloud ? theme.primary : theme.tertiary)
                 .accessibilityIdentifier("settings.ai.cloud")
@@ -258,7 +258,7 @@ struct AISettingsSection: View {
         @Bindable var ai = settings.ai
         SettingsSubsection(title: "Generation Parameters", addBottomSpace: cloud) {
             AIParameterRow(label: "Temperature", value: $ai.temperature, range: 0...2, steps: 20,
-                           help: "Controls randomness. Lower = more deterministic, higher = more creative. Used by this iPhone's AI and your own cloud assistant only (Claude sets its own).") {
+                           help: "Controls randomness. Lower = more deterministic, higher = more creative. Used by this iPhone's AI and your own cloud assistant only (the built-in cloud AI sets its own).") {
                 String(format: "%.2f", $0)
             }
             if cloud {

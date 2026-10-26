@@ -488,7 +488,7 @@ private struct FixtureStreamer: ClaudeLineStreaming {
         #expect(AIRouter.decide(AIRoutingInputs(isOnline: true, hasBuiltInKey: true, budgetExhausted: true)) == .onDevice(.budgetUsed))
         #expect(AIRouter.decide(AIRoutingInputs(isOnline: false, hasBuiltInKey: false, budgetExhausted: true,
                                                 ownProviderOverride: true)) == .ownProvider)
-        #expect(AIRouter.statusLine(.claude) == "Claude (cloud) — switches to this phone when offline")
+        #expect(AIRouter.statusLine(.claude) == "Cloud AI — switches to this phone when offline")
         #expect(AIRouter.note(.claude) == nil)
         #expect(AIRouter.note(.onDevice(.budgetUsed)) != nil)
     }

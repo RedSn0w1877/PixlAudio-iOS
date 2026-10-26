@@ -55,7 +55,7 @@ public enum AIRouter {
     /// Settings › AI features' status line.
     public static func statusLine(_ route: AIRoute) -> String {
         switch route {
-        case .claude: "Claude (cloud) — switches to this phone when offline"
+        case .claude: "Cloud AI — switches to this phone when offline"
         case .ownProvider: "Your own cloud assistant (developer mode)"
         case .onDevice(.offline): "This phone's AI — no internet right now"
         case .onDevice(.noBuiltInKey): "This phone's AI — cloud AI isn't set up in this build"

@@ -434,7 +434,7 @@ nonisolated enum HomeChangelog {
     static let versions: [HomeChangelogVersion] = [
         HomeChangelogVersion(version: "1.1.0-beta1", date: "2026-10-26", sections: [
             ("new stuff", [
-                "claude runs all the ai stuff now whenever youre online, and if youre offline your iphones own ai just takes over",
+                "the cloud ai runs all the ai stuff now whenever youre online, and if youre offline your iphones own ai just takes over",
                 "ask taizo is here ye, you can chat about music, play songs, build playlists, or say like play less of this artist and it actually tunes your recs",
                 "you can bring in your listening history from spotify and youtube music so your mixes know your taste from day one",
                 "sing: instrumentals get made in the cloud in like seconds with smooth fades between lines, and prepare songs ahead gets your favs ready early",
