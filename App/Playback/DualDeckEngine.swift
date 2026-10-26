@@ -138,7 +138,7 @@ final class DualDeckEngine: PlaybackEngine {
         emitPlaying()
         if hasEnded {
             hasEnded = false
-            if activeItem != nil { active.seek(to: 0) } else { loadCurrent(at: 0); return }
+            if activeItem != nil { active.seek(to: 0); emit(.seeked) } else { loadCurrent(at: 0); return }
         }
         guard activeItem != nil else {
             if loadTask == nil { loadCurrent(at: pendingStartSeconds) }
@@ -182,9 +182,12 @@ final class DualDeckEngine: PlaybackEngine {
         guard activeItem != nil else {
             pendingStartSeconds = seconds
             if loadTask == nil, queue.current != nil { loadCurrent(at: seconds) }
+            emit(.seeked)
             return
         }
         active.seek(to: seconds)
+        // The deck answers `currentPositionMs()` with the target at once; tell paused progress bars to re-read it.
+        emit(.seeked)
         onTimingChanged?()
         rescheduleCrossfadeCountdown()
     }

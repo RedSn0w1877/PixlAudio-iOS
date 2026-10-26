@@ -18,6 +18,9 @@ nonisolated enum PlaybackEngineEvent: Sendable, Equatable {
     case repeatModeChanged(RepeatMode)
     /// Shuffle changed outside `setShuffleEnabled` (lock screen, restore).
     case shuffleChanged(Bool)
+    /// The playback position jumped (a seek, a restart / "start over", the previous button inside a song). Position is
+    /// still never pushed; this only tells the UI to re-read it once, so a paused progress bar moves right away.
+    case seeked
 }
 
 /// Android `Player.REPEAT_MODE_*` values (stored under `repeat_mode`).

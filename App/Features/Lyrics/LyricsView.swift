@@ -125,7 +125,11 @@ struct LyricsView: View {
                     .opacity(controlsVisible ? 1 : 0)
                     .allowsHitTesting(false)
 
+                // The sideways skip swipe lives on the lyrics only. On the whole screen (as it was) it ran at the same
+                // time as the seek bar's drag and the buttons': dragging the thumb sideways past 100 pt also skipped to
+                // the next or previous song, and the bar was left on the old song's fraction.
                 lyricsContent(topChrome: topChrome, bottomChrome: bottomChrome)
+                    .simultaneousGesture(swipeGesture)
 
                 header(chrome: chrome, safeTop: safeTop)
 
@@ -164,7 +168,6 @@ struct LyricsView: View {
                 }
             }
             .ignoresSafeArea()
-            .simultaneousGesture(swipeGesture)
         }
         .background(Color.black.ignoresSafeArea())
         .alwaysDarkTheme(themeStore)
@@ -441,6 +444,8 @@ struct LyricsView: View {
     }
 
     private func stopDriver() {
+        // A seek-bar drag that was cut short must not leave the lyrics following a finger that is gone.
+        seekPreview.positionMs = nil
         driver.stop()
         ScreenAwake.set(false, for: .lyrics)
     }

@@ -67,6 +67,7 @@ final class DemoPlaybackEngine: PlaybackEngine {
     func seek(toMs positionMs: Int64) {
         accumulatedMs = max(0, positionMs)
         startedAt = isPlaying ? Date() : nil
+        continuation.yield(.seeked)
     }
 
     func setRepeatMode(_ mode: RepeatMode) { repeatMode = mode }
