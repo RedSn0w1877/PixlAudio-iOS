@@ -27,11 +27,15 @@ public enum AudioFormatPolicy: Sendable, Hashable {
     case android
     /// AAC only (141/140/139), then itag 18 — what AVPlayer can play progressively.
     case iOS
+    /// iOS, ahead of time: a stereo Opus stream better than the AAC pick, or nothing (`pickOpusUpgrade`). The app
+    /// downloads it whole and repackages it into MP4; it is never streamed.
+    case opusUpgrade
 
     public func pick(_ formats: [YouTubeAudioFormat], maxBitrateKbps: Int?) -> YouTubeAudioFormat? {
         switch self {
         case .android: return AudioFormatSelection.pickBestAudio(formats, maxBitrateKbps: maxBitrateKbps)
         case .iOS: return AudioFormatSelection.pickBestIOSAudio(formats, maxBitrateKbps: maxBitrateKbps)
+        case .opusUpgrade: return AudioFormatSelection.pickOpusUpgrade(formats, maxBitrateKbps: maxBitrateKbps)
         }
     }
 }

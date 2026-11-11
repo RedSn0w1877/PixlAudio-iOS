@@ -1007,3 +1007,10 @@ Launch, library, artwork, player and Spotify-matcher speed-ups (docs/performance
 | `Menu` with `Section` and `Button(_:systemImage:action:)` | 14 / 15 | /documentation/swiftui/menu | `TaizoChatsMenu` | Ask Taizo's header menu: New chat and the last five conversations. |
 | `Link(destination:label:)` | 14 | /documentation/swiftui/link | `TaizoSourceLink` | A cited page opens in the browser. |
 
+## Opus instead of AAC (2026-11-11, branch `audio-opus`)
+| API | Min OS | Doc | Used in | Notes |
+|---|---|---|---|---|
+| `kAudioFormatOpus` with `CMFormatDescriptionGetMediaSubType(_:)` | 11 / 4 | /documentation/coreaudiotypes/kaudioformatopus | `OpusPlaybackCheck` | The repackaged file's track must read as Opus. Opus is decoded "only in MP4 files" from iOS 17 (developer forums thread 759210), below our iOS 26 target. |
+| `AVURLAssetPreferPreciseDurationAndTimingKey` | 4 | /documentation/avfoundation/avurlassetpreferprecisedurationandtimingkey | `OpusPlaybackCheck` | Exact duration of the edited track (the check compares it with the valid samples within 2 ms). |
+| `AVAsset.load(.isPlayable)` | 15 | /documentation/avfoundation/avasset/isplayable | `OpusPlaybackCheck` | The file must be playable before it is renamed into place. |
+| `URLRequest.allowsExpensiveNetworkAccess` | 13 | /documentation/foundation/urlrequest/allowsexpensivenetworkaccess | `OpusDownloader` | With `allowsConstrainedNetworkAccess = false`: the whole-file download never runs on cellular, a hotspot or Low Data Mode, even when the network changes half way. |
