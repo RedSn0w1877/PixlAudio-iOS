@@ -27,7 +27,7 @@ settings:
     SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: NO
     # Release builds from a `v*` tag override this with the tag's version (ci/make-ipa.sh).
     MARKETING_VERSION: 1.1.0
-    CURRENT_PROJECT_VERSION: 2
+    CURRENT_PROJECT_VERSION: 3
     # The release tag (`v1.1.0-beta1`) on tag builds, empty otherwise (ci/make-ipa.sh). Info.plist's PixlReleaseTag:
     # how the app knows it is a beta, since CFBundleShortVersionString can't carry the suffix.
     PIXL_RELEASE_TAG: ""
