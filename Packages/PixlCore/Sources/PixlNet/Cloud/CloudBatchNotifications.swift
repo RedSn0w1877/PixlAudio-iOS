@@ -52,8 +52,9 @@ public enum CloudBatchNotifier {
         for batchId in order where previouslyIncomplete.contains(batchId) && !alreadyNotified.contains(batchId) {
             let members = groups[batchId] ?? []
             guard !members.isEmpty, members.allSatisfy({ $0.state.isFinished }) else { continue }
-            // Songs prepared ahead on their own are not news: nobody asked, so nothing interrupts them.
-            guard !members.allSatisfy({ $0.origin == .auto }) else { continue }
+            // Songs prepared ahead on their own are not news: nobody asked, so nothing interrupts them. Spatial audio's
+            // library jobs are quiet too (cloud audio spec 6.4: only the Active jobs row).
+            guard !members.allSatisfy({ $0.origin == .auto || $0.origin == .library }) else { continue }
             let counted = members.filter { $0.state != .cancelled }
             let imported = counted.filter { $0.state == .imported }
             let attention = counted.filter { $0.state == .failed || $0.state == .expired }.count

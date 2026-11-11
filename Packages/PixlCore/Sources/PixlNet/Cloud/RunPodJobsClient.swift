@@ -62,6 +62,9 @@ public struct CloudProgress: Sendable, Hashable {
         case "encode": "Encoding"
         case "upload": "Uploading results"
         case "guard": "Starting"
+        // Spatial audio (cloud audio spec 4): `stems6:NN`, `render:NN`.
+        case "stems6": "Separating the instruments"
+        case "render": "Rendering Spatial audio"
         default: stage.capitalized
         }
     }

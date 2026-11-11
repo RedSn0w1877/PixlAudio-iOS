@@ -101,6 +101,9 @@ public enum CloudActiveJobMapper {
         let counted = members.filter { $0.state != .cancelled }
         guard !counted.isEmpty else { return nil }
         let id = "cloud.\(batchId)"
+        // Spatial audio's library jobs have batches of their own and rows of their own (cloud audio spec 6.4). The id
+        // stays a cloud one: Cancel, Retry and Dismiss go to Cloud Studio as for any batch.
+        let kind: ActiveJob.Kind = counted.allSatisfy(\.isLibraryJob) ? .spatial : .cloud
         let updated = members.map { $0.updatedAtMs ?? $0.importedAtMs ?? $0.completedAtMs ?? $0.createdAtMs }.max() ?? 0
         let pending = counted.filter { $0.state.isPending }
         let imported = counted.filter { $0.state == .imported }.count
@@ -110,27 +113,28 @@ public enum CloudActiveJobMapper {
             let working = pending.contains(where: isWorking)
             if counted.count == 1, let record = counted.first {
                 let fraction = transfer[record.jobKey]
-                return ActiveJob(id: id, kind: .cloud,
+                return ActiveJob(id: id, kind: kind,
                                  subtitle: "\(record.title) · \(status(record, transfer: fraction))",
                                  percent: singlePercent(record, transfer: fraction),
                                  state: working ? .running : .queued, destination: .cloudQueue, updatedAtMs: updated)
             }
             let total = counted.reduce(0.0) { $0 + weight($1, transfer: transfer[$1.jobKey]) } / Double(counted.count)
-            return ActiveJob(id: id, kind: .cloud, subtitle: batchSummary(counted),
+            return ActiveJob(id: id, kind: kind, subtitle: batchSummary(counted),
                              percent: ActiveJobBoard.percent(fraction: total),
                              state: working ? .running : .queued, destination: .cloudQueue, updatedAtMs: updated)
         }
 
         let attention = counted.filter { $0.state == .failed || $0.state == .expired }.count
         if attention == 0 {
-            let line = counted.count == 1 ? "\(counted[0].title) is ready" : "\(imported) songs processed"
-            return ActiveJob(id: id, kind: .cloud, subtitle: line, percent: 100, state: .done,
+            let done = kind == .spatial ? "songs ready" : "songs processed"
+            let line = counted.count == 1 ? "\(counted[0].title) is ready" : "\(imported) \(done)"
+            return ActiveJob(id: id, kind: kind, subtitle: line, percent: 100, state: .done,
                              destination: .cloudQueue, updatedAtMs: updated)
         }
         let line = counted.count == 1
             ? "\(counted[0].title) · \(status(counted[0], transfer: nil))"
             : "\(imported) of \(counted.count) ready · \(attention) \(attention == 1 ? "needs" : "need") you"
-        return ActiveJob(id: id, kind: .cloud, subtitle: line, state: .failed, destination: .cloudQueue,
+        return ActiveJob(id: id, kind: kind, subtitle: line, state: .failed, destination: .cloudQueue,
                          updatedAtMs: updated, canRetry: true)
     }
 

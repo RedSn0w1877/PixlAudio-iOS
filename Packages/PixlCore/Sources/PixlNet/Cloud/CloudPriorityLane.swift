@@ -36,18 +36,20 @@ public enum CloudPriorityLane {
             switch record.effectiveOrigin {
             case .sing: keys.insert(record.jobKey)
             case .manual: if batchSizes[record.batchId] == 1 { keys.insert(record.jobKey) }
-            case .auto: break
+            // Spatial audio's library jobs never go first: a Sing job keeps priority over them (cloud audio spec 6.2).
+            case .auto, .library: break
             }
         }
         return keys
     }
 
-    /// 0 for Sing, 1 for one song sent by hand, 2 for a manual batch, 3 for auto: the order jobs are prepared and
-    /// uploaded in.
+    /// 0 for Sing, 1 for one song sent by hand, 2 for a manual batch, 3 for auto and Spatial audio's library jobs (the
+    /// song that plays before the ones prepared ahead): the order jobs are prepared and uploaded in.
     public static func tier(of record: CloudJobRecord, priorityKeys: Set<String>) -> Int {
         switch record.effectiveOrigin {
         case .sing: return 0
         case .manual: return priorityKeys.contains(record.jobKey) ? 1 : 2
+        case .library: return record.isPreparedAhead ? 4 : 3
         case .auto: return 3
         }
     }
@@ -66,7 +68,8 @@ public enum CloudPriorityLane {
     /// URLSessionTask priority (0…1) of a job's upload: the priority job first, auto work last.
     public static func transferPriority(for record: CloudJobRecord, priorityKeys: Set<String>) -> Float {
         if priorityKeys.contains(record.jobKey) { return 1.0 }
-        return record.effectiveOrigin == .auto ? 0.3 : 0.5
+        if record.isPreparedAhead { return 0.3 }
+        return record.effectiveOrigin == .library ? 0.4 : 0.5
     }
 
     // MARK: Pausing
@@ -159,7 +162,8 @@ public enum CloudPriorityLane {
                 guard let priority = byKey[by], !priority.state.isFinished, !inThisPass.contains(by),
                       priority.state.isBeforeSubmit, nowMs - (record.pausedAtMs ?? 0) < maxHoldMs else { continue }
                 held.insert(key)
-            } else if record.effectiveOrigin == .auto, holdsAuto {
+            } else if record.effectiveOrigin == .auto || record.effectiveOrigin == .library, holdsAuto {
+                // Library jobs, like songs prepared ahead, must not slip ahead of a Sing job that is getting ready.
                 held.insert(key)
             }
         }

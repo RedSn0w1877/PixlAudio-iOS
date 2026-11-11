@@ -16,6 +16,13 @@ final class CloudDeviceConditions {
     private(set) var network = StreamPrefetchPolicy.Conditions.unknown
     /// Called on the main actor when the network path changes (Prepare songs ahead looks again when Wi-Fi comes back).
     var onNetworkChange: (() -> Void)?
+    /// More listeners for the same changes (Spatial audio's library: a render waiting for Wi-Fi starts when it is back).
+    private var networkObservers: [() -> Void] = []
+
+    /// Adds a listener for network path changes (called on the main actor, after `onNetworkChange`).
+    func addNetworkObserver(_ observer: @escaping () -> Void) {
+        networkObservers.append(observer)
+    }
 
     private var monitor: NWPathMonitor?
     /// Free space is a file system call: asked at most every 30 s.
@@ -45,6 +52,7 @@ final class CloudDeviceConditions {
         guard monitor != nil, conditions != network else { return }
         network = conditions
         onNetworkChange?()
+        for observer in networkObservers { observer() }
     }
 
     /// The phone's state now, for `CloudAutoConditions.blockedReason`.

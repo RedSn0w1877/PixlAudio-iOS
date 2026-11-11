@@ -35,8 +35,14 @@ public struct CloudAutoLedger: Codable, Sendable, Equatable {
 
     /// A job goes to RunPod: its estimate is spent until the real cost replaces it, and it counts for today.
     public mutating func reserve(_ estimateMicroUSD: Int64) {
+        reserve(estimateMicroUSD, countsForToday: true)
+    }
+
+    /// The same, counting for today only when asked (Spatial audio's ledger counts only the songs its background queue
+    /// sends against `cloudAudio.dailyAhead`; a render for the song that plays spends without counting).
+    public mutating func reserve(_ estimateMicroUSD: Int64, countsForToday: Bool) {
         spentMicroUSD = min(spentMicroUSD + max(estimateMicroUSD, 0), 1_000_000_000_000)
-        dayCount += 1
+        if countsForToday { dayCount += 1 }
     }
 
     /// The real cost replaces what was reserved.

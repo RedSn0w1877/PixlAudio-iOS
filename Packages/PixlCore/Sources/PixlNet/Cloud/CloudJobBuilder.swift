@@ -69,12 +69,23 @@ public enum CloudJobBuilder {
     /// The whole `/run` body for a prepared and uploaded job, or nil when its input isn't known or a URL can't be
     /// signed. `lyrics` is required when the job has the lyrics task. `lastInBatch` marks the last job of a submit
     /// burst (`CloudSubmitBurst`; `CloudJobRequest.markingLastInBatch` sets it on a body built earlier).
+    ///
+    /// A job with the `spatial` task (Spatial audio, cloud audio spec 4) also carries `input.library` (its renders'
+    /// canonical `lib/` keys, presigned), runs under the longer execution timeout (1 800 s), and — when it has no
+    /// audio output of its own — sends `output.put` with only its manifest and no codec.
     public static func request(for record: CloudJobRecord, build: String, lyrics: CloudLyricsRequest?,
                                lastInBatch: Bool = false, presign: CloudPresign) -> CloudJobRequest? {
         guard CloudKeys.isValidJobKey(record.jobKey), let ext = record.inputExt, let inputKey = record.inputKey,
               let sha = record.sha256, let bytes = record.bytes, let durationMs = record.durationMs else { return nil }
-        let seconds = CloudTiming.workerPresignSeconds
+        let executionTimeout = CloudTiming.executionTimeoutMs(for: record.tasks)
+        let seconds = CloudTiming.workerPresignSeconds(executionTimeoutMs: executionTimeout)
         let jobKey = record.jobKey
+        var library: CloudLibraryJobRequest?
+        if record.tasks.contains(.spatial) {
+            guard let info = record.library,
+                  let block = CloudLibraryJobBuilder.block(for: info, seconds: seconds, presign: presign) else { return nil }
+            library = block
+        }
         guard let get = presign(.get, inputKey, seconds), let delete = presign(.delete, inputKey, seconds) else { return nil }
         var put: [String: String] = [:]
         for slot in outputSlots(tasks: record.tasks) {
@@ -89,6 +100,12 @@ public enum CloudJobBuilder {
         let wantsLyrics = record.tasks.contains(.lyrics)
         if wantsLyrics && lyrics == nil { return nil }
         let quality = CloudSelector.quality(record.quality, durationMs: durationMs)
+        // Library renders go to their own keys: a job that only renders for the library sends no codec.
+        let libraryOnly = !record.tasks.isEmpty && record.tasks.allSatisfy { $0 == .spatial }
+        let output = libraryOnly
+            ? CloudOutputRequest(manifestOnly: put)
+            : CloudOutputRequest(codec: record.outputCodec,
+                                 kbps: record.outputCodec == .aac ? CloudLimits.outputKbps : nil, put: put)
         let input = CloudJobInput(
             jobKey: jobKey,
             client: CloudClientInfo(build: build),
@@ -99,11 +116,11 @@ public enum CloudJobBuilder {
             // Lyrics alone still separate first (the aligner listens to the isolated vocals).
             separation: CloudSeparation(quality: quality),
             lyrics: wantsLyrics ? lyrics : nil,
-            output: CloudOutputRequest(codec: record.outputCodec,
-                                       kbps: record.outputCodec == .aac ? CloudLimits.outputKbps : nil, put: put),
-            guard: CloudJobGuard(manifestGet: manifestGet, attemptGet: attemptGet, attemptPut: attemptPut))
+            output: output,
+            guard: CloudJobGuard(manifestGet: manifestGet, attemptGet: attemptGet, attemptPut: attemptPut),
+            library: library)
         return CloudJobRequest(input: input, policy: CloudJobPolicy(ttl: CloudTiming.ttlMs,
-                                                                    executionTimeout: CloudTiming.executionTimeoutMs))
+                                                                    executionTimeout: executionTimeout))
             .markingLastInBatch(lastInBatch)
     }
 

@@ -259,7 +259,8 @@ final class ActiveJobs {
             Task { try? await library.refresh() }
         case .spotifyMatch: sources.spotify.startMatching(retryFailed: false)
         case .spotifyImport: sources.spotify.syncNow()
-        case .songDownload, .cloud, .localModel: break
+        // Cloud Studio's jobs (Spatial audio's too) have their own relaunch handling.
+        case .songDownload, .cloud, .spatial, .localModel: break
         }
     }
 
@@ -490,7 +491,7 @@ final class ActiveJobs {
     private func interruptedRows(_ sources: Sources) -> [ActiveJob] {
         sources.health.interrupted.compactMap { entry -> ActiveJob? in
             guard let kind = ActiveJob.Kind(rawValue: entry.kind), kind != .songDownload, kind != .cloud,
-                  kind != .localModel else { return nil }
+                  kind != .spatial, kind != .localModel else { return nil }
             var what = kind.label
             switch kind {
             case .lyricsSync, .instrumental, .roformer:

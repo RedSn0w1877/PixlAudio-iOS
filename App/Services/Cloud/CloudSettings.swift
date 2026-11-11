@@ -49,10 +49,13 @@ final class CloudSettings {
         /// What it has spent this month and sent today (JSON). Kept apart from the job list on purpose, so removing
         /// finished jobs never makes room under the budget.
         static let autoLedger = "cloud_studio_auto_ledger"
+        /// Spatial audio's library jobs: what they spent this month and how many songs the background queue sent today
+        /// (JSON). Their own sum under their own cap (cloud audio spec 6.1 "Money"), never Sing's.
+        static let libraryLedger = "cloud_studio_library_ledger"
 
         static let all = [enabled, endpointId, r2Endpoint, bucket, instrumental, lyrics, transcribe, quality, cellular,
                           pricePerSecond, monthlyCap, keysSaved, workerCaps, useOwnKeys, removedSpend, notifyWhenDone,
-                          notifiedBatches, autoEnabled, autoBudget, autoDailyCap, autoLedger]
+                          notifiedBatches, autoEnabled, autoBudget, autoDailyCap, autoLedger, libraryLedger]
     }
 
     /// Where the built-in keys stand in this build.
@@ -154,6 +157,9 @@ final class CloudSettings {
     private var removedSpendTotalMicroUSD: Int64
     /// What auto-prepare spent this month and sent today (as last written; `CloudStudio` rolls it to the clock).
     private(set) var autoLedger: CloudAutoLedger
+    /// What Spatial audio's library jobs spent this month and how many the background queue sent today (as last
+    /// written; `CloudStudio` rolls it to the clock). Kept apart from the job list, like the auto ledger.
+    private(set) var libraryLedger: CloudAutoLedger
 
     /// `builtIn`: this build's built-in keys (nil: none, as in tests and the UI-test demo by default).
     init(defaults: UserDefaults, secrets: any CloudSecretStoring, builtIn: (any CloudBuiltInKeysProviding)? = nil) {
@@ -190,6 +196,8 @@ final class CloudSettings {
             ?? CloudAutoBudget.defaultDailyCap
         autoLedger = defaults.data(forKey: Keys.autoLedger).flatMap { try? JSONDecoder().decode(CloudAutoLedger.self, from: $0) }
             ?? CloudAutoLedger()
+        libraryLedger = defaults.data(forKey: Keys.libraryLedger)
+            .flatMap { try? JSONDecoder().decode(CloudAutoLedger.self, from: $0) } ?? CloudAutoLedger()
     }
 
     /// Reads the Keychain off the main actor (once; `force` after a restore or a test), and opens the built-in keys
@@ -301,6 +309,25 @@ final class CloudSettings {
         guard ledger != autoLedger else { return }
         autoLedger = ledger
         if let data = try? JSONEncoder().encode(ledger) { defaults.set(data, forKey: Keys.autoLedger) }
+    }
+
+    // MARK: Spatial audio's library jobs
+
+    /// The library ledger rolled to the month and day in force.
+    func rolledLibraryLedger(monthStartMs: Int64, dayStartMs: Int64) -> CloudAutoLedger {
+        var ledger = libraryLedger
+        ledger.roll(monthStartMs: monthStartMs, dayStartMs: dayStartMs)
+        return ledger
+    }
+
+    /// Changes the library ledger (after rolling it to the month and day in force) and writes it.
+    func updateLibraryLedger(monthStartMs: Int64, dayStartMs: Int64, _ change: (inout CloudAutoLedger) -> Void) {
+        var ledger = libraryLedger
+        ledger.roll(monthStartMs: monthStartMs, dayStartMs: dayStartMs)
+        change(&ledger)
+        guard ledger != libraryLedger else { return }
+        libraryLedger = ledger
+        if let data = try? JSONEncoder().encode(ledger) { defaults.set(data, forKey: Keys.libraryLedger) }
     }
 
     /// Saves edited secrets to the Keychain (off the main actor).
