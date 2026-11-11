@@ -219,7 +219,6 @@ enum WebMBuilder {
         var index = 0
         var samples = 0
         var blockNumber = 0
-        let totalBlocks = Int((Double(packets.count) / Double(layout.framesPerBlock)).rounded(.up))
         while index < packets.count {
             let clusterStartMs = Int64(samples / 48) + (layout.gapAtPacket.map { index >= $0 ? 40 : 0 } ?? 0)
             var body = element(r.idClusterTimestamp, uint(UInt64(clusterStartMs)))
@@ -232,7 +231,7 @@ enum WebMBuilder {
                 let relative = Int16(stampMs - clusterStartMs)
                 let (laceFlags, payload) = lace(frames, layout.lacing)
                 let rel = UInt16(bitPattern: relative)
-                let isLast = blockNumber == totalBlocks - 1
+                let isLast = index + frames.count == packets.count
                 let discard = isLast ? layout.discardPaddingNs : (layout.discardPaddingOnBlock == blockNumber ? 1_000_000 : nil)
                 if layout.blockGroups || discard != nil {
                     let block = [0x81, UInt8(rel >> 8), UInt8(rel & 0xFF), laceFlags] + payload
@@ -432,13 +431,16 @@ struct OpusRemuxTests {
         let (head, packets, _) = try fixturePackets()
         for lacing in [WebMBuilder.Lacing.xiph, .ebml] {
             for perBlock in [2, 3, 8] {
-                var layout = WebMBuilder.Layout(head: head)
-                layout.lacing = lacing
-                layout.framesPerBlock = perBlock
-                layout.packetsPerCluster = 24
-                layout.blockGroups = perBlock == 3
-                layout.discardPaddingNs = 13_500_000
-                try expectSameStream(WebMBuilder.make(packets: packets, layout), packets: packets)
+                for clusterSize in [24, 50] {
+                    var layout = WebMBuilder.Layout(head: head)
+                    layout.lacing = lacing
+                    layout.framesPerBlock = perBlock
+                    layout.packetsPerCluster = clusterSize   // 50 leaves short blocks at cluster ends
+                    layout.blockGroups = perBlock == 3 && clusterSize == 24
+                    layout.unknownSizes = clusterSize == 50
+                    layout.discardPaddingNs = 13_500_000
+                    try expectSameStream(WebMBuilder.make(packets: packets, layout), packets: packets)
+                }
             }
         }
     }
