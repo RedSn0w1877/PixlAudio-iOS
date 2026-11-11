@@ -186,7 +186,7 @@ def test_bench_without_the_six_stem_models_still_renders_from_the_mix(tmp_path):
     out = worker.handle({"id": "b", "input": {"v": 1, "op": "bench", "bench": {"seconds": 10,
                                                                              "stages": ["stems6", "render"]}}})
     assert out["status"] == "ok" and "stems6" not in out["stagesMs"] and "render" in out["stagesMs"]
-    assert any("six-stem models are not baked" in n for n in out["notes"])
+    assert any("six-stem separator's weights are not baked" in n for n in out["notes"])
     assert any(n.startswith("render: studio, mix") for n in out["notes"])
 
 
@@ -194,7 +194,8 @@ def test_bench_says_when_the_cascade_only_gave_four_stems(tmp_path, monkeypatch)
     monkeypatch.setattr(Six, "there", False)
     worker = make_worker(tmp_path, stems6=S.Stems6(Separator(), Four(), Six()))
     out = worker.handle({"id": "b", "input": {"v": 1, "op": "bench", "bench": {"seconds": 10, "stages": ["stems6"]}}})
-    assert out["stagesMs"]["stems6Stems"] == 4 and any("four stems" in n for n in out["notes"])
+    assert out["stagesMs"]["stems6Stems"] == 4
+    assert "stems6: open-cascade-6 gave 4 stems, not six" in out["notes"]
 
 
 def test_the_default_bench_covers_the_spatial_path(caps):

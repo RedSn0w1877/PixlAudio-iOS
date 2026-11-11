@@ -29,19 +29,16 @@ def test_keys_follow_the_layout_of_the_spec():
     assert L.render_slot("studio") == "sp-studio"
     assert L.audio_key(VIDEO, "sp-studio") == "lib/v1/J7p4bzqLvCw/sp-studio.flac"
     assert L.manifest_key(VIDEO, "sp-studio") == "lib/v1/J7p4bzqLvCw/sp-studio.json"
-    assert L.audio_key(VIDEO, L.ENHANCED) == "lib/v1/J7p4bzqLvCw/enhanced.flac"
-    assert L.manifest_key(VIDEO, L.ENHANCED) == "lib/v1/J7p4bzqLvCw/enhanced.json"
-    assert [L.slot_kind(L.render_slot(p)) for p in PROFILE_IDS] == [("spatial", p) for p in PROFILE_IDS]
-    assert L.slot_kind("enhanced") == ("enhanced", None)
-    for bad in ("sp-cinema", "studio", "sp-", "instrumental", ""):
+    assert [L.slot_profile(L.render_slot(p)) for p in PROFILE_IDS] == list(PROFILE_IDS)
+    for bad in ("sp-cinema", "studio", "sp-", "instrumental", "enhanced", ""):
         with pytest.raises(ValueError):
-            L.slot_kind(bad)
+            L.slot_profile(bad)
 
 
 def test_a_new_library_version_moves_every_key(monkeypatch):
     monkeypatch.setattr(L, "LIB_V", 2)
     assert L.audio_key(VIDEO, "sp-hall") == "lib/v2/J7p4bzqLvCw/sp-hall.flac"
-    assert L.manifest_key(VIDEO, "enhanced") == "lib/v2/J7p4bzqLvCw/enhanced.json"
+    assert L.manifest_key(VIDEO, "sp-hall") == "lib/v2/J7p4bzqLvCw/sp-hall.json"
     # ... and a render made for the older version is no longer "already there"
     assert not L.manifest_matches(load_example("library.render.spatial.json"), video_id=VIDEO, slot="sp-studio")
 
@@ -56,8 +53,7 @@ def spatial_manifest():
         audio=L.audio_block(audio["key"], audio["bytes"], audio["sha256"], audio["sampleRate"], audio["samples"]),
         loudness=L.loudness_block(loud["integratedLufs"], loud["sourceLufs"], HEADROOM_DB, loud["truePeakDb"],
                                   loud["limiterMaxDb"]),
-        source=example["source"], engine=L.ENGINE_ID, stems="open-cascade-6", stem_mode="stems6",
-        restore={"applied": False, "model": None, "reason": "full_band"}, worker=WORKER,
+        source=example["source"], engine=L.ENGINE_ID, stems="open-cascade-6", stem_mode="stems6", worker=WORKER,
         created_at=example["createdAt"])
 
 
@@ -68,26 +64,25 @@ def test_the_worker_builds_exactly_the_spatial_example():
     assert doc["loudness"]["headroomDb"] == HEADROOM_DB == 4.0  # from the renderer, not typed in again
     assert doc["audio"]["durationMs"] == 202000 and doc["audio"]["bits"] == 16 and doc["audio"]["codec"] == "flac"
     assert doc["worker"] == {"version": "1.1.0", "gitSha": "abcdef012345"}  # no GPU details in a shared file
+    assert set(doc["render"]) == {"engine", "stems", "stemMode"} and "cutoffHz" not in doc["source"]
 
 
-def test_the_worker_builds_exactly_the_nothing_to_restore_example():
-    example = load_example("library.render.enhanced.none.json")
-    doc = L.render_manifest(video_id=VIDEO, slot="enhanced", audio=None, loudness=None, source=example["source"],
-                            engine=None, stems=None, stem_mode=None,
-                            restore={"applied": False, "model": None, "reason": "full_band"}, worker=WORKER,
-                            created_at=example["createdAt"])
-    MANIFEST.validate(doc)
-    assert doc == example and doc["kind"] == "enhanced" and doc["profile"] is None
+@pytest.mark.parametrize("slot", ["enhanced", "instrumental", "sp-cinema"])
+def test_only_spatial_renders_have_manifests(slot):
+    example = load_example("library.render.spatial.json")
+    with pytest.raises(ValueError):
+        L.render_manifest(video_id=VIDEO, slot=slot, audio=example["audio"], loudness=example["loudness"],
+                          source=example["source"], stems="open-cascade-6", stem_mode="stems6", worker=WORKER)
 
 
 def test_created_at_is_utc_iso_8601():
     assert L.utc_now(0) == "1970-01-01T00:00:00Z"
     assert L.utc_now(1794337331) == "2026-11-10T19:02:11Z"
-    doc = L.render_manifest(video_id=VIDEO, slot="enhanced", audio=None, loudness=None,
-                            source=load_example("library.render.enhanced.none.json")["source"], engine=None,
-                            stems=None, stem_mode=None,
-                            restore={"applied": False, "model": None, "reason": "unavailable"}, worker=WORKER)
+    example = load_example("library.render.spatial.json")
+    doc = L.render_manifest(video_id=VIDEO, slot="sp-night", audio=example["audio"], loudness=example["loudness"],
+                            source=example["source"], stems="open-cascade-6", stem_mode="mix", worker=WORKER)
     MANIFEST.validate(doc)  # createdAt filled in from the clock
+    assert doc["render"] == {"engine": "pixl-spatial-1", "stems": "open-cascade-6", "stemMode": "mix"}
 
 
 def test_loudness_block_rounds_to_hundredths():
@@ -99,16 +94,10 @@ def test_loudness_block_rounds_to_hundredths():
 
 def test_manifest_matches_only_the_render_that_was_asked_for():
     spatial = load_example("library.render.spatial.json")
-    nothing = load_example("library.render.enhanced.none.json")
-    restored = load_example("library.render.enhanced.json")
     assert L.manifest_matches(spatial, video_id=VIDEO, slot="sp-studio")
-    assert L.manifest_matches(nothing, video_id=VIDEO, slot="enhanced")
-    assert L.manifest_matches(restored, video_id="ZD6rXLXZOEI", slot="enhanced")
     # another slot, another video
     assert not L.manifest_matches(spatial, video_id=VIDEO, slot="sp-wide")
-    assert not L.manifest_matches(spatial, video_id=VIDEO, slot="enhanced")
     assert not L.manifest_matches(spatial, video_id="ZD6rXLXZOEI", slot="sp-studio")
-    assert not L.manifest_matches(nothing, video_id=VIDEO, slot="sp-studio")
     # not a manifest at all
     for junk in (None, [], "x", 5, {}, {"schema": "pixl.library.render"}, load_example("job.result.spatial.json")):
         assert not L.manifest_matches(junk, video_id=VIDEO, slot="sp-studio")
@@ -127,7 +116,7 @@ def test_manifest_matches_only_the_render_that_was_asked_for():
     for path, value in [
         (["schema"], "pixl.cloudstudio.result"), (["v"], 2), (["v"], True), (["v"], "1"), (["v"], KeyError),
         (["libV"], 2), (["libV"], True), (["libV"], 1.5), (["libV"], KeyError), (["videoId"], VIDEO.lower()),
-        (["kind"], "enhanced"), (["profile"], "wide"), (["profile"], None),
+        (["kind"], "stereo"), (["kind"], KeyError), (["profile"], "wide"), (["profile"], None),
         # a spatial manifest a phone could not use must not stop the render from being made
         (["audio"], None), (["audio"], "x"), (["audio"], KeyError),
         (["audio", "key"], "lib/v1/J7p4bzqLvCw/sp-wide.flac"), (["audio", "key"], KeyError),
@@ -140,10 +129,9 @@ def test_manifest_matches_only_the_render_that_was_asked_for():
     for path, value in [(["worker"], {"version": "9.9.9"}), (["loudness"], None), (["render"], {}),
                         (["createdAt"], "later"), (["future"], [1])]:
         assert L.manifest_matches(changed(spatial, path, value), video_id=VIDEO, slot="sp-studio"), path
-    # enhanced: with or without audio; a broken audio block is not accepted either
-    assert not L.manifest_matches(changed(restored, ["audio", "key"], "lib/v1/ZD6rXLXZOEI/sp-studio.flac"),
-                                  video_id="ZD6rXLXZOEI", slot="enhanced")
-    assert not L.manifest_matches(changed(nothing, ["profile"], "studio"), video_id=VIDEO, slot="enhanced")
+    # a slot that is not a render's is never "already there"
+    with pytest.raises(ValueError):
+        L.manifest_matches(spatial, video_id=VIDEO, slot="enhanced")
 
 
 def test_existing_output_is_the_entry_a_phone_downloads_from():
@@ -153,7 +141,6 @@ def test_existing_output_is_the_entry_a_phone_downloads_from():
     assert entry == L.output_entry("lib/v1/J7p4bzqLvCw/sp-studio.flac", 27100200, spatial["audio"]["sha256"], 48000,
                                    9696000)
     assert entry["codec"] == "flac" and entry["kbps"] is None
-    assert L.existing_output(load_example("library.render.enhanced.none.json")) is None
 
 
 # ---- 16 bits with TPDF dither ------------------------------------------------------------------------------

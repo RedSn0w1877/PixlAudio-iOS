@@ -49,7 +49,7 @@
     },
     "library": {
       "type": "object",
-      "description": "Worker 1.1.0 and later: the shared library this worker writes. Its absence means the worker refuses the tasks spatial and enhance.",
+      "description": "Worker 1.1.0 and later: the shared library this worker writes. Its absence means the worker refuses the spatial task.",
       "properties": {
         "libV": {"type": "integer", "minimum": 1, "description": "The library version: send it as library.v, and read renders from lib/v<libV>/."},
         "engine": {"type": "string", "description": "The spatial renderer (pixl-spatial-1)."},

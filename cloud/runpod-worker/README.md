@@ -3,16 +3,15 @@
 The server half of PixlAudio's "Cloud processing": for each song it separates the vocals with **BS-RoFormer**
 (anvuew ft1) and returns the **instrumental**. It can also write **word-timed lyrics** with Qwen3-ForcedAligner, or
 transcribe songs that have no lyrics with Qwen3-ASR (labelled "AI-written lyrics"), but since 2026-10-23 neither
-app asks for that (BiniLyrics and the other lyrics sources cover lyrics): the aligner now loads only when a job
+app asks for that (the apps' online lyrics sources cover lyrics): the aligner now loads only when a job
 asks for lyrics, so cold starts don't pay for it. 4 stems (htdemucs_ft) are available but off in the app for now.
 It runs on Hoa's own RunPod account, up to **3 workers at once** (`deploy/endpoint.json`, since 2026-10-23: three
 songs process side by side), scales to zero and bills per second, so a batch costs the same per song, only sooner. The full design, with every decision and its reasons, is
 [`docs/handoff/2026-10-07-plans/cloud-studio-design.md`](../../docs/handoff/2026-10-07-plans/cloud-studio-design.md).
 
 Since worker 1.1.0 it also makes **Spatial audio** renders (a song for headphones, from six separated stems, in six
-profiles) and answers for **Enhanced audio** (is the song's top end cut off, and, once the restoration model is in
-the image, the restored song). Those results go into a **shared library** in the same bucket, keyed by the YouTube
-video, where every phone fetches them: see "Spatial audio and Enhanced audio" below. The contract for that work is
+profiles). They go into a **shared library** in the same bucket, keyed by the YouTube video, where every phone
+fetches them: see "Spatial audio (the shared library)" below. The contract for that work is
 [`docs/handoff/2026-11-10-plans/cloud-audio-spec.md`](../../docs/handoff/2026-11-10-plans/cloud-audio-spec.md).
 
 ## How one song travels
@@ -32,44 +31,42 @@ video, where every phone fetches them: see "Spatial audio and Enhanced audio" be
 The job and result formats are [`schema/v1/`](schema/v1/) (JSON Schema plus golden examples the app's tests
 decode). Errors always come back as a code (`BAD_URL`, `INPUT_MISSING`, `POISONED`, ...) in both places.
 
-## Spatial audio and Enhanced audio (the shared library)
+## Spatial audio (the shared library)
 
-Two more tasks, `spatial` and `enhance`, in the same job format (still `v: 1`; a 1.0.0 worker refuses them by
-name). They can ride along with `instrumental` and the other tasks in one job, or come alone. Their results are
-not the job's own: a finished render is stored once and every device uses it.
+One more task, `spatial`, in the same job format (still `v: 1`; a 1.0.0 worker refuses it by name). It can ride
+along with `instrumental` and the other tasks in one job, or come alone. Its results are not the job's own: a
+finished render is stored once and every device uses it.
 
 ```
 lib/v1/<videoId>/sp-<profile>.flac    a spatial render: FLAC 16-bit, the song's own sample rate and frame count
 lib/v1/<videoId>/sp-<profile>.json    its manifest, written LAST: while it is missing the render does not exist
-lib/v1/<videoId>/enhanced.flac        the restored stereo song (only when something was restored)
-lib/v1/<videoId>/enhanced.json        its manifest; also written alone when nothing was restored, so phones stop asking
 ```
 
 `<videoId>` is the matched YouTube video, `<profile>` one of `studio`, `wide`, `intimate`, `hall`, `surround`,
 `night`, and `v1` the library version (`LIB_V` in `src/pixl_worker/library.py`, the only place it lives).
 
-What a job with these tasks does, after the download and decode every job starts with:
+What a job with this task does, after the download and decode every job starts with:
 
 1. **The job's own outputs first**, if it asked for any (instrumental, lyrics, ...): made, uploaded and freed as
-   before. The vocals are kept for step 5, so a job that wants an instrumental and a render separates them once.
-2. **What is already there?** One GET per requested output (`manifestGet`). A manifest for this library version,
+   before. The vocals are kept for step 3, so a job that wants an instrumental and a render separates them once.
+2. **What is already there?** One GET per requested render (`manifestGet`). A manifest for this library version,
    video and profile means the render exists: it is skipped and reported as `exists`. When everything asked for
    exists, the job ends `ok` there, without touching the GPU. Any doubt (no `manifestGet`, a bucket that does
    not answer, a manifest for something else) means "make it".
-3. **Where does the song's spectrum end?** (`restore.detect_cutoff_hz`, a second of CPU.) A 128 kb/s AAC stream
-   stops at about 16 kHz, an Opus stream at 20 kHz. Above 17 kHz the song is `full_band` and left alone.
-4. **Enhanced.** The restoration model is not in the image yet (it is the next worker change), so today nothing
-   is restored: `enhanced.json` is written without audio and says why (`full_band`, `off` when the job said
-   `library.restore: off`, or `unavailable` for a band-limited song this worker cannot restore).
-5. **Six stems** (`separate.Stems6`, open models only): vocals from BS-RoFormer, then htdemucs_ft on the rest for
+3. **Six stems** (`separate.Stems6`, open models only): vocals from BS-RoFormer, then htdemucs_ft on the rest for
    drums, bass and other, then htdemucs_6s on that "other" for guitar and piano. Without the htdemucs_6s files
-   the render is made from four stems and says so (`stemMode: stems4`).
-6. **Render** every missing profile (`pixl_worker/spatial/`, NumPy on the CPU), then for each one: encode FLAC
-   16-bit (TPDF dither), upload the audio, upload its manifest.
-7. The job's own `manifest.json` last, as always, now with a `library` block: per output `ok` (made now), `exists`,
-   `failed`, and for enhanced also `not_needed`. Then the input is deleted.
+   the render is made from four stems and says so (`stemMode: stems4`). `Stems6` is the only place stems come
+   from: a different separator is a class with the same contract (its docstring), built in
+   `handler.load_models()` instead (the spatial roadmap, "Where your own separator plugs in").
+4. **Render** every missing profile (`pixl_worker.spatial.render_profiles`, NumPy on the CPU), then for each one:
+   encode FLAC 16-bit (TPDF dither), upload the audio, upload its manifest.
+5. The job's own `manifest.json` last, as always, now with a `library` block: per render `ok` (made now), `exists`
+   or `failed`. Then the input is deleted.
 
-A failure in one output leaves the others: the job is `partial`. A job that delivers nothing at all is an error
+Progress strings `stems6:NN` and `render:NN`, timings `stems6Ms` and `renderMs`, and `models.stems6` are new in
+the job's manifest (spec section 4).
+
+A failure in one render leaves the others: the job is `partial`. A job that delivers nothing at all is an error
 with the first failure's code, and its input stays for a retry. Every spatial render sits 4 dB under the song's
 loudness on purpose (`loudness.headroomDb` in its manifest; the apps give it back when their volume gain has the
 room).
@@ -114,7 +111,7 @@ deployed: its summary now has `stems6` and `render` (one profile) and the memory
 Storing the renders costs nothing while the bucket stays inside R2's free 10 GB, which the janitor sees to.
 
 The real ceiling is the **prepaid balance**: auto-pay stays off. The keepalive emails when a week costs more
-than `CLOUD_WEEKLY_ALARM_USD` ($2). A job that hangs is cut at 15 minutes (~$0.17), one with library tasks at 30
+than `CLOUD_WEEKLY_ALARM_USD` ($2). A job that hangs is cut at 15 minutes (~$0.17), one with the spatial task at 30
 (~$0.35); the guard stops a job that keeps crashing after 2 deliveries (~$0.35 at worst, twice that for a library
 job).
 
@@ -248,8 +245,8 @@ with HTTP 403 means expired or wrong signatures (the phone re-signs); `INPUT_MIS
 sent with AAC output (AAC tops out at 96 kHz; the phone resends it with `output.codec: flac`). A job whose only
 task is `lyrics` fails with the lyrics' own code when they fail (there is nothing else to deliver); with stems
 requested it is `partial` instead.
-A job with library tasks says per output what happened (`library.renders`, `library.enhanced`, and a warning such
-as `library: sp-wide failed (UPLOAD_FAILED)`): `partial` when some of it arrived, an error with the first
+A job with the spatial task says per render what happened (`library.renders`, and a warning such as
+`library: sp-wide failed (UPLOAD_FAILED)`): `partial` when some of it arrived, an error with the first
 failure's code when none did. `UNSUPPORTED_VERSION` with "library.v" means the app and the worker disagree about
 the library version (deploy the worker first, then ship the app). `BAD_URL` on a `library` URL means it does not
 point at that video's own object. A long song that ends in `DEADLINE` during `stems6` or `render` was most
@@ -289,9 +286,11 @@ python ci/lock.py               # regenerate requirements.lock / requirements-te
 - **Changing how a render sounds** (the renderer, a profile, the separation): raise `LIB_V` in
   `src/pixl_worker/library.py` and the `const` in `schema/v1/job.input.schema.json`, and the apps' own constant.
   Renders made before are then ignored and expire.
-- **The restoration model** (the next worker change): subclass `restore.Restorer` (its docstring is the
-  contract), hand it to `pipeline.Models` in `handler.load_models`, add its weights to `weights.lock` and the
-  Dockerfile. The pipeline, the manifests and the tests (with a fake model) are already there.
+- **A different six-stem separator**: a class with `Stems6`'s contract (`model_id`, `available()`,
+  `stems(...)`; the docstring of `separate.Stems6` says exactly what it must return), in its own file, built in
+  `handler.load_models()` instead of `Stems6`; its weights in `weights.lock` and the Dockerfile (`final` and
+  `smoke`), the smoke stage pointed at it, and `LIB_V` raised (see the line above). The pipeline checks what it
+  returns (names and shapes) and fails the renders with a clear message otherwise.
 - **Adding word timing for more languages** (Whisper later): implement `WordTimingBackend` in
   `src/pixl_worker/lyrics/` and register it after the Qwen aligner in `handler.load_models` (load it lazily, like
   `_LazyAligner`, so cold starts don't pay for it); `backend_for()` then routes the languages Qwen lacks to it.
@@ -303,7 +302,7 @@ python ci/lock.py               # regenerate requirements.lock / requirements-te
 | `PIXL_MAX_INPUT_MB` | 160 | biggest upload (a 15-minute song decoded to FLAC on the phone is ~90-130 MB) |
 | `PIXL_MAX_AUDIO_S` | 900 | longest song, checked on the probe and on the decoded samples |
 | `PIXL_BEST_MAX_AUDIO_S` | 480 | "Best" quality (overlap 4) only up to 8 minutes |
-| `PIXL_EXECUTION_TIMEOUT_S` | 1800 | the endpoint's `timeout`. A job with library tasks (`spatial`, `enhance`) ends itself 30 s before it, so a manifest is always written; every other job still ends itself at 870 s, because the apps send those with `executionTimeout` 900 000 and RunPod would cut them there |
+| `PIXL_EXECUTION_TIMEOUT_S` | 1800 | the endpoint's `timeout`. A job with the `spatial` task ends itself 30 s before it, so a manifest is always written; every other job still ends itself at 870 s, because the apps send those with `executionTimeout` 900 000 and RunPod would cut them there |
 | `PIXL_ALLOWED_HOST_SUFFIXES` | `<R2_ACCOUNT_ID>.r2.cloudflarestorage.com` | the only storage host; HTTPS, public IP, signed, no redirects |
 | `PIXL_MAX_LYRICS_LINES` / `_CHARS` | 500 / 20000 | lyrics payload |
 | `PIXL_MAX_BODY_KB` | 256 | job input size |
@@ -317,7 +316,7 @@ weights.lock         every model file: sha256, size, licence, pinned URL
 fetch_small.py       fetches and verifies the small model files (stdlib)
 models/demucs/       the htdemucs_ft and htdemucs_6s bag files (from demucs, MIT)
 src/pixl_worker/     handler, schema, storage, audio, separate, lyrics/, pipeline, selftest, smoke, log;
-                     library (the shared library: keys, manifests, FLAC), restore (cutoff, the model's seam),
+                     library (the shared library: keys, manifests, FLAC, the one call into the renderer),
                      spatial/ (the renderer and the on-device tables' generator; NumPy only)
 schema/v1/           the job contract with the app (+ examples/), the render manifest, spatial/ (the tables)
 tests/               pytest, CPU only

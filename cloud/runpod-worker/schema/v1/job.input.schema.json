@@ -23,8 +23,8 @@
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "items": {"enum": ["instrumental", "vocals", "stems4", "lyrics", "spatial", "enhance"]},
-      "description": "spatial and enhance (worker 1.1.0) write into the shared library and need the `library` object; they may be combined with the older tasks in one job and are independent of them. An older worker refuses them with BAD_SCHEMA."
+      "items": {"enum": ["instrumental", "vocals", "stems4", "lyrics", "spatial"]},
+      "description": "spatial (worker 1.1.0) writes into the shared library and needs the `library` object; it may be combined with the older tasks in one job and is independent of them. An older worker refuses it with BAD_SCHEMA."
     },
     "separation": {
       "type": "object",
@@ -33,7 +33,7 @@
       }
     },
     "lyrics": {"$ref": "#/$defs/lyrics"},
-    "library": {"description": "Required, and read, only when tasks has spatial or enhance: see #/$defs/library. Ignored otherwise, whatever it holds."},
+    "library": {"description": "Required, and read, only when tasks has spatial: see #/$defs/library. Ignored otherwise, whatever it holds."},
     "output": {"$ref": "#/$defs/output"},
     "guard": {"$ref": "#/$defs/guard"},
     "bench": {"$ref": "#/$defs/bench"},
@@ -62,51 +62,12 @@
       "then": {"required": ["lyrics"]}
     },
     {
-      "if": {"properties": {"tasks": {"contains": {"enum": ["spatial", "enhance"]}}}, "required": ["tasks"]},
+      "if": {"properties": {"tasks": {"contains": {"const": "spatial"}}}, "required": ["tasks"]},
       "then": {
         "required": ["library"],
         "properties": {
           "library": {"$ref": "#/$defs/library"},
           "storage": {"const": "presigned", "description": "The shared library is in R2: the volume fallback has none."}
-        }
-      }
-    },
-    {
-      "if": {"properties": {"tasks": {"contains": {"const": "spatial"}}}, "required": ["tasks"]},
-      "then": {
-        "properties": {
-          "library": {
-            "required": ["renders"],
-            "properties": {
-              "renders": {
-                "type": "array",
-                "minItems": 1,
-                "maxItems": 6,
-                "items": {
-                  "allOf": [{"$ref": "#/$defs/libraryTarget"}],
-                  "required": ["profile"],
-                  "properties": {"profile": {"$ref": "#/$defs/profile"}}
-                },
-                "description": "One entry per profile to render; a profile may appear only once (the worker checks). Its URLs must end in lib/v<v>/<videoId>/sp-<profile>.flac and lib/v<v>/<videoId>/sp-<profile>.json."
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "if": {"properties": {"tasks": {"contains": {"const": "enhance"}}}, "required": ["tasks"]},
-      "then": {
-        "properties": {
-          "library": {
-            "required": ["enhanced"],
-            "properties": {
-              "enhanced": {
-                "$ref": "#/$defs/libraryTarget",
-                "description": "Its URLs must end in lib/v<v>/<videoId>/enhanced.flac and lib/v<v>/<videoId>/enhanced.json. The manifest is also written, without audio, when nothing was restored."
-              }
-            }
-          }
         }
       }
     }
@@ -168,11 +129,12 @@
       "enum": ["studio", "wide", "intimate", "hall", "surround", "night"],
       "description": "A Spatial audio profile id (pixl_worker.spatial.PROFILE_IDS)."
     },
-    "libraryTarget": {
+    "libraryRender": {
       "type": "object",
-      "description": "One object pair in the shared library. The worker refuses (BAD_URL) any URL whose path does not end in the canonical key of that object: it can only write this video's own renders.",
-      "required": ["audioPut", "manifestPut"],
+      "description": "One render to make: a profile and the presigned URLs of its two objects, lib/v<v>/<videoId>/sp-<profile>.flac and lib/v<v>/<videoId>/sp-<profile>.json. The worker refuses (BAD_URL) any URL whose path does not end in exactly that key: it can only write this video's own renders.",
+      "required": ["profile", "audioPut", "manifestPut"],
       "properties": {
+        "profile": {"$ref": "#/$defs/profile"},
         "audioPut": {"$ref": "#/$defs/presignedUrl", "description": "PUT of the .flac."},
         "manifestPut": {"$ref": "#/$defs/presignedUrl", "description": "PUT of the .json, written last: its presence means the render is complete."},
         "manifestGet": {"$ref": "#/$defs/presignedUrl", "description": "Optional GET of the same .json. With it the worker skips a render that is already in the library (state exists); without it the render is always made."}
@@ -180,8 +142,8 @@
     },
     "library": {
       "type": "object",
-      "description": "The shared library of finished renders, keyed by the YouTube video (docs/handoff/2026-11-10-plans/cloud-audio-spec.md, sections 3 and 4). `renders` belongs to the spatial task and `enhanced` to the enhance task (see the allOf rules); a block whose task is not requested is ignored.",
-      "required": ["v", "videoId"],
+      "description": "The shared library of finished renders, keyed by the YouTube video (docs/handoff/2026-11-10-plans/cloud-audio-spec.md, sections 3 and 4).",
+      "required": ["v", "videoId", "renders"],
       "properties": {
         "v": {"const": 1, "description": "The library version, LIB_V in src/pixl_worker/library.py. Any other value: UNSUPPORTED_VERSION."},
         "videoId": {"type": "string", "pattern": "^[A-Za-z0-9_-]{11}$", "description": "The matched YouTube video id. Never the Spotify id."},
@@ -193,7 +155,13 @@
             "codec": {"type": "string", "maxLength": 16}
           }
         },
-        "restore": {"enum": ["auto", "off"], "default": "auto", "description": "auto: a band-limited song is restored before it is rendered. off: never."}
+        "renders": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": {"$ref": "#/$defs/libraryRender"},
+          "description": "One entry per profile to render; a profile may appear only once (the worker checks)."
+        }
       }
     },
     "output": {
@@ -203,7 +171,7 @@
         "kbps": {"type": "integer", "minimum": 128, "maximum": 256, "default": 256},
         "put": {
           "type": "object",
-          "description": "One presigned PUT per output object. The worker refuses (BAD_URL) any URL whose path does not end in the object it expects: out/<jobKey>/<slot>.m4a for aac or out/<jobKey>/<slot>.flac for flac (slots instrumental, vocals, drums, bass, other), out/<jobKey>/lyrics.json and out/<jobKey>/manifest.json. Every requested task needs its slot (stems4 needs drums, bass and other; spatial and enhance need none here, their URLs are in `library`); manifest is always required and is written last.",
+          "description": "One presigned PUT per output object. The worker refuses (BAD_URL) any URL whose path does not end in the object it expects: out/<jobKey>/<slot>.m4a for aac or out/<jobKey>/<slot>.flac for flac (slots instrumental, vocals, drums, bass, other), out/<jobKey>/lyrics.json and out/<jobKey>/manifest.json. Every requested task needs its slot (stems4 needs drums, bass and other; spatial needs none here, its URLs are in `library`); manifest is always required and is written last.",
           "properties": {
             "instrumental": {"$ref": "#/$defs/presignedUrl"},
             "vocals": {"$ref": "#/$defs/presignedUrl"},

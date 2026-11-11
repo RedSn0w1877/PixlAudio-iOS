@@ -147,10 +147,9 @@ def group(objects: list[Obj]) -> list[Render]:
 
 def plan(renders: list[Render], limit_bytes: int, *, now: float) -> list[Render]:
     """The renders to delete, in order, so that what stays is at or under the limit. Nothing when it already is.
-    First what no phone can use (audio without a manifest for over an hour; renders of an older library version
-    than the newest one present), each group oldest first, then complete renders oldest first. A manifest on its
-    own (an enhanced.json saying nothing was restored, about 1 KB) goes last of all: deleting it frees nothing
-    and would only make phones ask again."""
+    First what no phone can use (audio without a manifest for over an hour; a manifest whose audio is already
+    gone, which only advertises a 404; renders of an older library version than the newest one present), each
+    group oldest first, then complete renders oldest first."""
     total = sum(r.size for r in renders)
     if total <= limit_bytes:
         return []
@@ -158,9 +157,9 @@ def plan(renders: list[Render], limit_bytes: int, *, now: float) -> list[Render]
 
     def rank(render: Render) -> tuple[int, float, str]:
         orphan = render.manifest is None and now - render.modified >= ORPHAN_AGE_S
+        audio_gone = render.manifest is not None and len(render.objects) == 1  # the manifest is written last
         stale = render.version < newest_version
-        note = render.manifest is not None and len(render.objects) == 1
-        return (0 if orphan else 1 if stale else 3 if note else 2, render.modified, render.stem)
+        return (0 if orphan or audio_gone else 1 if stale else 2, render.modified, render.stem)
 
     chosen: list[Render] = []
     for render in sorted(renders, key=rank):
@@ -204,7 +203,7 @@ def run(r2: R2, *, limit_bytes: int, dry_run: bool, now: float | None = None) ->
     complete = sum(1 for r in renders if r.manifest is not None and len(r.objects) > 1)
     notes = sum(1 for r in renders if r.manifest is not None and len(r.objects) == 1)
     say(f"library: {len(objects)} objects, {gb(total)} of {gb(limit_bytes)}: {complete} renders with audio, "
-        f"{notes} manifests without audio, {len(renders) - complete - notes} audio files without a manifest")
+        f"{notes} manifests whose audio is gone, {len(renders) - complete - notes} audio files without a manifest")
     doomed = plan(renders, limit_bytes, now=now)
     if not doomed:
         say("library janitor: under the limit, nothing to delete")

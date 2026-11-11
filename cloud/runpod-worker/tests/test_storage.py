@@ -181,9 +181,9 @@ def test_library_manifest_get_reads_the_slots_own_object():
     manifest = load_example("library.render.spatial.json")
     storage, transport = library_storage([Response(200, {}, json.dumps(manifest).encode()), Response(404, {})])
     assert storage.get_library_manifest("sp-studio") == manifest
-    assert storage.get_library_manifest("enhanced") is None
+    assert storage.get_library_manifest("sp-studio") is None  # 404: not there (yet)
     (m1, u1, k1), (m2, u2, _) = transport.calls
-    assert m1 == m2 == "GET" and f"/{LIB}/sp-studio.json?" in u1 and f"/{LIB}/enhanced.json?" in u2
+    assert m1 == m2 == "GET" and f"/{LIB}/sp-studio.json?" in u1 and f"/{LIB}/sp-studio.json?" in u2
     assert k1["max_body"] == 64 * 1024 and k1["timeout"] == 10.0
 
 
@@ -208,18 +208,17 @@ def test_without_a_manifest_get_nothing_is_asked():
 
 
 def test_library_puts_go_to_the_slots_urls_and_return_the_keys(tmp_path):
-    storage, transport = library_storage([Response(200, {}), Response(200, {}), Response(200, {}), Response(200, {})])
+    storage, transport = library_storage([Response(200, {}), Response(200, {})])
     flac = tmp_path / "sp-studio.flac"
     flac.write_bytes(b"fLaC" + b"\0" * 100)
     assert storage.put_library_audio("sp-studio", str(flac)) == f"{LIB}/sp-studio.flac"
     assert storage.put_library_manifest("sp-studio", b"{}") == f"{LIB}/sp-studio.json"
-    assert storage.put_library_audio("enhanced", str(flac)) == f"{LIB}/enhanced.flac"
-    assert storage.put_library_manifest("enhanced", b"{}") == f"{LIB}/enhanced.json"
-    (m1, u1, k1), (m2, u2, k2), (_, u3, _), (_, u4, _) = transport.calls
+    (m1, u1, k1), (m2, u2, k2) = transport.calls
     assert m1 == m2 == "PUT" and f"/{LIB}/sp-studio.flac?" in u1 and f"/{LIB}/sp-studio.json?" in u2
     assert k1["body_path"] == str(flac) and k1["headers"]["Content-Type"] == "audio/flac"
     assert k2["body"] == b"{}" and k2["headers"]["Content-Type"] == "application/json"
-    assert f"/{LIB}/enhanced.flac?" in u3 and f"/{LIB}/enhanced.json?" in u4
+    with pytest.raises(KeyError):
+        storage.put_library_audio("enhanced", str(flac))  # only this job's renders have URLs
 
 
 def test_library_puts_retry_and_report_like_any_upload(tmp_path):

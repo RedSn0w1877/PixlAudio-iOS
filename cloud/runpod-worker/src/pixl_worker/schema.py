@@ -5,9 +5,9 @@ schema/v1/job.input.schema.json is the contract. This module re-checks every rul
 server-side caps from config.Caps, and returns a normalised, immutable Job. tests/test_schema.py runs the
 golden examples and a set of broken inputs through both this module and jsonschema so the two cannot drift.
 
-The `spatial` and `enhance` tasks (docs/handoff/2026-11-10-plans/cloud-audio-spec.md, section 4) write into the
-shared library, lib/v<LIB_V>/<videoId>/, not into the job's own out/<jobKey>/ folder. Their URLs come in the
-top-level `library` object and are held to the library's canonical keys exactly as output.put is held to the job's.
+The `spatial` task (docs/handoff/2026-11-10-plans/cloud-audio-spec.md, section 4) writes into the shared library,
+lib/v<LIB_V>/<videoId>/, not into the job's own out/<jobKey>/ folder. Its URLs come in the top-level `library`
+object and are held to the library's canonical keys exactly as output.put is held to the job's.
 """
 
 from __future__ import annotations
@@ -21,11 +21,11 @@ from urllib.parse import parse_qs, unquote, urlsplit
 from . import SUPPORTED_VERSIONS
 from .config import Caps
 from .errors import BAD_OP, BAD_SCHEMA, BAD_URL, UNSUPPORTED_VERSION, WorkerError
-from .library import ENHANCED, LIB_V, PROFILE_IDS, VIDEO_ID_RE, audio_key, manifest_key, render_slot
+from .library import LIB_V, PROFILE_IDS, VIDEO_ID_RE, audio_key, manifest_key, render_slot
 
 JOB_SCHEMA = "pixl.cloudstudio.job"
 OPS = ("process", "selftest", "bench")
-LIBRARY_TASKS = ("spatial", "enhance")
+LIBRARY_TASKS = ("spatial",)  # the tasks whose results go into the shared library
 TASKS = ("instrumental", "vocals", "stems4", "lyrics") + LIBRARY_TASKS
 EXTS = ("m4a", "mp3", "flac", "wav", "ogg", "opus", "webm")
 STEM_SLOTS = ("instrumental", "vocals", "drums", "bass", "other")
@@ -98,10 +98,10 @@ class Guard:
 
 @dataclass(frozen=True)
 class LibraryTarget:
-    """One output in the shared library: its slot (sp-<profile> or enhanced) and the presigned URLs of its audio
+    """One render in the shared library: its profile, its slot (sp-<profile>) and the presigned URLs of its audio
     (library.audio_key) and of its manifest (library.manifest_key)."""
     slot: str
-    profile: str | None
+    profile: str
     audio_put: str
     manifest_put: str
     manifest_get: str | None  # optional: without it the worker cannot see that the render is already there
@@ -112,15 +112,10 @@ class LibrarySpec:
     video_id: str
     source_itag: int | None   # what the phone played (YouTube's itag and codec); only recorded in the manifests
     source_codec: str | None
-    restore: str              # auto | off
-    renders: tuple[LibraryTarget, ...] = ()   # the spatial task's profiles, in the order they were asked for
-    enhanced: LibraryTarget | None = None     # the enhance task's output
-
-    def targets(self) -> tuple[LibraryTarget, ...]:
-        return self.renders + ((self.enhanced,) if self.enhanced is not None else ())
+    renders: tuple[LibraryTarget, ...] = ()   # the profiles to render, in the order they were asked for
 
     def target(self, slot: str) -> LibraryTarget:
-        for target in self.targets():
+        for target in self.renders:
             if target.slot == slot:
                 return target
         raise KeyError(slot)
@@ -146,7 +141,7 @@ class Job:
     lyrics: LyricsRequest | None = None
     output: OutputSpec | None = None
     guard: Guard | None = None
-    library: LibrarySpec | None = None  # set when tasks has spatial or enhance
+    library: LibrarySpec | None = None  # set when tasks has spatial
     bench: BenchSpec | None = None
     # input.policy.last_in_batch: the phone's last job of a submit burst; the worker stops itself after it.
     last_in_batch: bool = False
@@ -389,9 +384,9 @@ def validate_job(raw: Any, caps: Caps) -> Job:
     library = None
     if any(task in tasks for task in LIBRARY_TASKS):
         if storage != "presigned":
-            raise _fail("the spatial and enhance tasks need presigned storage (the shared library is in R2)")
-        library = _library(raw.get("library"), tasks, caps)
-    # Without those tasks `library` is not looked at, whatever it holds.
+            raise _fail("the spatial task needs presigned storage (the shared library is in R2)")
+        library = _library(raw.get("library"), caps)
+    # Without that task `library` is not looked at, whatever it holds.
 
     if quality == "best" and audio.duration_ms > caps.best_max_audio_s * 1000:
         # Not an error: the worker falls back to standard and says so (pipeline adds the warning).
@@ -431,11 +426,10 @@ def _audio(value: Any, storage: str, job_key: str, caps: Caps) -> AudioRef:
     return AudioRef(get=get, delete=delete, key=key, ext=ext, bytes=size, sha256=sha, duration_ms=duration_ms)
 
 
-def _library(value: Any, tasks: list[str], caps: Caps) -> LibrarySpec:
-    """The `library` object of a job with the spatial or enhance task (spec section 4). `renders` is read only
-    for spatial and `enhanced` only for enhance: a block whose task was not asked for is ignored."""
+def _library(value: Any, caps: Caps) -> LibrarySpec:
+    """The `library` object of a job with the spatial task (spec section 4)."""
     if value is None:
-        raise _fail("library is required for the spatial and enhance tasks")
+        raise _fail("library is required for the spatial task")
     raw = _obj(value, "library")
     v = raw.get("v")
     if isinstance(v, bool) or not isinstance(v, int) or v != LIB_V:
@@ -446,38 +440,30 @@ def _library(value: Any, tasks: list[str], caps: Caps) -> LibrarySpec:
     source = _obj(raw.get("source"), "library.source", required=False) or {}
     itag = _int(source.get("itag"), "library.source.itag", lo=0, hi=MAX_ITAG, required=False)
     codec = _str(source.get("codec"), "library.source.codec", max_len=16, required=False)
-    restore = _enum(raw.get("restore"), "library.restore", ("auto", "off"), default="auto")
+    renders_raw = raw.get("renders")
+    if not isinstance(renders_raw, list) or not renders_raw:
+        raise _fail("library.renders must list 1 to 6 renders")
+    if len(renders_raw) > len(PROFILE_IDS):
+        raise _fail(f"library.renders has more than {len(PROFILE_IDS)} renders")
     renders: list[LibraryTarget] = []
-    if "spatial" in tasks:
-        renders_raw = raw.get("renders")
-        if not isinstance(renders_raw, list) or not renders_raw:
-            raise _fail("library.renders must list 1 to 6 renders for the spatial task")
-        if len(renders_raw) > len(PROFILE_IDS):
-            raise _fail(f"library.renders has more than {len(PROFILE_IDS)} renders")
-        for i, item in enumerate(renders_raw):
-            where = f"library.renders[{i}]"
-            profile = _obj(item, where).get("profile")
-            if not isinstance(profile, str) or profile not in PROFILE_IDS:
-                raise _fail(f"{where}.profile must be one of {', '.join(PROFILE_IDS)}")
-            if any(done.profile == profile for done in renders):
-                raise _fail("library.renders must not repeat a profile")
-            renders.append(_library_target(item, where, video_id, render_slot(profile), profile, caps))
-    enhanced = None
-    if "enhance" in tasks:
-        if raw.get("enhanced") is None:
-            raise _fail("library.enhanced is required for the enhance task")
-        enhanced = _library_target(raw.get("enhanced"), "library.enhanced", video_id, ENHANCED, None, caps)
-    return LibrarySpec(video_id=video_id, source_itag=itag, source_codec=codec, restore=restore,
-                       renders=tuple(renders), enhanced=enhanced)
+    for i, item in enumerate(renders_raw):
+        where = f"library.renders[{i}]"
+        entry = _obj(item, where)
+        profile = entry.get("profile")
+        if not isinstance(profile, str) or profile not in PROFILE_IDS:
+            raise _fail(f"{where}.profile must be one of {', '.join(PROFILE_IDS)}")
+        if any(done.profile == profile for done in renders):
+            raise _fail("library.renders must not repeat a profile")
+        renders.append(_library_target(entry, where, video_id, profile, caps))
+    return LibrarySpec(video_id=video_id, source_itag=itag, source_codec=codec, renders=tuple(renders))
 
 
-def _library_target(value: Any, where: str, video_id: str, slot: str, profile: str | None,
-                    caps: Caps) -> LibraryTarget:
-    """One render entry or the `enhanced` entry: every URL must point at this video's own object for that slot."""
-    entry = _obj(value, where)
+def _library_target(entry: dict, where: str, video_id: str, profile: str, caps: Caps) -> LibraryTarget:
+    """One render entry: every URL must point at this video's own object for that profile."""
     for name in ("audioPut", "manifestPut"):
         if name not in entry:
             raise _fail(f"{where}.{name} is required")
+    slot = render_slot(profile)
     manifest = manifest_key(video_id, slot)
     manifest_get = None
     if entry.get("manifestGet") is not None:

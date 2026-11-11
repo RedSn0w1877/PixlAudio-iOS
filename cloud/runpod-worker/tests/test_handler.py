@@ -291,7 +291,7 @@ def test_a_library_job_gets_thirty_minutes_and_every_other_job_the_fifteen_it_al
     worker.handle({"id": "c", "input": load_example("job.input.spatial.combined.json")})
     (old_tasks, old_s), (lib_tasks, lib_s), (both_tasks, both_s) = seen
     assert old_tasks == ("instrumental", "lyrics") and old_s == pytest.approx(870, abs=2)
-    assert lib_tasks == ("spatial", "enhance") and lib_s == pytest.approx(1770, abs=2)
+    assert lib_tasks == ("spatial",) and lib_s == pytest.approx(1770, abs=2)
     assert both_tasks == ("instrumental", "spatial") and both_s == pytest.approx(1770, abs=2)
     # RunPod's own request policy, should it ever reach the worker, can only shorten it
     worker.handle({"id": "d", "input": load_example("job.input.spatial.json"), "policy": {"executionTimeout": 600000}})
@@ -304,7 +304,7 @@ def test_the_worker_is_1_1_0():
     assert pixl_worker.WORKER_VERSION == "1.1.0" and handler.gpu_info()["version"] == "1.1.0"
     assert pixl_worker.SUPPORTED_VERSIONS == (1,)  # the job schema is still v 1: the new tasks are additions
     for name in ("job.result.spatial.json", "job.result.spatial.exists.json", "job.result.spatial.partial.json",
-                 "library.render.spatial.json", "library.render.enhanced.none.json", "library.render.enhanced.json"):
+                 "library.render.spatial.json"):
         assert load_example(name)["worker"]["version"] == pixl_worker.WORKER_VERSION, name
 
 

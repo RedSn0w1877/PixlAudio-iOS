@@ -1,16 +1,15 @@
-"""op: process — the whole job for one song (design 2.3–2.4; the library tasks: cloud-audio-spec.md, section 4).
+"""op: process — the whole job for one song (design 2.3–2.4; the spatial task: cloud-audio-spec.md, section 4).
 Models and storage are injected, so the CPU tests run this exact code with fakes; handler.py supplies the real ones.
 
 Order: guard → caps → download → probe → decode →
   the job's own outputs (out/<jobKey>/): separate → [stems4] → [lyrics] → encode → upload outputs → lyrics.json →
-  the shared library (lib/v<LIB_V>/<videoId>/, tasks spatial and enhance): library checks (what is already there
-  is skipped) → cutoff analysis → [restore] → [enhanced out] → stems6 → render each missing profile → encode →
-  upload its audio → upload its manifest →
+  the shared library (lib/v<LIB_V>/<videoId>/, task spatial): library checks (a render that is already there is
+  skipped) → stems6 → render each missing profile → encode → upload its audio → upload its manifest →
 manifest.json (always last) → delete the input (only after ok/partial) → clean up.
 A job runs the part its tasks ask for, or both; the vocal separation is then done once and shared.
 Any failure still writes an error manifest (so the phone learns why after /status has expired) and fails the
-RunPod job with "<CODE>: <message>". A failure of lyrics next to stems, or of one library output, leaves the rest
-intact (status partial); when nothing at all was delivered it is the job's error, and the input stays for a retry.
+RunPod job with "<CODE>: <message>". A failure of lyrics next to stems, or of one render, leaves the rest intact
+(status partial); when nothing at all was delivered it is the job's error, and the input stays for a retry.
 """
 
 from __future__ import annotations
@@ -27,7 +26,6 @@ import numpy as np
 
 from . import audio as A
 from . import library as L
-from . import restore as R
 from .config import Caps
 from .deadline import Deadline
 from .errors import (DEADLINE, GPU_OOM, INPUT_MISSING, INPUT_TOO_LARGE, INTERNAL, POISONED, TOO_LONG,
@@ -36,12 +34,13 @@ from .log import log, redact, redact_exception
 from .lyrics.postprocess import summarize
 from .lyrics.run import run_lyrics
 from .schema import JOB_KEY_RE, Job, OutputSpec, check_presigned_url
+from .spatial import STEM_NAMES
 from .storage import CONTENT_TYPES, TransientError, download_budget_s
 
 RESULT_SCHEMA = "pixl.cloudstudio.result"
 ATTEMPT_SCHEMA = "pixl.cloudstudio.attempt"
-TIMING_KEYS = ("coldStartMs", "downloadMs", "decodeMs", "separateMs", "stemsMs", "lyricsMs", "restoreMs", "stems6Ms",
-               "renderMs", "encodeMs", "uploadMs", "totalMs")
+TIMING_KEYS = ("coldStartMs", "downloadMs", "decodeMs", "separateMs", "stemsMs", "lyricsMs", "stems6Ms", "renderMs",
+               "encodeMs", "uploadMs", "totalMs")
 LIBRARY_ENCODE_TIMEOUT_S = 180.0  # a 15-minute render is 170 MB of 16-bit samples for ffmpeg's FLAC encoder
 
 
@@ -50,8 +49,7 @@ class Models:
     separator: Any  # .model_id, .vocals(mix, sr, quality=, progress=)
     stems4: Any = None  # .model_id, .stems(x, sr, progress=) — lazy
     transcriber_factory: Callable[[], Any] | None = None  # lazy Qwen3-ASR
-    stems6: Any = None  # .model_id, .stems(mix, sr, quality=, vocals=, progress=) -> {stem: array} — lazy inside
-    restorer: Any = None  # restore.Restorer: .model_id, .available(), .restore(mix, sr, cutoff_hz, progress=)
+    stems6: Any = None  # separate.Stems6 or a replacement: .model_id, .available(), .stems(...) — lazy inside
 
 
 @dataclass
@@ -71,11 +69,11 @@ class _Run:
     timings: dict = field(default_factory=lambda: {k: 0 for k in TIMING_KEYS})
     warnings: list = field(default_factory=list)
     models: dict = field(default_factory=lambda: {"separator": None, "stems4": None, "aligner": None, "asr": None,
-                                                  "stems6": None, "restorer": None})
+                                                  "stems6": None})
     input: dict | None = None
     outputs: dict = field(default_factory=dict)
     lyrics: dict | None = None
-    library: dict | None = None  # the library tasks' outcome (job.result.schema.json › library)
+    library: dict | None = None  # the spatial task's outcome (job.result.schema.json › library)
     status: str = "ok"
     refresh_worker: bool = False
 
@@ -275,11 +273,23 @@ class _Buffers:
     vocals: np.ndarray | None = None
 
 
+def _check_stems(stems: Any, shape: tuple) -> None:
+    """What the renderer relies on from the six-stem separator (separate.Stems6): a dict of known stem names, each
+    with exactly the song's shape. Anything else fails the renders with a message that says what was wrong."""
+    if not isinstance(stems, dict):
+        raise WorkerError(INTERNAL, "the six-stem separator returned no stems")
+    for name, stem in stems.items():
+        if name not in STEM_NAMES:
+            raise WorkerError(INTERNAL, f"the six-stem separator returned an unknown stem: {str(name)[:40]}")
+        if getattr(stem, "shape", None) != tuple(shape):
+            raise WorkerError(INTERNAL, f"the six-stem separator returned {name} with shape "
+                                        f"{getattr(stem, 'shape', None)}, not the song's {tuple(shape)}")
+
+
 def _delivered(run: _Run) -> bool:
-    """Did the job produce anything a phone can use (a stem, lyrics, or a library output that is there now)?"""
-    library = run.library or {}
-    states = list((library.get("renders") or {}).values()) + [library.get("enhanced")]
-    return bool(run.outputs) or run.lyrics is not None or any(s in ("ok", "exists", "not_needed") for s in states)
+    """Did the job produce anything a phone can use: a stem, lyrics, or a render that is in the library now
+    (made by this job or found there; both are listed in the outputs)?"""
+    return bool(run.outputs) or run.lyrics is not None
 
 
 def _own_outputs(job: Job, run: _Run, models: Models, ctx: Context, deadline: Deadline, storage, work_dir: str,
@@ -391,14 +401,14 @@ def _own_outputs(job: Job, run: _Run, models: Models, ctx: Context, deadline: De
 
 
 class _LibraryStage:
-    """The spatial and enhance tasks (cloud-audio-spec.md, section 4), after the job's own outputs:
+    """The spatial task (cloud-audio-spec.md, section 4), after the job's own outputs:
 
-        library checks → cutoff analysis → [restore] → [enhanced out] → stems6 → render the missing profiles →
-        for each: encode → upload its audio → upload its manifest
+        library checks → stems6 → render the missing profiles → for each: encode → upload its audio →
+        upload its manifest
 
-    Each output ends in one of the states ok, exists, failed (and not_needed for enhanced). Nothing here raises:
-    a failure marks the outputs it costs as failed and is remembered, and _process decides whether the job is
-    partial (something was delivered) or an error (nothing was)."""
+    Each render ends in one of the states ok, exists, failed. Nothing here raises: a failure marks the renders it
+    costs as failed and is remembered, and _process decides whether the job is partial (something was delivered)
+    or an error (nothing was)."""
 
     def __init__(self, job: Job, run: _Run, models: Models, ctx: Context, deadline: Deadline, storage,
                  work_dir: str):
@@ -406,23 +416,17 @@ class _LibraryStage:
         self.deadline, self.storage, self.work_dir = deadline, storage, work_dir
         self.spec = job.library
         self.failure: WorkerError | None = None
-        self.block = {"videoId": self.spec.video_id, "libV": L.LIB_V, "renders": {}, "enhanced": None,
-                      "restore": None, "stemMode": None}
+        self.states: dict[str, str] = {}  # profile -> ok | exists | failed
+        self.block = {"videoId": self.spec.video_id, "libV": L.LIB_V, "renders": self.states, "stemMode": None}
         run.library = self.block
 
     # ---- bookkeeping ------------------------------------------------------------------------------------
-    def _set(self, target, state: str) -> None:
-        if target.profile is None:
-            self.block["enhanced"] = state
-        else:
-            self.block["renders"][target.profile] = state
-
     def _failed(self, targets, exc: WorkerError, during: str) -> None:
         log.warning("library_failed", during=during, code=exc.code, message=exc.message,
                     slots=[t.slot for t in targets])
         self.run.refresh_worker = self.run.refresh_worker or exc.refresh_worker
         for target in targets:
-            self._set(target, "failed")
+            self.states[target.profile] = "failed"
             self.run.warnings.append(f"library: {target.slot} failed ({exc.code})")
         if targets:
             self.run.status = "partial"
@@ -444,7 +448,7 @@ class _LibraryStage:
         return False, error
 
     def _existing(self, target) -> dict | None:
-        """The finished render that is already in the library for this output, or None: make it."""
+        """The finished render that is already in the library for this profile, or None: make it."""
         try:
             doc = self.storage.get_library_manifest(target.slot)
         except Exception as exc:  # asking is best effort; any doubt means "make it"
@@ -453,16 +457,13 @@ class _LibraryStage:
         return doc if L.manifest_matches(doc, video_id=self.spec.video_id, slot=target.slot) else None
 
     # ---- the stage --------------------------------------------------------------------------------------
-    def _state(self, target) -> str | None:
-        return self.block["enhanced"] if target.profile is None else self.block["renders"].get(target.profile)
-
     def run_all(self, buffers: _Buffers, sr: int, quality: str) -> WorkerError | None:
         """Run the whole stage. Lets go of buffers.mix and buffers.vocals. Returns the first failure, if any."""
         try:
             self._run(buffers, sr, quality)
         except Exception as exc:  # a slip in this stage must not cost the outputs that are already delivered
             log.error("library_exception", during="library", error=type(exc).__name__, trace=redact_exception(exc))
-            unfinished = [t for t in self.spec.targets() if self._state(t) is None]
+            unfinished = [t for t in self.spec.renders if t.profile not in self.states]
             self._failed(unfinished, WorkerError(INTERNAL, f"the library stage failed unexpectedly "
                                                            f"({type(exc).__name__})"), "library")
         finally:
@@ -471,108 +472,55 @@ class _LibraryStage:
 
     def _run(self, buffers: _Buffers, sr: int, quality: str) -> None:
         spec, run = self.spec, self.run
-        # library checks: whatever is already there is not made again
+        # library checks: a render that is already there is not made again
         pending = []
-        for target in spec.targets():
+        for target in spec.renders:
             existing = self._existing(target)
             if existing is None:
                 pending.append(target)
                 continue
-            entry = L.existing_output(existing)
-            if entry is not None:
-                run.outputs[target.slot] = entry
-            # An enhanced.json without audio says nothing was restored: there is no file to fetch.
-            self._set(target, "exists" if entry is not None else "not_needed")
-        log.info("library_checked", exists=len(spec.targets()) - len(pending), pending=len(pending))
+            run.outputs[target.slot] = L.existing_output(existing)
+            self.states[target.profile] = "exists"
+        log.info("library_checked", exists=len(spec.renders) - len(pending), pending=len(pending))
         if not pending:
-            return  # the job ends ok at once: no analysis, no separation
-        renders = [t for t in pending if t.profile is not None]
-        enhanced = next((t for t in pending if t.profile is None), None)
-        frames = int(buffers.mix.shape[0])
-
-        # cutoff analysis, then the restoration when there is something to restore and a model to do it
-        done, plan = self._guarded(pending, "restore", lambda: self._analyse(buffers.mix, sr))
-        if not done:
-            return
-        cutoff, run_model, info = plan
-        restored = None
-        if run_model:
-            done, outcome = self._guarded([enhanced] if enhanced is not None else [], "restore",
-                                          lambda: self._restore(buffers.mix, sr, cutoff))
-            if done:
-                restored = outcome
-                info = R.RestoreInfo(True, self.models.restorer.model_id, None, info.cutoff_hz)
-                run.models["restorer"] = self.models.restorer.model_id
-            else:
-                # No enhanced file then. The renders are still made, from the song as it is, and their
-                # manifests say `restore.reason: failed` (`info` already does).
-                run.warnings.append(f"restore: failed ({outcome.code}); the song was left as it is")
-        self.block["restore"] = {**info.as_dict(), "cutoffHz": info.cutoff_hz}
-        source = {"itag": spec.source_itag, "codec": spec.source_codec, "sampleRate": sr, "decodedSamples": frames,
-                  "sha256": self.job.audio.sha256, "cutoffHz": info.cutoff_hz}
-
-        # enhanced out: the restored song, or just the note that nothing was restored (so phones don't ask again)
-        if enhanced is not None and self.block["enhanced"] is None:
-            if restored is not None:
-                self._guarded([enhanced], "enhanced", lambda: self._deliver_enhanced(enhanced, restored, buffers.mix,
-                                                                                     sr, source, info))
-            else:
-                self._guarded([enhanced], "enhanced", lambda: self._note_not_restored(enhanced, source, info))
-        if restored is not None:
-            buffers.mix, buffers.vocals = restored, None  # the renders are made from the restored song
-            restored = None
+            return  # the job ends ok at once: no separation
+        source = {"itag": spec.source_itag, "codec": spec.source_codec, "sampleRate": sr,
+                  "decodedSamples": int(buffers.mix.shape[0]), "sha256": self.job.audio.sha256}
 
         # stems6 → render → encode and upload each render, its manifest last
-        if not renders:
-            return
-        done, stems = self._guarded(renders, "stems6", lambda: self._stems6(buffers, sr, quality))
+        done, stems = self._guarded(pending, "stems6", lambda: self._stems6(buffers, sr, quality))
         if not done:
             return
-        done, results = self._guarded(renders, "render",
-                                      lambda: self._render(buffers.mix, stems, sr, [t.profile for t in renders]))
+        done, results = self._guarded(pending, "render",
+                                      lambda: self._render(buffers.mix, stems, sr, [t.profile for t in pending]))
         stems = None
         buffers.mix = buffers.vocals = None
         if not done:
             return
         self.ctx.progress("upload:0")
         stems_id = self.models.stems6.model_id
-        for target in renders:
+        for target in pending:
             result = results.pop(target.profile)
-            self._guarded([target], "upload", lambda: self._deliver_render(target, result, sr, source, info, stems_id))
+            self._guarded([target], "upload", lambda: self._deliver(target, result, sr, source, stems_id))
             result = None
 
     # ---- the steps --------------------------------------------------------------------------------------
-    def _analyse(self, mix: np.ndarray, sr: int):
-        self.deadline.check("restore")
-        with _Stage(self.run, "restoreMs", self.ctx.clock):
-            cutoff = R.detect_cutoff_hz(mix, sr)
-        run_model, info = R.decide(cutoff, self.spec.restore, self.models.restorer)
-        return cutoff, run_model, info
-
-    def _restore(self, mix: np.ndarray, sr: int, cutoff: float) -> np.ndarray:
-        self.deadline.check("restore")
-        self.ctx.progress("restore:0")
-        with _Stage(self.run, "restoreMs", self.ctx.clock):
-            restored = self.models.restorer.restore(mix, sr, cutoff,
-                                                    progress=_progress_reporter(self.ctx, self.deadline, "restore"))
-        restored = np.asarray(restored, dtype=np.float32)
-        if restored.shape != mix.shape:
-            raise WorkerError(INTERNAL, "the restoration changed the song's length")
-        return restored
-
     def _stems6(self, buffers: _Buffers, sr: int, quality: str) -> dict:
-        if self.models.stems6 is None:
+        separator = self.models.stems6  # separate.Stems6, or whatever replaces it (its docstring is the contract)
+        if separator is None:
             raise WorkerError(INTERNAL, "six-stem separation is not available on this worker")
         self.deadline.check("stems6")
         self.ctx.progress("stems6:0")
         own_vocals = buffers.vocals is not None
         with _Stage(self.run, "stems6Ms", self.ctx.clock):
-            stems = self.models.stems6.stems(buffers.mix, sr, quality=quality, vocals=buffers.vocals,
-                                             progress=_progress_reporter(self.ctx, self.deadline, "stems6"))
+            stems = separator.stems(buffers.mix, sr, quality=quality, vocals=buffers.vocals,
+                                    progress=_progress_reporter(self.ctx, self.deadline, "stems6"))
         buffers.vocals = None  # it is one of the stems now
-        self.run.models["stems6"] = self.models.stems6.model_id
-        if not own_vocals:
-            self.run.models["separator"] = getattr(self.models.separator, "model_id", None)
+        _check_stems(stems, buffers.mix.shape)
+        self.run.models["stems6"] = separator.model_id
+        vocal_model = getattr(separator, "separator", None)  # the cascade's BS-RoFormer; a replacement may have none
+        if not own_vocals and vocal_model is not None:
+            self.run.models["separator"] = getattr(vocal_model, "model_id", None)
         return stems
 
     def _render(self, mix: np.ndarray, stems: dict, sr: int, profiles: list) -> dict:
@@ -585,52 +533,32 @@ class _LibraryStage:
         self.block["stemMode"] = modes[0] if modes else None  # one preparation, so one mode for all of them
         return results
 
-    def _put_flac(self, slot: str, audio: np.ndarray, sr: int) -> dict:
-        """Encode (16-bit, dithered) and upload one library file. Returns its `outputs` entry."""
-        path = os.path.join(self.work_dir, f"{slot}.flac")
+    def _deliver(self, target, result, sr: int, source: dict, stems_id: str) -> None:
+        """Encode one render (16-bit, dithered), upload it, then upload its manifest: the manifest goes last
+        because its presence is what tells every phone that the render is whole."""
+        path = os.path.join(self.work_dir, f"{target.slot}.flac")
         try:
             with _Stage(self.run, "encodeMs", self.ctx.clock):
-                L.encode_flac16(audio, sr, path, timeout=LIBRARY_ENCODE_TIMEOUT_S)
+                L.encode_flac16(result.audio, sr, path, timeout=LIBRARY_ENCODE_TIMEOUT_S)
                 size, sha = _file_info(path)
             with _Stage(self.run, "uploadMs", self.ctx.clock):
-                key = self.storage.put_library_audio(slot, path)
+                key = self.storage.put_library_audio(target.slot, path)
         finally:
             try:
                 os.remove(path)
             except OSError:
                 pass
-        return L.output_entry(key, size, sha, sr, int(audio.shape[0]))
-
-    def _put_manifest(self, slot: str, entry: dict | None, loudness: dict | None, source: dict, info, *,
-                      engine: str | None = None, stems: str | None = None, stem_mode: str | None = None) -> None:
-        audio = None
-        if entry is not None:
-            audio = L.audio_block(entry["key"], entry["bytes"], entry["sha256"], entry["sampleRate"], entry["samples"])
-        doc = L.render_manifest(video_id=self.spec.video_id, slot=slot, audio=audio, loudness=loudness,
-                                source=source, engine=engine, stems=stems, stem_mode=stem_mode,
-                                restore=info.as_dict(), worker=self.ctx.worker, created_at=L.utc_now(self.ctx.now()))
+        frames = int(result.audio.shape[0])
+        doc = L.render_manifest(
+            video_id=self.spec.video_id, slot=target.slot, audio=L.audio_block(key, size, sha, sr, frames),
+            loudness=L.loudness_block(result.integrated_lufs, result.source_lufs, L.HEADROOM_DB,
+                                      result.true_peak_db, result.limiter_max_db),
+            source=source, stems=stems_id, stem_mode=result.stem_mode, worker=self.ctx.worker,
+            created_at=L.utc_now(self.ctx.now()))
         with _Stage(self.run, "uploadMs", self.ctx.clock):
-            self.storage.put_library_manifest(slot, _encode_json(doc))
-
-    def _deliver_render(self, target, result, sr: int, source: dict, info, stems_id: str) -> None:
-        entry = self._put_flac(target.slot, result.audio, sr)
-        loudness = L.loudness_block(result.integrated_lufs, result.source_lufs, L.HEADROOM_DB, result.true_peak_db,
-                                    result.limiter_max_db)
-        self._put_manifest(target.slot, entry, loudness, source, info, engine=L.ENGINE_ID,
-                           stems=stems_id if result.stem_mode != "mix" else None, stem_mode=result.stem_mode)
-        self.run.outputs[target.slot] = entry
-        self._set(target, "ok")
-
-    def _deliver_enhanced(self, target, restored: np.ndarray, mix: np.ndarray, sr: int, source: dict, info) -> None:
-        loudness = L.stereo_loudness(restored, mix, sr)  # not lowered: the restored song has the source's level
-        entry = self._put_flac(target.slot, restored, sr)
-        self._put_manifest(target.slot, entry, loudness, source, info)
-        self.run.outputs[target.slot] = entry
-        self._set(target, "ok")
-
-    def _note_not_restored(self, target, source: dict, info) -> None:
-        self._put_manifest(target.slot, None, None, source, info)
-        self._set(target, "not_needed")
+            self.storage.put_library_manifest(target.slot, _encode_json(doc))
+        self.run.outputs[target.slot] = L.output_entry(key, size, sha, sr, frames)
+        self.states[target.profile] = "ok"
 
 
 def _process(job: Job, run: _Run, models: Models, ctx: Context, deadline: Deadline, storage, work_dir: str,
@@ -678,7 +606,7 @@ def _process(job: Job, run: _Run, models: Models, ctx: Context, deadline: Deadli
         quality = "standard"
         run.warnings.append(f"separation: best quality is limited to {caps.best_max_audio_s // 60} minutes; used standard")
 
-    # The parts of a job that may fail without failing it (lyrics next to stems, each library output) report here;
+    # The parts of a job that may fail without failing it (lyrics next to stems, each render) report here;
     # the first one becomes the job's error when in the end nothing at all was delivered.
     first_failure: WorkerError | None = None
     buffers = _Buffers(mix=mix)

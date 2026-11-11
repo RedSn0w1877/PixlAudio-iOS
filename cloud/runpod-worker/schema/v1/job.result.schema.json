@@ -52,8 +52,7 @@
         "stems4": {"type": ["string", "null"]},
         "aligner": {"type": ["string", "null"]},
         "asr": {"type": ["string", "null"]},
-        "stems6": {"type": ["string", "null"], "description": "Worker 1.1.0 and later: the six-stem separation behind the spatial task (open-cascade-6)."},
-        "restorer": {"type": ["string", "null"], "description": "Worker 1.1.0 and later: the restoration model, when it ran."}
+        "stems6": {"type": ["string", "null"], "description": "Worker 1.1.0 and later: the six-stem separation behind the spatial task (open-cascade-6)."}
       },
       "description": "The model ids this job actually used (null when a stage did not run)."
     },
@@ -77,44 +76,24 @@
     },
     "outputs": {
       "type": "object",
-      "description": "Keys are the output slots that were delivered (instrumental, vocals, drums, bass, other; and for the library tasks sp-<profile> and enhanced, whose key is the lib/ key, also when the file was already in the library). Empty on error.",
+      "description": "Keys are the output slots that were delivered (instrumental, vocals, drums, bass, other; and for the spatial task sp-<profile>, whose key is the lib/ key, also when the render was already in the library). Empty on error.",
       "additionalProperties": {"$ref": "#/$defs/outputFile"}
     },
     "library": {
-      "description": "Worker 1.1.0 and later. What became of the shared-library outputs of a job with the spatial or enhance task; null for any other job and on error. Download each ok or exists output from its lib/ key (outputs has it) and never delete it: other devices use it.",
+      "description": "Worker 1.1.0 and later. What became of the renders of a job with the spatial task; null for any other job and on error. Download each ok or exists render from its lib/ key (outputs has it) and never delete it: other devices use it.",
       "oneOf": [
         {"type": "null"},
         {
           "type": "object",
-          "required": ["videoId", "libV", "renders", "enhanced", "restore", "stemMode"],
+          "required": ["videoId", "libV", "renders", "stemMode"],
           "properties": {
             "videoId": {"type": "string", "pattern": "^[A-Za-z0-9_-]{11}$"},
             "libV": {"type": "integer", "minimum": 1},
             "renders": {
               "type": "object",
-              "description": "Spatial profile id -> state, for every render the job asked for.",
+              "description": "Spatial profile id -> state, for every render the job asked for: ok (made now), exists (was already in the library), failed (then the job is partial).",
               "propertyNames": {"enum": ["studio", "wide", "intimate", "hall", "surround", "night"]},
               "additionalProperties": {"enum": ["ok", "exists", "failed"]}
-            },
-            "enhanced": {
-              "enum": ["ok", "exists", "failed", "not_needed", null],
-              "description": "null when the job had no enhance task. not_needed: nothing was restored, so there is no file (restore.reason says why); the library's enhanced.json records that."
-            },
-            "restore": {
-              "description": "What happened to the song's highs in this job. null when the job did not analyse the song (everything it asked for was already in the library).",
-              "oneOf": [
-                {"type": "null"},
-                {
-                  "type": "object",
-                  "required": ["applied", "model", "reason", "cutoffHz"],
-                  "properties": {
-                    "applied": {"type": "boolean"},
-                    "model": {"type": ["string", "null"]},
-                    "reason": {"enum": ["full_band", "off", "unavailable", "failed", null], "description": "Why it was not applied; null when it was."},
-                    "cutoffHz": {"type": "integer", "minimum": 0, "description": "Where the song's spectrum ends (about 16000 for a band-limited stream, 20000 or the Nyquist frequency for a full one)."}
-                  }
-                }
-              ]
             },
             "stemMode": {
               "enum": ["stems6", "stems4", "mix", null],
@@ -154,9 +133,8 @@
         "separateMs": {"type": "integer", "minimum": 0},
         "stemsMs": {"type": "integer", "minimum": 0},
         "lyricsMs": {"type": "integer", "minimum": 0},
-        "restoreMs": {"type": "integer", "minimum": 0, "description": "Worker 1.1.0 and later, like stems6Ms and renderMs; 0 when unused. The spectrum analysis and, when it ran, the restoration."},
-        "stems6Ms": {"type": "integer", "minimum": 0},
-        "renderMs": {"type": "integer", "minimum": 0},
+        "stems6Ms": {"type": "integer", "minimum": 0, "description": "Worker 1.1.0 and later, like renderMs; 0 when unused. The six-stem separation of the spatial task."},
+        "renderMs": {"type": "integer", "minimum": 0, "description": "Worker 1.1.0 and later; 0 when unused. The spatial renderer."},
         "encodeMs": {"type": "integer", "minimum": 0},
         "uploadMs": {"type": "integer", "minimum": 0},
         "totalMs": {"type": "integer", "minimum": 0}

@@ -1,8 +1,9 @@
-"""op: process for the tasks spatial and enhance (cloud-audio-spec.md, section 4), with in-memory storage and fake
-models: what is already in the library is skipped before any separation, each render uploads its audio and then
-its manifest, one failing output leaves the others (partial), a job that delivers nothing is an error that keeps
-its input, the vocal separation is shared with the job's own outputs, and every manifest is checked against its
-schema. Two tests run the real renderer end to end; the rest use a stand-in so they stay quick.
+"""op: process for the spatial task (cloud-audio-spec.md, section 4), with in-memory storage and fake models: what
+is already in the library is skipped before any separation, each render uploads its audio and then its manifest,
+one failing render leaves the others (partial), a job that delivers nothing is an error that keeps its input, the
+vocal separation is shared with the job's own outputs, what the six-stem separator returns is checked, and every
+manifest is checked against its schema. Two tests run the real renderer end to end; the rest use a stand-in so
+they stay quick.
 They decode and encode real audio, so they need ffmpeg (the Docker test target installs it)."""
 
 import copy
@@ -19,7 +20,6 @@ from conftest import EXAMPLE_HOST, load_example, load_schema
 from pixl_worker import audio as A
 from pixl_worker import errors, pipeline
 from pixl_worker import library as L
-from pixl_worker import restore as R
 from pixl_worker.config import load_caps
 from pixl_worker.deadline import Deadline
 from pixl_worker.errors import WorkerError
@@ -44,11 +44,13 @@ NOW = 1794337331.0  # 2026-11-10T19:02:11Z
 # ---- fakes -------------------------------------------------------------------------------------------------
 
 class FakeStems6:
-    """Splits the mix into six equal parts (they add up to it), or four without the 6s model."""
+    """Splits the mix into six equal parts (they add up to it), or four without the 6s model. Like the real
+    cascade it holds the vocal separator it runs when no vocals are handed in."""
     model_id = "open-cascade-6"
 
     def __init__(self, names=("vocals", "drums", "bass", "guitar", "piano", "other"), fail=None, during=None):
         self.names, self.fail, self.during, self.calls = names, fail, during, []
+        self.separator = HalfVocals()
 
     def stems(self, mix, sr, *, quality="standard", vocals=None, progress=None):
         self.calls.append({"mix": mix.copy(), "sr": sr, "quality": quality, "vocals": vocals})
@@ -87,24 +89,6 @@ class FakeRender:
         return out
 
 
-class FakeRestorer(R.Restorer):
-    model_id = "fake-restorer"
-
-    def __init__(self, fail=None):
-        self.fail, self.calls = fail, []
-
-    def available(self):
-        return True
-
-    def restore(self, mix, sample_rate, cutoff_hz, *, progress=None):
-        self.calls.append((mix.shape, sample_rate, cutoff_hz))
-        if progress:
-            progress(1, 2)
-        if self.fail:
-            raise self.fail
-        return (mix * 0.25).astype(np.float32)
-
-
 # ---- helpers -----------------------------------------------------------------------------------------------
 
 @pytest.fixture(scope="module")
@@ -123,7 +107,7 @@ def target(slot, video=VIDEO, get=True):
     return out
 
 
-def job_doc(data: bytes, *, tasks=("spatial", "enhance"), profiles=("studio",), **library):
+def job_doc(data: bytes, *, tasks=("spatial",), profiles=("studio",), **library):
     doc = load_example("job.input.spatial.json")
     doc["audio"].update(bytes=len(data), sha256=hashlib.sha256(data).hexdigest(), durationMs=SECONDS * 1000)
     doc["tasks"] = list(tasks)
@@ -193,17 +177,15 @@ def same_shape(a, b, path="") -> None:
 
 # ---- the whole path, with the real renderer ----------------------------------------------------------------
 
-def test_spatial_and_enhance_end_to_end(song, tmp_path):
+def test_spatial_end_to_end(song, tmp_path):
     result, storage, progress = run(job_doc(song), song, tmp_path)
     assert result["status"] == "ok", result
     RESULT.validate(result)
     same_shape(result, load_example("job.result.spatial.json"))  # the golden example is what the worker writes
-    # order: the note that nothing was restored, then the render (its audio first, its manifest last), then the
-    # job's own manifest last of all, and only then the input goes
-    assert puts(storage) == ["attempt", f"{LIB}/enhanced.json", f"{LIB}/sp-studio.flac", f"{LIB}/sp-studio.json",
-                             "manifest"]
-    assert [op for op in storage.ops if op[0] == "get"] == [("get", "lib:sp-studio"), ("get", "lib:enhanced")]
-    assert storage.ops.index(("get", "lib:enhanced")) < storage.ops.index(("put", f"{LIB}/enhanced.json"))
+    # order: the library check, then the render (its audio first, its manifest last), then the job's own manifest
+    # last of all, and only then the input goes
+    assert puts(storage) == ["attempt", f"{LIB}/sp-studio.flac", f"{LIB}/sp-studio.json", "manifest"]
+    assert [op for op in storage.ops if op[0] == "get"] == [("get", "lib:sp-studio")]
     assert storage.ops[-1] == ("delete_input",) and json.loads(storage.objects["manifest"]) == result
     frames = result["input"]["decodedSamples"]
     assert frames == SECONDS * 44100
@@ -212,7 +194,7 @@ def test_spatial_and_enhance_end_to_end(song, tmp_path):
     out = result["outputs"]["sp-studio"]
     assert out == {"key": f"{LIB}/sp-studio.flac", "bytes": len(flac), "sha256": hashlib.sha256(flac).hexdigest(),
                    "codec": "flac", "kbps": None, "sampleRate": 44100, "samples": frames}
-    assert list(result["outputs"]) == ["sp-studio"]  # nothing was restored: no enhanced file
+    assert list(result["outputs"]) == ["sp-studio"]
     pcm = decode_flac(flac, tmp_path)
     assert pcm.shape == (frames, 2) and np.abs(pcm).max() > 1000  # the source's frame count, and it is music
 
@@ -225,33 +207,24 @@ def test_spatial_and_enhance_end_to_end(song, tmp_path):
     assert loud["headroomDb"] == 4.0 and abs(loud["sourceLufs"] - 4.0 - loud["integratedLufs"]) <= 0.3
     assert loud["truePeakDb"] <= -0.95 and loud["limiterMaxDb"] >= 0.0
     assert manifest["source"] == {"itag": 251, "codec": "opus", "sampleRate": 44100, "decodedSamples": frames,
-                                  "sha256": hashlib.sha256(song).hexdigest(), "cutoffHz": manifest["source"]["cutoffHz"]}
-    assert manifest["source"]["cutoffHz"] > 17000  # the test song is full band
-    assert manifest["render"] == {"engine": "pixl-spatial-1", "stems": "open-cascade-6", "stemMode": "stems6",
-                                  "restore": {"applied": False, "model": None, "reason": "full_band"}}
+                                  "sha256": hashlib.sha256(song).hexdigest()}
+    assert manifest["render"] == {"engine": "pixl-spatial-1", "stems": "open-cascade-6", "stemMode": "stems6"}
     assert manifest["worker"] == {"version": "1.1.0", "gitSha": "abcdef012345"}
     assert manifest["createdAt"] == "2026-11-10T19:02:11Z"
     assert L.manifest_matches(manifest, video_id=VIDEO, slot="sp-studio")  # the next job will find it there
+    assert sorted(storage.library) == [f"{LIB}/sp-studio.flac", f"{LIB}/sp-studio.json"]  # nothing else is written
 
-    note = lib_json(storage, "enhanced")
-    same_shape(note, load_example("library.render.enhanced.none.json"))
-    assert note["kind"] == "enhanced" and note["audio"] is None and note["loudness"] is None
-    assert note["render"] == {"engine": None, "stems": None, "stemMode": None,
-                              "restore": {"applied": False, "model": None, "reason": "full_band"}}
-    assert note["source"] == manifest["source"] and f"{LIB}/enhanced.flac" not in storage.library
-
-    assert result["library"] == {"videoId": VIDEO, "libV": 1, "renders": {"studio": "ok"}, "enhanced": "not_needed",
-                                 "restore": {"applied": False, "model": None, "reason": "full_band",
-                                             "cutoffHz": manifest["source"]["cutoffHz"]},
-                                 "stemMode": "stems6"}
+    assert result["library"] == {"videoId": VIDEO, "libV": 1, "renders": {"studio": "ok"}, "stemMode": "stems6"}
     assert result["models"] == {"separator": "fake-separator", "stems4": None, "aligner": None, "asr": None,
-                                "stems6": "open-cascade-6", "restorer": None}
+                                "stems6": "open-cascade-6"}
     timings = result["timings"]
     assert timings["coldStartMs"] == 77 and timings["separateMs"] == 0 and timings["renderMs"] > 0
-    assert timings["totalMs"] >= timings["renderMs"] and timings["encodeMs"] > 0
+    assert timings["totalMs"] >= timings["renderMs"] and timings["encodeMs"] > 0 and timings["stems6Ms"] >= 0
+    assert set(timings) == set(pipeline.TIMING_KEYS) and "restoreMs" not in timings
     assert progress[:2] == ["download:0", "decode:0"] and progress[-1] == "done:100"
     assert "stems6:0" in progress and "render:0" in progress and "render:100" in progress and "upload:0" in progress
-    assert not any(p.startswith(("separate:", "restore:")) for p in progress)
+    assert not any(p.startswith("separate:") for p in progress)
+    assert {p.split(":")[0] for p in progress} == {"download", "decode", "stems6", "render", "upload", "done"}
     assert "http" not in json.dumps(result) and "http" not in json.dumps(manifest)  # no URL ever reaches a manifest
 
 
@@ -266,22 +239,20 @@ def test_a_song_at_another_sample_rate_keeps_its_rate_and_length(tmp_path):
     RESULT.validate(result)
     manifest = lib_json(storage, "sp-hall")
     assert manifest["audio"]["sampleRate"] == 32000 and manifest["audio"]["samples"] == 96000
-    assert manifest["source"]["cutoffHz"] <= 16000  # a 32 kHz file ends at 16 kHz: band-limited by its own rate
-    assert manifest["render"]["restore"] == {"applied": False, "model": None, "reason": "unavailable"}
+    assert manifest["source"]["sampleRate"] == 32000
     assert abs(manifest["loudness"]["sourceLufs"] - 4.0 - manifest["loudness"]["integratedLufs"]) <= 0.3
+    assert manifest["loudness"]["truePeakDb"] <= -0.95  # resampled back, and still under the ceiling
     assert decode_flac(storage.library[f"{LIB}/sp-hall.flac"], tmp_path).shape == (96000, 2)
-    assert result["library"]["enhanced"] is None and result["library"]["restore"]["reason"] == "unavailable"
+    assert result["library"]["renders"] == {"hall": "ok"}
 
 
 # ---- what is already in the library ------------------------------------------------------------------------
 
 def existing(slot, video=VIDEO):
-    doc = copy.deepcopy(load_example("library.render.spatial.json" if slot != "enhanced"
-                                     else "library.render.enhanced.none.json"))
+    doc = copy.deepcopy(load_example("library.render.spatial.json"))
     doc["videoId"] = video
-    if slot != "enhanced":
-        doc["profile"] = slot[3:]
-        doc["audio"]["key"] = f"lib/v1/{video}/{slot}.flac"
+    doc["profile"] = slot[3:]
+    doc["audio"]["key"] = f"lib/v1/{video}/{slot}.flac"
     return doc
 
 
@@ -291,8 +262,7 @@ def never(*args, **kwargs):
 
 def test_everything_already_there_ends_ok_at_once_without_separating(song, tmp_path, monkeypatch):
     monkeypatch.setattr(pipeline.L, "render", never)
-    monkeypatch.setattr(pipeline.R, "detect_cutoff_hz", never)
-    library = {f"{LIB}/sp-studio.json": existing("sp-studio"), f"{LIB}/enhanced.json": existing("enhanced")}
+    library = {f"{LIB}/sp-studio.json": existing("sp-studio")}
     stems6 = FakeStems6(fail=AssertionError("separated although everything was there"))
     result, storage, progress = run(job_doc(song), song, tmp_path, storage_kwargs={"library": library},
                                     models=models_for(stems6=stems6, separator=None))
@@ -300,26 +270,12 @@ def test_everything_already_there_ends_ok_at_once_without_separating(song, tmp_p
     RESULT.validate(result)
     same_shape(result, load_example("job.result.spatial.exists.json"))
     assert stems6.calls == [] and puts(storage) == ["attempt", "manifest"] and storage.input_deleted
-    assert result["library"] == {"videoId": VIDEO, "libV": 1, "renders": {"studio": "exists"},
-                                 "enhanced": "not_needed", "restore": None, "stemMode": None}
+    assert result["library"] == {"videoId": VIDEO, "libV": 1, "renders": {"studio": "exists"}, "stemMode": None}
     # the phone downloads from the entry: it is the existing render's own description
     assert result["outputs"] == {"sp-studio": load_example("job.result.spatial.exists.json")["outputs"]["sp-studio"]}
     assert set(result["models"].values()) == {None}
-    assert {result["timings"][k] for k in ("separateMs", "restoreMs", "stems6Ms", "renderMs", "encodeMs")} == {0}
-    assert not any(p.startswith(("stems6", "render", "separate", "restore")) for p in progress)
-
-
-def test_an_existing_enhanced_file_is_handed_over_like_a_render(song, tmp_path, fake_render):
-    restored = copy.deepcopy(load_example("library.render.enhanced.json"))
-    restored["videoId"] = VIDEO
-    restored["audio"]["key"] = f"{LIB}/enhanced.flac"
-    result, storage, _ = run(job_doc(song, tasks=("enhance",)), song, tmp_path,
-                             storage_kwargs={"library": {f"{LIB}/enhanced.json": restored}})
-    RESULT.validate(result)
-    assert result["library"]["enhanced"] == "exists" and result["library"]["renders"] == {}
-    assert result["outputs"]["enhanced"]["key"] == f"{LIB}/enhanced.flac"
-    assert result["outputs"]["enhanced"]["sha256"] == restored["audio"]["sha256"]
-    assert fake_render.calls == [] and puts(storage) == ["attempt", "manifest"]
+    assert {result["timings"][k] for k in ("separateMs", "stems6Ms", "renderMs", "encodeMs")} == {0}
+    assert not any(p.startswith(("stems6", "render", "separate")) for p in progress)
 
 
 def test_only_the_missing_profiles_are_rendered(song, tmp_path, fake_render):
@@ -413,16 +369,15 @@ def test_a_library_job_where_everything_fails_is_an_error_with_the_first_code_an
     assert puts(storage) == ["attempt", "manifest"]
 
 
-def test_the_note_that_nothing_was_restored_survives_a_failed_render(song, tmp_path, fake_render):
+def test_an_unexpected_render_failure_is_INTERNAL_and_no_url_reaches_the_manifest(song, tmp_path, fake_render):
     fake_render.fail = RuntimeError("boom https://x.r2.cloudflarestorage.com/in/a?X-Amz-Signature=" + "a" * 64)
     result, storage, _ = run(job_doc(song), song, tmp_path)
-    assert result["status"] == "partial", result
-    RESULT.validate(result)
-    assert result["library"]["renders"] == {"studio": "failed"} and result["library"]["enhanced"] == "not_needed"
-    assert result["warnings"] == ["library: sp-studio failed (INTERNAL)"] and result["outputs"] == {}
-    assert f"{LIB}/enhanced.json" in storage.library and storage.input_deleted
-    assert "X-Amz" not in json.dumps(result) and "cloudflarestorage" not in json.dumps(result)
-    assert result["library"]["stemMode"] is None and result["models"]["stems6"] == "open-cascade-6"
+    assert result == {"error": "INTERNAL: render failed unexpectedly (RuntimeError)", "refresh_worker": False}
+    manifest = json.loads(storage.objects["manifest"])
+    RESULT.validate(manifest)
+    assert manifest["warnings"] == ["library: sp-studio failed (INTERNAL)"] and manifest["outputs"] == {}
+    assert storage.library == {} and not storage.input_deleted
+    assert "X-Amz" not in json.dumps(manifest) and "cloudflarestorage" not in json.dumps(manifest)
 
 
 def test_running_out_of_memory_in_the_renderer_recycles_the_worker(song, tmp_path, fake_render):
@@ -434,10 +389,43 @@ def test_running_out_of_memory_in_the_renderer_recycles_the_worker(song, tmp_pat
 
 def test_a_worker_without_the_six_stem_models_fails_the_renders(song, tmp_path, fake_render):
     result, storage, _ = run(job_doc(song), song, tmp_path, models=models_for(stems6=None))
-    assert result["status"] == "partial" and result["library"]["renders"] == {"studio": "failed"}
-    assert result["library"]["enhanced"] == "not_needed" and fake_render.calls == []
-    result, _, _ = run(job_doc(song, tasks=("spatial",)), song, tmp_path, models=models_for(stems6=None))
     assert result["error"].startswith("INTERNAL: six-stem separation is not available")
+    assert fake_render.calls == [] and not storage.input_deleted
+
+
+@pytest.mark.parametrize("returned, says", [
+    ({"vocals": None}, "returned vocals with shape None"),
+    ({"voice": "x"}, "returned an unknown stem: voice"),
+    ("not a dict", "returned no stems"),
+    ({"drums": np.zeros((10, 2), dtype=np.float32)}, "returned drums with shape (10, 2), not the song's"),
+])
+def test_what_the_six_stem_separator_returns_is_checked_before_the_render(song, tmp_path, fake_render, returned,
+                                                                          says):
+    class Wrong(FakeStems6):
+        def stems(self, mix, sr, **kwargs):
+            return returned
+
+    result, storage, _ = run(job_doc(song), song, tmp_path, models=models_for(stems6=Wrong()))
+    assert result["error"].startswith("INTERNAL: the six-stem separator " + says), result
+    assert fake_render.calls == [] and storage.library == {}
+
+
+def test_a_separator_without_its_own_vocal_model_reports_none(song, tmp_path, fake_render):
+    # a replacement for the cascade needs only model_id, available() and stems(): nothing else is read from it
+    class Replacement:
+        model_id = "my-separator-1"
+
+        def available(self):
+            return True
+
+        def stems(self, mix, sample_rate, *, quality="standard", vocals=None, progress=None):
+            return {"vocals": mix * 0.5, "other": mix * 0.5}
+
+    result, storage, _ = run(job_doc(song), song, tmp_path, models=models_for(stems6=Replacement()))
+    assert result["status"] == "ok", result
+    assert result["models"]["stems6"] == "my-separator-1" and result["models"]["separator"] is None
+    assert lib_json(storage, "sp-studio")["render"]["stems"] == "my-separator-1"
+    assert fake_render.calls[0]["stems"] == ["other", "vocals"]
 
 
 class Clock:
@@ -468,8 +456,8 @@ def test_the_deadline_is_checked_inside_the_render(song, tmp_path, monkeypatch):
 
     monkeypatch.setattr(pipeline.L, "render", slow_render)
     result, storage, _ = run(job_doc(song), song, tmp_path, deadline=Deadline(1770, clock=clock))
-    assert result["status"] == "partial" and result["library"]["renders"] == {"studio": "failed"}
-    assert result["warnings"] == ["library: sp-studio failed (DEADLINE)"]
+    assert result["error"].startswith("DEADLINE: the job ran out of time during render"), result
+    assert json.loads(storage.objects["manifest"])["warnings"] == ["library: sp-studio failed (DEADLINE)"]
 
 
 # ---- together with the job's own outputs -------------------------------------------------------------------
@@ -510,7 +498,8 @@ def test_an_instrumental_and_spatial_job_separates_the_vocals_once(song, tmp_pat
     assert sorted(result["outputs"]) == ["instrumental", "sp-hall", "sp-night"]
     assert result["outputs"]["instrumental"]["key"].startswith("out/") and result["outputs"]["instrumental"]["codec"] == "aac"
     assert result["outputs"]["sp-hall"]["key"] == f"lib/v1/{video}/sp-hall.flac"
-    assert result["library"]["renders"] == {"night": "ok", "hall": "ok"} and result["library"]["enhanced"] is None
+    assert result["library"] == {"videoId": video, "libV": 1, "renders": {"night": "ok", "hall": "ok"},
+                                 "stemMode": "stems6"}
     assert result["models"]["separator"] == "fake-separator" and result["models"]["stems6"] == "open-cascade-6"
     assert result["timings"]["separateMs"] >= 0 and [p for p in progress if p.endswith(":0")] == [
         "download:0", "decode:0", "separate:0", "upload:0", "stems6:0", "render:0", "upload:0"]
@@ -565,103 +554,14 @@ def test_lyrics_failing_next_to_library_tasks_do_not_stop_them(song, tmp_path, f
     assert not storage.input_deleted and json.loads(storage.objects["manifest"])["error"]["code"] == "DEADLINE"
 
 
-# ---- restore: off, unavailable, and with a model -----------------------------------------------------------
-
-def band_limited(monkeypatch, hz=15989.4):
-    monkeypatch.setattr(pipeline.R, "detect_cutoff_hz", lambda mix, sr: hz)
-
-
-@pytest.mark.parametrize("mode, cutoff, reason", [("auto", 15989.4, "unavailable"), ("off", 15989.4, "off"),
-                                                  ("off", 20000.0, "full_band"), ("auto", 17000.6, "full_band"),
-                                                  ("auto", 17000.0, "unavailable")])
-def test_the_reason_nothing_was_restored_is_recorded_everywhere(song, tmp_path, fake_render, monkeypatch, mode,
-                                                                 cutoff, reason):
-    band_limited(monkeypatch, cutoff)
-    result, storage, _ = run(job_doc(song, restore=mode), song, tmp_path)
-    assert result["status"] == "ok"
-    RESULT.validate(result)
-    restore = {"applied": False, "model": None, "reason": reason}
-    assert result["library"]["restore"] == {**restore, "cutoffHz": int(round(cutoff))}
-    assert result["library"]["enhanced"] == "not_needed" and result["models"]["restorer"] is None
-    note, render = lib_json(storage, "enhanced"), lib_json(storage, "sp-studio")
-    assert note["audio"] is None and note["render"]["restore"] == restore == render["render"]["restore"]
-    assert note["source"]["cutoffHz"] == render["source"]["cutoffHz"] == int(round(cutoff))
-    assert f"{LIB}/enhanced.flac" not in storage.library
-
+# ---- what the manifests record -----------------------------------------------------------------------------
 
 def test_a_missing_source_block_is_recorded_as_unknown(song, tmp_path, fake_render):
     doc = job_doc(song)
     del doc["library"]["source"]
     _, storage, _ = run(doc, song, tmp_path)
-    for slot in ("enhanced", "sp-studio"):
-        assert lib_json(storage, slot)["source"]["itag"] is None and lib_json(storage, slot)["source"]["codec"] is None
-
-
-def test_with_a_restoration_model_the_restored_song_is_stored_and_rendered(song, tmp_path, fake_render, monkeypatch):
-    band_limited(monkeypatch)
-    restorer, stems6 = FakeRestorer(), FakeStems6()
-    result, storage, progress = run(job_doc(song), song, tmp_path, models=models_for(restorer=restorer, stems6=stems6))
-    assert result["status"] == "ok", result
-    RESULT.validate(result)
-    frames = result["input"]["decodedSamples"]
-    assert restorer.calls == [((frames, 2), 44100, 15989.4)]
-    assert puts(storage) == ["attempt", f"{LIB}/enhanced.flac", f"{LIB}/enhanced.json", f"{LIB}/sp-studio.flac",
-                             f"{LIB}/sp-studio.json", "manifest"]
-    applied = {"applied": True, "model": "fake-restorer", "reason": None}
-    assert result["library"] == {"videoId": VIDEO, "libV": 1, "renders": {"studio": "ok"}, "enhanced": "ok",
-                                 "restore": {**applied, "cutoffHz": 15989}, "stemMode": "stems6"}
-    assert result["models"]["restorer"] == "fake-restorer" and "restore:0" in progress
-    enhanced = lib_json(storage, "enhanced")
-    same_shape(enhanced, load_example("library.render.enhanced.json"))
-    flac = storage.library[f"{LIB}/enhanced.flac"]
-    assert enhanced["audio"]["sha256"] == hashlib.sha256(flac).hexdigest() == result["outputs"]["enhanced"]["sha256"]
-    assert enhanced["audio"]["samples"] == frames and enhanced["render"] == {
-        "engine": None, "stems": None, "stemMode": None, "restore": applied}
-    assert enhanced["loudness"]["headroomDb"] == 0.0 and enhanced["loudness"]["limiterMaxDb"] == 0.0
-    # the fake "restoration" is the song at a quarter of its level: 12 dB down, measured, not assumed
-    assert enhanced["loudness"]["sourceLufs"] - enhanced["loudness"]["integratedLufs"] == pytest.approx(12.04, abs=0.1)
-    assert decode_flac(flac, tmp_path).shape == (frames, 2)
-    # the stems and the render are made from the restored song; the spatial manifest says it contains it
-    assert np.allclose(fake_render.calls[0]["mix"], stems6.calls[0]["mix"]) and stems6.calls[0]["vocals"] is None
-    original = decode_flac(song, tmp_path).astype(np.float32) / 32768.0
-    assert np.allclose(stems6.calls[0]["mix"], 0.25 * original, atol=1e-4)
-    assert lib_json(storage, "sp-studio")["render"]["restore"] == applied
-
-
-def test_vocals_of_the_unrestored_song_are_not_reused_for_the_restored_one(song, tmp_path, fake_render, monkeypatch):
-    band_limited(monkeypatch)
-    separator, stems6 = CountingVocals(), FakeStems6()
-    result, _, _ = run(combined_doc(song), song, tmp_path,
-                       models=models_for(separator=separator, stems6=stems6, restorer=FakeRestorer()))
-    assert result["status"] == "ok" and separator.calls == 1  # for the instrumental; the cascade does its own
-    assert stems6.calls[0]["vocals"] is None
-    assert result["library"]["restore"]["applied"] is True and result["library"]["enhanced"] is None
-
-
-def test_a_failed_restoration_makes_no_enhanced_file_and_the_renders_go_on_without_it(song, tmp_path, fake_render,
-                                                                                       monkeypatch):
-    band_limited(monkeypatch)
-    restorer = FakeRestorer(fail=WorkerError(errors.GPU_OOM, "the GPU ran out of memory while restoring",
-                                             refresh_worker=True))
-    result, storage, _ = run(job_doc(song), song, tmp_path, models=models_for(restorer=restorer))
-    assert result.pop("refresh_worker") is True and result["status"] == "partial"
-    RESULT.validate(result)
-    failed = {"applied": False, "model": "fake-restorer", "reason": "failed"}
-    assert result["library"]["enhanced"] == "failed" and result["library"]["renders"] == {"studio": "ok"}
-    assert result["library"]["restore"] == {**failed, "cutoffHz": 15989}
-    assert result["warnings"] == ["library: enhanced failed (GPU_OOM)",
-                                  "restore: failed (GPU_OOM); the song was left as it is"]
-    # nothing is written for enhanced, so a later job tries again; the render says what it was made from
-    assert f"{LIB}/enhanced.json" not in storage.library and f"{LIB}/enhanced.flac" not in storage.library
-    assert lib_json(storage, "sp-studio")["render"]["restore"] == failed
-    assert result["models"]["restorer"] is None
-    # a restoration that changes the song's length is a failure too, not a file
-    class Short(FakeRestorer):
-        def restore(self, mix, sample_rate, cutoff_hz, *, progress=None):
-            return mix[:-10]
-
-    result, storage, _ = run(job_doc(song, tasks=("enhance",)), song, tmp_path, models=models_for(restorer=Short()))
-    assert result["error"].startswith("INTERNAL: the restoration changed the song's length")
+    source = lib_json(storage, "sp-studio")["source"]
+    assert source["itag"] is None and source["codec"] is None
 
 
 # ---- quality, the guard, rejections ------------------------------------------------------------------------
@@ -686,7 +586,8 @@ def test_four_stems_and_stem_free_renders_say_so(song, tmp_path, fake_render):
     result, storage, _ = run(job_doc(song, tasks=("spatial",)), song, tmp_path)
     assert result["library"]["stemMode"] == "mix"
     render = lib_json(storage, "sp-studio")["render"]
-    assert render["stemMode"] == "mix" and render["stems"] is None and render["engine"] == "pixl-spatial-1"
+    # render.stems still names the separator that ran (spec 3.1: whatever produced the stems)
+    assert render["stemMode"] == "mix" and render["stems"] == "open-cascade-6" and render["engine"] == "pixl-spatial-1"
 
 
 def test_a_resent_library_job_gets_its_finished_manifest_back(song, tmp_path, fake_render):

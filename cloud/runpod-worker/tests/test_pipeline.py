@@ -209,9 +209,9 @@ def test_ok_job_uploads_everything_then_the_manifest_last(song_m4a, tmp_path):
     assert abs(result["input"]["decodedSamples"] - SECONDS * 44100) <= 2048
     assert result["timings"]["coldStartMs"] == 1234 and result["timings"]["totalMs"] > 0
     assert result["models"] == {"separator": "fake-separator", "stems4": None, "aligner": "fake-aligner", "asr": None,
-                                "stems6": None, "restorer": None}
+                                "stems6": None}
     assert result["library"] is None  # no library task: the 1.1.0 fields are there, and empty
-    assert {result["timings"][k] for k in ("restoreMs", "stems6Ms", "renderMs")} == {0}
+    assert {result["timings"][k] for k in ("stems6Ms", "renderMs")} == {0}
     lyrics = json.loads(storage.objects["lyrics"])
     LYRICS.validate(lyrics)
     assert lyrics["mode"] == "aligned" and lyrics["language"] == "ko"

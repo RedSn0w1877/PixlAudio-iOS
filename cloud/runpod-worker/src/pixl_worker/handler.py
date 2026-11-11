@@ -210,7 +210,6 @@ class _LazyAligner:
 def load_models() -> tuple[pipeline.Models, Callable[[], dict]]:
     from .lyrics.languages import register_backend
     from .lyrics.transcribe import MODEL_ID as ASR_ID
-    from .restore import Restorer
     from .separate import SEPARATOR_ID, SIX_ID, STEMS4_ID, GuitarPiano, RoformerSeparator, Stems4, Stems6
 
     separator = RoformerSeparator(SEP_CONFIG, SEP_CKPT)
@@ -218,13 +217,13 @@ def load_models() -> tuple[pipeline.Models, Callable[[], dict]]:
     register_backend(aligner)
     stems4 = Stems4(DEMUCS_DIR)
     transcriber = _LazyTranscriber(ASR_DIR) if os.path.isdir(ASR_DIR) else None
-    # The six-stem cascade behind the spatial renders: the separator above, htdemucs_ft and, lazily, htdemucs_6s.
-    # Nothing is loaded for it here: a worker that only ever makes instrumentals pays nothing.
+    # The six-stem separator behind the spatial renders (separate.Stems6 says what it must do). This is the one
+    # place it is built: a different separator is constructed here instead (the spatial roadmap's "Where your own
+    # separator plugs in"). Nothing is loaded for it here: a worker that only ever makes instrumentals pays nothing.
     six = GuitarPiano(DEMUCS_DIR)
     stems6 = Stems6(separator, stems4, six)
     models = pipeline.Models(separator=separator, stems4=stems4 if stems4.available() else None,
-                             transcriber_factory=transcriber, stems6=stems6 if stems6.available() else None,
-                             restorer=Restorer())  # no restoration model yet (restore.py)
+                             transcriber_factory=transcriber, stems6=stems6 if stems6.available() else None)
 
     def state() -> dict:
         return {

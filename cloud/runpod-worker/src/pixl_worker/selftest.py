@@ -209,9 +209,9 @@ def bench(spec, *, caps: Caps, worker: dict, separator, stems4, transcriber_fact
                 six = timed("stems6", lambda: stems6.stems(mix, sr, quality="standard", vocals=vocals), memory=True)
                 stages["stems6Stems"] = len(six)
                 if len(six) < 6:
-                    notes.append("stems6: htdemucs_6s is not baked into this image; four stems")
+                    notes.append(f"stems6: {stems6.model_id} gave {len(six)} stems, not six")
             else:
-                notes.append("stems6: the six-stem models are not baked into this image")
+                notes.append("stems6: the six-stem separator's weights are not baked into this image")
         if "render" in spec.stages:
             rendered = timed("render", lambda: library.render(mix, six, sr, [BENCH_PROFILE])[BENCH_PROFILE],
                              memory=True)

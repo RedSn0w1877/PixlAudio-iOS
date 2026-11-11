@@ -230,15 +230,14 @@ def test_what_no_phone_can_use_goes_before_any_real_render():
     objects.update(render("orphanOld01", mb=40, age=0.5, manifest=False))    # its manifest never came
     objects.update(render("orphanNew01", mb=40, age=0.01, manifest=False))   # 14 minutes old: maybe still coming
     objects.update(render("olderLib001", mb=40, age=2.0, version=0))         # a library version nobody reads now
-    objects.update(render("noteOnly001", "enhanced", age=900.0, audio=False))  # "nothing to restore", 1 KB
+    objects.update(render("audioGone01", "sp-hall", age=30.5, audio=False))  # its audio expired: it advertises a 404
     bucket = FakeBucket(objects)
     assert run(bucket) == 0
     gone = deleted(bucket)
-    assert gone[:3] == ["lib/v1/orphanOld01/sp-studio.flac", "lib/v0/olderLib001/sp-studio.json",
-                        "lib/v0/olderLib001/sp-studio.flac"]
-    assert gone[3] == "lib/v1/video000000/sp-studio.json"  # then the oldest real render
+    assert gone[:4] == ["lib/v1/audioGone01/sp-hall.json", "lib/v1/orphanOld01/sp-studio.flac",
+                        "lib/v0/olderLib001/sp-studio.json", "lib/v0/olderLib001/sp-studio.flac"]
+    assert gone[4] == "lib/v1/video000000/sp-studio.json"  # then the oldest real render
     assert "lib/v1/orphanNew01/sp-studio.flac" in bucket.objects  # a render in progress is the newest thing there
-    assert "lib/v1/noteOnly001/enhanced.json" in bucket.objects   # ancient, but deleting it frees nothing
     assert sum(size for size, _ in bucket.objects.values()) <= 8 * J.GB
 
 
@@ -249,18 +248,22 @@ def test_plan_orders_by_the_manifests_date_and_takes_no_more_than_needed():
                J.Obj("lib/v1/bbb/sp-wide.flac", 30 * MB, NOW - 3 * DAY),
                J.Obj("lib/v1/bbb/sp-hall.json", 1000, NOW - 2 * DAY),        # another render of the same song
                J.Obj("lib/v1/bbb/sp-hall.flac", 30 * MB, NOW - 2 * DAY),
-               J.Obj("lib/v1/ccc/enhanced.flac", 30 * MB, NOW - 9 * DAY),
-               J.Obj("lib/v1/ccc/enhanced.json", 1000, NOW - 9 * DAY)]
+               J.Obj("lib/v1/ccc/sp-night.json", 1000, NOW - 1 * DAY),       # its audio is gone
+               J.Obj("lib/v1/ddd/sp-studio.flac", 30 * MB, NOW - 9 * DAY),
+               J.Obj("lib/v1/ddd/sp-studio.json", 1000, NOW - 9 * DAY)]
     renders = J.group(objects)
     assert sorted(r.stem for r in renders) == ["lib/v1/aaa/sp-studio", "lib/v1/bbb/sp-hall", "lib/v1/bbb/sp-wide",
-                                               "lib/v1/ccc/enhanced"]
+                                               "lib/v1/ccc/sp-night", "lib/v1/ddd/sp-studio"]
     assert J.plan(renders, 200 * MB, now=NOW) == []
     order = [r.stem for r in J.plan(renders, 0, now=NOW)]
-    assert order == ["lib/v1/ccc/enhanced", "lib/v1/bbb/sp-wide", "lib/v1/bbb/sp-hall", "lib/v1/aaa/sp-studio"]
-    assert [r.stem for r in J.plan(renders, 95 * MB, now=NOW)] == ["lib/v1/ccc/enhanced"]
-    assert [r.stem for r in J.plan(renders, 89 * MB, now=NOW)] == ["lib/v1/ccc/enhanced", "lib/v1/bbb/sp-wide"]
+    assert order == ["lib/v1/ccc/sp-night", "lib/v1/ddd/sp-studio", "lib/v1/bbb/sp-wide", "lib/v1/bbb/sp-hall",
+                     "lib/v1/aaa/sp-studio"]
+    assert [r.stem for r in J.plan(renders, 95 * MB, now=NOW)] == ["lib/v1/ccc/sp-night", "lib/v1/ddd/sp-studio"]
+    assert [r.stem for r in J.plan(renders, 89 * MB, now=NOW)] == ["lib/v1/ccc/sp-night", "lib/v1/ddd/sp-studio",
+                                                                  "lib/v1/bbb/sp-wide"]
     for chosen in J.plan(renders, 0, now=NOW):
-        assert [o.key.rsplit(".", 1)[1] for o in chosen.deletion_order()] == ["json", "flac"]
+        assert [o.key.rsplit(".", 1)[1] for o in chosen.deletion_order()] == (
+            ["json"] if chosen.stem == "lib/v1/ccc/sp-night" else ["json", "flac"])
 
 
 def test_a_manifest_that_cannot_be_deleted_keeps_its_audio_and_fails_the_run(capsys):

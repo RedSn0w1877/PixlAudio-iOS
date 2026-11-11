@@ -17,8 +17,7 @@
     "stems4": null,
     "aligner": null,
     "asr": null,
-    "stems6": null,
-    "restorer": null
+    "stems6": null
   },
   "input": {
     "codec": "flac",
@@ -46,8 +45,6 @@
     "renders": {
       "studio": "exists"
     },
-    "enhanced": "not_needed",
-    "restore": null,
     "stemMode": null
   },
   "timings": {
@@ -57,7 +54,6 @@
     "separateMs": 0,
     "stemsMs": 0,
     "lyricsMs": 0,
-    "restoreMs": 0,
     "stems6Ms": 0,
     "renderMs": 0,
     "encodeMs": 0,

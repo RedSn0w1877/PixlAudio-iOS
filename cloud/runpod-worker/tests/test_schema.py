@@ -256,7 +256,7 @@ def test_bench_defaults(caps):
         validate_job({"v": 1, "op": "bench", "bench": {"stages": ["mine"]}}, caps)
 
 
-# ---- the shared library: tasks spatial and enhance (cloud-audio-spec.md, section 4) -------------------------
+# ---- the shared library: the spatial task (cloud-audio-spec.md, section 4) ---------------------------------
 
 HOST = "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/pixl-cloud-studio"
 SIG = "X-Amz-Signature=" + "a" * 64
@@ -275,7 +275,7 @@ def test_the_library_version_lives_in_one_place():
     assert library.LIB_V == 1 and schema.LIB_V is library.LIB_V
     assert load_schema("job.input")["$defs"]["library"]["properties"]["v"]["const"] == library.LIB_V
     assert library.audio_key(VIDEO, "sp-studio") == f"lib/v{library.LIB_V}/{VIDEO}/sp-studio.flac"
-    assert library.manifest_key(VIDEO, "enhanced") == f"lib/v{library.LIB_V}/{VIDEO}/enhanced.json"
+    assert library.manifest_key(VIDEO, "sp-night") == f"lib/v{library.LIB_V}/{VIDEO}/sp-night.json"
     for name in ALL_EXAMPLES:  # every example that names a library object names this version
         text = (EXAMPLES / name).read_text(encoding="utf-8")
         assert "lib/v" not in text.replace(f"lib/v{library.LIB_V}/", ""), name
@@ -291,23 +291,23 @@ def test_the_schemas_list_the_renderers_profiles_and_the_workers_tasks_and_stage
     assert tuple(job_input["$defs"]["bench"]["properties"]["stages"]["items"]["enum"]) == schema.BENCH_STAGES
     library_block = result["properties"]["library"]["oneOf"][1]["properties"]
     assert tuple(library_block["renders"]["propertyNames"]["enum"]) == PROFILE_IDS
-    assert tuple(render["properties"]["profile"]["enum"]) == PROFILE_IDS + (None,)
+    assert tuple(render["properties"]["profile"]["enum"]) == PROFILE_IDS
     assert "|".join(PROFILE_IDS) in render["$defs"]["audio"]["properties"]["key"]["pattern"]
-    renders = next(rule for rule in job_input["allOf"]
+    assert job_input["$defs"]["library"]["properties"]["renders"]["maxItems"] == len(PROFILE_IDS)
+    spatial = next(rule for rule in job_input["allOf"]
                    if rule["if"]["properties"].get("tasks", {}).get("contains") == {"const": "spatial"})
-    assert renders["then"]["properties"]["library"]["properties"]["renders"]["maxItems"] == len(PROFILE_IDS)
+    assert spatial["then"]["required"] == ["library"]
 
 
 def test_spatial_example_normalises(caps):
     job = validate_job(load_example("job.input.spatial.json"), caps)
-    assert job.tasks == ("spatial", "enhance") and not job.wants_own_outputs() and job.stem_slots() == ()
+    assert job.tasks == ("spatial",) and not job.wants_own_outputs() and job.stem_slots() == ()
     lib = job.library
-    assert lib.video_id == VIDEO and lib.source_itag == 251 and lib.source_codec == "opus" and lib.restore == "auto"
-    assert [t.slot for t in lib.targets()] == ["sp-studio", "enhanced"]
+    assert lib.video_id == VIDEO and lib.source_itag == 251 and lib.source_codec == "opus"
+    assert [t.slot for t in lib.renders] == ["sp-studio"]
     studio = lib.target("sp-studio")
     assert studio.profile == "studio" and f"/{LIB}/sp-studio.flac?" in studio.audio_put
     assert f"/{LIB}/sp-studio.json?" in studio.manifest_put and f"/{LIB}/sp-studio.json?" in studio.manifest_get
-    assert lib.enhanced.profile is None and f"/{LIB}/enhanced.flac?" in lib.enhanced.audio_put
     assert set(job.output.put) == {"manifest"} and job.guard is not None and job.last_in_batch
     with pytest.raises(KeyError):
         lib.target("sp-wide")
@@ -318,7 +318,6 @@ def test_spatial_example_normalises(caps):
 def test_combined_example_keeps_its_own_outputs_and_defaults(caps):
     job = validate_job(load_example("job.input.spatial.combined.json"), caps)
     assert job.tasks == ("instrumental", "spatial") and job.wants_own_outputs() and job.stem_slots() == ("instrumental",)
-    assert job.library.restore == "auto" and job.library.enhanced is None
     assert [t.profile for t in job.library.renders] == ["night", "hall"]  # the order they were asked for
     assert job.library.renders[0].manifest_get and job.library.renders[1].manifest_get is None
     assert job.library.source_itag == 140
@@ -335,43 +334,30 @@ def test_library_is_ignored_without_its_tasks(caps):
     assert validate_job(doc, caps).library is None
 
 
-def test_a_block_whose_task_was_not_asked_for_is_ignored(caps):
+def test_spatial_is_the_only_library_task(caps):
+    # Enhanced audio was cut before release (2026-11-11): "enhance" is no task, like any other unknown name.
     doc = _spatial()
-    doc["tasks"] = ["spatial"]
-    doc["library"]["enhanced"] = {"audioPut": "not even a url"}
-    job = validate_job(doc, caps)
-    assert job.library.enhanced is None and len(job.library.renders) == 1
-    INPUT_SCHEMA.validate(doc)
-    del doc["library"]["enhanced"]
-    assert validate_job(doc, caps).library.enhanced is None
-    INPUT_SCHEMA.validate(doc)
-
-    doc = _spatial()
-    doc["tasks"] = ["enhance"]
-    doc["library"]["renders"] = "not a list"
-    job = validate_job(doc, caps)
-    assert job.library.renders == () and job.library.enhanced.slot == "enhanced"
-    INPUT_SCHEMA.validate(doc)
-    del doc["library"]["renders"]
-    assert validate_job(doc, caps).library.renders == ()
-    INPUT_SCHEMA.validate(doc)
+    doc["tasks"] = ["spatial", "enhance"]
+    with pytest.raises(errors.WorkerError) as info:
+        validate_job(doc, caps)
+    assert info.value.code == errors.BAD_SCHEMA
+    with pytest.raises(jsonschema.ValidationError):
+        INPUT_SCHEMA.validate(doc)
 
 
 def test_optional_library_fields(caps):
     doc = _spatial()
-    del doc["library"]["source"], doc["library"]["restore"]
-    del doc["library"]["renders"][0]["manifestGet"], doc["library"]["enhanced"]["manifestGet"]
+    del doc["library"]["source"], doc["library"]["renders"][0]["manifestGet"]
     job = validate_job(doc, caps)
     INPUT_SCHEMA.validate(doc)
-    assert (job.library.source_itag, job.library.source_codec, job.library.restore) == (None, None, "auto")
-    assert job.library.renders[0].manifest_get is None and job.library.enhanced.manifest_get is None
+    assert (job.library.source_itag, job.library.source_codec) == (None, None)
+    assert job.library.renders[0].manifest_get is None
     doc["library"]["source"] = {"codec": "aac", "future": True}
-    doc["library"]["restore"] = "off"
     doc["library"]["future"] = [1, 2]
     doc["library"]["renders"][0]["future"] = "x"
     job = validate_job(doc, caps)
     INPUT_SCHEMA.validate(doc)
-    assert (job.library.source_itag, job.library.source_codec, job.library.restore) == (None, "aac", "off")
+    assert (job.library.source_itag, job.library.source_codec) == (None, "aac")
 
 
 def test_all_six_profiles_in_one_job(caps):
@@ -384,7 +370,6 @@ def test_all_six_profiles_in_one_job(caps):
     job = validate_job(doc, caps)
     INPUT_SCHEMA.validate(doc)
     assert [t.profile for t in job.library.renders] == list(reversed(PROFILE_IDS))
-    assert [t.slot for t in job.library.targets()][-1] == "enhanced"
 
 
 def _library_mutations():
@@ -416,7 +401,7 @@ def _library_mutations():
     def twice(doc):
         doc["library"]["renders"].append(copy.deepcopy(doc["library"]["renders"][0]))
 
-    render, enhanced = ["library", "renders", 0], ["library", "enhanced"]
+    render = ["library", "renders", 0]
     jk = "3d9f0c52-7a41-4e8b-b6f3-91c2d5e7a804"
     return [
         ("library missing", delp(["library"]), errors.BAD_SCHEMA, True),
@@ -440,8 +425,6 @@ def _library_mutations():
         ("itag beyond 32 bits", setp(["library", "source", "itag"], 2 ** 31), errors.BAD_SCHEMA, True),
         ("codec too long", setp(["library", "source", "codec"], "x" * 17), errors.BAD_SCHEMA, True),
         ("codec a number", setp(["library", "source", "codec"], 251), errors.BAD_SCHEMA, True),
-        ("restore", setp(["library", "restore"], "on"), errors.BAD_SCHEMA, True),
-        ("restore a boolean", setp(["library", "restore"], True), errors.BAD_SCHEMA, True),
         ("renders missing", delp(["library", "renders"]), errors.BAD_SCHEMA, True),
         ("renders empty", setp(["library", "renders"], []), errors.BAD_SCHEMA, True),
         ("renders an object", setp(["library", "renders"], {}), errors.BAD_SCHEMA, True),
@@ -471,21 +454,12 @@ def _library_mutations():
          errors.BAD_URL, False),
         ("manifestPut on another host",
          setp(render + ["manifestPut"], f"https://evil.example.com/{LIB}/sp-studio.json?{SIG}"), errors.BAD_URL, False),
-        ("manifestGet of the enhanced manifest", setp(render + ["manifestGet"], f"{HOST}/{LIB}/enhanced.json?{SIG}"),
+        ("manifestGet of another profile", setp(render + ["manifestGet"], f"{HOST}/{LIB}/sp-wide.json?{SIG}"),
+         errors.BAD_URL, False),
+        ("manifestGet outside the renders", setp(render + ["manifestGet"], f"{HOST}/{LIB}/other.json?{SIG}"),
          errors.BAD_URL, False),
         ("manifestGet over http", setp(render + ["manifestGet"], f"http{HOST[5:]}/{LIB}/sp-studio.json?{SIG}"),
          errors.BAD_URL, True),
-        ("enhanced missing", delp(enhanced), errors.BAD_SCHEMA, True),
-        ("enhanced null", setp(enhanced, None), errors.BAD_SCHEMA, True),
-        ("enhanced a list", setp(enhanced, []), errors.BAD_SCHEMA, True),
-        ("enhanced audioPut missing", delp(enhanced + ["audioPut"]), errors.BAD_SCHEMA, True),
-        ("enhanced manifestPut missing", delp(enhanced + ["manifestPut"]), errors.BAD_SCHEMA, True),
-        ("enhanced audioPut at a render", setp(enhanced + ["audioPut"], f"{HOST}/{LIB}/sp-studio.flac?{SIG}"),
-         errors.BAD_URL, False),
-        ("enhanced manifestPut at its audio", setp(enhanced + ["manifestPut"], f"{HOST}/{LIB}/enhanced.flac?{SIG}"),
-         errors.BAD_URL, False),
-        ("enhanced manifestGet of a render", setp(enhanced + ["manifestGet"], f"{HOST}/{LIB}/sp-studio.json?{SIG}"),
-         errors.BAD_URL, False),
         ("no manifest put", delp(["output", "put", "manifest"]), errors.BAD_SCHEMA, True),
         ("the volume fallback has no library", volume, errors.BAD_SCHEMA, True),
     ]
@@ -512,7 +486,7 @@ def test_an_older_worker_would_refuse_the_new_tasks_by_name():
     # 1.0.0 answers BAD_SCHEMA "tasks may only contain ...": the phone must not send library tasks to it.
     from pixl_worker import schema
 
-    assert schema.LIBRARY_TASKS == ("spatial", "enhance")
+    assert schema.LIBRARY_TASKS == ("spatial",)
     assert schema.TASKS[:4] == ("instrumental", "vocals", "stems4", "lyrics")
 
 
@@ -520,10 +494,7 @@ def test_render_manifest_schema_rejects_what_a_phone_must_not_trust():
     validator = jsonschema.Draft202012Validator(load_schema("library.render"))
     jsonschema.Draft202012Validator.check_schema(load_schema("library.render"))
     spatial = load_example("library.render.spatial.json")
-    nothing = load_example("library.render.enhanced.none.json")
-    restored = load_example("library.render.enhanced.json")
-    for doc in (spatial, nothing, restored):
-        validator.validate(doc)
+    validator.validate(spatial)
 
     def broken(doc, path, value):
         doc = copy.deepcopy(doc)
@@ -547,21 +518,20 @@ def test_render_manifest_schema_rejects_what_a_phone_must_not_trust():
         broken(spatial, ["videoId"], "short"),
         broken(spatial, ["v"], 2),
         broken(spatial, ["schema"], "pixl.cloudstudio.result"),
-        broken(spatial, ["render", "restore", "reason"], "because"),
         broken(spatial, ["createdAt"], "yesterday"),
-        broken(nothing, ["profile"], "studio"),                 # kind enhanced has no profile
-        broken(nothing, ["loudness"], spatial["loudness"]),     # no audio, no loudness
-        broken(nothing, ["render", "restore", "applied"], True),
-        broken(nothing, ["render", "restore", "reason"], None),  # no file needs a reason
-        broken(nothing, ["render", "engine"], "pixl-spatial-1"),
-        broken(restored, ["render", "restore", "applied"], False),  # a file means it was restored
-        broken(restored, ["loudness"], None),
+        broken(spatial, ["kind"], "enhanced"),                  # spatial is the only kind
+        broken(spatial, ["render", "stems"], None),             # it always names the separator
+        broken(spatial, ["render", "stemMode"], None),
+        broken(spatial, ["audio", "key"], "lib/v1/J7p4bzqLvCw/enhanced.flac"),
     ]
     for doc in bad:
         with pytest.raises(jsonschema.ValidationError):
             validator.validate(doc)
-    # the two things the examples promise about level (spec 3.1)
-    assert spatial["loudness"]["headroomDb"] == 4.0 and restored["loudness"]["headroomDb"] == 0.0
+    # what the manifest of spec 3.1 has, and nothing it does not
+    assert set(spatial["source"]) == {"itag", "codec", "sampleRate", "decodedSamples", "sha256"}
+    assert spatial["render"] == {"engine": "pixl-spatial-1", "stems": "open-cascade-6", "stemMode": "stems6"}
+    # what the example promises about level (spec 3.1)
+    assert spatial["loudness"]["headroomDb"] == 4.0
     assert abs(spatial["loudness"]["sourceLufs"] - spatial["loudness"]["headroomDb"]
                - spatial["loudness"]["integratedLufs"]) <= 0.3
 
@@ -569,14 +539,15 @@ def test_render_manifest_schema_rejects_what_a_phone_must_not_trust():
 def test_result_examples_for_library_jobs():
     validator = jsonschema.Draft202012Validator(load_schema("job.result"))
     ok, exists, partial = (load_example(f"job.result.spatial{suffix}.json") for suffix in ("", ".exists", ".partial"))
-    assert ok["library"]["renders"] == {"studio": "ok"} and ok["library"]["enhanced"] == "not_needed"
+    assert ok["library"] == {"videoId": VIDEO, "libV": 1, "renders": {"studio": "ok"}, "stemMode": "stems6"}
     assert ok["outputs"]["sp-studio"]["key"] == f"{LIB}/sp-studio.flac"
-    assert exists["library"]["restore"] is None and exists["library"]["stemMode"] is None
+    assert exists["library"]["renders"] == {"studio": "exists"} and exists["library"]["stemMode"] is None
     assert partial["status"] == "partial" and partial["library"]["renders"]["hall"] == "failed"
     assert set(partial["outputs"]) == {"instrumental", "sp-night"}  # an older output next to a library one
+    for doc in (ok, exists, partial):  # spec section 4: these timings and models, these progress stages
+        assert "stems6Ms" in doc["timings"] and "renderMs" in doc["timings"] and "stems6" in doc["models"]
     for field, value in ((["library", "renders"], {"cinema": "ok"}), (["library", "renders"], {"studio": "done"}),
-                         (["library", "enhanced"], "skipped"), (["library", "stemMode"], "stems5"),
-                         (["library", "restore"], {"applied": False}),
+                         (["library", "renders"], {"studio": "not_needed"}), (["library", "stemMode"], "stems5"),
                          (["outputs", "sp-studio", "key"], "lib/J7p4bzqLvCw/sp-studio.flac")):
         doc = copy.deepcopy(ok)
         target = doc

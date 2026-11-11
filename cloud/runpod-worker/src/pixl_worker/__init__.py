@@ -5,5 +5,5 @@ pipeline, lyrics.windows, lyrics.postprocess, ...), so the CPU-only tests run wi
 The model wrappers (separate, lyrics.align, lyrics.transcribe) import torch lazily.
 """
 
-WORKER_VERSION = "1.1.0"  # 1.1.0: the shared library (tasks spatial and enhance), cloud-audio-spec.md
+WORKER_VERSION = "1.1.0"  # 1.1.0: Spatial audio renders in the shared library (task spatial), cloud-audio-spec.md
 SUPPORTED_VERSIONS = (1,)

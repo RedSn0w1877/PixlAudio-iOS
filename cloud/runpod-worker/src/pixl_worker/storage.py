@@ -296,7 +296,7 @@ class PresignedStorage:
         return self.job.object_key(slot)
 
     # ---- the shared library (lib/v<LIB_V>/<videoId>/, cloud-audio-spec.md section 3) ------------------------
-    # `slot` is sp-<profile> or enhanced; schema.py already held each URL to that slot's canonical key.
+    # `slot` is sp-<profile>; schema.py already held each URL to that slot's canonical key.
     def get_library_manifest(self, slot: str) -> dict | None:
         """The render manifest that is in the library for this slot, or None when there is none, when the job
         brought no manifestGet for it, or when storage could not be read (one try: asking is best effort, and

@@ -199,16 +199,22 @@ def test_notice_lists_what_1_1_0_added_and_the_image_ships_the_texts():
 
 def test_the_new_contract_files_keep_to_the_feature_names():
     # Owner rule for everything about this feature that a person may read (cloud-audio-spec.md, section 1): the
-    # features are "Spatial audio" and "Enhanced audio", and a handful of words are never used for them.
+    # feature is "Spatial audio", a handful of words are never used for it, and Enhanced audio (cut on 2026-11-11)
+    # is not mentioned at all.
     ruled_out = ("lossless", "hi-res", "hires", "dolby", "atmos", "360 reality", "claude", "anthropic",
-                 "binilyrics")
+                 "binilyrics", "enhanced audio")
     files = [ROOT / "schema" / "v1" / name for name in ("job.input.schema.json", "job.result.schema.json",
                                                          "library.render.schema.json", "selftest.result.schema.json")]
     files += sorted((ROOT / "schema" / "v1" / "examples").glob("*spatial*.json"))
     files += sorted((ROOT / "schema" / "v1" / "examples").glob("library.render*.json"))
-    files += [ROOT / "LICENSES" / "SADIE-II.txt", ROOT / "NOTICE", ROOT / "deploy" / "library_janitor.py",
-              ROOT / "src" / "pixl_worker" / "library.py", ROOT / "src" / "pixl_worker" / "restore.py"]
-    assert len(files) >= 16
+    files += [ROOT / "LICENSES" / "SADIE-II.txt", ROOT / "NOTICE", ROOT / "README.md",
+              ROOT / "deploy" / "library_janitor.py"]
+    files += [ROOT / "src" / "pixl_worker" / name for name in ("library.py", "pipeline.py", "separate.py", "schema.py",
+                                                               "selftest.py", "smoke.py", "handler.py")]
+    assert len(files) >= 20
+    assert not (ROOT / "src" / "pixl_worker" / "restore.py").exists()
+    assert sorted(p.name for p in (ROOT / "schema" / "v1" / "examples").glob("library.render*.json")) == [
+        "library.render.spatial.json"]
     for path in files:
         text = path.read_text(encoding="utf-8").lower()
         for word in ruled_out:

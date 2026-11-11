@@ -229,19 +229,35 @@ def _phase(progress: Callable[[int, int], None] | None, start: float, end: float
 
 
 class Stems6:
-    """Six stems from open models only, as a cascade (cloud-audio-spec.md, section 5):
+    """The six-stem separator behind the spatial renders: the ONE place their stems come from (cloud-audio-spec.md,
+    section 5; docs/handoff/2026-11-11-spatial-roadmap.md, Part 3, "Where your own separator plugs in").
 
+    A replacement is a class of its own (in its own file) built in handler.load_models() instead of this one. The
+    pipeline gets it as models.stems6 and uses exactly this of it:
+    - `model_id`: its own id. Every render's manifest names it (render.stems). A new separator also bumps
+      library.LIB_V, in the worker and in both apps, so renders made with the old one are not reused.
+    - `available() -> bool`: are its weights there? False means the worker makes no spatial renders.
+    - `stems(mix, sample_rate, *, quality="standard", vocals=None, progress=None) -> dict[str, np.ndarray]`.
+      mix is (frames, 2) float32 at sample_rate (usually 44.1 or 48 kHz). Return any of vocals, drums, bass,
+      guitar, piano, other (fewer is fine), each (frames, 2) float32 at the SAME sample rate with the SAME number
+      of frames as mix (the pipeline checks names and shapes), time-aligned to the sample, and adding up to the
+      song as closely as possible: the renderer puts the difference into "other", and renders the song without
+      stems when that difference is above -6 dB of it. quality is "standard" or "best". vocals, when given, are
+      the BS-RoFormer vocals of this same mix (the job already separated them): use them or ignore them. Call
+      progress(done, total) now and then: it carries the job's deadline. Load the weights on first use, and turn
+      a GPU out-of-memory error into WorkerError(GPU_OOM, ..., refresh_worker=True).
+    (`separator`, when an object has one, is reported as the job's models.separator if it ran; it is optional.)
+
+    This class is a cascade of open models only:
     1. vocals from the BS-RoFormer separator (or handed in, when the job already separated them for its
        instrumental: the vocal separation never runs twice);
     2. htdemucs_ft on mix − vocals for drums, bass and other;
     3. htdemucs_6s on that "other" for guitar and piano; what is left of it stays "other". Running it on "other"
        keeps the six consistent: guitar + piano + what is left add up to step 2's "other".
-
     Without the htdemucs_6s files step 3 is skipped and the result is the four stems (the render then says
-    stemMode stems4). Whatever the stems do not add up to (htdemucs_ft's own leftover) the renderer puts back
-    into "other". Every stem has the input's sample rate and frame count."""
+    stemMode stems4)."""
 
-    model_id = STEMS6_ID
+    model_id: str = STEMS6_ID
     # roughly how the stage's time splits between its three steps (for the progress reports only)
     _WEIGHTS = {"vocals": 0.50, "stems4": 0.38, "six": 0.12}
 
