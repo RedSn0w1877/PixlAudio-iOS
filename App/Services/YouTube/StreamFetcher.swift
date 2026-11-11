@@ -18,6 +18,8 @@ nonisolated struct StreamFetcher: Sendable {
         case badResponse(String)
         /// The re-resolved URL serves a different file (another itag) than the cached bytes.
         case formatChanged
+        /// SpotiFLAC's file is bigger than the quality setting takes (Pro: over 48 kHz); YouTube plays instead.
+        case aboveQualitySetting
 
         var errorDescription: String? {
             switch self {
@@ -26,6 +28,7 @@ nonisolated struct StreamFetcher: Sendable {
             case .http(let code): "The audio server answered HTTP \(code)."
             case .badResponse(let why): why
             case .formatChanged: "The audio changed on the server; try again."
+            case .aboveQualitySetting: "This song's file is above the quality setting."
             }
         }
     }
@@ -139,11 +142,10 @@ nonisolated struct StreamFetcher: Sendable {
             guard let http = response as? HTTPURLResponse else { throw Failure.badResponse("No HTTP response.") }
             if http.statusCode == 206 || http.statusCode == 200 {
                 do {
-                    return try await store(videoId: videoId, range: range, body: body, response: http,
-                                           streamURL: stream.url, streamMimeType: stream.mimeType)
+                    return try await store(videoId: videoId, range: range, body: body, response: http, stream: stream)
                 } catch {
-                    // If a SpotiFLAC upstream returned non-audio or invalid bytes before anything was cached,
-                    // switch automatically to YouTube (`InnerTube`).
+                    // A SpotiFLAC file that isn't usable audio, or is above the quality setting, before anything was
+                    // cached: switch to YouTube (`InnerTube`).
                     if stream.strategyName == InnerTubeService.spotiFLACStrategyName,
                        await cache.meta(videoId) == nil {
                         await service.invalidate(videoId: videoId)
@@ -174,7 +176,8 @@ nonisolated struct StreamFetcher: Sendable {
     }
 
     private func store(videoId: String, range: Range<Int64>, body: Data, response: HTTPURLResponse,
-                       streamURL: String, streamMimeType: String? = nil) async throws -> Data {
+                       stream: ResolvedStream) async throws -> Data {
+        let streamURL = stream.url
         let contentType = response.value(forHTTPHeaderField: "Content-Type")
         guard CloudStreamSecurity.isSupportedAudioContentType(contentType) else {
             throw Failure.badResponse("The server sent \(contentType ?? "?"), not audio.")
@@ -192,19 +195,31 @@ nonisolated struct StreamFetcher: Sendable {
             start = 0
             total = Int64(body.count)
         }
-        let isFLACStream = (streamMimeType?.lowercased().contains("flac") == true)
-            || (headerType?.lowercased().contains("flac") == true)
-            || (start == 0 && SpotiFLACParsing.isFLACMagicHeader(body))
-        if isFLACStream && start == 0 && body.count >= 4 {
-            let hasID3Tag = body[body.startIndex] == 0x49
-                && body[body.index(body.startIndex, offsetBy: 1)] == 0x44
-                && body[body.index(body.startIndex, offsetBy: 2)] == 0x33
-            if !SpotiFLACParsing.isFLACMagicHeader(body) && !hasID3Tag {
-                throw Failure.badResponse("Upstream did not return a valid FLAC header.")
+        var type = headerType ?? "audio/mp4"
+        var itag = URLCoding.androidQueryParameter(streamURL, "itag")
+        if stream.strategyName == InnerTubeService.spotiFLACStrategyName {
+            // Monochrome sends every file as application/octet-stream and mixes FLAC (16-bit, or 24-bit up to 192 kHz)
+            // with the odd AAC-in-MP4 file, so the first bytes say what it is (Android reads the same bytes in its
+            // proxy). Later ranges keep what the first one found.
+            let cachedType = await cache.meta(videoId)?.contentType
+            if start == 0 {
+                let facts = SpotiFLACParsing.audioFileFacts(body)
+                guard facts.format == .flac || facts.format == .mp4, let mimeType = facts.format.mimeType else {
+                    throw Failure.badResponse("SpotiFLAC sent a \(facts.format.rawValue) file this player can't keep.")
+                }
+                SpotiFLACTrackRegistry.shared.record(facts, forVideoId: videoId)
+                // Pro: a file over 48 kHz goes to YouTube, unless YouTube had nothing or bytes are already cached.
+                if cachedType == nil, !SpotiFLACTrackRegistry.shared.isLastResort(videoId),
+                   !StreamingAudioQuality.current().allowsFlacFirst(sampleRate: facts.flacSampleRate) {
+                    throw Failure.aboveQualitySetting
+                }
+                type = mimeType
+            } else {
+                type = cachedType ?? SpotiFLACTrackRegistry.shared.facts(forVideoId: videoId)?.format.mimeType
+                    ?? stream.mimeType ?? "audio/flac"
             }
+            itag = type.lowercased().contains("flac") ? "flac" : "spotiflac"
         }
-        let type = isFLACStream ? "audio/flac" : (headerType ?? "audio/mp4")
-        let itag = isFLACStream ? "flac" : URLCoding.androidQueryParameter(streamURL, "itag")
         guard total > 0, total <= CloudStreamSecurity.maxStreamContentLengthBytes else {
             throw Failure.badResponse("Unexpected stream size.")
         }

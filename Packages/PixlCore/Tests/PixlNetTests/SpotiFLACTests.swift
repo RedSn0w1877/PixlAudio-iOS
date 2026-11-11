@@ -259,6 +259,33 @@ struct SpotiFLACTests {
         #expect(resolved.trackId == "155102871061270528")
     }
 
+    /// `fLaC` + a STREAMINFO block laid out as in the FLAC spec.
+    static func flacHead(sampleRate: Int, channels: Int, bitDepth: Int) -> Data {
+        var head = [UInt8](repeating: 0, count: 42)
+        head.replaceSubrange(0..<4, with: Array("fLaC".utf8))
+        head[7] = 34
+        let packed = (UInt64(sampleRate) << 44) | (UInt64(channels - 1) << 41) | (UInt64(bitDepth - 1) << 36) | 12_345_678
+        for i in 0..<8 { head[18 + i] = UInt8(truncatingIfNeeded: packed >> (56 - 8 * UInt64(i))) }
+        return Data(head)
+    }
+
+    @Test("File heads give the format, and FLAC's rate, bit depth and channels")
+    func audioFileFacts() {
+        let cd = SpotiFLACParsing.audioFileFacts(Self.flacHead(sampleRate: 44_100, channels: 2, bitDepth: 16))
+        #expect(cd == SpotiFLACAudioFileFacts(format: .flac, sampleRate: 44_100, bitDepth: 16, channels: 2))
+        #expect(SpotiFLACParsing.audioFileFacts(Self.flacHead(sampleRate: 96_000, channels: 2, bitDepth: 24)).flacSampleRate == 96_000)
+        #expect(SpotiFLACParsing.audioFileFacts(Self.flacHead(sampleRate: 176_400, channels: 2, bitDepth: 24)).sampleRate == 176_400)
+
+        let mp4 = SpotiFLACParsing.audioFileFacts(Data([0, 0, 0, 0x20]) + Data("ftypisom".utf8))
+        #expect(mp4.format == .mp4)
+        #expect(mp4.flacSampleRate == nil)
+        #expect(mp4.format.mimeType == "audio/mp4")
+        #expect(SpotiFLACParsing.audioFileFacts(Data("ID3".utf8) + Data(count: 10)).format == .mp3)
+        #expect(SpotiFLACParsing.audioFileFacts(Data([0xFF, 0xF1, 0x50])).format == .aac)
+        #expect(SpotiFLACParsing.audioFileFacts(Data("<!doctype html>".utf8)).format == .unknown)
+        #expect(SpotiFLACParsing.audioFileFacts(Data("fLaC".utf8)) == SpotiFLACAudioFileFacts(format: .flac))
+    }
+
     @Test("FLAC magic header detector identifies genuine fLaC streams")
     func flacMagicHeaderDetection() {
         let validFLAC = Data([0x66, 0x4C, 0x61, 0x43, 0x00, 0x00, 0x00, 0x22])

@@ -13,6 +13,40 @@ nonisolated final class SpotiFLACTrackRegistry: @unchecked Sendable {
     private var bySpotifyId: [String: SpotiFLACTrackQuery] = [:]
     /// Synthetic ids handed out by `syntheticVideoId(forSpotifyId:)` in this process.
     private var syntheticIds: Set<String> = []
+    /// What each song's SpotiFLAC file turned out to be (its first bytes); Pro skips a FLAC over 48 kHz with it.
+    private var factsByVideoId: [String: SpotiFLACAudioFileFacts] = [:]
+    /// Songs whose SpotiFLAC file was chosen only because YouTube had nothing: any file beats none.
+    private var lastResortIds: Set<String> = []
+
+    func record(_ facts: SpotiFLACAudioFileFacts, forVideoId videoId: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        if factsByVideoId.count >= 512 { factsByVideoId.removeAll() }
+        factsByVideoId[videoId] = facts
+    }
+
+    func facts(forVideoId videoId: String) -> SpotiFLACAudioFileFacts? {
+        lock.lock()
+        defer { lock.unlock() }
+        return factsByVideoId[videoId]
+    }
+
+    func setLastResort(_ lastResort: Bool, forVideoId videoId: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        if lastResort {
+            if lastResortIds.count >= 512 { lastResortIds.removeAll() }
+            lastResortIds.insert(videoId)
+        } else {
+            lastResortIds.remove(videoId)
+        }
+    }
+
+    func isLastResort(_ videoId: String) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return lastResortIds.contains(videoId)
+    }
 
     init() {}
 

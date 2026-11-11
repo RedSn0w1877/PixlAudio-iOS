@@ -6601,13 +6601,35 @@
         }
       }
     },
-    "settings_audio_quality_standard" : {
+    "settings_audio_quality_medium" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Standard"
+            "value" : "Medium"
+          }
+        }
+      }
+    },
+    "settings_audio_quality_pro" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pro"
+          }
+        }
+      }
+    },
+    "settings_audio_quality_studio_pro" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Studio Pro"
           }
         }
       }
@@ -6618,7 +6640,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Caps the bitrate used for songs streamed from YouTube. Higher tiers use more mobile data."
+            "value" : "Higher quality sounds better and uses more mobile data. Pro plays FLAC when a song has it; Studio Pro also plays the biggest studio files."
           }
         }
       }
@@ -6630,17 +6652,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Streaming Audio Quality"
-          }
-        }
-      }
-    },
-    "settings_audio_quality_ultrasound" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ultrasound"
           }
         }
       }

@@ -60,6 +60,45 @@ extension SpotifyTrackRecord {
     }
 }
 
+/// What the first bytes of a SpotiFLAC file say about it (Android: `AudioFileFacts`). Monochrome sends everything as
+/// `application/octet-stream` and mixes 16-bit/44.1 kHz FLAC, 24-bit FLAC up to 192 kHz and the odd AAC-in-MP4 file.
+public struct SpotiFLACAudioFileFacts: Sendable, Hashable {
+    public enum Format: String, Sendable, Hashable {
+        case flac, mp4, mp3, aac, ogg, webm, unknown
+
+        /// The MIME type the player is told, or nil for an unknown format.
+        public var mimeType: String? {
+            switch self {
+            case .flac: "audio/flac"
+            case .mp4: "audio/mp4"
+            case .mp3: "audio/mpeg"
+            case .aac: "audio/aac"
+            case .ogg: "audio/ogg"
+            case .webm: "audio/webm"
+            case .unknown: nil
+            }
+        }
+    }
+
+    /// Enough for FLAC's STREAMINFO (bytes 8–41) and every other signature here.
+    public static let headBytes = 64
+
+    public var format: Format
+    public var sampleRate: Int?
+    public var bitDepth: Int?
+    public var channels: Int?
+
+    public init(format: Format, sampleRate: Int? = nil, bitDepth: Int? = nil, channels: Int? = nil) {
+        self.format = format
+        self.sampleRate = sampleRate
+        self.bitDepth = bitDepth
+        self.channels = channels
+    }
+
+    /// The FLAC sample rate, or nil for anything that isn't FLAC (or a rate the header didn't give).
+    public var flacSampleRate: Int? { format == .flac ? sampleRate : nil }
+}
+
 /// ReplayGain loudness metadata returned by lossless stream providers when available.
 public struct SpotiFLACReplayGain: Sendable, Codable, Hashable {
     public var trackGainDb: Double?
