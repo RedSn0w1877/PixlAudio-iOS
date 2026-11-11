@@ -36,7 +36,7 @@ class Caps:
     max_lyrics_lines: int = 500
     max_lyrics_chars: int = 20000
     max_body_kb: int = 256
-    execution_timeout_s: int = 900
+    execution_timeout_s: int = 1800  # the endpoint's limit; jobs without library tasks keep 900 (deadline.py)
     deadline_margin_s: int = 30
     allowed_host_suffixes: tuple[str, ...] = ()
     allowed_formats: tuple[str, ...] = DEFAULT_FORMATS
@@ -75,7 +75,7 @@ def load_caps(env: dict | None = None) -> Caps:
         max_lyrics_lines=_int(env, "PIXL_MAX_LYRICS_LINES", 500, 0, 5000),
         max_lyrics_chars=_int(env, "PIXL_MAX_LYRICS_CHARS", 20000, 0, 200000),
         max_body_kb=_int(env, "PIXL_MAX_BODY_KB", 256, 1, 10240),
-        execution_timeout_s=_int(env, "PIXL_EXECUTION_TIMEOUT_S", 900, 60, 7 * 24 * 3600),
+        execution_timeout_s=_int(env, "PIXL_EXECUTION_TIMEOUT_S", 1800, 60, 7 * 24 * 3600),
         deadline_margin_s=_int(env, "PIXL_DEADLINE_MARGIN_S", 30, 0, 600),
         allowed_host_suffixes=_list(env, "PIXL_ALLOWED_HOST_SUFFIXES", ()),
         allowed_formats=_list(env, "PIXL_ALLOWED_FORMATS", DEFAULT_FORMATS),

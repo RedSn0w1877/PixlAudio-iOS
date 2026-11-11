@@ -247,6 +247,22 @@ def test_bench_report_shows_the_spatial_stages_and_the_memory_not_the_counts(cap
     assert "<script>" not in out and "align: no word-timing" not in out
 
 
+def test_the_endpoint_gives_library_jobs_thirty_minutes_and_the_worker_knows():
+    sys.path.insert(0, str(ROOT / "src"))
+    from pixl_worker.config import load_caps
+
+    assert TEMPLATE["timeout"] == 1_800_000 and TEMPLATE["env"]["PIXL_EXECUTION_TIMEOUT_S"] == "1800"
+    caps = load_caps(TEMPLATE["env"])
+    assert caps.execution_timeout_s * 1000 == TEMPLATE["timeout"]  # RunPod's limit and the worker's are one number
+    assert caps.deadline_margin_s == 30  # so the worker ends a library job at 1770 s, with a manifest
+    defaults = load_caps({})  # a worker started without the endpoint's env has the same caps
+    for field in ("execution_timeout_s", "max_audio_s", "max_input_mb", "best_max_audio_s"):
+        assert getattr(defaults, field) == getattr(caps, field), field
+    # the README's table says the same
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "| `PIXL_EXECUTION_TIMEOUT_S` | 1800 |" in readme
+
+
 def test_the_deploy_knows_the_workers_bench_stages():
     sys.path.insert(0, str(ROOT / "src"))
     from pixl_worker import schema

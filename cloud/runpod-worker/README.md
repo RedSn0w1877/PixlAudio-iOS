@@ -194,7 +194,7 @@ python ci/lock.py               # regenerate requirements.lock / requirements-te
 | `PIXL_MAX_INPUT_MB` | 160 | biggest upload (a 15-minute song decoded to FLAC on the phone is ~90-130 MB) |
 | `PIXL_MAX_AUDIO_S` | 900 | longest song, checked on the probe and on the decoded samples |
 | `PIXL_BEST_MAX_AUDIO_S` | 480 | "Best" quality (overlap 4) only up to 8 minutes |
-| `PIXL_EXECUTION_TIMEOUT_S` | 900 | the job's own deadline is this minus 30 s, so a manifest is always written |
+| `PIXL_EXECUTION_TIMEOUT_S` | 1800 | the endpoint's `timeout`. A job with library tasks (`spatial`, `enhance`) ends itself 30 s before it, so a manifest is always written; every other job still ends itself at 870 s, because the apps send those with `executionTimeout` 900 000 and RunPod would cut them there |
 | `PIXL_ALLOWED_HOST_SUFFIXES` | `<R2_ACCOUNT_ID>.r2.cloudflarestorage.com` | the only storage host; HTTPS, public IP, signed, no redirects |
 | `PIXL_MAX_LYRICS_LINES` / `_CHARS` | 500 / 20000 | lyrics payload |
 | `PIXL_MAX_BODY_KB` | 256 | job input size |

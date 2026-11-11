@@ -31,7 +31,7 @@ from . import WORKER_VERSION  # noqa: E402
 from . import pipeline  # noqa: E402
 from . import selftest as st  # noqa: E402
 from .config import Caps, load_caps  # noqa: E402
-from .deadline import job_deadline  # noqa: E402
+from .deadline import job_deadline, time_limit_s  # noqa: E402
 from .errors import INTERNAL, WorkerError  # noqa: E402
 from .log import log, redact, redact_exception  # noqa: E402
 from .schema import validate_job  # noqa: E402
@@ -96,7 +96,8 @@ class Worker:
                                 transcriber_factory=self.models.transcriber_factory,
                                 cold_start_ms=self._take_cold_start(),
                                 progress=lambda message: self.progress(job, message))
-            deadline = job_deadline(self.caps.execution_timeout_s, self.caps.deadline_margin_s, job.get("policy"))
+            limit_s = time_limit_s(self.caps.execution_timeout_s, library_job=spec.library is not None)
+            deadline = job_deadline(limit_s, self.caps.deadline_margin_s, job.get("policy"))
             ctx = pipeline.Context(caps=self.caps, worker=self.worker_info, storage_factory=self.storage_factory,
                                    progress=lambda message: self.progress(job, message),
                                    cold_start_ms=self._take_cold_start())
