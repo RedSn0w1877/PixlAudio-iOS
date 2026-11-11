@@ -18,6 +18,10 @@ LENGTH_S = 0.024
 IMPULSES = 24
 DECAY_S = 0.006
 CANDIDATES = 96
+# Silence in front of both filters: their first impulses arrived together with the centred source they copy and
+# combed against it, differently at each ear (measured: +/- 6 dB in 1/12 octaves, and the image split left and
+# right in Surround). 3 ms is the measured compromise; 5 ms balances better but puts a third of the energy late.
+LEAD_S = 0.003
 
 
 def _sequence(sample_rate: int, seed: int) -> np.ndarray:
@@ -60,4 +64,5 @@ def pair(sample_rate: int) -> np.ndarray:
             score = ripples[i] + ripples[j] + 6.0 * alike
             if score < best_score:
                 best, best_score = (int(i), int(j)), score
-    return np.stack([candidates[best[0]], candidates[best[1]]])
+    lead = np.zeros(int(round(LEAD_S * sample_rate)))
+    return np.stack([np.concatenate([lead, candidates[best[0]]]), np.concatenate([lead, candidates[best[1]]])])

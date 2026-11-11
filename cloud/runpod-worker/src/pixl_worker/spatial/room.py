@@ -25,6 +25,7 @@ SPEED_OF_SOUND = 343.0
 EARLY_FLOOR_HZ = 250.0     # reflections carry nothing much below this (see KernelBuilder)
 SOFT_ONSET_MS = 6.0        # reflections arriving sooner than this are turned down in proportion
 SPREAD_FROM_HZ = 400.0     # a spread copy only carries what is above this; the lows stay in the middle
+DIFFUSE_PARTS, DIFFUSE_MS, DIFFUSE_DEG = 6, 7.0, 12.0   # see Room.diffuse_after_ms
 
 
 def source_position(room: Room, az: float, el: float, dist: float) -> np.ndarray:
@@ -70,6 +71,18 @@ def reflections(room: Room, source: np.ndarray, sample_rate: int) -> list[tuple[
                 az = float(np.degrees(np.arctan2(vector[1], vector[0])))
                 el = float(np.degrees(np.arcsin(np.clip(vector[2] / distance, -1.0, 1.0))))
                 found.append((delay_s * sample_rate, gain, az, el, bounces))
+    if room.diffuse_after_ms > 0.0:
+        rng = np.random.default_rng(1234)
+        spread = []
+        for delay, gain, az, el, bounces in found:
+            if delay / sample_rate * 1000.0 <= room.diffuse_after_ms:
+                spread.append((delay, gain, az, el, bounces))
+                continue
+            for _ in range(DIFFUSE_PARTS):
+                spread.append((delay + rng.uniform(-DIFFUSE_MS, DIFFUSE_MS) * sample_rate / 1000.0,
+                               gain / np.sqrt(DIFFUSE_PARTS) * rng.choice((-1.0, 1.0)),
+                               az + rng.uniform(-DIFFUSE_DEG, DIFFUSE_DEG), el, bounces))
+        found = spread
     return found
 
 
@@ -112,11 +125,15 @@ class KernelBuilder:
         self._band = (self._freqs >= 200.0) & (self._freqs <= 6000.0)
         front = self._direct_spectrum(0.0, 0.0)
         self.front_energy = self._energy(front)
-        # Scale the reflections so a centred source at the reference distance gets exactly room.er_db.
-        _, early = self._parts(0.0, 0.0, reference_dist)
-        early_energy = self._energy(early)
-        target = self.front_energy * 10.0 ** (room.er_db / 10.0)
-        self.er_scale = float(np.sqrt(target / early_energy)) if early_energy > 0.0 else 0.0
+        # Scale the reflections so a centred source at the reference distance gets exactly room.er_db, measured
+        # where it is heard: 200 Hz to 8 kHz, music-like (pink) weighting. (Full-band energy read 2-5 dB low,
+        # because the reflections are high-passed and dulled while the direct sound is not.)
+        weight = np.where((self._freqs >= 200.0) & (self._freqs <= 8000.0), 1.0 / np.maximum(self._freqs, 1.0), 0.0)
+        direct, early = self._parts(0.0, 0.0, reference_dist)
+        heard = lambda spec: float(np.sum((np.abs(spec) ** 2).mean(axis=0) * weight))  # noqa: E731
+        early_heard = heard(early)
+        target = heard(direct) * 10.0 ** (room.er_db / 10.0)
+        self.er_scale = float(np.sqrt(target / early_heard)) if early_heard > 0.0 else 0.0
 
     def _energy(self, spec: np.ndarray) -> float:
         """Mean over the two ears of the impulse response's energy (Parseval on the one-sided spectrum)."""

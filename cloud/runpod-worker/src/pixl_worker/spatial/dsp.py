@@ -84,28 +84,45 @@ def convolve_bank(sources: list[np.ndarray], kernels: np.ndarray, out_len: int,
     return out[:out_len]
 
 
+BLOCK_FRAMES = 1024   # frames transformed at a time: keeps the temporary arrays small for long songs
+
+
 def stft(x: np.ndarray, n_fft: int, hop: int) -> np.ndarray:
-    """x (frames,) float32 -> (T, n_fft//2+1) with a sqrt-Hann window; padded so every sample is covered n_fft/hop
-    times."""
+    """x (frames,) float32 -> (T, n_fft//2+1) complex64 with a sqrt-Hann window; padded so every sample is covered
+    n_fft/hop times."""
     window = np.sqrt(np.hanning(n_fft + 1)[:-1]).astype(np.float32)
     padded = np.concatenate([np.zeros(n_fft, np.float32), x.astype(np.float32, copy=False),
                              np.zeros(n_fft + hop, np.float32)])
     count = 1 + (len(padded) - n_fft) // hop
     view = np.lib.stride_tricks.sliding_window_view(padded, n_fft)[::hop][:count]
-    return np.fft.rfft(view * window, axis=-1)
+    out = np.empty((count, n_fft // 2 + 1), dtype=np.complex64)
+    for start in range(0, count, BLOCK_FRAMES):
+        out[start:start + BLOCK_FRAMES] = np.fft.rfft(view[start:start + BLOCK_FRAMES] * window, axis=-1)
+    return out
 
 
-def istft(spec: np.ndarray, n_fft: int, hop: int, length: int) -> np.ndarray:
-    """Inverse of stft() (sqrt-Hann synthesis, hop = n_fft/4). Returns `length` samples."""
+def istft(spec: np.ndarray, n_fft: int, hop: int, length: int, *, select: tuple[np.ndarray, int] | None = None
+          ) -> np.ndarray:
+    """Inverse of stft() (sqrt-Hann synthesis, hop = n_fft/4). Returns `length` samples. With `select` = (labels,
+    k), only the bins whose label is k are used (the others count as zero), without a full-size masked copy."""
     assert n_fft % hop == 0
     overlap = n_fft // hop
     window = np.sqrt(np.hanning(n_fft + 1)[:-1]).astype(np.float32)
-    frames = np.fft.irfft(spec, n_fft, axis=-1).astype(np.float32, copy=False) * window
-    total = (frames.shape[0] - 1) * hop + n_fft
+    count = spec.shape[0]
+    total = (count - 1) * hop + n_fft
     out = np.zeros(total + n_fft, dtype=np.float32)
-    for k in range(overlap):
-        part = frames[k::overlap]
-        out[k * hop:k * hop + part.size] += part.reshape(-1)
+    for start in range(0, count, BLOCK_FRAMES):
+        block = spec[start:start + BLOCK_FRAMES]
+        if select is not None:
+            labels, k = select
+            block = np.where(labels[start:start + BLOCK_FRAMES] == k, block, 0).astype(np.complex64, copy=False)
+        frames = np.fft.irfft(block, n_fft, axis=-1).astype(np.float32, copy=False)
+        frames *= window
+        base = start * hop
+        for k_off in range(overlap):
+            part = frames[k_off::overlap]   # rows k_off, k_off+overlap, ...: they tile without gaps
+            seg = part.reshape(-1)
+            out[base + k_off * hop:base + k_off * hop + seg.size] += seg
     # sqrt-Hann analysis x synthesis = Hann; Hann summed at hop n/4 is 2.0
     out *= 1.0 / (overlap / 2.0)
     return out[n_fft:n_fft + length]

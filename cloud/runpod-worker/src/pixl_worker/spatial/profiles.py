@@ -56,6 +56,9 @@ class Room:
     rev_db: float
     mix_time_s: float
     order: int = 3
+    # Reflections later than this (ms) are each spread into a few smaller arrivals over +/- 7 ms and +/- 12
+    # degrees, as uneven walls do; 0 = off. Without it a big room's side walls came back as distinct echoes.
+    diffuse_after_ms: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -102,7 +105,7 @@ _STUDIO = Profile(
     mix_stage=Stage(width=34, dist=1.9),
     room=Room(size=(6.8, 6.0, 3.0), listener=(2.7, 3.5, 1.25), reflect=(0.40, 0.25, 0.72, 0.56, 0.12, 0.20),
               damp_hz=7000, er_db=-11.0, er_max_s=0.07, rt60=(0.34, 0.28, 0.20), rev_db=-17.0, mix_time_s=0.045),
-    preview=Preview(theta=30, wet_db=-17, start_ms=9, end_ms=70, rt60=0.28),
+    preview=Preview(theta=30, wet_db=-10, start_ms=9, end_ms=70, rt60=0.28),
 )
 
 _WIDE = Profile(
@@ -118,7 +121,7 @@ _WIDE = Profile(
     mix_stage=Stage(width=55, dist=2.0, ambience=80),
     room=Room(size=(7.8, 7.2, 3.2), listener=(3.1, 4.2, 1.25), reflect=(0.45, 0.25, 0.76, 0.60, 0.12, 0.20),
               damp_hz=7000, er_db=-10.5, er_max_s=0.08, rt60=(0.42, 0.36, 0.25), rev_db=-16.0, mix_time_s=0.05),
-    preview=Preview(theta=52, wet_db=-16, start_ms=10, end_ms=80, rt60=0.36, side_theta=100, side_gain=0.2),
+    preview=Preview(theta=52, wet_db=-10, start_ms=10, end_ms=80, rt60=0.36, side_theta=100, side_gain=0.2),
 )
 
 _INTIMATE = Profile(
@@ -134,7 +137,7 @@ _INTIMATE = Profile(
     mix_stage=Stage(width=26, dist=1.4),
     room=Room(size=(4.8, 4.2, 2.6), listener=(1.9, 2.45, 1.2), reflect=(0.30, 0.20, 0.60, 0.46, 0.10, 0.15),
               damp_hz=6000, er_db=-16.0, er_max_s=0.05, rt60=(0.24, 0.20, 0.14), rev_db=-24.0, mix_time_s=0.035),
-    preview=Preview(theta=22, wet_db=-24, start_ms=6, end_ms=45, rt60=0.20),
+    preview=Preview(theta=22, wet_db=-15.5, start_ms=6, end_ms=45, rt60=0.20),
 )
 
 _HALL = Profile(
@@ -148,9 +151,10 @@ _HALL = Profile(
         "other": Stage(width=34, dist=11.0, rev=1.1, spread=0.20, spread_az=48),
     },
     mix_stage=Stage(width=22, dist=10.0),
-    room=Room(size=(38.0, 26.0, 15.0), listener=(15.0, 15.0, 1.4), reflect=(0.70, 0.55, 0.88, 0.78, 0.10, 0.60),
-              damp_hz=5000, er_db=-9.5, er_max_s=0.16, rt60=(2.0, 1.7, 1.0), rev_db=-9.5, mix_time_s=0.05),
-    preview=Preview(theta=24, wet_db=-10, start_ms=24, end_ms=180, rt60=1.2, side_theta=110, side_gain=0.25),
+    room=Room(size=(34.0, 19.0, 14.0), listener=(13.0, 10.5, 1.4), reflect=(0.70, 0.55, 0.88, 0.78, 0.10, 0.60),
+              damp_hz=5000, er_db=-9.5, er_max_s=0.16, rt60=(2.0, 1.7, 1.0), rev_db=-9.5, mix_time_s=0.05,
+              diffuse_after_ms=25.0),
+    preview=Preview(theta=24, wet_db=-7, start_ms=24, end_ms=180, rt60=1.2, side_theta=110, side_gain=0.25),
 )
 
 _SURROUND = Profile(
@@ -166,14 +170,14 @@ _SURROUND = Profile(
     mix_stage=Stage(width=75, dist=2.0, ambience=115),
     room=Room(size=(7.4, 6.8, 3.1), listener=(3.7, 3.9, 1.25), reflect=(0.55, 0.35, 0.74, 0.62, 0.12, 0.22),
               damp_hz=7000, er_db=-9.5, er_max_s=0.08, rt60=(0.48, 0.42, 0.28), rev_db=-14.5, mix_time_s=0.05),
-    preview=Preview(theta=38, wet_db=-14, start_ms=10, end_ms=90, rt60=0.42, side_theta=120, side_gain=0.3),
+    preview=Preview(theta=38, wet_db=-8, start_ms=10, end_ms=90, rt60=0.42, side_theta=120, side_gain=0.3),
 )
 
 _NIGHT = replace(
     _STUDIO, id="night", name="Night", seed=89, shelf_db=-4.0, leveler=0.5,
     stages={name: replace(stage, width=round(stage.width * 0.9)) for name, stage in _STUDIO.stages.items()},
     room=replace(_STUDIO.room, rev_db=-21.0),
-    preview=Preview(theta=28, wet_db=-21, start_ms=9, end_ms=70, rt60=0.28),
+    preview=Preview(theta=28, wet_db=-12, start_ms=9, end_ms=70, rt60=0.28),
 )
 
 PROFILES: dict[str, Profile] = {p.id: p for p in (_STUDIO, _WIDE, _INTIMATE, _HALL, _SURROUND, _NIGHT)}

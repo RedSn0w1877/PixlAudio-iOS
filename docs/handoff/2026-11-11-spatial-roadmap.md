@@ -100,8 +100,11 @@ results = render_profiles(mix, stems, sample_rate, ["studio", "wide"])   # -> {p
 
 ### 2.2 Taking a stem apart (`upmix.decompose`)
 
-STFT 4096 / hop 1024, sqrt-Hann both ways. Per time-frequency bin, from the channel powers `P_L`, `P_R` and the
-real part of their cross-spectrum `C`, each averaged over 9 frames and a third of an octave:
+STFT 4096 / hop 1024, sqrt-Hann both ways (drums, and the whole mix when there are no stems, use 1024 / 256 and
+36 frames of smoothing: the long frame's gains reached back before drum hits). Per time-frequency bin, from the
+channel powers `P_L`, `P_R` and the real part of their cross-spectrum `C`, each averaged over about 0.2 s and a
+third of an octave (in double precision: a single-precision running sum deleted quiet hi-hats next to loud
+kicks):
 
 1. `C' = max(C - 0.2*sqrt(P_L*P_R), 0) / 0.8` (two unrelated signals never measure as exactly unrelated).
 2. Ambience power `N` = the smaller eigenvalue of the 2x2 covariance: `N = ((P_L+P_R) - sqrt((P_L-P_R)^2 + 4C'^2)) / 2`.
@@ -113,7 +116,12 @@ real part of their cross-spectrum `C`, each averaged over 9 frames and a third o
 6. A trim puts the bin's power back where the gate is half open.
 7. Pan: `(a-b)/(a+b)`, with everything within 0.18 of the middle snapped to centre, then rounded to one of
    **7 directions** (hard left ... centre ... hard right). The whole bin's `m` goes to that one direction.
-   Directions holding under -35 dB of the stem are merged towards the centre.
+   A bin keeps its direction until its pan is clearly past the midpoint to the next one (hysteresis 0.2 of a
+   step), so a sound sitting between two directions does not flicker between them. Directions holding under
+   -35 dB of the stem are merged towards the centre.
+8. Memory: the analysis runs over blocks of about 11 s, and stems are taken apart one or two at a time and placed
+   in every requested profile before the next one, so a long song needs about two stems' worth of spectra at
+   once.
 
 Output per stem: up to seven mono source signals (one per direction) and two ambience signals.
 
@@ -147,10 +155,14 @@ For a source at (azimuth, elevation, distance) the builder makes one impulse res
   room's centre line so left and right reflections do not arrive as a mirrored pair. Each reflection goes through
   the head model for ITS direction, is delayed (fractional, in the frequency domain), damped at high frequencies
   per bounce, high-passed at 250 Hz (reflections carry no lows) and turned down if it follows within 6 ms.
-  The whole set is scaled so a centred source gets exactly the profile's `er_db`.
+  The whole set is scaled so a centred source gets exactly the profile's `er_db`, measured between 200 Hz and
+  8 kHz with a music-like weighting. In Concert Hall every reflection later than 25 ms is split into six smaller
+  arrivals over +/- 7 ms and +/- 12 degrees (what uneven walls do), so the side walls never come back as distinct
+  echoes.
 - **Spread** (when the profile asks): above 400 Hz, that share of the centred source's power is taken out of the
-  middle and sent to +/- `spread_az` through two short decorrelating filters (`decorrelate.py`: 24 ms of sparse
-  decaying impulses, picked from fixed candidates for the flattest tone). Lows and the rest stay in the middle.
+  middle and sent to +/- `spread_az` through two short decorrelating filters (`decorrelate.py`: 3 ms of silence,
+  then 24 ms of sparse decaying impulses, picked from fixed candidates for the flattest tone; without the 3 ms the
+  copies combed against the centred original). Lows and the rest stay in the middle.
 
 Positions: the centre direction is at 0 degrees; direction step k of 3 is at `k/3 * width`; ambience at
 `+/- ambience` (default: the width). Per stem these come from the profile (`profiles.py`).
@@ -183,7 +195,7 @@ Widths in degrees for the stems (voice / drums / bass / guitar / piano / other),
 | Studio | 22 / 32 / 12 / 48 / 42 / 58 | none | 6.8 x 6.0 x 3.0 m (0.28 s) | -11 / -17 dB |
 | Wide | 28 / 44 / 14 / 72 / 62 / 88 | guitar 35 %, piano 30 %, other 40 % | 7.8 x 7.2 x 3.2 m (0.36 s) | -10.5 / -16 dB |
 | Intimate | 16 / 26 / 10 / 38 / 34 / 44, voice at 0.9 m and +1.5 dB | none | 4.8 x 4.2 x 2.6 m (0.20 s) | -16 / -24 dB |
-| Concert Hall | 20 / 18 / 8 / 26 / 24 / 34, everything 9-11 m away | 15-20 % | 38 x 26 x 15 m (1.7 s) | -9.5 / -9.5 dB |
+| Concert Hall | 20 / 18 / 8 / 26 / 24 / 34, everything 9-11 m away | 15-20 % | 34 x 19 x 14 m (1.7 s), diffusing walls | -9.5 / -9.5 dB |
 | Surround | 26 / 40 / 14 / 100 / 70 / 128 | guitar 50 %, piano 45 %, other 55 %, to the sides and behind | 7.4 x 6.8 x 3.1 m (0.42 s) | -9.5 / -14.5 dB |
 | Night | Studio's widths x 0.9 | none | Studio's, late -21 dB | plus the shelf and the leveller |
 
@@ -193,9 +205,10 @@ These numbers are first settings from measurement. They are the thing to tune fr
 
 A phone cannot separate stems in real time, so until the cloud file arrives it runs a fixed filter on the plain
 stereo song: a real centre (the mid signal through the frontal head response), the side signal on a virtual
-speaker pair (plus a second pair further round for Wide, Hall and Surround), a short sparse "room" of about 40
-taps per ear, a 120 Hz crossover that leaves the lows alone, and a gain that already holds the same 4 dB of
-headroom. `python -m pixl_worker.spatial.preview --out schema/v1/spatial` writes the coefficient file
+speaker pair (plus a second pair further round for Wide, Hall and Surround, adding width but not level), a
+short sparse "room" of about 40 taps per ear fed through a 250 Hz high-pass (as wet as the cloud render after the
+direct sound), a 120 Hz crossover that leaves the lows alone, a gain that already holds the same 4 dB of headroom,
+and the app's soft limiter after it (it only acts above -1 dBFS). `python -m pixl_worker.spatial.preview --out schema/v1/spatial` writes the coefficient file
 (`spatial_preview_v1.json`, shipped in both apps) and a golden test file both apps must reproduce to 1e-4.
 
 ### 2.9 Around the renderer (the worker job; spec sections 3 and 4)
@@ -304,7 +317,16 @@ To hear a change: edit a profile in `profiles.py`, run `listening_render.py`, re
 - A centred source with ambience 6 to 10 dB under it: at most 2 % of it is left in the ambience.
 - A part-panned source goes to one direction with no leftover; hard-panned to the edge; unrelated left/right
   material stays ambience (about 97 % of it).
-- Memory: a 6-minute song with six stems peaked at 4.7 GB (before the direction split; to be re-measured).
+- Quiet highs: no 0.1 s window of any test stem loses more than 2 dB above 4 kHz (before the double-precision fix,
+  hi-hats next to loud kicks lost up to 79 dB).
+- A steady tone sitting between two directions: level steady within 0.1 dB (was up to 8 dB of flicker).
+- Concert Hall: the strongest late arrival is 17 to 20 dB under the direct sound and 3 to 5 dB above its
+  surroundings (it was 13 dB under and 8 dB above: a distinct echo).
+- On-phone version against the cloud render: tone of a centred, a part-panned and a hard-panned source within
+  about 1 to 2 dB from 200 Hz to 10 kHz; a hard-panned source within 0.8 dB of a centred one's level.
+- Memory: a 6-minute song with four stems peaked at 1.9 GB on this PC and took 8.5 minutes there with other jobs
+  running (it was about 9.5 GB before stems were taken apart one at a time). Speed on the GPU worker's CPU is
+  measured by its bench.
 
 ## Part 7. Decisions, with the reason
 

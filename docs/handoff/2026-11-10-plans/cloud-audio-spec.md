@@ -301,7 +301,7 @@ Stereo in, stereo out, at the source rate (44.1 or 48 kHz; any other rate: bypas
 never hand-edit it). Per profile and rate:
 
 ```json
-{"xoverHz": 120.0, "lowDelay": 42, "taps": 192,
+{"xoverHz": 120.0, "roomHpHz": 250.0, "lowDelay": 55, "taps": 192,
  "direct": [...192 floats...], "cross": [...192 floats...],
  "sparseL": [[delaySamples, gainFromLeft, gainFromRight], ...about 40...],
  "sparseR": [[delaySamples, gainFromLeft, gainFromRight], ...about 40...],
@@ -313,12 +313,20 @@ Processing per channel pair (the head is symmetric, so there are only "same side
 ```
 lo = LR4_lowpass(x, xoverHz)                     # two identical 2nd-order Butterworth low-pass biquads in series
 hi = x - lo                                      # per channel
-yL = fir(hiL, direct) + fir(hiR, cross) + Σ over sparseL: gainFromLeft*hiL[n-d] + gainFromRight*hiR[n-d]
-yR = fir(hiR, direct) + fir(hiL, cross) + Σ over sparseR: gainFromLeft*hiL[n-d] + gainFromRight*hiR[n-d]
+rm = HP2(hi, roomHpHz)                           # ONE 2nd-order high-pass biquad per channel: the room's input
+yL = fir(hiL, direct) + fir(hiR, cross) + Σ over sparseL: gainFromLeft*rmL[n-d] + gainFromRight*rmR[n-d]
+yR = fir(hiR, direct) + fir(hiL, cross) + Σ over sparseR: gainFromLeft*rmL[n-d] + gainFromRight*rmR[n-d]
 outL = gain * (yL + loL[n - lowDelay])           # same for R; fir(x, h)[n] = Σ_k h[k] * x[n-k]
+outL = softLimit(outL)                           # see Headroom below; same for R
 ```
 
-- Biquad coefficients (RBJ low-pass, Q = 1/√2) are computed on the device from `xoverHz` and the rate.
+- Biquad coefficients are computed on the device from `xoverHz`, `roomHpHz` and the rate: RBJ low-pass and RBJ
+  high-pass, both Q = 1/√2, a0 normalised to 1 (`spatial/preview.py`: `lowpass_coefficients`,
+  `highpass_coefficients`). Direct form I, as in `process`.
+- **Changed 2026-11-11 (tables v1.1):** the `roomHpHz` high-pass on the sparse room's input is new (without it the
+  room carried the bass and a hall boomed before every kick), the rear pair no longer adds level, and the room is
+  wetter. The file's `v` stays 1: a v1 table without `roomHpHz` is the old shape and must be treated as
+  `roomHpHz` = 0 (no high-pass); the shipped file always has it.
 - The file's top level is `{"schema": "pixl.spatial.preview", "v": 1, "engine": "pixl-spatial-1", "headroomDb":
   4.0, "profiles": {"studio": {"44100": {...}, "48000": {...}}, ...}}`. The largest sparse delay is about 8600
   samples (Concert Hall at 48 kHz). The two ears' sparse lists differ on purpose (that is what makes the room
@@ -327,9 +335,12 @@ outL = gain * (yL + loL[n - lowDelay])           # same for R; fir(x, h)[n] = Σ
   while processing. Changing preset or bypass ramps a wet/dry mix over ~80 ms (dry = the untouched input delayed by
   `lowDelay`), then swaps coefficients; never a click.
 - Headroom: `gain` already holds the loudness match and the 4 dB of headroom, so peaks stay under full scale on
-  all but the hottest masters (measured: at most about +1 dB over on a -7 LUFS master, for a few samples a
-  minute). After it, the existing limiter (iOS `SoftLimiter`, Android: a clamp to ±1.0 in float, saturating in
-  16-bit) is the only protection. No always-on saturation.
+  all but the hottest masters (measured: up to about +1 dB over on loud masters, for a few samples a minute).
+  So while the stage is active, every output sample goes through the same soft limiter on both platforms, iOS's
+  `SoftLimiter` (`Packages/PixlCore/Sources/PixlAudioCore/ReplayGain.swift`): with t = 0.8912509 (−1 dBFS),
+  |x| ≤ t passes untouched, otherwise y = sign(x) · (t + (1 − t) · tanh((|x| − t) / (1 − t))). It does nothing
+  below −1 dBFS, so it is not an always-on saturation. Android implements the same function. The golden file is
+  the stage BEFORE the limiter (the reference `process` has none).
 - The worker also writes `spatial_preview_golden_v1.json`: `{"frames": 1024, "tolerance": 1e-4, "input": {"left":
   [...], "right": [...]}, "output": {"<profile>": {"<rate>": {"left": [...], "right": [...]}}}}`: the output of
   the reference implementation (`spatial/preview.py` `process`, from a zero state) for that input. Both apps' unit

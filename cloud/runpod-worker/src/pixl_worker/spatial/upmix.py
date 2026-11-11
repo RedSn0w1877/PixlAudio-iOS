@@ -40,6 +40,12 @@ NEAR_CENTRE = 0.18   # as a share of (a + b): about +/- 1.6 dB between the chann
 DIRECTIONS = 7       # angles a source can go to, hard left ... centre ... hard right (odd)
 CORRELATION_FLOOR = 0.2
 NEGLIGIBLE = 3e-4    # a direction or an ambience signal with less than this share of the stem's power (-35 dB)
+ANALYSIS_BLOCK = 512 # frames analysed at a time at the default hop (about 11 s at 48 kHz)
+HYSTERESIS = 0.2     # a bin keeps its direction until its pan is this far past the midpoint to the next one
+# Drums (and the whole mix when there are no stems) are taken apart with a quarter of the frame length: the gains
+# of a long frame reach back before a hit (measured: 2-10 kHz energy up to 9 dB over the stem's own in the 30 ms
+# before drum hits). The time smoothing stays about 0.2 s either way.
+TRANSIENT = {"n_fft": 1024, "hop": 256, "smooth_frames": 36}
 
 
 @dataclass
@@ -56,16 +62,17 @@ class Decomposition:
         return DIRECTIONS // 2
 
 
-def _smooth_time(values: np.ndarray, frames: int) -> np.ndarray:
-    """Centred moving average over `frames` STFT frames (axis 0), edges held."""
-    if frames <= 1:
-        return values
+def _smooth_time(values: np.ndarray, first: int, start: int, stop: int, total: int, frames: int) -> np.ndarray:
+    """Centred moving average over `frames` STFT frames of the rows start..stop of a signal `total` frames long,
+    edges held. `values` holds that signal's rows first.. (at least start - frames//2 .. stop + frames//2, clipped
+    to the signal)."""
     pad = frames // 2
-    padded = np.concatenate([np.repeat(values[:1], pad, axis=0), values, np.repeat(values[-1:], pad, axis=0)])
-    count = values.shape[0]
-    out = padded[:count].copy()
+    rows = stop - start
+    index = np.clip(np.arange(start - pad, stop + pad), 0, total - 1) - first
+    padded = values[index]
+    out = padded[:rows].copy()
     for shift in range(1, frames):
-        out += padded[shift:shift + count]
+        out += padded[shift:shift + rows]
     out *= 1.0 / frames
     return out
 
@@ -80,9 +87,11 @@ def _third_octave_ranges(bins: int) -> tuple[np.ndarray, np.ndarray]:
 
 def _smooth_freq(values: np.ndarray, lo: np.ndarray, hi: np.ndarray) -> np.ndarray:
     """Mean over a third of an octave around each bin (axis 1), at least five bins."""
-    total = np.cumsum(values, axis=1, dtype=np.float32)   # a row is short: single precision is plenty
-    total = np.concatenate([np.zeros((values.shape[0], 1), np.float32), total], axis=1)
-    return (total[:, hi] - total[:, lo]) / (hi - lo).astype(np.float32)
+    # Double precision: a bin 70 dB under the row's running total vanishes from a single-precision sum, and with
+    # it the bin's statistics (measured: hi-hats near loud kicks lost up to 79 dB).
+    total = np.cumsum(values, axis=1, dtype=np.float64)
+    total = np.concatenate([np.zeros((values.shape[0], 1)), total], axis=1)
+    return ((total[:, hi] - total[:, lo]) / (hi - lo)).astype(np.float32)
 
 
 def analyse(p_ll: np.ndarray, p_rr: np.ndarray, cross: np.ndarray):
@@ -104,57 +113,98 @@ def analyse(p_ll: np.ndarray, p_rr: np.ndarray, cross: np.ndarray):
     # (g^2 + (1-g)^2 < 1). `trim` puts the bin's power back.
     along = source + ambience                                   # the projection's power: the source plus ambience
     kept = (gate * gate + (1.0 - gate) ** 2) * along + ambience
-    trim = np.sqrt((along + ambience) / np.maximum(kept, 1e-20))
+    trim = np.where(kept > 0.0, np.sqrt((along + ambience) / np.maximum(kept, 1e-20)), 1.0)
     offset = (left - right) / (left + right + 1e-20)
     pan = np.sign(offset) * np.maximum(np.abs(offset) - NEAR_CENTRE, 0.0) / (1.0 - NEAR_CENTRE)
     return (u_left.astype(np.float32), u_right.astype(np.float32), gate.astype(np.float32),
             np.minimum(trim, 1.5).astype(np.float32), pan.astype(np.float32))
 
 
-def decompose(x: np.ndarray) -> Decomposition:
-    """x (frames, 2) float32 -> the stem's sources by direction and its two ambience signals."""
+def decompose(x: np.ndarray, *, n_fft: int = N_FFT, hop: int = HOP, smooth_frames: int = SMOOTH_FRAMES
+              ) -> Decomposition:
+    """x (frames, 2) float32 -> the stem's sources by direction and its two ambience signals.
+
+    The analysis runs over blocks of frames (each with the few neighbouring frames the smoothing needs), so a long
+    song needs three full-size spectra (left, right and the source) and nothing else big. A bin keeps its
+    direction until its pan has clearly moved on (HYSTERESIS): a sound sitting between two directions no longer
+    flips between them (measured before: level jumps of up to 8 dB at one ear)."""
     frames = x.shape[0]
     left = np.ascontiguousarray(x[:, 0], dtype=np.float32)
     right = np.ascontiguousarray(x[:, 1], dtype=np.float32)
-    if frames < N_FFT or not np.any(x):
+    if frames < n_fft or not np.any(x):
         return Decomposition(ambience_left=left, ambience_right=right)
-    spec_l, spec_r = stft(left, N_FFT, HOP), stft(right, N_FFT, HOP)
-    lo, hi = _third_octave_ranges(spec_l.shape[1])
-    p_ll, p_rr, cross = (_smooth_freq(_smooth_time(p, SMOOTH_FRAMES), lo, hi)
-                         for p in (np.abs(spec_l) ** 2, np.abs(spec_r) ** 2, (spec_l * np.conj(spec_r)).real))
-    u_left, u_right, gate, trim, pan = analyse(p_ll, p_rr, cross)
-    del p_ll, p_rr, cross
+    spec_l, spec_r = stft(left, n_fft, hop), stft(right, n_fft, hop)
+    count, bins = spec_l.shape
+    lo, hi = _third_octave_ranges(bins)
     steps = DIRECTIONS // 2
-    step = np.rint(pan * steps).astype(np.int8)
-    del pan
-    source = (u_left * spec_l + u_right * spec_r) * gate
-    del gate
-    spec_l -= u_left * source
-    spec_r -= u_right * source
-    del u_left, u_right
-    source *= trim
-    spec_l *= trim
-    spec_r *= trim
-    del trim
+    pad = smooth_frames // 2
+    block = max(64, ANALYSIS_BLOCK * HOP // hop)
+    source = np.empty_like(spec_l)
+    step = np.empty((count, bins), dtype=np.int8)
+    power_by_step = np.zeros(DIRECTIONS)
+    bins_by_step = np.zeros(DIRECTIONS, dtype=np.int64)
+    ambience_power = [0.0, 0.0]
+    kept_l = kept_r = None    # the previous block's last frames, as they were before this pass changed them
+    state = None              # every bin's current direction (the hysteresis carries over between blocks)
+    for start in range(0, count, block):
+        stop = min(count, start + block)
+        end = min(count, stop + pad)
+        if kept_l is None:
+            first, block_l, block_r = start, spec_l[start:end], spec_r[start:end]
+        else:
+            first = start - kept_l.shape[0]
+            block_l, block_r = np.concatenate([kept_l, spec_l[start:end]]), np.concatenate([kept_r, spec_r[start:end]])
+        stats = []
+        for raw in (np.abs(block_l) ** 2, np.abs(block_r) ** 2, (block_l * np.conj(block_r)).real):
+            stats.append(_smooth_freq(_smooth_time(raw, first, start, stop, count, smooth_frames), lo, hi))
+        del block_l, block_r
+        u_left, u_right, gate, trim, pan = analyse(*stats)
+        del stats
+        tail = max(start, stop - pad)
+        kept_l, kept_r = spec_l[tail:stop].copy(), spec_r[tail:stop].copy()
+        rows_l, rows_r = spec_l[start:stop], spec_r[start:stop]      # views: changed in place below
+        here = (u_left * rows_l + u_right * rows_r) * gate
+        rows_l -= u_left * here
+        rows_r -= u_right * here
+        here *= trim
+        rows_l *= trim
+        rows_r *= trim
+        target = pan * steps
+        labels = np.empty(target.shape, dtype=np.int8)
+        if state is None:
+            state = np.rint(target[0])
+        for row in range(target.shape[0]):
+            move = np.abs(target[row] - state) > 0.5 + HYSTERESIS
+            state = np.where(move, np.rint(target[row]), state)
+            labels[row] = state
+        del target
+        source[start:stop] = here
+        step[start:stop] = labels
+        power = np.abs(here) ** 2
+        flat = labels.ravel().astype(np.int64) + steps
+        power_by_step += np.bincount(flat, weights=power.ravel(), minlength=DIRECTIONS)
+        bins_by_step += np.bincount(flat, minlength=DIRECTIONS)
+        ambience_power[0] += float(np.sum(np.abs(rows_l) ** 2))
+        ambience_power[1] += float(np.sum(np.abs(rows_r) ** 2))
+        del u_left, u_right, gate, trim, pan, here, labels, power, flat
     out = Decomposition()
-    total = float(np.sum(np.abs(source) ** 2) + np.sum(np.abs(spec_l) ** 2) + np.sum(np.abs(spec_r) ** 2))
-    floor = NEGLIGIBLE * total
-    if float(np.sum(np.abs(spec_l) ** 2)) > floor:
-        out.ambience_left = istft(spec_l, N_FFT, HOP, frames)
-    if float(np.sum(np.abs(spec_r) ** 2)) > floor:
-        out.ambience_right = istft(spec_r, N_FFT, HOP, frames)
+    floor = NEGLIGIBLE * (float(power_by_step.sum()) + ambience_power[0] + ambience_power[1])
+    if ambience_power[0] > floor:
+        out.ambience_left = istft(spec_l, n_fft, hop, frames)
+    if ambience_power[1] > floor:
+        out.ambience_right = istft(spec_r, n_fft, hop, frames)
     del spec_l, spec_r
     # A direction that holds next to nothing is not worth a source of its own: its bins join the next direction
     # towards the centre.
-    power = np.abs(source) ** 2
     for k in list(range(steps, 0, -1)) + list(range(-steps, 0)):
-        chosen = step == k
-        if chosen.any() and float(power[chosen].sum()) <= floor:
-            step[chosen] = k - 1 if k > 0 else k + 1
-    del power
+        here, inward = k + steps, (k - 1 if k > 0 else k + 1) + steps
+        if bins_by_step[here] > 0 and power_by_step[here] <= floor:
+            step[step == k] = inward - steps
+            power_by_step[inward] += power_by_step[here]
+            bins_by_step[inward] += bins_by_step[here]
+            power_by_step[here], bins_by_step[here] = 0.0, 0
     for k in range(-steps, steps + 1):
-        chosen = step == k
-        if not chosen.any():
+        if bins_by_step[k + steps] == 0:
             continue
-        out.sources[k] = istft(np.where(chosen, source, 0.0).astype(np.complex64), N_FFT, HOP, frames)
+        out.sources[k] = istft(source, n_fft, hop, frames, select=(step, k))
     return out

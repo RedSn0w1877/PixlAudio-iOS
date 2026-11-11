@@ -29,8 +29,12 @@ from .room import KernelBuilder
 TAPS = 192
 CROSSOVER_HZ = 120.0
 SPARSE_TAPS = 40
-INPUT_CORRELATION = 0.75
-SIDE_LEVEL = float(np.sqrt(0.5))   # as in render.py: one channel's content shares its power between the ears  # how alike left and right are in a typical mix (for tone and loudness matching)
+INPUT_CORRELATION = 0.75          # how alike left and right are in a typical mix (for tone and loudness matching)
+SIDE_LEVEL = float(np.sqrt(0.5))   # as in render.py: one channel's content shares its power between the ears
+# The sparse room's input is high-passed here: the crossover's "high" band (input minus the low-pass) still holds
+# +2.5..+4 dB at 60-120 Hz, and fed to the room that came back as boom before every kick (measured: up to +16 dB
+# of bass before kicks on a hall, where the cloud render keeps the lows dry and centred).
+ROOM_HP_HZ = 250.0
 GOLDEN_FRAMES = 1024
 RATES = (44100, 48000)
 
@@ -42,6 +46,36 @@ def lowpass_coefficients(sample_rate: int, cutoff_hz: float) -> tuple[float, flo
     cos0 = np.cos(w0)
     a0 = 1.0 + alpha
     return ((1.0 - cos0) / 2.0 / a0, (1.0 - cos0) / a0, (1.0 - cos0) / 2.0 / a0, -2.0 * cos0 / a0, (1.0 - alpha) / a0)
+
+
+def highpass_coefficients(sample_rate: int, cutoff_hz: float) -> tuple[float, float, float, float, float]:
+    """RBJ high-pass biquad, Q = 1/sqrt(2), as (b0, b1, b2, a1, a2) with a0 = 1 (one of them: the room's input)."""
+    w0 = 2.0 * np.pi * cutoff_hz / sample_rate
+    alpha = np.sin(w0) / (2.0 * (1.0 / np.sqrt(2.0)))
+    cos0 = np.cos(w0)
+    a0 = 1.0 + alpha
+    return ((1.0 + cos0) / 2.0 / a0, -(1.0 + cos0) / a0, (1.0 + cos0) / 2.0 / a0, -2.0 * cos0 / a0, (1.0 - alpha) / a0)
+
+
+def _response(coefficients: tuple[float, float, float, float, float], freqs: np.ndarray,
+              sample_rate: int) -> np.ndarray:
+    b0, b1, b2, a1, a2 = coefficients
+    z1 = np.exp(-2j * np.pi * freqs / sample_rate)
+    return (b0 + b1 * z1 + b2 * z1 * z1) / (1.0 + a1 * z1 + a2 * z1 * z1)
+
+
+def _biquad(x: np.ndarray, coefficients: tuple[float, float, float, float, float]) -> np.ndarray:
+    """Direct form I, per column, from a zero state (the reference the apps' tests reproduce)."""
+    b0, b1, b2, a1, a2 = coefficients
+    out = np.zeros_like(x)
+    for c in range(x.shape[1]):
+        x1 = x2 = y1 = y2 = 0.0
+        for n in range(x.shape[0]):
+            x0 = x[n, c]
+            y0 = b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
+            x2, x1, y2, y1 = x1, x0, y1, y0
+            out[n, c] = y0
+    return out
 
 
 def _lowpass_response(freqs: np.ndarray, sample_rate: int, cutoff_hz: float) -> np.ndarray:
@@ -83,7 +117,11 @@ def build_table(profile: Profile, sample_rate: int) -> dict:
     side = near - far
     if spec.side_gain > 0.0:
         rear_near, rear_far = pair(spec.side_theta)
-        side = side + spec.side_gain * (rear_near - rear_far)
+        widened = side + spec.side_gain * (rear_near - rear_far)
+        # the second pair adds width, not level: as loud as the first pair alone between 200 Hz and 6 kHz
+        # (measured before: a hard-panned sound came out 0.7-1.1 dB louder than a centred one, the cloud 0 dB)
+        voice = (freqs >= 200.0) & (freqs <= 6000.0)
+        side = widened * np.sqrt(np.sum(np.abs(side[voice]) ** 2) / np.sum(np.abs(widened[voice]) ** 2))
     smooth_to = 1.0 / (1.0 + (freqs / 6000.0) ** 4)
     lag = int(np.argmax(np.abs(np.fft.irfft(front * smooth_to, n_fft)))) \
         - int(np.argmax(np.abs(np.fft.irfft(near * smooth_to, n_fft))))
@@ -131,8 +169,9 @@ def build_table(profile: Profile, sample_rate: int) -> dict:
     x_spec = np.fft.rfft(cross_taps, 1 << 15)
     h_same = high * d_spec + low * np.exp(-2j * np.pi * grid * low_delay / sample_rate)
     h_cross = high * x_spec
+    room_in = np.abs(high * _response(highpass_coefficients(sample_rate, ROOM_HP_HZ), grid, sample_rate)) ** 2
     out_power = np.abs(h_same) ** 2 + np.abs(h_cross) ** 2 \
-        + 2.0 * INPUT_CORRELATION * (h_same * np.conj(h_cross)).real + wet * np.abs(high) ** 2
+        + 2.0 * INPUT_CORRELATION * (h_same * np.conj(h_cross)).real + wet * room_in
     # the reference spectrum is music-like, not pink: pink down to 1.5 kHz, then about 2 dB per octave steeper
     # (with plain pink noise the profiles that change the highs, Night above all, came out 0.5-0.8 LU too loud)
     weight = k_weight_power(grid, sample_rate) / np.maximum(grid, 20.0) / (1.0 + (grid / 1500.0) ** 2) ** 0.33
@@ -140,7 +179,7 @@ def build_table(profile: Profile, sample_rate: int) -> dict:
     gain = float(np.sqrt(weight.sum() / (weight * out_power).sum()) * 10.0 ** (-HEADROOM_DB / 20.0))
 
     return {
-        "xoverHz": CROSSOVER_HZ, "lowDelay": low_delay, "taps": TAPS,
+        "xoverHz": CROSSOVER_HZ, "roomHpHz": ROOM_HP_HZ, "lowDelay": low_delay, "taps": TAPS,
         "direct": [round(float(v), 7) for v in direct_taps],
         "cross": [round(float(v), 7) for v in cross_taps],
         "sparseL": sparse[0], "sparseR": sparse[1],
@@ -160,19 +199,10 @@ def process(x: np.ndarray, table: dict, sample_rate: int) -> np.ndarray:
     """The reference on-device stage. x (frames, 2) float -> (frames, 2) float64, from a zero state."""
     x = np.asarray(x, dtype=np.float64)
     frames = x.shape[0]
-    b0, b1, b2, a1, a2 = lowpass_coefficients(sample_rate, table["xoverHz"])
-    low = x.copy()
-    for _ in range(2):
-        out = np.zeros_like(low)
-        for c in range(2):
-            x1 = x2 = y1 = y2 = 0.0
-            for n in range(frames):
-                x0 = low[n, c]
-                y0 = b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
-                x2, x1, y2, y1 = x1, x0, y1, y0
-                out[n, c] = y0
-        low = out
+    lowpass = lowpass_coefficients(sample_rate, table["xoverHz"])
+    low = _biquad(_biquad(x, lowpass), lowpass)
     high = x - low
+    room = _biquad(high, highpass_coefficients(sample_rate, table["roomHpHz"]))
     direct = np.asarray(table["direct"], dtype=np.float64)
     cross = np.asarray(table["cross"], dtype=np.float64)
     y = np.zeros_like(x)
@@ -181,7 +211,7 @@ def process(x: np.ndarray, table: dict, sample_rate: int) -> np.ndarray:
     for ear, key in enumerate(("sparseL", "sparseR")):
         for delay, from_left, from_right in table[key]:
             if delay < frames:
-                y[delay:, ear] += from_left * high[:frames - delay, 0] + from_right * high[:frames - delay, 1]
+                y[delay:, ear] += from_left * room[:frames - delay, 0] + from_right * room[:frames - delay, 1]
     delayed = np.zeros_like(low)
     shift = int(table["lowDelay"])
     delayed[shift:] = low[:frames - shift]

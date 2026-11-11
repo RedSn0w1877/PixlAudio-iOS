@@ -15,14 +15,19 @@ For each profile:
 
 Everything is deterministic (fixed seeds), NumPy only, and the output has exactly the input's length and
 timeline.
+
+Memory: a stem taken apart is up to nine full-length signals, so stems are taken apart one or two at a time and
+each is placed in every requested profile before it is let go. What stays for the whole job is the song, its
+stems, and one stereo accumulator per profile.
 """
 
 from __future__ import annotations
 
 import os
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Iterator
 
 import numpy as np
 
@@ -31,7 +36,7 @@ from .dsp import convolve_bank, fast_len, interp_log, smooth_bands
 from .loudness import integrated_lufs, limit, true_peak_db
 from .profiles import PROFILES, STEM_NAMES, Profile, Stage
 from .room import KernelBuilder, late_tail
-from .upmix import Decomposition, decompose
+from .upmix import TRANSIENT, Decomposition, decompose
 
 CEILING_DB = -1.0
 # A binaural render of a loud modern master peaks 3-5 dB higher than the master at the same loudness (the head
@@ -62,17 +67,10 @@ class SpatialResult:
 
 
 @dataclass
-class _Stem:
-    name: str
-    parts: Decomposition
-    audio: np.ndarray           # (frames, 2): the stem itself, for the reverb send
-
-
-@dataclass
 class _Prepared:
     mix: np.ndarray
     sample_rate: int
-    stems: list[_Stem]
+    stems: list[tuple[str, np.ndarray]]   # (name, (frames, 2) float32) for every stem to place; "mix" when stem-free
     stem_mode: str
     source_lufs: float
     n_fft: int
@@ -117,14 +115,9 @@ def prepare(mix: np.ndarray, stems: dict[str, np.ndarray], sample_rate: int) -> 
             if _db(float(np.mean(stem.astype(np.float64) ** 2))) - _db(mix_power) < SILENT_DB:
                 continue
             todo.append((name, stem))
-    # Taking a stem apart is FFT work, which NumPy does outside the interpreter lock: a few at a time.
-    workers = max(1, min(len(todo), 3, (os.cpu_count() or 2) - 1))
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        parts = [_Stem(name, deco, audio)
-                 for (name, audio), deco in zip(todo, pool.map(lambda item: decompose(item[1]), todo))]
     n_fft = fast_len(frames + 4096)
     spectrum = np.stack([np.fft.rfft(mix[:, c], n_fft) for c in range(2)])
-    return _Prepared(mix=mix, sample_rate=sample_rate, stems=parts, stem_mode=stem_mode,
+    return _Prepared(mix=mix, sample_rate=sample_rate, stems=todo, stem_mode=stem_mode,
                      source_lufs=integrated_lufs(mix, sample_rate) if frames else -70.0, n_fft=n_fft,
                      mix_spectrum=spectrum)
 
@@ -155,48 +148,81 @@ def _level(x: np.ndarray, sample_rate: int, amount: float) -> np.ndarray:
     return (x * gain[:, None]).astype(np.float32)
 
 
-def render_one(prepared: _Prepared, profile: Profile, tick: Callable[[], None] | None = None) -> SpatialResult:
-    sr = prepared.sample_rate
-    frames = prepared.mix.shape[0]
-    if frames == 0 or not prepared.stems:
-        return SpatialResult(audio=np.zeros((frames, 2), np.float32), integrated_lufs=-70.0,
-                             source_lufs=prepared.source_lufs, true_peak_db=-180.0, limiter_max_db=0.0,
-                             stem_mode=prepared.stem_mode)
-    head = hrir_mod.load(sr)
-    builder = KernelBuilder(head, profile.room, profile.mix_stage.dist)
+LONG_SONG_FRAMES = 8 * 60 * 48000   # longer than this: one stem at a time (each one takes a few GB apart)
 
+
+def _decompositions(stems: list[tuple[str, np.ndarray]], frames: int) -> Iterator[tuple[str, Decomposition]]:
+    """Each stem taken apart, in order. Taking a stem apart is FFT work, which NumPy does outside the interpreter
+    lock, so the next stem is prepared while the current one is being placed; never more than two at once."""
+    workers = 1 if frames > LONG_SONG_FRAMES else 2
+    workers = max(1, min(workers, len(stems), (os.cpu_count() or 2) - 1))
+    def take_apart(name: str, audio: np.ndarray) -> Decomposition:
+        return decompose(audio, **TRANSIENT) if name in ("drums", "mix") else decompose(audio)
+
+    if workers == 1:
+        for name, audio in stems:
+            yield name, take_apart(name, audio)
+        return
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        upcoming = iter(stems)
+        pending: deque = deque()
+        for name, audio in upcoming:
+            pending.append((name, pool.submit(take_apart, name, audio)))
+            if len(pending) == workers:
+                break
+        while pending:
+            name, future = pending.popleft()
+            parts = future.result()
+            yield name, parts
+            del parts
+            following = next(upcoming, None)
+            if following is not None:
+                pending.append((following[0], pool.submit(take_apart, following[0], following[1])))
+
+
+def _place(builder: KernelBuilder, profile: Profile, name: str, parts: Decomposition, out_len: int,
+           tick: Callable[[], None] | None) -> np.ndarray | None:
+    """(out_len, 2) float32: one stem's sources and ambience, each at its place in the profile's room."""
+    stage = _stage_for(profile, name)
+    gain = 10.0 ** (stage.gain_db / 20.0)
+    level = gain * SIDE_LEVEL
+    steps = max(1, parts.steps)
     sources: list[np.ndarray] = []
     kernels: list[np.ndarray] = []
+    for k, signal in parts.sources.items():
+        sources.append(signal)
+        if k == 0:
+            kernels.append(builder.kernel(0.0, 0.0, stage.dist, level, stage.er, spread=stage.spread,
+                                          spread_az=stage.spread_az))
+        else:
+            share = k / steps
+            kernels.append(builder.kernel(share * stage.width, abs(share) * stage.side_el, stage.dist, level, stage.er))
+    for signal, az in ((parts.ambience_left, stage.ambience_az), (parts.ambience_right, -stage.ambience_az)):
+        if signal is None:
+            continue
+        sources.append(signal)
+        kernels.append(builder.kernel(az, stage.side_el, stage.dist, level, stage.er))
+    if not sources:
+        return None
+    return convolve_bank(sources, np.stack(kernels), out_len, tick)
+
+
+def _finish(prepared: _Prepared, profile: Profile, builder: KernelBuilder, wet: np.ndarray,
+            tick: Callable[[], None] | None = None) -> SpatialResult:
+    """Late reverb, the untouched lows, tone, loudness and the limiter, for one profile's placed stems."""
+    sr = prepared.sample_rate
+    frames = prepared.mix.shape[0]
+    head = builder.hrir
     send_left = np.zeros(frames, dtype=np.float32)
     send_right = np.zeros(frames, dtype=np.float32)
-    for stem in prepared.stems:
-        stage = _stage_for(profile, stem.name)
-        gain = 10.0 ** (stage.gain_db / 20.0)
-        level = gain * SIDE_LEVEL
-        steps = max(1, stem.parts.steps)
-        for k, signal in stem.parts.sources.items():
-            sources.append(signal)
-            if k == 0:
-                kernels.append(builder.kernel(0.0, 0.0, stage.dist, level, stage.er, spread=stage.spread,
-                                              spread_az=stage.spread_az))
-            else:
-                share = k / steps
-                kernels.append(builder.kernel(share * stage.width, abs(share) * stage.side_el, stage.dist, level,
-                                              stage.er))
-        for signal, az in ((stem.parts.ambience_left, stage.ambience_az), (stem.parts.ambience_right, -stage.ambience_az)):
-            if signal is None:
-                continue
-            sources.append(signal)
-            kernels.append(builder.kernel(az, stage.side_el, stage.dist, level, stage.er))
-        send = gain * stage.rev
-        send_left += send * stem.audio[:, 0]
-        send_right += send * stem.audio[:, 1]
-
-    out_len = frames + head.front_delay
-    wet = convolve_bank(sources, np.stack(kernels), out_len, tick) if sources else np.zeros((out_len, 2), np.float32)
+    for name, audio in prepared.stems:
+        stage = _stage_for(profile, name)
+        send = np.float32(10.0 ** (stage.gain_db / 20.0) * stage.rev)
+        send_left += send * audio[:, 0]
+        send_right += send * audio[:, 1]
     tail = late_tail(profile.room, head, profile.seed, builder.front_energy)
-    wet += convolve_bank([send_left, send_right], tail, out_len, tick)
-    del sources, kernels, send_left, send_right
+    wet += convolve_bank([send_left, send_right], tail, wet.shape[0], tick)
+    del send_left, send_right
     wet = wet[head.front_delay:]  # undo the head model's own delay: the render keeps the source's timeline
 
     n_fft = prepared.n_fft
@@ -242,6 +268,29 @@ def render_one(prepared: _Prepared, profile: Profile, tick: Callable[[], None] |
                          tone_db=tuple(round(float(v), 2) for v in 20.0 * np.log10(correction[1:])))
 
 
+
+def render_one(prepared: _Prepared, profile: Profile, tick: Callable[[], None] | None = None) -> SpatialResult:
+    """One profile (kept for callers that render profiles one by one; render_profiles shares the work)."""
+    frames = prepared.mix.shape[0]
+    if frames == 0 or not prepared.stems:
+        return _silent(prepared)
+    head = hrir_mod.load(prepared.sample_rate)
+    builder = KernelBuilder(head, profile.room, profile.mix_stage.dist)
+    wet = np.zeros((frames + head.front_delay, 2), dtype=np.float32)
+    for name, parts in _decompositions(prepared.stems, frames):
+        placed = _place(builder, profile, name, parts, wet.shape[0], tick)
+        if placed is not None:
+            wet += placed
+    return _finish(prepared, profile, builder, wet, tick)
+
+
+def _silent(prepared: _Prepared) -> SpatialResult:
+    frames = prepared.mix.shape[0]
+    return SpatialResult(audio=np.zeros((frames, 2), np.float32), integrated_lufs=-70.0,
+                         source_lufs=prepared.source_lufs, true_peak_db=-180.0, limiter_max_db=0.0,
+                         stem_mode=prepared.stem_mode)
+
+
 def render_profiles(mix: np.ndarray, stems: dict[str, np.ndarray], sample_rate: int, profiles: Iterable[str],
                     progress: Callable[[int, int], None] | None = None) -> dict[str, SpatialResult]:
     """See docs/handoff/2026-11-10-plans/cloud-audio-spec.md, section 5."""
@@ -251,18 +300,33 @@ def render_profiles(mix: np.ndarray, stems: dict[str, np.ndarray], sample_rate: 
             raise ValueError(f"unknown profile {profile_id}")
     if sample_rate not in hrir_mod.SUPPORTED_RATES:
         raise ValueError(f"the renderer works at {hrir_mod.SUPPORTED_RATES} Hz")
-    total = 2 + 10 * len(wanted)
+    prepared = prepare(mix, stems, sample_rate)
+    total = 2 + 10 * len(prepared.stems) + 10 * len(wanted)
     state = {"done": 0}
 
-    def step(count: int = 1) -> None:
+    def step(count: int = 0) -> None:
         state["done"] = min(total, state["done"] + count)
         if progress is not None:
-            progress(state["done"], total)
+            progress(state["done"], total)   # count 0: a heartbeat (the worker checks its deadline on every call)
 
-    prepared = prepare(mix, stems, sample_rate)
     step(2)
+    frames = prepared.mix.shape[0]
+    if frames == 0 or not prepared.stems:
+        return {profile_id: _silent(prepared) for profile_id in wanted}
+    head = hrir_mod.load(sample_rate)
+    builders = {profile_id: KernelBuilder(head, PROFILES[profile_id].room, PROFILES[profile_id].mix_stage.dist)
+                for profile_id in wanted}
+    wets = {profile_id: np.zeros((frames + head.front_delay, 2), dtype=np.float32) for profile_id in wanted}
+    for name, parts in _decompositions(prepared.stems, frames):
+        for profile_id in wanted:
+            placed = _place(builders[profile_id], PROFILES[profile_id], name, parts, frames + head.front_delay, step)
+            if placed is not None:
+                wets[profile_id] += placed
+            del placed
+        del parts
+        step(10)
     results: dict[str, SpatialResult] = {}
     for profile_id in wanted:
-        results[profile_id] = render_one(prepared, PROFILES[profile_id])
+        results[profile_id] = _finish(prepared, PROFILES[profile_id], builders[profile_id], wets.pop(profile_id), step)
         step(10)
     return results

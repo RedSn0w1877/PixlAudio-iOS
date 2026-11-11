@@ -76,9 +76,11 @@ def integrated_lufs(x: np.ndarray, sample_rate: int) -> float:
     return float(-0.691 + 10.0 * np.log10(power[keep].mean()))
 
 
-def peak_envelope(x: np.ndarray, oversample: int = 4) -> np.ndarray:
+def peak_envelope(x: np.ndarray, oversample: int = 4, floor: float = 0.0) -> np.ndarray:
     """Per input sample, the largest |value| of the band-limited waveform around it (any channel), from `oversample`
-    times oversampling. x (frames, ch) -> (frames,)."""
+    times oversampling. x (frames, ch) -> (frames,). Stretches whose samples all stay under `floor` are not
+    oversampled (their sample values are used): the waveform between samples of music is never more than a few dB
+    above them, and these stretches are only ever compared with a ceiling far above `floor`."""
     frames = x.shape[0]
     size, margin = 1 << 15, 256
     hop = size - 2 * margin
@@ -88,6 +90,10 @@ def peak_envelope(x: np.ndarray, oversample: int = 4) -> np.ndarray:
     bins = size // 2 + 1
     for start in range(0, frames, hop):
         chunk = padded[start:start + size]
+        end = min(frames, start + hop)
+        if floor > 0.0 and float(np.abs(chunk).max(initial=0.0)) < floor:
+            out[start:end] = np.abs(chunk[margin:margin + end - start]).max(axis=1)
+            continue
         spec = np.fft.rfft(chunk, axis=0)
         wide = np.zeros((size * oversample // 2 + 1, x.shape[1]), dtype=spec.dtype)
         wide[:bins] = spec
@@ -95,14 +101,16 @@ def peak_envelope(x: np.ndarray, oversample: int = 4) -> np.ndarray:
         up = np.fft.irfft(wide, size * oversample, axis=0) * oversample
         peak = np.abs(up).max(axis=1).reshape(size, oversample).max(axis=1)
         keep = peak[margin:margin + hop]
-        end = min(frames, start + hop)
         out[start:end] = keep[:end - start]
     return out
 
 
 def true_peak_db(x: np.ndarray) -> float:
-    peak = float(peak_envelope(x).max()) if x.size else 0.0
-    return 20.0 * np.log10(max(peak, 1e-9))
+    if not x.size:
+        return 20.0 * np.log10(1e-9)
+    sample_peak = float(np.abs(x).max())
+    peak = float(peak_envelope(x, floor=0.5 * sample_peak).max(initial=0.0))
+    return 20.0 * np.log10(max(peak, sample_peak, 1e-9))
 
 
 def limit(x: np.ndarray, sample_rate: int, ceiling_db: float = -1.0) -> tuple[np.ndarray, float]:
@@ -111,7 +119,7 @@ def limit(x: np.ndarray, sample_rate: int, ceiling_db: float = -1.0) -> tuple[np
     deepest = 0.0
     y = x
     for _ in range(3):
-        env = peak_envelope(y)
+        env = peak_envelope(y, floor=0.5 * ceiling)
         if float(env.max(initial=0.0)) <= ceiling * 1.0005:
             break
         block = max(1, sample_rate // 1000)
