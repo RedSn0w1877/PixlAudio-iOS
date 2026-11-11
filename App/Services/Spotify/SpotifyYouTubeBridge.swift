@@ -102,8 +102,24 @@ nonisolated struct SpotifyPlayableURLResolver: PlayableURLResolving {
 
     func playableURL(for song: Song) async -> URL? {
         guard let spotifyId = Self.spotifyId(of: song) else { return await base.playableURL(for: song) }
-        guard let videoId = await videoId(for: spotifyId), CloudStreamSecurity.validateYouTubeVideoId(videoId) else { return nil }
-        return await bridge.playableURL(videoId: videoId, base: base)
+        let record = try? await persistence.spotifySong(spotifyId: spotifyId)
+        let query = record?.spotiFLACQuery ?? SpotiFLACTrackQuery(
+            spotifyId: spotifyId,
+            title: song.title,
+            artist: song.displayArtist,
+            album: song.album,
+            durationMs: Int(clamping: song.duration),
+            isrc: nil
+        )
+        SpotiFLACTrackRegistry.shared.register(query)
+        if let videoId = await videoId(for: spotifyId), CloudStreamSecurity.validateYouTubeVideoId(videoId) {
+            SpotiFLACTrackRegistry.shared.register(query, forVideoId: videoId)
+            return await bridge.playableURL(videoId: videoId, base: base)
+        }
+        // Fallback when YouTube search has no match: synthetic 11-char ID resolved by SpotiFLAC in InnerTubeService.
+        let syntheticId = SpotiFLACTrackRegistry.syntheticVideoId(forSpotifyId: spotifyId)
+        SpotiFLACTrackRegistry.shared.register(query, forVideoId: syntheticId)
+        return await bridge.playableURL(videoId: syntheticId, base: base)
     }
 
     /// Another video for the song after the player could not load `failedURL`: that video is set aside for half an

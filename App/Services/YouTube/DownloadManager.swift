@@ -102,7 +102,9 @@ final class DownloadManager {
         guard let service, let fetcher else { return }
         resolving[videoId] = Task {
             defer { resolving[videoId] = nil }
-            let destination = DownloadFiles.fileURL(videoId: videoId)
+            SpotiFLACTrackRegistry.shared.register(song: song, forVideoId: videoId)
+            let cachedMime = await fetcher.cache.meta(videoId)?.contentType
+            let destination = DownloadFiles.fileURL(videoId: videoId, contentType: cachedMime)
             if await fetcher.cache.copyComplete(videoId, to: destination) {
                 guard !Task.isCancelled else { return }
                 succeed(videoId)
@@ -116,6 +118,7 @@ final class DownloadManager {
             }
             // Cancelled while the stream was being found: nothing is started.
             guard !Task.isCancelled else { return }
+            delegate.setExpectedMimeType(stream.mimeType, for: videoId)
             var request = URLRequest(url: url)
             request.setValue(stream.userAgent, forHTTPHeaderField: "User-Agent")
             request.setValue("bytes=0-", forHTTPHeaderField: "Range")
@@ -141,6 +144,7 @@ final class DownloadManager {
     func remove(_ song: Song) {
         guard let videoId = YouTubeSongIdentity.videoId(for: song) else { return }
         stopTransfer(videoId)
+        try? FileManager.default.removeItem(at: DownloadFiles.flacFileURL(videoId: videoId))
         try? FileManager.default.removeItem(at: DownloadFiles.fileURL(videoId: videoId))
         setState(videoId, nil)
     }
@@ -243,14 +247,16 @@ final class DownloadManager {
             fail(videoId, failure ?? "Download failed")
             return
         }
-        // googlevideo refused the single transfer: ranged fetch through the streaming cache, then copy.
+        // googlevideo or SpotiFLAC refused the single transfer: ranged fetch through the streaming cache, then copy.
         fallbackTasks[videoId] = Task { [weak self] in
             guard let manager = self else { return }
             do {
                 try await fetcher.fillCache(videoId: videoId) { written, total in
                     await manager.progress(videoId, written: written, expected: total)
                 }
-                let copied = await fetcher.cache.copyComplete(videoId, to: DownloadFiles.fileURL(videoId: videoId))
+                let cachedMime = await fetcher.cache.meta(videoId)?.contentType
+                let destination = DownloadFiles.fileURL(videoId: videoId, contentType: cachedMime)
+                let copied = await fetcher.cache.copyComplete(videoId, to: destination)
                 if copied { manager.succeed(videoId) } else { manager.fail(videoId, "Couldn't save the song.") }
             } catch is CancellationError {
             } catch {
@@ -266,6 +272,13 @@ final class DownloadManager {
         weak var owner: DownloadManager?
         private let lock = NSLock()
         private var failures: [Int: (reason: String, retry: Bool)] = [:]
+        private var expectedMimeTypes: [String: String] = [:]
+
+        func setExpectedMimeType(_ mimeType: String?, for videoId: String) {
+            lock.lock()
+            expectedMimeTypes[videoId] = mimeType
+            lock.unlock()
+        }
 
         func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
             guard let videoId = downloadTask.taskDescription else { return }
@@ -280,10 +293,22 @@ final class DownloadManager {
                 record(downloadTask.taskIdentifier, "The server sent \(type ?? "?"), not audio.", retry: true)
                 return
             }
-            let destination = DownloadFiles.fileURL(videoId: videoId)
+            lock.lock()
+            let expectedMime = expectedMimeTypes.removeValue(forKey: videoId)
+            lock.unlock()
+            let headerBytes = (try? FileHandle(forReadingFrom: location))
+                .flatMap { handle -> Data? in
+                    defer { try? handle.close() }
+                    return try? handle.read(upToCount: 4)
+                } ?? Data()
+            let isFLAC = (expectedMime?.lowercased().contains("flac") == true)
+                || (type?.lowercased().contains("flac") == true)
+                || SpotiFLACParsing.isFLACMagicHeader(headerBytes)
+            let destination = DownloadFiles.fileURL(videoId: videoId, contentType: isFLAC ? "audio/flac" : type)
             let fm = FileManager.default
             try? fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try? fm.removeItem(at: destination)
+            try? fm.removeItem(at: DownloadFiles.flacFileURL(videoId: videoId))
+            try? fm.removeItem(at: DownloadFiles.fileURL(videoId: videoId))
             do {
                 try fm.moveItem(at: location, to: destination)
             } catch {

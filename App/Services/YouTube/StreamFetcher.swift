@@ -35,9 +35,12 @@ nonisolated struct StreamFetcher: Sendable {
         var contentLength: Int64
         var contentType: String
 
-        /// The UTI the resource loader reports (`AVFileType`): muxed itag 18 is MPEG-4 video, the rest M4A audio.
+        /// The UTI the resource loader reports (`AVFileType`): FLAC (`org.xiph.flac`), muxed itag 18 (`public.mpeg-4`),
+        /// or M4A audio (`com.apple.m4a-audio`).
         var uniformTypeIdentifier: String {
-            contentType.lowercased().hasPrefix("video/") ? AVFileType.mp4.rawValue : AVFileType.m4a.rawValue
+            let lower = contentType.lowercased()
+            if lower.contains("flac") { return "org.xiph.flac" }
+            return lower.hasPrefix("video/") ? AVFileType.mp4.rawValue : AVFileType.m4a.rawValue
         }
     }
 
@@ -135,15 +138,35 @@ nonisolated struct StreamFetcher: Sendable {
             PlaybackStartTimings.shared.networkFetched(key: YouTubeSongIdentity.timingKey(videoId: videoId), bytes: body.count)
             guard let http = response as? HTTPURLResponse else { throw Failure.badResponse("No HTTP response.") }
             if http.statusCode == 206 || http.statusCode == 200 {
-                return try await store(videoId: videoId, range: range, body: body, response: http, streamURL: stream.url)
+                do {
+                    return try await store(videoId: videoId, range: range, body: body, response: http,
+                                           streamURL: stream.url, streamMimeType: stream.mimeType)
+                } catch {
+                    // If a SpotiFLAC upstream returned non-audio or invalid bytes before anything was cached,
+                    // switch automatically to YouTube (`InnerTube`).
+                    if stream.strategyName == InnerTubeService.spotiFLACStrategyName,
+                       await cache.meta(videoId) == nil {
+                        await service.invalidate(videoId: videoId)
+                        excluded.insert(InnerTubeService.spotiFLACStrategyName)
+                        continue
+                    }
+                    throw error
+                }
             }
             let hasCachedBytes = await cache.meta(videoId) != nil
             switch StreamRetryPolicy.decide(status: http.statusCode, attempt: attempt, hasCachedBytes: hasCachedBytes) {
             case .fail:
+                if stream.strategyName == InnerTubeService.spotiFLACStrategyName && !hasCachedBytes {
+                    await service.invalidate(videoId: videoId)
+                    excluded.insert(InnerTubeService.spotiFLACStrategyName)
+                    continue
+                }
                 throw Failure.http(http.statusCode)
             case .retry(let switchClient, let delayMs):
                 await service.invalidate(videoId: videoId)
-                if switchClient { excluded.insert(stream.strategyName ?? InnerTubeService.pipedStrategyName) }
+                if switchClient || stream.strategyName == InnerTubeService.spotiFLACStrategyName {
+                    excluded.insert(stream.strategyName ?? InnerTubeService.pipedStrategyName)
+                }
                 if delayMs > 0 { try await Task.sleep(for: .milliseconds(delayMs)) }
             }
         }
@@ -151,13 +174,12 @@ nonisolated struct StreamFetcher: Sendable {
     }
 
     private func store(videoId: String, range: Range<Int64>, body: Data, response: HTTPURLResponse,
-                       streamURL: String) async throws -> Data {
+                       streamURL: String, streamMimeType: String? = nil) async throws -> Data {
         let contentType = response.value(forHTTPHeaderField: "Content-Type")
         guard CloudStreamSecurity.isSupportedAudioContentType(contentType) else {
             throw Failure.badResponse("The server sent \(contentType ?? "?"), not audio.")
         }
-        let type = contentType.map { String($0.split(separator: ";").first ?? "") } ?? "audio/mp4"
-        let itag = URLCoding.androidQueryParameter(streamURL, "itag")
+        let headerType = contentType.map { String($0.split(separator: ";").first ?? "") }
         let start: Int64
         let total: Int64
         if response.statusCode == 206 {
@@ -170,6 +192,19 @@ nonisolated struct StreamFetcher: Sendable {
             start = 0
             total = Int64(body.count)
         }
+        let isFLACStream = (streamMimeType?.lowercased().contains("flac") == true)
+            || (headerType?.lowercased().contains("flac") == true)
+            || (start == 0 && SpotiFLACParsing.isFLACMagicHeader(body))
+        if isFLACStream && start == 0 && body.count >= 4 {
+            let hasID3Tag = body[body.startIndex] == 0x49
+                && body[body.index(body.startIndex, offsetBy: 1)] == 0x44
+                && body[body.index(body.startIndex, offsetBy: 2)] == 0x33
+            if !SpotiFLACParsing.isFLACMagicHeader(body) && !hasID3Tag {
+                throw Failure.badResponse("Upstream did not return a valid FLAC header.")
+            }
+        }
+        let type = isFLACStream ? "audio/flac" : (headerType ?? "audio/mp4")
+        let itag = isFLACStream ? "flac" : URLCoding.androidQueryParameter(streamURL, "itag")
         guard total > 0, total <= CloudStreamSecurity.maxStreamContentLengthBytes else {
             throw Failure.badResponse("Unexpected stream size.")
         }

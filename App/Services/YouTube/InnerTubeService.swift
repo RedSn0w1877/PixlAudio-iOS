@@ -17,8 +17,10 @@ actor InnerTubeService {
     let cipher: SignatureCipherSolver
     let evaluator: JavaScriptCoreEvaluator
     let piped: PipedStreamResolver
+    let spotiFLAC: SpotiFLACClient
     let remote: RemoteClientConfigStore
     private let resolver: ChainedYouTubeStreamResolver
+    private let validator: StreamUrlValidator
     private let account: YouTubeAccount
     private var cache: [String: (stream: ResolvedStream, expiresAt: Date)] = [:]
     private var inFlight: [String: Task<ResolvedStream?, Never>] = [:]
@@ -28,10 +30,11 @@ actor InnerTubeService {
     private(set) var lastSuccessfulStrategy: String?
 
     static let pipedStrategyName = "Piped"
+    static let spotiFLACStrategyName = "SpotiFLAC"
 
     /// - Parameters:
     ///   - innerTubeHTTP: InnerTube transport (no cookie jar; device-code Bearer for TVHTML5).
-    ///   - plainHTTP: base.js, probes and Piped (no cookie jar).
+    ///   - plainHTTP: base.js, probes, SpotiFLAC and Piped (no cookie jar).
     init(innerTubeHTTP: any HTTPClient, plainHTTP: any HTTPClient, account: YouTubeAccount, remote: RemoteClientConfigStore) {
         self.account = account
         self.remote = remote
@@ -42,8 +45,11 @@ actor InnerTubeService {
         let cipher = SignatureCipherSolver(http: BaseJsCachingHTTPClient(inner: plainHTTP), evaluator: evaluator)
         self.cipher = cipher
         piped = PipedStreamResolver(http: plainHTTP, aacOnly: true)
+        spotiFLAC = SpotiFLACClient(http: plainHTTP)
+        let validator = StreamUrlValidator(http: plainHTTP)
+        self.validator = validator
         resolver = ChainedYouTubeStreamResolver(
-            player: client, cipher: cipher, validator: StreamUrlValidator(http: plainHTTP), policy: .iOS,
+            player: client, cipher: cipher, validator: validator, policy: .iOS,
             isSignedIn: { await account.hasCookie },
             maxBitrateKbps: { StreamingAudioQuality.maxBitrateKbps() },
             strategies: { signedIn in await remote.current().chain(signedIn: signedIn) },
@@ -72,20 +78,57 @@ actor InnerTubeService {
         // resolution uses the current table (the saved file, or the built-in one).
         await remote.refreshInBackground()
         let configMs = PlaybackStartTimings.ms(from: started, to: .now)
-        var stream = (try? await resolver.resolveStream(videoId: videoId, validate: validate,
-                                                        excludedStrategies: excluding)) ?? nil
-        var attempts = await resolver.lastAttempts
-        var successful = await resolver.lastSuccessfulStrategy
-        if stream == nil, !excluding.contains(Self.pipedStrategyName) {
-            let fromPiped = await piped.resolve(videoId: videoId)
-            let detail = await piped.lastDetail
-            if let fromPiped {
-                stream = ResolvedStream(url: fromPiped.url, userAgent: fromPiped.userAgent,
-                                        strategyName: Self.pipedStrategyName)
-                successful = Self.pipedStrategyName
-                attempts.append("Piped: \(detail ?? "resolved")")
+        var stream: ResolvedStream?
+        var attempts: [String] = []
+        var successful: String?
+
+        // 0. SpotiFLAC primary lossless chain (`tracks.monochrome.st` → Tidal HiFi instances → Deezer ISRC enrichment).
+        //    Automatically falls back to YouTube (`InnerTube` → `Piped`) if the track is not found or fails validation.
+        if !excluding.contains(Self.spotiFLACStrategyName),
+           let query = SpotiFLACTrackRegistry.shared.query(forVideoId: videoId) {
+            if let flac = await spotiFLAC.resolve(query) {
+                let urlString = flac.url.absoluteString
+                var playable = true
+                if validate {
+                    let probe = await validator.probe(url: urlString, userAgent: flac.userAgent, sendRange: true)
+                    playable = probe.ok
+                    if !playable {
+                        await spotiFLAC.invalidate(query)
+                        attempts.append("SpotiFLAC (\(flac.provider.rawValue)): \(probe.describe())")
+                    }
+                }
+                if playable {
+                    stream = ResolvedStream(
+                        url: urlString,
+                        userAgent: flac.userAgent,
+                        strategyName: Self.spotiFLACStrategyName,
+                        mimeType: "audio/flac"
+                    )
+                    successful = Self.spotiFLACStrategyName
+                    attempts.append("SpotiFLAC (\(flac.provider.rawValue)): lossless FLAC (\(flac.trackId))")
+                }
             } else {
-                attempts.append("Piped: \(detail ?? "no instance answered")")
+                attempts.append("SpotiFLAC: no lossless match")
+            }
+        }
+
+        // 1. Automatic fallback to YouTube (`InnerTube` → `Piped`) when SpotiFLAC misses or was excluded.
+        if stream == nil, !SpotiFLACTrackRegistry.isSyntheticVideoId(videoId) {
+            stream = (try? await resolver.resolveStream(videoId: videoId, validate: validate,
+                                                        excludedStrategies: excluding)) ?? nil
+            attempts.append(contentsOf: await resolver.lastAttempts)
+            successful = await resolver.lastSuccessfulStrategy
+            if stream == nil, !excluding.contains(Self.pipedStrategyName) {
+                let fromPiped = await piped.resolve(videoId: videoId)
+                let detail = await piped.lastDetail
+                if let fromPiped {
+                    stream = ResolvedStream(url: fromPiped.url, userAgent: fromPiped.userAgent,
+                                            strategyName: Self.pipedStrategyName)
+                    successful = Self.pipedStrategyName
+                    attempts.append("Piped: \(detail ?? "resolved")")
+                } else {
+                    attempts.append("Piped: \(detail ?? "no instance answered")")
+                }
             }
         }
         lastAttempts = attempts
@@ -113,9 +156,12 @@ actor InnerTubeService {
                                             hasN: URLCoding.androidQueryParameter(stream.url, "n") != nil)
     }
 
-    /// Drops the cached URL (googlevideo answered 403/410: expired, or bound to another client).
-    func invalidate(videoId: String) {
+    /// Drops the cached URL (googlevideo or SpotiFLAC answered 403/410: expired, or bound to another client).
+    func invalidate(videoId: String) async {
         cache[videoId] = nil
+        if let query = SpotiFLACTrackRegistry.shared.query(forVideoId: videoId) {
+            await spotiFLAC.invalidate(query)
+        }
     }
 
     /// Drops every cached URL (the sign-in state changed, so other clients may now be used).
@@ -131,9 +177,10 @@ actor InnerTubeService {
         return Date().addingTimeInterval(4 * 3600)
     }
 
-    /// Hosts the streaming layer may fetch audio from: googlevideo plus the Piped hosts the resolver trusts.
+    /// Hosts the streaming layer may fetch audio from: googlevideo, SpotiFLAC lossless hosts, and trusted Piped hosts.
     func allowedHosts() async -> Set<String> {
         CloudStreamSecurity.allowedHostSuffixes(pipedTrustedHosts: await piped.trustedHosts)
+            .union(SpotiFLACClient.trustedAudioHostSuffixes)
     }
 
     /// A fresh, validated resolution with its attempts (the playback test).
