@@ -106,7 +106,8 @@ screens ──read/call──► SpatialAudioModel (env.spatial, @MainActor @Obs
 
 - Every protocol requirement is `async`; every value crossing is `Sendable`. A `@MainActor final class` may conform:
   `FakeSpatialLibrary` and `FakeSpatialPlayback` in `AppTests/SpatialAudioModelTests.swift` are exactly that, and
-  they compile and pass under this target's settings (CI run 43033433910, green). An `actor` or a
+  they compile and pass under this target's settings (CI runs 43033433910 and, with the nine statuses,
+  43067282310, green). An `actor` or a
   `nonisolated struct` may conform too (the no-ops are structs).
 - No requirement takes an `async` closure. The app target builds with approachable concurrency and default
   main-actor isolation; a closure type written in the package means something else there, and conformers then have
@@ -930,12 +931,15 @@ Loop: `gh run list --repo RedSn0w1877/PixlAudio-iOS --branch <branch>`, `gh run 
 `gh run view <id> --repo … --log-failed` (the job summary lists `file:line: error`). Logs are public: never print a
 secret.
 
-Two unit tests are timing-dependent and fail now and then on a busy runner:
+Three unit tests are timing-dependent and fail now and then on a busy runner:
 `AppTests/LaunchConfigurationTests.swift:138` `testPlaybackStoreWithDemoEngine` (it sleeps 50 ms, then expects
-`store.isPlaying`; it failed in run 43043932396, attempt 1, with nothing else red), and
+`store.isPlaying`; it failed in run 43043932396, attempt 1, with nothing else red),
 `SpotifyMatchCoordinatorTests.testConcurrentMatchesOfOneSongRunTheSearchOnce` (two searches instead of one; it
-failed in run 43053259035 with nothing else red, 2 failures in 587 tests). If one of them is the only failure,
-re-run the job instead of pushing again: `gh run rerun <id> --repo RedSn0w1877/PixlAudio-iOS --failed`.
+failed in run 43053259035 with nothing else red, 2 failures in 587 tests), and
+`AppTests/DualDeckEngineTests.swift:108` `testCrossfadeOverlapsBothDecksWithTheirGainCurves` (a recorded fade of
+0.876 s against 1 ± 0.1 s; run 43067282310, attempt 1, with nothing else red; attempt 2 was green). If one of them
+is the only failure, re-run the job instead of pushing again:
+`gh run rerun <id> --repo RedSn0w1877/PixlAudio-iOS --failed`.
 
 ### 10.2 PixlCore locally (Windows)
 
