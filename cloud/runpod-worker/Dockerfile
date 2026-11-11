@@ -82,6 +82,11 @@ ADD --link --chmod=644 --checksum=sha256:ef3bcb9c8b40d14ae5d51b6db2587339cc12c6b
 ADD --link --chmod=644 --checksum=sha256:f3cf25b222c4eed7cd49dd8b2c9597d50c18bd154090f7b919cfa5f93cf22c49 \
     https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/04573f0d-f3cf25b2.th \
     /models/demucs/04573f0d-f3cf25b2.th
+# demucs: htdemucs_6s, one model of 55 MB, MIT (loaded on the first spatial job: guitar and piano for the
+# six-stem cascade)
+ADD --link --chmod=644 --checksum=sha256:34c22ccb381c6f9fdbf324f04e1e2fe21aaaf293f5ded163a162697ff9a02ddd \
+    https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/5c90dfd2-34c22ccb.th \
+    /models/demucs/5c90dfd2-34c22ccb.th
 # aligner: Qwen3-ForcedAligner-0.6B, 1.84 GB, Apache-2.0 (loaded at start)
 ADD --link --chmod=644 --checksum=sha256:47831d0e82f96b20e9034dba01a075ee06436654719f6a68289e49f1b65ce0e7 \
     https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B/resolve/c7cbfc2048c462b0d63a45797104fc9db3ad62b7/model.safetensors \
@@ -95,6 +100,7 @@ ADD --link --chmod=644 --checksum=sha256:6e0b9d9e09e2e0238e7ef3cc8a484ab387e91b9
     /models/asr/model-00002-of-00002.safetensors
 COPY --link --from=small /models/ /models/
 COPY --link models/demucs/htdemucs_ft.yaml /models/demucs/htdemucs_ft.yaml
+COPY --link models/demucs/htdemucs_6s.yaml /models/demucs/htdemucs_6s.yaml
 COPY --link LICENSES/ /opt/pixl/LICENSES/
 COPY --link NOTICE weights.lock /opt/pixl/
 COPY --link src/ /opt/pixl/src/
@@ -125,11 +131,15 @@ ADD --link --chmod=644 --checksum=sha256:ef3bcb9c8b40d14ae5d51b6db2587339cc12c6b
 ADD --link --chmod=644 --checksum=sha256:f3cf25b222c4eed7cd49dd8b2c9597d50c18bd154090f7b919cfa5f93cf22c49 \
     https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/04573f0d-f3cf25b2.th \
     /models/demucs/04573f0d-f3cf25b2.th
+ADD --link --chmod=644 --checksum=sha256:34c22ccb381c6f9fdbf324f04e1e2fe21aaaf293f5ded163a162697ff9a02ddd \
+    https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/5c90dfd2-34c22ccb.th \
+    /models/demucs/5c90dfd2-34c22ccb.th
 ADD --link --chmod=644 --checksum=sha256:47831d0e82f96b20e9034dba01a075ee06436654719f6a68289e49f1b65ce0e7 \
     https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B/resolve/c7cbfc2048c462b0d63a45797104fc9db3ad62b7/model.safetensors \
     /models/aligner/model.safetensors
 COPY --link --from=small /models/ /models/
 COPY --link models/demucs/htdemucs_ft.yaml /models/demucs/htdemucs_ft.yaml
+COPY --link models/demucs/htdemucs_6s.yaml /models/demucs/htdemucs_6s.yaml
 COPY --link src/ /opt/pixl/src/
 ENV PYTHONPATH=/opt/pixl/src PIXL_MODELS_DIR=/models HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
     TOKENIZERS_PARALLELISM=false
