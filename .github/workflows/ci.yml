@@ -70,6 +70,12 @@ jobs:
       # same pair from its side (cloud-worker-build › check_fixtures.py), since this workflow ignores cloud/**.
       - name: Cloud fixtures match the worker's schema examples
         run: bash ci/check-cloud-fixtures.sh
+      # The on-device spatial stage (cloud audio spec, section 7): the table file the app ships and the copies the
+      # stage's tests read must be byte-identical to the files the worker generates
+      # (cloud/runpod-worker/schema/v1/spatial/). A regenerated table reaches the app with
+      # `bash ci/check-spatial-fixtures.sh --sync`; a push that only touches cloud/** does not run this workflow.
+      - name: Spatial table files match the worker's
+        run: bash ci/check-spatial-fixtures.sh
       - name: swift test
         run: swift test --package-path Packages/PixlCore --parallel
       # Stage 11: search + VISIONOS-first resolution + a ranged probe + BotGuard Create against the real services.
