@@ -7,7 +7,8 @@
 #         small - the KB-sized configs and tokenizers (fetch_small.py, sha256-checked)
 #         final - the image that is pushed and deployed. It has no RUN on purpose: a RUN here would need every
 #                 layer below it unpacked, which re-downloads 7 GB of weights whenever it re-runs.
-#         smoke - CI only, never pushed: loads the real weights on CPU and runs each model once.
+#         smoke - CI only, never pushed: loads the real weights on CPU and runs each model once, then the
+#                 six-stem cascade and one spatial render with its FLAC (src/pixl_worker/smoke.py).
 #
 # Pinning: every FROM (and this frontend) by digest; every model file by sha256 in weights.lock (each large file
 # is its own `ADD --link --checksum` layer, keyed by its checksum, so it is downloaded once and its layer digest
@@ -114,7 +115,8 @@ WORKDIR /opt/pixl
 CMD ["python3", "-u", "-m", "pixl_worker.handler"]
 
 ########## smoke: CI only. The same weights as final (same ADD lines, so the same cached layers) minus ASR, which
-# is too big to run in fp32 on a CI runner; `op: bench` on RunPod covers it.
+# is too big to run in fp32 on a CI runner; `op: bench` on RunPod covers it. The spatial renderer needs no weights:
+# its head model is a small data file inside src/.
 FROM deps AS smoke
 ADD --link --chmod=644 --checksum=sha256:60347271e8493fdff28ef558c3b2297afb869a1f4462594ed548038264bec395 \
     https://huggingface.co/anvuew/BS-RoFormer/resolve/24988f47270cb3529b62c4f3bbb8234f4586de9b/bs_roformer_ft1_anvuew_sdr_12.55.ckpt \
