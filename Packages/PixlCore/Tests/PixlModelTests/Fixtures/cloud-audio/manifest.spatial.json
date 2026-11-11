@@ -1,0 +1,15 @@
+{
+  "schema": "pixl.library.render", "v": 1, "libV": 1,
+  "videoId": "J7p4bzqLvCw", "kind": "spatial", "profile": "studio",
+  "audio": {"key": "lib/v1/J7p4bzqLvCw/sp-studio.flac", "bytes": 27100200,
+            "sha256": "3f1c9b0d2a4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8",
+            "codec": "flac", "bits": 16, "sampleRate": 48000, "samples": 9696000, "durationMs": 202000},
+  "loudness": {"integratedLufs": -13.8, "sourceLufs": -9.8, "headroomDb": 4.0, "truePeakDb": -1.0,
+               "limiterMaxDb": 0.6},
+  "source": {"itag": 251, "codec": "opus", "sampleRate": 48000, "decodedSamples": 9696000,
+             "sha256": "a0b1c2d3e4f5061728394a5b6c7d8e9f00112233445566778899aabbccddeeff"},
+  "render": {"engine": "pixl-spatial-1", "stems": "open-cascade-6", "stemMode": "stems6"},
+  "worker": {"version": "1.1.0", "gitSha": "abcdef012345"},
+  "createdAt": "2026-11-10T19:02:11Z",
+  "addedLater": {"ignored": true}
+}
