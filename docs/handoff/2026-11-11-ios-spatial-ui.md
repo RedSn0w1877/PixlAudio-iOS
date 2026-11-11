@@ -149,6 +149,18 @@ right here: iOS's `cloudRendersOn` is the model's own `settings.cloud && isCloud
 
 ## Not done / uncertain
 
-- Nothing was run on a device; the app target compiles only in CI. Layout widths were reasoned from the code and checked
-  on the CI screenshots (table below).
-- No local PixlCore run: this branch changes nothing in `Packages/PixlCore`; CI's `core` job runs it.
+- Nothing was run on a device; the app target compiles only in CI. Layout widths were reasoned from the code; the UI
+  tests assert the behaviour (lines, selection, values, the pick, the confirm), not the looks: **the screenshots in
+  artifact `shots-3a60dc66988f5a3f8bc6fa7c121b8d432d71d456` (run 43087884841) still want a look**, in particular the
+  `person.wave.2` symbol and the button's width next to a long title.
+- No local PixlCore run: this branch changes nothing in `Packages/PixlCore`; CI's `core` job ran it (green).
+
+## CI (`ci.yml`, branch `audio-ui`)
+
+| Run | Commit | Result |
+|---|---|---|
+| 43078803181 | ed2db49 | build for testing green; cancelled by the next push before the unit tests |
+| 43079645843 | d2c4d31 `[shots:SpatialScreenshotTests]` | build green, **603 unit tests green**; screenshots 15 of 19: the first three tests' `app.launch()` failed in every attempt ("Failed to get background assertion" / "does not have a process ID": the freshly booted simulator still settling, the same tests passed in the next run), and the Developer rows test asked the page's last row to sit higher than the page can scroll (test bug, fixed) |
+| 43087884841 | 3a60dc6 `[shots:SpatialScreenshotTests]` | **green**: build, 603 unit tests (11 of them `SpatialAudioUITests`), 19 of 19 screenshot tests, `core` |
+
+Later commits on the branch touch only this note (no CI run).
