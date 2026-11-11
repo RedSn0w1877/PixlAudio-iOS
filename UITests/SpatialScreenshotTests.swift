@@ -62,6 +62,7 @@ final class SpatialScreenshotTests: XCTestCase {
     // MARK: The full player's button
 
     func testPlayerButtonOnLight() throws {
+        continueAfterFailure = false
         let app = launch("nowPlaying.spatial", "light")
         let button = app.buttons["player.spatialAudio"].firstMatch
         XCTAssertTrue(button.waitForExistence(timeout: 20), "the Spatial audio button is missing")
@@ -71,6 +72,7 @@ final class SpatialScreenshotTests: XCTestCase {
     }
 
     func testPlayerButtonHeldBackDark() throws {
+        continueAfterFailure = false
         let app = launch("nowPlaying.spatialHeld", "dark")
         let button = app.buttons["player.spatialAudio"].firstMatch
         XCTAssertTrue(button.waitForExistence(timeout: 20), "the Spatial audio button is missing")
@@ -224,12 +226,18 @@ final class SpatialScreenshotTests: XCTestCase {
     }
 
     /// Short drags along the leading margin (never starting on a switch or a slider) until `element` sits above the mini
-    /// player.
+    /// player, or the page can't go further (its last row: the page keeps room for the mini player under it).
     private func scroll(_ app: XCUIApplication, toShow element: XCUIElement) {
         Thread.sleep(forTimeInterval: 1.0)
-        let limit = app.windows.firstMatch.frame.maxY - 130
+        // The mini player, alone at the bottom of a pushed page, covers about the bottom 110 pt.
+        let limit = app.windows.firstMatch.frame.maxY - 110
+        var lastMaxY: CGFloat = -1
         for _ in 0..<16 {
             if element.exists && element.frame.maxY <= limit && element.frame.minY > 0 { break }
+            if element.exists {
+                if element.frame.maxY == lastMaxY { break }
+                lastMaxY = element.frame.maxY
+            }
             let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.03, dy: 0.7))
             let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.03, dy: 0.4))
             start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.2)

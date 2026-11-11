@@ -169,6 +169,7 @@ private struct SpatialChoiceRow: View {
     let action: () -> Void
 
     @Environment(\.appTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let outerCorner: CGFloat = 24
     private static let innerCorner: CGFloat = 6
@@ -196,7 +197,8 @@ private struct SpatialChoiceRow: View {
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(theme.onSecondaryContainer)
                     .frame(width: 24, height: 24)
-                    .scaleEffect(selected ? 1 : 0.4)
+                    // Reduce Motion: the check fades in place instead of growing.
+                    .scaleEffect(selected || reduceMotion ? 1 : 0.4)
                     .opacity(selected ? 1 : 0)
                     .accessibilityHidden(true)
             }
