@@ -149,8 +149,10 @@ def test_the_listing_is_read_with_or_without_the_s3_namespace_and_with_escaped_k
     objects, token = J.parse_page(body)
     assert token is None and [(o.key, o.size) for o in objects] == [("lib/v1/a&b/x.flac", 12), ("lib/v1/c/y.json", 3)]
     assert objects[0].modified == pytest.approx(1791367200.0) and objects[1].modified == 0.0
-    # the app's own listing fixture (another prefix) parses too
-    fixture = ROOT.parents[1] / "Packages/PixlCore/Tests/PixlNetTests/Fixtures/cloud-phone/s3.list.xml"
+    # the app's own listing fixture (another prefix) parses too; inside the test image there is no repository
+    # around the worker (it is /t), so it is only looked for where one exists
+    repo = ROOT.parents[1] if len(ROOT.parents) > 1 else ROOT
+    fixture = repo / "Packages" / "PixlCore" / "Tests" / "PixlNetTests" / "Fixtures" / "cloud-phone" / "s3.list.xml"
     if fixture.is_file():
         objects, token = J.parse_page(fixture.read_bytes())
         assert token is None and [o.key for o in objects] == ["out/readme&notes.txt"]
