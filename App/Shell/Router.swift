@@ -13,8 +13,8 @@ final class Router {
     var cover: AppCover?
     /// The Search screen's query (stage 7c owns the field; kept here so deep links and UI tests can prefill it).
     var searchText: String
-    /// The tab bar is minimized because the selected tab's root scrolled down (`MinimizesTabBarOnScroll`). The shell
-    /// clears it when the tab or the selected tab's stack changes.
+    /// The tab bar is minimized because a tab root scrolled down (`MinimizesTabBarOnScroll`). It stays minimized across
+    /// tab switches and pushes; scrolling up, or tapping the selected tab, clears it.
     private(set) var isTabBarMinimized = false
 
     /// Sets `isTabBarMinimized`, writing only on a change (each write re-runs the shell's bottom bars).
@@ -70,6 +70,8 @@ final class Router {
     /// Bottom-bar tap: switches tab; tapping the selected tab pops it to its root (Android `navigateToTopLevelSafely`).
     func select(_ tab: RootTab) {
         if tab == selection {
+            // A page too short to scroll can't scroll the bar back: tapping the selected tab expands it.
+            setTabBarMinimized(false)
             switch tab {
             case .home: homePath.removeAll()
             case .search: searchPath.removeAll()

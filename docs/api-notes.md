@@ -464,7 +464,7 @@ Signatures checked against the developer.apple.com documentation JSON (`/tutoria
 | `UIApplication.isIdleTimerDisabled` | 2 | /documentation/uikit/uiapplication/isidletimerdisabled | `ScreenAwake` (`LyricsView`, `LyricsSyncEditorView`) | Keep screen on: since 2026-10-07 always while the lyrics screen or the sync editor is open (owner; Android's `keep_screen_on_lyrics` switch is gone), claimed again when the app becomes active (the docs don't say whether the flag survives the background) and released on disappear. One app-wide flag, so `ScreenAwake` keeps one claim per owner: the sync editor closing over the lyrics screen never turns it off under lyrics that still want it on. |
 | `View.allowsHitTesting(_:)` | 13 | /documentation/swiftui/view/allowshittesting(_:) | sync editor notice pill, scrims | The notice pill over the tap pad lets taps through unless it offers Undo (Android: only the Undo box is clickable). |
 | `FileDocument`, `View.fileExporter(isPresented:document:contentType:defaultFilename:onCompletion:)`, `View.fileImporter(isPresented:allowedContentTypes:onCompletion:)`, `UTType(filenameExtension:)` | 14 | /documentation/swiftui/view/fileexporter(ispresented:document:contenttype:defaultfilename:oncompletion:) | Save lyrics (.lrc), import lyrics | Imports go through PixlLyrics' `LyricsImportSecurity`. |
-| `TranslationSession.Configuration(source:target:)`, `invalidate()`, `View.translationTask(_:action:)`, `TranslationSession.translations(from:)`, `Request(sourceText:clientIdentifier:)`, `Response.targetText` / `.clientIdentifier` | 18 | /documentation/translation/translationsession | "Translate lyrics" in the More sheet | On-device; the system asks to download languages. The action closure is `(TranslationSession) async -> Void` (not Sendable) and main-actor isolated (formed in `body`); `TranslationSession` and `Request` are not Sendable, so the session is passed as a `nonisolated(unsafe)` local into the `@concurrent` `LyricsTranslator.translate`, which builds the requests itself. |
+| `TranslationSession.Configuration(source:target:)`, `invalidate()`, `View.translationTask(_:action:)`, `TranslationSession.translations(from:)`, `Request(sourceText:clientIdentifier:)`, `Response.targetText` / `.clientIdentifier` | 18 | /documentation/translation/translationsession | REMOVED 2026-10-26 (owner: no on-device translate, Translate via AI stays): was "Translate on device" in the lyrics More sheet | On-device; the system asks to download languages. The action closure is `(TranslationSession) async -> Void` (not Sendable) and main-actor isolated (formed in `body`); `TranslationSession` and `Request` are not Sendable, so the session is passed as a `nonisolated(unsafe)` local into the `@concurrent` `LyricsTranslator.translate`, which builds the requests itself. |
 | `CFStringTokenizerCreate`, `CFStringTokenizerAdvanceToNextToken`, `CFStringTokenizerCopyCurrentTokenAttribute(_:kCFStringTokenizerAttributeLatinTranscription)` | 3 | /documentation/corefoundation/cfstringtokenizer | `AppleCJKRomanization` | Japanese romaji for PixlLyrics' romaniser (Android kuromoji). |
 | `String.applyingTransform(.mandarinToLatin / .stripDiacritics, reverse:)` | 9 | /documentation/foundation/stringtransform/mandarintolatin | `AppleCJKRomanization` | Toneless pinyin, `ü` → `u:` (pinyin4j form). |
 | `UnevenRoundedRectangle`, `.contentTransition(.symbolEffect(.replace))`, `sensoryFeedback(_:trigger:)` | 16 / 17 | (see stage 4) | lyrics chrome | |
@@ -588,9 +588,10 @@ Signatures checked against the developer.apple.com documentation JSON (2026-10-0
 | `UserDefaults.dictionaryRepresentation()` | 2 | /documentation/foundation/userdefaults/dictionaryrepresentation() | `SettingsBackup` | Filtered to Android-named portable keys only. |
 | `uname(_:)` / `utsname.machine` | 2 | /documentation/kernel/1387506-uname | `BackupService` | Device model in the backup manifest (`iPhone17,1`). |
 | `DateFormatter.setLocalizedDateFormatFromTemplate(_:)` | 8 | /documentation/foundation/dateformatter/setlocalizeddateformatfromtemplate(_:) | `BackupDates` | Android's "MMM d, yyyy 'at' h:mm a" in the device locale. |
-| `UnevenRoundedRectangle(cornerRadii:style:)`, `RectangleCornerRadii` | 16 | /documentation/swiftui/unevenroundedrectangle | `SetupBottomBar` | Animatable: the next button's circle → rounded square → leaf. |
-| `GlassEffectContainer(spacing:content:)` + `glassEffect(_:in:)` with rotated shapes | 26 | /documentation/swiftui/glasseffectcontainer | `SetupIconCollage` | The five collage tiles render together. |
-| `DragGesture(minimumDistance:)` + `onEnded` | 13 | /documentation/swiftui/draggesture | `SetupView` | Swipe right = Android's back between setup pages. |
+| `MeshGradient(width:height:points:colors:)` in a 20 fps `TimelineView` | 18 | /documentation/swiftui/meshgradient | `SetupBackdrop` | The setup's drifting background; still under Reduce Motion. |
+| `phaseAnimator(_:content:animation:)` | 17 | /documentation/swiftui/view/phaseanimator(_:content:animation:) | `SetupWelcomePage` | The logo's breathing and the floating chips. |
+| `scrollTransition(_:axis:transition:)` + `matchedGeometryEffect` | 17 | /documentation/swiftui/view/scrolltransition(_:axis:transition:) | `SetupThemePage` | Cards shrink at the page edge; the selection ring slides between cards. |
+| `DragGesture(minimumDistance:)` + `onEnded` | 13 | /documentation/swiftui/draggesture | `SetupView` | Swipe right steps back a setup page (as a simultaneous gesture over the scrolling page). |
 | `Canvas` + `Path.addCurve(to:control1:control2:)` | 15 | /documentation/swiftui/canvas | `WelcomeArt` | The Android vector `welcome_art` (16 paths of M/C/Z) parsed once, filled with palette roles. |
 | `AVAudioSession.routeChangeNotification` via `NotificationCenter.publisher(for:)` + `onReceive` | 6 / 13 | /documentation/avfaudio/avaudiosession/routechangenotification | `DeviceCapabilitiesView` | Re-measures route and sample rate live (`receive(on: RunLoop.main)`). |
 | String Catalog (`Localizable.xcstrings`) with `String(localized:defaultValue:)` keys | 16 / Xcode 15 | /documentation/xcode/localizing-and-varying-text-with-a-string-catalog | all screens | Generated by `tools/localization/android_strings_to_xcstrings.py` from Android's 11 translated locales. |
@@ -735,7 +736,7 @@ grace period in which polls may show the state from before a command). All of th
 | API | Min iOS | Docs | Used in | Notes |
 |---|---|---|---|---|
 | `View.contextMenu(menuItems:)` | 13 | /documentation/swiftui/view/contextmenu(menuitems:) | player output pill | Long press on "Playing on <device>": Stop playing on <device> (the system menu). **Caution (CI, 2026-10-07):** on the lyrics Translate segment — an interactive-glass button inside a `GlassEffectContainer` — a context menu never opened; holding the segment ran its tap instead. The lyrics segment moved to `Menu(content:label:primaryAction:)` (next row). The output pill is the same kind of control and has no UI test of its hold yet: check it on the phone. |
-| `Menu(content:label:primaryAction:)` | 15 | /documentation/swiftui/menu/init(content:label:primaryaction:) | lyrics Translate segment | A tap runs the primary action (show / hide translations, or translate on device); touch and hold opens the menu (Translate via AI, Show romanization), which morphs out of the segment's glass like `ShapedGlassMenu`. Same styling as that: `.menuStyle(.button)`, `.buttonStyle(.plain)`, then the glass. UI test: `LyricsScreenshotTests.testTranslateMenu` (`press(forDuration:)`). |
+| `Menu(content:label:primaryAction:)` | 15 | /documentation/swiftui/menu/init(content:label:primaryaction:) | lyrics Translate segment | A tap runs the primary action (show / hide translations, or Translate via AI; the on-device translator was removed 2026-10-26); touch and hold opens the menu (Translate via AI, Show romanization), which morphs out of the segment's glass like `ShapedGlassMenu`. Same styling as that: `.menuStyle(.button)`, `.buttonStyle(.plain)`, then the glass. UI test: `LyricsScreenshotTests.testTranslateMenu` (`press(forDuration:)`). |
 | `Toggle(_:systemImage:isOn:)` | 14.0 | /documentation/swiftui/toggle/init(_:systemimage:ison:) | lyrics Translate segment's menu | "Show romanization" as a checkable menu item with its symbol (2026-10-07). |
 | `View.accessibilityRepresentation(representation:)` | 15.0 | /documentation/swiftui/view/accessibilityrepresentation(representation:) | lyrics More sheet's switch rows | "Replaces one or more accessibility elements for this view with new accessibility elements"; the representation is hidden and non-interactive. The rows are buttons (Android: the whole row is `clickable`) showing a non-hit-testable `Toggle`; the representation `Toggle(isOn:label:)` keeps them switches with their titles for VoiceOver and UI tests (2026-10-08). |
 | `LabelStyle` (custom `makeBody`) with `Label(_:systemImage:)` | 14 | /documentation/swiftui/labelstyle | `MiniPlayerBar` | The mini player's "Playing on <device>" line with a small speaker icon. |
@@ -983,7 +984,6 @@ Launch, library, artwork, player and Spotify-matcher speed-ups (docs/performance
 | `View.scrollBounceBehavior(_:axes:)` `.always`, `View.scrollDismissesKeyboard(.interactively)`, `View.onScrollGeometryChange(for:of:action:)` | 16.4 / 16 / 18 | /documentation/swiftui/view/scrollbouncebehavior(_:axes:) | `PlaylistDetailView` | Pulling the playlist down past its top (offset below -72 pt) reveals Find in playlist; a list shorter than the page still bounces. |
 | `View.confirmationDialog(_:isPresented:titleVisibility:presenting:actions:message:)` | 15 | /documentation/swiftui/view/confirmationdialog(_:ispresented:titlevisibility:presenting:actions:message:) | `RootView` ("Blocked artist" › Play anyway) | The action uses the request captured by `presenting:`; the binding clears the pending request as the dialog goes away. |
 | `View.contextMenu(menuItems:)` on the artwork carousel and the mini player | 13 | /documentation/swiftui/view/contextmenu(menuitems:) | `SongQuickActionsModifier` | Long press: add to playlist, share, go to the artist. |
-||||||| a9b76aa
 | `UIGestureRecognizerRepresentable` (`makeCoordinator(converter:)`, `makeUIGestureRecognizer`, `updateUIGestureRecognizer`, `handleUIGestureRecognizerAction`), `UIPanGestureRecognizer.velocity(in:)` / `UIGestureRecognizerDelegate.gestureRecognizerShouldBegin` | 18 | /documentation/swiftui/uigesturerecognizerrepresentable | `QueueSheet.HorizontalRowSwipe` | Queue row swipe-to-remove only begins for mostly-horizontal pans, so vertical drags on a row scroll the list. |
 
 ## Sing step 4: the preview piece (2026-10-23)
@@ -992,21 +992,12 @@ Launch, library, artwork, player and Spotify-matcher speed-ups (docs/performance
 | `AVAssetReader.timeRange` (set before `startReading()`), `CMSampleBufferGetPresentationTimeStamp` | 4 | /documentation/avfoundation/avassetreader/timerange | `CloudAudioPreparer.decode(frameRange:)` | Sing's preview piece decodes only its minute (plus 0.5 s of decoder pre-roll on each side); every buffer is placed by its presentation time and cut to the exact 44.1 kHz frames, so the cut matches a decode of the whole song. |
 | `AVMutableComposition`, `addMutableTrack(withMediaType:preferredTrackID:)`, `AVMutableCompositionTrack.insertEmptyTimeRange(_:)`, `insertTimeRange(_:of:at:)`, `AVAssetTrack.load(.timeRange)` | 4 / 15 | /documentation/avfoundation/avmutablecompositiontrack | `DeckItemFactory.makeClipItem` | The piece is placed at its start frame inside a composition as long as the song (silent before and after), so the deck item's timeline is the song's: position, seeks, lyrics, Now Playing and the in-sync switch need no offset. The processing tap is attached to the composition track. To be confirmed on the phone: the trailing empty range keeps the item as long as the song. |
 
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
 ## Listening history import (2026-10-23)
 | API | Min OS | Doc | Used in | Notes |
 |---|---|---|---|---|
 | `UTType.zip`, `UTType.json` with `fileImporter(isPresented:allowedContentTypes:allowsMultipleSelection:onCompletion:)` | 14 | /documentation/uniformtypeidentifiers/uttype-swift.struct/zip | `ListeningHistoryView` | The Spotify / Google Takeout ZIP or the JSON files inside it; read with PixlBackup's own ZIP reader (no new dependency). |
 | `RelativeDateTimeFormatter` (`unitsStyle = .abbreviated`, `localizedString(for:relativeTo:)`) | 13 | /documentation/foundation/relativedatetimeformatter | `ListeningHistoryText.status` | "Last synced 2 hr. ago"; one cached formatter. |
-||||||||| 7c50e28
-=========
-## Listening history import (2026-10-23)
-| API | Min OS | Doc | Used in | Notes |
-|---|---|---|---|---|
-| `UTType.zip`, `UTType.json` with `fileImporter(isPresented:allowedContentTypes:allowsMultipleSelection:onCompletion:)` | 14 | /documentation/uniformtypeidentifiers/uttype-swift.struct/zip | `ListeningHistoryView` | The Spotify / Google Takeout ZIP or the JSON files inside it; read with PixlBackup's own ZIP reader (no new dependency). |
-| `RelativeDateTimeFormatter` (`unitsStyle = .abbreviated`, `localizedString(for:relativeTo:)`) | 13 | /documentation/foundation/relativedatetimeformatter | `ListeningHistoryText.status` | "Last synced 2 hr. ago"; one cached formatter. |
-||||||| 7c50e28
+
 ## Claude everywhere and Ask Taizo (2026-10-23)
 | API | Min OS | Doc | Used in | Notes |
 |---|---|---|---|---|
@@ -1015,11 +1006,19 @@ Launch, library, artwork, player and Spotify-matcher speed-ups (docs/performance
 | `Data.WritingOptions.completeFileProtectionUntilFirstUserAuthentication`, `URLResourceValues.isExcludedFromBackup` | 4 / 5.1 | /documentation/foundation/nsdata/writingoptions | `TaizoConversationStore` | The saved conversations stay on the phone and out of device backups. |
 | `Menu` with `Section` and `Button(_:systemImage:action:)` | 14 / 15 | /documentation/swiftui/menu | `TaizoChatsMenu` | Ask Taizo's header menu: New chat and the last five conversations. |
 | `Link(destination:label:)` | 14 | /documentation/swiftui/link | `TaizoSourceLink` | A cited page opens in the browser. |
-||||||| 7c50e28
-## Listening history import (2026-10-23)
+
+## Opus instead of AAC (2026-11-11, branch `audio-opus`)
 | API | Min OS | Doc | Used in | Notes |
 |---|---|---|---|---|
-| `UTType.zip`, `UTType.json` with `fileImporter(isPresented:allowedContentTypes:allowsMultipleSelection:onCompletion:)` | 14 | /documentation/uniformtypeidentifiers/uttype-swift.struct/zip | `ListeningHistoryView` | The Spotify / Google Takeout ZIP or the JSON files inside it; read with PixlBackup's own ZIP reader (no new dependency). |
-| `RelativeDateTimeFormatter` (`unitsStyle = .abbreviated`, `localizedString(for:relativeTo:)`) | 13 | /documentation/foundation/relativedatetimeformatter | `ListeningHistoryText.status` | "Last synced 2 hr. ago"; one cached formatter. |
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
+| `kAudioFormatOpus` with `CMFormatDescriptionGetMediaSubType(_:)` | 11 / 4 | /documentation/coreaudiotypes/kaudioformatopus | `OpusPlaybackCheck` | The repackaged file's track must read as Opus. Opus is decoded "only in MP4 files" from iOS 17 (developer forums thread 759210), below our iOS 26 target. |
+| `AVURLAssetPreferPreciseDurationAndTimingKey` | 4 | /documentation/avfoundation/avurlassetpreferprecisedurationandtimingkey | `OpusPlaybackCheck` | Exact duration of the edited track (the check compares it with the valid samples within 2 ms). |
+| `AVAsset.load(.isPlayable)` | 15 | /documentation/avfoundation/avasset/isplayable | `OpusPlaybackCheck` | The file must be playable before it is renamed into place. |
+| `URLRequest.allowsExpensiveNetworkAccess` | 13 | /documentation/foundation/urlrequest/allowsexpensivenetworkaccess | `OpusDownloader` | With `allowsConstrainedNetworkAccess = false`: the whole-file download never runs on cellular, a hotspot or Low Data Mode, even when the network changes half way. |
+
+## Spatial audio: the on-device stage and the player (2026-11-11, ENGINE)
+| API | Min OS | Doc | Used in | Notes |
+|---|---|---|---|---|
+| `vDSP_conv` (positive filter stride: correlation with the reversed FIR = convolution over the history) | 4 | /documentation/accelerate/1450516-vdsp_conv | `SpatialStage` (PixlAudioCore, `#if canImport(Accelerate)`) | The two 192-tap FIRs of spec 7; result and inputs never overlap. Windows and Linux run the same stage on plain loops (the PixlCore golden test); `SpatialPlaybackTests` compares the two paths on the simulator. |
+| `vDSP_vsma`, `vDSP_vadd`, `vDSP_vsmul` | 4 | /documentation/accelerate/1450025-vdsp_vsma | `SpatialStage` | The sparse room's taps (in place, `C == D`), the FIR sums and the gain. No allocation: every buffer is made in `init`. |
+| `UnsafeMutableRawPointer.copyMemory(from:byteCount:)` | Swift stdlib | /documentation/swift/unsafemutablerawpointer/copymemory(from:bytecount:) | `SpatialStage.shiftHistory` | A memmove: the history's source and destination overlap. |
+| `AVAudioSession.Port` `.headphones`, `.usbAudio`, `.bluetoothA2DP`, `.bluetoothLE`, `.bluetoothHFP`, `.builtInSpeaker`, `.builtInReceiver`, `.airPlay`, `.carAudio`, `.lineOut`, `.HDMI` | 6 / 7 (`bluetoothLE`) | /documentation/avfaudio/avaudiosession/port | `SpatialOutputRoute` | The route rule's reading of `currentRoute.outputs.first?.portType` (spec 6.1); re-read on every `routeChangeNotification`. |

@@ -185,6 +185,15 @@ final class BackupServiceTests: XCTestCase {
         XCTAssertEqual(SetupView.Page.allCases.count, 6)
     }
 
+    func testSetupResumesWhereItWasClosed() {
+        XCTAssertEqual(SetupView.resumePage(storedIndex: 0), .welcome)
+        XCTAssertEqual(SetupView.resumePage(storedIndex: 3), .theme)
+        XCTAssertEqual(SetupView.resumePage(storedIndex: 5), .finish)
+        // A stale or corrupt value starts over instead of crashing.
+        XCTAssertEqual(SetupView.resumePage(storedIndex: 99), .welcome)
+        XCTAssertEqual(SetupView.resumePage(storedIndex: -1), .welcome)
+    }
+
     // MARK: -
 
     private func makeService() throws -> BackupService {

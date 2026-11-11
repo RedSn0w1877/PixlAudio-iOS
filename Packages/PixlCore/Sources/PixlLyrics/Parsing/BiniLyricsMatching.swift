@@ -56,7 +56,7 @@ public struct BiniLyricsCandidate: Sendable, Hashable {
 
 public enum BiniLyricsMatching {
     /// The source name shown with the lyrics ("Lyrics: BiniLyrics").
-    public static let sourceName = "BiniLyrics"
+    public static let sourceName = "Pixel Master Lyrics"
     /// The documented endpoint.
     public static let apiURL = "https://lyrics-api.binimum.org/"
     /// The only hosts a request (or a redirect, or a lyrics URL) may go to — HTTPS only.

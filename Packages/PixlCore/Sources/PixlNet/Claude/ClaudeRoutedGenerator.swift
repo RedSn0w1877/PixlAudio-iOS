@@ -81,11 +81,11 @@ public struct ClaudeRoutedGenerator: AiContentGenerating {
                                                            system: Self.system(persona: await persona(), type: type, context: context),
                                                            prompt: prompt, effort: Self.effort(for: type), onUsage: onUsage)
                 if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return text }
-                await onFallback("Claude returned no text for \(type.rawValue)")
+                await onFallback("Cloud AI returned no text for \(type.rawValue)")
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
-                await onFallback("Claude failed for \(type.rawValue): \(error)")
+                await onFallback("Cloud AI failed for \(type.rawValue): \(error)")
             }
         }
         return try await fallback.generateContent(prompt: prompt, type: type, temperature: temperature, context: context)

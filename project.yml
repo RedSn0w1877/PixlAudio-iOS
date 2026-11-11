@@ -5,7 +5,7 @@ name: PixlAudio
 options:
   bundleIdPrefix: io.github.redsn0w1877
   deploymentTarget:
-    iOS: "26.1"
+    iOS: "26.0"
   developmentLanguage: en
   createIntermediateGroups: true
   groupSortPosition: top
@@ -19,7 +19,7 @@ settings:
     SWIFT_VERSION: "6.0"
     SWIFT_APPROACHABLE_CONCURRENCY: YES
     SWIFT_STRICT_CONCURRENCY: complete
-    IPHONEOS_DEPLOYMENT_TARGET: "26.1"
+    IPHONEOS_DEPLOYMENT_TARGET: "26.0"
     TARGETED_DEVICE_FAMILY: "1"
     SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
     SUPPORTS_MACCATALYST: NO

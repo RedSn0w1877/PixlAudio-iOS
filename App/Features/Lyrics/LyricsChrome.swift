@@ -1,3 +1,4 @@
+import PixlFoundation
 import PixlModel
 import SwiftUI
 
@@ -199,16 +200,13 @@ struct LyricsControlCluster: View {
     let hasLyrics: Bool
     /// The song the segments act on.
     let song: Song?
-    /// On-device translation works on synced lines (`LyricsView.startTranslation`).
-    let canTranslateOnDevice: Bool
-    /// An on-device translation is running.
-    let translating: Bool
+    /// Lyrics are on screen to translate (Translate via AI works from any lyrics, synced or plain).
+    let canTranslate: Bool
     let clock: PlaybackClock
     let onOffsetChange: (Int) -> Void
     let onPlayPause: () -> Void
     let onSeek: (Int64) -> Void
     let onSeekPreview: (Int64?) -> Void
-    let onTranslate: () -> Void
     let onTranslateViaAI: () -> Void
     /// Any tap on Translate or Sing (it restarts the immersive timer, as the Synced / Static segments did).
     let onSegmentTap: () -> Void
@@ -225,15 +223,15 @@ struct LyricsControlCluster: View {
                 }
                 HStack(spacing: 12) {
                     LyricsPlayPauseButton(isPlaying: isPlaying, chrome: chrome, action: onPlayPause)
-                    LyricsSeekBar(clock: clock, isPlaying: isPlaying, chrome: chrome, brightArt: brightArt,
+                    LyricsSeekBar(clock: clock, songId: song?.id, durationHintMs: song?.duration ?? 0,
+                                  isPlaying: isPlaying, chrome: chrome, brightArt: brightArt,
                                   onSeek: onSeek, onPreview: onSeekPreview)
                         .frame(height: LyricsChromeMetrics.seekBarHeight)
                 }
                 Spacer().frame(height: 16)
-                LyricsToolbar(hasLyrics: hasLyrics, song: song, canTranslateOnDevice: canTranslateOnDevice,
-                              translating: translating, chrome: chrome, brightArt: brightArt, onTranslate: onTranslate,
-                              onTranslateViaAI: onTranslateViaAI, onSegmentTap: onSegmentTap, onBack: onBack,
-                              onMore: onMore)
+                LyricsToolbar(hasLyrics: hasLyrics, song: song, canTranslate: canTranslate, chrome: chrome,
+                              brightArt: brightArt, onTranslateViaAI: onTranslateViaAI, onSegmentTap: onSegmentTap,
+                              onBack: onBack, onMore: onMore)
             }
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.9), value: showSyncControls)
@@ -268,22 +266,45 @@ private struct LyricsPlayPauseButton: View {
 /// The seek bar pill (Android `PlayerSeekBar` + `WavySliderExpressive`, 5 pt track, 8 pt thumb, 30 pt waves while
 /// playing). Position is sampled ≤ 4 Hz from the player clock; a drag previews the position (the lyrics follow the
 /// finger) and seeks on release.
+///
+/// It draws against the same duration as the full player's bar (`PlaybackProgress.displayDuration`: the player's when
+/// it agrees with the song's, else the shorter). The raw player duration is a stream's estimate and can be far off,
+/// which left the thumb short of where the song was (stopping around the middle) and shifted every drag. It also holds
+/// nothing back after a seek: the engine reports the target as the position at once, so a "hold the committed seek"
+/// rule only ever kept a stale thumb on screen (after a restart, or a skip that left the old fraction behind).
 private struct LyricsSeekBar: View {
     let clock: PlaybackClock
+    let songId: String?
+    /// The library's duration for the song (0 = unknown), for `PlaybackProgress.displayDuration`.
+    let durationHintMs: Int64
     let isPlaying: Bool
     let chrome: LyricsChromeColors
     let brightArt: Bool
     let onSeek: (Int64) -> Void
     let onPreview: (Int64?) -> Void
 
+    @Environment(PlaybackStore.self) private var playback
     @State private var dragFraction: Double?
-    @State private var committedFraction: Double?
-    @State private var committedAt = Date.distantPast
+    /// True while a finger is down on the bar. It resets itself if the system cancels the drag (the screen's sideways
+    /// swipe, the controls hiding, a sheet), which `onEnded` never reports: without it the thumb and the lyrics stayed
+    /// frozen at the point where the finger was.
+    @GestureState private var isTouching = false
+
+    private var durationMs: Int64 {
+        PlaybackProgress.displayDuration(reportedMs: clock.durationMs, hintMs: durationHintMs)
+    }
+
+    private func liveFraction() -> Double {
+        PlaybackProgress.fraction(positionMs: clock.positionMs, durationMs: durationMs)
+    }
 
     var body: some View {
+        // A seek or restart while paused: this counter re-runs the body once so the thumb moves without a play press.
+        let _ = playback.seekRevision
         TimelineView(.periodic(from: .now, by: 0.25)) { timeline in
-            let live = clock.fraction
-            let fraction = dragFraction ?? stableFraction(live: live, now: timeline.date)
+            // Reading the tick's date makes the dependency on the schedule explicit: the closure re-runs every tick.
+            let _ = timeline.date
+            let fraction = dragFraction ?? liveFraction()
             GeometryReader { geometry in
                 let inset: CGFloat = 16 + 8
                 let trackWidth = max(geometry.size.width - 2 * inset, 1)
@@ -293,40 +314,44 @@ private struct LyricsSeekBar: View {
                     .contentShape(Rectangle())
                     .gesture(
                         DragGesture(minimumDistance: 0)
+                            .updating($isTouching) { _, touching, _ in touching = true }
                             .onChanged { value in
                                 let f = min(max((value.location.x - inset) / trackWidth, 0), 1)
                                 dragFraction = f
-                                onPreview(Int64(f * Double(clock.durationMs)))
+                                onPreview(Int64(f * Double(durationMs)))
                             }
                             .onEnded { value in
                                 let f = min(max((value.location.x - inset) / trackWidth, 0), 1)
-                                onSeek(Int64((f * Double(clock.durationMs)).rounded()))
+                                onSeek(Int64((f * Double(durationMs)).rounded()))
                                 onPreview(nil)
-                                committedFraction = f
-                                committedAt = Date()
                                 dragFraction = nil
                             }
                     )
             }
         }
         .glassEffect(chrome.panelGlass(brightArt: brightArt), in: Capsule())
+        .onChange(of: isTouching) { _, touching in
+            // A cancelled drag: let go of the thumb and the lyrics.
+            guard !touching, dragFraction != nil else { return }
+            dragFraction = nil
+            onPreview(nil)
+        }
+        .onChange(of: songId) { _, _ in
+            if dragFraction != nil {
+                dragFraction = nil
+                onPreview(nil)
+            }
+        }
         .pixlHaptic(.selection, trigger: dragFraction.map { Int($0 * 20) })
         .accessibilityElement()
         .accessibilityLabel(Text("Playback position"))
-        .accessibilityValue(Text("\(Int(clock.fraction * 100)) %"))
+        .accessibilityValue(Text("\(Int(liveFraction() * 100)) %"))
         .accessibilityAdjustableAction { direction in
             let step = Int64(10_000)
             let now = clock.positionMs
             onSeek(direction == .increment ? now + step : max(now - step, 0))
         }
         .longRunning("lyrics.seekBar (4 Hz periodic timeline, even when paused)")
-    }
-
-    /// Android keeps showing the committed seek until the player catches up (or 5 s pass).
-    private func stableFraction(live: Double, now: Date) -> Double {
-        guard let committedFraction else { return live }
-        if abs(live - committedFraction) < 0.04 || now.timeIntervalSince(committedAt) > 5 { return live }
-        return committedFraction
     }
 }
 
@@ -379,15 +404,13 @@ private struct WavyTrack: View {
 }
 
 /// Back · Translate · Sing · more (Android `LyricsFloatingToolbar`; the owner swapped Synced · Static for Translate ·
-/// Sing on 2026-10-07: synced vs plain is now automatic, with "Show as plain text" in the More sheet).
+/// Sing on 2026-10-07: synced vs plain is now automatic).
 private struct LyricsToolbar: View {
     let hasLyrics: Bool
     let song: Song?
-    let canTranslateOnDevice: Bool
-    let translating: Bool
+    let canTranslate: Bool
     let chrome: LyricsChromeColors
     let brightArt: Bool
-    let onTranslate: () -> Void
     let onTranslateViaAI: () -> Void
     let onSegmentTap: () -> Void
     let onBack: () -> Void
@@ -398,8 +421,7 @@ private struct LyricsToolbar: View {
             toolbarCircle(systemImage: "arrow.left", label: "Back", action: onBack)
             if hasLyrics {
                 HStack(spacing: 8) {
-                    LyricsTranslateSegment(canTranslateOnDevice: canTranslateOnDevice, translating: translating,
-                                           chrome: chrome, brightArt: brightArt, onTranslate: onTranslate,
+                    LyricsTranslateSegment(canTranslate: canTranslate, chrome: chrome, brightArt: brightArt,
                                            onTranslateViaAI: onTranslateViaAI, onTap: onSegmentTap)
                     LyricsSingSegment(song: song, chrome: chrome, brightArt: brightArt, onTap: onSegmentTap)
                 }
@@ -427,20 +449,18 @@ private struct LyricsToolbar: View {
     }
 }
 
-/// Translate: on-device translation into the phone's language (the system translator; owner, 2026-10-07). Active
-/// while translations show. A tap shows or hides the lyrics' translations, or (when they have none) translates them
-/// on this iPhone. Touch and hold: Translate via AI, and Show romanization when the lyrics need it. Reads the lyrics
-/// controller itself, so a translation landing redraws only this segment.
+/// Translate (the on-device translator was removed, owner 2026-10-26; Translate via AI stays). Active while
+/// translations show. A tap shows or hides the lyrics' translations, or (when they have none) asks the AI assistant
+/// to translate them. Touch and hold: the same AI action, and Show romanization when the lyrics need it. Reads the
+/// lyrics controller itself, so a translation landing redraws only this segment.
 ///
 /// A `Menu` with a primary action, not a `contextMenu` on a button: inside the cluster's glass container the context
 /// menu never opened (CI, 2026-10-07: holding the segment ran its tap instead). The menu's own long press opens it, and
 /// on iOS 26 it morphs out of the segment's glass like the app's other small menus (`ShapedGlassMenu`).
 private struct LyricsTranslateSegment: View {
-    let canTranslateOnDevice: Bool
-    let translating: Bool
+    let canTranslate: Bool
     let chrome: LyricsChromeColors
     let brightArt: Bool
-    let onTranslate: () -> Void
     let onTranslateViaAI: () -> Void
     /// Every tap (the immersive timer restarts).
     let onTap: () -> Void
@@ -453,8 +473,7 @@ private struct LyricsTranslateSegment: View {
         let controller = env.lyricsController
         let hasTranslation = controller.hasTranslatedLyrics
         let active = hasTranslation && controller.preferences.showTranslation
-        let value: LocalizedStringKey = translating ? "Translating" : active ? "Showing translations"
-            : hasTranslation ? "Translations hidden" : "Off"
+        let value: LocalizedStringKey = active ? "Showing translations" : hasTranslation ? "Translations hidden" : "Off"
         Menu {
             Button("Translate via AI", systemImage: "sparkles", action: onTranslateViaAI)
             if controller.hasRomanizedLyrics {
@@ -463,20 +482,16 @@ private struct LyricsTranslateSegment: View {
                                      set: { controller.preferences.showRomanization = $0 }))
             }
         } label: {
-            LyricsSegmentLabel(title: translating ? "Translating…" : "Translate", systemImage: "translate",
-                               active: active, faded: !hasTranslation && !canTranslateOnDevice && !translating,
-                               busy: translating, chrome: chrome)
+            LyricsSegmentLabel(title: "Translate", systemImage: "translate",
+                               active: active, faded: !hasTranslation && !canTranslate,
+                               busy: false, chrome: chrome)
         } primaryAction: {
             onTap()
             taps += 1
             if hasTranslation {
                 controller.preferences.showTranslation.toggle()
-            } else if translating {
-                return
-            } else if canTranslateOnDevice {
-                onTranslate()
-            } else {
-                controller.message = String(localized: "On-device translation needs synced lyrics. Touch and hold Translate for Translate via AI.")
+            } else if canTranslate {
+                onTranslateViaAI()
             }
         }
         .menuStyle(.button)

@@ -834,7 +834,7 @@ Android has no tests for the lyrics toolbar or the keep-screen-on switch; these 
   `testSingRendering` (value "Removing vocals …" while the demo job runs), `testTranslateMenu` (a tap on Translate
   hides the demo's translations and a second shows them again — the value goes "Translations hidden" → "Showing
   translations"; then a long press opens the menu with Translate via AI instead of running the tap),
-  `testShowAsPlainText` (a tap on the More sheet's "Show as plain text" row turns karaoke into plain text, so "Adjust
+  `testAdjustSyncIsLockedAndPlainTextIsGone` (2026-10-26, replaces `testShowAsPlainText`: the More sheet keeps "Adjust sync" greyed out and marked "Broken, fix soon" and no longer has "Show as plain text" or "Translate on device"; it was: a tap on the "Show as plain text" row turned karaoke into plain text, so "Adjust
   sync" leaves the sheet; the row is first scrolled clear of the screen's edge and left to settle, and it is tapped a
   second time only while the switch still reads off, so a late first tap can't be undone); `testMoreSheet` now shows
   the half-height glass sheet and `testMoreSheetBottomInLightApp` swipes on the sheet until its own heart is on
@@ -958,3 +958,11 @@ Android has no tests for a RunPod/R2 pipeline; everything here is new.
   (the Sing wish, the cloud / phone fallback table and the button's words), `DualDeckEngineInstrumentalTests` (placement,
   clamping, seek and alignment guards on the real engine) and `UITests/LyricsSingStatesTests`. Android's ranker test is
   `CloudAutoPrepareTest`.
+
+## Spatial audio screens (2026-11-11, branch `audio-ui`, Swift-only side of a shared spec)
+
+| Android test (class) | Cases | Swift test | Module | Status | Notes |
+|---|---|---|---|---|---|
+| `SpatialAudioUiTest` (`presentation/spatial`, Android branch `audio-ui`) | every status line, the six names and one-liners, Off and the quiet line word for word; the sheet's order and single selection; the button for every block; the Settings rows for the two switches and the stats; GB formatting; storage stops, cap choices and picks, the daily range; the diagnostics rows; the file-info mapping; no forbidden word | `AppTests/SpatialAudioUITests` | app | ported | Android's "every name in the `spatial_ui_` namespace" is n/a (iOS strings are Swift statics with the same keys). Added: every demo screen through the real model shows the line its name says |
+| `SpatialAudioStateHolderTest` (`storedSettings` null until the store is read) | 1 | — | — | n/a | iOS's model reads its settings synchronously when it is built, so the button never starts on Off |
+| — (UI) | | `UITests/SpatialScreenshotTests` | UI | new | the sheet for every line, the button, the pick, the Settings rows and the confirm |

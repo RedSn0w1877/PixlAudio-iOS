@@ -5,9 +5,12 @@
 import Foundation
 
 /// Who started a job. `manual` is "Process in cloud" (a record without an origin is a manual one), `sing` is a tap on
-/// Sing, `auto` is "Prepare songs ahead in the cloud" (the one thing that sends songs without a tap).
+/// Sing, `auto` is "Prepare songs ahead in the cloud" (the one thing that sends songs without a tap), `library` is
+/// Spatial audio (cloud audio spec 6.2, 6.4): renders for the shared library, for the song that plays or prepared ahead.
+/// Library jobs are quiet (no notification), go after Sing and anything sent by hand, and have their own monthly sum
+/// and cap (`CloudBudget` leaves them out of Sing's).
 public enum CloudJobOrigin: String, Codable, Sendable {
-    case manual, sing, auto
+    case manual, sing, auto, library
 }
 
 public struct CloudJobRecord: Codable, Sendable, Hashable, Identifiable {
@@ -116,7 +119,26 @@ public struct CloudJobRecord: Codable, Sendable, Hashable, Identifiable {
     /// The clip's length (ms): as asked for, then as the phone decoded it.
     public var clipDurationMs: Int64?
 
+    // Spatial audio (cloud audio spec 4, 6.2): a library job's video, profiles and per-render outcome. Optional like the
+    // rest; nil for every other job.
+    public var library: CloudLibraryJobInfo?
+    /// The estimate this library job reserved in the library ledger when RunPod took it, until its real cost replaces it.
+    public var libraryReservedMicroUSD: Int64?
+
     public var id: String { jobKey }
+
+    /// A Spatial audio library job (its money is counted apart from Sing's, its renders go to the shared library).
+    public var isLibraryJob: Bool { library != nil || tasks.contains(.spatial) }
+
+    /// Work done ahead of time that waits for a ready phone (Wi-Fi, charge, no Low Power Mode…) and never uses mobile
+    /// data: Sing's songs prepared ahead, and Spatial audio's background queue.
+    public var isPreparedAhead: Bool {
+        switch effectiveOrigin {
+        case .auto: true
+        case .library: library?.isAhead == true
+        case .manual, .sing: false
+        }
+    }
 
     /// A preview piece of a Sing, not a whole song: its result is played for a while and thrown away, never kept as the
     /// song's instrumental, and it has no row of its own in the queue or Active jobs.
@@ -283,6 +305,7 @@ public struct CloudJobRecord: Codable, Sendable, Hashable, Identifiable {
         lyricsFile = result.lyrics
         lyricsTranscribed = result.lyrics?.mode == "transcribed"
         warnings = (result.warnings ?? []).filter { $0 != "duplicate" }
+        library?.take(result.library)
         timings = result.timings
         gpu = result.worker?.gpu
         coldStartMs = result.timings?.coldStartMs
@@ -317,7 +340,8 @@ public struct CloudJobRecord: Codable, Sendable, Hashable, Identifiable {
     /// length.
     public var plan: CloudSongPlan {
         CloudSongPlan(songId: songId, tasks: tasks, lyricsMode: lyricsMode, isStreamed: isStreamed,
-                      durationMs: durationMs ?? clipDurationMs ?? songDurationMs ?? CloudCost.referenceSongMs)
+                      durationMs: durationMs ?? clipDurationMs ?? songDurationMs ?? CloudCost.referenceSongMs,
+                      renders: library?.profiles.count ?? 0)
     }
 
     /// RunPod holds this job now and hasn't finished the run (a redo after an earlier result counts again).
@@ -327,9 +351,11 @@ public struct CloudJobRecord: Codable, Sendable, Hashable, Identifiable {
         return (submittedAtMs ?? 0) > completed
     }
 
-    /// Every result this job asked for has been imported.
+    /// Every result this job asked for has been imported (for a library job: every render it asked for is stored on the
+    /// phone, rejected by its checks, or was not made).
     public var isFullyImported: Bool {
         (!tasks.contains(.instrumental) || importedInstrumental || outputs?["instrumental"] == nil)
             && (!tasks.contains(.lyrics) || importedLyrics || lyricsKey == nil)
+            && (library?.isSettled ?? true)
     }
 }

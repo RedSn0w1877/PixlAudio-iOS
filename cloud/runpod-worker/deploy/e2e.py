@@ -243,11 +243,13 @@ class R2:
                  sleep: Callable[[float], None] = time.sleep):
         self.keys, self.opener, self.sleep = keys, opener, sleep
 
-    def url(self, method: str, key: str) -> str:
-        return presign(method, key, keys=self.keys, expires_s=PRESIGN_S)
+    def url(self, method: str, key: str, query: tuple[tuple[str, str], ...] = ()) -> str:
+        return presign(method, key, keys=self.keys, expires_s=PRESIGN_S, query=query)
 
     def request(self, method: str, key: str, data: bytes | None = None, *, what: str,
-                expect: tuple[int, ...] = (200,), tries: int = 3) -> bytes:
+                expect: tuple[int, ...] = (200,), tries: int = 3,
+                query: tuple[tuple[str, str], ...] = ()) -> bytes:
+        """`key` "" with a `query` addresses the bucket itself (ListObjectsV2: deploy/library_janitor.py)."""
         status = 0
         detail = ""
         for attempt in range(tries):
@@ -255,7 +257,7 @@ class R2:
             headers = {"User-Agent": USER_AGENT}
             if data is not None:
                 headers["Content-Type"] = "application/octet-stream"
-            req = urllib.request.Request(self.url(method, key), data=data, method=method, headers=headers)
+            req = urllib.request.Request(self.url(method, key, query), data=data, method=method, headers=headers)
             try:
                 with self.opener(req, timeout=300) as resp:
                     status, body = resp.status, resp.read()

@@ -244,9 +244,11 @@ nonisolated final class CloudTransfers: NSObject, URLSessionDownloadDelegate, @u
         return (String(parts[0]), String(parts[1]))
     }
 
+    /// A slot is a short name of `a-z 0-9 _ -` (Spatial audio's renders are `sp-<profile>`, cloud audio spec 6.2 step
+    /// 3), never starting with a hyphen and never containing a path separator or a dot.
     static func isSafeSlot(_ slot: String) -> Bool {
-        !slot.isEmpty && slot.count <= 32 && slot.unicodeScalars.allSatisfy {
-            ($0 >= "a" && $0 <= "z") || ($0 >= "0" && $0 <= "9") || $0 == "_"
+        !slot.isEmpty && slot.count <= 32 && !slot.hasPrefix("-") && slot.unicodeScalars.allSatisfy {
+            ($0 >= "a" && $0 <= "z") || ($0 >= "0" && $0 <= "9") || $0 == "_" || $0 == "-"
         }
     }
 

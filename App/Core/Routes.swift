@@ -222,6 +222,9 @@ nonisolated enum AppSheet: Hashable, Sendable, Identifiable {
     /// Stage 13: the TAIS DJ chat (Android `TaisChatSheet`), Ask Taizo since 2026-10-23 — from Home's sparkles button,
     /// the player's sparkles circle, Settings › AI features and Experimental.
     case taisChat
+    /// Spatial audio (2026-11-11, cloud audio spec 6.5): the profiles and the playing song's status line, from the full
+    /// player's button (album colours) or from Settings › Playback › Sound (the app's).
+    case spatialAudio(fromPlayer: Bool)
 
     var id: String {
         switch self {
@@ -236,6 +239,7 @@ nonisolated enum AppSheet: Hashable, Sendable, Identifiable {
         case .artistPicker(let id): "artistPicker.\(id)"
         case .aiPlaylist: "aiPlaylist"
         case .taisChat: "taisChat"
+        case .spatialAudio(let fromPlayer): fromPlayer ? "spatialAudio.player" : "spatialAudio.settings"
         }
     }
 }

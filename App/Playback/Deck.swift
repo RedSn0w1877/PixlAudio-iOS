@@ -15,6 +15,9 @@ final class DeckItem {
     let durationSeconds: Double
     /// True for local files (ReplayGain tags can be read).
     let isLocalFile: Bool
+    /// What the item plays as Spatial audio sees it: the song's own audio (and of which video), a spatial render, or
+    /// Sing's audio. Decided when the item is built, for its whole life.
+    let audio: SpatialItemAudio
     /// The ReplayGain volume read from the file's tags (nil until read / when off).
     var replayGainVolume: Float?
     /// A seek requested before the item was ready to play (applied when it is).
@@ -27,13 +30,14 @@ final class DeckItem {
     var song: Song { entry.song }
 
     init(entry: QueueEntry, playerItem: AVPlayerItem, asset: AVURLAsset, tap: TapItemParameters,
-         durationSeconds: Double, isLocalFile: Bool) {
+         durationSeconds: Double, isLocalFile: Bool, audio: SpatialItemAudio = .other) {
         self.entry = entry
         self.playerItem = playerItem
         self.asset = asset
         self.tap = tap
         self.durationSeconds = durationSeconds
         self.isLocalFile = isLocalFile
+        self.audio = audio
     }
 
     /// Position from the item's timebase (cheap; no observation).
@@ -70,6 +74,21 @@ final class DeckItemFactory {
     let streaming: StreamingResourceLoaderRegistry
     /// Per-buffer tap log capacity (tests; 0 = off).
     var tapLogCapacity = 0
+    /// Spatial audio (cloud audio spec 6.3): the local render a song starts on, and the on-device stage's tables. Nil
+    /// (UI tests, or before it is attached): every item is plain stereo. Asked here, never in `resolver`: the resolver
+    /// chain also feeds Sing's uploads, which must never get a render as the song.
+    weak var spatial: (any DeckSpatialSource)?
+
+    /// Which audio an item for a queue entry plays when no other audio (`overrideURL`) is handed over.
+    enum Rendition {
+        /// The song's own audio, or its local spatial render when Spatial audio says so: what a song starts on, and
+        /// what Sing's "its own audio" means.
+        case automatic
+        /// The song's own audio, never a render (Spatial audio switching back to it).
+        case ownAudio
+        /// This local render (Spatial audio switching to it).
+        case render(LocalRendition)
+    }
 
     init(effects: AudioEffectsParameters, resolver: any PlayableURLResolving = DefaultPlayableURLResolver(),
          streaming: StreamingResourceLoaderRegistry = .shared) {
@@ -79,14 +98,29 @@ final class DeckItemFactory {
     }
 
     /// `overrideURL` plays other audio for the same queue entry (stage 14: a rendered instrumental). `timing` is the
-    /// start record (`PlaybackStartTimings`) the steps are reported to; nil for items prepared ahead.
-    func makeItem(for entry: QueueEntry, overrideURL: URL? = nil, timing: Int? = nil) async throws -> DeckItem {
+    /// start record (`PlaybackStartTimings`) the steps are reported to; nil for items prepared ahead. `rendition`
+    /// applies when there is no `overrideURL`.
+    func makeItem(for entry: QueueEntry, overrideURL: URL? = nil, timing: Int? = nil,
+                  rendition: Rendition = .automatic) async throws -> DeckItem {
+        if overrideURL == nil, case .render(let render) = rendition {
+            return try await makeRenderItem(for: entry, render: render, timing: timing)
+        }
         var resolved = overrideURL
         if resolved == nil { resolved = await resolver.playableURL(for: entry.song) }
         guard let url = resolved else {
             throw DeckItemError.unresolvable(songId: entry.song.id)
         }
         if let timing { PlaybackStartTimings.shared.urlResolved(timing, url: url) }
+        // Spec 6.3: with Spatial audio active, a song starts on its local render of the selected profile. The lookup
+        // answers from memory, and only while a profile is on.
+        if overrideURL == nil, case .automatic = rendition, let spatial, let videoId = Self.ownAudioVideoId(url),
+           let render = await spatial.startRendition(videoId: videoId, spotifyId: entry.song.spotifyId) {
+            do {
+                return try await makeRenderItem(for: entry, render: render, timing: timing)
+            } catch {
+                // The render could not be opened (removed meanwhile): the song's own audio plays.
+            }
+        }
         var activeURL = url
         var asset = AVURLAsset(url: activeURL)
         streaming.attach(to: asset)
@@ -119,15 +153,72 @@ final class DeckItemFactory {
         let duration = try? await asset.load(.duration)
         var seconds = duration.map { $0.isValid && $0.isNumeric ? $0.seconds : 0 } ?? 0
         if seconds <= 0 { seconds = Double(entry.song.duration) / 1000 }
+        let audio = Self.audio(of: activeURL, isOverride: overrideURL != nil)
+        // The song's own audio may run the on-device stage: its tap needs the tables (loaded once, at launch).
+        if case .own = audio { await spatial?.tablesReady() }
         let parameters = TapItemParameters(logCapacity: tapLogCapacity)
         parameters.mediaDuration.store(seconds)
+        Self.configureSpatial(parameters, for: audio)
         let item = AVPlayerItem(asset: asset)
         // Pitch-preserving rate changes (sync editor speeds 0.75 / 0.5).
         item.audioTimePitchAlgorithm = .spectral
         item.audioMix = ProcessingTap.makeAudioMix(for: track, effects: effects, item: parameters)
         if let timing { PlaybackStartTimings.shared.itemBuilt(timing) }
         return DeckItem(entry: entry, playerItem: item, asset: asset, tap: parameters, durationSeconds: seconds,
-                        isLocalFile: activeURL.isFileURL)
+                        isLocalFile: activeURL.isFileURL, audio: audio)
+    }
+
+    /// A local spatial render for the entry (spec 6.3): the stage never runs on it and the level rule gives its
+    /// headroom back. Lined up with the song by media time (a render may have another rate than the stream).
+    private func makeRenderItem(for entry: QueueEntry, render: LocalRendition, timing: Int?) async throws -> DeckItem {
+        let asset = AVURLAsset(url: render.fileURL)
+        guard let track = try await asset.loadTracks(withMediaType: .audio).first else {
+            throw DeckItemError.noAudioTrack(songId: entry.song.id)
+        }
+        if let timing { PlaybackStartTimings.shared.tracksLoaded(timing) }
+        let duration = try? await asset.load(.duration)
+        var seconds = duration.map { $0.isValid && $0.isNumeric ? $0.seconds : 0 } ?? 0
+        if seconds <= 0, let milliseconds = render.durationMs { seconds = Double(milliseconds) / 1000 }
+        if seconds <= 0 { seconds = Double(entry.song.duration) / 1000 }
+        let parameters = TapItemParameters(logCapacity: tapLogCapacity)
+        parameters.mediaDuration.store(seconds)
+        parameters.spatialRole.store(SpatialItemRole.render, ordering: .relaxed)
+        parameters.spatialHeadroomDb.store(render.headroomDb)
+        let item = AVPlayerItem(asset: asset)
+        item.audioTimePitchAlgorithm = .spectral
+        item.audioMix = ProcessingTap.makeAudioMix(for: track, effects: effects, item: parameters)
+        if let timing { PlaybackStartTimings.shared.itemBuilt(timing) }
+        return DeckItem(entry: entry, playerItem: item, asset: asset, tap: parameters, durationSeconds: seconds,
+                        isLocalFile: true, audio: .render(render.key))
+    }
+
+    /// What `url` plays as Spatial audio sees it. A file of the render store is a render whoever asked for it (never
+    /// spatialized twice); other audio handed over for the entry is Sing's; anything else is the song's own audio.
+    static func audio(of url: URL, isOverride: Bool) -> SpatialItemAudio {
+        if let key = CloudAudioLocalLayout.rendition(ofAudioFile: url) { return .render(key) }
+        if isOverride { return .other }
+        return .own(videoId: ownAudioVideoId(url))
+    }
+
+    /// The YouTube video of the song's own audio at `url`: `pixlstream://<videoId>`, a download
+    /// (`Downloads/<videoId>.m4a`), the stream cache's complete file (`streams/<videoId>.m4a`) or the repackaged Opus file
+    /// (`opus/<videoId>.mp4`); nil for anything else.
+    static func ownAudioVideoId(_ url: URL) -> String? {
+        if url.isFileURL { return SpatialRenditionRules.ownAudioVideoId(pathComponents: url.pathComponents) }
+        return YouTubeSongIdentity.videoId(from: url)
+    }
+
+    /// The tap's Spatial audio role, set before the tap exists (it holds for the whole item).
+    private static func configureSpatial(_ parameters: TapItemParameters, for audio: SpatialItemAudio) {
+        switch audio {
+        case .own:
+            parameters.spatialRole.store(SpatialItemRole.stage, ordering: .relaxed)
+        case .render:
+            parameters.spatialRole.store(SpatialItemRole.render, ordering: .relaxed)
+            parameters.spatialHeadroomDb.store(SpatialLevel.defaultHeadroomDb)
+        case .other:
+            break
+        }
     }
 
     /// Sing's preview piece: `clipURL` holds a stretch of the song's instrumental that starts `offsetSeconds` into the

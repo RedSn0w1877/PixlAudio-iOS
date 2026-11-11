@@ -87,6 +87,10 @@ final class AppEnvironment {
     let health: AppHealth
     /// Music Haptics (iOS-first, 2026-10-18): the Taptic Engine plays along with the music while the switch is on.
     let musicHaptics: MusicHapticsController
+    /// Spatial audio (cloud audio spec of 2026-11-10): the settings, what plays, and the cloud
+    /// render's status, for the player sheet and Settings. Its two halves come from `SpatialPlaybackFactory` (the
+    /// engine side) and `SpatialLibraryFactory` (the cloud side), which is where that work plugs in: not here.
+    let spatial: SpatialAudioModel
 
     init(launch: LaunchConfiguration) {
         self.launch = launch
@@ -222,7 +226,12 @@ final class AppEnvironment {
                     nowPlaying.remote = active ? spotifyConnect : nil
                     nowPlaying.update()
                 }
-                spotifyConnect.onRemoteStateChanged = { nowPlaying.update() }
+                // A seek or restart made on the lock screen must move a paused progress bar here too.
+                let playbackStore = playback
+                spotifyConnect.onRemoteStateChanged = {
+                    nowPlaying.update()
+                    playbackStore.notePositionJumped()
+                }
                 // The phone's volume buttons drive the Connect device while the app is open (not in UI tests: the
                 // simulator can't change the volume).
                 let volumeButtons = SpotifyConnectVolumeButtons(session: realPlayback.session)
@@ -275,6 +284,13 @@ final class AppEnvironment {
                                                      models: tais.models, studio: tais.studio, cloud: cloud, health: health))
         musicHaptics = MusicHapticsController(behavior: settings.behavior, playback: playback, health: health,
                                               bus: playbackServices?.engine.effects.haptics, isDemo: isUITest)
+        // Spatial audio: both halves are built from this one context by their own factories.
+        spatial = SpatialAudioModel.make(SpatialAudioContext(
+            launch: launch, defaults: settingsDefaults, settings: settings, library: library, playback: playback,
+            playbackServices: playbackServices, youtube: youtube, spotify: spotify, tais: tais,
+            lyricsController: lyricsController, cloud: cloud, persistence: persistence, home: home,
+            musicTaste: musicTaste, importedHistory: importedHistory, tasteAdjustments: tasteAdjustments,
+            health: health))
         wireHealth(health)
         wireBlockedArtists(settings.blocked)
         // A tap on "Your instrumentals are ready" opens the Cloud queue (the notification centre's delegate is set
@@ -382,6 +398,7 @@ final class AppEnvironment {
         musicHaptics.start()
         tais.start()
         automaticStudio.start()
+        spatial.start()
         let library = self.library, playback = self.playback
         let artistImages = self.artistImages
         spotify.attach(reloadLibrary: {

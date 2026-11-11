@@ -107,12 +107,15 @@ public enum LibraryTabId: String, Sendable, Hashable, Codable, CaseIterable {
     /// String Catalog key (Android string resource name).
     public var titleKey: String { LibraryTab(rawValue: rawValue)!.labelKey }
 
+    /// What a tab sorts by until the user picks something else (owner decision 2026-10-26: newest first, "date
+    /// added, descending"). Artists have no date to sort by, so they stay A-Z; playlists use their creation date.
+    /// Only the default: a stored choice always wins (`SortOption.fromStorageKey`).
     public var defaultSort: SortOption {
         switch self {
-        case .songs: .songTitleAZ
-        case .albums: .albumTitleAZ
+        case .songs: .songDateAdded
+        case .albums: .albumDateAdded
         case .artists: .artistNameAZ
-        case .playlists: .playlistNameAZ
+        case .playlists: .playlistDateCreated
         case .folders: .folderNameAZ
         case .liked: .likedSongDateLiked
         }

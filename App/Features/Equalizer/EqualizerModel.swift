@@ -177,6 +177,8 @@ nonisolated enum EqualizerViewMode: String, Sendable, CaseIterable {
 extension EqualizerPreferences {
     /// The settings the audio engine applies (PixlAudioCore `EqualizerSettings`), from the stored preferences.
     var engineSettings: EqualizerSettings {
+        // Locked while the equalizer is marked broken (owner, 2026-10-26): the engine always gets everything off.
+        if BrokenFeature.equalizer.isLocked { return EqualizerSettings() }
         var settings = EqualizerSettings()
         // Built-in presets restore by name; "custom" and saved custom presets apply their band levels.
         let isBuiltIn = EqualizerPreset.allPresets.contains { $0.name == presetName }

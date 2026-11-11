@@ -64,11 +64,14 @@ public struct StreamResolutionOutcome: Sendable, Hashable {
     public var stream: ResolvedStream?
     public var attempts: [String]
     public var successfulStrategy: String?
+    /// iOS: whether this song plays Opus (its prepared file) or AAC, and why. Shown as its own step when set.
+    public var opusStatus: String?
 
-    public init(stream: ResolvedStream?, attempts: [String], successfulStrategy: String?) {
+    public init(stream: ResolvedStream?, attempts: [String], successfulStrategy: String?, opusStatus: String? = nil) {
         self.stream = stream
         self.attempts = attempts
         self.successfulStrategy = successfulStrategy
+        self.opusStatus = opusStatus
     }
 }
 
@@ -80,6 +83,8 @@ public struct PlaybackDiagnostics: Sendable {
     public static let titleStream = "Audio stream"
     /// Android: "Local audio server" (its HTTP proxy). iOS: the resource loader's fetch.
     public static let titleLoader = "Streaming loader"
+    /// iOS only: the prepared Opus file (information, never a failure).
+    public static let titleOpus = "Opus stream"
 
     public let search: any YouTubeMusicSearching
     public let lastSearchFailure: @Sendable () async -> String?
@@ -162,6 +167,10 @@ public struct PlaybackDiagnostics: Sendable {
                           detail: probe.ok
                               ? "Audio reaches the player (\(probe.contentType ?? "unknown type"))."
                               : "The player's own route failed: \(probe.describe()). YouTube hands over the audio, but it does not survive the trip through the streaming loader."))
+        // 6. iOS: Opus or AAC for this song (information only).
+        if let opus = outcome.opusStatus {
+            steps.append(Step(title: Self.titleOpus, ok: true, detail: opus))
+        }
         return PlaybackDiagnosticsReport(steps: steps, succeeded: probe.ok)
     }
 

@@ -101,31 +101,21 @@ final class LyricsScreenshotTests: XCTestCase {
         }
     }
 
-    /// "Show as plain text" in the More sheet's Controls (synced vs plain is automatic now): turning it on shows the
-    /// song as plain text, so the karaoke-only row (Adjust sync) leaves the sheet.
-    func testShowAsPlainText() throws {
-        try capture("lyricsShowAsPlainText", demo: "words", freezeMs: 42_300, tap: "Lyrics options", settle: 1.5) { app in
+    /// The More sheet after the 2026-10-26 clean-up: "Adjust sync" is locked while it is broken (the row stays, greyed
+    /// out and marked "Broken, fix soon"), and "Show as plain text" and "Translate on device" are gone.
+    func testAdjustSyncIsLockedAndPlainTextIsGone() throws {
+        try capture("lyricsAdjustSyncLocked", demo: "words", freezeMs: 42_300, tap: "Lyrics options", settle: 1.5) { app in
             let sheet = app.descendants(matching: .any)["screen.lyricsOptions"].firstMatch
             XCTAssertTrue(sheet.waitForExistence(timeout: 10), "the More sheet did not open")
-            let plain = sheet.descendants(matching: .any)
-                .matching(NSPredicate(format: "label == %@", "Show as plain text")).firstMatch
-            XCTAssertTrue(plain.waitForExistence(timeout: 10), "Show as plain text is missing")
-            // Well clear of the screen's bottom edge, and settled: a tap on a row still sliding in (or under the home
-            // indicator) is lost.
-            self.reveal(plain, in: sheet, app: app, clearOfBottom: 120)
-            XCTAssertEqual(plain.value as? String, "0", "Show as plain text should start off")
             let adjustSync = sheet.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Adjust sync")).firstMatch
-            XCTAssertTrue(adjustSync.exists, "karaoke lyrics should offer Adjust sync")
-            // The whole row flips the switch, as on Android (since 2026-10-08; before, only the switch took taps and
-            // CI's simulator lost every tap and drag on it). Tap the row's title.
-            let title = plain.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
-            title.tap()
-            if !adjustSync.waitForNonExistence(timeout: 3), plain.value as? String == "0" {
-                // Still off, so a second tap can't undo a first one that landed late.
-                title.tap()
+            XCTAssertTrue(adjustSync.waitForExistence(timeout: 10), "Adjust sync should stay in the sheet, locked")
+            XCTAssertFalse(adjustSync.isEnabled, "Adjust sync is locked while it is broken")
+            XCTAssertTrue(adjustSync.label.contains("Broken, fix soon"), "the locked row should say it is broken")
+            for gone in ["Show as plain text", "Translate on device"] {
+                let row = sheet.descendants(matching: .any)
+                    .matching(NSPredicate(format: "label CONTAINS %@", gone)).firstMatch
+                XCTAssertFalse(row.exists, "\(gone) should be gone from the More sheet")
             }
-            let switched = adjustSync.waitForNonExistence(timeout: 5)
-            XCTAssertTrue(switched, "the lyrics did not switch to plain text (the switch reads \(plain.value ?? "nil"))")
             Thread.sleep(forTimeInterval: 1.0)
         }
     }

@@ -23,12 +23,12 @@ public enum ClaudeError: Error, Sendable, Hashable, CustomStringConvertible {
 
     public var description: String {
         switch self {
-        case .network(let message): "Claude network error: \(message)"
-        case .http(let status, let type, let message, _): "Claude HTTP \(status) \(type ?? ""): \(message ?? "")"
-        case .stream(let type, let message): "Claude stream error \(type): \(message)"
-        case .invalidResponse: "Claude returned an unreadable response"
-        case .noKey: "No built-in Claude key in this build"
-        case .interrupted(let message): "Claude stream interrupted: \(message)"
+        case .network(let message): "Cloud AI network error: \(message)"
+        case .http(let status, let type, let message, _): "Cloud AI HTTP \(status) \(type ?? ""): \(message ?? "")"
+        case .stream(let type, let message): "Cloud AI stream error \(type): \(message)"
+        case .invalidResponse: "Cloud AI returned an unreadable response"
+        case .noKey: "No built-in cloud AI key in this build"
+        case .interrupted(let message): "Cloud AI stream interrupted: \(message)"
         }
     }
 

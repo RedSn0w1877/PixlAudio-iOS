@@ -36,14 +36,19 @@ public enum CloudTask: String, Sendable, CaseIterable, Codable {
     case vocals
     case stems4
     case lyrics
+    /// Spatial audio renders for the shared library (cloud audio spec 4): needs `input.library`, whose renders carry
+    /// their own upload URLs (`lib/v1/<videoId>/sp-<profile>.flac` and `.json`).
+    case spatial
 
-    /// The `output.put` keys a task needs (`stems4` needs drums, bass and other).
+    /// The `output.put` keys a task needs (`stems4` needs drums, bass and other). `spatial` needs none: its files go
+    /// to the library keys named in `input.library.renders`, never into the job's own folder.
     public var outputSlots: [String] {
         switch self {
         case .instrumental: ["instrumental"]
         case .vocals: ["vocals"]
         case .stems4: ["drums", "bass", "other"]
         case .lyrics: ["lyrics"]
+        case .spatial: []
         }
     }
 }
@@ -122,12 +127,15 @@ public struct CloudJobInput: Codable, Sendable, Hashable {
     public var bench: CloudBenchOptions?
     /// The job's own instructions to the worker (`last_in_batch`); absent on every job but a burst's last.
     public var policy: CloudJobInputPolicy?
+    /// Spatial audio's library block (cloud audio spec 4): required when `tasks` has `spatial`, absent otherwise.
+    public var library: CloudLibraryJobRequest?
 
     public init(schema: String = CloudSchema.job, v: Int = CloudSchema.version, op: String = CloudOp.process.rawValue,
                 jobKey: String? = nil, client: CloudClientInfo? = nil, storage: String? = nil,
                 audio: CloudAudioInput? = nil, tasks: [String]? = nil, separation: CloudSeparation? = nil,
                 lyrics: CloudLyricsRequest? = nil, output: CloudOutputRequest? = nil, guard: CloudJobGuard? = nil,
-                bench: CloudBenchOptions? = nil, policy: CloudJobInputPolicy? = nil) {
+                bench: CloudBenchOptions? = nil, policy: CloudJobInputPolicy? = nil,
+                library: CloudLibraryJobRequest? = nil) {
         self.schema = schema
         self.v = v
         self.op = op
@@ -142,6 +150,7 @@ public struct CloudJobInput: Codable, Sendable, Hashable {
         self.guard = `guard`
         self.bench = bench
         self.policy = policy
+        self.library = library
     }
 
     /// The typed tasks (unknown entries dropped).
@@ -238,15 +247,24 @@ public struct CloudLyricsInputLine: Codable, Sendable, Hashable {
 }
 
 /// `input.output`: codec and one presigned PUT per output slot (`instrumental`, `vocals`, `drums`, `bass`, `other`,
-/// `lyrics`, `manifest`). The volume fallback has no URLs, so `put` is absent there.
+/// `lyrics`, `manifest`). The volume fallback has no URLs, so `put` is absent there. A job whose only task is
+/// `spatial` has no audio output of its own (its renders go to the library keys): `put` holds only `manifest` and
+/// there is no `codec` (cloud audio spec 4, "`output.codec` does not apply to library files").
 public struct CloudOutputRequest: Codable, Sendable, Hashable {
-    public var codec: String
+    public var codec: String?
     public var kbps: Int?
     public var put: [String: String]?
 
     public init(codec: CloudOutputCodec, kbps: Int?, put: [String: String]?) {
         self.codec = codec.rawValue
         self.kbps = kbps
+        self.put = put
+    }
+
+    /// The output block of a job with no audio output of its own (library renders only).
+    public init(manifestOnly put: [String: String]?) {
+        codec = nil
+        kbps = nil
         self.put = put
     }
 }
@@ -375,11 +393,13 @@ public struct CloudJobResult: Codable, Sendable, Hashable {
     public var outputs: [String: CloudOutputFile]?
     public var lyrics: CloudLyricsSummary?
     public var timings: CloudTimings?
+    /// Spatial audio's renders (cloud audio spec 4): per profile `ok`, `exists` or `failed`. Absent on other jobs.
+    public var library: CloudLibraryResult?
 
     public init(schema: String = CloudSchema.result, v: Int = CloudSchema.version, jobKey: String, status: CloudResultStatus,
                 error: CloudResultError? = nil, warnings: [String]? = nil, worker: CloudWorkerInfo? = nil,
                 models: CloudModelsInfo? = nil, input: CloudInputInfo? = nil, outputs: [String: CloudOutputFile]? = nil,
-                lyrics: CloudLyricsSummary? = nil, timings: CloudTimings? = nil) {
+                lyrics: CloudLyricsSummary? = nil, timings: CloudTimings? = nil, library: CloudLibraryResult? = nil) {
         self.schema = schema
         self.v = v
         self.jobKey = jobKey
@@ -392,6 +412,7 @@ public struct CloudJobResult: Codable, Sendable, Hashable {
         self.outputs = outputs
         self.lyrics = lyrics
         self.timings = timings
+        self.library = library
     }
 
     /// The typed status (an unknown status reads as `error`).
@@ -438,12 +459,15 @@ public struct CloudModelsInfo: Codable, Sendable, Hashable {
     public var stems4: String?
     public var aligner: String?
     public var asr: String?
+    /// What produced the six stems of a Spatial audio render (`open-cascade-6`).
+    public var stems6: String?
 
-    public init(separator: String?, stems4: String?, aligner: String?, asr: String?) {
+    public init(separator: String?, stems4: String?, aligner: String?, asr: String?, stems6: String? = nil) {
         self.separator = separator
         self.stems4 = stems4
         self.aligner = aligner
         self.asr = asr
+        self.stems6 = stems6
     }
 }
 
@@ -533,10 +557,13 @@ public struct CloudTimings: Codable, Sendable, Hashable {
     public var encodeMs: Int64?
     public var uploadMs: Int64?
     public var totalMs: Int64?
+    /// Spatial audio: the six-stem cascade and the renders (0 when unused).
+    public var stems6Ms: Int64?
+    public var renderMs: Int64?
 
     public init(coldStartMs: Int64? = nil, downloadMs: Int64? = nil, decodeMs: Int64? = nil, separateMs: Int64? = nil,
                 stemsMs: Int64? = nil, lyricsMs: Int64? = nil, encodeMs: Int64? = nil, uploadMs: Int64? = nil,
-                totalMs: Int64? = nil) {
+                totalMs: Int64? = nil, stems6Ms: Int64? = nil, renderMs: Int64? = nil) {
         self.coldStartMs = coldStartMs
         self.downloadMs = downloadMs
         self.decodeMs = decodeMs
@@ -546,6 +573,8 @@ public struct CloudTimings: Codable, Sendable, Hashable {
         self.encodeMs = encodeMs
         self.uploadMs = uploadMs
         self.totalMs = totalMs
+        self.stems6Ms = stems6Ms
+        self.renderMs = renderMs
     }
 }
 

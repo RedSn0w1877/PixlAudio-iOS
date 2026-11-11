@@ -12,6 +12,8 @@ import PixlNet
 /// 4. **Piped** instances.
 /// Formats are AAC only (`mp4a`, itags 141/140/139, then the muxed 18) — what AVPlayer plays progressively.
 /// Resolved URLs are cached until googlevideo's `expire`; the streaming loader invalidates them on a 403.
+/// Separately, `resolveOpus` finds the Opus stream that `OpusStreams.swift` repackages ahead of time; it reads the
+/// `player` responses the AAC resolution just fetched (`PlayerResponseMemo`) instead of asking YouTube again.
 actor InnerTubeService {
     let client: InnerTubeClient
     let cipher: SignatureCipherSolver
@@ -20,15 +22,20 @@ actor InnerTubeService {
     let spotiFLAC: SpotiFLACClient
     let remote: RemoteClientConfigStore
     private let resolver: ChainedYouTubeStreamResolver
+    private let opusResolver: ChainedYouTubeStreamResolver
+    private let responses: PlayerResponseMemo
     private let validator: StreamUrlValidator
     private let plainHTTP: any HTTPClient
     private let account: YouTubeAccount
     private var cache: [String: (stream: ResolvedStream, expiresAt: Date)] = [:]
     private var inFlight: [String: Task<ResolvedStream?, Never>] = [:]
+    private var opusStatusProvider: (@Sendable (String) async -> String?)?
 
     /// What the last resolution tried, in order (diagnostics).
     private(set) var lastAttempts: [String] = []
     private(set) var lastSuccessfulStrategy: String?
+    /// What the last Opus resolution tried.
+    private(set) var lastOpusAttempts: [String] = []
 
     static let pipedStrategyName = "Piped"
     static let spotiFLACStrategyName = "SpotiFLAC"
@@ -47,16 +54,24 @@ actor InnerTubeService {
         let cipher = SignatureCipherSolver(http: BaseJsCachingHTTPClient(inner: plainHTTP), evaluator: evaluator)
         self.cipher = cipher
         piped = PipedStreamResolver(http: plainHTTP, aacOnly: true)
+        let responses = PlayerResponseMemo(inner: client)
+        self.responses = responses
         spotiFLAC = SpotiFLACClient(http: plainHTTP)
         let validator = StreamUrlValidator(http: plainHTTP)
         self.validator = validator
         resolver = ChainedYouTubeStreamResolver(
-            player: client, cipher: cipher, validator: validator, policy: .iOS,
+            player: responses.live, cipher: cipher, validator: validator, policy: .iOS,
             isSignedIn: { await account.hasCookie },
             maxBitrateKbps: { StreamingAudioQuality.maxBitrateKbps() },
             strategies: { signedIn in await remote.current().chain(signedIn: signedIn) },
             // Streaming speed R8: overlapping clients only when remote/config.json turns `innertube.hedge` on.
             hedging: { await remote.current().hedging })
+        // The Opus upgrade: the same clients one after another, in the background, no probe.
+        opusResolver = ChainedYouTubeStreamResolver(
+            player: responses.remembered, cipher: cipher, validator: nil, policy: .opusUpgrade,
+            isSignedIn: { await account.hasCookie },
+            maxBitrateKbps: { StreamingAudioQuality.maxBitrateKbps() },
+            strategies: { signedIn in await remote.current().chain(signedIn: signedIn) })
     }
 
     // MARK: Resolution
@@ -229,10 +244,33 @@ actor InnerTubeService {
             .union(SpotiFLACClient.trustedAudioHostSuffixes)
     }
 
-    /// A fresh, validated resolution with its attempts (the playback test).
+    /// A fresh, validated resolution with its attempts (the playback test), and the song's Opus line.
     func diagnosticsOutcome(videoId: String) async -> StreamResolutionOutcome {
         let stream = await resolve(videoId: videoId, validate: true)
-        return StreamResolutionOutcome(stream: stream, attempts: lastAttempts, successfulStrategy: lastSuccessfulStrategy)
+        var outcome = StreamResolutionOutcome(stream: stream, attempts: lastAttempts, successfulStrategy: lastSuccessfulStrategy)
+        if let opusStatusProvider { outcome.opusStatus = await opusStatusProvider(videoId) }
+        return outcome
+    }
+
+    // MARK: Opus (iOS: repackaged ahead of time, see OpusStreams.swift)
+
+    /// The Opus stream to prepare for `videoId` when a client offers one better than the AAC pick (itag 251 over
+    /// 140; a 256 kbps AAC stays). The AAC stream is resolved first (usually cached), so its `player` response is
+    /// in the memo and choosing Opus costs no request on the usual path. `fresh` forgets that response first
+    /// (googlevideo refused the Opus URL).
+    func resolveOpus(videoId: String, fresh: Bool = false) async -> OpusStreamResolution? {
+        guard CloudStreamSecurity.validateYouTubeVideoId(videoId) else { return nil }
+        let aac = await resolve(videoId: videoId)
+        if fresh { await responses.forget(videoId: videoId) }
+        let stream = (try? await opusResolver.resolveStream(videoId: videoId, validate: false)) ?? nil
+        lastOpusAttempts = await opusResolver.lastAttempts
+        guard let stream else { return nil }
+        return OpusStreamResolution(stream: stream, aacStreamURL: aac?.url)
+    }
+
+    /// The Test playback report's Opus line (set by `YouTubeServices.install`).
+    func setOpusStatusProvider(_ provider: @escaping @Sendable (String) async -> String?) {
+        opusStatusProvider = provider
     }
 
     // MARK: Search and diagnostics

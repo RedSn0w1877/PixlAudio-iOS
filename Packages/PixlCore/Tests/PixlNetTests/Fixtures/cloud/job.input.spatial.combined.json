@@ -1,0 +1,52 @@
+{
+  "schema": "pixl.cloudstudio.job",
+  "v": 1,
+  "op": "process",
+  "jobKey": "a81c7e30-5f2d-4b96-8e14-c07d3a9b62f5",
+  "client": {
+    "app": "pixlaudio-android",
+    "build": "0.8.0 (80)"
+  },
+  "storage": "presigned",
+  "audio": {
+    "get": "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/pixl-cloud-studio/in/a81c7e30-5f2d-4b96-8e14-c07d3a9b62f5.m4a?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=EXAMPLEACCESSKEYID%2F20261110%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261110T190000Z&X-Amz-Expires=273600&X-Amz-SignedHeaders=host&X-Amz-Signature=e333be33898c2f2680d7e9ef9fd164c5a308d0a5180875059cf2c2831b710626",
+    "delete": "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/pixl-cloud-studio/in/a81c7e30-5f2d-4b96-8e14-c07d3a9b62f5.m4a?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=EXAMPLEACCESSKEYID%2F20261110%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261110T190000Z&X-Amz-Expires=273600&X-Amz-SignedHeaders=host&X-Amz-Signature=e5f941a258f74cf49d17113e5006dee23654d765c320456512cda5bc13592dde",
+    "ext": "m4a",
+    "bytes": 3145728,
+    "sha256": "f1db327b6614305f29b3a172cacc553aaa97034d1f069e9328b33a437e4d60be",
+    "durationMs": 194100
+  },
+  "tasks": [
+    "instrumental",
+    "spatial"
+  ],
+  "library": {
+    "v": 1,
+    "videoId": "ZD6rXLXZOEI",
+    "source": {
+      "itag": 140,
+      "codec": "aac"
+    },
+    "renders": [
+      {
+        "profile": "night",
+        "audioPut": "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/pixl-cloud-studio/lib/v1/ZD6rXLXZOEI/sp-night.flac?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=EXAMPLEACCESSKEYID%2F20261110%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261110T190000Z&X-Amz-Expires=273600&X-Amz-SignedHeaders=host&X-Amz-Signature=48c74e4b7e3964cd4cb038fd72dbffe0e6450e558ffa3ebe81de5ce8c71dd280",
+        "manifestPut": "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/pixl-cloud-studio/lib/v1/ZD6rXLXZOEI/sp-night.json?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=EXAMPLEACCESSKEYID%2F20261110%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261110T190000Z&X-Amz-Expires=273600&X-Amz-SignedHeaders=host&X-Amz-Signature=d3497292a1998de19c8c4d2222680ba141a147b61b4a4e8ef39016491e2a1b9c",
+        "manifestGet": "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/pixl-cloud-studio/lib/v1/ZD6rXLXZOEI/sp-night.json?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=EXAMPLEACCESSKEYID%2F20261110%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261110T190000Z&X-Amz-Expires=273600&X-Amz-SignedHeaders=host&X-Amz-Signature=332bbc8adba83c7f003ae8ddc88993684f32c916891825a56a25fbdf9d8cb2c2"
+      },
+      {
+        "profile": "hall",
+        "audioPut": "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/pixl-cloud-studio/lib/v1/ZD6rXLXZOEI/sp-hall.flac?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=EXAMPLEACCESSKEYID%2F20261110%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261110T190000Z&X-Amz-Expires=273600&X-Amz-SignedHeaders=host&X-Amz-Signature=c58f63ac66bc1868f97347fb7154d7a5789cb30ba34a9ba0a41b0387be91e084",
+        "manifestPut": "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/pixl-cloud-studio/lib/v1/ZD6rXLXZOEI/sp-hall.json?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=EXAMPLEACCESSKEYID%2F20261110%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261110T190000Z&X-Amz-Expires=273600&X-Amz-SignedHeaders=host&X-Amz-Signature=f40816bd5559d94383d55eea5b2995fb7ef0a3e17090cf4301834f917fad12ae"
+      }
+    ]
+  },
+  "output": {
+    "codec": "aac",
+    "kbps": 256,
+    "put": {
+      "instrumental": "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/pixl-cloud-studio/out/a81c7e30-5f2d-4b96-8e14-c07d3a9b62f5/instrumental.m4a?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=EXAMPLEACCESSKEYID%2F20261110%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261110T190000Z&X-Amz-Expires=273600&X-Amz-SignedHeaders=host&X-Amz-Signature=64f18f6d61895daba56953d737f46e013fd9beb09b4be9a0ea8714795894f4bc",
+      "manifest": "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/pixl-cloud-studio/out/a81c7e30-5f2d-4b96-8e14-c07d3a9b62f5/manifest.json?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=EXAMPLEACCESSKEYID%2F20261110%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20261110T190000Z&X-Amz-Expires=273600&X-Amz-SignedHeaders=host&X-Amz-Signature=fb97a1ddc5ae805ffdc4a82977b667c0999b1f850b67b7cd3e0aa115f052cfc8"
+    }
+  }
+}

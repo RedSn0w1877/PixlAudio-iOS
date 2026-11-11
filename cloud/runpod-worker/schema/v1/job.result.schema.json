@@ -51,7 +51,8 @@
         "separator": {"type": ["string", "null"]},
         "stems4": {"type": ["string", "null"]},
         "aligner": {"type": ["string", "null"]},
-        "asr": {"type": ["string", "null"]}
+        "asr": {"type": ["string", "null"]},
+        "stems6": {"type": ["string", "null"], "description": "Worker 1.1.0 and later: the six-stem separation behind the spatial task (open-cascade-6)."}
       },
       "description": "The model ids this job actually used (null when a stage did not run)."
     },
@@ -75,8 +76,32 @@
     },
     "outputs": {
       "type": "object",
-      "description": "Keys are the output slots that were delivered (instrumental, vocals, drums, bass, other). Empty on error.",
+      "description": "Keys are the output slots that were delivered (instrumental, vocals, drums, bass, other; and for the spatial task sp-<profile>, whose key is the lib/ key, also when the render was already in the library). Empty on error.",
       "additionalProperties": {"$ref": "#/$defs/outputFile"}
+    },
+    "library": {
+      "description": "Worker 1.1.0 and later. What became of the renders of a job with the spatial task; null for any other job and on error. Download each ok or exists render from its lib/ key (outputs has it) and never delete it: other devices use it.",
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "required": ["videoId", "libV", "renders", "stemMode"],
+          "properties": {
+            "videoId": {"type": "string", "pattern": "^[A-Za-z0-9_-]{11}$"},
+            "libV": {"type": "integer", "minimum": 1},
+            "renders": {
+              "type": "object",
+              "description": "Spatial profile id -> state, for every render the job asked for: ok (made now), exists (was already in the library), failed (then the job is partial).",
+              "propertyNames": {"enum": ["studio", "wide", "intimate", "hall", "surround", "night"]},
+              "additionalProperties": {"enum": ["ok", "exists", "failed"]}
+            },
+            "stemMode": {
+              "enum": ["stems6", "stems4", "mix", null],
+              "description": "How the renders made by this job were rendered: from six stems, from four (the fallback separator), or from the mix alone. null when it rendered nothing."
+            }
+          }
+        }
+      ]
     },
     "lyrics": {
       "oneOf": [
@@ -108,6 +133,8 @@
         "separateMs": {"type": "integer", "minimum": 0},
         "stemsMs": {"type": "integer", "minimum": 0},
         "lyricsMs": {"type": "integer", "minimum": 0},
+        "stems6Ms": {"type": "integer", "minimum": 0, "description": "Worker 1.1.0 and later, like renderMs; 0 when unused. The six-stem separation of the spatial task."},
+        "renderMs": {"type": "integer", "minimum": 0, "description": "Worker 1.1.0 and later; 0 when unused. The spatial renderer."},
         "encodeMs": {"type": "integer", "minimum": 0},
         "uploadMs": {"type": "integer", "minimum": 0},
         "totalMs": {"type": "integer", "minimum": 0}
@@ -126,7 +153,7 @@
       "type": "object",
       "required": ["key", "bytes", "sha256", "codec", "samples"],
       "properties": {
-        "key": {"type": "string", "pattern": "^out/[0-9a-f-]{36}/[A-Za-z0-9_.-]+$"},
+        "key": {"type": "string", "pattern": "^(out/[0-9a-f-]{36}|lib/v[0-9]+/[A-Za-z0-9_-]{11})/[A-Za-z0-9_.-]+$"},
         "bytes": {"type": "integer", "minimum": 1},
         "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
         "codec": {"enum": ["aac", "flac"]},

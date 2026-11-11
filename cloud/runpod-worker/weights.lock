@@ -11,11 +11,12 @@
 #
 # Sources and licences (also in NOTICE):
 #   sep      huggingface.co/anvuew/BS-RoFormer @ 24988f47270cb3529b62c4f3bbb8234f4586de9b      GPL-3.0 (model card tag)
-#   demucs   dl.fbaipublicfiles.com/demucs/hybrid_transformer (htdemucs_ft bag of 4)            MIT
+#   demucs   dl.fbaipublicfiles.com/demucs/hybrid_transformer (htdemucs_ft bag of 4; htdemucs_6s) MIT
 #   aligner  huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B @ c7cbfc2048c462b0d63a45797104fc9db3ad62b7  Apache-2.0
 #   asr      huggingface.co/Qwen/Qwen3-ASR-1.7B @ 7278e1e70fe206f11671096ffdd38061171dd6e5      Apache-2.0
 # Verified 2026-10-07: HF sizes and LFS sha256 from https://huggingface.co/api/models/<repo>?blobs=true, small files
 # downloaded at the pinned revision and hashed, demucs files downloaded and hashed (each matches its name).
+# Verified 2026-11-11: htdemucs_6s (5c90dfd2-34c22ccb.th, the last demucs row) downloaded and hashed the same way.
 #
 # kind  slot     sha256                                                            bytes       license     dest  url
 large   sep      60347271e8493fdff28ef558c3b2297afb869a1f4462594ed548038264bec395  204493312   GPL-3.0     /models/sep/bs_roformer_ft1_anvuew_sdr_12.55.ckpt  https://huggingface.co/anvuew/BS-RoFormer/resolve/24988f47270cb3529b62c4f3bbb8234f4586de9b/bs_roformer_ft1_anvuew_sdr_12.55.ckpt
@@ -25,6 +26,7 @@ large   demucs   ba3fe64ae8ef66ac9a4857222ce48efbdc5eb3ad375cb79dd13debee5aaa406
 large   demucs   e57c48e6b0e38af4f7118d7bd08c49f0a0c0edf7d09143bdd902ea0d237303e6  84141271    MIT         /models/demucs/d12395a8-e57c48e6.th  https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/d12395a8-e57c48e6.th
 large   demucs   ef3bcb9c8b40d14ae5d51b6db2587339cc12c6b77c0be151ce6d69002e087bf2  84141271    MIT         /models/demucs/92cfc3b6-ef3bcb9c.th  https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/92cfc3b6-ef3bcb9c.th
 large   demucs   f3cf25b222c4eed7cd49dd8b2c9597d50c18bd154090f7b919cfa5f93cf22c49  84141271    MIT         /models/demucs/04573f0d-f3cf25b2.th  https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/04573f0d-f3cf25b2.th
+large   demucs   34c22ccb381c6f9fdbf324f04e1e2fe21aaaf293f5ded163a162697ff9a02ddd  54996327    MIT         /models/demucs/5c90dfd2-34c22ccb.th  https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/5c90dfd2-34c22ccb.th
 large   aligner  47831d0e82f96b20e9034dba01a075ee06436654719f6a68289e49f1b65ce0e7  1835544544  Apache-2.0  /models/aligner/model.safetensors  https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B/resolve/c7cbfc2048c462b0d63a45797104fc9db3ad62b7/model.safetensors
 small   aligner  d616c65d46c4b90bdc651b0a0963ea932732241140f337f9bb6b0335a9c8ef09  5982        Apache-2.0  /models/aligner/config.json  https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B/resolve/c7cbfc2048c462b0d63a45797104fc9db3ad62b7/config.json
 small   aligner  948d089b23bca1d214e768d59c4438365665f52ec6d33678f4062206b3fbbb8c  115         Apache-2.0  /models/aligner/generation_config.json  https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B/resolve/c7cbfc2048c462b0d63a45797104fc9db3ad62b7/generation_config.json

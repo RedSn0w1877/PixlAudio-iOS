@@ -6,8 +6,7 @@ import SwiftUI
 struct LyricsMoreActions {
     var onSyncYourself: (() -> Void)?
     var onSave: (() -> Void)?
-    var onTranslate: (() -> Void)?
-    /// Android's "Translate via AI" (stage 13's provider); `onTranslate` is the on-device translation.
+    /// Android's "Translate via AI" (stage 13's provider). The on-device translation row is gone (owner, 2026-10-26).
     var onTranslateViaAI: (() -> Void)?
     var onReset: () -> Void
     var onToggleSyncControls: (() -> Void)?
@@ -17,8 +16,9 @@ struct LyricsMoreActions {
 }
 
 /// The lyrics More sheet (Android `LyricsMoreBottomSheet`): Lyrics actions, Appearance (alignment), Controls
-/// (sync offset, romanisation, translations, show as plain text, immersive once) and the shuffle / repeat / favourite
-/// row. The lyrics screen presents it at half height, where iOS draws the sheet as floating Liquid Glass (owner,
+/// (Adjust sync, locked as broken for now; romanisation, translations, immersive once) and the shuffle / repeat /
+/// favourite row. "Translate on device" and "Show as plain text" are gone (owner, 2026-10-26). The lyrics screen
+/// presents it at half height, where iOS draws the sheet as floating Liquid Glass (owner,
 /// 2026-10-07: "0 liquid glass"); its rows stay soft fills on that glass (no glass on glass), while the alignment
 /// picker (the liquid lens, `LiquidTabCapsule`) and the shuffle / repeat / favourite row (`PlayerToggleRow`) are
 /// liquid. "Keep screen on" is gone: the lyrics screen always keeps it on.
@@ -37,9 +37,6 @@ struct LyricsMoreSheet: View {
     let repeatMode: RepeatMode
     let isFavorite: Bool
     let actions: LyricsMoreActions
-    /// "Show as plain text" for this song (the lyrics screen's override of the automatic synced / plain choice); nil
-    /// where the sheet isn't over the lyrics screen (`LyricsOptionsSheet`).
-    var plainText: Binding<Bool>?
 
     @Environment(\.playerTheme) private var theme
     @Environment(\.dismiss) private var dismiss
@@ -55,7 +52,6 @@ struct LyricsMoreSheet: View {
 
     private var isUserSynced: Bool { lyrics?.document?.metadata.source == LyricsRepositoryLogic.userSource }
     private var hasWordTiming: Bool { lyrics?.synced?.contains { !($0.words ?? []).isEmpty } ?? false }
-    private var hasSyncedLines: Bool { !(lyrics?.synced ?? []).isEmpty }
     private var itemFill: Color { theme.onSurface.opacity(0.08) }
 
     /// The lyrics alignment on the liquid lens (Android's three alignment buttons).
@@ -125,12 +121,6 @@ struct LyricsMoreSheet: View {
                         onTranslateViaAI()
                     }
                 }
-                if lyrics != nil, let onTranslate = actions.onTranslate {
-                    row("Translate on device", systemImage: "character.bubble") {
-                        dismiss()
-                        onTranslate()
-                    }
-                }
                 row("Reset imported lyrics", systemImage: "arrow.counterclockwise") {
                     showResetDialog = true
                 }
@@ -164,15 +154,17 @@ struct LyricsMoreSheet: View {
 
     @ViewBuilder private var controlsGroup: some View {
         let syncVisible = showSyncedLyrics && actions.onToggleSyncControls != nil
-        let plainVisible = plainText != nil && hasSyncedLines
         let immersiveVisible = showSyncedLyrics && immersiveEnabled
-        if syncVisible || hasRomanizedLyrics || hasTranslatedLyrics || plainVisible || immersiveVisible {
+        if syncVisible || hasRomanizedLyrics || hasTranslatedLyrics || immersiveVisible {
             VStack(alignment: .leading, spacing: 2) {
                 caption("Controls")
                 rowGroup(bottomRadius: 24) {
                     if syncVisible, let toggle = actions.onToggleSyncControls {
-                        row(isSyncControlsVisible ? "Hide sync controls" : "Adjust sync",
-                            systemImage: "slider.horizontal.3") {
+                        // Locked while it is broken (owner, 2026-10-26): greyed out, marked, and it does nothing.
+                        let locked = BrokenFeature.lyricsAdjustSync.isLocked
+                        row(isSyncControlsVisible && !locked ? "Hide sync controls" : "Adjust sync",
+                            subtitle: locked ? LocalizedStringKey(BrokenFeature.label) : nil,
+                            systemImage: "slider.horizontal.3", isLocked: locked, identifier: "lyricsMore.adjustSync") {
                             dismiss()
                             toggle()
                         }
@@ -183,9 +175,6 @@ struct LyricsMoreSheet: View {
                     }
                     if hasTranslatedLyrics {
                         switchRow("Show translations", systemImage: "translate", isOn: $preferences.showTranslation)
-                    }
-                    if plainVisible, let plainText {
-                        switchRow("Show as plain text", systemImage: "text.justify.leading", isOn: plainText)
                     }
                     if immersiveVisible {
                         switchRow("Disable immersive (once)", systemImage: "eye.slash",
@@ -234,7 +223,7 @@ struct LyricsMoreSheet: View {
     /// fragile.
     @ViewBuilder
     private func row(_ title: LocalizedStringKey, subtitle: LocalizedStringKey? = nil, systemImage: String,
-                     accent: Bool = false, identifier: String? = nil,
+                     accent: Bool = false, isLocked: Bool = false, identifier: String? = nil,
                      action: @escaping () -> Void) -> some View {
         let button = Button(action: action) {
             HStack(spacing: 16) {
@@ -261,6 +250,9 @@ struct LyricsMoreSheet: View {
             .contentShape(rowShape)
         }
         .buttonStyle(PressScaleButtonStyle(pressedScale: 0.98))
+        // A locked row (a feature marked broken) stays visible, greyed out, and takes no taps.
+        .disabled(isLocked)
+        .opacity(isLocked ? 0.5 : 1)
         if let identifier {
             button.accessibilityIdentifier(identifier)
         } else {

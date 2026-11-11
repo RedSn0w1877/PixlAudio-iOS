@@ -1,5 +1,6 @@
 // `pickBestAudio` from `YouTubeStreamResolver.kt`, and the iOS selection on top of it: AVPlayer cannot play Opus in
-// WebM, so on iOS only AAC (`mp4a`, itags 141/140/139) is eligible, with the muxed itag 18 (H.264 + AAC) last.
+// WebM, so on iOS only AAC (`mp4a`, itags 141/140/139) is eligible, with the muxed itag 18 (H.264 + AAC) last. The
+// Opus stream is chosen separately (`pickOpusUpgrade`), for a file the app repackages into MP4 ahead of time.
 
 import Foundation
 
@@ -50,6 +51,34 @@ public enum AudioFormatSelection {
         }
         var best = candidates[0]
         for f in candidates.dropFirst() where key(f) > key(best) { best = f }
+        return best
+    }
+
+    /// Stereo Opus itags worth upgrading to on iOS, best first: 774 (YouTube Music's 256 kbps Opus) and 251 (about
+    /// 160 kbps). 249/250 (about 50/70 kbps) are worse than the AAC stream; 338 and the other multichannel Opus streams
+    /// are not stereo.
+    public static let opusUpgradeItags: [Int] = [774, 251]
+
+    /// Opus in WebM (`audio/webm; codecs="opus"`, or a known Opus itag without a MIME type).
+    public static func isOpusInWebM(_ format: YouTubeAudioFormat) -> Bool {
+        if format.isMuxedFallback { return false }
+        guard let mime = format.mimeType?.lowercased() else { return opusUpgradeItags.contains(format.itag) }
+        return mime.hasPrefix("audio/webm") && mime.contains("opus")
+    }
+
+    /// The iOS Opus upgrade (AVPlayer reads Opus only in MP4, so the app repackages the WebM ahead of time): the best
+    /// stereo Opus stream under the user's cap (never over it), and only when it is at least as good by bitrate as
+    /// the AAC stream `pickBestIOSAudio` takes from the same formats (Android's rule: highest bitrate, Opus preferred
+    /// at equal bitrate). So 251 replaces 140, and a 256 kbps 141 stays AAC.
+    public static func pickOpusUpgrade(_ formats: [YouTubeAudioFormat], maxBitrateKbps: Int? = nil) -> YouTubeAudioFormat? {
+        let opus = formats.filter { isOpusInWebM($0) && opusUpgradeItags.contains($0.itag) }
+        let capped = maxBitrateKbps.map { cap in opus.filter { $0.bitrate <= cap &* 1000 } } ?? opus
+        guard var best = capped.first else { return nil }
+        for f in capped.dropFirst() where f.bitrate > best.bitrate { best = f }
+        if let aac = pickBestIOSAudio(formats, maxBitrateKbps: maxBitrateKbps), !aac.isMuxedFallback,
+           aac.bitrate > best.bitrate {
+            return nil
+        }
         return best
     }
 

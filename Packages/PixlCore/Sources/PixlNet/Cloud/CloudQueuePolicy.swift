@@ -102,10 +102,23 @@ public enum CloudTiming {
     public static let ttlMs: Int64 = 3 * 86_400_000
     /// `policy.executionTimeout`: 900 s.
     public static let executionTimeoutMs: Int64 = 900_000
+    /// `policy.executionTimeout` of a job with library tasks (Spatial audio): 1 800 s, overriding the endpoint's
+    /// (cloud audio spec 5, 6.2 step 3). The six-stem cascade and the renders take longer than an instrumental.
+    public static let libraryExecutionTimeoutMs: Int64 = 1_800_000
     /// The upload PUT the phone presigns for itself: 24 h.
     public static let uploadPresignSeconds = 86_400
     /// The worker's URLs, signed at submission: `ttl + executionTimeout + 1 h` (73.25 h; R2's maximum is 7 d).
-    public static var workerPresignSeconds: Int { Int((ttlMs + executionTimeoutMs) / 1000) + 3_600 }
+    public static var workerPresignSeconds: Int { workerPresignSeconds(executionTimeoutMs: executionTimeoutMs) }
+
+    /// The same for a job with another execution timeout (a library job's URLs outlive its longer run).
+    public static func workerPresignSeconds(executionTimeoutMs: Int64) -> Int {
+        Int((ttlMs + max(executionTimeoutMs, 0)) / 1000) + 3_600
+    }
+
+    /// The execution timeout a job's `/run` body carries: 1 800 s when it has library tasks, else 900 s.
+    public static func executionTimeoutMs(for tasks: [CloudTask]) -> Int64 {
+        tasks.contains(.spatial) ? libraryExecutionTimeoutMs : executionTimeoutMs
+    }
     /// An input older than this is uploaded again instead of being submitted (upload age + ttl < the 7-day `in/`
     /// lifecycle).
     public static let maxInputAgeAtSubmitMs: Int64 = 3 * 86_400_000
@@ -217,6 +230,8 @@ public enum CloudJobMachine {
         case (.uploading, .uploadStarted): .uploading
         case (.preparing, .uploadStarted): .uploading
         case (.uploading, .uploadFinished): .uploaded
+        // A library job whose renders the shared library already holds (spec 6.2 step 2): nothing goes up, it fetches.
+        case (.preparing, .resultsReady): .resultsReady
         case (.uploaded, .submitted): .submitted
         case (.submitted, .started): .running
         case (.running, .started): .running
@@ -306,13 +321,17 @@ public struct CloudSongPlan: Sendable, Hashable {
     public var lyricsMode: CloudLyricsMode?
     public var isStreamed: Bool
     public var durationMs: Int64
+    /// Spatial audio renders asked for (one per profile; 0 for every other job).
+    public var renders: Int
 
-    public init(songId: String, tasks: [CloudTask], lyricsMode: CloudLyricsMode?, isStreamed: Bool, durationMs: Int64) {
+    public init(songId: String, tasks: [CloudTask], lyricsMode: CloudLyricsMode?, isStreamed: Bool, durationMs: Int64,
+                renders: Int = 0) {
         self.songId = songId
         self.tasks = tasks
         self.lyricsMode = lyricsMode
         self.isStreamed = isStreamed
         self.durationMs = durationMs
+        self.renders = renders
     }
 }
 
@@ -462,7 +481,9 @@ public enum CloudBurstEnd {
             switch record.state {
             case .uploading: return record.isDue(nowMs: nowMs)
             case .queued, .preparing:
-                return record.isDue(nowMs: nowMs) && !(autoBlocked && record.effectiveOrigin == .auto)
+                // A library job the month's cap holds back is not coming soon.
+                return record.isDue(nowMs: nowMs) && !(autoBlocked && record.isPreparedAhead)
+                    && record.library?.heldByCap != true
             default: return false
             }
         }
@@ -505,12 +526,27 @@ public enum CloudCost {
         return fallback
     }
 
+    /// A Spatial audio job (cloud audio spec 4): download, decode, the six-stem cascade (vocals, then drums / bass /
+    /// other, then guitar and piano out of "other"), encode and upload, for a 4-minute song. Not measured yet (spec 9:
+    /// the first `bench` after the worker deploys settles it); the worker's examples show about 74 s for a 3.4-minute
+    /// song with one render.
+    public static let spatialBaseSeconds: Int64 = 60
+    /// Each render on top of it (one per profile).
+    public static let spatialRenderSeconds: Int64 = 25
+
     /// Estimated GPU seconds for one song's plan (scaled by length: the figures are for a 4-minute song).
     public static func estimatedSeconds(_ plan: CloudSongPlan, quality: CloudSeparationQuality) -> Int64 {
+        let scale = max(Double(plan.durationMs) / Double(referenceSongMs), 0.25)
+        if plan.tasks.contains(.spatial) {
+            // A library job: the cascade and its renders, plus an instrumental only when it also asks for one.
+            var seconds = spatialBaseSeconds + spatialRenderSeconds * Int64(max(plan.renders, 1))
+            if plan.tasks.contains(.instrumental) { seconds += warmSecondsStandard }
+            if CloudSelector.quality(quality, durationMs: plan.durationMs) == .best { seconds += extraSecondsBest }
+            return Int64((Double(seconds) * scale).rounded(.up))
+        }
         var seconds = warmSecondsStandard
         if plan.tasks.contains(.stems4) { seconds += extraSecondsStems }
         if CloudSelector.quality(quality, durationMs: plan.durationMs) == .best { seconds += extraSecondsBest }
-        let scale = max(Double(plan.durationMs) / Double(referenceSongMs), 0.25)
         return Int64((Double(seconds) * scale).rounded(.up))
     }
 
@@ -545,23 +581,26 @@ public enum CloudCost {
     }
 }
 
-/// The monthly cap (§5, app guards): after it, submissions stop.
+/// The monthly cap (§5, app guards): after it, submissions stop. These sums are Sing's (Cloud Studio's own cap): a
+/// Spatial audio library job is never counted in them (cloud audio spec 6.1 "Money"); library jobs keep their own sum in
+/// their own ledger, under their own cap.
 public enum CloudBudget {
-    /// Cost recorded by jobs completed since `monthStartMs`.
+    /// Cost recorded by jobs completed since `monthStartMs` (library jobs left out).
     public static func spentMicroUSD(_ records: [CloudJobRecord], monthStartMs: Int64) -> Int64 {
         records.reduce(0) { sum, record in
-            guard let done = record.completedAtMs, done >= monthStartMs else { return sum }
+            guard !record.isLibraryJob, let done = record.completedAtMs, done >= monthStartMs else { return sum }
             return sum + max(record.costMicroUSD ?? 0, 0)
         }
     }
 
     /// What the month has used or will use: the recorded cost of jobs completed this month, plus the estimate of every
     /// job RunPod is running or holding now, so a large batch can't overshoot the cap before its first result arrives.
+    /// Library jobs are left out (they have their own sum).
     public static func committedMicroUSD(_ records: [CloudJobRecord], monthStartMs: Int64,
                                          pricePerSecondMicroUSD: Int64) -> Int64 {
         let price = max(pricePerSecondMicroUSD, 0)
         var inFlight: Int64 = 0
-        for record in records where record.isRunningAtRunPod {
+        for record in records where record.isRunningAtRunPod && !record.isLibraryJob {
             inFlight += CloudCost.estimatedSeconds(record.plan, quality: record.quality) * price
         }
         return spentMicroUSD(records, monthStartMs: monthStartMs) + inFlight
@@ -700,10 +739,21 @@ public enum CloudRetention {
     public static let inputLifecycleDays = 7
     public static let outputLifecycleDays = 30
 
+    /// Spatial audio's library jobs are many (one per song and profile that played) and worth little once done: their
+    /// renders are on the phone, their failures are in the library's own retry book. Done ones go after a day, failed,
+    /// cancelled and expired ones after three (the background queue rests a failed song for 12 h).
+    public static let keepImportedLibraryMs: Int64 = 86_400_000
+    public static let keepFinishedLibraryMs: Int64 = 3 * 86_400_000
+
     public static func shouldPrune(_ record: CloudJobRecord, nowMs: Int64) -> Bool {
+        let library = record.isLibraryJob
         switch record.state {
-        case .imported: return nowMs - (record.importedAtMs ?? record.createdAtMs) > keepImportedMs
-        case .failed, .cancelled, .expired: return nowMs - (record.updatedAtMs ?? record.createdAtMs) > keepFinishedMs
+        case .imported:
+            let keep = library ? keepImportedLibraryMs : keepImportedMs
+            return nowMs - (record.importedAtMs ?? record.createdAtMs) > keep
+        case .failed, .cancelled, .expired:
+            let keep = library ? keepFinishedLibraryMs : keepFinishedMs
+            return nowMs - (record.updatedAtMs ?? record.createdAtMs) > keep
         default: return false
         }
     }

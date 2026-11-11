@@ -41,6 +41,7 @@ private struct EqualizerContent: View {
     @State private var nameDraft = ""
     @State private var appeared = false
     @Environment(\.appTheme) private var theme
+    private let locked = BrokenFeature.equalizer.isLocked
 
     var body: some View {
         let prefs = model.prefs
@@ -52,17 +53,27 @@ private struct EqualizerContent: View {
                 withAnimation(PixlMotion.state) { model.cycleViewMode() }
             }
             .accessibilityIdentifier("eq.viewMode")
+            .disabled(locked)
+            .opacity(locked ? 0.5 : 1)
             Spacer().frame(width: 12)
             // Android's power toggle: a filled `primary` circle when on, a 12 % rounded square when off.
             EqualizerPowerButton(isOn: prefs.isEnabled) { withAnimation(PixlMotion.selection) { model.toggleEnabled() } }
+                .disabled(locked)
+                .opacity(locked ? 0.5 : 1)
             Spacer().frame(width: 12)
         } content: {
-            PresetTabsRow(model: model) { showsReorder = true }
-            EqualizerBandCard(model: model,
-                              onSave: { nameDraft = ""; showsSave = true },
-                              onUpdate: { if let name = model.editingPresetName { model.updateCustomPresetBands(name) } },
-                              onPresetsList: { showsCustomPresets = true })
-            EqualizerEffectsRow(prefs: prefs)
+            // Locked while it is broken (owner, 2026-10-26): greyed out and marked, every effect stays off.
+            if locked { EqualizerBrokenBanner() }
+            Group {
+                PresetTabsRow(model: model) { showsReorder = true }
+                EqualizerBandCard(model: model,
+                                  onSave: { nameDraft = ""; showsSave = true },
+                                  onUpdate: { if let name = model.editingPresetName { model.updateCustomPresetBands(name) } },
+                                  onPresetsList: { showsCustomPresets = true })
+                EqualizerEffectsRow(prefs: prefs)
+            }
+            .disabled(locked)
+            .opacity(locked ? 0.5 : 1)
             EqualizerVolumeCard()
             Spacer().frame(height: 4)
         }
@@ -100,6 +111,31 @@ private struct EqualizerContent: View {
         .fullScreenCover(isPresented: $showsReorder) {
             ReorderPresetsView(model: model)
         }
+    }
+}
+
+/// "Broken, fix soon" (owner, 2026-10-26): the note above the greyed-out equalizer.
+private struct EqualizerBrokenBanner: View {
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(theme.onErrorContainer)
+            Text(BrokenFeature.label)
+                .pixlFont(.titleSmall, weight: .semibold)
+                .foregroundStyle(theme.onErrorContainer)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .pixlGlass(in: RoundedRectangle(cornerRadius: 18, style: .continuous),
+                   tint: theme.errorContainer.opacity(GlassTint.container))
+        .padding(.horizontal, 16)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("eq.broken")
     }
 }
 

@@ -147,17 +147,17 @@ struct ParsingBiniLyricsTests {
     }
 
     @Test func raceDecidesAsSoonAsTheAnswerCannotChange() {
-        let word = OnlineSyncedLyrics(lyrics: LyricsUtils.parseLyrics("[00:01.00]<00:01.00>word"), source: "BiniLyrics")
-        let line = OnlineSyncedLyrics(lyrics: LyricsUtils.parseLyrics("[00:01.00]line"), source: "BiniLyrics")
+        let word = OnlineSyncedLyrics(lyrics: LyricsUtils.parseLyrics("[00:01.00]<00:01.00>word"), source: "Pixel Master Lyrics")
+        let line = OnlineSyncedLyrics(lyrics: LyricsUtils.parseLyrics("[00:01.00]line"), source: "Pixel Master Lyrics")
         let otherWord = OnlineSyncedLyrics(lyrics: LyricsUtils.parseLyrics("[00:02.00]<00:02.00>other"), source: "AMLL TTML")
         let lrc = OnlineSyncedLyrics(lyrics: LyricsUtils.parseLyrics("[00:01.00]line"), source: "LRCLIB")
         // Word-synced BiniLyrics ends the race at once.
-        #expect(LyricsRepositoryLogic.decidedCatalogResult([.some(word), nil, nil, nil], syncedOnly: false)??.source == "BiniLyrics")
+        #expect(LyricsRepositoryLogic.decidedCatalogResult([.some(word), nil, nil, nil], syncedOnly: false)??.source == "Pixel Master Lyrics")
         // A line-synced BiniLyrics result waits: word timing from another catalog would beat it…
         #expect(LyricsRepositoryLogic.decidedCatalogResult([.some(line), nil, .some(nil), .some(lrc)], syncedOnly: false) == nil)
         #expect(LyricsRepositoryLogic.decidedCatalogResult([.some(line), .some(otherWord), nil, nil], syncedOnly: false)??.source == "AMLL TTML")
         // …and wins over line timing elsewhere once everyone answered.
-        #expect(LyricsRepositoryLogic.decidedCatalogResult([.some(line), .some(nil), .some(nil), .some(lrc)], syncedOnly: false)??.source == "BiniLyrics")
+        #expect(LyricsRepositoryLogic.decidedCatalogResult([.some(line), .some(nil), .some(nil), .some(lrc)], syncedOnly: false)??.source == "Pixel Master Lyrics")
         // An earlier catalog still running keeps a later word-synced result waiting.
         #expect(LyricsRepositoryLogic.decidedCatalogResult([nil, .some(otherWord), nil, nil], syncedOnly: false) == nil)
         let allEmpty: [OnlineSyncedLyrics??] = [.some(nil), .some(nil), .some(nil), .some(nil)]
@@ -170,9 +170,9 @@ struct ParsingBiniLyricsTests {
     static let wordTimed = header + #" lrc:timing="Word" xml:lang="en"><head><metadata><ttm:agent type="person" xml:id="v1"><ttm:name type="full">Singer</ttm:name></ttm:agent><sourceMetadata xmlns="http://lrc.red/lyric-ttml-internal" leadingSilence="0"><translations/><songwriters><songwriter>Writer</songwriter></songwriters><audio lyricOffset="1.115" role="spatial"/></sourceMetadata></metadata></head><body dur="1:00.000"><div begin="10.000" end="20.000" lrc:songPart="Verse"><p begin="10.000" end="12.500" lrc:key="L1" ttm:agent="v1"><span begin="10.000" end="10.400">Paper</span> <span begin="10.400" end="10.800">lan</span><span begin="10.800" end="11.200">terns</span> <span begin="11.200" end="12.500">drift</span></p><p begin="13.000" end="16.000" lrc:key="L2" ttm:agent="v1"><span ttm:role="x-bg"><span begin="13.000" end="13.600">(far</span> <span begin="13.600" end="14.100">away)</span></span> <span begin="13.200" end="14.000">over</span> <span begin="14.000" end="16.000">water</span></p></div></body></tt>"#
 
     @Test func wordTimedDocumentKeepsSyllablesAndBackgroundVocals() throws {
-        let lyrics = try #require(TtmlDocumentParser.parse(Self.wordTimed, metadata: LyricsMetadata(source: "BiniLyrics")))
+        let lyrics = try #require(TtmlDocumentParser.parse(Self.wordTimed, metadata: LyricsMetadata(source: "Pixel Master Lyrics")))
         let doc = try #require(lyrics.document)
-        #expect(LyricsDocCodec.isValid(doc) && doc.metadata.source == "BiniLyrics" && lyrics.areFromRemote)
+        #expect(LyricsDocCodec.isValid(doc) && doc.metadata.source == "Pixel Master Lyrics" && lyrics.areFromRemote)
         #expect(doc.lines.map(\.text) == ["Paper lanterns drift", "over water", "far away"])
         #expect(doc.lines.map(\.voiceId) == ["lead", "lead", "background"])
         #expect(doc.voices.map(\.role) == [VoiceRole.lead, VoiceRole.background])
@@ -282,7 +282,7 @@ extension ParsingBiniLyricsTests {
         let lyrics = try #require(TtmlDocumentParser.parse(Self.wordTimed))
         let entry = try #require(BiniLyricsMatching.searchResult(candidate: Self.candidate(), lyrics: lyrics,
                                                                  document: Self.wordTimed))
-        #expect(entry.source == "BiniLyrics" && entry.record.id == -1 && entry.rawLyrics == Self.wordTimed)
+        #expect(entry.source == "Pixel Master Lyrics" && entry.record.id == -1 && entry.rawLyrics == Self.wordTimed)
         #expect(entry.record.name == "Glass Harbor" && entry.record.duration == 200)
         #expect(entry.record.syncedLyrics?.hasPrefix("[00:10.00]Paper lanterns drift") == true)
         #expect(LyricsSearchResult(record: entry.record, lyrics: lyrics, rawLyrics: "").source == "LRCLIB")

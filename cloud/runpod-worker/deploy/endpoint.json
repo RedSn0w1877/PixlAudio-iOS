@@ -11,12 +11,12 @@
   "workers": {"min": 0, "max": 3, "idleTimeout": 10},
   "scaling": {"type": "QUEUE_DELAY", "queueDelay": 4},
   "flashboot": "FLASHBOOT",
-  "timeout": 900000,
+  "timeout": 1800000,
   "env": {
     "PIXL_MAX_AUDIO_S": "900",
     "PIXL_MAX_INPUT_MB": "160",
     "PIXL_BEST_MAX_AUDIO_S": "480",
-    "PIXL_EXECUTION_TIMEOUT_S": "900",
+    "PIXL_EXECUTION_TIMEOUT_S": "1800",
     "PIXL_ALLOWED_HOST_SUFFIXES": "{R2_ACCOUNT_ID}.r2.cloudflarestorage.com",
     "PIXL_LOG_LEVEL": "INFO"
   }

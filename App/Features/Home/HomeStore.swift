@@ -7,7 +7,7 @@ import PixlModel
 /// `DailyMixStateHolder`, `HomeGreetingStateHolder`, `StatsViewModel.homeOverview` and the recently-played
 /// mapping in `HomeScreen`). One value, replaced atomically when the library or the history changes.
 nonisolated struct HomeContent: Sendable, Equatable {
-    var greeting = HomeGreeting(headline: HomeLogic.localHeadline(hour: 12, topArtist: nil, topGenre: nil),
+    var greeting = HomeGreeting(headline: HomeSummary.headline(HomeSummaryFacts(hasLibrary: false)),
                                 subtitle: HomeLogic.defaultSubtitle)
     /// The inputs of the expanded greeting insight (Android `expandInsight`, local fallback).
     var insight = ""
@@ -220,12 +220,12 @@ final class HomeStore {
         }
         isInsightExpanded = true
         let facts = content.greetingFacts
-        guard let greeter, facts.librarySize > 0 else { return }
+        guard let greeter, facts.hasLibrary else { return }
         isLoadingInsight = true
         insightTask = Task { [weak self] in
             let text = await greeter(.insight, facts)
             guard let self, !Task.isCancelled else { return }
-            self.aiInsight = text.flatMap { HomeLogic.cleanGreeting($0, limit: 600) }
+            self.aiInsight = text.flatMap { HomeLogic.cleanInsight($0) }
             self.isLoadingInsight = false
         }
     }
@@ -243,7 +243,7 @@ final class HomeStore {
     /// arrives and is kept for the day.
     private func requestAIGreeting(day: String) {
         let facts = content.greetingFacts
-        guard let greeter, defaults != nil, !hasRequestedAIGreeting, facts.librarySize > 0,
+        guard let greeter, defaults != nil, !hasRequestedAIGreeting, facts.hasLibrary,
               cachedAIGreeting(day: day) == nil else { return }
         hasRequestedAIGreeting = true
         Task { [weak self] in
@@ -418,22 +418,17 @@ final class HomeStore {
         let songs = snapshot.songs
         var content = HomeContent()
         let zone = ZoneClock(timeZone)
-        let hour = zone.localHour(at: nowMs)
         let songsById = Dictionary(songs.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 
-        // Greeting + insight (all-time summary).
+        // Greeting + insight (all-time summary). Imported listening names the favourite artist while the app's own
+        // history is still thin.
         let allTime = songs.isEmpty ? nil
             : PlaybackStats.buildSummary(range: .all, songs: songs, nowMillis: nowMs, events: events, timeZone: timeZone)
-        content.greeting = HomeLogic.greeting(hour: hour, librarySize: songs.count, allTime: allTime)
-        content.insight = HomeLogic.expandedFallback(librarySize: songs.count, totalPlayCount: allTime?.totalPlayCount ?? 0,
-                                                     topArtist: allTime?.topArtists.first?.artist,
-                                                     topGenre: HomeLogic.topGenre(allTime))
-        // Imported listening speaks for the listener while the app's own history is still thin.
-        content.greetingFacts = HomeGreetingFacts(hour: hour,
-                                                  topArtist: allTime?.topArtists.first?.artist ?? importedHistory.artists.first?.name,
-                                                  topGenre: HomeLogic.topGenre(allTime),
-                                                  totalPlays: (allTime?.totalPlayCount ?? 0) + importedHistory.totalPlays,
-                                                  librarySize: songs.count)
+        let facts = HomeLogic.summaryFacts(nowMs: nowMs, timeZone: timeZone, songs: songs, events: events, allTime: allTime,
+                                           importedTopArtist: importedHistory.artists.first?.name)
+        content.greeting = HomeLogic.greeting(facts)
+        content.insight = HomeSummary.insight(facts)
+        content.greetingFacts = facts
 
         if Task.isCancelled { return nil }
         // Newest songs (`ORDER BY date_added DESC, id DESC LIMIT 48`).

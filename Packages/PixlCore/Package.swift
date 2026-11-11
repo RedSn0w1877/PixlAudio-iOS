@@ -18,7 +18,7 @@ let modules: [(name: String, dependencies: [String])] = [
 
 let package = Package(
     name: "PixlCore",
-    platforms: [.iOS("26.1"), .macOS("26.0")],
+    platforms: [.iOS("26.0"), .macOS("26.0")],
     products: modules.map { Product.library(name: $0.name, targets: [$0.name]) },
     targets: modules.flatMap { module -> [Target] in
         [

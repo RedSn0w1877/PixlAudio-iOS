@@ -1,3 +1,4 @@
+import PixlFoundation
 import PixlModel
 import SwiftUI
 
@@ -8,8 +9,9 @@ import SwiftUI
 ///
 /// The track is Android's glass-mode scrubber shape (`MediaScrubber`) in the wavy slider's geometry: a 5 pt rounded
 /// line, the played part in `onPrimaryContainer`, the rest at 20 %, a 16 pt thumb with a 6 pt gap and a 3 pt stop dot
-/// at the end. Drag to scrub (haptic every 5 %), release to seek; tap seeks. After a seek the thumb holds the target
-/// until playback catches up (within 4 %) or 5 s pass.
+/// at the end. Drag to scrub (haptic every 5 %), release to seek; tap seeks. The engine reports the seek target as the
+/// position the moment a seek is issued, so the thumb needs no "hold" of its own (a hold left the old position on the
+/// bar after a restart, and a paused bar never redrew when it expired).
 struct PlayerSeekBar: View {
     let song: Song
     let isPlaying: Bool
@@ -21,40 +23,51 @@ struct PlayerSeekBar: View {
 
     @Environment(\.playerTheme) private var theme
     @Environment(SettingsStore.self) private var settings
+    @Environment(PlaybackStore.self) private var playback
+    @Environment(AppEnvironment.self) private var env
 
     @State private var scrubFraction: Double?
-    @State private var heldTarget: Double?
-    @State private var heldAt = Date.distantPast
+    /// True while a finger is down on the track; unlike `scrubFraction` it resets itself if the system cancels the drag
+    /// (a sheet gesture takes over, the view goes away), so a cancelled scrub can't leave the thumb or the sheet's
+    /// "scrubbing" flag stuck.
+    @GestureState private var isTouching = false
     @State private var hapticStep = -1
 
     var body: some View {
         let textColor = theme.onPrimaryContainer
+        // Paused, the timeline below doesn't tick. A seek or restart ("start over", previous inside a song) bumps this
+        // counter, which re-runs this body once so the bar and the labels show the new position without pressing play.
+        let _ = playback.seekRevision
+        // Spatial audio's part of the file-info chip ("Spatial Studio on phone"), read here, once per change, and only
+        // while the chip shows.
+        let spatialInfo = showsFileInfo ? SpatialAudioUI.fileInfo(env.spatial.snapshot.audible) : nil
         TimelineView(.animation(minimumInterval: 0.25, paused: !(isPlaying && isActive) || scrubFraction != nil)) { context in
+            let _ = context.date
             let duration = PlayerFormat.displayDuration(reportedMs: clock.durationMs, hintMs: song.duration)
-            let progress = displayedFraction(durationMs: duration, now: context.date)
+            let progress = displayedFraction(durationMs: duration)
             VStack(spacing: 0) {
                 track(progress: progress, color: textColor)
                     .padding(.vertical, 8)
                 labels(positionMs: Int64((progress * Double(max(duration, 1))).rounded()), durationMs: duration,
-                       color: textColor)
+                       color: textColor, spatialInfo: spatialInfo)
             }
             .frame(minHeight: 70, alignment: .top)
         }
         .onChange(of: song.id) { _, _ in
             scrubFraction = nil
-            heldTarget = nil
+        }
+        .onChange(of: isTouching) { _, touching in
+            guard !touching, scrubFraction != nil else { return }
+            scrubFraction = nil
+            onScrubbingChange(false)
         }
         .pixlHaptic(.selection, trigger: hapticStep)
         .longRunning("player.seekBar (4 Hz timeline)", active: isPlaying && isActive)
     }
 
-    private func displayedFraction(durationMs: Int64, now: Date) -> Double {
+    private func displayedFraction(durationMs: Int64) -> Double {
         if let scrubFraction { return scrubFraction }
-        let actual = durationMs > 0 ? min(max(Double(clock.positionMs) / Double(durationMs), 0), 1) : 0
-        if let heldTarget, now.timeIntervalSince(heldAt) < 5, abs(actual - heldTarget) >= 0.04 {
-            return heldTarget
-        }
-        return actual
+        return PlaybackProgress.fraction(positionMs: clock.positionMs, durationMs: durationMs)
     }
 
     // MARK: Track
@@ -105,6 +118,7 @@ struct PlayerSeekBar: View {
 
     private var scrubGesture: some Gesture {
         DragGesture(minimumDistance: 0)
+            .updating($isTouching) { _, touching, _ in touching = true }
             .onChanged { value in
                 if scrubFraction == nil { onScrubbingChange(true) }
                 let scrubbed = fraction(atX: value.location.x)
@@ -115,8 +129,6 @@ struct PlayerSeekBar: View {
             .onEnded { value in
                 let target = fraction(atX: value.location.x)
                 let duration = PlayerFormat.displayDuration(reportedMs: clock.durationMs, hintMs: song.duration)
-                heldTarget = target
-                heldAt = Date()
                 scrubFraction = nil
                 onScrubbingChange(false)
                 onSeek(Int64((target * Double(max(duration, 1))).rounded()))
@@ -133,7 +145,12 @@ struct PlayerSeekBar: View {
 
     // MARK: Labels
 
-    private func labels(positionMs: Int64, durationMs: Int64, color: Color) -> some View {
+    /// "Show player file info" (Settings › Appearance › Advanced) counts only in developer mode.
+    private var showsFileInfo: Bool {
+        settings.appearance.fullPlayerShowFileInfo && settings.experimental.developerMode
+    }
+
+    private func labels(positionMs: Int64, durationMs: Int64, color: Color, spatialInfo: String?) -> some View {
         ZStack {
             HStack {
                 Text(PlayerFormat.duration(positionMs / 1000 * 1000))
@@ -144,10 +161,10 @@ struct PlayerSeekBar: View {
             .monospacedDigit()
             .foregroundStyle(color)
             // "Show player file info" (Settings › Appearance › Advanced) counts only in developer mode: the format
-            // text (codec, bitrate, sample rate) is not for everyone.
-            if settings.appearance.fullPlayerShowFileInfo, settings.experimental.developerMode,
-               let label = PlayerFormat.audioMetaLabel(song: song) {
-                Text(label)
+            // text (codec, bitrate, sample rate) is not for everyone. While Spatial audio is audible it ends with what
+            // plays ("• Spatial Studio on phone", "• Spatial Studio cloud render"), as on Android.
+            if showsFileInfo, let label = PlayerFormat.audioMetaLabel(song: song) {
+                Text(spatialInfo.map { label + " \u{2022} " + $0 } ?? label)
                     .pixlFont(.custom(size: 11, weight: .medium, lineHeight: 16, tracking: 0.5))
                     .lineLimit(1)
                     .foregroundStyle(color.opacity(0.96))
@@ -181,13 +198,7 @@ nonisolated enum PlayerFormat {
     /// The duration the progress section shows: the player's when it agrees with the library's (±1.5 s), else the
     /// shorter of the two (Android `displayDurationValue`).
     static func displayDuration(reportedMs: Int64, hintMs: Int64) -> Int64 {
-        let reported = max(reportedMs, 0)
-        let hint = max(hintMs, 0)
-        if reported <= 0 && hint <= 0 { return 0 }
-        if reported <= 0 { return hint }
-        if hint <= 0 { return reported }
-        if abs(reported - hint) <= 1500 { return reported }
-        return min(reported, hint)
+        PlaybackProgress.displayDuration(reportedMs: reportedMs, hintMs: hintMs)
     }
 
     /// Android `streamQualityTierLabel`: the tier the playing stream falls into. FLAC is Pro up to 48 kHz and Studio Pro

@@ -68,8 +68,9 @@ enum CloudFixtures {
 
     /// Every worker example, by file name.
     static let workerInputs = ["job.input.process", "job.input.transcribe", "job.input.volume", "job.input.selftest",
-                               "job.input.bench"]
-    static let workerResults = ["job.result.ok", "job.result.partial", "job.result.error", "job.result.poisoned"]
+                               "job.input.bench", "job.input.spatial", "job.input.spatial.combined"]
+    static let workerResults = ["job.result.ok", "job.result.partial", "job.result.error", "job.result.poisoned",
+                                "job.result.spatial", "job.result.spatial.exists", "job.result.spatial.partial"]
     static let workerLyrics = ["lyrics.aligned", "lyrics.transcribed"]
 }
 

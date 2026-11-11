@@ -5,20 +5,14 @@ import PixlModel
 // Pure Home / Recently Played / Stats helpers ported from the Android presentation layer. Nothing here touches
 // SwiftUI or the stores, so AppTests cover it directly (AppTests/HomeLogicTests.swift).
 
-/// What the greeting card shows (Android `HomeGreeting`): a headline plus a smaller, always-local stats line.
+/// What the greeting card shows: a short headline and a one-line subtitle about the moment (never a statistic).
 nonisolated struct HomeGreeting: Sendable, Equatable {
     var headline: String
     var subtitle: String
 }
 
-/// What Android's AI greeting prompt says about the listener (`HomeGreetingStateHolder.refresh` / `expandInsight`).
-nonisolated struct HomeGreetingFacts: Sendable, Equatable {
-    var hour = 12
-    var topArtist: String?
-    var topGenre: String?
-    var totalPlays = 0
-    var librarySize = 0
-}
+/// What the summary at the top of Home may say about the listener (PixlLibrary `HomeSummary` owns the words).
+typealias HomeGreetingFacts = HomeSummaryFacts
 
 /// The two AI texts of the greeting card: the once-a-day headline and the on-demand insight.
 nonisolated enum HomeGreetingKind: Sendable, Equatable {
@@ -45,91 +39,71 @@ nonisolated struct HomeClock: Sendable {
 }
 
 nonisolated enum HomeLogic {
-    // MARK: Greeting (Android HomeGreetingStateHolder)
+    // MARK: Home summary (owner decision 2026-10-26: short, contextual, never a statistic; the words are PixlLibrary's)
 
     /// `dayPhase()`: morning 5–10, afternoon 11–16, evening 17–21, else night.
-    static func dayPhase(hour: Int) -> String {
-        switch hour {
-        case 5...10: "morning"
-        case 11...16: "afternoon"
-        case 17...21: "evening"
-        default: "night"
+    static func dayPhase(hour: Int) -> String { HomeSummary.dayPhase(hour: hour) }
+
+    /// What the card says before there is anything to say.
+    static let defaultSubtitle = HomeSummary.invitation
+
+    /// The greeting card's two lines for these facts.
+    static func greeting(_ facts: HomeSummaryFacts) -> HomeGreeting {
+        HomeGreeting(headline: HomeSummary.headline(facts), subtitle: HomeSummary.subtitle(facts))
+    }
+
+    /// The facts about the listener's day, from the library and the plays (off the main actor with the rest of Home's
+    /// computation). "Unknown Genre" is skipped; imported listening names the favourite artist while the app's own
+    /// history is still thin.
+    static func summaryFacts(nowMs: Int64, timeZone: TimeZone, songs: [Song], events: [PlaybackEvent],
+                             allTime: PlaybackStatsSummary?, importedTopArtist: String?) -> HomeSummaryFacts {
+        let zone = ZoneClock(timeZone)
+        let today = zone.localDate(at: nowMs).epochDay
+        var facts = HomeSummaryFacts(hour: zone.localHour(at: nowMs), weekday: HomeSummary.weekday(epochDay: today),
+                                     epochDay: today, hasLibrary: !songs.isEmpty)
+        guard !songs.isEmpty else { return facts }
+        facts.topArtist = allTime?.topArtists.first?.artist ?? importedTopArtist
+        facts.topGenre = topGenre(allTime)
+        // The most recent play that is still in the library.
+        let byId = Dictionary(songs.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        if let last = events.filter({ $0.timestamp <= nowMs && byId[$0.songId] != nil }).max(by: { $0.timestamp < $1.timestamp }),
+           let song = byId[last.songId] {
+            facts.lastPlayedTitle = song.title
+            facts.lastPlayedArtist = song.displayArtist
+            facts.lastPlayedMinutesAgo = Int(max(nowMs - last.timestamp, 0) / 60_000)
         }
-    }
-
-    /// `localHeadline(topArtist, topGenre)`.
-    static func localHeadline(hour: Int, topArtist: String?, topGenre: String?) -> String {
-        let salutation: String
-        switch dayPhase(hour: hour) {
-        case "morning": salutation = "Good morning"
-        case "afternoon": salutation = "Good afternoon"
-        case "evening": salutation = "Good evening"
-        default: salutation = "Still up?"
+        facts.streakDays = HomeSummary.streakDays(playDays: Set(events.map { zone.localDate(at: max($0.timestamp, 0)).epochDay }),
+                                                  today: today)
+        // The newest song, when it really is new.
+        if let newest = songs.max(by: { $0.dateAdded < $1.dateAdded }),
+           HomeSummary.isFresh(dateAdded: newest.dateAdded, nowMs: nowMs) {
+            facts.freshSongTitle = newest.title
+            facts.freshSongArtist = newest.displayArtist
         }
-        if let topArtist { return "\(salutation) — ready for more \(topArtist)?" }
-        if let topGenre { return "\(salutation) — in the mood for some \(topGenre)?" }
-        return "\(salutation) — let's find something to play."
-    }
-
-    /// `defaultSubtitle()`.
-    static let defaultSubtitle = "Let's find your next favorite song."
-
-    /// `statsSubtitle(librarySize, totalPlayCount, topGenre)`.
-    static func statsSubtitle(librarySize: Int, totalPlayCount: Int, topGenre: String?) -> String {
-        if totalPlayCount > 0, let topGenre { return "\(totalPlayCount) plays logged · mostly \(topGenre) lately" }
-        if totalPlayCount > 0 { return "\(totalPlayCount) plays across \(librarySize) songs in your library" }
-        if librarySize > 0 { return "\(librarySize) songs in your library, ready to explore" }
-        return defaultSubtitle
-    }
-
-    /// `expandedFallback(...)`: the insight shown when no AI provider is configured.
-    static func expandedFallback(librarySize: Int, totalPlayCount: Int, topArtist: String?, topGenre: String?) -> String {
-        let artistPart = topArtist.map { " \($0) has been getting the most plays." } ?? ""
-        let genrePart = topGenre.map { " \($0) is the genre you're leaning on most." } ?? ""
-        return "You've logged \(totalPlayCount) plays across \(librarySize) songs in your library.\(artistPart)\(genrePart)"
-    }
-
-    /// The greeting for a library and its all-time stats (Android `refresh`, local part). "Unknown Genre" is skipped.
-    static func greeting(hour: Int, librarySize: Int, allTime: PlaybackStatsSummary?) -> HomeGreeting {
-        guard librarySize > 0 else {
-            return HomeGreeting(headline: localHeadline(hour: hour, topArtist: nil, topGenre: nil),
-                                subtitle: defaultSubtitle)
-        }
-        let topArtist = allTime?.topArtists.first?.artist
-        let topGenre = topGenre(allTime)
-        let plays = allTime?.totalPlayCount ?? 0
-        return HomeGreeting(headline: localHeadline(hour: hour, topArtist: topArtist, topGenre: topGenre),
-                            subtitle: statsSubtitle(librarySize: librarySize, totalPlayCount: plays, topGenre: topGenre))
+        return facts
     }
 
     static func topGenre(_ summary: PlaybackStatsSummary?) -> String? {
         summary?.topGenres.first { $0.genre != PlaybackStats.unknownGenreLabel }?.genre
     }
 
-    // MARK: AI greeting (Android HomeGreetingStateHolder, the AI half)
+    // MARK: AI summary (the assistant half)
 
-    /// The headline prompt: `time_of_day=evening, top_artist=…, top_genre=…, total_plays=N`.
-    static func greetingPrompt(_ facts: HomeGreetingFacts) -> String {
-        var text = "time_of_day=\(dayPhase(hour: facts.hour))"
-        if let artist = facts.topArtist { text += ", top_artist=\(artist)" }
-        if let genre = facts.topGenre { text += ", top_genre=\(genre)" }
-        text += ", total_plays=\(facts.totalPlays)"
-        return text
+    /// The headline prompt: the context of the moment, no totals, and a rule against counting aloud.
+    static func greetingPrompt(_ facts: HomeGreetingFacts) -> String { HomeSummary.headlinePrompt(facts) }
+
+    /// The expanded insight's prompt: the same context, two short sentences.
+    static func insightPrompt(_ facts: HomeGreetingFacts) -> String { HomeSummary.insightPrompt(facts) }
+
+    /// An assistant's headline: one short line, cut on a word boundary, never statistic phrasing; nil when nothing
+    /// usable is left (the local headline stays).
+    static func cleanGreeting(_ text: String, limit: Int = HomeSummary.headlineHardLimit) -> String? {
+        HomeSummary.clean(text, limit: limit)
     }
 
-    /// The expanded insight's prompt (`expandInsight`): the headline facts, the library size and the request.
-    static func insightPrompt(_ facts: HomeGreetingFacts) -> String {
-        greetingPrompt(facts) + ", library_size=\(facts.librarySize)"
-            + ". Write 2-3 sentences of listening insight, more detailed than a one-line greeting."
-    }
-
-    /// Android `text.trim().trim('"').take(140)`; nil when nothing is left.
-    static func cleanGreeting(_ text: String, limit: Int = 140) -> String? {
-        var slice = Substring(text.trimmingCharacters(in: .whitespacesAndNewlines))
-        while slice.first == "\"" { slice = slice.dropFirst() }
-        while slice.last == "\"" { slice = slice.dropLast() }
-        let clean = String(slice.prefix(limit)).trimmingCharacters(in: .whitespacesAndNewlines)
-        return clean.isEmpty ? nil : clean
+    /// An assistant's insight: a few short sentences, cut on a word boundary, never statistic phrasing.
+    static func cleanInsight(_ text: String) -> String? {
+        HomeSummary.clean(text, limit: HomeSummary.insightLimit, singleLine: false)
     }
 
     // MARK: Recently played (Android presentation/model/RecentlyPlayedSongUi.kt)

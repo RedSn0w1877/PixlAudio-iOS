@@ -20,6 +20,9 @@ final class PlaybackStore {
     /// Bumped whenever `queue` is replaced (the queue sheet reacts to it instead of comparing every id).
     private(set) var queueRevision = 0
     private(set) var isPlaying = false
+    /// Bumped on every seek or restart (`PlaybackEngineEvent.seeked`, and the remote output's own seeks). It is not the
+    /// position: a progress bar that stops ticking while paused reads it so it redraws once, at the new position.
+    private(set) var seekRevision = 0
     private(set) var isPreparing = false
     private(set) var repeatMode: RepeatMode = .off
     private(set) var isShuffleEnabled = false
@@ -145,14 +148,17 @@ final class PlaybackStore {
     }
 
     func skipToPrevious() {
-        if let remote { remote.remoteSkipToPrevious(); return }
+        if let remote { remote.remoteSkipToPrevious(); seekRevision &+= 1; return }
         engine.skipToPrevious()
     }
 
     func seek(toMs positionMs: Int64) {
-        if let remote { remote.remoteSeek(toMs: positionMs); return }
+        if let remote { remote.remoteSeek(toMs: positionMs); seekRevision &+= 1; return }
         engine.seek(toMs: positionMs)
     }
+
+    /// The remote output moved the position (a seek from the lock screen, a restart): progress bars re-read it once.
+    func notePositionJumped() { seekRevision &+= 1 }
 
     func setRepeatMode(_ mode: RepeatMode) {
         repeatMode = mode
@@ -278,6 +284,8 @@ final class PlaybackStore {
             remote?.remoteRepeatModeChanged(mode)
         case .shuffleChanged(let enabled):
             if isShuffleEnabled != enabled { isShuffleEnabled = enabled }
+        case .seeked:
+            seekRevision &+= 1
         }
     }
 }

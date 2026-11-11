@@ -386,15 +386,20 @@ final class OnDeviceAITests: XCTestCase {
 
     // MARK: Home greeting (Android HomeGreetingStateHolder)
 
-    func testGreetingPromptsMatchAndroid() {
-        let facts = HomeGreetingFacts(hour: 19, topArtist: "Luma Vale", topGenre: "Indie", totalPlays: 340, librarySize: 490)
-        XCTAssertEqual(HomeLogic.greetingPrompt(facts), "time_of_day=evening, top_artist=Luma Vale, top_genre=Indie, total_plays=340")
-        XCTAssertEqual(HomeLogic.insightPrompt(facts), "time_of_day=evening, top_artist=Luma Vale, top_genre=Indie, "
-                       + "total_plays=340, library_size=490. Write 2-3 sentences of listening insight, more detailed than a "
-                       + "one-line greeting.")
-        XCTAssertEqual(HomeLogic.greetingPrompt(HomeGreetingFacts(hour: 2)), "time_of_day=night, total_plays=0")
-        XCTAssertEqual(HomeLogic.cleanGreeting("  \"Evening — a Luma Vale kind of night.\" "), "Evening — a Luma Vale kind of night.")
+    func testGreetingPromptsCarryContextAndNoTotals() {
+        let facts = HomeGreetingFacts(hour: 19, weekday: 4, topArtist: "Luma Vale", topGenre: "Indie", streakDays: 5)
+        XCTAssertEqual(HomeLogic.greetingPrompt(facts), HomeSummary.headlinePrompt(facts))
+        XCTAssertEqual(HomeLogic.insightPrompt(facts), HomeSummary.insightPrompt(facts))
+        for prompt in [HomeLogic.greetingPrompt(facts), HomeLogic.insightPrompt(facts), HomeAIGreeter.insightInstructions] {
+            XCTAssertFalse(prompt.contains("total_plays"))
+            XCTAssertFalse(prompt.contains("library_size"))
+            XCTAssertFalse(prompt.contains("plays across"))
+        }
+        XCTAssertTrue(HomeLogic.greetingPrompt(facts).hasPrefix("time_of_day=evening, weekday=Friday, top_artist=Luma Vale"))
+        XCTAssertEqual(HomeLogic.cleanGreeting("  \"Evening — a Luma Vale night.\" "), "Evening — a Luma Vale night.")
         XCTAssertNil(HomeLogic.cleanGreeting(" \"\" "))
-        XCTAssertEqual(HomeLogic.cleanGreeting(String(repeating: "a", count: 200))?.count, 140)
+        XCTAssertNil(HomeLogic.cleanGreeting("340 plays across 490 songs in your library"))
+        XCTAssertLessThanOrEqual(HomeLogic.cleanGreeting(String(repeating: "word ", count: 40))?.count ?? 0,
+                                 HomeSummary.headlineHardLimit)
     }
 }

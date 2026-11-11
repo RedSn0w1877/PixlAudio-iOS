@@ -3,7 +3,7 @@ import SwiftUI
 
 // Compat27 — the ONLY file allowed to use iOS 27-only APIs (CI enforces this in ci/check-forbidden.sh).
 //
-// The app deploys to iOS 26.1 and is built with Xcode 27 (Swift 6.4) on CI; a fallback lane still builds
+// The app deploys to iOS 26.0 and is built with Xcode 27 (Swift 6.4) on CI; a fallback lane still builds
 // with Xcode 26.6 (Swift 6.2), whose SDK does not contain iOS 27 symbols. So every iOS 27 API is wrapped
 // twice: `#if compiler(>=6.4)` hides it from the old compiler, `if #available(iOS 27, *)` guards it at
 // run time, and the else branches fall back to iOS 26 behaviour. Call sites use the wrapper only.

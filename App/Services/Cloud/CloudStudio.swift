@@ -210,6 +210,8 @@ final class CloudStudio {
         let jobKey: String
         let request: CloudJobRequest
         let estimateMicroUSD: Int64
+        /// A Spatial audio library job: its estimate counts against the library's cap, never Sing's.
+        var isLibrary = false
     }
 
     static let instrumentalSlot = "instrumental"
@@ -246,6 +248,14 @@ final class CloudStudio {
     /// The phone's network and power facts for work done ahead of time (set once by `CloudStudio.make`; nil in tests and
     /// the demo, where `Dependencies.autoConditions` stands in).
     @ObservationIgnored var deviceConditions: CloudDeviceConditions?
+    /// Spatial audio's local store (`SpatialLibraryFactory` sets it): where a library job's verified renders go. While it
+    /// is nil a library job has nowhere to put a render, so none is sent (`enqueueLibraryRender`).
+    @ObservationIgnored weak var renderInstaller: (any CloudRenderInstalling)?
+    /// Spatial audio's own monthly cap (`cloudAudio.monthlyCapUSD`, µ$; nil: no limit) and the background queue's daily
+    /// count (`cloudAudio.dailyAhead`), as the Spatial audio settings say (cloud audio spec 6.1). Sing's cap and its $3
+    /// rule never apply to library jobs.
+    @ObservationIgnored var libraryMonthlyCapMicroUSD: Int64? = CloudAudioSettings(builtInCloudKeys: true).monthlyCapMicroUSD
+    @ObservationIgnored var libraryDailyAhead = CloudAudioSettings.defaultDailyAhead
 
     // MARK: Plumbing
 
@@ -307,18 +317,23 @@ final class CloudStudio {
     func job(_ jobKey: String) -> CloudJobRecord? { jobs.first { $0.jobKey == jobKey } }
 
     /// The latest whole-song job for a song, whatever its state (the Sing button follows its progress). A Sing's preview
-    /// piece is never it.
-    func job(forSong songId: String) -> CloudJobRecord? { jobs.last { $0.songId == songId && !$0.isClip } }
+    /// piece is never it, and neither is a Spatial audio library job (it makes no instrumental).
+    func job(forSong songId: String) -> CloudJobRecord? {
+        jobs.last { $0.songId == songId && !$0.isClip && !$0.isLibraryJob }
+    }
 
     /// The song's preview piece on its way (the Sing button follows it until it plays).
     func pendingClip(forSong songId: String) -> CloudJobRecord? {
         jobs.last { $0.songId == songId && $0.isClip && $0.state.isPending }
     }
 
-    /// The song has a job that isn't finished (the automatic studio skips it; the song sheet says so).
-    func hasPendingJob(songId: String) -> Bool { jobs.contains { $0.songId == songId && $0.state.isPending } }
+    /// The song has an instrumental job that isn't finished (the automatic studio skips it; the song sheet says so). A
+    /// Spatial audio library job is not one: a Sing tap on its song still gets a job of its own.
+    func hasPendingJob(songId: String) -> Bool {
+        jobs.contains { $0.songId == songId && $0.state.isPending && !$0.isLibraryJob }
+    }
 
-    var pendingSongIds: Set<String> { Set(jobs.filter { $0.state.isPending }.map(\.songId)) }
+    var pendingSongIds: Set<String> { Set(jobs.filter { $0.state.isPending && !$0.isLibraryJob }.map(\.songId)) }
 
     /// Jobs in flight / done / needing the person, for the queue screen and Home's job line. A Sing's preview piece is
     /// part of its song's job there, not a row of its own.
@@ -574,7 +589,7 @@ final class CloudStudio {
         let readiness = await cloudReadiness()
         guard readiness == .usable else { return readiness }
         await loadIfNeeded()
-        if let pending = jobs.last(where: { $0.songId == song.id && $0.state.isPending && !$0.isClip }) {
+        if let pending = jobs.last(where: { $0.songId == song.id && $0.state.isPending && !$0.isClip && !$0.isLibraryJob }) {
             // A job that only makes lyrics can't give this tap its instrumental: the phone does that.
             return pending.tasks.contains(.instrumental) ? .alreadyPending(jobKey: pending.jobKey) : .nothingToDo
         }
@@ -610,7 +625,7 @@ final class CloudStudio {
            landed.endMs - playheadMs > CloudSingClip.minimumRemainingMs / 4 {
             clip = nil
         }
-        if let pending = jobs.last(where: { $0.songId == song.id && $0.state.isPending && !$0.isClip }) {
+        if let pending = jobs.last(where: { $0.songId == song.id && $0.state.isPending && !$0.isClip && !$0.isLibraryJob }) {
             guard pending.tasks.contains(.instrumental) else {
                 return .nothingToDo("Nothing to process — \(CloudSkipReason.pendingJob.label)")
             }
@@ -910,11 +925,13 @@ final class CloudStudio {
         if record.state.isAtRunPod, let id = record.runpodJobId, let clients {
             _ = try? await clients.runpod.cancel(jobId: id)
         }
-        // The reservation in the auto budget goes back when RunPod had not started the job.
+        // The reservation in the auto budget (or the library's) goes back when RunPod had not started the job.
         refundUnstartedAutoReservation(record)
+        refundUnstartedLibraryReservation(record)
         update(jobKey) { r in
             r.apply(.cancelled, nowMs: self.dependencies.nowMs())
             r.autoReservedMicroUSD = nil
+            r.libraryReservedMicroUSD = nil
             r.clearPause()
         }
         // Songs that stepped aside for this one carry on without it.
@@ -1138,10 +1155,12 @@ final class CloudStudio {
         await watchRunPod(clients)
         await collectResults(clients)
         // Continued processing lasts while songs are being prepared or are due to be; a song waiting out a retry
-        // (up to an hour) doesn't hold the system's progress UI open. Songs prepared ahead are not part of it.
+        // (up to an hour) doesn't hold the system's progress UI open. Songs prepared ahead are not part of it, and
+        // neither are Spatial audio's library jobs (quiet work).
         let now = dependencies.nowMs()
         let toPrepare = jobs.filter {
-            $0.effectiveOrigin != .auto && ($0.state == .preparing || ($0.state == .queued && $0.isDue(nowMs: now)))
+            $0.effectiveOrigin != .auto && $0.effectiveOrigin != .library
+                && ($0.state == .preparing || ($0.state == .queued && $0.isDue(nowMs: now)))
         }.count
         if toPrepare == 0 {
             dependencies.background?.endPreparing()
@@ -1297,8 +1316,16 @@ final class CloudStudio {
             case .preparing where preparing[record.jobKey] == nil:
                 update(record.jobKey) { _ = $0.apply(.requeue, nowMs: now) }
             case .downloading:
-                let description = CloudTransfers.taskDescription(jobKey: record.jobKey, slot: Self.instrumentalSlot)
-                if !pending.contains(description) { update(record.jobKey) { _ = $0.apply(.resultsReady, nowMs: now) } }
+                // A library job downloads one render at a time, under its `sp-<profile>` slot.
+                let slot = record.isLibraryJob
+                    ? record.library?.downloading.map { "sp-\($0)" } : Self.instrumentalSlot
+                let description = slot.map { CloudTransfers.taskDescription(jobKey: record.jobKey, slot: $0) }
+                if description.map({ !pending.contains($0) }) ?? true {
+                    update(record.jobKey) { r in
+                        _ = r.apply(.resultsReady, nowMs: now)
+                        r.library?.downloading = nil
+                    }
+                }
             default:
                 break
             }
@@ -1337,6 +1364,8 @@ final class CloudStudio {
             } else {
                 guard preparing.count - priorityBusy - clipBusy < limit else { break }
                 if record.effectiveOrigin == .auto, autoWaits { continue }
+                // Spatial audio's library jobs wait for a network they may use, and for room under their own cap.
+                if record.isLibraryJob, !libraryMayStart(record.jobKey) { continue }
             }
             let jobKey = record.jobKey
             update(jobKey) { _ = $0.apply(.prepareStarted, nowMs: now) }
@@ -1353,6 +1382,11 @@ final class CloudStudio {
 
     private func prepare(jobKey: String) async {
         guard let record = job(jobKey), record.state == .preparing else { return }
+        // Spatial audio's library jobs look in the shared library first, and take their audio from the stream cache.
+        if record.isLibraryJob {
+            await prepareLibrary(jobKey: jobKey)
+            return
+        }
         guard let song = dependencies.host.song(id: record.songId) else {
             fail(jobKey, "This song is no longer in your library.", code: nil, retryable: false)
             return
@@ -1433,8 +1467,9 @@ final class CloudStudio {
         }
         update(jobKey) { $0.uploadURLExpiresAtMs = now + Int64(CloudTiming.uploadPresignSeconds) * 1000 }
         let transfers = connectTransfers()
-        // Songs prepared ahead never use mobile data, whatever the switch says: their upload waits for Wi-Fi.
-        transfers.allowsCellular = settings.useCellular && record.effectiveOrigin != .auto
+        // Songs prepared ahead (Sing's and Spatial audio's) never use mobile data, whatever the switch says: their
+        // upload waits for Wi-Fi.
+        transfers.allowsCellular = settings.useCellular && !record.isPreparedAhead
         activeTransfers.insert(CloudTransfers.taskDescription(jobKey: jobKey, slot: CloudTransfers.uploadSlot))
         // When uploads share the connection, the song somebody waits for goes first and prepared-ahead work last.
         let priority = CloudPriorityLane.transferPriority(for: record, priorityKeys: CloudPriorityLane.priorityJobKeys(jobs))
@@ -1483,7 +1518,12 @@ final class CloudStudio {
             transferProgress[jobKey] = nil
             let task = Task { [weak self] in
                 guard let self else { return }
-                await self.importInstrumental(jobKey, slot: slot, staged: staged)
+                // A Spatial audio render comes down under its `sp-<profile>` slot.
+                if RenditionKey.profile(slot: slot) != nil {
+                    await self.importRender(jobKey, slot: slot, staged: staged)
+                } else {
+                    await self.importInstrumental(jobKey, slot: slot, staged: staged)
+                }
             }
             importing[jobKey] = task
             await task.value
@@ -1492,6 +1532,7 @@ final class CloudStudio {
             activeTransfers.remove(CloudTransfers.taskDescription(jobKey: jobKey, slot: slot))
             transferProgress[jobKey] = nil
             guard job(jobKey)?.state == .downloading else { return }
+            update(jobKey) { $0.library?.downloading = nil }
             if status == 404 {
                 // The lifecycle (or someone) removed the result before it was fetched: start the job over.
                 update(jobKey) { _ = $0.apply(.requeue, nowMs: now) }
@@ -1670,7 +1711,8 @@ final class CloudStudio {
         let monthStart = dependencies.monthStartMs(dependencies.nowMs())
         var committed = CloudBudget.committedMicroUSD(jobs, monthStartMs: monthStart, pricePerSecondMicroUSD: price)
             + settings.removedSpendMicroUSD(monthStartMs: monthStart)
-        for candidate in candidates where candidate.isRunningAtRunPod {
+        // Library jobs were never in Sing's sum (they have their own): only Sing's own jobs make room.
+        for candidate in candidates where candidate.isRunningAtRunPod && !candidate.isLibraryJob {
             committed -= CloudCost.estimatedSeconds(candidate.plan, quality: candidate.quality) * price
         }
         let estimate = CloudCost.estimatedSeconds(priority.plan, quality: priority.quality) * price
@@ -1741,6 +1783,9 @@ final class CloudStudio {
         // Auto jobs accepted in this pass but not yet in the ledger (a job is only reserved once RunPod has taken it).
         var passAutoCount = 0
         var passAutoMicroUSD: Int64 = 0
+        // The same for Spatial audio's library jobs, in their own ledger.
+        var passLibraryAhead = 0
+        var passLibraryMicroUSD: Int64 = 0
         for jobKey in ready {
             // A background wake with no time left sends nothing more (a request cut off half-way is wasted).
             guard canStartNewWork else {
@@ -1763,18 +1808,39 @@ final class CloudStudio {
             }
             let price = settings.effectivePricePerSecondMicroUSD
             let monthStart = dependencies.monthStartMs(now)
-            // The held jobs aren't at RunPod yet, but they will be: count them.
+            // The held jobs aren't at RunPod yet, but they will be: count them (Sing's jobs in Sing's sum).
             let committed = CloudBudget.committedMicroUSD(jobs, monthStartMs: monthStart, pricePerSecondMicroUSD: price)
                 + settings.removedSpendMicroUSD(monthStartMs: monthStart)
-                + burst.holding.reduce(0) { $0 + $1.estimateMicroUSD }
+                + burst.holding.filter { !$0.isLibrary }.reduce(0) { $0 + $1.estimateMicroUSD }
             let estimate = CloudCost.estimatedSeconds(record.plan, quality: record.quality) * price
-            guard CloudBudget.allows(estimateMicroUSD: estimate, capMicroUSD: settings.effectiveMonthlyCapMicroUSD,
-                                     spentMicroUSD: committed) else {
-                notice = .capReached
-                stoppedAtCap = true
-                break  // the jobs held so far still go out, as the burst's last
+            if record.isLibraryJob {
+                // Spatial audio's library jobs: their own monthly sum and cap (cloud audio spec 6.1), and for the
+                // background queue today's count. One that doesn't fit waits (`capReached`); Sing's jobs still go.
+                let ahead = record.isPreparedAhead
+                let fits = record.libraryReservedMicroUSD != nil || CloudLibraryBudget.allows(
+                    estimateMicroUSD: estimate, ledger: libraryLedgerNow, pendingMicroUSD: passLibraryMicroUSD,
+                    pendingAhead: passLibraryAhead, capMicroUSD: libraryMonthlyCapMicroUSD, ahead: ahead,
+                    dailyAhead: libraryDailyAhead)
+                guard fits else {
+                    let capped = !CloudLibraryBudget.capAllows(
+                        estimateMicroUSD: estimate, spentMicroUSD: libraryLedgerNow.spentMicroUSD + passLibraryMicroUSD,
+                        capMicroUSD: libraryMonthlyCapMicroUSD)
+                    if capped, record.library?.heldByCap != true { update(jobKey) { $0.library?.heldByCap = true } }
+                    continue
+                }
+                if record.libraryReservedMicroUSD == nil {
+                    passLibraryMicroUSD += estimate
+                    if ahead { passLibraryAhead += 1 }
+                }
+            } else {
+                guard CloudBudget.allows(estimateMicroUSD: estimate, capMicroUSD: settings.effectiveMonthlyCapMicroUSD,
+                                         spentMicroUSD: committed) else {
+                    notice = .capReached
+                    stoppedAtCap = true
+                    break  // the jobs held so far still go out, as the burst's last
+                }
+                if notice == .capReached { notice = nil }
             }
-            if notice == .capReached { notice = nil }
             // Songs prepared ahead also stay inside their own budget and today's count (a job already reserved, one that
             // went out before and stepped aside or is sent again, is counted once).
             let needsReservation = record.effectiveOrigin == .auto && record.autoReservedMicroUSD == nil
@@ -1823,7 +1889,8 @@ final class CloudStudio {
                 passAutoCount += 1
                 passAutoMicroUSD += estimate
             }
-            if let previous = burst.ready(PendingSubmit(jobKey: jobKey, request: request, estimateMicroUSD: estimate)) {
+            if let previous = burst.ready(PendingSubmit(jobKey: jobKey, request: request, estimateMicroUSD: estimate,
+                                                        isLibrary: record.isLibraryJob)) {
                 guard await submit(previous, lastInBatch: false, clients) else { return }
             }
         }
@@ -1870,6 +1937,10 @@ final class CloudStudio {
             // A song prepared ahead reserves its estimate in the auto budget the first time RunPod takes it (a job that
             // stepped aside and is sent again keeps its reservation); the real cost replaces it when the result lands.
             let reserves = self.job(jobKey).map { $0.effectiveOrigin == .auto && $0.autoReservedMicroUSD == nil } ?? false
+            // A library job reserves its estimate in the library's own ledger the same way (the background queue's
+            // jobs also count for today).
+            let reservesLibrary = self.job(jobKey).map { $0.isLibraryJob && $0.libraryReservedMicroUSD == nil } ?? false
+            let countsForToday = self.job(jobKey)?.isPreparedAhead ?? false
             update(jobKey) { r in
                 r.runpodJobId = job.id
                 r.lastError = nil
@@ -1878,8 +1949,11 @@ final class CloudStudio {
                 // Sending ends any pause: it goes out, with the priority job it stepped aside for.
                 r.apply(.submitted, nowMs: sentAt)
                 if reserves { r.autoReservedMicroUSD = pending.estimateMicroUSD }
+                if reservesLibrary { r.libraryReservedMicroUSD = pending.estimateMicroUSD }
+                r.library?.heldByCap = nil
             }
             if reserves { reserveAutoSpend(pending.estimateMicroUSD) }
+            if reservesLibrary { reserveLibrarySpend(pending.estimateMicroUSD, countsForToday: countsForToday) }
             // The id is on disk before the next POST (design §7.4).
             await persistNow()
             return true
@@ -2057,6 +2131,7 @@ final class CloudStudio {
             r.clearPause()
         }
         settleAutoReservation(jobKey, costBefore: costBefore)
+        settleLibraryReservation(jobKey, costBefore: costBefore)
         if result.hasResults {
             update(jobKey) { r in
                 r.lastError = nil
@@ -2122,7 +2197,7 @@ final class CloudStudio {
         for record in jobs where record.state == .resultsReady && record.isDue(nowMs: now) {
             guard canStartNewWork else { return }
             // Songs prepared ahead come down only on an unmetered connection; off Wi-Fi they wait, not fail.
-            if record.effectiveOrigin == .auto, !autoMayUseNetwork() { continue }
+            if record.isPreparedAhead, !autoMayUseNetwork() { continue }
             await collect(record.jobKey, clients)
         }
     }
@@ -2131,6 +2206,12 @@ final class CloudStudio {
     /// instrumental as a background download.
     private func collect(_ jobKey: String, _ clients: Clients) async {
         guard let record = job(jobKey), record.state == .resultsReady else { return }
+        // A Spatial audio render belongs to its video, not to a song: it is fetched and stored whatever the library
+        // song plays now.
+        if record.isLibraryJob {
+            await collectLibrary(jobKey, clients)
+            return
+        }
         guard let song = dependencies.host.song(id: record.songId) else {
             let keys = CloudJobBuilder.objectKeys(for: record)
             fail(jobKey, "This song is no longer in your library.", code: nil, retryable: false)
@@ -2360,7 +2441,8 @@ final class CloudStudio {
     private func finishIfDone(_ jobKey: String, _ clients: Clients) async {
         guard let record = job(jobKey), record.state == .resultsReady || record.state == .downloading,
               record.isFullyImported else { return }
-        let keys = CloudJobBuilder.objectKeys(for: record)
+        // A render found in the shared library left nothing of its own in the bucket (and `lib/` is never deleted).
+        let keys = record.library?.foundInLibrary == true ? [] : CloudJobBuilder.objectKeys(for: record)
         update(jobKey) { _ = $0.apply(.imported, nowMs: self.dependencies.nowMs()) }
         persist()
         cleanUpLocal(jobKey)
@@ -2434,6 +2516,419 @@ final class CloudStudio {
             _ = try manager.replaceItemAt(destination, withItemAt: source)
         } else {
             try manager.moveItem(at: source, to: destination)
+        }
+    }
+}
+
+// MARK: - Spatial audio's library jobs
+
+/// Spatial audio's renders as Cloud Studio jobs (cloud audio spec of 2026-11-10, sections 4, 6.1, 6.2 and 6.4). A library
+/// job is one video and its profiles (one today). It runs through the same queue, transfers, RunPod client, priority lane
+/// and background passes as every job, with these differences:
+/// - preparing it first looks on the phone and in the shared library (`lib/v1/<videoId>/sp-<profile>.json`, a signed
+///   GET): what is there is only fetched, with no upload and no GPU (spec 6.2 steps 1-2);
+/// - otherwise the song's audio comes from the stream cache (never a permanent download) and goes up decoded to FLAC as
+///   every streamed song does, and the job asks for `tasks: ["spatial"]` with the library block (step 3);
+/// - its money is its own: its own ledger and cap (`cloudAudio.monthlyCapUSD`), never Sing's, and the background
+///   queue's jobs count for `cloudAudio.dailyAhead` (spec 6.1 "Money");
+/// - it is quiet: no notification, no continued-processing UI; it goes after Sing and anything sent by hand; the
+///   background queue's jobs use Wi-Fi on a ready phone only (spec 6.4);
+/// - its results are fetched from their `lib/` keys, checked (manifest, size, SHA-256, timeline) and handed to Spatial
+///   audio's local store (`renderInstaller`); `lib/` objects are never deleted, `in/` and `out/<jobKey>/` are as today.
+extension CloudStudio {
+    /// The library jobs that have not finished, the background queue's (`ahead`) or the playing song's.
+    func outstandingLibraryJobs(ahead: Bool) -> [CloudJobRecord] {
+        jobs.filter { $0.isLibraryJob && $0.state.isPending && $0.isPreparedAhead == ahead }
+    }
+
+    /// The library ledger rolled to now: what library jobs spent (or reserved) this month and what the background queue
+    /// sent today.
+    var libraryLedgerNow: CloudAutoLedger {
+        let now = dependencies.nowMs()
+        return settings.rolledLibraryLedger(monthStartMs: dependencies.monthStartMs(now),
+                                            dayStartMs: dependencies.dayStartMs(now))
+    }
+
+    /// The YouTube video a library song plays (a Spotify song's stored match), nil when it has none yet.
+    func streamIdentity(for song: Song) async -> String? { await dependencies.host.streamIdentity(for: song) }
+
+    /// Whether a library job may use the network there is now: the background queue's only on a ready phone on Wi-Fi
+    /// (`CloudAutoConditions`: unmetered, not Low Data Mode, not Low Power Mode, a battery that is not low…), the
+    /// playing song's on any network Cloud Studio may upload on (Wi-Fi, or mobile data when "Use cellular data" is on).
+    func libraryMayUseNetwork(ahead: Bool) -> Bool {
+        if ahead { return autoBlockedReason == nil }
+        return networkAllowsUpload()
+    }
+
+    func libraryMayUseNetwork(_ record: CloudJobRecord) -> Bool { libraryMayUseNetwork(ahead: record.isPreparedAhead) }
+
+    /// Spec 6.2 steps 2-4 for one rendition, as a job of its own: it looks in the shared library first and only renders
+    /// what is missing. Nothing is queued while the cloud is not usable (the master switch off, not set up) or while
+    /// Spatial audio's store is not there. A rendition that already has a library job on its way gets that job back (the
+    /// playing song takes over a job the background queue started). Returns the job key.
+    @discardableResult
+    func enqueueLibraryRender(song: Song, videoId: String, profile: SpatialProfile, ahead: Bool,
+                              batchId: String? = nil) async -> String? {
+        guard !isDemo, CloudLibrary.isValidVideoId(videoId), renderInstaller != nil else { return nil }
+        guard await cloudReadiness() == .usable else { return nil }
+        await loadIfNeeded()
+        let key = RenditionKey(videoId: videoId, profile: profile)
+        if let pending = CloudLibraryStatus.pendingJob(for: key, in: jobs) {
+            if !ahead, pending.isPreparedAhead {
+                update(pending.jobKey) { $0.library?.ahead = nil }
+                persist()
+                requestPump()
+            }
+            return pending.jobKey
+        }
+        let now = dependencies.nowMs()
+        let jobKey = CloudKeys.jobKey(uuid: dependencies.newJobKey())
+        var record = CloudJobRecord(jobKey: jobKey, songId: song.id, title: song.title, artist: song.displayArtist,
+                                    batchId: batchId ?? "spatial-\(jobKey)", tasks: [.spatial], lyricsMode: nil,
+                                    quality: .standard, createdAtMs: now, isStreamed: true, videoId: videoId)
+        record.songDurationMs = song.duration
+        record.origin = .library
+        record.library = CloudLibraryJobInfo(videoId: videoId, profiles: [profile], ahead: ahead)
+        jobs.append(record)
+        persist()
+        requestPump()
+        return jobKey
+    }
+
+    /// Stops the library jobs `shouldCancel` names, each wherever it is (Spatial audio's cloud switch turned off, the
+    /// background queue turned off, another profile picked).
+    func cancelLibraryJobs(where shouldCancel: (CloudJobRecord) -> Bool) async {
+        let keys = jobs.filter { $0.isLibraryJob && $0.state.isPending && shouldCancel($0) }.map(\.jobKey)
+        for key in keys { await cancel(key) }
+    }
+
+    /// A queued library job may start preparing: it has somewhere to put its renders, a network it may use, and — when
+    /// the month's cap held it back — room again under the cap (a new month, a higher cap).
+    fileprivate func libraryMayStart(_ jobKey: String) -> Bool {
+        guard let record = job(jobKey), renderInstaller != nil else { return false }
+        if record.library?.heldByCap == true {
+            let estimate = CloudLibraryBudget.estimateMicroUSD(
+                durationMs: record.songDurationMs ?? 0, profiles: record.library?.profiles.count ?? 1,
+                pricePerSecondMicroUSD: settings.effectivePricePerSecondMicroUSD)
+            guard CloudLibraryBudget.capAllows(estimateMicroUSD: estimate, spentMicroUSD: libraryLedgerNow.spentMicroUSD,
+                                               capMicroUSD: libraryMonthlyCapMicroUSD) else { return false }
+            update(jobKey) { $0.library?.heldByCap = nil }
+        }
+        return libraryMayUseNetwork(record)
+    }
+
+    // MARK: Money
+
+    fileprivate func reserveLibrarySpend(_ estimateMicroUSD: Int64, countsForToday: Bool) {
+        let now = dependencies.nowMs()
+        settings.updateLibraryLedger(monthStartMs: dependencies.monthStartMs(now), dayStartMs: dependencies.dayStartMs(now)) {
+            $0.reserve(estimateMicroUSD, countsForToday: countsForToday)
+        }
+    }
+
+    /// What the run really cost replaces the estimate the library job reserved when RunPod took it.
+    fileprivate func settleLibraryReservation(_ jobKey: String, costBefore: Int64) {
+        guard let record = job(jobKey), let reserved = record.libraryReservedMicroUSD else { return }
+        let actual = max((record.costMicroUSD ?? 0) - costBefore, 0)
+        update(jobKey) { $0.libraryReservedMicroUSD = nil }
+        let now = dependencies.nowMs()
+        settings.updateLibraryLedger(monthStartMs: dependencies.monthStartMs(now), dayStartMs: dependencies.dayStartMs(now)) {
+            $0.settle(reservedMicroUSD: reserved, actualMicroUSD: actual)
+        }
+    }
+
+    /// A library job stopped before RunPod's worker had it gives its reservation back (it still counts for today).
+    fileprivate func refundUnstartedLibraryReservation(_ record: CloudJobRecord) {
+        guard let reserved = record.libraryReservedMicroUSD else { return }
+        let neverStarted = record.state == .submitted || (record.state == .uploaded && record.pausedNeverStarted == true)
+        guard neverStarted else { return }
+        let now = dependencies.nowMs()
+        settings.updateLibraryLedger(monthStartMs: dependencies.monthStartMs(now), dayStartMs: dependencies.dayStartMs(now)) {
+            $0.refund(reserved)
+        }
+    }
+
+    // MARK: Preparing (spec 6.2 steps 1-3)
+
+    fileprivate func prepareLibrary(jobKey: String) async {
+        guard let record = job(jobKey), record.state == .preparing, let info = record.library else { return }
+        guard let clients = currentClients() else {
+            update(jobKey) { _ = $0.apply(.requeue, nowMs: self.dependencies.nowMs()) }
+            return
+        }
+        let keys = info.keys
+        guard !keys.isEmpty, keys.count == info.profiles.count, CloudLibrary.isValidVideoId(info.videoId) else {
+            fail(jobKey, "This Spatial audio job names a render the library doesn't know.", code: nil, retryable: false)
+            return
+        }
+        // A fresh attempt (the first, a retry, a re-upload): what an earlier one found, held or fetched starts over.
+        update(jobKey) { r in
+            r.library?.resetOutcome()
+            r.outputs = nil
+        }
+        // Step 1: renders already on the phone need nothing more.
+        var wanted: [RenditionKey] = []
+        for key in keys {
+            if renderInstaller?.hasRender(key) == true {
+                update(jobKey) { r in
+                    r.library?.setState(.exists, for: key.profile)
+                    r.library?.markImported(key.profile)
+                }
+            } else {
+                wanted.append(key)
+            }
+        }
+        // Step 2: the shared library. A valid manifest at the render's library key means it is complete there: it is
+        // only fetched (no upload, no GPU). The network was checked before the job started preparing.
+        var missing: [RenditionKey] = []
+        for key in wanted {
+            guard let manifestKey = CloudLibrary.manifestKey(key) else { continue }
+            let data: Data?
+            do {
+                data = try await clients.objects.get(key: manifestKey)
+            } catch is CancellationError {
+                return
+            } catch {
+                update(jobKey) { _ = $0.apply(.requeue, nowMs: self.dependencies.nowMs()) }
+                fail(jobKey, "Couldn't reach the shared library: \(CloudRedaction.redact(error.localizedDescription))",
+                     code: nil, retryable: true)
+                return
+            }
+            if let data, let manifest = try? CloudLibraryManifest.decode(data), case .success(let audio) = manifest.check(for: key) {
+                update(jobKey) { r in
+                    r.library?.setState(.exists, for: key.profile)
+                    var outputs = r.outputs ?? [:]
+                    outputs[key.slot] = CloudOutputFile(render: audio)
+                    r.outputs = outputs
+                }
+            } else {
+                missing.append(key)
+            }
+        }
+        guard job(jobKey)?.state == .preparing else { return }
+        if missing.isEmpty {
+            update(jobKey) { r in
+                r.library?.foundInLibrary = true
+                _ = r.apply(.resultsReady, nowMs: self.dependencies.nowMs())
+            }
+            persist()
+            requestPump()
+            return
+        }
+        // Step 3: a job, within the month's cap (and for the background queue today's count) before anything is
+        // prepared or uploaded.
+        let now = dependencies.nowMs()
+        let ledger = libraryLedgerNow
+        let estimate = CloudLibraryBudget.estimateMicroUSD(durationMs: record.songDurationMs ?? 0,
+                                                           profiles: info.profiles.count,
+                                                           pricePerSecondMicroUSD: settings.effectivePricePerSecondMicroUSD)
+        guard CloudLibraryBudget.capAllows(estimateMicroUSD: estimate, spentMicroUSD: ledger.spentMicroUSD,
+                                           capMicroUSD: libraryMonthlyCapMicroUSD) else {
+            update(jobKey) { r in
+                _ = r.apply(.requeue, nowMs: now)
+                r.library?.heldByCap = true
+            }
+            persist()
+            return
+        }
+        if record.isPreparedAhead, ledger.dayCount >= libraryDailyAhead {
+            // Today's count is reached: the background queue's song waits for tomorrow (and looks again then).
+            update(jobKey) { r in
+                _ = r.apply(.requeue, nowMs: now)
+                r.nextAttemptAtMs = self.dependencies.dayStartMs(now) + 86_400_000
+            }
+            persist()
+            return
+        }
+        guard let song = dependencies.host.song(id: record.songId) else {
+            fail(jobKey, "This song is no longer in your library.", code: nil, retryable: false)
+            return
+        }
+        // The background queue's songs start only on a ready phone (the audio may come down first).
+        if record.isPreparedAhead, deferAutoJob(jobKey) { return }
+        do {
+            let source = try await dependencies.host.libraryAudioSource(for: song, videoId: info.videoId)
+            try Task.checkCancellation()
+            if record.isPreparedAhead, deferAutoJob(jobKey) { return }
+            // Exactly as Cloud Studio prepares every streamed song today: decoded to FLAC on the phone, no resample
+            // added (spec 6.2 step 3). `library.source` names the stream, not this file.
+            let prepared = try await dependencies.preparer.prepare(source: source.url, jobKey: jobKey, forceDecode: true,
+                                                                   paced: true, clip: nil)
+            guard job(jobKey)?.state == .preparing else {
+                dependencies.preparer.removeUpload(jobKey: jobKey)
+                return
+            }
+            if let refusal = CloudLimits.workerRefusal(bytes: prepared.bytes, durationMs: prepared.durationMs,
+                                                       caps: settings.workerCaps) {
+                dependencies.preparer.removeUpload(jobKey: jobKey)
+                update(jobKey) { _ = $0.apply(.requeue, nowMs: self.dependencies.nowMs()) }
+                fail(jobKey, refusal, code: nil, retryable: false)
+                return
+            }
+            let preparedAt = dependencies.nowMs()
+            update(jobKey) { r in
+                r.inputExt = prepared.ext
+                r.sha256 = prepared.sha256
+                r.bytes = prepared.bytes
+                r.durationMs = prepared.durationMs
+                r.decodedFrames = prepared.frames
+                r.sampleRate = prepared.sampleRate
+                r.itag = source.itag
+                r.library?.sourceItag = source.itag
+                r.library?.sourceCodec = source.codec
+                r.lowQualitySource = prepared.lowQuality
+                r.apply(.prepared, nowMs: preparedAt)
+            }
+            persist()
+            startUpload(jobKey, fileURL: prepared.fileURL, clients)
+        } catch is CancellationError {
+            return
+        } catch {
+            let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            let decodeFailure = (error as? CloudAudioPreparer.Failure)?.isDecodeFailure ?? false
+            update(jobKey) { _ = $0.apply(.requeue, nowMs: self.dependencies.nowMs()) }
+            fail(jobKey, CloudRedaction.redact(message), code: nil, retryable: !decodeFailure)
+        }
+    }
+
+    // MARK: Fetching (spec 6.2 step 4)
+
+    /// The next render the job made or found, from its `lib/` key: its manifest first (it must be the render asked for,
+    /// and the file the job manifest names), then the audio as a background download. When every render has an
+    /// outcome the job ends: imported when one was stored, failed when none was.
+    fileprivate func collectLibrary(_ jobKey: String, _ clients: Clients) async {
+        guard let record = job(jobKey), record.state == .resultsReady, record.library != nil else { return }
+        // A worker that named nothing about its renders made none.
+        if record.library?.renders == nil { update(jobKey) { $0.library?.settleUnanswered() } }
+        while let current = job(jobKey), current.state == .resultsReady, let info = current.library,
+              let profile = info.nextToFetch {
+            let key = RenditionKey(videoId: info.videoId, profile: profile)
+            // Already on the phone (another job brought it): nothing to fetch.
+            if renderInstaller?.hasRender(key) == true {
+                update(jobKey) { $0.library?.markImported(profile) }
+                continue
+            }
+            guard renderInstaller != nil, let manifestKey = CloudLibrary.manifestKey(key) else {
+                fail(jobKey, "Spatial audio has nowhere to keep its renders on this iPhone.", code: nil, retryable: true)
+                return
+            }
+            let data: Data?
+            do {
+                data = try await clients.objects.get(key: manifestKey)
+            } catch is CancellationError {
+                return
+            } catch {
+                fail(jobKey, "Couldn't reach the shared library: \(CloudRedaction.redact(error.localizedDescription))",
+                     code: nil, retryable: true)
+                return
+            }
+            guard job(jobKey)?.state == .resultsReady else { return }
+            guard let data, let manifest = try? CloudLibraryManifest.decode(data),
+                  case .success(let audio) = manifest.check(for: key),
+                  CloudLibraryImportCheck.outputAgrees(current.outputs?[key.slot], with: audio, key: key) else {
+                update(jobKey) { r in
+                    r.library?.markRejected(profile)
+                    r.warnings.append("The \(profile.displayName) render in the shared library wasn't the one asked for, so it wasn't used.")
+                }
+                persist()
+                continue
+            }
+            guard let text = clients.objects.presignedURL(.get, key: audio.key, expiresSeconds: CloudTiming.uploadPresignSeconds),
+                  let url = URL(string: text) else {
+                notice = .notConfigured
+                return
+            }
+            update(jobKey) { r in
+                var manifests = r.library?.manifests ?? [:]
+                manifests[profile.rawValue] = manifest
+                r.library?.manifests = manifests
+                r.library?.downloading = profile.rawValue
+                r.apply(.downloadStarted, nowMs: self.dependencies.nowMs())
+            }
+            persist()
+            let transfers = connectTransfers()
+            transfers.allowsCellular = settings.useCellular && !current.isPreparedAhead
+            activeTransfers.insert(CloudTransfers.taskDescription(jobKey: jobKey, slot: key.slot))
+            transfers.download(from: url, jobKey: jobKey, slot: key.slot)
+            return
+        }
+        guard let current = job(jobKey), current.state == .resultsReady, let info = current.library, info.isSettled else {
+            return
+        }
+        if info.hasImports {
+            await finishIfDone(jobKey, clients)
+        } else {
+            // Nothing usable came of it: the job ends failed (each render's outcome says why), and Spatial audio tries
+            // again later with its own backoff (10 minutes, an hour, a day).
+            fail(jobKey, "The cloud version didn't work this time.", code: current.lastErrorCode, retryable: false)
+        }
+    }
+
+    /// A downloaded render: its size and SHA-256 are its manifest's, its timeline is the song's (this phone's own render
+    /// by frame count, a shared one by media time, spec 6.2 step 3), then it goes to Spatial audio's store.
+    fileprivate func importRender(_ jobKey: String, slot: String, staged: URL) async {
+        guard let profile = RenditionKey.profile(slot: slot), let record = job(jobKey), record.state == .downloading,
+              let info = record.library, info.downloading == profile.rawValue,
+              let manifest = info.manifests?[profile.rawValue], let audio = manifest.audio else {
+            try? FileManager.default.removeItem(at: staged)
+            return
+        }
+        let inspector = dependencies.inspector
+        let now = dependencies.nowMs()
+        do {
+            let digest = try await Task.detached(priority: .utility) { try inspector.digest(staged) }.value
+            guard manifest.audioMatches(bytes: digest.bytes, sha256: digest.sha256) else {
+                try? FileManager.default.removeItem(at: staged)
+                update(jobKey) { r in
+                    _ = r.apply(.resultsReady, nowMs: now)
+                    r.library?.downloading = nil
+                }
+                fail(jobKey, "The downloaded render was damaged; it will be fetched again.", code: nil, retryable: true)
+                return
+            }
+            let own = info.state(of: profile) == .ok && info.foundInLibrary != true
+            let linesUp: Bool
+            if own {
+                linesUp = CloudLibraryImportCheck.ownRenderLinesUp(decodedFrames: record.decodedFrames,
+                                                                   decodedSampleRate: record.sampleRate, manifest: manifest)
+            } else {
+                linesUp = CloudLibraryImportCheck.sharedRenderCoversSong(renderDurationMs: audio.durationMs,
+                                                                         songDurationMs: record.durationMs ?? record.songDurationMs)
+            }
+            guard job(jobKey)?.state == .downloading else {
+                try? FileManager.default.removeItem(at: staged)
+                return
+            }
+            if linesUp {
+                guard let installer = renderInstaller else {
+                    throw Failure("Spatial audio has nowhere to keep its renders on this iPhone.")
+                }
+                try await installer.installRender(staged: staged, manifest: manifest)
+                update(jobKey) { r in
+                    r.library?.markImported(profile)
+                    _ = r.apply(.resultsReady, nowMs: self.dependencies.nowMs())
+                }
+            } else {
+                try? FileManager.default.removeItem(at: staged)
+                update(jobKey) { r in
+                    r.library?.markRejected(profile)
+                    r.warnings.append("The cloud version doesn't line up with this song, so it wasn't used.")
+                    _ = r.apply(.resultsReady, nowMs: self.dependencies.nowMs())
+                }
+            }
+            persist()
+            // The job's next render, or its end.
+            if let clients = currentClients() { await collectLibrary(jobKey, clients) }
+        } catch is CancellationError {
+            try? FileManager.default.removeItem(at: staged)
+        } catch {
+            try? FileManager.default.removeItem(at: staged)
+            update(jobKey) { r in
+                _ = r.apply(.resultsReady, nowMs: now)
+                r.library?.downloading = nil
+            }
+            let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            fail(jobKey, "Import: \(CloudRedaction.redact(message))", code: nil, retryable: true)
         }
     }
 }

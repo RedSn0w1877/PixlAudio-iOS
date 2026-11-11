@@ -36,7 +36,9 @@ final class DualDeckEngine: PlaybackEngine {
     private(set) var rate: Float = 1
     private(set) var shuffleEnabled = false
     /// The item treated as current (on `active`); nil while loading.
-    var activeItem: DeckItem?
+    var activeItem: DeckItem? {
+        didSet { if oldValue !== activeItem { onSpatialItemChanged?() } }
+    }
     /// The queue ran out (repeat off): `play()` restarts the current song.
     private(set) var hasEnded = false
     /// Position to report while the current item loads.
@@ -93,6 +95,9 @@ final class DualDeckEngine: PlaybackEngine {
     var onTimingChanged: (() -> Void)?
     var onRepeatModeChanged: ((RepeatMode) -> Void)?
     var onShuffleChanged: ((Bool) -> Void)?
+    /// Spatial audio's own hook (`SpatialPlaybackController`): the current item changed (a new song, or another
+    /// rendition of the same one), or the active deck's play state did (its tap has been prepared by then).
+    var onSpatialItemChanged: (() -> Void)?
 
     init(session: AudioSessionController, effects: AudioEffectsParameters, factory: DeckItemFactory) {
         (events, continuation) = AsyncStream.makeStream(of: PlaybackEngineEvent.self)
@@ -138,7 +143,7 @@ final class DualDeckEngine: PlaybackEngine {
         emitPlaying()
         if hasEnded {
             hasEnded = false
-            if activeItem != nil { active.seek(to: 0) } else { loadCurrent(at: 0); return }
+            if activeItem != nil { active.seek(to: 0); emit(.seeked) } else { loadCurrent(at: 0); return }
         }
         guard activeItem != nil else {
             if loadTask == nil { loadCurrent(at: pendingStartSeconds) }
@@ -182,9 +187,12 @@ final class DualDeckEngine: PlaybackEngine {
         guard activeItem != nil else {
             pendingStartSeconds = seconds
             if loadTask == nil, queue.current != nil { loadCurrent(at: seconds) }
+            emit(.seeked)
             return
         }
         active.seek(to: seconds)
+        // The deck answers `currentPositionMs()` with the target at once; tell paused progress bars to re-read it.
+        emit(.seeked)
         onTimingChanged?()
         rescheduleCrossfadeCountdown()
     }
@@ -461,6 +469,15 @@ final class DualDeckEngine: PlaybackEngine {
         active.play(rate: rate)
     }
 
+    /// Something that a switch of renditions must not cut into (spec 6.3 "no seek or track change in flight"): the
+    /// current item is loading, a seek has not landed, two decks overlap (a song-to-song transition or a switch still
+    /// fading), or a gapless hand-over is scheduled.
+    var isRenditionSwitchBlocked: Bool {
+        guard let item = activeItem else { return true }
+        return loadTask != nil || fade != nil || scheduledHandOver != nil || item.pendingSeekSeconds != nil
+            || item.seekTargetSeconds != nil
+    }
+
     func discard(_ items: [DeckItem]) {
         for item in items { factory.discard(item) }
     }
@@ -604,6 +621,7 @@ final class DualDeckEngine: PlaybackEngine {
                 startTiming = nil
             }
             setPreparing(loadTask != nil || (playWhenReady && status == .waitingToPlayAtSpecifiedRate))
+            onSpatialItemChanged?()
         case .itemEnded(let item):
             guard deck === active, item === activeItem, deck.upcoming.isEmpty else { return }
             if completeScheduledHandOver() { return }

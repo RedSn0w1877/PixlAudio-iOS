@@ -45,12 +45,11 @@ the build just before it compiles (`ci/write-cloud-defaults-key.sh`) and never c
 - The built-in keys are limited on purpose: a Restricted RunPod key for one endpoint, an R2 key for one bucket, and at
   most $3 a month per iPhone. They are obfuscated, not secret: someone who takes the app apart can recover them.
 
-The built-in Claude key works the same way: the `ANTHROPIC_API_KEY` Actions secret becomes obfuscated shares in the
-build (`ci/write-anthropic-key.sh`), and builds without it run every AI feature on the iPhone. It is **not secret
-either**: the IPA is public, and anyone who takes it apart can recover the key. The app's own monthly cap
-(`ClaudeBudgetStore`) only limits this device, so it does nothing once the key has been pulled out. The real limit
-has to be on Anthropic's side: use a dedicated key in its own Anthropic Console workspace with a hard monthly spend
-limit, and rotate it if it leaks.
+The built-in cloud AI key works the same way: the AI key Actions secret becomes obfuscated shares in the build
+(`ci/write-anthropic-key.sh`), and builds without it run every AI feature on the iPhone. It is **not secret either**:
+the IPA is public, and anyone who takes it apart can recover the key. The app's own monthly cap (`ClaudeBudgetStore`)
+only limits this device, so it does nothing once the key has been pulled out. The real limit has to be on the
+provider's side: use a dedicated key in its own workspace with a hard monthly spend limit, and rotate it if it leaks.
 
 The owner bakes or rotates them with `node tools/cloud/bake-cloud-keys.mjs` and checks them end to end with the
 manual **cloud-e2e** workflow; see [`docs/handoff/2026-10-08-baked-keys.md`](docs/handoff/2026-10-08-baked-keys.md).

@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/RedSn0w1877/PixlAudio-iOS/blob/main/cloud/runpod-worker/schema/v1/library.render.schema.json",
+  "title": "PixlAudio shared library render manifest (pixl.library.render v1)",
+  "description": "lib/v<libV>/<videoId>/sp-<profile>.json in the R2 bucket (docs/handoff/2026-11-10-plans/cloud-audio-spec.md, section 3.1). The worker writes it LAST, after the audio it describes, so its presence means the render is complete; nothing in the library is ever updated in place. A phone accepts a manifest only when schema, v, libV, videoId, kind and profile are what it asked for and, after the download, the file's bytes and sha256 match. Unknown fields must be ignored.",
+  "type": "object",
+  "required": ["schema", "v", "libV", "videoId", "kind", "profile", "audio", "loudness", "source", "render", "worker", "createdAt"],
+  "properties": {
+    "schema": {"const": "pixl.library.render"},
+    "v": {"const": 1},
+    "libV": {"type": "integer", "minimum": 1, "description": "The library version the render was made for (1 today); the same number as in the key."},
+    "videoId": {"type": "string", "pattern": "^[A-Za-z0-9_-]{11}$"},
+    "kind": {"const": "spatial", "description": "Always spatial; the field stays so that other kinds can be added later without a new schema."},
+    "profile": {"enum": ["studio", "wide", "intimate", "hall", "surround", "night"], "description": "The Spatial audio profile."},
+    "audio": {"$ref": "#/$defs/audio"},
+    "loudness": {"$ref": "#/$defs/loudness"},
+    "source": {
+      "type": "object",
+      "description": "The song the render was made from.",
+      "required": ["itag", "codec", "sampleRate", "decodedSamples", "sha256"],
+      "properties": {
+        "itag": {"type": ["integer", "null"], "minimum": 0, "description": "YouTube's itag of the stream the phone played, as the job said (library.source); null when it did not say."},
+        "codec": {"type": ["string", "null"], "maxLength": 16, "description": "That stream's codec, as the job said; null when it did not say. Not the codec of the upload, which the phone may have decoded to FLAC."},
+        "sampleRate": {"type": "integer", "minimum": 1},
+        "decodedSamples": {"type": "integer", "minimum": 0, "description": "Frames per channel of the decoded upload."},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$", "description": "Of the uploaded file."}
+      }
+    },
+    "render": {
+      "type": "object",
+      "required": ["engine", "stems", "stemMode"],
+      "properties": {
+        "engine": {"type": "string", "description": "The spatial renderer (pixl-spatial-1)."},
+        "stems": {"type": "string", "minLength": 1, "description": "Whatever produced the stems: the model_id of the worker's six-stem separator (open-cascade-6). The separator is a replaceable part; a new one comes with a new libV."},
+        "stemMode": {"enum": ["stems6", "stems4", "mix"], "description": "What the renderer made of the stems. stems6: six stems. stems4: four. mix: no usable stems, the stem-free render."}
+      }
+    },
+    "worker": {
+      "type": "object",
+      "required": ["version", "gitSha"],
+      "properties": {
+        "version": {"type": "string"},
+        "gitSha": {"type": "string"}
+      }
+    },
+    "createdAt": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$", "description": "UTC, ISO 8601."}
+  },
+  "$defs": {
+    "audio": {
+      "type": "object",
+      "description": "The file this manifest describes.",
+      "required": ["key", "bytes", "sha256", "codec", "bits", "sampleRate", "samples", "durationMs"],
+      "properties": {
+        "key": {"type": "string", "pattern": "^lib/v[0-9]+/[A-Za-z0-9_-]{11}/sp-(studio|wide|intimate|hall|surround|night)\\.flac$"},
+        "bytes": {"type": "integer", "minimum": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "codec": {"const": "flac"},
+        "bits": {"const": 16},
+        "sampleRate": {"type": "integer", "minimum": 1, "description": "Always the source's sampleRate."},
+        "samples": {"type": "integer", "minimum": 0, "description": "Frames per channel; equals source.decodedSamples: the file keeps the source's timeline, with no added delay."},
+        "durationMs": {"type": "integer", "minimum": 0}
+      }
+    },
+    "loudness": {
+      "type": "object",
+      "required": ["integratedLufs", "sourceLufs", "headroomDb", "truePeakDb", "limiterMaxDb"],
+      "properties": {
+        "integratedLufs": {"type": "number", "description": "ITU-R BS.1770 integrated loudness of the file."},
+        "sourceLufs": {"type": "number", "description": "The same for the song it was made from."},
+        "headroomDb": {"type": "number", "minimum": 0, "description": "How far under the source the render was levelled on purpose: 4.0 (integratedLufs = sourceLufs - headroomDb, within 0.3). The app gives it back whenever its own playback gain has the room."},
+        "truePeakDb": {"type": "number"},
+        "limiterMaxDb": {"type": "number", "minimum": 0, "description": "The deepest gain reduction the true-peak limiter applied; 0 when it stayed idle."}
+      }
+    }
+  }
+}

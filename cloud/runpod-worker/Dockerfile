@@ -7,7 +7,8 @@
 #         small - the KB-sized configs and tokenizers (fetch_small.py, sha256-checked)
 #         final - the image that is pushed and deployed. It has no RUN on purpose: a RUN here would need every
 #                 layer below it unpacked, which re-downloads 7 GB of weights whenever it re-runs.
-#         smoke - CI only, never pushed: loads the real weights on CPU and runs each model once.
+#         smoke - CI only, never pushed: loads the real weights on CPU and runs each model once, then the
+#                 six-stem cascade and one spatial render with its FLAC (src/pixl_worker/smoke.py).
 #
 # Pinning: every FROM (and this frontend) by digest; every model file by sha256 in weights.lock (each large file
 # is its own `ADD --link --checksum` layer, keyed by its checksum, so it is downloaded once and its layer digest
@@ -82,6 +83,11 @@ ADD --link --chmod=644 --checksum=sha256:ef3bcb9c8b40d14ae5d51b6db2587339cc12c6b
 ADD --link --chmod=644 --checksum=sha256:f3cf25b222c4eed7cd49dd8b2c9597d50c18bd154090f7b919cfa5f93cf22c49 \
     https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/04573f0d-f3cf25b2.th \
     /models/demucs/04573f0d-f3cf25b2.th
+# demucs: htdemucs_6s, one model of 55 MB, MIT (loaded on the first spatial job: guitar and piano for the
+# six-stem cascade)
+ADD --link --chmod=644 --checksum=sha256:34c22ccb381c6f9fdbf324f04e1e2fe21aaaf293f5ded163a162697ff9a02ddd \
+    https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/5c90dfd2-34c22ccb.th \
+    /models/demucs/5c90dfd2-34c22ccb.th
 # aligner: Qwen3-ForcedAligner-0.6B, 1.84 GB, Apache-2.0 (loaded at start)
 ADD --link --chmod=644 --checksum=sha256:47831d0e82f96b20e9034dba01a075ee06436654719f6a68289e49f1b65ce0e7 \
     https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B/resolve/c7cbfc2048c462b0d63a45797104fc9db3ad62b7/model.safetensors \
@@ -95,6 +101,7 @@ ADD --link --chmod=644 --checksum=sha256:6e0b9d9e09e2e0238e7ef3cc8a484ab387e91b9
     /models/asr/model-00002-of-00002.safetensors
 COPY --link --from=small /models/ /models/
 COPY --link models/demucs/htdemucs_ft.yaml /models/demucs/htdemucs_ft.yaml
+COPY --link models/demucs/htdemucs_6s.yaml /models/demucs/htdemucs_6s.yaml
 COPY --link LICENSES/ /opt/pixl/LICENSES/
 COPY --link NOTICE weights.lock /opt/pixl/
 COPY --link src/ /opt/pixl/src/
@@ -108,7 +115,8 @@ WORKDIR /opt/pixl
 CMD ["python3", "-u", "-m", "pixl_worker.handler"]
 
 ########## smoke: CI only. The same weights as final (same ADD lines, so the same cached layers) minus ASR, which
-# is too big to run in fp32 on a CI runner; `op: bench` on RunPod covers it.
+# is too big to run in fp32 on a CI runner; `op: bench` on RunPod covers it. The spatial renderer needs no weights:
+# its head model is a small data file inside src/.
 FROM deps AS smoke
 ADD --link --chmod=644 --checksum=sha256:60347271e8493fdff28ef558c3b2297afb869a1f4462594ed548038264bec395 \
     https://huggingface.co/anvuew/BS-RoFormer/resolve/24988f47270cb3529b62c4f3bbb8234f4586de9b/bs_roformer_ft1_anvuew_sdr_12.55.ckpt \
@@ -125,11 +133,15 @@ ADD --link --chmod=644 --checksum=sha256:ef3bcb9c8b40d14ae5d51b6db2587339cc12c6b
 ADD --link --chmod=644 --checksum=sha256:f3cf25b222c4eed7cd49dd8b2c9597d50c18bd154090f7b919cfa5f93cf22c49 \
     https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/04573f0d-f3cf25b2.th \
     /models/demucs/04573f0d-f3cf25b2.th
+ADD --link --chmod=644 --checksum=sha256:34c22ccb381c6f9fdbf324f04e1e2fe21aaaf293f5ded163a162697ff9a02ddd \
+    https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/5c90dfd2-34c22ccb.th \
+    /models/demucs/5c90dfd2-34c22ccb.th
 ADD --link --chmod=644 --checksum=sha256:47831d0e82f96b20e9034dba01a075ee06436654719f6a68289e49f1b65ce0e7 \
     https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B/resolve/c7cbfc2048c462b0d63a45797104fc9db3ad62b7/model.safetensors \
     /models/aligner/model.safetensors
 COPY --link --from=small /models/ /models/
 COPY --link models/demucs/htdemucs_ft.yaml /models/demucs/htdemucs_ft.yaml
+COPY --link models/demucs/htdemucs_6s.yaml /models/demucs/htdemucs_6s.yaml
 COPY --link src/ /opt/pixl/src/
 ENV PYTHONPATH=/opt/pixl/src PIXL_MODELS_DIR=/models HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
     TOKENIZERS_PARALLELISM=false
