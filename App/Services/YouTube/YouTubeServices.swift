@@ -15,6 +15,9 @@ final class YouTubeServices {
     @ObservationIgnored let service: InnerTubeService?
     @ObservationIgnored let cache: StreamCache?
     @ObservationIgnored let fetcher: StreamFetcher?
+    /// Prepared Opus files (iOS plays YouTube's Opus stream repackaged into MP4; `OpusStreams.swift`).
+    @ObservationIgnored let opus: OpusStreamStore?
+    @ObservationIgnored private let opusPreparer: OpusPreparer?
     @ObservationIgnored let deviceAuth: GoogleDeviceAuthClient?
     @ObservationIgnored let poTokens: PoTokenGenerator?
     @ObservationIgnored let searchProvider: (any SearchProviding)?
@@ -33,6 +36,8 @@ final class YouTubeServices {
             service = nil
             cache = nil
             fetcher = nil
+            opus = nil
+            opusPreparer = nil
             deviceAuth = nil
             poTokens = nil
             searchProvider = nil
@@ -64,6 +69,9 @@ final class YouTubeServices {
         self.cache = cache
         let fetcher = StreamFetcher(service: service, cache: cache, session: YouTubeNetwork.makeSession(timeout: 25))
         self.fetcher = fetcher
+        let opus = OpusStreamStore()
+        self.opus = opus
+        opusPreparer = OpusPreparer(store: opus, service: service, session: YouTubeNetwork.makeSession(timeout: 30))
         loader = YouTubeResourceLoader(fetcher: fetcher, onComplete: { videoId in
             Task { await cache.evictIfNeeded(keeping: videoId) }
         })
@@ -77,12 +85,23 @@ final class YouTubeServices {
     func install(on playback: PlaybackServices?) {
         guard let playback, let loader, let cache, let service, let fetcher else { return }
         StreamingResourceLoaderRegistry.shared.register(scheme: YouTubeSongIdentity.scheme) { _ in loader }
-        playback.engine.factory.resolver = StreamingPlayableURLResolver(base: playback.engine.factory.resolver, cache: cache)
+        playback.engine.factory.resolver = StreamingPlayableURLResolver(base: playback.engine.factory.resolver, cache: cache,
+                                                                        opus: opus)
         let prefetcher = YouTubePrefetcher(engine: playback.engine, service: service, fetcher: fetcher,
-                                           network: NetworkConditionsMonitor())
+                                           network: NetworkConditionsMonitor(), opus: opusPreparer, cache: cache)
         self.prefetcher = prefetcher
         playback.onUpcomingChanged = { [weak prefetcher] in prefetcher?.upcomingChanged() }
         playback.onPlayStateChanged = { [weak prefetcher] playing in prefetcher?.playingChanged(playing) }
+        // Settings › Developer › Test playback: the song's Opus line, with what the engine is playing right now.
+        if let opus {
+            let engine = playback.engine
+            Task {
+                await service.setOpusStatusProvider { [weak engine] videoId in
+                    let playing = await MainActor.run { engine?.activeItem?.asset.url }
+                    return await opus.statusLine(videoId: videoId, playingURL: playing, cache: cache)
+                }
+            }
+        }
     }
 
     /// Launch work (cheap): sign-in state, downloads, cache trim.
@@ -100,6 +119,7 @@ final class YouTubeServices {
             }
         }
         if let cache { Task.detached(priority: .utility) { await cache.evictIfNeeded(keeping: nil) } }
+        if let opus { Task.detached(priority: .utility) { await opus.evictIfNeeded() } }
     }
 
     /// Mirrors the session into `AccountsStore.youtube`.
