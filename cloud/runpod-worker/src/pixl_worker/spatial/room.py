@@ -2,6 +2,11 @@
 
 Early reflections are what moves a sound out of the head over headphones: each one is a quieter, slightly duller
 copy of the direct sound arriving from its own direction, so each goes through the head model for that direction.
+The ones that help are the LATERAL ones (side walls): they reach the two ears differently. Reflections from the
+floor, the ceiling and the wall behind the sources arrive in the same plane as a centred source, so they only
+colour it (a comb filter); the rooms in profiles.py therefore have soft floors, ceilings and front walls, lively
+side walls, and a listener who sits off the centre line so the left and right reflections never arrive as a
+mirrored pair.
 The late tail is diffuse: noise that decays at the room's reverberation time (faster at high frequencies), equal
 in level at both ears and decorrelated between them the way a real diffuse field is around a head (the same at low
 frequencies, independent above about 1 kHz).
@@ -28,22 +33,25 @@ def source_position(room: Room, az: float, el: float, dist: float) -> np.ndarray
 
 def reflections(room: Room, source: np.ndarray, sample_rate: int) -> list[tuple[float, float, float, float, int]]:
     """(delay in samples after the direct sound, gain relative to it, azimuth, elevation, bounces) for every image
-    source up to room.order bounces that arrives within room.er_max_s."""
+    source up to room.order bounces that arrives within room.er_max_s. Each wall has its own reflection
+    coefficient (room.reflect: back, front, right, left, floor, ceiling)."""
     listener = np.asarray(room.listener, dtype=np.float64)
     direct = float(np.linalg.norm(source - listener))
     per_axis = []
     for axis in range(3):
+        near, far = room.reflect[2 * axis], room.reflect[2 * axis + 1]  # the wall at 0 and the wall at size
         options = []
         for i in range(-room.order, room.order + 1):
             for parity in (0, 1):
-                hits = abs(i - parity) + abs(i)
-                if hits <= room.order:
-                    options.append(((1 - 2 * parity) * source[axis] + 2 * i * room.size[axis], hits))
+                hits_near, hits_far = abs(i - parity), abs(i)
+                if hits_near + hits_far <= room.order:
+                    options.append(((1 - 2 * parity) * source[axis] + 2 * i * room.size[axis], hits_near + hits_far,
+                                    near ** hits_near * far ** hits_far))
         per_axis.append(options)
     found = []
-    for x, hx in per_axis[0]:
-        for y, hy in per_axis[1]:
-            for z, hz in per_axis[2]:
+    for x, hx, gx in per_axis[0]:
+        for y, hy, gy in per_axis[1]:
+            for z, hz, gz in per_axis[2]:
                 bounces = hx + hy + hz
                 if bounces == 0 or bounces > room.order:
                     continue
@@ -52,7 +60,7 @@ def reflections(room: Room, source: np.ndarray, sample_rate: int) -> list[tuple[
                 delay_s = (distance - direct) / SPEED_OF_SOUND
                 if delay_s <= 0.0 or delay_s > room.er_max_s:
                     continue
-                gain = (direct / distance) * room.reflect[0] ** hx * room.reflect[1] ** hy * room.reflect[2] ** hz
+                gain = (direct / distance) * gx * gy * gz
                 az = float(np.degrees(np.arctan2(vector[1], vector[0])))
                 el = float(np.degrees(np.arcsin(np.clip(vector[2] / distance, -1.0, 1.0))))
                 found.append((delay_s * sample_rate, gain, az, el, bounces))
@@ -118,7 +126,7 @@ class KernelBuilder:
             smooth = (total[self._hi] - total[self._lo]) / np.maximum(self._hi - self._lo, 1)
             reference = float(smooth[self._band].mean())
             behind = max(0.0, (abs(float(self.hrir.az[index])) - 100.0) / 80.0)  # 0 in front and beside, 1 behind
-            strength = 0.85 - 0.5 * min(1.0, behind)
+            strength = 1.0 - 0.5 * min(1.0, behind)
             correction = np.clip((reference / np.maximum(smooth, 1e-12)) ** (0.5 * strength), 10 ** (-10 / 20),
                                  10 ** (10 / 20))
             correction[self._freqs < 150.0] = correction[np.searchsorted(self._freqs, 150.0)]
