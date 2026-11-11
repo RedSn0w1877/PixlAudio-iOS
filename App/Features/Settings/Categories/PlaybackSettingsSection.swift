@@ -40,11 +40,18 @@ struct PlaybackSettingsSection: View {
             }
             SettingsSubsection(title: L10n.settingsSectionSound) {
                 ThemeSelectorRow(label: L10n.settingsRowAudioQualityTitle, description: L10n.settingsRowAudioQualitySubtitle,
-                                 options: [SettingsOption(key: "LOW", label: L10n.settingsAudioQualityLow),
-                                           SettingsOption(key: "STANDARD", label: L10n.settingsAudioQualityStandard),
-                                           SettingsOption(key: "HIGH", label: L10n.settingsAudioQualityHigh),
-                                           SettingsOption(key: "ULTRASOUND", label: L10n.settingsAudioQualityUltrasound)],
-                                 selectedKey: playback.audioQuality, systemImage: "4k.tv") { quality in
+                                 options: [SettingsOption(key: StreamingAudioQuality.low.rawValue,
+                                                          label: L10n.settingsAudioQualityLow),
+                                           SettingsOption(key: StreamingAudioQuality.medium.rawValue,
+                                                          label: L10n.settingsAudioQualityMedium),
+                                           SettingsOption(key: StreamingAudioQuality.high.rawValue,
+                                                          label: L10n.settingsAudioQualityHigh),
+                                           SettingsOption(key: StreamingAudioQuality.pro.rawValue,
+                                                          label: L10n.settingsAudioQualityPro),
+                                           SettingsOption(key: StreamingAudioQuality.studioPro.rawValue,
+                                                          label: L10n.settingsAudioQualityStudioPro)],
+                                 selectedKey: StreamingAudioQuality.from(stored: playback.audioQuality).rawValue,
+                                 systemImage: "4k.tv") { quality in
                     playback.audioQuality = quality
                     // Cached stream URLs were picked under the old cap.
                     if let service = env.youtube.service { Task { await service.invalidateAll() } }

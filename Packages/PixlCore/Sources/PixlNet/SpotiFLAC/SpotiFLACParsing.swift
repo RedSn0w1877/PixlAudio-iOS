@@ -12,6 +12,36 @@ public enum SpotiFLACParsing {
             && data[data.index(start, offsetBy: 3)] == 0x43
     }
 
+    /// What a file's first bytes say it is (Android `AudioFileFacts.parse`): the container, and for FLAC the sample
+    /// rate, bit depth and channels from STREAMINFO (always the first block: its header at 4–7, block and frame
+    /// sizes, then 20 bits of rate, 3 of channels − 1 and 5 of bits − 1 from byte 18).
+    public static func audioFileFacts(_ head: Data) -> SpotiFLACAudioFileFacts {
+        let bytes = [UInt8](head.prefix(SpotiFLACAudioFileFacts.headBytes))
+        func ascii(_ at: Int, _ text: String) -> Bool {
+            let wanted = Array(text.utf8)
+            return bytes.count >= at + wanted.count && Array(bytes[at..<(at + wanted.count)]) == wanted
+        }
+        if ascii(0, "fLaC") {
+            guard bytes.count >= 22, bytes[4] & 0x7F == 0 else { return SpotiFLACAudioFileFacts(format: .flac) }
+            let rate = (Int(bytes[18]) << 12) | (Int(bytes[19]) << 4) | (Int(bytes[20]) >> 4)
+            let channels = ((Int(bytes[20]) >> 1) & 0x07) + 1
+            let bitDepth = (((Int(bytes[20]) & 0x01) << 4) | (Int(bytes[21]) >> 4)) + 1
+            return SpotiFLACAudioFileFacts(format: .flac, sampleRate: rate > 0 ? rate : nil, bitDepth: bitDepth,
+                                           channels: channels)
+        }
+        if ascii(4, "ftyp") { return SpotiFLACAudioFileFacts(format: .mp4) }
+        if ascii(0, "ID3") { return SpotiFLACAudioFileFacts(format: .mp3) }
+        if ascii(0, "OggS") { return SpotiFLACAudioFileFacts(format: .ogg) }
+        if bytes.count >= 4, bytes[0] == 0x1A, bytes[1] == 0x45, bytes[2] == 0xDF, bytes[3] == 0xA3 {
+            return SpotiFLACAudioFileFacts(format: .webm)
+        }
+        if bytes.count >= 2, bytes[0] == 0xFF {
+            if bytes[1] & 0xF6 == 0xF0 { return SpotiFLACAudioFileFacts(format: .aac) } // ADTS
+            if bytes[1] & 0xE0 == 0xE0 { return SpotiFLACAudioFileFacts(format: .mp3) } // frame sync
+        }
+        return SpotiFLACAudioFileFacts(format: .unknown)
+    }
+
     // MARK: - Monochrome Track Streamer (`https://tracks.monochrome.st`)
 
     /// Parses `GET /search/tracks?q=...` from a Monochrome track server (the same rows come back for an

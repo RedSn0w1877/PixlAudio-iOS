@@ -21,6 +21,7 @@ actor InnerTubeService {
     let remote: RemoteClientConfigStore
     private let resolver: ChainedYouTubeStreamResolver
     private let validator: StreamUrlValidator
+    private let plainHTTP: any HTTPClient
     private let account: YouTubeAccount
     private var cache: [String: (stream: ResolvedStream, expiresAt: Date)] = [:]
     private var inFlight: [String: Task<ResolvedStream?, Never>] = [:]
@@ -38,6 +39,7 @@ actor InnerTubeService {
     init(innerTubeHTTP: any HTTPClient, plainHTTP: any HTTPClient, account: YouTubeAccount, remote: RemoteClientConfigStore) {
         self.account = account
         self.remote = remote
+        self.plainHTTP = plainHTTP
         let client = InnerTubeClient(http: innerTubeHTTP, session: account)
         self.client = client
         let evaluator = JavaScriptCoreEvaluator()
@@ -85,13 +87,16 @@ actor InnerTubeService {
         // A synthetic id (a Spotify song YouTube can't match) has no video: SpotiFLAC is its only source.
         let synthetic = SpotiFLACTrackRegistry.isSyntheticVideoId(videoId)
         let spotiFLACUsable = !excluding.contains(Self.spotiFLACStrategyName)
-        // Same order as Android. FLAC runs about 1,000 kbps, so it goes first only when the audio quality setting has
-        // no cap (Ultrasound, the default); a capped tier stays on YouTube at its cap and falls back to FLAC only when
-        // YouTube has nothing for the song.
-        let flacFirst = spotiFLACUsable && (StreamingAudioQuality.maxBitrateKbps() == nil || synthetic)
+        // Same order as Android. Pro and Studio Pro: SpotiFLAC first, YouTube as the fallback; Pro skips a file it
+        // already knows is over 48 kHz. Low/Medium/High stay on YouTube at their cap and fall back to SpotiFLAC only
+        // when YouTube has nothing for the song (a synthetic id never has anything else).
+        let quality = StreamingAudioQuality.current()
+        let knownRate = SpotiFLACTrackRegistry.shared.facts(forVideoId: videoId)?.flacSampleRate
+        let flacFirst = spotiFLACUsable && (synthetic || quality.allowsFlacFirst(sampleRate: knownRate))
 
         // 0. SpotiFLAC first (`tracks.monochrome.st`, then any Tidal HiFi instance).
-        if flacFirst, let flac = await resolveViaSpotiFLAC(videoId: videoId, validate: validate, attempts: &attempts) {
+        if flacFirst, let flac = await resolveViaSpotiFLAC(videoId: videoId, validate: validate, lastResort: synthetic,
+                                                          quality: quality, attempts: &attempts) {
             stream = flac
             successful = Self.spotiFLACStrategyName
         }
@@ -116,9 +121,10 @@ actor InnerTubeService {
             }
         }
 
-        // 2. Capped quality: FLAC only as the last resort.
+        // 2. Capped quality (or a file too big for Pro): SpotiFLAC only as the last resort.
         if stream == nil, spotiFLACUsable, !flacFirst,
-           let flac = await resolveViaSpotiFLAC(videoId: videoId, validate: validate, attempts: &attempts) {
+           let flac = await resolveViaSpotiFLAC(videoId: videoId, validate: validate, lastResort: true,
+                                                quality: quality, attempts: &attempts) {
             stream = flac
             successful = Self.spotiFLACStrategyName
         }
@@ -134,25 +140,53 @@ actor InnerTubeService {
         return stream
     }
 
-    /// SpotiFLAC's stream for the song registered under `videoId`, or nil. Probed with a ranged GET when `validate`.
-    private func resolveViaSpotiFLAC(videoId: String, validate: Bool, attempts: inout [String]) async -> ResolvedStream? {
+    /// SpotiFLAC's stream for the song registered under `videoId`, or nil. `lastResort`: YouTube has nothing, so any
+    /// file is taken. When `validate` (downloads, the playback test) the file's first bytes are read before it is
+    /// handed out: they say what it is, and a file above the quality setting goes to YouTube before anything big is
+    /// downloaded. Streams check the same bytes in `StreamFetcher.store`.
+    private func resolveViaSpotiFLAC(videoId: String, validate: Bool, lastResort: Bool, quality: StreamingAudioQuality,
+                                     attempts: inout [String]) async -> ResolvedStream? {
         guard let query = SpotiFLACTrackRegistry.shared.query(forVideoId: videoId) else { return nil }
+        SpotiFLACTrackRegistry.shared.setLastResort(lastResort, forVideoId: videoId)
         guard let flac = await spotiFLAC.resolve(query) else {
             attempts.append("SpotiFLAC: no match")
             return nil
         }
         let urlString = flac.url.absoluteString
         if validate {
-            let probe = await validator.probe(url: urlString, userAgent: flac.userAgent, sendRange: true)
-            guard probe.ok else {
+            guard let facts = await headFacts(url: urlString, userAgent: flac.userAgent) else {
                 await spotiFLAC.invalidate(query)
-                attempts.append("SpotiFLAC (\(flac.provider.rawValue)): \(probe.describe())")
+                attempts.append("SpotiFLAC (\(flac.provider.rawValue)): the file didn't answer")
+                return nil
+            }
+            SpotiFLACTrackRegistry.shared.record(facts, forVideoId: videoId)
+            guard facts.format == .flac || facts.format == .mp4 else {
+                attempts.append("SpotiFLAC (\(flac.provider.rawValue)): a \(facts.format.rawValue) file this player can't keep")
+                return nil
+            }
+            if !lastResort, !quality.allowsFlacFirst(sampleRate: facts.flacSampleRate) {
+                attempts.append("SpotiFLAC (\(flac.provider.rawValue)): \(facts.sampleRate ?? 0) Hz, above the quality setting")
                 return nil
             }
         }
-        attempts.append("SpotiFLAC (\(flac.provider.rawValue)): FLAC (\(flac.trackId))")
+        let mimeType = SpotiFLACTrackRegistry.shared.facts(forVideoId: videoId)?.format.mimeType ?? flac.mimeType
+        attempts.append("SpotiFLAC (\(flac.provider.rawValue)): \(mimeType == "audio/flac" ? "FLAC" : mimeType) (\(flac.trackId))")
         return ResolvedStream(url: urlString, userAgent: flac.userAgent,
-                              strategyName: Self.spotiFLACStrategyName, mimeType: flac.mimeType)
+                              strategyName: Self.spotiFLACStrategyName, mimeType: mimeType)
+    }
+
+    /// The first `SpotiFLACAudioFileFacts.headBytes` of a SpotiFLAC file (one ranged GET), read as facts; nil when it
+    /// doesn't answer with them.
+    private func headFacts(url: String, userAgent: String) async -> SpotiFLACAudioFileFacts? {
+        let request = HTTPRequest(method: .get, url: url, headers: [
+            HTTPHeader("User-Agent", userAgent),
+            HTTPHeader("Range", "bytes=0-\(SpotiFLACAudioFileFacts.headBytes - 1)")
+        ], timeout: 10)
+        guard let response = try? await plainHTTP.send(request),
+              response.statusCode == 206 || response.statusCode == 200,
+              CloudStreamSecurity.isSupportedAudioContentType(response.header("Content-Type")) else { return nil }
+        let facts = SpotiFLACParsing.audioFileFacts(response.body)
+        return facts.format == .unknown ? nil : facts
     }
 
     /// The start-timings view of a resolution: the winner's detail (itag, bitrate, `n`), or every attempt.
@@ -227,16 +261,58 @@ actor InnerTubeService {
     }
 }
 
-/// Settings › Playback › Streaming audio quality (Android `AudioQuality.maxBitrateKbps`): the cap the stream
-/// resolvers pick under (the highest AAC stream at or below it; above every stream, the lowest), read whenever a
-/// stream is resolved. Changing it drops the cached URLs (`InnerTubeService.invalidateAll`).
-nonisolated enum StreamingAudioQuality {
-    static func maxBitrateKbps(_ defaults: UserDefaults = .standard) -> Int? {
-        switch defaults.string(forKey: PreferenceKeys.audioQuality) ?? "ULTRASOUND" {
-        case "LOW": 96
-        case "STANDARD": 160
-        case "HIGH": 256
-        default: nil
+/// Settings › Playback › Streaming audio quality (Android `AudioQuality`), read whenever a stream is resolved; changing
+/// it drops the cached URLs (`InnerTubeService.invalidateAll`).
+/// - Low / Medium / High cap YouTube at 96 / 160 / 256 kbps (the resolvers pick the highest AAC stream at or below it;
+///   above every stream, the lowest). SpotiFLAC is then only the last resort, when YouTube has nothing.
+/// - Pro (the default) plays SpotiFLAC's file first when it is at most 48 kHz: CD quality and most 24-bit masters.
+/// - Studio Pro plays every SpotiFLAC file first, including 88.2–192 kHz masters (up to ~6 Mbps).
+nonisolated enum StreamingAudioQuality: String, CaseIterable, Sendable {
+    case low = "LOW", medium = "MEDIUM", high = "HIGH", pro = "PRO", studioPro = "STUDIO_PRO"
+
+    static let `default`: StreamingAudioQuality = .pro
+
+    /// The tier for a stored value, including the old ones (`STANDARD` is Medium, `ULTRASOUND` is Pro).
+    static func from(stored value: String?) -> StreamingAudioQuality {
+        switch value {
+        case nil: .default
+        case "STANDARD": .medium
+        case "ULTRASOUND": .pro
+        case let other?: StreamingAudioQuality(rawValue: other) ?? .default
+        }
+    }
+
+    static func current(_ defaults: UserDefaults = .standard) -> StreamingAudioQuality {
+        from(stored: defaults.string(forKey: PreferenceKeys.audioQuality))
+    }
+
+    /// The YouTube cap the stream resolvers pick under (Android `AudioQuality.maxBitrateKbps`).
+    static func maxBitrateKbps(_ defaults: UserDefaults = .standard) -> Int? { current(defaults).maxBitrateKbps }
+
+    var maxBitrateKbps: Int? {
+        switch self {
+        case .low: 96
+        case .medium: 160
+        case .high: 256
+        case .pro, .studioPro: nil
+        }
+    }
+
+    /// Whether SpotiFLAC's file of `sampleRate` may play before YouTube (an unknown rate counts as allowed).
+    func allowsFlacFirst(sampleRate: Int?) -> Bool {
+        switch self {
+        case .low, .medium, .high: false
+        case .pro: sampleRate.map { $0 <= 48_000 } ?? true
+        case .studioPro: true
+        }
+    }
+
+    /// The label for a YouTube stream on this tier: an uncapped tier plays YouTube's best, "High".
+    var youTubeLabel: String {
+        switch self {
+        case .low: "Low"
+        case .medium: "Medium"
+        case .high, .pro, .studioPro: "High"
         }
     }
 }

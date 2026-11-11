@@ -301,9 +301,11 @@ final class DownloadManager {
                     defer { try? handle.close() }
                     return try? handle.read(upToCount: 4)
                 } ?? Data()
-            let isFLAC = (expectedMime?.lowercased().contains("flac") == true)
-                || (type?.lowercased().contains("flac") == true)
-                || SpotiFLACParsing.isFLACMagicHeader(headerBytes)
+            // The file's own bytes decide (SpotiFLAC can hand out an AAC-in-MP4 file); the MIME types only when the
+            // file couldn't be read.
+            let isFLAC = headerBytes.count >= 4
+                ? SpotiFLACParsing.isFLACMagicHeader(headerBytes)
+                : (expectedMime?.lowercased().contains("flac") == true) || (type?.lowercased().contains("flac") == true)
             let destination = DownloadFiles.fileURL(videoId: videoId, contentType: isFLAC ? "audio/flac" : type)
             let fm = FileManager.default
             try? fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
