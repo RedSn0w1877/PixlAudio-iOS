@@ -63,6 +63,21 @@ final class SpatialPlaybackTests: XCTestCase {
         XCTAssertTrue(SpatialActivation.routePasses(mode: .always, output: SpatialOutputRoute.kind(of: .builtInSpeaker)))
     }
 
+    /// The route rule follows the output live: every route change reaches Spatial audio, after the command it caused
+    /// (an unplug has paused playback by then, so a render swaps back silently).
+    func testEveryRouteChangeReachesSpatialAudioAfterItsCommand() {
+        let session = AudioSessionController()
+        var events: [String] = []
+        session.deckSnapshot = {
+            DeckPlaybackSnapshot(masterPlayWhenReady: true, masterIsPlaying: true, transitionRunning: false)
+        }
+        session.onCommand = { command in events.append("\(command)") }
+        session.onRouteChange = { events.append("route") }
+        session.handleRouteChange(reason: .oldDeviceUnavailable)
+        session.handleRouteChange(reason: .categoryChange)
+        XCTAssertEqual(events, ["pauseForRouteLoss", "route", "routeChanged", "route"])
+    }
+
     // MARK: The stage's vDSP path
 
     /// The bundled tables decode, and the stage's vDSP path (what the phone runs) gives what its portable path gives

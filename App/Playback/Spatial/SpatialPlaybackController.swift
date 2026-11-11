@@ -62,6 +62,8 @@ final class SpatialPlaybackController: SpatialPlayback, DeckSpatialSource {
     private var listener: Task<Void, Never>?
     private var pendingEvaluation: Task<Void, Never>?
     private var switching: Task<Void, Never>?
+    /// Something changed while a lookup or a switch was under way: look again when it ends.
+    private var reconcileAgain = false
     private var retry: Task<Void, Never>?
     private var retries = 0
     /// The item the retries and given-up switches count for.
@@ -310,7 +312,12 @@ final class SpatialPlaybackController: SpatialPlayback, DeckSpatialSource {
     }
 
     private func reconcile() {
-        guard switching == nil, let item = engine.activeItem else { return }
+        if switching != nil {
+            reconcileAgain = true
+            return
+        }
+        guard let item = engine.activeItem else { return }
+        reconcileAgain = false
         let playing = item.audio
         if case .other = playing { return }
         let library = self.library
@@ -359,6 +366,10 @@ final class SpatialPlaybackController: SpatialPlayback, DeckSpatialSource {
     }
 
     private func finished(_ attempt: Attempt, item: DeckItem) {
+        if reconcileAgain {
+            reconcileAgain = false
+            scheduleEvaluation()
+        }
         switch attempt {
         case .none:
             break

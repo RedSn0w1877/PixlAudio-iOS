@@ -89,3 +89,21 @@ uses the same endpoint, schema v1 and bucket later (design §8).
 | Priority lane (2026-10-22) | When a Sing job (or one song sent by hand) is uploaded and ready, the jobs RunPod holds but has not started (auto and manual-batch ones) step aside: intent saved, fresh `/status`, only `IN_QUEUE` is cancelled (reply must say `CANCELLED`), job back to `uploaded` with its upload kept, then sent again right behind it in the same burst (one `last_in_batch`). A running job is never cancelled; a RunPod `CANCELLED` for a job with that intent is a pause, not a failure. Label: "Paused for a song you're singing" | same rules on the `sing-cloud` branch | same |
 | Prepare songs ahead (2026-10-22) | Settings › Sing: off by default; a monthly budget ($0–$3, $0.25 steps, default $1; shared monthly cap still applies) with "About N songs a month", a status line, and in developer mode a daily cap (default 12) and "Why these songs". `SingPrepareRunner` ranks the library (`SingPrepareRanker`: favourites, plays and finishes, recency, playlist neighbours, album siblings, skips) while the app is open on Wi-Fi, up to 3 songs at a time; jobs have origin `auto`: never mobile data, no notification, no continued-processing UI, their own spending ledger (not derived from the job list). Switching it off cancels the auto jobs not yet at the worker | `CloudAutoPrepare` + a periodic WorkManager pass (unmetered, charging, songs already cached) | same constants and test vectors |
 | Cost model (2026-10-22; 2026-10-23) | warm seconds per 4-minute song 33 (instrumental only: the 38 s measured on an RTX A4500 less ~5 s of lyric alignment, an estimate), cold start 15 s for every worker a burst wakes (`min(workers, songs)`); prices unchanged | same constants | — |
+
+## Spatial audio, the player's side (2026-11-11, ENGINE)
+
+Spec: `docs/handoff/2026-11-10-plans/cloud-audio-spec.md` 6.3 and 7. Details and reasons:
+`docs/handoff/2026-11-11-ios-spatial-engine.md`. Readings the spec leaves open, for the Android ENGINE to match or to
+answer:
+
+| Behaviour | iOS | Android |
+|---|---|---|
+| Stage ramps | bypass on/off 80 ms; profile change 40 ms down to the dry sound, coefficients swapped, 40 ms up | spec: "~80 ms" |
+| Dry sound | the input delayed by `lowDelay`; an item that was never fully on fades from its undelayed input the first time (no delay switched on under the sound); once fully on, the item stays delayed after a bypass | spec: delayed input |
+| Old width effect | faded out along the stage's ramp; never applied to a render | spec: bypassed while the stage is active |
+| Level rule for the stage | applied to the stage's wet sound only (`min(1, gain × 1.585)` once fully on) | spec: the item's gain |
+| Time rules for switches | 20 s for a render switching in over the stream; none for a newly picked profile's render or for the way back (the swap's own clearance before the song's transition only) | spec: 20 s for an arriving render |
+| Spatial off or route failing while a render plays | swapped back to the stream (paused by an unplug: silent swap) | spec allows "finish the song" |
+| A render that does not line up (> 50 ms in length) or a failed switch | used from the next play | — |
+| Seek | the stage forgets the old position (no room tail across a seek) | — |
+| Mono song | like an unsupported rate: no stage, render still wanted | — |
