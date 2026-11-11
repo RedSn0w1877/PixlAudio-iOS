@@ -340,9 +340,10 @@ struct SpatialStageRampTests {
         let worst = max(SpatialStageRig.maxStep(out.left), SpatialStageRig.maxStep(out.right))
         #expect(worst <= steady * 1.25, "a step of \(worst) against the steady sound's \(steady)")
 
-        // Off again (from 24 000 + the ramp): exactly the input, delayed by lowDelay.
+        // Off again: the target changes at the first buffer starting at 24 000 or later (24 920 with these sizes), and
+        // 80 ms later the sound is exactly the input, delayed by lowDelay.
         let delay = try #require(SpatialFixtures.tables().table(for: .hall, sampleRate: rate)).lowDelay
-        for i in (24_000 + rampFrames + 600)..<32_000 {
+        for i in (24_000 + 1_024 + rampFrames + 64)..<32_000 {
             #expect(out.left[i] == left[i - delay] && out.right[i] == right[i - delay])
             if out.left[i] != left[i - delay] { break }
         }
