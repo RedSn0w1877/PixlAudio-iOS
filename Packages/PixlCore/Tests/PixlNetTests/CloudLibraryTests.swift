@@ -510,6 +510,15 @@ import PixlModel
         #expect(!CloudRetention.shouldPrune(sing, nowMs: 86_400_001))
     }
 
+    @Test func aCappedLibraryJobIsNotMoreToCome() {
+        // While the library's cap holds a render back, a burst's last jobs still tell their workers to stop.
+        let held = Self.job(.queued) { $0.heldByCap = true }
+        #expect(!CloudBurstEnd.moreComing([held], nowMs: 0, autoBlocked: false))
+        #expect(CloudBurstEnd.moreComing([Self.job(.queued)], nowMs: 0, autoBlocked: false))
+        // The background queue's jobs wait with Sing's songs prepared ahead while the phone isn't ready.
+        #expect(!CloudBurstEnd.moreComing([Self.job(.queued, ahead: true)], nowMs: 0, autoBlocked: true))
+    }
+
     @Test func lookupHitSkipsTheUpload() {
         // A library job found in the shared library goes from preparing straight to its results.
         #expect(CloudJobMachine.next(.preparing, on: .resultsReady) == .resultsReady)

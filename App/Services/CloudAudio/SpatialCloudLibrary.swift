@@ -264,18 +264,19 @@ final class SpatialCloudLibrary: SpatialLibrary, CloudRenderInstalling {
         hub.send(.statusChanged(key, status))
     }
 
-    /// Sends the status of every rendition anything is known about whose status moved: those of library jobs, those
-    /// reported before, those in the store.
+    /// Sends the status of every rendition whose status moved: those of library jobs and those reported before.
     private func refreshStatuses() {
         guard isLoaded else { return }
-        let network = networkFacts()
         // The latest library job per rendition, in one pass over the list (oldest first).
         var latest: [RenditionKey: CloudJobRecord] = [:]
         for record in cloud.jobs where record.isLibraryJob && record.state != .cancelled {
             for key in record.library?.keys ?? [] { latest[key] = record }
         }
-        var keys = Set(reported.keys).union(latest.keys)
-        keys.formUnion(index.keys)
+        // (Stored renders say so when they arrive, `renditionReady`, and when they go, `renditionRemoved`.)
+        let keys = Set(reported.keys).union(latest.keys)
+        // Nothing known about any rendition (Spatial audio unused): nothing to read, nothing to send.
+        guard !keys.isEmpty else { return }
+        let network = networkFacts()
         for key in keys {
             let status = currentStatus(key, network, job: .some(latest[key]))
             report(key, status)

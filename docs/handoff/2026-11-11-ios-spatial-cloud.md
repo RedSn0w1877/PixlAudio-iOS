@@ -88,7 +88,10 @@ frozen contract is untouched.
   download, already stored, one job per rendition, own cap, Sing's cap ignored, Sing not blocked, network rules,
   library + real store events, backoff, master switch, cancel on `spatial.cloud` off, store index/eviction).
 - `ci/parse-check.ps1`, `check-forbidden.sh`, `check-cloud-fixtures.sh`, `check-spatial-fixtures.sh`: OK.
-- CI: see the report's run ids (`gh run list --repo RedSn0w1877/PixlAudio-iOS --branch audio-cloud`).
+- CI (`ci.yml`): 43081972153 red (an exhaustive switch over `ActiveJob.Kind` in `App/Services/ActiveJobs.swift`,
+  fixed in 80202ba); 43082757469 attempt 1 red only on the known timing test
+  `testCrossfadeOverlapsBothDecksWithTheirGainCurves` (0.897 s against 1 ± 0.1), attempt 2 green: build, 604 app unit
+  tests, `core`. Later runs: `gh run list --repo RedSn0w1877/PixlAudio-iOS --branch audio-cloud`.
 
 ## Divergences and readings (lead, please confirm or overrule)
 

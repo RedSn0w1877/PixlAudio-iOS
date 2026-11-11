@@ -481,7 +481,9 @@ public enum CloudBurstEnd {
             switch record.state {
             case .uploading: return record.isDue(nowMs: nowMs)
             case .queued, .preparing:
+                // A library job the month's cap holds back is not coming soon.
                 return record.isDue(nowMs: nowMs) && !(autoBlocked && record.isPreparedAhead)
+                    && record.library?.heldByCap != true
             default: return false
             }
         }
