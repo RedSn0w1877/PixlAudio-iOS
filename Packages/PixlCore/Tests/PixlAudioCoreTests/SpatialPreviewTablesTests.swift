@@ -64,28 +64,60 @@ struct SpatialPreviewTablesTests {
         }
     }
 
-    @Test func theNumbersAreTheGeneratedOnes() throws {
+    /// Every number of the decoded tables is the file's own (read a second time as a plain JSON tree). The worker
+    /// regenerates the file whenever the renderer is tuned, so no value is written down here.
+    @Test func theDecodedNumbersAreTheFilesOwn() throws {
         let tables = try SpatialFixtures.tables()
-        let studio = try #require(tables.table(for: .studio, sampleRate: 44_100))
-        #expect(studio.lowDelay == 38)
-        #expect(studio.gain == 0.581174)
-        #expect(studio.direct[0] == 0.008662)
-        #expect(studio.sparseL[0] == SpatialSparseTap(delay: 417, gainFromLeft: 0.031176, gainFromRight: 0.023878))
-        let hall = try #require(tables.table(for: .hall, sampleRate: 48_000))
-        #expect(hall.lowDelay == 47)
-        #expect(hall.gain == 0.450987)
-        #expect(hall.maxSparseDelay == 8559)
-        #expect(hall.sparseL[0].delay == 1215)
-        let night = try #require(tables.table(for: .night, sampleRate: 48_000))
-        #expect(night.gain == 0.653782)
+        let tree = try SpatialFixtures.tree()
+        let profiles = try #require(tree["profiles"] as? [String: Any])
+        // A JSON number, however this platform's JSONSerialization hands it over.
+        func number(_ value: Any?) throws -> Double {
+            if let value = value as? Double { return value }
+            if let value = value as? Int { return Double(value) }
+            return try #require((value as? NSNumber)?.doubleValue)
+        }
+        func numbers(_ value: Any?) throws -> [Double] {
+            let list = try #require(value as? [Any])
+            return try list.map { try number($0) }
+        }
+        for profile in SpatialProfile.allCases {
+            let rates = try #require(profiles[profile.rawValue] as? [String: Any])
+            for rate in SpatialPreviewTables.sampleRates {
+                let raw = try #require(rates[String(rate)] as? [String: Any])
+                let table = try #require(tables.table(for: profile, sampleRate: rate))
+                let scalars = [try number(raw["xoverHz"]), try number(raw["lowDelay"]), try number(raw["taps"]),
+                               try number(raw["gain"])]
+                #expect(scalars == [table.xoverHz, Double(table.lowDelay), Double(table.taps), table.gain])
+                let direct = try numbers(raw["direct"])
+                let cross = try numbers(raw["cross"])
+                #expect(table.direct == direct)
+                #expect(table.cross == cross)
+                for (name, taps) in [("sparseL", table.sparseL), ("sparseR", table.sparseR)] {
+                    let rows = try #require(raw[name] as? [Any])
+                    let flat = try rows.flatMap { try numbers($0) }
+                    #expect(flat == taps.flatMap { [Double($0.delay), $0.gainFromLeft, $0.gainFromRight] })
+                }
+            }
+        }
     }
 
     @Test func oneRingServesEveryTable() throws {
         let tables = try SpatialFixtures.tables()
-        // Concert Hall at 48 kHz has the longest room.
-        #expect(tables.maxDelay == 8559)
-        #expect(tables.ringCapacity == 16_384)
-        #expect(tables.ringCapacity >= tables.maxDelay + 1)
+        var longest = 0
+        for profile in SpatialProfile.allCases {
+            for rate in SpatialPreviewTables.sampleRates {
+                longest = max(longest, try #require(tables.table(for: profile, sampleRate: rate)).maxDelay)
+            }
+        }
+        #expect(tables.maxDelay == longest)
+        // The spec's "about 8600 samples (Concert Hall at 48 kHz)": well under a second, well over a few FIR lengths.
+        #expect(longest > 1_000 && longest < 48_000)
+        #expect(tables.table(for: .hall, sampleRate: 48_000)?.maxSparseDelay == longest)
+        // The smallest power of two that holds the longest history plus the current sample.
+        let capacity = tables.ringCapacity
+        #expect(capacity & (capacity - 1) == 0)
+        #expect(capacity >= longest + 1)
+        #expect(capacity / 2 < longest + 1)
     }
 
     @Test func anyOtherRateHasNoTableSoTheStageIsBypassed() throws {

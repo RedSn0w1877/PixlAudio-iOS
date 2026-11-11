@@ -328,13 +328,17 @@ final class SpatialAudioModelTests: XCTestCase {
     func testTheTableFileIsInTheAppAndDecodes() throws {
         let tables = try SpatialPreviewResource.loadNow()
         XCTAssertEqual(tables.engine, CloudLibrary.engineId)
-        XCTAssertEqual(tables.headroomDb, 4.0)
+        XCTAssertEqual(tables.headroomDb, SpatialLevel.defaultHeadroomDb)
         for profile in SpatialProfile.allCases {
             for rate in SpatialPreviewTables.sampleRates {
-                XCTAssertEqual(tables.table(for: profile, sampleRate: rate)?.taps, 192, "\(profile.rawValue) \(rate)")
+                let table = tables.table(for: profile, sampleRate: rate)
+                XCTAssertNotNil(table, "\(profile.rawValue) \(rate)")
+                XCTAssertEqual(table?.direct.count, table?.taps)
             }
         }
-        XCTAssertEqual(tables.ringCapacity, 16_384)
+        // One delay ring serves every table.
+        XCTAssertGreaterThan(tables.ringCapacity, tables.maxDelay)
+        XCTAssertEqual(tables.ringCapacity & (tables.ringCapacity - 1), 0)
     }
 
     func testTheSettingsStoreReadsWhatItWroteAndForgetsOnReset() {
