@@ -6,8 +6,9 @@ switching, route and level rules), **CLOUD** (library client, jobs, local store,
 [`cloud-audio-spec.md`](cloud-audio-spec.md); this page says where everything it touches lives in the iOS code.
 
 Line numbers are those of commit `3670155` (branch `audio-foundation`), and still hold at the branch tip: later
-commits changed only the contract's own files and tests, fixtures, this page, the spec and files under `cloud/`
-(both through merges of `audio-hq`), and two spots of `AppEnvironment.swift`, whose numbers below are the tip's.
+commits changed only the contract's own files (PixlModel's and the Spatial audio model's) and their tests, fixtures,
+this page, the spec and files under `cloud/` (both through merges of `audio-hq`), and two spots of
+`AppEnvironment.swift`, whose numbers below are the tip's.
 Paths are from the repo root. Quotes are short on purpose: open the file for the rest.
 
 Contents: [1 What is already there](#1-what-is-already-there-the-contract-code) ·
@@ -15,7 +16,8 @@ Contents: [1 What is already there](#1-what-is-already-there-the-contract-code) 
 [4 Source resolution](#4-source-resolution-video-ids-format-info) · [5 Gain](#5-gain-where-the-level-rule-lives) ·
 [6 Route](#6-route) · [7 Cloud Studio](#7-cloud-studio) · [8 Settings and UI](#8-settings-and-ui) ·
 [9 Opus](#9-opus) · [10 Tests and CI](#10-tests-and-ci) · [11 Who owns which file](#11-who-owns-which-file) ·
-[12 What the spec settled](#12-where-the-spec-and-the-code-disagreed-and-how-it-was-settled)
+[12 What the spec settled](#12-where-the-spec-and-the-code-disagreed-and-how-it-was-settled) ·
+[13 The Android contract](#13-the-ios-and-the-android-contract-side-by-side)
 
 ---
 
@@ -30,10 +32,10 @@ ENGINE and CLOUD replace them.
 |---|---|
 | `Packages/PixlCore/Sources/PixlModel/CloudAudio/SpatialProfile.swift` | `SpatialProfile` (ids `studio wide intimate hall surround night`, `displayName`, `summary` = spec 6.5 one-liners), `SpatialSelection` (`.off` / `.profile(p)`, `storageValue`), `SpatialRouteMode`, `SpatialOutputKind`, `SpatialActivation.routePasses / isActive` (spec 6.3), `SpatialLevel.playbackGain(_:headroomDb:)` = `min(1, gain × 10^(dB/20))` |
 | `…/CloudAudio/CloudAudioSettings.swift` | `CloudAudioSettingsKey` (the spec 6.1 names, used verbatim as `UserDefaults` keys), `CloudAudioStoredSettings` (nil = never set), `CloudAudioSettings(stored:builtInCloudKeys:)` (defaults, ranges) |
-| `…/CloudAudio/Rendition.swift` | `RenditionKey(videoId:profile:)` (`slot` = `sp-<profile>`), `RenditionStatus` (the spec's seven: `none preview queued processing downloading ready failed`), `RenditionQueueReason` (`waitingForNetwork`, `capReached`), `RenditionState` (a status plus, only when queued, the reason), `RenditionRetry` (10 min, 1 h, 1 day) |
+| `…/CloudAudio/Rendition.swift` | `RenditionKey(videoId:profile:)` (`slot` = `sp-<profile>`), `RenditionStatus` (spec 6.1's states with `queued` as three cases, the Android contract's nine in its order: `none preview queued waitingForNetwork capReached processing downloading ready failed`; `isQueued`, `shown(onDeviceAudible:)`), `RenditionRetry` (10 min, 1 h, 1 day) |
 | `…/CloudAudio/CloudLibrary.swift` | `CloudLibrary.version` (1), `engineId`, `audioKey(_:)`, `manifestKey(_:)`, `parse(objectKey:)`, `isValidVideoId`; `CloudAudioLocalLayout` (`CloudAudio/<videoId>/<slot>.flac|.json`, `rendition(ofAudioFile:)`) |
 | `…/CloudAudio/CloudLibraryManifest.swift` | The render manifest (spec 3.1) as `Codable`, `check(for:)` (the acceptance rule), `audioMatches(bytes:sha256:)`, `headroomDb`, `stemMode` |
-| `…/CloudAudio/SpatialServices.swift` | The two seams: `SpatialLibrary` (CLOUD implements) and `SpatialPlayback` (ENGINE implements), `LocalRendition`, `RenditionRequest`, `CloudAudioUsage`, `SpatialLibraryEvent`, `SpatialPlaybackSnapshot`, `SpatialAudible`, `SpatialStatusLine` (the sheet's line for every state) and `SpatialCopy` (the level note), `SpatialEventHub`, `NoopSpatialLibrary`, `NoopSpatialPlayback` |
+| `…/CloudAudio/SpatialServices.swift` | The two seams: `SpatialLibrary` (CLOUD implements) and `SpatialPlayback` (ENGINE implements), `LocalRendition`, `RenditionRequest`, `CloudAudioUsage`, `SpatialLibraryEvent`, `SpatialPlaybackSnapshot` (with `blockedBy`), `SpatialAudible`, `SpatialBlock`, `SpatialStatusLine` (one case per row of spec 6.5's table, `of(settings:snapshot:status:cloudRendersOn:)`) and `SpatialCopy` (the level note), `SpatialEventHub`, `NoopSpatialLibrary`, `NoopSpatialPlayback` |
 | `Packages/PixlCore/Sources/PixlAudioCore/Spatial/SpatialPreviewTables.swift` | `SpatialPreviewTables.decode(_:)` for `spatial_preview_v1.json` (`table(for:sampleRate:)`, `headroomDb`, `ringCapacity`, 16384 with today's tables), `SpatialPreviewTable`, `SpatialSparseTap`, `SpatialPreviewGolden.decode(_:)` for the golden file. Decoding only |
 | Tests | `Tests/PixlModelTests/CloudAudioContractTests.swift` (fixtures in `Fixtures/cloud-audio/`), `Tests/PixlAudioCoreTests/SpatialPreviewTablesTests.swift` (fixtures in `Fixtures/spatial/`, read through `SpatialFixtures.tables()` / `.golden()`: ENGINE's stage test starts from those two calls) |
 
@@ -86,15 +88,19 @@ screens ──read/call──► SpatialAudioModel (env.spatial, @MainActor @Obs
 - The model asks for a render when the player's snapshot says one is wanted: `SpatialPlaybackSnapshot.wantedRender`
   (Spatial active, a video id, and the selected profile's render is not what plays). Once per wanted render; again
   after the selection, the song or "Remove downloaded renders" changed things. So ENGINE's whole duty towards the
-  cloud is to **publish truthful snapshots** (`songId`, `videoId`, `selection`, `output`, `routePasses`,
-  `singInstrumentalOn`, `audible`).
+  cloud is to **publish truthful snapshots** (`songId`, `videoId`, `selection`, `route`, `output`, `routePasses`,
+  `singInstrumentalOn`, `audible`). `blockedBy` (route, Sing, another device, a rate the stage does not take) is
+  derived from them; Android's player reports the same four itself.
 - CLOUD decides whether anything leaves the phone: both switches (Cloud Studio's own, the master, read from
   `context.cloud.settings.isEnabled`, and `spatial.cloud` from `apply`), the network, the caps. With either switch
-  off `request` answers `RenditionState.none` and no lookup, download or job happens. CLOUD's background queue
-  (spec 6.4) runs inside CLOUD and never goes through the model.
-- `RenditionStatus.preview` is never the library's answer: the model derives it (`RenditionState.shown`).
-- A render that is wanted but cannot start yet is `queued` with a reason (`RenditionState(.queued, queueReason:
-  .waitingForNetwork)` or `.capReached`), and `downloading` is a state of its own (spec 6.1): CLOUD reports both.
+  off `request` answers `.none` (`.ready` for a render already in the local store, which needs no cloud) and no
+  lookup, download or job happens. CLOUD's background queue (spec 6.4) runs inside CLOUD and never goes through the
+  model.
+- `RenditionStatus.preview` is never the library's answer: the model derives it
+  (`RenditionStatus.shown(onDeviceAudible:)`).
+- A render that is wanted but cannot start yet is `queued` with a reason, written as its own case:
+  `.waitingForNetwork` or `.capReached` (`isQueued` is true for those and `.queued`). `downloading` is a state of its
+  own (spec 6.1). CLOUD reports all of them.
 
 ### 1.4 Rules for implementations (Swift 6 pitfalls already paid for here)
 
@@ -111,7 +117,7 @@ screens ──read/call──► SpatialAudioModel (env.spatial, @MainActor @Obs
   (`playbackServices` is nil in UI tests); a plain `nonisolated async` function runs on the caller's actor, so
   off-main work is `@concurrent` or `Task.detached`.
 - In UI tests (`context.launch.isUITest`) a factory must return something that touches no audio, network or files.
-  `SpatialAudioModel.setDemo(snapshot:libraryState:usage:)` pins a state for screenshots; it is called from
+  `SpatialAudioModel.setDemo(snapshot:libraryStatus:usage:)` pins a state for screenshots; it is called from
   `SpatialDemo.apply(launch:to:)` (`App/Demo/SpatialDemo.swift`, UI's file). `spatial.start()` never runs in UI
   tests, and the settings start from an emptied suite (`SettingsStore.ephemeral()`).
 - Both factories run inside `AppEnvironment.init`; `apply(settings)` first arrives from `spatial.start()`, during
@@ -120,9 +126,9 @@ screens ──read/call──► SpatialAudioModel (env.spatial, @MainActor @Obs
 
 ### 1.5 What the screens get from `env.spatial`
 
-Read: `settings` (all seven), `selection`, `snapshot`, `state` and `status` (spec 6.1, for the playing song and
-selected profile; `state.queueReason` says why a queued render cannot start), `statusLine` (its `.text` is the
-spec 6.5 sentence for every state: table in section 12), `isActive`, `usage` (`songsReady`, `bytes`,
+Read: `settings` (all seven), `selection`, `snapshot`, `status` (spec 6.1, for the playing song and selected
+profile, `preview` added; `libraryStatus` is the library's own answer), `statusLine` (its `.text` is the spec 6.5
+sentence for every state: table in section 12), `isActive`, `usage` (`songsReady`, `bytes`,
 `spentThisMonthMicroUSD`, `sentToday`), `isRemovingRenders`, `hasBuiltInCloudKeys`, `isCloudStudioOn` (Cloud
 Studio's own switch, the master) and `cloudRendersOn` (both switches). The sheet's other fixed sentence is
 `SpatialCopy.levelNote`.
@@ -620,7 +626,7 @@ In the app (`CloudStudio.swift`), a library job differs from an instrumental job
   both on (spec 6.1 "Two switches").
 - Network: `networkAllowsUpload()` (845-853), `useCellular`; auto work is unmetered only (`autoMayUseNetwork`,
   753; `transfers.allowsCellular`, 1437). A render the playing song wants but the network rule holds back is
-  reported as `RenditionState(.queued, queueReason: .waitingForNetwork)` (it has its own status line).
+  reported as `.waitingForNetwork` (it has its own status line).
 - Heavy work: `HeavyWorkGate`, `HeavyJobGovernor` (1315-1319); safe mode holds preparations back.
 - Order: `CloudPriorityLane.ordered` (1328). Library jobs sit below Sing and below anything sent by hand.
 - Endpoint: three GPU workers on the built-in endpoint (`CloudKeyChoice.parallelWorkers`), batches gated by
@@ -641,8 +647,8 @@ spend must be counted apart from Sing's**: today every record's cost counts agai
 (`CloudBudget.committedMicroUSD`, PixlNet 560), and `effectiveMonthlyCap` clamps to $3 with built-in keys. A library
 record needs to be left out of Sing's sum and counted in its own. `CloudAudioUsage.spentThisMonthMicroUSD` and
 `.sentToday` report it to Settings. A render the playing song wants but the month's cap holds back is reported as
-`RenditionState(.queued, queueReason: .capReached)` (its own status line too); the shared-library lookup and
-download of 6.2 step 2 cost nothing on the GPU and are not held back by the cap.
+`.capReached` (its own status line too); the shared-library lookup and download of 6.2 step 2 cost nothing on the
+GPU and are not held back by the cap.
 
 Storage (spec 6.1, 6.2): `cloudAudio.storageMB` (3072), least recently played removed first
 (`SpatialLibrary.markPlayed`). `StreamCache.evictIfNeeded` (`StreamCache.swift:137-154`) is the house pattern for an
@@ -753,7 +759,8 @@ view of its own.
   String.LocalizationValue(profile.displayName))`, or simply repeat the literal with the PixlModel test as the guard.
 - Never in a user-visible string, changelog or doc: *lossless*, *hi-res*, *Dolby*, *Atmos*, *360 Reality*, the
   cloud AI's model name or maker, the lyrics source's old name; and (CI-enforced, `ci/check-forbidden.sh` rule 5)
-  "Apple". The feature name is "Spatial audio".
+  "Apple". Nor, in anything a user sees, *Enhanced audio* (cut on 2026-11-11). The feature name is "Spatial audio".
+  `PixlModelTests` checks the contract's own texts against these words.
 - Outside developer mode no row says codec, bitrate, GPU, stems or LUFS (the settings reorganisation's rule).
 
 ### 8.6 Changelog
@@ -923,9 +930,11 @@ Loop: `gh run list --repo RedSn0w1877/PixlAudio-iOS --branch <branch>`, `gh run 
 `gh run view <id> --repo … --log-failed` (the job summary lists `file:line: error`). Logs are public: never print a
 secret.
 
-One unit test is timing-dependent and fails now and then on a busy runner:
+Two unit tests are timing-dependent and fail now and then on a busy runner:
 `AppTests/LaunchConfigurationTests.swift:138` `testPlaybackStoreWithDemoEngine` (it sleeps 50 ms, then expects
-`store.isPlaying`; it failed in run 43043932396, attempt 1, with nothing else red). If it is the only failure,
+`store.isPlaying`; it failed in run 43043932396, attempt 1, with nothing else red), and
+`SpotifyMatchCoordinatorTests.testConcurrentMatchesOfOneSongRunTheSearchOnce` (two searches instead of one; it
+failed in run 43053259035 with nothing else red, 2 failures in 587 tests). If one of them is the only failure,
 re-run the job instead of pushing again: `gh run rerun <id> --repo RedSn0w1877/PixlAudio-iOS --failed`.
 
 ### 10.2 PixlCore locally (Windows)
@@ -1053,41 +1062,54 @@ The contract code follows: nothing in it carries those names any more. If you me
 | 7 | The transfer layer refuses `sp-studio` | 6.2 step 3: teach it `sp-<profile>` | CLOUD (`CloudTransfers.isSafeSlot`, lines 247-251: allow the hyphen, keep everything else out) |
 | 8 | Enhanced without Spatial unsaid | Enhanced audio is cut | nobody |
 | 9 | Stored forms chosen here | 6.1 "Stored forms": exactly these (`-1` = No limit, 256 … 65536 MB, 1 … 100 a day, a stored `always` is honoured) | nobody: `CloudAudioSettings` already does it |
-| 10 | Three status sentences, four states without one | 6.5: every state has a line (table below). 6.1: `downloading` is a status of its own, and a render that cannot start yet is `queued` with a reason | CLOUD reports `RenditionState`; UI reads `env.spatial.statusLine.text` |
-| 11 | A song at a rate the stage does not take | 6.3: it plays without the on-device stage, its cloud render still works, and it has no status line of its own | ENGINE (`audible: .stereo` while active; the render is still wanted, `wantedRender`) |
+| 10 | Three status sentences, four states without one | 6.5: every state has a line (table below). 6.1: `downloading` is a status of its own, and a render that cannot start yet is `queued` with a reason | CLOUD reports `RenditionStatus` (the two reasons are the cases `.waitingForNetwork` and `.capReached`); UI reads `env.spatial.statusLine.text` |
+| 11 | A song at a rate the stage does not take | 6.3: it plays without the on-device stage, its cloud render still works, and it has no status line of its own | ENGINE (`audible: .stereo` while active; the render is still wanted, `wantedRender`). The sheet shows no line until the render plays (`SpatialBlock.format`), as on Android |
 
-The lines, as `SpatialStatusLine.line(for:cloudRenders:state:)` gives them (tested against the spec's sentences):
+The lines, as `SpatialStatusLine.of(settings:snapshot:status:cloudRendersOn:)` gives them: the same rules in the
+same order as Android's `SpatialStatusLine.of`, tested against the spec's sentences and against Android's table row
+for row (`CloudAudioContractTests`, "The two services").
 
-| Case | When (a profile is on, the route passes, Sing is off, no render plays yet) | `.text` |
+| Case (Android's) | When (a profile is on, the route passes, Sing is off, the on-device stage plays) | `.text` |
 |---|---|---|
-| `.onDeviceForNow` | cloud renders on; state none, preview, queued without a reason, or processing | On your phone for now. The cloud version takes about a minute. |
-| `.waitingForNetwork` | queued, reason `waitingForNetwork` | On your phone for now. The cloud version waits for Wi-Fi. |
-| `.capReached` | queued, reason `capReached` | On your phone only. This month's cloud limit is reached. |
-| `.gettingCloudVersion` | downloading (or ready and about to take over) | Getting the cloud version. |
-| `.onDeviceOnly` | cloud renders off (either switch) | On your phone only. Turn on cloud renders for the full version. |
-| `.renderFailed` | failed | The cloud version didn't work this time. Still playing on your phone. |
+| `.onPhoneForNow` (`ON_PHONE_FOR_NOW`) | cloud renders on; status `none`, `preview`, `queued` or `processing` | On your phone for now. The cloud version takes about a minute. |
+| `.waitingForWifi` (`WAITING_FOR_WIFI`) | cloud renders on; status `waitingForNetwork` | On your phone for now. The cloud version waits for Wi-Fi. |
+| `.cloudLimitReached` (`CLOUD_LIMIT_REACHED`) | cloud renders on; status `capReached` | On your phone only. This month's cloud limit is reached. |
+| `.gettingCloudVersion` (`GETTING_CLOUD_VERSION`) | cloud renders on; status `downloading`, or `ready` (here, the switch to it comes next) | Getting the cloud version. |
+| `.onPhoneOnly` (`ON_PHONE_ONLY`) | cloud renders off (either switch), whatever the status | On your phone only. Turn on cloud renders for the full version. |
+| `.cloudFailed` (`CLOUD_FAILED`) | cloud renders on; status `failed` | The cloud version didn't work this time. Still playing on your phone. |
 
-| Case | When | `.text` |
+| Case (Android's) | When | `.text` |
 |---|---|---|
-| `.cloudVersion` | a render plays | Playing the cloud version. |
-| `.headphonesOnly` | a profile is on, the route rule fails | Headphones only. Plug in to hear it. |
-| `.pausedForSing` | a profile is on, Sing's instrumental plays | Paused while Sing is on. |
-| `.none` | Off, or nothing loaded | (no line) |
+| `.cloudVersion` (`CLOUD_VERSION`) | a render plays (the route passes, Sing is off) | Playing the cloud version. |
+| `.headphonesOnly` (`HEADPHONES_ONLY`) | a profile is on, the route rule fails (`blockedBy == .route`) | Headphones only. Plug in to hear it. |
+| `.pausedForSing` (`PAUSED_FOR_SING`) | a profile is on, Sing's instrumental plays (`.sing`) | Paused while Sing is on. |
+| `.none` (`NONE`) | Off, nothing loaded, or stereo for a reason 6.5 has no row for: another device while `spatial.route` is `always` (`.remote`), a rate the stage does not take (`.format`) | (no line) |
 
-How the states travel: `SpatialLibrary.status`, `.request` and the `.statusChanged` event carry a `RenditionState`:
-a `RenditionStatus` (the spec's seven: `none preview queued processing downloading ready failed`) plus, only with
-`queued`, a `RenditionQueueReason` (`waitingForNetwork`, `capReached`). CLOUD: say `.downloading` when the FLAC
-starts coming down (from a finished job or from a hit in the shared library), and say why a queued render cannot
-start. The model adds `preview` itself (`RenditionState.shown`).
+How the states travel: `SpatialLibrary.status`, `.request` and the `.statusChanged` event carry a `RenditionStatus`,
+spec 6.1's states with `queued` written as three cases (`queued`, `waitingForNetwork`, `capReached`; `isQueued` is
+true for the three): the same nine, in the same order, as Android's `SpatialRenditionStatus`. CLOUD: say
+`.downloading` when the FLAC starts coming down (from a finished job or from a hit in the shared library), and say
+why a queued render cannot start. The model adds `preview` itself (`RenditionStatus.shown(onDeviceAudible:)`).
 
-One reading the contract made on its own: **"ready but not playing yet"** (the render landed with under 20 s left,
-or waits for a quiet moment) shows `.gettingCloudVersion`. The spec has no line of its own for it.
+Readings both contracts made on their own, because the spec has no row for them (tell the lead if one is wrong):
+
+1. **Ready but not playing yet** (the render landed with under 20 s left, or waits for a quiet moment) shows
+   `.gettingCloudVersion` while cloud renders are on. With a switch off the line is `.onPhoneOnly` even then: cloud
+   renders off is checked before any status, so with a switch off the line never talks about Wi-Fi, the limit or a
+   download. (A draft of this branch showed "Getting the cloud version." there too, since a render on the phone needs
+   no cloud; it was dropped to match Android. The render still plays from the next play on either way.)
+2. **Another device while `spatial.route` is `always`** (`SpatialBlock.remote`, Developer mode only): no line. With
+   `headphones` the same device is the route rule's "no": "Headphones only. Plug in to hear it."
+3. **A rate the stage does not take** (`SpatialBlock.format`): no line until the render plays; the render is still
+   asked for. (This branch first gave it the on-device lines; it now matches Android.)
 
 Still open:
 
 1. **`SpatialOutputKind`'s reading of "headphones"** (section 6): line-out and the Bluetooth call route do not
    count. The spec lists wired, Bluetooth A2DP/LE and USB headset, so this is its letter, but it differs from
-   `AudioRouteMonitor`'s grouping; the Android side should group the same way.
+   `AudioRouteMonitor`'s grouping. Android's map (its 2.9) asks its ENGINE for the same list from the raw device
+   type, with SCO, hearing aids, line out and docks left out; whether the two lists end up identical is ENGINE's
+   work on each side.
 2. **A library job started by mere playback would leave a permanent download** if it reused Sing's audio source as
    it is (section 7.2). The spec says "prepare and upload the song exactly as Cloud Studio does today"; whether that
    includes keeping the download is the owner's call.
@@ -1100,3 +1122,52 @@ Still open:
    time. Whether the two streams' media times agree closely enough for a 250 ms crossfade (encoder delay, padding)
    has not been measured; the switch's only guard is the length check (`requireAligned`, 50 ms). ENGINE: keep that
    check on for renders, and treat `.misaligned` as "use it from the next play", not as a failure.
+6. **Spatial audio's settings in backups** (section 13): Android's seven settings travel in `.pxpl` backups, iOS's do
+   not (like Cloud Studio's own). The spec says nothing; whether they should travel is the owner's call.
+
+---
+
+## 13. The iOS and the Android contract side by side
+
+Compared on 2026-11-11 with the Android contract on `RedSn0w1877/PixlAudio` branch `audio-foundation` at `8f42799`
+(`app/src/main/java/com/theveloper/pixelplay/data/spatial/*.kt`, CI green). They mean the same: the same nine
+statuses in the same order, `preview` added outside the library, a queued render's reason as a status of its own, the
+same ten lines with the same sentences chosen by the same rules in the same order, cloud renders on = Cloud Studio's
+master switch AND `spatial.cloud`, the same seven settings with the same defaults and stored forms (`-1` and any
+negative cap = No limit, 256 … 65536 MB, 1 … 100 a day, a stored `always` honoured). What still differs is listed
+here, each with its reason; small conveniences aside (Android's `SpatialAudible.isSpatial`, iOS's
+`SpatialAudible.isOnDevice`, and the like), nothing else does.
+
+**Names and shapes (same meaning, Swift's form):**
+
+| Android | iOS | Why it differs |
+|---|---|---|
+| `SpatialRenditionStatus` (`NONE` … `FAILED`), `shown(library, onDeviceAudible)`, `isQueued` | `RenditionStatus` (`none` … `failed`), `status.shown(onDeviceAudible:)`, `isQueued` | Swift naming: a method on the library's answer |
+| `SpatialStatusLine` (`ON_PHONE_FOR_NOW` …), `of(settings, audible, status, cloudRendersOn)`; each case quotes its sentence in KDoc, the words go into the UI's string resources | `SpatialStatusLine` (`onPhoneForNow` …), `of(settings:snapshot:status:cloudRendersOn:)`; `.text` holds the English sentence, `SpatialCopy.levelNote` the level note | Swift naming; iOS keeps the source text next to the case (the app localises from it). The sentences are the spec's, word for word, on both (checked against Android's KDoc) |
+| `SpatialRendition` (`STEREO`, `ON_DEVICE`, `CLOUD_RENDER`) plus `SpatialAudible.profile` | `SpatialAudible` (`.stereo`, `.onDevice(p)`, `.render(p)`) | Swift puts the profile in the case: same facts |
+| A nullable `SpatialProfile` for off; `SpatialContract.LIB_V`, `ENGINE_ID` | `SpatialSelection` (`.off` / `.profile(p)`); `CloudLibrary.version`, `.engineId` | Swift naming; unknown stored text is off on both |
+| `SpatialSettings` + `SpatialSettingsRepository` (DataStore, the only writer) | `CloudAudioSettings` + `CloudAudioSettingsStore` (UserDefaults), written only through `SpatialAudioModel`'s setters | each platform's settings store |
+| `SpatialAudioStateHolder` (`currentStatus` = `shown(...)`), what the UI reads | `SpatialAudioModel` (`env.spatial`; `status` = `libraryStatus.shown(...)`, `statusLine`) | each app's state holder; same derivation |
+| `SpatialRender` (file and the manifest's facts) | `LocalRendition` (file and the whole verified manifest: `headroomDb`, `durationMs`, `sampleRate`, `bytes`, diagnostics from `manifest`) | iOS keeps the manifest as stored beside the file; same facts |
+| `SpatialLibraryStats` (`bytesOnPhone`, `spentThisMonthMicroUsd`) | `CloudAudioUsage` (`bytes`, `spentThisMonthMicroUSD`) | naming |
+| `NoOpSpatialLibrary`, `NoOpSpatialPlayback` | `NoopSpatialLibrary`, `NoopSpatialPlayback` | naming |
+
+**How the parts talk (same rules, each platform's plumbing):**
+
+| Android | iOS | Why it differs |
+|---|---|---|
+| The player reports `SpatialAudible.blockedBy` | `SpatialPlaybackSnapshot` carries the facts (`selection`, `route`, `output`, `routePasses`, `singInstrumentalOn`, `audible`) and derives `blockedBy` | The iOS player already publishes those facts; deriving the block in one tested place means it can never disagree with them. Same four blocks, same precedence (route, Sing, another device, format) |
+| `SpatialLibrary.cloudRendersOn: StateFlow<Boolean>`, computed by CLOUD | `SpatialAudioModel.cloudRendersOn` (`settings.cloud && isCloudStudioOn`) | The iOS model already owns `spatial.cloud` and observes Cloud Studio's switch for the screens; CLOUD still enforces both switches itself (it reads the master from `context.cloud.settings.isEnabled`) |
+| `status(videoId, profile): Flow`, `stats: StateFlow`, `events: SharedFlow` (`RenderReady`, `Removed(videoId?)`) | `status(_:)`, `usage()`, and one `events()` stream per reader (`.statusChanged`, `.usageChanged`, `.renditionReady`, `.renditionRemoved(key)`) | Swift's `async` protocols have no hot flows: changes travel in the event stream (`SpatialEventHub`). `.renditionRemoved` names one rendition at a time where Android's `Removed` may name a video or everything |
+| `request(songId, videoId, profile)`, returns nothing; the player calls it | `request(RenditionRequest) -> RenditionStatus` (the `Song`, the video, the profile, a reason `.playing` / `.ahead`); the model calls it when `snapshot.wantedRender` says so | The iOS preparer needs the whole `Song` to upload it, and the model, which knows the current song, is the one caller; it answers the status at once, later ones arrive as events. Same rule for when to ask (Spatial active, a video id, no local render of the selected profile) |
+| The library and the player read the settings flow themselves (the player through `apply`) | Both get every change through `apply(_:)` from the model, in order | The model is the single owner of the settings on iOS |
+| `localRender(videoId, profile)`, `markPlayed`, `removeAll()` | `localRendition(_:)`, `localRenditions(videoId:)`, `markPlayed(_:)`, `removeAll() -> CloudAudioUsage` | iOS also lists a song's renders for Developer mode's per-song diagnostics, and "Remove downloaded renders" answers what is left |
+| — | `SpatialActivation.routePasses` / `isActive`, `SpatialOutputKind`, `SpatialLevel.playbackGain`, `RenditionRetry`, `CloudLibrary` keys, `CloudLibraryManifest` | The iOS foundation put the route, level and backoff rules and the library's keys and manifest in PixlModel, where ENGINE, CLOUD and the tests share them; Android's foundation leaves them to its ENGINE and CLOUD (its map 2.8, 2.9, 3.x). Same rules in the spec |
+
+**Behaviour that differs, and why it may:**
+
+| Android | iOS | Why |
+|---|---|---|
+| `cloudAudio.monthlyCapUSD` is an `Int` of whole dollars; a value of the wrong type reads as the default | A number (`Double`): a fraction is kept as it is, and NaN or ±infinity read as the default (30), never as No limit | iOS's store keeps numbers as numbers, so it can hold what an `Int` cannot; something that is not a number was nobody's choice, and a money guard never opens by accident. The stores never meet (next row) |
+| The seven settings travel in `.pxpl` backups (they are in the shared settings DataStore) | They do not: PixlBackup's catalogue does not list them, like Cloud Studio's own `cloud_studio_*` | iOS backups carry only the portable keys of the Android catalogue, and the cloud settings stay per phone as Cloud Studio's do. If the owner wants Spatial's settings to travel, add the seven keys to `AndroidPreferenceCatalog` with Android's types (the cap as an `int`) |
+| A stored value of the wrong type reads as its default | Not handled specially | Only the app itself writes these keys on iOS (they are not in backups), so a wrong type cannot arrive |
