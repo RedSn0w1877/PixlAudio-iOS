@@ -198,6 +198,18 @@ above the detected cutoff and leaves the side channel as it is; it only runs whe
 | `cloudAudio.monthlyCapUSD` | 30 (owner: "raise it"; Developer mode can set up to 200 or No limit) | Separate from Sing's cap; Sing's $3 cap is unchanged. |
 | `cloudAudio.dailyAhead` | 25 | Songs a day the background queue may send. |
 
+Stored forms (identical on both platforms): `cloudAudio.monthlyCapUSD` "No limit" is `-1`; `cloudAudio.storageMB`
+is kept within 256 … 65536; `cloudAudio.dailyAhead` within 1 … 100; a stored `spatial.route = always` is honoured
+whether or not Developer mode is on (only the row is hidden).
+
+**Two switches.** Cloud Studio's own "Process songs in the cloud" switch is the master: off means no cloud
+activity of any kind, library lookups and downloads included. `spatial.cloud` is Spatial's own switch under it.
+A library job, lookup or download needs both on.
+
+**Money.** Library jobs have their own monthly sum and their own cap (`cloudAudio.monthlyCapUSD`). They are not
+counted against Sing's cap and Sing's jobs are not counted against theirs; Sing's $3 rule with built-in keys does
+not clamp them.
+
 Per song and profile the app tracks: `none` → `preview` (on-device) → `queued` → `processing` → `ready`
 (a verified local render) or `failed` (retry later with backoff: 10 min, 1 h, 1 day).
 
@@ -207,11 +219,19 @@ Per song and profile the app tracks: `none` → `preview` (on-device) → `queue
 2. Else, if `spatial.cloud`: GET `lib/v1/<videoId>/sp-<profile>.json` (signed). 200 and valid → download the FLAC,
    verify bytes and sha256, store. This costs nothing on the GPU and is allowed on any network the user allows
    for cloud work.
-3. Else send a job: prepare and upload the song exactly as Cloud Studio does today (the same preparer: AAC-LC is
-   passed through, everything else is decoded to FLAC), `tasks: ["spatial"]` (plus `"enhance"` when
-   `enhanced.enabled` and no `enhanced.json` exists yet), one render entry for the profile. Reuse the Cloud
-   Studio engine, queue, priority lane, background rules, RunPod client and Active jobs UI. A Sing job still has
+3. Else send a job: prepare and upload the song exactly as Cloud Studio does today on that platform (the same
+   preparer and the same decode-to-FLAC rule; do not add a resample that isn't there today), `tasks: ["spatial"]`
+   (plus `"enhance"` when `enhanced.enabled` and no `enhanced.json` exists yet), one render entry for the profile.
+   `library.source` names the STREAM the audio came from (`itag`, `codec`), not the uploaded FLAC. The request's
+   `executionTimeout` policy is 1 800 000 ms for a job with library tasks (it overrides the endpoint's). Reuse
+   the Cloud Studio engine, queue, priority lane, background rules, RunPod client and Active jobs UI; where the
+   transfer layer only accepts today's slot names, teach it `sp-<profile>` and `enhanced`. A Sing job still has
    priority over library jobs.
+   A render's sample rate is the uploaded file's (44.1 kHz from an iPhone, the stream's own rate from Android), so
+   a phone may fetch a render at a different rate than its own stream: line them up by media time, never by frame
+   count across files.
+   **Enhanced rides on Spatial jobs for now:** there are no `enhance`-only jobs this round (a song is never
+   uploaded just to find out whether its highs are cut off).
 4. On `ok`/`partial`: read the job manifest's `library`, then download each `ok`/`exists` output from its `lib/`
    key and verify it. Never delete `lib/` objects (other devices use them). Delete `in/` and `out/<jobKey>/` as
    today.
@@ -240,13 +260,17 @@ the FLAC and its manifest. The file's presence plus a valid manifest is the inde
   restoration.
 - ReplayGain, gapless/crossfade between songs, lyrics timing, the queue and Now Playing must not notice any of
   this: the queue entry stays the same song.
+- The existing Sing swap fades over 300-700 ms and has no "time left" rule; for these switches the fade is about
+  250 ms and the 20 s rule above is new. Sing's own behaviour must not change.
 - **Level.** Both spatial paths play 4 dB under the source (3.1). While a spatial rendition is audible (on-device
   stage active, or a spatial render playing) the app multiplies its own playback gain for that item (the
   ReplayGain / volume-normalisation gain it already applies) by +4 dB, **capped at unity**: `min(1.0, gain *
   1.585)`. So with loudness normalisation pulling a loud song down by 4 dB or more, Spatial is exactly as loud as
   stereo; without it, Spatial is up to 4 dB quieter and nothing ever clips. Ramp the change with the same 80 ms /
   crossfade ramps. Use the manifest's `headroomDb` for renders and the table's `headroomDb` for the on-device
-  stage (both 4.0 today).
+  stage (both 4.0 today). Streamed songs have no normalisation gain today, so in practice Spatial plays 4 dB under
+  stereo: that is expected (a loud master cannot be spread around the head and stay as loud without crushing its
+  peaks), and the sheet says so in one line (6.5).
 - While the on-device stage is active, Android audio offload is off (processors don't run under offload) and the
   old "virtualizer/width" effects stay bypassed on both platforms.
 
@@ -260,8 +284,19 @@ is not on the phone may be fetched for this (Wi-Fi only). Silent: no notificatio
 ### 6.5 UI
 
 - A **Spatial audio** entry in the full player (a chip/button near the other player actions) opening a sheet:
-  the profile list (name + one line), Off, and a status line for the current song: "On your phone for now. The
-  cloud version takes about a minute." / "Playing the cloud version." / "Headphones only. Plug in to hear it."
+  the profile list (name + one line), Off, and a status line for the current song. Every state has one:
+  | State | Line |
+  |---|---|
+  | on-device stage playing, cloud render wanted (queued, uploading, processing) | On your phone for now. The cloud version takes about a minute. |
+  | render downloading | Getting the cloud version. |
+  | cloud render playing | Playing the cloud version. |
+  | a profile is on, cloud renders are off | On your phone only. Turn on cloud renders for the full version. |
+  | the render failed | The cloud version didn't work this time. Still playing on your phone. |
+  | route rule fails | Headphones only. Plug in to hear it. |
+  | Sing's instrumental mode is on | Paused while Sing is on. |
+  Under the list, one quiet line: "Spatial plays a little quieter so the peaks stay clean."
+- Enhanced audio's switch sits with Spatial audio's rows this round ("Restore highs that the stream cut off",
+  with "Part of cloud renders" under it), because it only acts inside Spatial jobs for now.
 - Settings: a **Sound** group with Spatial audio (profile, cloud toggle, prepare ahead), Enhanced audio, and
   "Songs ready: N · X GB on this phone" with "Remove downloaded renders". Developer mode shows route mode, caps,
   storage budget and per-song diagnostics (source codec, cutoff, stem mode, loudness).
@@ -327,3 +362,7 @@ outL = gain * (yL + loL[n - lowDelay])           # same for R; fir(x, h)[n] = Σ
 
 - Restoration model speed and memory on the 16/24 GB pools (first `bench` after the worker deploys).
 - Whether iOS can play the Opus stream repackaged in MP4 (separate work item; unrelated to this contract).
+- Volume normalisation for streams (so Spatial and stereo are equally loud) is a possible follow-up; it is not
+  part of this round.
+- Enhanced without Spatial (an `enhance`-only job) waits for the restoration model and for a cheap on-phone check
+  of whether a stream is cut off.
