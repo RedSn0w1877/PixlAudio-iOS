@@ -196,8 +196,10 @@ A library job, lookup or download needs both on.
 counted against Sing's cap and Sing's jobs are not counted against theirs; Sing's $3 rule with built-in keys does
 not clamp them.
 
-Per song and profile the app tracks: `none` → `preview` (on-device) → `queued` → `processing` → `ready`
-(a verified local render) or `failed` (retry later with backoff: 10 min, 1 h, 1 day).
+Per song and profile the app tracks: `none` → `preview` (on-device) → `queued` → `processing` → `downloading` →
+`ready` (a verified local render) or `failed` (retry later with backoff: 10 min, 1 h, 1 day). `downloading` is a
+state of its own on both platforms (it has its own status line). A render that is wanted but cannot start yet is
+`queued` with a reason: `waitingForNetwork` (no network the person allows) or `capReached` (the month's limit).
 
 ### 6.2 Getting a render
 
@@ -253,7 +255,12 @@ the FLAC and its manifest. The file's presence plus a valid manifest is the inde
   stereo: that is expected (a loud master cannot be spread around the head and stay as loud without crushing its
   peaks), and the sheet says so in one line (6.5).
 - While the on-device stage is active, Android audio offload is off (processors don't run under offload) and the
-  old "virtualizer/width" effects stay bypassed on both platforms.
+  old "virtualizer/width" effects stay bypassed on both platforms. Turning a profile on mid-song on a phone that
+  was using offload costs one short gap, once; that is accepted (offload stays on for everyone who has no profile
+  selected). Android's Hi-Fi float output leaves custom processors out of the pipeline, so **Spatial wins**: while
+  a profile is selected and Spatial is active, float output is off.
+- A song at a sample rate the on-device stage does not take (not 44.1 or 48 kHz) plays without the on-device stage;
+  the cloud render still works (the worker resamples around the renderer). No status line of its own.
 
 ### 6.4 Background queue (prepare ahead)
 
@@ -269,6 +276,8 @@ is not on the phone may be fetched for this (Wi-Fi only). Silent: no notificatio
   | State | Line |
   |---|---|
   | on-device stage playing, cloud render wanted (queued, uploading, processing) | On your phone for now. The cloud version takes about a minute. |
+  | wanted, but no network the person allows for cloud work | On your phone for now. The cloud version waits for Wi-Fi. |
+  | wanted, but the month's cloud limit is reached | On your phone only. This month's cloud limit is reached. |
   | render downloading | Getting the cloud version. |
   | cloud render playing | Playing the cloud version. |
   | a profile is on, cloud renders are off | On your phone only. Turn on cloud renders for the full version. |
