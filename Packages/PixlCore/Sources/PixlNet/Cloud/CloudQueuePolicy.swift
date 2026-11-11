@@ -737,10 +737,21 @@ public enum CloudRetention {
     public static let inputLifecycleDays = 7
     public static let outputLifecycleDays = 30
 
+    /// Spatial audio's library jobs are many (one per song and profile that played) and worth little once done: their
+    /// renders are on the phone, their failures are in the library's own retry book. Done ones go after a day, failed,
+    /// cancelled and expired ones after three (the background queue rests a failed song for 12 h).
+    public static let keepImportedLibraryMs: Int64 = 86_400_000
+    public static let keepFinishedLibraryMs: Int64 = 3 * 86_400_000
+
     public static func shouldPrune(_ record: CloudJobRecord, nowMs: Int64) -> Bool {
+        let library = record.isLibraryJob
         switch record.state {
-        case .imported: return nowMs - (record.importedAtMs ?? record.createdAtMs) > keepImportedMs
-        case .failed, .cancelled, .expired: return nowMs - (record.updatedAtMs ?? record.createdAtMs) > keepFinishedMs
+        case .imported:
+            let keep = library ? keepImportedLibraryMs : keepImportedMs
+            return nowMs - (record.importedAtMs ?? record.createdAtMs) > keep
+        case .failed, .cancelled, .expired:
+            let keep = library ? keepFinishedLibraryMs : keepFinishedMs
+            return nowMs - (record.updatedAtMs ?? record.createdAtMs) > keep
         default: return false
         }
     }

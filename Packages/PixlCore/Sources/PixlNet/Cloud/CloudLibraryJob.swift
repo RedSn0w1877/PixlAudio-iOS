@@ -213,14 +213,22 @@ public struct CloudLibraryJobInfo: Codable, Sendable, Hashable {
         var list = imported ?? []
         if !list.contains(profile.rawValue) { list.append(profile.rawValue) }
         imported = list
-        if downloading == profile.rawValue { downloading = nil }
+        settle(profile)
     }
 
     public mutating func markRejected(_ profile: SpatialProfile) {
         var list = rejected ?? []
         if !list.contains(profile.rawValue) { list.append(profile.rawValue) }
         rejected = list
+        settle(profile)
+    }
+
+    /// A profile with an outcome needs neither its download slot nor its manifest any more (the store keeps its own
+    /// copy beside the audio; the job list stays small).
+    private mutating func settle(_ profile: SpatialProfile) {
         if downloading == profile.rawValue { downloading = nil }
+        manifests?[profile.rawValue] = nil
+        if manifests?.isEmpty == true { manifests = nil }
     }
 
     /// The job manifest's `library` block (and nothing else of it) is taken over: the per-profile states and the stem

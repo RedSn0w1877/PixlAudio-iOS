@@ -488,6 +488,28 @@ import PixlModel
         #expect(CloudLibrarySource.known(itag: nil, codec: String(repeating: "x", count: 40))?.codec?.count == 16)
     }
 
+    @Test func libraryRecordsStaySmallAndShortLived() throws {
+        var info = CloudLibraryJobInfo(videoId: Self.videoId, profiles: [.studio])
+        info.manifests = ["studio": try CloudLibraryManifest.decode(CloudFixtures.worker("library.render.spatial"))]
+        info.downloading = "studio"
+        info.markImported(.studio)
+        #expect(info.manifests == nil && info.downloading == nil)
+        var record = Self.exampleRecord()
+        record.state = .imported
+        record.importedAtMs = 0
+        #expect(!CloudRetention.shouldPrune(record, nowMs: 86_400_000))
+        #expect(CloudRetention.shouldPrune(record, nowMs: 86_400_001))
+        record.state = .failed
+        record.updatedAtMs = 0
+        #expect(!CloudRetention.shouldPrune(record, nowMs: 3 * 86_400_000))
+        #expect(CloudRetention.shouldPrune(record, nowMs: 3 * 86_400_000 + 1))
+        // Sing's jobs keep their 30 days.
+        var sing = CloudBuilderTests.uploadedRecord()
+        sing.state = .imported
+        sing.importedAtMs = 0
+        #expect(!CloudRetention.shouldPrune(sing, nowMs: 86_400_001))
+    }
+
     @Test func lookupHitSkipsTheUpload() {
         // A library job found in the shared library goes from preparing straight to its results.
         #expect(CloudJobMachine.next(.preparing, on: .resultsReady) == .resultsReady)
