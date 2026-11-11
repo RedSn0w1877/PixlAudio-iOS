@@ -201,6 +201,17 @@ struct OpusStreamPolicyTests {
         #expect(OpusStreamPolicy.durationsAgree(212_000, nil))
     }
 
+    @Test func theDecodeMustLoseThePreSkipAndMayKeepTheEndPadding() {
+        // The 1 s app fixture: 48,000 valid frames, 312 pre-skip, 648 padded at the end.
+        #expect(OpusStreamPolicy.acceptsDecodedFrames(48_000, validSamples: 48_000, endTrim: 648))
+        #expect(OpusStreamPolicy.acceptsDecodedFrames(48_648, validSamples: 48_000, endTrim: 648))   // what AVAssetReader does
+        #expect(OpusStreamPolicy.acceptsDecodedFrames(48_040, validSamples: 48_000, endTrim: 648))
+        #expect(!OpusStreamPolicy.acceptsDecodedFrames(48_312, validSamples: 48_000, endTrim: 648))  // pre-skip not cut
+        #expect(!OpusStreamPolicy.acceptsDecodedFrames(48_960, validSamples: 48_000, endTrim: 648))  // nothing cut
+        #expect(!OpusStreamPolicy.acceptsDecodedFrames(47_000, validSamples: 48_000, endTrim: 648))
+        #expect(!OpusStreamPolicy.acceptsDecodedFrames(0, validSamples: 48_000, endTrim: 0))
+    }
+
     @Test func failuresHoldForTheirKindsWindow() {
         var ledger = OpusFailureLedger()
         let t = 1_000_000.0

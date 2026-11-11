@@ -46,9 +46,42 @@ final class OpusStreamsTests: XCTestCase {
             XCTFail("The check refused the file: \(error.localizedDescription)")
             return
         }
-        XCTAssertEqual(report.decodedFrames, 48_000, "the edit list must remove the pre-skip and the end padding")
+        // AVAssetReader cuts the pre-skip and may decode the last packet whole (648 padded frames).
+        XCTAssertTrue([48_000, 48_648].contains(report.decodedFrames), "decoded \(report.decodedFrames) frames")
         XCTAssertEqual(report.durationSeconds, 1.0, accuracy: 0.0005)
         XCTAssertGreaterThan(report.peak, 1_000)
+    }
+
+    /// Positions line up sample for sample: the system decoder's output matches ffmpeg's decode of the WebM (which
+    /// cuts the pre-skip from CodecDelay) at the reference frames; an uncut pre-skip would be 312 frames late.
+    func testTheDecodeStartsOnTheSameSampleAsTheWebM() async throws {
+        let (url, _) = try remuxedFixture()
+        let asset = AVURLAsset(url: url)
+        let tracks = try await asset.loadTracks(withMediaType: .audio)
+        let track = try XCTUnwrap(tracks.first)
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
+            AVFormatIDKey: kAudioFormatLinearPCM, AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false,
+            AVLinearPCMIsBigEndianKey: false, AVLinearPCMIsNonInterleaved: false,
+        ])
+        reader.add(output)
+        XCTAssertTrue(reader.startReading())
+        var left: [Int16] = []
+        while let buffer = output.copyNextSampleBuffer() {
+            guard let block = CMSampleBufferGetDataBuffer(buffer) else { continue }
+            let length = CMBlockBufferGetDataLength(block)
+            var samples = [Int16](repeating: 0, count: length / 2)
+            _ = samples.withUnsafeMutableBytes { raw in
+                CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: length, destination: raw.baseAddress!)
+            }
+            left += stride(from: 0, to: samples.count, by: 2).map { samples[$0] }
+        }
+        XCTAssertEqual(reader.status, .completed)
+        for (frame, value) in OpusTestFixture.referenceLeft {
+            XCTAssertLessThan(frame, left.count)
+            guard frame < left.count else { continue }
+            XCTAssertEqual(Int(left[frame]), value, accuracy: 64, "frame \(frame)")
+        }
     }
 
     func testThePlayerOpensAndPlaysTheFile() async throws {

@@ -66,6 +66,17 @@ public enum OpusStreamPolicy {
     public static func itag(streamURL: String) -> Int? {
         URLCoding.androidQueryParameter(streamURL, "itag").flatMap { Int($0) }
     }
+
+    /// Whether the system decoder's full decode of a repackaged file has the right length. It must cut the
+    /// pre-skip (the edit's start): otherwise every position would be late by it, and that is refused. It may keep the
+    /// end padding: `AVAssetReader` decodes the last packet whole (CI, iOS 27 simulator: 48,648 frames for a
+    /// 48,000-frame edit with 648 padded), as it does with other formats, while the player stops at the edit's end
+    /// (the item's duration).
+    public static func acceptsDecodedFrames(_ frames: Int64, validSamples: Int, endTrim: Int) -> Bool {
+        let valid = Int64(validSamples)
+        return abs(frames - valid) <= maxDecodedFrameDifference
+            || abs(frames - valid - Int64(endTrim)) <= maxDecodedFrameDifference
+    }
 }
 
 /// Why a video plays AAC instead of Opus, and for how long that holds.

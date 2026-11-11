@@ -107,4 +107,10 @@ nonisolated enum OpusTestFixture {
         """
 
     static var webm: Data? { Data(base64Encoded: webmBase64, options: .ignoreUnknownCharacters) }
+
+    /// ffmpeg's (libopus) decode of the WebM, left channel, at these frames. Read 312 frames late (an uncut
+    /// pre-skip) the same frames would be -2738, 514, -2218, -2231, -2212, -2229, -2726.
+    static let referenceLeft: [(frame: Int, value: Int)] = [
+        (200, -2502), (1000, 2522), (4800, 18), (12000, 11), (24000, 20), (36000, 11), (47000, -2501),
+    ]
 }

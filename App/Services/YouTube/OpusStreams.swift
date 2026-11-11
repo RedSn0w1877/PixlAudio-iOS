@@ -426,7 +426,8 @@ nonisolated struct OpusDownloader: Sendable {
 
 /// Opens a repackaged file the way the player will (`AVURLAsset`) and decodes all of it with `AVAssetReader`, the
 /// decoder the player, Sing's preparer and the on-device models use. It must be one Opus track at 48 kHz with the
-/// expected channels, playable, exactly as long as the valid samples, decode to that many frames, and not be silent.
+/// expected channels, playable, exactly as long as the valid samples, decode without the pre-skip (the end padding
+/// may stay: `OpusStreamPolicy.acceptsDecodedFrames`), and not be silent.
 nonisolated enum OpusPlaybackCheck {
     nonisolated struct Report: Sendable, Equatable {
         var decodedFrames: Int64
@@ -480,9 +481,9 @@ nonisolated enum OpusPlaybackCheck {
         }
         try Task.checkCancellation()
         let (frames, peak) = try decodeAll(asset: asset, track: track)
-        let expected = Int64(summary.validSamples)
-        guard abs(frames - expected) <= OpusStreamPolicy.maxDecodedFrameDifference else {
-            throw Failure.wrongFrameCount(expected: expected, actual: frames)
+        // The pre-skip must be gone; the end padding may still be there (the reader decodes the last packet whole).
+        guard OpusStreamPolicy.acceptsDecodedFrames(frames, validSamples: summary.validSamples, endTrim: summary.endTrim) else {
+            throw Failure.wrongFrameCount(expected: Int64(summary.validSamples), actual: frames)
         }
         guard peak > 32 else { throw Failure.silent }
         return Report(decodedFrames: frames, durationSeconds: seconds, peak: peak)
