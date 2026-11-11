@@ -224,6 +224,48 @@ def test_bench_and_concurrency_check(capsys):
     assert f"peak running workers {MAX}, peak allocated {MAX} (workers.max is {MAX})" in out and "EXTRA" not in out
 
 
+def test_bench_report_shows_the_spatial_stages_and_the_memory_not_the_counts(capsys):
+    class Api:
+        def runsync(self, endpoint_id, job_input, wait_ms=300000):
+            assert job_input == {"v": 1, "op": "bench", "bench": {"seconds": 240}}  # the default: every stage
+            return {"id": "b", "status": "COMPLETED", "output": {
+                "stagesMs": {"decode": 700, "decodedFrames": 10584000, "separate": 12000, "stems4": 9000,
+                             "stems6": 21400, "stems6Stems": 6, "render": 48100, "renderFrames": 10584000,
+                             "encode": 1900},
+                "lazyLoadMs": {"stems4": 9000}, "vramPeakMB": 6100, "ramPeakByStageMB": {"stems6": 5200, "render": 7400},
+                "ramPeakMB": 7400, "ramLimitMB": 31000, "worker": {"gpu": "NVIDIA RTX A4500"},
+                "notes": ["render: studio, stems6, -19.8 LUFS (-15.8 in), true peak -6.4 dB",
+                          "align: no word-timing backend loaded <script>"]}}
+
+    D.bench(Api(), "ep123456", sleep=lambda s: None)
+    out = capsys.readouterr().out
+    assert ("bench (240 s synthetic song): decode 0.7 s, separate 12.0 s, stems4 9.0 s, stems6 21.4 s, "
+            "render 48.1 s, encode 1.9 s") in out
+    assert "Frames" not in out and "stems6Stems" not in out  # counts are not seconds
+    assert "process memory peak stems6 5200 MB, render 7400 MB (overall 7400 MB; the container may use 31000 MB)" in out
+    assert "bench: render: studio, stems6, -19.8 LUFS (-15.8 in), true peak -6.4 dB" in out
+    assert "<script>" not in out and "align: no word-timing" not in out
+
+
+def test_the_deploy_knows_the_workers_bench_stages():
+    sys.path.insert(0, str(ROOT / "src"))
+    from pixl_worker import schema
+
+    assert D.BENCH_STAGES == schema.BENCH_STAGES
+
+
+def test_selftest_report_shows_the_library_and_the_host(capsys):
+    D.report_selftest({"worker": {"gpu": "NVIDIA L4", "vramGB": 22.5, "cuda": "12.8"}, "supported": [1],
+                       "coldStartMs": 14200, "models": {"htdemucs_6s": "lazy", "anvuew-bs-roformer-ft1": True},
+                       "caps": {"maxInputMB": 160, "maxAudioS": 900, "hostsConfigured": 1},
+                       "library": {"libV": 1, "engine": "pixl-spatial-1", "profiles": ["studio", "wide"]},
+                       "host": {"cpus": 8, "ramLimitMB": 31000}})
+    out = capsys.readouterr().out
+    assert "htdemucs_6s=lazy" in out and "library: v1, 2 profiles; host: 8 CPUs, memory limit 31000 MB" in out
+    D.report_selftest({"worker": {}, "supported": [1], "models": {}, "caps": {"hostsConfigured": 1}})  # 1.0.0
+    assert "library:" not in capsys.readouterr().out
+
+
 def test_the_concurrency_check_reports_workers_beyond_the_max(capsys):
     api = FakeRunPod(deployed(), running=(MAX + 1,))
     assert D.concurrency_check(api, "ep123456", max_workers=MAX, sleep=lambda s: None) == MAX + 1
