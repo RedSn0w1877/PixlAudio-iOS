@@ -91,8 +91,8 @@ frozen contract is untouched.
 - CI (`ci.yml`): 43081972153 red (an exhaustive switch over `ActiveJob.Kind` in `App/Services/ActiveJobs.swift`,
   fixed in 80202ba); 43082757469 attempt 1 red only on the known timing test
   `testCrossfadeOverlapsBothDecksWithTheirGainCurves` (0.897 s against 1 ± 0.1), attempt 2 green: build, 604 app unit
-  tests, `core`. 43088162171 green at 8b569ad. Then `audio-hq` (the Opus merge) was merged in, without conflicts:
-  `gh run list --repo RedSn0w1877/PixlAudio-iOS --branch audio-cloud` for that run.
+  tests, `core`. 43088162171 green at 8b569ad. Then `audio-hq` (60b204f, the Opus merge) was merged in without
+  conflicts: 43089981513 green at d71c901 (app build and unit tests, `core`).
 
 ## Divergences and readings (lead, please confirm or overrule)
 
