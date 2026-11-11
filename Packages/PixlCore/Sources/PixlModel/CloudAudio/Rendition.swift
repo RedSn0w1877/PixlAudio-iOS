@@ -34,59 +34,51 @@ public struct RenditionKey: Sendable, Hashable, CustomStringConvertible {
     public var description: String { "\(videoId)/\(slot)" }
 }
 
-/// Where a song's rendition stands on this phone (spec 6.1): `none` → `preview` (the on-device stage) → `queued` →
-/// `processing` → `downloading` → `ready` (a verified local render), or `failed` (tried again later, see
-/// `RenditionRetry`).
+/// Where one song stands for one profile (spec 6.1: "Per song and profile the app tracks: `none` → `preview`
+/// (on-device) → `queued` → `processing` → `downloading` → `ready` … or `failed`"), keyed by `RenditionKey`; the order
+/// of the cases is the usual way forward. The Android app's `SpatialRenditionStatus` has the same nine cases in the
+/// same order.
+///
+/// The spec's `queued` is three cases here, because "a render that is wanted but cannot start yet is `queued` with a
+/// reason" (6.1) and each reason has its own status line (6.5): `queued` with no reason, `waitingForNetwork` and
+/// `capReached`. `isQueued` is true for all three.
+///
+/// `SpatialLibrary` keeps and reports the cloud's side of it: every case but `preview`, which is the player's fact and
+/// is added by `shown(onDeviceAudible:)`.
 public enum RenditionStatus: String, Sendable, Hashable, Codable, CaseIterable {
-    /// Nothing is known or wanted.
+    /// Nothing is known, wanted or under way for this song and profile.
     case none
-    /// The on-device stage stands in; no cloud work is under way (yet, or at all).
+    /// The on-device stage stands in and no cloud work is under way, yet or at all (6.1 "preview (on-device)"). Never
+    /// reported by the library: see `shown(onDeviceAudible:)`.
     case preview
-    /// Wanted from the cloud: waiting for the library check, the upload or a GPU, or unable to start yet
-    /// (`RenditionQueueReason`).
+    /// Wanted from the cloud and not on a GPU yet: the shared-library check, preparing and uploading the song, or
+    /// waiting for a worker (6.2 steps 2-3).
     case queued
-    /// The song is uploaded and the cloud is rendering it.
+    /// `queued` with the reason `waitingForNetwork` (6.1): wanted, but there is no network the person allows for cloud
+    /// work. It starts by itself when one comes back.
+    case waitingForNetwork
+    /// `queued` with the reason `capReached` (6.1): wanted, but the month's limit for library jobs
+    /// (`cloudAudio.monthlyCapUSD`) is reached.
+    case capReached
+    /// The GPU is working on it (6.2 step 3).
     case processing
-    /// A finished render (this job's, or one the shared library already had) is coming down and being verified.
+    /// The render exists, in the shared library or as the result of the job, and is coming down to be verified (6.2
+    /// steps 2 and 4). A state of its own on both platforms (6.1), with its own line.
     case downloading
-    /// A verified render is in the local store.
+    /// A verified render is in the local store (6.2 "Local store"): every later play starts on it (6.3).
     case ready
-    /// The last try failed; it is tried again after a pause.
+    /// The last attempt failed. It is tried again later with backoff (`RenditionRetry`: 10 minutes, 1 hour, 1 day).
     case failed
 
-    /// The cloud is on its way to a render.
-    public var isInFlight: Bool { self == .queued || self == .processing || self == .downloading }
-}
+    /// The spec's `queued` (6.1), with or without a reason: `queued`, `waitingForNetwork` or `capReached`.
+    public var isQueued: Bool { self == .queued || self == .waitingForNetwork || self == .capReached }
 
-/// Why a render that is wanted cannot start yet (spec 6.1: `queued` with a reason).
-public enum RenditionQueueReason: String, Sendable, Hashable, Codable, CaseIterable {
-    /// No network the person allows for cloud work.
-    case waitingForNetwork
-    /// The month's limit for library jobs is reached.
-    case capReached
-}
-
-/// A rendition's status, with the reason when it is queued and cannot start.
-public struct RenditionState: Sendable, Hashable {
-    public var status: RenditionStatus
-    /// Only ever set together with `queued`.
-    public var queueReason: RenditionQueueReason?
-
-    /// A reason given with any status but `queued` is dropped.
-    public init(_ status: RenditionStatus, queueReason: RenditionQueueReason? = nil) {
-        self.status = status
-        self.queueReason = status == .queued ? queueReason : nil
-    }
-
-    public static let none = RenditionState(.none)
-    public static let ready = RenditionState(.ready)
-
-    /// What the person is told for the playing song: the library's own state once the cloud is doing or has done
-    /// something, else `preview` while the on-device stage is what plays.
-    public func shown(onDeviceAudible: Bool) -> RenditionState {
-        switch status {
-        case .queued, .processing, .downloading, .ready, .failed: self
-        case .none, .preview: RenditionState(onDeviceAudible ? .preview : .none)
+    /// What the person is told for the playing song (6.1), `self` being the library's answer: that answer when the cloud
+    /// is doing or has done something, else `preview` while the on-device stage is what plays, else `none`.
+    public func shown(onDeviceAudible: Bool) -> RenditionStatus {
+        switch self {
+        case .none, .preview: onDeviceAudible ? .preview : .none
+        case .queued, .waitingForNetwork, .capReached, .processing, .downloading, .ready, .failed: self
         }
     }
 }

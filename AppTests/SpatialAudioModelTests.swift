@@ -11,9 +11,9 @@ import XCTest
 private final class FakeSpatialLibrary: SpatialLibrary {
     var applied: [CloudAudioSettings] = []
     var requests: [RenditionRequest] = []
-    var statuses: [RenditionKey: RenditionState] = [:]
-    /// What `request` answers (and records as the state).
-    var requestAnswer = RenditionState(.queued)
+    var statuses: [RenditionKey: RenditionStatus] = [:]
+    /// What `request` answers (and records as the status).
+    var requestAnswer = RenditionStatus.queued
     var usageNow = CloudAudioUsage(songsReady: 2, bytes: 52_000_000)
     var removals = 0
     let hub = SpatialEventHub<SpatialLibraryEvent>()
@@ -21,9 +21,9 @@ private final class FakeSpatialLibrary: SpatialLibrary {
     func apply(_ settings: CloudAudioSettings) async { applied.append(settings) }
     func localRendition(_ key: RenditionKey) async -> LocalRendition? { nil }
     func localRenditions(videoId: String) async -> [LocalRendition] { [] }
-    func status(_ key: RenditionKey) async -> RenditionState { statuses[key] ?? RenditionState.none }
+    func status(_ key: RenditionKey) async -> RenditionStatus { statuses[key] ?? RenditionStatus.none }
 
-    func request(_ request: RenditionRequest) async -> RenditionState {
+    func request(_ request: RenditionRequest) async -> RenditionStatus {
         requests.append(request)
         statuses[request.key] = requestAnswer
         return requestAnswer
@@ -213,9 +213,9 @@ final class SpatialAudioModelTests: XCTestCase {
         XCTAssertEqual(request.key, RenditionKey(videoId: Self.videoId, profile: .studio))
         XCTAssertEqual(request.song.id, "sp:1")
         XCTAssertEqual(request.reason, .playing)
-        await eventually { rig.model.libraryState.status == .queued }
+        await eventually { rig.model.libraryStatus == .queued }
         XCTAssertEqual(rig.model.status, .queued)
-        XCTAssertEqual(rig.model.statusLine, .onDeviceForNow)
+        XCTAssertEqual(rig.model.statusLine, .onPhoneForNow)
         XCTAssertTrue(rig.model.isActive)
 
         // The same snapshot again (a route flicker, say) asks for nothing new.
@@ -224,9 +224,11 @@ final class SpatialAudioModelTests: XCTestCase {
         XCTAssertEqual(rig.library.requests.count, 1)
 
         // The render lands and the player switches to it: the line says so, and nothing more is wanted.
-        rig.library.statuses[request.key] = RenditionState.ready
-        rig.library.hub.send(.statusChanged(request.key, RenditionState.ready))
-        await eventually { rig.model.libraryState.status == .ready }
+        rig.library.statuses[request.key] = RenditionStatus.ready
+        rig.library.hub.send(.statusChanged(request.key, RenditionStatus.ready))
+        await eventually { rig.model.libraryStatus == .ready }
+        // Here, the switch has not happened yet.
+        XCTAssertEqual(rig.model.statusLine, .gettingCloudVersion)
         rig.playback.move(to: playing(.studio, audible: .render(.studio)))
         await eventually { rig.model.statusLine == .cloudVersion }
         XCTAssertEqual(rig.library.requests.count, 1)
@@ -269,7 +271,24 @@ final class SpatialAudioModelTests: XCTestCase {
         await eventually { rig.model.snapshot == local }
         try? await Task.sleep(for: .milliseconds(80))
         XCTAssertTrue(rig.library.requests.isEmpty)
-        XCTAssertEqual(rig.model.libraryState, RenditionState.none)
+        XCTAssertEqual(rig.model.libraryStatus, RenditionStatus.none)
+    }
+
+    func testASongTheStageCannotTakeAsksForItsRenderAndShowsNoLine() async {
+        let rig = makeRig()
+        rig.model.select(.profile(.studio))
+        rig.model.start()
+        await eventually { rig.playback.hub.subscriberCount == 1 }
+        // Active, but its sample rate is not one the on-device stage takes: plain stereo until the render plays.
+        rig.playback.move(to: playing(.studio, audible: .stereo))
+        await eventually { rig.library.requests.count == 1 }
+        XCTAssertEqual(rig.model.snapshot.blockedBy, .format)
+        await eventually { rig.model.libraryStatus == .queued }
+        // No line of its own (spec 6.3): none, as on Android.
+        XCTAssertEqual(rig.model.status, .queued)
+        XCTAssertEqual(rig.model.statusLine, .none)
+        rig.playback.move(to: playing(.studio, audible: .render(.studio)))
+        await eventually { rig.model.statusLine == .cloudVersion }
     }
 
     func testNothingIsAskedForASongThatIsNoLongerTheCurrentOne() async {
@@ -288,36 +307,37 @@ final class SpatialAudioModelTests: XCTestCase {
         rig.model.select(.profile(.studio))
         rig.model.start()
         await eventually { rig.model.usage.songsReady == 2 }
-        rig.library.requestAnswer = RenditionState(.processing)
+        rig.library.requestAnswer = .processing
         rig.playback.move(to: playing(.studio))
-        await eventually { rig.model.libraryState.status == .processing }
+        await eventually { rig.model.libraryStatus == .processing }
         let key = RenditionKey(videoId: Self.videoId, profile: .studio)
         // Another song's render: not this line's business.
-        rig.library.hub.send(.statusChanged(RenditionKey(videoId: "AAAAAAAAAAA", profile: .studio), RenditionState(.failed)))
+        rig.library.hub.send(.statusChanged(RenditionKey(videoId: "AAAAAAAAAAA", profile: .studio), .failed))
         rig.library.hub.send(.usageChanged(CloudAudioUsage(songsReady: 3, bytes: 80_000_000)))
         await eventually { rig.model.usage.songsReady == 3 }
-        XCTAssertEqual(rig.model.libraryState.status, .processing)
+        XCTAssertEqual(rig.model.libraryStatus, .processing)
         // It cannot start yet: no allowed network, then the month's limit. Each has its own line.
-        rig.library.hub.send(.statusChanged(key, RenditionState(.queued, queueReason: .waitingForNetwork)))
-        await eventually { rig.model.statusLine == .waitingForNetwork }
+        rig.library.hub.send(.statusChanged(key, .waitingForNetwork))
+        await eventually { rig.model.statusLine == .waitingForWifi }
         XCTAssertEqual(rig.model.statusLine.text, "On your phone for now. The cloud version waits for Wi-Fi.")
-        rig.library.hub.send(.statusChanged(key, RenditionState(.queued, queueReason: .capReached)))
-        await eventually { rig.model.statusLine == .capReached }
-        XCTAssertEqual(rig.model.state.queueReason, .capReached)
+        rig.library.hub.send(.statusChanged(key, .capReached))
+        await eventually { rig.model.statusLine == .cloudLimitReached }
+        XCTAssertEqual(rig.model.status, .capReached)
+        XCTAssertTrue(rig.model.status.isQueued)
         // The render is coming down, then the try fails: each has its own line.
-        rig.library.hub.send(.statusChanged(key, RenditionState(.downloading)))
+        rig.library.hub.send(.statusChanged(key, .downloading))
         await eventually { rig.model.status == .downloading }
         XCTAssertEqual(rig.model.statusLine, .gettingCloudVersion)
-        rig.library.hub.send(.statusChanged(key, RenditionState(.failed)))
+        rig.library.hub.send(.statusChanged(key, .failed))
         await eventually { rig.model.status == .failed }
-        XCTAssertEqual(rig.model.statusLine, .renderFailed)
+        XCTAssertEqual(rig.model.statusLine, .cloudFailed)
         XCTAssertEqual(rig.model.statusLine.text, "The cloud version didn't work this time. Still playing on your phone.")
     }
 
     func testCloudRendersNeedBothSwitches() async {
         // Cloud Studio's own switch is off: Spatial's switch alone is not enough.
         let rig = makeRig(cloudStudioOn: false)
-        rig.library.requestAnswer = RenditionState.none
+        rig.library.requestAnswer = RenditionStatus.none
         rig.model.select(.profile(.studio))
         XCTAssertTrue(rig.model.settings.cloud)
         XCTAssertFalse(rig.model.isCloudStudioOn)
@@ -326,23 +346,23 @@ final class SpatialAudioModelTests: XCTestCase {
         await eventually { rig.playback.hub.subscriberCount == 1 }
         rig.playback.move(to: playing(.studio))
         await eventually { rig.model.snapshot.songId == "sp:1" }
-        XCTAssertEqual(rig.model.statusLine, .onDeviceOnly)
+        XCTAssertEqual(rig.model.statusLine, .onPhoneOnly)
         // The library was asked and said no (deciding is its job, with both switches in hand).
         await eventually { rig.library.requests.count == 1 }
-        XCTAssertEqual(rig.model.libraryState, RenditionState.none)
+        XCTAssertEqual(rig.model.libraryStatus, RenditionStatus.none)
 
         // The master is switched on: the model sees it and asks again for the playing song.
-        rig.library.requestAnswer = RenditionState(.queued)
+        rig.library.requestAnswer = .queued
         rig.switches.studioOn = true
         await eventually { rig.model.isCloudStudioOn }
         XCTAssertTrue(rig.model.cloudRendersOn)
         await eventually { rig.library.requests.count == 2 }
-        await eventually { rig.model.statusLine == .onDeviceForNow }
+        await eventually { rig.model.statusLine == .onPhoneForNow }
 
-        // Spatial's own switch off: on-device only again.
+        // Spatial's own switch off: on-device only again, whatever the library says.
         rig.model.setCloud(false)
         XCTAssertFalse(rig.model.cloudRendersOn)
-        XCTAssertEqual(rig.model.statusLine, .onDeviceOnly)
+        XCTAssertEqual(rig.model.statusLine, .onPhoneOnly)
     }
 
     func testTheDefaultOfTheCloudSwitchFollowsTheBuiltInKeys() async {
@@ -374,7 +394,7 @@ final class SpatialAudioModelTests: XCTestCase {
         let rig = makeRig()
         rig.model.select(.profile(.surround))
         let demo = playing(.surround, audible: .render(.surround))
-        rig.model.setDemo(snapshot: demo, libraryState: RenditionState.ready, usage: CloudAudioUsage(songsReady: 12, bytes: 1_400_000_000))
+        rig.model.setDemo(snapshot: demo, libraryStatus: .ready, usage: CloudAudioUsage(songsReady: 12, bytes: 1_400_000_000))
         rig.model.start()
         rig.playback.move(to: playing(.surround))
         try? await Task.sleep(for: .milliseconds(120))

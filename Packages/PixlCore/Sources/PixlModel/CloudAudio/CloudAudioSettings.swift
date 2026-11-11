@@ -62,7 +62,9 @@ public struct CloudAudioSettings: Sendable, Hashable {
     public var prepareAhead: Bool
     /// `cloudAudio.storageMB`. Default 3072.
     public var storageMB: Int
-    /// `cloudAudio.monthlyCapUSD`. Default 30; nil is "No limit" (Developer mode).
+    /// `cloudAudio.monthlyCapUSD`. Default 30; nil is "No limit" (Developer mode). Library jobs have their own
+    /// monthly sum under this cap (spec 6.1 "Money"): they are not counted against Sing's cap, Sing's jobs are not
+    /// counted against this one, and Sing's $3 rule with built-in keys does not clamp it.
     public var monthlyCapUSD: Double?
     /// `cloudAudio.dailyAhead`. Default 25.
     public var dailyAhead: Int
@@ -74,7 +76,8 @@ public struct CloudAudioSettings: Sendable, Hashable {
     public static let defaultMonthlyCapUSD: Double = 30
     /// The highest cap Developer mode offers before "No limit".
     public static let maxMonthlyCapUSD: Double = 200
-    /// "No limit" is stored as -1 under `cloudAudio.monthlyCapUSD` (any negative number reads as no limit).
+    /// "No limit" is stored as -1 under `cloudAudio.monthlyCapUSD` (any negative number reads as no limit; something
+    /// that is not a number reads as the default: a money guard never opens by accident).
     public static let noLimitStoredValue: Double = -1
     public static let defaultDailyAhead = 25
     /// A stored daily count is kept within 1 … 100.
@@ -118,15 +121,18 @@ public struct CloudAudioSettings: Sendable, Hashable {
         min(max(value, dailyAheadRange.lowerBound), dailyAheadRange.upperBound)
     }
 
-    /// A stored cap as the cap in force: negative (or not a number) is no limit, else 0 … 200 dollars.
+    /// A stored cap as the cap in force: a negative number is no limit, else 0 … 200 dollars. Something that is not a
+    /// number (NaN, an infinity) was nobody's choice, so the default applies.
     public static func monthlyCap(fromStored value: Double) -> Double? {
-        guard value.isFinite, value >= 0 else { return nil }
+        guard value.isFinite else { return defaultMonthlyCapUSD }
+        guard value >= 0 else { return nil }
         return min(value, maxMonthlyCapUSD)
     }
 
     /// A cap as it is stored (nil, "No limit", is `noLimitStoredValue`).
     public static func storedMonthlyCap(_ cap: Double?) -> Double {
         guard let cap else { return noLimitStoredValue }
+        guard cap.isFinite else { return defaultMonthlyCapUSD }
         return min(max(cap, 0), maxMonthlyCapUSD)
     }
 

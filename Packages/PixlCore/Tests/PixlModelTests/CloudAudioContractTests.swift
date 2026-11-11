@@ -167,7 +167,11 @@ struct CloudAudioSettingsTests {
     @Test func noLimitIsStoredAsMinusOne() {
         #expect(CloudAudioSettings.noLimitStoredValue == -1)
         #expect(CloudAudioSettings.monthlyCap(fromStored: -1) == nil)
-        #expect(CloudAudioSettings.monthlyCap(fromStored: .nan) == nil)
+        // Something that is not a number was nobody's choice: the default, never "no limit".
+        #expect(CloudAudioSettings.monthlyCap(fromStored: .nan) == 30)
+        #expect(CloudAudioSettings.monthlyCap(fromStored: .infinity) == 30)
+        #expect(CloudAudioSettings.monthlyCap(fromStored: -.infinity) == 30)
+        #expect(CloudAudioSettings.storedMonthlyCap(.nan) == 30)
         #expect(CloudAudioSettings.monthlyCap(fromStored: 0) == 0)
         #expect(CloudAudioSettings.monthlyCap(fromStored: 75) == 75)
         #expect(CloudAudioSettings.storedMonthlyCap(nil) == -1)
@@ -209,32 +213,28 @@ struct RenditionTests {
         #expect(RenditionKey(videoId: "J7p4bzqLvCw", profile: .wide).description == "J7p4bzqLvCw/sp-wide")
     }
 
-    @Test func theStatusesAreTheSpecsSeven() {
+    @Test func theStatusesAreTheSpecsWithQueuedAsThreeCasesInAndroidsOrder() {
+        // Android's `SpatialRenditionStatus`: NONE, PREVIEW, QUEUED, WAITING_FOR_NETWORK, CAP_REACHED, PROCESSING,
+        // DOWNLOADING, READY, FAILED.
         #expect(RenditionStatus.allCases.map(\.rawValue)
-            == ["none", "preview", "queued", "processing", "downloading", "ready", "failed"])
-        #expect(RenditionStatus.queued.isInFlight && RenditionStatus.processing.isInFlight
-            && RenditionStatus.downloading.isInFlight)
-        #expect(!RenditionStatus.ready.isInFlight && !RenditionStatus.failed.isInFlight && !RenditionStatus.preview.isInFlight)
+            == ["none", "preview", "queued", "waitingForNetwork", "capReached", "processing", "downloading", "ready",
+                "failed"])
+        // The spec's `queued`, with or without a reason.
+        let queued: Set<RenditionStatus> = [.queued, .waitingForNetwork, .capReached]
+        for status in RenditionStatus.allCases {
+            #expect(status.isQueued == queued.contains(status), "\(status)")
+        }
     }
 
-    @Test func onlyAQueuedRenderCarriesAReason() {
-        #expect(RenditionQueueReason.allCases.map(\.rawValue) == ["waitingForNetwork", "capReached"])
-        #expect(RenditionState(.queued, queueReason: .capReached).queueReason == .capReached)
-        #expect(RenditionState(.queued).queueReason == nil)
-        #expect(RenditionState(.processing, queueReason: .waitingForNetwork) == RenditionState(.processing))
-        #expect(RenditionState.none == RenditionState(.none))
-        #expect(RenditionState.ready.status == .ready)
-    }
-
-    @Test func theShownStateIsTheLibrarysOnceTheCloudIsInvolvedElsePreviewWhileTheStagePlays() {
-        #expect(RenditionState.none.shown(onDeviceAudible: true) == RenditionState(.preview))
-        #expect(RenditionState.none.shown(onDeviceAudible: false) == RenditionState.none)
-        let waiting = RenditionState(.queued, queueReason: .waitingForNetwork)
-        #expect(waiting.shown(onDeviceAudible: true) == waiting)
-        #expect(RenditionState(.processing).shown(onDeviceAudible: true).status == .processing)
-        #expect(RenditionState(.downloading).shown(onDeviceAudible: true).status == .downloading)
-        #expect(RenditionState.ready.shown(onDeviceAudible: false) == RenditionState.ready)
-        #expect(RenditionState(.failed).shown(onDeviceAudible: true).status == .failed)
+    @Test func theShownStatusIsTheLibrarysOnceTheCloudIsInvolvedElsePreviewWhileTheStagePlays() {
+        #expect(RenditionStatus.none.shown(onDeviceAudible: true) == .preview)
+        #expect(RenditionStatus.none.shown(onDeviceAudible: false) == RenditionStatus.none)
+        #expect(RenditionStatus.preview.shown(onDeviceAudible: false) == RenditionStatus.none)
+        #expect(RenditionStatus.preview.shown(onDeviceAudible: true) == .preview)
+        for status in RenditionStatus.allCases where status != .none && status != .preview {
+            #expect(status.shown(onDeviceAudible: true) == status, "\(status)")
+            #expect(status.shown(onDeviceAudible: false) == status, "\(status)")
+        }
     }
 
     @Test func failuresAreRetriedAfterTenMinutesAnHourThenADay() {
@@ -448,10 +448,10 @@ struct SpatialServicesTests {
         await library.apply(CloudAudioSettings(builtInCloudKeys: true))
         #expect(await library.localRendition(key) == nil)
         #expect(await library.localRenditions(videoId: key.videoId).isEmpty)
-        #expect(await library.status(key) == RenditionState.none)
+        #expect(await library.status(key) == RenditionStatus.none)
         let request = RenditionRequest(song: song, videoId: key.videoId, profile: key.profile)
         #expect(request.key == key && request.reason == .playing)
-        #expect(await library.request(request) == RenditionState.none)
+        #expect(await library.request(request) == RenditionStatus.none)
         await library.markPlayed(key)
         #expect(await library.usage() == .empty)
         #expect(await library.removeAll() == .empty)
@@ -500,6 +500,43 @@ struct SpatialServicesTests {
         #expect(!snapshot.isActive && snapshot.wantedRender == nil)
     }
 
+    @Test func whatHoldsASelectedProfileBackComesInAndroidsOrder() {
+        var snapshot = SpatialPlaybackSnapshot(songId: "sp:1", videoId: CloudAudioFixtures.videoId,
+                                               selection: .profile(.studio), output: .bluetooth, routePasses: true,
+                                               audible: .onDevice(.studio))
+        #expect(snapshot.route == .headphones)
+        #expect(snapshot.blockedBy == nil)
+        snapshot.audible = .render(.studio)
+        #expect(snapshot.blockedBy == nil)
+        // A rate the stage does not take: stereo while active.
+        snapshot.audible = .stereo
+        #expect(snapshot.blockedBy == .format)
+        // Sing comes before the format.
+        snapshot.singInstrumentalOn = true
+        #expect(snapshot.blockedBy == .sing)
+        // The route comes first.
+        snapshot.output = .phoneSpeaker
+        snapshot.routePasses = false
+        #expect(snapshot.blockedBy == .route)
+        // A device that plays the music itself: the route rule's "no" while the mode is headphones…
+        snapshot.singInstrumentalOn = false
+        snapshot.output = .remote
+        #expect(snapshot.blockedBy == .route)
+        // …and the device itself while the mode is `always` (Sing still comes first then).
+        snapshot.route = .always
+        #expect(SpatialActivation.routePasses(mode: snapshot.route, output: snapshot.output) == snapshot.routePasses)
+        #expect(snapshot.blockedBy == .remote)
+        snapshot.singInstrumentalOn = true
+        #expect(snapshot.blockedBy == .sing)
+        // Nothing selected, or nothing loaded: nothing is held back.
+        snapshot.selection = .off
+        #expect(snapshot.blockedBy == nil)
+        snapshot.selection = .profile(.studio)
+        snapshot.songId = nil
+        #expect(snapshot.blockedBy == nil)
+        #expect(SpatialBlock.allCases == [.route, .sing, .remote, .format])
+    }
+
     @Test func whatIsAudibleSaysItsProfile() {
         #expect(SpatialAudible.stereo.profile == nil)
         #expect(SpatialAudible.onDevice(.hall).profile == .hall)
@@ -510,70 +547,86 @@ struct SpatialServicesTests {
     }
 
     @Test func everyStateOfTheSheetHasTheSpecsSentence() {
-        #expect(SpatialStatusLine.onDeviceForNow.text == "On your phone for now. The cloud version takes about a minute.")
-        #expect(SpatialStatusLine.waitingForNetwork.text == "On your phone for now. The cloud version waits for Wi-Fi.")
-        #expect(SpatialStatusLine.capReached.text == "On your phone only. This month's cloud limit is reached.")
+        #expect(SpatialStatusLine.onPhoneForNow.text == "On your phone for now. The cloud version takes about a minute.")
+        #expect(SpatialStatusLine.waitingForWifi.text == "On your phone for now. The cloud version waits for Wi-Fi.")
+        #expect(SpatialStatusLine.cloudLimitReached.text == "On your phone only. This month's cloud limit is reached.")
         #expect(SpatialStatusLine.gettingCloudVersion.text == "Getting the cloud version.")
         #expect(SpatialStatusLine.cloudVersion.text == "Playing the cloud version.")
-        #expect(SpatialStatusLine.onDeviceOnly.text == "On your phone only. Turn on cloud renders for the full version.")
-        #expect(SpatialStatusLine.renderFailed.text == "The cloud version didn't work this time. Still playing on your phone.")
+        #expect(SpatialStatusLine.onPhoneOnly.text == "On your phone only. Turn on cloud renders for the full version.")
+        #expect(SpatialStatusLine.cloudFailed.text == "The cloud version didn't work this time. Still playing on your phone.")
         #expect(SpatialStatusLine.headphonesOnly.text == "Headphones only. Plug in to hear it.")
         #expect(SpatialStatusLine.pausedForSing.text == "Paused while Sing is on.")
         #expect(SpatialStatusLine.none.text == nil)
-        #expect(SpatialStatusLine.allCases.count == 10)
+        // Android's `SpatialStatusLine`, case for case and in its order.
+        #expect(SpatialStatusLine.allCases == [.none, .onPhoneForNow, .waitingForWifi, .cloudLimitReached,
+                                               .gettingCloudVersion, .cloudVersion, .onPhoneOnly, .cloudFailed,
+                                               .headphonesOnly, .pausedForSing])
         #expect(SpatialCopy.levelNote == "Spatial plays a little quieter so the peaks stay clean.")
     }
 
     @Test func theStatusLineFollowsWhatPlays() {
+        var settings = CloudAudioSettings(builtInCloudKeys: true)
+        settings.profile = .profile(.studio)
         var snapshot = SpatialPlaybackSnapshot(songId: "sp:1", videoId: CloudAudioFixtures.videoId,
                                                selection: .profile(.studio), output: .wiredHeadphones, routePasses: true,
                                                audible: .onDevice(.studio))
-        func line(cloudRenders: Bool = true, _ status: RenditionStatus,
-                  _ reason: RenditionQueueReason? = nil) -> SpatialStatusLine {
-            SpatialStatusLine.line(for: snapshot, cloudRenders: cloudRenders,
-                                   state: RenditionState(status, queueReason: reason))
+        func line(cloudRendersOn: Bool = true, _ status: RenditionStatus) -> SpatialStatusLine {
+            SpatialStatusLine.of(settings: settings, snapshot: snapshot, status: status, cloudRendersOn: cloudRendersOn)
         }
-        // The on-device stage plays: the line follows the cloud.
-        #expect(line(.none) == .onDeviceForNow)
-        #expect(line(.preview) == .onDeviceForNow)
-        #expect(line(.queued) == .onDeviceForNow)
-        #expect(line(.queued, .waitingForNetwork) == .waitingForNetwork)
-        #expect(line(.queued, .capReached) == .capReached)
-        #expect(line(.processing) == .onDeviceForNow)
-        #expect(line(.downloading) == .gettingCloudVersion)
-        // Here already, the switch has not happened yet.
-        #expect(line(.ready) == .gettingCloudVersion)
-        #expect(line(.failed) == .renderFailed)
-        // Cloud renders off (either switch) comes before anything the library says.
-        #expect(line(cloudRenders: false, .none) == .onDeviceOnly)
-        #expect(line(cloudRenders: false, .failed) == .onDeviceOnly)
-        #expect(line(cloudRenders: false, .queued, .capReached) == .onDeviceOnly)
-        // A song the stage cannot take has no line of its own: the same lines.
+        // The on-device stage plays: the line follows the cloud (Android's table, row for row).
+        let onDevice: [RenditionStatus: SpatialStatusLine] = [
+            .none: .onPhoneForNow, .preview: .onPhoneForNow, .queued: .onPhoneForNow,
+            .waitingForNetwork: .waitingForWifi, .capReached: .cloudLimitReached, .processing: .onPhoneForNow,
+            .downloading: .gettingCloudVersion, .ready: .gettingCloudVersion, .failed: .cloudFailed,
+        ]
+        #expect(onDevice.count == RenditionStatus.allCases.count)
+        for (status, expected) in onDevice {
+            #expect(line(status) == expected, "\(status)")
+            // Cloud renders off (either switch) comes before anything the library says, a render already on the
+            // phone included.
+            #expect(line(cloudRendersOn: false, status) == .onPhoneOnly, "\(status)")
+        }
+        // A song the stage cannot take plays stereo: no line of its own, so none, until its render plays.
         snapshot.audible = .stereo
-        #expect(line(.processing) == .onDeviceForNow)
-        #expect(line(.downloading) == .gettingCloudVersion)
-        #expect(line(cloudRenders: false, .none) == .onDeviceOnly)
+        #expect(snapshot.blockedBy == .format)
+        for status in RenditionStatus.allCases {
+            #expect(line(status) == SpatialStatusLine.none, "\(status)")
+            #expect(line(cloudRendersOn: false, status) == SpatialStatusLine.none, "\(status)")
+        }
         // The render plays, whatever the switches say now.
         snapshot.audible = .render(.studio)
         #expect(line(.ready) == .cloudVersion)
-        #expect(line(cloudRenders: false, .ready) == .cloudVersion)
+        #expect(line(cloudRendersOn: false, .ready) == .cloudVersion)
         // The route rule fails.
         snapshot.output = .phoneSpeaker
         snapshot.routePasses = false
         snapshot.audible = .stereo
         #expect(line(.ready) == .headphonesOnly)
         // Sing's instrumental plays.
+        snapshot.output = .wiredHeadphones
         snapshot.routePasses = true
         snapshot.singInstrumentalOn = true
         #expect(line(.ready) == .pausedForSing)
-        // Off, or nothing loaded.
+        // Another device plays the music: the route rule's "no" in headphones mode; no line in `always` mode, where
+        // only Sing still has one.
         snapshot.singInstrumentalOn = false
-        snapshot.audible = .onDevice(.studio)
-        snapshot.selection = .off
-        #expect(line(.none) == .none)
-        snapshot.selection = .profile(.studio)
+        snapshot.output = .remote
+        snapshot.routePasses = false
+        #expect(line(.processing) == .headphonesOnly)
+        snapshot.route = .always
+        #expect(line(.processing) == SpatialStatusLine.none)
+        snapshot.singInstrumentalOn = true
+        #expect(line(.processing) == .pausedForSing)
+        // Off (the setting, whatever the player still has), or nothing loaded.
+        snapshot = SpatialPlaybackSnapshot(songId: "sp:1", videoId: CloudAudioFixtures.videoId,
+                                           selection: .profile(.studio), output: .wiredHeadphones, routePasses: true,
+                                           audible: .onDevice(.studio))
+        settings.profile = .off
+        #expect(line(.none) == SpatialStatusLine.none)
+        settings.profile = .profile(.studio)
+        #expect(line(.none) == .onPhoneForNow)
         snapshot.songId = nil
-        #expect(line(.none) == .none)
+        #expect(line(.none) == SpatialStatusLine.none)
     }
 
     @Test func theHubHandsEveryEventToEveryStream() async {

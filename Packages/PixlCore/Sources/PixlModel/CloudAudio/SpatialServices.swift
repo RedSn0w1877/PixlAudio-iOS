@@ -98,9 +98,9 @@ public struct CloudAudioUsage: Sendable, Hashable {
 }
 
 public enum SpatialLibraryEvent: Sendable, Hashable {
-    /// A rendition's state moved (queued with or without a reason, processing, downloading, failed, back to none
-    /// after "Remove downloaded renders"…).
-    case statusChanged(RenditionKey, RenditionState)
+    /// A rendition's status moved (queued, waiting for a network or for next month, processing, downloading, failed,
+    /// back to none after "Remove downloaded renders"…).
+    case statusChanged(RenditionKey, RenditionStatus)
     /// A verified render is now in the local store. Sent in addition to `statusChanged(_, .ready)`.
     case renditionReady(LocalRendition)
     /// A local render is gone (evicted, removed by the person, or of an older library version).
@@ -122,18 +122,22 @@ public protocol SpatialLibrary: Sendable {
     /// Every local render of a song (Developer mode's per-song diagnostics read their manifests).
     func localRenditions(videoId: String) async -> [LocalRendition]
 
-    /// Where the rendition stands: `ready`, `queued` (with a reason when it cannot start: no allowed network, the
-    /// month's limit), `processing`, `downloading`, `failed`, or `none`. Never `preview`: that is the player's fact,
-    /// added by `RenditionState.shown`.
-    func status(_ key: RenditionKey) async -> RenditionState
+    /// The cloud's side of spec 6.1's state for one rendition: `ready` while a verified render is in the local store
+    /// (whatever the switches say), `queued`, `waitingForNetwork` or `capReached` while it is wanted and not on a GPU
+    /// yet, `processing`, `downloading`, `failed`, and `none` for anything not wanted or not under way. Never
+    /// `preview`: that is the player's fact (`RenditionStatus.shown(onDeviceAudible:)`).
+    func status(_ key: RenditionKey) async -> RenditionStatus
 
     /// Spec 6.2 for one rendition: the local store, else the shared library, else a job, as the two switches, the
     /// network and the caps allow. Both switches must be on for anything to leave or reach the phone: Cloud Studio's
     /// own "Process songs in the cloud" (the master, which the library reads itself) and `spatial.cloud`; with either
-    /// off the answer is `none` and nothing happens. Asking again for something already on its way changes nothing.
-    /// Returns the state now; later ones come through `events()`.
+    /// off nothing happens, and the answer is `ready` for a render that is already in the local store (step 1 needs
+    /// no cloud) and `none` otherwise. A render that is wanted but cannot start yet stays queued with its reason
+    /// (`waitingForNetwork`, `capReached`) and starts when it can. Asking again for the same rendition while one is
+    /// on its way, ready, or waiting out a failure's backoff changes nothing. Returns the status now; later ones come
+    /// through `events()`.
     @discardableResult
-    func request(_ request: RenditionRequest) async -> RenditionState
+    func request(_ request: RenditionRequest) async -> RenditionStatus
 
     /// The rendition was played just now (the local store removes the least recently played first).
     func markPlayed(_ key: RenditionKey) async
@@ -178,6 +182,25 @@ public enum SpatialAudible: Sendable, Hashable {
     }
 }
 
+/// Why a selected profile is not audible (spec 6.3 "Spatial active", 7): the Android app's `SpatialBlock`, with the
+/// same four cases in the same order of precedence (when more than one holds, the first counts).
+public enum SpatialBlock: Sendable, Hashable, CaseIterable {
+    /// The route rule fails (6.1, 6.3): `spatial.route` is `headphones` and the sound goes somewhere else, the phone's
+    /// speaker, a car, AirPlay, or another device that plays the music itself (Spotify Connect). 6.5: "Headphones
+    /// only. Plug in to hear it."
+    case route
+    /// Sing's instrumental mode is on (6.3 "Spatial active"). 6.5: "Paused while Sing is on."
+    case sing
+    /// Another device plays the music itself (Spotify Connect) and the route rule did not already say no
+    /// (`spatial.route` is `always`): such a device gets the normal sound whatever the mode (spec 1). 6.5 has no line
+    /// for it, so the sheet shows none.
+    case remote
+    /// The song's sample rate is not one the on-device stage takes (6.3, 7: anything but 44.1 or 48 kHz) and no render
+    /// plays. Its render is still wanted (`wantedRender`). No line of its own (6.3): the sheet shows none until the
+    /// render plays.
+    case format
+}
+
 /// The player's side of Spatial audio at one moment. Never the position.
 public struct SpatialPlaybackSnapshot: Sendable, Hashable {
     /// The current queue entry's song (nil: nothing is loaded).
@@ -186,9 +209,11 @@ public struct SpatialPlaybackSnapshot: Sendable, Hashable {
     public var videoId: String?
     /// The selection the player was given.
     public var selection: SpatialSelection
+    /// The route mode the player was given (`spatial.route`).
+    public var route: SpatialRouteMode
     /// Where the audio goes now.
     public var output: SpatialOutputKind
-    /// The route rule's answer for `output` and the route mode in force.
+    /// The route rule's answer for `output` and `route` (`SpatialActivation.routePasses`).
     public var routePasses: Bool
     /// Sing's instrumental plays (Spatial audio stands aside for it).
     public var singInstrumentalOn: Bool
@@ -197,11 +222,12 @@ public struct SpatialPlaybackSnapshot: Sendable, Hashable {
     public var audible: SpatialAudible
 
     public init(songId: String? = nil, videoId: String? = nil, selection: SpatialSelection = .off,
-                output: SpatialOutputKind = .phoneSpeaker, routePasses: Bool = false, singInstrumentalOn: Bool = false,
-                audible: SpatialAudible = .stereo) {
+                route: SpatialRouteMode = .headphones, output: SpatialOutputKind = .phoneSpeaker,
+                routePasses: Bool = false, singInstrumentalOn: Bool = false, audible: SpatialAudible = .stereo) {
         self.songId = songId
         self.videoId = videoId
         self.selection = selection
+        self.route = route
         self.output = output
         self.routePasses = routePasses
         self.singInstrumentalOn = singInstrumentalOn
@@ -213,6 +239,20 @@ public struct SpatialPlaybackSnapshot: Sendable, Hashable {
 
     /// "Spatial active" (spec 6.3).
     public var isActive: Bool { selection.isOn && routePasses && !singInstrumentalOn }
+
+    /// Why the selected profile is not audible now, or nil when it is, when none is selected or nothing is loaded:
+    /// the first of `route`, `sing`, `remote`, `format` that holds (the order the Android player reports them in).
+    public var blockedBy: SpatialBlock? {
+        guard selection.isOn, songId != nil else { return nil }
+        // A device that plays the music itself never passes the route rule here; with `always` that is not the
+        // rule saying no, it is the device (Android reports it the same way).
+        let elsewhere = output == .remote && route == .always
+        if !routePasses && !elsewhere { return .route }
+        if singInstrumentalOn { return .sing }
+        if elsewhere { return .remote }
+        if audible == .stereo { return .format }
+        return nil
+    }
 
     /// The rendition the cloud should be asked for while this plays: the selected profile's render of this video,
     /// when Spatial audio is active and that render is not already what plays. Nil otherwise.
@@ -237,73 +277,80 @@ public protocol SpatialPlayback: Sendable {
 
 // MARK: - The line under the profile list
 
-/// The status line of the Spatial audio sheet for the song that is playing (spec 6.5: every state has one).
+/// The status line of the Spatial audio sheet for the playing song (spec 6.5: "Every state has one"): one case per row
+/// of the spec's table, each quoting its row. The Android app's `SpatialStatusLine` has the same ten cases in the same
+/// order, and its strings are these sentences word for word.
 public enum SpatialStatusLine: Sendable, Hashable, CaseIterable {
-    /// Nothing to say: Spatial audio is off, or nothing is loaded.
+    /// Nothing to say: Spatial audio is off, nothing is loaded, or a state 6.5 has no row for (another device plays the
+    /// music while `spatial.route` is `always`, or the song's sample rate is one the on-device stage does not take).
     case none
-    /// The cloud render is wanted and on its way (queued, uploading, processing).
-    case onDeviceForNow
-    /// Wanted, but there is no network the person allows for cloud work.
-    case waitingForNetwork
-    /// Wanted, but the month's cloud limit is reached.
-    case capReached
-    /// The finished render is coming down (or is here and about to take over).
+    /// "On your phone for now. The cloud version takes about a minute." The on-device stage plays and the cloud render
+    /// is wanted (queued, uploading, processing).
+    case onPhoneForNow
+    /// "On your phone for now. The cloud version waits for Wi-Fi." Wanted, but no network the person allows.
+    case waitingForWifi
+    /// "On your phone only. This month's cloud limit is reached." Wanted, but the month's limit is reached.
+    case cloudLimitReached
+    /// "Getting the cloud version." The render is downloading, or is on the phone and the switch to it comes next.
     case gettingCloudVersion
-    /// The cloud render plays.
+    /// "Playing the cloud version."
     case cloudVersion
-    /// A profile is on and cloud renders are off (either switch).
-    case onDeviceOnly
-    /// The render failed; the on-device stage plays on.
-    case renderFailed
-    /// A profile is selected but the output is not headphones.
+    /// "On your phone only. Turn on cloud renders for the full version." A profile is on, cloud renders are off.
+    case onPhoneOnly
+    /// "The cloud version didn't work this time. Still playing on your phone."
+    case cloudFailed
+    /// "Headphones only. Plug in to hear it." The route rule fails.
     case headphonesOnly
-    /// A profile is selected but Sing's instrumental plays.
+    /// "Paused while Sing is on." Sing's instrumental mode is on.
     case pausedForSing
 
     /// The spec's sentence (the English source text); nil only for `none`.
     public var text: String? {
         switch self {
         case .none: nil
-        case .onDeviceForNow: "On your phone for now. The cloud version takes about a minute."
-        case .waitingForNetwork: "On your phone for now. The cloud version waits for Wi-Fi."
-        case .capReached: "On your phone only. This month's cloud limit is reached."
+        case .onPhoneForNow: "On your phone for now. The cloud version takes about a minute."
+        case .waitingForWifi: "On your phone for now. The cloud version waits for Wi-Fi."
+        case .cloudLimitReached: "On your phone only. This month's cloud limit is reached."
         case .gettingCloudVersion: "Getting the cloud version."
         case .cloudVersion: "Playing the cloud version."
-        case .onDeviceOnly: "On your phone only. Turn on cloud renders for the full version."
-        case .renderFailed: "The cloud version didn't work this time. Still playing on your phone."
+        case .onPhoneOnly: "On your phone only. Turn on cloud renders for the full version."
+        case .cloudFailed: "The cloud version didn't work this time. Still playing on your phone."
         case .headphonesOnly: "Headphones only. Plug in to hear it."
         case .pausedForSing: "Paused while Sing is on."
         }
     }
 
-    /// The line for what plays.
-    /// - Parameters:
-    ///   - cloudRenders: cloud renders are on, i.e. both switches are: Cloud Studio's own "Process songs in the
-    ///     cloud" (the master) and `spatial.cloud`.
-    ///   - state: the library's state of the selected profile's render of the playing song.
-    ///
-    /// A song the on-device stage cannot take (its sample rate) has no line of its own: it gets the same lines as one
-    /// the stage plays.
-    public static func line(for snapshot: SpatialPlaybackSnapshot, cloudRenders: Bool,
-                            state: RenditionState) -> SpatialStatusLine {
-        guard snapshot.selection.isOn, snapshot.songId != nil else { return .none }
-        if !snapshot.routePasses { return .headphonesOnly }
-        if snapshot.singInstrumentalOn { return .pausedForSing }
+    /// The line for the playing song (6.5), from the settings, what the player does, the song's status for the
+    /// selected profile as the person is told it (`RenditionStatus.shown(onDeviceAudible:)`) and whether cloud renders
+    /// can happen at all (`cloudRendersOn`: Cloud Studio's "Process songs in the cloud", the master, and
+    /// `spatial.cloud`, 6.1 "Two switches"). The same rules, in the same order, as the Android app's
+    /// `SpatialStatusLine.of`:
+    /// - no profile selected, or nothing loaded: `none`;
+    /// - the route rule fails: `headphonesOnly`; else Sing's instrumental mode is on: `pausedForSing`;
+    /// - a cloud render is audible: `cloudVersion`;
+    /// - the on-device stage is audible: `onPhoneOnly` while cloud renders are off; else `cloudFailed` after a
+    ///   failure, `waitingForWifi` and `cloudLimitReached` while the render is queued for that reason,
+    ///   `gettingCloudVersion` while it comes down (or is already here and the switch to it is next), and
+    ///   `onPhoneForNow` in every other case;
+    /// - anything else (stereo: another device while `spatial.route` is `always`, or a rate the stage does not take):
+    ///   `none`.
+    public static func of(settings: CloudAudioSettings, snapshot: SpatialPlaybackSnapshot, status: RenditionStatus,
+                          cloudRendersOn: Bool) -> SpatialStatusLine {
+        guard settings.profile.isOn, snapshot.songId != nil else { return .none }
+        switch snapshot.blockedBy {
+        case .route?: return .headphonesOnly
+        case .sing?: return .pausedForSing
+        case .remote?, .format?, nil: break
+        }
         if snapshot.audible.isCloudRender { return .cloudVersion }
-        guard cloudRenders else { return .onDeviceOnly }
-        switch state.status {
-        case .failed:
-            return .renderFailed
-        case .downloading, .ready:
-            return .gettingCloudVersion
-        case .queued:
-            switch state.queueReason {
-            case .waitingForNetwork?: return .waitingForNetwork
-            case .capReached?: return .capReached
-            case nil: return .onDeviceForNow
-            }
-        case .none, .preview, .processing:
-            return .onDeviceForNow
+        guard snapshot.audible.isOnDevice else { return .none }
+        guard cloudRendersOn else { return .onPhoneOnly }
+        switch status {
+        case .failed: return .cloudFailed
+        case .waitingForNetwork: return .waitingForWifi
+        case .capReached: return .cloudLimitReached
+        case .downloading, .ready: return .gettingCloudVersion
+        case .none, .preview, .queued, .processing: return .onPhoneForNow
         }
     }
 }
@@ -378,9 +425,9 @@ public struct NoopSpatialLibrary: SpatialLibrary {
     public func apply(_ settings: CloudAudioSettings) async {}
     public func localRendition(_ key: RenditionKey) async -> LocalRendition? { nil }
     public func localRenditions(videoId: String) async -> [LocalRendition] { [] }
-    public func status(_ key: RenditionKey) async -> RenditionState { .none }
+    public func status(_ key: RenditionKey) async -> RenditionStatus { RenditionStatus.none }
     @discardableResult
-    public func request(_ request: RenditionRequest) async -> RenditionState { .none }
+    public func request(_ request: RenditionRequest) async -> RenditionStatus { RenditionStatus.none }
     public func markPlayed(_ key: RenditionKey) async {}
     public func usage() async -> CloudAudioUsage { .empty }
     @discardableResult
