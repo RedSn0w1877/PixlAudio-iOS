@@ -131,9 +131,17 @@ another length is `misaligned`; a render landing mid-song switches in and Spatia
 9. **Ring size** is the next power of two ≥ longest delay + one 512-frame part + 1 (16 384 with today's tables, equal
    to `SpatialPreviewTables.ringCapacity`), because a part's own room input is written before it is read.
 
+## CI
+
+- `43081693157` (`dd570d5`, the player side): green. `core` (Linux, the whole package with the golden tests) and
+  `app` (build, 598 unit tests, 0 failures, none skipped).
+- `43083862405` (`d9537b7`, the follow-up and the route-hook test): green, 599 unit tests, 0 failures.
+- PixlCore locally on Windows: the 38 Spatial tests of PixlAudioCore and the 18 of PixlModel pass; parse-check,
+  `check-forbidden.sh` and `check-spatial-fixtures.sh` pass.
+
 ## Not done, uncertain
 
-- The app target cannot be compiled here: CI is the judge (runs listed below).
+- The app target cannot be compiled here: CI (above) built and tested it.
 - Not heard on a phone. Worth a listen: engage/bypass/profile changes while playing, a render landing mid-song, a
   Bluetooth disconnect while a render plays, Sing on/off with Spatial on.
 - The render switch's placement uses Sing's gap planner (word-timed lyrics only); without word timing it switches as
