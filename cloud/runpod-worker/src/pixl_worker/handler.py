@@ -1,7 +1,8 @@
 """RunPod Serverless entry point: `python -u -m pixl_worker.handler`.
 
 At start the process loads the separator once (its load is billed once per process, then FlashBoot keeps the
-worker warm); Qwen3-ForcedAligner, Qwen3-ASR and htdemucs_ft load lazily on first use. The apps stopped asking
+worker warm); Qwen3-ForcedAligner, Qwen3-ASR, htdemucs_ft and htdemucs_6s load lazily on first use (the last two
+are what a spatial render needs on top of the separator). The apps stopped asking
 for lyrics on 2026-10-23, so a cold start no longer pays for the aligner; a lyrics job (an older app, a job queued
 before then) still works and loads it then. Each job is validated
 (schema v1 + server caps) and dispatched to pipeline.process, selftest or bench. Nothing here ever logs or
@@ -91,6 +92,7 @@ class Worker:
             if spec.op == "bench":
                 return st.bench(spec.bench, caps=self.caps, worker=self.worker_info,
                                 separator=self.models.separator, stems4=self.models.stems4,
+                                stems6=self.models.stems6,
                                 transcriber_factory=self.models.transcriber_factory,
                                 cold_start_ms=self._take_cold_start(),
                                 progress=lambda message: self.progress(job, message))
@@ -207,15 +209,21 @@ class _LazyAligner:
 def load_models() -> tuple[pipeline.Models, Callable[[], dict]]:
     from .lyrics.languages import register_backend
     from .lyrics.transcribe import MODEL_ID as ASR_ID
-    from .separate import SEPARATOR_ID, STEMS4_ID, RoformerSeparator, Stems4
+    from .restore import Restorer
+    from .separate import SEPARATOR_ID, SIX_ID, STEMS4_ID, GuitarPiano, RoformerSeparator, Stems4, Stems6
 
     separator = RoformerSeparator(SEP_CONFIG, SEP_CKPT)
     aligner = _LazyAligner(ALIGNER_DIR)
     register_backend(aligner)
     stems4 = Stems4(DEMUCS_DIR)
     transcriber = _LazyTranscriber(ASR_DIR) if os.path.isdir(ASR_DIR) else None
+    # The six-stem cascade behind the spatial renders: the separator above, htdemucs_ft and, lazily, htdemucs_6s.
+    # Nothing is loaded for it here: a worker that only ever makes instrumentals pays nothing.
+    six = GuitarPiano(DEMUCS_DIR)
+    stems6 = Stems6(separator, stems4, six)
     models = pipeline.Models(separator=separator, stems4=stems4 if stems4.available() else None,
-                             transcriber_factory=transcriber)
+                             transcriber_factory=transcriber, stems6=stems6 if stems6.available() else None,
+                             restorer=Restorer())  # no restoration model yet (restore.py)
 
     def state() -> dict:
         return {
@@ -223,6 +231,7 @@ def load_models() -> tuple[pipeline.Models, Callable[[], dict]]:
             aligner.model_id: True if aligner.loaded else "lazy",
             ASR_ID: (True if transcriber.loaded else "lazy") if transcriber else False,
             STEMS4_ID: (True if stems4.loaded else "lazy") if stems4.available() else False,
+            SIX_ID: (True if six.loaded else "lazy") if six.available() else False,
         }
     return models, state
 

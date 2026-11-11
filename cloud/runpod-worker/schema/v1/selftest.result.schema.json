@@ -47,6 +47,23 @@
         "hostsConfigured": {"type": "integer", "minimum": 0, "description": "How many storage hosts the allowlist holds; 0 means every presigned job fails BAD_URL."}
       }
     },
+    "library": {
+      "type": "object",
+      "description": "Worker 1.1.0 and later: the shared library this worker writes. Its absence means the worker refuses the tasks spatial and enhance.",
+      "properties": {
+        "libV": {"type": "integer", "minimum": 1, "description": "The library version: send it as library.v, and read renders from lib/v<libV>/."},
+        "engine": {"type": "string", "description": "The spatial renderer (pixl-spatial-1)."},
+        "profiles": {"type": "array", "items": {"type": "string"}, "description": "The Spatial audio profile ids it renders."}
+      }
+    },
+    "host": {
+      "type": "object",
+      "description": "Worker 1.1.0 and later: the machine around the GPU, where the spatial renderer runs (it needs roughly 33 arrays the size of the song at once).",
+      "properties": {
+        "cpus": {"type": ["integer", "null"], "minimum": 1},
+        "ramLimitMB": {"type": ["integer", "null"], "minimum": 0, "description": "The container's memory limit, or the machine's memory when it has none."}
+      }
+    },
     "error": {
       "oneOf": [
         {"type": "null"},

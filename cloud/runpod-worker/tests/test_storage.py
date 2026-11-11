@@ -162,6 +162,79 @@ def test_delete_input_is_best_effort():
     assert transport.calls[0][0] == "DELETE"
 
 
+# ---- the shared library (lib/v1/<videoId>/) ------------------------------------------------------------------
+
+LIB = "lib/v1/J7p4bzqLvCw"
+
+
+def library_storage(script, mutate=lambda doc: None):
+    doc = load_example("job.input.spatial.json")
+    doc["audio"]["bytes"] = len(DATA)
+    doc["audio"]["sha256"] = hashlib.sha256(DATA).hexdigest()
+    mutate(doc)
+    caps = load_caps({"PIXL_ALLOWED_HOST_SUFFIXES": EXAMPLE_HOST, "PIXL_MAX_INPUT_MB": "1"})
+    transport = FakeTransport(script)
+    return PresignedStorage(validate_job(doc, caps), caps, transport, sleep=lambda s: None), transport
+
+
+def test_library_manifest_get_reads_the_slots_own_object():
+    manifest = load_example("library.render.spatial.json")
+    storage, transport = library_storage([Response(200, {}, json.dumps(manifest).encode()), Response(404, {})])
+    assert storage.get_library_manifest("sp-studio") == manifest
+    assert storage.get_library_manifest("enhanced") is None
+    (m1, u1, k1), (m2, u2, _) = transport.calls
+    assert m1 == m2 == "GET" and f"/{LIB}/sp-studio.json?" in u1 and f"/{LIB}/enhanced.json?" in u2
+    assert k1["max_body"] == 64 * 1024 and k1["timeout"] == 10.0
+
+
+@pytest.mark.parametrize("step", [Response(403, {}), Response(500, {}), Response(302, {}), TransientError("reset"),
+                                  TooLarge(), Response(200, {}, b"not json"), Response(200, {}, b"[1, 2]"),
+                                  Response(200, {}, b"\xff\xfe")])
+def test_a_library_manifest_that_cannot_be_read_is_none_after_one_try(step):
+    # Asking whether a render is already there is best effort: any doubt means "make it", never a failed job.
+    storage, transport = library_storage([step])
+    assert storage.get_library_manifest("sp-studio") is None
+    assert len(transport.calls) == 1
+
+
+def test_without_a_manifest_get_nothing_is_asked():
+    def drop(doc):
+        del doc["library"]["renders"][0]["manifestGet"]
+
+    storage, transport = library_storage([], drop)
+    assert storage.get_library_manifest("sp-studio") is None and transport.calls == []
+    with pytest.raises(KeyError):
+        storage.get_library_manifest("sp-wide")  # not an output of this job
+
+
+def test_library_puts_go_to_the_slots_urls_and_return_the_keys(tmp_path):
+    storage, transport = library_storage([Response(200, {}), Response(200, {}), Response(200, {}), Response(200, {})])
+    flac = tmp_path / "sp-studio.flac"
+    flac.write_bytes(b"fLaC" + b"\0" * 100)
+    assert storage.put_library_audio("sp-studio", str(flac)) == f"{LIB}/sp-studio.flac"
+    assert storage.put_library_manifest("sp-studio", b"{}") == f"{LIB}/sp-studio.json"
+    assert storage.put_library_audio("enhanced", str(flac)) == f"{LIB}/enhanced.flac"
+    assert storage.put_library_manifest("enhanced", b"{}") == f"{LIB}/enhanced.json"
+    (m1, u1, k1), (m2, u2, k2), (_, u3, _), (_, u4, _) = transport.calls
+    assert m1 == m2 == "PUT" and f"/{LIB}/sp-studio.flac?" in u1 and f"/{LIB}/sp-studio.json?" in u2
+    assert k1["body_path"] == str(flac) and k1["headers"]["Content-Type"] == "audio/flac"
+    assert k2["body"] == b"{}" and k2["headers"]["Content-Type"] == "application/json"
+    assert f"/{LIB}/enhanced.flac?" in u3 and f"/{LIB}/enhanced.json?" in u4
+
+
+def test_library_puts_retry_and_report_like_any_upload(tmp_path):
+    flac = tmp_path / "sp-studio.flac"
+    flac.write_bytes(b"fLaC")
+    storage, transport = library_storage([Response(503, {}), TransientError("reset"), Response(200, {})])
+    storage.put_library_audio("sp-studio", str(flac))
+    assert len(transport.calls) == 3
+    storage, transport = library_storage([Response(403, {})])
+    with pytest.raises(errors.WorkerError) as info:
+        storage.put_library_manifest("sp-studio", b"{}")
+    assert info.value.code == errors.UPLOAD_FAILED and len(transport.calls) == 1
+    assert "://" not in info.value.message and "sp-studio manifest" in info.value.message
+
+
 def test_private_addresses_are_refused(monkeypatch):
     def fake(host, port, type=0):
         return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.0.0.5", port))]
