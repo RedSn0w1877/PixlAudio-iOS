@@ -154,13 +154,14 @@ public enum SpatialRenditionRules {
 
     // MARK: The video of a file
 
-    /// The video id of the song's own audio file from its path: `…/Downloads/<videoId>.<ext>` (a download) or
-    /// `…/streams/<videoId>.<ext>` (the stream cache's complete file); nil for any other file. A render file is not
-    /// its song's own audio (`CloudAudioLocalLayout.rendition(ofAudioFileAt:)` names it).
+    /// The video id of the song's own audio file from its path: `…/Downloads/<videoId>.<ext>` (a download),
+    /// `…/streams/<videoId>.<ext>` (the stream cache's complete file) or `…/opus/<videoId>.mp4` (the repackaged Opus
+    /// file, `OpusStreams`); nil for any other file. A render file is not its song's own audio
+    /// (`CloudAudioLocalLayout.rendition(ofAudioFileAt:)` names it).
     public static func ownAudioVideoId(pathComponents: [String]) -> String? {
         guard pathComponents.count >= 2 else { return nil }
         let folder = pathComponents[pathComponents.count - 2]
-        guard folder == "Downloads" || folder == "streams" else { return nil }
+        guard folder == "Downloads" || folder == "streams" || folder == "opus" else { return nil }
         let name = pathComponents[pathComponents.count - 1]
         guard let dot = name.lastIndex(of: "."), dot > name.startIndex else { return nil }
         let id = String(name[..<dot])

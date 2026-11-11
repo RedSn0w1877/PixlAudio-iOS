@@ -201,7 +201,8 @@ final class DeckItemFactory {
     }
 
     /// The YouTube video of the song's own audio at `url`: `pixlstream://<videoId>`, a download
-    /// (`Downloads/<videoId>.m4a`) or the stream cache's complete file (`streams/<videoId>.m4a`); nil for anything else.
+    /// (`Downloads/<videoId>.m4a`), the stream cache's complete file (`streams/<videoId>.m4a`) or the repackaged Opus file
+    /// (`opus/<videoId>.mp4`); nil for anything else.
     static func ownAudioVideoId(_ url: URL) -> String? {
         if url.isFileURL { return SpatialRenditionRules.ownAudioVideoId(pathComponents: url.pathComponents) }
         return YouTubeSongIdentity.videoId(from: url)

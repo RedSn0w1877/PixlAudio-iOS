@@ -99,6 +99,10 @@ struct SpatialRenditionRulesTests {
                                                                        "\(id).m4a"]) == id)
         #expect(SpatialRenditionRules.ownAudioVideoId(pathComponents: ["/", "Caches", "YouTube", "streams",
                                                                        "\(id).m4a"]) == id)
+        // The repackaged Opus file (`Library/Caches/YouTube/opus/<id>.mp4`) is the song's own audio too, so a song
+        // playing from it still links to its cloud render.
+        #expect(SpatialRenditionRules.ownAudioVideoId(pathComponents: ["/", "Caches", "YouTube", "opus",
+                                                                       "\(id).mp4"]) == id)
         // A render of the song is not its own audio; a file anywhere else is not a YouTube video.
         #expect(SpatialRenditionRules.ownAudioVideoId(pathComponents: ["/", "CloudAudio", id, "sp-studio.flac"]) == nil)
         #expect(SpatialRenditionRules.ownAudioVideoId(pathComponents: ["/", "Music", "my-track-01.m4a"]) == nil)
