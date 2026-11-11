@@ -43,6 +43,26 @@ class HrirSet:
         pair = self.pair(az, el).astype(np.float64)
         return float(np.mean(np.sum(pair ** 2, axis=1)))
 
+    def diffuse_coherence(self, freqs: np.ndarray) -> np.ndarray:
+        """How alike the two ears' signals are, per frequency, when sound arrives equally from every direction:
+        the real part of the average of H_left * conj(H_right) over the sphere, over the average power. It is 1 at
+        the lowest frequencies and falls to about zero by 500 Hz for this head (a sphere model would still say 0.6
+        there). The late reverb is built to this curve."""
+        n_fft = 1024
+        spec = np.fft.rfft(self.ir.astype(np.float64), n_fft, axis=-1)          # (M, 2, bins)
+        rings = np.round(self.el).astype(int)
+        weight = np.cos(np.radians(self.el))
+        for ring in np.unique(rings):
+            members = rings == ring
+            weight[members] *= 1.0 / max(1, int(members.sum()))                # each ring counts once, by its area
+        weight = np.maximum(weight, 1e-3)
+        cross = np.tensordot(weight, (spec[:, 0] * np.conj(spec[:, 1])).real, axes=1)
+        power = np.sqrt(np.tensordot(weight, np.abs(spec[:, 0]) ** 2, axes=1)
+                        * np.tensordot(weight, np.abs(spec[:, 1]) ** 2, axes=1))
+        curve = cross / np.maximum(power, 1e-20)
+        grid = np.fft.rfftfreq(n_fft, 1.0 / self.sample_rate)
+        return np.clip(np.interp(freqs, grid, curve), -1.0, 1.0)
+
 
 @lru_cache(maxsize=2)
 def load(sample_rate: int) -> HrirSet:

@@ -119,11 +119,13 @@ def limit(x: np.ndarray, sample_rate: int, ceiling_db: float = -1.0) -> tuple[np
         padded = np.concatenate([env, np.zeros(count * block - len(env), np.float32)])
         need = np.minimum(1.0, ceiling / np.maximum(padded.reshape(count, block).max(axis=1), 1e-9))
         reach = 10  # blocks either side
-        wide = np.concatenate([np.ones(reach), need, np.ones(reach)])
+        # edge values, not ones, outside the signal: otherwise the first and last millisecond are let through
+        wide = np.concatenate([np.full(reach, need[0]), need, np.full(reach, need[-1])])
         floor = np.lib.stride_tricks.sliding_window_view(wide, 2 * reach + 1).min(axis=1)
         window = np.hanning(2 * reach + 3)[1:-1]
         window /= window.sum()
-        smooth = np.convolve(np.concatenate([np.ones(reach), floor, np.ones(reach)]), window, mode="valid")
+        smooth = np.convolve(np.concatenate([np.full(reach, floor[0]), floor, np.full(reach, floor[-1])]), window,
+                             mode="valid")
         centres = (np.arange(count) + 0.5) * block
         gain = np.interp(np.arange(len(env)), centres, smooth).astype(np.float32)
         deepest += float(-20.0 * np.log10(max(float(gain.min()), 1e-9)))

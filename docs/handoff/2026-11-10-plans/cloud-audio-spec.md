@@ -1,8 +1,13 @@
-# Cloud audio: Spatial profiles + Enhanced audio (spec, 2026-11-10)
+# Cloud audio: Spatial audio profiles (spec, 2026-11-10; Enhanced audio cut 2026-11-11)
 
 The contract for the next beta's audio work, shared by the GPU worker (`cloud/runpod-worker`, this repo), the
 iOS app (this repo) and the Android app (`RedSn0w1877/PixlAudio`, a copy of this file lives in its `handoff/`).
 Owner decisions are marked **(owner)**. If code and this file disagree, fix one of them in the same change.
+
+> **Cut on 2026-11-11 (owner): Enhanced audio.** There is no cloud restoration of songs, no `enhance` task, no
+> `enhanced.*` object in the library, no `restore` field anywhere, no `enhanced.enabled` setting and no restoration
+> model in the worker. This file describes Spatial audio only. Code or contract types that still carry any of
+> those names (some were written before the cut) are to be removed, not left dormant.
 
 ## 1. What the user gets
 
@@ -10,8 +15,6 @@ Owner decisions are marked **(owner)**. If code and this file disagree, fix one 
   ("Concert Hall"), `surround`, `night`. Picking a profile switches on a light **on-device** version at once.
   The **cloud** renders the real thing from separated stems; when it is ready the player fades to it mid-song,
   and every later play starts on it.
-- **Enhanced audio**: the cloud restores songs whose stream is band-limited (highs cut off at about 16 kHz) and
-  leaves full-band songs alone. It is honest: no file is made when there is nothing to restore.
 - **Shared library** (owner): a finished render is stored once in R2, keyed by the YouTube video, and any device
   fetches it. Nothing is processed twice while it is there.
 - **Silent background processing** (owner): favourites and most-played songs are prepared ahead, like Sing's
@@ -19,8 +22,8 @@ Owner decisions are marked **(owner)**. If code and this file disagree, fix one 
 
 Words that must never appear in UI, docs, changelogs or notes for this feature: *lossless*, *hi-res*, *Dolby*,
 *Atmos*, *360 Reality*, and (as before) the cloud AI's model name and the lyrics source's old name. The feature
-names are **Spatial audio** and **Enhanced audio**. Spatial audio is for headphones; speakers, cars and Connect
-devices get the normal (or Enhanced) stereo sound.
+name is **Spatial audio**. It is for headphones; speakers, cars and Connect devices get the normal stereo
+sound.
 
 Out of scope this round: head tracking, multichannel files, stems on the phone, a server in front of R2.
 
@@ -39,9 +42,6 @@ Out of scope this round: head tracking, multichannel files, stems on the phone, 
 ```
 lib/v1/<videoId>/sp-<profile>.flac     the binaural render, FLAC 16-bit, the input's sample rate and frame count
 lib/v1/<videoId>/sp-<profile>.json     its manifest, written LAST (its presence means the render is complete)
-lib/v1/<videoId>/enhanced.flac         the restored stereo song (only when restoration was applied)
-lib/v1/<videoId>/enhanced.json         its manifest, written last; also written, WITHOUT audio, when nothing
-                                       needed restoring, so phones don't ask again
 ```
 
 - Phones sign the URLs (SigV4, the built-in bucket key), exactly as for `in/` and `out/`. The worker still holds
@@ -55,7 +55,7 @@ lib/v1/<videoId>/enhanced.json         its manifest, written last; also written,
 - No object is ever updated in place and there is no shared index: one manifest per render. Two jobs rendering the
   same thing at once just write the same result twice.
 
-### 3.1 Render manifest (`sp-<profile>.json` and `enhanced.json`)
+### 3.1 Render manifest (`sp-<profile>.json`)
 
 ```json
 {
@@ -66,31 +66,28 @@ lib/v1/<videoId>/enhanced.json         its manifest, written last; also written,
   "loudness": {"integratedLufs": -13.8, "sourceLufs": -9.8, "headroomDb": 4.0, "truePeakDb": -1.0,
                "limiterMaxDb": 0.6},
   "source": {"itag": 251, "codec": "opus", "sampleRate": 48000, "decodedSamples": 9696000,
-             "sha256": "<64 hex of the uploaded file>", "cutoffHz": 20000},
-  "render": {"engine": "pixl-spatial-1", "stems": "open-cascade-6", "stemMode": "stems6",
-             "restore": {"applied": false, "model": null, "reason": "full_band"}},
+             "sha256": "<64 hex of the uploaded file>"},
+  "render": {"engine": "pixl-spatial-1", "stems": "open-cascade-6", "stemMode": "stems6"},
   "worker": {"version": "1.1.0", "gitSha": "abcdef012345"},
   "createdAt": "2026-11-10T19:02:11Z"
 }
 ```
 
-- `kind` is `spatial` (then `profile` is set) or `enhanced` (`profile` null).
-- `enhanced.json` with nothing to restore: `"audio": null`, `"loudness": null`,
-  `"render": {"engine": null, "stems": null, "stemMode": null, "restore": {"applied": false, "model": null,
-  "reason": "full_band"}}`. `reason` is one of `full_band`, `off`, `unavailable`, `failed`.
+- `kind` is always `spatial` (the field stays so other kinds can be added later without a new schema).
+- `render.stems` names whatever produced the stems (the separator is a replaceable part, see section 5).
 - `stemMode` is `stems6`, `stems4` (fallback separator) or `mix` (no usable stems: the stem-free render).
 - The audio keeps the source's timeline: same sample rate, same frame count, no added delay.
 - **Level.** A binaural render of a loud modern master peaks 3-5 dB higher than the master at the same loudness,
   so every spatial render sits `headroomDb` (4.0) under the source's integrated loudness instead of being squashed
   back (`integratedLufs` = `sourceLufs` - 4.0, within 0.3). The on-device stage has the same 4 dB built into its
   `gain`, so the two match and the switch is level-neutral. The apps give the 4 dB back whenever they have the room
-  (6.3). `enhanced.flac` is NOT lowered: it has the source's loudness (`headroomDb` 0).
+  (6.3).
 - A phone accepts a manifest only when `schema`, `v`, `libV`, `videoId`, `kind` and `profile` are what it asked for
   and, after download, bytes and sha256 match.
 
 ## 4. Job schema additions (still `v: 1`; old jobs are unchanged)
 
-New tasks: `spatial`, `enhance`. Both need the new top-level `library` object:
+New task: `spatial`. It needs the new top-level `library` object:
 
 ```json
 "tasks": ["spatial"],
@@ -98,45 +95,38 @@ New tasks: `spatial`, `enhance`. Both need the new top-level `library` object:
   "v": 1,
   "videoId": "J7p4bzqLvCw",
   "source": {"itag": 251, "codec": "opus"},
-  "restore": "auto",
   "renders": [
     {"profile": "studio", "audioPut": "<PUT lib/v1/<videoId>/sp-studio.flac>",
      "manifestPut": "<PUT .../sp-studio.json>", "manifestGet": "<GET .../sp-studio.json>"}
-  ],
-  "enhanced": {"audioPut": "<PUT .../enhanced.flac>", "manifestPut": "<PUT .../enhanced.json>",
-               "manifestGet": "<GET .../enhanced.json>"}
+  ]
 }
 ```
 
 Rules (worker `schema.py`, mirrored in `job.input.schema.json`, the examples and both apps' builders):
 
-- `library` is required when `tasks` has `spatial` or `enhance`, and ignored otherwise.
+- `library` is required when `tasks` has `spatial`, and ignored otherwise.
 - `library.v` must equal the worker's `LIB_V`, else `UNSUPPORTED_VERSION` ("library.v").
 - `videoId` must match the pattern. `source` is optional (`itag` integer, `codec` string ≤ 16) and only recorded.
-- `restore`: `auto` (default) or `off`. With `auto`, a band-limited song is restored before it is rendered.
 - `spatial` needs `renders`: 1 to 6 entries, profiles unique and known; every URL passes `check_presigned_url`
   with the canonical key as the expected suffix. `manifestGet` is optional (the "already there" check).
-- `enhance` needs `enhanced` with `audioPut` and `manifestPut` (`manifestGet` optional).
 - `output.put.manifest` (the job's own manifest in `out/<jobKey>/`) stays required. `output.codec` does not apply to
-  library files. `spatial`/`enhance` may be combined with the old tasks in one job; they are independent.
+  library files. `spatial` may be combined with the old tasks in one job; they are independent.
 - `separation.quality` applies to the six-stem separator too (`best` = more overlap, same 8-minute limit).
 
 Pipeline order for a job with library tasks:
 `guard → caps → download → probe → decode → [existing stages for old tasks] → library checks (manifestGet: a valid
-manifest for this libV/videoId/profile means "exists", skip it) → cutoff analysis → [restore] → [enhanced out] →
+manifest for this libV/videoId/profile means "exists", skip it) →
 stems6 → render each missing profile → encode → upload audio → upload its manifest → job manifest last → delete input`.
 When every requested library output already exists the job ends `ok` at once (no separation), with the outputs
 marked `exists`.
 
 Job manifest additions (`job.result.schema.json`, all optional so old readers are fine):
 
-- `outputs` gains the slots `sp-<profile>` and `enhanced` (same shape as a stem output; `key` is the `lib/` key).
-- `library`: `{"videoId": "...", "libV": 1, "renders": {"studio": "ok"}, "enhanced": "not_needed",
-  "restore": {"applied": false, "model": null, "reason": "full_band", "cutoffHz": 20000}, "stemMode": "stems6"}`.
-  Per-output states: `ok` (made now), `exists` (was already in the library), `failed` (then the job is `partial`),
-  and for `enhanced` also `not_needed`.
-- `timings` gains `restoreMs`, `stems6Ms`, `renderMs` (0 when unused). `models` gains `stems6`, `restorer`.
-- Progress strings: `restore:NN`, `stems6:NN`, `render:NN`.
+- `outputs` gains the slots `sp-<profile>` (same shape as a stem output; `key` is the `lib/` key).
+- `library`: `{"videoId": "...", "libV": 1, "renders": {"studio": "ok"}, "stemMode": "stems6"}`.
+  Per-render states: `ok` (made now), `exists` (was already in the library), `failed` (then the job is `partial`).
+- `timings` gains `stems6Ms`, `renderMs` (0 when unused). `models` gains `stems6`.
+- Progress strings: `stems6:NN`, `render:NN`.
 
 A failure in one render leaves the others intact (`status: partial`). A library-only job where everything fails is
 an error with the first failure's code, and the input stays for a retry.
@@ -147,7 +137,6 @@ an error with the first failure's code, and the input stays for a retry.
 |---|---|
 | `pixl_worker/spatial/` | The renderer. Pure NumPy (no torch, no SciPy), so the CPU tests run it. Entry points below. |
 | `pixl_worker/separate.py` `Stems6` | Six stems from open models only, as a cascade: vocals from the existing BS-RoFormer (anvuew), then `htdemucs_ft` on the rest for drums, bass and other (both already in the image), then `htdemucs_6s` (MIT, 55 MB, lazy) run on that "other" stem to lift guitar and piano out of it. Running it on "other" keeps the six consistent: guitar + piano + what is left add up to "other" exactly. Without the `htdemucs_6s` file the result is the four stems (`stemMode: stems4`). Stem id `open-cascade-6`. |
-| `pixl_worker/restore.py` `Restorer` | Band-limit detection (NumPy) and the restoration model wrapper (lazy, torch). |
 | `pixl_worker/library.py` | Library keys, manifests, the "exists" check, encode to FLAC 16-bit with TPDF dither. |
 
 Renderer interface (owned by the lead, do not change the signature without updating this file):
@@ -156,7 +145,7 @@ Renderer interface (owned by the lead, do not change the signature without updat
 from pixl_worker.spatial import PROFILE_IDS, ENGINE_ID, render_profiles
 
 results = render_profiles(
-    mix,            # (frames, 2) float32, the (possibly restored) song at `sample_rate`
+    mix,            # (frames, 2) float32, the song at `sample_rate`
     stems,          # {"vocals": (frames, 2) float32, "drums": ..., ...} any subset of the six names, or {} for the
                     # stem-free render. Whatever the stems don't sum to is added to "other" inside.
     sample_rate,    # 44100 or 48000 (other rates: resample around the renderer, see library.py)
@@ -173,15 +162,13 @@ HRIR data: SADIE II subject D1 (Neumann KU100), Apache-2.0, converted once by `t
 
 Endpoint: `timeout` and `PIXL_EXECUTION_TIMEOUT_S` go to 1800 s (library jobs do more work); GPU pools unchanged.
 
-**Why not BS-RoFormer SW** (the six-stem model with the best published scores): its only source is a community
-conversion of the stem splitter that ships inside Apple's Logic Pro. That is Apple's proprietary model, not an
-unlicensed open one, and the worker image is public, so it is not used here. Do not add it.
-
-**Restoration model** (second worker change, after the spatial path is deployed and measured): NVIDIA A2SB
-(non-commercial licence, weights public). It is mono and 44.1 kHz only, so the worker restores the MID channel
-above the detected cutoff and leaves the side channel as it is; it only runs when the cutoff is at or under
-17 kHz. Until that change lands, `restore.applied` is false with reason `unavailable` for band-limited songs and
-`full_band` for the rest; everything else in this spec already works without it.
+**The separator is a replaceable part.** The renderer only needs a dict of stems (any subset of vocals, drums,
+bass, guitar, piano, other; each `(frames, 2)` float32 at the song's sample rate and length). `Stems6` is the one
+place that produces it. The cascade above is what this repository ships. BS-RoFormer SW, the six-stem model with
+the best published scores, is NOT shipped by the lead: its only source is a community conversion of the stem
+splitter inside Apple's Logic Pro, and the worker image is public. Swapping the separator is the owner's call and
+is done by hand in `Stems6` (see `docs/handoff/2026-11-11-spatial-roadmap.md`, "Where your own separator plugs
+in"); bump `LIB_V` when the separator changes, so old renders are not reused.
 
 ## 6. App behaviour (both platforms; keep the two apps' behaviour identical)
 
@@ -193,7 +180,6 @@ above the detected cutoff and leaves the side channel as it is; it only runs whe
 | `spatial.route` | `headphones` | `headphones` (wired, Bluetooth A2DP/LE, USB headset; a Bluetooth speaker counts) or `always` (Developer mode only). |
 | `spatial.cloud` | on when built-in cloud keys exist | Ask the cloud for the real render. Off = on-device only. |
 | `spatial.prepareAhead` | on | Prepare favourites and most-played ahead (Wi-Fi only, battery not low). |
-| `enhanced.enabled` | on | Use the Enhanced version of band-limited songs (ask the cloud for it when `spatial.cloud` is on). |
 | `cloudAudio.storageMB` | 3072 | Local budget for downloaded renders; least-recently-played are removed first. |
 | `cloudAudio.monthlyCapUSD` | 30 (owner: "raise it"; Developer mode can set up to 200 or No limit) | Separate from Sing's cap; Sing's $3 cap is unchanged. |
 | `cloudAudio.dailyAhead` | 25 | Songs a day the background queue may send. |
@@ -220,18 +206,16 @@ Per song and profile the app tracks: `none` → `preview` (on-device) → `queue
    verify bytes and sha256, store. This costs nothing on the GPU and is allowed on any network the user allows
    for cloud work.
 3. Else send a job: prepare and upload the song exactly as Cloud Studio does today on that platform (the same
-   preparer and the same decode-to-FLAC rule; do not add a resample that isn't there today), `tasks: ["spatial"]`
-   (plus `"enhance"` when `enhanced.enabled` and no `enhanced.json` exists yet), one render entry for the profile.
+   preparer and the same decode-to-FLAC rule; do not add a resample that isn't there today), `tasks: ["spatial"]`,
+   one render entry for the profile.
    `library.source` names the STREAM the audio came from (`itag`, `codec`), not the uploaded FLAC. The request's
    `executionTimeout` policy is 1 800 000 ms for a job with library tasks (it overrides the endpoint's). Reuse
    the Cloud Studio engine, queue, priority lane, background rules, RunPod client and Active jobs UI; where the
-   transfer layer only accepts today's slot names, teach it `sp-<profile>` and `enhanced`. A Sing job still has
+   transfer layer only accepts today's slot names, teach it `sp-<profile>`. A Sing job still has
    priority over library jobs.
    A render's sample rate is the uploaded file's (44.1 kHz from an iPhone, the stream's own rate from Android), so
    a phone may fetch a render at a different rate than its own stream: line them up by media time, never by frame
    count across files.
-   **Enhanced rides on Spatial jobs for now:** there are no `enhance`-only jobs this round (a song is never
-   uploaded just to find out whether its highs are cut off).
 4. On `ok`/`partial`: read the job manifest's `library`, then download each `ok`/`exists` output from its `lib/`
    key and verify it. Never delete `lib/` objects (other devices use them). Delete `in/` and `out/<jobKey>/` as
    today.
@@ -255,9 +239,6 @@ the FLAC and its manifest. The file's presence plus a valid manifest is the inde
 - Turning Spatial off, or the route rule failing (headphones unplugged): the on-device stage bypasses at once; a
   cloud render that is playing is swapped back to the stream (or, if that is hard on a platform, finishes the song
   and the next song is normal: say which in the handoff note).
-- Enhanced: when `enhanced.enabled` and a local `enhanced.flac` exists, it replaces the stream for stereo
-  playback, and Spatial's on-device stage then runs on top of it. A spatial cloud render already contains the
-  restoration.
 - ReplayGain, gapless/crossfade between songs, lyrics timing, the queue and Now Playing must not notice any of
   this: the queue entry stays the same song.
 - The existing Sing swap fades over 300-700 ms and has no "time left" rule; for these switches the fade is about
@@ -295,11 +276,9 @@ is not on the phone may be fetched for this (Wi-Fi only). Silent: no notificatio
   | route rule fails | Headphones only. Plug in to hear it. |
   | Sing's instrumental mode is on | Paused while Sing is on. |
   Under the list, one quiet line: "Spatial plays a little quieter so the peaks stay clean."
-- Enhanced audio's switch sits with Spatial audio's rows this round ("Restore highs that the stream cut off",
-  with "Part of cloud renders" under it), because it only acts inside Spatial jobs for now.
-- Settings: a **Sound** group with Spatial audio (profile, cloud toggle, prepare ahead), Enhanced audio, and
+- Settings: a **Sound** group with Spatial audio (profile, cloud toggle, prepare ahead), and
   "Songs ready: N · X GB on this phone" with "Remove downloaded renders". Developer mode shows route mode, caps,
-  storage budget and per-song diagnostics (source codec, cutoff, stem mode, loudness).
+  storage budget and per-song diagnostics (source codec, stem mode, loudness).
 - Android: Material 3 Expressive, no glass. iOS: Liquid Glass, system components. Performance rules as always:
   nothing on the main thread, no per-frame allocation, animated values read in layout/draw only.
 - Profile one-liners: Studio "Clean and close, like good speakers in a quiet room." · Wide "Instruments pushed
@@ -360,9 +339,8 @@ outL = gain * (yL + loL[n - lowDelay])           # same for R; fir(x, h)[n] = Σ
 
 ## 9. Open items (to settle with measurements, then update here)
 
-- Restoration model speed and memory on the 16/24 GB pools (first `bench` after the worker deploys).
+- Speed and memory of the stem cascade and the renderer on the 16/24 GB pools (first `bench` after the worker
+  deploys).
 - Whether iOS can play the Opus stream repackaged in MP4 (separate work item; unrelated to this contract).
 - Volume normalisation for streams (so Spatial and stereo are equally loud) is a possible follow-up; it is not
   part of this round.
-- Enhanced without Spatial (an `enhance`-only job) waits for the restoration model and for a cheap on-phone check
-  of whether a stream is cut off.
