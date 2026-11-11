@@ -91,7 +91,8 @@ frozen contract is untouched.
 - CI (`ci.yml`): 43081972153 red (an exhaustive switch over `ActiveJob.Kind` in `App/Services/ActiveJobs.swift`,
   fixed in 80202ba); 43082757469 attempt 1 red only on the known timing test
   `testCrossfadeOverlapsBothDecksWithTheirGainCurves` (0.897 s against 1 ± 0.1), attempt 2 green: build, 604 app unit
-  tests, `core`. Later runs: `gh run list --repo RedSn0w1877/PixlAudio-iOS --branch audio-cloud`.
+  tests, `core`. 43088162171 green at 8b569ad. Then `audio-hq` (the Opus merge) was merged in, without conflicts:
+  `gh run list --repo RedSn0w1877/PixlAudio-iOS --branch audio-cloud` for that run.
 
 ## Divergences and readings (lead, please confirm or overrule)
 
@@ -113,6 +114,12 @@ frozen contract is untouched.
 7. **New enum cases** `CloudJobOrigin.library`, `ActiveJob.Kind.spatial`, `CloudTask.spatial`: an older build reading a
    job list with a library record would fail to decode it (downgrade only).
 8. **Estimates** (60 s + 25 s per render for a 4-minute song) are guesses until the worker's first bench (spec 9).
+9. **The upload is the AAC stream's decode** (the stream cache, as Cloud Studio prepares songs today), also when the
+   phone plays the repackaged Opus stream (OPUS's `OpusStreamStore`); `library.source` then says itag 140 / `aac`,
+   which is what the render was made from. Taking the Opus file when it is ready would give the renderer 48 kHz Opus
+   instead of 44.1 kHz AAC; the owner's call (it changes "exactly as Cloud Studio does today").
+10. **The master switch on but the cloud not set up** (keys missing): `request` answers `none`, so the sheet says "On
+   your phone for now. The cloud version takes about a minute." (the line rules have no row for it).
 
 ## Asks
 
