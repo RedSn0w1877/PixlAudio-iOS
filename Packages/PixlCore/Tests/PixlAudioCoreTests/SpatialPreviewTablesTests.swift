@@ -57,9 +57,6 @@ struct SpatialPreviewTablesTests {
                 #expect(table.sparseL != table.sparseR)
                 #expect(table.gain > 0.3 && table.gain < 0.8)
                 #expect(table.maxDelay == table.maxSparseDelay)
-                // The low band's delay is where the same-side FIR peaks.
-                let peak = table.direct.indices.max { abs(table.direct[$0]) < abs(table.direct[$1]) }
-                #expect(peak == table.lowDelay)
             }
         }
     }

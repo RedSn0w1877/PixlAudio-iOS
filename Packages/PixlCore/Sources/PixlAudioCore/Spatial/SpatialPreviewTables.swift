@@ -32,7 +32,7 @@ public struct SpatialSparseTap: Sendable, Hashable {
 public struct SpatialPreviewTable: Sendable, Hashable {
     /// The crossover frequency (the biquad coefficients are computed on the device from it and the rate).
     public let xoverHz: Double
-    /// The delay of the low band, in samples (it lines the lows up with the FIRs' main tap).
+    /// The delay of the low band, in samples (it lines the untouched lows up with the centre's arrival).
     public let lowDelay: Int
     /// The length of `direct` and `cross`.
     public let taps: Int
