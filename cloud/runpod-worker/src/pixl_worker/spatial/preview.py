@@ -206,9 +206,10 @@ def main() -> None:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     tables = build_tables()
-    (out / "spatial_preview_v1.json").write_text(json.dumps(tables, separators=(",", ":")) + "\n", encoding="utf-8")
-    (out / "spatial_preview_golden_v1.json").write_text(json.dumps(build_golden(tables), separators=(",", ":")) + "\n",
-                                                       encoding="utf-8")
+    # newline="\n": the apps carry byte-identical copies, so the files must not depend on who wrote them
+    for name, doc in (("spatial_preview_v1.json", tables), ("spatial_preview_golden_v1.json", build_golden(tables))):
+        with open(out / name, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(json.dumps(doc, separators=(",", ":")) + "\n")
     for profile, rates in tables["profiles"].items():
         for rate, table in rates.items():
             print(f"{profile:9s} {rate}: gain {table['gain']:.3f} lowDelay {table['lowDelay']} "

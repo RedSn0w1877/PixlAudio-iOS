@@ -7,6 +7,7 @@ worker and with the apps is docs/handoff/2026-11-10-plans/cloud-audio-spec.md.
 """
 
 from .profiles import ENGINE_ID, PROFILE_IDS, PROFILES, STEM_NAMES
-from .render import SpatialResult, render_profiles
+from .render import CEILING_DB, HEADROOM_DB, SpatialResult, render_profiles
 
-__all__ = ["ENGINE_ID", "PROFILE_IDS", "PROFILES", "STEM_NAMES", "SpatialResult", "render_profiles"]
+__all__ = ["CEILING_DB", "ENGINE_ID", "HEADROOM_DB", "PROFILE_IDS", "PROFILES", "STEM_NAMES", "SpatialResult",
+           "render_profiles"]
