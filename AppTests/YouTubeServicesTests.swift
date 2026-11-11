@@ -163,6 +163,33 @@ final class YouTubeServicesTests: XCTestCase {
         let baseURL = DefaultPlayableURLResolver.url(for: local)
         XCTAssertEqual(localURL, baseURL)
     }
+
+    func testFLACStreamCacheAndUTI() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let cache = StreamCache(directory: directory)
+        let id = "FlAc_-12345"
+        await cache.setInfo(id, contentLength: 4, contentType: "audio/flac", itag: "flac")
+        await cache.write(id, offset: 0, data: Data([0x66, 0x4C, 0x61, 0x43]))
+        let complete = await cache.isComplete(id)
+        XCTAssertTrue(complete)
+        let url = await cache.completeFileURL(id)
+        XCTAssertEqual(url?.lastPathComponent, "\(id).flac")
+
+        let flacInfo = StreamFetcher.Info(contentLength: 4, contentType: "audio/flac")
+        XCTAssertEqual(flacInfo.uniformTypeIdentifier, "org.xiph.flac")
+        let m4aInfo = StreamFetcher.Info(contentLength: 4, contentType: "audio/mp4")
+        XCTAssertEqual(m4aInfo.uniformTypeIdentifier, "com.apple.m4a-audio")
+    }
+
+    func testOnlyIssuedSyntheticIdsSkipTheYouTubeFallback() {
+        let synthetic = SpotiFLACTrackRegistry.syntheticVideoId(forSpotifyId: "0DiWol3AO6WpXZgp0goxAV")
+        XCTAssertEqual(synthetic.count, 11)
+        XCTAssertTrue(CloudStreamSecurity.validateYouTubeVideoId(synthetic))
+        XCTAssertTrue(SpotiFLACTrackRegistry.isSyntheticVideoId(synthetic))
+        // About 1 in 64 real YouTube ids starts with "_": those keep their YouTube fallback.
+        XCTAssertFalse(SpotiFLACTrackRegistry.isSyntheticVideoId("_xkHoUnqZvM"))
+    }
 }
 
 /// Answers every request with a small script and counts the calls.

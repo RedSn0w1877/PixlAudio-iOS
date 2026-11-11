@@ -306,7 +306,13 @@ writes `net-android-golden.jsonl` (612 lines). `NetGoldenTests` compares:
   `LyricsProviderTests`, `AiProviderTests`/`AiOrchestratorTests`/`AiPlaylistTests` (codecs, clients, provider chain
   with cooldowns, cache, model recovery, on-device client, candidate pool JSON, full prompt indentation, digest, Java
   `%.2f`), `SupportTests` (Android/OkHttp encodings, org.json reader/writer, Java `Double.toString`, Kotlin text and
-  `trimIndent`), `CloudStreamSecurityTests`.
+  `trimIndent`), `CloudStreamSecurityTests`, `SpotiFLACTests` (ISRC normalization, exact ISRC vs metadata candidate
+  scoring and variant guards, Monochrome search parsing on recorded live responses, Tidal HiFi base64 manifest
+  decoding and preview rejection, `SpotiFLACClient`: one `isrc:` search for a known ISRC, text search picking the
+  right cut, a configured HiFi instance as fallback, untrusted stream hosts refused, only clean misses remembered,
+  a cancelled lookup leaving no miss or cooldown; FLAC magic header detection; matches Android's `SpotiFLACTest`).
+  The scorers differ in weights (iOS `SpotiFLACMatcher` is title 100 / artist 50 / duration ≤ 25, Android's is
+  title 45 / artist 35 / duration ≤ 30 with a 10 s window); both take an exact ISRC first.
 
 ### Notes
 - Regex classes follow java.util.regex on the JVM (ASCII `\w`/`\s`/`\b`), like the earlier stages; Android's ICU regex

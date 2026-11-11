@@ -30,31 +30,51 @@ actor StreamCache {
         self.directory = directory
     }
 
+    nonisolated static func fileExtension(forContentType contentType: String) -> String {
+        contentType.lowercased().contains("flac") ? "flac" : "m4a"
+    }
+
     nonisolated func dataURL(_ videoId: String) -> URL { directory.appendingPathComponent("\(videoId).m4a") }
+    nonisolated func dataURL(_ videoId: String, ext: String) -> URL { directory.appendingPathComponent("\(videoId).\(ext)") }
     nonisolated func metaURL(_ videoId: String) -> URL { directory.appendingPathComponent("\(videoId).json") }
+
+    private func activeDataURL(_ videoId: String) -> URL {
+        if let meta = metas[videoId] {
+            return dataURL(videoId, ext: Self.fileExtension(forContentType: meta.contentType))
+        }
+        let flac = dataURL(videoId, ext: "flac")
+        if FileManager.default.fileExists(atPath: flac.path) { return flac }
+        return dataURL(videoId, ext: "m4a")
+    }
 
     // MARK: Metadata
 
     func meta(_ videoId: String) -> Meta? {
         if let meta = metas[videoId] { return meta }
         guard let data = try? Data(contentsOf: metaURL(videoId)),
-              let meta = try? JSONDecoder().decode(Meta.self, from: data),
-              FileManager.default.fileExists(atPath: dataURL(videoId).path) else { return nil }
+              let meta = try? JSONDecoder().decode(Meta.self, from: data) else { return nil }
+        let ext = Self.fileExtension(forContentType: meta.contentType)
+        guard FileManager.default.fileExists(atPath: dataURL(videoId, ext: ext).path) else { return nil }
         metas[videoId] = meta
         return meta
     }
 
-    /// Records the file's size and type. A different size or itag means another file: the old bytes go.
+    /// Records the file's size and type. A different size, container extension or itag means another file: the old bytes go.
     func setInfo(_ videoId: String, contentLength: Int64, contentType: String, itag: String?) {
+        let newExt = Self.fileExtension(forContentType: contentType)
         if let existing = meta(videoId) {
-            if existing.contentLength == contentLength && (existing.itag == nil || itag == nil || existing.itag == itag) {
+            let existingExt = Self.fileExtension(forContentType: existing.contentType)
+            if existing.contentLength == contentLength
+                && existingExt == newExt
+                && (existing.itag == nil || itag == nil || existing.itag == itag) {
                 return
             }
             remove(videoId)
         }
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        if !FileManager.default.fileExists(atPath: dataURL(videoId).path) {
-            FileManager.default.createFile(atPath: dataURL(videoId).path, contents: nil)
+        let targetURL = dataURL(videoId, ext: newExt)
+        if !FileManager.default.fileExists(atPath: targetURL.path) {
+            FileManager.default.createFile(atPath: targetURL.path, contents: nil)
         }
         metas[videoId] = Meta(contentLength: contentLength, contentType: contentType, itag: itag)
         saveMeta(videoId)
@@ -69,7 +89,7 @@ actor StreamCache {
     func completeFileURL(_ videoId: String) -> URL? {
         guard isComplete(videoId) else { return nil }
         touch(videoId)
-        return dataURL(videoId)
+        return activeDataURL(videoId)
     }
 
     // MARK: Bytes
@@ -123,13 +143,14 @@ actor StreamCache {
         let fm = FileManager.default
         try? fm.removeItem(at: destination)
         try? fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-        return (try? fm.copyItem(at: dataURL(videoId), to: destination)) != nil
+        return (try? fm.copyItem(at: activeDataURL(videoId), to: destination)) != nil
     }
 
     func remove(_ videoId: String) {
         closeHandle(videoId)
         metas[videoId] = nil
-        try? FileManager.default.removeItem(at: dataURL(videoId))
+        try? FileManager.default.removeItem(at: dataURL(videoId, ext: "m4a"))
+        try? FileManager.default.removeItem(at: dataURL(videoId, ext: "flac"))
         try? FileManager.default.removeItem(at: metaURL(videoId))
     }
 
@@ -139,7 +160,7 @@ actor StreamCache {
         guard let files = try? fm.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.fileSizeKey]) else { return }
         var entries: [(id: String, size: Int64, lastAccess: Double)] = []
         var total: Int64 = 0
-        for file in files where file.pathExtension == "m4a" {
+        for file in files where file.pathExtension == "m4a" || file.pathExtension == "flac" {
             let id = file.deletingPathExtension().lastPathComponent
             let size = Int64((try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
             total += size
@@ -171,7 +192,7 @@ actor StreamCache {
         while handles.count >= Self.maxOpenHandles, let oldest = handleOrder.first(where: { $0 != videoId }) {
             closeHandle(oldest)
         }
-        guard let handle = try? FileHandle(forUpdating: dataURL(videoId)) else { return nil }
+        guard let handle = try? FileHandle(forUpdating: activeDataURL(videoId)) else { return nil }
         handles[videoId] = handle
         handleOrder.append(videoId)
         return handle
