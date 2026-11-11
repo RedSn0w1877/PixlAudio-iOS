@@ -20,6 +20,8 @@ struct SpatialAudioContext {
     let spotify: SpotifyService
     /// Sing: `tais.instrumental` says whether the instrumental plays.
     let tais: TaisServices
+    /// The lyrics of the playing song (word timings place an in-song switch at a quiet moment, as Sing does).
+    let lyricsController: LyricsController
     /// Cloud Studio: the keys, the queue, the transfers.
     let cloud: CloudStudio
     let persistence: PersistenceActor?

@@ -5,8 +5,9 @@ switching, route and level rules), **CLOUD** (library client, jobs, local store,
 (player sheet, settings, strings) and **OPUS** (play YouTube's Opus stream on iPhones). The contract is
 [`cloud-audio-spec.md`](cloud-audio-spec.md); this page says where everything it touches lives in the iOS code.
 
-Line numbers are those of commit `3670155` (branch `audio-foundation`). Paths are from the repo root. Quotes are
-short on purpose: open the file for the rest.
+Line numbers are those of commit `3670155` (branch `audio-foundation`). Later commits on the branch changed only
+tests, fixtures, this page and, through a merge of `audio-hq`, files under `cloud/`, so they still hold at the
+branch tip. Paths are from the repo root. Quotes are short on purpose: open the file for the rest.
 
 Contents: [1 What is already there](#1-what-is-already-there-the-contract-code) ·
 [2 Playback](#2-playback-decks-items-the-tap) · [3 The Sing swap](#3-the-sing-swap-the-alternate-rendition-mechanism) ·
@@ -48,6 +49,7 @@ nobody needs a new module dependency. `Package.swift` is unchanged.
 | `App/Services/Spatial/SpatialPreviewResource.swift` | `SpatialPreviewResource.load()` (off the caller's actor) / `loadNow()` for the bundled tables | ENGINE may extend |
 | `App/Playback/Spatial/SpatialPlaybackFactory.swift` | `make(_ context:library:) -> any SpatialPlayback`, returns the no-op today | **ENGINE** |
 | `App/Services/CloudAudio/SpatialLibraryFactory.swift` | `make(_ context:) -> any SpatialLibrary`, returns the no-op today | **CLOUD** |
+| `App/Demo/SpatialDemo.swift` | `SpatialDemo.apply(launch:to:)`, called by `SpatialAudioModel.make` on UI-test launches; seeds nothing today | **UI** |
 | `App/Resources/spatial_preview_v1.json` | Byte-identical copy of the worker's file (XcodeGen bundles everything under `App/`: `project.yml:46-47` `sources: - path: App`) | regenerate with `bash ci/check-spatial-fixtures.sh --sync` |
 | `AppTests/SpatialAudioModelTests.swift` | The model with main-actor fakes of both protocols | foundation |
 
@@ -83,9 +85,10 @@ screens ──read/call──► SpatialAudioModel (env.spatial, @MainActor @Obs
 
 ### 1.4 Rules for implementations (Swift 6 pitfalls already paid for here)
 
-- Every protocol requirement is `async`; every value crossing is `Sendable`. A `@MainActor final class` may conform
-  (proved by `FakeSpatialLibrary` / `FakeSpatialPlayback` in `AppTests/SpatialAudioModelTests.swift`, if CI run of
-  commit `3670155` is green: see the foundation report), and so may an `actor` or a `nonisolated struct`.
+- Every protocol requirement is `async`; every value crossing is `Sendable`. A `@MainActor final class` may conform:
+  `FakeSpatialLibrary` and `FakeSpatialPlayback` in `AppTests/SpatialAudioModelTests.swift` are exactly that, and
+  they compile and pass under this target's settings (CI run 43033433910, green). An `actor` or a
+  `nonisolated struct` may conform too (the no-ops are structs).
 - No requirement takes an `async` closure. The app target builds with approachable concurrency and default
   main-actor isolation; a closure type written in the package means something else there, and conformers then have
   to write `@concurrent` on it (see `App/Demo/DemoClaude.swift:9`). Use `events()` instead.
@@ -95,7 +98,12 @@ screens ──read/call──► SpatialAudioModel (env.spatial, @MainActor @Obs
   (`playbackServices` is nil in UI tests); a plain `nonisolated async` function runs on the caller's actor, so
   off-main work is `@concurrent` or `Task.detached`.
 - In UI tests (`context.launch.isUITest`) a factory must return something that touches no audio, network or files.
-  `SpatialAudioModel.setDemo(snapshot:libraryStatus:usage:)` pins a state for screenshots.
+  `SpatialAudioModel.setDemo(snapshot:libraryStatus:usage:)` pins a state for screenshots; it is called from
+  `SpatialDemo.apply(launch:to:)` (`App/Demo/SpatialDemo.swift`, UI's file). `spatial.start()` never runs in UI
+  tests, and the settings start from an emptied suite (`SettingsStore.ephemeral()`).
+- Both factories run inside `AppEnvironment.init`; `apply(settings)` first arrives from `spatial.start()`, during
+  `AppEnvironment.start()`, about when the saved queue is restored (paused). To start in the right state without
+  waiting for it, read `context.settingsNow` in the factory.
 
 ### 1.5 What the screens get from `env.spatial`
 
@@ -291,8 +299,9 @@ The queue entry never changes, so the queue, Now Playing, lyrics timing and stat
   call site.
 - **"At a quiet moment when the app can tell":** that is what a `SwitchPlacement` is for. Sing's is
   `InstrumentalController.placeSwitch` (`App/Services/ML/InstrumentalController.swift:588-598`), built on
-  `SingSwitchPlanner` and the word-timed lyrics (`gapIndex`, 582-585). Reuse it when lyrics are loaded, else
-  `placement: nil` (as soon as ready).
+  `SingSwitchPlanner` and the word-timed lyrics (`gapIndex`, 582-585). Reuse it when lyrics are loaded
+  (`context.lyricsController`: `prepared`, `preparedSongId`, `store.offsetMs`), else `placement: nil` (as soon as
+  ready).
 - **Bypass for the incoming item** must be set when it is built (section 2.2), before `deck.load`.
 - **The level factor** changes with the same switch: ramp it with the crossfade (section 5).
 - **Back to the stream** (Spatial switched off, headphones unplugged, profile changed with no local render):
@@ -516,8 +525,14 @@ let prepared = try await dependencies.preparer.prepare(source: source, jobKey: j
 ```
 
 - `host.audioSource` is `TaisServices.audioSource` (`App/Services/ML/TaisServices.swift:40-…`): a streamed song is
-  **downloaded permanently** to `Downloads/<videoId>.m4a` first (up to three tries of 90 s). Spec 6.4's "a song
-  whose audio is not on the phone may be fetched for this (Wi-Fi only)" is this path.
+  **downloaded permanently** to `Downloads/<videoId>.m4a` first (up to three tries of 90 s), unless the resolver
+  already returns a file (a download, or a stream cache file that is complete). Spec 6.4's "a song whose audio is
+  not on the phone may be fetched for this (Wi-Fi only)" is this path. Mind the side effect for library jobs: a
+  render asked for because a song merely *played* would leave a permanent download behind (it counts in Settings ›
+  Offline storage and the song gets its "downloaded" badge, `DownloadBadges`). Sing does that on purpose, after a
+  tap. For library jobs either wait for the song's cache file to be complete, or fill the cache instead
+  (`StreamFetcher.fillCache`, `App/Services/YouTube/StreamFetcher.swift:96-106`, then `cache.completeFileURL`),
+  from a source function of your own in `App/Services/CloudAudio/` so `TaisServices` stays untouched.
 - `CloudAudioPreparer.prepare` (`CloudAudioPreparer.swift:138-215`) decides copy / passthrough / decode in `route`
   (121-127). **Every streamed song is force-decoded** to 44.1 kHz stereo 16-bit FLAC (`sampleRate` 64,
   `decodeToLossless` 234). AAC passthrough only ever applied to local AAC files, which this Spotify-only app no
@@ -697,8 +712,9 @@ view of its own.
   (`App/Features/NowPlaying/DevicesSheet.swift`) is the closest relative of the Spatial audio sheet: a list of
   choices with one selected, plus a status line.
 - UI tests: every sheet needs a `DemoScreen` case (`App/Demo/UITestLaunchRouter.swift:6`; `sheet` mapping at 267,
-  `opensOverPlayer` at 287, covers at 317) so `-uiTest -screen <id>` reaches it. Demo state:
-  `env.spatial.setDemo(…)`, called where the other demos are seeded.
+  `opensOverPlayer` at 287, covers at 317) so `-uiTest -screen <id>` reaches it. Demo state: switch on
+  `launch.screen` in `SpatialDemo.apply(launch:to:)` (`App/Demo/SpatialDemo.swift`) and call `model.select(_:)` /
+  `model.setDemo(…)` there, as `TaisDemo.apply` does for Sing (`App/Demo/TaisDemo.swift:7`).
 
 ### 8.5 Strings
 
@@ -761,9 +777,13 @@ without a token only the muxed itag 18 is eligible (`eligibleFormats`, `AudioFor
 `remote/config.json` (`RemoteClientConfig.swift`). Formats are parsed by `InnerTubeParsing.parseFormat`
 (`InnerTubeParsing.swift:43-66`): every `audio/*` format with a URL or a cipher is kept (WebM included), plus
 itag 18; so the Opus formats are already in `YouTubePlayerResponse.formats` and are only filtered out by the policy.
-Which itags `VISIONOS` really returns for a given video is not recorded anywhere in the repo: the playback test
-(Settings › Developer › Test playback, `PlaybackDiagnostics.swift`) prints the attempts; check there, or in the
-non-blocking `YouTubeLiveSmokeTests`.
+Which itags `VISIONOS` really returns for a given video is not recorded anywhere in the repo. The sample response
+the tests parse (`Tests/PixlNetTests/Fixtures/innertube-player.json`, hand-made) has 18 (muxed), 140
+(`audio/mp4; codecs="mp4a.40.2"`, 130 kbps), 251 (`audio/webm; codecs="opus"`, 160 kbps), 139 (ciphered) and 141
+(256 kbps, which ordinary accounts do not get). For a real answer use the phone: Settings › Developer › Test
+playback prints every client's attempt (`PlaybackDiagnostics.swift`). CI cannot tell you: the non-blocking
+`YouTubeLiveSmokeTests` step fails on GitHub's runners with `LOGIN_REQUIRED — Sign in to confirm you're not a bot`
+from every client (run 43033433910), which is YouTube refusing a datacentre address, not a broken client table.
 
 ### 9.3 The byte-range model
 
@@ -860,9 +880,20 @@ push cancels the run of the previous one. A docs-only push starts nothing and ca
 | `app` + screenshots | same job | only on `main`, or with `[shots]` / `[shots:ClassA,ClassB]` in the commit message, or a manual run | a few minutes per class; a full run is about 100 min |
 | `ipa` | `xcode-27` | only on `main`, tags, `[ipa]`, or a manual run | up to 60 min |
 
-So a normal branch push is green or red in about **18 minutes**, not an hour. `main` runs take about 150 minutes
-and its screenshot step is red at the moment (run 42952869050), unrelated to this work. `[perf]` and
-`[record:Class]` exist for performance numbers and videos.
+So a normal branch push is green or red in about **18 minutes**, not an hour (this branch's first run,
+43033433910: `core` 3 min, `app` about 16 min: build 212 s, simulator 303 s, 585 unit tests in 315 s). `main` runs take
+about 150 minutes and its screenshot step is red at the moment (run 42952869050), unrelated to this work. `[perf]`
+and `[record:Class]` exist for performance numbers and videos.
+
+A push that touches `cloud/runpod-worker/**` (a merge of `audio-hq` does) also starts `cloud-worker-build`: on a
+branch that is only its `test` job (the worker's CPU tests on a free Linux runner); no image is pushed and nothing
+is deployed without `[image]` in the commit message.
+
+**When the worker's tables are regenerated** (it happened once already, `0a295e6` on `audio-hq`): the three app
+copies must follow in the same change, with `bash ci/check-spatial-fixtures.sh --sync`. A push that only touches
+`cloud/**` does not run `ci.yml`, so nothing catches the drift until the next app push, where `core` then fails on
+"Spatial table files match the worker's". No test writes a generated number down: the stage's golden test reads
+whatever the two files hold.
 
 Loop: `gh run list --repo RedSn0w1877/PixlAudio-iOS --branch <branch>`, `gh run watch <id> --repo … --exit-status`,
 `gh run view <id> --repo … --log-failed` (the job summary lists `file:line: error`). Logs are public: never print a
@@ -932,7 +963,7 @@ One owner per file. If you need a change in a file that is not yours, ask its ow
 | Player UI | `App/Features/NowPlaying/*` (incl. `AudioRouteMonitor.swift`: ENGINE reads the session itself) | UI |
 | Settings UI | `App/Features/Settings/*` | UI |
 | Routes and sheets | `App/Core/Routes.swift`, `App/Shell/RouteDestinations.swift` | UI |
-| UI-test plumbing | `App/Demo/UITestLaunchRouter.swift`, `UITests/*` | UI |
+| UI-test plumbing | `App/Demo/UITestLaunchRouter.swift`, `App/Demo/SpatialDemo.swift`, `UITests/*` | UI |
 | Active jobs and cloud screens | `App/Features/Home/*` (changelog, Active jobs sheet), `App/Features/CloudStudio/*` | UI |
 | Design system | `App/DesignSystem/*` | UI |
 | Stream format choice | `Packages/PixlCore/Sources/PixlNet/YouTube/*`, `…/PixlNet/Stream/*` and their tests | OPUS |

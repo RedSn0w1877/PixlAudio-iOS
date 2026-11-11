@@ -287,9 +287,10 @@ final class AppEnvironment {
         // Spatial audio and Enhanced audio: both halves are built from this one context by their own factories.
         spatial = SpatialAudioModel.make(SpatialAudioContext(
             launch: launch, defaults: settingsDefaults, settings: settings, library: library, playback: playback,
-            playbackServices: playbackServices, youtube: youtube, spotify: spotify, tais: tais, cloud: cloud,
-            persistence: persistence, home: home, musicTaste: musicTaste, importedHistory: importedHistory,
-            tasteAdjustments: tasteAdjustments, health: health))
+            playbackServices: playbackServices, youtube: youtube, spotify: spotify, tais: tais,
+            lyricsController: lyricsController, cloud: cloud, persistence: persistence, home: home,
+            musicTaste: musicTaste, importedHistory: importedHistory, tasteAdjustments: tasteAdjustments,
+            health: health))
         wireHealth(health)
         wireBlockedArtists(settings.blocked)
         // A tap on "Your instrumentals are ready" opens the Cloud queue (the notification centre's delegate is set

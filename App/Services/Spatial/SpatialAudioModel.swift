@@ -94,9 +94,12 @@ final class SpatialAudioModel {
         let playback = SpatialPlaybackFactory.make(context, library: library)
         let playbackStore = context.playback
         let cloudSettings = context.cloud.settings
-        return SpatialAudioModel(defaults: context.defaults, library: library, playback: playback,
-                                 currentSong: { playbackStore.current },
-                                 builtInCloudKeys: { cloudSettings.builtInAvailable })
+        let model = SpatialAudioModel(defaults: context.defaults, library: library, playback: playback,
+                                      currentSong: { playbackStore.current },
+                                      builtInCloudKeys: { cloudSettings.builtInAvailable })
+        // UI tests: the states the screenshots show (`start()` never runs there).
+        if context.launch.isUITest { SpatialDemo.apply(launch: context.launch, to: model) }
+        return model
     }
 
     // MARK: Lifecycle
