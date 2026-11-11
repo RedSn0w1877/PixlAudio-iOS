@@ -29,7 +29,22 @@ public struct SpatialSparseTap: Sendable, Hashable {
 ///     yL = fir(hiL, direct) + fir(hiR, cross) + Σ sparseL: gainFromLeft·hiL[n-d] + gainFromRight·hiR[n-d]
 ///     yR = fir(hiR, direct) + fir(hiL, cross) + Σ sparseR: gainFromLeft·hiL[n-d] + gainFromRight·hiR[n-d]
 ///     out = gain · (y + lo[n - lowDelay])                         fir(x, h)[n] = Σ h[k]·x[n-k]
+///
+/// Tables v1.1 (spec section 7, 2026-11-11): the sparse room reads `rm = HP2(hi, roomHpHz)` (one RBJ high-pass biquad,
+/// Q = 1/√2, per channel) instead of `hi`. A table without `roomHpHz` is the older shape: `roomHpHz` is then 0, no
+/// high-pass, and the room reads `hi` as written above.
 public struct SpatialPreviewTable: Sendable, Hashable {
+    /// The sparse room's input high-pass (tables v1.1); 0 = none (a v1 table of the older shape).
+    public private(set) var roomHpHz: Double = 0
+
+    /// A table of v1.1, with the room's high-pass.
+    public init(xoverHz: Double, roomHpHz: Double, lowDelay: Int, taps: Int, direct: [Double], cross: [Double],
+                sparseL: [SpatialSparseTap], sparseR: [SpatialSparseTap], gain: Double) {
+        self.init(xoverHz: xoverHz, lowDelay: lowDelay, taps: taps, direct: direct, cross: cross, sparseL: sparseL,
+                  sparseR: sparseR, gain: gain)
+        self.roomHpHz = roomHpHz
+    }
+
     /// The crossover frequency (the biquad coefficients are computed on the device from it and the rate).
     public let xoverHz: Double
     /// The delay of the low band, in samples (it lines the untouched lows up with the centre's arrival).
@@ -152,6 +167,8 @@ public struct SpatialPreviewTables: Sendable, Hashable {
         var sparseL: [[Double]]
         var sparseR: [[Double]]
         var gain: Double
+        /// Tables v1.1; absent in the older v1 shape (then 0: no high-pass).
+        var roomHpHz: Double?
     }
 
     /// Decodes and checks the file. Every profile of this build must be there at both rates (profiles the build does
@@ -204,8 +221,10 @@ public struct SpatialPreviewTables: Sendable, Hashable {
                 return SpatialSparseTap(delay: Int(row[0]), gainFromLeft: row[1], gainFromRight: row[2])
             }
         }
-        return SpatialPreviewTable(xoverHz: wire.xoverHz, lowDelay: wire.lowDelay, taps: wire.taps, direct: wire.direct,
-                                   cross: wire.cross, sparseL: try sparse(wire.sparseL, "sparseL"),
+        let roomHpHz = wire.roomHpHz ?? 0
+        guard roomHpHz.isFinite, roomHpHz >= 0, roomHpHz < Double(rate) / 2 else { throw fail("roomHpHz") }
+        return SpatialPreviewTable(xoverHz: wire.xoverHz, roomHpHz: roomHpHz, lowDelay: wire.lowDelay, taps: wire.taps,
+                                   direct: wire.direct, cross: wire.cross, sparseL: try sparse(wire.sparseL, "sparseL"),
                                    sparseR: try sparse(wire.sparseR, "sparseR"), gain: wire.gain)
     }
 }
