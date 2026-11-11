@@ -264,6 +264,12 @@ nonisolated struct OpusPreparer: Sendable {
     }
 
     private func run(videoId: String) async -> OpusPreparationOutcome {
+        // 0. On Pro / Studio Pro the song may play SpotiFLAC's file instead of YouTube: then there is nothing to upgrade
+        //    (and nothing remembered, so a later capped tier still prepares it).
+        if let playing = await service.resolve(videoId: videoId),
+           playing.strategyName == InnerTubeService.spotiFLACStrategyName {
+            return .skipped("SpotiFLAC plays this song")
+        }
         // 1. Which stream: a better Opus stream than the AAC pick, from the same `player` response when possible.
         guard let resolution = await service.resolveOpus(videoId: videoId) else {
             if Task.isCancelled { return .skipped("cancelled") }

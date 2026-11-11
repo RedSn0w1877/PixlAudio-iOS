@@ -89,11 +89,13 @@ public struct ResolvedStream: Sendable, Hashable {
     public var url: String
     public var userAgent: String
     public var strategyName: String?
+    public var mimeType: String?
 
-    public init(url: String, userAgent: String, strategyName: String? = nil) {
+    public init(url: String, userAgent: String, strategyName: String? = nil, mimeType: String? = nil) {
         self.url = url
         self.userAgent = userAgent
         self.strategyName = strategyName
+        self.mimeType = mimeType
     }
 }
 

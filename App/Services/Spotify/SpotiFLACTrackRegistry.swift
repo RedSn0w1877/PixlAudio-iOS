@@ -1,0 +1,155 @@
+import Foundation
+import PixlModel
+import PixlNet
+
+/// Thread-safe registry mapping stream `videoId`s (and `spotifyId`s) to their `SpotiFLACTrackQuery` metadata
+/// so `InnerTubeService`, `StreamFetcher`, and `DownloadManager` can resolve lossless FLAC streams first
+/// and fall back automatically to YouTube (`InnerTube`) if a track is unavailable or fails on SpotiFLAC.
+nonisolated final class SpotiFLACTrackRegistry: @unchecked Sendable {
+    static let shared = SpotiFLACTrackRegistry()
+
+    private let lock = NSLock()
+    private var byVideoId: [String: SpotiFLACTrackQuery] = [:]
+    private var bySpotifyId: [String: SpotiFLACTrackQuery] = [:]
+    /// Synthetic ids handed out by `syntheticVideoId(forSpotifyId:)` in this process.
+    private var syntheticIds: Set<String> = []
+    /// What each song's SpotiFLAC file turned out to be (its first bytes); Pro skips a FLAC over 48 kHz with it.
+    private var factsByVideoId: [String: SpotiFLACAudioFileFacts] = [:]
+    /// Songs whose SpotiFLAC file was chosen only because YouTube had nothing: any file beats none.
+    private var lastResortIds: Set<String> = []
+
+    func record(_ facts: SpotiFLACAudioFileFacts, forVideoId videoId: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        if factsByVideoId.count >= 512 { factsByVideoId.removeAll() }
+        factsByVideoId[videoId] = facts
+    }
+
+    func facts(forVideoId videoId: String) -> SpotiFLACAudioFileFacts? {
+        lock.lock()
+        defer { lock.unlock() }
+        return factsByVideoId[videoId]
+    }
+
+    func setLastResort(_ lastResort: Bool, forVideoId videoId: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        if lastResort {
+            if lastResortIds.count >= 512 { lastResortIds.removeAll() }
+            lastResortIds.insert(videoId)
+        } else {
+            lastResortIds.remove(videoId)
+        }
+    }
+
+    func isLastResort(_ videoId: String) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return lastResortIds.contains(videoId)
+    }
+
+    init() {}
+
+    /// Registers a full `SpotiFLACTrackQuery` for `videoId` (and its `spotifyId` when non-empty).
+    func register(_ query: SpotiFLACTrackQuery, forVideoId videoId: String? = nil) {
+        guard !query.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        lock.lock()
+        defer { lock.unlock() }
+
+        let trimmedSpotifyId = query.spotifyId.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedSpotifyId.isEmpty {
+            if let existing = bySpotifyId[trimmedSpotifyId], existing.isrc != nil && query.isrc == nil {
+                var merged = query
+                merged.isrc = existing.isrc
+                bySpotifyId[trimmedSpotifyId] = merged
+            } else {
+                bySpotifyId[trimmedSpotifyId] = query
+            }
+        }
+
+        if let videoId, !videoId.isEmpty {
+            if let existing = byVideoId[videoId], existing.isrc != nil && query.isrc == nil {
+                var merged = query
+                merged.isrc = existing.isrc
+                byVideoId[videoId] = merged
+            } else if !trimmedSpotifyId.isEmpty, let enriched = bySpotifyId[trimmedSpotifyId] {
+                byVideoId[videoId] = enriched
+            } else {
+                byVideoId[videoId] = query
+            }
+        }
+    }
+
+    /// Registers metadata from a `Song` for `videoId` without overwriting an existing entry that already carries an ISRC.
+    func register(song: Song, forVideoId videoId: String) {
+        let title = song.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let artist = song.displayArtist.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty, !artist.isEmpty, artist != "Unknown Artist" else { return }
+
+        let spotifyId = SpotifyPlayableURLResolver.spotifyId(of: song) ?? ""
+        lock.lock()
+        let existingSpotifyQuery = spotifyId.isEmpty ? nil : bySpotifyId[spotifyId]
+        let existingVideoQuery = byVideoId[videoId]
+        lock.unlock()
+
+        if let existingVideoQuery, existingVideoQuery.isrc != nil {
+            return
+        }
+        if let existingSpotifyQuery {
+            register(existingSpotifyQuery, forVideoId: videoId)
+            return
+        }
+
+        let query = SpotiFLACTrackQuery(
+            spotifyId: spotifyId,
+            title: title,
+            artist: artist,
+            album: song.album == "Unknown Album" ? "" : song.album,
+            durationMs: Int(clamping: song.duration),
+            isrc: nil
+        )
+        register(query, forVideoId: videoId)
+    }
+
+    /// Returns the registered `SpotiFLACTrackQuery` for `videoId`, if any.
+    func query(forVideoId videoId: String) -> SpotiFLACTrackQuery? {
+        lock.lock()
+        defer { lock.unlock() }
+        return byVideoId[videoId]
+    }
+
+    /// Returns the registered `SpotiFLACTrackQuery` for `spotifyId`, if any.
+    func query(forSpotifyId spotifyId: String) -> SpotiFLACTrackQuery? {
+        lock.lock()
+        defer { lock.unlock() }
+        return bySpotifyId[spotifyId]
+    }
+
+    /// Deterministic 11-character identifier (`_[A-Za-z0-9]{10}`) for an unmatched Spotify track so it can travel
+    /// through `pixlstream://` and `StreamCache` when YouTube has no match.
+    static func syntheticVideoId(forSpotifyId spotifyId: String) -> String {
+        let filtered = spotifyId.unicodeScalars.filter { scalar in
+            (scalar.value >= 48 && scalar.value <= 57) ||
+            (scalar.value >= 65 && scalar.value <= 90) ||
+            (scalar.value >= 97 && scalar.value <= 122)
+        }
+        var suffix = String(String.UnicodeScalarView(filtered).prefix(10))
+        if suffix.count < 10 {
+            suffix += String(repeating: "0", count: 10 - suffix.count)
+        }
+        let id = "_" + suffix
+        shared.lock.lock()
+        shared.syntheticIds.insert(id)
+        shared.lock.unlock()
+        return id
+    }
+
+    /// True when `videoId` is a synthetic SpotiFLAC-only identifier this process handed out. Not a pattern check:
+    /// real YouTube ids start with `_` too (about 1 in 64), and taking one for synthetic would skip its YouTube
+    /// fallback whenever SpotiFLAC has no match.
+    static func isSyntheticVideoId(_ videoId: String) -> Bool {
+        shared.lock.lock()
+        defer { shared.lock.unlock() }
+        return shared.syntheticIds.contains(videoId)
+    }
+}

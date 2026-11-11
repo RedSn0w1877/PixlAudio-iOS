@@ -13,10 +13,18 @@ nonisolated struct StreamingPlayableURLResolver: PlayableURLResolving {
 
     func playableURL(for song: Song) async -> URL? {
         guard let videoId = YouTubeSongIdentity.videoId(for: song) else { return await base.playableURL(for: song) }
+        SpotiFLACTrackRegistry.shared.register(song: song, forVideoId: videoId)
         if let downloaded = DownloadFiles.existingFile(videoId: videoId) { return downloaded }
-        if let prepared = opus?.readyFile(videoId: videoId) { return prepared }
+        if let prepared = opus?.readyFile(videoId: videoId), !Self.flacPlaysInstead(videoId: videoId) { return prepared }
         if let cached = await cache.completeFileURL(videoId) { return cached }
         return YouTubeSongIdentity.streamURL(videoId: videoId)
+    }
+
+    /// Pro / Studio Pro play SpotiFLAC's FLAC for a song it has one for, not an Opus file prepared earlier (under a
+    /// capped tier). Opus files are no longer prepared for such songs (`OpusPreparer`).
+    static func flacPlaysInstead(videoId: String) -> Bool {
+        guard let facts = SpotiFLACTrackRegistry.shared.facts(forVideoId: videoId), facts.format == .flac else { return false }
+        return StreamingAudioQuality.current().allowsFlacFirst(sampleRate: facts.flacSampleRate)
     }
 
     /// A prepared Opus file the player could not open goes back to AAC for good (the same video: Spotify's
@@ -31,25 +39,45 @@ nonisolated struct StreamingPlayableURLResolver: PlayableURLResolving {
     }
 }
 
-/// Downloaded songs: `Application Support/Downloads/<videoId>.m4a` (the folder Settings › Offline storage measures).
+/// Downloaded songs: `Application Support/Downloads/<videoId>.flac` (lossless SpotiFLAC) or `<videoId>.m4a`
+/// (YouTube fallback), in the folder Settings › Offline storage measures.
 nonisolated enum DownloadFiles {
     static var directory: URL {
         OfflineStorageUsage.downloadsDirectory
             ?? URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("Downloads", isDirectory: true)
     }
 
+    static func flacFileURL(videoId: String) -> URL { directory.appendingPathComponent("\(videoId).flac") }
     static func fileURL(videoId: String) -> URL { directory.appendingPathComponent("\(videoId).m4a") }
 
-    static func existingFile(videoId: String) -> URL? {
-        let url = fileURL(videoId: videoId)
-        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    static func fileURL(videoId: String, contentType: String?) -> URL {
+        if contentType?.lowercased().contains("flac") == true {
+            return flacFileURL(videoId: videoId)
+        }
+        return fileURL(videoId: videoId)
     }
 
-    /// Video ids with a downloaded file.
+    static func existingFile(videoId: String) -> URL? {
+        let flac = flacFileURL(videoId: videoId)
+        if FileManager.default.fileExists(atPath: flac.path) { return flac }
+        let m4a = fileURL(videoId: videoId)
+        return FileManager.default.fileExists(atPath: m4a.path) ? m4a : nil
+    }
+
+    /// Video ids with a downloaded file (`.flac` or `.m4a`).
     static func downloadedIds() -> Set<String> {
         let files = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
-        return Set(files.filter { $0.hasSuffix(".m4a") }.map { String($0.dropLast(4)) }
-            .filter(CloudStreamSecurity.validateYouTubeVideoId))
+        var ids = Set<String>()
+        for file in files {
+            if file.hasSuffix(".flac") {
+                let id = String(file.dropLast(5))
+                if CloudStreamSecurity.validateYouTubeVideoId(id) { ids.insert(id) }
+            } else if file.hasSuffix(".m4a") {
+                let id = String(file.dropLast(4))
+                if CloudStreamSecurity.validateYouTubeVideoId(id) { ids.insert(id) }
+            }
+        }
+        return ids
     }
 }
 

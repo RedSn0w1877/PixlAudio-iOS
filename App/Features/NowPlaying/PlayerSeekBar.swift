@@ -201,13 +201,17 @@ nonisolated enum PlayerFormat {
         PlaybackProgress.displayDuration(reportedMs: reportedMs, hintMs: hintMs)
     }
 
-    /// Android `bitrateToQualityTierLabel`.
-    static func qualityTier(bitrateKbps: Int) -> String {
+    /// Android `streamQualityTierLabel`: the tier the playing stream falls into. FLAC is Pro up to 48 kHz and Studio Pro
+    /// above; anything else goes by its bitrate. Nil when neither tells.
+    static func qualityTier(mimeType: String?, bitrateKbps: Int?, sampleRate: Int?) -> String? {
+        if format(mimeType: mimeType) == "flac" {
+            return (sampleRate ?? 0) > 48_000 ? "Studio Pro" : "Pro"
+        }
+        guard let bitrateKbps else { return nil }
         switch bitrateKbps {
-        case ...96: "Low"
-        case ...160: "Standard"
-        case ...256: "High"
-        default: "Ultrasound"
+        case ...96: return "Low"
+        case ...160: return "Medium"
+        default: return "High"
         }
     }
 
@@ -232,14 +236,17 @@ nonisolated enum PlayerFormat {
         }
     }
 
-    /// Android `formatAudioMetaLabel`: "48.0 kHz • Standard • OPUS" (the configured quality tier when the bitrate is
-    /// unknown).
-    static func audioMetaLabel(song: Song, fallbackTier: String = "Ultrasound") -> String? {
+    /// Android `formatAudioMetaLabel`: "48.0 kHz • Medium • OPUS" (`fallbackTier`, the configured quality's YouTube tier,
+    /// when neither the format nor the bitrate tells).
+    static func audioMetaLabel(song: Song,
+                               fallbackTier: String = StreamingAudioQuality.current().youTubeLabel) -> String? {
         var parts: [String] = []
         if let rate = song.sampleRate, rate > 0 {
             parts.append(String(format: "%.1f kHz", locale: Locale(identifier: "en_US"), Double(rate) / 1000))
         }
-        let tier = song.bitrate.flatMap { $0 > 0 ? qualityTier(bitrateKbps: $0 / 1000) : nil } ?? fallbackTier
+        let tier = qualityTier(mimeType: song.mimeType,
+                               bitrateKbps: song.bitrate.flatMap { $0 > 0 ? $0 / 1000 : nil },
+                               sampleRate: song.sampleRate) ?? fallbackTier
         let format = format(mimeType: song.mimeType)
         parts.append(format == "-" ? tier : "\(tier) \u{2022} \(format.uppercased())")
         return parts.joined(separator: " \u{2022} ")

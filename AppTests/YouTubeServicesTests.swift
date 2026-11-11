@@ -163,6 +163,54 @@ final class YouTubeServicesTests: XCTestCase {
         let baseURL = DefaultPlayableURLResolver.url(for: local)
         XCTAssertEqual(localURL, baseURL)
     }
+
+    func testFLACStreamCacheAndUTI() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let cache = StreamCache(directory: directory)
+        let id = "FlAc_-12345"
+        await cache.setInfo(id, contentLength: 4, contentType: "audio/flac", itag: "flac")
+        await cache.write(id, offset: 0, data: Data([0x66, 0x4C, 0x61, 0x43]))
+        let complete = await cache.isComplete(id)
+        XCTAssertTrue(complete)
+        let url = await cache.completeFileURL(id)
+        XCTAssertEqual(url?.lastPathComponent, "\(id).flac")
+
+        let flacInfo = StreamFetcher.Info(contentLength: 4, contentType: "audio/flac")
+        XCTAssertEqual(flacInfo.uniformTypeIdentifier, "org.xiph.flac")
+        let m4aInfo = StreamFetcher.Info(contentLength: 4, contentType: "audio/mp4")
+        XCTAssertEqual(m4aInfo.uniformTypeIdentifier, "com.apple.m4a-audio")
+    }
+
+    func testQualityTiersAndThePlayersTierLabel() {
+        XCTAssertEqual(StreamingAudioQuality.from(stored: nil), .pro)
+        XCTAssertEqual(StreamingAudioQuality.from(stored: "STANDARD"), .medium)
+        XCTAssertEqual(StreamingAudioQuality.from(stored: "ULTRASOUND"), .pro)
+        XCTAssertEqual(StreamingAudioQuality.from(stored: "STUDIO_PRO"), .studioPro)
+        XCTAssertEqual(StreamingAudioQuality.from(stored: "nonsense"), .pro)
+        XCTAssertEqual(StreamingAudioQuality.allCases.map(\.maxBitrateKbps), [96, 160, 256, nil, nil])
+
+        XCTAssertTrue(StreamingAudioQuality.pro.allowsFlacFirst(sampleRate: 48_000))
+        XCTAssertTrue(StreamingAudioQuality.pro.allowsFlacFirst(sampleRate: nil))
+        XCTAssertFalse(StreamingAudioQuality.pro.allowsFlacFirst(sampleRate: 96_000))
+        XCTAssertTrue(StreamingAudioQuality.studioPro.allowsFlacFirst(sampleRate: 192_000))
+        XCTAssertFalse(StreamingAudioQuality.high.allowsFlacFirst(sampleRate: 44_100))
+        XCTAssertEqual(StreamingAudioQuality.studioPro.youTubeLabel, "High")
+
+        XCTAssertEqual(PlayerFormat.qualityTier(mimeType: "audio/flac", bitrateKbps: nil, sampleRate: 44_100), "Pro")
+        XCTAssertEqual(PlayerFormat.qualityTier(mimeType: "audio/flac", bitrateKbps: nil, sampleRate: 96_000), "Studio Pro")
+        XCTAssertEqual(PlayerFormat.qualityTier(mimeType: "audio/mp4", bitrateKbps: 128, sampleRate: 44_100), "Medium")
+        XCTAssertNil(PlayerFormat.qualityTier(mimeType: "audio/mp4", bitrateKbps: nil, sampleRate: nil))
+    }
+
+    func testOnlyIssuedSyntheticIdsSkipTheYouTubeFallback() {
+        let synthetic = SpotiFLACTrackRegistry.syntheticVideoId(forSpotifyId: "0DiWol3AO6WpXZgp0goxAV")
+        XCTAssertEqual(synthetic.count, 11)
+        XCTAssertTrue(CloudStreamSecurity.validateYouTubeVideoId(synthetic))
+        XCTAssertTrue(SpotiFLACTrackRegistry.isSyntheticVideoId(synthetic))
+        // About 1 in 64 real YouTube ids starts with "_": those keep their YouTube fallback.
+        XCTAssertFalse(SpotiFLACTrackRegistry.isSyntheticVideoId("_xkHoUnqZvM"))
+    }
 }
 
 /// Answers every request with a small script and counts the calls.

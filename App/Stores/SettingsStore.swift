@@ -448,7 +448,8 @@ final class PlaybackSettings {
         didSet { defaults.set(automaticInstrumentals, forKey: PreferenceKeys.automaticInstrumentals) }
     }
     var hiFiModeEnabled: Bool { didSet { defaults.set(hiFiModeEnabled, forKey: PreferenceKeys.hiFiModeEnabled) } }
-    /// Android `AudioQuality.name` (`ULTRASOUND` default = no bitrate cap).
+    /// Android `AudioQuality.name`: `LOW`, `MEDIUM`, `HIGH`, `PRO` (default) or `STUDIO_PRO` (`StreamingAudioQuality`;
+    /// the old `STANDARD` and `ULTRASOUND` are read as Medium and Pro).
     var audioQuality: String { didSet { defaults.set(audioQuality, forKey: PreferenceKeys.audioQuality) } }
     /// Android `PlayerAmbientStyle.name` (`BLENDED_COVER` default).
     var playerAmbientStyle: String {
@@ -464,7 +465,7 @@ final class PlaybackSettings {
         self.defaults = defaults
         globalTransitionSettingsJSON = defaults.string(forKey: PreferenceKeys.globalTransitionSettings)
         hiFiModeEnabled = defaults.bool(PreferenceKeys.hiFiModeEnabled, default: false)
-        audioQuality = defaults.string(PreferenceKeys.audioQuality, default: "ULTRASOUND")
+        audioQuality = StreamingAudioQuality.from(stored: defaults.string(forKey: PreferenceKeys.audioQuality)).rawValue
         playerAmbientStyle = defaults.string(PreferenceKeys.playerAmbientStyle, default: "BLENDED_COVER")
         keepPlayingInBackground = defaults.bool(PreferenceKeys.keepPlayingInBackground, default: true)
         isCrossfadeEnabled = defaults.bool(PreferenceKeys.isCrossfadeEnabled, default: false)
