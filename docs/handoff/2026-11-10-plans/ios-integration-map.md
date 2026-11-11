@@ -34,7 +34,7 @@ ENGINE and CLOUD replace them.
 | `…/CloudAudio/CloudLibrary.swift` | `CloudLibrary.version` (1), `engineId`, `audioKey(_:)`, `manifestKey(_:)`, `parse(objectKey:)`, `isValidVideoId`; `CloudAudioLocalLayout` (`CloudAudio/<videoId>/<slot>.flac|.json`, `rendition(ofAudioFile:)`) |
 | `…/CloudAudio/CloudLibraryManifest.swift` | The render manifest (spec 3.1) as `Codable`, `check(for:)` (the acceptance rule), `audioMatches(bytes:sha256:)`, `headroomDb`, `stemMode`, `restoreReason` |
 | `…/CloudAudio/SpatialServices.swift` | The two seams: `SpatialLibrary` (CLOUD implements) and `SpatialPlayback` (ENGINE implements), `LocalRendition`, `RenditionRequest`, `CloudAudioUsage`, `SpatialLibraryEvent`, `SpatialPlaybackSnapshot`, `SpatialAudible`, `SpatialStatusLine` (the sheet's line for every state) and `SpatialCopy` (its other fixed sentences), `SpatialEventHub`, `NoopSpatialLibrary`, `NoopSpatialPlayback` |
-| `Packages/PixlCore/Sources/PixlAudioCore/Spatial/SpatialPreviewTables.swift` | `SpatialPreviewTables.decode(_:)` for `spatial_preview_v1.json` (`table(for:sampleRate:)`, `headroomDb`, `ringCapacity` = 16384), `SpatialPreviewTable`, `SpatialSparseTap`, `SpatialPreviewGolden.decode(_:)` for the golden file. Decoding only |
+| `Packages/PixlCore/Sources/PixlAudioCore/Spatial/SpatialPreviewTables.swift` | `SpatialPreviewTables.decode(_:)` for `spatial_preview_v1.json` (`table(for:sampleRate:)`, `headroomDb`, `ringCapacity`, 16384 with today's tables), `SpatialPreviewTable`, `SpatialSparseTap`, `SpatialPreviewGolden.decode(_:)` for the golden file. Decoding only |
 | Tests | `Tests/PixlModelTests/CloudAudioContractTests.swift` (fixtures in `Fixtures/cloud-audio/`), `Tests/PixlAudioCoreTests/SpatialPreviewTablesTests.swift` (fixtures in `Fixtures/spatial/`, read through `SpatialFixtures.tables()` / `.golden()`: ENGINE's stage test starts from those two calls) |
 
 Why PixlModel: it is the lowest module both PixlAudioCore (the stage) and PixlNet (the job builder) import, so
@@ -241,7 +241,7 @@ How to feed it, following the patterns already in `TapParameters.swift`:
 - Coefficients: decode `SpatialPreviewTables` once (`SpatialPreviewResource.load()`), copy into buffers the tap
   owns in `prepare` (as `localBlock` is at lines 133-134 and 199-205). All twelve tables are 12 × (2×192 + 2×40×3)
   numbers: keep them all, so a change of profile is an index change and never an allocation.
-- State per tap: FIR history, one delay ring of `tables.ringCapacity` (16384) frames per channel, four biquad
+- State per tap: FIR history, one delay ring of `tables.ringCapacity` frames per channel (16384 with today's tables; read it, do not write it down), four biquad
   states. Allocate in `init`/`prepare`, free in `deinit` (lines 120-145 show the pattern).
 - Ramps: `applyGainRamp` (lines 370-383) is linear across one buffer. The spec's 80 ms wet/dry ramp is longer than
   a buffer at small IO sizes and shorter at large ones: carry the ramp position in the context (as
@@ -914,6 +914,11 @@ whatever the two files hold.
 Loop: `gh run list --repo RedSn0w1877/PixlAudio-iOS --branch <branch>`, `gh run watch <id> --repo … --exit-status`,
 `gh run view <id> --repo … --log-failed` (the job summary lists `file:line: error`). Logs are public: never print a
 secret.
+
+One unit test is timing-dependent and fails now and then on a busy runner:
+`AppTests/LaunchConfigurationTests.swift:138` `testPlaybackStoreWithDemoEngine` (it sleeps 50 ms, then expects
+`store.isPlaying`; it failed in run 43043932396, attempt 1, with nothing else red). If it is the only failure,
+re-run the job instead of pushing again: `gh run rerun <id> --repo RedSn0w1877/PixlAudio-iOS --failed`.
 
 ### 10.2 PixlCore locally (Windows)
 
