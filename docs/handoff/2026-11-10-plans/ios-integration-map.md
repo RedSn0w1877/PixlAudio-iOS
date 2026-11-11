@@ -6,9 +6,9 @@ switching, route and level rules), **CLOUD** (library client, jobs, local store,
 [`cloud-audio-spec.md`](cloud-audio-spec.md); this page says where everything it touches lives in the iOS code.
 
 Line numbers are those of commit `3670155` (branch `audio-foundation`), and still hold at the branch tip: later
-commits changed only tests, fixtures, this page, the contract's own app files, files under `cloud/` (through a merge
-of `audio-hq`) and two spots of `AppEnvironment.swift`, whose numbers below are the tip's. Paths are from the repo
-root. Quotes are short on purpose: open the file for the rest.
+commits changed only the contract's own files and tests, fixtures, this page, the spec and files under `cloud/`
+(both through merges of `audio-hq`), and two spots of `AppEnvironment.swift`, whose numbers below are the tip's.
+Paths are from the repo root. Quotes are short on purpose: open the file for the rest.
 
 Contents: [1 What is already there](#1-what-is-already-there-the-contract-code) ·
 [2 Playback](#2-playback-decks-items-the-tap) · [3 The Sing swap](#3-the-sing-swap-the-alternate-rendition-mechanism) ·
