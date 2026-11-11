@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/RedSn0w1877/PixlAudio-iOS/blob/main/cloud/runpod-worker/schema/v1/library.render.schema.json",
+  "title": "PixlAudio shared library render manifest (pixl.library.render v1)",
+  "description": "lib/v<libV>/<videoId>/sp-<profile>.json and lib/v<libV>/<videoId>/enhanced.json in the R2 bucket (docs/handoff/2026-11-10-plans/cloud-audio-spec.md, section 3.1). The worker writes it LAST, after the audio it describes, so its presence means the render is complete; nothing in the library is ever updated in place. A phone accepts a manifest only when schema, v, libV, videoId, kind and profile are what it asked for and, after the download, the file's bytes and sha256 match. Unknown fields must be ignored.",
+  "type": "object",
+  "required": ["schema", "v", "libV", "videoId", "kind", "profile", "audio", "loudness", "source", "render", "worker", "createdAt"],
+  "properties": {
+    "schema": {"const": "pixl.library.render"},
+    "v": {"const": 1},
+    "libV": {"type": "integer", "minimum": 1, "description": "The library version the render was made for (1 today); the same number as in the key."},
+    "videoId": {"type": "string", "pattern": "^[A-Za-z0-9_-]{11}$"},
+    "kind": {"enum": ["spatial", "enhanced"]},
+    "profile": {"enum": ["studio", "wide", "intimate", "hall", "surround", "night", null], "description": "The Spatial audio profile; null for kind enhanced."},
+    "audio": {
+      "description": "The file this manifest describes. null only in an enhanced.json that records that nothing was restored (so phones do not ask again).",
+      "oneOf": [{"type": "null"}, {"$ref": "#/$defs/audio"}]
+    },
+    "loudness": {
+      "description": "null exactly when audio is null.",
+      "oneOf": [{"type": "null"}, {"$ref": "#/$defs/loudness"}]
+    },
+    "source": {
+      "type": "object",
+      "description": "The song the render was made from.",
+      "required": ["itag", "codec", "sampleRate", "decodedSamples", "sha256", "cutoffHz"],
+      "properties": {
+        "itag": {"type": ["integer", "null"], "minimum": 0, "description": "YouTube's itag of the stream the phone played, as the job said (library.source); null when it did not say."},
+        "codec": {"type": ["string", "null"], "maxLength": 16, "description": "That stream's codec, as the job said; null when it did not say. Not the codec of the upload, which the phone may have decoded to FLAC."},
+        "sampleRate": {"type": "integer", "minimum": 1},
+        "decodedSamples": {"type": "integer", "minimum": 0, "description": "Frames per channel of the decoded upload."},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$", "description": "Of the uploaded file."},
+        "cutoffHz": {"type": "integer", "minimum": 0, "description": "Where the song's spectrum ends: about 16000 for a band-limited stream, 20000 (an Opus stream's own edge) or the Nyquist frequency for a full one."}
+      }
+    },
+    "render": {
+      "type": "object",
+      "required": ["engine", "stems", "stemMode", "restore"],
+      "properties": {
+        "engine": {"type": ["string", "null"], "description": "The spatial renderer (pixl-spatial-1); null for kind enhanced."},
+        "stems": {"type": ["string", "null"], "description": "The stem separation the render was made from (open-cascade-6); null for kind enhanced and for stemMode mix."},
+        "stemMode": {"enum": ["stems6", "stems4", "mix", null], "description": "stems6: six stems. stems4: four (the fallback separator). mix: no usable stems, the stem-free render. null for kind enhanced."},
+        "restore": {
+          "type": "object",
+          "required": ["applied", "model", "reason"],
+          "properties": {
+            "applied": {"type": "boolean", "description": "Whether the song's highs were restored before this file was made. A spatial render made from a restored song already contains the restoration."},
+            "model": {"type": ["string", "null"]},
+            "reason": {"enum": ["full_band", "off", "unavailable", "failed", null], "description": "Why not: full_band (nothing was cut), off (the job said library.restore off), unavailable (this worker has no restoration model), failed. null when applied is true."}
+          }
+        }
+      }
+    },
+    "worker": {
+      "type": "object",
+      "required": ["version", "gitSha"],
+      "properties": {
+        "version": {"type": "string"},
+        "gitSha": {"type": "string"}
+      }
+    },
+    "createdAt": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$", "description": "UTC, ISO 8601."}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"kind": {"const": "spatial"}}, "required": ["kind"]},
+      "then": {
+        "properties": {
+          "profile": {"type": "string"},
+          "audio": {"type": "object"},
+          "render": {"properties": {"engine": {"type": "string"}, "stemMode": {"type": "string"}}}
+        }
+      },
+      "else": {
+        "properties": {
+          "profile": {"type": "null"},
+          "render": {"properties": {"engine": {"type": "null"}, "stems": {"type": "null"}, "stemMode": {"type": "null"}}}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"audio": {"type": "null"}}, "required": ["audio"]},
+      "then": {
+        "properties": {
+          "loudness": {"type": "null"},
+          "render": {"properties": {"restore": {"properties": {"applied": {"const": false}, "reason": {"type": "string"}}}}}
+        }
+      },
+      "else": {"properties": {"loudness": {"type": "object"}}}
+    },
+    {
+      "if": {"properties": {"kind": {"const": "enhanced"}, "audio": {"type": "object"}}, "required": ["kind", "audio"]},
+      "then": {"properties": {"render": {"properties": {"restore": {"properties": {"applied": {"const": true}, "reason": {"type": "null"}}}}}}}
+    }
+  ],
+  "$defs": {
+    "audio": {
+      "type": "object",
+      "required": ["key", "bytes", "sha256", "codec", "bits", "sampleRate", "samples", "durationMs"],
+      "properties": {
+        "key": {"type": "string", "pattern": "^lib/v[0-9]+/[A-Za-z0-9_-]{11}/(sp-(studio|wide|intimate|hall|surround|night)|enhanced)\\.flac$"},
+        "bytes": {"type": "integer", "minimum": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "codec": {"const": "flac"},
+        "bits": {"const": 16},
+        "sampleRate": {"type": "integer", "minimum": 1, "description": "Always the source's sampleRate."},
+        "samples": {"type": "integer", "minimum": 0, "description": "Frames per channel; equals source.decodedSamples: the file keeps the source's timeline, with no added delay."},
+        "durationMs": {"type": "integer", "minimum": 0}
+      }
+    },
+    "loudness": {
+      "type": "object",
+      "required": ["integratedLufs", "sourceLufs", "headroomDb", "truePeakDb", "limiterMaxDb"],
+      "properties": {
+        "integratedLufs": {"type": "number", "description": "ITU-R BS.1770 integrated loudness of the file."},
+        "sourceLufs": {"type": "number", "description": "The same for the song it was made from."},
+        "headroomDb": {"type": "number", "minimum": 0, "description": "How far under the source the file was levelled on purpose: 4.0 for a spatial render (integratedLufs = sourceLufs - headroomDb, within 0.3), 0 for enhanced. The app gives it back whenever its own playback gain has the room."},
+        "truePeakDb": {"type": "number"},
+        "limiterMaxDb": {"type": "number", "minimum": 0, "description": "The deepest gain reduction the true-peak limiter applied; 0 when it stayed idle."}
+      }
+    }
+  }
+}

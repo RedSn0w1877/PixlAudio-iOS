@@ -1,0 +1,48 @@
+{
+  "schema": "pixl.library.render",
+  "v": 1,
+  "libV": 1,
+  "videoId": "ZD6rXLXZOEI",
+  "kind": "enhanced",
+  "profile": null,
+  "audio": {
+    "key": "lib/v1/ZD6rXLXZOEI/enhanced.flac",
+    "bytes": 24117248,
+    "sha256": "bb7dff686467a69f1564e05410703cb32e5455d7bab05001f92b15c94aade331",
+    "codec": "flac",
+    "bits": 16,
+    "sampleRate": 44100,
+    "samples": 8559810,
+    "durationMs": 194100
+  },
+  "loudness": {
+    "integratedLufs": -14.07,
+    "sourceLufs": -14.11,
+    "headroomDb": 0.0,
+    "truePeakDb": -0.21,
+    "limiterMaxDb": 0.0
+  },
+  "source": {
+    "itag": null,
+    "codec": null,
+    "sampleRate": 44100,
+    "decodedSamples": 8559810,
+    "sha256": "f1db327b6614305f29b3a172cacc553aaa97034d1f069e9328b33a437e4d60be",
+    "cutoffHz": 15989
+  },
+  "render": {
+    "engine": null,
+    "stems": null,
+    "stemMode": null,
+    "restore": {
+      "applied": true,
+      "model": "example-restorer-1",
+      "reason": null
+    }
+  },
+  "worker": {
+    "version": "1.1.0",
+    "gitSha": "abcdef012345"
+  },
+  "createdAt": "2026-11-10T19:04:40Z"
+}
