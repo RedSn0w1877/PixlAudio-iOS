@@ -1,13 +1,17 @@
 """The spatial renderer: stems in, one binaural stereo file per profile out.
 
 For each profile:
-1. every stem is split into centre / left / right (upmix.py) and each part becomes a source at its own place in
-   the profile's room: direct sound through the head model, plus early reflections (room.py);
+1. every stem is taken apart into its sources, each with its own direction, and its ambience (upmix.py); each
+   becomes a source at its place in the profile's room: direct sound through the head model plus early
+   reflections (room.py). In the profiles that ask for it, centred instruments are also spread around the
+   listener (room.py, decorrelate.py);
 2. a stereo send of all stems feeds the room's late reverb;
 3. below the crossover (110 Hz) the ORIGINAL mix passes straight through, time-aligned, so bass and kick keep
-   their weight and punch, and a share of the untouched mix is blended back above it;
-4. the result is matched to the original: its long-term tone (third-octave, at most +/- 5 dB), then its loudness
-   (BS.1770), and a true-peak limiter that is idle unless a peak goes over -1 dBTP.
+   their weight and punch. (Nothing of the untouched mix is blended back above it: it cancels against the head
+   model's phase. A 25 % blend measured as a 2-5 dB hole from 2.5 to 8 kHz.)
+4. the result is matched to the original: its long-term tone (third-octave, at most +/- 5 dB; in practice it
+   has about 2 dB to do), then its loudness (BS.1770), and a true-peak limiter that is idle unless a peak goes
+   over -1 dBTP.
 
 Everything is deterministic (fixed seeds), NumPy only, and the output has exactly the input's length and
 timeline.
@@ -15,6 +19,8 @@ timeline.
 
 from __future__ import annotations
 
+import os
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Callable, Iterable
 
@@ -25,7 +31,7 @@ from .dsp import convolve_bank, fast_len, interp_log, smooth_bands
 from .loudness import integrated_lufs, limit, true_peak_db
 from .profiles import PROFILES, STEM_NAMES, Profile, Stage
 from .room import KernelBuilder, late_tail
-from .upmix import split_center
+from .upmix import Decomposition, decompose
 
 CEILING_DB = -1.0
 # A binaural render of a loud modern master peaks 3-5 dB higher than the master at the same loudness (the head
@@ -36,6 +42,12 @@ HEADROOM_DB = 4.0
 TONE_LIMIT_DB = 5.0
 BAD_STEMS_DB = -6.0     # stems that miss the mix by more than this are not trusted
 SILENT_DB = -70.0
+# Levels. A source signal carries the power its sound had in BOTH channels together, and that power is shared
+# between the two ears (equally for a centred sound, mostly the near ear for a panned one). Every direction's head
+# model is levelled to the front's, per ear, so the share is 1/sqrt(2) everywhere: a centred voice then reaches
+# each ear exactly as on plain headphones, and a hard-panned guitar keeps the power its one channel had. (Without
+# it, everything panned came out 3 dB louder against the voice than the mix intended.)
+SIDE_LEVEL = float(np.sqrt(0.5))
 
 
 @dataclass
@@ -50,18 +62,17 @@ class SpatialResult:
 
 
 @dataclass
-class _Part:
-    stem: str
-    centre: np.ndarray
-    left: np.ndarray
-    right: np.ndarray
+class _Stem:
+    name: str
+    parts: Decomposition
+    audio: np.ndarray           # (frames, 2): the stem itself, for the reverb send
 
 
 @dataclass
 class _Prepared:
     mix: np.ndarray
     sample_rate: int
-    parts: list[_Part]
+    stems: list[_Stem]
     stem_mode: str
     source_lufs: float
     n_fft: int
@@ -76,10 +87,17 @@ def prepare(mix: np.ndarray, stems: dict[str, np.ndarray], sample_rate: int) -> 
     mix = np.ascontiguousarray(mix, dtype=np.float32)
     if mix.ndim != 2 or mix.shape[1] != 2:
         raise ValueError("mix must be (frames, 2)")
+    if not np.isfinite(mix).all():
+        mix = np.nan_to_num(mix, nan=0.0, posinf=0.0, neginf=0.0)
     frames = mix.shape[0]
-    mix_power = float(np.mean(mix.astype(np.float64) ** 2))
-    usable = {name: np.asarray(stems[name], dtype=np.float32) for name in STEM_NAMES
-              if name in stems and stems[name] is not None and np.shape(stems[name]) == mix.shape}
+    mix_power = float(np.mean(mix.astype(np.float64) ** 2)) if frames else 0.0
+    usable = {}
+    for name in STEM_NAMES:
+        stem = stems.get(name)
+        if stem is None or np.shape(stem) != mix.shape:
+            continue
+        stem = np.asarray(stem, dtype=np.float32)
+        usable[name] = stem if np.isfinite(stem).all() else np.nan_to_num(stem, nan=0.0, posinf=0.0, neginf=0.0)
     stem_mode = "mix"
     if usable and mix_power > 0.0:
         residual = mix - sum(usable.values())
@@ -87,9 +105,10 @@ def prepare(mix: np.ndarray, stems: dict[str, np.ndarray], sample_rate: int) -> 
             usable["other"] = usable["other"] + residual if "other" in usable else residual
             stem_mode = "stems6" if ("guitar" in usable or "piano" in usable) else "stems4"
         del residual
-    parts: list[_Part] = []
+    todo: list[tuple[str, np.ndarray]] = []
     if stem_mode == "mix":
-        parts.append(_Part("mix", *split_center(mix)))
+        if mix_power > 0.0:
+            todo.append(("mix", mix))
     else:
         for name in STEM_NAMES:
             stem = usable.get(name)
@@ -97,11 +116,17 @@ def prepare(mix: np.ndarray, stems: dict[str, np.ndarray], sample_rate: int) -> 
                 continue
             if _db(float(np.mean(stem.astype(np.float64) ** 2))) - _db(mix_power) < SILENT_DB:
                 continue
-            parts.append(_Part(name, *split_center(stem)))
+            todo.append((name, stem))
+    # Taking a stem apart is FFT work, which NumPy does outside the interpreter lock: a few at a time.
+    workers = max(1, min(len(todo), 3, (os.cpu_count() or 2) - 1))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        parts = [_Stem(name, deco, audio)
+                 for (name, audio), deco in zip(todo, pool.map(lambda item: decompose(item[1]), todo))]
     n_fft = fast_len(frames + 4096)
     spectrum = np.stack([np.fft.rfft(mix[:, c], n_fft) for c in range(2)])
-    return _Prepared(mix=mix, sample_rate=sample_rate, parts=parts, stem_mode=stem_mode,
-                     source_lufs=integrated_lufs(mix, sample_rate), n_fft=n_fft, mix_spectrum=spectrum)
+    return _Prepared(mix=mix, sample_rate=sample_rate, stems=parts, stem_mode=stem_mode,
+                     source_lufs=integrated_lufs(mix, sample_rate) if frames else -70.0, n_fft=n_fft,
+                     mix_spectrum=spectrum)
 
 
 def _stage_for(profile: Profile, stem: str) -> Stage:
@@ -122,7 +147,9 @@ def _level(x: np.ndarray, sample_rate: int, amount: float) -> np.ndarray:
     loud = level_db[level_db > np.percentile(level_db, 20)]
     reference = float(np.median(loud)) if loud.size else float(np.median(level_db))
     gain_db = np.clip(-0.35 * amount * 2.0 * (level_db - reference), -3.5, 3.5)
-    gain_db[level_db < reference - 25.0] = 0.0  # never lift near-silence
+    # never lift near-silence: the lift fades out between 18 and 30 dB under the usual level (a hard switch here
+    # stepped the gain by 3.5 dB inside a fade-out)
+    gain_db *= np.clip((level_db - (reference - 30.0)) / 12.0, 0.0, 1.0)
     centres = (np.arange(count) + 0.5) * block
     gain = 10.0 ** (np.interp(np.arange(x.shape[0]), centres, gain_db) / 20.0)
     return (x * gain[:, None]).astype(np.float32)
@@ -131,6 +158,10 @@ def _level(x: np.ndarray, sample_rate: int, amount: float) -> np.ndarray:
 def render_one(prepared: _Prepared, profile: Profile, tick: Callable[[], None] | None = None) -> SpatialResult:
     sr = prepared.sample_rate
     frames = prepared.mix.shape[0]
+    if frames == 0 or not prepared.stems:
+        return SpatialResult(audio=np.zeros((frames, 2), np.float32), integrated_lufs=-70.0,
+                             source_lufs=prepared.source_lufs, true_peak_db=-180.0, limiter_max_db=0.0,
+                             stem_mode=prepared.stem_mode)
     head = hrir_mod.load(sr)
     builder = KernelBuilder(head, profile.room, profile.mix_stage.dist)
 
@@ -138,26 +169,32 @@ def render_one(prepared: _Prepared, profile: Profile, tick: Callable[[], None] |
     kernels: list[np.ndarray] = []
     send_left = np.zeros(frames, dtype=np.float32)
     send_right = np.zeros(frames, dtype=np.float32)
-    for part in prepared.parts:
-        stage = _stage_for(profile, part.stem)
+    for stem in prepared.stems:
+        stage = _stage_for(profile, stem.name)
         gain = 10.0 ** (stage.gain_db / 20.0)
-        centre, left, right = part.centre, part.left, part.right
-        if stage.center < 1.0:  # leave some of the centred content on the sides
-            keep = (1.0 - stage.center) * centre
-            centre, left, right = stage.center * centre, left + keep, right + keep
-        for signal, az, el in ((centre, 0.0, stage.center_el), (left, stage.width, stage.side_el),
-                               (right, -stage.width, stage.side_el)):
-            if not np.any(signal):
+        level = gain * SIDE_LEVEL
+        steps = max(1, stem.parts.steps)
+        for k, signal in stem.parts.sources.items():
+            sources.append(signal)
+            if k == 0:
+                kernels.append(builder.kernel(0.0, 0.0, stage.dist, level, stage.er, spread=stage.spread,
+                                              spread_az=stage.spread_az))
+            else:
+                share = k / steps
+                kernels.append(builder.kernel(share * stage.width, abs(share) * stage.side_el, stage.dist, level,
+                                              stage.er))
+        for signal, az in ((stem.parts.ambience_left, stage.ambience_az), (stem.parts.ambience_right, -stage.ambience_az)):
+            if signal is None:
                 continue
             sources.append(signal)
-            kernels.append(builder.kernel(az, el, stage.dist, gain, stage.er))
+            kernels.append(builder.kernel(az, stage.side_el, stage.dist, level, stage.er))
         send = gain * stage.rev
-        send_left += send * (part.centre + part.left)
-        send_right += send * (part.centre + part.right)
+        send_left += send * stem.audio[:, 0]
+        send_right += send * stem.audio[:, 1]
 
     out_len = frames + head.front_delay
     wet = convolve_bank(sources, np.stack(kernels), out_len, tick) if sources else np.zeros((out_len, 2), np.float32)
-    tail = late_tail(profile.room, sr, profile.seed, builder.front_energy)
+    tail = late_tail(profile.room, head, profile.seed, builder.front_energy)
     wet += convolve_bank([send_left, send_right], tail, out_len, tick)
     del sources, kernels, send_left, send_right
     wet = wet[head.front_delay:]  # undo the head model's own delay: the render keeps the source's timeline
@@ -166,11 +203,9 @@ def render_one(prepared: _Prepared, profile: Profile, tick: Callable[[], None] |
     freqs = np.fft.rfftfreq(n_fft, 1.0 / sr)
     low = 1.0 / (1.0 + (freqs / profile.crossover_hz) ** 4)
     high = 1.0 - low
-    dry = profile.dry
     spectrum = np.empty_like(prepared.mix_spectrum)
     for c in range(2):
-        spectrum[c] = (1.0 - dry) * high * np.fft.rfft(wet[:, c], n_fft) \
-            + (dry * high + low) * prepared.mix_spectrum[c]
+        spectrum[c] = high * np.fft.rfft(wet[:, c], n_fft) + low * prepared.mix_spectrum[c]
     del wet
 
     # tone: match the original's long-term spectrum in third-octave bands

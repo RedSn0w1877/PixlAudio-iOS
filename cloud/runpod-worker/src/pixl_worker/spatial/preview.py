@@ -29,7 +29,8 @@ from .room import KernelBuilder
 TAPS = 192
 CROSSOVER_HZ = 120.0
 SPARSE_TAPS = 40
-INPUT_CORRELATION = 0.75  # how alike left and right are in a typical mix (for tone and loudness matching)
+INPUT_CORRELATION = 0.75
+SIDE_LEVEL = float(np.sqrt(0.5))   # as in render.py: one channel's content shares its power between the ears  # how alike left and right are in a typical mix (for tone and loudness matching)
 GOLDEN_FRAMES = 1024
 RATES = (44100, 48000)
 
@@ -67,19 +68,27 @@ def build_table(profile: Profile, sample_rate: int) -> dict:
     freqs = np.fft.rfftfreq(n_fft, 1.0 / sample_rate)
 
     def pair(theta: float) -> tuple[np.ndarray, np.ndarray]:
-        """(same side, other side) spectra for a source at +theta, as loud as a frontal one."""
+        """(near ear, far ear) spectra for a source at +theta, levelled like the renderer's side parts."""
         direct = builder.direct(theta, 0.0)
-        return direct[0], direct[1]
+        return direct[0] * SIDE_LEVEL, direct[1] * SIDE_LEVEL
 
-    same, cross = pair(spec.theta)
+    # A real centre plus the SIDE signal on a virtual speaker pair. In mid/side terms the stage is
+    #   yL = M * front + S * side,   yR = M * front - S * side      (M = (L+R)/2, S = (L-R)/2)
+    # so a centred sound is one source in front, as in the cloud render, instead of a phantom between two virtual
+    # speakers (measured against the cloud render, the phantom was 3 dB down at 1.6 kHz and far too wide: the two
+    # ears' signals were almost unrelated around 2 kHz where the render's are alike). The side response is lined
+    # up with the centre's main peak, so a panned sound's two parts add at the near ear and cancel at the far one.
+    front = builder.direct(0.0, 0.0)[0]
+    near, far = pair(spec.theta)
+    side = near - far
     if spec.side_gain > 0.0:
-        side_same, side_cross = pair(spec.side_theta)
-        rear = 0.5 * spec.side_gain * (side_same - side_cross)
-        same, cross = same + rear, cross - rear
-    delay = int(np.argmax(np.abs(np.fft.irfft(same, n_fft))))
-    shift = np.exp(-2j * np.pi * np.arange(len(freqs)) * delay / n_fft)
-    same = (1.0 - spec.dry) * same + spec.dry * shift
-    cross = (1.0 - spec.dry) * cross
+        rear_near, rear_far = pair(spec.side_theta)
+        side = side + spec.side_gain * (rear_near - rear_far)
+    smooth_to = 1.0 / (1.0 + (freqs / 6000.0) ** 4)
+    lag = int(np.argmax(np.abs(np.fft.irfft(front * smooth_to, n_fft)))) \
+        - int(np.argmax(np.abs(np.fft.irfft(near * smooth_to, n_fft))))
+    side = side * np.exp(-2j * np.pi * np.arange(len(freqs)) * max(0, lag) / n_fft)
+    same, cross = 0.5 * (front + side), 0.5 * (front - side)
 
     # tone: flat for a typical mix (left and right partly alike), by a smooth minimum-phase correction
     power = np.abs(same) ** 2 + np.abs(cross) ** 2 + 2.0 * INPUT_CORRELATION * (same * np.conj(cross)).real
@@ -96,7 +105,9 @@ def build_table(profile: Profile, sample_rate: int) -> dict:
     fade[TAPS - 24:] = 0.5 * (1.0 + np.cos(np.linspace(0.0, np.pi, 24)))
     direct_taps = np.fft.irfft(same * tone, n_fft)[:TAPS] * fade
     cross_taps = np.fft.irfft(cross * tone, n_fft)[:TAPS] * fade
-    low_delay = int(np.argmax(np.abs(direct_taps)))
+    # the untouched lows are lined up with the CENTRE's arrival (the two filters' own peak can sit on either of two
+    # close arrivals, which made this number jump between sample rates)
+    low_delay = int(np.argmax(np.abs(np.fft.irfft(front * tone, n_fft)[:TAPS])))
 
     # the sparse room: a few dozen decaying taps per ear, different for each ear so it surrounds
     rng = np.random.default_rng(profile.seed + sample_rate)
@@ -122,7 +133,9 @@ def build_table(profile: Profile, sample_rate: int) -> dict:
     h_cross = high * x_spec
     out_power = np.abs(h_same) ** 2 + np.abs(h_cross) ** 2 \
         + 2.0 * INPUT_CORRELATION * (h_same * np.conj(h_cross)).real + wet * np.abs(high) ** 2
-    weight = k_weight_power(grid, sample_rate) / np.maximum(grid, 20.0)
+    # the reference spectrum is music-like, not pink: pink down to 1.5 kHz, then about 2 dB per octave steeper
+    # (with plain pink noise the profiles that change the highs, Night above all, came out 0.5-0.8 LU too loud)
+    weight = k_weight_power(grid, sample_rate) / np.maximum(grid, 20.0) / (1.0 + (grid / 1500.0) ** 2) ** 0.33
     weight[(grid < 40.0) | (grid > 16000.0)] = 0.0
     gain = float(np.sqrt(weight.sum() / (weight * out_power).sum()) * 10.0 ** (-HEADROOM_DB / 20.0))
 
