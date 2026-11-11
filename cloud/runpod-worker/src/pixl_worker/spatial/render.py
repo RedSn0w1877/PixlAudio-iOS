@@ -5,7 +5,8 @@ For each profile:
    the profile's room: direct sound through the head model, plus early reflections (room.py);
 2. a stereo send of all stems feeds the room's late reverb;
 3. below the crossover (110 Hz) the ORIGINAL mix passes straight through, time-aligned, so bass and kick keep
-   their weight and punch, and a share of the untouched mix is blended back above it;
+   their weight and punch. (Nothing of the untouched mix is blended back above it: it cancels against the head
+   model's phase. A 25 % blend measured as a 2-5 dB hole from 2.5 to 8 kHz.)
 4. the result is matched to the original: its long-term tone (third-octave, at most +/- 5 dB), then its loudness
    (BS.1770), and a true-peak limiter that is idle unless a peak goes over -1 dBTP.
 
@@ -36,6 +37,7 @@ HEADROOM_DB = 4.0
 TONE_LIMIT_DB = 5.0
 BAD_STEMS_DB = -6.0     # stems that miss the mix by more than this are not trusted
 SILENT_DB = -70.0
+SIDE_LEVEL = float(np.sqrt(0.5))
 
 
 @dataclass
@@ -145,12 +147,17 @@ def render_one(prepared: _Prepared, profile: Profile, tick: Callable[[], None] |
         if stage.center < 1.0:  # leave some of the centred content on the sides
             keep = (1.0 - stage.center) * centre
             centre, left, right = stage.center * centre, left + keep, right + keep
-        for signal, az, el in ((centre, 0.0, stage.center_el), (left, stage.width, stage.side_el),
-                               (right, -stage.width, stage.side_el)):
+        # Levels. The centre signal stands for content that was in BOTH channels, so it reaches each ear at its own
+        # level, exactly as on plain headphones. A side signal was in ONE channel: its power is shared between
+        # the two ears (mostly the near one), so it gets 1/sqrt(2). Otherwise everything panned would come out
+        # 3 dB louder against the voice than the mix intended.
+        for signal, az, el, level in ((centre, 0.0, stage.center_el, 1.0),
+                                      (left, stage.width, stage.side_el, SIDE_LEVEL),
+                                      (right, -stage.width, stage.side_el, SIDE_LEVEL)):
             if not np.any(signal):
                 continue
             sources.append(signal)
-            kernels.append(builder.kernel(az, el, stage.dist, gain, stage.er))
+            kernels.append(builder.kernel(az, el, stage.dist, gain * level, stage.er))
         send = gain * stage.rev
         send_left += send * (part.centre + part.left)
         send_right += send * (part.centre + part.right)
@@ -166,11 +173,9 @@ def render_one(prepared: _Prepared, profile: Profile, tick: Callable[[], None] |
     freqs = np.fft.rfftfreq(n_fft, 1.0 / sr)
     low = 1.0 / (1.0 + (freqs / profile.crossover_hz) ** 4)
     high = 1.0 - low
-    dry = profile.dry
     spectrum = np.empty_like(prepared.mix_spectrum)
     for c in range(2):
-        spectrum[c] = (1.0 - dry) * high * np.fft.rfft(wet[:, c], n_fft) \
-            + (dry * high + low) * prepared.mix_spectrum[c]
+        spectrum[c] = high * np.fft.rfft(wet[:, c], n_fft) + low * prepared.mix_spectrum[c]
     del wet
 
     # tone: match the original's long-term spectrum in third-octave bands

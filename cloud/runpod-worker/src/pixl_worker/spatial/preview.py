@@ -29,7 +29,8 @@ from .room import KernelBuilder
 TAPS = 192
 CROSSOVER_HZ = 120.0
 SPARSE_TAPS = 40
-INPUT_CORRELATION = 0.75  # how alike left and right are in a typical mix (for tone and loudness matching)
+INPUT_CORRELATION = 0.75
+SIDE_LEVEL = float(np.sqrt(0.5))   # as in render.py: one channel's content shares its power between the ears  # how alike left and right are in a typical mix (for tone and loudness matching)
 GOLDEN_FRAMES = 1024
 RATES = (44100, 48000)
 
@@ -67,19 +68,20 @@ def build_table(profile: Profile, sample_rate: int) -> dict:
     freqs = np.fft.rfftfreq(n_fft, 1.0 / sample_rate)
 
     def pair(theta: float) -> tuple[np.ndarray, np.ndarray]:
-        """(same side, other side) spectra for a source at +theta, as loud as a frontal one."""
+        """(near ear, far ear) spectra for a source at +theta, levelled like the renderer's side parts."""
         direct = builder.direct(theta, 0.0)
-        return direct[0], direct[1]
+        return direct[0] * SIDE_LEVEL, direct[1] * SIDE_LEVEL
 
+    # Two virtual speakers at +/- theta (and, for the wider profiles, the side signal on a second pair further
+    # round). A centred sound is then a phantom between the two, like on real speakers; the cloud render does
+    # better with a real centre source, but that needs the centre pulled out of the mix first, which a fixed
+    # filter cannot do. (Mixing a real centre INTO this was tried: the two arrive a fraction of a millisecond
+    # apart and cancel each other in the highs.)
     same, cross = pair(spec.theta)
     if spec.side_gain > 0.0:
-        side_same, side_cross = pair(spec.side_theta)
-        rear = 0.5 * spec.side_gain * (side_same - side_cross)
+        side_near, side_far = pair(spec.side_theta)
+        rear = 0.5 * spec.side_gain * (side_near - side_far)
         same, cross = same + rear, cross - rear
-    delay = int(np.argmax(np.abs(np.fft.irfft(same, n_fft))))
-    shift = np.exp(-2j * np.pi * np.arange(len(freqs)) * delay / n_fft)
-    same = (1.0 - spec.dry) * same + spec.dry * shift
-    cross = (1.0 - spec.dry) * cross
 
     # tone: flat for a typical mix (left and right partly alike), by a smooth minimum-phase correction
     power = np.abs(same) ** 2 + np.abs(cross) ** 2 + 2.0 * INPUT_CORRELATION * (same * np.conj(cross)).real
