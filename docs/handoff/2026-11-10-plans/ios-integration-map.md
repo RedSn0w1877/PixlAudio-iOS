@@ -245,8 +245,9 @@ How to feed it, following the patterns already in `TapParameters.swift`:
 - Coefficients: decode `SpatialPreviewTables` once (`SpatialPreviewResource.load()`), copy into buffers the tap
   owns in `prepare` (as `localBlock` is at lines 133-134 and 199-205). All twelve tables are 12 × (2×192 + 2×40×3)
   numbers: keep them all, so a change of profile is an index change and never an allocation.
-- State per tap: FIR history, one delay ring of `tables.ringCapacity` frames per channel (16384 with today's tables; read it, do not write it down), four biquad
-  states. Allocate in `init`/`prepare`, free in `deinit` (lines 120-145 show the pattern).
+- State per tap: FIR history, one delay ring of `tables.ringCapacity` frames per channel (16384 with today's
+  tables; read it, do not write it down), four biquad states. Allocate in `init`/`prepare`, free in `deinit`
+  (lines 120-145 show the pattern).
 - Ramps: `applyGainRamp` (lines 370-383) is linear across one buffer. The spec's 80 ms wet/dry ramp is longer than
   a buffer at small IO sizes and shorter at large ones: carry the ramp position in the context (as
   `currentReplayGain` is carried, line 113) and count frames.
@@ -556,7 +557,10 @@ let prepared = try await dependencies.preparer.prepare(source: source, jobKey: j
   (1392-1404), and the upload goes out through a presigned PUT valid 24 h (`startUpload`, 1418-1442).
 - The import check compares the result's frame count with the phone's own decode (`samplesLineUp`, 2317;
   `CloudImportCheck.samplesMatch`, PixlNet `CloudQueuePolicy.swift:683`). A render has "the input's sample rate and
-  frame count" (spec 3), so the same check applies to it: `audio.samples` against `record.decodedFrames`.
+  frame count" (spec 3), so the same check applies to a render **this phone's own job** made: `audio.samples`
+  against `record.decodedFrames`. A render fetched from the shared library (6.2 step 2) may come from another
+  phone's upload at another rate (Android uploads the stream's own rate, an iPhone 44.1 kHz): there, compare
+  `audio.durationMs` with the song's length and never frame counts (spec 6.2 step 3, "by media time").
 
 ### 7.3 What a library job needs (spec 4)
 
@@ -615,7 +619,8 @@ In the app (`CloudStudio.swift`), a library job differs from an instrumental job
   separate switch **under** it: Cloud Studio's switch is the master, and a library job, lookup or download needs
   both on (spec 6.1 "Two switches").
 - Network: `networkAllowsUpload()` (845-853), `useCellular`; auto work is unmetered only (`autoMayUseNetwork`,
-  753; `transfers.allowsCellular`, 1437).
+  753; `transfers.allowsCellular`, 1437). A render the playing song wants but the network rule holds back is
+  reported as `RenditionState(.queued, queueReason: .waitingForNetwork)` (it has its own status line).
 - Heavy work: `HeavyWorkGate`, `HeavyJobGovernor` (1315-1319); safe mode holds preparations back.
 - Order: `CloudPriorityLane.ordered` (1328). Library jobs sit below Sing and below anything sent by hand.
 - Endpoint: three GPU workers on the built-in endpoint (`CloudKeyChoice.parallelWorkers`), batches gated by
@@ -635,7 +640,9 @@ nil = no limit) and `cloudAudio.dailyAhead` (25). They arrive through `SpatialLi
 spend must be counted apart from Sing's**: today every record's cost counts against the one cap
 (`CloudBudget.committedMicroUSD`, PixlNet 560), and `effectiveMonthlyCap` clamps to $3 with built-in keys. A library
 record needs to be left out of Sing's sum and counted in its own. `CloudAudioUsage.spentThisMonthMicroUSD` and
-`.sentToday` report it to Settings.
+`.sentToday` report it to Settings. A render the playing song wants but the month's cap holds back is reported as
+`RenditionState(.queued, queueReason: .capReached)` (its own status line too); the shared-library lookup and
+download of 6.2 step 2 cost nothing on the GPU and are not held back by the cap.
 
 Storage (spec 6.1, 6.2): `cloudAudio.storageMB` (3072), least recently played removed first
 (`SpatialLibrary.markPlayed`). `StreamCache.evictIfNeeded` (`StreamCache.swift:137-154`) is the house pattern for an
@@ -906,11 +913,11 @@ A push that touches `cloud/runpod-worker/**` (a merge of `audio-hq` does) also s
 branch that is only its `test` job (the worker's CPU tests on a free Linux runner); no image is pushed and nothing
 is deployed without `[image]` in the commit message.
 
-**When the worker's tables are regenerated** (it happened once already, `0a295e6` on `audio-hq`): the three app
-copies must follow in the same change, with `bash ci/check-spatial-fixtures.sh --sync`. A push that only touches
-`cloud/**` does not run `ci.yml`, so nothing catches the drift until the next app push, where `core` then fails on
-"Spatial table files match the worker's". No test writes a generated number down: the stage's golden test reads
-whatever the two files hold.
+**When the worker's tables are regenerated** (it happened three times while this page was written, last in
+`ec61dce` on `audio-hq`): the three app copies must follow in the same change, with
+`bash ci/check-spatial-fixtures.sh --sync`. A push that only touches `cloud/**` does not run `ci.yml`, so nothing
+catches the drift until the next app push, where `core` then fails on "Spatial table files match the worker's".
+No test writes a generated number down: the stage's golden test reads whatever the two files hold.
 
 Loop: `gh run list --repo RedSn0w1877/PixlAudio-iOS --branch <branch>`, `gh run watch <id> --repo … --exit-status`,
 `gh run view <id> --repo … --log-failed` (the job summary lists `file:line: error`). Logs are public: never print a
@@ -1088,3 +1095,8 @@ Still open:
    player uses.
 4. **AGENTS.md is behind:** it says deployment target 26.1 and names another co-author line; `project.yml` and
    `Package.swift` say 26.0.
+5. **A shared render made from another phone's stream** (not measured). Android uploads the stream it plays (Opus,
+   48 kHz); an iPhone plays and uploads AAC decoded to 44.1 kHz. The spec says to line a fetched render up by media
+   time. Whether the two streams' media times agree closely enough for a 250 ms crossfade (encoder delay, padding)
+   has not been measured; the switch's only guard is the length check (`requireAligned`, 50 ms). ENGINE: keep that
+   check on for renders, and treat `.misaligned` as "use it from the next play", not as a failure.
