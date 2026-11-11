@@ -984,7 +984,6 @@ Launch, library, artwork, player and Spotify-matcher speed-ups (docs/performance
 | `View.scrollBounceBehavior(_:axes:)` `.always`, `View.scrollDismissesKeyboard(.interactively)`, `View.onScrollGeometryChange(for:of:action:)` | 16.4 / 16 / 18 | /documentation/swiftui/view/scrollbouncebehavior(_:axes:) | `PlaylistDetailView` | Pulling the playlist down past its top (offset below -72 pt) reveals Find in playlist; a list shorter than the page still bounces. |
 | `View.confirmationDialog(_:isPresented:titleVisibility:presenting:actions:message:)` | 15 | /documentation/swiftui/view/confirmationdialog(_:ispresented:titlevisibility:presenting:actions:message:) | `RootView` ("Blocked artist" › Play anyway) | The action uses the request captured by `presenting:`; the binding clears the pending request as the dialog goes away. |
 | `View.contextMenu(menuItems:)` on the artwork carousel and the mini player | 13 | /documentation/swiftui/view/contextmenu(menuitems:) | `SongQuickActionsModifier` | Long press: add to playlist, share, go to the artist. |
-||||||| a9b76aa
 | `UIGestureRecognizerRepresentable` (`makeCoordinator(converter:)`, `makeUIGestureRecognizer`, `updateUIGestureRecognizer`, `handleUIGestureRecognizerAction`), `UIPanGestureRecognizer.velocity(in:)` / `UIGestureRecognizerDelegate.gestureRecognizerShouldBegin` | 18 | /documentation/swiftui/uigesturerecognizerrepresentable | `QueueSheet.HorizontalRowSwipe` | Queue row swipe-to-remove only begins for mostly-horizontal pans, so vertical drags on a row scroll the list. |
 
 ## Sing step 4: the preview piece (2026-10-23)
@@ -993,21 +992,12 @@ Launch, library, artwork, player and Spotify-matcher speed-ups (docs/performance
 | `AVAssetReader.timeRange` (set before `startReading()`), `CMSampleBufferGetPresentationTimeStamp` | 4 | /documentation/avfoundation/avassetreader/timerange | `CloudAudioPreparer.decode(frameRange:)` | Sing's preview piece decodes only its minute (plus 0.5 s of decoder pre-roll on each side); every buffer is placed by its presentation time and cut to the exact 44.1 kHz frames, so the cut matches a decode of the whole song. |
 | `AVMutableComposition`, `addMutableTrack(withMediaType:preferredTrackID:)`, `AVMutableCompositionTrack.insertEmptyTimeRange(_:)`, `insertTimeRange(_:of:at:)`, `AVAssetTrack.load(.timeRange)` | 4 / 15 | /documentation/avfoundation/avmutablecompositiontrack | `DeckItemFactory.makeClipItem` | The piece is placed at its start frame inside a composition as long as the song (silent before and after), so the deck item's timeline is the song's: position, seeks, lyrics, Now Playing and the in-sync switch need no offset. The processing tap is attached to the composition track. To be confirmed on the phone: the trailing empty range keeps the item as long as the song. |
 
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
 ## Listening history import (2026-10-23)
 | API | Min OS | Doc | Used in | Notes |
 |---|---|---|---|---|
 | `UTType.zip`, `UTType.json` with `fileImporter(isPresented:allowedContentTypes:allowsMultipleSelection:onCompletion:)` | 14 | /documentation/uniformtypeidentifiers/uttype-swift.struct/zip | `ListeningHistoryView` | The Spotify / Google Takeout ZIP or the JSON files inside it; read with PixlBackup's own ZIP reader (no new dependency). |
 | `RelativeDateTimeFormatter` (`unitsStyle = .abbreviated`, `localizedString(for:relativeTo:)`) | 13 | /documentation/foundation/relativedatetimeformatter | `ListeningHistoryText.status` | "Last synced 2 hr. ago"; one cached formatter. |
-||||||||| 7c50e28
-=========
-## Listening history import (2026-10-23)
-| API | Min OS | Doc | Used in | Notes |
-|---|---|---|---|---|
-| `UTType.zip`, `UTType.json` with `fileImporter(isPresented:allowedContentTypes:allowsMultipleSelection:onCompletion:)` | 14 | /documentation/uniformtypeidentifiers/uttype-swift.struct/zip | `ListeningHistoryView` | The Spotify / Google Takeout ZIP or the JSON files inside it; read with PixlBackup's own ZIP reader (no new dependency). |
-| `RelativeDateTimeFormatter` (`unitsStyle = .abbreviated`, `localizedString(for:relativeTo:)`) | 13 | /documentation/foundation/relativedatetimeformatter | `ListeningHistoryText.status` | "Last synced 2 hr. ago"; one cached formatter. |
-||||||| 7c50e28
+
 ## Claude everywhere and Ask Taizo (2026-10-23)
 | API | Min OS | Doc | Used in | Notes |
 |---|---|---|---|---|
@@ -1016,11 +1006,4 @@ Launch, library, artwork, player and Spotify-matcher speed-ups (docs/performance
 | `Data.WritingOptions.completeFileProtectionUntilFirstUserAuthentication`, `URLResourceValues.isExcludedFromBackup` | 4 / 5.1 | /documentation/foundation/nsdata/writingoptions | `TaizoConversationStore` | The saved conversations stay on the phone and out of device backups. |
 | `Menu` with `Section` and `Button(_:systemImage:action:)` | 14 / 15 | /documentation/swiftui/menu | `TaizoChatsMenu` | Ask Taizo's header menu: New chat and the last five conversations. |
 | `Link(destination:label:)` | 14 | /documentation/swiftui/link | `TaizoSourceLink` | A cited page opens in the browser. |
-||||||| 7c50e28
-## Listening history import (2026-10-23)
-| API | Min OS | Doc | Used in | Notes |
-|---|---|---|---|---|
-| `UTType.zip`, `UTType.json` with `fileImporter(isPresented:allowedContentTypes:allowsMultipleSelection:onCompletion:)` | 14 | /documentation/uniformtypeidentifiers/uttype-swift.struct/zip | `ListeningHistoryView` | The Spotify / Google Takeout ZIP or the JSON files inside it; read with PixlBackup's own ZIP reader (no new dependency). |
-| `RelativeDateTimeFormatter` (`unitsStyle = .abbreviated`, `localizedString(for:relativeTo:)`) | 13 | /documentation/foundation/relativedatetimeformatter | `ListeningHistoryText.status` | "Last synced 2 hr. ago"; one cached formatter. |
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
+
