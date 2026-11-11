@@ -217,22 +217,25 @@ def load_models() -> tuple[pipeline.Models, Callable[[], dict]]:
     register_backend(aligner)
     stems4 = Stems4(DEMUCS_DIR)
     transcriber = _LazyTranscriber(ASR_DIR) if os.path.isdir(ASR_DIR) else None
-    # The six-stem separator behind the spatial renders (separate.Stems6 says what it must do). This is the one
-    # place it is built: a different separator is constructed here instead (the spatial roadmap's "Where your own
-    # separator plugs in"). Nothing is loaded for it here: a worker that only ever makes instrumentals pays nothing.
-    six = GuitarPiano(DEMUCS_DIR)
-    stems6 = Stems6(separator, stems4, six)
+    # The six-stem separator behind the spatial renders (separate.Stems6 says what it must do). The next line is
+    # the one place it is built: a different separator is constructed there instead and nothing else here changes
+    # (the spatial roadmap's "Where your own separator plugs in"). Nothing is loaded for it now: a worker that only
+    # ever makes instrumentals pays nothing.
+    stems6 = Stems6(separator, stems4, GuitarPiano(DEMUCS_DIR))
     models = pipeline.Models(separator=separator, stems4=stems4 if stems4.available() else None,
                              transcriber_factory=transcriber, stems6=stems6 if stems6.available() else None)
 
     def state() -> dict:
-        return {
+        out = {
             SEPARATOR_ID: True,
             aligner.model_id: True if aligner.loaded else "lazy",
             ASR_ID: (True if transcriber.loaded else "lazy") if transcriber else False,
             STEMS4_ID: (True if stems4.loaded else "lazy") if stems4.available() else False,
-            SIX_ID: (True if six.loaded else "lazy") if six.available() else False,
         }
+        six = getattr(stems6, "six", None)  # the cascade's htdemucs_6s; a replacement has its own weights
+        if six is not None:
+            out[SIX_ID] = (True if six.loaded else "lazy") if six.available() else False
+        return out
     return models, state
 
 

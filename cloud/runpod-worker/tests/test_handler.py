@@ -308,6 +308,44 @@ def test_the_worker_is_1_1_0():
         assert load_example(name)["worker"]["version"] == pixl_worker.WORKER_VERSION, name
 
 
+def test_the_six_stem_separator_is_built_in_one_place_and_can_be_swapped_there(monkeypatch, tmp_path):
+    # The roadmap's "Where your own separator plugs in": load_models() builds separate.Stems6 on one line; a class
+    # with the same contract built there instead needs nothing else changed. No weights here, no torch.
+    from pixl_worker import separate as S
+    from pixl_worker.lyrics import languages
+
+    class Sep:
+        model_id = S.SEPARATOR_ID
+
+        def __init__(self, *args):
+            pass
+
+    monkeypatch.setattr(S, "RoformerSeparator", Sep)
+    monkeypatch.setattr(languages, "register_backend", lambda backend: None)
+    for name in ("DEMUCS_DIR", "ASR_DIR", "ALIGNER_DIR"):
+        monkeypatch.setattr(handler, name, str(tmp_path / "missing" / name))
+    models, state = handler.load_models()
+    assert models.stems6 is None  # no htdemucs_ft here: no spatial renders, and no crash at start-up
+    assert state()["htdemucs_6s"] is False and state()["htdemucs_ft"] is False
+
+    class Mine:
+        model_id = "my-separator-1"
+
+        def __init__(self, *args):
+            pass
+
+        def available(self):
+            return True
+
+        def stems(self, mix, sample_rate, *, quality="standard", vocals=None, progress=None):
+            return {}
+
+    monkeypatch.setattr(S, "Stems6", Mine)
+    models, state = handler.load_models()
+    assert models.stems6.model_id == "my-separator-1" and "htdemucs_6s" not in state()
+    assert state()[S.SEPARATOR_ID] is True
+
+
 def test_refresh_reason():
     assert handler.refresh_reason({"op": "selftest"}) == "selftest"
     assert handler.refresh_reason({"op": "bench"}) == "bench"
