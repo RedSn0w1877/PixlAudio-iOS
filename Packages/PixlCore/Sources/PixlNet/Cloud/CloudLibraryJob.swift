@@ -295,7 +295,8 @@ public enum CloudLibrarySourceFormat {
     }
 
     /// The audio codec of a YouTube stream: from its itag when it is a known audio one, else from its content type
-    /// (`audio/webm` is Opus, `audio/mp4` AAC). Nil when neither says.
+    /// (`audio/webm` is Opus, `audio/mp4` AAC). SpotiFLAC's file on Pro / Studio Pro (`audio/flac`, no itag) is the
+    /// render's source too (Hoa, 2026-11-11), so it reads "flac". Nil when neither says.
     public static func codec(itag: Int?, contentType: String?) -> String? {
         switch itag {
         case 249?, 250?, 251?, 338?, 774?: return "opus"
@@ -303,6 +304,7 @@ public enum CloudLibrarySourceFormat {
         default: break
         }
         guard let type = contentType?.lowercased() else { return nil }
+        if type.contains("flac") { return "flac" }
         if type.contains("opus") || type.contains("webm") { return "opus" }
         if type.contains("mp4a") || type.contains("mp4") || type.contains("aac") { return "aac" }
         return nil

@@ -483,6 +483,8 @@ import PixlModel
         #expect(CloudLibrarySourceFormat.codec(itag: nil, contentType: "audio/mp4; codecs=\"mp4a.40.2\"") == "aac")
         #expect(CloudLibrarySourceFormat.codec(itag: nil, contentType: "audio/webm; codecs=\"opus\"") == "opus")
         #expect(CloudLibrarySourceFormat.codec(itag: nil, contentType: nil) == nil)
+        #expect(CloudLibrarySourceFormat.codec(itag: nil, contentType: "audio/flac") == "flac")
+        #expect(CloudLibrarySourceFormat.codec(itag: nil, contentType: "audio/x-flac") == "flac")
         #expect(CloudLibrarySource.known(itag: nil, codec: nil) == nil)
         #expect(CloudLibrarySource.known(itag: 140, codec: "aac") == CloudLibrarySource(itag: 140, codec: "aac"))
         #expect(CloudLibrarySource.known(itag: nil, codec: String(repeating: "x", count: 40))?.codec?.count == 16)
