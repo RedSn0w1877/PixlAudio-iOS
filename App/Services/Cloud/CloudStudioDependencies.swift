@@ -120,6 +120,25 @@ nonisolated enum CloudLyricsSaveOutcome: Sendable, Equatable {
     case unusable
 }
 
+/// The audio a Spatial audio library job uploads (cloud audio spec 6.2 step 3), and the stream it came from
+/// (`library.source`: the itag and codec of what the phone streams, not of the FLAC that goes up).
+nonisolated struct CloudLibraryAudioSource: Sendable, Equatable {
+    var url: URL
+    var itag: Int?
+    var codec: String?
+}
+
+/// Spatial audio's local store as Cloud Studio sees it (cloud audio spec 6.2): whether a render is already on the
+/// phone (a library job then has nothing left to fetch for it), and where a downloaded, verified render goes. The
+/// Spatial audio library (`SpatialCloudLibrary`) is it; nil until that side is built, and in the demo.
+@MainActor
+protocol CloudRenderInstalling: AnyObject {
+    func hasRender(_ key: RenditionKey) -> Bool
+    /// Moves `staged` (bytes and SHA-256 already checked against `manifest`) into the store with the manifest beside it,
+    /// and tells whoever listens that it is there.
+    func installRender(staged: URL, manifest: CloudLibraryManifest) async throws
+}
+
 /// The app around the orchestrator: songs, their audio, the lyrics store and `Stems/`.
 @MainActor
 protocol CloudStudioHost: AnyObject {
@@ -130,6 +149,10 @@ protocol CloudStudioHost: AnyObject {
     var librarySongs: [Song] { get }
     /// A decodable URL for the song: a local file or library item; a streamed song is downloaded permanently first.
     func audioSource(for song: Song) async throws -> URL
+    /// The audio of `videoId` for a Spatial audio library job: a download already on the phone, else the stream cache's
+    /// complete file (filled first when it is not complete). Unlike `audioSource`, it never leaves a permanent download
+    /// behind: a render asked for because a song merely played must not add to Offline storage.
+    func libraryAudioSource(for song: Song, videoId: String) async throws -> CloudLibraryAudioSource
     /// The YouTube video a streamed song plays (a Spotify song's match), nil for local songs. Re-checked on import.
     func streamIdentity(for song: Song) async -> String?
     func lyricsFacts(for song: Song) async -> CloudLyricsFacts
@@ -149,6 +172,12 @@ protocol CloudStudioHost: AnyObject {
 }
 
 extension CloudStudioHost {
+    /// A host without a stream cache (the demo's, the tests' by default) takes the song's ordinary audio source, and
+    /// knows nothing of the stream.
+    func libraryAudioSource(for song: Song, videoId: String) async throws -> CloudLibraryAudioSource {
+        CloudLibraryAudioSource(url: try await audioSource(for: song), itag: nil, codec: nil)
+    }
+
     /// A host with nowhere to keep them (the demo's) takes no preview pieces.
     func installClip(from staged: URL, songId: String, startMs: Int64, flac: Bool) throws -> URL {
         throw CloudStudio.Failure("No storage for preview pieces")
@@ -175,15 +204,19 @@ final class LiveCloudStudioHost: CloudStudioHost {
     private let lyricsService: LyricsService?
     private let studio: TaisStudio
     private let source: (Song) async throws -> URL
+    private let librarySource: ((String) async throws -> CloudLibraryAudioSource)?
     private let videoIdForSpotify: (String) async -> String?
 
     init(library: LibraryStore, playback: PlaybackStore, lyricsService: LyricsService?, studio: TaisStudio,
-         audioSource: @escaping (Song) async throws -> URL, videoIdForSpotify: @escaping (String) async -> String?) {
+         audioSource: @escaping (Song) async throws -> URL,
+         libraryAudioSource: ((String) async throws -> CloudLibraryAudioSource)? = nil,
+         videoIdForSpotify: @escaping (String) async -> String?) {
         self.library = library
         self.playback = playback
         self.lyricsService = lyricsService
         self.studio = studio
         source = audioSource
+        librarySource = libraryAudioSource
         self.videoIdForSpotify = videoIdForSpotify
     }
 
@@ -192,6 +225,13 @@ final class LiveCloudStudioHost: CloudStudioHost {
     var librarySongs: [Song] { library.songs }
 
     func audioSource(for song: Song) async throws -> URL { try await source(song) }
+
+    func libraryAudioSource(for song: Song, videoId: String) async throws -> CloudLibraryAudioSource {
+        guard let librarySource else {
+            return CloudLibraryAudioSource(url: try await source(song), itag: nil, codec: nil)
+        }
+        return try await librarySource(videoId)
+    }
 
     func streamIdentity(for song: Song) async -> String? {
         if let videoId = YouTubeSongIdentity.videoId(for: song) { return videoId }

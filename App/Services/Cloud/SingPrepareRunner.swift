@@ -251,7 +251,8 @@ final class SingPrepareRunner {
         // The phone is ready: songs that were waiting for it carry on.
         cloud.wakeAutoJobs()
         // Songs the person asked for come first: nothing is picked while one is on its way.
-        if cloud.jobs.contains(where: { $0.state.isPending && $0.effectiveOrigin != .auto }) {
+        // (Spatial audio's library jobs are quiet work of their own, not songs the person asked for.)
+        if cloud.jobs.contains(where: { $0.state.isPending && $0.effectiveOrigin != .auto && $0.effectiveOrigin != .library }) {
             setWaiting("Getting your songs ready first")
             return
         }

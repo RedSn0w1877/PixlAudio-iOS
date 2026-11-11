@@ -20,6 +20,8 @@ public struct ActiveJob: Sendable, Hashable, Identifiable {
         case cloud
         /// The downloaded AI model loading or writing an answer (iOS only).
         case localModel
+        /// Spatial audio's cloud renders (Cloud Studio jobs of the library kind, one row per batch like `cloud`).
+        case spatial
 
         /// Android's labels (`PixelPlayJobKind.label`) where it has one.
         public var label: String {
@@ -34,6 +36,7 @@ public struct ActiveJob: Sendable, Hashable, Identifiable {
             case .roformer: "Rendering instrumental"
             case .cloud: "Cloud processing"
             case .localModel: "AI model"
+            case .spatial: "Spatial audio"
             }
         }
 
@@ -50,6 +53,7 @@ public struct ActiveJob: Sendable, Hashable, Identifiable {
             case .roformer: "waveform.badge.magnifyingglass"
             case .cloud: "icloud.and.arrow.up"
             case .localModel: "sparkles"
+            case .spatial: "headphones"
             }
         }
 
@@ -57,6 +61,7 @@ public struct ActiveJob: Sendable, Hashable, Identifiable {
         var rank: Int {
             switch self {
             case .cloud: 0
+            case .spatial: 1
             case .localModel: 1
             case .lyricsSync: 1
             case .instrumental: 2

@@ -15,12 +15,17 @@ extension CloudStudio {
         // PixlAudio's built-in keys when this build carries them (CI, from the CLOUD_DEFAULTS_KEY secret); decrypted on
         // first use, off the main actor.
         let settings = CloudSettings(defaults: defaults, secrets: CloudKeychain(), builtIn: CloudBuiltInKeys())
+        // Spatial audio's library jobs take the stream cache's copy of a song, never a permanent download.
+        let streamCache = youtube.cache, streamFetcher = youtube.fetcher
         let host = LiveCloudStudioHost(
             library: library, playback: playback, lyricsService: lyricsService, studio: tais.studio,
             audioSource: { [weak playbackServices, weak youtube] song in
                 // Streamed songs are downloaded permanently first (owner decision), like Android.
                 try await TaisServices.audioSource(for: song, resolver: playbackServices?.engine.factory.resolver,
                                                    downloads: youtube?.downloads)
+            },
+            libraryAudioSource: { videoId in
+                try await CloudAudioSource.fetch(videoId: videoId, cache: streamCache, fetcher: streamFetcher)
             },
             videoIdForSpotify: { spotifyId in
                 (try? await persistence?.matchedVideoId(spotifyId: spotifyId)) ?? nil

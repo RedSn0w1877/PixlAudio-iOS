@@ -60,8 +60,9 @@ public enum CloudBackgroundPlanner {
         } else {
             plan.processingNotBeforeMs = soonest
         }
-        // Songs the person is waiting for need every chance to run; songs prepared ahead can wait for the charger.
-        plan.processingRequiresPower = pending.allSatisfy { $0.origin == .auto }
+        // Songs the person is waiting for need every chance to run; songs prepared ahead and Spatial audio's library
+        // jobs (quiet work; while music plays the app is awake and follows them itself) can wait for the charger.
+        plan.processingRequiresPower = pending.allSatisfy { $0.origin == .auto || $0.origin == .library }
         return plan
     }
 
