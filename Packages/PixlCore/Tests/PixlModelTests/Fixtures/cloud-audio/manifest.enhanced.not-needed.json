@@ -1,0 +1,12 @@
+{
+  "schema": "pixl.library.render", "v": 1, "libV": 1,
+  "videoId": "J7p4bzqLvCw", "kind": "enhanced", "profile": null,
+  "audio": null,
+  "loudness": null,
+  "source": {"itag": 251, "codec": "opus", "sampleRate": 48000, "decodedSamples": 9696000,
+             "sha256": "a0b1c2d3e4f5061728394a5b6c7d8e9f00112233445566778899aabbccddeeff", "cutoffHz": 20000},
+  "render": {"engine": null, "stems": null, "stemMode": null,
+             "restore": {"applied": false, "model": null, "reason": "full_band"}},
+  "worker": {"version": "1.1.0", "gitSha": "abcdef012345"},
+  "createdAt": "2026-11-10T19:02:11Z"
+}

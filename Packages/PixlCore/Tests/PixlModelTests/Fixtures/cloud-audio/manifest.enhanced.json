@@ -1,0 +1,16 @@
+{
+  "schema": "pixl.library.render", "v": 1, "libV": 1,
+  "videoId": "J7p4bzqLvCw", "kind": "enhanced", "profile": null,
+  "audio": {"key": "lib/v1/J7p4bzqLvCw/enhanced.flac", "bytes": 24811320,
+            "sha256": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d",
+            "codec": "flac", "bits": 16, "sampleRate": 44100, "samples": 8908200, "durationMs": 202000},
+  "loudness": {"integratedLufs": -9.8, "sourceLufs": -9.8, "headroomDb": 0.0, "truePeakDb": -0.3,
+               "limiterMaxDb": 0.0},
+  "source": {"itag": 140, "codec": "aac", "sampleRate": 44100, "decodedSamples": 8908200,
+             "sha256": "a0b1c2d3e4f5061728394a5b6c7d8e9f00112233445566778899aabbccddeeff", "cutoffHz": 15900},
+  "render": {"engine": null, "stems": null, "stemMode": null,
+             "restore": {"applied": true, "model": "a2sb", "reason": null}},
+  "worker": {"version": "1.1.0", "gitSha": "abcdef012345"},
+  "createdAt": "2026-11-10T19:02:40Z",
+  "addedLater": {"ignored": true}
+}
