@@ -1024,3 +1024,11 @@ Launch, library, artwork, player and Spotify-matcher speed-ups (docs/performance
 | `RelativeDateTimeFormatter` (`unitsStyle = .abbreviated`, `localizedString(for:relativeTo:)`) | 13 | /documentation/foundation/relativedatetimeformatter | `ListeningHistoryText.status` | "Last synced 2 hr. ago"; one cached formatter. |
 ||||||| merged common ancestors
 >>>>>>>>> Temporary merge branch 2
+
+## Spatial audio: the on-device stage and the player (2026-11-11, ENGINE)
+| API | Min OS | Doc | Used in | Notes |
+|---|---|---|---|---|
+| `vDSP_conv` (positive filter stride: correlation with the reversed FIR = convolution over the history) | 4 | /documentation/accelerate/1450516-vdsp_conv | `SpatialStage` (PixlAudioCore, `#if canImport(Accelerate)`) | The two 192-tap FIRs of spec 7; result and inputs never overlap. Windows and Linux run the same stage on plain loops (the PixlCore golden test); `SpatialPlaybackTests` compares the two paths on the simulator. |
+| `vDSP_vsma`, `vDSP_vadd`, `vDSP_vsmul` | 4 | /documentation/accelerate/1450025-vdsp_vsma | `SpatialStage` | The sparse room's taps (in place, `C == D`), the FIR sums and the gain. No allocation: every buffer is made in `init`. |
+| `UnsafeMutableRawPointer.copyMemory(from:byteCount:)` | Swift stdlib | /documentation/swift/unsafemutablerawpointer/copymemory(from:bytecount:) | `SpatialStage.shiftHistory` | A memmove: the history's source and destination overlap. |
+| `AVAudioSession.Port` `.headphones`, `.usbAudio`, `.bluetoothA2DP`, `.bluetoothLE`, `.bluetoothHFP`, `.builtInSpeaker`, `.builtInReceiver`, `.airPlay`, `.carAudio`, `.lineOut`, `.HDMI` | 6 / 7 (`bluetoothLE`) | /documentation/avfaudio/avaudiosession/port | `SpatialOutputRoute` | The route rule's reading of `currentRoute.outputs.first?.portType` (spec 6.1); re-read on every `routeChangeNotification`. |

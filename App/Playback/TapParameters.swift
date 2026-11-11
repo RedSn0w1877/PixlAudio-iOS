@@ -88,6 +88,8 @@ nonisolated final class AudioEffectsParameters: @unchecked Sendable {
     let designSampleRate = AtomicDouble(44_100)
     /// Music Haptics: the shared signal the taps publish onsets and the bass level to (inactive unless switched on).
     let haptics = HapticSignalBus()
+    /// Spatial audio's on-device stage: the profile every tap plays (or none) and the shared coefficients.
+    let spatial = SpatialTapShared()
 
     init() {
         blocks = .allocate(capacity: Self.blockSize * Self.slotCount)
@@ -152,6 +154,16 @@ nonisolated final class TapItemParameters: @unchecked Sendable {
     let fixedGain = AtomicFloat(1)
     /// The item's duration in seconds (0 = unknown). Buffers past it are not counted as media by the meters.
     let mediaDuration = AtomicDouble(0)
+    /// What Spatial audio does with this item (`SpatialItemRole`), set before the tap is created and never changed:
+    /// the on-device stage may run on the song's own audio only, never on a render (never spatialized twice) nor on
+    /// Sing's audio.
+    let spatialRole = Atomic<Int>(SpatialItemRole.none)
+    /// A render's headroom (its manifest's `headroomDb`): the level rule gives it back while the render plays.
+    let spatialHeadroomDb = AtomicDouble(0)
+    /// Written by the tap's prepare (`SpatialItemFormat`): whether the stage can run on this item's format.
+    let spatialFormat = Atomic<Int>(SpatialItemFormat.unknown)
+    /// How engaged the stage is, after the last buffer (0 … 1; diagnostics and tests).
+    let spatialEngagement = AtomicFloat(0)
 
     // Meters, written by the render thread.
     /// Media time (s) just past the last processed frame.

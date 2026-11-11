@@ -269,6 +269,8 @@ public final class SpatialStage: @unchecked Sendable {
     private var dryDelay = 0
     private var wetWarm = false
     private var wetLevel: Float = 1
+    /// The first buffer takes its level as it is (no ramp from an earlier value that was never heard).
+    private var levelSet = false
 
     /// A stage for `sampleRate`, or nil at a rate the stage does not take (anything but 44.1 or 48 kHz).
     /// `accelerated`: vDSP where Accelerate exists (false runs the portable loops everywhere; tests compare the two).
@@ -351,8 +353,9 @@ public final class SpatialStage: @unchecked Sendable {
                         frames: Int, wetLevel newLevel: Float = 1) {
         guard frames > 0, started else { return }
         let level = newLevel.isFinite ? max(newLevel, 0) : 1
-        let levelFrom = wetLevel
+        let levelFrom = levelSet ? wetLevel : level
         wetLevel = level
+        levelSet = true
         var done = 0
         while done < frames {
             let n = min(Self.chunkFrames, frames - done)
