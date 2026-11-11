@@ -1,7 +1,7 @@
 import Foundation
 import PixlModel
 
-/// The eight settings of Spatial audio and Enhanced audio in `UserDefaults`, under the spec's own names
+/// The seven settings of Spatial audio in `UserDefaults`, under the spec's own names
 /// (`CloudAudioSettingsKey`: `spatial.profile`, `spatial.cloud`, `cloudAudio.storageMB`, …; cloud audio spec 6.1).
 /// PixlBackup's catalogue does not know these keys, so backups never carry them.
 ///
@@ -22,7 +22,6 @@ nonisolated struct CloudAudioSettingsStore: @unchecked Sendable {
                                  route: defaults.string(forKey: CloudAudioSettingsKey.spatialRoute),
                                  cloud: bool(CloudAudioSettingsKey.spatialCloud),
                                  prepareAhead: bool(CloudAudioSettingsKey.spatialPrepareAhead),
-                                 enhancedEnabled: bool(CloudAudioSettingsKey.enhancedEnabled),
                                  storageMB: number(CloudAudioSettingsKey.storageMB)?.intValue,
                                  monthlyCapUSD: number(CloudAudioSettingsKey.monthlyCapUSD)?.doubleValue,
                                  dailyAhead: number(CloudAudioSettingsKey.dailyAhead)?.intValue)
@@ -49,10 +48,6 @@ nonisolated struct CloudAudioSettingsStore: @unchecked Sendable {
         defaults.set(isOn, forKey: CloudAudioSettingsKey.spatialPrepareAhead)
     }
 
-    func setEnhancedEnabled(_ isOn: Bool) {
-        defaults.set(isOn, forKey: CloudAudioSettingsKey.enhancedEnabled)
-    }
-
     func setStorageMB(_ megabytes: Int) {
         defaults.set(CloudAudioSettings.clampedStorageMB(megabytes), forKey: CloudAudioSettingsKey.storageMB)
     }
@@ -66,7 +61,7 @@ nonisolated struct CloudAudioSettingsStore: @unchecked Sendable {
         defaults.set(CloudAudioSettings.clampedDailyAhead(songs), forKey: CloudAudioSettingsKey.dailyAhead)
     }
 
-    /// Forgets every stored value: all eight settings follow their defaults again.
+    /// Forgets every stored value: all seven settings follow their defaults again.
     func reset() {
         for key in CloudAudioSettingsKey.all { defaults.removeObject(forKey: key) }
     }

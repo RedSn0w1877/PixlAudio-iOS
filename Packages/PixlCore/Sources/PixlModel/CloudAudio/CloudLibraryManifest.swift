@@ -1,6 +1,6 @@
-// The render manifest of the shared library (cloud audio spec of 2026-11-10, section 3.1): `sp-<profile>.json` and
-// `enhanced.json`, the phone's copy of what the worker's `library.py` writes. One manifest per render, written last,
-// never updated in place.
+// The render manifest of the shared library (cloud audio spec of 2026-11-10, section 3.1): `sp-<profile>.json`, the
+// phone's copy of what the worker's `library.py` writes. One manifest per render, written last, never updated in
+// place.
 //
 // Like the Cloud Studio schema, enum-like fields stay `String` here (an unknown value from a newer worker must not
 // fail the whole manifest), typed views sit next to them, unknown members are ignored, and everything the acceptance
@@ -16,11 +16,11 @@ public struct CloudLibraryManifest: Codable, Sendable, Hashable {
     public var v: Int
     public var libV: Int
     public var videoId: String
-    /// `spatial` or `enhanced`.
+    /// Always `spatial` (`RenditionKey.manifestKind`).
     public var kind: String
-    /// The profile id of a spatial render; null for `enhanced`.
+    /// The profile id.
     public var profile: String?
-    /// The audio file. Null in an `enhanced.json` written because nothing needed restoring.
+    /// The audio file.
     public var audio: Audio?
     public var loudness: Loudness?
     public var source: Source?
@@ -38,8 +38,10 @@ public struct CloudLibraryManifest: Codable, Sendable, Hashable {
         /// `flac`.
         public var codec: String?
         public var bits: Int?
+        /// The uploaded file's rate (44100 from an iPhone, the stream's own rate from Android), which may differ from
+        /// the rate of the stream this phone plays.
         public var sampleRate: Int?
-        /// Sample frames per channel: the source's frame count (the render keeps the source's timeline).
+        /// Sample frames per channel: the uploaded file's frame count (the render keeps its timeline).
         public var samples: Int64?
         public var durationMs: Int64?
 
@@ -59,7 +61,7 @@ public struct CloudLibraryManifest: Codable, Sendable, Hashable {
     public struct Loudness: Codable, Sendable, Hashable {
         public var integratedLufs: Double?
         public var sourceLufs: Double?
-        /// How far under the source's loudness the render sits: 4.0 for a spatial render, 0 for `enhanced`.
+        /// How far under the source's loudness the render sits (4.0).
         public var headroomDb: Double?
         public var truePeakDb: Double?
         public var limiterMaxDb: Double?
@@ -74,7 +76,8 @@ public struct CloudLibraryManifest: Codable, Sendable, Hashable {
         }
     }
 
-    /// The audio the phone uploaded for the render (recorded, for diagnostics).
+    /// The audio the render was made from (recorded, for diagnostics): `itag` and `codec` name the stream the phone
+    /// played, the rest describes the file it uploaded.
     public struct Source: Codable, Sendable, Hashable {
         public var itag: Int?
         public var codec: String?
@@ -82,47 +85,29 @@ public struct CloudLibraryManifest: Codable, Sendable, Hashable {
         public var decodedSamples: Int64?
         /// SHA-256 of the uploaded file.
         public var sha256: String?
-        /// Where the source's spectrum ends (about 16000 for a band-limited stream, 20000 for a full-band one).
-        public var cutoffHz: Double?
 
         public init(itag: Int? = nil, codec: String? = nil, sampleRate: Int? = nil, decodedSamples: Int64? = nil,
-                    sha256: String? = nil, cutoffHz: Double? = nil) {
+                    sha256: String? = nil) {
             self.itag = itag
             self.codec = codec
             self.sampleRate = sampleRate
             self.decodedSamples = decodedSamples
             self.sha256 = sha256
-            self.cutoffHz = cutoffHz
         }
     }
 
     public struct Render: Codable, Sendable, Hashable {
-        /// `pixl-spatial-1`; null in an audio-less `enhanced.json`.
+        /// `pixl-spatial-1`.
         public var engine: String?
-        /// The separator's id (`open-cascade-6`).
+        /// Whatever produced the stems (`open-cascade-6`; the separator is a replaceable part).
         public var stems: String?
         /// `stems6`, `stems4` or `mix`.
         public var stemMode: String?
-        public var restore: Restore?
 
-        public init(engine: String? = nil, stems: String? = nil, stemMode: String? = nil, restore: Restore? = nil) {
+        public init(engine: String? = nil, stems: String? = nil, stemMode: String? = nil) {
             self.engine = engine
             self.stems = stems
             self.stemMode = stemMode
-            self.restore = restore
-        }
-    }
-
-    public struct Restore: Codable, Sendable, Hashable {
-        public var applied: Bool?
-        public var model: String?
-        /// `full_band`, `off`, `unavailable` or `failed`.
-        public var reason: String?
-
-        public init(applied: Bool? = nil, model: String? = nil, reason: String? = nil) {
-            self.applied = applied
-            self.model = model
-            self.reason = reason
         }
     }
 
@@ -137,9 +122,9 @@ public struct CloudLibraryManifest: Codable, Sendable, Hashable {
     }
 
     public init(schema: String = CloudLibraryManifest.schemaName, v: Int = CloudLibraryManifest.schemaVersion,
-                libV: Int = CloudLibrary.version, videoId: String, kind: String, profile: String?, audio: Audio?,
-                loudness: Loudness? = nil, source: Source? = nil, render: Render? = nil, worker: Worker? = nil,
-                createdAt: String? = nil) {
+                libV: Int = CloudLibrary.version, videoId: String, kind: String = RenditionKey.manifestKind,
+                profile: String?, audio: Audio?, loudness: Loudness? = nil, source: Source? = nil,
+                render: Render? = nil, worker: Worker? = nil, createdAt: String? = nil) {
         self.schema = schema
         self.v = v
         self.libV = libV
@@ -177,17 +162,6 @@ public enum CloudStemMode: String, Sendable, Hashable, CaseIterable {
     case mix
 }
 
-/// `render.restore.reason`: why restoration was not applied.
-public enum CloudRestoreReason: String, Sendable, Hashable, CaseIterable {
-    /// The song is not band-limited: there was nothing to restore.
-    case fullBand = "full_band"
-    /// The job asked for no restoration.
-    case off
-    /// The worker has no restoration model (yet).
-    case unavailable
-    case failed
-}
-
 /// Why a manifest is not accepted for the rendition that was asked for.
 public enum CloudLibraryManifestProblem: Error, Sendable, Hashable {
     case wrongSchema(String)
@@ -196,7 +170,7 @@ public enum CloudLibraryManifestProblem: Error, Sendable, Hashable {
     case wrongVideoId(String)
     case wrongKind(String)
     case wrongProfile(String?)
-    /// A spatial manifest must name its audio.
+    /// The manifest names no audio.
     case audioMissing
     /// `audio.key` is not this render's canonical library key.
     case wrongAudioKey(String)
@@ -206,49 +180,33 @@ public enum CloudLibraryManifestProblem: Error, Sendable, Hashable {
     case badAudioFacts
 }
 
-/// What an accepted manifest stands for.
-public enum CloudLibraryRender: Sendable, Hashable {
-    /// A file to fetch from its canonical key and verify against these facts.
-    case audio(CloudLibraryManifest.Audio)
-    /// `enhanced.json` without audio: the cloud looked at the song and made no Enhanced file, so there is nothing to
-    /// fetch and no reason to ask again for this library version. `reason` is the manifest's own word.
-    case noAudio(reason: String?)
-}
-
 extension CloudLibraryManifest {
     public var stemMode: CloudStemMode? { render?.stemMode.flatMap(CloudStemMode.init(rawValue:)) }
 
-    public var restoreReason: CloudRestoreReason? { render?.restore?.reason.flatMap(CloudRestoreReason.init(rawValue:)) }
-
-    public var restoreApplied: Bool { render?.restore?.applied == true }
-
-    /// The headroom the app gives back while this rendition plays (`SpatialLevel.playbackGain`): the manifest's own,
-    /// else today's 4 dB for a spatial render and none for anything else.
+    /// The headroom the app gives back while this render plays (`SpatialLevel.playbackGain`): the manifest's own,
+    /// else today's 4 dB.
     public var headroomDb: Double {
         if let value = loudness?.headroomDb, value.isFinite { return value }
-        return kind == "spatial" ? SpatialLevel.defaultHeadroomDb : 0
+        return SpatialLevel.defaultHeadroomDb
     }
 
     /// The acceptance rule of spec 3.1: `schema`, `v`, `libV`, `videoId`, `kind` and `profile` are what was asked
     /// for. An accepted manifest also names its audio at the canonical key (the phone fetches only from there), as
-    /// FLAC, with a size and a SHA-256 that can be verified; only `enhanced` may come without audio.
-    public func check(for key: RenditionKey) -> Result<CloudLibraryRender, CloudLibraryManifestProblem> {
+    /// FLAC, with a size and a SHA-256 that can be verified. The answer is the audio to fetch and verify.
+    public func check(for key: RenditionKey) -> Result<Audio, CloudLibraryManifestProblem> {
         guard schema == Self.schemaName else { return .failure(.wrongSchema(schema)) }
         guard v == Self.schemaVersion else { return .failure(.wrongSchemaVersion(v)) }
         guard libV == CloudLibrary.version else { return .failure(.wrongLibraryVersion(libV)) }
         guard CloudLibrary.isValidVideoId(key.videoId), videoId == key.videoId else { return .failure(.wrongVideoId(videoId)) }
-        guard kind == key.kind.manifestKind else { return .failure(.wrongKind(kind)) }
-        guard profile == key.kind.profile?.rawValue else { return .failure(.wrongProfile(profile)) }
-        guard let audio else {
-            if key.kind.isSpatial { return .failure(.audioMissing) }
-            return .success(.noAudio(reason: render?.restore?.reason))
-        }
+        guard kind == RenditionKey.manifestKind else { return .failure(.wrongKind(kind)) }
+        guard profile == key.profile.rawValue else { return .failure(.wrongProfile(profile)) }
+        guard let audio else { return .failure(.audioMissing) }
         guard audio.key == CloudLibrary.audioKey(key) else { return .failure(.wrongAudioKey(audio.key)) }
         if let codec = audio.codec, codec.lowercased() != CloudLibrary.audioExtension {
             return .failure(.wrongAudioCodec(codec))
         }
         guard audio.bytes > 0, Self.isSHA256Hex(audio.sha256) else { return .failure(.badAudioFacts) }
-        return .success(.audio(audio))
+        return .success(audio)
     }
 
     /// True when the manifest is accepted for `key` (`check(for:)` without the reason).
@@ -264,8 +222,8 @@ extension CloudLibraryManifest {
         return audio.bytes == bytes && audio.sha256.lowercased() == sha256.lowercased()
     }
 
-    /// The render keeps the source's timeline (same rate, same frame count), as far as the manifest says. Nil when
-    /// it does not say (one side is missing).
+    /// The render keeps the uploaded file's timeline (same rate, same frame count), as far as the manifest says. Nil
+    /// when it does not say (one side is missing).
     public var keepsSourceTimeline: Bool? {
         guard let rate = audio?.sampleRate, let samples = audio?.samples, let sourceRate = source?.sampleRate,
               let sourceSamples = source?.decodedSamples else { return nil }

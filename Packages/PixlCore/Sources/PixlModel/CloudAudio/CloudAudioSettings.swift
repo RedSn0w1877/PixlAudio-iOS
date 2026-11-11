@@ -1,7 +1,7 @@
-// The settings of Spatial audio and Enhanced audio (cloud audio spec of 2026-11-10, section 6.1): the keys, the
-// defaults and the clamps, as plain values, so both the rules and the storage round trip are tested without an app.
-// The app reads the eight keys into `CloudAudioStoredSettings`, resolves them here, and writes a key only when the
-// person changes it (a value that was never set keeps following its default).
+// The settings of Spatial audio (cloud audio spec of 2026-11-10, section 6.1): the keys, the defaults and the
+// clamps, as plain values, so both the rules and the storage round trip are tested without an app. The app reads the
+// seven keys into `CloudAudioStoredSettings`, resolves them here, and writes a key only when the person changes it
+// (a value that was never set keeps following its default).
 
 import Foundation
 
@@ -15,8 +15,6 @@ public enum CloudAudioSettingsKey {
     public static let spatialCloud = "spatial.cloud"
     /// Prepare favourites and most-played songs ahead (a Boolean).
     public static let spatialPrepareAhead = "spatial.prepareAhead"
-    /// Use the Enhanced version of band-limited songs (a Boolean).
-    public static let enhancedEnabled = "enhanced.enabled"
     /// The local budget for downloaded renders, in MB (an integer).
     public static let storageMB = "cloudAudio.storageMB"
     /// The month's cap for library jobs, in US dollars (a number; negative = no limit).
@@ -24,29 +22,26 @@ public enum CloudAudioSettingsKey {
     /// Songs a day the background queue may send (an integer).
     public static let dailyAhead = "cloudAudio.dailyAhead"
 
-    public static let all: [String] = [spatialProfile, spatialRoute, spatialCloud, spatialPrepareAhead, enhancedEnabled,
-                                       storageMB, monthlyCapUSD, dailyAhead]
+    public static let all: [String] = [spatialProfile, spatialRoute, spatialCloud, spatialPrepareAhead, storageMB,
+                                       monthlyCapUSD, dailyAhead]
 }
 
-/// The eight values as they are stored: nil means the person never set it, so its default applies.
+/// The seven values as they are stored: nil means the person never set it, so its default applies.
 public struct CloudAudioStoredSettings: Sendable, Hashable {
     public var profile: String?
     public var route: String?
     public var cloud: Bool?
     public var prepareAhead: Bool?
-    public var enhancedEnabled: Bool?
     public var storageMB: Int?
     public var monthlyCapUSD: Double?
     public var dailyAhead: Int?
 
     public init(profile: String? = nil, route: String? = nil, cloud: Bool? = nil, prepareAhead: Bool? = nil,
-                enhancedEnabled: Bool? = nil, storageMB: Int? = nil, monthlyCapUSD: Double? = nil,
-                dailyAhead: Int? = nil) {
+                storageMB: Int? = nil, monthlyCapUSD: Double? = nil, dailyAhead: Int? = nil) {
         self.profile = profile
         self.route = route
         self.cloud = cloud
         self.prepareAhead = prepareAhead
-        self.enhancedEnabled = enhancedEnabled
         self.storageMB = storageMB
         self.monthlyCapUSD = monthlyCapUSD
         self.dailyAhead = dailyAhead
@@ -65,8 +60,6 @@ public struct CloudAudioSettings: Sendable, Hashable {
     public var cloud: Bool
     /// `spatial.prepareAhead`. Default on (it still needs `cloud`, Wi-Fi and a battery that is not low).
     public var prepareAhead: Bool
-    /// `enhanced.enabled`. Default on.
-    public var enhancedEnabled: Bool
     /// `cloudAudio.storageMB`. Default 3072.
     public var storageMB: Int
     /// `cloudAudio.monthlyCapUSD`. Default 30; nil is "No limit" (Developer mode).
@@ -93,7 +86,6 @@ public struct CloudAudioSettings: Sendable, Hashable {
         route = .headphones
         cloud = builtInCloudKeys
         prepareAhead = true
-        enhancedEnabled = true
         storageMB = Self.defaultStorageMB
         monthlyCapUSD = Self.defaultMonthlyCapUSD
         dailyAhead = Self.defaultDailyAhead
@@ -106,7 +98,6 @@ public struct CloudAudioSettings: Sendable, Hashable {
         if let value = stored.route { route = SpatialRouteMode(storageValue: value) }
         if let value = stored.cloud { cloud = value }
         if let value = stored.prepareAhead { prepareAhead = value }
-        if let value = stored.enhancedEnabled { enhancedEnabled = value }
         if let value = stored.storageMB { storageMB = Self.clampedStorageMB(value) }
         if let value = stored.monthlyCapUSD { monthlyCapUSD = Self.monthlyCap(fromStored: value) }
         if let value = stored.dailyAhead { dailyAhead = Self.clampedDailyAhead(value) }
@@ -115,7 +106,7 @@ public struct CloudAudioSettings: Sendable, Hashable {
     /// Every value as it would be stored (used by tests and by a full write; the app normally writes one key).
     public var stored: CloudAudioStoredSettings {
         CloudAudioStoredSettings(profile: profile.storageValue, route: route.rawValue, cloud: cloud,
-                                 prepareAhead: prepareAhead, enhancedEnabled: enhancedEnabled, storageMB: storageMB,
+                                 prepareAhead: prepareAhead, storageMB: storageMB,
                                  monthlyCapUSD: Self.storedMonthlyCap(monthlyCapUSD), dailyAhead: dailyAhead)
     }
 

@@ -3,8 +3,6 @@
 //
 //   lib/v1/<videoId>/sp-<profile>.flac     the binaural render
 //   lib/v1/<videoId>/sp-<profile>.json     its manifest, written last: its presence means the render is complete
-//   lib/v1/<videoId>/enhanced.flac         the restored stereo song (only when restoration was applied)
-//   lib/v1/<videoId>/enhanced.json         its manifest; also written without audio when nothing needed restoring
 //
 // Phones sign the URLs themselves (the same bucket and keys as Cloud Studio) and never delete `lib/` objects: other
 // devices use them, and the bucket's lifecycle rule removes them 30 days after they were written.
@@ -45,14 +43,14 @@ public enum CloudLibrary {
         return "\(versionPrefix)\(videoId)/"
     }
 
-    /// `lib/v1/<videoId>/<slot>.flac`, or nil for a video id the library does not accept.
+    /// `lib/v1/<videoId>/sp-<profile>.flac`, or nil for a video id the library does not accept.
     public static func audioKey(_ key: RenditionKey) -> String? {
-        folder(videoId: key.videoId).map { "\($0)\(key.kind.slot).\(audioExtension)" }
+        folder(videoId: key.videoId).map { "\($0)\(key.slot).\(audioExtension)" }
     }
 
-    /// `lib/v1/<videoId>/<slot>.json`, or nil for a video id the library does not accept.
+    /// `lib/v1/<videoId>/sp-<profile>.json`, or nil for a video id the library does not accept.
     public static func manifestKey(_ key: RenditionKey) -> String? {
-        folder(videoId: key.videoId).map { "\($0)\(key.kind.slot).\(manifestExtension)" }
+        folder(videoId: key.videoId).map { "\($0)\(key.slot).\(manifestExtension)" }
     }
 
     /// An object key of this library version, taken apart.
@@ -69,42 +67,45 @@ public enum CloudLibrary {
         let parts = objectKey.dropFirst(versionPrefix.count).split(separator: "/", omittingEmptySubsequences: false)
         guard parts.count == 2, isValidVideoId(String(parts[0])) else { return nil }
         guard let file = CloudAudioLocalLayout.parse(fileName: String(parts[1])) else { return nil }
-        return ObjectKey(rendition: RenditionKey(videoId: String(parts[0]), kind: file.kind), isManifest: file.isManifest)
+        return ObjectKey(rendition: RenditionKey(videoId: String(parts[0]), profile: file.profile),
+                         isManifest: file.isManifest)
     }
 }
 
-/// The copies a phone keeps (spec 6.2): `<app data>/CloudAudio/<videoId>/<slot>.flac` and `<slot>.json` (iOS:
+/// The copies a phone keeps (spec 6.2): `<app data>/CloudAudio/<videoId>/sp-<profile>.flac` and `.json` (iOS:
 /// Application Support; Android: `filesDir/cloud_audio`). A file plus a valid manifest beside it is the index:
-/// there is no database. The video id and the slot are in the path, so a file says what it is.
+/// there is no database. The video id and the profile are in the path, so a file says what it is.
 public enum CloudAudioLocalLayout {
     /// The folder's name on iOS, under Application Support.
     public static let directoryName = "CloudAudio"
 
-    public static func audioFileName(_ kind: RenditionKind) -> String { "\(kind.slot).\(CloudLibrary.audioExtension)" }
-
-    public static func manifestFileName(_ kind: RenditionKind) -> String {
-        "\(kind.slot).\(CloudLibrary.manifestExtension)"
+    public static func audioFileName(_ profile: SpatialProfile) -> String {
+        "\(RenditionKey.slot(profile)).\(CloudLibrary.audioExtension)"
     }
 
-    /// `<videoId>/<slot>.flac` (or `.json`), relative to the store's folder; nil for a video id the library does not
-    /// accept (so a path is never built from text that could leave the folder).
+    public static func manifestFileName(_ profile: SpatialProfile) -> String {
+        "\(RenditionKey.slot(profile)).\(CloudLibrary.manifestExtension)"
+    }
+
+    /// `<videoId>/sp-<profile>.flac` (or `.json`), relative to the store's folder; nil for a video id the library does
+    /// not accept (so a path is never built from text that could leave the folder).
     public static func relativePath(_ key: RenditionKey, manifest: Bool = false) -> String? {
         guard CloudLibrary.isValidVideoId(key.videoId) else { return nil }
-        return "\(key.videoId)/\(manifest ? manifestFileName(key.kind) : audioFileName(key.kind))"
+        return "\(key.videoId)/\(manifest ? manifestFileName(key.profile) : audioFileName(key.profile))"
     }
 
     /// A file name of the store taken apart: `sp-wide.flac` → (wide, audio). Nil for anything else.
-    public static func parse(fileName: String) -> (kind: RenditionKind, isManifest: Bool)? {
+    public static func parse(fileName: String) -> (profile: SpatialProfile, isManifest: Bool)? {
         guard let dot = fileName.lastIndex(of: ".") else { return nil }
         let ext = String(fileName[fileName.index(after: dot)...])
         guard ext == CloudLibrary.audioExtension || ext == CloudLibrary.manifestExtension,
-              let kind = RenditionKind(slot: String(fileName[..<dot])) else { return nil }
-        return (kind, ext == CloudLibrary.manifestExtension)
+              let profile = RenditionKey.profile(slot: String(fileName[..<dot])) else { return nil }
+        return (profile, ext == CloudLibrary.manifestExtension)
     }
 
     /// Which rendition an audio file of the store is, from the last three parts of its path
-    /// (`…/CloudAudio/<videoId>/<slot>.flac`). Nil for a manifest and for any file that is not in the store, so the
-    /// player can ask this of whatever file it is about to play: a spatial render plays with the on-device stage
+    /// (`…/CloudAudio/<videoId>/sp-<profile>.flac`). Nil for a manifest and for any file that is not in the store, so
+    /// the player can ask this of whatever file it is about to play: a spatial render plays with the on-device stage
     /// bypassed, everything else does not.
     public static func rendition(ofAudioFileAt pathComponents: [String]) -> RenditionKey? {
         guard pathComponents.count >= 3 else { return nil }
@@ -112,7 +113,7 @@ public enum CloudAudioLocalLayout {
         let fileName = pathComponents[count - 1], videoId = pathComponents[count - 2]
         guard pathComponents[count - 3] == directoryName, CloudLibrary.isValidVideoId(videoId),
               let file = parse(fileName: fileName), !file.isManifest else { return nil }
-        return RenditionKey(videoId: videoId, kind: file.kind)
+        return RenditionKey(videoId: videoId, profile: file.profile)
     }
 
     /// `rendition(ofAudioFileAt:)` for a file URL.

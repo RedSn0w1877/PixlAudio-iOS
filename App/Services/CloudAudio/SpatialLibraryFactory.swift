@@ -1,7 +1,7 @@
 import Foundation
 import PixlModel
 
-/// Where the cloud side of Spatial audio and Enhanced audio is put together: the local store of verified renders,
+/// Where the cloud side of Spatial audio is put together: the local store of verified renders,
 /// the shared library in R2, the jobs that fill it, the background queue and the caps (cloud audio spec 6.2 and 6.4).
 /// `AppEnvironment` calls `make` once, while the app is assembled.
 ///

@@ -1,85 +1,49 @@
-// A rendition is another version of a song's audio made by the cloud: a spatial render in one profile, or the
-// Enhanced (restored) stereo song (cloud audio spec of 2026-11-10, sections 3, 6.1 and 6.2). These are the names the
-// library, the local store, the job manifest and the two app services share.
+// A rendition is the cloud's spatial render of one song in one profile (cloud audio spec of 2026-11-10, sections 3,
+// 6.1 and 6.2). These are the names the library, the local store, the job manifest and the two app services share.
 
 import Foundation
 
-/// What a rendition is.
-public enum RenditionKind: Sendable, Hashable {
-    /// The binaural render of one profile.
-    case spatial(SpatialProfile)
-    /// The restored stereo song.
-    case enhanced
-
-    /// Every kind: the six spatial ones in profile order, then Enhanced.
-    public static let allKinds: [RenditionKind] = SpatialProfile.allCases.map(RenditionKind.spatial) + [.enhanced]
-
-    /// The slot name: the file stem in the library and in the local store (`sp-studio`, `enhanced`), and the name of
-    /// this output in a job manifest's `outputs` and `library.renders`.
-    public var slot: String {
-        switch self {
-        case .spatial(let profile): "sp-\(profile.rawValue)"
-        case .enhanced: "enhanced"
-        }
-    }
-
-    /// The kind a slot names, or nil for anything else.
-    public init?(slot: String) {
-        if slot == "enhanced" {
-            self = .enhanced
-        } else if slot.hasPrefix("sp-"), let profile = SpatialProfile(rawValue: String(slot.dropFirst(3))) {
-            self = .spatial(profile)
-        } else {
-            return nil
-        }
-    }
-
-    /// A render manifest's `kind`: `spatial` or `enhanced`.
-    public var manifestKind: String {
-        switch self {
-        case .spatial: "spatial"
-        case .enhanced: "enhanced"
-        }
-    }
-
-    public var profile: SpatialProfile? {
-        if case .spatial(let profile) = self { return profile }
-        return nil
-    }
-
-    public var isSpatial: Bool { profile != nil }
-}
-
-/// One rendition of one song. The song is named by the YouTube video it plays from (`videoId`), never by its Spotify
-/// id: a render belongs to that audio, and every device that plays the same video shares it. The library version is
-/// not part of the key: it is `CloudLibrary.version` everywhere, and a render of another version is not a hit.
+/// One rendition: a song's render in one profile. The song is named by the YouTube video it plays from (`videoId`),
+/// never by its Spotify id: a render belongs to that audio, and every device that plays the same video shares it.
+/// The library version is not part of the key: it is `CloudLibrary.version` everywhere, and a render of another
+/// version is not a hit.
 public struct RenditionKey: Sendable, Hashable, CustomStringConvertible {
-    public var videoId: String
-    public var kind: RenditionKind
+    /// A render manifest's `kind`. Always `spatial` (the field stays so other kinds can be added without a new schema).
+    public static let manifestKind = "spatial"
 
-    public init(videoId: String, kind: RenditionKind) {
-        self.videoId = videoId
-        self.kind = kind
-    }
+    public var videoId: String
+    public var profile: SpatialProfile
 
     public init(videoId: String, profile: SpatialProfile) {
-        self.init(videoId: videoId, kind: .spatial(profile))
+        self.videoId = videoId
+        self.profile = profile
     }
 
-    public var description: String { "\(videoId)/\(kind.slot)" }
+    /// The slot name `sp-<profile>`: the file stem in the library and in the local store, and the name of this output
+    /// in a job manifest's `outputs`.
+    public var slot: String { Self.slot(profile) }
+
+    public static func slot(_ profile: SpatialProfile) -> String { "sp-\(profile.rawValue)" }
+
+    /// The profile a slot names, or nil for anything else.
+    public static func profile(slot: String) -> SpatialProfile? {
+        guard slot.hasPrefix("sp-") else { return nil }
+        return SpatialProfile(rawValue: String(slot.dropFirst(3)))
+    }
+
+    public var description: String { "\(videoId)/\(slot)" }
 }
 
 /// Where a song's rendition stands on this phone (spec 6.1): `none` → `preview` (the on-device stage) → `queued` →
-/// `processing` → `ready` (a verified local render), or `failed` (tried again later, see `RenditionRetry`).
-///
-/// `downloading` is a seventh case on top of the spec's six: the tail of `processing`, split off because the sheet
-/// has a line of its own for it (spec 6.5, "Getting the cloud version."). `specStatus` folds it back.
+/// `processing` → `downloading` → `ready` (a verified local render), or `failed` (tried again later, see
+/// `RenditionRetry`).
 public enum RenditionStatus: String, Sendable, Hashable, Codable, CaseIterable {
     /// Nothing is known or wanted.
     case none
     /// The on-device stage stands in; no cloud work is under way (yet, or at all).
     case preview
-    /// Wanted from the cloud: waiting for the library check, the upload or a GPU.
+    /// Wanted from the cloud: waiting for the library check, the upload or a GPU, or unable to start yet
+    /// (`RenditionQueueReason`).
     case queued
     /// The song is uploaded and the cloud is rendering it.
     case processing
@@ -92,16 +56,37 @@ public enum RenditionStatus: String, Sendable, Hashable, Codable, CaseIterable {
 
     /// The cloud is on its way to a render.
     public var isInFlight: Bool { self == .queued || self == .processing || self == .downloading }
+}
 
-    /// One of the spec's six statuses (`downloading` is part of `processing` there).
-    public var specStatus: RenditionStatus { self == .downloading ? .processing : self }
+/// Why a render that is wanted cannot start yet (spec 6.1: `queued` with a reason).
+public enum RenditionQueueReason: String, Sendable, Hashable, Codable, CaseIterable {
+    /// No network the person allows for cloud work.
+    case waitingForNetwork
+    /// The month's limit for library jobs is reached.
+    case capReached
+}
 
-    /// What the person is told for the playing song: the library's own status when the cloud is doing or has done
+/// A rendition's status, with the reason when it is queued and cannot start.
+public struct RenditionState: Sendable, Hashable {
+    public var status: RenditionStatus
+    /// Only ever set together with `queued`.
+    public var queueReason: RenditionQueueReason?
+
+    /// A reason given with any status but `queued` is dropped.
+    public init(_ status: RenditionStatus, queueReason: RenditionQueueReason? = nil) {
+        self.status = status
+        self.queueReason = status == .queued ? queueReason : nil
+    }
+
+    public static let none = RenditionState(.none)
+    public static let ready = RenditionState(.ready)
+
+    /// What the person is told for the playing song: the library's own state once the cloud is doing or has done
     /// something, else `preview` while the on-device stage is what plays.
-    public static func shown(library: RenditionStatus, onDeviceAudible: Bool) -> RenditionStatus {
-        switch library {
-        case .queued, .processing, .downloading, .ready, .failed: library
-        case .none, .preview: onDeviceAudible ? .preview : .none
+    public func shown(onDeviceAudible: Bool) -> RenditionState {
+        switch status {
+        case .queued, .processing, .downloading, .ready, .failed: self
+        case .none, .preview: RenditionState(onDeviceAudible ? .preview : .none)
         }
     }
 }

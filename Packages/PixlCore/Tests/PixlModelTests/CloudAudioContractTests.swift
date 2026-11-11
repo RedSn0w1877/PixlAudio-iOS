@@ -2,9 +2,9 @@ import Foundation
 import Testing
 @testable import PixlModel
 
-/// The contract of Spatial audio and Enhanced audio (docs/handoff/2026-11-10-plans/cloud-audio-spec.md): ids,
-/// settings, statuses, library keys, the render manifest and the two service seams. Every expected value here is
-/// copied from the spec, so a change on either side shows up as a failing test.
+/// The contract of Spatial audio (docs/handoff/2026-11-10-plans/cloud-audio-spec.md): ids, settings, statuses,
+/// library keys, the render manifest and the two service seams. Every expected value here is copied from the spec,
+/// so a change on either side shows up as a failing test.
 enum CloudAudioFixtures {
     static func data(_ name: String) throws -> Data {
         let url = try #require(Bundle.module.url(forResource: name, withExtension: "json",
@@ -12,7 +12,7 @@ enum CloudAudioFixtures {
         return try Data(contentsOf: url)
     }
 
-    static func manifest(_ name: String) throws -> CloudLibraryManifest {
+    static func manifest(_ name: String = "manifest.spatial") throws -> CloudLibraryManifest {
         try CloudLibraryManifest.decode(try data(name))
     }
 
@@ -40,11 +40,12 @@ struct SpatialProfileTests {
     }
 
     @Test func noShownTextUsesAWordTheSpecForbids() {
-        let forbidden = ["lossless", "hi-res", "dolby", "atmos", "360 reality", "claude", "anthropic", "binilyrics"]
+        let forbidden = ["lossless", "hi-res", "dolby", "atmos", "360 reality", "claude", "anthropic", "binilyrics",
+                         "enhanced"]
         var shown = SpatialProfile.allCases.flatMap { [$0.displayName, $0.summary] }
         shown += SpatialStatusLine.allCases.compactMap(\.text)
-        shown += [SpatialCopy.levelNote, SpatialCopy.enhancedSwitchTitle, SpatialCopy.enhancedSwitchCaption]
-        #expect(shown.count == 12 + 7 + 3)
+        shown.append(SpatialCopy.levelNote)
+        #expect(shown.count == 12 + 9 + 1)
         for text in shown {
             for word in forbidden { #expect(!text.lowercased().contains(word), "\(text) contains \(word)") }
         }
@@ -110,7 +111,7 @@ struct SpatialRulesTests {
         #expect(abs(SpatialLevel.playbackGain(Float(SpatialLevel.linear(db: -4)), headroomDb: 4) - 1) < 1e-5)
         // Down 2 dB: capped.
         #expect(SpatialLevel.playbackGain(Float(SpatialLevel.linear(db: -2)), headroomDb: 4) == 1)
-        // No headroom (Enhanced), or a broken value: the gain is unchanged.
+        // No headroom, or a broken value: the gain is unchanged.
         #expect(SpatialLevel.playbackGain(0.5, headroomDb: 0) == 0.5)
         #expect(SpatialLevel.playbackGain(0.5, headroomDb: -3) == 0.5)
         #expect(SpatialLevel.playbackGain(0.5, headroomDb: .nan) == 0.5)
@@ -122,9 +123,8 @@ struct SpatialRulesTests {
 struct CloudAudioSettingsTests {
     @Test func theKeysAreTheSpecsNames() {
         #expect(CloudAudioSettingsKey.all == ["spatial.profile", "spatial.route", "spatial.cloud", "spatial.prepareAhead",
-                                              "enhanced.enabled", "cloudAudio.storageMB", "cloudAudio.monthlyCapUSD",
-                                              "cloudAudio.dailyAhead"])
-        #expect(Set(CloudAudioSettingsKey.all).count == 8)
+                                              "cloudAudio.storageMB", "cloudAudio.monthlyCapUSD", "cloudAudio.dailyAhead"])
+        #expect(Set(CloudAudioSettingsKey.all).count == 7)
     }
 
     @Test func theDefaultsAreTheSpecs() {
@@ -133,7 +133,6 @@ struct CloudAudioSettingsTests {
         #expect(settings.route == .headphones)
         #expect(settings.cloud)
         #expect(settings.prepareAhead)
-        #expect(settings.enhancedEnabled)
         #expect(settings.storageMB == 3072)
         #expect(settings.monthlyCapUSD == 30)
         #expect(settings.dailyAhead == 25)
@@ -150,13 +149,14 @@ struct CloudAudioSettingsTests {
 
     @Test func storedValuesAreReadAndBroughtInsideTheirRanges() {
         let stored = CloudAudioStoredSettings(profile: "hall", route: "always", cloud: false, prepareAhead: false,
-                                              enhancedEnabled: false, storageMB: 1, monthlyCapUSD: 500, dailyAhead: 0)
+                                              storageMB: 1, monthlyCapUSD: 500, dailyAhead: 0)
         let settings = CloudAudioSettings(stored: stored, builtInCloudKeys: true)
         #expect(settings.profile == .profile(.hall))
+        // A stored `always` is honoured whether or not Developer mode is on.
         #expect(settings.route == .always)
         #expect(!settings.cloud)
         #expect(!settings.prepareAhead)
-        #expect(!settings.enhancedEnabled)
+        // 256 … 65536 MB, up to 200 dollars, 1 … 100 songs a day (the spec's stored forms).
         #expect(settings.storageMB == 256)
         #expect(settings.monthlyCapUSD == 200)
         #expect(settings.dailyAhead == 1)
@@ -164,7 +164,8 @@ struct CloudAudioSettingsTests {
         #expect(CloudAudioSettings.clampedDailyAhead(1_000) == 100)
     }
 
-    @Test func noLimitIsANegativeStoredCap() {
+    @Test func noLimitIsStoredAsMinusOne() {
+        #expect(CloudAudioSettings.noLimitStoredValue == -1)
         #expect(CloudAudioSettings.monthlyCap(fromStored: -1) == nil)
         #expect(CloudAudioSettings.monthlyCap(fromStored: .nan) == nil)
         #expect(CloudAudioSettings.monthlyCap(fromStored: 0) == 0)
@@ -194,41 +195,46 @@ struct CloudAudioSettingsTests {
 
 @Suite("Renditions")
 struct RenditionTests {
-    @Test func slotsAreTheFileStemsAndTheManifestSlots() {
-        #expect(RenditionKind.spatial(.studio).slot == "sp-studio")
-        #expect(RenditionKind.spatial(.hall).slot == "sp-hall")
-        #expect(RenditionKind.enhanced.slot == "enhanced")
-        #expect(RenditionKind.allKinds.count == 7)
-        for kind in RenditionKind.allKinds { #expect(RenditionKind(slot: kind.slot) == kind) }
-        #expect(RenditionKind(slot: "sp-cathedral") == nil)
-        #expect(RenditionKind(slot: "instrumental") == nil)
-        #expect(RenditionKind(slot: "sp-") == nil)
-        #expect(RenditionKind.spatial(.night).manifestKind == "spatial")
-        #expect(RenditionKind.enhanced.manifestKind == "enhanced")
-        #expect(RenditionKind.enhanced.profile == nil)
+    @Test func aSlotIsTheFileStemAndTheManifestSlot() {
+        #expect(RenditionKey(videoId: "J7p4bzqLvCw", profile: .studio).slot == "sp-studio")
+        #expect(RenditionKey.slot(.hall) == "sp-hall")
+        for profile in SpatialProfile.allCases {
+            #expect(RenditionKey.profile(slot: RenditionKey.slot(profile)) == profile)
+        }
+        #expect(RenditionKey.profile(slot: "sp-cathedral") == nil)
+        #expect(RenditionKey.profile(slot: "instrumental") == nil)
+        #expect(RenditionKey.profile(slot: "sp-") == nil)
+        #expect(RenditionKey.profile(slot: "studio") == nil)
+        #expect(RenditionKey.manifestKind == "spatial")
         #expect(RenditionKey(videoId: "J7p4bzqLvCw", profile: .wide).description == "J7p4bzqLvCw/sp-wide")
     }
 
-    @Test func theStatusesAreTheSpecsSixPlusDownloading() {
+    @Test func theStatusesAreTheSpecsSeven() {
         #expect(RenditionStatus.allCases.map(\.rawValue)
             == ["none", "preview", "queued", "processing", "downloading", "ready", "failed"])
-        // `downloading` is the tail of the spec's `processing` (the sheet has a line of its own for it).
-        #expect(Set(RenditionStatus.allCases.map(\.specStatus.rawValue))
-            == ["none", "preview", "queued", "processing", "ready", "failed"])
-        #expect(RenditionStatus.downloading.specStatus == .processing)
         #expect(RenditionStatus.queued.isInFlight && RenditionStatus.processing.isInFlight
             && RenditionStatus.downloading.isInFlight)
         #expect(!RenditionStatus.ready.isInFlight && !RenditionStatus.failed.isInFlight && !RenditionStatus.preview.isInFlight)
     }
 
-    @Test func theShownStatusIsTheLibrarysOnceTheCloudIsInvolvedElsePreviewWhileTheStagePlays() {
-        #expect(RenditionStatus.shown(library: .none, onDeviceAudible: true) == .preview)
-        #expect(RenditionStatus.shown(library: .none, onDeviceAudible: false) == .none)
-        #expect(RenditionStatus.shown(library: .queued, onDeviceAudible: true) == .queued)
-        #expect(RenditionStatus.shown(library: .processing, onDeviceAudible: true) == .processing)
-        #expect(RenditionStatus.shown(library: .downloading, onDeviceAudible: true) == .downloading)
-        #expect(RenditionStatus.shown(library: .ready, onDeviceAudible: false) == .ready)
-        #expect(RenditionStatus.shown(library: .failed, onDeviceAudible: true) == .failed)
+    @Test func onlyAQueuedRenderCarriesAReason() {
+        #expect(RenditionQueueReason.allCases.map(\.rawValue) == ["waitingForNetwork", "capReached"])
+        #expect(RenditionState(.queued, queueReason: .capReached).queueReason == .capReached)
+        #expect(RenditionState(.queued).queueReason == nil)
+        #expect(RenditionState(.processing, queueReason: .waitingForNetwork) == RenditionState(.processing))
+        #expect(RenditionState.none == RenditionState(.none))
+        #expect(RenditionState.ready.status == .ready)
+    }
+
+    @Test func theShownStateIsTheLibrarysOnceTheCloudIsInvolvedElsePreviewWhileTheStagePlays() {
+        #expect(RenditionState.none.shown(onDeviceAudible: true) == RenditionState(.preview))
+        #expect(RenditionState.none.shown(onDeviceAudible: false) == RenditionState.none)
+        let waiting = RenditionState(.queued, queueReason: .waitingForNetwork)
+        #expect(waiting.shown(onDeviceAudible: true) == waiting)
+        #expect(RenditionState(.processing).shown(onDeviceAudible: true).status == .processing)
+        #expect(RenditionState(.downloading).shown(onDeviceAudible: true).status == .downloading)
+        #expect(RenditionState.ready.shown(onDeviceAudible: false) == RenditionState.ready)
+        #expect(RenditionState(.failed).shown(onDeviceAudible: true).status == .failed)
     }
 
     @Test func failuresAreRetriedAfterTenMinutesAnHourThenADay() {
@@ -259,8 +265,7 @@ struct CloudLibraryKeyTests {
     @Test func keysAreBuiltAsTheSpecWritesThem() {
         #expect(CloudLibrary.audioKey(RenditionKey(videoId: videoId, profile: .studio)) == "lib/v1/J7p4bzqLvCw/sp-studio.flac")
         #expect(CloudLibrary.manifestKey(RenditionKey(videoId: videoId, profile: .studio)) == "lib/v1/J7p4bzqLvCw/sp-studio.json")
-        #expect(CloudLibrary.audioKey(RenditionKey(videoId: videoId, kind: .enhanced)) == "lib/v1/J7p4bzqLvCw/enhanced.flac")
-        #expect(CloudLibrary.manifestKey(RenditionKey(videoId: videoId, kind: .enhanced)) == "lib/v1/J7p4bzqLvCw/enhanced.json")
+        #expect(CloudLibrary.audioKey(RenditionKey(videoId: videoId, profile: .hall)) == "lib/v1/J7p4bzqLvCw/sp-hall.flac")
         #expect(CloudLibrary.folder(videoId: videoId) == "lib/v1/J7p4bzqLvCw/")
     }
 
@@ -269,15 +274,15 @@ struct CloudLibraryKeyTests {
         #expect(CloudLibrary.isValidVideoId("a-b_c-D_E12"))
         for bad in ["", "J7p4bzqLvC", "J7p4bzqLvCww", "J7p4bzqLv/w", "../../../etc", "J7p4bzqLvC ", "J7p4bzqLvCé", "J7p4bzq.vCw"] {
             #expect(!CloudLibrary.isValidVideoId(bad), "\(bad)")
-            #expect(CloudLibrary.audioKey(RenditionKey(videoId: bad, kind: .enhanced)) == nil)
+            #expect(CloudLibrary.audioKey(RenditionKey(videoId: bad, profile: .studio)) == nil)
             #expect(CloudLibrary.manifestKey(RenditionKey(videoId: bad, profile: .wide)) == nil)
-            #expect(CloudAudioLocalLayout.relativePath(RenditionKey(videoId: bad, kind: .enhanced)) == nil)
+            #expect(CloudAudioLocalLayout.relativePath(RenditionKey(videoId: bad, profile: .studio)) == nil)
         }
     }
 
     @Test func aKeyIsTakenApartAgain() throws {
-        for kind in RenditionKind.allKinds {
-            let key = RenditionKey(videoId: videoId, kind: kind)
+        for profile in SpatialProfile.allCases {
+            let key = RenditionKey(videoId: videoId, profile: profile)
             let audio = try #require(CloudLibrary.audioKey(key))
             let manifest = try #require(CloudLibrary.manifestKey(key))
             #expect(CloudLibrary.parse(objectKey: audio) == CloudLibrary.ObjectKey(rendition: key, isManifest: false))
@@ -285,28 +290,27 @@ struct CloudLibraryKeyTests {
         }
         for bad in ["lib/v2/J7p4bzqLvCw/sp-studio.flac", "lib/v1/J7p4bzqLvCw/sp-studio.wav", "lib/v1/J7p4bzqLvCw/sp-cathedral.flac",
                     "lib/v1/J7p4bzqLvCw/x/sp-studio.flac", "lib/v1/short/sp-studio.flac", "out/J7p4bzqLvCw/sp-studio.flac",
-                    "lib/v1/J7p4bzqLvCw/", "lib/v1/J7p4bzqLvCw/sp-studio", "in/abc.flac"] {
+                    "lib/v1/J7p4bzqLvCw/", "lib/v1/J7p4bzqLvCw/sp-studio", "lib/v1/J7p4bzqLvCw/studio.flac", "in/abc.flac"] {
             #expect(CloudLibrary.parse(objectKey: bad) == nil, "\(bad)")
         }
     }
 
-    @Test func theLocalStoreKeepsTheVideoIdAndTheSlotInThePath() {
+    @Test func theLocalStoreKeepsTheVideoIdAndTheProfileInThePath() {
         let key = RenditionKey(videoId: videoId, profile: .surround)
         #expect(CloudAudioLocalLayout.directoryName == "CloudAudio")
         #expect(CloudAudioLocalLayout.relativePath(key) == "J7p4bzqLvCw/sp-surround.flac")
         #expect(CloudAudioLocalLayout.relativePath(key, manifest: true) == "J7p4bzqLvCw/sp-surround.json")
-        #expect(CloudAudioLocalLayout.audioFileName(.enhanced) == "enhanced.flac")
-        #expect(CloudAudioLocalLayout.manifestFileName(.enhanced) == "enhanced.json")
+        #expect(CloudAudioLocalLayout.audioFileName(.night) == "sp-night.flac")
+        #expect(CloudAudioLocalLayout.manifestFileName(.night) == "sp-night.json")
     }
 
     @Test func aFileOfTheStoreSaysWhichRenditionItIs() {
         let store = ["/", "var", "mobile", "Library", "Application Support", "CloudAudio"]
         #expect(CloudAudioLocalLayout.rendition(ofAudioFileAt: store + [videoId, "sp-night.flac"])
             == RenditionKey(videoId: videoId, profile: .night))
-        #expect(CloudAudioLocalLayout.rendition(ofAudioFileAt: store + [videoId, "enhanced.flac"])
-            == RenditionKey(videoId: videoId, kind: .enhanced))
         // A manifest, a stream cache file, a download, an instrumental: not a rendition.
         #expect(CloudAudioLocalLayout.rendition(ofAudioFileAt: store + [videoId, "sp-night.json"]) == nil)
+        #expect(CloudAudioLocalLayout.rendition(ofAudioFileAt: store + [videoId, "instrumental.flac"]) == nil)
         #expect(CloudAudioLocalLayout.rendition(ofAudioFileAt: ["/", "Caches", "YouTube", "streams", "J7p4bzqLvCw.m4a"]) == nil)
         #expect(CloudAudioLocalLayout.rendition(ofAudioFileAt: ["/", "Downloads", videoId, "sp-night.flac"]) == nil)
         #expect(CloudAudioLocalLayout.rendition(ofAudioFileAt: store + ["short", "sp-night.flac"]) == nil)
@@ -321,10 +325,9 @@ struct CloudLibraryKeyTests {
 struct CloudLibraryManifestTests {
     private let videoId = CloudAudioFixtures.videoId
     private var studio: RenditionKey { RenditionKey(videoId: videoId, profile: .studio) }
-    private var enhanced: RenditionKey { RenditionKey(videoId: videoId, kind: .enhanced) }
 
-    @Test func theSpecsSpatialExampleDecodesAndIsAccepted() throws {
-        let manifest = try CloudAudioFixtures.manifest("manifest.spatial")
+    @Test func theSpecsExampleDecodesAndIsAccepted() throws {
+        let manifest = try CloudAudioFixtures.manifest()
         #expect(manifest.schema == "pixl.library.render")
         #expect(manifest.v == 1 && manifest.libV == 1)
         #expect(manifest.videoId == videoId && manifest.kind == "spatial" && manifest.profile == "studio")
@@ -339,25 +342,22 @@ struct CloudLibraryManifestTests {
         #expect(manifest.loudness?.limiterMaxDb == 0.6)
         #expect(manifest.headroomDb == 4.0)
         #expect(manifest.source?.itag == 251 && manifest.source?.codec == "opus")
-        #expect(manifest.source?.cutoffHz == 20_000)
+        #expect(manifest.source?.sampleRate == 48_000 && manifest.source?.decodedSamples == 9_696_000)
         #expect(manifest.render?.engine == CloudLibrary.engineId)
         #expect(manifest.render?.stems == "open-cascade-6")
         #expect(manifest.stemMode == .stems6)
-        #expect(manifest.restoreReason == .fullBand)
-        #expect(!manifest.restoreApplied)
         #expect(manifest.worker?.version == "1.1.0" && manifest.worker?.gitSha == "abcdef012345")
         #expect(manifest.createdAt == "2026-11-10T19:02:11Z")
         #expect(manifest.keepsSourceTimeline == true)
-        #expect(manifest.check(for: studio) == .success(.audio(audio)))
+        #expect(manifest.check(for: studio) == .success(audio))
         #expect(manifest.isAccepted(for: studio))
     }
 
     @Test func aManifestForSomethingElseThanWasAskedIsRefused() throws {
-        let manifest = try CloudAudioFixtures.manifest("manifest.spatial")
+        let manifest = try CloudAudioFixtures.manifest()
         #expect(manifest.check(for: RenditionKey(videoId: videoId, profile: .wide)) == .failure(.wrongProfile("studio")))
-        #expect(manifest.check(for: enhanced) == .failure(.wrongKind("spatial")))
         #expect(manifest.check(for: RenditionKey(videoId: "AAAAAAAAAAA", profile: .studio)) == .failure(.wrongVideoId(videoId)))
-        #expect(!manifest.isAccepted(for: enhanced))
+        #expect(!manifest.isAccepted(for: RenditionKey(videoId: videoId, profile: .night)))
 
         var changed = manifest
         changed.schema = "pixl.cloudstudio.result"
@@ -371,10 +371,14 @@ struct CloudLibraryManifestTests {
         changed = manifest
         changed.profile = nil
         #expect(changed.check(for: studio) == .failure(.wrongProfile(nil)))
+        // `kind` is always `spatial` today; a kind a later schema adds is not this render.
+        changed = manifest
+        changed.kind = "stems"
+        #expect(changed.check(for: studio) == .failure(.wrongKind("stems")))
     }
 
-    @Test func aSpatialManifestMustNameUsableAudioAtItsCanonicalKey() throws {
-        let manifest = try CloudAudioFixtures.manifest("manifest.spatial")
+    @Test func aManifestMustNameUsableAudioAtItsCanonicalKey() throws {
+        let manifest = try CloudAudioFixtures.manifest()
         var changed = manifest
         changed.audio = nil
         #expect(changed.check(for: studio) == .failure(.audioMissing))
@@ -396,56 +400,34 @@ struct CloudLibraryManifestTests {
     }
 
     @Test func theDownloadMustMatchTheManifestsSizeAndHash() throws {
-        let manifest = try CloudAudioFixtures.manifest("manifest.spatial")
+        let manifest = try CloudAudioFixtures.manifest()
         let sha = try #require(manifest.audio?.sha256)
         #expect(manifest.audioMatches(bytes: 27_100_200, sha256: sha))
         #expect(manifest.audioMatches(bytes: 27_100_200, sha256: sha.uppercased()))
         #expect(!manifest.audioMatches(bytes: 27_100_201, sha256: sha))
         #expect(!manifest.audioMatches(bytes: 27_100_200, sha256: String(repeating: "0", count: 64)))
+        var empty = manifest
+        empty.audio = nil
+        #expect(!empty.audioMatches(bytes: 0, sha256: ""))
     }
 
-    @Test func anEnhancedManifestWithAudioIsAcceptedWithNoHeadroom() throws {
-        let manifest = try CloudAudioFixtures.manifest("manifest.enhanced")
-        let audio = try #require(manifest.audio)
-        #expect(manifest.profile == nil)
-        #expect(manifest.check(for: enhanced) == .success(.audio(audio)))
-        #expect(manifest.headroomDb == 0)
-        #expect(manifest.restoreApplied)
-        #expect(manifest.stemMode == nil)
-        #expect(manifest.source?.cutoffHz == 15_900)
-        #expect(manifest.check(for: studio) == .failure(.wrongKind("enhanced")))
-    }
-
-    @Test func anEnhancedManifestWithoutAudioMeansThereIsNothingToFetch() throws {
-        let manifest = try CloudAudioFixtures.manifest("manifest.enhanced.not-needed")
-        #expect(manifest.audio == nil && manifest.loudness == nil)
-        #expect(manifest.check(for: enhanced) == .success(.noAudio(reason: "full_band")))
-        #expect(manifest.restoreReason == .fullBand)
-        #expect(manifest.headroomDb == 0)
-        #expect(!manifest.audioMatches(bytes: 0, sha256: ""))
-        #expect(manifest.keepsSourceTimeline == nil)
-    }
-
-    @Test func theRestoreReasonsAndStemModesAreTheSpecs() {
-        #expect(CloudRestoreReason.allCases.map(\.rawValue) == ["full_band", "off", "unavailable", "failed"])
+    @Test func theStemModesAreTheSpecs() {
         #expect(CloudStemMode.allCases.map(\.rawValue) == ["stems6", "stems4", "mix"])
     }
 
     @Test func aManifestWrittenBesideTheAudioReadsBackTheSame() throws {
-        for name in ["manifest.spatial", "manifest.enhanced", "manifest.enhanced.not-needed"] {
-            let manifest = try CloudAudioFixtures.manifest(name)
-            #expect(try CloudLibraryManifest.decode(manifest.encoded()) == manifest)
-        }
+        let manifest = try CloudAudioFixtures.manifest()
+        #expect(try CloudLibraryManifest.decode(manifest.encoded()) == manifest)
     }
 
-    @Test func aMissingHeadroomFallsBackToFourForSpatialAndNoneForEnhanced() throws {
-        var manifest = try CloudAudioFixtures.manifest("manifest.spatial")
+    @Test func aMissingHeadroomFallsBackToFour() throws {
+        var manifest = try CloudAudioFixtures.manifest()
         manifest.loudness = nil
         #expect(manifest.headroomDb == 4.0)
         #expect(manifest.isAccepted(for: studio))
-        var other = try CloudAudioFixtures.manifest("manifest.enhanced")
-        other.loudness = nil
-        #expect(other.headroomDb == 0)
+        #expect(manifest.keepsSourceTimeline == true)
+        manifest.source = nil
+        #expect(manifest.keepsSourceTimeline == nil)
     }
 
     @Test func somethingThatIsNotAManifestDoesNotDecode() {
@@ -466,10 +448,10 @@ struct SpatialServicesTests {
         await library.apply(CloudAudioSettings(builtInCloudKeys: true))
         #expect(await library.localRendition(key) == nil)
         #expect(await library.localRenditions(videoId: key.videoId).isEmpty)
-        #expect(await library.status(key) == .none)
-        let request = RenditionRequest(song: song, videoId: key.videoId, kind: key.kind)
+        #expect(await library.status(key) == RenditionState.none)
+        let request = RenditionRequest(song: song, videoId: key.videoId, profile: key.profile)
         #expect(request.key == key && request.reason == .playing)
-        #expect(await library.request(request) == .none)
+        #expect(await library.request(request) == RenditionState.none)
         await library.markPlayed(key)
         #expect(await library.usage() == .empty)
         #expect(await library.removeAll() == .empty)
@@ -484,7 +466,7 @@ struct SpatialServicesTests {
         let snapshot = await playback.snapshot()
         #expect(snapshot == .idle)
         #expect(!snapshot.isActive && snapshot.wantedRender == nil)
-        #expect(snapshot.audible == .stereo(enhanced: false))
+        #expect(snapshot.audible == .stereo)
         var events = 0
         for await _ in await playback.events() { events += 1 }
         #expect(events == 0)
@@ -493,7 +475,7 @@ struct SpatialServicesTests {
     @Test func aSnapshotWantsTheSelectedProfilesRenderOnlyWhileActiveAndNotYetPlayingIt() {
         var snapshot = SpatialPlaybackSnapshot(songId: "sp:1", videoId: CloudAudioFixtures.videoId,
                                                selection: .profile(.wide), output: .bluetooth, routePasses: true,
-                                               audible: .onDevice(.wide, enhanced: false))
+                                               audible: .onDevice(.wide))
         #expect(snapshot.isActive)
         #expect(snapshot.wantedRender == RenditionKey(videoId: CloudAudioFixtures.videoId, profile: .wide))
         snapshot.audible = .render(.wide)
@@ -501,7 +483,10 @@ struct SpatialServicesTests {
         // The render of another profile still plays (the swap has not happened yet): the new one is wanted.
         snapshot.audible = .render(.studio)
         #expect(snapshot.wantedRender == RenditionKey(videoId: CloudAudioFixtures.videoId, profile: .wide))
-        snapshot.audible = .onDevice(.wide, enhanced: true)
+        // A song the on-device stage cannot take (its sample rate) plays stereo: its render is wanted all the same.
+        snapshot.audible = .stereo
+        #expect(snapshot.wantedRender == RenditionKey(videoId: CloudAudioFixtures.videoId, profile: .wide))
+        snapshot.audible = .onDevice(.wide)
         snapshot.routePasses = false
         #expect(!snapshot.isActive && snapshot.wantedRender == nil)
         snapshot.routePasses = true
@@ -516,15 +501,18 @@ struct SpatialServicesTests {
     }
 
     @Test func whatIsAudibleSaysItsProfile() {
-        #expect(SpatialAudible.stereo(enhanced: true).profile == nil)
-        #expect(SpatialAudible.onDevice(.hall, enhanced: false).profile == .hall)
+        #expect(SpatialAudible.stereo.profile == nil)
+        #expect(SpatialAudible.onDevice(.hall).profile == .hall)
         #expect(SpatialAudible.render(.night).profile == .night)
         #expect(SpatialAudible.render(.night).isCloudRender && !SpatialAudible.render(.night).isOnDevice)
-        #expect(SpatialAudible.onDevice(.hall, enhanced: true).isOnDevice)
+        #expect(SpatialAudible.onDevice(.hall).isOnDevice && !SpatialAudible.onDevice(.hall).isCloudRender)
+        #expect(!SpatialAudible.stereo.isOnDevice && !SpatialAudible.stereo.isCloudRender)
     }
 
     @Test func everyStateOfTheSheetHasTheSpecsSentence() {
         #expect(SpatialStatusLine.onDeviceForNow.text == "On your phone for now. The cloud version takes about a minute.")
+        #expect(SpatialStatusLine.waitingForNetwork.text == "On your phone for now. The cloud version waits for Wi-Fi.")
+        #expect(SpatialStatusLine.capReached.text == "On your phone only. This month's cloud limit is reached.")
         #expect(SpatialStatusLine.gettingCloudVersion.text == "Getting the cloud version.")
         #expect(SpatialStatusLine.cloudVersion.text == "Playing the cloud version.")
         #expect(SpatialStatusLine.onDeviceOnly.text == "On your phone only. Turn on cloud renders for the full version.")
@@ -532,23 +520,25 @@ struct SpatialServicesTests {
         #expect(SpatialStatusLine.headphonesOnly.text == "Headphones only. Plug in to hear it.")
         #expect(SpatialStatusLine.pausedForSing.text == "Paused while Sing is on.")
         #expect(SpatialStatusLine.none.text == nil)
-        #expect(SpatialStatusLine.allCases.count == 8)
+        #expect(SpatialStatusLine.allCases.count == 10)
         #expect(SpatialCopy.levelNote == "Spatial plays a little quieter so the peaks stay clean.")
-        #expect(SpatialCopy.enhancedSwitchTitle == "Restore highs that the stream cut off")
-        #expect(SpatialCopy.enhancedSwitchCaption == "Part of cloud renders")
     }
 
     @Test func theStatusLineFollowsWhatPlays() {
         var snapshot = SpatialPlaybackSnapshot(songId: "sp:1", videoId: CloudAudioFixtures.videoId,
                                                selection: .profile(.studio), output: .wiredHeadphones, routePasses: true,
-                                               audible: .onDevice(.studio, enhanced: false))
-        func line(cloudRenders: Bool = true, _ status: RenditionStatus) -> SpatialStatusLine {
-            SpatialStatusLine.line(for: snapshot, cloudRenders: cloudRenders, status: status)
+                                               audible: .onDevice(.studio))
+        func line(cloudRenders: Bool = true, _ status: RenditionStatus,
+                  _ reason: RenditionQueueReason? = nil) -> SpatialStatusLine {
+            SpatialStatusLine.line(for: snapshot, cloudRenders: cloudRenders,
+                                   state: RenditionState(status, queueReason: reason))
         }
         // The on-device stage plays: the line follows the cloud.
         #expect(line(.none) == .onDeviceForNow)
         #expect(line(.preview) == .onDeviceForNow)
         #expect(line(.queued) == .onDeviceForNow)
+        #expect(line(.queued, .waitingForNetwork) == .waitingForNetwork)
+        #expect(line(.queued, .capReached) == .capReached)
         #expect(line(.processing) == .onDeviceForNow)
         #expect(line(.downloading) == .gettingCloudVersion)
         // Here already, the switch has not happened yet.
@@ -557,7 +547,12 @@ struct SpatialServicesTests {
         // Cloud renders off (either switch) comes before anything the library says.
         #expect(line(cloudRenders: false, .none) == .onDeviceOnly)
         #expect(line(cloudRenders: false, .failed) == .onDeviceOnly)
-        #expect(line(cloudRenders: false, .ready) == .onDeviceOnly)
+        #expect(line(cloudRenders: false, .queued, .capReached) == .onDeviceOnly)
+        // A song the stage cannot take has no line of its own: the same lines.
+        snapshot.audible = .stereo
+        #expect(line(.processing) == .onDeviceForNow)
+        #expect(line(.downloading) == .gettingCloudVersion)
+        #expect(line(cloudRenders: false, .none) == .onDeviceOnly)
         // The render plays, whatever the switches say now.
         snapshot.audible = .render(.studio)
         #expect(line(.ready) == .cloudVersion)
@@ -565,17 +560,15 @@ struct SpatialServicesTests {
         // The route rule fails.
         snapshot.output = .phoneSpeaker
         snapshot.routePasses = false
-        snapshot.audible = .stereo(enhanced: false)
+        snapshot.audible = .stereo
         #expect(line(.ready) == .headphonesOnly)
         // Sing's instrumental plays.
         snapshot.routePasses = true
         snapshot.singInstrumentalOn = true
         #expect(line(.ready) == .pausedForSing)
-        // Active, but the stage cannot run on this audio: the spec has no line.
-        snapshot.singInstrumentalOn = false
-        #expect(line(.none) == .none)
         // Off, or nothing loaded.
-        snapshot.audible = .onDevice(.studio, enhanced: false)
+        snapshot.singInstrumentalOn = false
+        snapshot.audible = .onDevice(.studio)
         snapshot.selection = .off
         #expect(line(.none) == .none)
         snapshot.selection = .profile(.studio)

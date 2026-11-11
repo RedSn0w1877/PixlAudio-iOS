@@ -1,7 +1,7 @@
 import Foundation
 import PixlModel
 
-/// What `AppEnvironment` hands the two halves of Spatial audio and Enhanced audio when the app is put together:
+/// What `AppEnvironment` hands the two halves of Spatial audio when the app is put together:
 /// every store and service either of them may need. `SpatialLibraryFactory` (the cloud side) and
 /// `SpatialPlaybackFactory` (the engine side) each build their half from it, so neither edits `AppEnvironment`.
 ///
@@ -32,7 +32,7 @@ struct SpatialAudioContext {
     let tasteAdjustments: TasteAdjustmentStore
     let health: AppHealth
 
-    /// The eight settings as they are stored now.
+    /// The seven settings as they are stored now.
     var settingsStore: CloudAudioSettingsStore { CloudAudioSettingsStore(defaults: defaults) }
 
     /// The settings in force now (the model applies them again at `start()` and after every change).

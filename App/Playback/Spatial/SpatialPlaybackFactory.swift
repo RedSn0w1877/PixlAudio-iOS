@@ -1,7 +1,7 @@
 import Foundation
 import PixlModel
 
-/// Where the player's side of Spatial audio and Enhanced audio is put together: the on-device stage in the
+/// Where the player's side of Spatial audio is put together: the on-device stage in the
 /// processing tap, which audio a song plays from, the in-song switch to a render, the route rule and the level rule
 /// (cloud audio spec 6.3 and 7). `AppEnvironment` calls `make` once, while the app is assembled.
 ///

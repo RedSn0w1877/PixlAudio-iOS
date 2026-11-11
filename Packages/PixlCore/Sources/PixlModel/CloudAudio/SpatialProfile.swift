@@ -129,7 +129,7 @@ public enum SpatialOutputKind: String, Sendable, Hashable, CaseIterable {
 
 /// When Spatial audio is "active" (spec 6.3): a profile is selected AND the route rule passes AND Sing's instrumental
 /// mode is not on. While it is active the song plays through the on-device stage or as a spatial cloud render; while
-/// it is not, the song plays in plain (or Enhanced) stereo.
+/// it is not, the song plays in plain stereo.
 public enum SpatialActivation {
     /// The route rule alone. A device that plays the music itself never passes: nothing is rendered here for it.
     public static func routePasses(mode: SpatialRouteMode, output: SpatialOutputKind) -> Bool {

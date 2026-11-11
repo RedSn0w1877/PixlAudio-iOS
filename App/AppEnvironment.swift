@@ -87,7 +87,7 @@ final class AppEnvironment {
     let health: AppHealth
     /// Music Haptics (iOS-first, 2026-10-18): the Taptic Engine plays along with the music while the switch is on.
     let musicHaptics: MusicHapticsController
-    /// Spatial audio and Enhanced audio (cloud audio spec of 2026-11-10): the settings, what plays, and the cloud
+    /// Spatial audio (cloud audio spec of 2026-11-10): the settings, what plays, and the cloud
     /// render's status, for the player sheet and Settings. Its two halves come from `SpatialPlaybackFactory` (the
     /// engine side) and `SpatialLibraryFactory` (the cloud side), which is where that work plugs in: not here.
     let spatial: SpatialAudioModel
@@ -284,7 +284,7 @@ final class AppEnvironment {
                                                      models: tais.models, studio: tais.studio, cloud: cloud, health: health))
         musicHaptics = MusicHapticsController(behavior: settings.behavior, playback: playback, health: health,
                                               bus: playbackServices?.engine.effects.haptics, isDemo: isUITest)
-        // Spatial audio and Enhanced audio: both halves are built from this one context by their own factories.
+        // Spatial audio: both halves are built from this one context by their own factories.
         spatial = SpatialAudioModel.make(SpatialAudioContext(
             launch: launch, defaults: settingsDefaults, settings: settings, library: library, playback: playback,
             playbackServices: playbackServices, youtube: youtube, spotify: spotify, tais: tais,

@@ -2,10 +2,10 @@ import Foundation
 import Observation
 import PixlModel
 
-/// Spatial audio and Enhanced audio as the screens see them (`env.spatial`; cloud audio spec of 2026-11-10,
-/// section 6): the eight settings, what plays now, where the cloud render of the playing song stands, and what the
-/// phone holds. The player sheet's Spatial audio sheet and Settings › Playback › Sound read it and call it; they never
-/// touch the two services behind it.
+/// Spatial audio as the screens see it (`env.spatial`; cloud audio spec of 2026-11-10, section 6): the seven
+/// settings, what plays now, where the cloud render of the playing song stands, and what the phone holds. The player
+/// sheet's Spatial audio sheet and Settings › Playback › Sound read it and call it; they never touch the two services
+/// behind it.
 ///
 /// The work is done by those two services (PixlModel's `SpatialPlayback` and `SpatialLibrary`, built by
 /// `SpatialPlaybackFactory` and `SpatialLibraryFactory`). This object only connects them:
@@ -13,7 +13,7 @@ import PixlModel
 /// - it mirrors the player's snapshot and the library's events for the screens;
 /// - it is the one caller of `SpatialLibrary.request` for the song that is playing: whenever the player says the
 ///   selected profile's render is wanted (`SpatialPlaybackSnapshot.wantedRender`), it asks once. Whether anything
-///   leaves the phone is the library's decision (the cloud switch, the network, the caps).
+///   leaves the phone is the library's decision (the two cloud switches, the network, the caps).
 ///
 /// Nothing here is per frame: the snapshot changes when the song, the selection, the output or the audible rendition
 /// changes, never with the position.
@@ -27,8 +27,8 @@ final class SpatialAudioModel {
     /// What the player does now.
     private(set) var snapshot: SpatialPlaybackSnapshot = .idle
     /// Where the library stands with the selected profile's render of the playing song (`none` when nothing plays or
-    /// Spatial audio is off).
-    private(set) var libraryStatus: RenditionStatus = .none
+    /// Spatial audio is off), with the reason when it is queued and cannot start.
+    private(set) var libraryState: RenditionState = .none
     /// "Songs ready: N · X GB on this phone".
     private(set) var usage: CloudAudioUsage = .empty
     /// "Remove downloaded renders" is running.
@@ -46,15 +46,16 @@ final class SpatialAudioModel {
     /// false while that is true, the master switch is what holds renders back.
     var cloudRendersOn: Bool { settings.cloud && isCloudStudioOn }
 
-    /// The playing song's status for the selected profile (spec 6.1): the library's once the cloud is involved, else
+    /// The playing song's state for the selected profile (spec 6.1): the library's once the cloud is involved, else
     /// `preview` while the on-device stage is what plays.
-    var status: RenditionStatus {
-        RenditionStatus.shown(library: libraryStatus, onDeviceAudible: snapshot.audible.isOnDevice)
-    }
+    var state: RenditionState { libraryState.shown(onDeviceAudible: snapshot.audible.isOnDevice) }
+
+    /// `state.status`.
+    var status: RenditionStatus { state.status }
 
     /// The line under the profile list (spec 6.5); `statusLine.text` is the sentence.
     var statusLine: SpatialStatusLine {
-        SpatialStatusLine.line(for: snapshot, cloudRenders: cloudRendersOn, status: status)
+        SpatialStatusLine.line(for: snapshot, cloudRenders: cloudRendersOn, state: state)
     }
 
     /// "Spatial active" (spec 6.3), as the player sees it.
@@ -76,6 +77,9 @@ final class SpatialAudioModel {
     @ObservationIgnored private var statusTask: Task<Void, Never>?
     /// The render already asked for (asked again only once the player has stopped wanting it, or the settings changed).
     @ObservationIgnored private var requested: RenditionKey?
+    /// Counts every word about the current render's state, so an answer that was on its way while a newer one
+    /// arrived is dropped instead of overwriting it.
+    @ObservationIgnored private var statusStamp = 0
     /// UI tests: the state was set by hand and nothing overwrites it.
     @ObservationIgnored private var isDemo = false
 
@@ -180,7 +184,7 @@ final class SpatialAudioModel {
         settingsChanged()
     }
 
-    /// "Use the cloud": ask the cloud for the real render (off: on-device only).
+    /// Spatial audio's own cloud switch: ask the cloud for the real render (off: on-device only).
     func setCloud(_ isOn: Bool) {
         // Written even when it equals the default: from now on it is the person's choice.
         store.setCloud(isOn)
@@ -194,14 +198,6 @@ final class SpatialAudioModel {
         guard settings.prepareAhead != isOn else { return }
         settings.prepareAhead = isOn
         store.setPrepareAhead(isOn)
-        settingsChanged()
-    }
-
-    /// "Enhanced audio".
-    func setEnhancedEnabled(_ isOn: Bool) {
-        guard settings.enhancedEnabled != isOn else { return }
-        settings.enhancedEnabled = isOn
-        store.setEnhancedEnabled(isOn)
         settingsChanged()
     }
 
@@ -267,18 +263,18 @@ final class SpatialAudioModel {
         syncCurrentRender()
     }
 
-    /// Developer mode's per-song diagnostics: the local renditions of the playing song, with their manifests (source
-    /// codec, cutoff, stem mode, loudness).
+    /// Developer mode's per-song diagnostics: the local renders of the playing song, with their manifests (source
+    /// codec, stem mode, loudness).
     func renditionsOfCurrentSong() async -> [LocalRendition] {
         guard let videoId = snapshot.videoId else { return [] }
         return await library.localRenditions(videoId: videoId)
     }
 
     /// UI tests: a fixed state for a screenshot (nothing overwrites it afterwards).
-    func setDemo(snapshot: SpatialPlaybackSnapshot, libraryStatus: RenditionStatus, usage: CloudAudioUsage = .empty) {
+    func setDemo(snapshot: SpatialPlaybackSnapshot, libraryState: RenditionState, usage: CloudAudioUsage = .empty) {
         isDemo = true
         self.snapshot = snapshot
-        self.libraryStatus = libraryStatus
+        self.libraryState = libraryState
         self.usage = usage
     }
 
@@ -308,13 +304,13 @@ final class SpatialAudioModel {
     private func libraryChanged(_ event: SpatialLibraryEvent) {
         guard !isDemo else { return }
         switch event {
-        case .statusChanged(let key, let status):
-            if key == currentKey { setLibraryStatus(status) }
+        case .statusChanged(let key, let state):
+            if key == currentKey { setLibraryState(state) }
         case .renditionReady(let rendition):
-            if rendition.key == currentKey { setLibraryStatus(.ready) }
+            if rendition.key == currentKey { setLibraryState(RenditionState.ready) }
         case .renditionRemoved(let key):
             if key == currentKey {
-                setLibraryStatus(.none)
+                setLibraryState(RenditionState.none)
                 requested = nil
             }
         case .usageChanged(let usage):
@@ -328,23 +324,19 @@ final class SpatialAudioModel {
         return RenditionKey(videoId: videoId, profile: profile)
     }
 
-    /// Counts every word about the current render's status, so an answer that was on its way while a newer one
-    /// arrived is dropped instead of overwriting it.
-    @ObservationIgnored private var statusStamp = 0
-
-    private func setLibraryStatus(_ status: RenditionStatus) {
+    private func setLibraryState(_ state: RenditionState) {
         statusStamp &+= 1
-        if libraryStatus != status { libraryStatus = status }
+        if libraryState != state { libraryState = state }
     }
 
-    /// Brings `libraryStatus` up to date for the song that is playing, and runs spec 6.2 for it: when the player wants
+    /// Brings `libraryState` up to date for the song that is playing, and runs spec 6.2 for it: when the player wants
     /// the selected profile's render and it was not asked for yet, the library is asked, once. Otherwise the library
     /// is only asked where the render stands.
     private func syncCurrentRender() {
         statusTask?.cancel()
         statusTask = nil
         guard let key = currentKey else {
-            setLibraryStatus(.none)
+            setLibraryState(RenditionState.none)
             return
         }
         statusStamp &+= 1
@@ -352,18 +344,18 @@ final class SpatialAudioModel {
         let library = self.library
         if started, snapshot.wantedRender == key, key != requested, let song = currentSong(), song.id == snapshot.songId {
             requested = key
-            let request = RenditionRequest(song: song, videoId: key.videoId, kind: key.kind, reason: .playing)
+            let request = RenditionRequest(song: song, videoId: key.videoId, profile: key.profile, reason: .playing)
             // Never cancelled: a request, once made, is the library's to finish.
             Task { [weak self] in
-                let status = await library.request(request)
+                let state = await library.request(request)
                 guard let self, self.statusStamp == stamp, self.currentKey == key else { return }
-                self.setLibraryStatus(status)
+                self.setLibraryState(state)
             }
         } else {
             statusTask = Task { [weak self] in
-                let status = await library.status(key)
+                let state = await library.status(key)
                 guard !Task.isCancelled, let self, self.statusStamp == stamp, self.currentKey == key else { return }
-                self.setLibraryStatus(status)
+                self.setLibraryState(state)
             }
         }
     }
