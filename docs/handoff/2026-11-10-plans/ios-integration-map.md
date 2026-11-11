@@ -5,9 +5,10 @@ switching, route and level rules), **CLOUD** (library client, jobs, local store,
 (player sheet, settings, strings) and **OPUS** (play YouTube's Opus stream on iPhones). The contract is
 [`cloud-audio-spec.md`](cloud-audio-spec.md); this page says where everything it touches lives in the iOS code.
 
-Line numbers are those of commit `3670155` (branch `audio-foundation`). Later commits on the branch changed only
-tests, fixtures, this page and, through a merge of `audio-hq`, files under `cloud/`, so they still hold at the
-branch tip. Paths are from the repo root. Quotes are short on purpose: open the file for the rest.
+Line numbers are those of commit `3670155` (branch `audio-foundation`), and still hold at the branch tip: later
+commits changed only tests, fixtures, this page, the contract's own app files, files under `cloud/` (through a merge
+of `audio-hq`) and two spots of `AppEnvironment.swift`, whose numbers below are the tip's. Paths are from the repo
+root. Quotes are short on purpose: open the file for the rest.
 
 Contents: [1 What is already there](#1-what-is-already-there-the-contract-code) ·
 [2 Playback](#2-playback-decks-items-the-tap) · [3 The Sing swap](#3-the-sing-swap-the-alternate-rendition-mechanism) ·
@@ -54,9 +55,14 @@ nobody needs a new module dependency. `Package.swift` is unchanged.
 | `AppTests/SpatialAudioModelTests.swift` | The model with main-actor fakes of both protocols | foundation |
 
 `App/AppEnvironment.swift` is wired once and for all: `let spatial: SpatialAudioModel` (line 93), built at lines
-288-292 from one `SpatialAudioContext` (after Cloud Studio and Sing exist, before anything uses `self`), started at
-line 400 (`spatial.start()`, real launches only). **Nobody needs to edit `AppEnvironment.swift` for this feature**:
+288-293 from one `SpatialAudioContext` (after Cloud Studio and Sing exist, before anything uses `self`), started at
+line 401 (`spatial.start()`, real launches only). **Nobody needs to edit `AppEnvironment.swift` for this feature**:
 plug in through your factory file.
+
+`SpatialAudioContext` carries: `launch`, `defaults`, `settings` (`SettingsStore`), `library`, `playback`
+(`PlaybackStore`), `playbackServices` (nil in UI tests), `youtube`, `spotify`, `tais`, `lyricsController`, `cloud`
+(`CloudStudio`), `persistence`, `home`, `musicTaste`, `importedHistory`, `tasteAdjustments`, `health`, plus
+`settingsStore` and `settingsNow`.
 
 ### 1.3 Who calls what
 
@@ -73,7 +79,10 @@ screens ──read/call──► SpatialAudioModel (env.spatial, @MainActor @Obs
 ```
 
 - ENGINE gets the library as the factory's second argument. It asks `localRendition(_:)` whenever it builds an item
-  and listens to `events()` for `.renditionReady`. It never calls `request`.
+  and listens to `events()` for `.renditionReady` (and `.renditionRemoved`: a file that is playing may be deleted by
+  "Remove downloaded renders"; the open item keeps playing, the next build must not find it). It calls
+  `markPlayed(_:)` when a render or the Enhanced file starts playing (the store evicts the least recently played
+  first). It never calls `request`.
 - The model asks for a render when the player's snapshot says one is wanted: `SpatialPlaybackSnapshot.wantedRender`
   (Spatial active, a video id, and the selected profile's render is not what plays). Once per wanted render; again
   after the selection, the song or "Remove downloaded renders" changed things. So ENGINE's whole duty towards the
