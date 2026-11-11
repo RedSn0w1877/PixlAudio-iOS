@@ -9,6 +9,12 @@ It runs on Hoa's own RunPod account, up to **3 workers at once** (`deploy/endpoi
 songs process side by side), scales to zero and bills per second, so a batch costs the same per song, only sooner. The full design, with every decision and its reasons, is
 [`docs/handoff/2026-10-07-plans/cloud-studio-design.md`](../../docs/handoff/2026-10-07-plans/cloud-studio-design.md).
 
+Since worker 1.1.0 it also makes **Spatial audio** renders (a song for headphones, from six separated stems, in six
+profiles) and answers for **Enhanced audio** (is the song's top end cut off, and, once the restoration model is in
+the image, the restored song). Those results go into a **shared library** in the same bucket, keyed by the YouTube
+video, where every phone fetches them: see "Spatial audio and Enhanced audio" below. The contract for that work is
+[`docs/handoff/2026-11-10-plans/cloud-audio-spec.md`](../../docs/handoff/2026-11-10-plans/cloud-audio-spec.md).
+
 ## How one song travels
 
 1. The phone uploads the song to Hoa's Cloudflare R2 bucket `pixl-cloud-studio` (`in/<jobKey>.<ext>`) with a
@@ -25,6 +31,63 @@ songs process side by side), scales to zero and bills per second, so a batch cos
 
 The job and result formats are [`schema/v1/`](schema/v1/) (JSON Schema plus golden examples the app's tests
 decode). Errors always come back as a code (`BAD_URL`, `INPUT_MISSING`, `POISONED`, ...) in both places.
+
+## Spatial audio and Enhanced audio (the shared library)
+
+Two more tasks, `spatial` and `enhance`, in the same job format (still `v: 1`; a 1.0.0 worker refuses them by
+name). They can ride along with `instrumental` and the other tasks in one job, or come alone. Their results are
+not the job's own: a finished render is stored once and every device uses it.
+
+```
+lib/v1/<videoId>/sp-<profile>.flac    a spatial render: FLAC 16-bit, the song's own sample rate and frame count
+lib/v1/<videoId>/sp-<profile>.json    its manifest, written LAST: while it is missing the render does not exist
+lib/v1/<videoId>/enhanced.flac        the restored stereo song (only when something was restored)
+lib/v1/<videoId>/enhanced.json        its manifest; also written alone when nothing was restored, so phones stop asking
+```
+
+`<videoId>` is the matched YouTube video, `<profile>` one of `studio`, `wide`, `intimate`, `hall`, `surround`,
+`night`, and `v1` the library version (`LIB_V` in `src/pixl_worker/library.py`, the only place it lives).
+
+What a job with these tasks does, after the download and decode every job starts with:
+
+1. **The job's own outputs first**, if it asked for any (instrumental, lyrics, ...): made, uploaded and freed as
+   before. The vocals are kept for step 5, so a job that wants an instrumental and a render separates them once.
+2. **What is already there?** One GET per requested output (`manifestGet`). A manifest for this library version,
+   video and profile means the render exists: it is skipped and reported as `exists`. When everything asked for
+   exists, the job ends `ok` there, without touching the GPU. Any doubt (no `manifestGet`, a bucket that does
+   not answer, a manifest for something else) means "make it".
+3. **Where does the song's spectrum end?** (`restore.detect_cutoff_hz`, a second of CPU.) A 128 kb/s AAC stream
+   stops at about 16 kHz, an Opus stream at 20 kHz. Above 17 kHz the song is `full_band` and left alone.
+4. **Enhanced.** The restoration model is not in the image yet (it is the next worker change), so today nothing
+   is restored: `enhanced.json` is written without audio and says why (`full_band`, `off` when the job said
+   `library.restore: off`, or `unavailable` for a band-limited song this worker cannot restore).
+5. **Six stems** (`separate.Stems6`, open models only): vocals from BS-RoFormer, then htdemucs_ft on the rest for
+   drums, bass and other, then htdemucs_6s on that "other" for guitar and piano. Without the htdemucs_6s files
+   the render is made from four stems and says so (`stemMode: stems4`).
+6. **Render** every missing profile (`pixl_worker/spatial/`, NumPy on the CPU), then for each one: encode FLAC
+   16-bit (TPDF dither), upload the audio, upload its manifest.
+7. The job's own `manifest.json` last, as always, now with a `library` block: per output `ok` (made now), `exists`,
+   `failed`, and for enhanced also `not_needed`. Then the input is deleted.
+
+A failure in one output leaves the others: the job is `partial`. A job that delivers nothing at all is an error
+with the first failure's code, and its input stays for a retry. Every spatial render sits 4 dB under the song's
+loudness on purpose (`loudness.headroomDb` in its manifest; the apps give it back when their volume gain has the
+room).
+
+**The library is shared and is never cleaned up by a phone.** Two things keep it small:
+- the bucket's own lifecycle rule (owner checklist, step 2: the rule with no prefix) deletes every object
+  **30 days** after it was written. That is how long a render stays shared; phones keep their own copy as long as
+  they like, and a song that is asked for again is simply rendered again;
+- **`cloud-library-janitor`** (GitHub Actions, daily at 04:43 UTC; `deploy/library_janitor.py`) keeps `lib/` inside
+  R2's free 10 GB: when it holds more than **8 GB** it deletes the oldest renders until it is under, each manifest
+  before its audio. Under 8 GB it deletes nothing. See the runbook.
+
+A new library version (`LIB_V` 2, when the renderer or the separation changes audibly) moves every key to
+`lib/v2/`; the old renders are then ignored and go away on their own.
+
+Jobs with these tasks may run for 30 minutes (the endpoint's `timeout`); the apps must send them with
+`policy.executionTimeout` 1 800 000 (`schema/v1/examples/run.request.spatial.json`), because the worker cannot see
+a request's policy and plans for the endpoint's limit. Every other job keeps its 15 minutes.
 
 ## What it costs (estimates until the first `bench`)
 
@@ -45,9 +108,15 @@ these pools), and on 2026-10-08 one sat idle and ready for 7+ minutes after the 
 releases any that stay anyway within 30 minutes (~$0.35 a worker at worst, up to 3); see "Idle workers" in the
 runbook.
 
+A spatial render has not been timed on a GPU worker yet: it adds the htdemucs_ft and htdemucs_6s passes on the GPU
+and the renderer on the CPU to the vocal separation above. Run the deploy with **bench** ticked once this worker is
+deployed: its summary now has `stems6` and `render` (one profile) and the memory the process needed for them.
+Storing the renders costs nothing while the bucket stays inside R2's free 10 GB, which the janitor sees to.
+
 The real ceiling is the **prepaid balance**: auto-pay stays off. The keepalive emails when a week costs more
-than `CLOUD_WEEKLY_ALARM_USD` ($2). A job that hangs is cut at 15 minutes (~$0.17); the guard stops a job that
-keeps crashing after 2 deliveries (~$0.35 at worst).
+than `CLOUD_WEEKLY_ALARM_USD` ($2). A job that hangs is cut at 15 minutes (~$0.17), one with library tasks at 30
+(~$0.35); the guard stops a job that keeps crashing after 2 deliveries (~$0.35 at worst, twice that for a library
+job).
 
 ## Owner checklist (once, about 15 minutes)
 
@@ -144,10 +213,33 @@ workers back* / *couldn't set max workers to 0* (a RunPod API error: put Max wor
 run `cloud-worker-keepalive`, which restores it). A `/health` that can't be read is only a warning there: the
 keepalive's daily run reports an unreachable RunPod or a revoked key.
 
+**The shared library (`lib/` in the bucket).** Nothing to do day to day: renders expire 30 days after they were
+written (the bucket's lifecycle rule with no prefix; check it exists under the bucket's Settings → Object
+lifecycle rules, because without it `lib/` only ever grows), and **`cloud-library-janitor`** runs every day.
+- Its summary says how many objects and GB `lib/` holds and what it deleted. Most days: "under the limit, nothing
+  to delete".
+- By hand: Actions → `cloud-library-janitor` → Run workflow; tick **dry run** to only see what it would delete.
+  From a checkout: `CLOUD_DEFAULTS_KEY=... python3 deploy/library_janitor.py --dry-run` (needs `cryptography`).
+- It fails (GitHub emails) only when something needs a look: the listing was refused (the R2 token lost its
+  rights, or was replaced: bake the keys again), or renders could not be deleted. A failed delete never leaves a
+  manifest without its audio; the other way round (audio whose manifest is gone) is harmless and expires.
+- To empty the library on purpose (a bad render went out): raise `LIB_V` in `src/pixl_worker/library.py`
+  (everything moves to `lib/v2/` and the old renders are ignored by workers and phones), or delete the `lib/`
+  prefix in the Cloudflare dashboard. Phones keep the copies they already downloaded either way.
+- GitHub stops scheduled workflows in public repositories after 60 days without activity; re-enable it in the
+  Actions tab if that happens. The lifecycle rule still deletes on time; only the 8 GB guard would be asleep.
+
+**Bench after a deploy.** Actions → `cloud-worker-deploy` → Run workflow, tick **bench**. One synthetic 4-minute
+song goes through every stage, the spatial path included: the summary shows `stems6` (htdemucs_ft and htdemucs_6s
+on the GPU, with their first loads) and `render` (one profile on the CPU) in seconds, peak VRAM, and the
+process's peak memory around those two stages next to what the container may use. Multiply the render's memory by
+the song's length over 4 minutes for a longer song: it grows in step with it.
+
 **Logs.** RunPod console → Serverless → `pixl-cloud-studio` → Logs (or Workers → a worker → Logs). One JSON line
 per event: `boot`, `models_loaded`, `job_start`, `job_done`, `job_error` (with a code), `job_duplicate`,
-`worker_refresh` (the worker asked RunPod to stop it after this job). URLs appear as host/path only; lyrics,
-titles and job bodies are never logged.
+`worker_refresh` (the worker asked RunPod to stop it after this job), and for library jobs `library_checked` (how
+many outputs were already there) and `library_failed` (which output, during what, with a code). URLs appear as
+host/path only; lyrics, titles and job bodies are never logged.
 
 **When a job fails**: the manifest's `error.code` says which step. `BAD_URL`
 with HTTP 403 means expired or wrong signatures (the phone re-signs); `INPUT_MISSING` means the upload is gone
@@ -156,6 +248,12 @@ with HTTP 403 means expired or wrong signatures (the phone re-signs); `INPUT_MIS
 sent with AAC output (AAC tops out at 96 kHz; the phone resends it with `output.codec: flac`). A job whose only
 task is `lyrics` fails with the lyrics' own code when they fail (there is nothing else to deliver); with stems
 requested it is `partial` instead.
+A job with library tasks says per output what happened (`library.renders`, `library.enhanced`, and a warning such
+as `library: sp-wide failed (UPLOAD_FAILED)`): `partial` when some of it arrived, an error with the first
+failure's code when none did. `UNSUPPORTED_VERSION` with "library.v" means the app and the worker disagree about
+the library version (deploy the worker first, then ship the app). `BAD_URL` on a `library` URL means it does not
+point at that video's own object. A long song that ends in `DEADLINE` during `stems6` or `render` was most
+likely sent with the old 15-minute `executionTimeout`.
 
 **Sending a job twice** (a lost `/run` response) costs about a second: a finished `ok` manifest for the same
 input comes straight back with the warning `duplicate`. A resend that finds the input already gone also hands
@@ -183,6 +281,17 @@ python ci/lock.py               # regenerate requirements.lock / requirements-te
   Pin Hugging Face files by commit, never `main`; take sha256 from `https://huggingface.co/api/models/<repo>?blobs=true`.
 - **A branch build**: put `[image]` in the commit message to build the whole image and run the CPU smoke test
   (real weights on CPU) without pushing anything. On main the image is pushed.
+- **The contract files have copies in the apps.** `schema/v1/examples/` and `schema/v1/spatial/` are the
+  originals; `python ci/check_fixtures.py` fails when a copy in this repository differs by a byte. The two files in
+  `schema/v1/spatial/` are generated: after changing a profile or the head model run
+  `PYTHONPATH=src python -m pixl_worker.spatial.preview --out schema/v1/spatial`, commit them, and copy them into
+  both apps (a test compares the committed files with what the generator writes).
+- **Changing how a render sounds** (the renderer, a profile, the separation): raise `LIB_V` in
+  `src/pixl_worker/library.py` and the `const` in `schema/v1/job.input.schema.json`, and the apps' own constant.
+  Renders made before are then ignored and expire.
+- **The restoration model** (the next worker change): subclass `restore.Restorer` (its docstring is the
+  contract), hand it to `pipeline.Models` in `handler.load_models`, add its weights to `weights.lock` and the
+  Dockerfile. The pipeline, the manifests and the tests (with a fake model) are already there.
 - **Adding word timing for more languages** (Whisper later): implement `WordTimingBackend` in
   `src/pixl_worker/lyrics/` and register it after the Qwen aligner in `handler.load_models` (load it lazily, like
   `_LazyAligner`, so cold starts don't pay for it); `backend_for()` then routes the languages Qwen lacks to it.
@@ -206,11 +315,15 @@ Dockerfile           test | deps | small | final | smoke (CI only)
 requirements.in      top-level deps → requirements.lock (hashed, generated by ci/lock.py); constraints.txt
 weights.lock         every model file: sha256, size, licence, pinned URL
 fetch_small.py       fetches and verifies the small model files (stdlib)
-models/demucs/       the htdemucs_ft bag file (from demucs, MIT)
-src/pixl_worker/     handler, schema, storage, audio, separate, lyrics/, pipeline, selftest, smoke, log
-schema/v1/           the job contract with the app (+ examples/)
+models/demucs/       the htdemucs_ft and htdemucs_6s bag files (from demucs, MIT)
+src/pixl_worker/     handler, schema, storage, audio, separate, lyrics/, pipeline, selftest, smoke, log;
+                     library (the shared library: keys, manifests, FLAC), restore (cutoff, the model's seam),
+                     spatial/ (the renderer and the on-device tables' generator; NumPy only)
+schema/v1/           the job contract with the app (+ examples/), the render manifest, spatial/ (the tables)
 tests/               pytest, CPU only
 ci/                  check_weights, check_fixtures, pip_check, lock
-deploy/              endpoint.json, runpod_deploy.py, keepalive.py, reaper.py, runpod_api.py (stdlib, REST v2)
+deploy/              endpoint.json, runpod_deploy.py, keepalive.py, reaper.py, runpod_api.py (stdlib, REST v2),
+                     e2e.py, library_janitor.py (need `cryptography`)
+tools/               build_hrir.py (made spatial/data/hrir_ku100.npz from the SADIE II database; run by hand)
 LICENSES/ NOTICE     licence texts and where every component comes from
 ```

@@ -184,6 +184,37 @@ def test_the_repositorys_own_copies_are_in_step(capsys):
         assert b"\r" not in raw and raw.endswith(b"\n") and not raw.endswith(b"\n\n"), path.name
 
 
+def test_notice_lists_what_1_1_0_added_and_the_image_ships_the_texts():
+    notice = (ROOT / "NOTICE").read_text(encoding="utf-8")
+    assert "htdemucs_6s" in notice and "5c90dfd2-34c22ccb.th" in notice and "LICENSES/MIT-demucs.txt" in notice
+    assert "SADIE II Database" in notice and "https://zenodo.org/records/12092466" in notice
+    assert "LICENSES/SADIE-II.txt" in notice and "Apache-2.0" in notice and "This file is not the original" in notice
+    sadie = (ROOT / "LICENSES" / "SADIE-II.txt").read_text(encoding="utf-8")
+    assert "University of York" in sadie and "section 4(b)" in sadie and "hrir_ku100.npz" in sadie
+    assert (ROOT / "LICENSES" / "Apache-2.0.txt").is_file() and (ROOT / "LICENSES" / "MIT-demucs.txt").is_file()
+    assert (ROOT / "src" / "pixl_worker" / "spatial" / "data" / "hrir_ku100.npz").is_file()
+    assert "COPY --link LICENSES/ /opt/pixl/LICENSES/" in DOCKERFILE and "COPY --link NOTICE weights.lock" in DOCKERFILE
+    assert "COPY --link src/ /opt/pixl/src/" in DOCKERFILE  # the head model data rides in the package
+
+
+def test_the_new_contract_files_keep_to_the_feature_names():
+    # Owner rule for everything about this feature that a person may read (cloud-audio-spec.md, section 1): the
+    # features are "Spatial audio" and "Enhanced audio", and a handful of words are never used for them.
+    ruled_out = ("lossless", "hi-res", "hires", "dolby", "atmos", "360 reality", "claude", "anthropic",
+                 "binilyrics")
+    files = [ROOT / "schema" / "v1" / name for name in ("job.input.schema.json", "job.result.schema.json",
+                                                         "library.render.schema.json", "selftest.result.schema.json")]
+    files += sorted((ROOT / "schema" / "v1" / "examples").glob("*spatial*.json"))
+    files += sorted((ROOT / "schema" / "v1" / "examples").glob("library.render*.json"))
+    files += [ROOT / "LICENSES" / "SADIE-II.txt", ROOT / "NOTICE", ROOT / "deploy" / "library_janitor.py",
+              ROOT / "src" / "pixl_worker" / "library.py", ROOT / "src" / "pixl_worker" / "restore.py"]
+    assert len(files) >= 16
+    for path in files:
+        text = path.read_text(encoding="utf-8").lower()
+        for word in ruled_out:
+            assert word not in text, (path.name, word)
+
+
 def test_lock_drops_what_the_base_image_provides():
     text = ("absl-py==2.5.0 \\\n    --hash=sha256:aa\n"
             "torch==2.11.0 \\\n    --hash=sha256:bb \\\n    --hash=sha256:cc\n"
