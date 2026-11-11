@@ -1,8 +1,9 @@
 import PixlAudioCore
 import SwiftUI
 
-/// Settings › Playback (Android `SettingsCategoryScreen` PLAYBACK): queue and transitions, sound (audio quality),
-/// headphones and volume — and, in developer mode, an "Advanced" block (ReplayGain). The player background moved to
+/// Settings › Playback (Android `SettingsCategoryScreen` PLAYBACK): queue and transitions, sound (audio quality and
+/// Spatial audio), headphones and volume — and, in developer mode, an "Advanced" block (ReplayGain, Spatial audio's
+/// route, limit, storage and diagnostics). The player background moved to
 /// Appearance, the gestures and music haptics to Gestures & haptics, Blocked artists to Library & storage.
 ///
 /// Dropped (Android-only): battery optimisation (iOS background audio needs no exemption), Chromecast autoplay
@@ -49,6 +50,9 @@ struct PlaybackSettingsSection: View {
                     // Cached stream URLs were picked under the old cap.
                     if let service = env.youtube.service { Task { await service.invalidateAll() } }
                 }
+                // Spatial audio (cloud audio spec 6.5), after Audio quality as on Android: its own view reads
+                // `env.spatial`, so its changes redraw only these rows.
+                SpatialAudioSettingsRows()
             }
             SettingsSubsection(title: L10n.settingsSectionHeadphonesVolume, addBottomSpace: developerMode) {
                 SwitchSettingRow(title: L10n.settingsHeadphonesResumeTitle,
@@ -69,6 +73,8 @@ struct PlaybackSettingsSection: View {
                                      systemImage: "speaker.wave.1") { playback.replayGainUseAlbumGain = $0 == "album" }
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
+                // Spatial audio's developer rows: route, monthly limit, storage, songs a day, this song's diagnostics.
+                SpatialAudioDeveloperRows()
             }
         }
         .animation(PixlMotion.state, value: playback.replayGainEnabled)

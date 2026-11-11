@@ -114,3 +114,17 @@ answer:
 | A render that does not line up (> 50 ms in length) or a failed switch | used from the next play | — |
 | Seek | the stage forgets the old position (no room tail across a seek) | — |
 | Mono song | like an unsupported rate: no stage, render still wanted | — |
+
+## Spatial audio: the screens (2026-11-11, built on both apps at once)
+
+Spec `docs/handoff/2026-11-10-plans/cloud-audio-spec.md` 6.5; the Android side is `RedSn0w1877/PixlAudio` branch
+`audio-ui` (`presentation/spatial/*`, `strings_spatial_ui.xml`). Same places, order, words and rules; Liquid Glass
+instead of Material. Notes: `docs/handoff/2026-11-11-ios-spatial-ui.md`.
+
+| Part | iOS | Android |
+|---|---|---|
+| Player entry | `SpatialAudioPlayerButton`: third sibling after Lyrics and Ask Taizo in the song row; 48 pt clear-glass circle, "Off" under the icon; on: `primary` glass, 16 pt corners, the profile's name (≤ 104 pt); held back (route, Sing): name kept, fill dropped | `SpatialAudioPlayerButton` in `SongMetadataDisplaySection`, same states |
+| Sheet | `SpatialAudioSheet` (`AppSheet.spatialAudio`): header "Spatial audio" / "For headphones.", status line card (every row of 6.5), Off + six profiles with the one-liners, the quiet level line; a pick applies at once, the sheet stays open; album colours from the player, app colours from Settings | `SpatialAudioSheet`, same |
+| Settings › Playback › Sound | Spatial audio (opens the sheet), Cloud renders, "Cloud processing is off" (leads to the master), Prepare ahead (needs cloud renders), "Songs ready: N · X GB on this phone" + Remove downloaded renders (confirm) | same rows |
+| Settings › Playback › Advanced | route, monthly limit ($5 … $200, No limit), storage (14 stops, 256 MB … 64 GB), songs a day ahead (1 … 100), this song's diagnostics | same rows |
+| Player file-info chip (developer mode) | ends with "• Spatial Studio on phone" / "• Spatial Studio cloud render" | same |

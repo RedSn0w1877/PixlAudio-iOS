@@ -24,6 +24,7 @@ struct PlayerSeekBar: View {
     @Environment(\.playerTheme) private var theme
     @Environment(SettingsStore.self) private var settings
     @Environment(PlaybackStore.self) private var playback
+    @Environment(AppEnvironment.self) private var env
 
     @State private var scrubFraction: Double?
     /// True while a finger is down on the track; unlike `scrubFraction` it resets itself if the system cancels the drag
@@ -37,6 +38,9 @@ struct PlayerSeekBar: View {
         // Paused, the timeline below doesn't tick. A seek or restart ("start over", previous inside a song) bumps this
         // counter, which re-runs this body once so the bar and the labels show the new position without pressing play.
         let _ = playback.seekRevision
+        // Spatial audio's part of the file-info chip ("Spatial Studio on phone"), read here, once per change, and only
+        // while the chip shows.
+        let spatialInfo = showsFileInfo ? SpatialAudioUI.fileInfo(env.spatial.snapshot.audible) : nil
         TimelineView(.animation(minimumInterval: 0.25, paused: !(isPlaying && isActive) || scrubFraction != nil)) { context in
             let _ = context.date
             let duration = PlayerFormat.displayDuration(reportedMs: clock.durationMs, hintMs: song.duration)
@@ -45,7 +49,7 @@ struct PlayerSeekBar: View {
                 track(progress: progress, color: textColor)
                     .padding(.vertical, 8)
                 labels(positionMs: Int64((progress * Double(max(duration, 1))).rounded()), durationMs: duration,
-                       color: textColor)
+                       color: textColor, spatialInfo: spatialInfo)
             }
             .frame(minHeight: 70, alignment: .top)
         }
@@ -141,7 +145,12 @@ struct PlayerSeekBar: View {
 
     // MARK: Labels
 
-    private func labels(positionMs: Int64, durationMs: Int64, color: Color) -> some View {
+    /// "Show player file info" (Settings › Appearance › Advanced) counts only in developer mode.
+    private var showsFileInfo: Bool {
+        settings.appearance.fullPlayerShowFileInfo && settings.experimental.developerMode
+    }
+
+    private func labels(positionMs: Int64, durationMs: Int64, color: Color, spatialInfo: String?) -> some View {
         ZStack {
             HStack {
                 Text(PlayerFormat.duration(positionMs / 1000 * 1000))
@@ -152,10 +161,10 @@ struct PlayerSeekBar: View {
             .monospacedDigit()
             .foregroundStyle(color)
             // "Show player file info" (Settings › Appearance › Advanced) counts only in developer mode: the format
-            // text (codec, bitrate, sample rate) is not for everyone.
-            if settings.appearance.fullPlayerShowFileInfo, settings.experimental.developerMode,
-               let label = PlayerFormat.audioMetaLabel(song: song) {
-                Text(label)
+            // text (codec, bitrate, sample rate) is not for everyone. While Spatial audio is audible it ends with what
+            // plays ("• Spatial Studio on phone", "• Spatial Studio cloud render"), as on Android.
+            if showsFileInfo, let label = PlayerFormat.audioMetaLabel(song: song) {
+                Text(spatialInfo.map { label + " \u{2022} " + $0 } ?? label)
                     .pixlFont(.custom(size: 11, weight: .medium, lineHeight: 16, tracking: 0.5))
                     .lineLimit(1)
                     .foregroundStyle(color.opacity(0.96))

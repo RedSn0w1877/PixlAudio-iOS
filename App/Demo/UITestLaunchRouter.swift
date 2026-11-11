@@ -140,6 +140,24 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case cloudSettings = "cloud.settings", cloudQueue = "cloud.queue"
     case cloudSettingsBuiltIn = "cloud.settings.builtin"
 
+    // Spatial audio (2026-11-11, `SpatialDemo`): the sheet over the full player with Studio on the phone and the cloud
+    // version on its way (`spatialAudio`), then one screen per status line of spec 6.5 and Off; the full player with a
+    // profile on and held back (headphones only); Settings › Playback with Spatial's rows and demo numbers. The lines that
+    // need cloud renders on also need `-cloud_studio_enabled YES` (see `SpatialDemo`).
+    case spatialAudio
+    case spatialAudioOff = "spatialAudio.off"
+    case spatialAudioWaitingForWifi = "spatialAudio.waitingForWifi"
+    case spatialAudioCloudLimit = "spatialAudio.cloudLimit"
+    case spatialAudioGettingCloudVersion = "spatialAudio.gettingCloudVersion"
+    case spatialAudioCloudVersion = "spatialAudio.cloudVersion"
+    case spatialAudioOnPhoneOnly = "spatialAudio.onPhoneOnly"
+    case spatialAudioCloudFailed = "spatialAudio.cloudFailed"
+    case spatialAudioHeadphonesOnly = "spatialAudio.headphonesOnly"
+    case spatialAudioPausedForSing = "spatialAudio.pausedForSing"
+    case nowPlayingSpatial = "nowPlaying.spatial"
+    case nowPlayingSpatialHeld = "nowPlaying.spatialHeld"
+    case settingsPlaybackSpatial = "settingsCategory.playback.spatial"
+
     /// The accessibility identifier present once the screen is up (`screen.<id>`).
     var readyIdentifier: String {
         switch self {
@@ -244,6 +262,12 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .taisSongSheet, .taisInstrumental, .taisInstrumentalRendering, .taisInstrumentalActive,
              .taisSingPreparingCloud, .taisSingWaitingForWiFi, .taisSingWaitingGap:
             return nil
+        case .spatialAudio, .spatialAudioOff, .spatialAudioWaitingForWifi, .spatialAudioCloudLimit,
+             .spatialAudioGettingCloudVersion, .spatialAudioCloudVersion, .spatialAudioOnPhoneOnly,
+             .spatialAudioCloudFailed, .spatialAudioHeadphonesOnly, .spatialAudioPausedForSing,
+             .nowPlayingSpatial, .nowPlayingSpatialHeld:
+            return nil
+        case .settingsPlaybackSpatial: return .settingsCategory(.playback)
         }
     }
 
@@ -279,6 +303,10 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .artistPicker: return .artistPicker(songId: DemoLibrary.songs[DemoLibrary.featuredSongIndex].id)
         case .aiPlaylist: return .aiPlaylist
         case .taisChat, .taisChatConversation, .taisChatCloud: return .taisChat
+        case .spatialAudio, .spatialAudioOff, .spatialAudioWaitingForWifi, .spatialAudioCloudLimit,
+             .spatialAudioGettingCloudVersion, .spatialAudioCloudVersion, .spatialAudioOnPhoneOnly,
+             .spatialAudioCloudFailed, .spatialAudioHeadphonesOnly, .spatialAudioPausedForSing:
+            return .spatialAudio(fromPlayer: true)
         default: return nil
         }
     }
@@ -288,6 +316,10 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         switch self {
         case .queue, .queueSaveAsPlaylist, .sleepTimer, .devices, .artistPicker: true
         case .devicesSpotifyConnect, .devicesSpotifyPlaying, .devicesSpotifyReconnect, .devicesSpotifyEmpty: true
+        case .spatialAudio, .spatialAudioOff, .spatialAudioWaitingForWifi, .spatialAudioCloudLimit,
+             .spatialAudioGettingCloudVersion, .spatialAudioCloudVersion, .spatialAudioOnPhoneOnly,
+             .spatialAudioCloudFailed, .spatialAudioHeadphonesOnly, .spatialAudioPausedForSing:
+            true
         default: false
         }
     }
@@ -317,6 +349,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     var cover: AppCover? {
         switch self {
         case .nowPlaying, .nowPlayingSpotifyConnect, .nowPlayingBluetooth, .nowPlayingSpotifyVolumeHUD: .nowPlaying
+        case .nowPlayingSpatial, .nowPlayingSpatialHeld: .nowPlaying
         case .editSong: .editSong(songId: DemoLibrary.songs.first?.id ?? "")
         case .lyrics, .taisInstrumental, .taisInstrumentalRendering, .taisInstrumentalActive, .lyricsSpotifyVolumeHUD,
              .taisSingPreparingCloud, .taisSingWaitingForWiFi, .taisSingWaitingGap:
