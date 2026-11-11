@@ -133,7 +133,9 @@ def build_table(profile: Profile, sample_rate: int) -> dict:
     h_cross = high * x_spec
     out_power = np.abs(h_same) ** 2 + np.abs(h_cross) ** 2 \
         + 2.0 * INPUT_CORRELATION * (h_same * np.conj(h_cross)).real + wet * np.abs(high) ** 2
-    weight = k_weight_power(grid, sample_rate) / np.maximum(grid, 20.0)
+    # the reference spectrum is music-like, not pink: pink down to 1.5 kHz, then about 2 dB per octave steeper
+    # (with plain pink noise the profiles that change the highs, Night above all, came out 0.5-0.8 LU too loud)
+    weight = k_weight_power(grid, sample_rate) / np.maximum(grid, 20.0) / (1.0 + (grid / 1500.0) ** 2) ** 0.33
     weight[(grid < 40.0) | (grid > 16000.0)] = 0.0
     gain = float(np.sqrt(weight.sum() / (weight * out_power).sum()) * 10.0 ** (-HEADROOM_DB / 20.0))
 
