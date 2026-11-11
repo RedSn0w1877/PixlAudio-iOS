@@ -50,6 +50,26 @@ extension DualDeckEngine {
     /// A playhead that went back further than this since the switch began was moved.
     private static let backwardSeekSeconds = 0.25
 
+    /// The fade a switch may run and the rule it adds. Sing's switches keep their 300–700 ms; Spatial audio's
+    /// renditions fade for about 250 ms and may ask for time left (spec 6.3).
+    struct SwitchStyle {
+        /// The shortest fade a placement may ask for.
+        var minFadeSeconds: Double
+        /// The longest, and the fade without a placement.
+        var maxFadeSeconds: Double
+        /// The switch is not made when less of the song than this is left where it would start (0: no rule).
+        var minimumSecondsLeft: Double = 0
+
+        static let sing = SwitchStyle(minFadeSeconds: Double(DualDeckEngine.instrumentalMinCrossfadeMs) / 1000,
+                                      maxFadeSeconds: Double(DualDeckEngine.instrumentalCrossfadeMs) / 1000)
+
+        /// Spatial audio: a short linear crossfade (`SpatialRenditionRules.switchFadeSeconds`).
+        static func rendition(minimumSecondsLeft: Double) -> SwitchStyle {
+            SwitchStyle(minFadeSeconds: SpatialRenditionRules.switchFadeSeconds,
+                        maxFadeSeconds: SpatialRenditionRules.switchFadeSeconds, minimumSecondsLeft: minimumSecondsLeft)
+        }
+    }
+
     /// Plays `url` (an instrumental) for the current entry, or its own audio again when `url` is nil. Returns false
     /// when nothing is loaded or the other audio can't be opened.
     @discardableResult
@@ -62,7 +82,7 @@ extension DualDeckEngine {
     /// switched. Whatever the outcome other than `.switched`, the song plays on and its own plan for what comes next
     /// is made again.
     func switchCurrentAudio(to url: URL?, placement: SwitchPlacement?, requireAligned: Bool = false) async -> SwitchOutcome {
-        await switchAudio(to: .file(url), placement: placement, requireAligned: requireAligned)
+        await switchAudio(to: .file(url), placement: placement, requireAligned: requireAligned, style: .sing)
     }
 
     /// Sing's preview piece: plays `url` — a stretch of the instrumental that starts `offsetSeconds` into the song — in
@@ -71,7 +91,20 @@ extension DualDeckEngine {
     /// crossfade, seeks, the lyrics clock and the way back work as for a whole instrumental. Outside the clip that item
     /// is silent: the caller goes back before the clip runs out, or as soon as a seek leaves it.
     func switchCurrentAudio(toClip url: URL, offsetSeconds: Double, placement: SwitchPlacement?) async -> SwitchOutcome {
-        await switchAudio(to: .clip(url, offsetSeconds: offsetSeconds), placement: placement, requireAligned: false)
+        await switchAudio(to: .clip(url, offsetSeconds: offsetSeconds), placement: placement, requireAligned: false,
+                          style: .sing)
+    }
+
+    /// Spatial audio's switch (spec 6.3): plays another rendition of the current entry — its local spatial render, or
+    /// its own audio again — through the same in-sync swap as Sing's: the other audio is prerolled muted on the idle
+    /// deck, lined up by media time (a render may have another sample rate than the stream), and crossfaded linearly
+    /// for about 250 ms where `placement` says (a quiet moment, or as soon as it is ready). With `minimumSecondsLeft`
+    /// nothing is switched when less of the song than that would be left at the start. Sing's own switches are not
+    /// affected.
+    func switchCurrentRendition(to rendition: DeckItemFactory.Rendition, placement: SwitchPlacement?,
+                                minimumSecondsLeft: Double, requireAligned: Bool) async -> SwitchOutcome {
+        await switchAudio(to: .rendition(rendition), placement: placement, requireAligned: requireAligned,
+                          style: .rendition(minimumSecondsLeft: minimumSecondsLeft))
     }
 
     /// What a switch plays.
@@ -80,22 +113,31 @@ extension DualDeckEngine {
         case file(URL?)
         /// A preview piece starting this far into the song.
         case clip(URL, offsetSeconds: Double)
+        /// Spatial audio's renditions of the song.
+        case rendition(DeckItemFactory.Rendition)
     }
 
-    private func switchAudio(to source: SwitchSource, placement: SwitchPlacement?, requireAligned: Bool) async
-        -> SwitchOutcome {
+    private func switchAudio(to source: SwitchSource, placement: SwitchPlacement?, requireAligned: Bool,
+                             style: SwitchStyle) async -> SwitchOutcome {
         guard let outgoing = activeItem else { return .failed }
         let seekGeneration = outgoing.seekGeneration
         let startedAt = outgoing.positionSeconds
         // The song's own transition (a crossfade, or the gapless hand-over at the end) is cancelled below; where it
         // was planned tells whether a swap fits before it.
         let plannedPointMs = plannedTransition?.transitionPointMs
-        let defaultFadeSeconds = Double(Self.instrumentalCrossfadeMs) / 1000
+        let defaultFadeSeconds = style.maxFadeSeconds
         func transitionTooClose(start: Double, fade: Double) -> Bool {
             guard let plannedPointMs else { return false }
             return Double(plannedPointMs) / 1000 < start + fade + Self.switchClearanceSeconds
         }
-        if transitionTooClose(start: startedAt + Self.switchLeadSeconds * Double(rate), fade: defaultFadeSeconds) {
+        /// The style's time-left rule at a start (media time).
+        func tooLittleLeft(start: Double) -> Bool {
+            style.minimumSecondsLeft > 0
+                && !SpatialRenditionRules.leavesEnough(durationSeconds: outgoing.durationSeconds, startSeconds: start,
+                                                       minimum: style.minimumSecondsLeft)
+        }
+        if transitionTooClose(start: startedAt + Self.switchLeadSeconds * Double(rate), fade: defaultFadeSeconds)
+            || tooLittleLeft(start: startedAt + Self.switchLeadSeconds * Double(rate)) {
             return .failed
         }
         finishFadeNow()
@@ -115,7 +157,7 @@ extension DualDeckEngine {
             outgoing.seekGeneration != seekGeneration || outgoing.positionSeconds < startedAt - Self.backwardSeekSeconds
         }
         func clampedFade(_ seconds: Double) -> Double {
-            Swift.min(Swift.max(seconds, Double(Self.instrumentalMinCrossfadeMs) / 1000), defaultFadeSeconds)
+            Swift.min(Swift.max(seconds, style.minFadeSeconds), defaultFadeSeconds)
         }
 
         let incoming: DeckItem
@@ -126,6 +168,8 @@ extension DualDeckEngine {
             case .clip(let url, let offsetSeconds):
                 incoming = try await factory.makeClipItem(for: outgoing.entry, clipURL: url, offsetSeconds: offsetSeconds,
                                                           songSeconds: outgoing.durationSeconds)
+            case .rendition(let rendition):
+                incoming = try await factory.makeItem(for: outgoing.entry, rendition: rendition)
             }
         } catch {
             return leave(.failed)
@@ -200,7 +244,7 @@ extension DualDeckEngine {
             _ = await waitUntilReady(incoming, on: deck, while: outgoing)
             if transitionTooClose(start: target, fade: fadeSeconds) { return leave(.failed, incoming, on: deck) }
         }
-        guard remaining > 0.03 else { return leave(.failed, incoming, on: deck) }
+        guard remaining > 0.03, !tooLittleLeft(start: target) else { return leave(.failed, incoming, on: deck) }
         // The outgoing tap renders ahead of the playhead: its curve starts where its processing is, never in the past.
         let outgoingStart = max(target, outgoing.tap.processedMediaTime.load())
         incoming.tap.ramp.publish(CrossfadeRamp(role: .incoming, curve: .linear, startTime: target, duration: fadeSeconds,

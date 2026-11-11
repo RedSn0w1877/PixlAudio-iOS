@@ -6,12 +6,15 @@ import Darwin
 import Foundation
 import MediaToolbox
 import PixlAudioCore
+import PixlModel
 import Synchronization
 
 /// Builds the `MTAudioProcessingTap` attached to every item (architecture §2 "Playback"): ReplayGain pre-gain (+ soft
 /// limiter when boosting) → 10-band EQ + bass-boost shelf as `vDSP_biquadm` (RBJ coefficients from PixlAudioCore) with
 /// the loudness pre-gain → virtualizer (stereo width) → limiter when any boost is on → mid/side instrumental fallback
-/// → the crossfade gain g(t) evaluated from the item's own media time, ramped per buffer → fixed deck gain.
+/// → Spatial audio's on-device stage (cloud audio spec 7: the song's own audio only, while Spatial audio is active;
+/// it replaces the virtualizer, which fades out along the stage's ramp, and ends in the soft limiter) → the crossfade
+/// gain g(t) evaluated from the item's own media time, ramped per buffer → fixed deck gain.
 ///
 /// The same tap works for `AVPlayerItem.audioMix` (playback) and `AVAssetReaderAudioMixOutput.audioMix` (offline:
 /// the tests measure the chain that way).
@@ -117,6 +120,18 @@ nonisolated final class TapContext: @unchecked Sendable {
     private var hapticAnalyzer = MusicHapticAnalyzer(sampleRate: 44_100)
     private var hapticAnalyzerRunning = false
 
+    // Spatial audio (cloud audio spec 6.3, 7). Everything is set up in `prepare`.
+    /// This item's on-device stage: only for the song's own audio, in stereo float at 44.1 or 48 kHz.
+    private var spatialStage: SpatialStage?
+    /// This item is a spatial render (`SpatialItemRole.render`): never spatialized again, never widened.
+    private var isSpatialRender = false
+    /// A spatial render's level factor (its headroom given back, spec 6.3 "Level"); 1 for anything else.
+    private var renderLevel: Float = 1
+    /// The stage's headroom as a factor (the table file's `headroomDb`).
+    private var stageLevel: Float = 1
+    /// Media time just past the last buffer (a jump means a seek: the stage forgets the old position).
+    private var nextMediaTime: Double = -1
+
     init(effects: AudioEffectsParameters, item: TapItemParameters) {
         self.effects = effects
         self.item = item
@@ -156,6 +171,7 @@ nonisolated final class TapContext: @unchecked Sendable {
         hapticAnalyzer = MusicHapticAnalyzer(sampleRate: sampleRate)
         hapticAnalyzerRunning = false
         framesSincePrepare = 0
+        prepareSpatial()
         currentReplayGain = effectiveReplayGain()
         currentFixedGain = item.fixedGain.load()
         rebuildBiquad()
@@ -221,8 +237,46 @@ nonisolated final class TapContext: @unchecked Sendable {
     private func effectiveReplayGain() -> Float {
         let volume = item.replayGainVolume.load()
         let v = volume.isNaN ? 1 : volume
-        return effects.allowReplayGainBoost.load(ordering: .relaxed) ? min(max(v, 0), ReplayGain.maxVolume)
-                                                                     : min(max(v, 0), 1)
+        let gain = effects.allowReplayGainBoost.load(ordering: .relaxed) ? min(max(v, 0), ReplayGain.maxVolume)
+                                                                         : min(max(v, 0), 1)
+        // A spatial render plays `headroomDb` under the source: the level rule gives it back, capped at unity
+        // (`SpatialLevel.playbackGain`, spec 6.3). The stage's own share is given back inside the stage (`wetLevel`).
+        return renderLevel > 1 ? min(1, gain * renderLevel) : gain
+    }
+
+    /// Spatial audio's part of `prepare`: the item's role, the render's level, and the stage when the format takes it.
+    private func prepareSpatial() {
+        let role = item.spatialRole.load(ordering: .relaxed)
+        isSpatialRender = role == SpatialItemRole.render
+        nextMediaTime = -1
+        let headroom = item.spatialHeadroomDb.load()
+        renderLevel = isSpatialRender && headroom.isFinite && headroom > 0 ? Float(SpatialLevel.linear(db: headroom)) : 1
+        guard role == SpatialItemRole.stage else {
+            spatialStage = nil
+            return
+        }
+        guard channels == 2, isFloat32, let coefficients = effects.spatial.coefficients else {
+            spatialStage = nil
+            item.spatialFormat.store(SpatialItemFormat.unsupported, ordering: .relaxed)
+            return
+        }
+        if let stage = spatialStage, abs(Double(stage.sampleRate) - sampleRate) <= 0.5,
+           stage.coefficients === coefficients {
+            stage.reset()
+        } else {
+            spatialStage = SpatialStage(coefficients: coefficients, sampleRate: sampleRate)
+        }
+        stageLevel = Float(SpatialLevel.linear(db: max(coefficients.headroomDb, 0)))
+        item.spatialFormat.store(spatialStage == nil ? SpatialItemFormat.unsupported : SpatialItemFormat.supported,
+                                 ordering: .relaxed)
+    }
+
+    /// The stage's wet level for a ReplayGain gain: `min(1, gain × headroom) / gain`, so the spatial sound plays at
+    /// `SpatialLevel.playbackGain(gain, headroomDb:)` while the dry sound keeps `gain` (spec 6.3 "Level").
+    @inline(__always)
+    private func stageWetLevel(_ gain: Float) -> Float {
+        guard gain > 0, stageLevel > 1 else { return 1 }
+        return min(1, gain * stageLevel) / gain
     }
 
     // MARK: Process (render thread — no allocation, locks or logging)
@@ -253,6 +307,18 @@ nonisolated final class TapContext: @unchecked Sendable {
         guard isFloat32, channels > 0, bindChannels(bufferList, frames: frames) else { return }
 
         let rmsIn = item.log != nil ? rms(frames: frames) : 0
+
+        // Spatial audio: the stage takes this buffer's target first (the profile, or bypass), so the virtualizer it
+        // replaces fades along the same ramp.
+        var engagement: (start: Float, end: Float) = (0, 0)
+        if let stage = spatialStage {
+            if timeRange.start.isValid && timeRange.start.isNumeric {
+                // A jump in media time is a seek: the room must not ring on with the old position.
+                if nextMediaTime >= 0 && abs(firstTime - nextMediaTime) > 0.05 { stage.reset() }
+                nextMediaTime = firstTime + Double(frames) / sampleRate
+            }
+            engagement = stage.begin(frames: frames, target: effects.spatial.profileIndex.load(ordering: .relaxed))
+        }
 
         // 1. ReplayGain (+ limiter only when boosting above unity).
         let replayGain = effectiveReplayGain()
@@ -287,7 +353,16 @@ nonisolated final class TapContext: @unchecked Sendable {
                     }
                 }
             }
-            if channels == 2 && width != 1 { applyWidth(frames: frames) }
+            // The virtualizer: never on a spatial render (it would smear the binaural cues), and faded out along the
+            // stage's ramp while the stage is on (spec 6.3 keeps it bypassed then).
+            if channels == 2 && width != 1 && !isSpatialRender {
+                if engagement.start > 0 || engagement.end > 0 {
+                    applyWidth(frames: frames, from: width + (1 - width) * engagement.start,
+                               to: width + (1 - width) * engagement.end)
+                } else {
+                    applyWidth(frames: frames)
+                }
+            }
             if needsLimiter { limit(frames: frames) }
             if bypass { tailFrames = max(tailFrames - frames, 0) }
         }
@@ -295,6 +370,14 @@ nonisolated final class TapContext: @unchecked Sendable {
         // 3. Mid/side vocal attenuation (stereo).
         let attenuation = effects.midSideAttenuation.load()
         if channels == 2 && attenuation > 0 { applyMidSide(attenuation: min(attenuation, 1), frames: frames) }
+
+        // 3½. Spatial audio's on-device stage, ending in the soft limiter while it is active (spec 7). The level rule's
+        // factor rides on its wet sound.
+        if let stage = spatialStage {
+            stage.process(left: channelStarts[0], right: channelStarts[1], stride: stride, frames: frames,
+                          wetLevel: stageWetLevel(replayGain))
+            item.spatialEngagement.store(engagement.end)
+        }
 
         // 4. Crossfade gain from this item's media time, then the deck's fixed gain.
         if let ramp = item.ramp.read() {
@@ -404,6 +487,24 @@ nonisolated final class TapContext: @unchecked Sendable {
             let side = (l[i] - r[i]) * 0.5 * width
             l[i] = mid + side
             r[i] = mid - side
+            i += stride
+        }
+    }
+
+    /// `applyWidth` with the width moving linearly from `from` (first frame) to `to` (last frame).
+    @inline(__always)
+    private func applyWidth(frames: Int, from: Float, to: Float) {
+        if from == 1 && to == 1 { return }
+        let l = channelStarts[0], r = channelStarts[1]
+        let step = frames > 1 ? (to - from) / Float(frames - 1) : 0
+        var w = from
+        var i = 0
+        for _ in 0..<frames {
+            let mid = (l[i] + r[i]) * 0.5
+            let side = (l[i] - r[i]) * 0.5 * w
+            l[i] = mid + side
+            r[i] = mid - side
+            w += step
             i += stride
         }
     }

@@ -37,6 +37,9 @@ final class AudioSessionController {
     /// Whether a crossfade is running when the interruption ends.
     var isTransitionRunning: () -> Bool = { false }
     var onCommand: ((Command) -> Void)?
+    /// Spatial audio's own hook: called after every route change, whatever its reason (and after the command it
+    /// caused, so an unplug has paused playback by then). Its route rule follows the output live.
+    var onRouteChange: (() -> Void)?
 
     private var observers: [any NSObjectProtocol] = []
     private let session: AVAudioSession
@@ -186,6 +189,9 @@ final class AudioSessionController {
         session.currentRoute.outputs.map { "\($0.portName) (\($0.portType.rawValue))" }.joined(separator: ", ")
     }
 
+    /// The port the sound goes to now (the route's first output; nil when there is none).
+    var currentOutputPort: AVAudioSession.Port? { session.currentRoute.outputs.first?.portType }
+
     // MARK: Events (internal so tests can drive them without posting system notifications)
 
     func handleInterruption(began: Bool, shouldResume: Bool) {
@@ -223,6 +229,7 @@ final class AudioSessionController {
         default:
             onCommand?(.routeChanged)
         }
+        onRouteChange?()
     }
 
     /// The user resumed or stopped by hand: a later reconnect must not resume.

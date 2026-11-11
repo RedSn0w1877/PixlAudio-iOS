@@ -96,3 +96,21 @@ Android plays itag 251 (Opus) straight from ExoPlayer. iOS keeps streaming itag 
 plays itag 251 once a checked Opus file is on disk: PixlNet `Remux/` repackages the WebM into MP4 (no re-encoding), the
 prefetcher prepares the next song (then the playing one) on unmetered Wi-Fi, and any failure means AAC for that video.
 Android needs none of this. Design and status: `docs/handoff/2026-11-11-ios-opus.md`.
+
+## Spatial audio, the player's side (2026-11-11, ENGINE)
+
+Spec: `docs/handoff/2026-11-10-plans/cloud-audio-spec.md` 6.3 and 7. Details and reasons:
+`docs/handoff/2026-11-11-ios-spatial-engine.md`. Readings the spec leaves open, for the Android ENGINE to match or to
+answer:
+
+| Behaviour | iOS | Android |
+|---|---|---|
+| Stage ramps | bypass on/off 80 ms; profile change 40 ms down to the dry sound, coefficients swapped, 40 ms up | spec: "~80 ms" |
+| Dry sound | the input delayed by `lowDelay`; an item that was never fully on fades from its undelayed input the first time (no delay switched on under the sound); once fully on, the item stays delayed after a bypass | spec: delayed input |
+| Old width effect | faded out along the stage's ramp; never applied to a render | spec: bypassed while the stage is active |
+| Level rule for the stage | applied to the stage's wet sound only (`min(1, gain × 1.585)` once fully on) | spec: the item's gain |
+| Time rules for switches | 20 s for a render switching in over the stream; none for a newly picked profile's render or for the way back (the swap's own clearance before the song's transition only) | spec: 20 s for an arriving render |
+| Spatial off or route failing while a render plays | swapped back to the stream (paused by an unplug: silent swap) | spec allows "finish the song" |
+| A render that does not line up (> 50 ms in length) or a failed switch | used from the next play | — |
+| Seek | the stage forgets the old position (no room tail across a seek) | — |
+| Mono song | like an unsupported rate: no stage, render still wanted | — |

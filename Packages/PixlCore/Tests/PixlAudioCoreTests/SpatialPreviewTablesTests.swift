@@ -256,3 +256,50 @@ struct SpatialPreviewGoldenTests {
         #expect(throws: SpatialPreviewError.self) { try SpatialPreviewGolden.decode(tables) }
     }
 }
+
+/// Tables v1.1 (spec 7, 2026-11-11): the sparse room's input high-pass, `roomHpHz`.
+@Suite("Spatial preview tables v1.1")
+struct SpatialPreviewTablesRoomHighPassTests {
+    private func tree(_ change: (inout [String: Any]) -> Void) throws -> Data {
+        var tree = try SpatialFixtures.tree()
+        var profiles = try #require(tree["profiles"] as? [String: Any])
+        var studio = try #require(profiles["studio"] as? [String: Any])
+        var table = try #require(studio["44100"] as? [String: Any])
+        change(&table)
+        studio["44100"] = table
+        profiles["studio"] = studio
+        tree["profiles"] = profiles
+        return try SpatialFixtures.encode(tree)
+    }
+
+    @Test func theShippedFileHasTheRoomHighPassOnEveryTable() throws {
+        let tables = try SpatialFixtures.tables()
+        let raw = try #require(SpatialFixtures.tree()["profiles"] as? [String: Any])
+        for profile in SpatialProfile.allCases {
+            let rates = try #require(raw[profile.rawValue] as? [String: Any])
+            for rate in SpatialPreviewTables.sampleRates {
+                let table = try #require(tables.table(for: profile, sampleRate: rate))
+                let wire = try #require(rates[String(rate)] as? [String: Any])
+                // A JSON number, however this platform's JSONSerialization hands it over.
+                let raw = wire["roomHpHz"]
+                let value = try #require((raw as? Double) ?? (raw as? Int).map(Double.init)
+                                         ?? (raw as? NSNumber)?.doubleValue)
+                #expect(table.roomHpHz == value)
+                #expect(table.roomHpHz > 0 && table.roomHpHz < table.xoverHz * 4)
+            }
+        }
+    }
+
+    @Test func aTableOfTheOlderShapeHasNoHighPass() throws {
+        let tables = try SpatialPreviewTables.decode(try tree { $0["roomHpHz"] = nil })
+        #expect(tables.table(for: .studio, sampleRate: 44_100)?.roomHpHz == 0)
+        #expect((tables.table(for: .studio, sampleRate: 48_000)?.roomHpHz ?? 0) > 0)
+    }
+
+    @Test func aBrokenRoomHighPassIsRefused() throws {
+        for bad: Any in [-1, 30_000, "250"] {
+            let data = try tree { $0["roomHpHz"] = bad }
+            #expect(throws: SpatialPreviewError.self) { try SpatialPreviewTables.decode(data) }
+        }
+    }
+}
