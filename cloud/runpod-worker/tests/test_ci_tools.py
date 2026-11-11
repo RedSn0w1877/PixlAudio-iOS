@@ -140,6 +140,87 @@ def test_fixture_drift(tmp_path):
     assert len(check_fixtures.drift(examples, copies)) == 2
 
 
+def test_spatial_table_copies_must_be_byte_identical(tmp_path):
+    originals, resources, tests = tmp_path / "spatial", tmp_path / "App" / "Resources", tmp_path / "Tests"
+    originals.mkdir()
+    table, golden = b'{"schema":"pixl.spatial.preview","v":1}\n', b'{"frames":1024}\n'
+    (originals / "spatial_preview_v1.json").write_bytes(table)
+    (originals / "spatial_preview_golden_v1.json").write_bytes(golden)
+    args = (originals, resources, tests, tmp_path)
+    assert check_fixtures.spatial_copies(originals, resources, tests) == []  # the app has no copy yet: fine
+    assert check_fixtures.spatial_drift(*args) == []
+
+    (resources / "Audio").mkdir(parents=True)
+    asset = resources / "Audio" / "spatial_preview_v1.json"  # anywhere under App/Resources
+    asset.write_bytes(table)
+    fixtures = tests / "PixlAudioTests" / "Fixtures" / "spatial"  # any Fixtures folder of any test target
+    fixtures.mkdir(parents=True)
+    (fixtures / "spatial_preview_v1.json").write_bytes(table)
+    (fixtures / "spatial_preview_golden_v1.json").write_bytes(golden)
+    (tests / "PixlAudioTests" / "spatial_preview_v1.json").write_bytes(b"not a fixture: not looked at")
+    (fixtures / "other.json").write_bytes(b"{}")
+    copies = check_fixtures.spatial_copies(originals, resources, tests)
+    assert len(copies) == 3 and {c.name for _, c in copies} == {"spatial_preview_v1.json",
+                                                                 "spatial_preview_golden_v1.json"}
+    assert check_fixtures.spatial_drift(*args) == []
+
+    asset.write_bytes(table.replace(b"\n", b"\r\n"))  # one line ending is drift
+    (fixtures / "spatial_preview_golden_v1.json").write_bytes(b'{"frames": 1024}\n')  # so is one space
+    problems = check_fixtures.spatial_drift(*args)
+    assert len(problems) == 2
+    assert any(p.startswith("App/Resources/Audio/spatial_preview_v1.json: differs from "
+                            "cloud/runpod-worker/schema/v1/spatial/spatial_preview_v1.json") for p in problems)
+    assert any(p.startswith("Tests/PixlAudioTests/Fixtures/spatial/spatial_preview_golden_v1.json: differs")
+               for p in problems)
+
+
+def test_the_repositorys_own_copies_are_in_step(capsys):
+    assert check_fixtures.main() == 0  # whatever copies this checkout has (none inside the test image) match
+    assert "0 drifted file(s)" in capsys.readouterr().out
+    originals = sorted(p.name for p in check_fixtures.SPATIAL.glob("*.json"))
+    assert originals == ["spatial_preview_golden_v1.json", "spatial_preview_v1.json"]
+    for path in check_fixtures.SPATIAL.glob("*.json"):  # written with LF and one trailing newline, on any machine
+        raw = path.read_bytes()
+        assert b"\r" not in raw and raw.endswith(b"\n") and not raw.endswith(b"\n\n"), path.name
+
+
+def test_notice_lists_what_1_1_0_added_and_the_image_ships_the_texts():
+    notice = (ROOT / "NOTICE").read_text(encoding="utf-8")
+    assert "htdemucs_6s" in notice and "5c90dfd2-34c22ccb.th" in notice and "LICENSES/MIT-demucs.txt" in notice
+    assert "SADIE II Database" in notice and "https://zenodo.org/records/12092466" in notice
+    assert "LICENSES/SADIE-II.txt" in notice and "Apache-2.0" in notice and "This file is not the original" in notice
+    sadie = (ROOT / "LICENSES" / "SADIE-II.txt").read_text(encoding="utf-8")
+    assert "University of York" in sadie and "section 4(b)" in sadie and "hrir_ku100.npz" in sadie
+    assert (ROOT / "LICENSES" / "Apache-2.0.txt").is_file() and (ROOT / "LICENSES" / "MIT-demucs.txt").is_file()
+    assert (ROOT / "src" / "pixl_worker" / "spatial" / "data" / "hrir_ku100.npz").is_file()
+    assert "COPY --link LICENSES/ /opt/pixl/LICENSES/" in DOCKERFILE and "COPY --link NOTICE weights.lock" in DOCKERFILE
+    assert "COPY --link src/ /opt/pixl/src/" in DOCKERFILE  # the head model data rides in the package
+
+
+def test_the_new_contract_files_keep_to_the_feature_names():
+    # Owner rule for everything about this feature that a person may read (cloud-audio-spec.md, section 1): the
+    # feature is "Spatial audio", a handful of words are never used for it, and Enhanced audio (cut on 2026-11-11)
+    # is not mentioned at all.
+    ruled_out = ("lossless", "hi-res", "hires", "dolby", "atmos", "360 reality", "claude", "anthropic",
+                 "binilyrics", "enhanced audio")
+    files = [ROOT / "schema" / "v1" / name for name in ("job.input.schema.json", "job.result.schema.json",
+                                                         "library.render.schema.json", "selftest.result.schema.json")]
+    files += sorted((ROOT / "schema" / "v1" / "examples").glob("*spatial*.json"))
+    files += sorted((ROOT / "schema" / "v1" / "examples").glob("library.render*.json"))
+    files += [ROOT / "LICENSES" / "SADIE-II.txt", ROOT / "NOTICE", ROOT / "README.md",
+              ROOT / "deploy" / "library_janitor.py"]
+    files += [ROOT / "src" / "pixl_worker" / name for name in ("library.py", "pipeline.py", "separate.py", "schema.py",
+                                                               "selftest.py", "smoke.py", "handler.py")]
+    assert len(files) >= 20
+    assert not (ROOT / "src" / "pixl_worker" / "restore.py").exists()
+    assert sorted(p.name for p in (ROOT / "schema" / "v1" / "examples").glob("library.render*.json")) == [
+        "library.render.spatial.json"]
+    for path in files:
+        text = path.read_text(encoding="utf-8").lower()
+        for word in ruled_out:
+            assert word not in text, (path.name, word)
+
+
 def test_lock_drops_what_the_base_image_provides():
     text = ("absl-py==2.5.0 \\\n    --hash=sha256:aa\n"
             "torch==2.11.0 \\\n    --hash=sha256:bb \\\n    --hash=sha256:cc\n"

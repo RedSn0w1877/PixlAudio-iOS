@@ -23,15 +23,17 @@
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "items": {"enum": ["instrumental", "vocals", "stems4", "lyrics"]}
+      "items": {"enum": ["instrumental", "vocals", "stems4", "lyrics", "spatial"]},
+      "description": "spatial (worker 1.1.0) writes into the shared library and needs the `library` object; it may be combined with the older tasks in one job and is independent of them. An older worker refuses it with BAD_SCHEMA."
     },
     "separation": {
       "type": "object",
       "properties": {
-        "quality": {"enum": ["standard", "best"], "default": "standard"}
+        "quality": {"enum": ["standard", "best"], "default": "standard", "description": "Also applies to the six-stem separation behind the spatial task (best = more overlap, limited to the same 8 minutes)."}
       }
     },
     "lyrics": {"$ref": "#/$defs/lyrics"},
+    "library": {"description": "Required, and read, only when tasks has spatial: see #/$defs/library. Ignored otherwise, whatever it holds."},
     "output": {"$ref": "#/$defs/output"},
     "guard": {"$ref": "#/$defs/guard"},
     "bench": {"$ref": "#/$defs/bench"},
@@ -58,6 +60,16 @@
     {
       "if": {"properties": {"tasks": {"contains": {"const": "lyrics"}}}, "required": ["tasks"]},
       "then": {"required": ["lyrics"]}
+    },
+    {
+      "if": {"properties": {"tasks": {"contains": {"const": "spatial"}}}, "required": ["tasks"]},
+      "then": {
+        "required": ["library"],
+        "properties": {
+          "library": {"$ref": "#/$defs/library"},
+          "storage": {"const": "presigned", "description": "The shared library is in R2: the volume fallback has none."}
+        }
+      }
     }
   ],
   "$defs": {
@@ -113,14 +125,53 @@
         "lines": {"type": "array", "maxItems": 500, "items": {"$ref": "#/$defs/lyricsLine"}, "description": "Caps (worker env): 500 lines, 20,000 characters in total."}
       }
     },
+    "profile": {
+      "enum": ["studio", "wide", "intimate", "hall", "surround", "night"],
+      "description": "A Spatial audio profile id (pixl_worker.spatial.PROFILE_IDS)."
+    },
+    "libraryRender": {
+      "type": "object",
+      "description": "One render to make: a profile and the presigned URLs of its two objects, lib/v<v>/<videoId>/sp-<profile>.flac and lib/v<v>/<videoId>/sp-<profile>.json. The worker refuses (BAD_URL) any URL whose path does not end in exactly that key: it can only write this video's own renders.",
+      "required": ["profile", "audioPut", "manifestPut"],
+      "properties": {
+        "profile": {"$ref": "#/$defs/profile"},
+        "audioPut": {"$ref": "#/$defs/presignedUrl", "description": "PUT of the .flac."},
+        "manifestPut": {"$ref": "#/$defs/presignedUrl", "description": "PUT of the .json, written last: its presence means the render is complete."},
+        "manifestGet": {"$ref": "#/$defs/presignedUrl", "description": "Optional GET of the same .json. With it the worker skips a render that is already in the library (state exists); without it the render is always made."}
+      }
+    },
+    "library": {
+      "type": "object",
+      "description": "The shared library of finished renders, keyed by the YouTube video (docs/handoff/2026-11-10-plans/cloud-audio-spec.md, sections 3 and 4).",
+      "required": ["v", "videoId", "renders"],
+      "properties": {
+        "v": {"const": 1, "description": "The library version, LIB_V in src/pixl_worker/library.py. Any other value: UNSUPPORTED_VERSION."},
+        "videoId": {"type": "string", "pattern": "^[A-Za-z0-9_-]{11}$", "description": "The matched YouTube video id. Never the Spotify id."},
+        "source": {
+          "type": "object",
+          "description": "Optional, and only recorded in the render manifests: the stream the phone played.",
+          "properties": {
+            "itag": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+            "codec": {"type": "string", "maxLength": 16}
+          }
+        },
+        "renders": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": {"$ref": "#/$defs/libraryRender"},
+          "description": "One entry per profile to render; a profile may appear only once (the worker checks)."
+        }
+      }
+    },
     "output": {
       "type": "object",
       "properties": {
-        "codec": {"enum": ["aac", "flac"], "default": "aac", "description": "aac keeps the input's sample rate only up to 96 kHz (the encoder's rates): a stem job with aac output and a 176.4/192 kHz input fails UNSUPPORTED_FORMAT before separating, so ask for flac for those."},
+        "codec": {"enum": ["aac", "flac"], "default": "aac", "description": "Does not apply to library files (always FLAC 16-bit). aac keeps the input's sample rate only up to 96 kHz (the encoder's rates): a stem job with aac output and a 176.4/192 kHz input fails UNSUPPORTED_FORMAT before separating, so ask for flac for those."},
         "kbps": {"type": "integer", "minimum": 128, "maximum": 256, "default": 256},
         "put": {
           "type": "object",
-          "description": "One presigned PUT per output object. The worker refuses (BAD_URL) any URL whose path does not end in the object it expects: out/<jobKey>/<slot>.m4a for aac or out/<jobKey>/<slot>.flac for flac (slots instrumental, vocals, drums, bass, other), out/<jobKey>/lyrics.json and out/<jobKey>/manifest.json. Every requested task needs its slot (stems4 needs drums, bass and other); manifest is always required and is written last.",
+          "description": "One presigned PUT per output object. The worker refuses (BAD_URL) any URL whose path does not end in the object it expects: out/<jobKey>/<slot>.m4a for aac or out/<jobKey>/<slot>.flac for flac (slots instrumental, vocals, drums, bass, other), out/<jobKey>/lyrics.json and out/<jobKey>/manifest.json. Every requested task needs its slot (stems4 needs drums, bass and other; spatial needs none here, its URLs are in `library`); manifest is always required and is written last.",
           "properties": {
             "instrumental": {"$ref": "#/$defs/presignedUrl"},
             "vocals": {"$ref": "#/$defs/presignedUrl"},
@@ -151,7 +202,7 @@
         "stages": {
           "type": "array",
           "uniqueItems": true,
-          "items": {"enum": ["decode", "separate", "stems4", "align", "transcribe", "encode"]}
+          "items": {"enum": ["decode", "separate", "stems4", "stems6", "render", "align", "transcribe", "encode"]}
         },
         "crash": {"type": "boolean", "default": false, "description": "Test builds only (PIXL_ALLOW_CRASH_TEST=1): kills the process to measure RunPod re-delivery."}
       }

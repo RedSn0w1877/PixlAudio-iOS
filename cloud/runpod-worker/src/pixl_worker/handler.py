@@ -1,7 +1,8 @@
 """RunPod Serverless entry point: `python -u -m pixl_worker.handler`.
 
 At start the process loads the separator once (its load is billed once per process, then FlashBoot keeps the
-worker warm); Qwen3-ForcedAligner, Qwen3-ASR and htdemucs_ft load lazily on first use. The apps stopped asking
+worker warm); Qwen3-ForcedAligner, Qwen3-ASR, htdemucs_ft and htdemucs_6s load lazily on first use (the last two
+are what a spatial render needs on top of the separator). The apps stopped asking
 for lyrics on 2026-10-23, so a cold start no longer pays for the aligner; a lyrics job (an older app, a job queued
 before then) still works and loads it then. Each job is validated
 (schema v1 + server caps) and dispatched to pipeline.process, selftest or bench. Nothing here ever logs or
@@ -30,7 +31,7 @@ from . import WORKER_VERSION  # noqa: E402
 from . import pipeline  # noqa: E402
 from . import selftest as st  # noqa: E402
 from .config import Caps, load_caps  # noqa: E402
-from .deadline import job_deadline  # noqa: E402
+from .deadline import job_deadline, time_limit_s  # noqa: E402
 from .errors import INTERNAL, WorkerError  # noqa: E402
 from .log import log, redact, redact_exception  # noqa: E402
 from .schema import validate_job  # noqa: E402
@@ -91,10 +92,12 @@ class Worker:
             if spec.op == "bench":
                 return st.bench(spec.bench, caps=self.caps, worker=self.worker_info,
                                 separator=self.models.separator, stems4=self.models.stems4,
+                                stems6=self.models.stems6,
                                 transcriber_factory=self.models.transcriber_factory,
                                 cold_start_ms=self._take_cold_start(),
                                 progress=lambda message: self.progress(job, message))
-            deadline = job_deadline(self.caps.execution_timeout_s, self.caps.deadline_margin_s, job.get("policy"))
+            limit_s = time_limit_s(self.caps.execution_timeout_s, library_job=spec.library is not None)
+            deadline = job_deadline(limit_s, self.caps.deadline_margin_s, job.get("policy"))
             ctx = pipeline.Context(caps=self.caps, worker=self.worker_info, storage_factory=self.storage_factory,
                                    progress=lambda message: self.progress(job, message),
                                    cold_start_ms=self._take_cold_start())
@@ -207,23 +210,32 @@ class _LazyAligner:
 def load_models() -> tuple[pipeline.Models, Callable[[], dict]]:
     from .lyrics.languages import register_backend
     from .lyrics.transcribe import MODEL_ID as ASR_ID
-    from .separate import SEPARATOR_ID, STEMS4_ID, RoformerSeparator, Stems4
+    from .separate import SEPARATOR_ID, SIX_ID, STEMS4_ID, GuitarPiano, RoformerSeparator, Stems4, Stems6
 
     separator = RoformerSeparator(SEP_CONFIG, SEP_CKPT)
     aligner = _LazyAligner(ALIGNER_DIR)
     register_backend(aligner)
     stems4 = Stems4(DEMUCS_DIR)
     transcriber = _LazyTranscriber(ASR_DIR) if os.path.isdir(ASR_DIR) else None
+    # The six-stem separator behind the spatial renders (separate.Stems6 says what it must do). The next line is
+    # the one place it is built: a different separator is constructed there instead and nothing else here changes
+    # (the spatial roadmap's "Where your own separator plugs in"). Nothing is loaded for it now: a worker that only
+    # ever makes instrumentals pays nothing.
+    stems6 = Stems6(separator, stems4, GuitarPiano(DEMUCS_DIR))
     models = pipeline.Models(separator=separator, stems4=stems4 if stems4.available() else None,
-                             transcriber_factory=transcriber)
+                             transcriber_factory=transcriber, stems6=stems6 if stems6.available() else None)
 
     def state() -> dict:
-        return {
+        out = {
             SEPARATOR_ID: True,
             aligner.model_id: True if aligner.loaded else "lazy",
             ASR_ID: (True if transcriber.loaded else "lazy") if transcriber else False,
             STEMS4_ID: (True if stems4.loaded else "lazy") if stems4.available() else False,
         }
+        six = getattr(stems6, "six", None)  # the cascade's htdemucs_6s; a replacement has its own weights
+        if six is not None:
+            out[SIX_ID] = (True if six.loaded else "lazy") if six.available() else False
+        return out
     return models, state
 
 

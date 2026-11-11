@@ -6,7 +6,11 @@ runner; `op: bench` on RunPod covers it):
 
 - BS-RoFormer (anvuew ft1) through msst: the vocals come back with the input's length and rate;
 - Qwen3-ForcedAligner: one English window aligns to monotonic tokens that map back onto the text;
-- htdemucs_ft from the local repo: drums, bass and other come back with the input's length.
+- htdemucs_ft from the local repo: drums, bass and other come back with the input's length;
+- the six-stem cascade (Stems6: those two models plus htdemucs_6s from the same repo): six stems of the input's
+  length, progress from start to end;
+- one spatial profile rendered from those stems (NumPy and the head model in the package) and packed by the
+  library's FLAC encoder: the level, the true peak and the frame count the manifest promises.
 
 This is what proves, before anything is deployed, that the pinned torch / msst / qwen-asr / transformers /
 demucs versions and the pinned weights work together (design risk R1). Exit status 0 means every check passed.
@@ -38,7 +42,7 @@ def smoke(models_dir: str, seconds: float = 4.0) -> bool:
     from .lyrics.languages import AlignRequest
     from .lyrics.postprocess import map_tokens
     from .selftest import synthetic_song
-    from .separate import RoformerSeparator, Stems4
+    from .separate import GuitarPiano, RoformerSeparator, Stems4, Stems6
     from . import audio as A
 
     sr = 44100
@@ -87,6 +91,7 @@ def smoke(models_dir: str, seconds: float = 4.0) -> bool:
     except Exception as exc:
         results.append(_line("aligner", False, error=f"{type(exc).__name__}: {str(exc)[:300]}"))
 
+    stems4 = None
     try:
         stems4 = Stems4(os.path.join(models_dir, "demucs"))
         if not stems4.available():
@@ -106,6 +111,66 @@ def smoke(models_dir: str, seconds: float = 4.0) -> bool:
                              progressCalls=len(calls), progressTotal=sorted(totals), progressLast=dones[-1:]))
     except Exception as exc:
         results.append(_line("stems4", False, error=f"{type(exc).__name__}: {str(exc)[:300]}"))
+
+    # The spatial path (worker 1.1.0). First the six-stem cascade: the separator's vocals handed in (as a job that
+    # also makes an instrumental hands them over), htdemucs_ft on the rest, then htdemucs_6s from the local repo
+    # on its "other" stem. Six stems of the input's length must come back and progress must run from 0 to its end.
+    clip = mix[: int(3.0 * sr)]
+    stems: dict = {}
+    try:
+        six = GuitarPiano(os.path.join(models_dir, "demucs"))
+        if not six.available():
+            raise RuntimeError("htdemucs_6s weights or its bag file are missing")
+        if vocals is None or stems4 is None or not stems4.available():
+            raise RuntimeError("the cascade needs the separator and htdemucs_ft, and one of them failed above")
+        cascade = Stems6(sep, stems4, six)
+        calls = []
+        t0 = time.monotonic()
+        stems = cascade.stems(clip, sr, quality="standard", vocals=vocals[: clip.shape[0]],
+                              progress=lambda done, total: calls.append((done, total)))
+        names_ok = sorted(stems) == ["bass", "drums", "guitar", "other", "piano", "vocals"]
+        shapes_ok = all(v.shape == clip.shape and v.dtype == np.float32 and bool(np.isfinite(v).all())
+                        for v in stems.values())
+        dones = [d for d, _ in calls]
+        progress_ok = bool(calls) and dones[0] == 0 and dones[-1] == calls[-1][1] and dones == sorted(dones)
+        leftover = clip - sum(stems.values())
+        mix_power = float(np.mean(clip.astype(np.float64) ** 2))
+        leftover_db = 10.0 * np.log10(max(float(np.mean(leftover.astype(np.float64) ** 2)), 1e-20)
+                                      / max(mix_power, 1e-20))
+        results.append(_line("stems6", names_ok and shapes_ok and progress_ok and six.loaded,
+                             runMs=int((time.monotonic() - t0) * 1000), stems=sorted(stems),
+                             progressCalls=len(calls), leftoverDb=round(leftover_db, 1)))
+    except Exception as exc:
+        stems = {}
+        results.append(_line("stems6", False, error=f"{type(exc).__name__}: {str(exc)[:300]}"))
+
+    # Then one profile through the renderer (NumPy, the committed head model) from those stems, and the library's
+    # FLAC encoder (ffmpeg): the file a phone would download. A synthetic clip is not music, so whether the
+    # renderer trusts its stems (stems6) or falls back to the mix is reported, not required.
+    try:
+        import tempfile
+
+        from . import library as L
+        from .spatial import CEILING_DB, HEADROOM_DB
+
+        t0 = time.monotonic()
+        result = L.render(clip, stems, sr, ["studio"])["studio"]
+        run_ms = int((time.monotonic() - t0) * 1000)
+        level_ok = abs(result.source_lufs - HEADROOM_DB - result.integrated_lufs) <= 0.5
+        ok = (result.audio.shape == clip.shape and bool(np.isfinite(result.audio).all()) and level_ok
+              and result.true_peak_db <= CEILING_DB + 0.1 and result.stem_mode in ("stems6", "stems4", "mix"))
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "sp-studio.flac")
+            L.encode_flac16(result.audio, sr, path)
+            with open(path, "rb") as fh:
+                head = fh.read(4)
+            flac_bytes = os.path.getsize(path)
+        results.append(_line("render", ok and head == b"fLaC" and flac_bytes > 1000, runMs=run_ms,
+                             stemMode=result.stem_mode, lufs=round(result.integrated_lufs, 2),
+                             sourceLufs=round(result.source_lufs, 2), truePeakDb=round(result.true_peak_db, 2),
+                             flacBytes=flac_bytes))
+    except Exception as exc:
+        results.append(_line("render", False, error=f"{type(exc).__name__}: {str(exc)[:300]}"))
 
     passed = all(r["ok"] for r in results)
     _line("summary", passed, checks=len(results), frames=frames)

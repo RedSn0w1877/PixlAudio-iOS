@@ -1,0 +1,63 @@
+{
+  "schema": "pixl.cloudstudio.result",
+  "v": 1,
+  "jobKey": "3d9f0c52-7a41-4e8b-b6f3-91c2d5e7a804",
+  "status": "ok",
+  "error": null,
+  "warnings": [],
+  "worker": {
+    "version": "1.1.0",
+    "gitSha": "abcdef012345",
+    "gpu": "NVIDIA RTX A4500",
+    "vramGB": 20.0,
+    "cuda": "12.8"
+  },
+  "models": {
+    "separator": "anvuew-bs-roformer-ft1",
+    "stems4": null,
+    "aligner": null,
+    "asr": null,
+    "stems6": "open-cascade-6"
+  },
+  "input": {
+    "codec": "flac",
+    "sampleRate": 48000,
+    "channels": 2,
+    "decodedSamples": 9696000,
+    "durationMs": 202000,
+    "sha256": "f2218379956ab8d0d22bfd05d9c0b60a7f461aada888aa86f614e0db77724372"
+  },
+  "outputs": {
+    "sp-studio": {
+      "key": "lib/v1/J7p4bzqLvCw/sp-studio.flac",
+      "bytes": 27100200,
+      "sha256": "fb8cabcce83ea77ea9fa485fc745368fe10aba1f241cd77cd39ac394c602f333",
+      "codec": "flac",
+      "kbps": null,
+      "sampleRate": 48000,
+      "samples": 9696000
+    }
+  },
+  "lyrics": null,
+  "library": {
+    "videoId": "J7p4bzqLvCw",
+    "libV": 1,
+    "renders": {
+      "studio": "ok"
+    },
+    "stemMode": "stems6"
+  },
+  "timings": {
+    "coldStartMs": 14200,
+    "downloadMs": 1100,
+    "decodeMs": 900,
+    "separateMs": 0,
+    "stemsMs": 0,
+    "lyricsMs": 0,
+    "stems6Ms": 41800,
+    "renderMs": 23600,
+    "encodeMs": 2900,
+    "uploadMs": 2100,
+    "totalMs": 73400
+  }
+}

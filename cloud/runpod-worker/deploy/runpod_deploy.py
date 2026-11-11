@@ -48,6 +48,8 @@ TAG_RE = re.compile(r"^sha-[0-9a-f]{12}$")
 ACCOUNT_RE = re.compile(r"^[0-9a-f]{32}$")
 POOL_RE = re.compile(r"^[A-Z][A-Z0-9_]{1,40}$")
 HERE = Path(__file__).resolve().parent
+# The worker's bench stages (src/pixl_worker/schema.py BENCH_STAGES; a test keeps the two lists the same).
+BENCH_STAGES = ("decode", "separate", "stems4", "stems6", "render", "align", "transcribe", "encode")
 
 
 class DeployError(Exception):
@@ -172,6 +174,10 @@ def report_selftest(output: dict) -> None:
     say("models: " + ", ".join(f"{k}={'loaded' if v is True else v}" for k, v in sorted(models.items())))
     say(f"caps: input <= {caps.get('maxInputMB')} MB, audio <= {caps.get('maxAudioS')} s, "
         f"storage hosts configured: {caps.get('hostsConfigured')}")
+    library, host = output.get("library") or {}, output.get("host") or {}
+    if library or host:  # worker 1.1.0 and later
+        say(f"library: v{library.get('libV')}, {len(library.get('profiles') or [])} profiles; "
+            f"host: {host.get('cpus')} CPUs, memory limit {host.get('ramLimitMB')} MB")
     if caps and not caps.get("hostsConfigured"):
         raise DeployError("the worker's storage allowlist is empty: every presigned job would fail BAD_URL")
 
@@ -185,10 +191,21 @@ def bench(api: RunPod, endpoint_id: str, *, sleep: Callable[[float], None] = tim
         raise DeployError(f"bench {reply.get('status')} ({_error_code(reply)})")
     out = reply.get("output") or {}
     stages = out.get("stagesMs") or {}
-    say("bench (240 s synthetic song): " + ", ".join(f"{k} {round(v / 1000, 1)} s" for k, v in stages.items()
-                                                    if k.isalpha() and isinstance(v, (int, float))))
+    # Only the stages: the other keys in stagesMs (decodedFrames, alignWindows, ...) are counts, not times.
+    say("bench (240 s synthetic song): " + ", ".join(
+        f"{k} {round(v / 1000, 1)} s" for k, v in stages.items()
+        if k in BENCH_STAGES and isinstance(v, (int, float))))
     say(f"bench: lazy loads {out.get('lazyLoadMs')}, peak VRAM {out.get('vramPeakMB')} MB on "
         f"{(out.get('worker') or {}).get('gpu')}")
+    if out.get("ramPeakByStageMB") or out.get("ramLimitMB"):
+        # The spatial renderer runs on the CPU and needs room: this is what the 6 GB question is answered with.
+        by_stage = out.get("ramPeakByStageMB") or {}
+        say("bench: process memory peak " + ", ".join(f"{k} {int(v)} MB" for k, v in by_stage.items()
+                                                      if isinstance(v, (int, float)))
+            + f" (overall {out.get('ramPeakMB')} MB; the container may use {out.get('ramLimitMB')} MB)")
+    for note in out.get("notes") or []:
+        if isinstance(note, str) and note.startswith(("render:", "stems6:")):
+            say("bench: " + re.sub(r"[^A-Za-z0-9 .,:;()_-]", "", note)[:160])
     return out
 
 

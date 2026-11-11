@@ -1,0 +1,75 @@
+{
+  "schema": "pixl.cloudstudio.result",
+  "v": 1,
+  "jobKey": "a81c7e30-5f2d-4b96-8e14-c07d3a9b62f5",
+  "status": "partial",
+  "error": null,
+  "warnings": [
+    "library: sp-hall failed (UPLOAD_FAILED)"
+  ],
+  "worker": {
+    "version": "1.1.0",
+    "gitSha": "abcdef012345",
+    "gpu": "NVIDIA RTX A4500",
+    "vramGB": 20.0,
+    "cuda": "12.8"
+  },
+  "models": {
+    "separator": "anvuew-bs-roformer-ft1",
+    "stems4": null,
+    "aligner": null,
+    "asr": null,
+    "stems6": "open-cascade-6"
+  },
+  "input": {
+    "codec": "aac",
+    "sampleRate": 44100,
+    "channels": 2,
+    "decodedSamples": 8559810,
+    "durationMs": 194100,
+    "sha256": "f1db327b6614305f29b3a172cacc553aaa97034d1f069e9328b33a437e4d60be"
+  },
+  "outputs": {
+    "instrumental": {
+      "key": "out/a81c7e30-5f2d-4b96-8e14-c07d3a9b62f5/instrumental.m4a",
+      "bytes": 6289120,
+      "sha256": "7156731de23414dfd1fff0be5f84da962b7695b604db3ed6565136035b4a123d",
+      "codec": "aac",
+      "kbps": 256,
+      "sampleRate": 44100,
+      "samples": 8559810
+    },
+    "sp-night": {
+      "key": "lib/v1/ZD6rXLXZOEI/sp-night.flac",
+      "bytes": 20511744,
+      "sha256": "0015b6d0093e172d540b2992a342d19548dc0b547c8b0bfbaa448caf598e1ae6",
+      "codec": "flac",
+      "kbps": null,
+      "sampleRate": 44100,
+      "samples": 8559810
+    }
+  },
+  "lyrics": null,
+  "library": {
+    "videoId": "ZD6rXLXZOEI",
+    "libV": 1,
+    "renders": {
+      "night": "ok",
+      "hall": "failed"
+    },
+    "stemMode": "stems6"
+  },
+  "timings": {
+    "coldStartMs": 0,
+    "downloadMs": 700,
+    "decodeMs": 800,
+    "separateMs": 30100,
+    "stemsMs": 0,
+    "lyricsMs": 0,
+    "stems6Ms": 14900,
+    "renderMs": 39800,
+    "encodeMs": 6100,
+    "uploadMs": 3900,
+    "totalMs": 97300
+  }
+}
