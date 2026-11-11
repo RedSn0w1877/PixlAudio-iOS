@@ -279,6 +279,41 @@ def test_unknown_profiles_and_rates_are_refused(band):
     assert render_profiles(mix[:4410], {}, 44100, []) == {}
 
 
+def test_the_committed_on_device_tables_are_what_the_generator_writes():
+    """schema/v1/spatial/ is generated from the profiles and the head model (`python -m pixl_worker.spatial.preview
+    --out schema/v1/spatial`) and copied into both apps. When a profile is retuned and the files are not written
+    again, the phones would keep playing the old stage while the cloud renders the new one: this is the alarm.
+    Compared as numbers (1e-5), not bytes, so another FFT library's last digit cannot set it off."""
+    import json
+    from pathlib import Path
+
+    from pixl_worker.spatial import preview
+
+    folder = Path(__file__).resolve().parents[1] / "schema" / "v1" / "spatial"
+    tables = preview.build_tables()
+    golden = preview.build_golden(tables)
+
+    def same(made, committed, path=""):
+        if isinstance(committed, dict):
+            assert isinstance(made, dict) and sorted(made) == sorted(committed), path
+            for key in committed:
+                same(made[key], committed[key], f"{path}.{key}")
+        elif isinstance(committed, list):
+            assert isinstance(made, list) and len(made) == len(committed), path
+            for k, (a, b) in enumerate(zip(made, committed)):
+                same(a, b, f"{path}[{k}]")
+        elif isinstance(committed, float) or isinstance(made, float):
+            assert abs(made - committed) <= 1e-5, (path, made, committed)
+        else:
+            assert made == committed, (path, made, committed)
+
+    for name, made in (("spatial_preview_v1.json", tables), ("spatial_preview_golden_v1.json", golden)):
+        same(made, json.loads((folder / name).read_text(encoding="utf-8")), name)
+    assert tables["schema"] == "pixl.spatial.preview" and tables["engine"] == ENGINE_ID
+    assert tables["headroomDb"] == HEADROOM_DB and list(tables["profiles"]) == list(PROFILE_IDS)
+    assert golden["tolerance"] == 1e-4 and golden["frames"] == 1024
+
+
 @pytest.mark.parametrize("frames", [1, 100, 4095, 4097, 44101])
 def test_very_short_and_odd_lengths(frames):
     x = (0.1 * np.random.default_rng(1).standard_normal((frames, 2))).astype(np.float32)
