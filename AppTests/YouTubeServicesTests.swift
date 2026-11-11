@@ -181,6 +181,15 @@ final class YouTubeServicesTests: XCTestCase {
         let m4aInfo = StreamFetcher.Info(contentLength: 4, contentType: "audio/mp4")
         XCTAssertEqual(m4aInfo.uniformTypeIdentifier, "com.apple.m4a-audio")
     }
+
+    func testOnlyIssuedSyntheticIdsSkipTheYouTubeFallback() {
+        let synthetic = SpotiFLACTrackRegistry.syntheticVideoId(forSpotifyId: "0DiWol3AO6WpXZgp0goxAV")
+        XCTAssertEqual(synthetic.count, 11)
+        XCTAssertTrue(CloudStreamSecurity.validateYouTubeVideoId(synthetic))
+        XCTAssertTrue(SpotiFLACTrackRegistry.isSyntheticVideoId(synthetic))
+        // About 1 in 64 real YouTube ids starts with "_": those keep their YouTube fallback.
+        XCTAssertFalse(SpotiFLACTrackRegistry.isSyntheticVideoId("_xkHoUnqZvM"))
+    }
 }
 
 /// Answers every request with a small script and counts the calls.

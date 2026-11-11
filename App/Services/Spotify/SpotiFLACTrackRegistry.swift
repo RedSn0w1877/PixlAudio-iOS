@@ -11,6 +11,8 @@ nonisolated final class SpotiFLACTrackRegistry: @unchecked Sendable {
     private let lock = NSLock()
     private var byVideoId: [String: SpotiFLACTrackQuery] = [:]
     private var bySpotifyId: [String: SpotiFLACTrackQuery] = [:]
+    /// Synthetic ids handed out by `syntheticVideoId(forSpotifyId:)` in this process.
+    private var syntheticIds: Set<String> = []
 
     init() {}
 
@@ -101,11 +103,19 @@ nonisolated final class SpotiFLACTrackRegistry: @unchecked Sendable {
         if suffix.count < 10 {
             suffix += String(repeating: "0", count: 10 - suffix.count)
         }
-        return "_" + suffix
+        let id = "_" + suffix
+        shared.lock.lock()
+        shared.syntheticIds.insert(id)
+        shared.lock.unlock()
+        return id
     }
 
-    /// True when `videoId` is a synthetic SpotiFLAC-only stream identifier rather than a real YouTube video ID.
+    /// True when `videoId` is a synthetic SpotiFLAC-only identifier this process handed out. Not a pattern check:
+    /// real YouTube ids start with `_` too (about 1 in 64), and taking one for synthetic would skip its YouTube
+    /// fallback whenever SpotiFLAC has no match.
     static func isSyntheticVideoId(_ videoId: String) -> Bool {
-        videoId.count == 11 && videoId.hasPrefix("_")
+        shared.lock.lock()
+        defer { shared.lock.unlock() }
+        return shared.syntheticIds.contains(videoId)
     }
 }
