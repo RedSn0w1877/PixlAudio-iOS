@@ -94,6 +94,14 @@ def manifest(run: _Run, ctx: Context, error: WorkerError | None = None) -> dict:
     }
 
 
+def library_sample_rate(sr: int) -> int:
+    """The rate a library-only job works at: an input above 48 kHz comes down to its base rate (88.2 / 176.4 kHz to
+    44.1 kHz, 96 / 192 kHz to 48 kHz); 48 kHz and below stay as they are."""
+    if sr <= 48000:
+        return sr
+    return 44100 if sr % 44100 == 0 else 48000
+
+
 def _encode_json(doc: dict) -> bytes:
     return (json.dumps(doc, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
 
@@ -484,8 +492,11 @@ class _LibraryStage:
         log.info("library_checked", exists=len(spec.renders) - len(pending), pending=len(pending))
         if not pending:
             return  # the job ends ok at once: no separation
-        source = {"itag": spec.source_itag, "codec": spec.source_codec, "sampleRate": sr,
-                  "decodedSamples": int(buffers.mix.shape[0]), "sha256": self.job.audio.sha256}
+        # The uploaded stream as it was, before any resampling to a library rate (run.input).
+        uploaded = self.run.input or {}
+        source = {"itag": spec.source_itag, "codec": spec.source_codec, "sampleRate": uploaded.get("sampleRate", sr),
+                  "decodedSamples": uploaded.get("decodedSamples", int(buffers.mix.shape[0])),
+                  "sha256": self.job.audio.sha256}
 
         # stems6 → render → encode and upload each render, its manifest last
         done, stems = self._guarded(pending, "stems6", lambda: self._stems6(buffers, sr, quality))
@@ -596,6 +607,14 @@ def _process(job: Job, run: _Run, models: Models, ctx: Context, deadline: Deadli
                  "durationMs": duration_ms, "sha256": job.audio.sha256}
     if abs(duration_ms - job.audio.duration_ms) > 2000:
         run.warnings.append(f"input: decoded {duration_ms / 1000:.1f} s, the app said {job.audio.duration_ms / 1000:.1f} s")
+    target_sr = library_sample_rate(sr) if job.library is not None and not job.wants_own_outputs() else sr
+    if target_sr != sr:
+        # SpotiFLAC's 24-bit files go up to 176.4 kHz. A library render is lined up by media time (spec 6.2 step 3),
+        # so its rate is free: one at the base rate is a quarter the size for every phone that downloads it, and the
+        # separators and the renderer work at 44.1 / 48 kHz anyway. run.input keeps what was uploaded.
+        with _Stage(run, "decodeMs", clock):
+            mix = A.resample(mix, sr, target_sr)
+        sr = target_sr
     try:
         os.remove(src)
     except OSError:

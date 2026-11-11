@@ -246,6 +246,27 @@ def test_a_song_at_another_sample_rate_keeps_its_rate_and_length(tmp_path):
     assert result["library"]["renders"] == {"hall": "ok"}
 
 
+@pytest.mark.parametrize("rate,base", [(88200, 44100), (96000, 48000), (176400, 44100), (192000, 48000)])
+def test_a_library_job_above_48k_renders_at_the_base_rate_and_names_the_upload(tmp_path, rate, base):
+    # SpotiFLAC's 24-bit files: the render comes down to 44.1 / 48 kHz, lined up by media time on the phone.
+    path = tmp_path / f"song{rate}.flac"
+    A.encode(synthetic_song(2, rate), rate, str(path), codec="flac", kbps=0)
+    data = path.read_bytes()
+    doc = job_doc(data, tasks=("spatial",), profiles=("hall",))
+    doc["audio"]["durationMs"] = 2000
+    result, storage, _ = run(doc, data, tmp_path)
+    assert result["status"] == "ok", result
+    manifest = lib_json(storage, "sp-hall")
+    assert manifest["audio"]["sampleRate"] == base and manifest["audio"]["samples"] == 2 * base
+    assert manifest["source"]["sampleRate"] == rate and manifest["source"]["decodedSamples"] == 2 * rate
+
+
+@pytest.mark.parametrize("rate,expected", [(8000, 8000), (44100, 44100), (48000, 48000), (88200, 44100),
+                                           (96000, 48000), (176400, 44100), (192000, 48000), (64000, 48000)])
+def test_the_library_rate(rate, expected):
+    assert pipeline.library_sample_rate(rate) == expected
+
+
 # ---- what is already in the library ------------------------------------------------------------------------
 
 def existing(slot, video=VIDEO):
