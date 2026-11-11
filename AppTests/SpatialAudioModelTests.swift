@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import PixlAudioCore
 import PixlModel
 import XCTest
@@ -58,6 +59,19 @@ private final class FakeSpatialPlayback: SpatialPlayback {
     }
 }
 
+/// The two facts the model follows in Cloud Studio's settings, observable as the real ones are.
+@MainActor
+@Observable
+private final class FakeCloudSwitches {
+    var builtInKeys: Bool
+    var studioOn: Bool
+
+    init(builtInKeys: Bool, studioOn: Bool) {
+        self.builtInKeys = builtInKeys
+        self.studioOn = studioOn
+    }
+}
+
 /// Spatial audio's model without a screen: the settings round trip, and the one piece of behaviour it owns, asking the
 /// library for the playing song's render when the player wants it.
 @MainActor
@@ -66,6 +80,7 @@ final class SpatialAudioModelTests: XCTestCase {
         let defaults: UserDefaults
         let library: FakeSpatialLibrary
         let playback: FakeSpatialPlayback
+        let switches: FakeCloudSwitches
         let model: SpatialAudioModel
         let song: Song
     }
@@ -79,17 +94,20 @@ final class SpatialAudioModelTests: XCTestCase {
         return defaults
     }
 
-    private func makeRig(builtInCloudKeys: Bool = true, defaults: UserDefaults? = nil, currentSongId: String? = "sp:1") -> Rig {
+    private func makeRig(builtInCloudKeys: Bool = true, cloudStudioOn: Bool = true, defaults: UserDefaults? = nil,
+                         currentSongId: String? = "sp:1") -> Rig {
         let defaults = defaults ?? makeDefaults()
         let library = FakeSpatialLibrary()
         let playback = FakeSpatialPlayback()
+        let switches = FakeCloudSwitches(builtInKeys: builtInCloudKeys, studioOn: cloudStudioOn)
         let song = Song(id: "sp:1", title: "Song", artist: "Artist", artistId: 1, album: "Album", albumId: 1, path: "",
                         contentUriString: "spotify://1", albumArtUriString: nil, duration: 202_000, mimeType: nil,
                         bitrate: nil, sampleRate: nil)
         let model = SpatialAudioModel(defaults: defaults, library: library, playback: playback,
                                       currentSong: { currentSongId == song.id ? song : nil },
-                                      builtInCloudKeys: { builtInCloudKeys })
-        return Rig(defaults: defaults, library: library, playback: playback, model: model, song: song)
+                                      builtInCloudKeys: { switches.builtInKeys },
+                                      cloudStudioEnabled: { switches.studioOn })
+        return Rig(defaults: defaults, library: library, playback: playback, switches: switches, model: model, song: song)
     }
 
     /// Waits (≤ 2 s) until `condition` holds; the model's work hops through a few tasks.
@@ -281,9 +299,56 @@ final class SpatialAudioModelTests: XCTestCase {
         rig.library.hub.send(.usageChanged(CloudAudioUsage(songsReady: 3, bytes: 80_000_000)))
         await eventually { rig.model.usage.songsReady == 3 }
         XCTAssertEqual(rig.model.libraryStatus, .processing)
+        // The render is coming down, then the try fails: each has its own line.
+        rig.library.hub.send(.statusChanged(key, .downloading))
+        await eventually { rig.model.status == .downloading }
+        XCTAssertEqual(rig.model.statusLine, .gettingCloudVersion)
         rig.library.hub.send(.statusChanged(key, .failed))
         await eventually { rig.model.status == .failed }
+        XCTAssertEqual(rig.model.statusLine, .renderFailed)
+        XCTAssertEqual(rig.model.statusLine.text, "The cloud version didn't work this time. Still playing on your phone.")
+    }
+
+    func testCloudRendersNeedBothSwitches() async {
+        // Cloud Studio's own switch is off: Spatial's switch alone is not enough.
+        let rig = makeRig(cloudStudioOn: false)
+        rig.library.requestAnswer = .none
+        rig.model.select(.profile(.studio))
+        XCTAssertTrue(rig.model.settings.cloud)
+        XCTAssertFalse(rig.model.isCloudStudioOn)
+        XCTAssertFalse(rig.model.cloudRendersOn)
+        rig.model.start()
+        await eventually { rig.playback.hub.subscriberCount == 1 }
+        rig.playback.move(to: playing(.studio))
+        await eventually { rig.model.snapshot.songId == "sp:1" }
         XCTAssertEqual(rig.model.statusLine, .onDeviceOnly)
+        // The library was asked and said no (deciding is its job, with both switches in hand).
+        await eventually { rig.library.requests.count == 1 }
+        XCTAssertEqual(rig.model.libraryStatus, .none)
+
+        // The master is switched on: the model sees it and asks again for the playing song.
+        rig.library.requestAnswer = .queued
+        rig.switches.studioOn = true
+        await eventually { rig.model.isCloudStudioOn }
+        XCTAssertTrue(rig.model.cloudRendersOn)
+        await eventually { rig.library.requests.count == 2 }
+        await eventually { rig.model.statusLine == .onDeviceForNow }
+
+        // Spatial's own switch off: on-device only again.
+        rig.model.setCloud(false)
+        XCTAssertFalse(rig.model.cloudRendersOn)
+        XCTAssertEqual(rig.model.statusLine, .onDeviceOnly)
+    }
+
+    func testTheDefaultOfTheCloudSwitchFollowsTheBuiltInKeys() async {
+        let rig = makeRig(builtInCloudKeys: true)
+        rig.model.start()
+        XCTAssertTrue(rig.model.settings.cloud)
+        // The built-in keys turn out not to open: the default flips, and both services hear of it.
+        rig.switches.builtInKeys = false
+        await eventually { !rig.model.hasBuiltInCloudKeys }
+        XCTAssertFalse(rig.model.settings.cloud)
+        await eventually { rig.library.applied.last?.cloud == false && rig.playback.applied.last?.cloud == false }
     }
 
     func testRemovingTheDownloadedRendersEmptiesTheCountAndAsksAgainForThePlayingSong() async {

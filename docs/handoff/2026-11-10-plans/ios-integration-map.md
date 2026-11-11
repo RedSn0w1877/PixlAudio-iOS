@@ -15,7 +15,7 @@ Contents: [1 What is already there](#1-what-is-already-there-the-contract-code) 
 [4 Source resolution](#4-source-resolution-video-ids-format-info) · [5 Gain](#5-gain-where-the-level-rule-lives) ·
 [6 Route](#6-route) · [7 Cloud Studio](#7-cloud-studio) · [8 Settings and UI](#8-settings-and-ui) ·
 [9 Opus](#9-opus) · [10 Tests and CI](#10-tests-and-ci) · [11 Who owns which file](#11-who-owns-which-file) ·
-[12 Where the spec and the code disagree](#12-where-the-spec-and-the-code-disagree)
+[12 What the spec settled](#12-where-the-spec-and-the-code-disagreed-and-how-it-was-settled)
 
 ---
 
@@ -30,10 +30,10 @@ ENGINE and CLOUD replace them.
 |---|---|
 | `Packages/PixlCore/Sources/PixlModel/CloudAudio/SpatialProfile.swift` | `SpatialProfile` (ids `studio wide intimate hall surround night`, `displayName`, `summary` = spec 6.5 one-liners), `SpatialSelection` (`.off` / `.profile(p)`, `storageValue`), `SpatialRouteMode`, `SpatialOutputKind`, `SpatialActivation.routePasses / isActive` (spec 6.3), `SpatialLevel.playbackGain(_:headroomDb:)` = `min(1, gain × 10^(dB/20))` |
 | `…/CloudAudio/CloudAudioSettings.swift` | `CloudAudioSettingsKey` (the spec 6.1 names, used verbatim as `UserDefaults` keys), `CloudAudioStoredSettings` (nil = never set), `CloudAudioSettings(stored:builtInCloudKeys:)` (defaults, ranges) |
-| `…/CloudAudio/Rendition.swift` | `RenditionKind` (`.spatial(profile)` / `.enhanced`, `slot` = `sp-<profile>` / `enhanced`), `RenditionKey(videoId:kind:)`, `RenditionStatus` (`none preview queued processing ready failed`), `RenditionRetry` (10 min, 1 h, 1 day) |
+| `…/CloudAudio/Rendition.swift` | `RenditionKind` (`.spatial(profile)` / `.enhanced`, `slot` = `sp-<profile>` / `enhanced`), `RenditionKey(videoId:kind:)`, `RenditionStatus` (the spec's `none preview queued processing ready failed`, plus `downloading`: section 12), `RenditionRetry` (10 min, 1 h, 1 day) |
 | `…/CloudAudio/CloudLibrary.swift` | `CloudLibrary.version` (1), `engineId`, `audioKey(_:)`, `manifestKey(_:)`, `parse(objectKey:)`, `isValidVideoId`; `CloudAudioLocalLayout` (`CloudAudio/<videoId>/<slot>.flac|.json`, `rendition(ofAudioFile:)`) |
 | `…/CloudAudio/CloudLibraryManifest.swift` | The render manifest (spec 3.1) as `Codable`, `check(for:)` (the acceptance rule), `audioMatches(bytes:sha256:)`, `headroomDb`, `stemMode`, `restoreReason` |
-| `…/CloudAudio/SpatialServices.swift` | The two seams: `SpatialLibrary` (CLOUD implements) and `SpatialPlayback` (ENGINE implements), `LocalRendition`, `RenditionRequest`, `CloudAudioUsage`, `SpatialLibraryEvent`, `SpatialPlaybackSnapshot`, `SpatialAudible`, `SpatialStatusLine` (the sheet's three sentences), `SpatialEventHub`, `NoopSpatialLibrary`, `NoopSpatialPlayback` |
+| `…/CloudAudio/SpatialServices.swift` | The two seams: `SpatialLibrary` (CLOUD implements) and `SpatialPlayback` (ENGINE implements), `LocalRendition`, `RenditionRequest`, `CloudAudioUsage`, `SpatialLibraryEvent`, `SpatialPlaybackSnapshot`, `SpatialAudible`, `SpatialStatusLine` (the sheet's line for every state) and `SpatialCopy` (its other fixed sentences), `SpatialEventHub`, `NoopSpatialLibrary`, `NoopSpatialPlayback` |
 | `Packages/PixlCore/Sources/PixlAudioCore/Spatial/SpatialPreviewTables.swift` | `SpatialPreviewTables.decode(_:)` for `spatial_preview_v1.json` (`table(for:sampleRate:)`, `headroomDb`, `ringCapacity` = 16384), `SpatialPreviewTable`, `SpatialSparseTap`, `SpatialPreviewGolden.decode(_:)` for the golden file. Decoding only |
 | Tests | `Tests/PixlModelTests/CloudAudioContractTests.swift` (fixtures in `Fixtures/cloud-audio/`), `Tests/PixlAudioCoreTests/SpatialPreviewTablesTests.swift` (fixtures in `Fixtures/spatial/`, read through `SpatialFixtures.tables()` / `.golden()`: ENGINE's stage test starts from those two calls) |
 
@@ -88,8 +88,9 @@ screens ──read/call──► SpatialAudioModel (env.spatial, @MainActor @Obs
   after the selection, the song or "Remove downloaded renders" changed things. So ENGINE's whole duty towards the
   cloud is to **publish truthful snapshots** (`songId`, `videoId`, `selection`, `output`, `routePasses`,
   `singInstrumentalOn`, `audible`).
-- CLOUD decides whether anything leaves the phone (`spatial.cloud`, network, caps). With the cloud off `request`
-  answers `.none`. CLOUD's background queue (spec 6.4) runs inside CLOUD and never goes through the model.
+- CLOUD decides whether anything leaves the phone: both switches (Cloud Studio's own, the master, read from
+  `context.cloud.settings.isEnabled`, and `spatial.cloud` from `apply`), the network, the caps. With either switch
+  off `request` answers `.none` and no lookup, download or job happens. CLOUD's background queue (spec 6.4) runs inside CLOUD and never goes through the model.
 - `RenditionStatus.preview` is never the library's answer: the model derives it (`RenditionStatus.shown`).
 
 ### 1.4 Rules for implementations (Swift 6 pitfalls already paid for here)
@@ -117,9 +118,10 @@ screens ──read/call──► SpatialAudioModel (env.spatial, @MainActor @Obs
 ### 1.5 What the screens get from `env.spatial`
 
 Read: `settings` (all eight), `selection`, `snapshot`, `status` (spec 6.1, for the playing song and selected
-profile), `statusLine` (`.onDeviceForNow` / `.cloudVersion` / `.headphonesOnly` carry the spec's sentences in
-`.text`; `.onDeviceOnly`, `.pausedForSing`, `.none` have none), `isActive`, `usage` (`songsReady`, `bytes`,
-`spentThisMonthMicroUSD`, `sentToday`), `isRemovingRenders`, `hasBuiltInCloudKeys`.
+profile), `statusLine` (its `.text` is the spec 6.5 sentence for every state: table in section 12), `isActive`,
+`usage` (`songsReady`, `bytes`, `spentThisMonthMicroUSD`, `sentToday`), `isRemovingRenders`,
+`hasBuiltInCloudKeys`, `isCloudStudioOn` (Cloud Studio's own switch, the master) and `cloudRendersOn` (both
+switches). The other fixed sentences are `SpatialCopy.levelNote`, `.enhancedSwitchTitle`, `.enhancedSwitchCaption`.
 
 Call: `select(_:)`, `setCloud(_:)`, `setPrepareAhead(_:)`, `setEnhancedEnabled(_:)`, `setRoute(_:)`,
 `setStorageMB(_:)`, `setMonthlyCapUSD(_:)` (nil = No limit), `setDailyAhead(_:)`, `refreshUsage()`,
@@ -511,7 +513,7 @@ headphones here. A car over Bluetooth is `.bluetoothA2DP` and passes: the phone 
 | Job record | PixlNet `CloudJobRecord.swift` (one `Codable` struct, stored as one JSON file by `CloudJobStore`, `App/Services/Cloud/CloudJobStore.swift`) | **new fields must be optional** (comment at 93-95: a non-optional new field makes every stored list unreadable) |
 | Priority lane | PixlNet `CloudPriorityLane.swift` | yes: spec 6.2 "A Sing job still has priority over library jobs" is its tiers (`tier(of:priorityKeys:)`, 47) |
 | Preparer | `CloudAudioPreparer.swift` | yes, see 7.2 |
-| Transfers (background `URLSession`) | `CloudTransfers.swift` (session id line 44; `upload` 112/118, `download` 144, staging 206-234) | yes, with one catch: `isSafeSlot` (247-251) allows only `a-z 0-9 _`, so the slot name `sp-studio` is refused. Use a transfer slot such as `sp_studio`, or widen the check |
+| Transfers (background `URLSession`) | `CloudTransfers.swift` (session id line 44; `upload` 112/118, `download` 144, staging 206-234) | yes, with one catch: `isSafeSlot` (247-251) allows only `a-z 0-9 _`, so the slot name `sp-studio` is refused. The spec (6.2 step 3) says to teach it `sp-<profile>` and `enhanced`: allow the hyphen there |
 | Background work | `CloudBackground.swift` (`BGAppRefresh` `…pixlaudio.refresh` line 23, `BGProcessing` `…cloud-processing` line 26, `registerProcessing(for:)` 68); planner PixlNet `CloudBackgroundPlanner.swift` | yes. Identifiers are already in `project.yml:95-100`: a new one means a `project.yml` change (7.6) |
 | Device conditions | `CloudDeviceConditions.swift` (`autoConditions()` 51: Wi-Fi, battery, heat, free space, Low Power Mode); PixlNet `CloudAutoConditions` (`CloudAutoBudget.swift:104`) | yes: this is spec 6.4's "Wi-Fi only, battery not low, never in Low Data Mode" |
 | Prepare ahead | `SingPrepareRunner.swift` (`evaluate()` 224-306); ranking PixlLibrary `SingPrepareRanker.rank(_:limit:)` (`Packages/PixlCore/Sources/PixlLibrary/SingPrepareRanker.swift:197`), inputs `SingPrepareInputs` (24) with an `excluded` set | the ranker yes (spec 6.4 "the same ranking"); the runner is Sing's: copy its shape, with `excluded` = songs that already have a local render of the selected profile |
@@ -545,7 +547,7 @@ let prepared = try await dependencies.preparer.prepare(source: source, jobKey: j
 - `CloudAudioPreparer.prepare` (`CloudAudioPreparer.swift:138-215`) decides copy / passthrough / decode in `route`
   (121-127). **Every streamed song is force-decoded** to 44.1 kHz stereo 16-bit FLAC (`sampleRate` 64,
   `decodeToLossless` 234). AAC passthrough only ever applied to local AAC files, which this Spotify-only app no
-  longer has. See 12.1.
+  longer has. The spec now says to keep exactly this (section 12, row 1).
 - The record then holds `inputExt`, `sha256`, `bytes`, `durationMs`, `decodedFrames`, `sampleRate`, `videoId`
   (1392-1404), and the upload goes out through a presigned PUT valid 24 h (`startUpload`, 1418-1442).
 - The import check compares the result's frame count with the phone's own decode (`samplesLineUp`, 2317;
@@ -608,7 +610,8 @@ In the app (`CloudStudio.swift`), a library job differs from an instrumental job
 
 - Consent: nothing is sent while `settings.isEnabled` is false (`CloudSettings.swift:77-83`; default on exactly
   when built-in keys are available, `CloudKeyChoice.defaultEnabled`). `spatial.cloud` has the same default but is a
-  separate switch. The spec does not say whether Cloud Studio's own switch also gates library jobs: see 12.4.
+  separate switch **under** it: Cloud Studio's switch is the master, and a library job, lookup or download needs
+  both on (spec 6.1 "Two switches").
 - Network: `networkAllowsUpload()` (845-853), `useCellular`; auto work is unmetered only (`autoMayUseNetwork`,
   753; `transfers.allowsCellular`, 1437).
 - Heavy work: `HeavyWorkGate`, `HeavyJobGovernor` (1315-1319); safe mode holds preparations back.
@@ -667,7 +670,11 @@ LRU by a stored access time.
   280-290. Spec 6.5 says "a **Sound** group": Settings › Playback already has one,
   `SettingsSubsection(title: L10n.settingsSectionSound)` (`Categories/PlaybackSettingsSection.swift:41-52`, today
   only "Streaming audio quality"). The Developer block of that page is `SettingsAdvancedSubsection`
-  (60-72): route mode, caps, storage budget and per-song diagnostics go there.
+  (60-72): route mode, caps, storage budget and per-song diagnostics go there. Enhanced audio's switch sits with
+  Spatial audio's rows this round (spec 6.5): title `SpatialCopy.enhancedSwitchTitle`, caption
+  `SpatialCopy.enhancedSwitchCaption`. When `env.spatial.settings.cloud` is on but `env.spatial.isCloudStudioOn` is
+  off, the cloud row should say where the master switch is (Settings › Sing › Cloud processing, route
+  `.cloudProcessing`).
 - Components (`Features/Settings/Components/SettingsRows.swift`): `SettingsSubsection` (57),
   `SettingsAdvancedSubsection` (83, drawn only in developer mode), `SettingsItemRow` (163, chevron row),
   `SwitchSettingRow` (210), `ThemeSelectorRow` (258, a value capsule opening `SettingsOptionSheet` 314: right for the
@@ -734,7 +741,7 @@ view of its own.
   Android strings (`tools/localization/android_strings_to_xcstrings.py`) and is not hand-edited: **nobody needs to
   touch it**.
 - The canonical English texts are in PixlModel so both apps and the tests agree: `SpatialProfile.displayName`,
-  `.summary`, `SpatialStatusLine.text`. Wrap them: `String(localized: "spatial_profile_hall_name", defaultValue:
+  `.summary`, `SpatialStatusLine.text`, `SpatialCopy`. Wrap them: `String(localized: "spatial_profile_hall_name", defaultValue:
   String.LocalizationValue(profile.displayName))`, or simply repeat the literal with the PixlModel test as the guard.
 - Never in a user-visible string, changelog or doc: *lossless*, *hi-res*, *Dolby*, *Atmos*, *360 Reality*, the
   cloud AI's model name or maker, the lyrics source's old name; and (CI-enforced, `ci/check-forbidden.sh` rule 5)
@@ -1015,37 +1022,58 @@ Two overlaps to watch, both about the in-song switch:
 
 ---
 
-## 12. Where the spec and the code disagree
+## 12. Where the spec and the code disagreed, and how it was settled
 
-Found while mapping. None is resolved here: the contract code takes no side unless it says so.
+The first version of this page listed eleven mismatches. The spec answered most of them the same day (commit
+`b8894a2` on `audio-hq`, merged into this branch); the contract code follows the answers. What each means for you:
 
-1. **"AAC-LC is passed through" (spec 6.2 step 3) is not what happens.** Every streamed song is force-decoded to
-   44.1 kHz stereo 16-bit FLAC before upload (`CloudStudio.swift:1373-1378`, `CloudAudioPreparer.swift:64`), and
-   every song in this app is streamed. So `library.source` should name the stream (`itag`, `codec`) while the upload
-   is FLAC, and a render comes back at 44.1 kHz even for a 48 kHz source (the spec's example manifest shows 48000).
-   Lining up by media time still works; frame counts are those of the 44.1 kHz decode.
-2. **The level rule is a no-op for streams** (section 5): there is no loudness normalisation for streamed songs, so
-   their gain is 1 and `min(1, 1 × 1.585)` is 1. Spatial therefore plays 4 dB under stereo for nearly every song,
-   which the spec allows ("without it, Spatial is up to 4 dB quieter") but may not be what was pictured.
-3. **The switch's fade is 300-700 ms, not about 250 ms** (section 3.3), and the "20 s left" rule does not exist yet.
-4. **Two consent switches.** Cloud Studio has "Process songs in the cloud" (`cloud_studio_enabled`); the spec adds
-   `spatial.cloud` with the same default. Whether turning Cloud Studio's switch off also stops library jobs is not
-   said. The contract passes `spatial.cloud` to the library and leaves the rule to CLOUD and the lead.
-5. **Sing's $3 cap with built-in keys** clamps every job's budget today (`CloudKeyChoice.effectiveMonthlyCap`):
-   library jobs need their own sum and cap (section 7.5), otherwise the first few renders of a month use up Sing's
-   budget and `cloudAudio.monthlyCapUSD` never applies.
-6. **`executionTimeout` is 900 s in every `/run` body** (`CloudTiming.executionTimeoutMs`); spec 5 raises the
-   endpoint to 1800 s. The request policy overrides the endpoint's, so it must be raised for library jobs.
-7. **Slot names with a hyphen** (`sp-studio`) are refused by the transfer layer (`CloudTransfers.isSafeSlot`).
-8. **Enhanced without Spatial.** Spec 6.2 only describes `enhance` riding on a `spatial` job; spec 6.1 says Enhanced
-   is asked for "when `spatial.cloud` is on". Whether a song gets an `enhance`-only job while Spatial is off is not
-   said. The contract allows a `RenditionRequest` of kind `.enhanced`; the model never sends one by itself
-   (`wantedRender` is spatial only).
-9. **Not in the spec, chosen here and to be confirmed (Android must match):** "No limit" is stored as `-1` under
-   `cloudAudio.monthlyCapUSD`; `cloudAudio.storageMB` is kept within 256 … 65536 and `cloudAudio.dailyAhead` within
-   1 … 100; a stored `spatial.route = always` is honoured whether or not Developer mode is on (the row is only
-   shown there); `SpatialOutputKind` treats line-out and the Bluetooth call route as not headphones (section 6).
-10. **Status line.** The spec has three sentences. A selected profile with the cloud off, a failed render, and Sing
-    playing have none: `SpatialStatusLine.onDeviceOnly` / `.pausedForSing` return no text.
-11. **AGENTS.md is behind:** it says deployment target 26.1 and a different `Co-Authored-By` line; `project.yml` and
-    `Package.swift` say 26.0.
+| # | Was | Settled as (spec) | Who acts |
+|---|---|---|---|
+| 1 | Spec said "AAC-LC is passed through"; the app force-decodes every streamed song to 44.1 kHz FLAC (`CloudStudio.swift:1373-1378`, `CloudAudioPreparer.swift:64`) | 6.2 step 3: upload exactly as Cloud Studio does today on this platform, add no resample. `library.source` names the **stream** (`itag`, `codec`), not the FLAC. A render's rate is the uploaded file's (44.1 kHz from an iPhone): line up by media time, never by frame count across files | CLOUD (job block; itag from `StreamCache.Meta`, section 4.3), ENGINE (switch by media time, which `switchAudio` already does) |
+| 2 | The level rule does nothing for streams (their gain is 1) | 6.3: expected. Spatial plays 4 dB under stereo, and the sheet says so in one quiet line: `SpatialCopy.levelNote`. Stream normalisation is a possible follow-up (spec 9), not this round | ENGINE implements the rule anyway (section 5); UI shows the line |
+| 3 | The swap fades 300-700 ms and has no "time left" rule | 6.3: about 250 ms and the 20 s rule are new, for these switches only. **Sing's own behaviour must not change** | ENGINE (section 3.3) |
+| 4 | Two consent switches, relation unsaid | 6.1 "Two switches": Cloud Studio's "Process songs in the cloud" is the master; off means no cloud activity of any kind, library lookups and downloads included. `spatial.cloud` is Spatial's own switch under it. A job, lookup or download needs both | CLOUD enforces (`context.cloud.settings.isEnabled` and `settings.cloud`). The model exposes `isCloudStudioOn` and `cloudRendersOn` for the screens and asks again when the master is switched on |
+| 5 | Sing's $3 cap would clamp library jobs | 6.1 "Money": library jobs have their own monthly sum and their own cap; neither counts against the other; the $3 rule with built-in keys does not clamp them | CLOUD (section 7.5) |
+| 6 | `executionTimeout` 900 s in every `/run` body | 6.2 step 3: 1 800 000 ms for a job with library tasks | CLOUD (`CloudJobBuilder`, `CloudTiming`) |
+| 7 | The transfer layer refuses `sp-studio` | 6.2 step 3: teach it `sp-<profile>` and `enhanced` | CLOUD (`CloudTransfers.isSafeSlot`, lines 247-251: allow the hyphen, keep everything else out) |
+| 8 | Enhanced without Spatial unsaid | 6.2: Enhanced rides on Spatial jobs; **no `enhance`-only jobs this round** (spec 9 keeps it open for later). 6.5: its switch sits with Spatial audio's rows: `SpatialCopy.enhancedSwitchTitle` ("Restore highs that the stream cut off") over `SpatialCopy.enhancedSwitchCaption` ("Part of cloud renders") | CLOUD (a request of kind `.enhanced` looks in the local store and the shared library only); UI (the row) |
+| 9 | Stored forms chosen here | 6.1 "Stored forms": exactly these (`-1` = No limit, 256 … 65536 MB, 1 … 100 a day, a stored `always` is honoured) | nobody: `CloudAudioSettings` already does it |
+| 10 | Three status sentences, four states without one | 6.5: every state has a line (table below) | UI reads `env.spatial.statusLine.text` |
+
+The lines, as `SpatialStatusLine` gives them (`SpatialStatusLine.line(for:cloudRenders:status:)`, tested):
+
+| Case | When | `.text` |
+|---|---|---|
+| `.onDeviceForNow` | the stage plays, cloud renders on, library status none / preview / queued / processing | On your phone for now. The cloud version takes about a minute. |
+| `.gettingCloudVersion` | the stage plays, status downloading (or ready and about to take over) | Getting the cloud version. |
+| `.cloudVersion` | a render plays | Playing the cloud version. |
+| `.onDeviceOnly` | the stage plays, cloud renders off (either switch) | On your phone only. Turn on cloud renders for the full version. |
+| `.renderFailed` | the stage plays, status failed | The cloud version didn't work this time. Still playing on your phone. |
+| `.headphonesOnly` | a profile is on, the route rule fails | Headphones only. Plug in to hear it. |
+| `.pausedForSing` | a profile is on, Sing's instrumental plays | Paused while Sing is on. |
+| `.none` | Off, nothing loaded, or the stage cannot run on this audio (see below) | (no line) |
+
+What the contract added to make this work, beyond the spec's letter:
+
+- **`RenditionStatus.downloading`**, a seventh case. Spec 6.1 lists six statuses, but 6.5 gives "render
+  downloading" its own line, so the library has to be able to say it. It is the tail of `processing`
+  (`specStatus` folds it back). CLOUD: emit `.statusChanged(key, .downloading)` when the FLAC starts coming down,
+  from a finished job or from a hit in the shared library.
+- **"Ready but not playing yet"** (the render landed with under 20 s left, or waits for a quiet moment) shows
+  `.gettingCloudVersion`. The spec has no line of its own for it.
+
+Still open:
+
+1. **Active but the stage cannot run** (the item's rate is neither 44.1 nor 48 kHz, or the table file failed to
+   load): `SpatialAudible.stereo` while `isActive`. The spec's table has no line; `statusLine` is `.none`. Rare
+   (every stream is 44.1 or 48 kHz), but real for a local file at another rate.
+2. **`SpatialOutputKind`'s reading of "headphones"** (section 6): line-out and the Bluetooth call route do not
+   count. The spec lists wired, Bluetooth A2DP/LE and USB headset, so this is its letter, but it differs from
+   `AudioRouteMonitor`'s grouping; the Android side should group the same way.
+3. **A library job started by mere playback would leave a permanent download** if it reused Sing's audio source as
+   it is (section 7.2). The spec says "prepare and upload the song exactly as Cloud Studio does today"; whether that
+   includes keeping the download is the owner's call.
+4. **Where the Spatial audio entry sits in the full player** (section 8.3): it has to be the place the Android
+   player uses.
+5. **AGENTS.md is behind:** it says deployment target 26.1 and names another co-author line; `project.yml` and
+   `Package.swift` say 26.0.

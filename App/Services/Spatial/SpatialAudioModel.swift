@@ -35,9 +35,16 @@ final class SpatialAudioModel {
     private(set) var isRemovingRenders = false
     /// This build carries PixlAudio's own cloud keys and they open (what `spatial.cloud` defaults to).
     private(set) var hasBuiltInCloudKeys: Bool
+    /// Cloud Studio's own switch, "Process songs in the cloud" (Settings › Sing › Cloud processing): the master. Off
+    /// means no cloud activity of any kind, whatever `spatial.cloud` says (spec 6.1 "Two switches").
+    private(set) var isCloudStudioOn: Bool
 
     /// `spatial.profile`: off, or the selected profile.
     var selection: SpatialSelection { settings.profile }
+
+    /// Cloud renders are on: both switches are. The row for `spatial.cloud` shows `settings.cloud`; when this is
+    /// false while that is true, the master switch is what holds renders back.
+    var cloudRendersOn: Bool { settings.cloud && isCloudStudioOn }
 
     /// The playing song's status for the selected profile (spec 6.1): the library's once the cloud is involved, else
     /// `preview` while the on-device stage is what plays.
@@ -45,9 +52,9 @@ final class SpatialAudioModel {
         RenditionStatus.shown(library: libraryStatus, onDeviceAudible: snapshot.audible.isOnDevice)
     }
 
-    /// The line under the profile list (spec 6.5).
+    /// The line under the profile list (spec 6.5); `statusLine.text` is the sentence.
     var statusLine: SpatialStatusLine {
-        SpatialStatusLine.line(for: snapshot, cloud: settings.cloud, status: status)
+        SpatialStatusLine.line(for: snapshot, cloudRenders: cloudRendersOn, status: status)
     }
 
     /// "Spatial active" (spec 6.3), as the player sees it.
@@ -61,6 +68,7 @@ final class SpatialAudioModel {
     @ObservationIgnored private let store: CloudAudioSettingsStore
     @ObservationIgnored private let currentSong: () -> Song?
     @ObservationIgnored private let builtInCloudKeys: () -> Bool
+    @ObservationIgnored private let cloudStudioEnabled: () -> Bool
     @ObservationIgnored private var started = false
     @ObservationIgnored private var listeners: [Task<Void, Never>] = []
     /// Settings reach the services one after another, in the order they were made.
@@ -75,16 +83,20 @@ final class SpatialAudioModel {
     ///   - currentSong: the song the player shows as current (`PlaybackStore.current`).
     ///   - builtInCloudKeys: whether built-in cloud keys are available now (`CloudSettings.builtInAvailable`); read
     ///     through observation, so the default of `spatial.cloud` follows it.
+    ///   - cloudStudioEnabled: Cloud Studio's own switch (`CloudSettings.isEnabled`), the master; observed too.
     init(defaults: UserDefaults, library: any SpatialLibrary, playback: any SpatialPlayback,
-         currentSong: @escaping () -> Song?, builtInCloudKeys: @escaping () -> Bool) {
+         currentSong: @escaping () -> Song?, builtInCloudKeys: @escaping () -> Bool,
+         cloudStudioEnabled: @escaping () -> Bool) {
         self.library = library
         self.playback = playback
         self.currentSong = currentSong
         self.builtInCloudKeys = builtInCloudKeys
+        self.cloudStudioEnabled = cloudStudioEnabled
         let store = CloudAudioSettingsStore(defaults: defaults)
         self.store = store
         let available = builtInCloudKeys()
         hasBuiltInCloudKeys = available
+        isCloudStudioOn = cloudStudioEnabled()
         settings = store.load(builtInCloudKeys: available)
     }
 
@@ -96,7 +108,8 @@ final class SpatialAudioModel {
         let cloudSettings = context.cloud.settings
         let model = SpatialAudioModel(defaults: context.defaults, library: library, playback: playback,
                                       currentSong: { playbackStore.current },
-                                      builtInCloudKeys: { cloudSettings.builtInAvailable })
+                                      builtInCloudKeys: { cloudSettings.builtInAvailable },
+                                      cloudStudioEnabled: { cloudSettings.isEnabled })
         // UI tests: the states the screenshots show (`start()` never runs there).
         if context.launch.isUITest { SpatialDemo.apply(launch: context.launch, to: model) }
         return model
@@ -108,7 +121,7 @@ final class SpatialAudioModel {
     func start() {
         guard !started else { return }
         started = true
-        observeBuiltInCloudKeys()
+        observeCloudStudio()
         let library = self.library, playback = self.playback, settings = self.settings
         let setup = Task { [weak self] in
             // Listen before anything is applied, so no change is missed.
@@ -135,16 +148,26 @@ final class SpatialAudioModel {
         })
     }
 
-    /// Follows the built-in keys: a blob that turns out not to open switches the default of `spatial.cloud` off.
-    private func observeBuiltInCloudKeys() {
-        let available = withObservationTracking {
-            builtInCloudKeys()
+    /// Follows two facts of Cloud Studio's settings: the built-in keys (a blob that turns out not to open switches
+    /// the default of `spatial.cloud` off) and its own switch, the master of every cloud activity.
+    private func observeCloudStudio() {
+        let (available, enabled) = withObservationTracking {
+            (builtInCloudKeys(), cloudStudioEnabled())
         } onChange: { [weak self] in
-            Task { @MainActor in self?.observeBuiltInCloudKeys() }
+            Task { @MainActor in self?.observeCloudStudio() }
         }
-        guard available != hasBuiltInCloudKeys else { return }
-        hasBuiltInCloudKeys = available
-        reloadSettings()
+        if enabled != isCloudStudioOn {
+            isCloudStudioOn = enabled
+            // Switched on: a render the player wants may be asked for now.
+            if enabled {
+                requested = nil
+                syncCurrentRender()
+            }
+        }
+        if available != hasBuiltInCloudKeys {
+            hasBuiltInCloudKeys = available
+            reloadSettings()
+        }
     }
 
     // MARK: What the screens do

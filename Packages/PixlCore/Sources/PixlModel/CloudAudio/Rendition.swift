@@ -71,6 +71,9 @@ public struct RenditionKey: Sendable, Hashable, CustomStringConvertible {
 
 /// Where a song's rendition stands on this phone (spec 6.1): `none` → `preview` (the on-device stage) → `queued` →
 /// `processing` → `ready` (a verified local render), or `failed` (tried again later, see `RenditionRetry`).
+///
+/// `downloading` is a seventh case on top of the spec's six: the tail of `processing`, split off because the sheet
+/// has a line of its own for it (spec 6.5, "Getting the cloud version."). `specStatus` folds it back.
 public enum RenditionStatus: String, Sendable, Hashable, Codable, CaseIterable {
     /// Nothing is known or wanted.
     case none
@@ -78,21 +81,26 @@ public enum RenditionStatus: String, Sendable, Hashable, Codable, CaseIterable {
     case preview
     /// Wanted from the cloud: waiting for the library check, the upload or a GPU.
     case queued
-    /// The cloud is rendering it, or the finished render is coming down.
+    /// The song is uploaded and the cloud is rendering it.
     case processing
+    /// A finished render (this job's, or one the shared library already had) is coming down and being verified.
+    case downloading
     /// A verified render is in the local store.
     case ready
     /// The last try failed; it is tried again after a pause.
     case failed
 
     /// The cloud is on its way to a render.
-    public var isInFlight: Bool { self == .queued || self == .processing }
+    public var isInFlight: Bool { self == .queued || self == .processing || self == .downloading }
+
+    /// One of the spec's six statuses (`downloading` is part of `processing` there).
+    public var specStatus: RenditionStatus { self == .downloading ? .processing : self }
 
     /// What the person is told for the playing song: the library's own status when the cloud is doing or has done
     /// something, else `preview` while the on-device stage is what plays.
     public static func shown(library: RenditionStatus, onDeviceAudible: Bool) -> RenditionStatus {
         switch library {
-        case .queued, .processing, .ready, .failed: library
+        case .queued, .processing, .downloading, .ready, .failed: library
         case .none, .preview: onDeviceAudible ? .preview : .none
         }
     }

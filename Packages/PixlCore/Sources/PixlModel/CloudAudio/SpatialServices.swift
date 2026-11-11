@@ -42,6 +42,8 @@ public struct LocalRendition: Sendable, Hashable {
     public var headroomDb: Double { manifest.headroomDb }
     /// The file's length as the manifest says (the in-song switch checks it against the song before lining up).
     public var durationMs: Int64? { manifest.audio?.durationMs }
+    /// The render's rate: the uploaded file's, which may differ from the rate of the stream this phone plays. Line a
+    /// render up with the song by media time, never by frame count across files.
     public var sampleRate: Int? { manifest.audio?.sampleRate }
     public var bytes: Int64 { manifest.audio?.bytes ?? 0 }
 }
@@ -95,7 +97,8 @@ public struct CloudAudioUsage: Sendable, Hashable {
 }
 
 public enum SpatialLibraryEvent: Sendable, Hashable {
-    /// A rendition's status moved (queued, processing, failed, back to none after "Remove downloaded renders"…).
+    /// A rendition's status moved (queued, processing, downloading, failed, back to none after "Remove downloaded
+    /// renders"…).
     case statusChanged(RenditionKey, RenditionStatus)
     /// A verified render is now in the local store. Sent in addition to `statusChanged(_, .ready)`.
     case renditionReady(LocalRendition)
@@ -107,7 +110,8 @@ public enum SpatialLibraryEvent: Sendable, Hashable {
 /// The cloud side of Spatial audio and Enhanced audio.
 public protocol SpatialLibrary: Sendable {
     /// The settings in force: called once at launch and after every change. The library follows `cloud`,
-    /// `prepareAhead`, `enhancedEnabled`, the profile the background queue prepares, the storage budget and the caps.
+    /// `prepareAhead`, `enhancedEnabled`, the profile the background queue prepares, the storage budget and the caps
+    /// (library jobs have their own monthly sum and cap, apart from Sing's).
     func apply(_ settings: CloudAudioSettings) async
 
     /// Step 1 of spec 6.2: the verified local render, or nil. Called whenever the player builds an item, so it
@@ -117,13 +121,19 @@ public protocol SpatialLibrary: Sendable {
     /// Every local rendition of a song (Developer mode's per-song diagnostics read their manifests).
     func localRenditions(videoId: String) async -> [LocalRendition]
 
-    /// Where the rendition stands: `ready`, `queued`, `processing`, `failed`, or `none`. Never `preview`: that is the
-    /// player's fact, added by `RenditionStatus.shown`.
+    /// Where the rendition stands: `ready`, `queued`, `processing`, `downloading`, `failed`, or `none`. Never
+    /// `preview`: that is the player's fact, added by `RenditionStatus.shown`.
     func status(_ key: RenditionKey) async -> RenditionStatus
 
-    /// Spec 6.2 for one rendition: the local store, else the shared library, else a job, as the settings, the network
-    /// and the caps allow (with `spatial.cloud` off nothing leaves the phone and the answer is `none`). Asking again
-    /// for something already on its way changes nothing. Returns the status now; later ones come through `events()`.
+    /// Spec 6.2 for one rendition: the local store, else the shared library, else a job, as the two switches, the
+    /// network and the caps allow. Both switches must be on for anything to leave or reach the phone: Cloud Studio's
+    /// own "Process songs in the cloud" (the master, which the library reads itself) and `spatial.cloud`; with either
+    /// off the answer is `none` and nothing happens. Asking again for something already on its way changes nothing.
+    /// Returns the status now; later ones come through `events()`.
+    ///
+    /// A spatial request also brings the Enhanced file along when `enhanced.enabled` is on (the job gets the
+    /// `enhance` task). There are no enhance-only jobs this round: a request of kind `.enhanced` is answered from the
+    /// local store and the shared library, and never uploads a song.
     @discardableResult
     func request(_ request: RenditionRequest) async -> RenditionStatus
 
@@ -227,44 +237,74 @@ public protocol SpatialPlayback: Sendable {
 
 // MARK: - The line under the profile list
 
-/// The status line of the Spatial audio sheet for the song that is playing (spec 6.5).
-public enum SpatialStatusLine: Sendable, Hashable {
-    /// Nothing to say: Spatial audio is off, or nothing of it is heard.
+/// The status line of the Spatial audio sheet for the song that is playing (spec 6.5: every state has one).
+public enum SpatialStatusLine: Sendable, Hashable, CaseIterable {
+    /// Nothing to say: Spatial audio is off, nothing is loaded, or (a corner the spec has no line for) Spatial audio
+    /// is active but the on-device stage cannot run on this audio.
     case none
-    /// The on-device version plays and the cloud version is wanted.
+    /// The on-device stage plays and the cloud render is wanted (queued, uploading, processing).
     case onDeviceForNow
-    /// The on-device version plays and no cloud version is coming (the cloud is off, or the last try failed).
-    case onDeviceOnly
+    /// The finished render is coming down (or is here and about to take over).
+    case gettingCloudVersion
     /// The cloud render plays.
     case cloudVersion
+    /// A profile is on and cloud renders are off (either switch).
+    case onDeviceOnly
+    /// The render failed; the on-device stage plays on.
+    case renderFailed
     /// A profile is selected but the output is not headphones.
     case headphonesOnly
     /// A profile is selected but Sing's instrumental plays.
     case pausedForSing
 
-    /// The spec's sentence (the English source text), where it has one. `onDeviceOnly` and `pausedForSing` have none
-    /// in the spec: the screens choose what to show for them, if anything.
+    /// The spec's sentence (the English source text); nil only for `none`.
     public var text: String? {
         switch self {
+        case .none: nil
         case .onDeviceForNow: "On your phone for now. The cloud version takes about a minute."
+        case .gettingCloudVersion: "Getting the cloud version."
         case .cloudVersion: "Playing the cloud version."
+        case .onDeviceOnly: "On your phone only. Turn on cloud renders for the full version."
+        case .renderFailed: "The cloud version didn't work this time. Still playing on your phone."
         case .headphonesOnly: "Headphones only. Plug in to hear it."
-        case .none, .onDeviceOnly, .pausedForSing: nil
+        case .pausedForSing: "Paused while Sing is on."
         }
     }
 
-    /// The line for what plays, whether the cloud may be asked (`spatial.cloud`), and the library's status of the
-    /// selected profile's render.
-    public static func line(for snapshot: SpatialPlaybackSnapshot, cloud: Bool, status: RenditionStatus) -> SpatialStatusLine {
+    /// The line for what plays.
+    /// - Parameters:
+    ///   - cloudRenders: cloud renders are on, i.e. both switches are: Cloud Studio's own "Process songs in the
+    ///     cloud" (the master) and `spatial.cloud`.
+    ///   - status: the library's status of the selected profile's render of the playing song.
+    public static func line(for snapshot: SpatialPlaybackSnapshot, cloudRenders: Bool,
+                            status: RenditionStatus) -> SpatialStatusLine {
         guard snapshot.selection.isOn, snapshot.songId != nil else { return .none }
         if !snapshot.routePasses { return .headphonesOnly }
         if snapshot.singInstrumentalOn { return .pausedForSing }
         switch snapshot.audible {
-        case .render: return .cloudVersion
-        case .onDevice: return cloud && status != .failed ? .onDeviceForNow : .onDeviceOnly
-        case .stereo: return .none
+        case .render:
+            return .cloudVersion
+        case .onDevice:
+            guard cloudRenders else { return .onDeviceOnly }
+            switch status {
+            case .failed: return .renderFailed
+            case .downloading, .ready: return .gettingCloudVersion
+            case .none, .preview, .queued, .processing: return .onDeviceForNow
+            }
+        case .stereo:
+            return .none
         }
     }
+}
+
+/// The other fixed sentences of the Spatial audio sheet and its settings rows (spec 6.5; the English source text).
+public enum SpatialCopy {
+    /// The quiet line under the profile list: why Spatial audio plays a little under stereo (spec 6.3 "Level").
+    public static let levelNote = "Spatial plays a little quieter so the peaks stay clean."
+    /// Enhanced audio's switch. It sits with Spatial audio's rows this round: it only acts inside Spatial jobs.
+    public static let enhancedSwitchTitle = "Restore highs that the stream cut off"
+    /// The line under that switch.
+    public static let enhancedSwitchCaption = "Part of cloud renders"
 }
 
 // MARK: - Events

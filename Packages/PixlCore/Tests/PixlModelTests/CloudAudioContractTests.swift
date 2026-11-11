@@ -42,7 +42,9 @@ struct SpatialProfileTests {
     @Test func noShownTextUsesAWordTheSpecForbids() {
         let forbidden = ["lossless", "hi-res", "dolby", "atmos", "360 reality", "claude", "anthropic", "binilyrics"]
         var shown = SpatialProfile.allCases.flatMap { [$0.displayName, $0.summary] }
-        shown += [SpatialStatusLine.onDeviceForNow, .cloudVersion, .headphonesOnly].compactMap(\.text)
+        shown += SpatialStatusLine.allCases.compactMap(\.text)
+        shown += [SpatialCopy.levelNote, SpatialCopy.enhancedSwitchTitle, SpatialCopy.enhancedSwitchCaption]
+        #expect(shown.count == 12 + 7 + 3)
         for text in shown {
             for word in forbidden { #expect(!text.lowercased().contains(word), "\(text) contains \(word)") }
         }
@@ -207,9 +209,15 @@ struct RenditionTests {
         #expect(RenditionKey(videoId: "J7p4bzqLvCw", profile: .wide).description == "J7p4bzqLvCw/sp-wide")
     }
 
-    @Test func theStatusesAreTheSpecsSix() {
-        #expect(RenditionStatus.allCases.map(\.rawValue) == ["none", "preview", "queued", "processing", "ready", "failed"])
-        #expect(RenditionStatus.queued.isInFlight && RenditionStatus.processing.isInFlight)
+    @Test func theStatusesAreTheSpecsSixPlusDownloading() {
+        #expect(RenditionStatus.allCases.map(\.rawValue)
+            == ["none", "preview", "queued", "processing", "downloading", "ready", "failed"])
+        // `downloading` is the tail of the spec's `processing` (the sheet has a line of its own for it).
+        #expect(Set(RenditionStatus.allCases.map(\.specStatus.rawValue))
+            == ["none", "preview", "queued", "processing", "ready", "failed"])
+        #expect(RenditionStatus.downloading.specStatus == .processing)
+        #expect(RenditionStatus.queued.isInFlight && RenditionStatus.processing.isInFlight
+            && RenditionStatus.downloading.isInFlight)
         #expect(!RenditionStatus.ready.isInFlight && !RenditionStatus.failed.isInFlight && !RenditionStatus.preview.isInFlight)
     }
 
@@ -218,6 +226,7 @@ struct RenditionTests {
         #expect(RenditionStatus.shown(library: .none, onDeviceAudible: false) == .none)
         #expect(RenditionStatus.shown(library: .queued, onDeviceAudible: true) == .queued)
         #expect(RenditionStatus.shown(library: .processing, onDeviceAudible: true) == .processing)
+        #expect(RenditionStatus.shown(library: .downloading, onDeviceAudible: true) == .downloading)
         #expect(RenditionStatus.shown(library: .ready, onDeviceAudible: false) == .ready)
         #expect(RenditionStatus.shown(library: .failed, onDeviceAudible: true) == .failed)
     }
@@ -514,37 +523,64 @@ struct SpatialServicesTests {
         #expect(SpatialAudible.onDevice(.hall, enhanced: true).isOnDevice)
     }
 
-    @Test func theStatusLineIsTheSpecsThreeSentences() {
+    @Test func everyStateOfTheSheetHasTheSpecsSentence() {
         #expect(SpatialStatusLine.onDeviceForNow.text == "On your phone for now. The cloud version takes about a minute.")
+        #expect(SpatialStatusLine.gettingCloudVersion.text == "Getting the cloud version.")
         #expect(SpatialStatusLine.cloudVersion.text == "Playing the cloud version.")
+        #expect(SpatialStatusLine.onDeviceOnly.text == "On your phone only. Turn on cloud renders for the full version.")
+        #expect(SpatialStatusLine.renderFailed.text == "The cloud version didn't work this time. Still playing on your phone.")
         #expect(SpatialStatusLine.headphonesOnly.text == "Headphones only. Plug in to hear it.")
-        #expect(SpatialStatusLine.none.text == nil && SpatialStatusLine.onDeviceOnly.text == nil
-            && SpatialStatusLine.pausedForSing.text == nil)
+        #expect(SpatialStatusLine.pausedForSing.text == "Paused while Sing is on.")
+        #expect(SpatialStatusLine.none.text == nil)
+        #expect(SpatialStatusLine.allCases.count == 8)
+        #expect(SpatialCopy.levelNote == "Spatial plays a little quieter so the peaks stay clean.")
+        #expect(SpatialCopy.enhancedSwitchTitle == "Restore highs that the stream cut off")
+        #expect(SpatialCopy.enhancedSwitchCaption == "Part of cloud renders")
     }
 
     @Test func theStatusLineFollowsWhatPlays() {
         var snapshot = SpatialPlaybackSnapshot(songId: "sp:1", videoId: CloudAudioFixtures.videoId,
                                                selection: .profile(.studio), output: .wiredHeadphones, routePasses: true,
                                                audible: .onDevice(.studio, enhanced: false))
-        #expect(SpatialStatusLine.line(for: snapshot, cloud: true, status: .preview) == .onDeviceForNow)
-        #expect(SpatialStatusLine.line(for: snapshot, cloud: true, status: .processing) == .onDeviceForNow)
-        #expect(SpatialStatusLine.line(for: snapshot, cloud: true, status: .failed) == .onDeviceOnly)
-        #expect(SpatialStatusLine.line(for: snapshot, cloud: false, status: .none) == .onDeviceOnly)
+        func line(cloudRenders: Bool = true, _ status: RenditionStatus) -> SpatialStatusLine {
+            SpatialStatusLine.line(for: snapshot, cloudRenders: cloudRenders, status: status)
+        }
+        // The on-device stage plays: the line follows the cloud.
+        #expect(line(.none) == .onDeviceForNow)
+        #expect(line(.preview) == .onDeviceForNow)
+        #expect(line(.queued) == .onDeviceForNow)
+        #expect(line(.processing) == .onDeviceForNow)
+        #expect(line(.downloading) == .gettingCloudVersion)
+        // Here already, the switch has not happened yet.
+        #expect(line(.ready) == .gettingCloudVersion)
+        #expect(line(.failed) == .renderFailed)
+        // Cloud renders off (either switch) comes before anything the library says.
+        #expect(line(cloudRenders: false, .none) == .onDeviceOnly)
+        #expect(line(cloudRenders: false, .failed) == .onDeviceOnly)
+        #expect(line(cloudRenders: false, .ready) == .onDeviceOnly)
+        // The render plays, whatever the switches say now.
         snapshot.audible = .render(.studio)
-        #expect(SpatialStatusLine.line(for: snapshot, cloud: true, status: .ready) == .cloudVersion)
+        #expect(line(.ready) == .cloudVersion)
+        #expect(line(cloudRenders: false, .ready) == .cloudVersion)
+        // The route rule fails.
         snapshot.output = .phoneSpeaker
         snapshot.routePasses = false
         snapshot.audible = .stereo(enhanced: false)
-        #expect(SpatialStatusLine.line(for: snapshot, cloud: true, status: .ready) == .headphonesOnly)
+        #expect(line(.ready) == .headphonesOnly)
+        // Sing's instrumental plays.
         snapshot.routePasses = true
         snapshot.singInstrumentalOn = true
-        #expect(SpatialStatusLine.line(for: snapshot, cloud: true, status: .ready) == .pausedForSing)
+        #expect(line(.ready) == .pausedForSing)
+        // Active, but the stage cannot run on this audio: the spec has no line.
         snapshot.singInstrumentalOn = false
+        #expect(line(.none) == .none)
+        // Off, or nothing loaded.
+        snapshot.audible = .onDevice(.studio, enhanced: false)
         snapshot.selection = .off
-        #expect(SpatialStatusLine.line(for: snapshot, cloud: true, status: .none) == .none)
+        #expect(line(.none) == .none)
         snapshot.selection = .profile(.studio)
         snapshot.songId = nil
-        #expect(SpatialStatusLine.line(for: snapshot, cloud: true, status: .none) == .none)
+        #expect(line(.none) == .none)
     }
 
     @Test func theHubHandsEveryEventToEveryStream() async {

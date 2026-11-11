@@ -57,9 +57,11 @@ public struct CloudAudioStoredSettings: Sendable, Hashable {
 public struct CloudAudioSettings: Sendable, Hashable {
     /// `spatial.profile`. Default off.
     public var profile: SpatialSelection
-    /// `spatial.route`. Default headphones.
+    /// `spatial.route`. Default headphones. A stored `always` is honoured whether or not Developer mode is on (only
+    /// its row is hidden outside it).
     public var route: SpatialRouteMode
-    /// `spatial.cloud`. Default: on exactly when this build has built-in cloud keys.
+    /// `spatial.cloud`. Default: on exactly when this build has built-in cloud keys. It is Spatial audio's own
+    /// switch under Cloud Studio's "Process songs in the cloud", the master: cloud renders need both on.
     public var cloud: Bool
     /// `spatial.prepareAhead`. Default on (it still needs `cloud`, Wi-Fi and a battery that is not low).
     public var prepareAhead: Bool
@@ -72,16 +74,17 @@ public struct CloudAudioSettings: Sendable, Hashable {
     /// `cloudAudio.dailyAhead`. Default 25.
     public var dailyAhead: Int
 
+    // The stored forms below are spec 6.1's, identical on both platforms.
     public static let defaultStorageMB = 3072
-    /// Not in the spec: what a stored storage budget is kept inside (256 MB … 64 GB).
+    /// A stored storage budget is kept within 256 MB … 64 GB.
     public static let storageMBRange: ClosedRange<Int> = 256...65_536
     public static let defaultMonthlyCapUSD: Double = 30
     /// The highest cap Developer mode offers before "No limit".
     public static let maxMonthlyCapUSD: Double = 200
-    /// How "No limit" is stored under `cloudAudio.monthlyCapUSD` (any negative number reads as no limit).
+    /// "No limit" is stored as -1 under `cloudAudio.monthlyCapUSD` (any negative number reads as no limit).
     public static let noLimitStoredValue: Double = -1
     public static let defaultDailyAhead = 25
-    /// Not in the spec: what a stored daily count is kept inside.
+    /// A stored daily count is kept within 1 … 100.
     public static let dailyAheadRange: ClosedRange<Int> = 1...100
 
     /// The defaults. `builtInCloudKeys`: this build carries PixlAudio's own cloud keys (and they are usable).
