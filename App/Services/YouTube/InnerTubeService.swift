@@ -82,38 +82,22 @@ actor InnerTubeService {
         var attempts: [String] = []
         var successful: String?
 
-        // 0. SpotiFLAC primary lossless chain (`tracks.monochrome.st` → Tidal HiFi instances → Deezer ISRC enrichment).
-        //    Automatically falls back to YouTube (`InnerTube` → `Piped`) if the track is not found or fails validation.
-        if !excluding.contains(Self.spotiFLACStrategyName),
-           let query = SpotiFLACTrackRegistry.shared.query(forVideoId: videoId) {
-            if let flac = await spotiFLAC.resolve(query) {
-                let urlString = flac.url.absoluteString
-                var playable = true
-                if validate {
-                    let probe = await validator.probe(url: urlString, userAgent: flac.userAgent, sendRange: true)
-                    playable = probe.ok
-                    if !playable {
-                        await spotiFLAC.invalidate(query)
-                        attempts.append("SpotiFLAC (\(flac.provider.rawValue)): \(probe.describe())")
-                    }
-                }
-                if playable {
-                    stream = ResolvedStream(
-                        url: urlString,
-                        userAgent: flac.userAgent,
-                        strategyName: Self.spotiFLACStrategyName,
-                        mimeType: "audio/flac"
-                    )
-                    successful = Self.spotiFLACStrategyName
-                    attempts.append("SpotiFLAC (\(flac.provider.rawValue)): lossless FLAC (\(flac.trackId))")
-                }
-            } else {
-                attempts.append("SpotiFLAC: no lossless match")
-            }
+        // A synthetic id (a Spotify song YouTube can't match) has no video: SpotiFLAC is its only source.
+        let synthetic = SpotiFLACTrackRegistry.isSyntheticVideoId(videoId)
+        let spotiFLACUsable = !excluding.contains(Self.spotiFLACStrategyName)
+        // Same order as Android. FLAC runs about 1,000 kbps, so it goes first only when the audio quality setting has
+        // no cap (Ultrasound, the default); a capped tier stays on YouTube at its cap and falls back to FLAC only when
+        // YouTube has nothing for the song.
+        let flacFirst = spotiFLACUsable && (StreamingAudioQuality.maxBitrateKbps() == nil || synthetic)
+
+        // 0. SpotiFLAC first (`tracks.monochrome.st`, then any Tidal HiFi instance).
+        if flacFirst, let flac = await resolveViaSpotiFLAC(videoId: videoId, validate: validate, attempts: &attempts) {
+            stream = flac
+            successful = Self.spotiFLACStrategyName
         }
 
-        // 1. Automatic fallback to YouTube (`InnerTube` → `Piped`) when SpotiFLAC misses or was excluded.
-        if stream == nil, !SpotiFLACTrackRegistry.isSyntheticVideoId(videoId) {
+        // 1. YouTube (`InnerTube` → `Piped`) when SpotiFLAC wasn't first, missed or was excluded.
+        if stream == nil, !synthetic {
             stream = (try? await resolver.resolveStream(videoId: videoId, validate: validate,
                                                         excludedStrategies: excluding)) ?? nil
             attempts.append(contentsOf: await resolver.lastAttempts)
@@ -131,6 +115,13 @@ actor InnerTubeService {
                 }
             }
         }
+
+        // 2. Capped quality: FLAC only as the last resort.
+        if stream == nil, spotiFLACUsable, !flacFirst,
+           let flac = await resolveViaSpotiFLAC(videoId: videoId, validate: validate, attempts: &attempts) {
+            stream = flac
+            successful = Self.spotiFLACStrategyName
+        }
         lastAttempts = attempts
         lastSuccessfulStrategy = stream == nil ? nil : successful
         if let stream { cache[videoId] = (stream, Self.expiry(of: stream.url)) }
@@ -141,6 +132,27 @@ actor InnerTubeService {
                             ms: PlaybackStartTimings.ms(from: started, to: .now), configMs: configMs))
         }
         return stream
+    }
+
+    /// SpotiFLAC's stream for the song registered under `videoId`, or nil. Probed with a ranged GET when `validate`.
+    private func resolveViaSpotiFLAC(videoId: String, validate: Bool, attempts: inout [String]) async -> ResolvedStream? {
+        guard let query = SpotiFLACTrackRegistry.shared.query(forVideoId: videoId) else { return nil }
+        guard let flac = await spotiFLAC.resolve(query) else {
+            attempts.append("SpotiFLAC: no match")
+            return nil
+        }
+        let urlString = flac.url.absoluteString
+        if validate {
+            let probe = await validator.probe(url: urlString, userAgent: flac.userAgent, sendRange: true)
+            guard probe.ok else {
+                await spotiFLAC.invalidate(query)
+                attempts.append("SpotiFLAC (\(flac.provider.rawValue)): \(probe.describe())")
+                return nil
+            }
+        }
+        attempts.append("SpotiFLAC (\(flac.provider.rawValue)): FLAC (\(flac.trackId))")
+        return ResolvedStream(url: urlString, userAgent: flac.userAgent,
+                              strategyName: Self.spotiFLACStrategyName, mimeType: flac.mimeType)
     }
 
     /// The start-timings view of a resolution: the winner's detail (itag, bitrate, `n`), or every attempt.
