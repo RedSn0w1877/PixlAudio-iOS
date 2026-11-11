@@ -49,6 +49,12 @@ grew. The suite went from 314 to 570 passing (plus one expected failure, see "Th
   Jobs without library tasks are unaffected: the worker still ends those at 870 s on its own.
 - The job example to build against is `job.input.spatial.json` (one profile plus `enhance`). The result examples
   show the three outcomes. `outputs["sp-studio"].key` is the `lib/` key, also when the state is `exists`.
+- **`manifestGet` is the switch for "skip what is there".** The worker can only see a render's manifest, not its
+  audio (the job carries no GET for the audio). The bucket's 30-day rule removes the two objects separately, and
+  the audio is the older one by a few seconds, so for up to a day at the end of a render's life its manifest can
+  outlive its audio. A phone that gets `exists` (or a manifest from its own GET) and then a 404 on the FLAC should
+  send the job again **without `manifestGet`** for that output: the worker then renders it whatever is there.
+  (The janitor never causes this: it deletes the manifest first.)
 - `library.enhanced` is `not_needed` whenever there is no restored file, whether the worker wrote the note now or
   found one already there. `exists` for enhanced means a restored file is in the library.
 - `library.restore` and `library.stemMode` are `null` when the job did no analysis (everything it asked for was
