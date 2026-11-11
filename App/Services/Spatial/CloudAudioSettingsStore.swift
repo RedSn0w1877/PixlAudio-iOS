@@ -1,7 +1,7 @@
 import Foundation
 import PixlModel
 
-/// The seven settings of Spatial audio in `UserDefaults`, under the spec's own names
+/// The eight settings of Spatial audio in `UserDefaults`, under the spec's own names
 /// (`CloudAudioSettingsKey`: `spatial.profile`, `spatial.cloud`, `cloudAudio.storageMB`, …; cloud audio spec 6.1).
 /// PixlBackup's catalogue does not know these keys, so backups never carry them.
 ///
@@ -24,7 +24,8 @@ nonisolated struct CloudAudioSettingsStore: @unchecked Sendable {
                                  prepareAhead: bool(CloudAudioSettingsKey.spatialPrepareAhead),
                                  storageMB: number(CloudAudioSettingsKey.storageMB)?.intValue,
                                  monthlyCapUSD: number(CloudAudioSettingsKey.monthlyCapUSD)?.doubleValue,
-                                 dailyAhead: number(CloudAudioSettingsKey.dailyAhead)?.intValue)
+                                 dailyAhead: number(CloudAudioSettingsKey.dailyAhead)?.intValue,
+                                 songsOff: songsOff())
     }
 
     /// The settings in force. `builtInCloudKeys`: this build carries PixlAudio's own cloud keys and they open.
@@ -61,9 +62,24 @@ nonisolated struct CloudAudioSettingsStore: @unchecked Sendable {
         defaults.set(CloudAudioSettings.clampedDailyAhead(songs), forKey: CloudAudioSettingsKey.dailyAhead)
     }
 
-    /// Forgets every stored value: all seven settings follow their defaults again.
+    /// `spatial.songsOff`: Spatial audio turned off (`off`) or back on for `spotifyId`'s song, from the sheet's "This
+    /// song" switch (Hoa, 2026-11-11). The rest of the list is kept as stored.
+    func setSongOff(_ spotifyId: String, off: Bool) {
+        guard !spotifyId.isEmpty else { return }
+        var ids = CloudAudioSettings.songsOff(fromStored: defaults.object(forKey: CloudAudioSettingsKey.songsOff))
+        if off { ids.insert(spotifyId) } else { ids.remove(spotifyId) }
+        defaults.set(CloudAudioSettings.storedSongsOff(ids), forKey: CloudAudioSettingsKey.songsOff)
+    }
+
+    /// Forgets every stored value: all eight settings follow their defaults again.
     func reset() {
         for key in CloudAudioSettingsKey.all { defaults.removeObject(forKey: key) }
+    }
+
+    /// The stored list, made safe (`CloudAudioSettings.songsOff(fromStored:)`): a value of another type reads as empty.
+    private func songsOff() -> [String]? {
+        guard let value = defaults.object(forKey: CloudAudioSettingsKey.songsOff) else { return nil }
+        return CloudAudioSettings.storedSongsOff(CloudAudioSettings.songsOff(fromStored: value))
     }
 
     private func bool(_ key: String) -> Bool? {

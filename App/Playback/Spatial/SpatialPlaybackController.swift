@@ -12,7 +12,9 @@ protocol DeckSpatialSource: AnyObject {
     /// per launch, from the moment the app is assembled, so this rarely waits.
     func tablesReady() async
     /// Spec 6.3: the verified local render the song of `videoId` starts on instead of its own audio, or nil.
-    func startRendition(videoId: String) async -> LocalRendition?
+    /// `spotifyId`: the song's Spotify track; a song Spatial audio is turned off for (`spatial.songsOff`) never starts
+    /// on a render.
+    func startRendition(videoId: String, spotifyId: String?) async -> LocalRendition?
 }
 
 /// The player's side of Spatial audio (cloud audio spec of 2026-11-10, sections 6.1, 6.3 and 7; integration map
@@ -28,6 +30,10 @@ protocol DeckSpatialSource: AnyObject {
 ///   route failing: `SpatialRenditionRules` decides, `DualDeckEngine.switchCurrentRendition` switches (Sing's swap with
 ///   a 250 ms linear fade, lined up by media time, at a quiet moment of the lyrics when they are loaded).
 /// - It never asks the library for a render: the Spatial audio model does that from the snapshots published here.
+/// - Off for one song (`spatial.songsOff`, Hoa, 2026-11-11): every decision above is made with that song's own
+///   selection (`CloudAudioSettings.selection(for:)`), `off` for a song turned off. It starts on its own audio, the
+///   stage bypasses it, and a render it plays when it is turned off goes back to its own audio by the same switch as
+///   Spatial audio turned off.
 @MainActor
 final class SpatialPlaybackController: SpatialPlayback, DeckSpatialSource {
     /// What the controller follows outside the engine, read through observation.
@@ -96,7 +102,9 @@ final class SpatialPlaybackController: SpatialPlayback, DeckSpatialSource {
     func apply(_ settings: CloudAudioSettings) async {
         let previous = self.settings
         self.settings = settings
-        guard previous.profile != settings.profile || previous.route != settings.route else { return }
+        // `songsOff`: the song that plays, or the one prepared next, may have been turned off or back on.
+        guard previous.profile != settings.profile || previous.route != settings.route
+            || previous.songsOff != settings.songsOff else { return }
         stateChanged(nextMayChange: true)
     }
 
@@ -110,13 +118,14 @@ final class SpatialPlaybackController: SpatialPlayback, DeckSpatialSource {
         await tables?.value
     }
 
-    func startRendition(videoId: String) async -> LocalRendition? {
-        guard settings.profile.isOn, routePasses, let profile = settings.profile.profile else { return nil }
+    func startRendition(videoId: String, spotifyId: String?) async -> LocalRendition? {
+        // A song turned off for Spatial audio starts on its original (its selection is `off`).
+        guard routePasses, let profile = settings.profileFor(spotifyId) else { return nil }
         let render = await library.localRendition(RenditionKey(videoId: videoId, profile: profile))
-        // The selection may have moved while the library answered.
+        // The selection (or the song's own switch) may have moved while the library answered.
         guard let render, render.key == RenditionKey(videoId: videoId, profile: profile),
-              SpatialRenditionRules.startsWithRender(selection: settings.profile, routePasses: routePasses,
-                                                     hasLocalRender: true) else { return nil }
+              SpatialRenditionRules.startsWithRender(selection: settings.selection(for: spotifyId),
+                                                     routePasses: routePasses, hasLocalRender: true) else { return nil }
         return render
     }
 
@@ -124,9 +133,15 @@ final class SpatialPlaybackController: SpatialPlayback, DeckSpatialSource {
 
     private var output: SpatialOutputKind { SpatialOutputRoute.kind(of: port, remoteDevicePlays: remote) }
     private var routePasses: Bool { SpatialActivation.routePasses(mode: settings.route, output: output) }
-    /// "Spatial active" (spec 6.3).
+    /// The current queue entry's Spotify track (the item that plays, else the entry that loads): the key of
+    /// `spatial.songsOff`.
+    private var currentSpotifyId: String? { (engine.activeItem?.entry ?? engine.queue.current)?.song.spotifyId }
+    /// The selection the current song plays with: the selected profile, or `off` when Spatial audio is turned off for
+    /// that song (Hoa, 2026-11-11).
+    private var currentSelection: SpatialSelection { settings.selection(for: currentSpotifyId) }
+    /// "Spatial active" (spec 6.3), for the current song: never for a song turned off.
     private var isActive: Bool {
-        SpatialActivation.isActive(selection: settings.profile, mode: settings.route, output: output,
+        SpatialActivation.isActive(selection: currentSelection, mode: settings.route, output: output,
                                    singInstrumentalOn: singOn)
     }
 
@@ -138,8 +153,10 @@ final class SpatialPlaybackController: SpatialPlayback, DeckSpatialSource {
         if nextMayChange { replanNextIfStale() }
     }
 
+    /// One atomic store: cheap enough for every evaluation. It follows the current item too, not only the settings: a
+    /// song turned off for Spatial audio bypasses the stage while the songs around it keep it.
     private func publishStageTarget() {
-        engine.effects.spatial.play(isActive ? settings.profile.profile : nil)
+        engine.effects.spatial.play(isActive ? currentSelection.profile : nil)
     }
 
     private func routeChanged() {
@@ -206,7 +223,9 @@ final class SpatialPlaybackController: SpatialPlayback, DeckSpatialSource {
     /// it was built. When that is no longer the one a start would choose, it is built again.
     private func replanNextIfStale() {
         guard let prepared = engine.preparedIncoming else { return }
-        let wanted = routePasses ? settings.profile.profile : nil
+        // That song's own profile: none for a song turned off, so an item built on a render is built again on its own
+        // audio (and one turned back on looks for its render again).
+        let wanted = routePasses ? settings.profileFor(prepared.song.spotifyId) : nil
         switch prepared.audio {
         case .render(let key):
             if key.profile != wanted { engine.rescheduleNext() }
@@ -244,6 +263,7 @@ final class SpatialPlaybackController: SpatialPlayback, DeckSpatialSource {
             retries = 0
             givenUp = []
         }
+        publishStageTarget()
         refreshSnapshot()
         notePlayedRender()
         reconcile()
@@ -263,13 +283,15 @@ final class SpatialPlaybackController: SpatialPlayback, DeckSpatialSource {
             return SpatialPlaybackSnapshot(selection: settings.profile, route: settings.route, output: output,
                                            routePasses: routePasses, singInstrumentalOn: singOn, audible: .stereo)
         }
+        let spotifyId = entry.song.spotifyId
         var videoId = item?.entry.id == entry.id ? item?.audio.videoId : nil
         if let videoId {
             lastVideo = (entry.id, videoId)
         } else if let lastVideo, lastVideo.entry == entry.id {
             videoId = lastVideo.videoId
         }
-        let profile = settings.profile.profile
+        // The song's own profile (`isActive` reads the same entry): a song turned off plays stereo.
+        let profile = settings.profileFor(spotifyId)
         let audible: SpatialAudible
         switch item?.audio {
         case .render(let key)?:
@@ -284,9 +306,10 @@ final class SpatialPlaybackController: SpatialPlayback, DeckSpatialSource {
             // Loading: what the start will play, as far as it can be told.
             if isActive, let profile { audible = .onDevice(profile) } else { audible = .stereo }
         }
-        return SpatialPlaybackSnapshot(songId: entry.song.id, videoId: videoId, selection: settings.profile,
-                                       route: settings.route, output: output, routePasses: routePasses,
-                                       singInstrumentalOn: singOn, audible: audible)
+        return SpatialPlaybackSnapshot(songId: entry.song.id, videoId: videoId, spotifyId: spotifyId,
+                                       selection: settings.profile, route: settings.route, output: output,
+                                       routePasses: routePasses, singInstrumentalOn: singOn, audible: audible,
+                                       songOff: settings.isOffFor(spotifyId))
     }
 
     /// The library removes the least recently played renders first: tell it when one starts playing.
@@ -321,7 +344,8 @@ final class SpatialPlaybackController: SpatialPlayback, DeckSpatialSource {
         let playing = item.audio
         if case .other = playing { return }
         let library = self.library
-        let key = settings.profile.profile.flatMap { profile in
+        // The song's own profile: a song turned off looks up no render.
+        let key = settings.profileFor(item.song.spotifyId).flatMap { profile in
             playing.videoId.map { RenditionKey(videoId: $0, profile: profile) }
         }
         switching = Task { [weak self] in
@@ -336,9 +360,12 @@ final class SpatialPlaybackController: SpatialPlayback, DeckSpatialSource {
 
     private func attempt(item: DeckItem, playing: SpatialItemAudio, render: LocalRendition?) async -> Attempt {
         guard engine.activeItem === item else { return .stale }
-        let usable = render?.key.profile == settings.profile.profile ? render : nil
+        // Spec 6.3 with the song's own selection: `off` for a song turned off, so a render it plays goes back to its
+        // own audio (the same in-sync 250 ms crossfade as Spatial audio switched off) and nothing switches in.
+        let selection = settings.selection(for: item.song.spotifyId)
+        let usable = render?.key.profile == selection.profile ? render : nil
         let situation = SpatialRenditionRules.Situation(
-            playing: playing, selection: settings.profile, routePasses: routePasses,
+            playing: playing, selection: selection, routePasses: routePasses,
             singBusy: singOn || singSwitching, hasLocalRender: usable != nil,
             secondsLeft: item.durationSeconds - item.positionSeconds,
             transitionInFlight: engine.isRenditionSwitchBlocked)

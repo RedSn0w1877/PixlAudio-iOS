@@ -177,6 +177,9 @@ final class CloudAudioPrepareAhead {
         for candidate in ranked where sent < room {
             // Switched off, or another profile picked, while it looked.
             guard isOn, settings.profile.profile == profile else { return }
+            // Turned off for this song (`spatial.songsOff`, Hoa, 2026-11-11): it plays its original, so nothing is
+            // prepared (or paid for) for it. Android's `SpatialAhead` skips it the same way.
+            if settings.isOffFor(candidate.song.spotifyId) { continue }
             // A Spotify song is rendered from its matched video; one that was never matched waits until it plays.
             guard let videoId = await cloud.streamIdentity(for: candidate.song), CloudLibrary.isValidVideoId(videoId) else {
                 continue

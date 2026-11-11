@@ -54,6 +54,26 @@ struct SpatialRenditionRulesTests {
         #expect(SpatialRenditionRules.action(for: situation(render, .off, transitionInFlight: true)) == .wait)
     }
 
+    /// "This song" (Hoa, 2026-11-11): the player decides with the song's own selection
+    /// (`CloudAudioSettings.selection(for:)`), `off` for a song turned off: it starts on its own audio, a render it
+    /// plays goes back to its own audio (the same way back as Spatial audio switched off) and none switches in.
+    @Test func aSongTurnedOffPlaysItsOwnAudio() {
+        var settings = CloudAudioSettings(builtInCloudKeys: true)
+        settings.profile = .profile(.studio)
+        settings.songsOff = ["off-song"]
+        let off = settings.selection(for: "off-song")
+        #expect(!SpatialRenditionRules.startsWithRender(selection: off, routePasses: true, hasLocalRender: true))
+        #expect(SpatialRenditionRules.action(for: situation(Self.studioRender, off)) == .switchToOwnAudio)
+        #expect(SpatialRenditionRules.action(for: situation(Self.studioRender, off, secondsLeft: 5)) == .switchToOwnAudio)
+        #expect(SpatialRenditionRules.action(for: situation(Self.studioRender, off, singBusy: true)) == .wait)
+        #expect(SpatialRenditionRules.action(for: situation(.own(videoId: Self.video), off)) == .none)
+        // Every other song keeps the profile.
+        let other = settings.selection(for: "other-song")
+        #expect(SpatialRenditionRules.startsWithRender(selection: other, routePasses: true, hasLocalRender: true))
+        #expect(SpatialRenditionRules.action(for: situation(Self.studioRender, other)) == .none)
+        #expect(SpatialRenditionRules.action(for: situation(.own(videoId: Self.video), other)) == .switchToRender(.studio))
+    }
+
     @Test func anotherProfileSwapsToItsRenderOrBackToTheSong() {
         let render = Self.studioRender
         #expect(SpatialRenditionRules.action(for: situation(render, .profile(.hall), hasLocalRender: true))

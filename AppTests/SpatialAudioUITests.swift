@@ -24,6 +24,10 @@ final class SpatialAudioUITests: XCTestCase {
             .surround: "Sound beside and behind you.",
             .night: "Softer and gentler for late listening.",
         ]
+        // "This song" (Hoa, 2026-11-11): Android's `spatial_ui_this_song*`, word for word.
+        XCTAssertEqual(L10n.spatialThisSong, "This song")
+        XCTAssertEqual(L10n.spatialThisSongOn, "Spatial audio is on for this song.")
+        XCTAssertEqual(L10n.spatialThisSongOff, "Off for this song. It plays the original, at full quality.")
         for profile in SpatialProfile.allCases {
             XCTAssertEqual(SpatialAudioUI.name(profile), names[profile], "\(profile)")
             XCTAssertEqual(SpatialAudioUI.name(profile), profile.displayName, "\(profile)")
@@ -71,6 +75,7 @@ final class SpatialAudioUITests: XCTestCase {
             L10n.spatialDevDailyCaption(4), L10n.spatialDevDiagTitle, L10n.spatialDevDiagNothing,
             L10n.spatialDevDiagRendition, L10n.spatialDevDiagHeld, L10n.spatialDevDiagStatus, L10n.spatialDevDiagRender,
             L10n.spatialDevDiagCodec, L10n.spatialDevDiagStems, L10n.spatialDevDiagLoudness, L10n.spatialDevDiagRate,
+            L10n.spatialThisSong, L10n.spatialThisSongOn, L10n.spatialThisSongOff,
         ]
         texts += SpatialSelection.allChoices.flatMap { [SpatialAudioUI.name($0), SpatialAudioUI.line($0)] }
         texts += SpatialStatusLine.allCases.compactMap(SpatialAudioUI.statusText)

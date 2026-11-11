@@ -114,7 +114,7 @@ final class DeckItemFactory {
         // Spec 6.3: with Spatial audio active, a song starts on its local render of the selected profile. The lookup
         // answers from memory, and only while a profile is on.
         if overrideURL == nil, case .automatic = rendition, let spatial, let videoId = Self.ownAudioVideoId(url),
-           let render = await spatial.startRendition(videoId: videoId) {
+           let render = await spatial.startRendition(videoId: videoId, spotifyId: entry.song.spotifyId) {
             do {
                 return try await makeRenderItem(for: entry, render: render, timing: timing)
             } catch {

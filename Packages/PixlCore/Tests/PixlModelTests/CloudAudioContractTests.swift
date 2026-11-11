@@ -123,8 +123,11 @@ struct SpatialRulesTests {
 struct CloudAudioSettingsTests {
     @Test func theKeysAreTheSpecsNames() {
         #expect(CloudAudioSettingsKey.all == ["spatial.profile", "spatial.route", "spatial.cloud", "spatial.prepareAhead",
-                                              "cloudAudio.storageMB", "cloudAudio.monthlyCapUSD", "cloudAudio.dailyAhead"])
-        #expect(Set(CloudAudioSettingsKey.all).count == 7)
+                                              "cloudAudio.storageMB", "cloudAudio.monthlyCapUSD", "cloudAudio.dailyAhead",
+                                              "spatial.songsOff"])
+        #expect(Set(CloudAudioSettingsKey.all).count == 8)
+        // The Android app's key, so both platforms' backups agree.
+        #expect(CloudAudioSettingsKey.songsOff == "spatial.songsOff")
     }
 
     @Test func theDefaultsAreTheSpecs() {
@@ -136,6 +139,7 @@ struct CloudAudioSettingsTests {
         #expect(settings.storageMB == 3072)
         #expect(settings.monthlyCapUSD == 30)
         #expect(settings.dailyAhead == 25)
+        #expect(settings.songsOff.isEmpty)
         #expect(settings == CloudAudioSettings(builtInCloudKeys: true))
         #expect(settings.storageBytes == 3072 * 1_048_576)
         #expect(settings.monthlyCapMicroUSD == 30_000_000)
@@ -191,9 +195,51 @@ struct CloudAudioSettingsTests {
         settings.storageMB = 8192
         settings.monthlyCapUSD = 120
         settings.dailyAhead = 40
+        settings.songsOff = ["7ouMYWpwJ422jRcDASZB7P", "4uLU6hMCjMI75M1A2tKUQC"]
         #expect(CloudAudioSettings(stored: settings.stored, builtInCloudKeys: false) == settings)
         #expect(settings.stored.profile == "surround")
         #expect(settings.stored.route == "always")
+        // Sorted: the same set always writes the same list.
+        #expect(settings.stored.songsOff == ["4uLU6hMCjMI75M1A2tKUQC", "7ouMYWpwJ422jRcDASZB7P"])
+    }
+
+    // MARK: Off for one song (Hoa, 2026-11-11)
+
+    @Test func aSongTurnedOffPlaysWithoutAProfileAndTheOthersKeepIt() {
+        var settings = CloudAudioSettings(builtInCloudKeys: true)
+        settings.profile = .profile(.hall)
+        settings.songsOff = ["off-song"]
+        #expect(settings.isOffFor("off-song"))
+        #expect(settings.profileFor("off-song") == nil)
+        #expect(settings.selection(for: "off-song") == .off)
+        #expect(!settings.isOffFor("other-song"))
+        #expect(settings.profileFor("other-song") == .hall)
+        #expect(settings.selection(for: "other-song") == .profile(.hall))
+        // A song without a Spotify id follows the selection.
+        #expect(!settings.isOffFor(nil))
+        #expect(settings.profileFor(nil) == .hall)
+        #expect(settings.selection(for: nil) == .profile(.hall))
+        // With Spatial audio off nothing has a profile, whatever the list says.
+        settings.profile = .off
+        #expect(settings.profileFor("other-song") == nil)
+        #expect(settings.profileFor("off-song") == nil)
+        #expect(settings.isOffFor("off-song"))
+    }
+
+    @Test func storedSongsOffAreReadSafely() {
+        #expect(CloudAudioSettings.songsOff(fromStored: ["a", "b", "a"]) == ["a", "b"])
+        // Empty ids and values that are not strings are dropped; something that is not a list reads as empty.
+        #expect(CloudAudioSettings.songsOff(fromStored: ["a", "", 3, NSNull(), "b"] as [Any]) == ["a", "b"])
+        #expect(CloudAudioSettings.songsOff(fromStored: "a").isEmpty)
+        #expect(CloudAudioSettings.songsOff(fromStored: 42).isEmpty)
+        #expect(CloudAudioSettings.songsOff(fromStored: ["a": "b"]).isEmpty)
+        #expect(CloudAudioSettings.songsOff(fromStored: nil).isEmpty)
+        #expect(CloudAudioSettings.songsOff(fromStored: [String]()).isEmpty)
+        #expect(CloudAudioSettings.storedSongsOff(["b", "", "a"]) == ["a", "b"])
+        // Never set: nobody turned a song off.
+        #expect(CloudAudioSettings(stored: CloudAudioStoredSettings(), builtInCloudKeys: true).songsOff.isEmpty)
+        let stored = CloudAudioStoredSettings(profile: "studio", songsOff: ["x", "", "y"])
+        #expect(CloudAudioSettings(stored: stored, builtInCloudKeys: true).songsOff == ["x", "y"])
     }
 }
 
@@ -498,6 +544,41 @@ struct SpatialServicesTests {
         snapshot.videoId = CloudAudioFixtures.videoId
         snapshot.selection = .off
         #expect(!snapshot.isActive && snapshot.wantedRender == nil)
+    }
+
+    /// "This song" (Hoa, 2026-11-11): a song turned off is not active, wants no render and nothing holds it back.
+    @Test func aSongTurnedOffWantsNothingAndIsNotHeldBack() {
+        var snapshot = SpatialPlaybackSnapshot(songId: "sp:1", videoId: CloudAudioFixtures.videoId,
+                                               spotifyId: "off-song", selection: .profile(.wide), output: .bluetooth,
+                                               routePasses: true, audible: .stereo, songOff: true)
+        #expect(!snapshot.isActive)
+        #expect(snapshot.wantedRender == nil)
+        #expect(snapshot.blockedBy == nil)
+        // The sheet shows no status line for it.
+        var settings = CloudAudioSettings(builtInCloudKeys: true)
+        settings.profile = .profile(.wide)
+        #expect(SpatialStatusLine.of(settings: settings, snapshot: snapshot, status: .queued, cloudRendersOn: true)
+                == .none)
+        // Nor the moment the switch is flipped, before the player has caught up: the settings say it already.
+        var stale = snapshot
+        stale.songOff = false
+        stale.audible = .onDevice(.wide)
+        settings.songsOff = ["off-song"]
+        #expect(SpatialStatusLine.of(settings: settings, snapshot: stale, status: .queued, cloudRendersOn: true) == .none)
+        settings.songsOff = []
+        #expect(SpatialStatusLine.of(settings: settings, snapshot: stale, status: .queued, cloudRendersOn: true)
+                == .onPhoneForNow)
+        // Held back by the route as well: still nothing (the person chose its original).
+        snapshot.output = .phoneSpeaker
+        snapshot.routePasses = false
+        #expect(snapshot.blockedBy == nil)
+        // Turned back on: the selected profile is wanted again.
+        snapshot.output = .bluetooth
+        snapshot.routePasses = true
+        snapshot.songOff = false
+        snapshot.audible = .onDevice(.wide)
+        #expect(snapshot.isActive)
+        #expect(snapshot.wantedRender == RenditionKey(videoId: CloudAudioFixtures.videoId, profile: .wide))
     }
 
     @Test func whatHoldsASelectedProfileBackComesInAndroidsOrder() {

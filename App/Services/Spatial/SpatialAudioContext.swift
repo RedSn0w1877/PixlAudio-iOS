@@ -32,7 +32,7 @@ struct SpatialAudioContext {
     let tasteAdjustments: TasteAdjustmentStore
     let health: AppHealth
 
-    /// The seven settings as they are stored now.
+    /// The eight settings as they are stored now.
     var settingsStore: CloudAudioSettingsStore { CloudAudioSettingsStore(defaults: defaults) }
 
     /// The settings in force now (the model applies them again at `start()` and after every change).

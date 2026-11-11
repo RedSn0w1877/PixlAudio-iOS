@@ -383,4 +383,64 @@ final class SpatialPlaybackTests: XCTestCase {
         }
         XCTAssertTrue(back, "the render is swapped back to the song's own audio")
     }
+
+    // MARK: This song (Hoa, 2026-11-11)
+
+    private static let spotifyId = "4uLU6hMCjMI75M1A2tKUQC"
+
+    private func settings(_ profile: SpatialProfile?, songsOff: Set<String>) -> CloudAudioSettings {
+        var settings = settings(profile)
+        settings.songsOff = songsOff
+        return settings
+    }
+
+    /// A song Spatial audio is turned off for (`spatial.songsOff`) starts on its own audio although its render is on
+    /// the phone, the stage bypassed and nothing wanted from the cloud; the player's snapshot says it is off.
+    func testASongTurnedOffStartsOnItsOwnAudioWithTheStageBypassed() async throws {
+        let files = try makeFiles(seconds: 6)
+        var song = files.song
+        song.spotifyId = Self.spotifyId
+        let rig = makeRig(.studio, renders: [files.render])
+        await rig.controller.apply(settings(.studio, songsOff: [Self.spotifyId]))
+        defer { rig.engine.stop() }
+        rig.engine.setQueue([song], startIndex: 0, startPositionMs: 0, playWhenReady: false)
+        let loaded = await waitUntil(timeout: 5) { rig.engine.activeItem != nil }
+        XCTAssertTrue(loaded)
+        let item = try XCTUnwrap(rig.engine.activeItem)
+        XCTAssertEqual(item.audio, .own(videoId: Self.videoId))
+        let reported = await waitUntil(timeout: 2) { rig.controller.current.songId == song.id }
+        XCTAssertTrue(reported)
+        XCTAssertNil(rig.engine.effects.spatial.playing, "the stage bypasses the song")
+        XCTAssertTrue(rig.controller.current.songOff)
+        XCTAssertEqual(rig.controller.current.spotifyId, Self.spotifyId)
+        XCTAssertEqual(rig.controller.current.audible, .stereo)
+        XCTAssertNil(rig.controller.current.wantedRender, "nothing is asked of the cloud for it")
+        XCTAssertTrue(rig.library.played.isEmpty)
+    }
+
+    /// Turned off while its render plays: back to its own audio by the in-sync swap (the stage bypassed at once);
+    /// turned back on: the stage plays again and the render switches back in.
+    func testTurningTheSongOffMidRenderSwapsBackAndOnAgainBringsTheRender() async throws {
+        let files = try makeFiles(seconds: 30)
+        var song = files.song
+        song.spotifyId = Self.spotifyId
+        let rig = makeRig(.studio, renders: [files.render])
+        defer { rig.engine.stop() }
+        rig.engine.setQueue([song], startIndex: 0, startPositionMs: 0, playWhenReady: true)
+        try await waitForAudio(rig.engine)
+        XCTAssertEqual(rig.engine.activeItem?.audio, .render(files.render.key))
+
+        await rig.controller.apply(settings(.studio, songsOff: [Self.spotifyId]))
+        XCTAssertNil(rig.engine.effects.spatial.playing, "the stage bypasses at once")
+        let back = await waitUntil(timeout: 10) { rig.engine.activeItem?.audio == .own(videoId: Self.videoId) }
+        XCTAssertTrue(back, "the render is swapped back to the song's own audio")
+        let off = await waitUntil(timeout: 2) { rig.controller.current.songOff && rig.controller.current.audible == .stereo }
+        XCTAssertTrue(off)
+        XCTAssertEqual(rig.engine.activeItem?.entry.song.id, song.id, "the queue entry stays the same")
+
+        await rig.controller.apply(settings(.studio, songsOff: []))
+        XCTAssertEqual(rig.engine.effects.spatial.playing, .studio)
+        let again = await waitUntil(timeout: 10) { rig.engine.activeItem?.audio == .render(files.render.key) }
+        XCTAssertTrue(again, "the render switches back in")
+    }
 }

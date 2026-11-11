@@ -404,6 +404,81 @@ final class SpatialAudioModelTests: XCTestCase {
         XCTAssertTrue(rig.library.requests.isEmpty)
     }
 
+    // MARK: This song (Hoa, 2026-11-11)
+
+    private static let spotifyId = "4uLU6hMCjMI75M1A2tKUQC"
+
+    /// The sheet's "This song" switch: shown while a profile is on and a Spotify song plays; off is stored under
+    /// `spatial.songsOff`, remembered across launches, clears the status line, reads Off on the player's button, and
+    /// nothing more is asked of the cloud for the song. Back on, it is asked for again once the player wants it.
+    func testThisSongTurnedOffIsRememberedAndAsksNothingOfTheCloud() async {
+        let rig = makeRig()
+        rig.model.select(.profile(.studio))
+        rig.model.start()
+        await eventually { rig.playback.hub.subscriberCount == 1 }
+        XCTAssertFalse(rig.model.showsThisSong, "nothing plays")
+        var on = playing(.studio)
+        on.spotifyId = Self.spotifyId
+        rig.playback.move(to: on)
+        await eventually { rig.library.requests.count == 1 }
+        await eventually { rig.model.statusLine == .onPhoneForNow }
+        XCTAssertTrue(rig.model.showsThisSong)
+        XCTAssertTrue(rig.model.isOnForCurrentSong)
+        XCTAssertEqual(rig.model.currentSongSelection, .profile(.studio))
+
+        rig.model.setOnForCurrentSong(false)
+        XCTAssertFalse(rig.model.isOnForCurrentSong)
+        XCTAssertEqual(rig.defaults.stringArray(forKey: "spatial.songsOff"), [Self.spotifyId])
+        // At once, before the player has caught up: no line, Off on the button, the list keeps the profile.
+        XCTAssertEqual(rig.model.statusLine, .none)
+        XCTAssertEqual(rig.model.currentSongSelection, .off)
+        XCTAssertEqual(rig.model.selection, .profile(.studio))
+        XCTAssertTrue(rig.model.showsThisSong, "the switch stays, to turn it back on")
+        await eventually { rig.playback.applied.last?.songsOff == [Self.spotifyId] }
+        XCTAssertEqual(rig.library.applied.last?.songsOff, [Self.spotifyId])
+        var off = on
+        off.songOff = true
+        off.audible = .stereo
+        rig.playback.move(to: off)
+        await eventually { rig.model.snapshot == off }
+        try? await Task.sleep(for: .milliseconds(80))
+        XCTAssertEqual(rig.library.requests.count, 1)
+        XCTAssertEqual(rig.model.libraryStatus, RenditionStatus.none)
+        XCTAssertEqual(rig.model.statusLine, .none)
+
+        // A relaunch reads the same choice.
+        XCTAssertTrue(makeRig(defaults: rig.defaults).model.settings.isOffFor(Self.spotifyId))
+
+        rig.model.setOnForCurrentSong(true)
+        XCTAssertTrue(rig.model.isOnForCurrentSong)
+        XCTAssertEqual(rig.defaults.stringArray(forKey: "spatial.songsOff"), [])
+        rig.playback.move(to: on)
+        await eventually { rig.library.requests.count == 2 }
+        XCTAssertEqual(rig.library.requests[1].key, RenditionKey(videoId: Self.videoId, profile: .studio))
+    }
+
+    /// No switch while Spatial audio is off, or for a song without a Spotify id.
+    func testThisSongIsHiddenWithoutAProfileOrASpotifySong() async {
+        let rig = makeRig()
+        rig.model.start()
+        await eventually { rig.playback.hub.subscriberCount == 1 }
+        var snapshot = playing(.studio)
+        snapshot.selection = .off
+        snapshot.spotifyId = Self.spotifyId
+        rig.playback.move(to: snapshot)
+        await eventually { rig.model.snapshot == snapshot }
+        XCTAssertFalse(rig.model.showsThisSong)
+        rig.model.select(.profile(.studio))
+        XCTAssertTrue(rig.model.showsThisSong)
+        snapshot.spotifyId = nil
+        rig.playback.move(to: snapshot)
+        await eventually { rig.model.snapshot == snapshot }
+        XCTAssertFalse(rig.model.showsThisSong)
+        // Nothing to key the choice by: the setter does nothing.
+        rig.model.setOnForCurrentSong(false)
+        XCTAssertNil(rig.defaults.object(forKey: "spatial.songsOff"))
+    }
+
     // MARK: The pieces the app is assembled from
 
     func testTheFactoriesGiveTheNoOpHalvesUntilTheRealOnesExist() async {
@@ -441,6 +516,18 @@ final class SpatialAudioModelTests: XCTestCase {
         XCTAssertEqual(store.stored().monthlyCapUSD, 75)
         XCTAssertEqual(store.stored().storageMB, 65_536)
         XCTAssertEqual(store.load(builtInCloudKeys: false).profile, .profile(.intimate))
+        // `spatial.songsOff`: one song at a time, the rest of the list kept.
+        store.setSongOff("b", off: true)
+        store.setSongOff("a", off: true)
+        store.setSongOff("b", off: false)
+        XCTAssertEqual(store.stored().songsOff, ["a"])
+        XCTAssertEqual(store.load(builtInCloudKeys: false).songsOff, ["a"])
+        // A value of another type (an older build, a bad restore) reads as empty and never fails.
+        store.defaults.set("not a list", forKey: CloudAudioSettingsKey.songsOff)
+        XCTAssertEqual(store.stored().songsOff, [])
+        XCTAssertEqual(store.load(builtInCloudKeys: false).songsOff, [])
+        store.defaults.set(["c", 7] as [Any], forKey: CloudAudioSettingsKey.songsOff)
+        XCTAssertEqual(store.load(builtInCloudKeys: false).songsOff, ["c"])
         store.reset()
         XCTAssertEqual(store.stored(), CloudAudioStoredSettings())
         XCTAssertEqual(store.load(builtInCloudKeys: true), CloudAudioSettings(builtInCloudKeys: true))

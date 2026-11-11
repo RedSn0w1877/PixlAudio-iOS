@@ -207,6 +207,8 @@ public struct SpatialPlaybackSnapshot: Sendable, Hashable {
     public var songId: String?
     /// The YouTube video its audio comes from, when it has one.
     public var videoId: String?
+    /// The song's Spotify track, when it has one: the key of the sheet's "This song" switch (`spatial.songsOff`).
+    public var spotifyId: String?
     /// The selection the player was given.
     public var selection: SpatialSelection
     /// The route mode the player was given (`spatial.route`).
@@ -220,30 +222,37 @@ public struct SpatialPlaybackSnapshot: Sendable, Hashable {
     /// What is heard. While Spatial audio is active this is `onDevice` or `render`, except for a song at a sample
     /// rate the on-device stage does not take (not 44.1 or 48 kHz): that one plays `stereo` until its render is here.
     public var audible: SpatialAudible
+    /// Spatial audio is turned off for this song (`spatial.songsOff`, Hoa, 2026-11-11): it plays its original audio,
+    /// `stereo`, while `selection` stays the profile picked for every other song.
+    public var songOff: Bool
 
-    public init(songId: String? = nil, videoId: String? = nil, selection: SpatialSelection = .off,
-                route: SpatialRouteMode = .headphones, output: SpatialOutputKind = .phoneSpeaker,
-                routePasses: Bool = false, singInstrumentalOn: Bool = false, audible: SpatialAudible = .stereo) {
+    public init(songId: String? = nil, videoId: String? = nil, spotifyId: String? = nil,
+                selection: SpatialSelection = .off, route: SpatialRouteMode = .headphones,
+                output: SpatialOutputKind = .phoneSpeaker, routePasses: Bool = false, singInstrumentalOn: Bool = false,
+                audible: SpatialAudible = .stereo, songOff: Bool = false) {
         self.songId = songId
         self.videoId = videoId
+        self.spotifyId = spotifyId
         self.selection = selection
         self.route = route
         self.output = output
         self.routePasses = routePasses
         self.singInstrumentalOn = singInstrumentalOn
         self.audible = audible
+        self.songOff = songOff
     }
 
     /// Nothing loaded, Spatial audio off.
     public static let idle = SpatialPlaybackSnapshot()
 
-    /// "Spatial active" (spec 6.3).
-    public var isActive: Bool { selection.isOn && routePasses && !singInstrumentalOn }
+    /// "Spatial active" (spec 6.3). Never for a song Spatial audio is turned off for.
+    public var isActive: Bool { selection.isOn && !songOff && routePasses && !singInstrumentalOn }
 
-    /// Why the selected profile is not audible now, or nil when it is, when none is selected or nothing is loaded:
-    /// the first of `route`, `sing`, `remote`, `format` that holds (the order the Android player reports them in).
+    /// Why the selected profile is not audible now, or nil when it is, when none is selected, nothing is loaded or the
+    /// song is turned off (nothing holds it back: the person chose its original): the first of `route`, `sing`,
+    /// `remote`, `format` that holds (the order the Android player reports them in).
     public var blockedBy: SpatialBlock? {
-        guard selection.isOn, songId != nil else { return nil }
+        guard selection.isOn, !songOff, songId != nil else { return nil }
         // A device that plays the music itself never passes the route rule here; with `always` that is not the
         // rule saying no, it is the device (Android reports it the same way).
         let elsewhere = output == .remote && route == .always
@@ -325,7 +334,8 @@ public enum SpatialStatusLine: Sendable, Hashable, CaseIterable {
     /// can happen at all (`cloudRendersOn`: Cloud Studio's "Process songs in the cloud", the master, and
     /// `spatial.cloud`, 6.1 "Two switches"). The same rules, in the same order, as the Android app's
     /// `SpatialStatusLine.of`:
-    /// - no profile selected, or nothing loaded: `none`;
+    /// - no profile selected, nothing loaded, or Spatial audio turned off for the song (by the settings, so the line
+    ///   goes the moment the switch is flipped, or by the player): `none`;
     /// - the route rule fails: `headphonesOnly`; else Sing's instrumental mode is on: `pausedForSing`;
     /// - a cloud render is audible: `cloudVersion`;
     /// - the on-device stage is audible: `onPhoneOnly` while cloud renders are off; else `cloudFailed` after a
@@ -336,7 +346,8 @@ public enum SpatialStatusLine: Sendable, Hashable, CaseIterable {
     ///   `none`.
     public static func of(settings: CloudAudioSettings, snapshot: SpatialPlaybackSnapshot, status: RenditionStatus,
                           cloudRendersOn: Bool) -> SpatialStatusLine {
-        guard settings.profile.isOn, snapshot.songId != nil else { return .none }
+        guard settings.profile.isOn, snapshot.songId != nil, !snapshot.songOff,
+              !settings.isOffFor(snapshot.spotifyId) else { return .none }
         switch snapshot.blockedBy {
         case .route?: return .headphonesOnly
         case .sing?: return .pausedForSing

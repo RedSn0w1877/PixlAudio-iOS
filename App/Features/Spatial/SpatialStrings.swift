@@ -69,6 +69,14 @@ nonisolated extension L10n {
     static let spatialQuieterNote = String(localized: "spatial_ui_quieter_note",
                                            defaultValue: "Spatial plays a little quieter so the peaks stay clean.")
 
+    // MARK: The sheet's "This song" switch (Hoa, 2026-11-11; Android's `spatial_ui_this_song*`)
+
+    static let spatialThisSong = String(localized: "spatial_ui_this_song", defaultValue: "This song")
+    static let spatialThisSongOn = String(localized: "spatial_ui_this_song_on",
+                                          defaultValue: "Spatial audio is on for this song.")
+    static let spatialThisSongOff = String(localized: "spatial_ui_this_song_off",
+                                           defaultValue: "Off for this song. It plays the original, at full quality.")
+
     // MARK: The full player's button (VoiceOver: the label is "Spatial audio", the value "Off" or the profile's name)
 
     /// A selected profile that can't be heard right now (the route rule or Sing; the sheet's line says why).

@@ -1,6 +1,6 @@
 // The settings of Spatial audio (cloud audio spec of 2026-11-10, section 6.1): the keys, the defaults and the
 // clamps, as plain values, so both the rules and the storage round trip are tested without an app. The app reads the
-// seven keys into `CloudAudioStoredSettings`, resolves them here, and writes a key only when the person changes it
+// eight keys into `CloudAudioStoredSettings`, resolves them here, and writes a key only when the person changes it
 // (a value that was never set keeps following its default).
 
 import Foundation
@@ -21,12 +21,15 @@ public enum CloudAudioSettingsKey {
     public static let monthlyCapUSD = "cloudAudio.monthlyCapUSD"
     /// Songs a day the background queue may send (an integer).
     public static let dailyAhead = "cloudAudio.dailyAhead"
+    /// The Spotify track ids of the songs Spatial audio is turned off for (an array of strings), from the sheet's
+    /// "This song" switch (Hoa, 2026-11-11). The Android app's key, so both platforms read the same backups.
+    public static let songsOff = "spatial.songsOff"
 
     public static let all: [String] = [spatialProfile, spatialRoute, spatialCloud, spatialPrepareAhead, storageMB,
-                                       monthlyCapUSD, dailyAhead]
+                                       monthlyCapUSD, dailyAhead, songsOff]
 }
 
-/// The seven values as they are stored: nil means the person never set it, so its default applies.
+/// The eight values as they are stored: nil means the person never set it, so its default applies.
 public struct CloudAudioStoredSettings: Sendable, Hashable {
     public var profile: String?
     public var route: String?
@@ -35,9 +38,12 @@ public struct CloudAudioStoredSettings: Sendable, Hashable {
     public var storageMB: Int?
     public var monthlyCapUSD: Double?
     public var dailyAhead: Int?
+    /// `spatial.songsOff` as read (`CloudAudioSettings.songsOff(fromStored:)` makes a set of whatever is there).
+    public var songsOff: [String]?
 
     public init(profile: String? = nil, route: String? = nil, cloud: Bool? = nil, prepareAhead: Bool? = nil,
-                storageMB: Int? = nil, monthlyCapUSD: Double? = nil, dailyAhead: Int? = nil) {
+                storageMB: Int? = nil, monthlyCapUSD: Double? = nil, dailyAhead: Int? = nil,
+                songsOff: [String]? = nil) {
         self.profile = profile
         self.route = route
         self.cloud = cloud
@@ -45,6 +51,7 @@ public struct CloudAudioStoredSettings: Sendable, Hashable {
         self.storageMB = storageMB
         self.monthlyCapUSD = monthlyCapUSD
         self.dailyAhead = dailyAhead
+        self.songsOff = songsOff
     }
 }
 
@@ -68,6 +75,10 @@ public struct CloudAudioSettings: Sendable, Hashable {
     public var monthlyCapUSD: Double?
     /// `cloudAudio.dailyAhead`. Default 25.
     public var dailyAhead: Int
+    /// `spatial.songsOff`: the Spotify ids of the songs Spatial audio is turned off for (Hoa, 2026-11-11). Default
+    /// empty. Such a song plays its original audio at full quality while a profile is selected: no on-device stage, no
+    /// cloud render, nothing asked of the cloud or prepared ahead for it (spec 6.3, 6.4 apply to the other songs).
+    public var songsOff: Set<String>
 
     // The stored forms below are spec 6.1's, identical on both platforms.
     public static let defaultStorageMB = 3072
@@ -92,6 +103,7 @@ public struct CloudAudioSettings: Sendable, Hashable {
         storageMB = Self.defaultStorageMB
         monthlyCapUSD = Self.defaultMonthlyCapUSD
         dailyAhead = Self.defaultDailyAhead
+        songsOff = []
     }
 
     /// The stored values with the defaults filled in and every number brought inside its range.
@@ -104,13 +116,49 @@ public struct CloudAudioSettings: Sendable, Hashable {
         if let value = stored.storageMB { storageMB = Self.clampedStorageMB(value) }
         if let value = stored.monthlyCapUSD { monthlyCapUSD = Self.monthlyCap(fromStored: value) }
         if let value = stored.dailyAhead { dailyAhead = Self.clampedDailyAhead(value) }
+        if let value = stored.songsOff { songsOff = Self.songsOff(fromStored: value) }
     }
 
     /// Every value as it would be stored (used by tests and by a full write; the app normally writes one key).
     public var stored: CloudAudioStoredSettings {
         CloudAudioStoredSettings(profile: profile.storageValue, route: route.rawValue, cloud: cloud,
                                  prepareAhead: prepareAhead, storageMB: storageMB,
-                                 monthlyCapUSD: Self.storedMonthlyCap(monthlyCapUSD), dailyAhead: dailyAhead)
+                                 monthlyCapUSD: Self.storedMonthlyCap(monthlyCapUSD), dailyAhead: dailyAhead,
+                                 songsOff: Self.storedSongsOff(songsOff))
+    }
+
+    // MARK: Off for one song (Hoa, 2026-11-11)
+
+    /// The profile `spotifyId`'s song plays with: the selected one, or nil when Spatial audio is off or turned off for
+    /// that song (Android's `SpatialSettings.profileFor`). A song without a Spotify id follows the selection.
+    public func profileFor(_ spotifyId: String?) -> SpatialProfile? {
+        isOffFor(spotifyId) ? nil : profile.profile
+    }
+
+    /// `profileFor` as a selection: `off` for a song Spatial audio is turned off for. What the player decides with for
+    /// that song (the stage, the render it starts on, the switches of spec 6.3).
+    public func selection(for spotifyId: String?) -> SpatialSelection {
+        isOffFor(spotifyId) ? .off : profile
+    }
+
+    /// Spatial audio is turned off for `spotifyId`'s song in particular (Android's `SpatialSettings.isOffFor`).
+    public func isOffFor(_ spotifyId: String?) -> Bool {
+        guard let spotifyId else { return false }
+        return songsOff.contains(spotifyId)
+    }
+
+    /// Whatever was stored under `spatial.songsOff` as a set of ids: anything that is not a non-empty string is
+    /// dropped, and something that is not a list at all (nobody's choice) reads as empty. Never fails.
+    public static func songsOff(fromStored value: Any?) -> Set<String> {
+        guard let list = value as? [Any] else { return [] }
+        var ids = Set<String>()
+        for case let id as String in list where !id.isEmpty { ids.insert(id) }
+        return ids
+    }
+
+    /// The set as it is stored: sorted, so the same set always writes the same list.
+    public static func storedSongsOff(_ ids: Set<String>) -> [String] {
+        ids.filter { !$0.isEmpty }.sorted()
     }
 
     public static func clampedStorageMB(_ value: Int) -> Int {

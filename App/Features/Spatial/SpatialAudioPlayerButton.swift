@@ -11,7 +11,8 @@ struct SpatialAudioPlayerButton: View {
 
     var body: some View {
         let spatial = env.spatial
-        SpatialAudioButtonContent(ui: SpatialButtonUI.of(selection: spatial.selection,
+        // The current song's selection: Off for a song Spatial audio is turned off for ("This song", Hoa, 2026-11-11).
+        SpatialAudioButtonContent(ui: SpatialButtonUI.of(selection: spatial.currentSongSelection,
                                                          blockedBy: spatial.snapshot.blockedBy)) {
             router.present(AppSheet.spatialAudio(fromPlayer: true))
         }

@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import PixlModel
 
-/// Spatial audio as the screens see it (`env.spatial`; cloud audio spec of 2026-11-10, section 6): the seven
+/// Spatial audio as the screens see it (`env.spatial`; cloud audio spec of 2026-11-10, section 6): the eight
 /// settings, what plays now, where the cloud render of the playing song stands, and what the phone holds. The player
 /// sheet's Spatial audio sheet and Settings › Playback › Sound read it and call it; they never touch the two services
 /// behind it.
@@ -58,6 +58,20 @@ final class SpatialAudioModel {
 
     /// "Spatial active" (spec 6.3), as the player sees it.
     var isActive: Bool { snapshot.isActive }
+
+    // MARK: This song (Hoa, 2026-11-11)
+
+    /// The sheet's "This song" switch is shown: a profile is selected and the playing song has a Spotify id (the key
+    /// of `spatial.songsOff`). With Spatial audio off every song plays its original anyway.
+    var showsThisSong: Bool { settings.profile.isOn && snapshot.songId != nil && snapshot.spotifyId != nil }
+
+    /// The switch's state: Spatial audio plays for the current song (false: turned off for it, it plays its original
+    /// at full quality). Read from the settings, so it flips the moment it is tapped; the player follows.
+    var isOnForCurrentSong: Bool { !settings.isOffFor(snapshot.spotifyId) }
+
+    /// The selection the current song plays with: `off` for a song turned off. The player's button shows it, so it
+    /// reads Off for that song while the sheet's list keeps the profile picked for every other song.
+    var currentSongSelection: SpatialSelection { settings.selection(for: snapshot.spotifyId) }
 
     // MARK: Plumbing
 
@@ -199,6 +213,22 @@ final class SpatialAudioModel {
         settingsChanged()
     }
 
+    /// The sheet's "This song" switch: Spatial audio on or off for the song that plays, remembered for every later
+    /// play of it (`spatial.songsOff`). Off, it plays its original: the player bypasses the stage, goes back from a
+    /// render to its own audio, and nothing is asked of the cloud or prepared ahead for it.
+    func setOnForCurrentSong(_ isOn: Bool) {
+        guard let spotifyId = snapshot.spotifyId else { return }
+        setSongOff(spotifyId, off: !isOn)
+    }
+
+    /// `spatial.songsOff` for one song.
+    func setSongOff(_ spotifyId: String, off: Bool) {
+        guard !spotifyId.isEmpty, settings.isOffFor(spotifyId) != off else { return }
+        if off { settings.songsOff.insert(spotifyId) } else { settings.songsOff.remove(spotifyId) }
+        store.setSongOff(spotifyId, off: off)
+        settingsChanged()
+    }
+
     /// Developer mode: where Spatial audio may play.
     func setRoute(_ mode: SpatialRouteMode) {
         guard settings.route != mode else { return }
@@ -316,9 +346,10 @@ final class SpatialAudioModel {
         }
     }
 
-    /// The selected profile's render of the playing song.
+    /// The selected profile's render of the playing song; nil for a song Spatial audio is turned off for (nothing is
+    /// asked for it, and its status is `none`).
     private var currentKey: RenditionKey? {
-        guard let videoId = snapshot.videoId, let profile = settings.profile.profile else { return nil }
+        guard let videoId = snapshot.videoId, let profile = settings.profileFor(snapshot.spotifyId) else { return nil }
         return RenditionKey(videoId: videoId, profile: profile)
     }
 

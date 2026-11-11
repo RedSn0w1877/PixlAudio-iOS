@@ -12178,6 +12178,39 @@
         }
       }
     },
+    "spatial_ui_this_song" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This song"
+          }
+        }
+      }
+    },
+    "spatial_ui_this_song_off" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Off for this song. It plays the original, at full quality."
+          }
+        }
+      }
+    },
+    "spatial_ui_this_song_on" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spatial audio is on for this song."
+          }
+        }
+      }
+    },
     "third_party_notices_action" : {
       "extractionState" : "manual",
       "localizations" : {
