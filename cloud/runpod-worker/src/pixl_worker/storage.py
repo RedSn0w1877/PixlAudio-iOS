@@ -28,11 +28,13 @@ from .config import Caps
 from .errors import (
     BAD_URL, DOWNLOAD_FAILED, INPUT_MISMATCH, INPUT_MISSING, INPUT_TOO_LARGE, UPLOAD_FAILED, WorkerError,
 )
+from .library import audio_key, manifest_key
 from .log import log, safe_url
 from .schema import Job
 
 CONTENT_TYPES = {"m4a": "audio/mp4", "flac": "audio/flac", "json": "application/json"}
 CHUNK = 1024 * 1024
+LIBRARY_MANIFEST_MAX = 64 * 1024  # a render manifest is about 1 KB
 RETRY_STATUSES = {408, 425, 429, 500, 502, 503, 504}
 
 
@@ -292,6 +294,42 @@ class PresignedStorage:
     def put_json(self, slot: str, data: bytes) -> str:
         self._put(self.job.output.put[slot], body=data, content_type=CONTENT_TYPES["json"], what=slot)
         return self.job.object_key(slot)
+
+    # ---- the shared library (lib/v<LIB_V>/<videoId>/, cloud-audio-spec.md section 3) ------------------------
+    # `slot` is sp-<profile>; schema.py already held each URL to that slot's canonical key.
+    def get_library_manifest(self, slot: str) -> dict | None:
+        """The render manifest that is in the library for this slot, or None when there is none, when the job
+        brought no manifestGet for it, or when storage could not be read (one try: asking is best effort, and
+        the answer to any doubt is to make the render)."""
+        url = self.job.library.target(slot).manifest_get
+        if not url:
+            return None
+        try:
+            resp = self.transport.request("GET", url, max_body=LIBRARY_MANIFEST_MAX, timeout=10.0,
+                                          deadline=self.clock() + 10.0)
+        except (TooLarge, TransientError) as exc:
+            log.warning("library_manifest_unreadable", slot=slot, reason=type(exc).__name__)
+            return None
+        if resp.status != 200:
+            if resp.status != 404:
+                log.warning("library_manifest_unreadable", slot=slot, reason=f"HTTP {resp.status}")
+            return None
+        try:
+            value = json.loads(resp.body.decode("utf-8"))
+        except (UnicodeDecodeError, ValueError):
+            return None
+        return value if isinstance(value, dict) else None
+
+    def put_library_audio(self, slot: str, path: str) -> str:
+        """Upload a render's FLAC. Returns its key. Its manifest must follow (put_library_manifest), never lead."""
+        self._put(self.job.library.target(slot).audio_put, body_path=path, content_type=CONTENT_TYPES["flac"],
+                  what=slot, timeout=download_budget_s(os.path.getsize(path)))
+        return audio_key(self.job.library.video_id, slot)
+
+    def put_library_manifest(self, slot: str, data: bytes) -> str:
+        self._put(self.job.library.target(slot).manifest_put, body=data, content_type=CONTENT_TYPES["json"],
+                  what=f"{slot} manifest")
+        return manifest_key(self.job.library.video_id, slot)
 
     # ---- guard --------------------------------------------------------------------------------------------
     @property

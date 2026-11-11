@@ -1,0 +1,5 @@
+# htdemucs_6s: the six-source Hybrid Transformer Demucs (drums, bass, other, vocals, guitar, piano), one model.
+# Copied unchanged from demucs 4.1.0 (MIT), demucs/remote/htdemucs_6s.yaml; demucs.pretrained.get_model reads it
+# from the local repo next to the .th file (weights.lock lists it). The worker uses only its guitar and piano
+# outputs, on the "other" stem of htdemucs_ft (separate.Stems6: the six-stem cascade behind the spatial renders).
+models: ['5c90dfd2']

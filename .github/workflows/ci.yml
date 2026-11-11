@@ -12,6 +12,7 @@ on:
       - 'cloud/**'
       - '.github/workflows/cloud-worker-*.yml'
       - '.github/workflows/cloud-e2e.yml'
+      - '.github/workflows/cloud-library-janitor.yml'
   workflow_dispatch:
     inputs:
       shots:

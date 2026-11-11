@@ -34,10 +34,12 @@ SECONDS = 12
 
 
 class MemStorage:
-    """The storage driver interface, in memory. `objects` maps slot names to bytes; `ops` records the order."""
+    """The storage driver interface, in memory. `objects` maps slot names to bytes; `ops` records the order.
+    The shared library is `library`: its keys (lib/v1/<videoId>/...) to bytes; a put is recorded under its key.
+    `fail_put` takes slots (a library slot fails its audio, "<slot> manifest" its manifest)."""
 
     def __init__(self, job, caps, source: bytes, *, guard=True, manifest=None, attempt=None, fail_put=(),
-                 missing=False):
+                 missing=False, library=None, library_get=None):
         self.job, self.caps, self.source, self.missing = job, caps, source, missing
         self.has_guard = guard
         self.objects = {}
@@ -48,6 +50,32 @@ class MemStorage:
         self.ops = []
         self.fail_put = set(fail_put)
         self.input_deleted = False
+        self.library = {key: (value if isinstance(value, bytes) else json.dumps(value).encode())
+                        for key, value in (library or {}).items()}
+        self.library_get = library_get  # callable(slot) -> dict | None, instead of reading self.library
+
+    def get_library_manifest(self, slot):
+        self.ops.append(("get", f"lib:{slot}"))
+        if self.job.library.target(slot).manifest_get is None:
+            return None
+        if self.library_get is not None:
+            return self.library_get(slot)
+        raw = self.library.get(f"lib/v1/{self.job.library.video_id}/{slot}.json")
+        return json.loads(raw) if raw else None
+
+    def _put_library(self, slot, what, key, data):
+        if what in self.fail_put:
+            raise WorkerError(errors.UPLOAD_FAILED, f"storage refused the {what} upload (HTTP 403)")
+        self.ops.append(("put", key))
+        self.library[key] = data
+        return key
+
+    def put_library_audio(self, slot, path):
+        with open(path, "rb") as fh:
+            return self._put_library(slot, slot, f"lib/v1/{self.job.library.video_id}/{slot}.flac", fh.read())
+
+    def put_library_manifest(self, slot, data):
+        return self._put_library(slot, f"{slot} manifest", f"lib/v1/{self.job.library.video_id}/{slot}.json", data)
 
     def fetch_input(self, dest, *, total_timeout=120.0):
         self.ops.append(("fetch", total_timeout))
@@ -180,7 +208,10 @@ def test_ok_job_uploads_everything_then_the_manifest_last(song_m4a, tmp_path):
     assert result["input"]["sha256"] == hashlib.sha256(song_m4a).hexdigest()
     assert abs(result["input"]["decodedSamples"] - SECONDS * 44100) <= 2048
     assert result["timings"]["coldStartMs"] == 1234 and result["timings"]["totalMs"] > 0
-    assert result["models"] == {"separator": "fake-separator", "stems4": None, "aligner": "fake-aligner", "asr": None}
+    assert result["models"] == {"separator": "fake-separator", "stems4": None, "aligner": "fake-aligner", "asr": None,
+                                "stems6": None}
+    assert result["library"] is None  # no library task: the 1.1.0 fields are there, and empty
+    assert {result["timings"][k] for k in ("stems6Ms", "renderMs")} == {0}
     lyrics = json.loads(storage.objects["lyrics"])
     LYRICS.validate(lyrics)
     assert lyrics["mode"] == "aligned" and lyrics["language"] == "ko"

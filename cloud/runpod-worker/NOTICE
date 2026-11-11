@@ -21,6 +21,11 @@ Model weights (data, loaded by the code above; baked in at build time, never dow
   Licence: MIT  Text: LICENSES/MIT-demucs.txt
   Source: https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/ (f7e0c4bc, d12395a8, 92cfc3b6, 04573f0d)
   and https://github.com/facebookresearch/demucs (the bag file models/demucs/htdemucs_ft.yaml comes from it)
+- htdemucs_6s (Hybrid Transformer Demucs, six sources; only its guitar and piano outputs are used) by Meta
+  Platforms, Inc. and affiliates
+  Licence: MIT  Text: LICENSES/MIT-demucs.txt
+  Source: https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/5c90dfd2-34c22ccb.th
+  and https://github.com/facebookresearch/demucs (the bag file models/demucs/htdemucs_6s.yaml comes from it)
 - Qwen3-ForcedAligner-0.6B by the Qwen team, Alibaba Cloud
   Licence: Apache-2.0  Text: LICENSES/Apache-2.0.txt
   Source: https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B at commit c7cbfc2048c462b0d63a45797104fc9db3ad62b7
@@ -28,6 +33,22 @@ Model weights (data, loaded by the code above; baked in at build time, never dow
   Licence: Apache-2.0  Text: LICENSES/Apache-2.0.txt
   Source: https://huggingface.co/Qwen/Qwen3-ASR-1.7B at commit 7278e1e70fe206f11671096ffdd38061171dd6e5
 Neither Qwen repository ships a NOTICE file at those commits.
+
+Measurement data (inside the worker code's package, and in the files the apps ship)
+------------------------------------------------------------------------------------
+- Head-related impulse responses of the Neumann KU100 dummy head: src/pixl_worker/spatial/data/hrir_ku100.npz,
+  derived from the SADIE II Database, subject D1 (D1_48K_24bit_256tap_FIR_SOFA.sofa in D1_HRIR_SOFA.zip), by
+  AudioLab and Gavin Kearney, University of York.
+  Licence: Apache-2.0  Text: LICENSES/Apache-2.0.txt, and the licence's own notice for this data in
+  LICENSES/SADIE-II.txt
+  Source: https://zenodo.org/records/12092466 (version 2-2, doi:10.5281/zenodo.12092466)
+  This file is not the original. tools/build_hrir.py made it from the database (2026-11-10): about 900 of the
+  8802 measured directions are kept, the right half of the sphere is replaced by the mirror image of the left,
+  the common leading silence is removed and the tails are faded out, the set is diffuse-field equalised, and the
+  samples are stored as 16-bit integers with a scale factor.
+  The on-device tables schema/v1/spatial/spatial_preview_v1.json and spatial_preview_golden_v1.json (shipped in
+  both PixlAudio apps) are computed from that file by src/pixl_worker/spatial/preview.py, and every spatial
+  render the worker produces is made with it.
 
 Python libraries (installed from PyPI by hash; see requirements.lock)
 -----------------------------------------------------------------------

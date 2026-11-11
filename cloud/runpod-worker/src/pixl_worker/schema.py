@@ -1,8 +1,13 @@
-"""Validation of the job input, schema v1 (stdlib only; no torch, no jsonschema).
+"""Validation of the job input, schema v1 (no torch, no jsonschema; the library's version, keys and profile ids
+come from library.py, which needs NumPy).
 
 schema/v1/job.input.schema.json is the contract. This module re-checks every rule in it by hand, plus the
 server-side caps from config.Caps, and returns a normalised, immutable Job. tests/test_schema.py runs the
 golden examples and a set of broken inputs through both this module and jsonschema so the two cannot drift.
+
+The `spatial` task (docs/handoff/2026-11-10-plans/cloud-audio-spec.md, section 4) writes into the shared library,
+lib/v<LIB_V>/<videoId>/, not into the job's own out/<jobKey>/ folder. Its URLs come in the top-level `library`
+object and are held to the library's canonical keys exactly as output.put is held to the job's.
 """
 
 from __future__ import annotations
@@ -16,14 +21,17 @@ from urllib.parse import parse_qs, unquote, urlsplit
 from . import SUPPORTED_VERSIONS
 from .config import Caps
 from .errors import BAD_OP, BAD_SCHEMA, BAD_URL, UNSUPPORTED_VERSION, WorkerError
+from .library import LIB_V, PROFILE_IDS, VIDEO_ID_RE, audio_key, manifest_key, render_slot
 
 JOB_SCHEMA = "pixl.cloudstudio.job"
 OPS = ("process", "selftest", "bench")
-TASKS = ("instrumental", "vocals", "stems4", "lyrics")
+LIBRARY_TASKS = ("spatial",)  # the tasks whose results go into the shared library
+TASKS = ("instrumental", "vocals", "stems4", "lyrics") + LIBRARY_TASKS
 EXTS = ("m4a", "mp3", "flac", "wav", "ogg", "opus", "webm")
 STEM_SLOTS = ("instrumental", "vocals", "drums", "bass", "other")
 PUT_SLOTS = STEM_SLOTS + ("lyrics", "manifest")
-BENCH_STAGES = ("decode", "separate", "stems4", "align", "transcribe", "encode")
+BENCH_STAGES = ("decode", "separate", "stems4", "stems6", "render", "align", "transcribe", "encode")
+MAX_ITAG = 2 ** 31 - 1  # library.source.itag is only recorded, but it lands in a manifest every phone decodes
 
 JOB_KEY_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -89,6 +97,31 @@ class Guard:
 
 
 @dataclass(frozen=True)
+class LibraryTarget:
+    """One render in the shared library: its profile, its slot (sp-<profile>) and the presigned URLs of its audio
+    (library.audio_key) and of its manifest (library.manifest_key)."""
+    slot: str
+    profile: str
+    audio_put: str
+    manifest_put: str
+    manifest_get: str | None  # optional: without it the worker cannot see that the render is already there
+
+
+@dataclass(frozen=True)
+class LibrarySpec:
+    video_id: str
+    source_itag: int | None   # what the phone played (YouTube's itag and codec); only recorded in the manifests
+    source_codec: str | None
+    renders: tuple[LibraryTarget, ...] = ()   # the profiles to render, in the order they were asked for
+
+    def target(self, slot: str) -> LibraryTarget:
+        for target in self.renders:
+            if target.slot == slot:
+                return target
+        raise KeyError(slot)
+
+
+@dataclass(frozen=True)
 class BenchSpec:
     seconds: int
     stages: tuple[str, ...]
@@ -108,12 +141,18 @@ class Job:
     lyrics: LyricsRequest | None = None
     output: OutputSpec | None = None
     guard: Guard | None = None
+    library: LibrarySpec | None = None  # set when tasks has spatial
     bench: BenchSpec | None = None
     # input.policy.last_in_batch: the phone's last job of a submit burst; the worker stops itself after it.
     last_in_batch: bool = False
 
     def wants(self, task: str) -> bool:
         return task in self.tasks
+
+    def wants_own_outputs(self) -> bool:
+        """Does the job ask for anything that goes into its own out/<jobKey>/ folder (every task from before
+        1.1.0)? All of those start from the vocal separation; a job with only library tasks never runs it there."""
+        return any(task not in LIBRARY_TASKS for task in self.tasks)
 
     def stem_slots(self) -> tuple[str, ...]:
         slots = []
@@ -342,6 +381,13 @@ def validate_job(raw: Any, caps: Caps) -> Job:
     elif raw.get("lyrics") is not None:
         _obj(raw.get("lyrics"), "lyrics")  # present but unused: still has to be an object
 
+    library = None
+    if any(task in tasks for task in LIBRARY_TASKS):
+        if storage != "presigned":
+            raise _fail("the spatial task needs presigned storage (the shared library is in R2)")
+        library = _library(raw.get("library"), caps)
+    # Without that task `library` is not looked at, whatever it holds.
+
     if quality == "best" and audio.duration_ms > caps.best_max_audio_s * 1000:
         # Not an error: the worker falls back to standard and says so (pipeline adds the warning).
         pass
@@ -352,7 +398,7 @@ def validate_job(raw: Any, caps: Caps) -> Job:
     return Job(
         op="process", job_key=job_key, client_app=client_app, client_build=client_build, storage=storage,
         audio=audio, tasks=tuple(tasks), quality=quality, lyrics=lyrics, output=output, guard=guard,
-        last_in_batch=last_in_batch,
+        library=library, last_in_batch=last_in_batch,
     )
 
 
@@ -378,6 +424,55 @@ def _audio(value: Any, storage: str, job_key: str, caps: Caps) -> AudioRef:
         if key != f"in/{job_key}.{ext}":
             raise _fail("audio.key must be in/<jobKey>.<ext> for this job")
     return AudioRef(get=get, delete=delete, key=key, ext=ext, bytes=size, sha256=sha, duration_ms=duration_ms)
+
+
+def _library(value: Any, caps: Caps) -> LibrarySpec:
+    """The `library` object of a job with the spatial task (spec section 4)."""
+    if value is None:
+        raise _fail("library is required for the spatial task")
+    raw = _obj(value, "library")
+    v = raw.get("v")
+    if isinstance(v, bool) or not isinstance(v, int) or v != LIB_V:
+        raise WorkerError(UNSUPPORTED_VERSION, f"library.v must be {LIB_V}")
+    video_id = raw.get("videoId")
+    if not isinstance(video_id, str) or not VIDEO_ID_RE.fullmatch(video_id):
+        raise _fail("library.videoId must be an 11-character YouTube video id")
+    source = _obj(raw.get("source"), "library.source", required=False) or {}
+    itag = _int(source.get("itag"), "library.source.itag", lo=0, hi=MAX_ITAG, required=False)
+    codec = _str(source.get("codec"), "library.source.codec", max_len=16, required=False)
+    renders_raw = raw.get("renders")
+    if not isinstance(renders_raw, list) or not renders_raw:
+        raise _fail("library.renders must list 1 to 6 renders")
+    if len(renders_raw) > len(PROFILE_IDS):
+        raise _fail(f"library.renders has more than {len(PROFILE_IDS)} renders")
+    renders: list[LibraryTarget] = []
+    for i, item in enumerate(renders_raw):
+        where = f"library.renders[{i}]"
+        entry = _obj(item, where)
+        profile = entry.get("profile")
+        if not isinstance(profile, str) or profile not in PROFILE_IDS:
+            raise _fail(f"{where}.profile must be one of {', '.join(PROFILE_IDS)}")
+        if any(done.profile == profile for done in renders):
+            raise _fail("library.renders must not repeat a profile")
+        renders.append(_library_target(entry, where, video_id, profile, caps))
+    return LibrarySpec(video_id=video_id, source_itag=itag, source_codec=codec, renders=tuple(renders))
+
+
+def _library_target(entry: dict, where: str, video_id: str, profile: str, caps: Caps) -> LibraryTarget:
+    """One render entry: every URL must point at this video's own object for that profile."""
+    for name in ("audioPut", "manifestPut"):
+        if name not in entry:
+            raise _fail(f"{where}.{name} is required")
+    slot = render_slot(profile)
+    manifest = manifest_key(video_id, slot)
+    manifest_get = None
+    if entry.get("manifestGet") is not None:
+        manifest_get = check_presigned_url(entry["manifestGet"], f"{where}.manifestGet", caps, manifest)
+    return LibraryTarget(
+        slot=slot, profile=profile,
+        audio_put=check_presigned_url(entry["audioPut"], f"{where}.audioPut", caps, audio_key(video_id, slot)),
+        manifest_put=check_presigned_url(entry["manifestPut"], f"{where}.manifestPut", caps, manifest),
+        manifest_get=manifest_get)
 
 
 def _lyrics(value: Any, caps: Caps) -> LyricsRequest:

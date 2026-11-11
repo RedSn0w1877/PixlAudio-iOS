@@ -1,0 +1,52 @@
+name: cloud-library-janitor
+
+# Free-tier guard for the shared library of renders (docs/handoff/2026-11-10-plans/cloud-audio-spec.md, section 3):
+# R2 stores 10 GB for free, and every finished render stays under lib/ in the bucket for 30 days. Once a day
+# cloud/runpod-worker/deploy/library_janitor.py opens the committed App/Resources/CloudDefaults.enc with the
+# CLOUD_DEFAULTS_KEY secret (as cloud-e2e does), lists lib/ and, only when it holds more than 8 GB, deletes the
+# oldest renders until it is under: each manifest first, then its audio, so a half-deleted render is never
+# advertised. It never touches in/ or out/, sends no jobs and costs nothing.
+# CLOUD_DEFAULTS_KEY is a repository secret, so this needs no environment (the `runpod` environment holds only the
+# RunPod deploy key, which this never uses). Logs are public: every value from the blob is masked before anything
+# else happens, and only counts and sizes are printed. Without the secret it says so and succeeds.
+# By hand: Actions -> cloud-library-janitor -> Run workflow (tick "dry run" to only see what it would delete).
+on:
+  schedule:
+    - cron: '43 4 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Dry run (report what would be deleted, delete nothing)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloud-library-janitor
+  cancel-in-progress: false
+
+jobs:
+  janitor:
+    runs-on: ubuntu-24.04
+    # A listing takes seconds. Deleting is two requests a render; even a library three times over the limit is done
+    # in a few minutes, and whatever a run does not get to, the next day's run starts from a fresh listing.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Tools (cryptography)
+        run: |
+          set -euo pipefail
+          # AES-GCM for the blob: cryptography and its two dependencies, pinned with hashes, in a throwaway venv.
+          python3 -m venv "$RUNNER_TEMP/janitor-venv"
+          "$RUNNER_TEMP/janitor-venv/bin/pip" install -q --disable-pip-version-check --require-hashes --only-binary :all: \
+            -r cloud/runpod-worker/deploy/e2e-requirements.txt
+      - name: Keep lib/ under 8 GB
+        env:
+          CLOUD_DEFAULTS_KEY: ${{ secrets.CLOUD_DEFAULTS_KEY }}
+          JANITOR_DRY_RUN: ${{ inputs.dry_run }}
+        # The input reaches the script through the environment, never pasted into the shell.
+        run: exec "$RUNNER_TEMP/janitor-venv/bin/python" cloud/runpod-worker/deploy/library_janitor.py

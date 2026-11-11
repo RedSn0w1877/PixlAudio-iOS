@@ -1,0 +1,39 @@
+SADIE II Database (head-related impulse responses)
+==================================================
+
+What is used
+------------
+PixlAudio's Spatial audio is computed with head-related impulse responses of the Neumann KU100 dummy head taken
+from the SADIE II Database, subject D1: D1_48K_24bit_256tap_FIR_SOFA.sofa (8802 directions, 256 taps, 48 kHz),
+from D1_HRIR_SOFA.zip.
+
+    SADIE II Database, version 2-2
+    AudioLab and Gavin Kearney, University of York
+    https://zenodo.org/records/12092466   doi:10.5281/zenodo.12092466
+
+Licence
+-------
+The database is licensed under the Apache License, Version 2.0. The full text is in Apache-2.0.txt next to this
+file; it is also at http://www.apache.org/licenses/LICENSE-2.0. The data is provided "AS IS", without warranties
+or conditions of any kind.
+
+Changes (Apache License 2.0, section 4(b))
+------------------------------------------
+The file distributed here, src/pixl_worker/spatial/data/hrir_ku100.npz, is a modified derivative of the
+database, made on 2026-11-10 by cloud/runpod-worker/tools/build_hrir.py in
+https://github.com/RedSn0w1877/PixlAudio-iOS:
+
+1. about 900 of the measured directions are kept: the one nearest to each point of a regular grid (every 5
+   degrees of azimuth on the rings from -45 to +60 degrees of elevation, coarser rings near the poles);
+2. the set is made exactly left-right symmetric: the right half of the sphere is the mirror image of the left
+   half, and on the median plane both ears get the average;
+3. the common leading silence is removed (the same number of samples from every response) and the tails are
+   faded out;
+4. the set is diffuse-field equalised (a minimum-phase correction limited to +/- 12 dB);
+5. the samples are stored as 16-bit integers with a scale factor.
+
+Two more files are computed from it and shipped in the PixlAudio apps (iOS and Android):
+schema/v1/spatial/spatial_preview_v1.json and schema/v1/spatial/spatial_preview_golden_v1.json. They hold short
+filters and sparse reflection patterns derived from a few of those responses, not the responses themselves.
+
+The University of York, AudioLab and the database's authors have not reviewed or endorsed PixlAudio.

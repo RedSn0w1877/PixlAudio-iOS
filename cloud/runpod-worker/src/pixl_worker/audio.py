@@ -160,6 +160,15 @@ def encode(samples: np.ndarray, sample_rate: int, out_path: str, *, codec: str, 
             pass
 
 
+def flac_from_s16(raw_path: str, sample_rate: int, channels: int, out_path: str, *, timeout: float = 120.0) -> None:
+    """Pack a file of raw interleaved little-endian 16-bit samples into FLAC, bit for bit. For the shared library
+    (library.encode_flac16), whose samples were already dithered down to 16 bits in NumPy; encode() above, which
+    lets ffmpeg convert float to 16 bits without dither, is unchanged for the stems."""
+    args = [FFMPEG, *BASE, "-f", "s16le", "-ar", str(sample_rate), "-ac", str(channels), "-i", raw_path,
+            "-c:a", "flac", "-sample_fmt", "s16", "-f", "flac", "-y", out_path]
+    _run(args, timeout=timeout, what="ffmpeg encode", code=INTERNAL)
+
+
 def resample(x: np.ndarray, sr_from: int, sr_to: int) -> np.ndarray:
     """Resample along axis 0. Uses soxr (shipped with librosa) when present, else linear interpolation (tests)."""
     if sr_from == sr_to:

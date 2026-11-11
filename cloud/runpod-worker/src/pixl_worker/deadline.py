@@ -31,6 +31,22 @@ class Deadline:
         return max(1.0, min(limit_s, self.remaining()))
 
 
+# What the apps' /run policy gives a job without library tasks (schema/v1/examples/run.request.json: 900,000 ms),
+# and what the endpoint's own limit was until worker 1.1.0.
+CLASSIC_EXECUTION_TIMEOUT_S = 900.0
+
+
+def time_limit_s(execution_timeout_s: float, library_job: bool) -> float:
+    """How long RunPod lets this job run, as far as the worker can know. The endpoint's limit (PIXL_EXECUTION_
+    TIMEOUT_S, 1800 s since 1.1.0) is there for jobs with library tasks, which do more work and which the apps send
+    with policy.executionTimeout 1,800,000 (run.request.spatial.json). Every other job is still sent with 900,000,
+    and RunPod does not show the worker a request's policy. So those keep the 900 s they always had: the worker's
+    own deadline (this minus the margin) then still ends a slow job, with a manifest, before RunPod ends it
+    without one."""
+    limit = float(execution_timeout_s)
+    return limit if library_job else min(limit, CLASSIC_EXECUTION_TIMEOUT_S)
+
+
 def job_deadline(execution_timeout_s: float, margin_s: float, policy: dict | None = None,
                  clock: Callable[[], float] = time.monotonic) -> Deadline:
     """RunPod doesn't hand the request's policy to the worker today, so the endpoint timeout (env) is the source;
