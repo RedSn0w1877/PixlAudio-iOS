@@ -17,8 +17,7 @@
     "stems4": null,
     "aligner": null,
     "asr": null,
-    "stems6": "open-cascade-6",
-    "restorer": null
+    "stems6": "open-cascade-6"
   },
   "input": {
     "codec": "flac",
@@ -46,13 +45,6 @@
     "renders": {
       "studio": "ok"
     },
-    "enhanced": "not_needed",
-    "restore": {
-      "applied": false,
-      "model": null,
-      "reason": "full_band",
-      "cutoffHz": 20000
-    },
     "stemMode": "stems6"
   },
   "timings": {
@@ -62,7 +54,6 @@
     "separateMs": 0,
     "stemsMs": 0,
     "lyricsMs": 0,
-    "restoreMs": 350,
     "stems6Ms": 41800,
     "renderMs": 23600,
     "encodeMs": 2900,

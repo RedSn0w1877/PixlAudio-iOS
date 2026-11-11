@@ -19,8 +19,7 @@
     "stems4": null,
     "aligner": null,
     "asr": null,
-    "stems6": "open-cascade-6",
-    "restorer": null
+    "stems6": "open-cascade-6"
   },
   "input": {
     "codec": "aac",
@@ -58,13 +57,6 @@
       "night": "ok",
       "hall": "failed"
     },
-    "enhanced": null,
-    "restore": {
-      "applied": false,
-      "model": null,
-      "reason": "unavailable",
-      "cutoffHz": 15989
-    },
     "stemMode": "stems6"
   },
   "timings": {
@@ -74,7 +66,6 @@
     "separateMs": 30100,
     "stemsMs": 0,
     "lyricsMs": 0,
-    "restoreMs": 310,
     "stems6Ms": 14900,
     "renderMs": 39800,
     "encodeMs": 6100,

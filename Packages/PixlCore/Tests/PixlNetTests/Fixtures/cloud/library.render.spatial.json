@@ -27,18 +27,12 @@
     "codec": "opus",
     "sampleRate": 48000,
     "decodedSamples": 9696000,
-    "sha256": "f2218379956ab8d0d22bfd05d9c0b60a7f461aada888aa86f614e0db77724372",
-    "cutoffHz": 20000
+    "sha256": "f2218379956ab8d0d22bfd05d9c0b60a7f461aada888aa86f614e0db77724372"
   },
   "render": {
     "engine": "pixl-spatial-1",
     "stems": "open-cascade-6",
-    "stemMode": "stems6",
-    "restore": {
-      "applied": false,
-      "model": null,
-      "reason": "full_band"
-    }
+    "stemMode": "stems6"
   },
   "worker": {
     "version": "1.1.0",
