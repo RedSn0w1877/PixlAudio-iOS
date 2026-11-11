@@ -14,22 +14,14 @@ public enum SpotiFLACParsing {
 
     // MARK: - Monochrome Track Streamer (`https://tracks.monochrome.st`)
 
-    /// Parses `GET /search/tracks?q=...` from a Monochrome track server.
-    ///
-    /// Example response:
+    /// Parses `GET /search/tracks?q=...` from a Monochrome track server (the same rows come back for an
+    /// `isrc:<ISRC>` query). Live response (2026-11-11, trimmed):
     /// ```json
-    /// {
-    ///   "tracks": [
-    ///     {
-    ///       "trackId": "154014286732070912",
-    ///       "title": "Blinding Lights",
-    ///       "artistNames": ["The Weeknd"],
-    ///       "releaseId": "154010323538415616",
-    ///       "releaseTitle": "After Hours"
-    ///     }
-    ///   ]
-    /// }
+    /// {"tracks":[{"id":"155102871061270528","trackId":"155102871061270528","title":"One More Time",
+    ///   "artistNames":["Daft Punk"],"releaseId":"155102851176075264","playable":true,"duration":320357,
+    ///   "isrc":"GBDUW0000053"}],"releases":[],"artists":[],"topResults":[],"users":[],"playlists":[]}
     /// ```
+    /// `duration` is in milliseconds.
     public static func parseMonochromeSearchTracks(
         _ data: Data,
         baseURL: URL
@@ -57,58 +49,9 @@ public enum SpotiFLACParsing {
         return results
     }
 
-    /// Parses `GET /releases/:releaseId` from a Monochrome track server, returning full track candidates
-    /// enriched with `isrc`, `duration` (ms), and `playable` flags.
-    public static func parseMonochromeReleaseTracks(
-        _ data: Data,
-        baseURL: URL
-    ) -> [SpotiFLACCandidate] {
-        guard let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
-            return []
-        }
-        let releaseDict: [String: Any]
-        if let nested = root["release"] as? [String: Any] {
-            releaseDict = nested
-        } else {
-            releaseDict = root
-        }
-
-        let releaseId = stringValue(releaseDict["releaseId"]) ?? stringValue(releaseDict["id"])
-        let releaseTitle = (releaseDict["title"] as? String) ?? (releaseDict["releaseTitle"] as? String)
-        let releaseArtists = parseArtistNames(from: releaseDict)
-
-        guard let tracks = releaseDict["tracks"] as? [[String: Any]] else {
-            return []
-        }
-
-        var results: [SpotiFLACCandidate] = []
-        results.reserveCapacity(tracks.count)
-        for item in tracks {
-            if var candidate = parseMonochromeTrackObject(
-                item,
-                baseURL: baseURL,
-                fallbackReleaseId: releaseId,
-                fallbackAlbum: releaseTitle,
-                fallbackArtists: releaseArtists
-            ) {
-                if candidate.releaseId == nil {
-                    candidate.releaseId = releaseId
-                }
-                if candidate.album == nil {
-                    candidate.album = releaseTitle
-                }
-                results.append(candidate)
-            }
-        }
-        return results
-    }
-
     private static func parseMonochromeTrackObject(
         _ item: [String: Any],
-        baseURL: URL,
-        fallbackReleaseId: String? = nil,
-        fallbackAlbum: String? = nil,
-        fallbackArtists: [String] = []
+        baseURL: URL
     ) -> SpotiFLACCandidate? {
         guard let trackId = stringValue(item["trackId"]) ?? stringValue(item["id"]),
               !trackId.isEmpty,
@@ -117,13 +60,10 @@ public enum SpotiFLACParsing {
             return nil
         }
 
-        var artistNames = parseArtistNames(from: item)
-        if artistNames.isEmpty {
-            artistNames = fallbackArtists
-        }
+        let artistNames = parseArtistNames(from: item)
         let primaryArtist = artistNames.first ?? ""
-        let releaseId = stringValue(item["releaseId"]) ?? fallbackReleaseId
-        let album = (item["releaseTitle"] as? String) ?? (item["albumTitle"] as? String) ?? fallbackAlbum
+        let releaseId = stringValue(item["releaseId"])
+        let album = (item["releaseTitle"] as? String) ?? (item["albumTitle"] as? String)
         let durationMs = intValue(item["duration"]) ?? intValue(item["durationMs"])
         let isrc = item["isrc"] as? String
         let playable = (item["playable"] as? Bool) ?? true
@@ -148,7 +88,13 @@ public enum SpotiFLACParsing {
         )
     }
 
+    /// `<base>/track/<trackId>`; `nil` for an id that isn't plain letters, digits, `-` or `_` (no path tricks).
     public static func buildMonochromeTrackURL(baseURL: URL, trackId: String) -> URL? {
+        guard !trackId.isEmpty, trackId.unicodeScalars.allSatisfy({ scalar in
+            scalar.isASCII && (CharacterSet.alphanumerics.contains(scalar) || scalar == "-" || scalar == "_")
+        }) else {
+            return nil
+        }
         var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)
         let basePath = (components?.path ?? "").trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let encodedId = trackId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? trackId
