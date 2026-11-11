@@ -8,8 +8,8 @@ import SwiftUI
 ///   plus the device's name for any output other than this phone) and the queue pill (right-rounded, 50×42), 6 pt
 ///   apart;
 /// - 24 pt side margins, then — spread like Compose's `SpaceAround` — the album carousel with title / artist, the
-///   lyrics and AI DJ circles (48 pt), the seek bar with times and the format chip; then the transport (80 pt) and
-///   the shuffle / repeat / favourite row;
+///   lyrics and AI DJ circles and the Spatial audio button (48 pt), the seek bar with times and the format chip; then
+///   the transport (80 pt) and the shuffle / repeat / favourite row;
 /// - the ambient background style behind it all.
 /// Each section fades in at Android's thresholds as the sheet expands (top bar from 0, carousel and seek bar from
 /// 8 %, metadata from 20 % with a 24 pt slide, controls from 42 %). Material fills become tinted clear glass (the
@@ -345,7 +345,8 @@ private struct PlayerToggles: View {
     }
 }
 
-/// Title, artist and the lyrics / AI DJ circles (Android `SongMetadataDisplaySection` + `PlayerSongInfo`).
+/// Title, artist and the lyrics / AI DJ circles and the Spatial audio button (Android `SongMetadataDisplaySection` +
+/// `PlayerSongInfo`).
 private struct PlayerMetadataRow: View {
     let song: Song
 
@@ -397,6 +398,9 @@ private struct PlayerMetadataRow: View {
                     circle(systemImage: "sparkles", label: "Ask Taizo", identifier: "player.aiDJ", iconSize: 20) {
                         router.present(AppSheet.taisChat)
                     }
+                    // Spatial audio (2026-11-11): the third sibling, where Android's player has it. It reads its own
+                    // state, so a profile change redraws the button alone.
+                    SpatialAudioPlayerButton()
                 }
             }
         }
