@@ -156,8 +156,8 @@ Choices where the spec is silent or the code needed one; none changes a shape in
 ## Verified and not
 
 Verified:
-- The CPU suite, locally (Python 3.14, NumPy 2.5.4, ffmpeg 8.1) and in CI (Python 3.12 in the test image):
-  see "CI" below for the counts.
+- The CPU suite, locally (Python 3.14, NumPy 2.5.4, ffmpeg 8.1) and in CI (Python 3.12 in the test image), and
+  the image's CPU smoke stage with the real weights, including the six-stem cascade and one render: see "CI".
 - `ci/check_weights.py`, `ci/check_fixtures.py` (it also compares the apps' copies of `schema/v1/spatial/*.json`;
   the apps have none yet) and `ci/check-cloud-fixtures.sh` (the Swift copies are byte-identical).
 - The htdemucs_6s file's size and sha256 (checked once by downloading it: 54,996,327 bytes).
@@ -170,6 +170,15 @@ Not verified:
 
 ## CI
 
-Workflow `cloud-worker-build` on `audio-worker`:
-- test job: see the lead's report for the run of the last push.
-- image build and CPU smoke stage (`[image]`): see the lead's report.
+Workflow `cloud-worker-build` on `audio-worker`, after the removal of Enhanced audio:
+- run 43066554839 (`dff97b0`, `[image]`): green.
+  - test job: weights check, fixture check, 539 passed and 8 skipped in the Docker test image (locally on Windows:
+    545 passed, 2 skipped; the 6 extra local ones need files outside the worker folder).
+  - image job: the image built without pushing, then the CPU smoke stage with the real weights: separator,
+    separator at 48 kHz, aligner, htdemucs_ft, the six-stem cascade (six stems, progress 0 to the end, what they
+    miss of the mix -7.8 dB), and one render (`studio`, `stemMode` stems6, -19.04 LUFS from a -15.04 LUFS clip,
+    true peak -6.4 dBTP, a 190,490-byte FLAC). All six checks ok.
+- run 43065833679 (`cd92f24`, `[image]`): failed at the fixture check, because the Swift copies came in the next
+  commit (`6f1fa0e`, `[skip ci]`); nothing was built. Superseded by the run above.
+- The `[image]` run before the removal (43047397464) had failed on the runner's DNS (apt could not resolve
+  archive.ubuntu.com), not on the worker.
