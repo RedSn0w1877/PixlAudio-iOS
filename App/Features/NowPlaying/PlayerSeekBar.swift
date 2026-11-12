@@ -32,6 +32,9 @@ struct PlayerSeekBar: View {
     /// "scrubbing" flag stuck.
     @GestureState private var isTouching = false
     @State private var hapticStep = -1
+    /// What the engine actually plays for this song (FLAC and its rate, or the YouTube stream's bitrate), for the
+    /// quality label; nil until the first bytes say.
+    @State private var playingFormat: PlayingStreamFormat?
 
     var body: some View {
         let textColor = theme.onPrimaryContainer
@@ -56,6 +59,7 @@ struct PlayerSeekBar: View {
         .onChange(of: song.id) { _, _ in
             scrubFraction = nil
         }
+        .task(id: song.id) { await followPlayingFormat() }
         .onChange(of: isTouching) { _, touching in
             guard !touching, scrubFraction != nil else { return }
             scrubFraction = nil
@@ -145,6 +149,22 @@ struct PlayerSeekBar: View {
 
     // MARK: Labels
 
+    /// Reads what plays for this song once its first bytes are in: a look a second for 15 s (the source can still
+    /// change early, SpotiFLAC turned down for YouTube), then nothing. No ticking otherwise.
+    private func followPlayingFormat() async {
+        playingFormat = nil
+        let cache = env.youtube.cache, opus = env.youtube.opus
+        for _ in 0..<15 {
+            guard !Task.isCancelled else { return }
+            if let videoId = PlayingStreamFormat.currentVideoId(engine: env.playbackServices?.engine),
+               let format = await PlayingStreamFormat.of(videoId: videoId, cache: cache, opus: opus),
+               format != playingFormat {
+                playingFormat = format
+            }
+            try? await Task.sleep(for: .seconds(1))
+        }
+    }
+
     /// "Show player file info" (Settings › Appearance › Advanced) counts only in developer mode.
     private var showsFileInfo: Bool {
         settings.appearance.fullPlayerShowFileInfo && settings.experimental.developerMode
@@ -163,7 +183,11 @@ struct PlayerSeekBar: View {
             // "Show player file info" (Settings › Appearance › Advanced) counts only in developer mode: the format
             // text (codec, bitrate, sample rate) is not for everyone. While Spatial audio is audible it ends with what
             // plays ("• Spatial Studio on phone", "• Spatial Studio cloud render"), as on Android.
-            if showsFileInfo, let label = PlayerFormat.audioMetaLabel(song: song) {
+            // The quality tier ("Pro", "Studio Pro", "High") is for everyone; the format details (rate, codec, Spatial)
+            // stay behind "Show player file info" in developer mode (Hoa, 2026-11-11).
+            if let label = showsFileInfo
+                ? PlayerFormat.audioMetaLabel(song: song, playing: playingFormat)
+                : PlayerFormat.qualityTierLabel(song: song, playing: playingFormat) {
                 Text(spatialInfo.map { label + " \u{2022} " + $0 } ?? label)
                     .pixlFont(.custom(size: 11, weight: .medium, lineHeight: 16, tracking: 0.5))
                     .lineLimit(1)
@@ -238,17 +262,31 @@ nonisolated enum PlayerFormat {
 
     /// Android `formatAudioMetaLabel`: "48.0 kHz • Medium • OPUS" (`fallbackTier`, the configured quality's YouTube tier,
     /// when neither the format nor the bitrate tells).
-    static func audioMetaLabel(song: Song,
+    /// `playing`: what the engine actually plays (a streamed song's library entry says nothing about its format);
+    /// the song's own fields otherwise (a local or downloaded file).
+    static func audioMetaLabel(song: Song, playing: PlayingStreamFormat? = nil,
                                fallbackTier: String = StreamingAudioQuality.current().youTubeLabel) -> String? {
+        let mimeType = playing?.mimeType ?? song.mimeType
+        let sampleRate = playing?.sampleRate ?? song.sampleRate
         var parts: [String] = []
-        if let rate = song.sampleRate, rate > 0 {
+        if let rate = sampleRate, rate > 0 {
             parts.append(String(format: "%.1f kHz", locale: Locale(identifier: "en_US"), Double(rate) / 1000))
         }
-        let tier = qualityTier(mimeType: song.mimeType,
-                               bitrateKbps: song.bitrate.flatMap { $0 > 0 ? $0 / 1000 : nil },
-                               sampleRate: song.sampleRate) ?? fallbackTier
-        let format = format(mimeType: song.mimeType)
+        let tier = qualityTier(mimeType: mimeType,
+                               bitrateKbps: playing?.bitrateKbps ?? song.bitrate.flatMap { $0 > 0 ? $0 / 1000 : nil },
+                               sampleRate: sampleRate) ?? fallbackTier
+        let format = format(mimeType: mimeType)
         parts.append(format == "-" ? tier : "\(tier) \u{2022} \(format.uppercased())")
         return parts.joined(separator: " \u{2022} ")
+    }
+
+    /// The tier alone ("Pro", "Studio Pro", "High", …), shown to everyone: what plays, never a guess from the setting
+    /// (nil until a streamed song's first bytes say).
+    static func qualityTierLabel(song: Song, playing: PlayingStreamFormat?) -> String? {
+        if let playing {
+            return qualityTier(mimeType: playing.mimeType, bitrateKbps: playing.bitrateKbps, sampleRate: playing.sampleRate)
+        }
+        return qualityTier(mimeType: song.mimeType, bitrateKbps: song.bitrate.flatMap { $0 > 0 ? $0 / 1000 : nil },
+                           sampleRate: song.sampleRate)
     }
 }
