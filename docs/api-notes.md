@@ -1040,3 +1040,13 @@ Launch, library, artwork, player and Spotify-matcher speed-ups (docs/performance
 | `FocusState<Bool>.Binding` passed down, `View.focused(_:)` | 15 | /documentation/swiftui/focusstate/binding | `RootView` → `GlassNavBar` → `NavSearchField` | The shell owns the field's focus and drops it when Search is left. |
 | `Layout` with `LayoutSubviews.dropFirst()`, `LayoutSubview.place(at:anchor:proposal:)` | 16 | /documentation/swiftui/layout | `NavSegmentsLayout` | First subview = the selection capsule, placed on the emphasized span; a change of `emphasized` inside `withAnimation` animates every placement. `nonisolated`, as `SyncWeightedColumn`. |
 | `glassEffect(_:in:)` + `glassEffectID(_:in:)` on two shapes that resize and swap content in a `GlassEffectContainer` | 26.0 | /documentation/swiftui/view/glasseffectid(_:in:) | `GlassNavBar` | The flip keeps each shape's view and id; only frames (fixed ↔ flexible width) and contents change, so the morph doesn't depend on matching an inserted to a removed effect. |
+
+## Now playing and mini player (2026-11-16, branch `new-ui`, stage 3)
+| API | Min OS | Doc | Used in | Notes |
+|---|---|---|---|---|
+| `Menu` item labels with a second `Text` (`Button { … } label: { Label(…); Text(…) }`) | 15 | /documentation/swiftui/menu | `PlayerMoreMenu` | The second text is the item's subtitle (the Spatial audio profile, Sing's state). Builds either way; to check on the phone how it renders. |
+| `View.mask(alignment:_:)` with a `LinearGradient` of a static `Gradient` | 15 | /documentation/swiftui/view/mask(alignment:_:) | `ProgressiveBlurHero` | Two masks per hero (the blurred copy's ramp, the whole hero's melt); the gradients are built once per profile (`HeroGradients`). |
+| `LinearGradient(stops:startPoint:endPoint:)`, `Gradient.Stop(color:location:)` | 13 | /documentation/swiftui/lineargradient | `ProgressiveBlurHero` (veil) | Stops from PixlFoundation `ProgressiveHero.veilMask`, coloured with the page's role. |
+| `InsettableShape.inset(by:)` + `Shape.trim(from:to:)` + `stroke(_:style:)` | 13 | /documentation/swiftui/shape/trim(from:to:) | `MiniPlayerProgressRing` | The ring sits inside the 44 pt touch area; `rotationEffect(-90°)` starts it at 12 o'clock. |
+| `TimelineView(.animation(minimumInterval:paused:))` | 15 | /documentation/swiftui/timelineview | `MiniPlayerProgressRing` | Already in the ledger (seek bar); here the interval follows the song's length (`ProgressRing.tickInterval`). |
+| `View.accessibilitySortPriority(_:)` | 14 | /documentation/swiftui/view/accessibilitysortpriority(_:) | `NowPlayingView` | The top bar reads first although the hero comes first in the stack. |

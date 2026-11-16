@@ -3,24 +3,28 @@ import PixlNet
 import SwiftUI
 
 /// The full player (Android `FullPlayerContent`, portrait), drawn inside the player sheet's card
-/// (`PlayerSheetHost`) over the album's `primaryContainer`:
-/// - top bar (64 pt): the collapse circle (42 pt), and on the right the output pill (left-rounded; the output's icon,
-///   plus the device's name for any output other than this phone) and the queue pill (right-rounded, 50×42), 6 pt
-///   apart;
-/// - 24 pt side margins, then — spread like Compose's `SpaceAround` — the album carousel with title / artist, the
-///   lyrics and AI DJ circles and the Spatial audio button (48 pt), the seek bar with times and the format chip; then
-///   the transport (80 pt) and the shuffle / repeat / favourite row;
-/// - the ambient background style behind it all.
-/// Each section fades in at Android's thresholds as the sheet expands (top bar from 0, carousel and seek bar from
-/// 8 %, metadata from 20 % with a 24 pt slide, controls from 42 %). Material fills become tinted clear glass (the
-/// player sits over media); colours are the album palette (`playerTheme`).
+/// (`PlayerSheetHost`) over the album's `primaryContainer`. New UI (owner decisions, 2026-11-16; mockup `iOSPlayer`):
+/// - the hero: the queue's covers fill the top edge to edge (the full-bleed `AlbumCarousel`, so swiping, tapping for
+///   the album, double-tap to like and the long-press quick actions all stay), sharp at the top and progressively
+///   blurred from about halfway down until they melt into the album colour and the ambient background under the title
+///   and controls (`ProgressiveBlurHero`: one pre-blurred copy behind a static mask, no live blur);
+/// - over it, the top bar (64 pt): the collapse circle (42 pt), and on the right the output pill (the output's icon,
+///   plus the device's name for any output other than this phone) joined to the ⋯ menu (`PlayerMoreMenu`: Spatial
+///   audio, Sing, Ask Taizo and the song's actions), 6 pt apart;
+/// - at the bottom: the title (SF Pro at the widest width that fits, `FitWidthTitle`) and artist with the Queue circle
+///   where the like button was, the seek bar with times and the quality label, the transport (80 pt, the press-to-bounce
+///   group, unchanged), and the split pills — Shuffle · Repeat · Like in the big capsule, Lyrics in the small circle
+///   (`PlayerActionPills`).
+/// Each section fades in at Android's thresholds as the sheet expands (top bar from 0, hero and seek bar from 8 %,
+/// metadata from 20 % with a 24 pt slide, controls from 42 %). Material fills become tinted clear glass (the player sits
+/// over media); colours are the album palette (`playerTheme`).
 struct NowPlayingView: View {
     var safeArea: EdgeInsets
     /// The screen width the player is laid out at (0 = unknown): seeds the carousel and the transport with their
     /// final widths, so a fresh build lays out once instead of measuring first.
     var width: CGFloat
-    /// The screen height the player is laid out at (0 = unknown): on a short screen the artwork shrinks so the top
-    /// bar and the shuffle · repeat · favourite row stay on screen (`carouselWidth`).
+    /// The screen height the player is laid out at (0 = unknown). The full-bleed hero no longer shrinks on short screens
+    /// (the controls sit over its melted bottom instead of below it), so only the caller's frame uses it.
     var height: CGFloat
 
     init(safeArea: EdgeInsets = EdgeInsets(), width: CGFloat = 0, height: CGFloat = 0) {
@@ -39,10 +43,6 @@ struct NowPlayingView: View {
     /// Double-tap to like: bumped per tap; `burstIsLike` says which heart the burst draws.
     @State private var burstCount = 0
     @State private var burstIsLike = true
-    /// The measured heights of the sections around the artwork (seeded with their default-text-size heights, so the
-    /// first pass already fits): they decide how much height the artwork may take on a short screen.
-    @State private var detailsHeight: CGFloat = 136
-    @State private var controlsHeight: CGFloat = 174
 
     var body: some View {
         if let song = playback.current {
@@ -54,58 +54,31 @@ struct NowPlayingView: View {
 
     private func content(_ song: Song) -> some View {
         let isVisible = env.playerSheet.isExpanded || env.playerSheet.isDragging
-        let carouselStyle = PlayerCarouselStyle(storageKey: settings.appearance.carouselStyle)
-        let fullCarouselWidth = max(width - 48, 0)
-        let carouselWidth = carouselWidth(full: fullCarouselWidth, style: carouselStyle,
-                                          queueCount: playback.queue.count)
-        // The background never takes part in layout (a filled cover is wider than the screen).
-        return VStack(spacing: 0) {
-            PlayerTopBar()
-                .padding(.top, safeArea.top)
-                .playerSectionFade(start: 0)
+        // The background never takes part in layout (a filled cover is wider than the screen); the hero is a square at
+        // the top, under the chrome, and the content stack sits over its melted bottom.
+        return ZStack(alignment: .top) {
+            hero(song)
+                .playerSectionFade(start: 0.08)
             VStack(spacing: 0) {
-                Spacer(minLength: 0)
-                VStack(spacing: 0) {
-                    AlbumCarousel(queue: playback.queue, currentIndex: playback.currentIndex,
-                                  style: carouselStyle,
-                                  isPlaying: playback.isPlaying,
-                                  initialWidth: carouselWidth,
-                                  allowsSwipe: settings.behavior.gesturePlayerArtworkSwipe,
-                                  onDoubleTap: settings.behavior.gesturePlayerArtworkDoubleTapLike && !voiceOver
-                                      ? { toggleLike(song) } : nil,
-                                  onSelect: { index in playback.skipToQueueItem(at: index) },
-                                  onAlbumTap: { tapped in openAlbum(tapped) })
-                        // Narrower (centred) only where the screen is too short for the full-width artwork.
-                        .frame(width: carouselWidth < fullCarouselWidth ? carouselWidth : nil)
-                        .padding(.vertical, 8)
-                        .overlay { HeartBurst(trigger: burstCount, isLike: burstIsLike) }
-                        .songQuickActions(song: song, isEnabled: settings.behavior.gesturePlayerArtworkLongPress)
-                        .pixlHaptic(.success, trigger: burstCount)
-                        .accessibilityActions {
-                            Button("Next song") { playback.skipToNext() }
-                            Button("Previous song") { playback.skipToPrevious() }
-                            Button("Like or unlike") { toggleLike(song) }
-                        }
+                PlayerTopBar(song: song)
+                    .padding(.top, safeArea.top)
+                    .playerSectionFade(start: 0)
+                    // VoiceOver still starts at the top bar, though the hero comes first in the stack.
+                    .accessibilitySortPriority(1)
+                Spacer(minLength: 8)
+                VStack(alignment: .leading, spacing: 4) {
+                    PlayerMetadataRow(song: song)
+                        .playerSectionFade(start: 0.20, slide: 24)
+                    PlayerSeekBar(song: song, isPlaying: playback.isPlaying, isActive: isVisible,
+                                  clock: playback.clock,
+                                  onSeek: { playback.seek(toMs: $0) },
+                                  onScrubbingChange: { env.playerSheet.isScrubbing = $0 })
                         .playerSectionFade(start: 0.08)
-                    VStack(alignment: .leading, spacing: 4) {
-                        PlayerMetadataRow(song: song)
-                            .playerSectionFade(start: 0.20, slide: 24)
-                        PlayerSeekBar(song: song, isPlaying: playback.isPlaying, isActive: isVisible,
-                                      clock: playback.clock,
-                                      onSeek: { playback.seek(toMs: $0) },
-                                      onScrubbingChange: { env.playerSheet.isScrubbing = $0 })
-                            .playerSectionFade(start: 0.08)
-                    }
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { detailsHeight = $0 }
                 }
-                Spacer(minLength: 0)
-                Spacer(minLength: 0)
+                .padding(.horizontal, 24)
                 controls(song)
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { controlsHeight = $0 }
                     .playerSectionFade(start: 0.42)
-                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 24)
             .padding(.bottom, safeArea.bottom)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -129,36 +102,47 @@ struct NowPlayingView: View {
         .accessibilityAction(.escape) { env.playerSheet.collapse() }
     }
 
+    /// The full-bleed hero: the queue's covers (swipe, tap for the album, double-tap to like, long press for the quick
+    /// actions) under one progressive blur that melts into the album colour.
+    private func hero(_ song: Song) -> some View {
+        ProgressiveBlurHero(source: ArtworkSource(song: song), gradients: .player, veil: theme.primaryContainer,
+                            topScrimHeight: safeArea.top + 72) {
+            AlbumCarousel(queue: playback.queue, currentIndex: playback.currentIndex,
+                          style: PlayerCarouselStyle(storageKey: settings.appearance.carouselStyle),
+                          isPlaying: playback.isPlaying,
+                          initialWidth: width,
+                          allowsSwipe: settings.behavior.gesturePlayerArtworkSwipe,
+                          onDoubleTap: settings.behavior.gesturePlayerArtworkDoubleTapLike && !voiceOver
+                              ? { toggleLike(song) } : nil,
+                          fullBleed: true,
+                          onSelect: { index in playback.skipToQueueItem(at: index) },
+                          onAlbumTap: { tapped in openAlbum(tapped) })
+                .overlay { HeartBurst(trigger: burstCount, isLike: burstIsLike) }
+                .songQuickActions(song: song, isEnabled: settings.behavior.gesturePlayerArtworkLongPress)
+                .pixlHaptic(.success, trigger: burstCount)
+                .accessibilityActions {
+                    Button("Next song") { playback.skipToNext() }
+                    Button("Previous song") { playback.skipToPrevious() }
+                    Button("Like or unlike") { toggleLike(song) }
+                }
+        }
+    }
+
     private func controls(_ song: Song) -> some View {
         VStack(spacing: 0) {
+            // Unchanged (owner, 2026-11-16): the press-to-bounce previous / play-pause / next group.
             AnimatedPlaybackControls(isPlaying: playback.isPlaying,
                                      onPrevious: { playback.skipToPrevious() },
                                      onPlayPause: { playback.togglePlayPause() },
                                      onNext: { playback.skipToNext() },
                                      initialWidth: max(width - 72, 0))
-                .padding(.horizontal, 12)
+                .padding(.horizontal, 36)
                 .padding(.vertical, 8)
             Spacer().frame(height: 14)
             PlayerToggles(song: song)
-                .padding(.horizontal, 26)
+                .padding(.horizontal, 16)
                 .padding(.bottom, 6)
         }
-    }
-
-    /// The carousel's width: the full width (24 pt margins) unless the screen is too short for the artwork that width
-    /// gives, as on a compact iPhone (386 × 678 pt, CI 2026-10-23). The player is laid out at screen size, and an
-    /// artwork taller than the room the top bar, the title and seek bar and the controls leave pushed the collapse
-    /// circle and the output pill above the screen and the shuffle · repeat · favourite row below it, out of a
-    /// finger's reach. The cover keeps its shape; the carousel narrows until its height fits.
-    private func carouselWidth(full: CGFloat, style: PlayerCarouselStyle, queueCount: Int) -> CGFloat {
-        guard height > 0, full > 0 else { return full }
-        // 64: the top bar; 16: the carousel's vertical padding; 8: the least room the spacers keep. Every current
-        // full-size iPhone (the mini included) has room for the full width, so only shorter screens change.
-        let room = height - safeArea.top - safeArea.bottom - 64 - detailsHeight - controlsHeight - 16 - 8
-        // The cover's side per point of carousel width (one song: no peek, the cover takes the full width).
-        let ratio = queueCount <= 1 ? 1 : style.itemSize(width: 1)
-        guard ratio > 0 else { return full }
-        return min(full, max(room, 160) / ratio)
     }
 
     /// Double-tap on the artwork (and VoiceOver's "Like or unlike"): toggles the favourite and shows the heart.
@@ -198,8 +182,11 @@ private struct ModalWhileExpanded: ViewModifier {
 
 /// The player's top bar (Android `FullPlayerContent` `TopAppBar`), without Android's "Now Playing" title and its cloud
 /// for streamed songs (Hoa, 2026-10-07): the collapse circle on the left; on the right the output pill, which names
-/// the output and may grow into the freed width, joined to the queue pill.
+/// the output and may grow into the freed width, joined to the ⋯ menu (new UI, 2026-11-16: the queue pill moved to the
+/// title row as a circle, and the ⋯ menu took its place and shape).
 private struct PlayerTopBar: View {
+    let song: Song
+
     @Environment(AppEnvironment.self) private var env
     @Environment(Router.self) private var router
     @Environment(\.playerTheme) private var theme
@@ -234,20 +221,10 @@ private struct PlayerTopBar: View {
             Spacer(minLength: 12)
             HStack(spacing: 6) {
                 outputPill
-                Button { router.present(AppSheet.queue) } label: {
-                    Image(systemName: "music.note.list") // Android rounded_queue_music_24
-                        .font(.system(size: 19, weight: .semibold))
-                        .foregroundStyle(theme.primary)
-                        .frame(width: 50, height: 42)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .playerGlass(in: UnevenRoundedRectangle(topLeadingRadius: 6, bottomLeadingRadius: 6,
-                                                        bottomTrailingRadius: 21, topTrailingRadius: 21,
-                                                        style: .continuous),
-                             tint: theme.onPrimary.opacity(GlassTint.playerChrome))
-                .accessibilityLabel("Open Queue")
-                .accessibilityIdentifier("player.queue")
+                PlayerMoreMenu(song: song,
+                               shape: UnevenRoundedRectangle(topLeadingRadius: 6, bottomLeadingRadius: 6,
+                                                             bottomTrailingRadius: 21, topTrailingRadius: 21,
+                                                             style: .continuous))
             }
             .padding(.trailing, 18)
             // Ahead of the Spacer, so a long name can use all the width the collapse circle leaves (about width −
@@ -259,7 +236,7 @@ private struct PlayerTopBar: View {
 
     /// The output pill (Android's cast button): the output's icon, plus its name for any output other than this
     /// phone's speaker — a Spotify Connect device, AirPlay, Bluetooth, wired headphones, a car (Hoa, 2026-10-07; Android
-    /// names only a cast device). It hugs its content (icon only: 50 pt, like the queue pill) and grows with the name
+    /// names only a cast device). It hugs its content (icon only: 50 pt, like the ⋯ pill) and grows with the name
     /// up to the collapse circle, truncating at the tail. A dot marks an output that plays elsewhere (Connect,
     /// AirPlay), as Android's does while casting; "Connecting…" and a spinner while a Connect session starts. Long
     /// press while Connect plays: stop playing there.
@@ -324,8 +301,8 @@ private struct PlayerTopBar: View {
     }
 }
 
-/// Shuffle · repeat · favourite with their state read here, so a favourite edit or a shuffle / repeat change redraws
-/// this row only, not the whole full player. The favourite goes through `observedSong(id:)`: the library's song
+/// The bottom split pills (shuffle · repeat · favourite, and lyrics) with their state read here, so a favourite edit or
+/// a shuffle / repeat change redraws these pills only, not the whole full player. The favourite goes through `observedSong(id:)`: the library's song
 /// lookup is not observed, and reading it in the player's body left the heart stale until something else (shuffle,
 /// repeat, play / pause) redrew the player.
 private struct PlayerToggles: View {
@@ -334,19 +311,23 @@ private struct PlayerToggles: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(PlaybackStore.self) private var playback
     @Environment(LibraryStore.self) private var library
+    @Environment(Router.self) private var router
 
     var body: some View {
         let isFavorite = library.observedSong(id: song.id)?.isFavorite ?? song.isFavorite
-        PlayerToggleRow(isShuffleOn: playback.isShuffleEnabled, repeatMode: playback.repeatMode,
-                        isFavorite: isFavorite,
-                        onShuffle: { playback.setShuffleEnabled(!playback.isShuffleEnabled) },
-                        onRepeat: { playback.setRepeatMode(NowPlayingView.nextRepeatMode(after: playback.repeatMode)) },
-                        onFavorite: { env.libraryEditor.toggleFavorite(song.id) })
+        PlayerActionPills(isShuffleOn: playback.isShuffleEnabled, repeatMode: playback.repeatMode,
+                          isFavorite: isFavorite,
+                          onShuffle: { playback.setShuffleEnabled(!playback.isShuffleEnabled) },
+                          onRepeat: { playback.setRepeatMode(NowPlayingView.nextRepeatMode(after: playback.repeatMode)) },
+                          onFavorite: { env.libraryEditor.toggleFavorite(song.id) },
+                          onLyrics: { router.present(AppCover.lyrics) })
     }
 }
 
-/// Title, artist and the lyrics / AI DJ circles and the Spatial audio button (Android `SongMetadataDisplaySection` +
-/// `PlayerSongInfo`).
+/// Title, artist and the Queue circle (Android `SongMetadataDisplaySection` + `PlayerSongInfo`; new UI, 2026-11-16: the
+/// Queue circle sits where the like button was, Lyrics moved to the bottom pills, and Ask Taizo, Spatial audio and Sing
+/// to the ⋯ menu). The title is SF Pro at the widest width that fits one line (`FitWidthTitle`, `.playerTitle`: heavy,
+/// expanded down to compressed), re-measured only when the song or the width changes.
 private struct PlayerMetadataRow: View {
     let song: Song
 
@@ -358,12 +339,10 @@ private struct PlayerMetadataRow: View {
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(song.title)
-                    .pixlFont(.headlineSmall, weight: .bold)
+                FitWidthTitle(text: song.title, face: .playerTitle, narrowest: .compressed, lines: 1)
                     .foregroundStyle(theme.onPrimaryContainer)
-                    .lineLimit(1)
                 Text(song.displayArtist)
-                    .pixlFont(PixlTextStyle.titleMedium.tracking(0))
+                    .pixlFont(.custom(size: 18, weight: .medium, lineHeight: 24))
                     .foregroundStyle(theme.onPrimaryContainer.opacity(0.7))
                     .lineLimit(1)
                     .contentShape(.rect)
@@ -374,8 +353,8 @@ private struct PlayerMetadataRow: View {
             }
             .padding(.vertical, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
-            // The loading chip and the two circles render together (spacing below their 12 pt / 20 pt gaps: they never
-            // blend at rest).
+            // The loading chip and the Queue circle render together (spacing below their 20 pt gap: they never blend at
+            // rest).
             GlassEffectContainer(spacing: 6) {
                 HStack(spacing: 12) {
                     if playback.isPreparing {
@@ -391,16 +370,10 @@ private struct PlayerMetadataRow: View {
                             .padding(.trailing, 8)
                             .transition(.scale(scale: 0.85).combined(with: .opacity))
                     }
-                    circle(systemImage: "quote.bubble", label: "Lyrics", identifier: "player.lyrics") {
-                        router.present(AppCover.lyrics)
+                    // Android rounded_queue_music_24.
+                    circle(systemImage: "music.note.list", label: "Open Queue", identifier: "player.queue") {
+                        router.present(AppSheet.queue)
                     }
-                    // Ask Taizo (2026-10-23): the assistant knows the song that's playing.
-                    circle(systemImage: "sparkles", label: "Ask Taizo", identifier: "player.aiDJ", iconSize: 20) {
-                        router.present(AppSheet.taisChat)
-                    }
-                    // Spatial audio (2026-11-11): the third sibling, where Android's player has it. It reads its own
-                    // state, so a profile change redraws the button alone.
-                    SpatialAudioPlayerButton()
                 }
             }
         }

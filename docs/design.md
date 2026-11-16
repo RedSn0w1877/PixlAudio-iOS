@@ -25,7 +25,7 @@ Beta 2: `pp_*.png`; current Library › Songs: `owner-library-songs-2026-09-30.p
 | `TopAppBar` with large title + actions | Same title in SF Pro + glass action circles | `LargeHeader` |
 | Section title + subtitle (+ refresh button) | Same text styles, optional glass circle | `SectionHeader` |
 | Bottom `NavigationBar` (custom compact bar, 3 icons) | **New UI 2026-11-16:** the split pill — a big see-through glass capsule (Home + Library, gliding tonal selection) and a glass circle (Search); on Search they flip into a Home circle and the search field (see Shell › Split-pill bar). Earlier: the liquid-lens capsule (2026-10-02) | `GlassNavBar` |
-| Mini player (player sheet, collapsed) | Glass bar tinted with the album's `primaryContainer`, same layout | `MiniPlayerBar` |
+| Mini player (player sheet, collapsed) | **New UI 2026-11-16:** a see-through glass pill floating 12 pt above the split-pill bar, lightly tinted with the album's `primaryContainer` (`GlassTint.miniPlayer`); the progress is a thin ring round the play / pause circle (see Now playing and mini player (new UI stage 3)). Earlier: glass bar tinted at `container` | `MiniPlayerBar` |
 | `ModalBottomSheet` | System sheet (glass by itself) + PixlAudio's sheet layout inside | `SheetScaffold` + `.pixlSheet()` |
 | Ripple, state layers | Glass `.interactive()` highlight; `PressScaleButtonStyle` for fills sitting on glass | `GlassStyle.swift` |
 | Tonal elevation, shadows | None (glass depth) | — |
@@ -187,7 +187,7 @@ PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact ba
     `GlassEffectContainer`: off is lightly tinted with an 18 pt corner radius; on is filled with its fixed role and becomes a pill.
 - The bars float over the tabs as an overlay (no layout space, docs/performance.md); content scrolls under the
   see-through glass, and every tab root and route reserves the bars' room inside its own stack
-  (`BottomBarsClearance`: tab bar + mini player + 8 pt on a root, the mini player + 8 pt on a pushed screen, as
+  (`BottomBarsClearance`: tab bar + mini player + 12 pt on a root, the mini player + 12 pt on a pushed screen, as
   Android pads by `bottomBarHeight + MiniPlayerHeight`), so the last rows scroll up above the bars. Android's bottom
   gradients behind its bar (Home, Search) are gone.
 - The bar shows only at a tab's root — every pushed screen hides it (Android `routesWithHiddenNavigationBar`); the
@@ -236,6 +236,44 @@ rules in PixlFoundation `SplitPillNav` (tested).
 - **Performance:** only `NavTabsPill` re-renders while a finger moves, and only when the segment under it changes;
   the hit test is arithmetic on a width measured once per size. The field's keystrokes re-render the bar alone (the
   shell passes a binding and never reads the text).
+
+### Now playing and mini player (new UI stage 3, 2026-11-16)
+
+Owner decisions on the approved mockups (`iOSPlayer`, `iOSPlayerMenu`, `iOSHome`'s mini player); they override the
+mockups where they differ (the mockup's square cover became full bleed). Pure rules in PixlFoundation
+`ProgressiveHero` / `ProgressRing` (tested).
+
+- **Hero (`ProgressiveBlurHero`, design system — the artist and playlist pages take it next with
+  `HeroGradients.header`):** the queue's covers fill the top edge to edge as a square (`AlbumCarousel(fullBleed:)`: no
+  corners, no gaps, no shrink while paused; swipe, tap for the album, double-tap to like and the long-press quick
+  actions all stay). Sharp at the top; from 42 % down one pre-blurred copy of the cover (`BlurredArtworkCache`, the
+  blended-cover background's 128 px Core Image blur, so no extra work) fades in along a smoothstep mask and covers it
+  from 78 %; a veil of the album's `primaryContainer` rises with it to 50 % so the title reads; the whole stack melts
+  out over the last 20 % into the card's fill and the ambient background. A 32 % black scrim behind the status bar and
+  the top bar keeps the clear-glass chrome legible over bright art. No live blur and no per-frame work: the gradients
+  are static (`HeroGradients.player`), a new song cross-fades the blurred copy in 0.3 s. The carousel style setting
+  (peeks) doesn't apply to the full-bleed hero.
+- **Top bar:** collapse circle; output pill joined to the ⋯ menu (`PlayerMoreMenu`, the queue pill's place and shape).
+- **⋯ menu (system liquid menu):** Listen — Spatial audio (opens the Spatial audio sheet; subtitle: the profile, or
+  "… Not playing right now."), Sing (the lyrics screen's request: vocals off / on through the instrumental, subtitle
+  its state; off while switching or on Spotify Connect), Ask Taizo; the song — Add to playlist, Go to album, Go to
+  artist (picker for several), Share; Sleep timer, Song details. Spatial audio and Sing are gone from the player's
+  visible controls (the lyrics screen keeps its own Sing segment).
+- **Title row:** `FitWidthTitle(.playerTitle)` — 26 pt heavy SF Pro at the widest width that fits one line (expanded
+  → compressed, then truncation), re-measured only when the song, width or text size changes; the artist at 18 pt
+  medium (tap: artist / picker; long press: the primary artist); a 48 pt clear-glass Queue circle (`player.queue`)
+  where the like button was; the preparing chip before it.
+- **Seek bar, quality label and transport:** unchanged (`PlayerSeekBar`, `AnimatedPlaybackControls`).
+- **Bottom split pills (`PlayerActionPills`):** the bar's pair at the player's bottom, 16 pt from the sides, 10 pt
+  apart, 64 pt tall: a big clear-glass capsule with Shuffle · Repeat · Like (equal segments 5 pt in, 4 pt apart; an
+  "on" segment sits in a tonal capsule — `primaryFixed` / `secondaryFixed` / `tertiaryFixed` at `prominent` — that
+  fades and swells in; ids `player.shuffle` / `player.repeat` / `player.favorite`, selected trait) and a Lyrics circle
+  (`player.lyrics`, opens the lyrics screen). The lyrics More sheet keeps `PlayerToggleRow`.
+- **Mini player:** floats as its own pill 12 pt above the bar (`Tokens.Shell.miniPlayerSpacing`, was 8), see-through
+  (`GlassTint.miniPlayer` 0.34, was `container` 0.62). Play / pause shrinks to a 34 pt circle inside a 44 pt, 2.5 pt
+  ring (`MiniPlayerProgressRing`: `onPrimaryContainer` 18 % track, `primary` arc from 12 o'clock, round cap). The ring
+  samples the clock on a `TimelineView` only while playing and on screen, as often as the arc's end moves about a point
+  (`ProgressRing.tickInterval`, 0.25–2 s: ~1.3 s for a 3-minute song); paused it draws once (and again after a seek).
 
 ## Screen map (Android → iOS)
 

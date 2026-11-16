@@ -1,8 +1,9 @@
 import XCTest
 
 /// Spatial audio (cloud audio spec 6.5) in demo states (`SpatialDemo`: the no-op services, a state pinned per screen):
-/// the sheet over the full player for every status line and for Off; the full player's button (on, held back, and a tap
-/// that opens the sheet, where a pick applies at once); Settings › Playback's rows (Sound, the "Cloud processing is
+/// the sheet over the full player for every status line and for Off; the full player's ⋯ menu row (new UI, 2026-11-16:
+/// the button beside the title moved into the menu — on, held back, and a tap that opens the sheet, where a pick
+/// applies at once); Settings › Playback's rows (Sound, the "Cloud processing is
 /// off" row, Developer mode's rows) and the confirm before "Remove downloaded renders".
 ///
 /// Cloud renders need both switches (spec 6.1). `SpatialDemo` sets `spatial.cloud`; Cloud Studio's own "Process songs in
@@ -59,35 +60,31 @@ final class SpatialScreenshotTests: XCTestCase {
                          cloudStudioOn: false, suffix: "-masterOff")
     }
 
-    // MARK: The full player's button
+    // MARK: The full player's ⋯ menu
 
     func testPlayerButtonOnLight() throws {
         continueAfterFailure = false
         let app = launch("nowPlaying.spatial", "light")
-        let button = app.buttons["player.spatialAudio"].firstMatch
-        XCTAssertTrue(button.waitForExistence(timeout: 20), "the Spatial audio button is missing")
-        XCTAssertEqual(button.label, "Spatial audio")
-        XCTAssertEqual(button.value as? String, "Studio")
+        let row = openSpatialRow(app)
+        assertRow(row, in: app, mentions: "Studio")
         snapshot(app, "nowPlaying.spatial-light")
     }
 
     func testPlayerButtonHeldBackDark() throws {
         continueAfterFailure = false
         let app = launch("nowPlaying.spatialHeld", "dark")
-        let button = app.buttons["player.spatialAudio"].firstMatch
-        XCTAssertTrue(button.waitForExistence(timeout: 20), "the Spatial audio button is missing")
-        XCTAssertEqual(button.value as? String, "Concert Hall. Not playing right now.")
+        let row = openSpatialRow(app)
+        assertRow(row, in: app, mentions: "Concert Hall. Not playing right now.")
         snapshot(app, "nowPlaying.spatialHeld-dark")
     }
 
-    /// Off in the player; a tap opens the sheet with Off selected; picking Wide applies at once and the sheet stays
-    /// open; closed, the button names the pick.
+    /// Off in the player's menu; a tap opens the sheet with Off selected; picking Wide applies at once and the sheet
+    /// stays open; closed, the menu row names the pick.
     func testTheButtonOpensTheSheetAndAPickApplies() throws {
         continueAfterFailure = false
         let app = launch("nowPlaying", "light")
-        let button = app.buttons["player.spatialAudio"].firstMatch
-        XCTAssertTrue(button.waitForExistence(timeout: 20), "the Spatial audio button is missing")
-        XCTAssertEqual(button.value as? String, "Off")
+        let button = openSpatialRow(app)
+        assertRow(button, in: app, mentions: "Off")
         Thread.sleep(forTimeInterval: 1.0)
         button.tap()
 
@@ -113,8 +110,31 @@ final class SpatialScreenshotTests: XCTestCase {
         let top = sheet.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 12))
         top.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.98)))
         waitFor(NSPredicate(format: "exists == false"), sheet, "the sheet did not close")
-        waitFor(NSPredicate(format: "value == %@", "Wide"), button, "the player's button does not name the pick")
+        Thread.sleep(forTimeInterval: 1.0)
+        assertRow(openSpatialRow(app), in: app, mentions: "Wide")
         app.terminate()
+    }
+
+    /// Opens the full player's ⋯ menu and returns its Spatial audio row (the subtitle names the profile).
+    private func openSpatialRow(_ app: XCUIApplication) -> XCUIElement {
+        let more = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@", "player.more",
+                                                    "More options")).firstMatch
+        XCTAssertTrue(more.waitForExistence(timeout: 20), "the player's ⋯ menu is missing")
+        more.tap()
+        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Spatial audio")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "the menu has no Spatial audio row")
+        Thread.sleep(forTimeInterval: 0.8)
+        return row
+    }
+
+    /// The row's subtitle: in its label or value, or as its own text (how a menu item's subtitle reaches
+    /// accessibility isn't pinned).
+    private func assertRow(_ row: XCUIElement, in app: XCUIApplication, mentions text: String,
+                           file: StaticString = #filePath, line: UInt = #line) {
+        let inRow = row.label.contains(text) || ((row.value as? String)?.contains(text) ?? false)
+        let asText = app.staticTexts.matching(NSPredicate(format: "label == %@", text)).firstMatch.exists
+        XCTAssertTrue(inRow || asText, "the Spatial audio row doesn't say \"\(text)\" (label: \(row.label))",
+                      file: file, line: line)
     }
 
     // MARK: Settings › Playback

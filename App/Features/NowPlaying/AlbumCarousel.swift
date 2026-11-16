@@ -37,6 +37,10 @@ nonisolated enum PlayerCarouselStyle: String, Sendable {
 ///
 /// Material's keyline carousel (neighbours masked to smaller slices) is approximated by plain square pages whose
 /// neighbours are cut by the carousel edge.
+///
+/// `fullBleed` (new UI, 2026-11-16): the covers fill the width edge to edge, square, without corners or gaps, and stay
+/// full size while paused — the sharp layer of the full player's hero (`ProgressiveBlurHero`). Peeking neighbours
+/// can't show in a full-bleed hero, so the carousel style doesn't apply there.
 struct AlbumCarousel: View {
     let queue: [Song]
     let currentIndex: Int?
@@ -48,15 +52,17 @@ struct AlbumCarousel: View {
     /// are a context menu the full player puts around the whole carousel).
     var allowsSwipe = true
     var onDoubleTap: (() -> Void)?
+    var fullBleed = false
 
     /// Starts at the width the player lays it out at (when known), so the covers are there on the first pass instead
     /// of after a measuring pass; measuring still follows later changes.
     @State private var width: CGFloat
 
     init(queue: [Song], currentIndex: Int?, style: PlayerCarouselStyle, isPlaying: Bool, initialWidth: CGFloat = 0,
-         allowsSwipe: Bool = true, onDoubleTap: (() -> Void)? = nil,
+         allowsSwipe: Bool = true, onDoubleTap: (() -> Void)? = nil, fullBleed: Bool = false,
          onSelect: @escaping (Int) -> Void, onAlbumTap: @escaping (Song) -> Void) {
         self.allowsSwipe = allowsSwipe
+        self.fullBleed = fullBleed
         self.onDoubleTap = onDoubleTap
         self.queue = queue
         self.currentIndex = currentIndex
@@ -74,15 +80,16 @@ struct AlbumCarousel: View {
     @State private var hintToken = 0
 
     var body: some View {
-        let item = style.itemSize(width: width)
+        let item = fullBleed ? width : style.itemSize(width: width)
         let margins = style.margins(width: width)
-        let singleStyle = queue.count <= 1 ? PlayerCarouselStyle.noPeek : style
+        let singleStyle = queue.count <= 1 || fullBleed ? PlayerCarouselStyle.noPeek : style
         ScrollView(.horizontal) {
-            LazyHStack(spacing: 8) {
+            LazyHStack(spacing: fullBleed ? 0 : 8) {
                 // Covers decode at their display size, so they wait for the measured width.
                 ForEach(width > 0 ? queue.indices : 0..<0, id: \.self) { index in
                     let song = queue[index]
-                    ArtworkView(song: song, size: max(singleStyle == .noPeek ? width : item, 1), cornerRadius: 18)
+                    ArtworkView(song: song, size: max(singleStyle == .noPeek ? width : item, 1),
+                                cornerRadius: fullBleed ? 0 : 18)
                         .contentShape(.rect)
                         // Double-tap goes first, so the single tap (open the album) waits for it to fail.
                         .modifier(CarouselDoubleTap(action: index == (position ?? currentIndex) ? onDoubleTap : nil))
@@ -116,7 +123,8 @@ struct AlbumCarousel: View {
             }
         }
         .frame(height: max(item, 1))
-        .scaleEffect(isPlaying ? 1 : 0.95)
+        // Full bleed stays full size: a shrink would open gaps at the screen edges.
+        .scaleEffect(isPlaying || fullBleed ? 1 : 0.95)
         .animation(.easeOut(duration: 0.26), value: isPlaying)
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .onAppear { position = currentIndex }
@@ -130,10 +138,11 @@ struct AlbumCarousel: View {
             if position != currentIndex { position = currentIndex }
         }
         .pixlHaptic(.impact(weight: .medium), trigger: settleHaptic)
-        .overlay(alignment: .top) {
+        // Full bleed: in the middle of the cover, clear of the player's top bar over it.
+        .overlay(alignment: fullBleed ? .center : .top) {
             if let hint {
                 SwipeHint(direction: hint)
-                    .padding(.top, 10)
+                    .padding(.top, fullBleed ? 0 : 10)
                     .transition(.opacity.combined(with: .scale(scale: 0.92)))
             }
         }

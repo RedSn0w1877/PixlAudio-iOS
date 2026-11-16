@@ -1,3 +1,4 @@
+import PixlFoundation
 import PixlModel
 import SwiftUI
 
@@ -8,7 +9,10 @@ import SwiftUI
 /// floating above the tab bar.
 ///
 /// The transport circles sit on the glass, so they are fills (`PressScaleButtonStyle`), not glass-on-glass.
-/// Nothing here updates per second.
+///
+/// New UI (2026-11-16): the bar floats above the split-pill nav as its own see-through pill (`GlassTint.miniPlayer`),
+/// and the song's progress is a thin ring round the play / pause circle (`MiniPlayerProgressRing`), not a line on the
+/// pill's edge. Only the ring updates while playing, on its own timeline; nothing else here updates per second.
 struct MiniPlayerBar: View {
     let song: Song
     let isPlaying: Bool
@@ -18,6 +22,10 @@ struct MiniPlayerBar: View {
     var drawsGlass = true
     /// Spotify Connect: the device playing the queue ("Playing on <device>" in place of the artist line).
     var remoteDeviceName: String?
+    /// The playback clock the progress ring samples (nil: no ring, as in previews).
+    var clock: PlaybackClock?
+    /// Whether the ring may tick (the bar is on screen: not under the expanded player).
+    var showsProgress = true
     let onOpen: () -> Void
     let onPrevious: () -> Void
     let onPlayPause: () -> Void
@@ -65,8 +73,17 @@ struct MiniPlayerBar: View {
             transportButton("backward.end.fill", label: "Previous", fill: theme.onPrimary, icon: theme.primary,
                             action: onPrevious)
             transportButton(isPlaying ? "pause.fill" : "play.fill", label: isPlaying ? "Pause" : "Play",
-                            fill: theme.primary, icon: theme.onPrimary, action: onPlayPause)
+                            fill: theme.primary, icon: theme.onPrimary, circleSize: m.playButtonSize,
+                            action: onPlayPause)
                 .accessibilityIdentifier("miniPlayer.playPause")
+                .background {
+                    if let clock {
+                        MiniPlayerProgressRing(clock: clock, durationHintMs: song.duration, songId: song.id,
+                                               isPlaying: isPlaying, isActive: showsProgress, color: theme.primary,
+                                               track: theme.onPrimaryContainer.opacity(0.18))
+                    }
+                }
+                .padding(.horizontal, m.ringSpacing)
             transportButton("forward.end.fill", label: "Next", fill: theme.onPrimary, icon: theme.primary,
                             action: onNext)
         }
@@ -76,7 +93,7 @@ struct MiniPlayerBar: View {
         .contentShape(shape)
         .onTapGesture(perform: onOpen)
         .modifier(MiniPlayerGlass(enabled: drawsGlass, shape: shape,
-                                  tint: theme.primaryContainer.opacity(GlassTint.container)))
+                                  tint: theme.primaryContainer.opacity(GlassTint.miniPlayer)))
         .pixlHaptic(.impact(weight: .light), trigger: isPlaying)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("miniPlayer")
@@ -86,14 +103,15 @@ struct MiniPlayerBar: View {
     private static let hitInset = (Tokens.MiniPlayer.buttonHitSize - Tokens.MiniPlayer.buttonSize) / 2
 
     private func transportButton(_ symbol: String, label: LocalizedStringKey, fill: Color, icon: Color,
+                                 circleSize: CGFloat = Tokens.MiniPlayer.buttonSize,
                                  action: @escaping () -> Void) -> some View {
         let m = Tokens.MiniPlayer.self
         return Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: m.buttonIconSize * 0.8, weight: .semibold))
+                .font(.system(size: m.buttonIconSize * 0.8 * circleSize / m.buttonSize, weight: .semibold))
                 .foregroundStyle(icon)
                 .contentTransition(.symbolEffect(.replace))
-                .frame(width: m.buttonSize, height: m.buttonSize)
+                .frame(width: circleSize, height: circleSize)
                 .background(Circle().fill(fill))
                 .frame(width: m.buttonHitSize, height: m.buttonHitSize)
                 .contentShape(.rect)
@@ -101,6 +119,52 @@ struct MiniPlayerBar: View {
         .buttonStyle(PressScaleButtonStyle())
         .disabled(isPreparing)
         .accessibilityLabel(label)
+    }
+}
+
+/// The song's progress as a thin ring round the mini player's play / pause circle (new UI, 2026-11-16; Android draws
+/// M3 Expressive's wavy circular indicator there). Position is never observable state: a `TimelineView` samples the
+/// clock only while playing and on screen, as often as the arc's end moves about a point
+/// (`ProgressRing.tickInterval`: about every 1.3 s for a 3-minute song), and only this small view redraws. Paused, it
+/// draws once — again after a seek or a new song. The track ring is static, outside the timeline.
+struct MiniPlayerProgressRing: View {
+    let clock: PlaybackClock
+    let durationHintMs: Int64
+    let songId: String
+    let isPlaying: Bool
+    let isActive: Bool
+    let color: Color
+    let track: Color
+
+    @Environment(PlaybackStore.self) private var playback
+
+    var body: some View {
+        let m = Tokens.MiniPlayer.self
+        // A seek or restart while paused redraws the arc once (the timeline doesn't tick then).
+        let _ = playback.seekRevision
+        let interval = ProgressRing.tickInterval(durationMs: durationHintMs, diameter: Double(m.ringDiameter))
+        ZStack {
+            Circle()
+                .inset(by: m.ringLineWidth / 2)
+                .stroke(track, lineWidth: m.ringLineWidth)
+            TimelineView(.animation(minimumInterval: interval, paused: !(isPlaying && isActive))) { context in
+                let _ = context.date
+                let duration = PlaybackProgress.displayDuration(reportedMs: clock.durationMs, hintMs: durationHintMs)
+                let fraction = ProgressRing.drawnFraction(
+                    PlaybackProgress.fraction(positionMs: clock.positionMs, durationMs: duration))
+                Circle()
+                    .inset(by: m.ringLineWidth / 2)
+                    .trim(from: 0, to: CGFloat(fraction))
+                    .stroke(color, style: StrokeStyle(lineWidth: m.ringLineWidth, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
+        }
+        .frame(width: m.ringDiameter, height: m.ringDiameter)
+        // A new song starts its ring from the top at once (no sweep back from the old position).
+        .id(songId)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+        .longRunning("miniPlayer.progressRing (timeline)", active: isPlaying && isActive)
     }
 }
 

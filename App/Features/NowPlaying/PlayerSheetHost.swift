@@ -7,10 +7,11 @@ import SwiftUI
 /// Android's springs.
 ///
 /// The shell puts a `MiniPlayerSlot` where the mini player sits and this host as a sibling above everything; the
-/// card interpolates from the slot's frame (16 pt side insets, 64 pt tall, 32 pt top / 10 pt bottom corners) to the
-/// whole screen (no corners) with the expansion fraction (`PlayerSheetMorph`). Collapsed, the card is the
-/// album-tinted glass mini player; while it expands the glass fades out over the first quarter and the album's
-/// `primaryContainer` fades in — the full player's background, as in Android's glass mode.
+/// card interpolates from the slot's frame (16 pt side insets, 64 pt tall, a 32 pt-cornered pill floating above the
+/// split-pill bar) to the whole screen (no corners) with the expansion fraction (`PlayerSheetMorph`). Collapsed, the
+/// card is the see-through, lightly album-tinted glass mini player (`GlassTint.miniPlayer`); while it expands the glass
+/// fades out over the first quarter and the album's `primaryContainer` fades in — the full player's background, as in
+/// Android's glass mode.
 struct PlayerSheetHost: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(PlaybackStore.self) private var playback
@@ -38,7 +39,7 @@ struct PlayerSheetHost: View {
                 card(song: song, screen: screen, safeArea: insets, collapsedMinX: collapsed.minX)
                     .modifier(PlayerSheetMorph(progress: sheet.expansion, collapsed: collapsed, screen: screen,
                                                collapsedBottomRadius: sheet.collapsedBottomRadius,
-                                               glassTint: theme.primaryContainer.opacity(GlassTint.container),
+                                               glassTint: theme.primaryContainer.opacity(GlassTint.miniPlayer),
                                                fill: theme.primaryContainer,
                                                overshootScaleY: sheet.overshootScaleY))
                     .simultaneousGesture(sheetDrag(distance: max(collapsed.minY, 1)))
@@ -239,8 +240,11 @@ private struct MiniPlayerLayer: View {
     @State private var skipCount = 0
 
     var body: some View {
+        // The ring ticks only while the bar shows: not under the expanded player, not stepped aside for the keyboard.
+        let sheet = env.playerSheet
         MiniPlayerBar(song: song, isPlaying: playback.isPlaying, isPreparing: playback.isPreparing,
                       drawsGlass: false, remoteDeviceName: playback.remoteOutputName,
+                      clock: playback.clock, showsProgress: !sheet.isExpanded && !sheet.hiddenForKeyboard,
                       onOpen: { env.playerSheet.expand() },
                       onPrevious: { playback.skipToPrevious() },
                       onPlayPause: { playback.togglePlayPause() },

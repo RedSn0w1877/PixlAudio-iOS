@@ -51,8 +51,9 @@ nonisolated enum Tokens {
         static let horizontalInset: CGFloat = 16
         /// `MiniPlayerHeight`.
         static let miniPlayerHeight: CGFloat = 64
-        /// `MiniPlayerBottomSpacer`: the mini player floats this far above the tab bar.
-        static let miniPlayerSpacing: CGFloat = 8
+        /// The mini player floats this far above the split-pill bar as its own pill (new UI, 2026-11-16: the approved
+        /// mockups leave 12–14 pt; Android's `MiniPlayerBottomSpacer` was 8).
+        static let miniPlayerSpacing: CGFloat = 12
     }
 
     /// Mini player content (`MiniPlayerContentInternal`).
@@ -67,6 +68,22 @@ nonisolated enum Tokens {
         /// The transport buttons' touch area (Compose extends small clickables to 48 dp; iOS asks for 44 pt): the
         /// 36 pt circles sit centred in it, so the 8 pt gaps between them are now part of the buttons.
         static let buttonHitSize: CGFloat = 44
+        /// Play / pause inside its progress ring (new UI, 2026-11-16): the fill shrinks to leave room for the ring,
+        /// which runs round the 44 pt touch area, 2.5 pt thick.
+        static let playButtonSize: CGFloat = 34
+        static let ringDiameter: CGFloat = 44
+        static let ringLineWidth: CGFloat = 2.5
+        /// Extra room each side of the ringed play button, so the ring clears the previous / next circles.
+        static let ringSpacing: CGFloat = 2
+    }
+
+    /// The full player's bottom split pills (new UI, 2026-11-16, mockup `iOSPlayer`): a big capsule (shuffle, repeat,
+    /// favourite) and a small circle (lyrics), like the bottom bar's pair.
+    enum PlayerPills {
+        static let height: CGFloat = 64
+        static let padding: CGFloat = 5
+        static let segmentSpacing: CGFloat = 4
+        static let iconSize: CGFloat = 21
     }
 
     /// Song list item (`EnhancedSongListItem`).
