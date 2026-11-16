@@ -1056,5 +1056,12 @@ Launch, library, artwork, player and Spotify-matcher speed-ups (docs/performance
 |---|---|---|---|---|
 | `View.visualEffect(_:)` + `VisualEffect.scaleEffect(_:anchor:)` / `.offset(y:)` | 17 | /documentation/swiftui/view/visualeffect(_:) | `ArtistDetailView` (hero) | `visualEffect` + `offset` were already used (Mix headers); `scaleEffect(_:anchor: .bottom)` is new here: the overscroll stretch (PixlFoundation `HeroHeader.scrollEffect`), evaluated in the render phase, no state. |
 | `View.onGeometryChange(for:of:action:)` reading `size.height` | 16 | /documentation/swiftui/view/ongeometrychange(for:of:action:) | `ArtistDetailView` | Measures the hero title block and the name once per text / size (sizes don't change while scrolling) to place the collapse window (`HeroHeader.titleCollapse`). |
-| `View.background(alignment:content:)` drawn past the view with `offset` | 15 | /documentation/swiftui/view/background(alignment:content:) | `ArtistTopBar` | The page-coloured fade behind the pinned bar extends under the status bar (`offset(y: -safeTop)`); backgrounds aren't clipped. |
+| `View.background(alignment:content:)` drawn past the view with `offset` | 15 | /documentation/swiftui/view/background(alignment:content:) | `ArtistTopBar` (now the shared `HeroTopBar`) | The page-coloured fade behind the pinned bar extends under the status bar (`offset(y: -safeTop)`); backgrounds aren't clipped. |
 | `View.contextMenu(menuItems:)` | 13 | /documentation/swiftui/view/contextmenu(menuitems:) | `ArtistAlbumTile` | Already used (Cloud queue); Play / Go to album on an album cover. |
+
+## Playlist page (2026-11-16, branch `new-ui`, stage 5)
+| API | Min OS | Doc | Used in | Notes |
+|---|---|---|---|---|
+| `View.onScrollGeometryChange(for:of:action:)` with an `Equatable` enum | 18 | /documentation/swiftui/view/onscrollgeometrychange(for:of:action:) | `PlaylistDetailView` | Already in the ledger with `CGFloat`; here the transform returns PixlFoundation `PullToFind.Zone`, so the action (open / put away Find in playlist) runs only when the page crosses a threshold, never per frame. |
+| `ForEach` inside the branches of a `LazyVStack` | 13 | /documentation/swiftui/lazyvstack | `PlaylistDetailView` | The hero, the card's top, each song row and the card's bottom are separate items of the page's one lazy stack, so a long playlist still lays out only the rows near the screen; the card is plain `surfaceContainerHigh` fills behind each row that tile into one shape. |
+| `View.padding(_:_:)` with a negative length inside `background(alignment:content:)` | 13 | /documentation/swiftui/view/padding(_:_:) | `PlaylistDetailView` (Find field) | Extends the page-coloured fade 16 pt below the pinned Find field so rows pass under it softly. |

@@ -310,6 +310,38 @@ play-count texts.
   re-renders only the name's morphing layer and the bar title, a few times per collapse; the hero's stretch and
   parallax run in `visualEffect`.
 
+### Playlist page (new UI stage 5, 2026-11-16)
+
+Owner decisions on the approved `iOSPlaylist` mockup (they override it where they differ). Pure rules in PixlFoundation
+`PlaylistHero` and `PullToFind` (tested); the hero geometry is the artist page's (`HeroHeader`, `Tokens.PageHero`).
+
+- **Hero (`ProgressiveBlurHero`, `HeroGradients.header`), same treatment as the artist page:** the playlist's own
+  image, else its colour cover (the colour edge to edge with its icon large in the sharp part), else the first song's
+  cover in the playlist's own order (`PlaylistHero.art`; re-sorting the list never swaps it), else a placeholder glyph.
+  The page is themed from that art (`ArtworkThemed`). Overscroll stretch and 30 % parallax in `visualEffect`.
+- **Title block on the blurred part, 16 pt in:** the name in `FitWidthTitle(.playlistHero)` (34 pt heavy SF Pro at the
+  widest width that fits two lines, collapsing narrower and lighter under the bar, where `CollapsedBarTitle` takes
+  over). Then the meta line (15 pt medium, 80 %): "Made by Taizo · N Songs · 1 h 52 min" — the owner only for generated
+  playlists (`isAiGenerated`, with the sparkles badge) or imported ones ("From Spotify", the disc badge); the user's own
+  playlists show just the count and duration. Then Play (prominent glass capsule tinted `primary`, `playlist.play`;
+  turns shuffle off, as before) and Shuffle (clear glass capsule, `playlist.shuffle`), equal widths, one container.
+  **No "Edit with Taizo":** Ask Taizo (`AppSheet.taisChat`) opens without context, so there is no way yet to hand it a
+  playlist. **No description line:** playlists have none.
+- **Bar (pinned, the shared `HeroTopBar`):** back (`detail.back`), the collapsed name, Sort Songs (`playlist.sort`) and
+  ⋯ (`playlist.more`) — system menus, left out of a glass container like the old bar. The ⋯ menu is unchanged (Find,
+  Edit, Set default transition, Export, Download all, Process all on-device / in cloud, Delete). The mockup's download
+  circle stays in the menu.
+- **Songs:** a `surfaceContainerHigh` card (8 pt in, 28 pt corners) under the hero: the edit row first (Add, Remove,
+  Reorder — unchanged, the inactive modes now `surfaceContainerHighest` so they read on the card), then the
+  `PlaylistSongRow`s as before (glass rows, drag handles and drop-to-reorder, remove buttons, swipe to queue, ⋯ → song
+  info, blocked-artist dimming). Each row is its own item of the page's lazy stack.
+- **Find in playlist:** pulling the page down past its top (72 pt) opens it (not while reordering / removing); the
+  field pins under the bar on the page colour and the hero gives way to the matching songs (the keyboard would cover
+  them below the hero). Scrolling 60 pt with nothing typed puts it away; Cancel brings the page back. The scroll
+  observer works on zones (`PullToFind.zone`), so it acts only when a threshold is crossed.
+- **Performance:** the page body re-renders on library / sort / mode / Find changes, not on scroll; scrolling re-renders
+  only the name's morphing layer and the bar title (a few times per collapse); one pre-blurred layer for the hero.
+
 ## Screen map (Android → iOS)
 
 | Android screen / sheet | iOS route / presentation | View (file) | Stage |

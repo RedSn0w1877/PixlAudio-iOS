@@ -100,6 +100,17 @@ final class LibraryScreenshotTests: XCTestCase {
     func testPlaylistDetailLight() throws { try capture("playlistDetail", "light", ready: "screen.playlistDetail") }
     func testPlaylistDetailDark() throws { try capture("playlistDetail", "dark", ready: "screen.playlistDetail") }
     func testPlaylistReorderLight() throws { try capture("playlistReorder", "light", ready: "screen.playlistDetail") }
+    /// New UI stage 5: the cover hero with Play and Shuffle, then swiped up to the collapsed bar over the song card.
+    func testPlaylistDetailCollapsedDark() throws {
+        try capture("playlistDetail", "dark", ready: "screen.playlistDetail", suffix: "-collapsed") { app in
+            // By label: controls inside a glass container keep only their labels.
+            XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label == %@", "Play")).firstMatch
+                              .waitForExistence(timeout: 10), "Play is missing on the playlist hero")
+            XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label == %@", "Shuffle")).firstMatch
+                              .exists, "Shuffle is missing on the playlist hero")
+            app.swipeUp()
+        }
+    }
     func testPlaylistOptionsLight() throws { try capture("playlistOptions", "light", ready: "sheet.playlistOptions") }
     /// The options sheet pulled up to its large detent: "Process all on-device" and "Process all in cloud" under
     /// "Download all songs".

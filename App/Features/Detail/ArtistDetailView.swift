@@ -151,8 +151,8 @@ private struct ArtistDetailContent: View {
                 theme.surface.ignoresSafeArea()
                 if let artist = library.artist(id: artistId) {
                     page(artist, width: width, heroHeight: heroHeight, safeTop: safeTop)
-                    ArtistTopBar(name: artist.name, titleState: titleState, safeTop: safeTop,
-                                 onBack: { router.pop() }) {
+                    HeroTopBar(title: artist.name, titleState: titleState, safeTop: safeTop,
+                               onBack: { router.pop() }) {
                         moreMenu(artist)
                     }
                 } else {
@@ -486,53 +486,6 @@ private struct ArtistContent {
     let plays: [String: String]
     /// The first song's cover: the hero when the artist has no image.
     let fallbackArt: String?
-}
-
-/// The pinned top bar over the hero: back, the condensed name once the hero name has collapsed under it
-/// (`CollapsedBarTitle`), and the ⋯ menu. A page-coloured fade rises behind it (under the status bar too) on the same
-/// stop, so the rows scrolling under it stay out of the way. Reads only `isCollapsed`: a few renders per collapse.
-private struct ArtistTopBar<MenuContent: View>: View {
-    let name: String
-    let titleState: CollapsingTitleState
-    let safeTop: CGFloat
-    let onBack: () -> Void
-    @ViewBuilder let menu: () -> MenuContent
-
-    @Environment(\.appTheme) private var theme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        let collapsed = titleState.isCollapsed
-        let barHeight = Tokens.PageHero.barHeight
-        // The back and menu circles render together (spacing below their gap).
-        GlassEffectContainer(spacing: 3) {
-            HStack(spacing: Tokens.TopBar.actionSpacing) {
-                GlassCircleButton(systemImage: "arrow.left", accessibilityLabel: "Back",
-                                  tint: theme.surfaceContainerLow.opacity(GlassTint.container),
-                                  foreground: theme.onSurface, action: onBack)
-                    .accessibilityIdentifier("detail.back")
-                CollapsedBarTitle(text: name, state: titleState)
-                    .foregroundStyle(theme.onSurface)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 6)
-                menu()
-            }
-        }
-        .padding(.horizontal, 12)
-        .frame(height: barHeight)
-        .background(alignment: .top) {
-            LinearGradient(stops: [.init(color: theme.surface, location: 0),
-                                   .init(color: theme.surface.opacity(0.92), location: 0.62),
-                                   .init(color: theme.surface.opacity(0), location: 1)],
-                           startPoint: .top, endPoint: .bottom)
-                .frame(height: safeTop + barHeight + 28)
-                .offset(y: -safeTop)
-                .opacity(collapsed ? 1 : 0)
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: collapsed)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-        }
-    }
 }
 
 /// An album of the artist on the shelf: a 132 pt cover (18 pt corners), the title and the year (or song count).

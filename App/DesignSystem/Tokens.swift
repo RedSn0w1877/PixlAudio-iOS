@@ -102,6 +102,11 @@ nonisolated enum Tokens {
         static let albumCorner: CGFloat = 18
         static let albumSpacing: CGFloat = 12
         static let sectionSpacing: CGFloat = 24
+        /// The playlist page's song card: inset from the screen edges, its corner radius.
+        static let panelInset: CGFloat = 8
+        static let panelCorner: CGFloat = 28
+        /// The Find field pinned under the playlist page's bar (`ListFindField`: 8 + 48 + 4 pt).
+        static let findFieldHeight: CGFloat = 60
     }
 
     /// Song list item (`EnhancedSongListItem`).

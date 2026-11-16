@@ -226,3 +226,75 @@ struct ArtworkThemed<Content: View>: View {
         }
     }
 }
+
+/// The pinned top bar over a page hero (the new UI's artist and playlist pages): back, the condensed title once the
+/// hero title has collapsed under it (`CollapsedBarTitle`), and the trailing circles (menus). A page-coloured fade rises
+/// behind it (under the status bar too) on the last collapse stop — or always, with `forcesBackdrop` (the playlist's
+/// Find field sits under it) — so rows scrolling under it stay out of the way. Reads only `isCollapsed`: a few renders
+/// per collapse.
+struct HeroTopBar<Trailing: View>: View {
+    let title: String
+    let titleState: CollapsingTitleState
+    let safeTop: CGFloat
+    let forcesBackdrop: Bool
+    /// Back and the trailing circles in one `GlassEffectContainer` (the artist page). The playlist page leaves its
+    /// system menus ungrouped, like its old bar (their morph out of the button was approved as it is, 2026-10-02).
+    let groupsGlass: Bool
+    let onBack: () -> Void
+    let trailing: Trailing
+
+    @Environment(\.appTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    init(title: String, titleState: CollapsingTitleState, safeTop: CGFloat, forcesBackdrop: Bool = false,
+         groupsGlass: Bool = true, onBack: @escaping () -> Void, @ViewBuilder trailing: () -> Trailing) {
+        self.title = title
+        self.titleState = titleState
+        self.safeTop = safeTop
+        self.forcesBackdrop = forcesBackdrop
+        self.groupsGlass = groupsGlass
+        self.onBack = onBack
+        self.trailing = trailing()
+    }
+
+    var body: some View {
+        let shown = forcesBackdrop || titleState.isCollapsed
+        let barHeight = Tokens.PageHero.barHeight
+        Group {
+            if groupsGlass {
+                // The circles render together (spacing below their gap).
+                GlassEffectContainer(spacing: 3) { row }
+            } else {
+                row
+            }
+        }
+        .padding(.horizontal, 12)
+        .frame(height: barHeight)
+        .background(alignment: .top) {
+            LinearGradient(stops: [.init(color: theme.surface, location: 0),
+                                   .init(color: theme.surface.opacity(0.92), location: 0.62),
+                                   .init(color: theme.surface.opacity(0), location: 1)],
+                           startPoint: .top, endPoint: .bottom)
+                .frame(height: safeTop + barHeight + 28)
+                .offset(y: -safeTop)
+                .opacity(shown ? 1 : 0)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: shown)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+    }
+
+    private var row: some View {
+        HStack(spacing: Tokens.TopBar.actionSpacing) {
+            GlassCircleButton(systemImage: "arrow.left", accessibilityLabel: "Back",
+                              tint: theme.surfaceContainerLow.opacity(GlassTint.container),
+                              foreground: theme.onSurface, action: onBack)
+                .accessibilityIdentifier("detail.back")
+            CollapsedBarTitle(text: title, state: titleState)
+                .foregroundStyle(theme.onSurface)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 6)
+            trailing
+        }
+    }
+}

@@ -1,18 +1,40 @@
+import PixlFoundation
 import PixlLibrary
 import PixlModel
 import SwiftUI
 
-/// Playlist detail (Android `PlaylistDetailScreen`):
-/// - the top bar: back circle, the name (`headlineMedium`) over "N Songs • duration" (`labelMedium`), the sort and ⋮
-///   circles;
-/// - the play row (56 pt): "Play it" (`primary`, 60 / 14 pt corners) and Shuffle (`secondaryContainer`, 14 / 60 pt);
-/// - the edit row (42 pt): Add (`tertiaryContainer` capsule), then Remove and Reorder sharing the rest (12 pt
-///   corners, 24 pt and `tertiary` while active);
-/// - the songs in a `surfaceContainerHigh` panel (32 pt top corners) as `PlaylistSongRow`s, 8 pt apart; drag handles
-///   in reorder mode, remove buttons in remove mode;
-/// - sheets: Add songs (`SongPickerSheet`), Sort Songs, Playlist options (edit, delete, default transition, export,
-///   download all, process all on-device / in cloud).
+/// Playlist detail, new UI (2026-11-16, mockup `iOSPlaylist`; owner decisions over the mockup), themed with the hero
+/// art's scheme:
+/// - The cover fills the top edge to edge, sharp at the top and progressively blurred into the page
+///   (`ProgressiveBlurHero`, `HeroGradients.header`, like the artist page): the playlist's own image, else its colour
+///   cover (colour + icon), else the first song's cover (`PlaylistHero.art`). Over its blurred part: the name
+///   (`FitWidthTitle(.playlistHero)`: SF Pro heavy at the widest width that fits two lines, morphing narrower and
+///   lighter as it scrolls under the bar, where `CollapsedBarTitle` takes over), the meta line ("Made by Taizo · N Songs
+///   · duration", the owner only for generated / imported playlists), then Play (prominent glass capsule) and Shuffle
+///   (clear glass capsule). No "Edit with Taizo": Ask Taizo can't be opened on a playlist yet.
+/// - A pinned bar: back, the collapsed name, the Sort Songs and ⋯ menus (system menus, ungrouped glass as before).
+/// - The songs on a `surfaceContainerHigh` card: the edit row first (Add, Remove, Reorder), then `PlaylistSongRow`s
+///   (drag handles in reorder mode, remove buttons in remove mode, swipe to queue, ⋯ → song info).
+/// - Find in playlist: pull the page down past its top (or ⋯ › Find in playlist). The field pins under the bar and the
+///   page shows only the matching songs until Cancel; scrolling with nothing typed puts it away (`PullToFind`).
+/// - Sheets: Add songs (`SongPickerSheet`), Sort Songs, Playlist options (UI-test launch state); the ⋯ menu has edit,
+///   default transition, export, download all, process all on-device / in cloud, delete.
 struct PlaylistDetailView: View {
+    let playlistId: String
+
+    @Environment(LibraryStore.self) private var library
+
+    var body: some View {
+        let art = library.playlist(id: playlistId).map { PlaylistDetailContent.heroArt($0, library: library) }
+        ArtworkThemed(artUri: art?.uri) {
+            PlaylistDetailContent(playlistId: playlistId)
+        }
+        .toolbar(.hidden, for: .navigationBar)
+        .accessibilityIdentifier("screen.playlistDetail")
+    }
+}
+
+private struct PlaylistDetailContent: View {
     let playlistId: String
 
     @Environment(AppEnvironment.self) private var env
@@ -23,7 +45,7 @@ struct PlaylistDetailView: View {
     @Environment(\.appTheme) private var theme
 
     @State private var songs: [Song] = []
-    /// Find in playlist: pull the list down past its top (or More options › Find in playlist).
+    /// Find in playlist: pull the page down past its top (or More options › Find in playlist).
     @State private var find = ListFindModel()
     @State private var sortOption: SortOption = .songDefaultOrder
     @State private var isReorderMode = false
@@ -32,12 +54,15 @@ struct PlaylistDetailView: View {
     @State private var showsSort = false
     @State private var showsOptions = false
     @State private var confirmsDelete = false
-    /// The page's bottom safe area: the home indicator plus the floating mini player's room (`BottomBarsClearance`).
-    /// The song list ignores the bottom safe area (its panel runs to the screen's edge), so it pads by this itself.
-    @State private var bottomInset: CGFloat = 0
     /// The playlist written as M3U for the options menu's Export (rewritten when the playlist changes).
     @State private var exportURL: URL?
     @State private var didApplyLaunchState = false
+    /// The hero name's collapse stop: only the name and the bar title read it, so scrolling never re-renders the page.
+    @State private var titleState = CollapsingTitleState()
+    /// The title block's and the name's heights, measured once per text / size (they don't change while scrolling):
+    /// they place the collapse window.
+    @State private var overlayHeight: CGFloat = 0
+    @State private var titleHeight: CGFloat = 0
 
     private var prefs: LibraryPreferences { LibraryPreferences.shared(isUITest: env.launch.isUITest) }
     /// The song picker always starts on all songs (every song is a Spotify song; there is no local/cloud split).
@@ -52,46 +77,37 @@ struct PlaylistDetailView: View {
         var sort: SortOption
     }
 
+    /// What fills the hero: the playlist's image, its colour cover, else the first song's cover in the playlist's own
+    /// order (re-sorting the list never swaps the hero). Stops at the first song with a cover.
+    static func heroArt(_ playlist: Playlist, library: LibraryStore) -> PlaylistHero.Art {
+        PlaylistHero.art(coverImageUri: playlist.coverImageUri, hasColourCover: playlist.coverColorArgb != nil,
+                         songArt: playlist.songIds.lazy.map { library.song(id: $0)?.albumArtUriString })
+    }
+
     var body: some View {
         let playlist = self.playlist
-        VStack(spacing: 0) {
-            if find.isOpen {
-                ListFindField(model: find)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-            }
-            DetailTopBar(title: playlist?.name ?? "Playlist",
-                         subtitle: "\(LibraryFormat.songCount(songs.count)) • \(LibraryFormat.totalDuration(songs))",
-                         onBack: { router.pop() }) {
-                // Small menus morph out of their buttons (owner change 2026-10-02).
-                GlassCircleMenu(systemImage: "line.3.horizontal.decrease", accessibilityLabel: "Sort Songs") {
-                    SortMenuSections(options: SortOption.songs, selected: sortOption) { option in
-                        withAnimation(PixlMotion.state) { sortOption = option }
-                        prefs.setSongOrder(option, forPlaylist: playlistId)
-                    }
-                }
-                .accessibilityIdentifier("playlist.sort")
-                GlassCircleMenu(systemImage: "ellipsis", accessibilityLabel: "More options") {
-                    optionsMenu
-                }
-                    .accessibilityIdentifier("playlist.more")
-            }
-            if playlist == nil {
-                LibraryEmptyState(systemImage: "music.note.list", title: "Playlist not found.", subtitle: "")
-            } else {
-                playRow
-                editRow
-                if songs.isEmpty {
-                    emptyState
-                } else if find.hasNoMatches {
-                    ListFindNoMatches(query: find.query)
+        GeometryReader { proxy in
+            let safeTop = proxy.safeAreaInsets.top
+            let width = proxy.size.width
+            let viewport = proxy.size.height + safeTop + proxy.safeAreaInsets.bottom
+            let heroHeight = CGFloat(HeroHeader.height(width: Double(width), viewportHeight: Double(viewport),
+                                                       aspect: Double(Tokens.PageHero.aspect)))
+            ZStack(alignment: .top) {
+                theme.surface.ignoresSafeArea()
+                if let playlist {
+                    page(playlist, width: width, heroHeight: heroHeight, safeTop: safeTop)
+                    topChrome(playlist, safeTop: safeTop)
                 } else {
-                    songList(find.isOpen ? (find.results ?? songs) : songs)
+                    VStack(spacing: 0) {
+                        HeroTopBar(title: "", titleState: titleState, safeTop: safeTop, groupsGlass: false,
+                                   onBack: { router.pop() }) {
+                            EmptyView()
+                        }
+                        LibraryEmptyState(systemImage: "music.note.list", title: "Playlist not found.", subtitle: "")
+                    }
                 }
             }
         }
-        .background(theme.background.ignoresSafeArea())
-        .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { bottomInset = $0 }
-        .toolbar(.hidden, for: .navigationBar)
         .onChange(of: Inputs(songIds: playlist?.songIds ?? [], librarySongCount: library.songs.count, sort: sortOption),
                   initial: true) { _, inputs in
             songs = orderedSongs(inputs)
@@ -135,7 +151,6 @@ struct PlaylistDetailView: View {
             Text("Are you sure you want to delete this playlist?")
         }
         .libraryToast()
-        .accessibilityIdentifier("screen.playlistDetail")
     }
 
     // MARK: Ordering
@@ -145,38 +160,272 @@ struct PlaylistDetailView: View {
         return inputs.sort == .songDefaultOrder ? resolved : LibrarySorting.sortPlaylistSongs(resolved, by: inputs.sort)
     }
 
-    // MARK: Rows
+    // MARK: Page
 
-    /// Android: a 62 pt row (20 pt sides, 6 pt bottom) of two 76 pt buttons clipped to it.
-    private var playRow: some View {
-        let enabled = !songs.isEmpty
-        // The two buttons render together (spacing below their 8 pt gap).
-        return GlassEffectContainer(spacing: 4) {
+    /// One scrolling page: the hero with its title block, then the song card. With Find open, the hero gives way to
+    /// the matching songs under the pinned field (the keyboard would otherwise cover them).
+    private func page(_ playlist: Playlist, width: CGFloat, heroHeight: CGFloat, safeTop: CGFloat) -> some View {
+        let titleTop = HeroHeader.overlayTop(heroHeight: Double(heroHeight), overlayHeight: Double(overlayHeight))
+        let window = HeroHeader.titleCollapse(titleTop: titleTop, titleHeight: Double(titleHeight),
+                                              barBottom: Double(safeTop + Tokens.PageHero.barHeight))
+        let isFinding = find.isOpen
+        return ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                if isFinding {
+                    Color.clear
+                        .frame(height: safeTop + Tokens.PageHero.barHeight + Tokens.PageHero.findFieldHeight + 8)
+                        .accessibilityHidden(true)
+                    if find.hasNoMatches {
+                        ListFindNoMatches(query: find.query)
+                            .padding(.top, 32)
+                    } else {
+                        panelTop(showsEditRow: false)
+                        songRows(find.results ?? songs)
+                        panelBottom
+                    }
+                } else {
+                    hero(playlist, width: width, height: heroHeight, safeTop: safeTop)
+                    panelTop(showsEditRow: true)
+                    if songs.isEmpty {
+                        emptyState
+                    } else {
+                        songRows(songs)
+                    }
+                    panelBottom
+                }
+            }
+            // The mini player's and the bar's room comes from the route's safe area (`BottomBarsClearance`).
+            .padding(.bottom, 24)
+        }
+        .scrollIndicators(.hidden)
+        // Pulling down past the top reveals Find in playlist; it bounces even when the page is shorter than the screen.
+        .scrollBounceBehavior(.always, axes: .vertical)
+        .scrollDismissesKeyboard(.interactively)
+        .ignoresSafeArea(edges: .top)
+        .trackingTitleCollapse(titleState, start: CGFloat(window.start), distance: CGFloat(window.distance))
+        // Discrete zones: the action runs only when the page crosses a threshold, never per frame.
+        .onScrollGeometryChange(for: PullToFind.Zone.self) { geometry in
+            PullToFind.zone(offset: Double(geometry.contentOffset.y + geometry.contentInsets.top))
+        } action: { _, zone in
+            entered(zone)
+        }
+        .accessibilityAction(named: "Find in playlist") { withAnimation(PixlMotion.state) { find.open() } }
+    }
+
+    /// The bar, and under it the Find field while it is open (on the page colour, so the rows pass under it).
+    private func topChrome(_ playlist: Playlist, safeTop: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            HeroTopBar(title: playlist.name, titleState: titleState, safeTop: safeTop, forcesBackdrop: find.isOpen,
+                       groupsGlass: false, onBack: { router.pop() }) {
+                // Small menus morph out of their buttons (owner change 2026-10-02).
+                GlassCircleMenu(systemImage: "line.3.horizontal.decrease", accessibilityLabel: "Sort Songs") {
+                    SortMenuSections(options: SortOption.songs, selected: sortOption) { option in
+                        withAnimation(PixlMotion.state) { sortOption = option }
+                        prefs.setSongOrder(option, forPlaylist: playlistId)
+                    }
+                }
+                .accessibilityIdentifier("playlist.sort")
+                GlassCircleMenu(systemImage: "ellipsis", accessibilityLabel: "More options") {
+                    optionsMenu
+                }
+                .accessibilityIdentifier("playlist.more")
+            }
+            if find.isOpen {
+                ListFindField(model: find)
+                    .background(alignment: .top) {
+                        LinearGradient(stops: [.init(color: theme.surface, location: 0),
+                                               .init(color: theme.surface, location: 0.78),
+                                               .init(color: theme.surface.opacity(0), location: 1)],
+                                       startPoint: .top, endPoint: .bottom)
+                            .padding(.bottom, -16)
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
+                    }
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+    }
+
+    /// Entering a pull / scroll zone opens or puts away Find in playlist (`PullToFind`).
+    private func entered(_ zone: PullToFind.Zone) {
+        let action = PullToFind.action(entering: zone, isOpen: find.isOpen, hasQuery: !find.query.isEmpty,
+                                       isEditing: isReorderMode || isRemoveMode)
+        switch action {
+        case .open?: withAnimation(PixlMotion.state) { find.open() }
+        case .close?: withAnimation(PixlMotion.state) { find.close() }
+        case nil: break
+        }
+    }
+
+    // MARK: Hero
+
+    /// The cover filling the top edge to edge, sharp at the top and progressively blurred into the page under the title
+    /// block (`ProgressiveBlurHero`, one pre-blurred layer). It stretches from its bottom edge when the page is pulled
+    /// down and trails the page a little as it scrolls away — both in `visualEffect` (render phase).
+    private func hero(_ playlist: Playlist, width: CGFloat, height: CGFloat, safeTop: CGFloat) -> some View {
+        let art = Self.heroArt(playlist, library: library)
+        let source = ArtworkSource(uriString: art.uri)
+        return ZStack(alignment: .bottomLeading) {
+            ProgressiveBlurHero(source: source, gradients: .header, veil: theme.surface,
+                                topScrimHeight: safeTop + Tokens.PageHero.barHeight + 16,
+                                aspectRatio: width / max(height, 1)) {
+                heroArt(art, source: source, playlist: playlist, width: width, height: height)
+            }
+            .frame(width: width, height: height)
+            .visualEffect { content, proxy in
+                let effect = HeroHeader.scrollEffect(minY: Double(proxy.frame(in: .scrollView).minY),
+                                                     height: Double(proxy.size.height))
+                return content
+                    .scaleEffect(CGFloat(effect.scale), anchor: .bottom)
+                    .offset(y: CGFloat(effect.offset))
+            }
+            heroOverlay(playlist)
+                .padding(.horizontal, Tokens.PageHero.sidePadding)
+                .padding(.bottom, 4)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height.rounded() } action: { overlayHeight = $0 }
+        }
+    }
+
+    @ViewBuilder
+    private func heroArt(_ art: PlaylistHero.Art, source: ArtworkSource?, playlist: Playlist, width: CGFloat,
+                         height: CGFloat) -> some View {
+        if let source {
+            // A square at the hero's larger side, centre-cropped to the hero (decoded once at that size).
+            ArtworkView(source: source, size: max(width, height), cornerRadius: 0)
+                .frame(width: width, height: height)
+                .clipped()
+                .accessibilityHidden(true)
+        } else if art == .colour, let colour = playlist.coverColorArgb {
+            // The colour cover: its colour edge to edge, its icon large in the sharp part.
+            let argb = UInt32(bitPattern: colour)
+            ZStack {
+                Color(argb: argb)
+                Image(systemName: PlaylistIcons.symbol(for: playlist.coverIconName))
+                    .font(.system(size: min(width, height) * 0.34, weight: .semibold))
+                    .foregroundStyle(PlaylistIcons.contentColor(onArgb: argb, theme: theme))
+                    .offset(y: -height * 0.14)
+            }
+            .frame(width: width, height: height)
+            .accessibilityHidden(true)
+        } else {
+            Image(systemName: "music.note.list")
+                .font(.system(size: 96, weight: .semibold))
+                .foregroundStyle(theme.onSurfaceVariant.opacity(0.2))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(theme.surfaceVariant)
+                .accessibilityHidden(true)
+        }
+    }
+
+    /// Over the blurred part (mockup `iOSPlaylist`): the name (SF Pro heavy at the widest width that fits two lines,
+    /// morphing narrower and lighter as it scrolls under the bar), the meta line, then Play and Shuffle.
+    private func heroOverlay(_ playlist: Playlist) -> some View {
+        let owner = PlaylistHero.owner(isAiGenerated: playlist.isAiGenerated, source: playlist.source)
+        return VStack(alignment: .leading, spacing: 0) {
+            FitWidthTitle(text: playlist.name, face: .playlistHero, narrowest: .compressed, lines: 2,
+                          collapse: titleState)
+                .foregroundStyle(theme.onSurface)
+                .shadow(color: theme.surface.opacity(0.35), radius: 7, y: 1)
+                .accessibilityAddTraits(.isHeader)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height.rounded() } action: { titleHeight = $0 }
             HStack(spacing: 8) {
-                SegmentedGlassButton(title: "Play it", systemImage: "play.fill", accessibilityLabel: "Play",
-                                     leading: 60, trailing: 14, height: 56, horizontalPadding: 10,
-                                     tint: theme.primary.opacity(GlassTint.prominent), foreground: theme.onPrimary,
-                                     fillsWidth: true) {
+                if let owner { ownerBadge(owner) }
+                Text(PlaylistHero.meta(owner: owner, songCount: songs.count,
+                                       duration: LibraryFormat.totalDuration(songs)))
+                    .pixlFont(.custom(size: 15, weight: .medium))
+                    .foregroundStyle(theme.onSurface.opacity(0.8))
+                    .lineLimit(1)
+            }
+            .padding(.top, 4)
+            heroActions
+                .padding(.top, 14)
+        }
+    }
+
+    /// The mockup's 22 pt badge before the owner: Taizo's sparkles, or Spotify's disc.
+    private func ownerBadge(_ owner: PlaylistHero.Owner) -> some View {
+        let isTaizo = owner == .taizo
+        return Image(systemName: isTaizo ? "sparkles" : "opticaldisc.fill")
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(isTaizo ? theme.onTertiaryContainer : Color(argb: 0xFF1DB954))
+            .frame(width: 22, height: 22)
+            .background(Circle().fill(isTaizo ? theme.tertiaryContainer : theme.surfaceContainerHigh))
+            .accessibilityHidden(true)
+    }
+
+    /// Play (the one prominent glass capsule) and Shuffle (a clear glass capsule), sharing one glass container.
+    private var heroActions: some View {
+        let enabled = !songs.isEmpty
+        return GlassEffectContainer(spacing: Tokens.PageHero.actionSpacing / 2) {
+            HStack(spacing: Tokens.PageHero.actionSpacing) {
+                Button {
                     guard let first = songs.first else { return }
                     if playback.isShuffleEnabled { playback.setShuffleEnabled(false) }
                     playback.play(first, in: songs)
+                } label: {
+                    actionLabel("Play", systemImage: "play.fill", foreground: theme.onPrimary)
                 }
-                .frame(maxWidth: .infinity)
+                .buttonStyle(.plain)
+                .pixlGlass(in: Capsule(), tint: theme.primary.opacity(GlassTint.prominent), interactive: true)
+                .accessibilityLabel("Play")
                 .accessibilityIdentifier("playlist.play")
-                SegmentedGlassButton(title: "Shuffle", systemImage: "shuffle", accessibilityLabel: "Shuffle",
-                                     leading: 14, trailing: 60, height: 56, horizontalPadding: 10,
-                                     tint: theme.secondaryContainer.opacity(GlassTint.prominent),
-                                     foreground: theme.onSecondaryContainer, fillsWidth: true) {
+                Button {
                     playback.playShuffled(songs)
+                } label: {
+                    actionLabel("Shuffle", systemImage: "shuffle", foreground: theme.onSurface)
                 }
-                .frame(maxWidth: .infinity)
+                .buttonStyle(.plain)
+                .pixlGlass(in: Capsule(), tint: theme.surfaceContainerHigh.opacity(GlassTint.surface), interactive: true)
+                .accessibilityLabel("Shuffle")
                 .accessibilityIdentifier("playlist.shuffle")
             }
         }
         .disabled(!enabled)
         .opacity(enabled ? 1 : 0.5)
-        .padding(.horizontal, 20)
-        .padding(.bottom, 6)
+    }
+
+    private func actionLabel(_ title: LocalizedStringKey, systemImage: String, foreground: Color) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: systemImage)
+                .font(.system(size: 18, weight: .semibold))
+                .accessibilityHidden(true)
+            Text(title)
+                .pixlFont(.custom(size: 17, weight: .medium))
+                .lineLimit(1)
+        }
+        .foregroundStyle(foreground)
+        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, minHeight: Tokens.PageHero.actionHeight)
+        .contentShape(.capsule)
+    }
+
+    // MARK: Song card
+
+    /// The card's top: rounded corners, then (outside Find) the edit row.
+    private func panelTop(showsEditRow: Bool) -> some View {
+        let shape = UnevenRoundedRectangle(topLeadingRadius: Tokens.PageHero.panelCorner, bottomLeadingRadius: 0,
+                                           bottomTrailingRadius: 0, topTrailingRadius: Tokens.PageHero.panelCorner,
+                                           style: .continuous)
+        return VStack(spacing: 0) {
+            if showsEditRow { editRow }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, showsEditRow ? 14 : 12)
+        .padding(.bottom, showsEditRow ? 4 : 0)
+        .background(shape.fill(theme.surfaceContainerHigh))
+        .padding(.horizontal, Tokens.PageHero.panelInset)
+        .padding(.top, showsEditRow ? 12 : 0)
+    }
+
+    /// The card's bottom: its rounded end.
+    private var panelBottom: some View {
+        UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: Tokens.PageHero.panelCorner,
+                               bottomTrailingRadius: Tokens.PageHero.panelCorner, topTrailingRadius: 0,
+                               style: .continuous)
+            .fill(theme.surfaceContainerHigh)
+            .frame(height: 16)
+            .padding(.horizontal, Tokens.PageHero.panelInset)
+            .accessibilityHidden(true)
     }
 
     /// Android: Add (capsule, `tertiaryContainer`), then Remove and Reorder stretched over the rest.
@@ -201,16 +450,14 @@ struct PlaylistDetailView: View {
                 .accessibilityIdentifier("playlist.reorder")
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 2)
-        .padding(.bottom, 8)
+        .padding(.horizontal, 12)
     }
 
     private func modeButton(_ title: String, systemImage: String, isOn: Bool, action: @escaping () -> Void) -> some View {
         let radius: CGFloat = isOn ? 24 : 12
         return SegmentedGlassButton(title: title, systemImage: systemImage, accessibilityLabel: title, leading: radius,
                                     trailing: radius, height: 42, horizontalPadding: 8, iconSize: 18,
-                                    tint: (isOn ? theme.tertiary : theme.surfaceContainerHigh)
+                                    tint: (isOn ? theme.tertiary : theme.surfaceContainerHighest)
                                         .opacity(isOn ? GlassTint.prominent : GlassTint.container),
                                     foreground: isOn ? theme.onTertiary : theme.onSurface,
                                     titleStyle: .labelMedium, fillsWidth: true, action: action)
@@ -233,54 +480,31 @@ struct PlaylistDetailView: View {
                 .pixlFont(.bodyMedium)
                 .foregroundStyle(theme.onSurfaceVariant)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+        .background(theme.surfaceContainerHigh)
+        .padding(.horizontal, Tokens.PageHero.panelInset)
     }
 
-    private func songList(_ list: [Song]) -> some View {
-        let panel = UnevenRoundedRectangle(topLeadingRadius: 32, bottomLeadingRadius: 0, bottomTrailingRadius: 0,
-                                           topTrailingRadius: 32, style: .continuous)
-        return ScrollView {
-            LazyVStack(spacing: 8) {
-                ForEach(list) { song in
-                    PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
-                        PlaylistSongRow(song: song, isCurrent: isCurrent, isPlaying: isPlaying,
-                                        showsDragHandle: isReorderMode,
-                                        showsRemove: isRemoveMode,
-                                        onTap: { blocked.playTapped(song, in: list, using: playback) },
-                                        onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
-                                        onRemove: { env.libraryEditor.removeSong(song.id, fromPlaylist: playlistId) })
-                    }
-                    .swipeToQueue(song: song, isEnabled: !isReorderMode && !isRemoveMode)
-                    .dropDestination(for: String.self) { items, _ in
-                        move(items.first, onto: song.id)
-                    }
-                }
+    /// The rows, each its own item of the page's lazy stack (laid out only when near the screen), on the card's colour
+    /// (plain fills that tile into one card; the rows themselves are the glass).
+    private func songRows(_ list: [Song]) -> some View {
+        ForEach(list) { song in
+            PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
+                PlaylistSongRow(song: song, isCurrent: isCurrent, isPlaying: isPlaying,
+                                showsDragHandle: isReorderMode,
+                                showsRemove: isRemoveMode,
+                                onTap: { blocked.playTapped(song, in: list, using: playback) },
+                                onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
+                                onRemove: { env.libraryEditor.removeSong(song.id, fromPlaylist: playlistId) })
             }
-            .padding(.top, 12)
-            // Ends above the mini player: the list ignores the bottom safe area, so the room comes from the page's
-            // (never less than the mini player's own, should the measured inset not be in yet).
-            .padding(.bottom, 16 + max(bottomInset, playback.miniPlayerClearance))
-        }
-        .scrollIndicators(.hidden)
-        // Pulling down past the top reveals Find in playlist; it bounces even when the list is shorter than the page.
-        .scrollBounceBehavior(.always, axes: .vertical)
-        .scrollDismissesKeyboard(.interactively)
-        .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { _, offset in
-            scrolled(to: offset)
-        }
-        .accessibilityAction(named: "Find in playlist") { withAnimation(PixlMotion.state) { find.open() } }
-        .background(panel.fill(theme.surfaceContainerHigh))
-        .clipShape(panel)
-        .ignoresSafeArea(edges: .bottom)
-    }
-
-    /// The list was pulled down past its top: reveal the find field. It goes away again when the list is scrolled
-    /// up with nothing typed (a query keeps it until Cancel, so the results stay reachable).
-    private func scrolled(to offset: CGFloat) {
-        if offset < -72, !find.isOpen, !isReorderMode, !isRemoveMode {
-            withAnimation(PixlMotion.state) { find.open() }
-        } else if offset > 60, find.isOpen, find.query.isEmpty {
-            withAnimation(PixlMotion.state) { find.close() }
+            .swipeToQueue(song: song, isEnabled: !isReorderMode && !isRemoveMode)
+            .dropDestination(for: String.self) { items, _ in
+                move(items.first, onto: song.id)
+            }
+            .padding(.vertical, 4)
+            .background(theme.surfaceContainerHigh)
+            .padding(.horizontal, Tokens.PageHero.panelInset)
         }
     }
 
