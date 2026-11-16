@@ -1022,3 +1022,12 @@ Launch, library, artwork, player and Spotify-matcher speed-ups (docs/performance
 | `vDSP_vsma`, `vDSP_vadd`, `vDSP_vsmul` | 4 | /documentation/accelerate/1450025-vdsp_vsma | `SpatialStage` | The sparse room's taps (in place, `C == D`), the FIR sums and the gain. No allocation: every buffer is made in `init`. |
 | `UnsafeMutableRawPointer.copyMemory(from:byteCount:)` | Swift stdlib | /documentation/swift/unsafemutablerawpointer/copymemory(from:bytecount:) | `SpatialStage.shiftHistory` | A memmove: the history's source and destination overlap. |
 | `AVAudioSession.Port` `.headphones`, `.usbAudio`, `.bluetoothA2DP`, `.bluetoothLE`, `.bluetoothHFP`, `.builtInSpeaker`, `.builtInReceiver`, `.airPlay`, `.carAudio`, `.lineOut`, `.HDMI` | 6 / 7 (`bluetoothLE`) | /documentation/avfaudio/avaudiosession/port | `SpatialOutputRoute` | The route rule's reading of `currentRoute.outputs.first?.portType` (spec 6.1); re-read on every `routeChangeNotification`. |
+
+## Expressive SF Pro type toolkit (2026-11-16, branch `new-ui`)
+| API | Min OS | Doc | Used in | Notes |
+|---|---|---|---|---|
+| `ContentTransition.interpolate` via `View.contentTransition(_:)` | 16 | /documentation/swiftui/contenttransition/interpolate | `expressiveEmphasis`, `FitWidthTitle` (collapsing) | Same string, new weight / width: SwiftUI interpolates the variable font during the animation instead of cross-fading. |
+| `Font.system(size:weight:)` + `Font.width(_:)`, `Font.monospacedDigit()` | 16 / 15 | /documentation/swiftui/font/width(_:) | `ExpressiveFace.font(scale:)` | Only the four named `Font.Width` stops are used (no custom width values). |
+| `UIFont.systemFont(ofSize:weight:width:)`, `NSString.size(withAttributes:)` with `.kern` | 16 / 7 | /documentation/uikit/uifont/systemfont(ofsize:weight:width:) | `ExpressiveFace.measure` | Measuring only, as `GenreTitleTypography`; once per text × width × Dynamic Type size. |
+| `View.onScrollGeometryChange(for:of:action:)` | 18 | /documentation/swiftui/view/onscrollgeometrychange(for:of:action:) | `trackingTitleCollapse` | The transform returns a fraction quantized to 0.01; the state publishes only when the collapse stop changes. |
+| `View.onGeometryChange(for:of:action:)`, `View.onChange(of:initial:_:)` | 16 / 17 | /documentation/swiftui/view/ongeometrychange(for:of:action:) | `FitWidthTitle` | Available width and inputs → one re-fit; nothing per frame. |

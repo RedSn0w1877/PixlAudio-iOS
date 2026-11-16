@@ -79,6 +79,28 @@ Text scales with Dynamic Type (like sp), capped at 1.6× to keep fixed bars inta
 
 Icons: a Material 24 dp icon ≈ an SF Symbol at 20 pt.
 
+### Expressive type (weight × width)
+
+Android plays Google Sans Flex's axes; iOS plays SF Pro's: nine weights and a width axis (compressed, condensed,
+standard, expanded), optical sizes built in. `DesignSystem/ExpressiveType.swift` is the toolkit (pure decisions in
+PixlFoundation `ExpressiveType.swift`, unit-tested):
+
+- **Fit by width** — `FitWidthTitle(text:face:narrowest:lines:)` keeps a hero title's size and takes the widest
+  width at which it fits without breaking a word (`.artistHero` 46 pt black, `.playlistHero` 34 pt heavy,
+  `.playerTitle` 26 pt heavy, all from expanded down). Measured with UIKit once per text × width × Dynamic Type size.
+- **Emphasis** — `.expressiveEmphasis(isSelected, .navLabel)` on a `Text` moves weight and width together
+  (`.navLabel`, `.chip`, `.tab`); `.contentTransition(.interpolate)` morphs the variable font instead of
+  cross-fading. Toggle selection inside `withAnimation` so the container moves with the label.
+- **Collapsing title** — a `CollapsingTitleState` fed by `.trackingTitleCollapse(state, distance:)` on the page's
+  scroll view; `FitWidthTitle(…, collapse: state)` morphs narrower and lighter per stop (`CollapseRamp`) while its
+  resting face holds the layout, and `CollapsedBarTitle(text:state:)` (17 pt bold condensed) fades into the top bar
+  on the last stop. Only those two views observe the state, a few times per collapse; the page never re-renders
+  while scrolling.
+- **Times** — `.pixlTimeFont(style)` or `ExpressiveFace.time` (tabular digits).
+
+Hero faces are drawn at the weight given (already heavy); `ExpressiveFace(style:width:)` applies `PixlWeightBoost`
+to build a face from a Type.kt role. Reduce Motion drops the morph animations.
+
 ## Spacing, radii, geometry
 
 `Tokens` (`DesignSystem/Tokens.swift`) holds the values used across screens, each naming its Compose source:
