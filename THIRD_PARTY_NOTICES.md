@@ -44,10 +44,10 @@ own Swift. Some of that Swift is a port of open-source code, listed here with it
 - By the Ultimate Vocal Remover authors. Ultimate Vocal Remover is MIT-licensed; the model release names no separate
   licence for the weights.
 
-## FabBar (technique for the bottom tab bar)
+## FabBar (technique for the liquid-lens pickers)
 
 - Upstream: https://github.com/ryanashcraft/FabBar (Swift, MIT).
-- Followed in `App/DesignSystem/Components/LiquidTabBar.swift`: hosting the tab bar on a `UISegmentedControl`
+- Followed in `App/DesignSystem/Components/LiquidTabBar.swift`: hosting the lens pickers (once the tab bar) on a `UISegmentedControl`
   inside interactive UIKit glass so the selection is the system's liquid lens; injecting the tab glyphs into the
   segment views; masking accent-coloured copies of the glyphs to the lens' animated frame; moving the lens on
   touch down. Rewritten for PixlAudio (its own glyph view, accent-tinted resting pill, compact mode); no FabBar

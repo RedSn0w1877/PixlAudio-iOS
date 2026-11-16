@@ -24,7 +24,7 @@ Beta 2: `pp_*.png`; current Library › Songs: `owner-library-songs-2026-09-30.p
 | Song list item (`EnhancedSongListItem`) | Glass rounded card, same geometry; playing = capsule + brighter `primaryContainer` glass | `SongCard` |
 | `TopAppBar` with large title + actions | Same title in SF Pro + glass action circles | `LargeHeader` |
 | Section title + subtitle (+ refresh button) | Same text styles, optional glass circle | `SectionHeader` |
-| Bottom `NavigationBar` (custom compact bar, 3 icons) | **Owner change 2026-10-01/02:** the iOS tab bar — floating interactive-glass capsule (symbol + label, icons only in compact mode) whose selection is the system liquid lens (accent-tinted pill at rest; clear, swelling, magnifying lens under the finger) | `GlassNavBar` + `LiquidTabBar` |
+| Bottom `NavigationBar` (custom compact bar, 3 icons) | **New UI 2026-11-16:** the split pill — a big see-through glass capsule (Home + Library, gliding tonal selection) and a glass circle (Search); on Search they flip into a Home circle and the search field (see Shell › Split-pill bar). Earlier: the liquid-lens capsule (2026-10-02) | `GlassNavBar` |
 | Mini player (player sheet, collapsed) | Glass bar tinted with the album's `primaryContainer`, same layout | `MiniPlayerBar` |
 | `ModalBottomSheet` | System sheet (glass by itself) + PixlAudio's sheet layout inside | `SheetScaffold` + `.pixlSheet()` |
 | Ripple, state layers | Glass `.interactive()` highlight; `PressScaleButtonStyle` for fills sitting on glass | `GlassStyle.swift` |
@@ -116,8 +116,8 @@ Compose file they come from.
 - One variant per context: `.regular` everywhere; `.clear` only over media (player/lyrics backgrounds) with ~35 %
   dimming when the art is bright (`relativeLuminance > 0.6`).
 - No glass on glass inside one element: a control sitting on a glass card/bar is a fill with `PressScaleButtonStyle`
-  (mini-player transport, the song card's ⋮), or joins the card with `glassEffectUnion`. Exception by owner
-  request: the tab bar's accent glass selection pill.
+  (mini-player transport, the song card's ⋮), or joins the card with `glassEffectUnion`. (The lens tab bar's
+  accent glass pill was an owner-requested exception; the split-pill bar's selection is a fill.)
 - Clusters of separate glass shapes share a `GlassEffectContainer` whose `spacing` is **smaller than the gap**
   between them, so they render together but never blend at rest.
 - Sheets use the system presentation; never override `presentationBackground`.
@@ -172,6 +172,7 @@ PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact ba
   up, coming within 24 pt of the top, switching tabs, pushing or popping restores it. The minimized bar
   stays fully interactive (lens and all). Reduce Motion: the shape changes without the spring.
   (`MinimizesTabBarOnScroll`, `Router.isTabBarMinimized`, `LiquidLensBarView.setShape`.)
+- **Split-pill bar (new UI stage 2, 2026-11-16; supersedes the single lens capsule above):** see Shell › Split-pill bar below.
 - **Song picker LOCAL / CLOUD (2026-10-03, owner: "the same liquid magnifying mechanism as the main home screen"):**
   `LiquidSegmentedPicker` puts the same lens in a 56 pt glass capsule, with inline glyphs (16 pt symbol beside a 14 pt
   bold label) in `onSurface`, and the accent pill with `onPrimary` glyphs.
@@ -194,6 +195,47 @@ PixlAudio's layout (Android `MainActivity.MainUI`, default nav style, compact ba
 - The mini player is the collapsed player sheet (stage 8): tap or drag it up to expand (see Stage 8 notes).
 - Root screens draw their own PixlAudio headers (system navigation bar hidden); pushed placeholders use the
   system bar for now — stages replacing them with PixlAudio's top bars must keep the back swipe working.
+
+### Split-pill bar (new UI stage 2, 2026-11-16)
+
+Owner decision on the approved mockups (`iOSHome`, `iOSLibrary`, `iOSSearch`): one big pill and one small pill side
+by side, floating at the bottom, see-through glass (no heavy frosting). `GlassNavBar` (SwiftUI; the lens bar's
+UIKit `LiquidTabBar` is gone, `LiquidSegmentedPicker` / `LiquidTabCapsule` keep the lens for sheet tabs). Pure
+rules in PixlFoundation `SplitPillNav` (tested).
+
+- **Geometry:** 64 pt tall (54 compact, 48 minimized), 16 pt from the screen sides, 10 pt between the shapes; the
+  circle is as wide as it is tall. Both are `Glass.regular.interactive()` in one `GlassEffectContainer` (spacing
+  4 pt, below the gap), untinted.
+- **Home / Library:** the big capsule holds the two segments 5 pt in, 4 pt apart: symbol beside a 15 pt label
+  (`EmphasisFaces.navInline`: medium standard → heavy expanded on the selected one, morphing the variable font). The
+  selected segment takes a 1.3 : 1 share (`SplitPillNav.emphasisWeight`, mockup flex) and sits in a tonal capsule
+  (`primaryContainer` at `GlassTint.container` with a hairline; glyph `onPrimaryContainer`, filled symbol). A custom
+  `Layout` (`NavSegmentsLayout`) places the segments and the capsule from the same spans, so a change glides the
+  capsule and resizes the segments in one animated layout pass (`PixlMotion.selection`). The circle is Search.
+- **Touch (the lens' behaviour, kept):** a finger down lifts the selection — the capsule swells 1.06×, clears to
+  30 % and the label under it turns `primary` — and it follows the finger from segment to segment (the wide
+  segment under the finger gives the drag hysteresis at a boundary). The tab changes on release; releasing on the
+  selected tab pops it to its root and restores a minimized bar (`Router.select`). A cancelled touch drops the lift
+  (`@GestureState`). Selection haptic on every change.
+- **Search (the flip):** the shapes keep their glass and ids and swap sizes: the big capsule shrinks into the Home
+  circle, the circle grows into the search field. Contents cross-fade (`PixlMotion.selection`), so it reads as one
+  liquid morph. The field is the one that used to sit at the top of the Search page: bound to `Router.searchText`,
+  `primary` search symbol and placeholder, clear button once there is text, search key → `Router.submitSearch()` →
+  the page records the query (`searchSubmission`). The Search page now shows a large "Search" title with the
+  settings circle. No voice button: the app has no speech search.
+- **Keyboard:** the bars step aside for the keyboard as before, except on Search, where the bar is the field and
+  rides 8 pt above the keyboard (the mini player still steps aside; the page keeps room for the bar). Keyed to the
+  tab, not to focus: focus drops a moment before the keyboard's hide notification on submit.
+- **Minimized on scroll:** labels go; the big capsule narrows to 58 pt per segment (`SplitPillNav.minimizedWidth`)
+  and both shapes lower to 48 pt, the pair centred; on Search the field just lowers. Compact mode: symbols only,
+  54 pt, full width.
+- **Accessibility:** each segment is a button (`navBar.home`, `navBar.library`; selected trait); the circles are
+  `navBar.search` / `navBar.home`; the field is `search.field`, its clear button `search.clear`. Under the expanded
+  player the bar leaves the accessibility tree and takes no touches. Reduce Motion: no swell, short eases, no font
+  morph.
+- **Performance:** only `NavTabsPill` re-renders while a finger moves, and only when the segment under it changes;
+  the hit test is arithmetic on a width measured once per size. The field's keystrokes re-render the bar alone (the
+  shell passes a binding and never reads the text).
 
 ## Screen map (Android → iOS)
 

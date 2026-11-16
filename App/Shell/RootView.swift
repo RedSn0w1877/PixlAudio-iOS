@@ -1,15 +1,18 @@
 import Combine
+import PixlFoundation
 import PixlModel
 import SwiftUI
 import UIKit
 
 /// The shell, in PixlAudio's layout (Android MainActivity `MainUI`): the selected tab's content full screen, and at
 /// the bottom — inset 16 pt from the sides, above the home indicator — the mini player floating 8 pt above the
-/// iOS-style glass tab bar (`GlassNavBar`), each its own capsule. The bar shows only at a tab's root (pushed screens
-/// hide it, as on Android); the mini player stays.
+/// split-pill glass bar (`GlassNavBar`: a big capsule with Home + Library and a Search circle, flipping into a Home
+/// circle + search field on Search). The bar shows only at a tab's root (pushed screens hide it, as on Android); the
+/// mini player stays.
 /// Each tab keeps its own `NavigationStack` alive so switching tabs keeps scroll positions.
 /// While the keyboard is up the bars step aside: on Android they stay at the bottom under the keyboard (edge to edge,
-/// only the content gets the IME inset), so they must not ride up above it here (stage 7c, Search's field).
+/// only the content gets the IME inset), so they must not ride up above it here (stage 7c). The one exception is the
+/// bar's own search field: while it types, the bar rides on the keyboard (the mini player still steps aside).
 ///
 /// Transition performance (docs/performance.md): the bars are an overlay that takes no layout space, so a push, a
 /// pop or the mini player's first appearance doesn't touch the three stacks' layout; the selected tab fades in on its
@@ -22,6 +25,8 @@ struct RootView: View {
     @Environment(SettingsStore.self) private var settings
     @Environment(\.colorScheme) private var colorScheme
     @State private var isKeyboardVisible = false
+    /// The bar's search field has focus (Search tab). Owned here so leaving Search drops it explicitly.
+    @FocusState private var isSearchFieldFocused: Bool
     /// Tabs whose stack exists. The selected tab is always built; the other two are built after launch has settled
     /// (`prebuildHiddenTabs`) or on first selection, and a built tab keeps its stack and scroll position for life.
     @State private var builtTabs: Set<RootTab> = []
@@ -82,6 +87,8 @@ struct RootView: View {
         }
         .onChange(of: router.selection, initial: true) { _, tab in
             if !builtTabs.contains(tab) { builtTabs.insert(tab) }
+            // The field leaves with the Search tab (the bar flips back to the tab segments).
+            if tab != .search, isSearchFieldFocused { isSearchFieldFocused = false }
         }
         .task { await prebuildHiddenTabs() }
         // Blocked artists: a tap on a blocked song asks first (it is never played by itself).
@@ -129,7 +136,7 @@ struct RootView: View {
                 }
                 // Room for the floating bars, per page (`BottomBarsClearance`): equal values don't propagate, so only
                 // the mini player appearing, compact mode or the keyboard on this tab change a page's inset.
-                .environment(\.bottomBarsClearance, clearance(isSelected: isSelected))
+                .environment(\.bottomBarsClearance, clearance(for: tab, isSelected: isSelected))
                 // A song change animates the album colours over 0.45 s (the root `.animation` below): only on the tab
                 // that is on screen. A hidden tab is at opacity 0, so snapping its colours shows nothing and costs no
                 // frames.
@@ -166,19 +173,26 @@ struct RootView: View {
     }
 
     /// The bars' height over a tab root and over a pushed page. The keyboard hides both bars, but only the selected
-    /// tab changes for it (the hidden tabs keep their layout).
-    private func clearance(isSelected: Bool) -> BottomBarsClearance {
+    /// tab changes for it (the hidden tabs keep their layout) — except the bar while its own search field types, which
+    /// stays on top of the keyboard.
+    private func clearance(for tab: RootTab, isSelected: Bool) -> BottomBarsClearance {
         let keyboard = isKeyboardVisible && isSelected
         let miniPlayer: CGFloat = playback.current != nil && !keyboard
             ? Tokens.Shell.miniPlayerHeight + Tokens.Shell.miniPlayerSpacing : 0
-        let bar: CGFloat = keyboard ? 0
-            : settings.appearance.navBarCompactMode ? Tokens.Shell.navBarCompactHeight : Tokens.Shell.navBarHeight
+        // (Only the tab-root value uses it: pushed pages have no bar.)
+        let barOverKeyboard = SplitPillNav.ridesKeyboard(atTabRoot: true, keyboardVisible: keyboard,
+                                                         onSearchTab: tab == .search)
+        let barHeight = GlassNavBar.height(compact: settings.appearance.navBarCompactMode, minimized: false)
+        let bar: CGFloat = barOverKeyboard ? barHeight + Tokens.Shell.navKeyboardGap : keyboard ? 0 : barHeight
         return BottomBarsClearance(tabRoot: bar + miniPlayer, pushed: miniPlayer)
     }
 
     @ViewBuilder
     private var bottomBars: some View {
-        let showsBar = router.isNavigationBarVisible && !isKeyboardVisible
+        @Bindable var router = router
+        let showsBar = SplitPillNav.showsBar(atTabRoot: router.isNavigationBarVisible,
+                                             keyboardVisible: isKeyboardVisible,
+                                             onSearchTab: router.selection == .search)
         VStack(spacing: Tokens.Shell.miniPlayerSpacing) {
             if playback.current != nil, !isKeyboardVisible {
                 // Stage 8: the player sheet draws the mini player here (and expands it from here).
@@ -189,16 +203,21 @@ struct RootView: View {
                 GlassNavBar(selection: router.selection,
                             compact: settings.appearance.navBarCompactMode,
                             minimized: router.isTabBarMinimized,
-                            onSelect: { tab in withAnimation(PixlMotion.selection) { router.select(tab) } })
+                            searchText: $router.searchText,
+                            searchFocus: $isSearchFieldFocused,
+                            onSelect: { tab in withAnimation(PixlMotion.selection) { router.select(tab) } },
+                            onSubmitSearch: { router.submitSearch() })
                     .modifier(HiddenWhilePlayerExpanded())
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .padding(.horizontal, Tokens.Shell.horizontalInset)
+        // Riding on the keyboard (the search field typing), the bar keeps a small gap above it.
+        .padding(.bottom, isKeyboardVisible ? Tokens.Shell.navKeyboardGap : 0)
         .animation(PixlMotion.bars, value: showsBar)
         .animation(PixlMotion.bars, value: playback.hasItem)
-        // The minimized bar is lower: the mini player follows it down on the bars' curve (the capsule itself
-        // animates in UIKit, `LiquidLensBarView.setShape`).
+        // The minimized bar is lower: the mini player follows it down on the bars' curve, and the bar's shapes
+        // narrow and lower in the same transaction.
         .animation(PixlMotion.bars, value: router.isTabBarMinimized)
         // A minimized bar stays minimized across a tab switch, a push and a pop; scrolling up restores it
         // (`MinimizesTabBarOnScroll`), as does tapping the selected tab (`Router.select`).
@@ -232,18 +251,19 @@ private struct ShellCoveredByPlayer: ViewModifier {
     }
 }
 
-/// Hides the tab bar from VoiceOver while the full player covers it (the mini player's own layer hides itself). The
-/// bar's tabs are UIKit segments, which `accessibilityHidden` doesn't reach, so `GlassNavBar` also hides them itself
-/// (`tabBarAccessibilityHidden`): left in the tree, they answered accessibility hit tests under the player's toggle
-/// row (CI, 2026-10-07: UI tests tapped the heart at its corner, outside the round "on" segment).
+/// Hides the tab bar from VoiceOver while the full player covers it (the mini player's own layer hides itself): left
+/// in the tree, its tabs answered accessibility hit tests under the player's toggle row (CI, 2026-10-07). The
+/// split-pill bar is all SwiftUI, so `accessibilityHidden` reaches every segment (the UIKit segments of the former
+/// lens bar needed `accessibilityElementsHidden` too).
 private struct HiddenWhilePlayerExpanded: ViewModifier {
     @Environment(AppEnvironment.self) private var environment
 
     func body(content: Content) -> some View {
         let isExpanded = environment.playerSheet.isExpanded
         content
-            .environment(\.tabBarAccessibilityHidden, isExpanded)
             .accessibilityHidden(isExpanded)
+            // Under the expanded player the bar takes no touches either.
+            .allowsHitTesting(!isExpanded)
     }
 }
 

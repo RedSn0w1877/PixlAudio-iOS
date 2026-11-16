@@ -24,7 +24,13 @@ final class HiddenTabsTests: XCTestCase {
         button.tap()
         XCTAssertTrue(app.descendants(matching: .any)[screen].firstMatch.waitForExistence(timeout: 10),
                       "\(screen) did not appear after tapping \(tab)")
-        XCTAssertTrue(button.isSelected, "\(tab) was not selected")
+        if tab == "search" {
+            // Split pill: on Search the Search circle has become the bar's search field.
+            XCTAssertTrue(app.textFields["search.field"].firstMatch.waitForExistence(timeout: 5),
+                          "the bar did not turn into the search field")
+        } else {
+            XCTAssertTrue(button.isSelected, "\(tab) was not selected")
+        }
     }
 
     /// Straight after launch: Library, Search, Home, each built on its first selection or by the idle build.
@@ -40,7 +46,8 @@ final class HiddenTabsTests: XCTestCase {
         let app = launch()
         Thread.sleep(forTimeInterval: 4.0)
         visit(app, tab: "search", screen: "screen.search")
-        visit(app, tab: "library", screen: "screen.library")
+        // From Search the bar offers Home only (split pill); Library is one tap further.
         visit(app, tab: "home", screen: "screen.home")
+        visit(app, tab: "library", screen: "screen.library")
     }
 }

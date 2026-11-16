@@ -3,9 +3,9 @@ import PixlModel
 import SwiftUI
 
 /// Search — the port of PixlAudio's `SearchScreen.kt` (default, non-glass-mode layout):
-/// - top row (24 pt sides, 12 pt below the status bar, 12 pt gap): the docked search field (56 pt, 28 pt corners,
-///   `primaryContainer` 30 %; `primary` search icon and placeholder; a clear button once there is text) and the
-///   settings button (40 pt, `primaryContainer`) — as a glass capsule and a glass circle;
+/// - top: the large "Search" title with the settings button (40 pt, `primaryContainer` glass circle). The search
+///   field itself moved into the bottom bar (split pill, new UI 2026-11-16): on this tab the bar's big capsule is the
+///   field (`GlassNavBar`), bound to `Router.searchText`; its search key bumps `Router.searchSubmission`;
 /// - empty query: the browse grid (catalogue categories + library genres, `GenreBrowseView`);
 /// - otherwise (16 pt sides): the filter chips (All / Songs / Albums / Artists / Playlists) as glass capsules, then
 ///   the results grouped Songs, Albums, Artists, Playlists, "More on Spotify", "From YouTube Music" (top corners
@@ -22,13 +22,11 @@ struct SearchView: View {
     @Environment(\.appTheme) private var theme
 
     @State private var model = SearchModel(filter: SearchLaunchOptions.initialFilter)
-    @FocusState private var isFieldFocused: Bool
 
     var body: some View {
-        @Bindable var router = router
         let showsGenres = router.searchText.isKotlinBlank
         VStack(spacing: 0) {
-            topRow(query: $router.searchText)
+            topRow
             ZStack(alignment: .top) {
                 if showsGenres {
                     genreBrowse
@@ -50,6 +48,8 @@ struct SearchView: View {
             prepare()
             model.performSearch(query)
         }
+        // The bar's field was submitted (Android `onSearch`: the query goes into the history).
+        .onChange(of: router.searchSubmission) { _, _ in model.submit(router.searchText) }
         .onChange(of: model.filter) { _, _ in model.performSearch(router.searchText) }
         .onChange(of: settings.library.minTracksPerAlbum) { _, value in model.minTracksChanged(value) }
         .toolbar(.hidden, for: .navigationBar)
@@ -63,67 +63,17 @@ struct SearchView: View {
 
     // MARK: Top row
 
-    private func topRow(query: Binding<String>) -> some View {
-        // Field and button are separate glass shapes 12 pt apart: one container, spacing below the gap.
-        GlassEffectContainer(spacing: 6) {
-            HStack(spacing: 12) {
-                searchField(query: query)
-                GlassCircleButton(systemImage: "gearshape", accessibilityLabel: "Settings",
-                                  tint: theme.primaryContainer.opacity(GlassTint.container),
-                                  foreground: theme.onPrimaryContainer) {
-                    router.push(.settings)
-                }
-                .padding(.bottom, 2)
-                .accessibilityIdentifier("search.settings")
+    /// The page title and the settings circle (as Library's header). The field is the bottom bar's big capsule on
+    /// this tab (`GlassNavBar`).
+    private var topRow: some View {
+        LargeHeader("Search") {
+            GlassCircleButton(systemImage: "gearshape", accessibilityLabel: "Settings",
+                              tint: theme.primaryContainer.opacity(GlassTint.container),
+                              foreground: theme.onPrimaryContainer) {
+                router.push(.settings)
             }
+            .accessibilityIdentifier("search.settings")
         }
-        .padding(.horizontal, 24)
-        .padding(.top, 12)
-    }
-
-    /// Android `DockedSearchBar` + `SearchBarDefaults.InputField`: the 48 pt icon slots sit 4 pt in from the ends,
-    /// the text starts 4 pt after the leading slot.
-    private func searchField(query: Binding<String>) -> some View {
-        HStack(spacing: 0) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(theme.primary)
-                .frame(width: 48, height: 48)
-                .padding(.leading, 4)
-                .accessibilityLabel("Search")
-            TextField("", text: query, prompt: Text("Search…").foregroundStyle(theme.primary))
-                .pixlFont(.bodyLarge)
-                .foregroundStyle(isFieldFocused ? theme.onSurface : theme.onSurface.opacity(0.8))
-                .tint(theme.primary)
-                .focused($isFieldFocused)
-                .submitLabel(.search)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
-                .onSubmit { model.submit(query.wrappedValue) }
-                .padding(.horizontal, 4)
-                .accessibilityIdentifier("search.field")
-            if !query.wrappedValue.isKotlinBlank {
-                Button {
-                    query.wrappedValue = ""
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(theme.primary)
-                        .frame(width: 48, height: 48)
-                        .background(Circle().fill(theme.primaryContainer.opacity(0.2)))
-                        .contentShape(.circle)
-                }
-                .buttonStyle(PressScaleButtonStyle())
-                .padding(.trailing, 4)
-                .accessibilityLabel("Clear search")
-                .accessibilityIdentifier("search.clear")
-                .transition(.scale.combined(with: .opacity))
-            }
-        }
-        .frame(height: 56)
-        .frame(maxWidth: .infinity)
-        .pixlGlass(in: Capsule(), tint: theme.primaryContainer.opacity(0.3))
-        .animation(PixlMotion.state, value: query.wrappedValue.isKotlinBlank)
     }
 
     // MARK: Browse

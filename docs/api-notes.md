@@ -1031,3 +1031,12 @@ Launch, library, artwork, player and Spotify-matcher speed-ups (docs/performance
 | `UIFont.systemFont(ofSize:weight:width:)`, `NSString.size(withAttributes:)` with `.kern` | 16 / 7 | /documentation/uikit/uifont/systemfont(ofsize:weight:width:) | `ExpressiveFace.measure` | Measuring only, as `GenreTitleTypography`; once per text × width × Dynamic Type size. |
 | `View.onScrollGeometryChange(for:of:action:)` | 18 | /documentation/swiftui/view/onscrollgeometrychange(for:of:action:) | `trackingTitleCollapse` | The transform returns a fraction quantized to 0.01; the state publishes only when the collapse stop changes. |
 | `View.onGeometryChange(for:of:action:)`, `View.onChange(of:initial:_:)` | 16 / 17 | /documentation/swiftui/view/ongeometrychange(for:of:action:) | `FitWidthTitle` | Available width and inputs → one re-fit; nothing per frame. |
+
+## Split-pill navigation bar (2026-11-16, branch `new-ui`, stage 2)
+| API | Min OS | Doc | Used in | Notes |
+|---|---|---|---|---|
+| `@GestureState`, `Gesture.updating(_:body:)` | 13 | /documentation/swiftui/gesturestate | `NavTabsPill` | `isTouching` resets by itself when the system cancels the touch (no `onEnded` then), which clears the lifted selection. The body only sets the state; it touches nothing else. |
+| `DragGesture(minimumDistance: 0, coordinateSpace: .local)` with `onChanged` / `onEnded` | 13 | /documentation/swiftui/draggesture | `NavTabsPill` | One gesture for taps and press-and-drag across the segments (the old SwiftUI bar's pattern, ledger above); segments are plain views with `accessibilityAction` + `.isButton`. |
+| `FocusState<Bool>.Binding` passed down, `View.focused(_:)` | 15 | /documentation/swiftui/focusstate/binding | `RootView` → `GlassNavBar` → `NavSearchField` | The shell owns the field's focus and drops it when Search is left. |
+| `Layout` with `LayoutSubviews.dropFirst()`, `LayoutSubview.place(at:anchor:proposal:)` | 16 | /documentation/swiftui/layout | `NavSegmentsLayout` | First subview = the selection capsule, placed on the emphasized span; a change of `emphasized` inside `withAnimation` animates every placement. `nonisolated`, as `SyncWeightedColumn`. |
+| `glassEffect(_:in:)` + `glassEffectID(_:in:)` on two shapes that resize and swap content in a `GlassEffectContainer` | 26.0 | /documentation/swiftui/view/glasseffectid(_:in:) | `GlassNavBar` | The flip keeps each shape's view and id; only frames (fixed ↔ flexible width) and contents change, so the morph doesn't depend on matching an inserted to a removed effect. |

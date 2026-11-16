@@ -27,8 +27,12 @@ final class TransitionPerformanceTests: XCTestCase {
         let home = app.descendants(matching: .any)["navBar.home"].firstMatch
         XCTAssertTrue(search.waitForExistence(timeout: 10), "the tab bar is missing")
         measureTransitions(app) {
+            // Split pill: on Search the bar is Home + the field, so Library is reached through Home.
             search.tap()
-            XCTAssertTrue(search.isSelected, "Search was not selected")
+            XCTAssertTrue(app.textFields["search.field"].firstMatch.waitForExistence(timeout: 5),
+                          "Search was not selected")
+            home.tap()
+            XCTAssertTrue(home.isSelected, "Home was not selected")
             library.tap()
             XCTAssertTrue(library.isSelected, "Library was not selected")
             home.tap()

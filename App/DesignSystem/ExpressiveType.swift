@@ -181,6 +181,10 @@ nonisolated struct EmphasisFaces: Hashable, Sendable {
     /// Nav bar labels: the selected tab's label goes black and expanded inside its tonal capsule.
     static let navLabel = EmphasisFaces(rest: ExpressiveFace(size: 11, weight: .semibold, width: .standard),
                                         emphasized: ExpressiveFace(size: 11, weight: .black, width: .expanded))
+    /// The split-pill bar's inline labels (symbol beside a 15 pt label, mockup): the emphasized tab goes heavy and
+    /// expanded inside its tonal capsule while the capsule widens (`SplitPillNav.emphasisWeight`).
+    static let navInline = EmphasisFaces(rest: ExpressiveFace(size: 15, weight: .medium, width: .standard),
+                                         emphasized: ExpressiveFace(size: 15, weight: .heavy, width: .expanded))
     /// Filter chips / segmented pills.
     static let chip = EmphasisFaces(rest: ExpressiveFace(size: 14, weight: .semibold, width: .condensed),
                                     emphasized: ExpressiveFace(size: 14, weight: .heavy, width: .standard))

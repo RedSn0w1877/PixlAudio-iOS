@@ -57,17 +57,44 @@ final class ScreenshotTests: XCTestCase {
         attachScreenshot(app, "tabBarTap-light")
     }
 
-    /// Press and drag from Home to Search: the pill follows the finger and Search is selected on release.
+    /// Press and drag from Home to Library along the big capsule (split pill, 2026-11-16): the lifted selection
+    /// follows the finger and Library is selected on release.
     func testTabBarDragDark() throws {
         let app = launchHome("dark")
         let home = app.descendants(matching: .any)["navBar.home"].firstMatch
-        let search = app.descendants(matching: .any)["navBar.search"].firstMatch
-        XCTAssertTrue(home.waitForExistence(timeout: 10) && search.exists, "the tab bar items are missing")
-        home.press(forDuration: 0.2, thenDragTo: search)
-        XCTAssertTrue(app.descendants(matching: .any)["screen.search"].firstMatch.waitForExistence(timeout: 5),
-                      "dragging to Search did not switch tabs")
-        XCTAssertTrue(search.isSelected, "the Search tab is not marked selected")
+        let library = app.descendants(matching: .any)["navBar.library"].firstMatch
+        XCTAssertTrue(home.waitForExistence(timeout: 10) && library.exists, "the tab bar items are missing")
+        home.press(forDuration: 0.2, thenDragTo: library)
+        XCTAssertTrue(app.descendants(matching: .any)["screen.library"].firstMatch.waitForExistence(timeout: 5),
+                      "dragging to Library did not switch tabs")
+        XCTAssertTrue(library.isSelected, "the Library tab is not marked selected")
         attachScreenshot(app, "tabBarDrag-dark")
+    }
+
+    /// The Search circle flips the bar: the small circle becomes Home and the big capsule the search field, which
+    /// takes text; Home flips it back.
+    func testTabBarSearchFlipLight() throws {
+        let app = launchHome("light")
+        let search = app.descendants(matching: .any)["navBar.search"].firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: 10), "the Search circle is missing")
+        search.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["screen.search"].firstMatch.waitForExistence(timeout: 5),
+                      "tapping Search did not switch tabs")
+        let field = app.textFields["search.field"].firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "the bar did not turn into the search field")
+        XCTAssertFalse(app.descendants(matching: .any)["navBar.library"].firstMatch.exists,
+                       "the Library segment is still in the bar on Search")
+        field.tap()
+        field.typeText("love")
+        XCTAssertTrue(field.isHittable, "the field went under the keyboard")
+        attachScreenshot(app, "tabBarSearchField-light")
+        let home = app.descendants(matching: .any)["navBar.home"].firstMatch
+        XCTAssertTrue(home.waitForExistence(timeout: 5), "the Home circle is missing on Search")
+        home.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["screen.home"].firstMatch.waitForExistence(timeout: 5),
+                      "the Home circle did not go home")
+        XCTAssertTrue(app.descendants(matching: .any)["navBar.library"].firstMatch.waitForExistence(timeout: 5),
+                      "the bar did not flip back to the tab segments")
     }
 
     /// Scrolling Home down minimizes the bar (symbols only, narrow, lower); scrolling back up restores it.

@@ -26,15 +26,23 @@ nonisolated enum Tokens {
 
     /// Shell geometry (MainActivity, PlayerInternalNavigationBar, UnifiedPlayerSheetShared, SheetVisualState).
     enum Shell {
-        /// The iOS-style tab bar (2026-10-01, replaces Android's compact bar): a floating glass capsule as tall as
-        /// the system tab bar with labels, shorter in compact mode (icons only).
-        static let navBarHeight: CGFloat = 62
+        /// The split-pill bar (new UI, 2026-11-16): a big glass capsule (Home + Library) and a glass circle (Search)
+        /// side by side, as tall as the approved mockup's 64 pt; shorter in compact mode (icons only).
+        static let navBarHeight: CGFloat = 64
         static let navBarCompactHeight: CGFloat = 54
-        /// The tab bar while a tab root scrolls down (2026-10-03): symbols only, the capsule narrowed to
+        /// The bar while a tab root scrolls down (2026-10-03): symbols only, the big capsule narrowed to
         /// `navBarMinimizedSegmentWidth` per tab and lowered to this height. Scrolling up or reaching the top restores it.
         static let navBarMinimizedHeight: CGFloat = 48
         static let navBarMinimizedSegmentWidth: CGFloat = 58
-        /// Padding between the tab bar's glass capsule and the segmented control holding the lens (as FabBar).
+        /// Gap between the big capsule and the small circle (mockup: 10).
+        static let navPillSpacing: CGFloat = 10
+        /// Inset of the segments (and their selection capsule) inside the big capsule (mockup: 5).
+        static let navPillPadding: CGFloat = 5
+        /// Gap between the segments inside the big capsule (mockup: 4).
+        static let navSegmentSpacing: CGFloat = 4
+        /// Room between the bar and the keyboard while the bar's search field types.
+        static let navKeyboardGap: CGFloat = 8
+        /// Padding between a liquid-lens picker's glass capsule and its segmented control (as FabBar).
         static let navGlassPadding: CGFloat = 2
         /// `nav_bar_corner_radius` default (`NAV_BAR_CORNER_RADIUS ?: 32`): the mini player's corners (a capsule at
         /// 64 pt) and PixlAudio's large glass cards.

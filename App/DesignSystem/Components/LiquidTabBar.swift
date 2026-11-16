@@ -1,8 +1,9 @@
 import SwiftUI
 import UIKit
 
-// The UIKit core of PixlAudio's liquid-lens controls: the bottom tab bar and segmented pickers such as the song
-// picker's LOCAL / CLOUD switch. On iOS 26 and later the system offers the "liquid lens" selection in only two
+// The UIKit core of PixlAudio's liquid-lens controls: segmented pickers such as the song picker's LOCAL / CLOUD
+// switch and the sheets' tab capsules (`LiquidTabCapsule`). The bottom tab bar was built on it until the split-pill
+// bar (new UI, 2026-11-16), which is SwiftUI glass so it can morph into the search field (`GlassNavBar`). On iOS 26 and later the system offers the "liquid lens" selection in only two
 // controls, UITabBar and UISegmentedControl. When touched, the selection lifts off as clear glass, swells past the
 // bar, follows the finger and magnifies the content under it, then settles back into the tinted pill.
 // This file follows the technique of the open-source FabBar (Ryan Ashcraft, MIT,
@@ -30,112 +31,10 @@ nonisolated struct LiquidSegmentItem: Hashable, Sendable {
 
 /// How a glyph arranges its symbol and label.
 nonisolated enum LiquidGlyphLayout: Sendable {
-    /// Symbol over a 10 pt label (the tab bar).
+    /// Symbol over a 10 pt label (the former tab bar).
     case stacked
     /// Symbol beside a 14 pt bold label (pickers).
     case inline
-}
-
-// MARK: - Tab bar
-
-/// PixlAudio's tab bar as a SwiftUI view: Home, Search, Library on the system liquid lens.
-/// `minimized` is the scroll state (Hoa, 2026-10-03: "an auto compact version that removes the labels and shrinks the
-/// distance between the icons and makes it smaller and … a bit shorter as well when the user scrolls"): the capsule
-/// narrows around the symbols and lowers, animated in UIKit so the lens and its masks follow every frame.
-struct LiquidTabBar: UIViewRepresentable {
-    let selection: RootTab
-    /// Settings › Appearance compact mode: symbols only, full width.
-    let compact: Bool
-    /// Scrolled: symbols only, narrow and shorter.
-    let minimized: Bool
-    /// Tint of the resting selection pill (the accent).
-    let pillColor: UIColor
-    /// Glyph colour on the resting pill (`onPrimary`).
-    let restingGlyphColor: UIColor
-    /// Glyph colour under the lifted, clear lens (the accent, as on the system tab bar).
-    let liftedGlyphColor: UIColor
-    /// Takes the bar's UIKit segments out of the accessibility tree (`accessibilityElementsHidden`), e.g. while the
-    /// full player covers the bar. SwiftUI's `accessibilityHidden` around this view does not reach them: the hidden
-    /// tabs kept answering accessibility hit tests under the player's shuffle · repeat · favourite row.
-    var accessibilityHidden = false
-    let onSelect: (RootTab) -> Void
-
-    static func items() -> [LiquidSegmentItem] {
-        RootTab.allCases.map {
-            LiquidSegmentItem(title: $0.title, systemImage: $0.systemImage,
-                              selectedSystemImage: $0.selectedSystemImage, identifier: "navBar.\($0.rawValue)")
-        }
-    }
-
-    /// The glass capsule's height in each state; the SwiftUI frame around the bar uses the same values.
-    static func height(compact: Bool, minimized: Bool) -> CGFloat {
-        minimized ? Tokens.Shell.navBarMinimizedHeight
-            : compact ? Tokens.Shell.navBarCompactHeight : Tokens.Shell.navBarHeight
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onSelect: onSelect)
-    }
-
-    func makeUIView(context: Context) -> LiquidLensBarView {
-        let control = LiquidLensSegmentedControl(items: Self.items(), layout: .stacked, showsTitles: !compact && !minimized)
-        control.accessibilityTraits = .tabBar
-        let view = LiquidLensBarView(control: control)
-        let coordinator = context.coordinator
-        control.addTarget(coordinator, action: #selector(Coordinator.valueChanged(_:)), for: .valueChanged)
-        control.onReselect = { [weak coordinator] index in coordinator?.reselect(index: index) }
-        apply(to: view, coordinator: coordinator, animated: false)
-        return view
-    }
-
-    func updateUIView(_ view: LiquidLensBarView, context: Context) {
-        context.coordinator.onSelect = onSelect
-        apply(to: view, coordinator: context.coordinator, animated: true)
-    }
-
-    private func apply(to view: LiquidLensBarView, coordinator: Coordinator, animated: Bool) {
-        let control = view.control
-        control.pillColor = pillColor
-        control.restingGlyphColor = restingGlyphColor
-        control.liftedGlyphColor = liftedGlyphColor
-        control.baseGlyphColor = .label
-        if view.accessibilityElementsHidden != accessibilityHidden {
-            view.accessibilityElementsHidden = accessibilityHidden
-        }
-        let width: CGFloat? = minimized
-            ? CGFloat(RootTab.allCases.count) * Tokens.Shell.navBarMinimizedSegmentWidth + 2 * Tokens.Shell.navGlassPadding
-            : nil
-        view.setShape(height: Self.height(compact: compact, minimized: minimized), width: width, animated: animated)
-        control.setShowsTitles(!compact && !minimized, animated: animated)
-        let index = RootTab.allCases.firstIndex(of: selection) ?? 0
-        coordinator.currentIndex = index
-        // While a finger is on the bar the control owns the selection (the lens follows the finger).
-        if !control.isTracking, control.selectedSegmentIndex != index {
-            control.selectedSegmentIndex = index
-        }
-    }
-
-    final class Coordinator: NSObject {
-        var onSelect: (RootTab) -> Void
-        var currentIndex = 0
-
-        init(onSelect: @escaping (RootTab) -> Void) {
-            self.onSelect = onSelect
-        }
-
-        @objc func valueChanged(_ control: UISegmentedControl) {
-            let index = control.selectedSegmentIndex
-            // One callback per real change (a re-tap goes through `reselect`, which pops the tab to its root).
-            guard index != currentIndex, RootTab.allCases.indices.contains(index) else { return }
-            currentIndex = index
-            onSelect(RootTab.allCases[index])
-        }
-
-        func reselect(index: Int) {
-            guard RootTab.allCases.indices.contains(index) else { return }
-            onSelect(RootTab.allCases[index])
-        }
-    }
 }
 
 // MARK: - Segmented picker
