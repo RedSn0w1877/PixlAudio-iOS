@@ -162,35 +162,38 @@ private struct PlaylistDetailContent: View {
 
     // MARK: Page
 
-    /// One scrolling page: the hero with its title block, then the song card. With Find open, the hero gives way to
-    /// the matching songs under the pinned field (the keyboard would otherwise cover them).
+    /// One scrolling page: the hero with its title block, then the song card. With Find open, the hero folds away to
+    /// the pinned field's height and the card shows the matching songs (the keyboard would otherwise cover them).
+    /// Both modes share one structure: the hero stays mounted (folded, transparent; its blurred copy and fitted title
+    /// survive Find) and the rows are one `ForEach` over whichever list shows, so opening or closing Find keeps every
+    /// row's identity instead of rebuilding the page.
     private func page(_ playlist: Playlist, width: CGFloat, heroHeight: CGFloat, safeTop: CGFloat) -> some View {
         let titleTop = HeroHeader.overlayTop(heroHeight: Double(heroHeight), overlayHeight: Double(overlayHeight))
         let window = HeroHeader.titleCollapse(titleTop: titleTop, titleHeight: Double(titleHeight),
                                               barBottom: Double(safeTop + Tokens.PageHero.barHeight))
         let isFinding = find.isOpen
+        let noMatches = isFinding && find.hasNoMatches
+        let rows = isFinding ? (find.results ?? songs) : songs
+        let foldedHeight = safeTop + Tokens.PageHero.barHeight + Tokens.PageHero.findFieldHeight + 8
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                if isFinding {
-                    Color.clear
-                        .frame(height: safeTop + Tokens.PageHero.barHeight + Tokens.PageHero.findFieldHeight + 8)
-                        .accessibilityHidden(true)
-                    if find.hasNoMatches {
-                        ListFindNoMatches(query: find.query)
-                            .padding(.top, 32)
-                    } else {
-                        panelTop(showsEditRow: false)
-                        songRows(find.results ?? songs)
-                        panelBottom
-                    }
+                hero(playlist, width: width, height: heroHeight, safeTop: safeTop)
+                    // Not clipped: the pull-down stretch grows the hero past its top edge.
+                    .frame(height: isFinding ? foldedHeight : heroHeight, alignment: .top)
+                    .opacity(isFinding ? 0 : 1)
+                    .allowsHitTesting(!isFinding)
+                    .accessibilityHidden(isFinding)
+                if noMatches {
+                    ListFindNoMatches(query: find.query)
+                        .padding(.top, 32)
                 } else {
-                    hero(playlist, width: width, height: heroHeight, safeTop: safeTop)
-                    panelTop(showsEditRow: true)
-                    if songs.isEmpty {
-                        emptyState
-                    } else {
-                        songRows(songs)
-                    }
+                    panelTop(showsEditRow: !isFinding)
+                }
+                if !isFinding, songs.isEmpty {
+                    emptyState
+                }
+                songRows(rows)
+                if !noMatches {
                     panelBottom
                 }
             }
@@ -268,7 +271,7 @@ private struct PlaylistDetailContent: View {
         return ZStack(alignment: .bottomLeading) {
             ProgressiveBlurHero(source: source, gradients: .header, veil: theme.surface,
                                 topScrimHeight: safeTop + Tokens.PageHero.barHeight + 16,
-                                aspectRatio: width / max(height, 1)) {
+                                size: CGSize(width: width, height: height)) {
                 heroArt(art, source: source, playlist: playlist, width: width, height: height)
             }
             .frame(width: width, height: height)

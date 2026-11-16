@@ -93,7 +93,10 @@ private struct BlendedCoverBackground: View {
     }
 }
 
-/// Blurs a cover once at a small size (Core Image Gaussian blur) and keeps the last few.
+/// Blurs a cover once at a small size (Core Image Gaussian blur) and keeps the last few. Shared by the player's
+/// blended-cover background, the full player's hero (one copy per carousel page) and the artist and playlist heroes,
+/// so it keeps a few more than one screen needs, and a cover asked for again while it is still being blurred waits for
+/// that blur instead of starting a second one (the actor is reentrant at the artwork load).
 actor BlurredArtworkCache {
     static let shared = BlurredArtworkCache()
 
@@ -102,20 +105,32 @@ actor BlurredArtworkCache {
     private lazy var context = CIContext(options: [.cacheIntermediates: false])
     private var cache: [ArtworkSource: ArtworkImage] = [:]
     private var order: [ArtworkSource] = []
+    private var inFlight: [ArtworkSource: Task<ArtworkImage?, Never>] = [:]
+    private static let capacity = 8
 
     func image(for source: ArtworkSource) async -> ArtworkImage? {
         if let hit = cache[source] { return hit }
+        if let running = inFlight[source] { return await running.value }
+        let task = Task { await self.blur(source) }
+        inFlight[source] = task
+        let result = await task.value
+        inFlight[source] = nil
+        if let result, cache[source] == nil {
+            cache[source] = result
+            order.append(source)
+            if order.count > Self.capacity { cache[order.removeFirst()] = nil }
+        }
+        return result
+    }
+
+    private func blur(_ source: ArtworkSource) async -> ArtworkImage? {
         guard let art = await ArtworkPipeline.shared.image(source, pixelSize: 128) else { return nil }
         let input = CIImage(cgImage: art.cgImage)
         let extent = input.extent
         // Android blurs 72 dp on a screen-wide image; the art here is 128 px for ~400 pt.
         let blurred = input.clampedToExtent().applyingGaussianBlur(sigma: 14).cropped(to: extent)
         guard let output = context.createCGImage(blurred, from: extent) else { return nil }
-        let result = ArtworkImage(cgImage: output)
-        cache[source] = result
-        order.append(source)
-        if order.count > 4 { cache[order.removeFirst()] = nil }
-        return result
+        return ArtworkImage(cgImage: output)
     }
 }
 

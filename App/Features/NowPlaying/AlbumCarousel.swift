@@ -1,3 +1,4 @@
+import PixlFoundation
 import PixlModel
 import SwiftUI
 
@@ -38,9 +39,13 @@ nonisolated enum PlayerCarouselStyle: String, Sendable {
 /// Material's keyline carousel (neighbours masked to smaller slices) is approximated by plain square pages whose
 /// neighbours are cut by the carousel edge.
 ///
-/// `fullBleed` (new UI, 2026-11-16): the covers fill the width edge to edge, square, without corners or gaps, and stay
-/// full size while paused — the sharp layer of the full player's hero (`ProgressiveBlurHero`). Peeking neighbours
-/// can't show in a full-bleed hero, so the carousel style doesn't apply there.
+/// `fullBleed` (new UI, 2026-11-16): the full player's hero. The covers fill the width edge to edge without corners or
+/// gaps, and stay full size while paused, each page sized by `ProgressiveHero.playerLayout` (the cover scaled to fill
+/// `width × sharpHeight`, so it reaches about halfway down the screen). Each page carries its own blurred copy
+/// (`HeroBlurredCopy`) running on below the carousel to the hero's bottom, so a swipe moves one melting picture; the
+/// veil and the top scrim (`HeroVeil`) are one static layer over the whole carousel. The scroll view stays as tall as
+/// the sharp part (taps under it still reach the player's background) and doesn't clip, so the copies show below it.
+/// Peeking neighbours can't show in a full-bleed hero, so the carousel style doesn't apply there.
 struct AlbumCarousel: View {
     let queue: [Song]
     let currentIndex: Int?
@@ -52,14 +57,14 @@ struct AlbumCarousel: View {
     /// are a context menu the full player puts around the whole carousel).
     var allowsSwipe = true
     var onDoubleTap: (() -> Void)?
-    var fullBleed = false
+    var fullBleed: CarouselHero?
 
     /// Starts at the width the player lays it out at (when known), so the covers are there on the first pass instead
     /// of after a measuring pass; measuring still follows later changes.
     @State private var width: CGFloat
 
     init(queue: [Song], currentIndex: Int?, style: PlayerCarouselStyle, isPlaying: Bool, initialWidth: CGFloat = 0,
-         allowsSwipe: Bool = true, onDoubleTap: (() -> Void)? = nil, fullBleed: Bool = false,
+         allowsSwipe: Bool = true, onDoubleTap: (() -> Void)? = nil, fullBleed: CarouselHero? = nil,
          onSelect: @escaping (Int) -> Void, onAlbumTap: @escaping (Song) -> Void) {
         self.allowsSwipe = allowsSwipe
         self.fullBleed = fullBleed
@@ -80,16 +85,20 @@ struct AlbumCarousel: View {
     @State private var hintToken = 0
 
     var body: some View {
-        let item = fullBleed ? width : style.itemSize(width: width)
+        let hero = fullBleed.map { config in
+            ProgressiveHero.playerLayout(width: Double(width), screenHeight: Double(config.screenHeight),
+                                         titleClearance: Double(config.titleClearance))
+        }
+        let isFullBleed = fullBleed != nil
+        let item = hero.map { CGFloat($0.sharpHeight) } ?? style.itemSize(width: width)
         let margins = style.margins(width: width)
-        let singleStyle = queue.count <= 1 || fullBleed ? PlayerCarouselStyle.noPeek : style
+        let singleStyle = queue.count <= 1 || isFullBleed ? PlayerCarouselStyle.noPeek : style
         ScrollView(.horizontal) {
-            LazyHStack(spacing: fullBleed ? 0 : 8) {
+            LazyHStack(spacing: isFullBleed ? 0 : 8) {
                 // Covers decode at their display size, so they wait for the measured width.
                 ForEach(width > 0 ? queue.indices : 0..<0, id: \.self) { index in
                     let song = queue[index]
-                    ArtworkView(song: song, size: max(singleStyle == .noPeek ? width : item, 1),
-                                cornerRadius: fullBleed ? 0 : 18)
+                    cover(song, size: max(singleStyle == .noPeek ? width : item, 1), hero: hero)
                         .contentShape(.rect)
                         // Double-tap goes first, so the single tap (open the album) waits for it to fail.
                         .modifier(CarouselDoubleTap(action: index == (position ?? currentIndex) ? onDoubleTap : nil))
@@ -105,6 +114,7 @@ struct AlbumCarousel: View {
             .scrollTargetLayout()
         }
         .scrollIndicators(.hidden)
+        .scrollClipDisabled(isFullBleed)
         .scrollDisabled(!allowsSwipe)
         .scrollTargetBehavior(.viewAligned)
         .contentMargins(.leading, singleStyle == .noPeek ? 0 : margins.leading, for: .scrollContent)
@@ -123,8 +133,15 @@ struct AlbumCarousel: View {
             }
         }
         .frame(height: max(item, 1))
+        // The hero's veil and top scrim: one static layer over every page, down to the hero's bottom.
+        .overlay(alignment: .top) {
+            if let fullBleed, let hero {
+                HeroVeil(gradients: .player, veil: fullBleed.veil, topScrimHeight: fullBleed.topScrimHeight)
+                    .frame(width: width, height: max(CGFloat(hero.heroHeight), 1))
+            }
+        }
         // Full bleed stays full size: a shrink would open gaps at the screen edges.
-        .scaleEffect(isPlaying || fullBleed ? 1 : 0.95)
+        .scaleEffect(isPlaying || isFullBleed ? 1 : 0.95)
         .animation(.easeOut(duration: 0.26), value: isPlaying)
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .onAppear { position = currentIndex }
@@ -139,10 +156,10 @@ struct AlbumCarousel: View {
         }
         .pixlHaptic(.impact(weight: .medium), trigger: settleHaptic)
         // Full bleed: in the middle of the cover, clear of the player's top bar over it.
-        .overlay(alignment: fullBleed ? .center : .top) {
+        .overlay(alignment: isFullBleed ? .center : .top) {
             if let hint {
                 SwipeHint(direction: hint)
-                    .padding(.top, fullBleed ? 0 : 10)
+                    .padding(.top, isFullBleed ? 0 : 10)
                     .transition(.opacity.combined(with: .scale(scale: 0.92)))
             }
         }
@@ -154,6 +171,37 @@ struct AlbumCarousel: View {
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: hint)
     }
+
+    /// One page: a rounded square cover, or (full bleed) the cover filling `width × sharpHeight` with its blurred copy
+    /// running on below it to the hero's bottom (outside the page's frame and touches).
+    @ViewBuilder
+    private func cover(_ song: Song, size: CGFloat, hero: ProgressiveHero.Layout?) -> some View {
+        if let fullBleed, let hero {
+            let sharp = max(CGFloat(hero.sharpHeight), 1)
+            ArtworkView(song: song, size: max(width, sharp), cornerRadius: 0)
+                .frame(width: width, height: sharp)
+                .clipped()
+                .overlay(alignment: .top) {
+                    HeroBlurredCopy(source: ArtworkSource(song: song), gradients: .player, veil: fullBleed.veil,
+                                    width: width, sharpHeight: sharp,
+                                    heroHeight: max(CGFloat(hero.heroHeight), sharp))
+                }
+        } else {
+            ArtworkView(song: song, size: size, cornerRadius: 18)
+        }
+    }
+}
+
+/// The full player's hero round the carousel (`AlbumCarousel.fullBleed`).
+struct CarouselHero {
+    /// The screen height the player is laid out at (0: unknown).
+    var screenHeight: CGFloat
+    /// From the title's top to the screen's bottom edge: the blurred copy is fully in by the title.
+    var titleClearance: CGFloat
+    /// The colour the hero melts into (the album's `primaryContainer`).
+    var veil: Color
+    /// The dimming scrim behind the status bar and the top bar.
+    var topScrimHeight: CGFloat
 }
 
 /// Double-tap on a cover (like / unlike) when the gesture is on; no gesture at all otherwise, so the single tap that

@@ -96,13 +96,20 @@ public enum SplitPillNav {
     /// its bar under the keyboard), except on the Search tab, where the bar is the search field and rides on top of
     /// the keyboard. Keyed to the tab rather than the field's focus: focus drops a moment before the keyboard's hide
     /// notification on submit, and a focus rule would pull the bar out and put it back in that moment.
-    public static func showsBar(atTabRoot: Bool, keyboardVisible: Bool, onSearchTab: Bool) -> Bool {
+    ///
+    /// `searchFieldOwnsKeyboard`: the keyboard on screen was raised by the bar's own search field. Leaving Search
+    /// while it types (the Home circle) drops the field's focus, but the keyboard's hide notification comes a moment
+    /// later; until then the bar keeps riding the keyboard and morphs back to the tab segments in place, instead of
+    /// sliding out for that moment and back in once the keyboard has gone.
+    public static func showsBar(atTabRoot: Bool, keyboardVisible: Bool, onSearchTab: Bool,
+                                searchFieldOwnsKeyboard: Bool = false) -> Bool {
         guard atTabRoot else { return false }
-        return !keyboardVisible || onSearchTab
+        return !keyboardVisible || onSearchTab || searchFieldOwnsKeyboard
     }
 
     /// Whether the bar rides on the keyboard (and the page under it keeps room for it).
-    public static func ridesKeyboard(atTabRoot: Bool, keyboardVisible: Bool, onSearchTab: Bool) -> Bool {
-        atTabRoot && keyboardVisible && onSearchTab
+    public static func ridesKeyboard(atTabRoot: Bool, keyboardVisible: Bool, onSearchTab: Bool,
+                                     searchFieldOwnsKeyboard: Bool = false) -> Bool {
+        atTabRoot && keyboardVisible && (onSearchTab || searchFieldOwnsKeyboard)
     }
 }

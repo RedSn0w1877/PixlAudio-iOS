@@ -79,4 +79,20 @@ import Testing
         #expect(!SplitPillNav.ridesKeyboard(atTabRoot: true, keyboardVisible: true, onSearchTab: false))
         #expect(!SplitPillNav.ridesKeyboard(atTabRoot: false, keyboardVisible: true, onSearchTab: true))
     }
+
+    @Test func barKeepsRidingWhileTheSearchFieldsKeyboardGoesAway() {
+        // Leaving Search while its field types: the tab is no longer Search, the keyboard is still up for a moment.
+        #expect(SplitPillNav.showsBar(atTabRoot: true, keyboardVisible: true, onSearchTab: false,
+                                      searchFieldOwnsKeyboard: true))
+        #expect(SplitPillNav.ridesKeyboard(atTabRoot: true, keyboardVisible: true, onSearchTab: false,
+                                           searchFieldOwnsKeyboard: true))
+        // Another field's keyboard still hides the bar; a pushed page never shows it.
+        #expect(!SplitPillNav.showsBar(atTabRoot: true, keyboardVisible: true, onSearchTab: false,
+                                       searchFieldOwnsKeyboard: false))
+        #expect(!SplitPillNav.showsBar(atTabRoot: false, keyboardVisible: true, onSearchTab: false,
+                                       searchFieldOwnsKeyboard: true))
+        // Once the keyboard is gone the flag changes nothing.
+        #expect(!SplitPillNav.ridesKeyboard(atTabRoot: true, keyboardVisible: false, onSearchTab: false,
+                                            searchFieldOwnsKeyboard: true))
+    }
 }

@@ -5,9 +5,10 @@ import SwiftUI
 /// The full player (Android `FullPlayerContent`, portrait), drawn inside the player sheet's card
 /// (`PlayerSheetHost`) over the album's `primaryContainer`. New UI (owner decisions, 2026-11-16; mockup `iOSPlayer`):
 /// - the hero: the queue's covers fill the top edge to edge (the full-bleed `AlbumCarousel`, so swiping, tapping for
-///   the album, double-tap to like and the long-press quick actions all stay), sharp at the top and progressively
-///   blurred from about halfway down until they melt into the album colour and the ambient background under the title
-///   and controls (`ProgressiveBlurHero`: one pre-blurred copy behind a static mask, no live blur);
+///   the album, double-tap to like and the long-press quick actions all stay), about three quarters of the screen tall
+///   (`ProgressiveHero.playerLayout`): sharp at the top, progressively blurred from about halfway down the screen,
+///   fully blurred where the title starts, then melting into the album colour and the ambient background under the
+///   title and the seek bar (each page's pre-blurred copy behind a static mask, one static veil; no live blur);
 /// - over it, the top bar (64 pt): the collapse circle (42 pt), and on the right the output pill (the output's icon,
 ///   plus the device's name for any output other than this phone) joined to the ⋯ menu (`PlayerMoreMenu`: Spatial
 ///   audio, Sing, Ask Taizo and the song's actions), 6 pt apart;
@@ -23,8 +24,8 @@ struct NowPlayingView: View {
     /// The screen width the player is laid out at (0 = unknown): seeds the carousel and the transport with their
     /// final widths, so a fresh build lays out once instead of measuring first.
     var width: CGFloat
-    /// The screen height the player is laid out at (0 = unknown). The full-bleed hero no longer shrinks on short screens
-    /// (the controls sit over its melted bottom instead of below it), so only the caller's frame uses it.
+    /// The screen height the player is laid out at (0 = unknown): sizes the full-bleed hero to the screen
+    /// (`ProgressiveHero.playerLayout`), with the controls over its blurred, melting bottom.
     var height: CGFloat
 
     init(safeArea: EdgeInsets = EdgeInsets(), width: CGFloat = 0, height: CGFloat = 0) {
@@ -54,8 +55,8 @@ struct NowPlayingView: View {
 
     private func content(_ song: Song) -> some View {
         let isVisible = env.playerSheet.isExpanded || env.playerSheet.isDragging
-        // The background never takes part in layout (a filled cover is wider than the screen); the hero is a square at
-        // the top, under the chrome, and the content stack sits over its melted bottom.
+        // The background never takes part in layout (a filled cover is wider than the screen); the hero sits at the
+        // top, under the chrome, and the content stack sits over its blurred, melting bottom.
         return ZStack(alignment: .top) {
             hero(song)
                 .playerSectionFade(start: 0.08)
@@ -103,30 +104,36 @@ struct NowPlayingView: View {
     }
 
     /// The full-bleed hero: the queue's covers (swipe, tap for the album, double-tap to like, long press for the quick
-    /// actions) under one progressive blur that melts into the album colour.
+    /// actions), each page with its own progressive blur, under one veil that melts into the album colour.
     private func hero(_ song: Song) -> some View {
-        ProgressiveBlurHero(source: ArtworkSource(song: song), gradients: .player, veil: theme.primaryContainer,
-                            topScrimHeight: safeArea.top + 72) {
-            AlbumCarousel(queue: playback.queue, currentIndex: playback.currentIndex,
-                          style: PlayerCarouselStyle(storageKey: settings.appearance.carouselStyle),
-                          isPlaying: playback.isPlaying,
-                          initialWidth: width,
-                          allowsSwipe: settings.behavior.gesturePlayerArtworkSwipe,
-                          onDoubleTap: settings.behavior.gesturePlayerArtworkDoubleTapLike && !voiceOver
-                              ? { toggleLike(song) } : nil,
-                          fullBleed: true,
-                          onSelect: { index in playback.skipToQueueItem(at: index) },
-                          onAlbumTap: { tapped in openAlbum(tapped) })
-                .overlay { HeartBurst(trigger: burstCount, isLike: burstIsLike) }
-                .songQuickActions(song: song, isEnabled: settings.behavior.gesturePlayerArtworkLongPress)
-                .pixlHaptic(.success, trigger: burstCount)
-                .accessibilityActions {
-                    Button("Next song") { playback.skipToNext() }
-                    Button("Previous song") { playback.skipToPrevious() }
-                    Button("Like or unlike") { toggleLike(song) }
-                }
-        }
+        AlbumCarousel(queue: playback.queue, currentIndex: playback.currentIndex,
+                      style: PlayerCarouselStyle(storageKey: settings.appearance.carouselStyle),
+                      isPlaying: playback.isPlaying,
+                      initialWidth: width,
+                      allowsSwipe: settings.behavior.gesturePlayerArtworkSwipe,
+                      onDoubleTap: settings.behavior.gesturePlayerArtworkDoubleTapLike && !voiceOver
+                          ? { toggleLike(song) } : nil,
+                      fullBleed: CarouselHero(screenHeight: height,
+                                              titleClearance: Self.titleClearance + safeArea.bottom,
+                                              veil: theme.primaryContainer,
+                                              topScrimHeight: safeArea.top + 72),
+                      onSelect: { index in playback.skipToQueueItem(at: index) },
+                      onAlbumTap: { tapped in openAlbum(tapped) })
+            .overlay { HeartBurst(trigger: burstCount, isLike: burstIsLike) }
+            .songQuickActions(song: song, isEnabled: settings.behavior.gesturePlayerArtworkLongPress)
+            .pixlHaptic(.success, trigger: burstCount)
+            .accessibilityActions {
+                Button("Next song") { playback.skipToNext() }
+                Button("Previous song") { playback.skipToPrevious() }
+                Button("Like or unlike") { toggleLike(song) }
+            }
     }
+
+    /// From the title's top to the bottom safe area — the metadata row under the title's top (~68), the seek bar (70),
+    /// the transport with its padding (96), the 14 pt gap and the split pills with theirs (70): the hero is fully
+    /// blurred where the title starts. An estimate (a larger text size lifts the title a little onto the blur band,
+    /// where the veil still covers it), so the player measures nothing for it.
+    private static let titleClearance: CGFloat = 320
 
     private func controls(_ song: Song) -> some View {
         VStack(spacing: 0) {
@@ -353,46 +360,43 @@ private struct PlayerMetadataRow: View {
             }
             .padding(.vertical, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
-            // The loading chip and the Queue circle render together (spacing below their 20 pt gap: they never blend at
-            // rest).
-            GlassEffectContainer(spacing: 6) {
-                HStack(spacing: 12) {
-                    if playback.isPreparing {
-                        // Android's chip is a Material circle `Surface` (FullPlayerContent.kt:1630-1644): clear glass
-                        // over the player's background like its neighbours (decision 10), not interactive (no button).
-                        ProgressView()
-                            .controlSize(.regular)
-                            .tint(theme.primary)
-                            .frame(width: 28, height: 28)
-                            .padding(10)
-                            .glassEffect(Glass.clear.tint(theme.onPrimary.opacity(GlassTint.playerChrome)),
-                                         in: Circle())
-                            .padding(.trailing, 8)
-                            .transition(.scale(scale: 0.85).combined(with: .opacity))
-                    }
-                    // Android rounded_queue_music_24.
-                    circle(systemImage: "music.note.list", label: "Open Queue", identifier: "player.queue") {
-                        router.present(AppSheet.queue)
-                    }
-                }
+            // Android's loading chip (a circle beside the queue button) became the Queue circle's own spinner: a chip
+            // inserted next to the title changed the title's width as each song started and finished preparing, and
+            // re-fitted it twice per song. The title's width now depends on the song and the screen only.
+            // Android rounded_queue_music_24.
+            circle(systemImage: "music.note.list", label: "Open Queue", identifier: "player.queue",
+                   isBusy: playback.isPreparing) {
+                router.present(AppSheet.queue)
             }
         }
         .frame(minHeight: 70)
         .animation(.easeOut(duration: 0.3), value: playback.isPreparing)
     }
 
+    /// `isBusy`: the song is still being prepared — the icon gives way to a spinner (the button still works).
     private func circle(systemImage: String, label: LocalizedStringKey, identifier: String, iconSize: CGFloat = 22,
-                        action: @escaping () -> Void) -> some View {
+                        isBusy: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: iconSize, weight: .semibold))
-                .foregroundStyle(theme.primary)
-                .frame(width: 48, height: 48)
-                .contentShape(.circle)
+            ZStack {
+                Image(systemName: systemImage)
+                    .font(.system(size: iconSize, weight: .semibold))
+                    .foregroundStyle(theme.primary)
+                    .opacity(isBusy ? 0 : 1)
+                    .scaleEffect(isBusy ? 0.85 : 1)
+                if isBusy {
+                    ProgressView()
+                        .controlSize(.regular)
+                        .tint(theme.primary)
+                        .transition(.scale(scale: 0.85).combined(with: .opacity))
+                }
+            }
+            .frame(width: 48, height: 48)
+            .contentShape(.circle)
         }
         .buttonStyle(.plain)
         .playerGlass(in: Circle(), tint: theme.onPrimary.opacity(GlassTint.playerChrome))
         .accessibilityLabel(label)
+        .accessibilityValue(isBusy ? Text("Preparing") : Text(""))
         .accessibilityIdentifier(identifier)
     }
 

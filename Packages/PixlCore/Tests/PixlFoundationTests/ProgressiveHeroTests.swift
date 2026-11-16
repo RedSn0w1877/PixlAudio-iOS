@@ -80,6 +80,84 @@ import Testing
     }
 }
 
+@Suite struct ProgressiveHeroCompositionTests {
+    private func close(_ a: Double, _ b: Double) -> Bool { abs(a - b) < 0.0001 }
+
+    @Test func blurredCopyIsClearAtTheTopOpaqueInTheMiddleAndMeltedAtTheBottom() {
+        let profile = ProgressiveHero.Profile.player
+        let stops = ProgressiveHero.blurMeltMask(profile)
+        #expect(zip(stops, stops.dropFirst()).allSatisfy { $0.location < $1.location })
+        #expect(ProgressiveHero.value(stops, at: 0) == 0)
+        #expect(ProgressiveHero.value(stops, at: profile.blurStart) == 0)
+        // Opaque from where the sharp art is cut to where the melt starts: the cut never shows.
+        #expect(close(ProgressiveHero.value(stops, at: profile.blurEnd), 1))
+        #expect(close(ProgressiveHero.value(stops, at: (profile.blurEnd + profile.meltStart) / 2), 1))
+        #expect(close(ProgressiveHero.value(stops, at: profile.meltStart), 1))
+        #expect(ProgressiveHero.value(stops, at: 1) == 0)
+        #expect(stops.allSatisfy { $0.opacity >= 0 && $0.opacity <= 1 })
+    }
+
+    @Test func veilRisesThenMeltsAway() {
+        let profile = ProgressiveHero.Profile.player
+        let stops = ProgressiveHero.veilMeltMask(profile)
+        #expect(ProgressiveHero.value(stops, at: 0) == 0)
+        #expect(ProgressiveHero.value(stops, at: 1) == 0)
+        #expect(stops.allSatisfy { $0.opacity <= profile.veilOpacity + 0.0001 })
+        #expect(ProgressiveHero.value(stops, at: profile.meltStart) > 0.2)
+    }
+
+    @Test func productReadsEachMaskBetweenItsStops() {
+        let a = [ProgressiveHero.Stop(location: 0, opacity: 0), .init(location: 1, opacity: 1)]
+        let b = [ProgressiveHero.Stop(location: 0.5, opacity: 1), .init(location: 1, opacity: 0)]
+        let product = ProgressiveHero.product(a, b)
+        #expect(product.map(\.location) == [0, 0.5, 1])
+        #expect(close(product[1].opacity, 0.5))
+        #expect(product.last?.opacity == 0)
+        #expect(close(ProgressiveHero.value(a, at: 0.25), 0.25))
+        // Held beyond the ends; no stops reads as opaque.
+        #expect(ProgressiveHero.value(b, at: 0.1) == 1)
+        #expect(ProgressiveHero.value([], at: 0.3) == 1)
+    }
+
+    @Test func playerHeroReachesUnderTheTitle() {
+        // A 393 × 852 phone; the title starts 340 pt above the bottom edge.
+        let layout = ProgressiveHero.playerLayout(width: 393, screenHeight: 852, titleClearance: 340)
+        let profile = ProgressiveHero.Profile.player
+        // About three quarters of the screen, sharp well past the square cover.
+        #expect(layout.heroHeight > 0.7 * 852 && layout.heroHeight < 0.8 * 852)
+        #expect(layout.sharpHeight > 393)
+        // The blur starts near the middle of the screen and is fully in where the title starts.
+        let blurStart = layout.heroHeight * profile.blurStart
+        #expect(blurStart > 0.42 * 852 && blurStart < 0.52 * 852)
+        #expect(abs(layout.heroHeight * profile.blurEnd - (852 - 340)) <= 1)
+        #expect(layout.sharpHeight >= layout.heroHeight * profile.blurEnd)
+    }
+
+    @Test func playerHeroStaysBetweenTheWidthAndTheScreen() {
+        // A short screen: never shorter than the width.
+        let short = ProgressiveHero.playerLayout(width: 375, screenHeight: 500, titleClearance: 400)
+        #expect(short.heroHeight == 375)
+        // Never taller than the screen.
+        let tall = ProgressiveHero.playerLayout(width: 393, screenHeight: 852, titleClearance: 0)
+        #expect(tall.heroHeight == 852)
+        // Unknown height: 1.6 × the width; unknown width: nothing.
+        #expect(ProgressiveHero.playerLayout(width: 400, screenHeight: 0, titleClearance: 340).heroHeight == 640)
+        #expect(ProgressiveHero.playerLayout(width: 0, screenHeight: 852, titleClearance: 340)
+            == .init(heroHeight: 0, sharpHeight: 0))
+    }
+
+    @Test func blurredCopyLinesUpWithTheSharpArt() {
+        // A header: the art fills the whole hero, a square at its larger side, centred; nothing to mirror.
+        let header = ProgressiveHero.copyLayout(width: 393, sharpHeight: 480, heroHeight: 480)
+        #expect(header == .init(side: 480, top: 0, mirrors: false))
+        let wide = ProgressiveHero.copyLayout(width: 600, sharpHeight: 400, heroHeight: 400)
+        #expect(wide == .init(side: 600, top: -100, mirrors: false))
+        // The player: the square ends at the sharp part's bottom, and a mirrored copy runs on to the hero's bottom.
+        let player = ProgressiveHero.copyLayout(width: 393, sharpHeight: 512, heroHeight: 624)
+        #expect(player == .init(side: 512, top: 0, mirrors: true))
+    }
+}
+
 @Suite struct ProgressRingTests {
     @Test func tickFollowsHowFastTheArcMoves() {
         // 3 minutes on a 44 pt ring (≈138 pt round): about 1.3 s per point.

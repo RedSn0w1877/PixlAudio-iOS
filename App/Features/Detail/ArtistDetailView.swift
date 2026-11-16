@@ -211,7 +211,7 @@ private struct ArtistDetailContent: View {
         return ZStack(alignment: .bottomLeading) {
             ProgressiveBlurHero(source: source, gradients: .header, veil: theme.surface,
                                 topScrimHeight: safeTop + Tokens.PageHero.barHeight + 16,
-                                aspectRatio: width / max(height, 1)) {
+                                size: CGSize(width: width, height: height)) {
                 heroArt(source, width: width, height: height)
             }
             .frame(width: width, height: height)
@@ -280,6 +280,7 @@ private struct ArtistDetailContent: View {
                     HStack(spacing: 7) {
                         Image(systemName: "play.fill")
                             .font(.system(size: 18, weight: .semibold))
+                            .accessibilityHidden(true)
                         Text("Play")
                             .pixlFont(.custom(size: 17, weight: .medium))
                             .lineLimit(1)
@@ -292,6 +293,7 @@ private struct ArtistDetailContent: View {
                 .buttonStyle(.plain)
                 .pixlGlass(in: Capsule(), tint: theme.primary.opacity(GlassTint.prominent), interactive: true)
                 .disabled(allSongs.isEmpty)
+                .accessibilityLabel("Play")
                 .accessibilityIdentifier("artist.play")
                 GlassCircleButton(systemImage: "shuffle", accessibilityLabel: "Shuffle play", size: h,
                                   iconSize: 20, tint: theme.surfaceContainerHigh.opacity(GlassTint.surface),

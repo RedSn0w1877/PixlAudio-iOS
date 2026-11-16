@@ -72,8 +72,11 @@ struct MiniPlayerBar: View {
             Spacer().frame(width: m.buttonSpacing - Self.hitInset)
             transportButton("backward.end.fill", label: "Previous", fill: theme.onPrimary, icon: theme.primary,
                             action: onPrevious)
+            // The ring's extra room either side sits inside the button's touch area (`hitWidth`), not as padding
+            // outside it: a tap there used to fall through to the bar and open the full player.
             transportButton(isPlaying ? "pause.fill" : "play.fill", label: isPlaying ? "Pause" : "Play",
                             fill: theme.primary, icon: theme.onPrimary, circleSize: m.playButtonSize,
+                            hitWidth: m.buttonHitSize + 2 * m.ringSpacing,
                             action: onPlayPause)
                 .accessibilityIdentifier("miniPlayer.playPause")
                 .background {
@@ -83,7 +86,6 @@ struct MiniPlayerBar: View {
                                                track: theme.onPrimaryContainer.opacity(0.18))
                     }
                 }
-                .padding(.horizontal, m.ringSpacing)
             transportButton("forward.end.fill", label: "Next", fill: theme.onPrimary, icon: theme.primary,
                             action: onNext)
         }
@@ -104,6 +106,7 @@ struct MiniPlayerBar: View {
 
     private func transportButton(_ symbol: String, label: LocalizedStringKey, fill: Color, icon: Color,
                                  circleSize: CGFloat = Tokens.MiniPlayer.buttonSize,
+                                 hitWidth: CGFloat = Tokens.MiniPlayer.buttonHitSize,
                                  action: @escaping () -> Void) -> some View {
         let m = Tokens.MiniPlayer.self
         return Button(action: action) {
@@ -113,7 +116,7 @@ struct MiniPlayerBar: View {
                 .contentTransition(.symbolEffect(.replace))
                 .frame(width: circleSize, height: circleSize)
                 .background(Circle().fill(fill))
-                .frame(width: m.buttonHitSize, height: m.buttonHitSize)
+                .frame(width: hitWidth, height: m.buttonHitSize)
                 .contentShape(.rect)
         }
         .buttonStyle(PressScaleButtonStyle())

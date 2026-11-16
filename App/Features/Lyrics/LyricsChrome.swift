@@ -75,7 +75,8 @@ enum LyricsChromeMetrics {
     static let playingCorner: CGFloat = 18
     static let pausedCorner: CGFloat = 39
     static let seekBarHeight: CGFloat = 50
-    static let toggleHeight: CGFloat = 50
+    /// A toolbar segment inside the big capsule (`Tokens.PlayerPills`: 64 pt capsule, 5 pt inset).
+    static let toggleHeight: CGFloat = Tokens.PlayerPills.height - 2 * Tokens.PlayerPills.padding
 }
 
 // MARK: - Header
@@ -403,8 +404,13 @@ private struct WavyTrack: View {
     }
 }
 
-/// Back · Translate · Sing · more (Android `LyricsFloatingToolbar`; the owner swapped Synced · Static for Translate ·
-/// Sing on 2026-10-07: synced vs plain is now automatic).
+/// Translate · Sing · more and Back (Android `LyricsFloatingToolbar`; the owner swapped Synced · Static for Translate ·
+/// Sing on 2026-10-07: synced vs plain is now automatic). New UI (owner, 2026-11-16): the player's split pills carry
+/// over to this toolbar, the lyrics above it unchanged — one big clear-glass capsule holding Translate, Sing and the
+/// options (the active segment in a tonal capsule, `PlayerActionPills`' metrics), and one small circle beside it, Back,
+/// where the player's Lyrics circle sits (the same spot goes to the lyrics and back). Both shapes render in the
+/// cluster's `GlassEffectContainer` (spacing 3, below their 10 pt gap). Without lyrics the capsule gives way to the
+/// options circle.
 private struct LyricsToolbar: View {
     let hasLyrics: Bool
     let song: Song?
@@ -417,30 +423,50 @@ private struct LyricsToolbar: View {
     let onMore: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
-            toolbarCircle(systemImage: "arrow.left", label: "Back", action: onBack)
+        let p = Tokens.PlayerPills.self
+        HStack(spacing: Tokens.Shell.navPillSpacing) {
             if hasLyrics {
-                HStack(spacing: 8) {
+                HStack(spacing: p.segmentSpacing) {
                     LyricsTranslateSegment(canTranslate: canTranslate, chrome: chrome, brightArt: brightArt,
                                            onTranslateViaAI: onTranslateViaAI, onTap: onSegmentTap)
                     LyricsSingSegment(song: song, chrome: chrome, brightArt: brightArt, onTap: onSegmentTap)
+                    moreSegment
                 }
+                .padding(p.padding)
                 .frame(maxWidth: .infinity)
+                .frame(height: p.height)
+                .glassEffect(chrome.panelGlass(brightArt: brightArt, interactive: true), in: Capsule())
             } else {
-                Spacer().frame(maxWidth: .infinity).frame(height: LyricsChromeMetrics.toggleHeight)
+                Spacer(minLength: 0)
+                toolbarCircle(systemImage: "ellipsis", label: "Lyrics options", rotated: true, action: onMore)
             }
-            toolbarCircle(systemImage: "ellipsis", label: "Lyrics options", rotated: true, action: onMore)
+            toolbarCircle(systemImage: "chevron.down", label: "Back", action: onBack)
         }
+        .frame(height: p.height)
+    }
+
+    /// The options inside the big capsule: an icon segment, no fill of its own.
+    private var moreSegment: some View {
+        Button(action: onMore) {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 20, weight: .semibold))
+                .rotationEffect(.degrees(90))
+                .foregroundStyle(chrome.content)
+                .frame(width: LyricsChromeMetrics.toggleHeight, height: LyricsChromeMetrics.toggleHeight)
+                .contentShape(.capsule)
+        }
+        .buttonStyle(PressScaleButtonStyle(pressedScale: 0.94))
+        .accessibilityLabel("Lyrics options")
     }
 
     private func toolbarCircle(systemImage: String, label: LocalizedStringKey, rotated: Bool = false,
                                action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 20, weight: .semibold))
+                .font(.system(size: Tokens.PlayerPills.iconSize, weight: .semibold))
                 .rotationEffect(.degrees(rotated ? 90 : 0))
                 .foregroundStyle(chrome.content)
-                .frame(width: 40, height: 40)
+                .frame(width: Tokens.PlayerPills.height, height: Tokens.PlayerPills.height)
                 .contentShape(.circle)
         }
         .buttonStyle(.plain)
@@ -548,8 +574,8 @@ private struct LyricsSingSegment: View {
     }
 }
 
-/// Android `ToggleSegmentButton`: active = accent capsule, inactive = 8 pt rounded rectangle, both clear glass in the
-/// cluster's container (Sing; Translate is a menu on the same label and glass).
+/// Android `ToggleSegmentButton`: a segment of the toolbar's big capsule, the accent capsule when active (Sing;
+/// Translate is a menu on the same label and look).
 private struct LyricsToggleSegment: View {
     let title: LocalizedStringKey
     var systemImage: String?
@@ -590,7 +616,7 @@ private struct LyricsSegmentLabel: View {
     let chrome: LyricsChromeColors
 
     var body: some View {
-        let shape = LyricsSegmentGlass.shape(active: active)
+        let shape = LyricsSegmentGlass.shape
         let foreground = active ? chrome.onSelected : chrome.content
         HStack(spacing: 6) {
             if busy {
@@ -626,9 +652,10 @@ private struct LyricsSegmentLabel: View {
     }
 }
 
-/// A toolbar segment's glass, applied after everything that changes its look (Apple: "Apply the glassEffect(_:in:)
-/// modifier after other modifiers"): the accent capsule when active, the panel tint otherwise; interactive. The label
-/// is fixed for VoiceOver (and for UI tests: identifiers don't survive the glass container); the state is its value.
+/// A toolbar segment's look inside the big capsule (new UI, 2026-11-16, like `PlayerActionPills`): active, a tonal
+/// capsule of the accent — a fill on the capsule's glass, not glass on glass, always mounted so turning on fades and
+/// swells it in; inactive, nothing of its own. The label is fixed for VoiceOver (and for UI tests: identifiers don't
+/// survive the glass container); the state is its value.
 private struct LyricsSegmentGlass: ViewModifier {
     let active: Bool
     let enabled: Bool
@@ -637,16 +664,17 @@ private struct LyricsSegmentGlass: ViewModifier {
     let chrome: LyricsChromeColors
     let brightArt: Bool
 
-    static func shape(active: Bool) -> RoundedRectangle {
-        RoundedRectangle(cornerRadius: active ? LyricsChromeMetrics.toggleHeight / 2 : 8, style: .continuous)
-    }
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    static let shape = Capsule()
 
     func body(content: Content) -> some View {
         content
-            .glassEffect(active
-                         ? Glass.clear.tint(chrome.selected.opacity(enabled ? GlassTint.prominent : GlassTint.prominent / 2)).interactive()
-                         : chrome.panelGlass(brightArt: brightArt, interactive: true),
-                         in: Self.shape(active: active))
+            .background {
+                Self.shape
+                    .fill(chrome.selected.opacity(active ? (enabled ? GlassTint.prominent : GlassTint.prominent / 2) : 0))
+                    .scaleEffect(active || reduceMotion ? 1 : 0.86)
+            }
             .animation(.spring(response: 0.5, dampingFraction: 0.8), value: active)
             .accessibilityLabel(Text(accessibilityLabel))
             .accessibilityValue(Text(accessibilityValue))

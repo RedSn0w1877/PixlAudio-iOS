@@ -243,16 +243,23 @@ Owner decisions on the approved mockups (`iOSPlayer`, `iOSPlayerMenu`, `iOSHome`
 mockups where they differ (the mockup's square cover became full bleed). Pure rules in PixlFoundation
 `ProgressiveHero` / `ProgressRing` (tested).
 
-- **Hero (`ProgressiveBlurHero`, design system — the artist and playlist pages take it next with
-  `HeroGradients.header`):** the queue's covers fill the top edge to edge as a square (`AlbumCarousel(fullBleed:)`: no
-  corners, no gaps, no shrink while paused; swipe, tap for the album, double-tap to like and the long-press quick
-  actions all stay). Sharp at the top; from 42 % down one pre-blurred copy of the cover (`BlurredArtworkCache`, the
-  blended-cover background's 128 px Core Image blur, so no extra work) fades in along a smoothstep mask and covers it
-  from 78 %; a veil of the album's `primaryContainer` rises with it to 50 % so the title reads; the whole stack melts
-  out over the last 20 % into the card's fill and the ambient background. A 32 % black scrim behind the status bar and
-  the top bar keeps the clear-glass chrome legible over bright art. No live blur and no per-frame work: the gradients
-  are static (`HeroGradients.player`), a new song cross-fades the blurred copy in 0.3 s. The carousel style setting
-  (peeks) doesn't apply to the full-bleed hero.
+- **Hero (`ProgressiveBlurHero`'s layers round the carousel; the artist and playlist pages use the view itself with
+  `HeroGradients.header`):** the queue's covers fill the top edge to edge, sized to the screen rather than the cover
+  (`ProgressiveHero.playerLayout`: about three quarters of the screen, so the blurred copy is fully in where the title
+  starts; the sharp part is `blurEnd` of it and the square cover is scaled to fill it, cutting a little of its sides).
+  `AlbumCarousel(fullBleed: CarouselHero)`: no corners, no gaps, no shrink while paused; swipe, tap for the album,
+  double-tap to like and the long-press quick actions all stay. Sharp at the top; from 62 % of the hero (near the
+  screen's middle) one pre-blurred copy of the cover (`BlurredArtworkCache`, the blended-cover background's 128 px
+  Core Image blur, deduplicated in flight) fades in along a smoothstep mask and covers it from 82 % (where the sharp art
+  is cut by a plain clip, never masked); the copy is mirrored below the square to reach the hero's bottom. Each
+  carousel page carries its own copy (`HeroBlurredCopy`, flattened with `drawingGroup`), so a swipe moves one melting
+  picture; the scroll view stays as tall as the sharp part (taps below it reach the background) and doesn't clip. One
+  static veil of the album's `primaryContainer` (`HeroVeil`) rises with the blur to 60 % so the title reads, and
+  everything melts out from 86 % into the card's fill and the ambient background, under the title and the seek bar. A
+  32 % black scrim behind the status bar and the top bar keeps the clear-glass chrome legible over bright art. Without
+  a copy (no art, not blurred yet, the blur failed) the page colour takes its place under the same mask. No live blur
+  and no per-frame work: the gradients are static (`HeroGradients.player`). The carousel style setting (peeks) doesn't
+  apply to the full-bleed hero.
 - **Top bar:** collapse circle; output pill joined to the ⋯ menu (`PlayerMoreMenu`, the queue pill's place and shape).
 - **⋯ menu (system liquid menu):** Listen — Spatial audio (opens the Spatial audio sheet; subtitle: the profile, or
   "… Not playing right now."), Sing (the lyrics screen's request: vocals off / on through the instrumental, subtitle
@@ -262,13 +269,17 @@ mockups where they differ (the mockup's square cover became full bleed). Pure ru
 - **Title row:** `FitWidthTitle(.playerTitle)` — 26 pt heavy SF Pro at the widest width that fits one line (expanded
   → compressed, then truncation), re-measured only when the song, width or text size changes; the artist at 18 pt
   medium (tap: artist / picker; long press: the primary artist); a 48 pt clear-glass Queue circle (`player.queue`)
-  where the like button was; the preparing chip before it.
+  where the like button was; while a song is prepared its icon gives way to a spinner (the title's width never
+  changes for it).
 - **Seek bar, quality label and transport:** unchanged (`PlayerSeekBar`, `AnimatedPlaybackControls`).
 - **Bottom split pills (`PlayerActionPills`):** the bar's pair at the player's bottom, 16 pt from the sides, 10 pt
   apart, 64 pt tall: a big clear-glass capsule with Shuffle · Repeat · Like (equal segments 5 pt in, 4 pt apart; an
   "on" segment sits in a tonal capsule — `primaryFixed` / `secondaryFixed` / `tertiaryFixed` at `prominent` — that
   fades and swells in; ids `player.shuffle` / `player.repeat` / `player.favorite`, selected trait) and a Lyrics circle
   (`player.lyrics`, opens the lyrics screen). The lyrics More sheet keeps `PlayerToggleRow`.
+- **Lyrics toolbar:** the lyrics themselves are unchanged; only the bottom toolbar takes the split pills — a big
+  clear-glass capsule with Translate · Sing · options (`Tokens.PlayerPills` metrics, the active segment in a tonal
+  accent capsule) and a Back circle where the player's Lyrics circle sits.
 - **Mini player:** floats as its own pill 12 pt above the bar (`Tokens.Shell.miniPlayerSpacing`, was 8), see-through
   (`GlassTint.miniPlayer` 0.34, was `container` 0.62). Play / pause shrinks to a 34 pt circle inside a 44 pt, 2.5 pt
   ring (`MiniPlayerProgressRing`: `onPrimaryContainer` 18 % track, `primary` arc from 12 o'clock, round cap). The ring

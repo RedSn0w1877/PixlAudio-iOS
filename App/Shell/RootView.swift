@@ -25,6 +25,10 @@ struct RootView: View {
     @Environment(SettingsStore.self) private var settings
     @Environment(\.colorScheme) private var colorScheme
     @State private var isKeyboardVisible = false
+    /// The keyboard on screen was raised by the bar's search field. Leaving Search drops the field's focus a moment
+    /// before the keyboard's hide notification; until then the bar keeps riding the keyboard and morphs back to the
+    /// tab segments in place (`SplitPillNav.showsBar`), instead of sliding out and back in.
+    @State private var searchFieldOwnsKeyboard = false
     /// The bar's search field has focus (Search tab). Owned here so leaving Search drops it explicitly.
     @FocusState private var isSearchFieldFocused: Bool
     /// Tabs whose stack exists. The selected tab is always built; the other two are built after launch has settled
@@ -111,12 +115,14 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             withAnimation(PixlMotion.bars) {
                 isKeyboardVisible = true
+                searchFieldOwnsKeyboard = isSearchFieldFocused
                 environment.playerSheet.hiddenForKeyboard = true
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
             withAnimation(PixlMotion.bars) {
                 isKeyboardVisible = false
+                searchFieldOwnsKeyboard = false
                 environment.playerSheet.hiddenForKeyboard = false
             }
         }
@@ -181,7 +187,8 @@ struct RootView: View {
             ? Tokens.Shell.miniPlayerHeight + Tokens.Shell.miniPlayerSpacing : 0
         // (Only the tab-root value uses it: pushed pages have no bar.)
         let barOverKeyboard = SplitPillNav.ridesKeyboard(atTabRoot: true, keyboardVisible: keyboard,
-                                                         onSearchTab: tab == .search)
+                                                         onSearchTab: tab == .search,
+                                                         searchFieldOwnsKeyboard: searchFieldOwnsKeyboard)
         let barHeight = GlassNavBar.height(compact: settings.appearance.navBarCompactMode, minimized: false)
         let bar: CGFloat = barOverKeyboard ? barHeight + Tokens.Shell.navKeyboardGap : keyboard ? 0 : barHeight
         return BottomBarsClearance(tabRoot: bar + miniPlayer, pushed: miniPlayer)
@@ -192,7 +199,8 @@ struct RootView: View {
         @Bindable var router = router
         let showsBar = SplitPillNav.showsBar(atTabRoot: router.isNavigationBarVisible,
                                              keyboardVisible: isKeyboardVisible,
-                                             onSearchTab: router.selection == .search)
+                                             onSearchTab: router.selection == .search,
+                                             searchFieldOwnsKeyboard: searchFieldOwnsKeyboard)
         VStack(spacing: Tokens.Shell.miniPlayerSpacing) {
             if playback.current != nil, !isKeyboardVisible {
                 // Stage 8: the player sheet draws the mini player here (and expands it from here).
