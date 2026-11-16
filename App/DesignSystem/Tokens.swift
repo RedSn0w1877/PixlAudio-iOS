@@ -86,6 +86,24 @@ nonisolated enum Tokens {
         static let iconSize: CGFloat = 21
     }
 
+    /// Page heroes (new UI, 2026-11-16, mockups `iOSArtist` / `iOSPlaylist`): the art fills the top edge to edge
+    /// (`ProgressiveBlurHero`, `HeroHeader.height`), the title block sits on its blurred bottom.
+    enum PageHero {
+        /// Width ÷ height on a portrait phone (390 pt → 424 pt: the mockup's 360 pt plus the status bar).
+        static let aspect: CGFloat = 0.92
+        static let sidePadding: CGFloat = 16
+        /// The pinned top bar under the status bar (the 40 pt back circle and the ⋯ menu, centred).
+        static let barHeight: CGFloat = 56
+        /// Play capsule and Shuffle circle.
+        static let actionHeight: CGFloat = 52
+        static let actionSpacing: CGFloat = 8
+        /// Album tiles in the horizontal shelf.
+        static let albumTile: CGFloat = 132
+        static let albumCorner: CGFloat = 18
+        static let albumSpacing: CGFloat = 12
+        static let sectionSpacing: CGFloat = 24
+    }
+
     /// Song list item (`EnhancedSongListItem`).
     enum SongCard {
         static let cornerRadius: CGFloat = 22

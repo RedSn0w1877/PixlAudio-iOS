@@ -44,6 +44,24 @@ final class LibraryScreenshotTests: XCTestCase {
     func testAlbumDetailDark() throws { try capture("albumDetail", "dark", ready: "screen.albumDetail") }
     func testArtistDetailLight() throws { try capture("artistDetail", "light", ready: "screen.artistDetail") }
     func testArtistDetailDark() throws { try capture("artistDetail", "dark", ready: "screen.artistDetail") }
+    /// New UI (stage 4): Play and Shuffle on the hero, then scrolled until the name has collapsed into the bar.
+    func testArtistDetailCollapsedDark() throws {
+        try capture("artistDetail", "dark", ready: "screen.artistDetail", suffix: "-collapsed") { app in
+            // By label: controls inside a glass container keep only their labels.
+            XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label == %@", "Play")).firstMatch
+                              .waitForExistence(timeout: 10), "Play is missing on the artist hero")
+            XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label == %@", "Shuffle play")).firstMatch
+                              .exists, "Shuffle is missing on the artist hero")
+            app.swipeUp()
+        }
+    }
+    /// The ⋯ menu: the artist image actions (Android's pencil) and Block artist.
+    func testArtistDetailMenuLight() throws {
+        try capture("artistDetail", "light", ready: "screen.artistDetail", tap: "More options", suffix: "-menu") { app in
+            XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Choose")).firstMatch
+                              .waitForExistence(timeout: 10), "the artist image action is missing from the menu")
+        }
+    }
     func testGenreDetailLight() throws { try capture("genreDetail", "light", ready: "screen.genreDetail") }
     func testGenreDetailDark() throws { try capture("genreDetail", "dark", ready: "screen.genreDetail") }
     func testGenreSortLight() throws { try capture("genreSort", "light", ready: "screen.genreDetail", tap: "Options") }

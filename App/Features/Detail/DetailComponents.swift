@@ -40,7 +40,8 @@ nonisolated struct CollapseMetrics: Sendable {
     static func lerp(_ a: CGFloat, _ b: CGFloat, _ t: CGFloat) -> CGFloat { a + (b - a) * t }
 }
 
-/// The Album / Artist header: the artwork filling 300 pt and fading out (by twice the collapse), the gradient into
+/// The Album header (the artist page moved to the new UI's full-bleed hero, `ProgressiveBlurHero`, on 2026-11-16):
+/// the artwork filling 300 pt and fading out (by twice the collapse), the gradient into
 /// `surface`, the status-bar scrim, the back circle, the title (30 → 18 pt semibold, 2 lines while mostly open,
 /// sliding from the bottom-left to the top bar), the subtitle (`labelLarge`), trailing actions, and the shuffle
 /// button (Android's large FAB → a 96 pt prominent glass circle) that rides from bottom to top while it fades out.

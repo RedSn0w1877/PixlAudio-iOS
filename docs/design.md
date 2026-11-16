@@ -275,6 +275,41 @@ mockups where they differ (the mockup's square cover became full bleed). Pure ru
   samples the clock on a `TimelineView` only while playing and on screen, as often as the arc's end moves about a point
   (`ProgressRing.tickInterval`, 0.25–2 s: ~1.3 s for a 3-minute song); paused it draws once (and again after a seek).
 
+### Artist page (new UI stage 4, 2026-11-16)
+
+Owner decisions on the approved `iOSArtist` mockup (they override it where they differ). Pure rules in PixlFoundation
+`HeroHeader` (tested): hero height, the title's collapse window, the overscroll / parallax response, the header and
+play-count texts.
+
+- **Hero (`ProgressiveBlurHero`, `HeroGradients.header`):** the artist image (else the first song's cover, else a
+  placeholder glyph) fills the top edge to edge, `HeroHeader.height`: width ÷ 0.92 on a portrait phone (390 → 424 pt,
+  the mockup's 360 pt plus the status bar), at most 60 % of the screen, at least 300 pt. Sharp at the top, blurred from
+  36 % down (one pre-blurred copy, `BlurredArtworkCache`), veiled with the page's `surface` to 55 % and melted into the
+  page from 78 %. A 32 % scrim sits behind the status bar and the bar. Pulled down, it stretches from its bottom edge by
+  exactly the pull; scrolled, it trails the page by 30 % (`visualEffect`, render phase, no state).
+- **Title block on the blurred part, 16 pt in:** the name in `FitWidthTitle(.artistHero)` — 46 pt black SF Pro at the
+  widest width that fits two lines (expanded → compressed), with a soft `surface` shadow; as it scrolls under the bar
+  it morphs narrower and lighter on three stops (`CollapsingTitleState`, fed by `trackingTitleCollapse`; the window
+  runs from 48 pt before the name reaches the bar until it is under it), and on the last stop the bar shows the
+  condensed name (`CollapsedBarTitle`) over a page-coloured fade. Then "N Songs · M Albums" (15 pt, 80 %) — the app has
+  no monthly listeners, so that line carries the counts. Then Play (a 52 pt prominent glass capsule tinted `primary`;
+  plays every song in order, turns shuffle off like the mixes' Play) and Shuffle (a 52 pt clear glass circle,
+  `detail.shuffle`), one `GlassEffectContainer`. **No Follow:** the app can read Spotify's followed artists but has no
+  way to follow or unfollow, so there is nothing to toggle.
+- **Bar (pinned):** back circle (`detail.back`), the collapsed name, the ⋯ menu (`artist.more`): Choose artist image /
+  Choose a new image (`artist.editImage`, the photo picker — Android's pencil), Remove custom image (when one is set),
+  Block / Unblock artist. The pencil circle and the image confirmation dialog are gone; their actions are in the menu.
+- **Most played** (the old section, the mockup's "Popular"): the artist's five most played songs as grouped
+  `SongCard`s with art; the second line is the play count ("12 plays", `HeroHeader.plays`) instead of the artist
+  (`SongCard.subtitle`). The play circle plays them. Hidden when nothing has been played.
+- **Albums:** a horizontal shelf of 132 pt covers (18 pt corners), title and year (else the song count); tap opens the
+  album (or plays it when the library has no album page for it), the context menu has Play and Go to album.
+- **All songs:** the page's original list, unchanged — one collapsible glass section per album, newest year first,
+  rows without art in the 50 % `surfaceContainerLow` group.
+- **Performance:** the page body re-renders only when the library, play counts or a measured height change; scrolling
+  re-renders only the name's morphing layer and the bar title, a few times per collapse; the hero's stretch and
+  parallax run in `visualEffect`.
+
 ## Screen map (Android → iOS)
 
 | Android screen / sheet | iOS route / presentation | View (file) | Stage |

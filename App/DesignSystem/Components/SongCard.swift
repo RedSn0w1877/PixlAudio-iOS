@@ -30,6 +30,9 @@ struct SongCard: View {
     var selectionIndex: Int?
     /// Long press (Android: starts / toggles multi-selection). Nil = no long-press action.
     var onLongPress: (() -> Void)?
+    /// The second line in place of the artist (the artist page's top songs show their play count: the artist is the
+    /// page's). Nil = the artist.
+    var subtitle: String?
 
     @Environment(\.appTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -65,7 +68,7 @@ struct SongCard: View {
                         .lineLimit(1)
                         .opacity(dim)
                     HStack(spacing: 6) {
-                        Text(song.displayArtist)
+                        Text(subtitle ?? song.displayArtist)
                             .pixlFont(.bodyMedium)
                             .opacity(0.7 * dim)
                             .lineLimit(1)

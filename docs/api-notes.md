@@ -1050,3 +1050,11 @@ Launch, library, artwork, player and Spotify-matcher speed-ups (docs/performance
 | `InsettableShape.inset(by:)` + `Shape.trim(from:to:)` + `stroke(_:style:)` | 13 | /documentation/swiftui/shape/trim(from:to:) | `MiniPlayerProgressRing` | The ring sits inside the 44 pt touch area; `rotationEffect(-90°)` starts it at 12 o'clock. |
 | `TimelineView(.animation(minimumInterval:paused:))` | 15 | /documentation/swiftui/timelineview | `MiniPlayerProgressRing` | Already in the ledger (seek bar); here the interval follows the song's length (`ProgressRing.tickInterval`). |
 | `View.accessibilitySortPriority(_:)` | 14 | /documentation/swiftui/view/accessibilitysortpriority(_:) | `NowPlayingView` | The top bar reads first although the hero comes first in the stack. |
+
+## Artist page (2026-11-16, branch `new-ui`, stage 4)
+| API | Min OS | Doc | Used in | Notes |
+|---|---|---|---|---|
+| `View.visualEffect(_:)` + `VisualEffect.scaleEffect(_:anchor:)` / `.offset(y:)` | 17 | /documentation/swiftui/view/visualeffect(_:) | `ArtistDetailView` (hero) | `visualEffect` + `offset` were already used (Mix headers); `scaleEffect(_:anchor: .bottom)` is new here: the overscroll stretch (PixlFoundation `HeroHeader.scrollEffect`), evaluated in the render phase, no state. |
+| `View.onGeometryChange(for:of:action:)` reading `size.height` | 16 | /documentation/swiftui/view/ongeometrychange(for:of:action:) | `ArtistDetailView` | Measures the hero title block and the name once per text / size (sizes don't change while scrolling) to place the collapse window (`HeroHeader.titleCollapse`). |
+| `View.background(alignment:content:)` drawn past the view with `offset` | 15 | /documentation/swiftui/view/background(alignment:content:) | `ArtistTopBar` | The page-coloured fade behind the pinned bar extends under the status bar (`offset(y: -safeTop)`); backgrounds aren't clipped. |
+| `View.contextMenu(menuItems:)` | 13 | /documentation/swiftui/view/contextmenu(menuitems:) | `ArtistAlbumTile` | Already used (Cloud queue); Play / Go to album on an album cover. |
