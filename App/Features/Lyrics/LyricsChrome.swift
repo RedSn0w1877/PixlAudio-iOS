@@ -71,10 +71,12 @@ enum LyricsChromeMetrics {
     /// The bottom scrim extends this far above the controls, up to this darkness.
     static let scrimExtra: CGFloat = 72
     static let scrimAlpha: Double = 0.38
-    static let playPauseSize: CGFloat = 78
+    /// Play/pause and the seek pill share the toolbar's 64 pt height (owner, 2026-11-16: a 78 pt square beside a 50 pt
+    /// pill read as a sizing error), so the controls are two even bands.
+    static let playPauseSize: CGFloat = Tokens.PlayerPills.height
     static let playingCorner: CGFloat = 18
-    static let pausedCorner: CGFloat = 39
-    static let seekBarHeight: CGFloat = 50
+    static let pausedCorner: CGFloat = Tokens.PlayerPills.height / 2
+    static let seekBarHeight: CGFloat = Tokens.PlayerPills.height
     /// A toolbar segment inside the big capsule (`Tokens.PlayerPills`: 64 pt capsule, 5 pt inset).
     static let toggleHeight: CGFloat = Tokens.PlayerPills.height - 2 * Tokens.PlayerPills.padding
 }
@@ -618,20 +620,17 @@ private struct LyricsSegmentLabel: View {
     var body: some View {
         let shape = LyricsSegmentGlass.shape
         let foreground = active ? chrome.onSelected : chrome.content
-        HStack(spacing: 6) {
-            if busy {
-                ProgressView()
-                    .controlSize(.small)
-                    .tint(foreground)
-            } else if let systemImage {
-                Image(systemName: systemImage)
-                    .font(.system(size: 15, weight: .semibold))
+        // Never wraps (owner, 2026-11-16: "Transla / te"): the widest face that fits one line — symbol and word, then
+        // the word alone, then the symbol alone (VoiceOver keeps the full label from `LyricsSegmentGlass`).
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 6) {
+                leading(foreground)
+                word
             }
-            Text(title)
-                .pixlFont(.bodyMedium, weight: .bold)
-                .lineLimit(2)
-                .minimumScaleFactor(0.85)
-                .multilineTextAlignment(.center)
+            word
+            if busy || systemImage != nil {
+                leading(foreground)
+            }
         }
         .foregroundStyle(foreground)
         .padding(.horizontal, 8)
@@ -649,6 +648,26 @@ private struct LyricsSegmentLabel: View {
         }
         .opacity(faded ? 0.5 : 1)
         .contentShape(shape)
+    }
+
+    /// The symbol, or the busy spinner in its place.
+    @ViewBuilder
+    private func leading(_ foreground: Color) -> some View {
+        if busy {
+            ProgressView()
+                .controlSize(.small)
+                .tint(foreground)
+        } else if let systemImage {
+            Image(systemName: systemImage)
+                .font(.system(size: 15, weight: .semibold))
+        }
+    }
+
+    private var word: some View {
+        Text(title)
+            .pixlFont(.bodyMedium, weight: .bold)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
     }
 }
 
