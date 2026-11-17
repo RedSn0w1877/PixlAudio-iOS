@@ -245,24 +245,30 @@ mockups where they differ (the mockup's square cover became full bleed). Pure ru
 
 - **Hero (`ProgressiveBlurHero`'s layers round the carousel; the artist and playlist pages use the view itself with
   `HeroGradients.header`):** the queue's covers fill the top edge to edge, sized to the screen rather than the cover
-  (`ProgressiveHero.playerLayout`: about three quarters of the screen, so the blurred copy is fully in where the title
-  starts; the sharp part is `blurEnd` of it and the square cover is scaled to fill it, cutting a little of its sides).
-  `AlbumCarousel(fullBleed: CarouselHero)`: no corners, no gaps, no shrink while paused; swipe, tap for the album,
-  double-tap to like and the long-press quick actions all stay. Sharp at the top; from 62 % of the hero (near the
-  screen's middle) one pre-blurred copy of the cover (`BlurredArtworkCache`, the blended-cover background's 128 px
-  Core Image blur, deduplicated in flight) fades in along a smoothstep mask and covers it from 82 % (where the sharp art
-  is cut by a plain clip, never masked); the copy is mirrored below the square to reach the hero's bottom. The
-  focused carousel page and its two neighbours carry their own copy (`HeroBlurredCopy`, flattened with `drawingGroup`),
-  so a swipe moves one melting picture; while the player is collapsed only the focused page does (no blur jobs or
-  flattened layers for prefetched pages or a hidden screen); the scroll view stays as tall as the sharp part (taps below it reach the background) and doesn't clip. One
-  static veil of the album's `primaryContainer` (`HeroVeil`) rises with the blur to 60 % so the title reads, and
-  everything melts out from 86 % into the card's fill and the ambient background, under the title and the seek bar. A
-  32 % black scrim behind the status bar and the top bar keeps the clear-glass chrome legible over bright art. Without
-  a copy (no art, not blurred yet, the blur failed) the page colour takes its place under the same mask, as a plain
-  masked fill outside the flattened layer (the album colour animates on every song change, and it must not redraw the
-  big texture). No live blur and no per-frame work: the gradients are static (`HeroGradients.player`). The carousel
-  style setting (peeks) can't apply to a full-bleed hero, so its Settings › Appearance row is gone (the value stays
-  stored for backups).
+  (`ProgressiveHero.playerLayout`: the blurred copy is fully in where the title starts, at 70 % of the hero, and the
+  hero runs on about 200 pt below it, to the transport — about 85 % of the screen; the sharp part is `blurEnd` of it
+  and the square cover is scaled to fill it, cutting a little of its sides). `AlbumCarousel(fullBleed: CarouselHero)`:
+  no corners, no gaps, no shrink while paused; swipe, tap for the album, double-tap to like and the long-press quick
+  actions all stay. Sharp at the top; from 54 % of the hero (near the screen's middle) one pre-blurred copy of the
+  cover (`BlurredArtworkCache`, the blended-cover background's 128 px Core Image blur, deduplicated in flight) fades in
+  along a smootherstep mask and covers it from 70 % (where the sharp art is cut by a plain clip, never masked); the
+  copy is mirrored below the square to reach the hero's bottom. Every carousel page — and so the scroll view — is as
+  tall as the whole hero: the sharp cover at its top (the only part that takes the page's taps) and, on the focused
+  page and its two neighbours, its own copy (`HeroBlurredCopy`, flattened with `drawingGroup`) down to the hero's
+  bottom, so a swipe moves one melting picture; while the player is collapsed only the focused page has one (no blur
+  jobs or flattened layers for prefetched pages or a hidden screen). Nothing of the hero is drawn outside its frame
+  (2026-11-16 fix: the copies used to overflow pages only as tall as the sharp part and were cut at their bottom edge,
+  a hard line right above the title). One static veil of the album's `primaryContainer` (`HeroVeil`) rises with the
+  blur to 45 % so the title reads, and from 75 % everything — copy, fallback and veil — melts along smootherstep to
+  exactly nothing at the hero's bottom edge (about 175 pt, under the title, the seek bar and the transport), so the hero
+  dissolves into the card's fill and whatever ambient background is on, with no line. A 32 % black scrim behind the
+  status bar and the top bar, eased to nothing, keeps the clear-glass chrome legible over bright art. Without a copy
+  (no art, not blurred yet, the blur failed) the page colour takes its place under the same mask, as a plain masked
+  fill outside the flattened layer (the album colour animates on every song change, and it must not redraw the big
+  texture). No live blur and no per-frame work: the gradients are static (`HeroGradients.player`, 16 stops per eased
+  band). The seams are tested in PixlFoundation (`ProgressiveHeroSeamTests`: every layer 0 at the bottom edge, the cut
+  only where the copy is opaque, no step in the composite). The carousel style setting (peeks) can't apply to a
+  full-bleed hero, so its Settings › Appearance row is gone (the value stays stored for backups).
 - **Top bar:** collapse circle; output pill joined to the ⋯ menu (`PlayerMoreMenu`, the queue pill's place and shape).
 - **⋯ menu (system liquid menu):** Listen — Spatial audio (opens the Spatial audio sheet; subtitle: the profile, or
   "… Not playing right now."), Sing (the lyrics screen's request: vocals off / on through the instrumental, subtitle
@@ -300,9 +306,9 @@ play-count texts.
 - **Hero (`ProgressiveBlurHero`, `HeroGradients.header`):** the artist image (else the first song's cover, else a
   placeholder glyph) fills the top edge to edge, `HeroHeader.height`: width ÷ 0.92 on a portrait phone (390 → 424 pt,
   the mockup's 360 pt plus the status bar), at most 60 % of the screen, at least 300 pt. Sharp at the top, blurred from
-  36 % down (one pre-blurred copy, `BlurredArtworkCache`), veiled with the page's `surface` to 55 % and melted into the
-  page from 78 %. A 32 % scrim sits behind the status bar and the bar. Pulled down, it stretches from its bottom edge by
-  exactly the pull; scrolled, it trails the page by 30 % (`visualEffect`, render phase, no state).
+  36 % down (one pre-blurred copy, `BlurredArtworkCache`), veiled with the page's `surface` to 45 % and melted into the
+  page from 78 % to nothing at its bottom edge (smootherstep). A 32 % scrim sits behind the status bar and the bar.
+  Pulled down, it stretches from its bottom edge by exactly the pull; scrolled, it trails the page by 30 % (`visualEffect`, render phase, no state).
 - **Title block on the blurred part, 16 pt in:** the name in `FitWidthTitle(.artistHero)` — 46 pt black SF Pro at the
   widest width that fits two lines (expanded → compressed), with a soft `surface` shadow; as it scrolls under the bar
   it morphs narrower and lighter on three stops (`CollapsingTitleState`, fed by `trackingTitleCollapse`; the window

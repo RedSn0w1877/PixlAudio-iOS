@@ -1,3 +1,4 @@
+import PixlFoundation
 import PixlModel
 import PixlNet
 import SwiftUI
@@ -5,10 +6,11 @@ import SwiftUI
 /// The full player (Android `FullPlayerContent`, portrait), drawn inside the player sheet's card
 /// (`PlayerSheetHost`) over the album's `primaryContainer`. New UI (owner decisions, 2026-11-16; mockup `iOSPlayer`):
 /// - the hero: the queue's covers fill the top edge to edge (the full-bleed `AlbumCarousel`, so swiping, tapping for
-///   the album, double-tap to like and the long-press quick actions all stay), about three quarters of the screen tall
+///   the album, double-tap to like and the long-press quick actions all stay), about 85 % of the screen tall
 ///   (`ProgressiveHero.playerLayout`): sharp at the top, progressively blurred from about halfway down the screen,
-///   fully blurred where the title starts, then melting into the album colour and the ambient background under the
-///   title and the seek bar (each page's pre-blurred copy behind a static mask, one static veil; no live blur);
+///   fully blurred where the title starts, then melting to nothing at the hero's bottom edge, under the seek bar and
+///   the transport, into the album colour and the ambient background (each page's pre-blurred copy behind a static
+///   mask, one static veil; no live blur);
 /// - over it, the top bar (64 pt): the collapse circle (42 pt), and on the right the output pill (the output's icon,
 ///   plus the device's name for any output other than this phone) joined to the ⋯ menu (`PlayerMoreMenu`: Spatial
 ///   audio, Sing, Ask Taizo and the song's actions), 6 pt apart;
@@ -106,7 +108,13 @@ struct NowPlayingView: View {
     /// The full-bleed hero: the queue's covers (swipe, tap for the album, double-tap to like, long press for the quick
     /// actions), each page with its own progressive blur, under one veil that melts into the album colour.
     private func hero(_ song: Song, isVisible: Bool) -> some View {
-        AlbumCarousel(queue: playback.queue, currentIndex: playback.currentIndex,
+        // The carousel is as tall as the whole hero; the heart pops in the middle of its sharp cover (the middle of the
+        // carousel while the width is unknown).
+        let sharp = ProgressiveHero.playerLayout(width: Double(width), screenHeight: Double(height),
+                                                 titleClearance: Double(Self.titleClearance + safeArea.bottom))
+            .sharpHeight
+        let heartHeight: CGFloat? = sharp > 0 ? CGFloat(sharp) : nil
+        return AlbumCarousel(queue: playback.queue, currentIndex: playback.currentIndex,
                       style: PlayerCarouselStyle(storageKey: settings.appearance.carouselStyle),
                       isPlaying: playback.isPlaying,
                       initialWidth: width,
@@ -120,7 +128,10 @@ struct NowPlayingView: View {
                                               isVisible: isVisible),
                       onSelect: { index in playback.skipToQueueItem(at: index) },
                       onAlbumTap: { tapped in openAlbum(tapped) })
-            .overlay { HeartBurst(trigger: burstCount, isLike: burstIsLike) }
+            .overlay(alignment: heartHeight == nil ? .center : .top) {
+                HeartBurst(trigger: burstCount, isLike: burstIsLike)
+                    .frame(height: heartHeight)
+            }
             .songQuickActions(song: song, isEnabled: settings.behavior.gesturePlayerArtworkLongPress)
             .pixlHaptic(.success, trigger: burstCount)
             .accessibilityActions {

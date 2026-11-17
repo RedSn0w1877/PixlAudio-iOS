@@ -16,6 +16,9 @@ import SwiftUI
 /// 3. `HeroVeil`: the page colour rising with the blur (melting with it), so text over the blurred part stays
 ///    legible, plus an optional dimming scrim behind the status bar and the glass chrome over the sharp top (clear
 ///    glass over bright art wants ~35 % dimming, docs/design.md).
+/// Every layer is laid out at the hero's full size and every mask is exactly 0 at its bottom edge, so the hero melts
+/// into whatever is behind it with no line: nothing of it may be drawn outside its frame, where a parent could cut it
+/// (the player's blurred copies once overflowed a carousel page only as tall as the sharp part and were cut there).
 /// The gradients are built once per profile (`HeroGradients`). The layers take no touches and are hidden from VoiceOver.
 struct ProgressiveBlurHero<Sharp: View>: View {
     let source: ArtworkSource?
@@ -173,8 +176,8 @@ struct HeroGradients {
     /// Artist and playlist headers.
     static let header = HeroGradients(profile: .header)
 
-    /// Behind the status bar and the chrome over the sharp top.
-    static let topScrim = Gradient(colors: [.black.opacity(0.32), .black.opacity(0)])
+    /// Behind the status bar and the chrome over the sharp top: 32 % black eased to nothing at its bottom edge.
+    static let topScrim = HeroGradients.alphaGradient(ProgressiveHero.topScrimMask(opacity: 0.32))
 
     private static func alphaGradient(_ stops: [ProgressiveHero.Stop]) -> Gradient {
         Gradient(stops: stops.map { Gradient.Stop(color: .black.opacity($0.opacity), location: CGFloat($0.location)) })
