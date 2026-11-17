@@ -10,8 +10,10 @@ import SwiftUI
 ///   (`ProgressiveBlurHero`, `HeroGradients.header`; the first song's cover when the artist has no image). Over its
 ///   blurred part: the name very large (`FitWidthTitle(.artistHero)`: SF Pro black at the widest width that fits two
 ///   lines, morphing narrower and lighter as it scrolls under the bar, where `CollapsedBarTitle` takes over), the song
-///   and album counts, and Play (prominent glass capsule) + Shuffle (glass circle). No listener counts or Follow: the
-///   app has neither.
+///   and album counts ("· Following" when the synced Spotify follows include the artist), and Play (prominent glass
+///   capsule) + Shuffle (glass circle). No listener counts (the app has none) and no Follow toggle yet: the follows
+///   are read-only (`user-follow-read`); writing one needs `user-follow-modify` (every account reconnects) and a
+///   Spotify artist id the library does not keep.
 /// - A pinned bar: back, the collapsed name, and the ⋯ menu (artist image: choose / remove — Android's pencil; Block /
 ///   Unblock).
 /// - "Most played" (play circle) with the artist's top five songs by play count, their counts as the second line;
@@ -123,6 +125,10 @@ private struct ArtistDetailContent: View {
     /// The ⋯ menu's "Choose artist image" (Android: the pencil opens the photo picker).
     @State private var showsPhotoPicker = false
     @State private var photoItem: PhotosPickerItem?
+    /// Whether the artist is among the Spotify follows of the last listening-history sync (read off the main thread).
+    @State private var isFollowedArtist = false
+    /// Width, top inset and viewport, measured on the first layout and only when they change (`HeroPageMetrics`).
+    @State private var metrics: HeroPageMetrics?
 
     private var content: ArtistContent {
         let counts = env.playCounts
@@ -141,16 +147,17 @@ private struct ArtistDetailContent: View {
     private var topSongs: [Song] { content.topSongs }
 
     var body: some View {
-        GeometryReader { proxy in
-            let safeTop = proxy.safeAreaInsets.top
-            let width = proxy.size.width
-            let viewport = proxy.size.height + safeTop + proxy.safeAreaInsets.bottom
-            let heroHeight = CGFloat(HeroHeader.height(width: Double(width), viewportHeight: Double(viewport),
-                                                       aspect: Double(Tokens.PageHero.aspect)))
-            ZStack(alignment: .top) {
-                theme.surface.ignoresSafeArea()
+        // Measured, not a `GeometryReader` round the page: a change of the bottom bars' clearance moves no metric
+        // here, so it doesn't rebuild the page (`HeroPageMetrics`).
+        ZStack(alignment: .top) {
+            theme.surface.ignoresSafeArea()
+            if let metrics {
+                let safeTop = metrics.safeTop
+                let heroHeight = CGFloat(HeroHeader.height(width: Double(metrics.width),
+                                                           viewportHeight: Double(metrics.viewport),
+                                                           aspect: Double(Tokens.PageHero.aspect)))
                 if let artist = library.artist(id: artistId) {
-                    page(artist, width: width, heroHeight: heroHeight, safeTop: safeTop)
+                    page(artist, width: metrics.width, heroHeight: heroHeight, safeTop: safeTop)
                     HeroTopBar(title: artist.name, titleState: titleState, safeTop: safeTop,
                                onBack: { router.pop() }) {
                         moreMenu(artist)
@@ -160,8 +167,18 @@ private struct ArtistDetailContent: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .measuringHeroPage($metrics)
         .task(id: env.home.history.revision) {
             await env.playCounts.refresh(editor: env.libraryEditor, revision: env.home.history.revision)
+        }
+        .task(id: env.importedHistory.revision) {
+            guard let name = library.artist(id: artistId)?.name else { return }
+            let followed = await env.importedHistory.spotifyTaste().followedArtists
+            let isFollowed = await Task.detached(priority: .utility) {
+                ImportedPlayIdentity.isFollowed(name, among: followed)
+            }.value
+            if isFollowedArtist != isFollowed { isFollowedArtist = isFollowed }
         }
         .photosPicker(isPresented: $showsPhotoPicker, selection: $photoItem, matching: .images)
         .onChange(of: photoItem) { _, item in
@@ -182,7 +199,7 @@ private struct ArtistDetailContent: View {
                 hero(artist, width: width, height: heroHeight, safeTop: safeTop)
                 if !topSongs.isEmpty {
                     sectionTitle("Most played") {
-                        if let first = topSongs.first { blocked.playTapped(first, in: topSongs, using: playback) }
+                        if let first = topSongs.first { playback.play(first, in: topSongs) }
                     }
                     ForEach(Array(topSongs.enumerated()), id: \.element.id) { index, song in
                         topSongRow(song, index: index)
@@ -248,7 +265,7 @@ private struct ArtistDetailContent: View {
 
     /// Over the blurred part (mockup `iOSArtist`): the name very large (SF Pro black at the widest width that fits two
     /// lines, morphing narrower and lighter as it scrolls under the bar), the song and album counts (the app has no
-    /// listener counts), then Play and Shuffle.
+    /// listener counts) with "Following" when followed on Spotify, then Play and Shuffle.
     private func heroOverlay(_ artist: Artist) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             FitWidthTitle(text: artist.name, face: .artistHero, narrowest: .compressed, lines: 2,
@@ -256,7 +273,7 @@ private struct ArtistDetailContent: View {
                 .foregroundStyle(theme.onSurface)
                 .shadow(color: theme.surface.opacity(0.35), radius: 7, y: 1)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height.rounded() } action: { titleHeight = $0 }
-            Text(HeroHeader.summary(songs: content.allSongs.count, albums: sections.count))
+            Text(HeroHeader.summary(songs: content.allSongs.count, albums: sections.count, following: isFollowedArtist))
                 .pixlFont(.custom(size: 15, weight: .light))
                 .foregroundStyle(theme.onSurface.opacity(0.8))
                 .lineLimit(1)
@@ -274,8 +291,14 @@ private struct ArtistDetailContent: View {
             HStack(spacing: Tokens.PageHero.actionSpacing) {
                 Button {
                     guard let first = allSongs.first else { return }
-                    blocked.playTapped(first, in: allSongs, using: playback)
-                    if playback.isShuffleEnabled { playback.setShuffleEnabled(false) }
+                    if blocked.isBlocked(first) {
+                        // "Play anyway?" decides; shuffle is left alone (a cancel must not have changed it).
+                        blocked.playTapped(first, in: allSongs, using: playback)
+                    } else {
+                        // In order, like the playlist page's Play: shuffle off only when playback starts.
+                        if playback.isShuffleEnabled { playback.setShuffleEnabled(false) }
+                        playback.play(first, in: allSongs)
+                    }
                 } label: {
                     HStack(spacing: 7) {
                         Image(systemName: "play.fill")

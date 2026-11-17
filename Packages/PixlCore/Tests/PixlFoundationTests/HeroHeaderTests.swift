@@ -63,6 +63,8 @@ import Testing
         #expect(HeroHeader.summary(songs: 1, albums: 1) == "1 Song · 1 Album")
         #expect(HeroHeader.summary(songs: 4, albums: 0) == "4 Songs")
         #expect(HeroHeader.summary(songs: -2, albums: 0) == "0 Songs")
+        #expect(HeroHeader.summary(songs: 12, albums: 3, following: true) == "12 Songs · 3 Albums · Following")
+        #expect(HeroHeader.summary(songs: 4, albums: 0, following: true) == "4 Songs · Following")
     }
 
     @Test func playsAreShortAndSingularAware() {

@@ -12,7 +12,9 @@ import SwiftUI
 ///
 /// New UI (2026-11-16): the bar floats above the split-pill nav as its own see-through pill (`GlassTint.miniPlayer`),
 /// and the song's progress is a thin ring round the play / pause circle (`MiniPlayerProgressRing`), not a line on the
-/// pill's edge. Only the ring updates while playing, on its own timeline; nothing else here updates per second.
+/// pill's edge. Only the ring updates while playing, on its own timeline; nothing else here updates per second. The
+/// ringed play / pause is a glyph on the pill's glass (`onPrimaryContainer` on a faint wash, mockup `iOSHome`), not a
+/// `primary` disc: the ring is the one `primary` mark there, so it reads as a thin circle round a glass button.
 struct MiniPlayerBar: View {
     let song: Song
     let isPlaying: Bool
@@ -75,7 +77,8 @@ struct MiniPlayerBar: View {
             // The ring's extra room either side sits inside the button's touch area (`hitWidth`), not as padding
             // outside it: a tap there used to fall through to the bar and open the full player.
             transportButton(isPlaying ? "pause.fill" : "play.fill", label: isPlaying ? "Pause" : "Play",
-                            fill: theme.primary, icon: theme.onPrimary, circleSize: m.playButtonSize,
+                            fill: theme.onPrimaryContainer.opacity(Self.playWashOpacity),
+                            icon: theme.onPrimaryContainer, circleSize: m.playButtonSize,
                             hitWidth: m.buttonHitSize + 2 * m.ringSpacing,
                             action: onPlayPause)
                 .accessibilityIdentifier("miniPlayer.playPause")
@@ -100,6 +103,9 @@ struct MiniPlayerBar: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("miniPlayer")
     }
+
+    /// The ringed play / pause's faint wash on the glass (enough to read as a button, not as a filled disc).
+    private static let playWashOpacity = 0.08
 
     /// How far a button's touch area reaches past its circle on each side.
     private static let hitInset = (Tokens.MiniPlayer.buttonHitSize - Tokens.MiniPlayer.buttonSize) / 2

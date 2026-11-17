@@ -40,6 +40,32 @@ nonisolated struct CollapseMetrics: Sendable {
     static func lerp(_ a: CGFloat, _ b: CGFloat, _ t: CGFloat) -> CGFloat { a + (b - a) * t }
 }
 
+/// What a full-bleed hero page (artist, playlist) lays out from, measured into `@State` with `onGeometryChange`
+/// rather than read in a `GeometryReader` round the page: the viewport (height plus both insets, whole points) stays
+/// the same when the keyboard or the bottom bars' clearance moves the bottom inset, so those frames run no body pass
+/// over the hero, the bar and the rows. Nil until the first layout measures it.
+nonisolated struct HeroPageMetrics: Equatable, Sendable {
+    var width: CGFloat
+    var safeTop: CGFloat
+    var viewport: CGFloat
+
+    init(width: CGFloat, safeTop: CGFloat, height: CGFloat, safeBottom: CGFloat) {
+        self.width = width
+        self.safeTop = safeTop
+        viewport = (height + safeTop + safeBottom).rounded()
+    }
+}
+
+extension View {
+    /// Measures `HeroPageMetrics` (see there) into `metrics`; the action runs only when they change.
+    func measuringHeroPage(_ metrics: Binding<HeroPageMetrics?>) -> some View {
+        onGeometryChange(for: HeroPageMetrics.self) { proxy in
+            HeroPageMetrics(width: proxy.size.width, safeTop: proxy.safeAreaInsets.top, height: proxy.size.height,
+                            safeBottom: proxy.safeAreaInsets.bottom)
+        } action: { metrics.wrappedValue = $0 }
+    }
+}
+
 /// The Album header (the artist page moved to the new UI's full-bleed hero, `ProgressiveBlurHero`, on 2026-11-16):
 /// the artwork filling 300 pt and fading out (by twice the collapse), the gradient into
 /// `surface`, the status-bar scrim, the back circle, the title (30 → 18 pt semibold, 2 lines while mostly open,

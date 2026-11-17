@@ -58,7 +58,7 @@ struct NowPlayingView: View {
         // The background never takes part in layout (a filled cover is wider than the screen); the hero sits at the
         // top, under the chrome, and the content stack sits over its blurred, melting bottom.
         return ZStack(alignment: .top) {
-            hero(song)
+            hero(song, isVisible: isVisible)
                 .playerSectionFade(start: 0.08)
             VStack(spacing: 0) {
                 PlayerTopBar(song: song)
@@ -105,7 +105,7 @@ struct NowPlayingView: View {
 
     /// The full-bleed hero: the queue's covers (swipe, tap for the album, double-tap to like, long press for the quick
     /// actions), each page with its own progressive blur, under one veil that melts into the album colour.
-    private func hero(_ song: Song) -> some View {
+    private func hero(_ song: Song, isVisible: Bool) -> some View {
         AlbumCarousel(queue: playback.queue, currentIndex: playback.currentIndex,
                       style: PlayerCarouselStyle(storageKey: settings.appearance.carouselStyle),
                       isPlaying: playback.isPlaying,
@@ -116,7 +116,8 @@ struct NowPlayingView: View {
                       fullBleed: CarouselHero(screenHeight: height,
                                               titleClearance: Self.titleClearance + safeArea.bottom,
                                               veil: theme.primaryContainer,
-                                              topScrimHeight: safeArea.top + 72),
+                                              topScrimHeight: safeArea.top + 72,
+                                              isVisible: isVisible),
                       onSelect: { index in playback.skipToQueueItem(at: index) },
                       onAlbumTap: { tapped in openAlbum(tapped) })
             .overlay { HeartBurst(trigger: burstCount, isLike: burstIsLike) }

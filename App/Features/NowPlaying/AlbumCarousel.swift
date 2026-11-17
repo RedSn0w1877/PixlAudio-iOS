@@ -41,9 +41,12 @@ nonisolated enum PlayerCarouselStyle: String, Sendable {
 ///
 /// `fullBleed` (new UI, 2026-11-16): the full player's hero. The covers fill the width edge to edge without corners or
 /// gaps, and stay full size while paused, each page sized by `ProgressiveHero.playerLayout` (the cover scaled to fill
-/// `width × sharpHeight`, so it reaches about halfway down the screen). Each page carries its own blurred copy
-/// (`HeroBlurredCopy`) running on below the carousel to the hero's bottom, so a swipe moves one melting picture; the
-/// veil and the top scrim (`HeroVeil`) are one static layer over the whole carousel. The scroll view stays as tall as
+/// `width × sharpHeight`, so it reaches about halfway down the screen). Each page near the focused one carries its own
+/// blurred copy (`HeroBlurredCopy`) running on below the carousel to the hero's bottom, so a swipe moves one melting
+/// picture; the veil and the top scrim (`HeroVeil`) are one static layer over the whole carousel. The copies are
+/// bounded: the focused page and its two neighbours while the player is shown (a swipe can only bring those in), the
+/// focused page alone while it is hidden (it is what the expand opens on), so prefetched pages and a collapsed
+/// player run no extra blur jobs or flattened layers. The scroll view stays as tall as
 /// the sharp part (taps under it still reach the player's background) and doesn't clip, so the copies show below it.
 /// Peeking neighbours can't show in a full-bleed hero, so the carousel style doesn't apply there.
 struct AlbumCarousel: View {
@@ -98,7 +101,7 @@ struct AlbumCarousel: View {
                 // Covers decode at their display size, so they wait for the measured width.
                 ForEach(width > 0 ? queue.indices : 0..<0, id: \.self) { index in
                     let song = queue[index]
-                    cover(song, size: max(singleStyle == .noPeek ? width : item, 1), hero: hero)
+                    cover(song, index: index, size: max(singleStyle == .noPeek ? width : item, 1), hero: hero)
                         .contentShape(.rect)
                         // Double-tap goes first, so the single tap (open the album) waits for it to fail.
                         .modifier(CarouselDoubleTap(action: index == (position ?? currentIndex) ? onDoubleTap : nil))
@@ -175,16 +178,19 @@ struct AlbumCarousel: View {
     /// One page: a rounded square cover, or (full bleed) the cover filling `width × sharpHeight` with its blurred copy
     /// running on below it to the hero's bottom (outside the page's frame and touches).
     @ViewBuilder
-    private func cover(_ song: Song, size: CGFloat, hero: ProgressiveHero.Layout?) -> some View {
+    private func cover(_ song: Song, index: Int, size: CGFloat, hero: ProgressiveHero.Layout?) -> some View {
         if let fullBleed, let hero {
             let sharp = max(CGFloat(hero.sharpHeight), 1)
+            let distance = abs(index - (position ?? currentIndex ?? 0))
             ArtworkView(song: song, size: max(width, sharp), cornerRadius: 0)
                 .frame(width: width, height: sharp)
                 .clipped()
                 .overlay(alignment: .top) {
-                    HeroBlurredCopy(source: ArtworkSource(song: song), gradients: .player, veil: fullBleed.veil,
-                                    width: width, sharpHeight: sharp,
-                                    heroHeight: max(CGFloat(hero.heroHeight), sharp))
+                    if distance <= (fullBleed.isVisible ? 1 : 0) {
+                        HeroBlurredCopy(source: ArtworkSource(song: song), gradients: .player, veil: fullBleed.veil,
+                                        width: width, sharpHeight: sharp,
+                                        heroHeight: max(CGFloat(hero.heroHeight), sharp))
+                    }
                 }
         } else {
             ArtworkView(song: song, size: size, cornerRadius: 18)
@@ -202,6 +208,8 @@ struct CarouselHero {
     var veil: Color
     /// The dimming scrim behind the status bar and the top bar.
     var topScrimHeight: CGFloat
+    /// Whether the player is on screen (not collapsed): only then do the focused page's neighbours carry blurred copies.
+    var isVisible = true
 }
 
 /// Double-tap on a cover (like / unlike) when the gesture is on; no gesture at all otherwise, so the single tap that

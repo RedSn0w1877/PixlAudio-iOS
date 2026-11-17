@@ -58,8 +58,11 @@ struct ProgressiveBlurHero<Sharp: View>: View {
 /// copy — no art, not blurred yet, or the blur failed — the page colour takes its place under the same mask, so the
 /// sharp art's cut edge never shows and a previous song's copy never lingers. A new source cross-fades in 0.3 s.
 ///
-/// Flattened (`drawingGroup`): the masked layer is drawn once into its own texture and then only moved — on the
+/// Flattened (`drawingGroup`): the masked copy is drawn once into its own texture and then only moved — on the
 /// player it rides a swiping carousel page and the sheet's expand / collapse, on the header pages the scroll stretch.
+/// Only the copy is flattened: the page-colour fallback animates with the album colour (the player's theme fades for
+/// 0.45 s per song), so it is a plain masked fill beside it, present only while there is no copy — a theme change
+/// never redraws the big flattened texture.
 struct HeroBlurredCopy: View {
     let source: ArtworkSource?
     let gradients: HeroGradients
@@ -83,7 +86,12 @@ struct HeroBlurredCopy: View {
         let side = CGFloat(copy.side)
         let top = CGFloat(copy.top)
         ZStack(alignment: .top) {
-            veil.opacity(blurred == nil ? 1 : 0)
+            if blurred == nil {
+                veil
+                    .frame(width: width, height: heroHeight)
+                    .mask { LinearGradient(gradient: gradients.blur, startPoint: .top, endPoint: .bottom) }
+                    .transition(.opacity)
+            }
             if let blurred {
                 ZStack(alignment: .top) {
                     Image(decorative: blurred.image.cgImage, scale: 1)
@@ -100,15 +108,13 @@ struct HeroBlurredCopy: View {
                 }
                 .frame(width: width, height: heroHeight, alignment: .top)
                 .clipped()
+                .mask { LinearGradient(gradient: gradients.blur, startPoint: .top, endPoint: .bottom) }
+                .drawingGroup()
                 .id(blurred.source)
                 .transition(.opacity)
             }
         }
         .frame(width: width, height: heroHeight, alignment: .top)
-        .mask {
-            LinearGradient(gradient: gradients.blur, startPoint: .top, endPoint: .bottom)
-        }
-        .drawingGroup()
         .allowsHitTesting(false)
         .accessibilityHidden(true)
         .task(id: source) { await load() }

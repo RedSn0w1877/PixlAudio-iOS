@@ -127,6 +127,15 @@ struct ListeningHistoryTests {
         #expect(ImportedPlayIdentity.primaryArtistKey("  THE  Weeknd ") == "the weeknd")
     }
 
+    @Test func followedArtistMatchesTheWholeNormalisedName() {
+        let followed = ["The Weeknd", "Simon & Garfunkel"]
+        #expect(ImportedPlayIdentity.isFollowed("  the  WEEKND ", among: followed))
+        #expect(ImportedPlayIdentity.isFollowed("Simon & Garfunkel", among: followed))
+        #expect(!ImportedPlayIdentity.isFollowed("Simon", among: followed))
+        #expect(!ImportedPlayIdentity.isFollowed("", among: [""]))
+        #expect(!ImportedPlayIdentity.isFollowed("Daft Punk", among: []))
+    }
+
     @Test func reimportingTheSameFileAddsNothing() throws {
         let name = "Streaming_History_Audio_2023-2024_0.json"
         let plays = ListeningHistoryParsers.parse(fileName: name, bytes: try fixture(name)).plays

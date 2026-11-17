@@ -121,6 +121,15 @@ public enum ImportedPlayIdentity {
         return String(n[..<cut]).kotlinTrimmed()
     }
 
+    /// Whether the library artist `artist` is among Spotify's followed artists (`followed`, as last synced): the whole
+    /// normalised name must match (a followed "Simon & Garfunkel" is not a follow of "Simon"). The artist page's
+    /// "Following" reads it.
+    public static func isFollowed(_ artist: String, among followed: [String]) -> Bool {
+        let key = MusicRecommendationEngine.normalize(artist)
+        guard !key.isEmpty else { return false }
+        return followed.contains { MusicRecommendationEngine.normalize($0) == key }
+    }
+
     /// `normalized title|primary artist`: how a play without a Spotify id finds its song.
     public static func nameKey(title: String, artist: String) -> String {
         "\(normalizedTitle(title))|\(primaryArtistKey(artist))"

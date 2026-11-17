@@ -70,12 +70,8 @@ struct AppearanceSettingsSection: View {
                                  selectedKey: playback.playerAmbientStyle, systemImage: "rectangle.on.rectangle") {
                     playback.playerAmbientStyle = $0
                 }
-                ThemeSelectorRow(label: L10n.settingsCarouselStyleTitle, description: L10n.settingsCarouselStyleSubtitle,
-                                 options: [SettingsOption(key: "no_peek", label: L10n.settingsCarouselNoPeek),
-                                           SettingsOption(key: "one_peek", label: L10n.settingsCarouselOnePeek)],
-                                 selectedKey: appearance.carouselStyle, systemImage: "square.stack") {
-                    appearance.carouselStyle = $0
-                }
+                // No "Carousel style" row: the new player's covers are always full bleed, where neighbours can't peek
+                // in (`AlbumCarousel.fullBleed`). `carouselStyle` stays stored for backups.
             }
             SettingsSubsection(title: L10n.settingsSectionHome) {
                 ThemeSelectorRow(label: L10n.settingsCollagePatternTitle,

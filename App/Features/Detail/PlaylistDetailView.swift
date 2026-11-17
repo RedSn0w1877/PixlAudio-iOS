@@ -63,6 +63,8 @@ private struct PlaylistDetailContent: View {
     /// they place the collapse window.
     @State private var overlayHeight: CGFloat = 0
     @State private var titleHeight: CGFloat = 0
+    /// Width, top inset and viewport, measured on the first layout and only when they change (`HeroPageMetrics`).
+    @State private var metrics: HeroPageMetrics?
 
     private var prefs: LibraryPreferences { LibraryPreferences.shared(isUITest: env.launch.isUITest) }
     /// The song picker always starts on all songs (every song is a Spotify song; there is no local/cloud split).
@@ -86,16 +88,17 @@ private struct PlaylistDetailContent: View {
 
     var body: some View {
         let playlist = self.playlist
-        GeometryReader { proxy in
-            let safeTop = proxy.safeAreaInsets.top
-            let width = proxy.size.width
-            let viewport = proxy.size.height + safeTop + proxy.safeAreaInsets.bottom
-            let heroHeight = CGFloat(HeroHeader.height(width: Double(width), viewportHeight: Double(viewport),
-                                                       aspect: Double(Tokens.PageHero.aspect)))
-            ZStack(alignment: .top) {
-                theme.surface.ignoresSafeArea()
+        // Measured, not a `GeometryReader` round the page: the keyboard (Find in playlist) moves no metric here, so
+        // its frames don't rebuild the hero and the rows (`HeroPageMetrics`).
+        ZStack(alignment: .top) {
+            theme.surface.ignoresSafeArea()
+            if let metrics {
+                let safeTop = metrics.safeTop
+                let heroHeight = CGFloat(HeroHeader.height(width: Double(metrics.width),
+                                                           viewportHeight: Double(metrics.viewport),
+                                                           aspect: Double(Tokens.PageHero.aspect)))
                 if let playlist {
-                    page(playlist, width: width, heroHeight: heroHeight, safeTop: safeTop)
+                    page(playlist, width: metrics.width, heroHeight: heroHeight, safeTop: safeTop)
                     topChrome(playlist, safeTop: safeTop)
                 } else {
                     VStack(spacing: 0) {
@@ -108,6 +111,8 @@ private struct PlaylistDetailContent: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .measuringHeroPage($metrics)
         .onChange(of: Inputs(songIds: playlist?.songIds ?? [], librarySongCount: library.songs.count, sort: sortOption),
                   initial: true) { _, inputs in
             songs = orderedSongs(inputs)

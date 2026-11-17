@@ -75,10 +75,11 @@ public enum HeroHeader {
     }
 
     /// The header line under a page title: "12 Songs · 3 Albums" (the app's "N Songs" wording; a zero album count is
-    /// left out, singulars are singular).
-    public static func summary(songs: Int, albums: Int) -> String {
+    /// left out, singulars are singular), then "Following" when the person follows the artist on Spotify.
+    public static func summary(songs: Int, albums: Int, following: Bool = false) -> String {
         var parts = [songs == 1 ? "1 Song" : "\(max(0, songs)) Songs"]
         if albums > 0 { parts.append(albums == 1 ? "1 Album" : "\(albums) Albums") }
+        if following { parts.append("Following") }
         return parts.joined(separator: " · ")
     }
 

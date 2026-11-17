@@ -251,15 +251,18 @@ mockups where they differ (the mockup's square cover became full bleed). Pure ru
   double-tap to like and the long-press quick actions all stay. Sharp at the top; from 62 % of the hero (near the
   screen's middle) one pre-blurred copy of the cover (`BlurredArtworkCache`, the blended-cover background's 128 px
   Core Image blur, deduplicated in flight) fades in along a smoothstep mask and covers it from 82 % (where the sharp art
-  is cut by a plain clip, never masked); the copy is mirrored below the square to reach the hero's bottom. Each
-  carousel page carries its own copy (`HeroBlurredCopy`, flattened with `drawingGroup`), so a swipe moves one melting
-  picture; the scroll view stays as tall as the sharp part (taps below it reach the background) and doesn't clip. One
+  is cut by a plain clip, never masked); the copy is mirrored below the square to reach the hero's bottom. The
+  focused carousel page and its two neighbours carry their own copy (`HeroBlurredCopy`, flattened with `drawingGroup`),
+  so a swipe moves one melting picture; while the player is collapsed only the focused page does (no blur jobs or
+  flattened layers for prefetched pages or a hidden screen); the scroll view stays as tall as the sharp part (taps below it reach the background) and doesn't clip. One
   static veil of the album's `primaryContainer` (`HeroVeil`) rises with the blur to 60 % so the title reads, and
   everything melts out from 86 % into the card's fill and the ambient background, under the title and the seek bar. A
   32 % black scrim behind the status bar and the top bar keeps the clear-glass chrome legible over bright art. Without
-  a copy (no art, not blurred yet, the blur failed) the page colour takes its place under the same mask. No live blur
-  and no per-frame work: the gradients are static (`HeroGradients.player`). The carousel style setting (peeks) doesn't
-  apply to the full-bleed hero.
+  a copy (no art, not blurred yet, the blur failed) the page colour takes its place under the same mask, as a plain
+  masked fill outside the flattened layer (the album colour animates on every song change, and it must not redraw the
+  big texture). No live blur and no per-frame work: the gradients are static (`HeroGradients.player`). The carousel
+  style setting (peeks) can't apply to a full-bleed hero, so its Settings › Appearance row is gone (the value stays
+  stored for backups).
 - **Top bar:** collapse circle; output pill joined to the ⋯ menu (`PlayerMoreMenu`, the queue pill's place and shape).
 - **⋯ menu (system liquid menu):** Listen — Spatial audio (opens the Spatial audio sheet; subtitle: the profile, or
   "… Not playing right now."), Sing (the lyrics screen's request: vocals off / on through the instrumental, subtitle
@@ -281,8 +284,10 @@ mockups where they differ (the mockup's square cover became full bleed). Pure ru
   clear-glass capsule with Translate · Sing · options (`Tokens.PlayerPills` metrics, the active segment in a tonal
   accent capsule) and a Back circle where the player's Lyrics circle sits.
 - **Mini player:** floats as its own pill 12 pt above the bar (`Tokens.Shell.miniPlayerSpacing`, was 8), see-through
-  (`GlassTint.miniPlayer` 0.34, was `container` 0.62). Play / pause shrinks to a 34 pt circle inside a 44 pt, 2.5 pt
-  ring (`MiniPlayerProgressRing`: `onPrimaryContainer` 18 % track, `primary` arc from 12 o'clock, round cap). The ring
+  (`GlassTint.miniPlayer` 0.34, was `container` 0.62). Play / pause shrinks to a 34 pt glyph button on the pill's glass
+  (`onPrimaryContainer` glyph on an 8 % wash of it, not a `primary` disc: the mockup's bare glyph) inside a 44 pt,
+  2.5 pt ring (`MiniPlayerProgressRing`: `onPrimaryContainer` 18 % track, `primary` arc from 12 o'clock, round cap), so
+  the ring is the one `primary` mark there. Previous and next keep their fills. The ring
   samples the clock on a `TimelineView` only while playing and on screen, as often as the arc's end moves about a point
   (`ProgressRing.tickInterval`, 0.25–2 s: ~1.3 s for a 3-minute song); paused it draws once (and again after a seek).
 
@@ -303,10 +308,13 @@ play-count texts.
   it morphs narrower and lighter on three stops (`CollapsingTitleState`, fed by `trackingTitleCollapse`; the window
   runs from 48 pt before the name reaches the bar until it is under it), and on the last stop the bar shows the
   condensed name (`CollapsedBarTitle`) over a page-coloured fade. Then "N Songs · M Albums" (15 pt, 80 %) — the app has
-  no monthly listeners, so that line carries the counts. Then Play (a 52 pt prominent glass capsule tinted `primary`;
-  plays every song in order, turns shuffle off like the mixes' Play) and Shuffle (a 52 pt clear glass circle,
-  `detail.shuffle`), one `GlassEffectContainer`. **No Follow:** the app can read Spotify's followed artists but has no
-  way to follow or unfollow, so there is nothing to toggle.
+  no monthly listeners, so that line carries the counts — ending in "· Following" when the last listening-history
+  sync's Spotify follows include the artist (`ImportedPlayIdentity.isFollowed`, whole normalised name). Then Play (a
+  52 pt prominent glass capsule tinted `primary`; plays every song in order and turns shuffle off when playback starts,
+  like the playlist's Play — a blocked artist's page asks "Play anyway?" first and leaves shuffle alone) and Shuffle (a
+  52 pt clear glass circle, `detail.shuffle`), one `GlassEffectContainer`. **No Follow toggle yet (needs the owner):**
+  the follows are read-only (`user-follow-read`); following or unfollowing needs the `user-follow-modify` scope (every
+  linked account reconnects once) and a Spotify artist id, which library artists don't keep.
 - **Bar (pinned):** back circle (`detail.back`), the collapsed name, the ⋯ menu (`artist.more`): Choose artist image /
   Choose a new image (`artist.editImage`, the photo picker — Android's pencil), Remove custom image (when one is set),
   Block / Unblock artist. The pencil circle and the image confirmation dialog are gone; their actions are in the menu.
