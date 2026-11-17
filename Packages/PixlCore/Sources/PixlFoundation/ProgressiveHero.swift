@@ -195,6 +195,22 @@ public enum ProgressiveHero {
         return Layers(sharp: location < clip ? 1 : 0, copy: value(copy, at: location), veil: value(veil, at: location))
     }
 
+    /// Swapping the blurred copy (a new source, the copy arriving over the page-colour fallback, or giving way to it),
+    /// in seconds: the incoming layer fades in over `swapFade` while the outgoing one stays opaque under or over it,
+    /// and only then fades out for as long. A plain cross-fade (both at once) covers only `1 − p(1 − p)` of the band
+    /// where the copy is opaque — 75 % half way — so for its 0.3 s the sharp art's cut and the background below it
+    /// showed through as a line.
+    public static let swapFade = 0.3
+
+    /// The incoming and outgoing layers' opacities `time` seconds into a swap (linear progress; the app eases each
+    /// fade, which keeps where they start and end). At every moment one of them is opaque.
+    public static func swapOpacities(at time: Double, fade: Double = swapFade) -> (incoming: Double, outgoing: Double) {
+        guard fade > 0 else { return (1, 0) }
+        let incoming = min(max(time / fade, 0), 1)
+        let outgoing = 1 - min(max((time - fade) / fade, 0), 1)
+        return (incoming, outgoing)
+    }
+
     /// The full player's hero, in points.
     public struct Layout: Sendable, Equatable {
         /// From the screen's top to where the hero has melted away: the height of every carousel page and of every

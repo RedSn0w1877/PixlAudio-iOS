@@ -59,7 +59,10 @@ struct ProgressiveBlurHero<Sharp: View>: View {
 /// background), lined up with the sharp art (`ProgressiveHero.copyLayout`: the same square, scaled to fill the sharp
 /// part, and mirrored below it when the hero runs on past it), under one static mask (blur ramp × melt). Without a
 /// copy — no art, not blurred yet, or the blur failed — the page colour takes its place under the same mask, so the
-/// sharp art's cut edge never shows and a previous song's copy never lingers. A new source cross-fades in 0.3 s.
+/// sharp art's cut edge never shows and a previous song's copy never lingers. A swap (a new source, the copy arriving
+/// over the fallback or giving way to it) never dips: the incoming layer fades in over 0.3 s while the outgoing one
+/// stays opaque, then the outgoing one fades (`ProgressiveHero.swapOpacities`) — a plain cross-fade left the opaque
+/// band 75 % covered half way, showing the sharp art's cut as a line for 0.3 s.
 ///
 /// Flattened (`drawingGroup`): the masked copy is drawn once into its own texture and then only moved — on the
 /// player it rides a swiping carousel page and the sheet's expand / collapse, on the header pages the scroll stretch.
@@ -83,6 +86,14 @@ struct HeroBlurredCopy: View {
 
     @State private var blurred: Blurred?
 
+    /// In over 0.3 s; out only after that, over 0.3 s (`ProgressiveHero.swapOpacities`): whichever layer is on top,
+    /// the other is opaque while it is part-way, so the band where the copy is opaque stays covered throughout.
+    private static var swap: AnyTransition {
+        let fade = ProgressiveHero.swapFade
+        return .asymmetric(insertion: .opacity.animation(.easeOut(duration: fade)),
+                           removal: .opacity.animation(.easeOut(duration: fade).delay(fade)))
+    }
+
     var body: some View {
         let copy = ProgressiveHero.copyLayout(width: Double(width), sharpHeight: Double(sharpHeight),
                                               heroHeight: Double(heroHeight))
@@ -93,7 +104,7 @@ struct HeroBlurredCopy: View {
                 veil
                     .frame(width: width, height: heroHeight)
                     .mask { LinearGradient(gradient: gradients.blur, startPoint: .top, endPoint: .bottom) }
-                    .transition(.opacity)
+                    .transition(Self.swap)
             }
             if let blurred {
                 ZStack(alignment: .top) {
@@ -114,7 +125,7 @@ struct HeroBlurredCopy: View {
                 .mask { LinearGradient(gradient: gradients.blur, startPoint: .top, endPoint: .bottom) }
                 .drawingGroup()
                 .id(blurred.source)
-                .transition(.opacity)
+                .transition(Self.swap)
             }
         }
         .frame(width: width, height: heroHeight, alignment: .top)

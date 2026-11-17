@@ -43,7 +43,8 @@ nonisolated enum PlayerCarouselStyle: String, Sendable {
 /// gaps, and stay full size while paused, each page sized by `ProgressiveHero.playerLayout` (the cover scaled to fill
 /// `width × sharpHeight`, so it reaches about halfway down the screen). Each page is as tall as the whole hero: the
 /// sharp cover at its top and, on pages near the focused one, its own blurred copy (`HeroBlurredCopy`) down to the
-/// hero's bottom, so a swipe moves one melting picture; the veil and the top scrim (`HeroVeil`) are one static layer
+/// hero's bottom, so a swipe moves one melting picture (pages further away carry the copy's page-colour fallback, so
+/// no page ever shows the sharp cover's cut); the veil and the top scrim (`HeroVeil`) are one static layer
 /// over the whole carousel. Nothing is drawn outside a page or the scroll view: a copy that overflowed a page only as
 /// tall as the sharp part was cut at its bottom edge (a hard line right above the title, 2026-11-16), whatever
 /// `scrollClipDisabled` said. Only the sharp cover takes the page's taps (album, double-tap to like); the copy takes
@@ -185,10 +186,13 @@ struct AlbumCarousel: View {
                               .frame(width: width, height: sharp)
                               .clipped(),
                           song: song, index: index)
-                if distance <= (fullBleed.isVisible ? 1 : 0) {
-                    HeroBlurredCopy(source: ArtworkSource(song: song), gradients: .player, veil: fullBleed.veil,
-                                    width: width, sharpHeight: sharp, heroHeight: heroHeight)
-                }
+                // Every page has the layer, so the sharp cover's cut is always under something opaque; only pages near
+                // the focused one get the blurred copy, the others its page-colour fallback (a source of nil: no blur
+                // job, no flattened layer). A jump of several songs scrolls past those, and the page it leaves loses
+                // its copy as the scroll starts: with no layer at all, each showed the cut as a hard line.
+                HeroBlurredCopy(source: distance <= (fullBleed.isVisible ? 1 : 0) ? ArtworkSource(song: song) : nil,
+                                gradients: .player, veil: fullBleed.veil,
+                                width: width, sharpHeight: sharp, heroHeight: heroHeight)
             }
             .frame(width: width, height: heroHeight, alignment: .top)
         } else {

@@ -265,7 +265,10 @@ mockups where they differ (the mockup's square cover became full bleed). Pure ru
   status bar and the top bar, eased to nothing, keeps the clear-glass chrome legible over bright art. Without a copy
   (no art, not blurred yet, the blur failed) the page colour takes its place under the same mask, as a plain masked
   fill outside the flattened layer (the album colour animates on every song change, and it must not redraw the big
-  texture). No live blur and no per-frame work: the gradients are static (`HeroGradients.player`, 16 stops per eased
+  texture); pages further from the focused one carry that fallback too, so a jump across several songs never scrolls a
+  bare cut past. A swap (new copy, copy ↔ fallback) fades the incoming layer in over 0.3 s while the outgoing one stays
+  opaque, then fades that out (`ProgressiveHero.swapOpacities`): a plain cross-fade left the opaque band 75 % covered
+  half way and showed the cut for 0.3 s. No live blur and no per-frame work: the gradients are static (`HeroGradients.player`, 16 stops per eased
   band). The seams are tested in PixlFoundation (`ProgressiveHeroSeamTests`: every layer 0 at the bottom edge, the cut
   only where the copy is opaque, no step in the composite). The carousel style setting (peeks) can't apply to a
   full-bleed hero, so its Settings › Appearance row is gone (the value stays stored for backups).

@@ -341,6 +341,30 @@ import Testing
         }
     }
 
+    @Test func swappingTheCopyNeverUncoversTheCut() {
+        // Where the copy is opaque (blurEnd … meltStart, the sharp art's cut among it) two copies — or a copy and the
+        // page-colour fallback — are swapped. The coverage there must stay whole all through the swap, else the cut
+        // shows: a plain cross-fade dips to 75 % half way.
+        let fade = ProgressiveHero.swapFade
+        #expect(fade > 0)
+        var worst = 1.0
+        for i in 0 ... 600 {
+            let time = 2.4 * fade * Double(i) / 600 - 0.2 * fade
+            let (incoming, outgoing) = ProgressiveHero.swapOpacities(at: time)
+            #expect((0 ... 1).contains(incoming) && (0 ... 1).contains(outgoing))
+            worst = min(worst, 1 - (1 - incoming) * (1 - outgoing))
+        }
+        #expect(worst > 1 - 1e-12, "coverage fell to \(worst) mid-swap")
+        // It begins with the outgoing layer alone and ends with the incoming one alone (no copy left behind), and the
+        // incoming one is fully in before the outgoing one starts to go.
+        let start = ProgressiveHero.swapOpacities(at: 0)
+        #expect(start.incoming == 0 && start.outgoing == 1)
+        let end = ProgressiveHero.swapOpacities(at: 2 * fade)
+        #expect(end.incoming == 1 && end.outgoing == 0)
+        let handover = ProgressiveHero.swapOpacities(at: fade)
+        #expect(handover.incoming == 1 && handover.outgoing == 1)
+    }
+
     @Test func compositeModelMatchesTheStack() {
         let layers = ProgressiveHero.Layers(sharp: 0, copy: 0.5, veil: 0.5)
         #expect(layers.coverage == 0.75)
