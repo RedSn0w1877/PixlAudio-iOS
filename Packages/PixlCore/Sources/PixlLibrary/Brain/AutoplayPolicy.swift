@@ -39,7 +39,7 @@ public enum AutoplayPolicy {
         case off
         /// Repeat-one or repeat-all is on: the queue already never ends.
         case repeating
-        /// Spotify Connect plays: autoplay is off during remote sessions in stage 1.
+        /// The output cannot take the engine's picks: see `remoteRule`.
         case remote
         /// A saved queue is being restored; its own engine items come back with it.
         case restoring

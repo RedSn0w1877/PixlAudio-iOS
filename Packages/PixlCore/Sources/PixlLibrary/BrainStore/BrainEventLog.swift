@@ -89,6 +89,22 @@ public final class BrainEventLog {
         return eventFile.put(records) ? records.count : 0
     }
 
+    /// The events that started at or after `sinceMs`, oldest first. An event id is `(startedAtMs << 16) | seq`, so the
+    /// keys say which events are wanted and only those are read: the refresh and the mixes look at the last weeks,
+    /// never at the whole log.
+    public func events(startedSince sinceMs: Int64) -> [PlayEvent] {
+        openEvents()
+        let floor = sinceMs &<< 16
+        var out: [PlayEvent] = []
+        for key in eventFile.keys {
+            guard let id = Int64(key), id >= floor, let payload = eventFile.payload(for: key),
+                  let event = PlayEvent.decode(String(decoding: payload, as: UTF8.self)) else { continue }
+            out.append(event)
+        }
+        out.sort { $0.eventId < $1.eventId }
+        return out
+    }
+
     /// Every stored event in ascending `eventId`: the order a replay is defined on. Reads the whole file.
     public func allEvents() -> [PlayEvent] {
         var out: [PlayEvent] = []

@@ -434,6 +434,43 @@ public actor BrainEngine {
         return scored.prefix(limit).map(\.index)
     }
 
+    // MARK: Mixes (8.2) and the refresh (3.6, 3.7)
+
+    /// How many different tracks the listener has played: what `BrainEngineChoice.hasState` reads. Loads the state on
+    /// first use, which is why the callers wait until the app has started.
+    public func heardTrackCount() -> Int {
+        ensureLoaded()
+        return loaded!.affinity.size(Family.track)
+    }
+
+    public func hasState() -> Bool { BrainEngineChoice.hasState(heardTracks: heardTrackCount()) }
+
+    /// Reads the affinity tables for one synchronous step; nothing is changed.
+    public func readAffinity<T: Sendable>(_ body: @Sendable (Affinity.State) -> T) -> T {
+        ensureLoaded()
+        return body(loaded!.affinity)
+    }
+
+    /// Plans a Daily Mix or Your Mix on the brain's state. Against a FRESH session (a skip a minute ago does not
+    /// reshuffle a mix that was built this morning) and nothing is consumed: a mix is not part of the listening session.
+    public func planMix(_ request: MixPlanner.Request) -> StationPlanner.Plan {
+        ensureLoaded()
+        return MixPlanner.plan(request, affinity: loaded!.affinity)
+    }
+
+    /// The events that started at or after `sinceMs`, oldest first (the seeds of the refresh read the last weeks).
+    public func recentEvents(sinceMs: Int64) -> [PlayEvent] { log.events(startedSince: sinceMs) }
+
+    /// The install's random salt: lists differ between listeners. Made once and kept.
+    public func salt() -> Int64 {
+        if let text = log.value(Self.saltKey), let value = Int64(text) { return value }
+        let fresh = Int64.random(in: Int64.min...Int64.max)
+        log.setValue(Self.saltKey, String(fresh))
+        return fresh
+    }
+
+    static let saltKey = "salt"
+
     // MARK: Rebuild (4.4)
 
     /// Asks for a rebuild in the background. Without `force` it only runs when one is needed.
@@ -625,6 +662,8 @@ public actor BrainEngine {
         return loaded!.session
     }
     public func storedValue(_ name: String) -> String? { log.value(name) }
+    /// Stores a small named value (`brain_state`); nil removes it.
+    public func setStoredValue(_ name: String, _ value: String?) { log.setValue(name, value) }
 }
 
 /// The play in flight as one line of canonical JSON (`brain_state` value `open_play`).

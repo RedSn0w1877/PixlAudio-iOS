@@ -82,6 +82,8 @@ public final class BrainTables {
     private let radioListFile: KeyedLogStore
     private let radioRowsFile: KeyedLogStore
     private let playableFile: KeyedLogStore
+    /// `graph_edge.pbl` (stage 2a): the radio lists as edges of the similarity graph.
+    public let edges: GraphEdgeStore
 
     private var identityLoaded = false
     private var trackAlias: [BrainKey: (rid: Int64, durationMs: Int32)] = [:]
@@ -111,6 +113,7 @@ public final class BrainTables {
         radioListFile = file("radio_list.pbl")
         radioRowsFile = file("radio_rows.pbl")
         playableFile = file("playable.pbl")
+        edges = GraphEdgeStore(directory: directory, compactionFloorBytes: compactionFloorBytes)
     }
 
     // MARK: Identity (3.1)
@@ -293,6 +296,17 @@ public final class BrainTables {
         var count = 0
         for facts in radioFacts.values where facts.fetchedAt >= sinceMs { count += 1 }
         return count
+    }
+
+    /// The facts of every healthy list, in a fixed order (seed, kind, chip): what the one-time conversion into edges
+    /// walks.
+    public func healthyRadioFacts() -> [RadioListFacts] {
+        loadRadios()
+        return radioFacts.values.filter(\.healthy).sorted { a, b in
+            if a.seedRid != b.seedRid { return a.seedRid < b.seedRid }
+            if a.kind != b.kind { return a.kind < b.kind }
+            return a.chip.utf8.lexicographicallyPrecedes(b.chip.utf8)
+        }
     }
 
     public var radioCount: Int {

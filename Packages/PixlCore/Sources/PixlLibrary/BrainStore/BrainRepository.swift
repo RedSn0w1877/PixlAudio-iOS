@@ -321,8 +321,57 @@ public actor BrainRepository {
         }
         tables.upsertRadio(RadioList(seedRid: seedRid, kind: kind, chip: chip, fetchedAt: now, lastUsedAt: now,
                                      healthy: true, rows: stored, chips: chips))
+        // An artist station's list is the artist's top songs, not a ranking by closeness to the seed: it is not an
+        // edge of the graph. Every other stored radio also becomes edges (3.6).
+        if !BrainKey.sameBytes(chip, Self.artistStationChip) {
+            tables.edges.record(seedRid: seedRid, kind: kind, rids: stored.map(\.rid), nowMs: now)
+        }
         return StoredRadio(seedRid: seedRid, kind: kind, rows: stored, fromCache: false)
     }
+
+    // MARK: What a mix reads (8.2, stage 2a): the cache and the graph, never the network
+
+    /// The list a mix reads for the library track `seedRid`: what the cache holds, however old. A song radio is
+    /// preferred over the Related tab; nil when neither is stored healthy with rows in it.
+    public func cachedRadio(seedRid: Int64) -> StoredRadio? {
+        for kind in [RadioList.kindSong, RadioList.kindRelated] {
+            guard let facts = tables.radioFacts(seedRid: seedRid, kind: kind, chip: ""), facts.healthy else { continue }
+            let rows = tables.radioRows(seedRid: seedRid, kind: kind, chip: "")
+            if !rows.isEmpty { return StoredRadio(seedRid: seedRid, kind: kind, rows: rows, fromCache: true) }
+        }
+        return nil
+    }
+
+    /// The artist top songs and radio the artist station of `seedRid` cached, however old; empty when none.
+    public func cachedArtistRadio(seedRid: Int64) -> [StoredRadioRow] {
+        let chip = Self.artistStationChip
+        guard let facts = tables.radioFacts(seedRid: seedRid, kind: RadioList.kindArtist, chip: chip), facts.healthy else { return [] }
+        return tables.radioRows(seedRid: seedRid, kind: RadioList.kindArtist, chip: chip)
+    }
+
+    /// How many lists were fetched at or after `sinceMs`: the daily request budget the foreground and the refresh share.
+    public func radiosFetchedSince(_ sinceMs: Int64) -> Int { tables.radiosFetchedSince(sinceMs) }
+
+    /// The stored edges that touch any of `nodes` (3.6).
+    public func edgesFor(_ nodes: [Int64]) -> [MixPlanner.Edge] { tables.edges.edgesFor(nodes) }
+
+    /// Converts every healthy list in the cache into edges, once. Safe to call again: it does nothing after the first
+    /// run. The conversion keeps the age of the list it came from, so its edges expire with it.
+    public func backfillEdgesOnce(nowMs: Int64? = nil) {
+        if tables.edges.isBackfilled { return }
+        let now = nowMs ?? clock()
+        for facts in tables.healthyRadioFacts() where !BrainKey.sameBytes(facts.chip, Self.artistStationChip) {
+            let rids = tables.radioRows(seedRid: facts.seedRid, kind: facts.kind, chip: facts.chip).map(\.rid)
+            tables.edges.record(seedRid: facts.seedRid, kind: facts.kind, rids: rids, nowMs: min(facts.fetchedAt, now))
+        }
+        tables.edges.markBackfilled(nowMs: now)
+    }
+
+    /// Drops the edges of lists fetched more than 30 days ago.
+    @discardableResult
+    public func pruneEdges(nowMs: Int64? = nil) -> Int { tables.edges.prune(nowMs: nowMs ?? clock()) }
+
+    public func edgeCount() -> Int { tables.edges.count }
 
     // MARK: Playable (7.2)
 
