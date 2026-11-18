@@ -688,3 +688,205 @@ playing, from the player's ⋯; open an artist and start a station from its ⋯;
 at Settings › Taste changes; move the switch to Discover and watch the end of the queue change; finish a song you
 chose, switch to another tab and back to Home and look for "Because you listened to ..."; play a card, then check
 the library does not have it; kill the app mid-station and reopen the queue.
+
+---
+
+## Review fixes (2026-11-18): the independent review of stage 1
+
+An independent reviewer read the whole stage 1 diff and filed 21 findings (6 major, 15 minor). Most had one cause:
+iOS was ported from Android commit `c8514fd`, and Android has since fixed the findings of its own review (`ac8cc3d`,
+`ad62646`, `ea1c4c9`). This section is what was done about each on iOS. **Still nothing has been run on a phone.**
+
+The pure core (`Sources/PixlLibrary/Brain/` except `AutoplayPolicy.swift`) and the golden files are unchanged: the
+twelve files under `Fixtures/brain` are byte-identical to Android's committed `brain/src/test/resources/brain-golden`
+(compared by git blob id). `recommendationMatchesAndroid` and `Recommendation.swift` are untouched.
+
+### What changed, by finding
+
+| # | Finding | Result | Where |
+|---|---|---|---|
+| 1 | Three skips of the listener's OWN tracks turned the session for good | fixed | `BrainStore/Direction.swift` (port of Android's `Direction`), `BrainEngine.record`, `AutoplayPolicy.turnApplies`, `AutoplayController.currentSeeding` |
+| 2 | Offline, Autoplay queued tracks that need the network | fixed | `AutoplayPool.build` (library alone when the network may not be used; offline only what plays from the phone), `App/Services/Brain/AutoplayOffline.swift`, `AutoplayPolicy.poolTtlMs` |
+| 3 | The radio budget ran dry inside an hour | fixed, one part left | `HostBudget` (24 at once, then one per 40 minutes: still at most 60 in 24 hours), only the newest anchor may cost a request, a library pool that stands in for radios is rebuilt after 10 minutes, a top-up fill is dropped once the queue is long enough. Left: a deepen still fetches page one again |
+| 4 | With crossfade on, top-ups were held then dropped; re-scores and taste edits never landed | fixed | `DualDeckEngine.commitEngineEdit`, `AutoplayPolicy.mustDeferQueueEdit(changesNext:handOverScheduled:)`; the held-append machinery is gone |
+| 5 | "Go to artist" / "Go to album" on a track from outside the library opened "not found" | fixed | `EngineSongLinks.link` (PixlCore), `BrainService.linked`; the rows are hidden when the library has no page |
+| 6 | "Less from X" did nothing until the anchors changed | fixed | `AutoplayTasteFilter.boosts` / `.applying`, `AutoplayController.applyTaste` |
+| 7 | Previous twice logged the track being left as replayed | fixed | `OpenPlay.finish` (`replayConfirmMs`) |
+| 8 | An anchor with no stored YouTube match gives library-only autoplay | not real as described | see below |
+| 9 | After a restart the restored pick was counted in the legacy stores, and Like did nothing | fixed | `AutoplayPolicy.isOutsideLibrary`, `EngineTrack.init?(queueSong:)`, `BrainService.track(songId:)` |
+| 10 | Skips did not thin the tail after a restart, in a library pool, or behind a deepened pool | fixed | `AutoplayController.dropArtistFromTail`, `AutoplayPolicy.firstIndexOfArtist` |
+| 11 | A re-score and a top-up planned together could queue a track twice | fixed | `AutoplayPolicy.mayPlanNow`, `AutoplayPlanning.notQueued` |
+| 12 | The play that first wakes the brain was stored twice | fixed | `LegacyMigration.cutoff`, `brain_state` value `first_live_start_ms` |
+| 13 | An empty radio answer marked the seed junk for a day | fixed | `BrainRepository.radioForLocked` (30 minutes, in memory, the stored list stays) |
+| 14 | "Ignored three times" counted picks that never sounded | fixed | `IgnoreTally.isIgnore` (Android's new rule) |
+| 15 | "Not for me" / Next did nothing on a one-song queue | fixed | `DualDeckEngine.onNextWithNothingQueued`, `AutoplayController.rememberNext`, `AutoplayPolicy.nextMayStillSkip` |
+| 16 | The backstop's fill was swallowed by a fill waiting to settle | fixed | `AutoplayPolicy.backstopReplacesFill`, `startFill(purpose:)` |
+| 17 | Home's first refresh waited on the brain's playable file | fixed | `BrainService.engineSongsForHome` (4 s after launch, cached songs), `HomeStore.refresh` |
+| 18 | Two sentences of "How picks work" said more than the code does | fixed | `BrainStrings` (Android's wording). "Off. The queue ends after the last song" is kept: Android says the same |
+| 19 | "Start station" on a paused track stayed silent; a failing pick showed an error | fixed | `StationRules.inPlaceStartMustPlay`, `AutoplayPolicy.failedPickIsSilent`, `DualDeckEngine.loadFailed` |
+| 20 | A rebuild blocks the brain's actor | partly | the library's facts, the imported keys and the facts build run detached; `log.allEvents()` still decodes on the actor. The audio route is not read while a queue is restored |
+| 21 | The deferral test asserted an identity function; nothing drives `AutoplayController` | partly | the identity function is gone; the decisions that failed are pure functions with tests (below). There is still no `AppTests` harness that drives the controller against a fake engine |
+
+**Finding 8, why it is not real here.** A Spotify song cannot sound on iOS before
+`SpotifyPlayableURLResolver.playableURL` has run `videoId(for:)`, which returns the stored match or searches for one
+on the spot and stores it. Autoplay reads the stored match 1.5 s into the track at the earliest, so the anchor that
+is playing, or that was heard, has one. The case that is left is a song YouTube has no match for at all (it plays
+under a synthetic id from the FLAC source): no radio can be asked by audio id, the library stands in, and with this
+round that pool is now tried again after 10 minutes instead of being played to its end. Android's on-demand match was
+not ported: it would only repeat a search that just found nothing.
+
+### How it works now (the parts that changed)
+
+- **Direction.** Only hard skips of the ENGINE's picks count towards the three. While turned the engine follows the
+  one anchor it turned to (plus any pick liked since); with none left the pool is seeded from the library
+  (`otherDirection`). The listener's next own track ends the turn, and while a track of theirs is current
+  `turnApplies` is false, so tapping one song after any amount of skipping gives music like that song.
+  `SessionState.reseedCount` still counts every hard skip in the pure core; nothing reads it.
+- **Queue edits never wait for a prepared next song.** `appendEngineItems`, `replaceEngineTail` and
+  `removeUpcomingEnginePicks` edit a copy of the queue and compare which entry is next before and after. Unchanged:
+  the edit goes in and the player's plan (a prepared crossfade, a scheduled hand-over, a running fade) is left
+  alone. Changed: the plan is built again, except in the last moments of a track when the incoming deck is already
+  started on the host clock; then a re-score or a removal is refused and tried again at the track change. An append
+  is never refused.
+- **One plan at a time.** `appendFromPool` and `rescoreTail` both ask `mayPlanNow`. When a re-score ends it looks at
+  the queue again, so a top-up that waited gets its turn; `commit` drops picks the queue already holds.
+- **Pools expire.** A pool built offline lives 2 minutes, a library pool that stands in for radios 10 minutes; a
+  radio pool lives until it runs out, as before.
+- **Budget.** `HostBudget()` is 24 requests at once and then one per 40 minutes. In `AutoplayPool.build` only the
+  first (newest) anchor may reach the network; the others are answered from the cache or left out. A change of
+  direction no longer happens while the listener skips their own tracks, so it no longer spends requests there.
+- **Next with nothing queued** (also what "Not for me" on the only track does): the press is remembered for the
+  10 s backstop window, a pool is built with no settle wait, and when the first batch lands while the same track is
+  current the player moves on, one main-actor turn after the append so the log says `next`.
+- **Home at launch.** `HomeStore.refresh` asks for the tracks from outside the library only when it is going to
+  compute, through `engineSongsForHome`, which answers from memory in the app's first 4 seconds, reads the stored
+  tracks after that, and tells Home (`engineTracksChanged`) when that turned up anything. The songs are built once
+  per set of tracks, not once per call.
+
+### Deviations from the spec and from Android (continuing the list)
+
+58. **The request bucket is 24 and then one per 40 minutes** (Android: 12 and then one per 24 minutes). Both stay
+    within the spec's 60 a day; Android's shape left the reviewer's ordinary first hour on library-only picks.
+59. **Only the newest anchor may cost a radio request** (Android asks all three together). Older anchors join from
+    the cache once they were the newest in their turn.
+60. **A library pool that stands in for radios is rebuilt after 10 minutes** (`BuiltAutoplayPool.fellBack`).
+    Android keeps such a pool until it is used up.
+61. **A queue edit of the engine's waits only when it would change the next track during a scheduled hand-over**
+    (Android: during any running transition). Deviation 20's "the append also waits while the next song is
+    prepared" is withdrawn.
+62. **Android's 70 to 79 hold where they apply**: a change of direction is a detour counted outside the pure
+    core; offline ignores cached radios; "ignored three times" runs for 60 days from the last ignore. Not
+    applicable on iOS: `QueueAttachSignal` (a tapped song's queue is set in one call here), the shuffle and
+    cancelled-crossfade fixes (`EngineTail`, `learnExcluded`), the on-demand match (finding 8 above). Not ported:
+    Android's "More from X" line on a library pick by an anchor's artist; such a pick shows no line here, which
+    the reworded promise allows.
+63. **The ignore tally keeps a long play only for a recording the engine served** (now or before). Android's query
+    counts a play of 30 s or more "from anywhere, ever". A song the listener heard out from their own library
+    before the engine ever offered it, and then skipped three times as a pick, is kept away here and not on Android.
+64. **The play that starts the live log is found by a stored value** (`first_live_start_ms`, written with the first
+    live event), not by reading the first event of the log.
+65. **"Go to artist" resolves by the library's own artist id for the lower-cased name** (the id Spotify artists
+    get), not by a folded-name search, so it costs two dictionary lookups on the main actor. An artist the library
+    does not have has no page: the row is hidden and the artist line of the player does nothing. "Go to album" is
+    hidden unless the library has that album.
+66. **A failed pick is silent only when music goes on behind it**; a failure that stops the music still says what
+    could not be played. Tracks that failed are kept out of new pools for 30 minutes (in memory).
+
+### Cut or left (say so to the owner)
+
+- **A deepen still spends three requests** (page one again, then two continuation pages): the continuation token is
+  not stored with the first page.
+- **`log.allEvents()` in a rebuild** still decodes the whole event log on the brain's actor.
+- **No `AppTests` harness for `AutoplayController`**: its decisions are tested, its sequencing is not.
+- **The artist picker sheet** still lists every credited artist of a song from outside the library, including ones
+  the library has no page for.
+- **Recently Played**: songs opened from there keep the importer's artist ids (they are not linked), so "Go to
+  artist" is hidden for them rather than resolved.
+- Everything on the earlier cut lists.
+
+### New and changed tests (PixlCore)
+
+`BrainDirectionTests` 8 (Android's `DirectionTest`). `AutoplayPolicyTests` +9 (the queue-edit rule, `turnApplies`,
+one plan at a time, the skipped artist's first index, Next with nothing queued, pool expiry, the backstop fill, a
+silent failed pick, a track from outside the library known from the queue). `BrainEventRecorderTests` +2 and one
+rewritten (engine picks turn the engine and the listener's own track turns it back; one's own playlist never turns
+it; one anchor turns to the library). `BrainPlayContextTests` +1 (Previous twice). `BrainMigrationTests` +2 (the
+cutoff; the first live play stored once). `BrainAutoplayPlanningTests` +1 (`notQueued`). `BrainRepositoryTests` +2
+(the empty answer). `AutoplayPoolTests` +3 (offline; the newest anchor; `fellBack`). `BrainIgnoredTests` +1 and one
+rewritten. `BrainStationTests` +2 (the boosts of "Less from X"; a paused in-place start). New suite
+`BrainOutsideTrackTests` 4 (`EngineSongLinks`, `EngineTrack(queueSong:)`, `BrainStartup`).
+
+### Not verified (all of it on a phone)
+
+1. **The engine edits.** That appending behind a prepared or scheduled next track really leaves that hand-over
+   alone (crossfade on and off), and that a re-score or a removal that changes the next track rebuilds it cleanly.
+   This replaces the old deferral and nobody has heard it.
+2. **Next with nothing queued**: that the press moves on when the picks land, that it is logged as `next`, and that
+   nothing happens when the listener has started something else meanwhile.
+3. **Offline**: that a downloaded or fully cached track really plays in airplane mode, that nothing else is queued,
+   and that the queue ends without a message when nothing qualifies.
+4. **A failed pick**: no message, the next track plays, the pick does not come back.
+5. **Direction**: skip three picks, read the note, tap a song of your own, and hear music like that song.
+6. **"Less from X"** changing the tail of a running station.
+7. **"Go to artist"** on a pick whose artist is in the library, and the missing rows when it is not.
+8. **After a kill**: Like on the restored pick saves it; the restored pick is not in the taste counters.
+9. **Home at launch**: that Recently Played fills in its tracks from outside the library a few seconds later
+   without the page jumping.
+10. Cost: nothing was measured.
+11. Everything on the 1a, 1b and 1c lists.
+
+### How to test on a phone (for the owner)
+
+Use a build of branch `music-brain` (the `ipa` job of workflow `ci`). Sign in to Spotify, let the library sync.
+For each step: what to do, then what should happen. Anything else is a bug worth a note.
+
+1. **One song.** Tap one song in search. Before it ends, open the queue: under the Autoplay line there are five
+   songs, each with a reason. Let the song end: music continues.
+2. **Next on a lone song.** Tap one song and press Next within two seconds. The line says "Finding more like this";
+   within ten seconds the player moves to a pick. (If nothing lands in ten seconds, the song keeps playing.)
+3. **Not for me on a lone song.** Same as 2, with "Not for me" from the player's ⋯ menu instead of Next. The bar
+   says "Got it", and the player moves on when the picks land.
+4. **Crossfade on.** Settings › Playback: switch crossfade on. Play an album from its third-last track and do not
+   touch anything. Picks must appear under the line while the third-last track plays, the crossfades must sound as
+   before, and the album's end must run into the picks without a gap or a restart.
+5. **Crossfade off.** The same with crossfade off: the hand-overs stay gapless.
+6. **Skip one artist twice.** In autoplay, skip two picks by the same artist within ten seconds of each starting.
+   That artist is gone from the queue below the next track.
+7. **Change of direction.** Skip three picks in a row. The line says "Skipped three. Changing direction." for a few
+   seconds and the tail changes. Now tap a song of your own: when it ends, the picks are like THAT song.
+8. **Your own playlist.** Play a playlist and press Next six times quickly. No "Changing direction" note. Let it
+   run out: the picks are like the playlist's last songs.
+9. **Less from.** Start a station. "Not for me" on a pick, then "Less from <artist>" on the bar. Fewer songs by
+   that artist in the rest of the queue (some may remain). Undo brings the old order back at the next track.
+10. **Go to artist.** On a pick by an artist you have in your library, the player's ⋯ menu has "Go to artist" and
+    it opens that artist. On a pick by an artist you do not have, the row is not there.
+11. **Start station while paused.** Pause a song, open its sheet, "Start station". It plays on and picks follow.
+12. **Airplane mode, downloads.** Download a playlist, switch to airplane mode, play it near its end. Only
+    downloaded or fully heard songs are added, or nothing; never a "Couldn't play" message.
+13. **Airplane mode, nothing downloaded.** The queue simply ends.
+14. **Back online.** Two minutes after 12, with the network back, the next top-up brings new music again.
+15. **Kill and reopen** in the middle of autoplay. The line and the reasons are still there; press play, it goes
+    on. Tap the heart on the pick that is showing: it is in your library afterwards.
+16. **Previous twice.** Forty seconds into a pick press Previous twice. Later picks must not say "Because you
+    liked" that song.
+17. **A long evening.** Tap eight songs one after another, a minute each, and start two stations. Autoplay must
+    still say something other than "From your library" at the end. If it does say it, it should be back to new
+    music within about ten minutes.
+18. **Home after launch.** Kill the app, open it, look at Home: it appears at once; "Recently played" may fill in a
+    few covers a few seconds later.
+19. Then the steps of milestones 1a, 1b and 1c above.
+
+### Commands and results (this round)
+
+```
+gh run list --branch music-brain --workflow ci --limit 3          # at the start: 44288739439 success
+cmd //c "ci\\swiftw.cmd test --package-path Packages\\PixlCore --filter Brain --filter Autoplay --filter QueueSnapshot"
+cmd //c "ci\\swiftw.cmd test --package-path Packages\\PixlCore"
+bash ci/check-forbidden.sh
+powershell -NoProfile -ExecutionPolicy Bypass -File ci/parse-check.ps1
+```
+
+The filtered run: 197 tests in 26 suites, 0 failed. The full suite: exit 0, 2,155 tests in 8 bundles, 0 failed (34
+more than 1c). `check-forbidden.sh`: OK. `parse-check.ps1`: 135 files OK (syntax only: nothing under `App/` is
+type-checked on this machine). The CI result of this round is written below once the run has finished.
+
