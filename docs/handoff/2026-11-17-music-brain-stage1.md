@@ -20,6 +20,16 @@ hold on Linux as well as on Windows). `app` (Xcode 27, iOS simulator): the app b
 three new cases of `AutoplayQueueTests` among them. The non-blocking live YouTube smoke step reported one issue
 again; it does not test this work. No screenshot (`[shots]`) run was made.
 
+CI for milestone 1c: run `44288739439` (workflow `ci`, commit `fb92b63`) finished green on its third attempt. The
+app BUILT on the first attempt, and `core` (Linux) passed on the first attempt: the eight PixlCore test bundles,
+2,121 tests, `BrainCopyTests` among them (it reads `App/` as text, on Linux too). The `app` job (Xcode 27, iOS
+simulator) ran 657 unit tests: attempt 1 failed only `DualDeckEngineTests.testCrossfadeOverlapsBothDecksWithTheirGainCurves`,
+attempt 2 only `SpatialPlaybackTests.testTheRenditionSwitchFadesForAQuarterSecondAndKeepsTheTwentySecondRule`
+(the two known timing-dependent tests; neither failed twice), attempt 3 passed all 657. The only failure named in
+attempts 1 and 2 was that one test each, so the five new cases of `AutoplayQueueTests` and
+`LaunchConfigurationTests.testEveryDemoScreenRoutes` passed every time. The non-blocking live YouTube smoke step
+reported one issue again. No screenshot (`[shots]`) run was made.
+
 ---
 
 ## Milestone 1a: "a track from outside the library plays, and the queue does not end"
@@ -664,6 +674,12 @@ cmd //c "ci\\swiftw.cmd test --package-path Packages\\PixlCore"
 bash ci/check-forbidden.sh
 powershell -NoProfile -ExecutionPolicy Bypass -File ci/parse-check.ps1     # syntax of the changed App files
 ```
+
+Last local run (2026-11-18, on the tree that was committed): the filtered run, 163 tests in 24 suites, 0 failed
+(new: `BrainStationTests` 9, `BrainHomeRowTests` 9, `BrainFeedbackTests` 6, `BrainIgnoredTests` 3,
+`QueueSnapshotReasonFieldsTests` 2, `BrainCopyTests` 3). The full suite: exit 0, 2,121 tests in 8 bundles, 0
+failed. `bash ci/check-forbidden.sh`: OK. `parse-check.ps1` over the changed files of the whole branch: 132 files
+OK. `recommendationMatchesAndroid` and `Recommendation.swift` are untouched; the golden files are 1b's.
 
 On a phone, after 1a's and 1b's lists: open a song's ⋮ and tap "Start station" (the song should play, the queue
 should say "Station · <title>" and fill with twenty picks, each with a reason); do the same on the track that is
