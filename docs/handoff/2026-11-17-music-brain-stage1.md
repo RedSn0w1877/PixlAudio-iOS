@@ -6,10 +6,13 @@ reference implementation is the Android repo's branch `music-brain` and its own 
 differs from the spec and from Android, what was cut, what nobody has run. Each milestone appends a section. The
 next agent starts here.
 
-**Nothing below has been run on a phone, and nothing under `App/` was compiled before it was pushed.** Only
-`Packages/PixlCore` compiles on the Windows machine. "Works" in this file means: PixlCore unit tests pass, the `App/`
-files pass a syntax-only parse (`swift -frontend -parse`), and the code paths were read end to end. Whether `App/`
-type-checks is decided by GitHub CI (workflow `ci`); read its result before trusting anything in `App/`.
+**Nothing below has been run on a phone.** Only `Packages/PixlCore` compiles on the Windows machine; `App/` is
+compiled by GitHub CI alone. "Works" in this file means: unit tests pass and the code paths were read end to end.
+
+CI for milestone 1a: run `44254580118` (workflow `ci`, commit `167b4b7`) finished green. `core` (Linux): the eight
+PixlCore test bundles passed, 2,047 tests. `app` (Xcode 27, iOS 27 simulator): the app built and 649 unit tests
+passed, `AutoplayQueueTests` among them. The separate, non-blocking live YouTube smoke step reported one issue, as
+it may by design; it does not test this work. No screenshot (`[shots]`) run was made.
 
 ---
 
@@ -207,7 +210,7 @@ Snapshot fields: done (same JSON names as Android). Recently Played: done. Like 
 
 ### Not verified (all of it on a phone; the specific risks)
 
-1. **Whether `App/` compiles.** See the CI run for the pushed commit.
+1. Screenshots: no `[shots]` run was made, so nobody has looked at the queue sheet with the Autoplay line.
 2. An engine track actually playing end to end: resolve, audio, seek, crossfade into and out of it.
 3. Autoplay appending during real playback; the settle wait; the held append around a crossfade and around a
    gapless hand-over; whether the first appended track is handed over to without a gap.
