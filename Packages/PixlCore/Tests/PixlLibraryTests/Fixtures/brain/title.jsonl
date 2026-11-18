@@ -1,0 +1,300 @@
+{"fn":"cleanTitle","in":{"s":"\u591c\u306b\u99c6\u3051\u308b"},"out":{"title":"\u591c\u306b\u99c6\u3051\u308b","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"\u767d\u65e5"},"out":{"title":"\u767d\u65e5","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"\u30de\u30ea\u30fc\u30b4\u30fc\u30eb\u30c9"},"out":{"title":"\u30de\u30ea\u30fc\u30b4\u30fc\u30eb\u30c9","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Pretender"},"out":{"title":"pretender","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"\u7d05\u84ee\u83ef"},"out":{"title":"\u7d05\u84ee\u83ef","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Lemon"},"out":{"title":"lemon","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"\u30a2\u30a4\u30c9\u30eb"},"out":{"title":"\u30a2\u30a4\u30c9\u30eb","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"\u7fa4\u9752"},"out":{"title":"\u7fa4\u9752","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"\u602a\u7269 (Anime Version)"},"out":{"title":"\u602a\u7269 anime version","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"First Love (2022 Remastered)"},"out":{"title":"first love","versionFlags":16,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"\u4e38\u306e\u5185\u30b5\u30c7\u30a3\u30b9\u30c6\u30a3\u30c3\u30af (Live)"},"out":{"title":"\u4e38\u306e\u5185\u30b5\u30c7\u30a3\u30b9\u30c6\u30a3\u30c3\u30af","versionFlags":1,"identityFlags":1}}
+{"fn":"cleanTitle","in":{"s":"\u6b8b\u9177\u306a\u5929\u4f7f\u306e\u30c6\u30fc\u30bc (Instrumental)"},"out":{"title":"\u6b8b\u9177\u306a\u5929\u4f7f\u306e\u30c6\u30fc\u30bc","versionFlags":8,"identityFlags":8}}
+{"fn":"cleanTitle","in":{"s":"\u30c9\u30e9\u30a4\u30d5\u30e9\u30ef\u30fc [Acoustic Ver.]"},"out":{"title":"\u30c9\u30e9\u30a4\u30d5\u30e9\u30ef\u30fc","versionFlags":4,"identityFlags":4}}
+{"fn":"cleanTitle","in":{"s":"\u5efb\u5efb\u5947\u8b5a - Remix"},"out":{"title":"\u5efb\u5efb\u5947\u8b5a","versionFlags":2,"identityFlags":2}}
+{"fn":"cleanTitle","in":{"s":"\u708e \uff08\u30ab\u30e9\u30aa\u30b1\uff09"},"out":{"title":"\u708e \u30ab\u30e9\u30aa\u30b1","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"\u591c\u306b\u99c6\u3051\u308b\uff08Instrumental\uff09"},"out":{"title":"\u591c\u306b\u99c6\u3051\u308b","versionFlags":8,"identityFlags":8}}
+{"fn":"cleanTitle","in":{"s":"\ubd04\ub0a0"},"out":{"title":"\ubd04\ub0a0","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Dynamite (Acoustic Remix)"},"out":{"title":"dynamite","versionFlags":6,"identityFlags":6}}
+{"fn":"cleanTitle","in":{"s":"\ubc24\ud3b8\uc9c0"},"out":{"title":"\ubc24\ud3b8\uc9c0","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Ditto"},"out":{"title":"ditto","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Super Shy"},"out":{"title":"super shy","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"\ub69c\ub450\ub69c\ub450 (DDU-DU DDU-DU)"},"out":{"title":"\ub69c\ub450\ub69c\ub450 ddu du ddu du","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"\uc88b\uc740 \ub0a0"},"out":{"title":"\uc88b\uc740 \ub0a0","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"\uc5d0\uc787 (Prod.&Feat. SUGA of BTS)"},"out":{"title":"\uc5d0\uc787","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"\uc0ac\uac74\uc758 \uc9c0\ud3c9\uc120"},"out":{"title":"\uc0ac\uac74\uc758 \uc9c0\ud3c9\uc120","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Love Dive (Live)"},"out":{"title":"love dive","versionFlags":1,"identityFlags":1}}
+{"fn":"cleanTitle","in":{"s":"Hype Boy - Sped Up"},"out":{"title":"hype boy","versionFlags":128,"identityFlags":128}}
+{"fn":"cleanTitle","in":{"s":"Blue Hour (Japanese Ver.)"},"out":{"title":"blue hour japanese ver","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Ch\u00fang Ta C\u1ee7a Hi\u1ec7n T\u1ea1i"},"out":{"title":"chung ta cua hien tai","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"H\u00e3y Trao Cho Anh (feat. Snoop Dogg)"},"out":{"title":"hay trao cho anh","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"N\u01a1i N\u00e0y C\u00f3 Anh"},"out":{"title":"noi nay co anh","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"L\u1ea1c Tr\u00f4i (Triple D Remix)"},"out":{"title":"lac troi","versionFlags":2,"identityFlags":2}}
+{"fn":"cleanTitle","in":{"s":"See T\u00ecnh"},"out":{"title":"see tinh","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"See T\u00ecnh (Speed Up Version)"},"out":{"title":"see tinh","versionFlags":128,"identityFlags":128}}
+{"fn":"cleanTitle","in":{"s":"\u0110\u1ec3 M\u1ecb N\u00f3i Cho M\u00e0 Nghe"},"out":{"title":"de mi noi cho ma nghe","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"B\u1eafc Kim Thang"},"out":{"title":"bac kim thang","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Em C\u1ee7a Ng\u00e0y H\u00f4m Qua"},"out":{"title":"em cua ngay hom qua","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"C\u00f3 Ch\u1eafc Y\u00eau L\u00e0 \u0110\u00e2y - Live at Sky Tour"},"out":{"title":"co chac yeu la day","versionFlags":1,"identityFlags":1}}
+{"fn":"cleanTitle","in":{"s":"Mang Ti\u1ec1n V\u1ec1 Cho M\u1eb9 (feat. Nguy\u00ean Th\u1ea3o)"},"out":{"title":"mang tien ve cho me","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"\u0110i V\u1ec1 Nh\u00e0"},"out":{"title":"di ve nha","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"N\u00e0ng Th\u01a1"},"out":{"title":"nang tho","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Th\u00edch Em H\u01a1i Nhi\u1ec1u (Acoustic)"},"out":{"title":"thich em hoi nhieu","versionFlags":4,"identityFlags":4}}
+{"fn":"cleanTitle","in":{"s":"Waiting For You (Karaoke)"},"out":{"title":"waiting for you","versionFlags":64,"identityFlags":64}}
+{"fn":"cleanTitle","in":{"s":"Ng\u00e0y Mai Ng\u01b0\u1eddi Ta L\u1ea5y Ch\u1ed3ng - Lofi Ver."},"out":{"title":"ngay mai nguoi ta lay chong lofi ver","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"B\u00f4ng Hoa \u0110\u1eb9p Nh\u1ea5t (Cover)"},"out":{"title":"bong hoa dep nhat","versionFlags":32,"identityFlags":32}}
+{"fn":"cleanTitle","in":{"s":"V\u00ec Anh \u0110\u00e2u C\u00f3 Bi\u1ebft (Slowed + Reverb)"},"out":{"title":"vi anh dau co biet","versionFlags":256,"identityFlags":256}}
+{"fn":"cleanTitle","in":{"s":"Th\u00e1ng T\u01b0 L\u00e0 L\u1eddi N\u00f3i D\u1ed1i C\u1ee7a Em"},"out":{"title":"thang tu la loi noi doi cua em","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Anh \u0110\u00e3 Quen V\u1edbi C\u00f4 \u0110\u01a1n"},"out":{"title":"anh da quen voi co don","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"\u0110\u1eebng L\u00e0m Tr\u00e1i Tim Anh \u0110au"},"out":{"title":"dung lam trai tim anh dau","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Ph\u00eda Sau M\u1ed9t C\u00f4 G\u00e1i (Beat)"},"out":{"title":"phia sau mot co gai beat","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"H\u01a1n C\u1ea3 Y\u00eau (Piano Version)"},"out":{"title":"hon ca yeu","versionFlags":4,"identityFlags":4}}
+{"fn":"cleanTitle","in":{"s":"Dreams (2004 Remaster)"},"out":{"title":"dreams","versionFlags":16,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Love Story (Taylor's Version)"},"out":{"title":"love story","versionFlags":512,"identityFlags":512}}
+{"fn":"cleanTitle","in":{"s":"All Too Well (10 Minute Version) (Taylor's Version) (From The Vault)"},"out":{"title":"all too well 10 minute version","versionFlags":512,"identityFlags":512}}
+{"fn":"cleanTitle","in":{"s":"Smells Like Teen Spirit - Remastered 2021"},"out":{"title":"smells like teen spirit","versionFlags":16,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Bohemian Rhapsody (Live Aid)"},"out":{"title":"bohemian rhapsody","versionFlags":1,"identityFlags":1}}
+{"fn":"cleanTitle","in":{"s":"Hotel California - Live On MTV, 1994"},"out":{"title":"hotel california","versionFlags":1,"identityFlags":1}}
+{"fn":"cleanTitle","in":{"s":"Blinding Lights (with ROSAL\u00cdA) - Remix"},"out":{"title":"blinding lights","versionFlags":2,"identityFlags":2}}
+{"fn":"cleanTitle","in":{"s":"HUMBLE."},"out":{"title":"humble","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Not Like Us"},"out":{"title":"not like us","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"DNA."},"out":{"title":"dna","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"m.A.A.d city (feat. MC Eiht)"},"out":{"title":"m a a d city","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Archangel"},"out":{"title":"archangel","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Espresso"},"out":{"title":"espresso","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Espresso - Double Shot Version"},"out":{"title":"espresso double shot version","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Here With Me"},"out":{"title":"here with me","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Romantic Homicide"},"out":{"title":"romantic homicide","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Good Luck, Babe!"},"out":{"title":"good luck babe","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"bad guy (with Justin Bieber)"},"out":{"title":"bad guy","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Get Lucky (Radio Edit) [feat. Pharrell Williams & Nile Rodgers]"},"out":{"title":"get lucky","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Creep (Acoustic)"},"out":{"title":"creep","versionFlags":4,"identityFlags":4}}
+{"fn":"cleanTitle","in":{"s":"Karma Police - Remastered"},"out":{"title":"karma police","versionFlags":16,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Hips Don't Lie (feat. Wyclef Jean)"},"out":{"title":"hips don t lie","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Last Last"},"out":{"title":"last last","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Song 2"},"out":{"title":"song 2","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Part 2 (Interlude)"},"out":{"title":"part 2 interlude","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Intro"},"out":{"title":"intro","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"(Intro)"},"out":{"title":"intro","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"[Untitled]"},"out":{"title":"untitled","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Untitled (How Does It Feel)"},"out":{"title":"untitled how does it feel","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"7 rings"},"out":{"title":"7 rings","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Stay (Instrumental)"},"out":{"title":"stay","versionFlags":8,"identityFlags":8}}
+{"fn":"cleanTitle","in":{"s":"Stay - Karaoke Version"},"out":{"title":"stay","versionFlags":64,"identityFlags":64}}
+{"fn":"cleanTitle","in":{"s":"Stay (Originally Performed by The Kid LAROI) [Backing Track]"},"out":{"title":"stay originally performed by the kid laroi","versionFlags":64,"identityFlags":64}}
+{"fn":"cleanTitle","in":{"s":"Heat Waves (Slowed)"},"out":{"title":"heat waves","versionFlags":256,"identityFlags":256}}
+{"fn":"cleanTitle","in":{"s":"Heat Waves - Sped Up"},"out":{"title":"heat waves","versionFlags":128,"identityFlags":128}}
+{"fn":"cleanTitle","in":{"s":"Somebody That I Used To Know (Tribute Version)"},"out":{"title":"somebody that i used to know","versionFlags":32,"identityFlags":32}}
+{"fn":"cleanTitle","in":{"s":"Africa (Cover)"},"out":{"title":"africa","versionFlags":32,"identityFlags":32}}
+{"fn":"cleanTitle","in":{"s":"Hurt - Live"},"out":{"title":"hurt","versionFlags":1,"identityFlags":1}}
+{"fn":"cleanTitle","in":{"s":"Unplugged in New York: About a Girl"},"out":{"title":"unplugged in new york about a girl","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Wonderwall (MTV Unplugged)"},"out":{"title":"wonderwall","versionFlags":1,"identityFlags":1}}
+{"fn":"cleanTitle","in":{"s":"One (Mono)"},"out":{"title":"one","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"One - Stereo Mix"},"out":{"title":"one stereo mix","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Levitating (feat. DaBaby)"},"out":{"title":"levitating","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Levitating (The Blessed Madonna Remix) [feat. Madonna and Missy Elliott]"},"out":{"title":"levitating","versionFlags":2,"identityFlags":2}}
+{"fn":"cleanTitle","in":{"s":"Mr. Brightside (Jacques Lu Cont's Thin White Duke Mix)"},"out":{"title":"mr brightside jacques lu cont s thin white duke mix","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Around the World (Original Mix)"},"out":{"title":"around the world","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"One More Time - Club Mix"},"out":{"title":"one more time club mix","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Sweet Child O' Mine (Re-Recorded)"},"out":{"title":"sweet child o mine","versionFlags":512,"identityFlags":512}}
+{"fn":"cleanTitle","in":{"s":"Rerecorded Hits: Jump"},"out":{"title":"rerecorded hits jump","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Fearless (John's Version)"},"out":{"title":"fearless","versionFlags":512,"identityFlags":512}}
+{"fn":"cleanTitle","in":{"s":"Live Forever"},"out":{"title":"live forever","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Alive"},"out":{"title":"alive","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Concert for One"},"out":{"title":"concert for one","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"The Remix Song"},"out":{"title":"the remix song","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Cover Me Up"},"out":{"title":"cover me up","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Nightcore - Angel With A Shotgun"},"out":{"title":"nightcore angel with a shotgun","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Piano Man"},"out":{"title":"piano man","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"With Or Without You"},"out":{"title":"with or without you","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"From The Start"},"out":{"title":"from the start","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Feat"},"out":{"title":"feat","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Explicit"},"out":{"title":"explicit","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Clean"},"out":{"title":"clean","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Deluxe"},"out":{"title":"deluxe","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Song (Deluxe Edition)"},"out":{"title":"song","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Song (Bonus Track)"},"out":{"title":"song","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Song (Single Version)"},"out":{"title":"song","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Song (Album Version)"},"out":{"title":"song","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Song (Explicit)"},"out":{"title":"song","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Song (Clean)"},"out":{"title":"song","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Song - Radio Edit"},"out":{"title":"song","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Song \u2013 Live"},"out":{"title":"song","versionFlags":1,"identityFlags":1}}
+{"fn":"cleanTitle","in":{"s":"Song \u2014 Acoustic"},"out":{"title":"song","versionFlags":4,"identityFlags":4}}
+{"fn":"cleanTitle","in":{"s":"Song (prod. Metro Boomin)"},"out":{"title":"song","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Song (ft. Someone)"},"out":{"title":"song","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Song (featuring Someone Else)"},"out":{"title":"song","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Song (From \"A Film\")"},"out":{"title":"song","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Song (Bootleg)"},"out":{"title":"song","versionFlags":2,"identityFlags":2}}
+{"fn":"cleanTitle","in":{"s":"Song (Mashup)"},"out":{"title":"song","versionFlags":2,"identityFlags":2}}
+{"fn":"cleanTitle","in":{"s":"Song (Rework)"},"out":{"title":"song","versionFlags":2,"identityFlags":2}}
+{"fn":"cleanTitle","in":{"s":"Song (VIP Flip)"},"out":{"title":"song","versionFlags":2,"identityFlags":2}}
+{"fn":"cleanTitle","in":{"s":"Song (RMX)"},"out":{"title":"song","versionFlags":2,"identityFlags":2}}
+{"fn":"cleanTitle","in":{"s":"Song (Inst.)"},"out":{"title":"song","versionFlags":8,"identityFlags":8}}
+{"fn":"cleanTitle","in":{"s":"Song (Stripped)"},"out":{"title":"song","versionFlags":4,"identityFlags":4}}
+{"fn":"cleanTitle","in":{"s":"Song (Speed Up)"},"out":{"title":"song","versionFlags":128,"identityFlags":128}}
+{"fn":"cleanTitle","in":{"s":""},"out":{"title":"","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"   "},"out":{"title":"","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"()"},"out":{"title":"","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"- Live"},"out":{"title":"live","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"' CH\u1eb2NG C\u1ea6N B\u00ccNH Y\u00caN |"},"out":{"title":"chang can binh yen","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"(B\u1ea2N HOT) Th\u1ea5m Tho\u00e1t Cha Cha Cha - Kh\u1ea3 Hi\u1ec7p"},"out":{"title":"tham thoat cha cha cha kha hiep ban hot","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"07. Em - Binz (feat. SOOBIN) | G\u1eb7p L\u1ea1i Album"},"out":{"title":"07 em binz gap lai album","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"3 Ph\u1ea3i 6 \u0110\u1eebng"},"out":{"title":"3 phai 6 dung","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"50 N\u0103m V\u1ec1 Sau"},"out":{"title":"50 nam ve sau","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"ANH L\u00c0 NGO\u1ea0I L\u1ec6 C\u1ee6A EM - PH\u01af\u01a0NG LY | OFFICIAL MV"},"out":{"title":"anh la ngoai le cua em phuong ly official mv","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"ANH V\u1eaaN D\u00d5I THEO EM"},"out":{"title":"anh van doi theo em","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Ai S\u1ebd Th\u01b0\u01a1ng Em"},"out":{"title":"ai se thuong em","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Anh N\u00ean \u0110i Kh\u1ecfi \u0110\u00e2y"},"out":{"title":"anh nen di khoi day","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Anh Trai V\u01b0\u1ee3t Ng\u00e0n Ch\u00f4ng Gai"},"out":{"title":"anh trai vuot ngan chong gai","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Anh V\u1eabn \u1ede \u0110\u00e2y - Quang \u0110\u0103ng Tr\u1ea7n x ViAM - Official Music Video"},"out":{"title":"anh van o day quang dang tran x viam official music video","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Anh V\u1ed9i Qu\u00ean Drill ( Prod Young_Tachi ) Nguy\u1ec5n Th\u1ea1c B\u1ea3o Ng\u1ecdc - Audio Lyrics"},"out":{"title":"anh voi quen drill nguyen thac bao ngoc audio lyrics","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Anh \u0110ang N\u01a1i \u0110\u00e2u"},"out":{"title":"anh dang noi dau","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"BACK TO HOMETOWN (TR\u1ede V\u1ec0 QU\u00ca NH\u00c0) (feat. Sol7)"},"out":{"title":"back to hometown tro ve que nha","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Bu\u1ed3n Hay Vui (feat. RPT MCK, Obito, Ronboogz & Boyzed)"},"out":{"title":"buon hay vui","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"B\u00e0i H\u00e1t Khi\u1ebfn B\u1ea1n Ng\u1ea9n Ng\u01a1 V\u00ec Ti\u1ebfc Nu\u1ed1i M\u1ed1i T\u00ecnh \u0110\u1ea7u | Tr\u00fac \u0110\u00e0o - Thanh T\u00fa [Ph\u1ed1 Nh\u1ea1c Vi\u1ec7t]"},"out":{"title":"bai hat khien ban ngan ngo vi tiec nuoi moi tinh dau truc dao thanh tu pho nhac viet","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"B\u00ean Tr\u00ean T\u1ea7ng L\u1ea7u"},"out":{"title":"ben tren tang lau","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"B\u00ed K\u00edp Sinh T\u1ed3n Cho Tr\u00e1i Tim Tan V\u1ee1"},"out":{"title":"bi kip sinh ton cho trai tim tan vo","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"B\u1ea1n \u0110\u1eddi"},"out":{"title":"ban doi","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"B\u1ea3o Anh "},"out":{"title":"bao anh","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"B\u1ea3o Anh - TH\u1ebe N\u00c0O L\u00c0 \u0110\u00daNG? (OST CH\u1eca CH\u1eca EM EM 3) | MV OFFICIAL"},"out":{"title":"bao anh the nao la dung mv official ost chi chi em em 3","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"B\u1ea3o Ng\u1ecdc"},"out":{"title":"bao ngoc","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"B\u1eadt T\u00ecnh Y\u00eau L\u00ean"},"out":{"title":"bat tinh yeu len","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"B\u1ed9 3 Tam Ca Khi\u1ebfn C\u1ea3 Qu\u00e1n Nh\u1eadu \u0110\u1ee9ng Ng\u1ed3i Kh\u00f4ng Y\u00ean V\u00ec Qu\u00e1 Gi\u1ed1ng \u0110an Nguy\u00ean, M\u1ea1nh Qu\u1ef3nh, Ch\u1ebf Linh"},"out":{"title":"bo 3 tam ca khien ca quan nhau dung ngoi khong yen vi qua giong dan nguyen manh quynh che linh","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"COOLKID - QU\u00c1 \u0110\u1ee6 R\u1ed2I (OFFICIAL VISUALIZER)"},"out":{"title":"coolkid qua du roi official visualizer","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Cause I Love You - Noo Ph\u01b0\u1edbc Th\u1ecbnh [Official Music Video]"},"out":{"title":"cause i love you noo phuoc thinh official music video","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Chia Tay Qu\u00e1 \u0110\u00e3"},"out":{"title":"chia tay qua da","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Chim S\u1ebb V\u00e0 D\u00e2u T\u00e2y , Wowy) (feat. D\u1ebf Cho\u1eaft (DC) & Wowy)"},"out":{"title":"chim se va dau tay wowy","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Chuy\u1ec7n T\u00ecnh T\u1ee9 C\u1ee9 T\u1eeb T\u1eeb T\u00ednh"},"out":{"title":"chuyen tinh tu cu tu tu tinh","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Chuy\u1ec7n \u0110\u00f4i Ta (feat. Mu\u1ed9ii)"},"out":{"title":"chuyen doi ta","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Chuy\u1ec7n \u0110\u00f4i Ta - Emcee L (Da LAB) ft Mu\u1ed9ii (Official MV)"},"out":{"title":"chuyen doi ta emcee l ft muoii da lab official mv","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Ch\u00e2n \u00c1i"},"out":{"title":"chan ai","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Ch\u00fang Ta C\u1ee7a T\u01b0\u01a1ng Lai"},"out":{"title":"chung ta cua tuong lai","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Ch\u00fang Ta Kh\u00f4ng Thu\u1ed9c V\u1ec1 Nhau"},"out":{"title":"chung ta khong thuoc ve nhau","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Ch\u00fang Ta Kh\u00f4ng Thu\u1ed9c V\u1ec1 Nhau (Sky Tour 2019)"},"out":{"title":"chung ta khong thuoc ve nhau sky tour 2019","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Ch\u0103m Em M\u1ed9t \u0110\u1eddi"},"out":{"title":"cham em mot doi","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Ch\u0103m Hoa"},"out":{"title":"cham hoa","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Ch\u01a1i Nh\u01b0 T\u1ee5i M\u1ef9"},"out":{"title":"choi nhu tui my","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Ch\u01b0a Ph\u1ea3i L\u00e0 Y\u00eau (feat. Rex)"},"out":{"title":"chua phai la yeu","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Ch\u1ea1y Ngay \u0110i"},"out":{"title":"chay ngay di","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Ch\u1ea1y Ngay \u0110i (Onionn Remix)"},"out":{"title":"chay ngay di","versionFlags":2,"identityFlags":2}}
+{"fn":"cleanTitle","in":{"s":"Ch\u1ea1y Ngay \u0110i (Sky Tour 2019)"},"out":{"title":"chay ngay di sky tour 2019","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Ch\u1eafc Ai \u0110\u00f3 S\u1ebd V\u1ec1"},"out":{"title":"chac ai do se ve","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Ch\u1eafc Ai \u0110\u00f3 S\u1ebd V\u1ec1 (Sky Tour 2019)"},"out":{"title":"chac ai do se ve sky tour 2019","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Ch\u1edd Em \u0110\u1ebfn Bao Gi\u1edd?"},"out":{"title":"cho em den bao gio","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"C\u00f3 Ch\u1eafc Y\u00eau L\u00e0 \u0110\u00e2y"},"out":{"title":"co chac yeu la day","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"C\u00f3 Kh\u00f4ng Gi\u1eef M\u1ea5t \u0110\u1eebng T\u00ecm"},"out":{"title":"co khong giu mat dung tim","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"C\u00f3 \u0110\u00f4i \u0110i\u1ec1u"},"out":{"title":"co doi dieu","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"C\u00f4 B\u00e9 \u01a0i"},"out":{"title":"co be oi","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"C\u00f4 G\u00e1i V\u00e0ng (feat. T\u00f9ng Viu)"},"out":{"title":"co gai vang","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"C\u0169ng B\u1edfi Do Ngh\u00e8o (V\u1ecdng Kim Lang)"},"out":{"title":"cung boi do ngheo vong kim lang","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"C\u01a1n M\u01b0a Cu\u1ed1i"},"out":{"title":"con mua cuoi","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"C\u01a1n M\u01b0a Ngang Qua"},"out":{"title":"con mua ngang qua","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"C\u01a1n M\u01b0a Ngang Qua (Remix 2022)"},"out":{"title":"con mua ngang qua","versionFlags":2,"identityFlags":2}}
+{"fn":"cleanTitle","in":{"s":"C\u01b0\u1edbi \u0110i (feat. ChangC)"},"out":{"title":"cuoi di","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"C\u1ece D\u1ea0I V\u00c0 HOA D\u00c0NH D\u00c0NH | \u0110\u1eb6NG THANH TUY\u1ec0N | OFFICIAL MUSIC VIDEO (Version Nam)"},"out":{"title":"co dai va hoa danh danh dang thanh tuyen official music video version nam","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"C\u1ee8 \u0110\u1ec2 ANH TA R\u1edcI \u0110I (feat. D\u01af\u01a0NG DOMIC, QUANG H\u00d9NG MASTERD, LOU HO\u00c0NG & SONG LU\u00c2N)"},"out":{"title":"cu de anh ta roi di","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"DC T\u00e2m Remix - Mashup 15 In 1 C\u1ef1c Cu\u1ed1n 2026 \ud83d\udd25 V\u1ec1 \u0110\u00e2y Em Lo x \u0110\u1eafng Cay Tu\u1ed5i \u0110\u00f4i M\u01b0\u01a1i x V\u1edf K\u1ecbch C\u1ee7a Em"},"out":{"title":"dc tam remix","versionFlags":2,"identityFlags":2}}
+{"fn":"cleanTitle","in":{"s":"DON'T C\u00d4I"},"out":{"title":"don t coi","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Dangrangto - '\u0111\u1ec3 d\u00e0nh cho em' (Visualizer)"},"out":{"title":"dangrangto de danh cho em visualizer","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Day D\u1ee9t N\u1ed7i \u0110au"},"out":{"title":"day dut noi dau","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Don't C\u00f4i - RPT Orijinn x Ronboogz (Visualizer)"},"out":{"title":"don t coi rpt orijinn x ronboogz visualizer","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"D\u00f9 Anh C\u00f3 \u0110\u1ee9ng L\u1ea1i"},"out":{"title":"du anh co dung lai","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"E L\u00e0 \u0110\u00f4n Ch\u1ec1"},"out":{"title":"e la don che","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"ERIK - 'D\u00f9 cho t\u1eadn th\u1ebf (v\u1eabn y\u00eau em)' | Official MV | Valentine 2025"},"out":{"title":"erik du cho tan the official mv valentine 2025 van yeu em","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Em Ch\u01b0a 18 (Em Ch\u01b0a 18 Original Soundtrack)"},"out":{"title":"em chua 18 em chua 18 original soundtrack","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Em C\u1ee7a Ng\u00e0y H\u00f4m Qua (Sky Tour 2019)"},"out":{"title":"em cua ngay hom qua sky tour 2019","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Em K\u1ec3 Anh Nghe"},"out":{"title":"em ke anh nghe","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Em kh\u00f4ng l\u1ebb loi"},"out":{"title":"em khong le loi","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"GI\u00c1 NH\u01af EM L\u00c0 ANH - MAX Cover x H\u00f9ng Qu\u00e2n | \u01af\u1edbc chi anh nh\u00ecn th\u1ea5y em \u0111\u00e3 \u0111\u1edbn \u0111au b\u1eadt kh\u00f3c"},"out":{"title":"gia nhu em la anh","versionFlags":32,"identityFlags":32}}
+{"fn":"cleanTitle","in":{"s":"(Don't Fear) The Reaper (Single Version)"},"out":{"title":"the reaper don t fear","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"(S)TRONG"},"out":{"title":"trong s","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"223's (feat. 9lokknine)"},"out":{"title":"223 s","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"404 (New Era)"},"out":{"title":"404 new era","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"50 Ph\u00edt (Remix)"},"out":{"title":"50 phit","versionFlags":2,"identityFlags":2}}
+{"fn":"cleanTitle","in":{"s":"6 Inch (feat. The Weeknd)"},"out":{"title":"6 inch","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"679 (feat. Monty)"},"out":{"title":"679","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"9 Samurai (feat. The Spaceape)"},"out":{"title":"9 samurai","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"A Closer Look - Late Night with Seth Meyers"},"out":{"title":"a closer look late night with seth meyers","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"A LITTLE VENGEANCE (is more human than no vengeance at all)"},"out":{"title":"a little vengeance is more human than no vengeance at all","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Aayee Hai Diwali (From \"Aamdani Atthanni Kharcha Rupaiya\")"},"out":{"title":"aayee hai diwali","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Additup - Gangsta B*tch | From The Block Performance \ud83c\udf99"},"out":{"title":"additup gangsta b tch from the block performance \ud83c\udf99","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Ala Bolelo - Lyric Video | Jailer 2 | Superstar Rajinikanth | Sun Pictures | Nelson | Anirudh"},"out":{"title":"ala bolelo lyric video jailer 2 superstar rajinikanth sun pictures nelson anirudh","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Ala Ela (feat. Ricky Star, Gducky & Karik)"},"out":{"title":"ala ela","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"All I Know (feat. Future)"},"out":{"title":"all i know","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"All I Want for Christmas Is You (Make My Wish Come True Edition)"},"out":{"title":"all i want for christmas is you make my wish come true edition","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"All The Stars (From \"Black Panther: The Album\")"},"out":{"title":"all the stars","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Alone Again (Official Audio)"},"out":{"title":"alone again official audio","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Another Love (Zwette Edit)"},"out":{"title":"another love zwette edit","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Anti-Hero"},"out":{"title":"anti hero","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Anti-Hero (Official Music Video)"},"out":{"title":"anti hero official music video","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Archangel Territory (Re-Work)"},"out":{"title":"archangel territory re work","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"As It Was (Official Video)"},"out":{"title":"as it was official video","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Ascend (Slowed & Reverb)"},"out":{"title":"ascend","versionFlags":256,"identityFlags":256}}
+{"fn":"cleanTitle","in":{"s":"B.o.B - Nothin' On You (feat. Bruno Mars) [Official Video]"},"out":{"title":"b o b nothin on you official video","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"BADMAN FUNK (SPED UP)"},"out":{"title":"badman funk","versionFlags":128,"identityFlags":128}}
+{"fn":"cleanTitle","in":{"s":"BIGBANG - BLUE M/V"},"out":{"title":"bigbang blue m v","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"BIOS - Zorrovian [Official Visualiser]"},"out":{"title":"bios zorrovian official visualiser","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"BOO (Radio Edit)"},"out":{"title":"boo","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"BTBT (feat. Ricky Star)"},"out":{"title":"btbt","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"BURNIN' BURNIN' (GENIC LIVE 2023 -Flavors- Special Edition)"},"out":{"title":"burnin burnin","versionFlags":1,"identityFlags":1}}
+{"fn":"cleanTitle","in":{"s":"Bad Boy (feat. Korkormikor)"},"out":{"title":"bad boy","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Bad Dream (Official Video)"},"out":{"title":"bad dream official video","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Bad Wolves - Zombie (Official Video)"},"out":{"title":"bad wolves zombie official video","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Bailando (feat. Descemer Bueno & Gente De Zona)"},"out":{"title":"bailando","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Baltimora -Tarzan Boy (Moreno J Remix)"},"out":{"title":"baltimora tarzan boy","versionFlags":2,"identityFlags":2}}
+{"fn":"cleanTitle","in":{"s":"Be Honest (feat. Burna Boy)"},"out":{"title":"be honest","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Beautiful People (feat. Khalid)"},"out":{"title":"beautiful people","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Beauty And A Beat (feat. Nicki Minaj)"},"out":{"title":"beauty and a beat","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Big Guy (from \"The SpongeBob Movie: Search for SquarePants\u201d)"},"out":{"title":"big guy","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Blame (feat. John Newman)"},"out":{"title":"blame","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Blinding Lights (Acoustic)"},"out":{"title":"blinding lights","versionFlags":4,"identityFlags":4}}
+{"fn":"cleanTitle","in":{"s":"Blinding Lights (Live On The 2020 MTV VMAs)"},"out":{"title":"blinding lights","versionFlags":1,"identityFlags":1}}
+{"fn":"cleanTitle","in":{"s":"Blinding Lights (Live)"},"out":{"title":"blinding lights","versionFlags":1,"identityFlags":1}}
+{"fn":"cleanTitle","in":{"s":"Blinding Lights (Metal Version)"},"out":{"title":"blinding lights metal version","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Blinding Lights (Official Video)"},"out":{"title":"blinding lights official video","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Blinding Lights (Tabata)"},"out":{"title":"blinding lights tabata","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Blinding Lights (Techno)"},"out":{"title":"blinding lights techno","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Blinding Lights (The Weeknd)"},"out":{"title":"blinding lights the weeknd","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Blinding Lights - Slowed (feat. Complicit)"},"out":{"title":"blinding lights","versionFlags":256,"identityFlags":256}}
+{"fn":"cleanTitle","in":{"s":"Blinding Lights / Take On Me - Friends Like These (The Weeknd & A-Ha Cover)"},"out":{"title":"blinding lights take on me friends like these","versionFlags":32,"identityFlags":32}}
+{"fn":"cleanTitle","in":{"s":"Blue Monday-88 (2025 Remaster)"},"out":{"title":"blue monday 88","versionFlags":16,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Body Like A Back Road (Official Lyric Video)"},"out":{"title":"body like a back road official lyric video","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Boston (Slowed)"},"out":{"title":"boston","versionFlags":256,"identityFlags":256}}
+{"fn":"cleanTitle","in":{"s":"Both Ways (feat. EST Gee)"},"out":{"title":"both ways","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Breathe This Air (Remaster 2023)"},"out":{"title":"breathe this air","versionFlags":16,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Broken Wings (Official Video)"},"out":{"title":"broken wings official video","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Bruno Mars - That\u2019s What I Like [Official Music Video]"},"out":{"title":"bruno mars that s what i like official music video","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Burial: In McDonalds (Hyperdub 2007)"},"out":{"title":"burial in mcdonalds hyperdub 2007","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Burial: UK  (Hyperdub 2007)"},"out":{"title":"burial uk hyperdub 2007","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"California Gurls (Official Music Video) (feat. Snoop Dogg)"},"out":{"title":"california gurls official music video","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Call Out My Name (Live)"},"out":{"title":"call out my name","versionFlags":1,"identityFlags":1}}
+{"fn":"cleanTitle","in":{"s":"Call Out My Name (Official Video)"},"out":{"title":"call out my name official video","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Can't Feel My Face (Official Video)"},"out":{"title":"can t feel my face official video","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Can't Hold Us (feat. Ray Dalton)"},"out":{"title":"can t hold us","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Capital Cities - Safe And Sound"},"out":{"title":"capital cities safe and sound","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Caribbean Queen (No More Love on the Run) (Official HD Video)"},"out":{"title":"caribbean queen no more love on the run official hd video","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Casa Tupka Anthemo (feat. Priyanshi Srivastava)"},"out":{"title":"casa tupka anthemo","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Catlow - Outside For The Day"},"out":{"title":"catlow outside for the day","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Chandelier (Official Video)"},"out":{"title":"chandelier official video","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Chantaje (feat. Maluma)"},"out":{"title":"chantaje","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Cheerleader (Felix Jaehn Remix) (Radio Edit)"},"out":{"title":"cheerleader","versionFlags":2,"identityFlags":2}}
+{"fn":"cleanTitle","in":{"s":"Chica (Stay With Me Afrobeat)"},"out":{"title":"chica stay with me afrobeat","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Chill Bill (feat. J. Davi$ & Spooks)"},"out":{"title":"chill bill","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"City Pressure (feat. Bulb)"},"out":{"title":"city pressure","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Clave Especial - MA\u00d1A [Video Oficial]"},"out":{"title":"clave especial mana video oficial","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Clocks - Radio Edit"},"out":{"title":"clocks","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Closer (feat. Halsey)"},"out":{"title":"closer","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Cold Heart (PNAU Remix)"},"out":{"title":"cold heart","versionFlags":2,"identityFlags":2}}
+{"fn":"cleanTitle","in":{"s":"Come As You Are (Instrumental)"},"out":{"title":"come as you are","versionFlags":8,"identityFlags":8}}
+{"fn":"cleanTitle","in":{"s":"Come As You Are (Piano Version)"},"out":{"title":"come as you are","versionFlags":4,"identityFlags":4}}
+{"fn":"cleanTitle","in":{"s":"Come As You Are (made popular by Nirvana) [backing version]"},"out":{"title":"come as you are made popular by nirvana backing version","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Come My Way (softer version)"},"out":{"title":"come my way softer version","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Come as You Are (Metal Cover)"},"out":{"title":"come as you are","versionFlags":32,"identityFlags":32}}
+{"fn":"cleanTitle","in":{"s":"Come as You are (Unplugged Version) [Originally Performed by Nirvana] {Karaoke Version}"},"out":{"title":"come as you are karaoke version originally performed by nirvana","versionFlags":1,"identityFlags":1}}
+{"fn":"cleanTitle","in":{"s":"Counting Stars (2023 Version) [Official Audio]"},"out":{"title":"counting stars 2023 version official audio","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Creedence Clearwater Revival - Have You Ever Seen the Rain (For the Love of Dogs)"},"out":{"title":"creedence clearwater revival have you ever seen the rain for the love of dogs","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Creepin' (Remix)"},"out":{"title":"creepin","versionFlags":2,"identityFlags":2}}
+{"fn":"cleanTitle","in":{"s":"Crew Love (feat. The Weeknd)"},"out":{"title":"crew love","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Crooked Colours - I'll Be There [Official Video]"},"out":{"title":"crooked colours i ll be there official video","versionFlags":0,"identityFlags":0}}
+{"fn":"cleanTitle","in":{"s":"Cupid (Twin Version)"},"out":{"title":"cupid twin version","versionFlags":0,"identityFlags":0}}

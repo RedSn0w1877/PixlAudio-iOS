@@ -247,16 +247,41 @@ public enum AutoplayPolicy {
     /// autoplay is still the radio of what the listener chose, not the radio of a radio. `engineOwned` says, per
     /// queue index, whether the engine put that item there.
     public static func anchorIndices(currentAbsoluteIndex: Int, queueSize: Int, engineOwned: (Int) -> Bool,
-                                     mediaIdAt: (Int) -> String) -> [Int] {
+                                     mediaIdAt: (Int) -> String, max: Int = maxAnchors) -> [Int] {
         if queueSize <= 0 { return [] }
         var out: [Int] = []
         var seen = Set<BrainKey>()
         var i = min(currentAbsoluteIndex, queueSize - 1)
-        while i >= 0 && out.count < maxAnchors {
+        while i >= 0 && out.count < max {
             if !engineOwned(i) && seen.insert(BrainKey(mediaIdAt(i))).inserted { out.append(i) }
             i -= 1
         }
         return out
+    }
+
+    // MARK: Re-scoring the tail (7.3, decision D8)
+
+    /// How many tracks after the current one the prefetcher has warmed: the next one, or the next two on unmetered
+    /// Wi-Fi. A re-score never replaces them.
+    public static func warmedAhead(unmeteredWifi: Bool) -> Int { unmeteredWifi ? 2 : 1 }
+
+    /// The first queue index a re-score may replace, or -1 when there is nothing to re-score. It lies after the
+    /// current track and the `warmedAhead` ones, and after the last track the listener put in the queue: only an
+    /// unbroken run of engine items at the very end is the engine's to change.
+    public static func rescoreStart(queueSize: Int, currentAbsoluteIndex: Int, warmedAhead: Int,
+                                    engineOwned: (Int) -> Bool) -> Int {
+        if queueSize <= 0 || currentAbsoluteIndex < 0 { return -1 }
+        var start = currentAbsoluteIndex + 1 + (warmedAhead < 1 ? 1 : warmedAhead)
+        if start >= queueSize { return -1 }
+        var i = queueSize - 1
+        while i >= start {
+            if !engineOwned(i) {
+                start = i + 1
+                break
+            }
+            i -= 1
+        }
+        return start >= queueSize ? -1 : start
     }
 
     /// The arm of a library track the pool plays: FAV when it was ever played, DEEP when it never was.

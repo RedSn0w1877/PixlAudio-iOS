@@ -1,0 +1,345 @@
+{"fn":"nameKey","in":{"artist":"\u7c73\u6d25\u7384\u5e2b","title":"\u591c\u306b\u99c6\u3051\u308b"},"out":{"key":"n:\u7c73\u6d25\u7384\u5e2b|\u591c\u306b\u99c6\u3051\u308b|0"}}
+{"fn":"nameKey","in":{"artist":"Mrs. GREEN APPLE","title":"Pretender"},"out":{"key":"n:mrs green apple|pretender|0"}}
+{"fn":"nameKey","in":{"artist":"\ube14\ub799\ud551\ud06c","title":"\u30a2\u30a4\u30c9\u30eb"},"out":{"key":"n:\ube14\ub799\ud551\ud06c|\u30a2\u30a4\u30c9\u30eb|0"}}
+{"fn":"nameKey","in":{"artist":"\uc545\ub3d9\ubba4\uc9c0\uc158","title":"First Love (2022 Remastered)"},"out":{"key":"n:\uc545\ub3d9\ubba4\uc9c0\uc158|first love|0"}}
+{"fn":"nameKey","in":{"artist":"V\u0169.","title":"\u30c9\u30e9\u30a4\u30d5\u30e9\u30ef\u30fc [Acoustic Ver.]"},"out":{"key":"n:vu|\u30c9\u30e9\u30a4\u30d5\u30e9\u30ef\u30fc|4"}}
+{"fn":"nameKey","in":{"artist":"Erik","title":"\u591c\u306b\u99c6\u3051\u308b\uff08Instrumental\uff09"},"out":{"key":"n:erik|\u591c\u306b\u99c6\u3051\u308b|8"}}
+{"fn":"nameKey","in":{"artist":"Noo Ph\u01b0\u1edbc Th\u1ecbnh","title":"\ubc24\ud3b8\uc9c0"},"out":{"key":"n:noo phuoc thinh|\ubc24\ud3b8\uc9c0|0"}}
+{"fn":"nameKey","in":{"artist":"Zo\u00eb Keating","title":"\ub69c\ub450\ub69c\ub450 (DDU-DU DDU-DU)"},"out":{"key":"n:zoe keating|\ub69c\ub450\ub69c\ub450 ddu du ddu du|0"}}
+{"fn":"nameKey","in":{"artist":"Die \u00c4rzte","title":"\uc0ac\uac74\uc758 \uc9c0\ud3c9\uc120"},"out":{"key":"n:die arzte|\uc0ac\uac74\uc758 \uc9c0\ud3c9\uc120|0"}}
+{"fn":"nameKey","in":{"artist":"$uicideboy$","title":"Blue Hour (Japanese Ver.)"},"out":{"key":"n:uicideboy|blue hour japanese ver|0"}}
+{"fn":"nameKey","in":{"artist":"\u0414\u0414\u0422","title":"N\u01a1i N\u00e0y C\u00f3 Anh"},"out":{"key":"n:\u0434\u0434\u0442|noi nay co anh|0"}}
+{"fn":"nameKey","in":{"artist":"NewJeans","title":"See T\u00ecnh (Speed Up Version)"},"out":{"key":"n:newjeans|see tinh|80"}}
+{"fn":"nameKey","in":{"artist":"Billie Eilish","title":"Em C\u1ee7a Ng\u00e0y H\u00f4m Qua"},"out":{"key":"n:billie eilish|em cua ngay hom qua|0"}}
+{"fn":"nameKey","in":{"artist":"tab\u0009separated","title":"\u0110i V\u1ec1 Nh\u00e0"},"out":{"key":"n:tab separated|di ve nha|0"}}
+{"fn":"nameKey","in":{"artist":"e\u0301","title":"Waiting For You (Karaoke)"},"out":{"key":"n:e|waiting for you|40"}}
+{"fn":"nameKey","in":{"artist":" Meme Media","title":"V\u00ec Anh \u0110\u00e2u C\u00f3 Bi\u1ebft (Slowed + Reverb)"},"out":{"key":"n:meme media|vi anh dau co biet|100"}}
+{"fn":"nameKey","in":{"artist":"'00s Rock Chillout","title":"\u0110\u1eebng L\u00e0m Tr\u00e1i Tim Anh \u0110au"},"out":{"key":"n:00s rock chillout|dung lam trai tim anh dau|0"}}
+{"fn":"nameKey","in":{"artist":"'80s Rock Ballads","title":"Dreams (2004 Remaster)"},"out":{"key":"n:80s rock ballads|dreams|0"}}
+{"fn":"nameKey","in":{"artist":"070 Shake","title":"Smells Like Teen Spirit - Remastered 2021"},"out":{"key":"n:070 shake|smells like teen spirit|0"}}
+{"fn":"nameKey","in":{"artist":"2000s Radio","title":"Blinding Lights (with ROSAL\u00cdA) - Remix"},"out":{"key":"n:2000s radio|blinding lights|2"}}
+{"fn":"nameKey","in":{"artist":"2AM","title":"DNA."},"out":{"key":"n:2am|dna|0"}}
+{"fn":"nameKey","in":{"artist":"4 Shooters Only\u2122","title":"Espresso"},"out":{"key":"n:4 shooters only\u2122|espresso|0"}}
+{"fn":"nameKey","in":{"artist":"9 months & 50 hours","title":"Romantic Homicide"},"out":{"key":"n:9 months 50 hours|romantic homicide|0"}}
+{"fn":"nameKey","in":{"artist":"A Piece Of My Mind","title":"Get Lucky (Radio Edit) [feat. Pharrell Williams & Nile Rodgers]"},"out":{"key":"n:a piece of my mind|get lucky|0"}}
+{"fn":"nameKey","in":{"artist":"ADDICTED","title":"Hips Don't Lie (feat. Wyclef Jean)"},"out":{"key":"n:addicted|hips don t lie|0"}}
+{"fn":"nameKey","in":{"artist":"ANDROMEDA","title":"Part 2 (Interlude)"},"out":{"key":"n:andromeda|part 2 interlude|0"}}
+{"fn":"nameKey","in":{"artist":"ATEEZ","title":"[Untitled]"},"out":{"key":"n:ateez|untitled|0"}}
+{"fn":"nameKey","in":{"artist":"Aaron Smith","title":"Stay (Instrumental)"},"out":{"key":"n:aaron smith|stay|8"}}
+{"fn":"nameKey","in":{"artist":"Acoustic Japan","title":"Heat Waves (Slowed)"},"out":{"key":"n:acoustic japan|heat waves|100"}}
+{"fn":"nameKey","in":{"artist":"Adam Mockler","title":"Africa (Cover)"},"out":{"key":"n:adam mockler|africa|20"}}
+{"fn":"nameKey","in":{"artist":"After Hours (Deluxe)","title":"Wonderwall (MTV Unplugged)"},"out":{"key":"n:after hours deluxe|wonderwall|1"}}
+{"fn":"nameKey","in":{"artist":"Akon","title":"Levitating (feat. DaBaby)"},"out":{"key":"n:akon|levitating|0"}}
+{"fn":"nameKey","in":{"artist":"Alice In Chains","title":"Around the World (Original Mix)"},"out":{"key":"n:alice in chains|around the world|0"}}
+{"fn":"nameKey","in":{"artist":"All Time Low","title":"Rerecorded Hits: Jump"},"out":{"key":"n:all time low|rerecorded hits jump|0"}}
+{"fn":"nameKey","in":{"artist":"Aloka","title":"Alive"},"out":{"key":"n:aloka|alive|0"}}
+{"fn":"nameKey","in":{"artist":"Alt-Pop Hits","title":"Cover Me Up"},"out":{"key":"n:alt pop hits|cover me up|0"}}
+{"fn":"nameKey","in":{"artist":"Ambient Music Japan","title":"With Or Without You"},"out":{"key":"n:ambient music japan|with or without you|0"}}
+{"fn":"nameKey","in":{"artist":"Amin\u00e9","title":"Explicit"},"out":{"key":"n:amine|explicit|0"}}
+{"fn":"nameKey","in":{"artist":"Anderson .Paak","title":"Song (Deluxe Edition)"},"out":{"key":"n:anderson paak|song|0"}}
+{"fn":"nameKey","in":{"artist":"Anh T\u00fa Atus","title":"Song (Album Version)"},"out":{"key":"n:anh tu atus|song|0"}}
+{"fn":"nameKey","in":{"artist":"Anne Hathaway","title":"Song - Radio Edit"},"out":{"key":"n:anne hathaway|song|0"}}
+{"fn":"nameKey","in":{"artist":"Anti Love Songs","title":"Song (prod. Metro Boomin)"},"out":{"key":"n:anti love songs|song|0"}}
+{"fn":"nameKey","in":{"artist":"Ares","title":"Song (From \"A Film\")"},"out":{"key":"n:ares|song|0"}}
+{"fn":"nameKey","in":{"artist":"Armani White","title":"Song (Rework)"},"out":{"key":"n:armani white|song|2"}}
+{"fn":"nameKey","in":{"artist":"Asian Wave","title":"Song (Inst.)"},"out":{"key":"n:asian wave|song|8"}}
+{"fn":"nameKey","in":{"artist":"Audioslave","title":""},"out":{"key":null}}
+{"fn":"nameKey","in":{"artist":"B.o.B","title":"- Live"},"out":{"key":"n:b o b|live|0"}}
+{"fn":"nameKey","in":{"artist":"BAM BAM","title":"07. Em - Binz (feat. SOOBIN) | G\u1eb7p L\u1ea1i Album"},"out":{"key":"n:bam bam|07 em binz gap lai album|0"}}
+{"fn":"nameKey","in":{"artist":"BIBI","title":"ANH L\u00c0 NGO\u1ea0I L\u1ec6 C\u1ee6A EM - PH\u01af\u01a0NG LY | OFFICIAL MV"},"out":{"key":"n:bibi|anh la ngoai le cua em phuong ly official mv|0"}}
+{"fn":"nameKey","in":{"artist":"BLAME IT ON BABY","title":"Anh N\u00ean \u0110i Kh\u1ecfi \u0110\u00e2y"},"out":{"key":"n:blame it on baby|anh nen di khoi day|0"}}
+{"fn":"nameKey","in":{"artist":"BRAT","title":"Anh V\u1ed9i Qu\u00ean Drill ( Prod Young_Tachi ) Nguy\u1ec5n Th\u1ea1c B\u1ea3o Ng\u1ecdc - Audio Lyrics"},"out":{"key":"n:brat|anh voi quen drill nguyen thac bao ngoc audio lyrics|0"}}
+{"fn":"nameKey","in":{"artist":"Babydoll","title":"Bu\u1ed3n Hay Vui (feat. RPT MCK, Obito, Ronboogz & Boyzed)"},"out":{"key":"n:babydoll|buon hay vui|0"}}
+{"fn":"nameKey","in":{"artist":"Badshah","title":"B\u00ed K\u00edp Sinh T\u1ed3n Cho Tr\u00e1i Tim Tan V\u1ee1"},"out":{"key":"n:badshah|bi kip sinh ton cho trai tim tan vo|0"}}
+{"fn":"nameKey","in":{"artist":"Barker","title":"B\u1ea3o Anh - TH\u1ebe N\u00c0O L\u00c0 \u0110\u00daNG? (OST CH\u1eca CH\u1eca EM EM 3) | MV OFFICIAL"},"out":{"key":"n:barker|bao anh the nao la dung mv official ost chi chi em em 3|0"}}
+{"fn":"nameKey","in":{"artist":"Bazzi","title":"B\u1ed9 3 Tam Ca Khi\u1ebfn C\u1ea3 Qu\u00e1n Nh\u1eadu \u0110\u1ee9ng Ng\u1ed3i Kh\u00f4ng Y\u00ean V\u00ec Qu\u00e1 Gi\u1ed1ng \u0110an Nguy\u00ean, M\u1ea1nh Qu\u1ef3nh, Ch\u1ebf Linh"},"out":{"key":"n:bazzi|bo 3 tam ca khien ca quan nhau dung ngoi khong yen vi qua giong dan nguyen manh quynh che linh|0"}}
+{"fn":"nameKey","in":{"artist":"Beats & Soul","title":"Chia Tay Qu\u00e1 \u0110\u00e3"},"out":{"key":"n:beats soul|chia tay qua da|0"}}
+{"fn":"nameKey","in":{"artist":"Believer","title":"Chuy\u1ec7n \u0110\u00f4i Ta (feat. Mu\u1ed9ii)"},"out":{"key":"n:believer|chuyen doi ta|0"}}
+{"fn":"nameKey","in":{"artist":"Best Friends (Remix)","title":"Ch\u00fang Ta C\u1ee7a T\u01b0\u01a1ng Lai"},"out":{"key":"n:best friends remix|chung ta cua tuong lai|0"}}
+{"fn":"nameKey","in":{"artist":"Big Dawgs","title":"Ch\u0103m Em M\u1ed9t \u0110\u1eddi"},"out":{"key":"n:big dawgs|cham em mot doi|0"}}
+{"fn":"nameKey","in":{"artist":"Billy Idol","title":"Ch\u01b0a Ph\u1ea3i L\u00e0 Y\u00eau (feat. Rex)"},"out":{"key":"n:billy idol|chua phai la yeu|0"}}
+{"fn":"nameKey","in":{"artist":"Bite The Dust","title":"Ch\u1ea1y Ngay \u0110i (Sky Tour 2019)"},"out":{"key":"n:bite the dust|chay ngay di sky tour 2019|0"}}
+{"fn":"nameKey","in":{"artist":"Black Panther The Album Music From And Inspired By","title":"Ch\u1edd Em \u0110\u1ebfn Bao Gi\u1edd?"},"out":{"key":"n:black panther the album music from and inspired by|cho em den bao gio|0"}}
+{"fn":"nameKey","in":{"artist":"Blinding Lights","title":"C\u00f3 \u0110\u00f4i \u0110i\u1ec1u"},"out":{"key":"n:blinding lights|co doi dieu|0"}}
+{"fn":"nameKey","in":{"artist":"Blinding Lights (Official Video)","title":"C\u0169ng B\u1edfi Do Ngh\u00e8o (V\u1ecdng Kim Lang)"},"out":{"key":"n:blinding lights official video|cung boi do ngheo vong kim lang|0"}}
+{"fn":"nameKey","in":{"artist":"Blksmiith","title":"C\u01a1n M\u01b0a Ngang Qua (Remix 2022)"},"out":{"key":"n:blksmiith|con mua ngang qua|2"}}
+{"fn":"nameKey","in":{"artist":"Blue \u00d6yster Cult","title":"C\u1ee8 \u0110\u1ec2 ANH TA R\u1edcI \u0110I (feat. D\u01af\u01a0NG DOMIC, QUANG H\u00d9NG MASTERD, LOU HO\u00c0NG & SONG LU\u00c2N)"},"out":{"key":"n:blue oyster cult|cu de anh ta roi di|0"}}
+{"fn":"nameKey","in":{"artist":"Bon Nghi\u00eam","title":"Dangrangto - '\u0111\u1ec3 d\u00e0nh cho em' (Visualizer)"},"out":{"key":"n:bon nghiem|dangrangto de danh cho em visualizer|0"}}
+{"fn":"nameKey","in":{"artist":"Both Feet In","title":"D\u00f9 Anh C\u00f3 \u0110\u1ee9ng L\u1ea1i"},"out":{"key":"n:both feet in|du anh co dung lai|0"}}
+{"fn":"nameKey","in":{"artist":"Brenda Lee","title":"Em Ch\u01b0a 18 (Em Ch\u01b0a 18 Original Soundtrack)"},"out":{"key":"n:brenda lee|em chua 18 em chua 18 original soundtrack|0"}}
+{"fn":"nameKey","in":{"artist":"Broken Toy Airplanes","title":"Em kh\u00f4ng l\u1ebb loi"},"out":{"key":"n:broken toy airplanes|em khong le loi|0"}}
+{"fn":"nameKey","in":{"artist":"Burgundy Symphony","title":"(S)TRONG"},"out":{"key":"n:burgundy symphony|trong s|0"}}
+{"fn":"nameKey","in":{"artist":"B\u00f9i C\u00f4ng Nam","title":"50 Ph\u00edt (Remix)"},"out":{"key":"n:bui cong nam|50 phit|2"}}
+{"fn":"nameKey","in":{"artist":"CCAP Entertainment","title":"9 Samurai (feat. The Spaceape)"},"out":{"key":"n:ccap entertainment|9 samurai|0"}}
+{"fn":"nameKey","in":{"artist":"CONFESSIONS II: Instrumentals","title":"Aayee Hai Diwali (From \"Aamdani Atthanni Kharcha Rupaiya\")"},"out":{"key":"n:confessions ii instrumentals|aayee hai diwali|0"}}
+{"fn":"nameKey","in":{"artist":"Californication","title":"Ala Ela (feat. Ricky Star, Gducky & Karik)"},"out":{"key":"n:californication|ala ela|0"}}
+{"fn":"nameKey","in":{"artist":"Can't Feel My Face (Martin Garrix Remix)","title":"All The Stars (From \"Black Panther: The Album\")"},"out":{"key":"n:can t feel my face martin garrix remix|all the stars|0"}}
+{"fn":"nameKey","in":{"artist":"Caribou","title":"Anti-Hero"},"out":{"key":"n:caribou|anti hero|0"}}
+{"fn":"nameKey","in":{"artist":"Cedric Gervais","title":"As It Was (Official Video)"},"out":{"key":"n:cedric gervais|as it was official video|0"}}
+{"fn":"nameKey","in":{"artist":"Charlie Hunter Trio","title":"BADMAN FUNK (SPED UP)"},"out":{"key":"n:charlie hunter trio|badman funk|80"}}
+{"fn":"nameKey","in":{"artist":"Cherry Red","title":"BOO (Radio Edit)"},"out":{"key":"n:cherry red|boo|0"}}
+{"fn":"nameKey","in":{"artist":"Chill EDM Hits","title":"Bad Boy (feat. Korkormikor)"},"out":{"key":"n:chill edm hits|bad boy|0"}}
+{"fn":"nameKey","in":{"artist":"Chill Tracks 2026","title":"Bailando (feat. Descemer Bueno & Gente De Zona)"},"out":{"key":"n:chill tracks 2026|bailando|0"}}
+{"fn":"nameKey","in":{"artist":"Chrome Sparks","title":"Beautiful People (feat. Khalid)"},"out":{"key":"n:chrome sparks|beautiful people|0"}}
+{"fn":"nameKey","in":{"artist":"Ch\u00fang Ta Kh\u00f4ng Thu\u1ed9c V\u1ec1 Nhau","title":"Blame (feat. John Newman)"},"out":{"key":"n:chung ta khong thuoc ve nhau|blame|0"}}
+{"fn":"nameKey","in":{"artist":"Ch\u1edd Em \u0110\u1ebfn Bao Gi\u1edd?","title":"Blinding Lights (Live)"},"out":{"key":"n:cho em den bao gio|blinding lights|1"}}
+{"fn":"nameKey","in":{"artist":"Classic Easy Rock","title":"Blinding Lights (Tabata)"},"out":{"key":"n:classic easy rock|blinding lights tabata|0"}}
+{"fn":"nameKey","in":{"artist":"Classical Solo Piano","title":"Blinding Lights - Slowed (feat. Complicit)"},"out":{"key":"n:classical solo piano|blinding lights|100"}}
+{"fn":"nameKey","in":{"artist":"Cloud","title":"Body Like A Back Road (Official Lyric Video)"},"out":{"key":"n:cloud|body like a back road official lyric video|0"}}
+{"fn":"nameKey","in":{"artist":"Coldz","title":"Breathe This Air (Remaster 2023)"},"out":{"key":"n:coldz|breathe this air|0"}}
+{"fn":"nameKey","in":{"artist":"Come To Daddy","title":"Burial: In McDonalds (Hyperdub 2007)"},"out":{"key":"n:come to daddy|burial in mcdonalds hyperdub 2007|0"}}
+{"fn":"nameKey","in":{"artist":"Cool","title":"Call Out My Name (Live)"},"out":{"key":"n:cool|call out my name|1"}}
+{"fn":"nameKey","in":{"artist":"Cozy Jazz","title":"Can't Hold Us (feat. Ray Dalton)"},"out":{"key":"n:cozy jazz|can t hold us|0"}}
+{"fn":"nameKey","in":{"artist":"Creepin' (Remix) (feat. 21 Savage)","title":"Casa Tupka Anthemo (feat. Priyanshi Srivastava)"},"out":{"key":"n:creepin remix feat 21 savage|casa tupka anthemo|0"}}
+{"fn":"nameKey","in":{"artist":"Cuntsniffer","title":"Chantaje (feat. Maluma)"},"out":{"key":"n:cuntsniffer|chantaje|0"}}
+{"fn":"nameKey","in":{"artist":"C\u01a1n M\u01b0a Cu\u1ed1i","title":"Chill Bill (feat. J. Davi$ & Spooks)"},"out":{"key":"n:con mua cuoi|chill bill|0"}}
+{"fn":"nameKey","in":{"artist":"DC T\u00e2m","title":"Clocks - Radio Edit"},"out":{"key":"n:dc tam|clocks|0"}}
+{"fn":"nameKey","in":{"artist":"DJ Goja","title":"Come As You Are (Instrumental)"},"out":{"key":"n:dj goja|come as you are|8"}}
+{"fn":"nameKey","in":{"artist":"DON'T YOU WORRY (Farruko Remix)","title":"Come My Way (softer version)"},"out":{"key":"n:don t you worry farruko remix|come my way softer version|0"}}
+{"fn":"nameKey","in":{"artist":"Da Real Slime","title":"Counting Stars (2023 Version) [Official Audio]"},"out":{"key":"n:da real slime|counting stars 2023 version official audio|0"}}
+{"fn":"nameKey","in":{"artist":"Daily Top Music Videos - Vietnam","title":"Crew Love (feat. The Weeknd)"},"out":{"key":"n:daily top music videos vietnam|crew love|0"}}
+{"fn":"nameKey","in":{"artist":"Dancing In The Flames (Live from S\u00e3o Paulo)","title":"\u591c\u306b\u99c6\u3051\u308b"},"out":{"key":"n:dancing in the flames live from sao paulo|\u591c\u306b\u99c6\u3051\u308b|0"}}
+{"fn":"nameKey","in":{"artist":"Dat G","title":"Pretender"},"out":{"key":"n:dat g|pretender|0"}}
+{"fn":"nameKey","in":{"artist":"Dawn FM (Lyric Videos)","title":"\u30a2\u30a4\u30c9\u30eb"},"out":{"key":"n:dawn fm lyric videos|\u30a2\u30a4\u30c9\u30eb|0"}}
+{"fn":"nameKey","in":{"artist":"DeBarge","title":"First Love (2022 Remastered)"},"out":{"key":"n:debarge|first love|0"}}
+{"fn":"nameKey","in":{"artist":"Def Leppard","title":"\u30c9\u30e9\u30a4\u30d5\u30e9\u30ef\u30fc [Acoustic Ver.]"},"out":{"key":"n:def leppard|\u30c9\u30e9\u30a4\u30d5\u30e9\u30ef\u30fc|4"}}
+{"fn":"nameKey","in":{"artist":"Desiigner","title":"\u591c\u306b\u99c6\u3051\u308b\uff08Instrumental\uff09"},"out":{"key":"n:desiigner|\u591c\u306b\u99c6\u3051\u308b|8"}}
+{"fn":"nameKey","in":{"artist":"Diddy","title":"\ubc24\ud3b8\uc9c0"},"out":{"key":"n:diddy|\ubc24\ud3b8\uc9c0|0"}}
+{"fn":"nameKey","in":{"artist":"Dinner for Two","title":"\ub69c\ub450\ub69c\ub450 (DDU-DU DDU-DU)"},"out":{"key":"n:dinner for two|\ub69c\ub450\ub69c\ub450 ddu du ddu du|0"}}
+{"fn":"nameKey","in":{"artist":"Dj Towla","title":"\uc0ac\uac74\uc758 \uc9c0\ud3c9\uc120"},"out":{"key":"n:dj towla|\uc0ac\uac74\uc758 \uc9c0\ud3c9\uc120|0"}}
+{"fn":"nameKey","in":{"artist":"Dominic Fike","title":"Blue Hour (Japanese Ver.)"},"out":{"key":"n:dominic fike|blue hour japanese ver|0"}}
+{"fn":"nameKey","in":{"artist":"Dope Spot","title":"N\u01a1i N\u00e0y C\u00f3 Anh"},"out":{"key":"n:dope spot|noi nay co anh|0"}}
+{"fn":"nameKey","in":{"artist":"Drake","title":"See T\u00ecnh (Speed Up Version)"},"out":{"key":"n:drake|see tinh|80"}}
+{"fn":"nameKey","in":{"artist":"Driving and chill","title":"Em C\u1ee7a Ng\u00e0y H\u00f4m Qua"},"out":{"key":"n:driving and chill|em cua ngay hom qua|0"}}
+{"fn":"nameKey","in":{"artist":"Duryodhan Rana","title":"\u0110i V\u1ec1 Nh\u00e0"},"out":{"key":"n:duryodhan rana|di ve nha|0"}}
+{"fn":"nameKey","in":{"artist":"E L\u00e0 \u0110\u00f4n Ch\u1ec1","title":"Waiting For You (Karaoke)"},"out":{"key":"n:e la don che|waiting for you|40"}}
+{"fn":"nameKey","in":{"artist":"ELM","title":"V\u00ec Anh \u0110\u00e2u C\u00f3 Bi\u1ebft (Slowed + Reverb)"},"out":{"key":"n:elm|vi anh dau co biet|100"}}
+{"fn":"nameKey","in":{"artist":"Eastern Anatolia Folk","title":"\u0110\u1eebng L\u00e0m Tr\u00e1i Tim Anh \u0110au"},"out":{"key":"n:eastern anatolia folk|dung lam trai tim anh dau|0"}}
+{"fn":"nameKey","in":{"artist":"Echosmith","title":"Dreams (2004 Remaster)"},"out":{"key":"n:echosmith|dreams|0"}}
+{"fn":"nameKey","in":{"artist":"Egyptian Chill","title":"Smells Like Teen Spirit - Remastered 2021"},"out":{"key":"n:egyptian chill|smells like teen spirit|0"}}
+{"fn":"nameKey","in":{"artist":"El Payaso Plim Plim","title":"Blinding Lights (with ROSAL\u00cdA) - Remix"},"out":{"key":"n:el payaso plim plim|blinding lights|2"}}
+{"fn":"nameKey","in":{"artist":"Elephant","title":"DNA."},"out":{"key":"n:elephant|dna|0"}}
+{"fn":"nameKey","in":{"artist":"Em K\u1ec3 Anh Nghe","title":"Espresso"},"out":{"key":"n:em ke anh nghe|espresso|0"}}
+{"fn":"nameKey","in":{"artist":"En Algun Lugar","title":"Romantic Homicide"},"out":{"key":"n:en algun lugar|romantic homicide|0"}}
+{"fn":"nameKey","in":{"artist":"Endtroducing.....","title":"Get Lucky (Radio Edit) [feat. Pharrell Williams & Nile Rodgers]"},"out":{"key":"n:endtroducing|get lucky|0"}}
+{"fn":"nameKey","in":{"artist":"Esencia Caribe\u00f1a","title":"Hips Don't Lie (feat. Wyclef Jean)"},"out":{"key":"n:esencia caribena|hips don t lie|0"}}
+{"fn":"nameKey","in":{"artist":"Everybody Scream Tour Live","title":"Part 2 (Interlude)"},"out":{"key":"n:everybody scream tour live|part 2 interlude|0"}}
+{"fn":"nameKey","in":{"artist":"FIFTY FIFTY","title":"[Untitled]"},"out":{"key":"n:fifty fifty|untitled|0"}}
+{"fn":"nameKey","in":{"artist":"FUTURE","title":"Stay (Instrumental)"},"out":{"key":"n:future|stay|8"}}
+{"fn":"nameKey","in":{"artist":"Fall Out Boy","title":"Heat Waves (Slowed)"},"out":{"key":"n:fall out boy|heat waves|100"}}
+{"fn":"nameKey","in":{"artist":"Fatt Smaxk","title":"Africa (Cover)"},"out":{"key":"n:fatt smaxk|africa|20"}}
+{"fn":"nameKey","in":{"artist":"Feeling Good","title":"Wonderwall (MTV Unplugged)"},"out":{"key":"n:feeling good|wonderwall|1"}}
+{"fn":"nameKey","in":{"artist":"Final Circle","title":"Levitating (feat. DaBaby)"},"out":{"key":"n:final circle|levitating|0"}}
+{"fn":"nameKey","in":{"artist":"Florence + The Machine","title":"Around the World (Original Mix)"},"out":{"key":"n:florence the machine|around the world|0"}}
+{"fn":"nameKey","in":{"artist":"Foster The People","title":"Rerecorded Hits: Jump"},"out":{"key":"n:foster the people|rerecorded hits jump|0"}}
+{"fn":"nameKey","in":{"artist":"French Montana","title":"Alive"},"out":{"key":"n:french montana|alive|0"}}
+{"fn":"nameKey","in":{"artist":"Freshly Chilled: Alt Pop and Indie","title":"Cover Me Up"},"out":{"key":"n:freshly chilled alt pop and indie|cover me up|0"}}
+{"fn":"nameKey","in":{"artist":"Funk Wav Bounces Vol.1","title":"With Or Without You"},"out":{"key":"n:funk wav bounces vol 1|with or without you|0"}}
+{"fn":"nameKey","in":{"artist":"GENIC","title":"Explicit"},"out":{"key":"n:genic|explicit|0"}}
+{"fn":"nameKey","in":{"artist":"GREY D","title":"Song (Deluxe Edition)"},"out":{"key":"n:grey d|song|0"}}
+{"fn":"nameKey","in":{"artist":"Geek Music","title":"Song (Album Version)"},"out":{"key":"n:geek music|song|0"}}
+{"fn":"nameKey","in":{"artist":"Gesaffelstein","title":"Song - Radio Edit"},"out":{"key":"n:gesaffelstein|song|0"}}
+{"fn":"nameKey","in":{"artist":"Gil's Arena","title":"Song (prod. Metro Boomin)"},"out":{"key":"n:gil s arena|song|0"}}
+{"fn":"nameKey","in":{"artist":"Go Slower","title":"Song (From \"A Film\")"},"out":{"key":"n:go slower|song|0"}}
+{"fn":"nameKey","in":{"artist":"\u5b87\u591a\u7530\u30d2\u30ab\u30eb","title":"Song (Rework)"},"out":{"key":"n:\u5b87\u591a\u7530\u30d2\u30ab\u30eb|song|2"}}
+{"fn":"nameKey","in":{"artist":"\u690e\u540d\u6797\u6a8e","title":"Song (Inst.)"},"out":{"key":"n:\u690e\u540d\u6797\u6a8e|song|8"}}
+{"fn":"nameKey","in":{"artist":"\uc544\uc774\uc720","title":""},"out":{"key":null}}
+{"fn":"nameKey","in":{"artist":"S\u01a1n T\u00f9ng M-TP","title":"- Live"},"out":{"key":"n:son tung m tp|live|0"}}
+{"fn":"nameKey","in":{"artist":"Chillies","title":"07. Em - Binz (feat. SOOBIN) | G\u1eb7p L\u1ea1i Album"},"out":{"key":"n:chillies|07 em binz gap lai album|0"}}
+{"fn":"nameKey","in":{"artist":"MIN","title":"ANH L\u00c0 NGO\u1ea0I L\u1ec6 C\u1ee6A EM - PH\u01af\u01a0NG LY | OFFICIAL MV"},"out":{"key":"n:min|anh la ngoai le cua em phuong ly official mv|0"}}
+{"fn":"nameKey","in":{"artist":"Nguy\u1ec5n Tr\u1ea7n Trung Qu\u00e2n","title":"Anh N\u00ean \u0110i Kh\u1ecfi \u0110\u00e2y"},"out":{"key":"n:nguyen tran trung quan|anh nen di khoi day|0"}}
+{"fn":"nameKey","in":{"artist":"\u0141\u0105ki \u0141an","title":"Anh V\u1ed9i Qu\u00ean Drill ( Prod Young_Tachi ) Nguy\u1ec5n Th\u1ea1c B\u1ea3o Ng\u1ecdc - Audio Lyrics"},"out":{"key":"n:laki lan|anh voi quen drill nguyen thac bao ngoc audio lyrics|0"}}
+{"fn":"nameKey","in":{"artist":"Stra\u00dfe","title":"Bu\u1ed3n Hay Vui (feat. RPT MCK, Obito, Ronboogz & Boyzed)"},"out":{"key":"n:strasse|buon hay vui|0"}}
+{"fn":"nameKey","in":{"artist":"blink-182","title":"B\u00ed K\u00edp Sinh T\u1ed3n Cho Tr\u00e1i Tim Tan V\u1ee1"},"out":{"key":"n:blink 182|bi kip sinh ton cho trai tim tan vo|0"}}
+{"fn":"nameKey","in":{"artist":"\u0417\u0435\u043c\u0444\u0438\u0440\u0430","title":"B\u1ea3o Anh - TH\u1ebe N\u00c0O L\u00c0 \u0110\u00daNG? (OST CH\u1eca CH\u1eca EM EM 3) | MV OFFICIAL"},"out":{"key":"n:\u0437\u0435\u043c\u0444\u0438\u0440\u0430|bao anh the nao la dung mv official ost chi chi em em 3|0"}}
+{"fn":"nameKey","in":{"artist":"Nirvana","title":"B\u1ed9 3 Tam Ca Khi\u1ebfn C\u1ea3 Qu\u00e1n Nh\u1eadu \u0110\u1ee9ng Ng\u1ed3i Kh\u00f4ng Y\u00ean V\u00ec Qu\u00e1 Gi\u1ed1ng \u0110an Nguy\u00ean, M\u1ea1nh Qu\u1ef3nh, Ch\u1ebf Linh"},"out":{"key":"n:nirvana|bo 3 tam ca khien ca quan nhau dung ngoi khong yen vi qua giong dan nguyen manh quynh che linh|0"}}
+{"fn":"nameKey","in":{"artist":"Daft Punk","title":"Chia Tay Qu\u00e1 \u0110\u00e3"},"out":{"key":"n:daft punk|chia tay qua da|0"}}
+{"fn":"nameKey","in":{"artist":"\uff46\uff55\uff4c\uff4c\uff57\uff49\uff44\uff54\uff48","title":"Chuy\u1ec7n \u0110\u00f4i Ta (feat. Mu\u1ed9ii)"},"out":{"key":"n:fullwidth|chuyen doi ta|0"}}
+{"fn":"nameKey","in":{"artist":"o\u0302\u0301","title":"Ch\u00fang Ta C\u1ee7a T\u01b0\u01a1ng Lai"},"out":{"key":"n:o|chung ta cua tuong lai|0"}}
+{"fn":"nameKey","in":{"artist":"#1 Hits Now","title":"Ch\u0103m Em M\u1ed9t \u0110\u1eddi"},"out":{"key":"n:1 hits now|cham em mot doi|0"}}
+{"fn":"nameKey","in":{"artist":"'10s Party","title":"Ch\u01b0a Ph\u1ea3i L\u00e0 Y\u00eau (feat. Rex)"},"out":{"key":"n:10s party|chua phai la yeu|0"}}
+{"fn":"nameKey","in":{"artist":"'90s Alternative","title":"Ch\u1ea1y Ngay \u0110i (Sky Tour 2019)"},"out":{"key":"n:90s alternative|chay ngay di sky tour 2019|0"}}
+{"fn":"nameKey","in":{"artist":"1 o clock","title":"Ch\u1edd Em \u0110\u1ebfn Bao Gi\u1edd?"},"out":{"key":"n:1 o clock|cho em den bao gio|0"}}
+{"fn":"nameKey","in":{"artist":"2014 Forest Hills Drive","title":"C\u00f3 \u0110\u00f4i \u0110i\u1ec1u"},"out":{"key":"n:2014 forest hills drive|co doi dieu|0"}}
+{"fn":"nameKey","in":{"artist":"2T","title":"C\u0169ng B\u1edfi Do Ngh\u00e8o (V\u1ecdng Kim Lang)"},"out":{"key":"n:2t|cung boi do ngheo vong kim lang|0"}}
+{"fn":"nameKey","in":{"artist":"48 Hours","title":"C\u01a1n M\u01b0a Ngang Qua (Remix 2022)"},"out":{"key":"n:48 hours|con mua ngang qua|2"}}
+{"fn":"nameKey","in":{"artist":"90s British Pop","title":"C\u1ee8 \u0110\u1ec2 ANH TA R\u1edcI \u0110I (feat. D\u01af\u01a0NG DOMIC, QUANG H\u00d9NG MASTERD, LOU HO\u00c0NG & SONG LU\u00c2N)"},"out":{"key":"n:90s british pop|cu de anh ta roi di|0"}}
+{"fn":"nameKey","in":{"artist":"A Place In The Sun","title":"Dangrangto - '\u0111\u1ec3 d\u00e0nh cho em' (Visualizer)"},"out":{"key":"n:a place in the sun|dangrangto de danh cho em visualizer|0"}}
+{"fn":"nameKey","in":{"artist":"AD\u00c9LA","title":"D\u00f9 Anh C\u00f3 \u0110\u1ee9ng L\u1ea1i"},"out":{"key":"n:adela|du anh co dung lai|0"}}
+{"fn":"nameKey","in":{"artist":"ANH TRAI \"SAY HI\"","title":"Em Ch\u01b0a 18 (Em Ch\u01b0a 18 Original Soundtrack)"},"out":{"key":"n:anh trai say hi|em chua 18 em chua 18 original soundtrack|0"}}
+{"fn":"nameKey","in":{"artist":"AUDREY NUNA","title":"Em kh\u00f4ng l\u1ebb loi"},"out":{"key":"n:audrey nuna|em khong le loi|0"}}
+{"fn":"nameKey","in":{"artist":"Aaryan Shah","title":"(S)TRONG"},"out":{"key":"n:aaryan shah|trong s|0"}}
+{"fn":"nameKey","in":{"artist":"Acoustic Love Songs","title":"50 Ph\u00edt (Remix)"},"out":{"key":"n:acoustic love songs|50 phit|2"}}
+{"fn":"nameKey","in":{"artist":"Ade Govinda","title":"9 Samurai (feat. The Spaceape)"},"out":{"key":"n:ade govinda|9 samurai|0"}}
+{"fn":"nameKey","in":{"artist":"After Hours (Remixes)","title":"Aayee Hai Diwali (From \"Aamdani Atthanni Kharcha Rupaiya\")"},"out":{"key":"n:after hours remixes|aayee hai diwali|0"}}
+{"fn":"nameKey","in":{"artist":"Akustikan","title":"Ala Ela (feat. Ricky Star, Gducky & Karik)"},"out":{"key":"n:akustikan|ala ela|0"}}
+{"fn":"nameKey","in":{"artist":"Alice in Chains","title":"All The Stars (From \"Black Panther: The Album\")"},"out":{"key":"n:alice in chains|all the stars|0"}}
+{"fn":"nameKey","in":{"artist":"All of Me","title":"Anti-Hero"},"out":{"key":"n:all of me|anti hero|0"}}
+{"fn":"nameKey","in":{"artist":"Alone Again (Official Live Performance)","title":"As It Was (Official Video)"},"out":{"key":"n:alone again official live performance|as it was official video|0"}}
+{"fn":"nameKey","in":{"artist":"Alternative","title":"BADMAN FUNK (SPED UP)"},"out":{"key":"n:alternative|badman funk|80"}}
+{"fn":"nameKey","in":{"artist":"Ambient Punk, Vol. II","title":"BOO (Radio Edit)"},"out":{"key":"n:ambient punk vol ii|boo|0"}}
+{"fn":"nameKey","in":{"artist":"Amitabh Bhattacharya","title":"Bad Boy (feat. Korkormikor)"},"out":{"key":"n:amitabh bhattacharya|bad boy|0"}}
+{"fn":"nameKey","in":{"artist":"Andrea Storm Kaden","title":"Bailando (feat. Descemer Bueno & Gente De Zona)"},"out":{"key":"n:andrea storm kaden|bailando|0"}}
+{"fn":"nameKey","in":{"artist":"Anh \u0110\u00e3 Quen V\u1edbi C\u00f4 \u0110\u01a1n","title":"Beautiful People (feat. Khalid)"},"out":{"key":"n:anh da quen voi co don|beautiful people|0"}}
+{"fn":"nameKey","in":{"artist":"Annie Elise","title":"Blame (feat. John Newman)"},"out":{"key":"n:annie elise|blame|0"}}
+{"fn":"nameKey","in":{"artist":"Antidawn EP","title":"Blinding Lights (Live)"},"out":{"key":"n:antidawn ep|blinding lights|1"}}
+{"fn":"nameKey","in":{"artist":"Ari Abdul","title":"Blinding Lights (Tabata)"},"out":{"key":"n:ari abdul|blinding lights tabata|0"}}
+{"fn":"nameKey","in":{"artist":"Artemas","title":"Blinding Lights - Slowed (feat. Complicit)"},"out":{"key":"n:artemas|blinding lights|100"}}
+{"fn":"nameKey","in":{"artist":"Astech","title":"Body Like A Back Road (Official Lyric Video)"},"out":{"key":"n:astech|body like a back road official lyric video|0"}}
+{"fn":"nameKey","in":{"artist":"Autechre","title":"Breathe This Air (Remaster 2023)"},"out":{"key":"n:autechre|breathe this air|0"}}
+{"fn":"nameKey","in":{"artist":"B2K","title":"Burial: In McDonalds (Hyperdub 2007)"},"out":{"key":"n:b2k|burial in mcdonalds hyperdub 2007|0"}}
+{"fn":"nameKey","in":{"artist":"BAN","title":"Call Out My Name (Live)"},"out":{"key":"n:ban|call out my name|1"}}
+{"fn":"nameKey","in":{"artist":"BIGBANG","title":"Can't Hold Us (feat. Ray Dalton)"},"out":{"key":"n:bigbang|can t hold us|0"}}
+{"fn":"nameKey","in":{"artist":"BLITZERS","title":"Casa Tupka Anthemo (feat. Priyanshi Srivastava)"},"out":{"key":"n:blitzers|casa tupka anthemo|0"}}
+{"fn":"nameKey","in":{"artist":"BREAK EVEN","title":"Chantaje (feat. Maluma)"},"out":{"key":"n:break even|chantaje|0"}}
+{"fn":"nameKey","in":{"artist":"Back For Everything","title":"Chill Bill (feat. J. Davi$ & Spooks)"},"out":{"key":"n:back for everything|chill bill|0"}}
+{"fn":"nameKey","in":{"artist":"Bag Raiders","title":"Clocks - Radio Edit"},"out":{"key":"n:bag raiders|clocks|0"}}
+{"fn":"nameKey","in":{"artist":"Baroque","title":"Come As You Are (Instrumental)"},"out":{"key":"n:baroque|come as you are|8"}}
+{"fn":"nameKey","in":{"artist":"Be Honest","title":"Come My Way (softer version)"},"out":{"key":"n:be honest|come my way softer version|0"}}
+{"fn":"nameKey","in":{"artist":"Beautiful People","title":"Counting Stars (2023 Version) [Official Audio]"},"out":{"key":"n:beautiful people|counting stars 2023 version official audio|0"}}
+{"fn":"nameKey","in":{"artist":"Belly","title":"Crew Love (feat. The Weeknd)"},"out":{"key":"n:belly|crew love|0"}}
+{"fn":"resolveTrack","in":{"case":"step1-strong-key-decides","step":0,"s":"4uLU6hMCjMI75M1A2tKUQC","i":null,"y":null,"artist":"Fleetwood Mac","title":"Dreams","durationMs":257000},"out":{"rid":"4634338134007667361","minted":true,"aliases":[{"key":"s:4uLU6hMCjMI75M1A2tKUQC","id":"4634338134007667361","durationMs":257000},{"key":"n:fleetwood mac|dreams|0","id":"4634338134007667361","durationMs":257000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"step1-strong-key-decides","step":1,"s":"4uLU6hMCjMI75M1A2tKUQC","i":null,"y":"mrZRURcb1cM","artist":"Fleetwood Mac","title":"Dreams (2004 Remaster)","durationMs":258000},"out":{"rid":"4634338134007667361","minted":false,"aliases":[{"key":"y:mrZRURcb1cM","id":"4634338134007667361","durationMs":258000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"step1-strong-key-decides","step":2,"s":null,"i":null,"y":"mrZRURcb1cM","artist":null,"title":null,"durationMs":0},"out":{"rid":"4634338134007667361","minted":false,"aliases":[],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"step2-name-bridge","step":0,"s":"2Fxmhks0bxGSBdJ92vM42m","i":null,"y":null,"artist":"Billie Eilish","title":"bad guy","durationMs":194000},"out":{"rid":"-7599991025023295578","minted":true,"aliases":[{"key":"s:2Fxmhks0bxGSBdJ92vM42m","id":"-7599991025023295578","durationMs":194000},{"key":"n:billie eilish|bad guy|0","id":"-7599991025023295578","durationMs":194000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"step2-name-bridge","step":1,"s":null,"i":null,"y":"DyDfgMOUjCI","artist":"Billie Eilish","title":"bad guy","durationMs":195500},"out":{"rid":"-7599991025023295578","minted":false,"aliases":[{"key":"y:DyDfgMOUjCI","id":"-7599991025023295578","durationMs":195500}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"step2-name-bridge","step":2,"s":null,"i":null,"y":null,"artist":"billie eilish","title":"Bad Guy","durationMs":0},"out":{"rid":"-7599991025023295578","minted":false,"aliases":[],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"step2-name-bridge","step":3,"s":null,"i":null,"y":null,"artist":"Billie Eilish","title":"bad guy (Live)","durationMs":0},"out":{"rid":"-922404686369972461","minted":true,"aliases":[{"key":"n:billie eilish|bad guy|1","id":"-922404686369972461","durationMs":0}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"step2-duration-rejection","step":0,"s":"aaaaaaaaaaaaaaaaaaaaaa","i":null,"y":null,"artist":"Taylor Swift","title":"All Too Well","durationMs":329000},"out":{"rid":"-2506434287235539798","minted":true,"aliases":[{"key":"s:aaaaaaaaaaaaaaaaaaaaaa","id":"-2506434287235539798","durationMs":329000},{"key":"n:taylor swift|all too well|0","id":"-2506434287235539798","durationMs":329000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"step2-duration-rejection","step":1,"s":null,"i":null,"y":"tollGa3S0o8","artist":"Taylor Swift","title":"All Too Well","durationMs":613000},"out":{"rid":"-7896493912711384156","minted":true,"aliases":[{"key":"y:tollGa3S0o8","id":"-7896493912711384156","durationMs":613000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"step2-duration-rejection","step":2,"s":null,"i":null,"y":"tollGa3S0o8","artist":"Taylor Swift","title":"All Too Well","durationMs":613000},"out":{"rid":"-7896493912711384156","minted":false,"aliases":[],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"step2-duration-rejection","step":3,"s":null,"i":null,"y":null,"artist":"Taylor Swift","title":"All Too Well","durationMs":0},"out":{"rid":"-2506434287235539798","minted":false,"aliases":[],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"step2-duration-rejection","step":4,"s":null,"i":null,"y":"zzzzzzzzzzz","artist":"Taylor Swift","title":"All Too Well","durationMs":331500},"out":{"rid":"-2506434287235539798","minted":false,"aliases":[{"key":"y:zzzzzzzzzzz","id":"-2506434287235539798","durationMs":331500}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"step3-mint-order","step":0,"s":null,"i":"usum71703861","y":"y1","artist":"A","title":"B","durationMs":1000},"out":{"rid":"-8405517619021400735","minted":true,"aliases":[{"key":"i:USUM71703861","id":"-8405517619021400735","durationMs":1000},{"key":"y:y1","id":"-8405517619021400735","durationMs":1000},{"key":"n:a|b|0","id":"-8405517619021400735","durationMs":1000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"step3-mint-order","step":1,"s":null,"i":null,"y":"y2","artist":"C","title":"D","durationMs":0},"out":{"rid":"-8354333118879066495","minted":true,"aliases":[{"key":"y:y2","id":"-8354333118879066495","durationMs":0},{"key":"n:c|d|0","id":"-8354333118879066495","durationMs":0}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"step3-mint-order","step":2,"s":null,"i":null,"y":null,"artist":"E","title":"F","durationMs":0},"out":{"rid":"6741695773282122158","minted":true,"aliases":[{"key":"n:e|f|0","id":"6741695773282122158","durationMs":0}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"step3-mint-order","step":3,"s":null,"i":null,"y":null,"artist":null,"title":null,"durationMs":0},"out":{"rid":null}}
+{"fn":"resolveTrack","in":{"case":"step3-mint-order","step":4,"s":"","i":" ","y":"","artist":"","title":"","durationMs":0},"out":{"rid":null}}
+{"fn":"resolveTrack","in":{"case":"merge-isrc-joins-two","step":0,"s":"sp1","i":null,"y":null,"artist":"S\u01a1n T\u00f9ng M-TP","title":"Ch\u00fang Ta C\u1ee7a Hi\u1ec7n T\u1ea1i","durationMs":302000},"out":{"rid":"-6802226921820121290","minted":true,"aliases":[{"key":"s:sp1","id":"-6802226921820121290","durationMs":302000},{"key":"n:son tung m tp|chung ta cua hien tai|0","id":"-6802226921820121290","durationMs":302000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"merge-isrc-joins-two","step":1,"s":null,"i":null,"y":"yt1","artist":"Son Tung M-TP","title":"Chung Ta Cua Hien Tai (Official Audio Edit)","durationMs":250000},"out":{"rid":"-1440324149700027294","minted":true,"aliases":[{"key":"y:yt1","id":"-1440324149700027294","durationMs":250000},{"key":"n:son tung m tp|chung ta cua hien tai official audio edit|0","id":"-1440324149700027294","durationMs":250000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"merge-isrc-joins-two","step":2,"s":"sp1","i":"VNA0D2000001","y":"yt1","artist":null,"title":null,"durationMs":302000},"out":{"rid":"-6802226921820121290","minted":false,"aliases":[{"key":"i:VNA0D2000001","id":"-6802226921820121290","durationMs":302000}],"merges":[{"from":"-1440324149700027294","into":"-6802226921820121290"}]}}
+{"fn":"resolveTrack","in":{"case":"merge-isrc-joins-two","step":3,"s":null,"i":"vna0d2000001","y":null,"artist":null,"title":null,"durationMs":0},"out":{"rid":"-6802226921820121290","minted":false,"aliases":[],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"merge-isrc-joins-two","step":4,"s":null,"i":null,"y":"yt1","artist":null,"title":null,"durationMs":0},"out":{"rid":"-6802226921820121290","minted":false,"aliases":[],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"merge-isrc-joins-two","step":5,"s":null,"i":null,"y":"yt2","artist":"S\u01a1n T\u00f9ng M-TP","title":"Ch\u00fang Ta C\u1ee7a Hi\u1ec7n T\u1ea1i","durationMs":303000},"out":{"rid":"-6802226921820121290","minted":false,"aliases":[{"key":"y:yt2","id":"-6802226921820121290","durationMs":303000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"merge-isrc-joins-two","step":6,"s":"sp2","i":null,"y":"yt2","artist":null,"title":null,"durationMs":0},"out":{"rid":"-6802226921820121290","minted":false,"aliases":[{"key":"s:sp2","id":"-6802226921820121290","durationMs":0}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"merge-isrc-joins-two","step":7,"s":"sp2","i":null,"y":"yt1","artist":null,"title":null,"durationMs":0},"out":{"rid":"-6802226921820121290","minted":false,"aliases":[],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":0,"s":null,"i":null,"y":"vid0","artist":"\u7c73\u6d25\u7384\u5e2b","title":"\u591c\u306b\u99c6\u3051\u308b","durationMs":200000},"out":{"rid":"6036748418050110635","minted":true,"aliases":[{"key":"y:vid0","id":"6036748418050110635","durationMs":200000},{"key":"n:\u7c73\u6d25\u7384\u5e2b|\u591c\u306b\u99c6\u3051\u308b|0","id":"6036748418050110635","durationMs":200000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":1,"s":null,"i":null,"y":null,"artist":"\uff21\uff22\uff23\u3000\uff24\uff25\uff26","title":"Lemon","durationMs":0},"out":{"rid":"5880865118806254639","minted":true,"aliases":[{"key":"n:abc def|lemon|0","id":"5880865118806254639","durationMs":0}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":2,"s":null,"i":null,"y":null,"artist":"S\u01a1n T\u00f9ng M-TP","title":"\u4e38\u306e\u5185\u30b5\u30c7\u30a3\u30b9\u30c6\u30a3\u30c3\u30af (Live)","durationMs":201000},"out":{"rid":"-3881666978902146527","minted":true,"aliases":[{"key":"n:son tung m tp|\u4e38\u306e\u5185\u30b5\u30c7\u30a3\u30b9\u30c6\u30a3\u30c3\u30af|1","id":"-3881666978902146527","durationMs":201000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":3,"s":null,"i":null,"y":"vid3","artist":"Tr\u00fac Nh\u00e2n","title":"\u591c\u306b\u99c6\u3051\u308b\uff08Instrumental\uff09","durationMs":0},"out":{"rid":"6036749517561738846","minted":true,"aliases":[{"key":"y:vid3","id":"6036749517561738846","durationMs":0},{"key":"n:truc nhan|\u591c\u306b\u99c6\u3051\u308b|8","id":"6036749517561738846","durationMs":0}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":4,"s":null,"i":null,"y":null,"artist":"Beyonc\u00e9","title":"Super Shy","durationMs":202000},"out":{"rid":"6997595752733519855","minted":true,"aliases":[{"key":"n:beyonce|super shy|0","id":"6997595752733519855","durationMs":202000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":5,"s":null,"i":null,"y":null,"artist":"Kraftklub","title":"Love Dive (Live)","durationMs":0},"out":{"rid":"226681676352779080","minted":true,"aliases":[{"key":"n:kraftklub|love dive|1","id":"226681676352779080","durationMs":0}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":6,"s":null,"i":null,"y":"vid6","artist":"M.I.A.","title":"N\u01a1i N\u00e0y C\u00f3 Anh","durationMs":203000},"out":{"rid":"6036755015119879901","minted":true,"aliases":[{"key":"y:vid6","id":"6036755015119879901","durationMs":203000},{"key":"n:m i a|noi nay co anh|0","id":"6036755015119879901","durationMs":203000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":7,"s":null,"i":null,"y":null,"artist":"NewJeans","title":"B\u1eafc Kim Thang","durationMs":0},"out":{"rid":"-586642056564813055","minted":true,"aliases":[{"key":"n:newjeans|bac kim thang|0","id":"-586642056564813055","durationMs":0}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":8,"s":null,"i":null,"y":null,"artist":"Burna Boy","title":"N\u00e0ng Th\u01a1","durationMs":204000},"out":{"rid":"-8749461763180096788","minted":true,"aliases":[{"key":"n:burna boy|nang tho|0","id":"-8749461763180096788","durationMs":204000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":9,"s":null,"i":null,"y":"vid9","artist":"o\u0302\u0301","title":"V\u00ec Anh \u0110\u00e2u C\u00f3 Bi\u1ebft (Slowed + Reverb)","durationMs":0},"out":{"rid":"6036738522445456736","minted":true,"aliases":[{"key":"y:vid9","id":"6036738522445456736","durationMs":0},{"key":"n:o|vi anh dau co biet|100","id":"6036738522445456736","durationMs":0}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":10,"s":null,"i":null,"y":null,"artist":"'00s Hip Hop Party","title":"H\u01a1n C\u1ea3 Y\u00eau (Piano Version)","durationMs":205000},"out":{"rid":"-6324243004673247850","minted":true,"aliases":[{"key":"n:00s hip hop party|hon ca yeu|4","id":"-6324243004673247850","durationMs":205000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":11,"s":null,"i":null,"y":null,"artist":"\u5b87\u591a\u7530\u30d2\u30ab\u30eb","title":"Bohemian Rhapsody (Live Aid)","durationMs":0},"out":{"rid":"6932801843682356676","minted":true,"aliases":[{"key":"n:\u5b87\u591a\u7530\u30d2\u30ab\u30eb|bohemian rhapsody|1","id":"6932801843682356676","durationMs":0}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":12,"s":null,"i":null,"y":"vid12","artist":"\uff71\uff72\uff90\uff6e\uff9d","title":"DNA.","durationMs":206000},"out":{"rid":"-6768933949348819650","minted":true,"aliases":[{"key":"y:vid12","id":"-6768933949348819650","durationMs":206000},{"key":"n:\uff71\uff72\uff90\uff6e\uff9d|dna|0","id":"-6768933949348819650","durationMs":206000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":13,"s":null,"i":null,"y":null,"artist":"Ho\u00e0ng Th\u00f9y Linh","title":"Here With Me","durationMs":0},"out":{"rid":"3899239459539089757","minted":true,"aliases":[{"key":"n:hoang thuy linh|here with me|0","id":"3899239459539089757","durationMs":0}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":14,"s":null,"i":null,"y":null,"artist":"\u0110\u1ee9c Ph\u00fac","title":"Creep (Acoustic)","durationMs":207000},"out":{"rid":"661944600867067808","minted":true,"aliases":[{"key":"n:duc phuc|creep|4","id":"661944600867067808","durationMs":207000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":15,"s":null,"i":null,"y":"vid15","artist":"Sigur R\u00f3s","title":"Part 2 (Interlude)","durationMs":0},"out":{"rid":"-6768930650813935017","minted":true,"aliases":[{"key":"y:vid15","id":"-6768930650813935017","durationMs":0},{"key":"n:sigur ros|part 2 interlude|0","id":"-6768930650813935017","durationMs":0}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":16,"s":null,"i":null,"y":null,"artist":"Die \u00c4rzte","title":"7 rings","durationMs":208000},"out":{"rid":"8982709106601336935","minted":true,"aliases":[{"key":"n:die arzte|7 rings|0","id":"8982709106601336935","durationMs":208000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":17,"s":null,"i":null,"y":null,"artist":"will.i.am","title":"Heat Waves - Sped Up","durationMs":0},"out":{"rid":"8590631579119213624","minted":true,"aliases":[{"key":"n:will i am|heat waves|80","id":"8590631579119213624","durationMs":0}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":18,"s":null,"i":null,"y":"vid18","artist":"Nirvana","title":"Wonderwall (MTV Unplugged)","durationMs":209000},"out":{"rid":"-6768944944465101760","minted":true,"aliases":[{"key":"y:vid18","id":"-6768944944465101760","durationMs":209000},{"key":"n:nirvana|wonderwall|1","id":"-6768944944465101760","durationMs":209000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":19,"s":null,"i":null,"y":null,"artist":"  leading and trailing  ","title":"Mr. Brightside (Jacques Lu Cont's Thin White Duke Mix)","durationMs":0},"out":{"rid":"-2265697884168809195","minted":true,"aliases":[{"key":"n:leading and trailing|mr brightside jacques lu cont s thin white duke mix|0","id":"-2265697884168809195","durationMs":0}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":20,"s":null,"i":null,"y":null,"artist":"\u00a0nbsp\u00a0","title":"Fearless (John's Version)","durationMs":210000},"out":{"rid":"-6243217360106073401","minted":true,"aliases":[{"key":"n:nbsp|fearless|200","id":"-6243217360106073401","durationMs":210000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":21,"s":null,"i":null,"y":"vid21","artist":"'00s R&B Chill","title":"Cover Me Up","durationMs":0},"out":{"rid":"-6765997153790435744","minted":true,"aliases":[{"key":"y:vid21","id":"-6765997153790435744","durationMs":0},{"key":"n:00s r b chill|cover me up|0","id":"-6765997153790435744","durationMs":0}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":22,"s":null,"i":null,"y":null,"artist":"\u3042\u3044\u307f\u3087\u3093","title":"Feat","durationMs":211000},"out":{"rid":"-5275111211615182992","minted":true,"aliases":[{"key":"n:\u3042\u3044\u307f\u3087\u3093|feat|0","id":"-5275111211615182992","durationMs":211000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":23,"s":null,"i":null,"y":null,"artist":"\ubc29\ud0c4\uc18c\ub144\ub2e8","title":"Song (Bonus Track)","durationMs":0},"out":{"rid":"-5598601665894970190","minted":true,"aliases":[{"key":"n:\ubc29\ud0c4\uc18c\ub144\ub2e8|song|0","id":"-5598601665894970190","durationMs":0}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":24,"s":null,"i":null,"y":"vid24","artist":"\u0110en V\u00e2u","title":"\u591c\u306b\u99c6\u3051\u308b","durationMs":212000},"out":{"rid":"-6765991656232294689","minted":true,"aliases":[{"key":"y:vid24","id":"-6765991656232294689","durationMs":212000},{"key":"n:den vau|\u591c\u306b\u99c6\u3051\u308b|0","id":"-6765991656232294689","durationMs":212000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":25,"s":null,"i":null,"y":null,"artist":"Erik","title":"Lemon","durationMs":0},"out":{"rid":"5050345292565089729","minted":true,"aliases":[{"key":"n:erik|lemon|0","id":"5050345292565089729","durationMs":0}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":26,"s":null,"i":null,"y":null,"artist":"Bj\u00f6rk","title":"\u4e38\u306e\u5185\u30b5\u30c7\u30a3\u30b9\u30c6\u30a3\u30c3\u30af (Live)","durationMs":213000},"out":{"rid":"1046537602169550070","minted":true,"aliases":[{"key":"n:bjork|\u4e38\u306e\u5185\u30b5\u30c7\u30a3\u30b9\u30c6\u30a3\u30c3\u30af|1","id":"1046537602169550070","durationMs":213000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":27,"s":null,"i":null,"y":"vid27","artist":"Stra\u00dfe","title":"\u591c\u306b\u99c6\u3051\u308b\uff08Instrumental\uff09","durationMs":0},"out":{"rid":"-6765990556720666478","minted":true,"aliases":[{"key":"y:vid27","id":"-6765990556720666478","durationMs":0},{"key":"n:strasse|\u591c\u306b\u99c6\u3051\u308b|8","id":"-6765990556720666478","durationMs":0}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":28,"s":null,"i":null,"y":null,"artist":"\u041a\u0438\u043d\u043e","title":"Super Shy","durationMs":214000},"out":{"rid":"-5703681385637747069","minted":true,"aliases":[{"key":"n:\u043a\u0438\u043d\u043e|super shy|0","id":"-5703681385637747069","durationMs":214000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":29,"s":null,"i":null,"y":null,"artist":"Burial","title":"Love Dive (Live)","durationMs":0},"out":{"rid":"2069026352300220225","minted":true,"aliases":[{"key":"n:burial|love dive|1","id":"2069026352300220225","durationMs":0}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":30,"s":null,"i":null,"y":"vid30","artist":"MiXeD CaSe NaMe","title":"N\u01a1i N\u00e0y C\u00f3 Anh","durationMs":215000},"out":{"rid":"-6766952629395161878","minted":true,"aliases":[{"key":"y:vid30","id":"-6766952629395161878","durationMs":215000},{"key":"n:mixed case name|noi nay co anh|0","id":"-6766952629395161878","durationMs":215000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":31,"s":null,"i":null,"y":null,"artist":"\ufb01 ligature","title":"B\u1eafc Kim Thang","durationMs":0},"out":{"rid":"-644182209642970989","minted":true,"aliases":[{"key":"n:\ufb01 ligature|bac kim thang|0","id":"-644182209642970989","durationMs":0}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":32,"s":null,"i":null,"y":null,"artist":"'00s Rock Chillout","title":"N\u00e0ng Th\u01a1","durationMs":216000},"out":{"rid":"3972579991106924830","minted":true,"aliases":[{"key":"n:00s rock chillout|nang tho|0","id":"3972579991106924830","durationMs":216000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":33,"s":null,"i":null,"y":"vid33","artist":"Official\u9aed\u7537dism","title":"V\u00ec Anh \u0110\u00e2u C\u00f3 Bi\u1ebft (Slowed + Reverb)","durationMs":0},"out":{"rid":"-6766953728906790089","minted":true,"aliases":[{"key":"y:vid33","id":"-6766953728906790089","durationMs":0},{"key":"n:official\u9aed\u7537dism|vi anh dau co biet|100","id":"-6766953728906790089","durationMs":0}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":34,"s":null,"i":null,"y":null,"artist":"\ube14\ub799\ud551\ud06c","title":"H\u01a1n C\u1ea3 Y\u00eau (Piano Version)","durationMs":217000},"out":{"rid":"7315990943349620763","minted":true,"aliases":[{"key":"n:\ube14\ub799\ud551\ud06c|hon ca yeu|4","id":"7315990943349620763","durationMs":217000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":35,"s":null,"i":null,"y":null,"artist":"M\u1ef9 T\u00e2m","title":"Bohemian Rhapsody (Live Aid)","durationMs":0},"out":{"rid":"-7980058610219661901","minted":true,"aliases":[{"key":"n:my tam|bohemian rhapsody|1","id":"-7980058610219661901","durationMs":0}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":36,"s":null,"i":null,"y":"vid36","artist":"MIN","title":"DNA.","durationMs":218000},"out":{"rid":"-6766959226464931144","minted":true,"aliases":[{"key":"y:vid36","id":"-6766959226464931144","durationMs":218000},{"key":"n:min|dna|0","id":"-6766959226464931144","durationMs":218000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":37,"s":null,"i":null,"y":null,"artist":"M\u00f6tley Cr\u00fce","title":"Here With Me","durationMs":0},"out":{"rid":"-1498055764788362934","minted":true,"aliases":[{"key":"n:motley crue|here with me|0","id":"-1498055764788362934","durationMs":0}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":38,"s":null,"i":null,"y":null,"artist":"\u00c6nima","title":"Creep (Acoustic)","durationMs":219000},"out":{"rid":"-7959591123165328531","minted":true,"aliases":[{"key":"n:aenima|creep|4","id":"-7959591123165328531","durationMs":219000}],"merges":[]}}
+{"fn":"resolveTrack","in":{"case":"names-from-the-corpus","step":39,"s":null,"i":null,"y":"vid39","artist":"\u041c\u043e\u043b\u0447\u0430\u0442 \u0414\u043e\u043c\u0430","title":"Part 2 (Interlude)","durationMs":0},"out":{"rid":"-6766960325976559355","minted":true,"aliases":[{"key":"y:vid39","id":"-6766960325976559355","durationMs":0},{"key":"n:\u043c\u043e\u043b\u0447\u0430\u0442 \u0434\u043e\u043c\u0430|part 2 interlude|0","id":"-6766960325976559355","durationMs":0}],"merges":[]}}
+{"fn":"mint","in":{"key":"y:collide0","taken":["6736756628531670044"]},"out":{"id":"-1647397499290877196"}}
+{"fn":"mint","in":{"key":"y:collide1","taken":["6736757728043298255","-1028969487585693169"]},"out":{"id":"-1028968388074064958"}}
+{"fn":"mint","in":{"key":"y:collide2","taken":["6736758827554926466"]},"out":{"id":"-402928457368289978"}}
+{"fn":"mint","in":{"key":"y:collide3","taken":["6736759927066554677","161896163448947977"]},"out":{"id":"161892864914063344"}}
+{"fn":"mint","in":{"key":"y:collide4","taken":["6736752230485157200"]},"out":{"id":"-4144128921555297400"}}
+{"fn":"mint","in":{"key":"y:collide5","taken":["6736753329996785411","-3525700909850113373"]},"out":{"id":"-3525699810338485162"}}
+{"fn":"mint","in":{"key":"y:collide6","taken":["6736754429508413622"]},"out":{"id":"-2960845502707285510"}}
+{"fn":"mint","in":{"key":"y:collide7","taken":["6736755529020041833","-2334800074443369475"]},"out":{"id":"-2334803372978254108"}}
+{"fn":"mint","in":{"key":"y:collide8","taken":["6736765424624695732"]},"out":{"id":"3284668615930771372"}}
+{"fn":"mint","in":{"key":"y:collide9","taken":["6736766524136323943","3903131812008058151"]},"out":{"id":"3903132911519686362"}}
+{"fn":"mint","in":{"key":"y:collide10","taken":["-4601405100157310899"]},"out":{"id":"2150180419906415137"}}
+{"fn":"mint","in":{"key":"y:collide11","taken":["-4601406199668939110","1524134991642499102"]},"out":{"id":"1524133892130870891"}}
+{"fn":"mint","in":{"key":"y:collide12","taken":["-4601407299180567321"]},"out":{"id":"836873153978417831"}}
+{"fn":"mint","in":{"key":"y:collide13","taken":["-4601408398692195532","218409957901131052"]},"out":{"id":"218413256436015685"}}
+{"fn":"mint","in":{"key":"y:collide14","taken":["-4601409498203823743"]},"out":{"id":"-346410264869594059"}}
+{"fn":"mint","in":{"key":"y:collide15","taken":["-4601410597715451954","-972596430621921102"]},"out":{"id":"-972597530133549313"}}
+{"fn":"mint","in":{"key":"y:collide16","taken":["-4601411697227080165"]},"out":{"id":"-1598637460839324293"}}
+{"fn":"mint","in":{"key":"y:collide17","taken":["-4601412796738708376","-2278321464363289152"]},"out":{"id":"-2278318165828404519"}}
+{"fn":"mint","in":{"key":"y:collide18","taken":["-4601413896250336587"]},"out":{"id":"-2904362494580692343"}}
+{"fn":"mint","in":{"key":"y:collide19","taken":["-4601414995761964798","-3469187115397930298"]},"out":{"id":"-3469188214909558509"}}
+{"fn":"resolveArtist","in":{"step":0,"sa":"sa0","ya":"UC0","name":"\u7c73\u6d25\u7384\u5e2b"},"out":{"aid":"-8739960172383728377","minted":true,"aliases":["sa:sa0","ya:UC0","na:\u7c73\u6d25\u7384\u5e2b"]}}
+{"fn":"resolveArtist","in":{"step":1,"sa":null,"ya":null,"name":"\ubc29\ud0c4\uc18c\ub144\ub2e8"},"out":{"aid":"8652535212462669288","minted":true,"aliases":["na:\ubc29\ud0c4\uc18c\ub144\ub2e8"]}}
+{"fn":"resolveArtist","in":{"step":2,"sa":null,"ya":null,"name":"B\u00edch Ph\u01b0\u01a1ng"},"out":{"aid":"9100468823491969011","minted":true,"aliases":["na:bich phuong"]}}
+{"fn":"resolveArtist","in":{"step":3,"sa":null,"ya":"UC3","name":"Ph\u01b0\u01a1ng M\u1ef9 Chi"},"out":{"aid":"-358463861757134068","minted":true,"aliases":["ya:UC3","na:phuong my chi"]}}
+{"fn":"resolveArtist","in":{"step":4,"sa":null,"ya":null,"name":"C\u00e9line Dion"},"out":{"aid":"-1511744283344792218","minted":true,"aliases":["na:celine dion"]}}
+{"fn":"resolveArtist","in":{"step":5,"sa":"sa5","ya":null,"name":"*NSYNC"},"out":{"aid":"-8739965669941869432","minted":true,"aliases":["sa:sa5","na:nsync"]}}
+{"fn":"resolveArtist","in":{"step":6,"sa":null,"ya":"UC6","name":"Nirvana"},"out":{"aid":"-358467160292018701","minted":true,"aliases":["ya:UC6","na:nirvana"]}}
+{"fn":"resolveArtist","in":{"step":7,"sa":null,"ya":null,"name":"tab\u0009separated"},"out":{"aid":"-5443083738389310334","minted":true,"aliases":["na:tab separated"]}}
+{"fn":"resolveArtist","in":{"step":8,"sa":null,"ya":null,"name":"\u0131i"},"out":{"aid":"-2436179124666974924","minted":true,"aliases":["na:ii"]}}
+{"fn":"resolveArtist","in":{"step":9,"sa":null,"ya":"UC9","name":"'80s Dance"},"out":{"aid":"-358452866640851958","minted":true,"aliases":["ya:UC9","na:80s dance"]}}
+{"fn":"resolveArtist","in":{"step":10,"sa":"sa10","ya":null,"name":"14 Casper"},"out":{"aid":"-1742581523348989204","minted":true,"aliases":["sa:sa10","na:14 casper"]}}
+{"fn":"resolveArtist","in":{"step":11,"sa":null,"ya":null,"name":"2pillz"},"out":{"aid":"371522764056099215","minted":true,"aliases":["na:2pillz"]}}
+{"fn":"resolveArtist","in":{"step":12,"sa":null,"ya":"UC12","name":"90s Chill: Bollywood"},"out":{"aid":"-5565131511799920960","minted":true,"aliases":["ya:UC12","na:90s chill bollywood"]}}
+{"fn":"resolveArtist","in":{"step":13,"sa":null,"ya":null,"name":"AD\u00c9LA"},"out":{"aid":"-2150131580055058807","minted":true,"aliases":["na:adela"]}}
+{"fn":"resolveArtist","in":{"step":14,"sa":null,"ya":null,"name":"ATEEZ"},"out":{"aid":"-5096295508769576043","minted":true,"aliases":["na:ateez"]}}
+{"fn":"resolveArtist","in":{"step":15,"sa":"sa15","ya":"UC15","name":"Acoustic Indie & Alternative"},"out":{"aid":"-1742584821883873837","minted":true,"aliases":["sa:sa15","ya:UC15","na:acoustic indie alternative"]}}
+{"fn":"resolveArtist","in":{"step":16,"sa":null,"ya":null,"name":"\u690e\u540d\u6797\u6a8e"},"out":{"aid":"-1122881876941872325","minted":true,"aliases":["na:\u690e\u540d\u6797\u6a8e"]}}
+{"fn":"resolveArtist","in":{"step":17,"sa":null,"ya":null,"name":"\uc545\ub3d9\ubba4\uc9c0\uc158"},"out":{"aid":"-6759028412677606232","minted":true,"aliases":["na:\uc545\ub3d9\ubba4\uc9c0\uc158"]}}
+{"fn":"resolveArtist","in":{"step":18,"sa":null,"ya":"UC18","name":"\u0110\u1ee9c Ph\u00fac"},"out":{"aid":"-5565120516683638850","minted":true,"aliases":["ya:UC18","na:duc phuc"]}}
+{"fn":"resolveArtist","in":{"step":19,"sa":null,"ya":null,"name":"M\u00f6tley Cr\u00fce"},"out":{"aid":"4170539459870005647","minted":true,"aliases":["na:motley crue"]}}
+{"fn":"resolveArtist","in":{"step":20,"sa":"sa20","ya":null,"name":"Tyler, The Creator"},"out":{"aid":"-1739746982372028921","minted":true,"aliases":["sa:sa20","na:tyler the creator"]}}
+{"fn":"resolveArtist","in":{"step":21,"sa":null,"ya":"UC21","name":"\u0386\u03bd\u03bd\u03b1 \u0392\u03af\u03c3\u03c3\u03b7"},"out":{"aid":"-5566086987404647094","minted":true,"aliases":["ya:UC21","na:\u03ac\u03bd\u03bd\u03b1 \u03b2\u03af\u03c3\u03c3\u03b7"]}}
+{"fn":"resolveArtist","in":{"step":22,"sa":null,"ya":null,"name":"Radiohead"},"out":{"aid":"9104913322688936659","minted":true,"aliases":["na:radiohead"]}}
+{"fn":"resolveArtist","in":{"step":23,"sa":null,"ya":null,"name":"o\u0302\u0301"},"out":{"aid":"-4349962966872743581","minted":true,"aliases":["na:o"]}}
+{"fn":"resolveArtist","in":{"step":24,"sa":null,"ya":"UC24","name":"'00s Rock Chillout"},"out":{"aid":"-5566090285939531727","minted":true,"aliases":["ya:UC24","na:00s rock chillout"]}}
+{"fn":"resolveArtist","in":{"step":25,"sa":"sa25","ya":null,"name":"(What's The Story) Morning Glory?"},"out":{"aid":"-1739752479930169976","minted":true,"aliases":["sa:sa25","na:what s the story morning glory"]}}
+{"fn":"resolveArtist","in":{"step":26,"sa":null,"ya":null,"name":"22"},"out":{"aid":"-2385609286360695326","minted":true,"aliases":["na:22"]}}
+{"fn":"resolveArtist","in":{"step":27,"sa":null,"ya":"UC27","name":"50 Cent"},"out":{"aid":"-5566093584474416360","minted":true,"aliases":["ya:UC27","na:50 cent"]}}
+{"fn":"resolveArtist","in":{"step":28,"sa":null,"ya":null,"name":"A2O"},"out":{"aid":"-3338825175315528026","minted":true,"aliases":["na:a2o"]}}
+{"fn":"resolveArtist","in":{"step":29,"sa":null,"ya":null,"name":"AOA"},"out":{"aid":"-3305331852103587419","minted":true,"aliases":["na:aoa"]}}
+{"fn":"resolveArtist","in":{"step":30,"sa":"sa30","ya":"UC30","name":"Aaryan Shah"},"out":{"aid":"-1740738741860486018","minted":true,"aliases":["sa:sa30","ya:UC30","na:aaryan shah"]}}
+{"fn":"resolveArtist","in":{"step":31,"sa":null,"ya":null,"name":"Official\u9aed\u7537dism"},"out":{"aid":"-2160052261313740095","minted":true,"aliases":["na:official\u9aed\u7537dism"]}}
+{"fn":"resolveArtist","in":{"step":32,"sa":null,"ya":null,"name":"\ub274\uc9c4\uc2a4"},"out":{"aid":"4261276990509007617","minted":true,"aliases":["na:\ub274\uc9c4\uc2a4"]}}
+{"fn":"resolveArtist","in":{"step":33,"sa":null,"ya":"UC33","name":"Chillies"},"out":{"aid":"-5566933611358180339","minted":true,"aliases":["ya:UC33","na:chillies"]}}
+{"fn":"resolveArtist","in":{"step":34,"sa":null,"ya":null,"name":"Noo Ph\u01b0\u1edbc Th\u1ecbnh"},"out":{"aid":"7034711717142279910","minted":true,"aliases":["na:noo phuoc thinh"]}}
+{"fn":"resolveArtist","in":{"step":35,"sa":"sa35","ya":null,"name":"Kraftklub"},"out":{"aid":"-1740733244302344963","minted":true,"aliases":["sa:sa35","na:kraftklub"]}}
+{"fn":"resolveArtist","in":{"step":36,"sa":null,"ya":"UC36","name":"\u041a\u0438\u043d\u043e"},"out":{"aid":"-5566939108916321394","minted":true,"aliases":["ya:UC36","na:\u043a\u0438\u043d\u043e"]}}
+{"fn":"resolveArtist","in":{"step":37,"sa":null,"ya":null,"name":"Chappell Roan"},"out":{"aid":"-675392021278026595","minted":true,"aliases":["na:chappell roan"]}}
+{"fn":"resolveArtist","in":{"step":38,"sa":null,"ya":null,"name":"dash \u2013 en \u2014 em"},"out":{"aid":"3589180214288593981","minted":true,"aliases":["na:dash en em"]}}
+{"fn":"resolveArtist","in":{"step":39,"sa":null,"ya":"UC39","name":"#sadforever"},"out":{"aid":"-5566944606474462449","minted":true,"aliases":["ya:UC39","na:sadforever"]}}
+{"fn":"resolveArtist","in":{"step":40,"sa":"sa40","ya":null,"name":"'90s Alternative"},"out":{"aid":"-1745521617442257743","minted":true,"aliases":["sa:sa40","na:90s alternative"]}}
+{"fn":"resolveArtist","in":{"step":41,"sa":null,"ya":null,"name":"2000s Radio"},"out":{"aid":"-6476694493552915038","minted":true,"aliases":["na:2000s radio"]}}
+{"fn":"resolveArtist","in":{"step":42,"sa":null,"ya":"UC42","name":"3two (EP)"},"out":{"aid":"-5567926470358265647","minted":true,"aliases":["ya:UC42","na:3two ep"]}}
+{"fn":"resolveArtist","in":{"step":43,"sa":null,"ya":null,"name":"A Happy Alternative"},"out":{"aid":"-2010301559524499416","minted":true,"aliases":["na:a happy alternative"]}}
+{"fn":"resolveArtist","in":{"step":44,"sa":null,"ya":null,"name":"AM"},"out":{"aid":"-2428618882712909888","minted":true,"aliases":["na:am"]}}
+{"fn":"resolveArtist","in":{"step":45,"sa":"sa45","ya":"UC45","name":"AUSTIN"},"out":{"aid":"-1745518318907373110","minted":true,"aliases":["sa:sa45","ya:UC45","na:austin"]}}
+{"fn":"resolveArtist","in":{"step":46,"sa":null,"ya":null,"name":"Acoustic Pop"},"out":{"aid":"-5574618123704595794","minted":true,"aliases":["na:acoustic pop"]}}
+{"fn":"resolveArtist","in":{"step":47,"sa":null,"ya":null,"name":"\uff21\uff22\uff23\u3000\uff24\uff25\uff26"},"out":{"aid":"5066954629885581349","minted":true,"aliases":["na:abc def"]}}
+{"fn":"resolveArtist","in":{"step":48,"sa":null,"ya":"UC48","name":"\u0110en V\u00e2u"},"out":{"aid":"-5567937465474547757","minted":true,"aliases":["ya:UC48","na:den vau"]}}
+{"fn":"resolveArtist","in":{"step":49,"sa":null,"ya":null,"name":"tlinh"},"out":{"aid":"1108625266260747747","minted":true,"aliases":["na:tlinh"]}}
+{"fn":"resolveArtist","in":{"step":50,"sa":"sa50","ya":null,"name":"\u0141\u0105ki \u0141an"},"out":{"aid":"-1746372639442303832","minted":true,"aliases":["sa:sa50","na:laki lan"]}}
+{"fn":"resolveArtist","in":{"step":51,"sa":null,"ya":"UC51","name":"$uicideboy$"},"out":{"aid":"-5568919329358350955","minted":true,"aliases":["ya:UC51","na:uicideboy"]}}
+{"fn":"resolveArtist","in":{"step":52,"sa":null,"ya":null,"name":"Kendrick Lamar"},"out":{"aid":"-4117157334134054826","minted":true,"aliases":["na:kendrick lamar"]}}
+{"fn":"resolveArtist","in":{"step":53,"sa":null,"ya":null,"name":"  leading and trailing  "},"out":{"aid":"1800930579925206603","minted":true,"aliases":["na:leading and trailing"]}}
+{"fn":"resolveArtist","in":{"step":54,"sa":null,"ya":"UC54","name":"\u00df"},"out":{"aid":"-5568924826916492010","minted":true,"aliases":["ya:UC54","na:ss"]}}
+{"fn":"resolveArtist","in":{"step":55,"sa":"sa55","ya":null,"name":"'10s R&B Chill"},"out":{"aid":"-1746367141884162777","minted":true,"aliases":["sa:sa55","na:10s r b chill"]}}
+{"fn":"resolveArtist","in":{"step":56,"sa":null,"ya":null,"name":"10X"},"out":{"aid":"8141913506540539165","minted":true,"aliases":["na:10x"]}}
+{"fn":"resolveArtist","in":{"step":57,"sa":null,"ya":"UC57","name":"2T"},"out":{"aid":"-5568925926428120221","minted":true,"aliases":["ya:UC57","na:2t"]}}
+{"fn":"resolveArtist","in":{"step":58,"sa":null,"ya":null,"name":"9 months & 50 hours"},"out":{"aid":"2030603095509818318","minted":true,"aliases":["na:9 months 50 hours"]}}
+{"fn":"resolveArtist","in":{"step":59,"sa":null,"ya":null,"name":"ABSOLUTE BRAGADO Vol. 1"},"out":{"aid":"-6015998973495021577","minted":true,"aliases":["na:absolute bragado vol 1"]}}

@@ -1,0 +1,1000 @@
+{"fn":"fold","in":{"s":"\u7c73\u6d25\u7384\u5e2b"},"out":{"s":"\u7c73\u6d25\u7384\u5e2b"}}
+{"fn":"fold","in":{"s":"\u5b87\u591a\u7530\u30d2\u30ab\u30eb"},"out":{"s":"\u5b87\u591a\u7530\u30d2\u30ab\u30eb"}}
+{"fn":"fold","in":{"s":"\u3042\u3044\u307f\u3087\u3093"},"out":{"s":"\u3042\u3044\u307f\u3087\u3093"}}
+{"fn":"fold","in":{"s":"Official\u9aed\u7537dism"},"out":{"s":"official\u9aed\u7537dism"}}
+{"fn":"fold","in":{"s":"King Gnu"},"out":{"s":"king gnu"}}
+{"fn":"fold","in":{"s":"YOASOBI"},"out":{"s":"yoasobi"}}
+{"fn":"fold","in":{"s":"back number"},"out":{"s":"back number"}}
+{"fn":"fold","in":{"s":"Mrs. GREEN APPLE"},"out":{"s":"mrs green apple"}}
+{"fn":"fold","in":{"s":"\u690e\u540d\u6797\u6a8e"},"out":{"s":"\u690e\u540d\u6797\u6a8e"}}
+{"fn":"fold","in":{"s":"\u30b5\u30b6\u30f3\u30aa\u30fc\u30eb\u30b9\u30bf\u30fc\u30ba"},"out":{"s":"\u30b5\u30b6\u30f3\u30aa\u30fc\u30eb\u30b9\u30bf\u30fc\u30ba"}}
+{"fn":"fold","in":{"s":"\u30b9\u30d4\u30c3\u30c4"},"out":{"s":"\u30b9\u30d4\u30c3\u30c4"}}
+{"fn":"fold","in":{"s":"\uff21\uff22\uff23\u3000\uff24\uff25\uff26"},"out":{"s":"abc def"}}
+{"fn":"fold","in":{"s":"\uff71\uff72\uff90\uff6e\uff9d"},"out":{"s":"\uff71\uff72\uff90\uff6e\uff9d"}}
+{"fn":"fold","in":{"s":"\ubc29\ud0c4\uc18c\ub144\ub2e8"},"out":{"s":"\ubc29\ud0c4\uc18c\ub144\ub2e8"}}
+{"fn":"fold","in":{"s":"\ube14\ub799\ud551\ud06c"},"out":{"s":"\ube14\ub799\ud551\ud06c"}}
+{"fn":"fold","in":{"s":"\uc544\uc774\uc720"},"out":{"s":"\uc544\uc774\uc720"}}
+{"fn":"fold","in":{"s":"\ub274\uc9c4\uc2a4"},"out":{"s":"\ub274\uc9c4\uc2a4"}}
+{"fn":"fold","in":{"s":"\uc138\ube10\ud2f4"},"out":{"s":"\uc138\ube10\ud2f4"}}
+{"fn":"fold","in":{"s":"\ub974\uc138\ub77c\ud54c"},"out":{"s":"\ub974\uc138\ub77c\ud54c"}}
+{"fn":"fold","in":{"s":"\uc5d0\uc2a4\ud30c"},"out":{"s":"\uc5d0\uc2a4\ud30c"}}
+{"fn":"fold","in":{"s":"\ubcfc\ube68\uac04\uc0ac\ucd98\uae30"},"out":{"s":"\ubcfc\ube68\uac04\uc0ac\ucd98\uae30"}}
+{"fn":"fold","in":{"s":"\uc545\ub3d9\ubba4\uc9c0\uc158"},"out":{"s":"\uc545\ub3d9\ubba4\uc9c0\uc158"}}
+{"fn":"fold","in":{"s":"S\u01a1n T\u00f9ng M-TP"},"out":{"s":"son tung m tp"}}
+{"fn":"fold","in":{"s":"Ho\u00e0ng Th\u00f9y Linh"},"out":{"s":"hoang thuy linh"}}
+{"fn":"fold","in":{"s":"\u0110en V\u00e2u"},"out":{"s":"den vau"}}
+{"fn":"fold","in":{"s":"M\u1ef9 T\u00e2m"},"out":{"s":"my tam"}}
+{"fn":"fold","in":{"s":"B\u00edch Ph\u01b0\u01a1ng"},"out":{"s":"bich phuong"}}
+{"fn":"fold","in":{"s":"HIEUTHUHAI"},"out":{"s":"hieuthuhai"}}
+{"fn":"fold","in":{"s":"V\u0169."},"out":{"s":"vu"}}
+{"fn":"fold","in":{"s":"Chillies"},"out":{"s":"chillies"}}
+{"fn":"fold","in":{"s":"Ng\u1ecdt"},"out":{"s":"ngot"}}
+{"fn":"fold","in":{"s":"Th\u1ecbnh Suy"},"out":{"s":"thinh suy"}}
+{"fn":"fold","in":{"s":"H\u00e0 Anh Tu\u1ea5n"},"out":{"s":"ha anh tuan"}}
+{"fn":"fold","in":{"s":"Tr\u00fac Nh\u00e2n"},"out":{"s":"truc nhan"}}
+{"fn":"fold","in":{"s":"\u0110\u1ee9c Ph\u00fac"},"out":{"s":"duc phuc"}}
+{"fn":"fold","in":{"s":"Erik"},"out":{"s":"erik"}}
+{"fn":"fold","in":{"s":"MIN"},"out":{"s":"min"}}
+{"fn":"fold","in":{"s":"tlinh"},"out":{"s":"tlinh"}}
+{"fn":"fold","in":{"s":"Wren Evans"},"out":{"s":"wren evans"}}
+{"fn":"fold","in":{"s":"Ph\u01b0\u01a1ng M\u1ef9 Chi"},"out":{"s":"phuong my chi"}}
+{"fn":"fold","in":{"s":"V\u0103n Mai H\u01b0\u01a1ng"},"out":{"s":"van mai huong"}}
+{"fn":"fold","in":{"s":"T\u00f3c Ti\u00ean"},"out":{"s":"toc tien"}}
+{"fn":"fold","in":{"s":"Noo Ph\u01b0\u1edbc Th\u1ecbnh"},"out":{"s":"noo phuoc thinh"}}
+{"fn":"fold","in":{"s":"Nguy\u1ec5n Tr\u1ea7n Trung Qu\u00e2n"},"out":{"s":"nguyen tran trung quan"}}
+{"fn":"fold","in":{"s":"Beyonc\u00e9"},"out":{"s":"beyonce"}}
+{"fn":"fold","in":{"s":"Sigur R\u00f3s"},"out":{"s":"sigur ros"}}
+{"fn":"fold","in":{"s":"Bj\u00f6rk"},"out":{"s":"bjork"}}
+{"fn":"fold","in":{"s":"M\u00f6tley Cr\u00fce"},"out":{"s":"motley crue"}}
+{"fn":"fold","in":{"s":"Mot\u00f6rhead"},"out":{"s":"motorhead"}}
+{"fn":"fold","in":{"s":"Zo\u00eb Keating"},"out":{"s":"zoe keating"}}
+{"fn":"fold","in":{"s":"\u0141\u0105ki \u0141an"},"out":{"s":"laki lan"}}
+{"fn":"fold","in":{"s":"Fran\u00e7oise Hardy"},"out":{"s":"francoise hardy"}}
+{"fn":"fold","in":{"s":"C\u00e9line Dion"},"out":{"s":"celine dion"}}
+{"fn":"fold","in":{"s":"M\u00e5neskin"},"out":{"s":"maneskin"}}
+{"fn":"fold","in":{"s":"R\u00f8yksopp"},"out":{"s":"royksopp"}}
+{"fn":"fold","in":{"s":"Kraftklub"},"out":{"s":"kraftklub"}}
+{"fn":"fold","in":{"s":"Die \u00c4rzte"},"out":{"s":"die arzte"}}
+{"fn":"fold","in":{"s":"Stra\u00dfe"},"out":{"s":"strasse"}}
+{"fn":"fold","in":{"s":"\u00c6nima"},"out":{"s":"aenima"}}
+{"fn":"fold","in":{"s":"\u00c6ther Realm"},"out":{"s":"aether realm"}}
+{"fn":"fold","in":{"s":"Tyler, The Creator"},"out":{"s":"tyler the creator"}}
+{"fn":"fold","in":{"s":"AC/DC"},"out":{"s":"ac dc"}}
+{"fn":"fold","in":{"s":"P!nk"},"out":{"s":"p nk"}}
+{"fn":"fold","in":{"s":"$uicideboy$"},"out":{"s":"uicideboy"}}
+{"fn":"fold","in":{"s":"blink-182"},"out":{"s":"blink 182"}}
+{"fn":"fold","in":{"s":"*NSYNC"},"out":{"s":"nsync"}}
+{"fn":"fold","in":{"s":"M.I.A."},"out":{"s":"m i a"}}
+{"fn":"fold","in":{"s":"will.i.am"},"out":{"s":"will i am"}}
+{"fn":"fold","in":{"s":"\u041a\u0438\u043d\u043e"},"out":{"s":"\u043a\u0438\u043d\u043e"}}
+{"fn":"fold","in":{"s":"\u041c\u043e\u043b\u0447\u0430\u0442 \u0414\u043e\u043c\u0430"},"out":{"s":"\u043c\u043e\u043b\u0447\u0430\u0442 \u0434\u043e\u043c\u0430"}}
+{"fn":"fold","in":{"s":"\u0414\u0414\u0422"},"out":{"s":"\u0434\u0434\u0442"}}
+{"fn":"fold","in":{"s":"\u0417\u0435\u043c\u0444\u0438\u0440\u0430"},"out":{"s":"\u0437\u0435\u043c\u0444\u0438\u0440\u0430"}}
+{"fn":"fold","in":{"s":"\u039c\u03af\u03ba\u03b7\u03c2 \u0398\u03b5\u03bf\u03b4\u03c9\u03c1\u03ac\u03ba\u03b7\u03c2"},"out":{"s":"\u03bc\u03af\u03ba\u03b7\u03c2 \u03b8\u03b5\u03bf\u03b4\u03c9\u03c1\u03ac\u03ba\u03b7\u03c2"}}
+{"fn":"fold","in":{"s":"\u0386\u03bd\u03bd\u03b1 \u0392\u03af\u03c3\u03c3\u03b7"},"out":{"s":"\u03ac\u03bd\u03bd\u03b1 \u03b2\u03af\u03c3\u03c3\u03b7"}}
+{"fn":"fold","in":{"s":"Fleetwood Mac"},"out":{"s":"fleetwood mac"}}
+{"fn":"fold","in":{"s":"The Weeknd"},"out":{"s":"the weeknd"}}
+{"fn":"fold","in":{"s":"Kendrick Lamar"},"out":{"s":"kendrick lamar"}}
+{"fn":"fold","in":{"s":"NewJeans"},"out":{"s":"newjeans"}}
+{"fn":"fold","in":{"s":"Nirvana"},"out":{"s":"nirvana"}}
+{"fn":"fold","in":{"s":"Burial"},"out":{"s":"burial"}}
+{"fn":"fold","in":{"s":"d4vd"},"out":{"s":"d4vd"}}
+{"fn":"fold","in":{"s":"Chappell Roan"},"out":{"s":"chappell roan"}}
+{"fn":"fold","in":{"s":"Sabrina Carpenter"},"out":{"s":"sabrina carpenter"}}
+{"fn":"fold","in":{"s":"Taylor Swift"},"out":{"s":"taylor swift"}}
+{"fn":"fold","in":{"s":"Billie Eilish"},"out":{"s":"billie eilish"}}
+{"fn":"fold","in":{"s":"Daft Punk"},"out":{"s":"daft punk"}}
+{"fn":"fold","in":{"s":"Radiohead"},"out":{"s":"radiohead"}}
+{"fn":"fold","in":{"s":"Shakira"},"out":{"s":"shakira"}}
+{"fn":"fold","in":{"s":"Burna Boy"},"out":{"s":"burna boy"}}
+{"fn":"fold","in":{"s":"  leading and trailing  "},"out":{"s":"leading and trailing"}}
+{"fn":"fold","in":{"s":"MiXeD CaSe NaMe"},"out":{"s":"mixed case name"}}
+{"fn":"fold","in":{"s":"tab\u0009separated"},"out":{"s":"tab separated"}}
+{"fn":"fold","in":{"s":"\uff46\uff55\uff4c\uff4c\uff57\uff49\uff44\uff54\uff48"},"out":{"s":"fullwidth"}}
+{"fn":"fold","in":{"s":"\u201cquoted\u201d"},"out":{"s":"quoted"}}
+{"fn":"fold","in":{"s":"dash \u2013 en \u2014 em"},"out":{"s":"dash en em"}}
+{"fn":"fold","in":{"s":"Nguy\u1ec5n"},"out":{"s":"nguyen"}}
+{"fn":"fold","in":{"s":"Nguy\u1ec5n"},"out":{"s":"nguyen"}}
+{"fn":"fold","in":{"s":"Tr\u1ea7n Th\u1ecb"},"out":{"s":"tran thi"}}
+{"fn":"fold","in":{"s":"e\u0301"},"out":{"s":"e"}}
+{"fn":"fold","in":{"s":"o\u0302\u0301"},"out":{"s":"o"}}
+{"fn":"fold","in":{"s":"\u00a0nbsp\u00a0"},"out":{"s":"nbsp"}}
+{"fn":"fold","in":{"s":"\ufb01 ligature"},"out":{"s":"\ufb01 ligature"}}
+{"fn":"fold","in":{"s":"\u00df"},"out":{"s":"ss"}}
+{"fn":"fold","in":{"s":"\u0130stanbul"},"out":{"s":"istanbul"}}
+{"fn":"fold","in":{"s":"\u0131i"},"out":{"s":"ii"}}
+{"fn":"fold","in":{"s":" Meme Media"},"out":{"s":"meme media"}}
+{"fn":"fold","in":{"s":"#1 Hits Now"},"out":{"s":"1 hits now"}}
+{"fn":"fold","in":{"s":"#sadforever"},"out":{"s":"sadforever"}}
+{"fn":"fold","in":{"s":"'00s Alternative"},"out":{"s":"00s alternative"}}
+{"fn":"fold","in":{"s":"'00s Dirty South Hip Hop"},"out":{"s":"00s dirty south hip hop"}}
+{"fn":"fold","in":{"s":"'00s Hip Hop Party"},"out":{"s":"00s hip hop party"}}
+{"fn":"fold","in":{"s":"'00s R&B Chill"},"out":{"s":"00s r b chill"}}
+{"fn":"fold","in":{"s":"'00s Rock Chillout"},"out":{"s":"00s rock chillout"}}
+{"fn":"fold","in":{"s":"'10s Party"},"out":{"s":"10s party"}}
+{"fn":"fold","in":{"s":"'10s R&B"},"out":{"s":"10s r b"}}
+{"fn":"fold","in":{"s":"'10s R&B Chill"},"out":{"s":"10s r b chill"}}
+{"fn":"fold","in":{"s":"'60s Folk"},"out":{"s":"60s folk"}}
+{"fn":"fold","in":{"s":"'80s Dance"},"out":{"s":"80s dance"}}
+{"fn":"fold","in":{"s":"'80s Rock"},"out":{"s":"80s rock"}}
+{"fn":"fold","in":{"s":"'80s Rock Ballads"},"out":{"s":"80s rock ballads"}}
+{"fn":"fold","in":{"s":"'90s Alternative"},"out":{"s":"90s alternative"}}
+{"fn":"fold","in":{"s":"'90s R&B"},"out":{"s":"90s r b"}}
+{"fn":"fold","in":{"s":"'90s Slow Jams"},"out":{"s":"90s slow jams"}}
+{"fn":"fold","in":{"s":"(((())))"},"out":{"s":""}}
+{"fn":"fold","in":{"s":"(S)TRONG"},"out":{"s":"s trong"}}
+{"fn":"fold","in":{"s":"(What's The Story) Morning Glory?"},"out":{"s":"what s the story morning glory"}}
+{"fn":"fold","in":{"s":"070 Shake"},"out":{"s":"070 shake"}}
+{"fn":"fold","in":{"s":"1 o clock"},"out":{"s":"1 o clock"}}
+{"fn":"fold","in":{"s":"10X"},"out":{"s":"10x"}}
+{"fn":"fold","in":{"s":"11:11 (Deluxe)"},"out":{"s":"11 11 deluxe"}}
+{"fn":"fold","in":{"s":"14 Casper"},"out":{"s":"14 casper"}}
+{"fn":"fold","in":{"s":"193"},"out":{"s":"193"}}
+{"fn":"fold","in":{"s":"2 Chainz"},"out":{"s":"2 chainz"}}
+{"fn":"fold","in":{"s":"2000s Radio"},"out":{"s":"2000s radio"}}
+{"fn":"fold","in":{"s":"2014 Forest Hills Drive"},"out":{"s":"2014 forest hills drive"}}
+{"fn":"fold","in":{"s":"2020 Covers"},"out":{"s":"2020 covers"}}
+{"fn":"fold","in":{"s":"2025 the Playlist"},"out":{"s":"2025 the playlist"}}
+{"fn":"fold","in":{"s":"21 Savage"},"out":{"s":"21 savage"}}
+{"fn":"fold","in":{"s":"22"},"out":{"s":"22"}}
+{"fn":"fold","in":{"s":"24kGoldn"},"out":{"s":"24kgoldn"}}
+{"fn":"fold","in":{"s":"2AM"},"out":{"s":"2am"}}
+{"fn":"fold","in":{"s":"2T"},"out":{"s":"2t"}}
+{"fn":"fold","in":{"s":"2hollis"},"out":{"s":"2hollis"}}
+{"fn":"fold","in":{"s":"2pillz"},"out":{"s":"2pillz"}}
+{"fn":"fold","in":{"s":"3 Doors Down"},"out":{"s":"3 doors down"}}
+{"fn":"fold","in":{"s":"310babii"},"out":{"s":"310babii"}}
+{"fn":"fold","in":{"s":"3two (EP)"},"out":{"s":"3two ep"}}
+{"fn":"fold","in":{"s":"4 Shooters Only\u2122"},"out":{"s":"4 shooters only\u2122"}}
+{"fn":"fold","in":{"s":"48 Hours"},"out":{"s":"48 hours"}}
+{"fn":"fold","in":{"s":"5 Seconds of Summer"},"out":{"s":"5 seconds of summer"}}
+{"fn":"fold","in":{"s":"5 Strings Screaming"},"out":{"s":"5 strings screaming"}}
+{"fn":"fold","in":{"s":"50 Cent"},"out":{"s":"50 cent"}}
+{"fn":"fold","in":{"s":"50 Shades of R&B"},"out":{"s":"50 shades of r b"}}
+{"fn":"fold","in":{"s":"808bb"},"out":{"s":"808bb"}}
+{"fn":"fold","in":{"s":"9 months & 50 hours"},"out":{"s":"9 months 50 hours"}}
+{"fn":"fold","in":{"s":"90s British Pop"},"out":{"s":"90s british pop"}}
+{"fn":"fold","in":{"s":"90s Chill: Bollywood"},"out":{"s":"90s chill bollywood"}}
+{"fn":"fold","in":{"s":"96 Months"},"out":{"s":"96 months"}}
+{"fn":"fold","in":{"s":"A Friend of Ours 2"},"out":{"s":"a friend of ours 2"}}
+{"fn":"fold","in":{"s":"A Happy Alternative"},"out":{"s":"a happy alternative"}}
+{"fn":"fold","in":{"s":"A LITTLE VENGEANCE (is more human than no vengeance at all)"},"out":{"s":"a little vengeance is more human than no vengeance at all"}}
+{"fn":"fold","in":{"s":"A Piece Of My Mind"},"out":{"s":"a piece of my mind"}}
+{"fn":"fold","in":{"s":"A Place In The Sun"},"out":{"s":"a place in the sun"}}
+{"fn":"fold","in":{"s":"A$AP Rocky"},"out":{"s":"a ap rocky"}}
+{"fn":"fold","in":{"s":"A2O"},"out":{"s":"a2o"}}
+{"fn":"fold","in":{"s":"A2O LITE"},"out":{"s":"a2o lite"}}
+{"fn":"fold","in":{"s":"ABC News"},"out":{"s":"abc news"}}
+{"fn":"fold","in":{"s":"ABSOLUTE BRAGADO Vol. 1"},"out":{"s":"absolute bragado vol 1"}}
+{"fn":"fold","in":{"s":"ADDICTED"},"out":{"s":"addicted"}}
+{"fn":"fold","in":{"s":"AD\u00c9LA"},"out":{"s":"adela"}}
+{"fn":"fold","in":{"s":"ALGO T\u00da"},"out":{"s":"algo tu"}}
+{"fn":"fold","in":{"s":"ALTNTVO"},"out":{"s":"altntvo"}}
+{"fn":"fold","in":{"s":"AM"},"out":{"s":"am"}}
+{"fn":"fold","in":{"s":"AM I THE DRAMA? (Beat Edition)"},"out":{"s":"am i the drama beat edition"}}
+{"fn":"fold","in":{"s":"AMEE"},"out":{"s":"amee"}}
+{"fn":"fold","in":{"s":"ANDROMEDA"},"out":{"s":"andromeda"}}
+{"fn":"fold","in":{"s":"ANH TRAI \"SAY HI\""},"out":{"s":"anh trai say hi"}}
+{"fn":"fold","in":{"s":"AOA"},"out":{"s":"aoa"}}
+{"fn":"fold","in":{"s":"ARDIPITHECUS"},"out":{"s":"ardipithecus"}}
+{"fn":"fold","in":{"s":"ARJN"},"out":{"s":"arjn"}}
+{"fn":"fold","in":{"s":"ASTROWORLD"},"out":{"s":"astroworld"}}
+{"fn":"fold","in":{"s":"ATE"},"out":{"s":"ate"}}
+{"fn":"fold","in":{"s":"ATEEZ"},"out":{"s":"ateez"}}
+{"fn":"fold","in":{"s":"AUDREY NUNA"},"out":{"s":"audrey nuna"}}
+{"fn":"fold","in":{"s":"AURORA"},"out":{"s":"aurora"}}
+{"fn":"fold","in":{"s":"AUSTIN"},"out":{"s":"austin"}}
+{"fn":"fold","in":{"s":"AWOLNATION"},"out":{"s":"awolnation"}}
+{"fn":"fold","in":{"s":"Aaliyah"},"out":{"s":"aaliyah"}}
+{"fn":"fold","in":{"s":"Aaman Trikha"},"out":{"s":"aaman trikha"}}
+{"fn":"fold","in":{"s":"Aaron Smith"},"out":{"s":"aaron smith"}}
+{"fn":"fold","in":{"s":"Aaryan Shah"},"out":{"s":"aaryan shah"}}
+{"fn":"fold","in":{"s":"Abstract Hip-Hop"},"out":{"s":"abstract hip hop"}}
+{"fn":"fold","in":{"s":"Acoustic Bedtime"},"out":{"s":"acoustic bedtime"}}
+{"fn":"fold","in":{"s":"Acoustic Covers of Love Songs"},"out":{"s":"acoustic covers of love songs"}}
+{"fn":"fold","in":{"s":"Acoustic Doze-Off"},"out":{"s":"acoustic doze off"}}
+{"fn":"fold","in":{"s":"Acoustic Indie & Alternative"},"out":{"s":"acoustic indie alternative"}}
+{"fn":"fold","in":{"s":"Acoustic Japan"},"out":{"s":"acoustic japan"}}
+{"fn":"fold","in":{"s":"Acoustic Love Songs"},"out":{"s":"acoustic love songs"}}
+{"fn":"fold","in":{"s":"Acoustic Pop"},"out":{"s":"acoustic pop"}}
+{"fn":"fold","in":{"s":"Acoustic Singer-Songwriters"},"out":{"s":"acoustic singer songwriters"}}
+{"fn":"fold","in":{"s":"Acoustic Soul"},"out":{"s":"acoustic soul"}}
+{"fn":"fold","in":{"s":"Acoustic Turkish Pop"},"out":{"s":"acoustic turkish pop"}}
+{"fn":"fold","in":{"s":"Adam BFD"},"out":{"s":"adam bfd"}}
+{"fn":"fold","in":{"s":"Adam Mockler"},"out":{"s":"adam mockler"}}
+{"fn":"fold","in":{"s":"Ade Govinda"},"out":{"s":"ade govinda"}}
+{"fn":"fold","in":{"s":"Aerosmith"},"out":{"s":"aerosmith"}}
+{"fn":"fold","in":{"s":"African Giant"},"out":{"s":"african giant"}}
+{"fn":"fold","in":{"s":"Afr\u00f8telize"},"out":{"s":"afrotelize"}}
+{"fn":"fold","in":{"s":"Afr\u00f8telizes: Best Hits & Afro House Anthems by Afr\u00f8telize"},"out":{"s":"afrotelizes best hits afro house anthems by afrotelize"}}
+{"fn":"fold","in":{"s":"After Hours"},"out":{"s":"after hours"}}
+{"fn":"fold","in":{"s":"After Hours (Deluxe)"},"out":{"s":"after hours deluxe"}}
+{"fn":"fold","in":{"s":"After Hours (Remixes)"},"out":{"s":"after hours remixes"}}
+{"fn":"fold","in":{"s":"Afternoon Memories"},"out":{"s":"afternoon memories"}}
+{"fn":"fold","in":{"s":"Ai C\u0169ng Ph\u1ea3i B\u1eaft \u0110\u1ea7u T\u1eeb \u0110\u00e2u \u0110\u00f3"},"out":{"s":"ai cung phai bat dau tu dau do"}}
+{"fn":"fold","in":{"s":"Ain't No Rest For The Wicked (Official Video)"},"out":{"s":"ain t no rest for the wicked official video"}}
+{"fn":"fold","in":{"s":"Airplane Mode"},"out":{"s":"airplane mode"}}
+{"fn":"fold","in":{"s":"Ajay Gogavale"},"out":{"s":"ajay gogavale"}}
+{"fn":"fold","in":{"s":"Akon"},"out":{"s":"akon"}}
+{"fn":"fold","in":{"s":"Akustikan"},"out":{"s":"akustikan"}}
+{"fn":"fold","in":{"s":"Al Shami"},"out":{"s":"al shami"}}
+{"fn":"fold","in":{"s":"Alameda Loft Party (LA CALI)"},"out":{"s":"alameda loft party la cali"}}
+{"fn":"fold","in":{"s":"Alan Walker"},"out":{"s":"alan walker"}}
+{"fn":"fold","in":{"s":"Alexander Acha"},"out":{"s":"alexander acha"}}
+{"fn":"fold","in":{"s":"Alfaaz (Alan Walker Relight)"},"out":{"s":"alfaaz alan walker relight"}}
+{"fn":"fold","in":{"s":"Alice In Chains"},"out":{"s":"alice in chains"}}
+{"fn":"fold","in":{"s":"Alice in Chains"},"out":{"s":"alice in chains"}}
+{"fn":"fold","in":{"s":"Align"},"out":{"s":"align"}}
+{"fn":"fold","in":{"s":"Alin Vibe"},"out":{"s":"alin vibe"}}
+{"fn":"fold","in":{"s":"Alina \u2013 Only You (Music Video)"},"out":{"s":"alina only you music video"}}
+{"fn":"fold","in":{"s":"Alka Yagnik"},"out":{"s":"alka yagnik"}}
+{"fn":"fold","in":{"s":"All Artists"},"out":{"s":"all artists"}}
+{"fn":"fold","in":{"s":"All Time Low"},"out":{"s":"all time low"}}
+{"fn":"fold","in":{"s":"All of Me"},"out":{"s":"all of me"}}
+{"fn":"fold","in":{"s":"All the Right Reasons (Special Edition)"},"out":{"s":"all the right reasons special edition"}}
+{"fn":"fold","in":{"s":"All-Time Alt"},"out":{"s":"all time alt"}}
+{"fn":"fold","in":{"s":"All-Time Easy Acoustics"},"out":{"s":"all time easy acoustics"}}
+{"fn":"fold","in":{"s":"All\u00e1 En Sonora"},"out":{"s":"alla en sonora"}}
+{"fn":"fold","in":{"s":"Alok"},"out":{"s":"alok"}}
+{"fn":"fold","in":{"s":"Aloka"},"out":{"s":"aloka"}}
+{"fn":"fold","in":{"s":"Alone Again (Official Live Performance)"},"out":{"s":"alone again official live performance"}}
+{"fn":"fold","in":{"s":"Alone at Prom"},"out":{"s":"alone at prom"}}
+{"fn":"fold","in":{"s":"Alone at Prom (Deluxe)"},"out":{"s":"alone at prom deluxe"}}
+{"fn":"fold","in":{"s":"Alphaville"},"out":{"s":"alphaville"}}
+{"fn":"fold","in":{"s":"Alt Icons"},"out":{"s":"alt icons"}}
+{"fn":"fold","in":{"s":"Alt J-Rap"},"out":{"s":"alt j rap"}}
+{"fn":"fold","in":{"s":"Alt-Pop Hits"},"out":{"s":"alt pop hits"}}
+{"fn":"fold","in":{"s":"Alternative"},"out":{"s":"alternative"}}
+{"fn":"fold","in":{"s":"Alternative All Day"},"out":{"s":"alternative all day"}}
+{"fn":"fold","in":{"s":"Alternative Current: Hits"},"out":{"s":"alternative current hits"}}
+{"fn":"fold","in":{"s":"Always Alright!"},"out":{"s":"always alright"}}
+{"fn":"fold","in":{"s":"Alyssa Grace"},"out":{"s":"alyssa grace"}}
+{"fn":"fold","in":{"s":"Ambient Dreams"},"out":{"s":"ambient dreams"}}
+{"fn":"fold","in":{"s":"Ambient Music Japan"},"out":{"s":"ambient music japan"}}
+{"fn":"fold","in":{"s":"Ambient Punk, Vol. II"},"out":{"s":"ambient punk vol ii"}}
+{"fn":"fold","in":{"s":"Ambiente Ac\u00fastico"},"out":{"s":"ambiente acustico"}}
+{"fn":"fold","in":{"s":"American Authors"},"out":{"s":"american authors"}}
+{"fn":"fold","in":{"s":"American Heart"},"out":{"s":"american heart"}}
+{"fn":"fold","in":{"s":"American Idiot"},"out":{"s":"american idiot"}}
+{"fn":"fold","in":{"s":"American Standard"},"out":{"s":"american standard"}}
+{"fn":"fold","in":{"s":"Amin\u00e9"},"out":{"s":"amine"}}
+{"fn":"fold","in":{"s":"Amitabh Bhattacharya"},"out":{"s":"amitabh bhattacharya"}}
+{"fn":"fold","in":{"s":"Amon Tobin"},"out":{"s":"amon tobin"}}
+{"fn":"fold","in":{"s":"An Electro Tribute to Nirvana"},"out":{"s":"an electro tribute to nirvana"}}
+{"fn":"fold","in":{"s":"An Introduction To Ellie Goulding EP"},"out":{"s":"an introduction to ellie goulding ep"}}
+{"fn":"fold","in":{"s":"Ana\u00efs Mitchell"},"out":{"s":"anais mitchell"}}
+{"fn":"fold","in":{"s":"And, Again"},"out":{"s":"and again"}}
+{"fn":"fold","in":{"s":"Anderson .Paak"},"out":{"s":"anderson paak"}}
+{"fn":"fold","in":{"s":"Andrea Storm Kaden"},"out":{"s":"andrea storm kaden"}}
+{"fn":"fold","in":{"s":"Andree Right Hand"},"out":{"s":"andree right hand"}}
+{"fn":"fold","in":{"s":"Andrew Niman"},"out":{"s":"andrew niman"}}
+{"fn":"fold","in":{"s":"Angel"},"out":{"s":"angel"}}
+{"fn":"fold","in":{"s":"Anh Trai V\u01b0\u1ee3t Ng\u00e0n Ch\u00f4ng Gai 2024"},"out":{"s":"anh trai vuot ngan chong gai 2024"}}
+{"fn":"fold","in":{"s":"Anh Trai V\u01b0\u1ee3t Ng\u00e0n Ch\u00f4ng Gai 2024 - C\u00f4ng Di\u1ec5n 1"},"out":{"s":"anh trai vuot ngan chong gai 2024 cong dien 1"}}
+{"fn":"fold","in":{"s":"Anh T\u00fa Atus"},"out":{"s":"anh tu atus"}}
+{"fn":"fold","in":{"s":"Anh \u0110\u00e3 Quen V\u1edbi C\u00f4 \u0110\u01a1n"},"out":{"s":"anh da quen voi co don"}}
+{"fn":"fold","in":{"s":"Animal"},"out":{"s":"animal"}}
+{"fn":"fold","in":{"s":"Anirudh Ravichander"},"out":{"s":"anirudh ravichander"}}
+{"fn":"fold","in":{"s":"Anitta"},"out":{"s":"anitta"}}
+{"fn":"fold","in":{"s":"Anjali Raj"},"out":{"s":"anjali raj"}}
+{"fn":"fold","in":{"s":"Ann Sandig"},"out":{"s":"ann sandig"}}
+{"fn":"fold","in":{"s":"Anne Hathaway"},"out":{"s":"anne hathaway"}}
+{"fn":"fold","in":{"s":"Annie Elise"},"out":{"s":"annie elise"}}
+{"fn":"fold","in":{"s":"Annie Lennox"},"out":{"s":"annie lennox"}}
+{"fn":"fold","in":{"s":"Anniversary | Oral Fixation (20th) and Pies Descalzos (30th) LIVE"},"out":{"s":"anniversary oral fixation 20th and pies descalzos 30th live"}}
+{"fn":"fold","in":{"s":"Another Love (Official Video)"},"out":{"s":"another love official video"}}
+{"fn":"fold","in":{"s":"Another Love (Zwette Edit)"},"out":{"s":"another love zwette edit"}}
+{"fn":"fold","in":{"s":"Antenna"},"out":{"s":"antenna"}}
+{"fn":"fold","in":{"s":"Anti Love Songs"},"out":{"s":"anti love songs"}}
+{"fn":"fold","in":{"s":"Antidawn EP"},"out":{"s":"antidawn ep"}}
+{"fn":"fold","in":{"s":"Anuel AA"},"out":{"s":"anuel aa"}}
+{"fn":"fold","in":{"s":"Aphex Twin"},"out":{"s":"aphex twin"}}
+{"fn":"fold","in":{"s":"Aqu\u00ed de chill"},"out":{"s":"aqui de chill"}}
+{"fn":"fold","in":{"s":"Archangel"},"out":{"s":"archangel"}}
+{"fn":"fold","in":{"s":"Arctic Monkeys"},"out":{"s":"arctic monkeys"}}
+{"fn":"fold","in":{"s":"Ares"},"out":{"s":"ares"}}
+{"fn":"fold","in":{"s":"Ari Abdul"},"out":{"s":"ari abdul"}}
+{"fn":"fold","in":{"s":"Ariana Grande"},"out":{"s":"ariana grande"}}
+{"fn":"fold","in":{"s":"Aries tis"},"out":{"s":"aries tis"}}
+{"fn":"fold","in":{"s":"Arijit Singh"},"out":{"s":"arijit singh"}}
+{"fn":"fold","in":{"s":"Aris"},"out":{"s":"aris"}}
+{"fn":"fold","in":{"s":"Armaan Khan"},"out":{"s":"armaan khan"}}
+{"fn":"fold","in":{"s":"Armani White"},"out":{"s":"armani white"}}
+{"fn":"fold","in":{"s":"Artemas"},"out":{"s":"artemas"}}
+{"fn":"fold","in":{"s":"Artificial Paradise (Deluxe)"},"out":{"s":"artificial paradise deluxe"}}
+{"fn":"fold","in":{"s":"Arun Srinivasan"},"out":{"s":"arun srinivasan"}}
+{"fn":"fold","in":{"s":"Ashe"},"out":{"s":"ashe"}}
+{"fn":"fold","in":{"s":"Ashley Alisha"},"out":{"s":"ashley alisha"}}
+{"fn":"fold","in":{"s":"Asi Es Mi Cartel"},"out":{"s":"asi es mi cartel"}}
+{"fn":"fold","in":{"s":"Asian Wave"},"out":{"s":"asian wave"}}
+{"fn":"fold","in":{"s":"Astech"},"out":{"s":"astech"}}
+{"fn":"fold","in":{"s":"Astro Lounge"},"out":{"s":"astro lounge"}}
+{"fn":"fold","in":{"s":"Astronaut In The Ocean"},"out":{"s":"astronaut in the ocean"}}
+{"fn":"fold","in":{"s":"At Night, Alone."},"out":{"s":"at night alone"}}
+{"fn":"fold","in":{"s":"At The Beach, In Every Life"},"out":{"s":"at the beach in every life"}}
+{"fn":"fold","in":{"s":"Attention"},"out":{"s":"attention"}}
+{"fn":"fold","in":{"s":"Audioslave"},"out":{"s":"audioslave"}}
+{"fn":"fold","in":{"s":"Autechre"},"out":{"s":"autechre"}}
+{"fn":"fold","in":{"s":"Ava Max"},"out":{"s":"ava max"}}
+{"fn":"fold","in":{"s":"Aventura"},"out":{"s":"aventura"}}
+{"fn":"fold","in":{"s":"Avicii"},"out":{"s":"avicii"}}
+{"fn":"fold","in":{"s":"B Ray"},"out":{"s":"b ray"}}
+{"fn":"fold","in":{"s":"B ray"},"out":{"s":"b ray"}}
+{"fn":"fold","in":{"s":"B.o.B"},"out":{"s":"b o b"}}
+{"fn":"fold","in":{"s":"B2K"},"out":{"s":"b2k"}}
+{"fn":"fold","in":{"s":"BABYMONSTER"},"out":{"s":"babymonster"}}
+{"fn":"fold","in":{"s":"BADMAN FUNK"},"out":{"s":"badman funk"}}
+{"fn":"fold","in":{"s":"BAE173"},"out":{"s":"bae173"}}
+{"fn":"fold","in":{"s":"BALLISTIK BOYZ LIVE TOUR 2023 \u201cN.E.X.T.\u201d"},"out":{"s":"ballistik boyz live tour 2023 n e x t"}}
+{"fn":"fold","in":{"s":"BALLISTIK BOYZ from EXILE TRIBE"},"out":{"s":"ballistik boyz from exile tribe"}}
+{"fn":"fold","in":{"s":"BAM BAM"},"out":{"s":"bam bam"}}
+{"fn":"fold","in":{"s":"BAN"},"out":{"s":"ban"}}
+{"fn":"fold","in":{"s":"BASIC INSTINCTS"},"out":{"s":"basic instincts"}}
+{"fn":"fold","in":{"s":"BBpanzu"},"out":{"s":"bbpanzu"}}
+{"fn":"fold","in":{"s":"BEAUTIFUL CHAOS"},"out":{"s":"beautiful chaos"}}
+{"fn":"fold","in":{"s":"BEFORE SUNRISE Part. 4"},"out":{"s":"before sunrise part 4"}}
+{"fn":"fold","in":{"s":"BETTER OVER TIME"},"out":{"s":"better over time"}}
+{"fn":"fold","in":{"s":"BIBI"},"out":{"s":"bibi"}}
+{"fn":"fold","in":{"s":"BIGBANG"},"out":{"s":"bigbang"}}
+{"fn":"fold","in":{"s":"BILLIE EILISH."},"out":{"s":"billie eilish"}}
+{"fn":"fold","in":{"s":"BIOS"},"out":{"s":"bios"}}
+{"fn":"fold","in":{"s":"BL00MS"},"out":{"s":"bl00ms"}}
+{"fn":"fold","in":{"s":"BLACK SHEEP"},"out":{"s":"black sheep"}}
+{"fn":"fold","in":{"s":"BLACKPINK"},"out":{"s":"blackpink"}}
+{"fn":"fold","in":{"s":"BLAME IT ON BABY"},"out":{"s":"blame it on baby"}}
+{"fn":"fold","in":{"s":"BLITZERS"},"out":{"s":"blitzers"}}
+{"fn":"fold","in":{"s":"BLOK3"},"out":{"s":"blok3"}}
+{"fn":"fold","in":{"s":"BMZ"},"out":{"s":"bmz"}}
+{"fn":"fold","in":{"s":"BOO (Radio Edit)"},"out":{"s":"boo radio edit"}}
+{"fn":"fold","in":{"s":"BPM SNACK"},"out":{"s":"bpm snack"}}
+{"fn":"fold","in":{"s":"BRABUS MUSIC"},"out":{"s":"brabus music"}}
+{"fn":"fold","in":{"s":"BRAT"},"out":{"s":"brat"}}
+{"fn":"fold","in":{"s":"BREAK EVEN"},"out":{"s":"break even"}}
+{"fn":"fold","in":{"s":"BTS"},"out":{"s":"bts"}}
+{"fn":"fold","in":{"s":"BULLDAWG: GRAVEYARD SHIFT"},"out":{"s":"bulldawg graveyard shift"}}
+{"fn":"fold","in":{"s":"Baazigar"},"out":{"s":"baazigar"}}
+{"fn":"fold","in":{"s":"Baby DONT Cry"},"out":{"s":"baby dont cry"}}
+{"fn":"fold","in":{"s":"BabyChiefDoit"},"out":{"s":"babychiefdoit"}}
+{"fn":"fold","in":{"s":"Babydoll"},"out":{"s":"babydoll"}}
+{"fn":"fold","in":{"s":"Back For Everything"},"out":{"s":"back for everything"}}
+{"fn":"fold","in":{"s":"Background Jazz"},"out":{"s":"background jazz"}}
+{"fn":"fold","in":{"s":"Bad Bunny"},"out":{"s":"bad bunny"}}
+{"fn":"fold","in":{"s":"Bad Dream"},"out":{"s":"bad dream"}}
+{"fn":"fold","in":{"s":"Bad Habits"},"out":{"s":"bad habits"}}
+{"fn":"fold","in":{"s":"Bad Wolves"},"out":{"s":"bad wolves"}}
+{"fn":"fold","in":{"s":"Badshah"},"out":{"s":"badshah"}}
+{"fn":"fold","in":{"s":"Bag Raiders"},"out":{"s":"bag raiders"}}
+{"fn":"fold","in":{"s":"Baile da Mari"},"out":{"s":"baile da mari"}}
+{"fn":"fold","in":{"s":"Bananarama"},"out":{"s":"bananarama"}}
+{"fn":"fold","in":{"s":"Banjaare"},"out":{"s":"banjaare"}}
+{"fn":"fold","in":{"s":"Banqueta y Banquete"},"out":{"s":"banqueta y banquete"}}
+{"fn":"fold","in":{"s":"Barberry Records"},"out":{"s":"barberry records"}}
+{"fn":"fold","in":{"s":"Barker"},"out":{"s":"barker"}}
+{"fn":"fold","in":{"s":"Baroque"},"out":{"s":"baroque"}}
+{"fn":"fold","in":{"s":"Barstool Yak"},"out":{"s":"barstool yak"}}
+{"fn":"fold","in":{"s":"Based On A T.R.U. Story (Deluxe)"},"out":{"s":"based on a t r u story deluxe"}}
+{"fn":"fold","in":{"s":"Basket Case (Live at Makuhari Messe, Tokyo, Japan, March 18, 2001)"},"out":{"s":"basket case live at makuhari messe tokyo japan march 18 2001"}}
+{"fn":"fold","in":{"s":"Bastille"},"out":{"s":"bastille"}}
+{"fn":"fold","in":{"s":"Bathukamma (From \"ENE Repeat\")"},"out":{"s":"bathukamma from ene repeat"}}
+{"fn":"fold","in":{"s":"Bazzi"},"out":{"s":"bazzi"}}
+{"fn":"fold","in":{"s":"Be Honest"},"out":{"s":"be honest"}}
+{"fn":"fold","in":{"s":"Be Kind"},"out":{"s":"be kind"}}
+{"fn":"fold","in":{"s":"Be There In A Minute"},"out":{"s":"be there in a minute"}}
+{"fn":"fold","in":{"s":"Be Your Own Boss"},"out":{"s":"be your own boss"}}
+{"fn":"fold","in":{"s":"Beach Beats"},"out":{"s":"beach beats"}}
+{"fn":"fold","in":{"s":"Beach House"},"out":{"s":"beach house"}}
+{"fn":"fold","in":{"s":"Beats & Soul"},"out":{"s":"beats soul"}}
+{"fn":"fold","in":{"s":"Beautiful People"},"out":{"s":"beautiful people"}}
+{"fn":"fold","in":{"s":"Beauty Behind The Madness"},"out":{"s":"beauty behind the madness"}}
+{"fn":"fold","in":{"s":"Bebe Rexha"},"out":{"s":"bebe rexha"}}
+{"fn":"fold","in":{"s":"Beckham Music"},"out":{"s":"beckham music"}}
+{"fn":"fold","in":{"s":"Bee Gees"},"out":{"s":"bee gees"}}
+{"fn":"fold","in":{"s":"Beerbongs & Bentleys"},"out":{"s":"beerbongs bentleys"}}
+{"fn":"fold","in":{"s":"Believer"},"out":{"s":"believer"}}
+{"fn":"fold","in":{"s":"Belly"},"out":{"s":"belly"}}
+{"fn":"fold","in":{"s":"Belly Gang Kushington"},"out":{"s":"belly gang kushington"}}
+{"fn":"fold","in":{"s":"Belong To The World"},"out":{"s":"belong to the world"}}
+{"fn":"fold","in":{"s":"Benson Boone"},"out":{"s":"benson boone"}}
+{"fn":"fold","in":{"s":"Berlin"},"out":{"s":"berlin"}}
+{"fn":"fold","in":{"s":"Berserker"},"out":{"s":"berserker"}}
+{"fn":"fold","in":{"s":"Best Friends (Remix)"},"out":{"s":"best friends remix"}}
+{"fn":"fold","in":{"s":"Best of Burn Series, Vol. 1"},"out":{"s":"best of burn series vol 1"}}
+{"fn":"fold","in":{"s":"Bestie"},"out":{"s":"bestie"}}
+{"fn":"fold","in":{"s":"Better Believe"},"out":{"s":"better believe"}}
+{"fn":"fold","in":{"s":"Beyond the Top OST, Vol. 1"},"out":{"s":"beyond the top ost vol 1"}}
+{"fn":"fold","in":{"s":"Be\u00e9le"},"out":{"s":"beele"}}
+{"fn":"fold","in":{"s":"Bicep"},"out":{"s":"bicep"}}
+{"fn":"fold","in":{"s":"Big Dawgs"},"out":{"s":"big dawgs"}}
+{"fn":"fold","in":{"s":"Big Guy (from \"The SpongeBob Movie: Search for SquarePants\u201d)"},"out":{"s":"big guy from the spongebob movie search for squarepants"}}
+{"fn":"fold","in":{"s":"Big Michael Michael"},"out":{"s":"big michael michael"}}
+{"fn":"fold","in":{"s":"Big Sean"},"out":{"s":"big sean"}}
+{"fn":"fold","in":{"s":"BigDaddy"},"out":{"s":"bigdaddy"}}
+{"fn":"fold","in":{"s":"BigXthaPlug"},"out":{"s":"bigxthaplug"}}
+{"fn":"fold","in":{"s":"Bigger, Better, Faster, More !"},"out":{"s":"bigger better faster more"}}
+{"fn":"fold","in":{"s":"Billy Idol"},"out":{"s":"billy idol"}}
+{"fn":"fold","in":{"s":"Billy Ocean"},"out":{"s":"billy ocean"}}
+{"fn":"fold","in":{"s":"Bindaas x Hukum Theme (From \"Jailer 2\")"},"out":{"s":"bindaas x hukum theme from jailer 2"}}
+{"fn":"fold","in":{"s":"Bing! Bing! Bing!"},"out":{"s":"bing bing bing"}}
+{"fn":"fold","in":{"s":"Bintu Pabra"},"out":{"s":"bintu pabra"}}
+{"fn":"fold","in":{"s":"Binz"},"out":{"s":"binz"}}
+{"fn":"fold","in":{"s":"Birds in the Trap Sing McKnight"},"out":{"s":"birds in the trap sing mcknight"}}
+{"fn":"fold","in":{"s":"Bite The Dust"},"out":{"s":"bite the dust"}}
+{"fn":"fold","in":{"s":"Bitter Sweet Symphony"},"out":{"s":"bitter sweet symphony"}}
+{"fn":"fold","in":{"s":"Bizarrap"},"out":{"s":"bizarrap"}}
+{"fn":"fold","in":{"s":"Black (Official Audio)"},"out":{"s":"black official audio"}}
+{"fn":"fold","in":{"s":"Black Atlass"},"out":{"s":"black atlass"}}
+{"fn":"fold","in":{"s":"Black Eyed Peas"},"out":{"s":"black eyed peas"}}
+{"fn":"fold","in":{"s":"Black Hole Sun"},"out":{"s":"black hole sun"}}
+{"fn":"fold","in":{"s":"Black Panther The Album Music From And Inspired By"},"out":{"s":"black panther the album music from and inspired by"}}
+{"fn":"fold","in":{"s":"Black Panther: Wakanda Forever - Music From and Inspired By"},"out":{"s":"black panther wakanda forever music from and inspired by"}}
+{"fn":"fold","in":{"s":"Black Sabbath"},"out":{"s":"black sabbath"}}
+{"fn":"fold","in":{"s":"Black Sea Folk"},"out":{"s":"black sea folk"}}
+{"fn":"fold","in":{"s":"Blackbird"},"out":{"s":"blackbird"}}
+{"fn":"fold","in":{"s":"Bleach: Deluxe Edition"},"out":{"s":"bleach deluxe edition"}}
+{"fn":"fold","in":{"s":"Bleed American"},"out":{"s":"bleed american"}}
+{"fn":"fold","in":{"s":"Blinding Lights"},"out":{"s":"blinding lights"}}
+{"fn":"fold","in":{"s":"Blinding Lights (Acoustic)"},"out":{"s":"blinding lights acoustic"}}
+{"fn":"fold","in":{"s":"Blinding Lights (But it hits different)"},"out":{"s":"blinding lights but it hits different"}}
+{"fn":"fold","in":{"s":"Blinding Lights (Instrumental)"},"out":{"s":"blinding lights instrumental"}}
+{"fn":"fold","in":{"s":"Blinding Lights (Live On The 2020 MTV VMAs)"},"out":{"s":"blinding lights live on the 2020 mtv vmas"}}
+{"fn":"fold","in":{"s":"Blinding Lights (Major Lazer Remix) (feat. Major Lazer)"},"out":{"s":"blinding lights major lazer remix feat major lazer"}}
+{"fn":"fold","in":{"s":"Blinding Lights (Metal Version)"},"out":{"s":"blinding lights metal version"}}
+{"fn":"fold","in":{"s":"Blinding Lights (Official Video)"},"out":{"s":"blinding lights official video"}}
+{"fn":"fold","in":{"s":"Blinding Lights (Remix)"},"out":{"s":"blinding lights remix"}}
+{"fn":"fold","in":{"s":"Blinding Lights (Tabata)"},"out":{"s":"blinding lights tabata"}}
+{"fn":"fold","in":{"s":"Blinding Lights (Techno)"},"out":{"s":"blinding lights techno"}}
+{"fn":"fold","in":{"s":"Blinding Lights (The Weeknd)"},"out":{"s":"blinding lights the weeknd"}}
+{"fn":"fold","in":{"s":"Blinding Lights Oiia"},"out":{"s":"blinding lights oiia"}}
+{"fn":"fold","in":{"s":"Blinding Lights Radio"},"out":{"s":"blinding lights radio"}}
+{"fn":"fold","in":{"s":"Blksmiith"},"out":{"s":"blksmiith"}}
+{"fn":"fold","in":{"s":"Blonde"},"out":{"s":"blonde"}}
+{"fn":"fold","in":{"s":"Blondie"},"out":{"s":"blondie"}}
+{"fn":"fold","in":{"s":"Blood Sugar Sex Magik (Deluxe Edition)"},"out":{"s":"blood sugar sex magik deluxe edition"}}
+{"fn":"fold","in":{"s":"Blow The Whistle"},"out":{"s":"blow the whistle"}}
+{"fn":"fold","in":{"s":"Blu Billy"},"out":{"s":"blu billy"}}
+{"fn":"fold","in":{"s":"Blue Dream"},"out":{"s":"blue dream"}}
+{"fn":"fold","in":{"s":"Blue \u00d6yster Cult"},"out":{"s":"blue oyster cult"}}
+{"fn":"fold","in":{"s":"Bluestrips"},"out":{"s":"bluestrips"}}
+{"fn":"fold","in":{"s":"Blurryface"},"out":{"s":"blurryface"}}
+{"fn":"fold","in":{"s":"Boards of Canada"},"out":{"s":"boards of canada"}}
+{"fn":"fold","in":{"s":"Bobby Helms"},"out":{"s":"bobby helms"}}
+{"fn":"fold","in":{"s":"Bobby Pulido"},"out":{"s":"bobby pulido"}}
+{"fn":"fold","in":{"s":"Bobby Shmurda"},"out":{"s":"bobby shmurda"}}
+{"fn":"fold","in":{"s":"Bon Nghi\u00eam"},"out":{"s":"bon nghiem"}}
+{"fn":"fold","in":{"s":"Bones"},"out":{"s":"bones"}}
+{"fn":"fold","in":{"s":"Bonnie Tyler"},"out":{"s":"bonnie tyler"}}
+{"fn":"fold","in":{"s":"Bonobo"},"out":{"s":"bonobo"}}
+{"fn":"fold","in":{"s":"Bonobo - Memory Signal (Official Video)"},"out":{"s":"bonobo memory signal official video"}}
+{"fn":"fold","in":{"s":"Bossa Nova Covers"},"out":{"s":"bossa nova covers"}}
+{"fn":"fold","in":{"s":"Bossa Nova Time"},"out":{"s":"bossa nova time"}}
+{"fn":"fold","in":{"s":"Both Feet In"},"out":{"s":"both feet in"}}
+{"fn":"fold","in":{"s":"BothBirds"},"out":{"s":"bothbirds"}}
+{"fn":"fold","in":{"s":"Bow Bow Bow"},"out":{"s":"bow bow bow"}}
+{"fn":"fold","in":{"s":"BoyWithUke"},"out":{"s":"boywithuke"}}
+{"fn":"fold","in":{"s":"Brazilian Phonk (slowed)"},"out":{"s":"brazilian phonk slowed"}}
+{"fn":"fold","in":{"s":"Break the Cycle"},"out":{"s":"break the cycle"}}
+{"fn":"fold","in":{"s":"Breaking Points"},"out":{"s":"breaking points"}}
+{"fn":"fold","in":{"s":"Brenda Lee"},"out":{"s":"brenda lee"}}
+{"fn":"fold","in":{"s":"Brian Tyler Cohen"},"out":{"s":"brian tyler cohen"}}
+{"fn":"fold","in":{"s":"Brick Squad Boyz"},"out":{"s":"brick squad boyz"}}
+{"fn":"fold","in":{"s":"Bring Me The Horizon"},"out":{"s":"bring me the horizon"}}
+{"fn":"fold","in":{"s":"Bringing Out"},"out":{"s":"bringing out"}}
+{"fn":"fold","in":{"s":"Britpop | Best British Indie Music 80's 90's 00's"},"out":{"s":"britpop best british indie music 80 s 90 s 00 s"}}
+{"fn":"fold","in":{"s":"Broken Lip"},"out":{"s":"broken lip"}}
+{"fn":"fold","in":{"s":"Broken Toy Airplanes"},"out":{"s":"broken toy airplanes"}}
+{"fn":"fold","in":{"s":"Brown Noise"},"out":{"s":"brown noise"}}
+{"fn":"fold","in":{"s":"Bruce Springsteen"},"out":{"s":"bruce springsteen"}}
+{"fn":"fold","in":{"s":"Bruno Mars"},"out":{"s":"bruno mars"}}
+{"fn":"fold","in":{"s":"Bruno Martini"},"out":{"s":"bruno martini"}}
+{"fn":"fold","in":{"s":"Bubble Pop"},"out":{"s":"bubble pop"}}
+{"fn":"fold","in":{"s":"Buong Doi Tay Nhau Ra"},"out":{"s":"buong doi tay nhau ra"}}
+{"fn":"fold","in":{"s":"Burgundy Symphony"},"out":{"s":"burgundy symphony"}}
+{"fn":"fold","in":{"s":"Bush"},"out":{"s":"bush"}}
+{"fn":"fold","in":{"s":"Butt Rock Billionaire"},"out":{"s":"butt rock billionaire"}}
+{"fn":"fold","in":{"s":"Buttechno"},"out":{"s":"buttechno"}}
+{"fn":"fold","in":{"s":"Bu\u1ed3n Hay Vui"},"out":{"s":"buon hay vui"}}
+{"fn":"fold","in":{"s":"B\u00d8RNS"},"out":{"s":"borns"}}
+{"fn":"fold","in":{"s":"B\u00e9same After Dark"},"out":{"s":"besame after dark"}}
+{"fn":"fold","in":{"s":"B\u00f9i C\u00f4ng Nam"},"out":{"s":"bui cong nam"}}
+{"fn":"fold","in":{"s":"B\u1ea1n \u0110\u1eddi"},"out":{"s":"ban doi"}}
+{"fn":"fold","in":{"s":"B\u1ea3o Anh "},"out":{"s":"bao anh"}}
+{"fn":"fold","in":{"s":"B\u1ea3o Uy\u00ean"},"out":{"s":"bao uyen"}}
+{"fn":"fold","in":{"s":"B\u1eadt T\u00ecnh Y\u00eau L\u00ean"},"out":{"s":"bat tinh yeu len"}}
+{"fn":"fold","in":{"s":"CAPTAIN BOY"},"out":{"s":"captain boy"}}
+{"fn":"fold","in":{"s":"CATALYST"},"out":{"s":"catalyst"}}
+{"fn":"fold","in":{"s":"CCAP Entertainment"},"out":{"s":"ccap entertainment"}}
+{"fn":"fold","in":{"s":"CHARLIE"},"out":{"s":"charlie"}}
+{"fn":"fold","in":{"s":"CHAXZER"},"out":{"s":"chaxzer"}}
+{"fn":"fold","in":{"s":"CKay"},"out":{"s":"ckay"}}
+{"fn":"fold","in":{"s":"CKay The First"},"out":{"s":"ckay the first"}}
+{"fn":"fold","in":{"s":"CLAVE ESPECIAL"},"out":{"s":"clave especial"}}
+{"fn":"fold","in":{"s":"COLORS"},"out":{"s":"colors"}}
+{"fn":"fold","in":{"s":"CONFESSIONS II: Instrumentals"},"out":{"s":"confessions ii instrumentals"}}
+{"fn":"fold","in":{"s":"COOLKID"},"out":{"s":"coolkid"}}
+{"fn":"fold","in":{"s":"CRAZY"},"out":{"s":"crazy"}}
+{"fn":"fold","in":{"s":"CURRENCY"},"out":{"s":"currency"}}
+{"fn":"fold","in":{"s":"Ca S\u0129 \u0110\u01b0\u1eddng Ph\u1ed1"},"out":{"s":"ca si duong pho"}}
+{"fn":"fold","in":{"s":"Cafecito & Chill"},"out":{"s":"cafecito chill"}}
+{"fn":"fold","in":{"s":"Caleb Hammer"},"out":{"s":"caleb hammer"}}
+{"fn":"fold","in":{"s":"Californication"},"out":{"s":"californication"}}
+{"fn":"fold","in":{"s":"Call Out My Name (Official Video)"},"out":{"s":"call out my name official video"}}
+{"fn":"fold","in":{"s":"Calm Down"},"out":{"s":"calm down"}}
+{"fn":"fold","in":{"s":"Calm Instrumental from Turkey"},"out":{"s":"calm instrumental from turkey"}}
+{"fn":"fold","in":{"s":"Calvin Harris"},"out":{"s":"calvin harris"}}
+{"fn":"fold","in":{"s":"Camila Cabello"},"out":{"s":"camila cabello"}}
+{"fn":"fold","in":{"s":"Campfire Classics"},"out":{"s":"campfire classics"}}
+{"fn":"fold","in":{"s":"Can't Feel My Face (Martin Garrix Remix)"},"out":{"s":"can t feel my face martin garrix remix"}}
+{"fn":"fold","in":{"s":"Candace Owens"},"out":{"s":"candace owens"}}
+{"fn":"fold","in":{"s":"Candlebox"},"out":{"s":"candlebox"}}
+{"fn":"fold","in":{"s":"Cannons"},"out":{"s":"cannons"}}
+{"fn":"fold","in":{"s":"Capital Cities"},"out":{"s":"capital cities"}}
+{"fn":"fold","in":{"s":"Cardi B"},"out":{"s":"cardi b"}}
+{"fn":"fold","in":{"s":"Cardo Grandz"},"out":{"s":"cardo grandz"}}
+{"fn":"fold","in":{"s":"Caribou"},"out":{"s":"caribou"}}
+{"fn":"fold","in":{"s":"Carlos Vives"},"out":{"s":"carlos vives"}}
+{"fn":"fold","in":{"s":"Carnaval De Luz"},"out":{"s":"carnaval de luz"}}
+{"fn":"fold","in":{"s":"Cartoon"},"out":{"s":"cartoon"}}
+{"fn":"fold","in":{"s":"Cash"},"out":{"s":"cash"}}
+{"fn":"fold","in":{"s":"Casino Versus Japan"},"out":{"s":"casino versus japan"}}
+{"fn":"fold","in":{"s":"Cause I Love You"},"out":{"s":"cause i love you"}}
+{"fn":"fold","in":{"s":"Cedric Gervais"},"out":{"s":"cedric gervais"}}
+{"fn":"fold","in":{"s":"Celebrity"},"out":{"s":"celebrity"}}
+{"fn":"fold","in":{"s":"Champagne Diet"},"out":{"s":"champagne diet"}}
+{"fn":"fold","in":{"s":"Changg"},"out":{"s":"changg"}}
+{"fn":"fold","in":{"s":"Channel Tres"},"out":{"s":"channel tres"}}
+{"fn":"fold","in":{"s":"Charles Webster"},"out":{"s":"charles webster"}}
+{"fn":"fold","in":{"s":"Charli xcx"},"out":{"s":"charli xcx"}}
+{"fn":"fold","in":{"s":"Charlie Hunter Trio"},"out":{"s":"charlie hunter trio"}}
+{"fn":"fold","in":{"s":"Charlie Puth"},"out":{"s":"charlie puth"}}
+{"fn":"fold","in":{"s":"Chase Atlantic"},"out":{"s":"chase atlantic"}}
+{"fn":"fold","in":{"s":"Chazg"},"out":{"s":"chazg"}}
+{"fn":"fold","in":{"s":"Cheap Thrills"},"out":{"s":"cheap thrills"}}
+{"fn":"fold","in":{"s":"Chemz"},"out":{"s":"chemz"}}
+{"fn":"fold","in":{"s":"Cherry Music"},"out":{"s":"cherry music"}}
+{"fn":"fold","in":{"s":"Cherry Red"},"out":{"s":"cherry red"}}
+{"fn":"fold","in":{"s":"Chevelle"},"out":{"s":"chevelle"}}
+{"fn":"fold","in":{"s":"Chica (Stay With Me Afrobeat)"},"out":{"s":"chica stay with me afrobeat"}}
+{"fn":"fold","in":{"s":"Childish Gambino"},"out":{"s":"childish gambino"}}
+{"fn":"fold","in":{"s":"Chill Arabic Indie"},"out":{"s":"chill arabic indie"}}
+{"fn":"fold","in":{"s":"Chill Bangers"},"out":{"s":"chill bangers"}}
+{"fn":"fold","in":{"s":"Chill Bill"},"out":{"s":"chill bill"}}
+{"fn":"fold","in":{"s":"Chill EDM Hits"},"out":{"s":"chill edm hits"}}
+{"fn":"fold","in":{"s":"Chill House"},"out":{"s":"chill house"}}
+{"fn":"fold","in":{"s":"Chill House & Techno"},"out":{"s":"chill house techno"}}
+{"fn":"fold","in":{"s":"Chill Indie Beats"},"out":{"s":"chill indie beats"}}
+{"fn":"fold","in":{"s":"Chill Out With 80s Vibes"},"out":{"s":"chill out with 80s vibes"}}
+{"fn":"fold","in":{"s":"Chill Phonk (slowed)"},"out":{"s":"chill phonk slowed"}}
+{"fn":"fold","in":{"s":"Chill R&B"},"out":{"s":"chill r b"}}
+{"fn":"fold","in":{"s":"Chill Tracks 2026"},"out":{"s":"chill tracks 2026"}}
+{"fn":"fold","in":{"s":"Chilled Dance Anthems"},"out":{"s":"chilled dance anthems"}}
+{"fn":"fold","in":{"s":"Chilled Hip-Hop"},"out":{"s":"chilled hip hop"}}
+{"fn":"fold","in":{"s":"Chilled Ibiza"},"out":{"s":"chilled ibiza"}}
+{"fn":"fold","in":{"s":"Chimbala (Ensamble et\u00e9reo) (Ensamble et\u00e9reo Live Session)"},"out":{"s":"chimbala ensamble etereo ensamble etereo live session"}}
+{"fn":"fold","in":{"s":"Chip Chrome & The Mono-Tones (Deluxe)"},"out":{"s":"chip chrome the mono tones deluxe"}}
+{"fn":"fold","in":{"s":"Chris Brown"},"out":{"s":"chris brown"}}
+{"fn":"fold","in":{"s":"Chrome Sparks"},"out":{"s":"chrome sparks"}}
+{"fn":"fold","in":{"s":"Chu Duy\u00ean"},"out":{"s":"chu duyen"}}
+{"fn":"fold","in":{"s":"Chuy\u1ec7n \u0110\u00f4i Ta"},"out":{"s":"chuyen doi ta"}}
+{"fn":"fold","in":{"s":"Ch\u00e2n \u00c1i"},"out":{"s":"chan ai"}}
+{"fn":"fold","in":{"s":"Ch\u00e2u \u0110\u0103ng Khoa"},"out":{"s":"chau dang khoa"}}
+{"fn":"fold","in":{"s":"Ch\u00fang Ta C\u1ee7a Hi\u1ec7n T\u1ea1i"},"out":{"s":"chung ta cua hien tai"}}
+{"fn":"fold","in":{"s":"Ch\u00fang Ta C\u1ee7a T\u01b0\u01a1ng Lai"},"out":{"s":"chung ta cua tuong lai"}}
+{"fn":"fold","in":{"s":"Ch\u00fang Ta Kh\u00f4ng Thu\u1ed9c V\u1ec1 Nhau"},"out":{"s":"chung ta khong thuoc ve nhau"}}
+{"fn":"fold","in":{"s":"Ch\u0103m Em M\u1ed9t \u0110\u1eddi"},"out":{"s":"cham em mot doi"}}
+{"fn":"fold","in":{"s":"Ch\u0103m Hoa"},"out":{"s":"cham hoa"}}
+{"fn":"fold","in":{"s":"Ch\u01a1i Nh\u01b0 T\u1ee5i M\u1ef9"},"out":{"s":"choi nhu tui my"}}
+{"fn":"fold","in":{"s":"Ch\u1ea1y Ngay \u0110i"},"out":{"s":"chay ngay di"}}
+{"fn":"fold","in":{"s":"Ch\u1ea1y Ngay \u0110i [Onionn Remix]"},"out":{"s":"chay ngay di onionn remix"}}
+{"fn":"fold","in":{"s":"Ch\u1eafc Ai \u0110\u00f3 S\u1ebd V\u1ec1"},"out":{"s":"chac ai do se ve"}}
+{"fn":"fold","in":{"s":"Ch\u1edd Em \u0110\u1ebfn Bao Gi\u1edd?"},"out":{"s":"cho em den bao gio"}}
+{"fn":"fold","in":{"s":"Cigarettes After Sex"},"out":{"s":"cigarettes after sex"}}
+{"fn":"fold","in":{"s":"Cinematic Ambience"},"out":{"s":"cinematic ambience"}}
+{"fn":"fold","in":{"s":"Clark"},"out":{"s":"clark"}}
+{"fn":"fold","in":{"s":"Class Of 2020"},"out":{"s":"class of 2020"}}
+{"fn":"fold","in":{"s":"Classic Ambient"},"out":{"s":"classic ambient"}}
+{"fn":"fold","in":{"s":"Classic Country"},"out":{"s":"classic country"}}
+{"fn":"fold","in":{"s":"Classic Easy Rock"},"out":{"s":"classic easy rock"}}
+{"fn":"fold","in":{"s":"Classic Rock Hits 1 - Party Tyme (Backing Versions)"},"out":{"s":"classic rock hits 1 party tyme backing versions"}}
+{"fn":"fold","in":{"s":"Classic Rock Lullabies"},"out":{"s":"classic rock lullabies"}}
+{"fn":"fold","in":{"s":"Classic Rock Relaxation"},"out":{"s":"classic rock relaxation"}}
+{"fn":"fold","in":{"s":"Classical Calm"},"out":{"s":"classical calm"}}
+{"fn":"fold","in":{"s":"Classical Focus"},"out":{"s":"classical focus"}}
+{"fn":"fold","in":{"s":"Classical Meditation"},"out":{"s":"classical meditation"}}
+{"fn":"fold","in":{"s":"Classical Solo Piano"},"out":{"s":"classical solo piano"}}
+{"fn":"fold","in":{"s":"Classical Spanish Guitar"},"out":{"s":"classical spanish guitar"}}
+{"fn":"fold","in":{"s":"Classical for Reading"},"out":{"s":"classical for reading"}}
+{"fn":"fold","in":{"s":"Classical for Sleeping"},"out":{"s":"classical for sleeping"}}
+{"fn":"fold","in":{"s":"Classy Arabic"},"out":{"s":"classy arabic"}}
+{"fn":"fold","in":{"s":"Clean Bandit"},"out":{"s":"clean bandit"}}
+{"fn":"fold","in":{"s":"Clint Eastwood"},"out":{"s":"clint eastwood"}}
+{"fn":"fold","in":{"s":"Cloud"},"out":{"s":"cloud"}}
+{"fn":"fold","in":{"s":"Cloudy Day R&B"},"out":{"s":"cloudy day r b"}}
+{"fn":"fold","in":{"s":"Club Misterio"},"out":{"s":"club misterio"}}
+{"fn":"fold","in":{"s":"Club Shay Shay"},"out":{"s":"club shay shay"}}
+{"fn":"fold","in":{"s":"Coffee Shop Blend"},"out":{"s":"coffee shop blend"}}
+{"fn":"fold","in":{"s":"Coffee Shop Indie"},"out":{"s":"coffee shop indie"}}
+{"fn":"fold","in":{"s":"Coldplay"},"out":{"s":"coldplay"}}
+{"fn":"fold","in":{"s":"Coldz"},"out":{"s":"coldz"}}
+{"fn":"fold","in":{"s":"Colours"},"out":{"s":"colours"}}
+{"fn":"fold","in":{"s":"Come As You Are"},"out":{"s":"come as you are"}}
+{"fn":"fold","in":{"s":"Come As You Are - Nirvana Piano Covers"},"out":{"s":"come as you are nirvana piano covers"}}
+{"fn":"fold","in":{"s":"Come Clean"},"out":{"s":"come clean"}}
+{"fn":"fold","in":{"s":"Come My Way"},"out":{"s":"come my way"}}
+{"fn":"fold","in":{"s":"Come My Way (softer version)"},"out":{"s":"come my way softer version"}}
+{"fn":"fold","in":{"s":"Come To Daddy"},"out":{"s":"come to daddy"}}
+{"fn":"fold","in":{"s":"Commodo"},"out":{"s":"commodo"}}
+{"fn":"fold","in":{"s":"Compro"},"out":{"s":"compro"}}
+{"fn":"fold","in":{"s":"Confession"},"out":{"s":"confession"}}
+{"fn":"fold","in":{"s":"Connor Price"},"out":{"s":"connor price"}}
+{"fn":"fold","in":{"s":"Contemporary Classical Guitar"},"out":{"s":"contemporary classical guitar"}}
+{"fn":"fold","in":{"s":"Context"},"out":{"s":"context"}}
+{"fn":"fold","in":{"s":"Cool"},"out":{"s":"cool"}}
+{"fn":"fold","in":{"s":"Cool Jazz Moods"},"out":{"s":"cool jazz moods"}}
+{"fn":"fold","in":{"s":"CoolKid"},"out":{"s":"coolkid"}}
+{"fn":"fold","in":{"s":"Cooped Up / Return Of The Mack"},"out":{"s":"cooped up return of the mack"}}
+{"fn":"fold","in":{"s":"Cordae"},"out":{"s":"cordae"}}
+{"fn":"fold","in":{"s":"Country Coffeehouse"},"out":{"s":"country coffeehouse"}}
+{"fn":"fold","in":{"s":"Cozy Gaming"},"out":{"s":"cozy gaming"}}
+{"fn":"fold","in":{"s":"Cozy Jazz"},"out":{"s":"cozy jazz"}}
+{"fn":"fold","in":{"s":"Cradles"},"out":{"s":"cradles"}}
+{"fn":"fold","in":{"s":"Crazy Story"},"out":{"s":"crazy story"}}
+{"fn":"fold","in":{"s":"Creed"},"out":{"s":"creed"}}
+{"fn":"fold","in":{"s":"Creedence Clearwater Revival"},"out":{"s":"creedence clearwater revival"}}
+{"fn":"fold","in":{"s":"Creep"},"out":{"s":"creep"}}
+{"fn":"fold","in":{"s":"CreepCast"},"out":{"s":"creepcast"}}
+{"fn":"fold","in":{"s":"Creepin' (Remix) (feat. 21 Savage)"},"out":{"s":"creepin remix feat 21 savage"}}
+{"fn":"fold","in":{"s":"Crier"},"out":{"s":"crier"}}
+{"fn":"fold","in":{"s":"Crime Weekly"},"out":{"s":"crime weekly"}}
+{"fn":"fold","in":{"s":"Crooked Colours"},"out":{"s":"crooked colours"}}
+{"fn":"fold","in":{"s":"Cr\u00e1neo"},"out":{"s":"craneo"}}
+{"fn":"fold","in":{"s":"Cuddling Country"},"out":{"s":"cuddling country"}}
+{"fn":"fold","in":{"s":"Cult Member"},"out":{"s":"cult member"}}
+{"fn":"fold","in":{"s":"Cuntsniffer"},"out":{"s":"cuntsniffer"}}
+{"fn":"fold","in":{"s":"Curation Three: Verraco"},"out":{"s":"curation three verraco"}}
+{"fn":"fold","in":{"s":"Currents"},"out":{"s":"currents"}}
+{"fn":"fold","in":{"s":"C\u00f3 Ch\u1eafc Y\u00eau L\u00e0 \u0110\u00e2y"},"out":{"s":"co chac yeu la day"}}
+{"fn":"fold","in":{"s":"C\u00f3 Kh\u00f4ng Gi\u1eef M\u1ea5t \u0110\u1eebng T\u00ecm"},"out":{"s":"co khong giu mat dung tim"}}
+{"fn":"fold","in":{"s":"C\u00f3 em"},"out":{"s":"co em"}}
+{"fn":"fold","in":{"s":"C\u00f4 G\u00e1i V\u00e0ng"},"out":{"s":"co gai vang"}}
+{"fn":"fold","in":{"s":"C\u01a1n M\u01b0a Cu\u1ed1i"},"out":{"s":"con mua cuoi"}}
+{"fn":"fold","in":{"s":"C\u01a1n M\u01b0a Ngang Qua (Remix 2022)"},"out":{"s":"con mua ngang qua remix 2022"}}
+{"fn":"fold","in":{"s":"C\u01b0\u1edbi \u0110i"},"out":{"s":"cuoi di"}}
+{"fn":"fold","in":{"s":"C\u01b0\u1eddng Seven"},"out":{"s":"cuong seven"}}
+{"fn":"fold","in":{"s":"D>E>A>T>H>M>E>T>A>L"},"out":{"s":"d e a t h m e t a l"}}
+{"fn":"fold","in":{"s":"DAI DAI FESTIVAL OF NATIONS"},"out":{"s":"dai dai festival of nations"}}
+{"fn":"fold","in":{"s":"DAMN. COLLECTORS EDITION."},"out":{"s":"damn collectors edition"}}
+{"fn":"fold","in":{"s":"DC T\u00e2m"},"out":{"s":"dc tam"}}
+{"fn":"fold","in":{"s":"DECIDE"},"out":{"s":"decide"}}
+{"fn":"fold","in":{"s":"DEPENDS"},"out":{"s":"depends"}}
+{"fn":"fold","in":{"s":"DIRTY GLASSEZ"},"out":{"s":"dirty glassez"}}
+{"fn":"fold","in":{"s":"DJ Anemia"},"out":{"s":"dj anemia"}}
+{"fn":"fold","in":{"s":"DJ Asul"},"out":{"s":"dj asul"}}
+{"fn":"fold","in":{"s":"DJ FKU"},"out":{"s":"dj fku"}}
+{"fn":"fold","in":{"s":"DJ Goja"},"out":{"s":"dj goja"}}
+{"fn":"fold","in":{"s":"DJ Raphi"},"out":{"s":"dj raphi"}}
+{"fn":"fold","in":{"s":"DJ Shadow"},"out":{"s":"dj shadow"}}
+{"fn":"fold","in":{"s":"DJ Snake"},"out":{"s":"dj snake"}}
+{"fn":"fold","in":{"s":"DJ.Lombardi"},"out":{"s":"dj lombardi"}}
+{"fn":"fold","in":{"s":"DNCE"},"out":{"s":"dnce"}}
+{"fn":"fold","in":{"s":"DON'T C\u00d4I"},"out":{"s":"don t coi"}}
+{"fn":"fold","in":{"s":"DON'T YOU WORRY (Farruko Remix)"},"out":{"s":"don t you worry farruko remix"}}
+{"fn":"fold","in":{"s":"DONAL"},"out":{"s":"donal"}}
+{"fn":"fold","in":{"s":"DRIP"},"out":{"s":"drip"}}
+{"fn":"fold","in":{"s":"DRODi"},"out":{"s":"drodi"}}
+{"fn":"fold","in":{"s":"DROWNED GOD"},"out":{"s":"drowned god"}}
+{"fn":"fold","in":{"s":"DT T\u1eadp Rap"},"out":{"s":"dt tap rap"}}
+{"fn":"fold","in":{"s":"Da LAB"},"out":{"s":"da lab"}}
+{"fn":"fold","in":{"s":"Da Real Slime"},"out":{"s":"da real slime"}}
+{"fn":"fold","in":{"s":"DaBaby"},"out":{"s":"dababy"}}
+{"fn":"fold","in":{"s":"Daddy Yankee"},"out":{"s":"daddy yankee"}}
+{"fn":"fold","in":{"s":"Dai Dai"},"out":{"s":"dai dai"}}
+{"fn":"fold","in":{"s":"Daily Top Music Videos - Global"},"out":{"s":"daily top music videos global"}}
+{"fn":"fold","in":{"s":"Daily Top Music Videos - South Korea"},"out":{"s":"daily top music videos south korea"}}
+{"fn":"fold","in":{"s":"Daily Top Music Videos - United States"},"out":{"s":"daily top music videos united states"}}
+{"fn":"fold","in":{"s":"Daily Top Music Videos - Vietnam"},"out":{"s":"daily top music videos vietnam"}}
+{"fn":"fold","in":{"s":"Dalvin La Melodia"},"out":{"s":"dalvin la melodia"}}
+{"fn":"fold","in":{"s":"Damelo Otra Vez (Neoperreo)"},"out":{"s":"damelo otra vez neoperreo"}}
+{"fn":"fold","in":{"s":"Dance Pop Bangers"},"out":{"s":"dance pop bangers"}}
+{"fn":"fold","in":{"s":"Dance The Night (From Barbie The Album)"},"out":{"s":"dance the night from barbie the album"}}
+{"fn":"fold","in":{"s":"Dancin (Krono Remix)"},"out":{"s":"dancin krono remix"}}
+{"fn":"fold","in":{"s":"Dancing In The Flames"},"out":{"s":"dancing in the flames"}}
+{"fn":"fold","in":{"s":"Dancing In The Flames (Live from S\u00e3o Paulo)"},"out":{"s":"dancing in the flames live from sao paulo"}}
+{"fn":"fold","in":{"s":"Dangrangto"},"out":{"s":"dangrangto"}}
+{"fn":"fold","in":{"s":"Daniel Levi"},"out":{"s":"daniel levi"}}
+{"fn":"fold","in":{"s":"Danzig"},"out":{"s":"danzig"}}
+{"fn":"fold","in":{"s":"Dark Sky Paradise"},"out":{"s":"dark sky paradise"}}
+{"fn":"fold","in":{"s":"Daryl Hall & John Oates"},"out":{"s":"daryl hall john oates"}}
+{"fn":"fold","in":{"s":"Dasha"},"out":{"s":"dasha"}}
+{"fn":"fold","in":{"s":"Dat G"},"out":{"s":"dat g"}}
+{"fn":"fold","in":{"s":"DatKaa"},"out":{"s":"datkaa"}}
+{"fn":"fold","in":{"s":"Dave Stewart"},"out":{"s":"dave stewart"}}
+{"fn":"fold","in":{"s":"David Guetta"},"out":{"s":"david guetta"}}
+{"fn":"fold","in":{"s":"David Kushner"},"out":{"s":"david kushner"}}
+{"fn":"fold","in":{"s":"Dawn FM"},"out":{"s":"dawn fm"}}
+{"fn":"fold","in":{"s":"Dawn FM (Alternate World)"},"out":{"s":"dawn fm alternate world"}}
+{"fn":"fold","in":{"s":"Dawn FM (Lyric Videos)"},"out":{"s":"dawn fm lyric videos"}}
+{"fn":"fold","in":{"s":"Dawn FM (OPN Remix) (feat. Oneohtrix Point Never)"},"out":{"s":"dawn fm opn remix feat oneohtrix point never"}}
+{"fn":"fold","in":{"s":"Dawn FM Experience"},"out":{"s":"dawn fm experience"}}
+{"fn":"fold","in":{"s":"Daylight"},"out":{"s":"daylight"}}
+{"fn":"fold","in":{"s":"Daylight (Official Music Video)"},"out":{"s":"daylight official music video"}}
+{"fn":"fold","in":{"s":"Days of Thunder"},"out":{"s":"days of thunder"}}
+{"fn":"fold","in":{"s":"De La Soul"},"out":{"s":"de la soul"}}
+{"fn":"fold","in":{"s":"DeBarge"},"out":{"s":"debarge"}}
+{"fn":"fold","in":{"s":"Dead Company"},"out":{"s":"dead company"}}
+{"fn":"fold","in":{"s":"Dead Fresh"},"out":{"s":"dead fresh"}}
+{"fn":"fold","in":{"s":"Debut"},"out":{"s":"debut"}}
+{"fn":"fold","in":{"s":"Dedication To The Cause"},"out":{"s":"dedication to the cause"}}
+{"fn":"fold","in":{"s":"Deep Harbour"},"out":{"s":"deep harbour"}}
+{"fn":"fold","in":{"s":"Deep Sleep Meditation"},"out":{"s":"deep sleep meditation"}}
+{"fn":"fold","in":{"s":"Def Leppard"},"out":{"s":"def leppard"}}
+{"fn":"fold","in":{"s":"Deftones"},"out":{"s":"deftones"}}
+{"fn":"fold","in":{"s":"Delulu Pack"},"out":{"s":"delulu pack"}}
+{"fn":"fold","in":{"s":"Demon Days"},"out":{"s":"demon days"}}
+{"fn":"fold","in":{"s":"Deniece Williams"},"out":{"s":"deniece williams"}}
+{"fn":"fold","in":{"s":"Departamento"},"out":{"s":"departamento"}}
+{"fn":"fold","in":{"s":"Descendants of the Dragon (Remix)"},"out":{"s":"descendants of the dragon remix"}}
+{"fn":"fold","in":{"s":"Desiigner"},"out":{"s":"desiigner"}}
+{"fn":"fold","in":{"s":"Despacito"},"out":{"s":"despacito"}}
+{"fn":"fold","in":{"s":"Devotion"},"out":{"s":"devotion"}}
+{"fn":"fold","in":{"s":"Dexter and The Moonrocks"},"out":{"s":"dexter and the moonrocks"}}
+{"fn":"fold","in":{"s":"Dezko"},"out":{"s":"dezko"}}
+{"fn":"fold","in":{"s":"Dfoxie37"},"out":{"s":"dfoxie37"}}
+{"fn":"fold","in":{"s":"Dick"},"out":{"s":"dick"}}
+{"fn":"fold","in":{"s":"Diddy"},"out":{"s":"diddy"}}
+{"fn":"fold","in":{"s":"Die For You"},"out":{"s":"die for you"}}
+{"fn":"fold","in":{"s":"Die For You (Remix)"},"out":{"s":"die for you remix"}}
+{"fn":"fold","in":{"s":"Different Level"},"out":{"s":"different level"}}
+{"fn":"fold","in":{"s":"Diljit Dosanjh"},"out":{"s":"diljit dosanjh"}}
+{"fn":"fold","in":{"s":"Dim Stars / For Residue (Extended)"},"out":{"s":"dim stars for residue extended"}}
+{"fn":"fold","in":{"s":"Dimoridi"},"out":{"s":"dimoridi"}}
+{"fn":"fold","in":{"s":"Dinner for Two"},"out":{"s":"dinner for two"}}
+{"fn":"fold","in":{"s":"Diplo"},"out":{"s":"diplo"}}
+{"fn":"fold","in":{"s":"Disclosure"},"out":{"s":"disclosure"}}
+{"fn":"fold","in":{"s":"Disney"},"out":{"s":"disney"}}
+{"fn":"fold","in":{"s":"Diverso"},"out":{"s":"diverso"}}
+{"fn":"fold","in":{"s":"Dizzy up the Girl"},"out":{"s":"dizzy up the girl"}}
+{"fn":"fold","in":{"s":"Dj Dark"},"out":{"s":"dj dark"}}
+{"fn":"fold","in":{"s":"Dj Towla"},"out":{"s":"dj towla"}}
+{"fn":"fold","in":{"s":"Djo"},"out":{"s":"djo"}}
+{"fn":"fold","in":{"s":"Do You See The Birds, Too?"},"out":{"s":"do you see the birds too"}}
+{"fn":"fold","in":{"s":"Doechii"},"out":{"s":"doechii"}}
+{"fn":"fold","in":{"s":"Doja Cat"},"out":{"s":"doja cat"}}
+{"fn":"fold","in":{"s":"Dolly Babe"},"out":{"s":"dolly babe"}}
+{"fn":"fold","in":{"s":"Dolor suavecito"},"out":{"s":"dolor suavecito"}}
+{"fn":"fold","in":{"s":"Dominic Fike"},"out":{"s":"dominic fike"}}
+{"fn":"fold","in":{"s":"Don Toliver"},"out":{"s":"don toliver"}}
+{"fn":"fold","in":{"s":"Don't Forget About Me, Demos"},"out":{"s":"don t forget about me demos"}}
+{"fn":"fold","in":{"s":"Don't Start Now"},"out":{"s":"don t start now"}}
+{"fn":"fold","in":{"s":"Don't Wanna Know (Fareoh Remix)"},"out":{"s":"don t wanna know fareoh remix"}}
+{"fn":"fold","in":{"s":"Don't You Worry Child"},"out":{"s":"don t you worry child"}}
+{"fn":"fold","in":{"s":"Doomsday Generation (Slacker For The Ages) (feat. Walter Schreifels)"},"out":{"s":"doomsday generation slacker for the ages feat walter schreifels"}}
+{"fn":"fold","in":{"s":"Dope Spot"},"out":{"s":"dope spot"}}
+{"fn":"fold","in":{"s":"Double Fantasy (feat. Future)"},"out":{"s":"double fantasy feat future"}}
+{"fn":"fold","in":{"s":"Dove Cameron"},"out":{"s":"dove cameron"}}
+{"fn":"fold","in":{"s":"Downhill2k01"},"out":{"s":"downhill2k01"}}
+{"fn":"fold","in":{"s":"Downtempo Soundscapes"},"out":{"s":"downtempo soundscapes"}}
+{"fn":"fold","in":{"s":"Dr Insanity"},"out":{"s":"dr insanity"}}
+{"fn":"fold","in":{"s":"Dracula"},"out":{"s":"dracula"}}
+{"fn":"fold","in":{"s":"Drake"},"out":{"s":"drake"}}
+{"fn":"fold","in":{"s":"Dream Fatigue"},"out":{"s":"dream fatigue"}}
+{"fn":"fold","in":{"s":"Dreamboat Annie"},"out":{"s":"dreamboat annie"}}
+{"fn":"fold","in":{"s":"Dreamer"},"out":{"s":"dreamer"}}
+{"fn":"fold","in":{"s":"Dreamland"},"out":{"s":"dreamland"}}
+{"fn":"fold","in":{"s":"Drew's Famous Instrumental Modern Rock Collection (Vol. 10)"},"out":{"s":"drew s famous instrumental modern rock collection vol 10"}}
+{"fn":"fold","in":{"s":"Drift Away Indie"},"out":{"s":"drift away indie"}}
+{"fn":"fold","in":{"s":"Driving and chill"},"out":{"s":"driving and chill"}}
+{"fn":"fold","in":{"s":"Droplets"},"out":{"s":"droplets"}}
+{"fn":"fold","in":{"s":"Drowning Pool"},"out":{"s":"drowning pool"}}
+{"fn":"fold","in":{"s":"Drum7"},"out":{"s":"drum7"}}
+{"fn":"fold","in":{"s":"Dua Lipa"},"out":{"s":"dua lipa"}}
+{"fn":"fold","in":{"s":"Dubstep Classics"},"out":{"s":"dubstep classics"}}
+{"fn":"fold","in":{"s":"Duran Duran"},"out":{"s":"duran duran"}}
+{"fn":"fold","in":{"s":"Duryodhan Rana"},"out":{"s":"duryodhan rana"}}
+{"fn":"fold","in":{"s":"Duskus"},"out":{"s":"duskus"}}
+{"fn":"fold","in":{"s":"Duvet"},"out":{"s":"duvet"}}
+{"fn":"fold","in":{"s":"Dwight Evans"},"out":{"s":"dwight evans"}}
+{"fn":"fold","in":{"s":"Dying In This House"},"out":{"s":"dying in this house"}}
+{"fn":"fold","in":{"s":"Dylan Brady"},"out":{"s":"dylan brady"}}
+{"fn":"fold","in":{"s":"D\u00f9 Anh C\u00f3 \u0110\u1ee9ng L\u1ea1i"},"out":{"s":"du anh co dung lai"}}
+{"fn":"fold","in":{"s":"E L\u00e0 \u0110\u00f4n Ch\u1ec1"},"out":{"s":"e la don che"}}
+{"fn":"fold","in":{"s":"E.CLIS"},"out":{"s":"e clis"}}
+{"fn":"fold","in":{"s":"ECLIPSE"},"out":{"s":"eclipse"}}
+{"fn":"fold","in":{"s":"EELF"},"out":{"s":"eelf"}}
+{"fn":"fold","in":{"s":"EJ Ross - Sunrise & Sunsets (Official Visualizer)"},"out":{"s":"ej ross sunrise sunsets official visualizer"}}
+{"fn":"fold","in":{"s":"EJAE"},"out":{"s":"ejae"}}
+{"fn":"fold","in":{"s":"EL ROOKIE"},"out":{"s":"el rookie"}}
+{"fn":"fold","in":{"s":"ELM"},"out":{"s":"elm"}}
+{"fn":"fold","in":{"s":"ERRx"},"out":{"s":"errx"}}
+{"fn":"fold","in":{"s":"EVE: ROMANCE"},"out":{"s":"eve romance"}}
+{"fn":"fold","in":{"s":"EXPLORE WITH US"},"out":{"s":"explore with us"}}
+{"fn":"fold","in":{"s":"Eagles"},"out":{"s":"eagles"}}
+{"fn":"fold","in":{"s":"Earned It (Fifty Shades Of Grey) [From The \"Fifty Shades Of Grey\" Soundtrack]"},"out":{"s":"earned it fifty shades of grey from the fifty shades of grey soundtrack"}}
+{"fn":"fold","in":{"s":"Earrings"},"out":{"s":"earrings"}}
+{"fn":"fold","in":{"s":"Eastern Anatolia Folk"},"out":{"s":"eastern anatolia folk"}}
+{"fn":"fold","in":{"s":"Easy Going Sertanejo"},"out":{"s":"easy going sertanejo"}}
+{"fn":"fold","in":{"s":"Easy Modern Soul"},"out":{"s":"easy modern soul"}}
+{"fn":"fold","in":{"s":"Easy Rock"},"out":{"s":"easy rock"}}
+{"fn":"fold","in":{"s":"Easy-Going Pop & Rock"},"out":{"s":"easy going pop rock"}}
+{"fn":"fold","in":{"s":"Echo Counting"},"out":{"s":"echo counting"}}
+{"fn":"fold","in":{"s":"Echoes of Silence"},"out":{"s":"echoes of silence"}}
+{"fn":"fold","in":{"s":"Echosmith"},"out":{"s":"echosmith"}}
+{"fn":"fold","in":{"s":"Eclectic Rock"},"out":{"s":"eclectic rock"}}
+{"fn":"fold","in":{"s":"Eclisism"},"out":{"s":"eclisism"}}
+{"fn":"fold","in":{"s":"Ed Sheeran"},"out":{"s":"ed sheeran"}}
+{"fn":"fold","in":{"s":"Eddie Murphy"},"out":{"s":"eddie murphy"}}
+{"fn":"fold","in":{"s":"Edgardo Nu\u00f1ez"},"out":{"s":"edgardo nunez"}}
+{"fn":"fold","in":{"s":"Effie Rose"},"out":{"s":"effie rose"}}
+{"fn":"fold","in":{"s":"Egyptian Chill"},"out":{"s":"egyptian chill"}}
+{"fn":"fold","in":{"s":"Egyptian Instrumental"},"out":{"s":"egyptian instrumental"}}
+{"fn":"fold","in":{"s":"Eiden XII"},"out":{"s":"eiden xii"}}
+{"fn":"fold","in":{"s":"Ekkstacy"},"out":{"s":"ekkstacy"}}
+{"fn":"fold","in":{"s":"El Blachy"},"out":{"s":"el blachy"}}
+{"fn":"fold","in":{"s":"El Dorado"},"out":{"s":"el dorado"}}
+{"fn":"fold","in":{"s":"El Due\u00f1o De Tu Amor By Los Jrs"},"out":{"s":"el dueno de tu amor by los jrs"}}
+{"fn":"fold","in":{"s":"El Payaso Plim Plim"},"out":{"s":"el payaso plim plim"}}
+{"fn":"fold","in":{"s":"El T\u00e1ndem"},"out":{"s":"el tandem"}}
+{"fn":"fold","in":{"s":"Electric Blaze"},"out":{"s":"electric blaze"}}
+{"fn":"fold","in":{"s":"Electric Guitar Songs"},"out":{"s":"electric guitar songs"}}
+{"fn":"fold","in":{"s":"Electric Love (Oliver Remix)"},"out":{"s":"electric love oliver remix"}}
+{"fn":"fold","in":{"s":"Electro Deceleration"},"out":{"s":"electro deceleration"}}
+{"fn":"fold","in":{"s":"Electronic Dream"},"out":{"s":"electronic dream"}}
+{"fn":"fold","in":{"s":"Elephant"},"out":{"s":"elephant"}}
+{"fn":"fold","in":{"s":"Ella Langley"},"out":{"s":"ella langley"}}
+{"fn":"fold","in":{"s":"Ellie Goulding"},"out":{"s":"ellie goulding"}}
+{"fn":"fold","in":{"s":"Elton John"},"out":{"s":"elton john"}}
+{"fn":"fold","in":{"s":"Elyn EraVi"},"out":{"s":"elyn eravi"}}
+{"fn":"fold","in":{"s":"Em Ch\u01b0a 18 (Em Ch\u01b0a 18 Original Soundtrack)"},"out":{"s":"em chua 18 em chua 18 original soundtrack"}}
+{"fn":"fold","in":{"s":"Em C\u1ee7a Ng\u00e0y H\u00f4m Qua"},"out":{"s":"em cua ngay hom qua"}}
+{"fn":"fold","in":{"s":"Em K\u1ec3 Anh Nghe"},"out":{"s":"em ke anh nghe"}}
+{"fn":"fold","in":{"s":"Em kh\u00f4ng l\u1ebb loi"},"out":{"s":"em khong le loi"}}
+{"fn":"fold","in":{"s":"EmceeDan"},"out":{"s":"emceedan"}}
+{"fn":"fold","in":{"s":"Emily"},"out":{"s":"emily"}}
+{"fn":"fold","in":{"s":"Eminem"},"out":{"s":"eminem"}}
+{"fn":"fold","in":{"s":"Emo EDM"},"out":{"s":"emo edm"}}
+{"fn":"fold","in":{"s":"Empire Of The Sun"},"out":{"s":"empire of the sun"}}
+{"fn":"fold","in":{"s":"En Algun Lugar"},"out":{"s":"en algun lugar"}}
+{"fn":"fold","in":{"s":"En Evoluci\u00f3n"},"out":{"s":"en evolucion"}}
+{"fn":"fold","in":{"s":"En yeni pop"},"out":{"s":"en yeni pop"}}
+{"fn":"fold","in":{"s":"Encircled by Wolves"},"out":{"s":"encircled by wolves"}}
+{"fn":"fold","in":{"s":"Encore"},"out":{"s":"encore"}}
+{"fn":"fold","in":{"s":"End of Beginning"},"out":{"s":"end of beginning"}}
+{"fn":"fold","in":{"s":"Endless Loop"},"out":{"s":"endless loop"}}
+{"fn":"fold","in":{"s":"Endtroducing....."},"out":{"s":"endtroducing"}}
+{"fn":"fold","in":{"s":"Enema Of The State"},"out":{"s":"enema of the state"}}
+{"fn":"fold","in":{"s":"English music"},"out":{"s":"english music"}}
+{"fn":"fold","in":{"s":"Enjoy The Show (Single Version) (feat. Future)"},"out":{"s":"enjoy the show single version feat future"}}
+{"fn":"fold","in":{"s":"Enrique Iglesias"},"out":{"s":"enrique iglesias"}}
+{"fn":"fold","in":{"s":"Eric Carmen"},"out":{"s":"eric carmen"}}
+{"fn":"fold","in":{"s":"Escape From Limbo"},"out":{"s":"escape from limbo"}}
+{"fn":"fold","in":{"s":"Esencia Caribe\u00f1a"},"out":{"s":"esencia caribena"}}
+{"fn":"fold","in":{"s":"Esensi R&B"},"out":{"s":"esensi r b"}}
+{"fn":"fold","in":{"s":"Essential Motown Hits"},"out":{"s":"essential motown hits"}}
+{"fn":"fold","in":{"s":"Eternity"},"out":{"s":"eternity"}}
+{"fn":"fold","in":{"s":"Eurythmics"},"out":{"s":"eurythmics"}}
+{"fn":"fold","in":{"s":"Eve 6"},"out":{"s":"eve 6"}}
+{"fn":"fold","in":{"s":"Everlong (Official HD Video)"},"out":{"s":"everlong official hd video"}}
+{"fn":"fold","in":{"s":"Everybody Scream Tour Live"},"out":{"s":"everybody scream tour live"}}
+{"fn":"fold","in":{"s":"Evolve"},"out":{"s":"evolve"}}
+{"fn":"fold","in":{"s":"Ex's Hate Me"},"out":{"s":"ex s hate me"}}
+{"fn":"fold","in":{"s":"Exc\u00e9ntrico"},"out":{"s":"excentrico"}}
+{"fn":"fold","in":{"s":"Exitos con banda"},"out":{"s":"exitos con banda"}}
+{"fn":"fold","in":{"s":"Exitos del Momento"},"out":{"s":"exitos del momento"}}
+{"fn":"fold","in":{"s":"Eym Fresh"},"out":{"s":"eym fresh"}}
+{"fn":"fold","in":{"s":"FIFTY FIFTY"},"out":{"s":"fifty fifty"}}
+{"fn":"fold","in":{"s":"FIFTY4"},"out":{"s":"fifty4"}}
+{"fn":"fold","in":{"s":"FINAL GIRL"},"out":{"s":"final girl"}}
+{"fn":"fold","in":{"s":"FINNEAS"},"out":{"s":"finneas"}}
+{"fn":"fold","in":{"s":"FKA twigs"},"out":{"s":"fka twigs"}}
+{"fn":"fold","in":{"s":"FRANCIA"},"out":{"s":"francia"}}
+{"fn":"fold","in":{"s":"FRESH"},"out":{"s":"fresh"}}
+{"fn":"fold","in":{"s":"FUTURE"},"out":{"s":"future"}}
+{"fn":"fold","in":{"s":"FYP"},"out":{"s":"fyp"}}
+{"fn":"fold","in":{"s":"Facelift"},"out":{"s":"facelift"}}
+{"fn":"fold","in":{"s":"Fade Into You (Official Music Video)"},"out":{"s":"fade into you official music video"}}
+{"fn":"fold","in":{"s":"Falco"},"out":{"s":"falco"}}
+{"fn":"fold","in":{"s":"Fall Asleep"},"out":{"s":"fall asleep"}}
+{"fn":"fold","in":{"s":"Fall In Luv"},"out":{"s":"fall in luv"}}
+{"fn":"fold","in":{"s":"Fall Out Boy"},"out":{"s":"fall out boy"}}
+{"fn":"fold","in":{"s":"Falling for You This Christmas"},"out":{"s":"falling for you this christmas"}}
+{"fn":"fold","in":{"s":"Fame On Fire"},"out":{"s":"fame on fire"}}
+{"fn":"fold","in":{"s":"Fancy Some More?"},"out":{"s":"fancy some more"}}
+{"fn":"fold","in":{"s":"Faouzia"},"out":{"s":"faouzia"}}
+{"fn":"fold","in":{"s":"Farruko"},"out":{"s":"farruko"}}
+{"fn":"fold","in":{"s":"Fashion Store K-Pop Shopping Mall Music"},"out":{"s":"fashion store k pop shopping mall music"}}
+{"fn":"fold","in":{"s":"Fatt Smaxk"},"out":{"s":"fatt smaxk"}}
+{"fn":"fold","in":{"s":"Favorites 53"},"out":{"s":"favorites 53"}}
+{"fn":"fold","in":{"s":"Favourite Worst Nightmare"},"out":{"s":"favourite worst nightmare"}}
+{"fn":"fold","in":{"s":"Fe3O4: BREAK"},"out":{"s":"fe3o4 break"}}
+{"fn":"fold","in":{"s":"Fede Vigevani"},"out":{"s":"fede vigevani"}}
+{"fn":"fold","in":{"s":"Feel"},"out":{"s":"feel"}}
+{"fn":"fold","in":{"s":"Feel-Good R&B Pop"},"out":{"s":"feel good r b pop"}}
+{"fn":"fold","in":{"s":"Feeling Good"},"out":{"s":"feeling good"}}
+{"fn":"fold","in":{"s":"Felipe e Rodrigo"},"out":{"s":"felipe e rodrigo"}}
+{"fn":"fold","in":{"s":"Fero"},"out":{"s":"fero"}}
+{"fn":"fold","in":{"s":"Fetty Wap"},"out":{"s":"fetty wap"}}
+{"fn":"fold","in":{"s":"Fetty Wap (Deluxe)"},"out":{"s":"fetty wap deluxe"}}
+{"fn":"fold","in":{"s":"Fifi"},"out":{"s":"fifi"}}
+{"fn":"fold","in":{"s":"Fijaci\u00f3n Oral Volumen 1 (Expanded Edition)"},"out":{"s":"fijacion oral volumen 1 expanded edition"}}
+{"fn":"fold","in":{"s":"Final Circle"},"out":{"s":"final circle"}}
+{"fn":"fold","in":{"s":"Fine Line"},"out":{"s":"fine line"}}
+{"fn":"fold","in":{"s":"Finger Eleven"},"out":{"s":"finger eleven"}}
+{"fn":"fold","in":{"s":"Fireside Country"},"out":{"s":"fireside country"}}
+{"fn":"fold","in":{"s":"Fireworks & Rollerblades"},"out":{"s":"fireworks rollerblades"}}
+{"fn":"fold","in":{"s":"Flizzy"},"out":{"s":"flizzy"}}
+{"fn":"fold","in":{"s":"Floating Points"},"out":{"s":"floating points"}}
+{"fn":"fold","in":{"s":"Florence + The Machine"},"out":{"s":"florence the machine"}}
+{"fn":"fold","in":{"s":"Flower In A Hurricane (feat. Tame Impala, SZA, King Gizzard & the Lizard Wizard) [From GTAVI: Original Score]"},"out":{"s":"flower in a hurricane feat tame impala sza king gizzard the lizard wizard from gtavi original score"}}
+{"fn":"fold","in":{"s":"Flutes Of The Jungle"},"out":{"s":"flutes of the jungle"}}
+{"fn":"fold","in":{"s":"Focus (feat. 21 Savage)"},"out":{"s":"focus feat 21 savage"}}
+{"fn":"fold","in":{"s":"Follow You / Cutthroat"},"out":{"s":"follow you cutthroat"}}
+{"fn":"fold","in":{"s":"Foo Fighters"},"out":{"s":"foo fighters"}}
+{"fn":"fold","in":{"s":"Forest Swords"},"out":{"s":"forest swords"}}
+{"fn":"fold","in":{"s":"Foster The People"},"out":{"s":"foster the people"}}
+{"fn":"fold","in":{"s":"Four Tet"},"out":{"s":"four tet"}}
+{"fn":"fold","in":{"s":"Frank Ocean"},"out":{"s":"frank ocean"}}
+{"fn":"fold","in":{"s":"Freakin\u2019 Out"},"out":{"s":"freakin out"}}
+{"fn":"fold","in":{"s":"Freakin\u2019 Out (Official Music Video)"},"out":{"s":"freakin out official music video"}}
+{"fn":"fold","in":{"s":"Freaks"},"out":{"s":"freaks"}}
+{"fn":"fold","in":{"s":"Fred again.."},"out":{"s":"fred again"}}
+{"fn":"fold","in":{"s":"French Montana"},"out":{"s":"french montana"}}
+{"fn":"fold","in":{"s":"French Sweets"},"out":{"s":"french sweets"}}
+{"fn":"fold","in":{"s":"French Variety FM"},"out":{"s":"french variety fm"}}
+{"fn":"fold","in":{"s":"Fresh Boleros"},"out":{"s":"fresh boleros"}}
+{"fn":"fold","in":{"s":"Fresh Coffee"},"out":{"s":"fresh coffee"}}
+{"fn":"fold","in":{"s":"Fresh Korean Hip-Hop"},"out":{"s":"fresh korean hip hop"}}
+{"fn":"fold","in":{"s":"Fresh New Indie"},"out":{"s":"fresh new indie"}}
+{"fn":"fold","in":{"s":"Freshly Chilled: Alt Pop and Indie"},"out":{"s":"freshly chilled alt pop and indie"}}
+{"fn":"fold","in":{"s":"Friends Like These"},"out":{"s":"friends like these"}}
+{"fn":"fold","in":{"s":"From Under The Cork Tree"},"out":{"s":"from under the cork tree"}}
+{"fn":"fold","in":{"s":"Fuel"},"out":{"s":"fuel"}}
+{"fn":"fold","in":{"s":"Fuerza Regida"},"out":{"s":"fuerza regida"}}
+{"fn":"fold","in":{"s":"Fujii Kaze"},"out":{"s":"fujii kaze"}}
+{"fn":"fold","in":{"s":"Fun."},"out":{"s":"fun"}}
+{"fn":"fold","in":{"s":"Funk Wav Bounces Vol.1"},"out":{"s":"funk wav bounces vol 1"}}
+{"fn":"fold","in":{"s":"Future"},"out":{"s":"future"}}
+{"fn":"fold","in":{"s":"Future Nostalgia"},"out":{"s":"future nostalgia"}}
+{"fn":"fold","in":{"s":"G. V. Prakash Kumar"},"out":{"s":"g v prakash kumar"}}
+{"fn":"fold","in":{"s":"GAVIND"},"out":{"s":"gavind"}}
+{"fn":"fold","in":{"s":"GDucky"},"out":{"s":"gducky"}}
+{"fn":"fold","in":{"s":"GEEKALEEK"},"out":{"s":"geekaleek"}}
+{"fn":"fold","in":{"s":"GENIC"},"out":{"s":"genic"}}
+{"fn":"fold","in":{"s":"GENIC LIVE 2023 -Flavors- Special Edition"},"out":{"s":"genic live 2023 flavors special edition"}}
+{"fn":"fold","in":{"s":"GERDNANG"},"out":{"s":"gerdnang"}}
+{"fn":"fold","in":{"s":"GLORIOUS"},"out":{"s":"glorious"}}
+{"fn":"fold","in":{"s":"GNX"},"out":{"s":"gnx"}}
+{"fn":"fold","in":{"s":"GOLDEN HOUR : Part.6"},"out":{"s":"golden hour part 6"}}
+{"fn":"fold","in":{"s":"GOOD DOPE SELL ITSELF"},"out":{"s":"good dope sell itself"}}
+{"fn":"fold","in":{"s":"GREY D"},"out":{"s":"grey d"}}
+{"fn":"fold","in":{"s":"GUrbane"},"out":{"s":"gurbane"}}
+{"fn":"fold","in":{"s":"Gael Valenzuela"},"out":{"s":"gael valenzuela"}}
+{"fn":"fold","in":{"s":"Galantis"},"out":{"s":"galantis"}}
+{"fn":"fold","in":{"s":"Garrett Hornbuckle"},"out":{"s":"garrett hornbuckle"}}
+{"fn":"fold","in":{"s":"Gazpachuelo (VOL.1)"},"out":{"s":"gazpachuelo vol 1"}}
+{"fn":"fold","in":{"s":"Gee - The First Mini Album"},"out":{"s":"gee the first mini album"}}
+{"fn":"fold","in":{"s":"Geek Music"},"out":{"s":"geek music"}}
+{"fn":"fold","in":{"s":"Gemini Rights"},"out":{"s":"gemini rights"}}
+{"fn":"fold","in":{"s":"Genre Blurring"},"out":{"s":"genre blurring"}}
+{"fn":"fold","in":{"s":"Gentle Acoustic Instrumentals"},"out":{"s":"gentle acoustic instrumentals"}}
+{"fn":"fold","in":{"s":"Gentle Chamber Music"},"out":{"s":"gentle chamber music"}}
+{"fn":"fold","in":{"s":"Gentle Piano"},"out":{"s":"gentle piano"}}
+{"fn":"fold","in":{"s":"Geogaddi"},"out":{"s":"geogaddi"}}
+{"fn":"fold","in":{"s":"Gesaffelstein"},"out":{"s":"gesaffelstein"}}
+{"fn":"fold","in":{"s":"Get Lucky (Radio Edit - feat. Pharrell Williams and Nile Rodgers)"},"out":{"s":"get lucky radio edit feat pharrell williams and nile rodgers"}}
+{"fn":"fold","in":{"s":"Ghen"},"out":{"s":"ghen"}}
+{"fn":"fold","in":{"s":"Ghost Hardware EP"},"out":{"s":"ghost hardware ep"}}
+{"fn":"fold","in":{"s":"Ghost Stories"},"out":{"s":"ghost stories"}}
+{"fn":"fold","in":{"s":"Gh\u00e9 Qua"},"out":{"s":"ghe qua"}}
+{"fn":"fold","in":{"s":"Gigi Perez"},"out":{"s":"gigi perez"}}
+{"fn":"fold","in":{"s":"Gil's Arena"},"out":{"s":"gil s arena"}}
+{"fn":"fold","in":{"s":"Gill"},"out":{"s":"gill"}}
+{"fn":"fold","in":{"s":"Girls' Generation"},"out":{"s":"girls generation"}}
+{"fn":"fold","in":{"s":"Glass Animals"},"out":{"s":"glass animals"}}
+{"fn":"fold","in":{"s":"Glenn Beck"},"out":{"s":"glenn beck"}}
+{"fn":"fold","in":{"s":"GloRilla"},"out":{"s":"glorilla"}}
+{"fn":"fold","in":{"s":"Gloria Jessica"},"out":{"s":"gloria jessica"}}
+{"fn":"fold","in":{"s":"Go Slower"},"out":{"s":"go slower"}}
+{"fn":"fold","in":{"s":"Go Tell It On The Mountain"},"out":{"s":"go tell it on the mountain"}}
+{"fn":"fold","in":{"s":"God made a typo"},"out":{"s":"god made a typo"}}
+{"fn":"fold","in":{"s":"Golden (from the Netflix film KPop Demon Hunters)"},"out":{"s":"golden from the netflix film kpop demon hunters"}}
+{"fn":"fold","in":{"s":"Goo Goo Dolls"},"out":{"s":"goo goo dolls"}}
+{"fn":"fold","in":{"s":"Good For You"},"out":{"s":"good for you"}}

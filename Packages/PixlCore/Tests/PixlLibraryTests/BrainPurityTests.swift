@@ -13,6 +13,19 @@ struct BrainPurityTests {
         ("import Darwin", false, "no libm"),
         ("import Glibc", false, "no libm"),
         ("import ucrt", false, "no libm"),
+        ("import CRT", false, "no libm"),
+        ("import Musl", false, "no libm"),
+        ("log1p(", true, "use BrainMath"),
+        ("expm1(", true, "use BrainMath"),
+        ("sin(", true, "not in the contract"),
+        ("cos(", true, "not in the contract"),
+        ("tan(", true, "not in the contract"),
+        ("cbrt(", true, "not in the contract"),
+        ("sqrt(", true, "use BrainMath.sqrt"),
+        ("floor(", true, "use BrainMath.floorToLong"),
+        ("round(", true, "use BrainMath.floorToLong(x + 0.5)"),
+        ("lround(", true, "use BrainMath.floorToLong(x + 0.5)"),
+        ("fma(", true, "no fused multiply-add"),
         ("log(", true, "use BrainMath.ln (10.2)"),
         ("log2(", true, "use BrainMath.log2"),
         ("log10(", true, "use BrainMath"),
@@ -76,13 +89,19 @@ struct BrainPurityTests {
             || (scalar.value >= 0x61 && scalar.value <= 0x7A)
     }
 
+    /// The brain's own functions carry the names of the banned ones (`BrainMath.exp` is not libm's `exp`): a match
+    /// that is a call through `BrainMath.` or the declaration itself (`func exp(`) is ours.
+    private let ownPrefixes = ["BrainMath.", "func "]
+
     private func contains(_ code: String, _ needle: String, wholeWord: Bool) -> Bool {
         var searchFrom = code.startIndex
         while let range = code.range(of: needle, range: searchFrom..<code.endIndex) {
             if !wholeWord { return true }
+            let before = code[code.startIndex..<range.lowerBound]
             let standsAlone = range.lowerBound == code.startIndex
                 || !isIdentifierScalar(code.unicodeScalars[code.unicodeScalars.index(before: range.lowerBound)])
-            if standsAlone { return true }
+            let isOurs = ownPrefixes.contains { before.hasSuffix($0) }
+            if standsAlone && !isOurs { return true }
             searchFrom = range.upperBound
         }
         return false
@@ -93,13 +112,19 @@ struct BrainPurityTests {
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Sources/PixlLibrary/Brain", isDirectory: true)
         let names = try FileManager.default.contentsOfDirectory(atPath: brain.path).filter { $0.hasSuffix(".swift") }
-        #expect(names.count >= 7, "the brain sources were not found at \(brain.path)")
+        #expect(names.count >= 22, "expected the whole core at \(brain.path), found \(names.count) files")
         var violations: [String] = []
         for name in names {
             let source = try String(contentsOf: brain.appendingPathComponent(name), encoding: .utf8)
             let code = codeOnly(source)
             for rule in banned where contains(code, rule.needle, wholeWord: rule.wholeWord) {
                 violations.append("\(name): `\(rule.needle)` (\(rule.why))")
+            }
+            // The square root and rounding down are the two platform operations the contract allows, in one place.
+            if name != "BrainMath.swift" {
+                for needle in [".squareRoot(", ".rounded(", ".round("] where contains(code, needle, wholeWord: false) {
+                    violations.append("\(name): `\(needle)` (go through BrainMath)")
+                }
             }
         }
         #expect(violations.isEmpty, "\(violations.joined(separator: "\n"))")
@@ -111,5 +136,14 @@ struct BrainPurityTests {
         #expect(!contains(code, "exp(", wholeWord: true))
         #expect(!contains(code, "pow(", wholeWord: true))
         #expect(contains(code, "Date(", wholeWord: true))
+    }
+
+    @Test func theScanTellsOurOwnMathsFromThePlatforms() {
+        #expect(contains(codeOnly("let y = exp(1.0)"), "exp(", wholeWord: true))
+        #expect(contains(codeOnly("let y = Foundation.exp(1.0)"), "exp(", wholeWord: true))
+        #expect(contains(codeOnly("let y = 2 * log2(x)"), "log2(", wholeWord: true))
+        #expect(!contains(codeOnly("let y = BrainMath.exp(1.0) // exp( is banned"), "exp(", wholeWord: true))
+        #expect(!contains(codeOnly("public static func exp(_ x: Double) -> Double { x }"), "exp(", wholeWord: true))
+        #expect(!contains(codeOnly("let y = BrainMath.log2(x)"), "log2(", wholeWord: true))
     }
 }

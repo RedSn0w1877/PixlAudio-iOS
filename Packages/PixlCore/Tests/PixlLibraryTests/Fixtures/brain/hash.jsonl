@@ -1,0 +1,900 @@
+{"fn":"fnv1a64","in":{"text":"\u7c73\u6d25\u7384\u5e2b"},"out":{"h":"-2475420808041675076"}}
+{"fn":"fnv1a64","in":{"text":"\u5b87\u591a\u7530\u30d2\u30ab\u30eb"},"out":{"h":"-4336349545440474318"}}
+{"fn":"fnv1a64","in":{"text":"\u3042\u3044\u307f\u3087\u3093"},"out":{"h":"-2541185246313308100"}}
+{"fn":"fnv1a64","in":{"text":"Official\u9aed\u7537dism"},"out":{"h":"592043985041947242"}}
+{"fn":"fnv1a64","in":{"text":"King Gnu"},"out":{"h":"-3669979945988921950"}}
+{"fn":"fnv1a64","in":{"text":"YOASOBI"},"out":{"h":"8122758917112862075"}}
+{"fn":"fnv1a64","in":{"text":"back number"},"out":{"h":"4539718976234528851"}}
+{"fn":"fnv1a64","in":{"text":"Mrs. GREEN APPLE"},"out":{"h":"5922810843866969088"}}
+{"fn":"fnv1a64","in":{"text":"\u690e\u540d\u6797\u6a8e"},"out":{"h":"7838685592411924124"}}
+{"fn":"fnv1a64","in":{"text":"\u30b5\u30b6\u30f3\u30aa\u30fc\u30eb\u30b9\u30bf\u30fc\u30ba"},"out":{"h":"-7488047405553772044"}}
+{"fn":"fnv1a64","in":{"text":"\u30b9\u30d4\u30c3\u30c4"},"out":{"h":"941575654656272716"}}
+{"fn":"fnv1a64","in":{"text":"\uff21\uff22\uff23\u3000\uff24\uff25\uff26"},"out":{"h":"6326346949059524871"}}
+{"fn":"fnv1a64","in":{"text":"\uff71\uff72\uff90\uff6e\uff9d"},"out":{"h":"-8314134169641494777"}}
+{"fn":"fnv1a64","in":{"text":"\ubc29\ud0c4\uc18c\ub144\ub2e8"},"out":{"h":"-3943227233461846435"}}
+{"fn":"fnv1a64","in":{"text":"\ube14\ub799\ud551\ud06c"},"out":{"h":"-5173980559118517789"}}
+{"fn":"fnv1a64","in":{"text":"\uc544\uc774\uc720"},"out":{"h":"-5602222130810930223"}}
+{"fn":"fnv1a64","in":{"text":"\ub274\uc9c4\uc2a4"},"out":{"h":"2172715424541980364"}}
+{"fn":"fnv1a64","in":{"text":"\uc138\ube10\ud2f4"},"out":{"h":"-1004700483426304756"}}
+{"fn":"fnv1a64","in":{"text":"\ub974\uc138\ub77c\ud54c"},"out":{"h":"-3837117997026865537"}}
+{"fn":"fnv1a64","in":{"text":"\uc5d0\uc2a4\ud30c"},"out":{"h":"-7386314740408261607"}}
+{"fn":"fnv1a64","in":{"text":"\ubcfc\ube68\uac04\uc0ac\ucd98\uae30"},"out":{"h":"-6662389686667699417"}}
+{"fn":"fnv1a64","in":{"text":"\uc545\ub3d9\ubba4\uc9c0\uc158"},"out":{"h":"-3985356266751532423"}}
+{"fn":"fnv1a64","in":{"text":"S\u01a1n T\u00f9ng M-TP"},"out":{"h":"6922217036327790094"}}
+{"fn":"fnv1a64","in":{"text":"Ho\u00e0ng Th\u00f9y Linh"},"out":{"h":"2170162415489071976"}}
+{"fn":"fnv1a64","in":{"text":"\u0110en V\u00e2u"},"out":{"h":"7499064596517521344"}}
+{"fn":"fnv1a64","in":{"text":"M\u1ef9 T\u00e2m"},"out":{"h":"8580236406597914637"}}
+{"fn":"fnv1a64","in":{"text":"B\u00edch Ph\u01b0\u01a1ng"},"out":{"h":"-3646720876754178614"}}
+{"fn":"fnv1a64","in":{"text":"HIEUTHUHAI"},"out":{"h":"-1878268596686126421"}}
+{"fn":"fnv1a64","in":{"text":"V\u0169."},"out":{"h":"5917529847244845563"}}
+{"fn":"fnv1a64","in":{"text":"Chillies"},"out":{"h":"2966503883289971520"}}
+{"fn":"fnv1a64","in":{"text":"Ng\u1ecdt"},"out":{"h":"4695848759490209311"}}
+{"fn":"fnv1a64","in":{"text":"Th\u1ecbnh Suy"},"out":{"h":"1112579448123863615"}}
+{"fn":"fnv1a64","in":{"text":"H\u00e0 Anh Tu\u1ea5n"},"out":{"h":"-6977460899649232796"}}
+{"fn":"fnv1a64","in":{"text":"Tr\u00fac Nh\u00e2n"},"out":{"h":"-5501195336731644000"}}
+{"fn":"fnv1a64","in":{"text":"\u0110\u1ee9c Ph\u00fac"},"out":{"h":"-5086543426417814321"}}
+{"fn":"fnv1a64","in":{"text":"Erik"},"out":{"h":"-2542473938429119150"}}
+{"fn":"fnv1a64","in":{"text":"MIN"},"out":{"h":"2191637946366158935"}}
+{"fn":"fnv1a64","in":{"text":"tlinh"},"out":{"h":"6441736905437862234"}}
+{"fn":"fnv1a64","in":{"text":"Wren Evans"},"out":{"h":"4521783210301440730"}}
+{"fn":"fnv1a64","in":{"text":"Ph\u01b0\u01a1ng M\u1ef9 Chi"},"out":{"h":"5972135904671315151"}}
+{"fn":"fnv1a64","in":{"text":"V\u0103n Mai H\u01b0\u01a1ng"},"out":{"h":"8302479327211243179"}}
+{"fn":"fnv1a64","in":{"text":"T\u00f3c Ti\u00ean"},"out":{"h":"3161502580933670534"}}
+{"fn":"fnv1a64","in":{"text":"Noo Ph\u01b0\u1edbc Th\u1ecbnh"},"out":{"h":"-2432303137254242934"}}
+{"fn":"fnv1a64","in":{"text":"Nguy\u1ec5n Tr\u1ea7n Trung Qu\u00e2n"},"out":{"h":"3578371663559040492"}}
+{"fn":"fnv1a64","in":{"text":"Beyonc\u00e9"},"out":{"h":"-4242296402423353449"}}
+{"fn":"fnv1a64","in":{"text":"Sigur R\u00f3s"},"out":{"h":"-5625602082625209686"}}
+{"fn":"fnv1a64","in":{"text":"Bj\u00f6rk"},"out":{"h":"-5464690837910041781"}}
+{"fn":"fnv1a64","in":{"text":"M\u00f6tley Cr\u00fce"},"out":{"h":"6940058526949306042"}}
+{"fn":"fnv1a64","in":{"text":"Mot\u00f6rhead"},"out":{"h":"-3595084265172955326"}}
+{"fn":"fnv1a64","in":{"text":"Zo\u00eb Keating"},"out":{"h":"2259143502044123811"}}
+{"fn":"fnv1a64","in":{"text":"\u0141\u0105ki \u0141an"},"out":{"h":"374413884690680725"}}
+{"fn":"fnv1a64","in":{"text":"Fran\u00e7oise Hardy"},"out":{"h":"-2426618120473024256"}}
+{"fn":"fnv1a64","in":{"text":"C\u00e9line Dion"},"out":{"h":"-4043823179107574866"}}
+{"fn":"fnv1a64","in":{"text":"M\u00e5neskin"},"out":{"h":"6941658130567980020"}}
+{"fn":"fnv1a64","in":{"text":"R\u00f8yksopp"},"out":{"h":"3434686996812063852"}}
+{"fn":"fnv1a64","in":{"text":"Kraftklub"},"out":{"h":"-2697249299574009095"}}
+{"fn":"fnv1a64","in":{"text":"Die \u00c4rzte"},"out":{"h":"8297036640195101243"}}
+{"fn":"fnv1a64","in":{"text":"Stra\u00dfe"},"out":{"h":"-167438934997426472"}}
+{"fn":"fnv1a64","in":{"text":"\u00c6nima"},"out":{"h":"-2261467626817210637"}}
+{"fn":"fnv1a64","in":{"text":"\u00c6ther Realm"},"out":{"h":"-2332020495118964240"}}
+{"fn":"fnv1a64","in":{"text":"Tyler, The Creator"},"out":{"h":"8258649738895913316"}}
+{"fn":"fnv1a64","in":{"text":"AC/DC"},"out":{"h":"-7224205558845360689"}}
+{"fn":"fnv1a64","in":{"text":"P!nk"},"out":{"h":"6243771508478056133"}}
+{"fn":"fnv1a64","in":{"text":"$uicideboy$"},"out":{"h":"-484836757766393360"}}
+{"fn":"fnv1a64","in":{"text":"blink-182"},"out":{"h":"771405032941356237"}}
+{"fn":"fnv1a64","in":{"text":"*NSYNC"},"out":{"h":"-342312107337505146"}}
+{"fn":"fnv1a64","in":{"text":"M.I.A."},"out":{"h":"1474417468292344702"}}
+{"fn":"fnv1a64","in":{"text":"will.i.am"},"out":{"h":"7388006207464766948"}}
+{"fn":"fnv1a64","in":{"text":"\u041a\u0438\u043d\u043e"},"out":{"h":"2613064434766723258"}}
+{"fn":"fnv1a64","in":{"text":"\u041c\u043e\u043b\u0447\u0430\u0442 \u0414\u043e\u043c\u0430"},"out":{"h":"216904151434689693"}}
+{"fn":"fnv1a64","in":{"text":"\u0414\u0414\u0422"},"out":{"h":"6357959368121617479"}}
+{"fn":"fnv1a64","in":{"text":"\u0417\u0435\u043c\u0444\u0438\u0440\u0430"},"out":{"h":"4541543241865662903"}}
+{"fn":"fnv1a64","in":{"text":"\u039c\u03af\u03ba\u03b7\u03c2 \u0398\u03b5\u03bf\u03b4\u03c9\u03c1\u03ac\u03ba\u03b7\u03c2"},"out":{"h":"-8754154375014784200"}}
+{"fn":"fnv1a64","in":{"text":"\u0386\u03bd\u03bd\u03b1 \u0392\u03af\u03c3\u03c3\u03b7"},"out":{"h":"-270393916234168892"}}
+{"fn":"fnv1a64","in":{"text":"Fleetwood Mac"},"out":{"h":"2907870621041668797"}}
+{"fn":"fnv1a64","in":{"text":"The Weeknd"},"out":{"h":"3964564206394983602"}}
+{"fn":"fnv1a64","in":{"text":"Kendrick Lamar"},"out":{"h":"5090309787929081005"}}
+{"fn":"fnv1a64","in":{"text":"NewJeans"},"out":{"h":"6969210120875668440"}}
+{"fn":"fnv1a64","in":{"text":"Nirvana"},"out":{"h":"-7985372054343936582"}}
+{"fn":"fnv1a64","in":{"text":"Burial"},"out":{"h":"9011223870811953992"}}
+{"fn":"fnv1a64","in":{"text":"d4vd"},"out":{"h":"5767944988379081143"}}
+{"fn":"fnv1a64","in":{"text":"Chappell Roan"},"out":{"h":"2108937556746559656"}}
+{"fn":"fnv1a64","in":{"text":"Sabrina Carpenter"},"out":{"h":"1747669910960785913"}}
+{"fn":"fnv1a64","in":{"text":"Taylor Swift"},"out":{"h":"3331851040787974097"}}
+{"fn":"fnv1a64","in":{"text":"Billie Eilish"},"out":{"h":"-6264249979476226656"}}
+{"fn":"fnv1a64","in":{"text":"Daft Punk"},"out":{"h":"-4343710184733193636"}}
+{"fn":"fnv1a64","in":{"text":"Radiohead"},"out":{"h":"2932870802215074694"}}
+{"fn":"fnv1a64","in":{"text":"Shakira"},"out":{"h":"-9090725443826534888"}}
+{"fn":"fnv1a64","in":{"text":"Burna Boy"},"out":{"h":"1415946132572745761"}}
+{"fn":"fnv1a64","in":{"text":"  leading and trailing  "},"out":{"h":"-3132242170559412088"}}
+{"fn":"fnv1a64","in":{"text":"MiXeD CaSe NaMe"},"out":{"h":"1669185504578519639"}}
+{"fn":"fnv1a64","in":{"text":"tab\u0009separated"},"out":{"h":"-2923391649790264822"}}
+{"fn":"fnv1a64","in":{"text":"\uff46\uff55\uff4c\uff4c\uff57\uff49\uff44\uff54\uff48"},"out":{"h":"5125760210278927716"}}
+{"fn":"fnv1a64","in":{"text":"\u201cquoted\u201d"},"out":{"h":"-4968568743410686586"}}
+{"fn":"fnv1a64","in":{"text":"dash \u2013 en \u2014 em"},"out":{"h":"2727531277216489051"}}
+{"fn":"fnv1a64","in":{"text":"Nguy\u1ec5n"},"out":{"h":"-1352242594188958753"}}
+{"fn":"fnv1a64","in":{"text":"Nguy\u1ec5n"},"out":{"h":"-1352242594188958753"}}
+{"fn":"fnv1a64","in":{"text":"Tr\u1ea7n Th\u1ecb"},"out":{"h":"7726570057356882284"}}
+{"fn":"fnv1a64","in":{"text":"e\u0301"},"out":{"h":"-4554876344562864609"}}
+{"fn":"fnv1a64","in":{"text":"o\u0302\u0301"},"out":{"h":"-3010703075100309437"}}
+{"fn":"fnv1a64","in":{"text":"\u00a0nbsp\u00a0"},"out":{"h":"-8020410773607268190"}}
+{"fn":"fnv1a64","in":{"text":"\ufb01 ligature"},"out":{"h":"6572989388181650190"}}
+{"fn":"fnv1a64","in":{"text":"\u00df"},"out":{"h":"775156830230269911"}}
+{"fn":"fnv1a64","in":{"text":"\u0130stanbul"},"out":{"h":"-4766400892214339632"}}
+{"fn":"fnv1a64","in":{"text":"\u0131i"},"out":{"h":"4010958065381395357"}}
+{"fn":"fnv1a64","in":{"text":" Meme Media"},"out":{"h":"-7093771250883991073"}}
+{"fn":"fnv1a64","in":{"text":"#1 Hits Now"},"out":{"h":"-3261545199978199455"}}
+{"fn":"fnv1a64","in":{"text":"#sadforever"},"out":{"h":"2115573357158047101"}}
+{"fn":"fnv1a64","in":{"text":"'00s Alternative"},"out":{"h":"1560703952632593808"}}
+{"fn":"fnv1a64","in":{"text":"'00s Dirty South Hip Hop"},"out":{"h":"-459407167794202568"}}
+{"fn":"fnv1a64","in":{"text":"'00s Hip Hop Party"},"out":{"h":"-1889684594224867955"}}
+{"fn":"fnv1a64","in":{"text":"'00s R&B Chill"},"out":{"h":"-3988617614472922885"}}
+{"fn":"fnv1a64","in":{"text":"'00s Rock Chillout"},"out":{"h":"1641143073874992078"}}
+{"fn":"fnv1a64","in":{"text":"'10s Party"},"out":{"h":"1420488446094813040"}}
+{"fn":"fnv1a64","in":{"text":"'10s R&B"},"out":{"h":"4376461851360364226"}}
+{"fn":"fnv1a64","in":{"text":"'10s R&B Chill"},"out":{"h":"6907913383367635372"}}
+{"fn":"fnv1a64","in":{"text":"'60s Folk"},"out":{"h":"-3160108775551592251"}}
+{"fn":"fnv1a64","in":{"text":"'80s Dance"},"out":{"h":"1688335998041378892"}}
+{"fn":"fnv1a64","in":{"text":"'80s Rock"},"out":{"h":"6194484138149224100"}}
+{"fn":"fnv1a64","in":{"text":"'80s Rock Ballads"},"out":{"h":"-2801969008871891587"}}
+{"fn":"fnv1a64","in":{"text":"'90s Alternative"},"out":{"h":"-2708120663190439097"}}
+{"fn":"fnv1a64","in":{"text":"'90s R&B"},"out":{"h":"32418134794565626"}}
+{"fn":"fnv1a64","in":{"text":"'90s Slow Jams"},"out":{"h":"8830413380954389022"}}
+{"fn":"fnv1a64","in":{"text":"(((())))"},"out":{"h":"4034194922100826681"}}
+{"fn":"fnv1a64","in":{"text":"(S)TRONG"},"out":{"h":"2478643715398263353"}}
+{"fn":"fnv1a64","in":{"text":"(What's The Story) Morning Glory?"},"out":{"h":"-6318212899800438974"}}
+{"fn":"fnv1a64","in":{"text":"070 Shake"},"out":{"h":"-8272226683452762194"}}
+{"fn":"fnv1a64","in":{"text":"1 o clock"},"out":{"h":"-7028999218791639465"}}
+{"fn":"fnv1a64","in":{"text":"10X"},"out":{"h":"5001563049515893812"}}
+{"fn":"fnv1a64","in":{"text":"11:11 (Deluxe)"},"out":{"h":"2253254720318356713"}}
+{"fn":"fnv1a64","in":{"text":"14 Casper"},"out":{"h":"-5274883258243587960"}}
+{"fn":"fnv1a64","in":{"text":"193"},"out":{"h":"4994714191585092068"}}
+{"fn":"fnv1a64","in":{"text":"2 Chainz"},"out":{"h":"-7808373313104627270"}}
+{"fn":"fnv1a64","in":{"text":"2000s Radio"},"out":{"h":"8869189474688394271"}}
+{"fn":"fnv1a64","in":{"text":"2014 Forest Hills Drive"},"out":{"h":"8963939934489868051"}}
+{"fn":"fnv1a64","in":{"text":"2020 Covers"},"out":{"h":"4405508903062581327"}}
+{"fn":"fnv1a64","in":{"text":"2025 the Playlist"},"out":{"h":"961579064172754181"}}
+{"fn":"fnv1a64","in":{"text":"21 Savage"},"out":{"h":"-882765364829029215"}}
+{"fn":"fnv1a64","in":{"text":"22"},"out":{"h":"577311807400780357"}}
+{"fn":"fnv1a64","in":{"text":"24kGoldn"},"out":{"h":"8047919791489505264"}}
+{"fn":"fnv1a64","in":{"text":"2AM"},"out":{"h":"6980200194664399747"}}
+{"fn":"fnv1a64","in":{"text":"2T"},"out":{"h":"577340394703113843"}}
+{"fn":"fnv1a64","in":{"text":"2hollis"},"out":{"h":"-1540633008520920072"}}
+{"fn":"fnv1a64","in":{"text":"2pillz"},"out":{"h":"-4418285978956347432"}}
+{"fn":"fnv1a64","in":{"text":"3 Doors Down"},"out":{"h":"9046464356026656385"}}
+{"fn":"fnv1a64","in":{"text":"310babii"},"out":{"h":"-8824335737644764486"}}
+{"fn":"fnv1a64","in":{"text":"3two (EP)"},"out":{"h":"5304778975407242420"}}
+{"fn":"fnv1a64","in":{"text":"4 Shooters Only\u2122"},"out":{"h":"-6058747099227415222"}}
+{"fn":"fnv1a64","in":{"text":"48 Hours"},"out":{"h":"-6503830856277130630"}}
+{"fn":"fnv1a64","in":{"text":"5 Seconds of Summer"},"out":{"h":"-243680380364896669"}}
+{"fn":"fnv1a64","in":{"text":"5 Strings Screaming"},"out":{"h":"7657272413958485313"}}
+{"fn":"fnv1a64","in":{"text":"50 Cent"},"out":{"h":"4503166972679171598"}}
+{"fn":"fnv1a64","in":{"text":"50 Shades of R&B"},"out":{"h":"-5610520397848414131"}}
+{"fn":"fnv1a64","in":{"text":"808bb"},"out":{"h":"2668824871501518327"}}
+{"fn":"fnv1a64","in":{"text":"9 months & 50 hours"},"out":{"h":"5914611223387989461"}}
+{"fn":"fnv1a64","in":{"text":"90s British Pop"},"out":{"h":"-4717514828648600619"}}
+{"fn":"fnv1a64","in":{"text":"90s Chill: Bollywood"},"out":{"h":"4988487222054161632"}}
+{"fn":"fnv1a64","in":{"text":"96 Months"},"out":{"h":"-1330644183735268107"}}
+{"fn":"fnv1a64","in":{"text":"A Friend of Ours 2"},"out":{"h":"7103103201102575554"}}
+{"fn":"fnv1a64","in":{"text":"A Happy Alternative"},"out":{"h":"-2845377426057543279"}}
+{"fn":"fnv1a64","in":{"text":"A LITTLE VENGEANCE (is more human than no vengeance at all)"},"out":{"h":"6354269054466878243"}}
+{"fn":"fnv1a64","in":{"text":"A Piece Of My Mind"},"out":{"h":"-4673966055557101391"}}
+{"fn":"fnv1a64","in":{"text":"A Place In The Sun"},"out":{"h":"-2722102818725978909"}}
+{"fn":"fnv1a64","in":{"text":"A$AP Rocky"},"out":{"h":"702228696802504361"}}
+{"fn":"fnv1a64","in":{"text":"A2O"},"out":{"h":"-372956433089637425"}}
+{"fn":"fnv1a64","in":{"text":"A2O LITE"},"out":{"h":"-3385718893697872639"}}
+{"fn":"fnv1a64","in":{"text":"ABC News"},"out":{"h":"523162500942666378"}}
+{"fn":"fnv1a64","in":{"text":"ABSOLUTE BRAGADO Vol. 1"},"out":{"h":"1879887900059534796"}}
+{"fn":"fnv1a64","in":{"text":"ADDICTED"},"out":{"h":"-3531784623040956183"}}
+{"fn":"fnv1a64","in":{"text":"AD\u00c9LA"},"out":{"h":"-8643574929584213977"}}
+{"fn":"fnv1a64","in":{"text":"ALGO T\u00da"},"out":{"h":"7936951334745877187"}}
+{"fn":"fnv1a64","in":{"text":"ALTNTVO"},"out":{"h":"-7221122559366412627"}}
+{"fn":"fnv1a64","in":{"text":"AM"},"out":{"h":"650865836778641299"}}
+{"fn":"fnv1a64","in":{"text":"AM I THE DRAMA? (Beat Edition)"},"out":{"h":"7014326368828576438"}}
+{"fn":"fnv1a64","in":{"text":"AMEE"},"out":{"h":"2527287448779737221"}}
+{"fn":"fnv1a64","in":{"text":"ANDROMEDA"},"out":{"h":"-5200785012269247116"}}
+{"fn":"fnv1a64","in":{"text":"ANH TRAI \"SAY HI\""},"out":{"h":"-6919024694069885784"}}
+{"fn":"fnv1a64","in":{"text":"AOA"},"out":{"h":"-429530704396441944"}}
+{"fn":"fnv1a64","in":{"text":"ARDIPITHECUS"},"out":{"h":"-8985485285202055158"}}
+{"fn":"fnv1a64","in":{"text":"ARJN"},"out":{"h":"2046468817290433434"}}
+{"fn":"fnv1a64","in":{"text":"ASTROWORLD"},"out":{"h":"-5250603152737644200"}}
+{"fn":"fnv1a64","in":{"text":"ATE"},"out":{"h":"-409295292394820425"}}
+{"fn":"fnv1a64","in":{"text":"ATEEZ"},"out":{"h":"-2643009771162098556"}}
+{"fn":"fnv1a64","in":{"text":"AUDREY NUNA"},"out":{"h":"1393853941644175041"}}
+{"fn":"fnv1a64","in":{"text":"AURORA"},"out":{"h":"-853544972015123647"}}
+{"fn":"fnv1a64","in":{"text":"AUSTIN"},"out":{"h":"9164809130434745883"}}
+{"fn":"fnv1a64","in":{"text":"AWOLNATION"},"out":{"h":"4294614374575095105"}}
+{"fn":"fnv1a64","in":{"text":"Aaliyah"},"out":{"h":"-3900017031245414758"}}
+{"fn":"fnv1a64","in":{"text":"Aaman Trikha"},"out":{"h":"4282621551770822114"}}
+{"fn":"fnv1a64","in":{"text":"Aaron Smith"},"out":{"h":"3125980335957067297"}}
+{"fn":"fnv1a64","in":{"text":"Aaryan Shah"},"out":{"h":"-3241341760259835403"}}
+{"fn":"fnv1a64","in":{"text":"Abstract Hip-Hop"},"out":{"h":"687891051362901944"}}
+{"fn":"fnv1a64","in":{"text":"Acoustic Bedtime"},"out":{"h":"-3027971647638166372"}}
+{"fn":"fnv1a64","in":{"text":"Acoustic Covers of Love Songs"},"out":{"h":"8246629750953618523"}}
+{"fn":"fnv1a64","in":{"text":"Acoustic Doze-Off"},"out":{"h":"2683085929211876946"}}
+{"fn":"fnv1a64","in":{"text":"Acoustic Indie & Alternative"},"out":{"h":"-1820988860428364980"}}
+{"fn":"fnv1a64","in":{"text":"Acoustic Japan"},"out":{"h":"-6547662138629596146"}}
+{"fn":"fnv1a64","in":{"text":"Acoustic Love Songs"},"out":{"h":"-222680460611242592"}}
+{"fn":"fnv1a64","in":{"text":"Acoustic Pop"},"out":{"h":"831066757897080645"}}
+{"fn":"fnv1a64","in":{"text":"Acoustic Singer-Songwriters"},"out":{"h":"5058561468361692488"}}
+{"fn":"fnv1a64","in":{"text":"Acoustic Soul"},"out":{"h":"-2552119687224565383"}}
+{"fn":"fnv1a64","in":{"text":"Acoustic Turkish Pop"},"out":{"h":"14823175458246761"}}
+{"fn":"fnv1a64","in":{"text":"Adam BFD"},"out":{"h":"1022497246748273934"}}
+{"fn":"fnv1a64","in":{"text":"Adam Mockler"},"out":{"h":"7141705168035025027"}}
+{"fn":"fnv1a64","in":{"text":"Ade Govinda"},"out":{"h":"2862674440541209659"}}
+{"fn":"fnv1a64","in":{"text":"Aerosmith"},"out":{"h":"-1418159609496878641"}}
+{"fn":"fnv1a64","in":{"text":"African Giant"},"out":{"h":"2058340765427866058"}}
+{"fn":"fnv1a64","in":{"text":"Afr\u00f8telize"},"out":{"h":"-9204276900439311494"}}
+{"fn":"fnv1a64","in":{"text":"Afr\u00f8telizes: Best Hits & Afro House Anthems by Afr\u00f8telize"},"out":{"h":"-1948495610074147001"}}
+{"fn":"fnv1a64","in":{"text":"After Hours"},"out":{"h":"846441125808413058"}}
+{"fn":"fnv1a64","in":{"text":"After Hours (Deluxe)"},"out":{"h":"-8002219684008004152"}}
+{"fn":"fnv1a64","in":{"text":"After Hours (Remixes)"},"out":{"h":"2877153438780690994"}}
+{"fn":"fnv1a64","in":{"text":"Afternoon Memories"},"out":{"h":"-5086945884613582682"}}
+{"fn":"fnv1a64","in":{"text":"Ai C\u0169ng Ph\u1ea3i B\u1eaft \u0110\u1ea7u T\u1eeb \u0110\u00e2u \u0110\u00f3"},"out":{"h":"-49726523531426614"}}
+{"fn":"fnv1a64","in":{"text":"Ain't No Rest For The Wicked (Official Video)"},"out":{"h":"-2324776608817676713"}}
+{"fn":"fnv1a64","in":{"text":"Airplane Mode"},"out":{"h":"-2037760954942834486"}}
+{"fn":"fnv1a64","in":{"text":"Ajay Gogavale"},"out":{"h":"-7087248993537092560"}}
+{"fn":"fnv1a64","in":{"text":"Akon"},"out":{"h":"4594398993642457008"}}
+{"fn":"fnv1a64","in":{"text":"Akustikan"},"out":{"h":"8359550988735098648"}}
+{"fn":"fnv1a64","in":{"text":"Al Shami"},"out":{"h":"1900967356892058680"}}
+{"fn":"fnv1a64","in":{"text":"Alameda Loft Party (LA CALI)"},"out":{"h":"2853087954259057768"}}
+{"fn":"fnv1a64","in":{"text":"Alan Walker"},"out":{"h":"-6997965800867733913"}}
+{"fn":"fnv1a64","in":{"text":"Alexander Acha"},"out":{"h":"201219038239894236"}}
+{"fn":"fnv1a64","in":{"text":"Alfaaz (Alan Walker Relight)"},"out":{"h":"5805513569807203780"}}
+{"fn":"fnv1a64","in":{"text":"Alice In Chains"},"out":{"h":"-2418043217101643796"}}
+{"fn":"fnv1a64","in":{"text":"Alice in Chains"},"out":{"h":"-5516523968326530484"}}
+{"fn":"fnv1a64","in":{"text":"Align"},"out":{"h":"1316707830251657598"}}
+{"fn":"fnv1a64","in":{"text":"Alin Vibe"},"out":{"h":"8623815977834429553"}}
+{"fn":"fnv1a64","in":{"text":"Alina \u2013 Only You (Music Video)"},"out":{"h":"-7935618250038466267"}}
+{"fn":"fnv1a64","in":{"text":"Alka Yagnik"},"out":{"h":"7309488162086647835"}}
+{"fn":"fnv1a64","in":{"text":"All Artists"},"out":{"h":"2604195542151716404"}}
+{"fn":"fnv1a64","in":{"text":"All Time Low"},"out":{"h":"-7104162884782289497"}}
+{"fn":"fnv1a64","in":{"text":"All of Me"},"out":{"h":"-1901204989924939567"}}
+{"fn":"fnv1a64","in":{"text":"All the Right Reasons (Special Edition)"},"out":{"h":"1366360071539370660"}}
+{"fn":"fnv1a64","in":{"text":"All-Time Alt"},"out":{"h":"1711229497305726893"}}
+{"fn":"fnv1a64","in":{"text":"All-Time Easy Acoustics"},"out":{"h":"4892419312089786360"}}
+{"fn":"fnv1a64","in":{"text":"All\u00e1 En Sonora"},"out":{"h":"-2489031092443190799"}}
+{"fn":"fnv1a64","in":{"text":"Alok"},"out":{"h":"418689126299672962"}}
+{"fn":"fnv1a64","in":{"text":"Aloka"},"out":{"h":"5237914840615654585"}}
+{"fn":"fnv1a64","in":{"text":"Alone Again (Official Live Performance)"},"out":{"h":"3427879554806981154"}}
+{"fn":"fnv1a64","in":{"text":"Alone at Prom"},"out":{"h":"7202464579358949789"}}
+{"fn":"fnv1a64","in":{"text":"Alone at Prom (Deluxe)"},"out":{"h":"212295527331948589"}}
+{"fn":"fnv1a64","in":{"text":"Alphaville"},"out":{"h":"-7472025103810279091"}}
+{"fn":"fnv1a64","in":{"text":"Alt Icons"},"out":{"h":"8025782109730251026"}}
+{"fn":"fnv1a64","in":{"text":"Alt J-Rap"},"out":{"h":"4354470083090395668"}}
+{"fn":"fnv1a64","in":{"text":"Alt-Pop Hits"},"out":{"h":"-6837219752541408336"}}
+{"fn":"fnv1a64","in":{"text":"Alternative"},"out":{"h":"701061106256192968"}}
+{"fn":"fnv1a64","in":{"text":"Alternative All Day"},"out":{"h":"-903405909807479047"}}
+{"fn":"fnv1a64","in":{"text":"Alternative Current: Hits"},"out":{"h":"7844314782667788297"}}
+{"fn":"fnv1a64","in":{"text":"Always Alright!"},"out":{"h":"7984556926068916456"}}
+{"fn":"fnv1a64","in":{"text":"Alyssa Grace"},"out":{"h":"-1846682874480978456"}}
+{"fn":"fnv1a64","in":{"text":"Ambient Dreams"},"out":{"h":"-6137415527403010511"}}
+{"fn":"fnv1a64","in":{"text":"Ambient Music Japan"},"out":{"h":"7381660713401016812"}}
+{"fn":"fnv1a64","in":{"text":"Ambient Punk, Vol. II"},"out":{"h":"5020421023242714870"}}
+{"fn":"fnv1a64","in":{"text":"Ambiente Ac\u00fastico"},"out":{"h":"520060237612235873"}}
+{"fn":"fnv1a64","in":{"text":"American Authors"},"out":{"h":"5458623608313280343"}}
+{"fn":"fnv1a64","in":{"text":"American Heart"},"out":{"h":"-810953780363632597"}}
+{"fn":"fnv1a64","in":{"text":"American Idiot"},"out":{"h":"-7098483950490242352"}}
+{"fn":"fnv1a64","in":{"text":"American Standard"},"out":{"h":"6484120012174279392"}}
+{"fn":"fnv1a64","in":{"text":"Amin\u00e9"},"out":{"h":"8744960248415730512"}}
+{"fn":"fnv1a64","in":{"text":"Amitabh Bhattacharya"},"out":{"h":"-5097171423552346557"}}
+{"fn":"fnv1a64","in":{"text":"Amon Tobin"},"out":{"h":"4280340731711338620"}}
+{"fn":"fnv1a64","in":{"text":"An Electro Tribute to Nirvana"},"out":{"h":"7885586288839052919"}}
+{"fn":"fnv1a64","in":{"text":"An Introduction To Ellie Goulding EP"},"out":{"h":"357784112046712058"}}
+{"fn":"fnv1a64","in":{"text":"Ana\u00efs Mitchell"},"out":{"h":"8481723602039979304"}}
+{"fn":"fnv1a64","in":{"text":"And, Again"},"out":{"h":"8574902682654583786"}}
+{"fn":"fnv1a64","in":{"text":"Anderson .Paak"},"out":{"h":"-7716422138017380974"}}
+{"fn":"fnv1a64","in":{"text":"Andrea Storm Kaden"},"out":{"h":"6004860875270829348"}}
+{"fn":"fnv1a64","in":{"text":"Andree Right Hand"},"out":{"h":"-4949055850648236979"}}
+{"fn":"fnv1a64","in":{"text":"Andrew Niman"},"out":{"h":"9043686204432094871"}}
+{"fn":"fnv1a64","in":{"text":"Angel"},"out":{"h":"6599060811930723210"}}
+{"fn":"fnv1a64","in":{"text":"Anh Trai V\u01b0\u1ee3t Ng\u00e0n Ch\u00f4ng Gai 2024"},"out":{"h":"-5511324501098719573"}}
+{"fn":"fnv1a64","in":{"text":"Anh Trai V\u01b0\u1ee3t Ng\u00e0n Ch\u00f4ng Gai 2024 - C\u00f4ng Di\u1ec5n 1"},"out":{"h":"4062901622901135460"}}
+{"fn":"fnv1a64","in":{"text":"Anh T\u00fa Atus"},"out":{"h":"-6272806013595823588"}}
+{"fn":"fnv1a64","in":{"text":"Anh \u0110\u00e3 Quen V\u1edbi C\u00f4 \u0110\u01a1n"},"out":{"h":"-2225694267005585824"}}
+{"fn":"fnv1a64","in":{"text":"Animal"},"out":{"h":"-3272971154455774403"}}
+{"fn":"fnv1a64","in":{"text":"Anirudh Ravichander"},"out":{"h":"6809758581853585591"}}
+{"fn":"fnv1a64","in":{"text":"Anitta"},"out":{"h":"-7685117803259056892"}}
+{"fn":"fnv1a64","in":{"text":"Anjali Raj"},"out":{"h":"-5857904307608516627"}}
+{"fn":"fnv1a64","in":{"text":"Ann Sandig"},"out":{"h":"1455582606557774106"}}
+{"fn":"fnv1a64","in":{"text":"Anne Hathaway"},"out":{"h":"-503700299468626292"}}
+{"fn":"fnv1a64","in":{"text":"Annie Elise"},"out":{"h":"1208438009613751858"}}
+{"fn":"fnv1a64","in":{"text":"Annie Lennox"},"out":{"h":"-8610021677569539538"}}
+{"fn":"fnv1a64","in":{"text":"Anniversary | Oral Fixation (20th) and Pies Descalzos (30th) LIVE"},"out":{"h":"-5399126444868953994"}}
+{"fn":"fnv1a64","in":{"text":"Another Love (Official Video)"},"out":{"h":"-5260889639325023959"}}
+{"fn":"fnv1a64","in":{"text":"Another Love (Zwette Edit)"},"out":{"h":"-3189357633700263462"}}
+{"fn":"fnv1a64","in":{"text":"Antenna"},"out":{"h":"5993488583572303344"}}
+{"fn":"fnv1a64","in":{"text":"Anti Love Songs"},"out":{"h":"-5022318791472723623"}}
+{"fn":"fnv1a64","in":{"text":"Antidawn EP"},"out":{"h":"-4758774345460702312"}}
+{"fn":"fnv1a64","in":{"text":"Anuel AA"},"out":{"h":"867092361283467966"}}
+{"fn":"fnv1a64","in":{"text":"Aphex Twin"},"out":{"h":"3755183273921541017"}}
+{"fn":"fnv1a64","in":{"text":"Aqu\u00ed de chill"},"out":{"h":"9157823416651067847"}}
+{"fn":"fnv1a64","in":{"text":"Archangel"},"out":{"h":"6053786476084514470"}}
+{"fn":"fnv1a64","in":{"text":"Arctic Monkeys"},"out":{"h":"1730729703526406007"}}
+{"fn":"fnv1a64","in":{"text":"Ares"},"out":{"h":"503630800023025466"}}
+{"fn":"fnv1a64","in":{"text":"Ari Abdul"},"out":{"h":"1280306867437391497"}}
+{"fn":"fnv1a64","in":{"text":"Ariana Grande"},"out":{"h":"-8145051566170853406"}}
+{"fn":"fnv1a64","in":{"text":"Aries tis"},"out":{"h":"-2410472674220514735"}}
+{"fn":"fnv1a64","in":{"text":"Arijit Singh"},"out":{"h":"-4710493895010102151"}}
+{"fn":"fnv1a64","in":{"text":"Aris"},"out":{"h":"492081529882567822"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"ce308803e3bee8c483cea1ab069bf89dde"},"out":{"h":"-7816892116543904512"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"1970b72f42ec5ab65a72e8ed1d7cca49b947b83da4193135b987da03bab8"},"out":{"h":"897169025048424860"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"d2c9d57009dd55ff803690efb3ba0004f625d104"},"out":{"h":"6307319867678192569"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"82a48b2afc396c"},"out":{"h":"-7677586377184558213"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"ad940ddca7762a452b2506cc0bc8f47ef79fd68602339fcc6a7a55ae2bb15cf2c0b2de"},"out":{"h":"7971784852335073891"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"9d9681b3d190a95e"},"out":{"h":"-442086897391031388"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"522291d70ca64175c79ce9d3171ebef19537b6098566e7d414472d2b"},"out":{"h":"-3044488663201817194"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"5ca4717b571a118dfd"},"out":{"h":"-8813553648452414055"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"9bcfe1e217d11fa94121dc1babffbdbecb07d2086a48f58368682aa8f0"},"out":{"h":"-194268057371174174"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"12cf7dae4319a794fc5fbb3f5705428fe9a3e9c8706ca84b65fd3cfd54df7ed5"},"out":{"h":"-7057365732878422105"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"9f6aa7"},"out":{"h":"-1939560384456448143"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"a55f1a9a221f8bf1ed1f392c10ca5080ea4a332d"},"out":{"h":"4219532482650479457"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"f1f86c5d53"},"out":{"h":"7371606800911404892"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"a24d"},"out":{"h":"684361359013838328"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"1d6029c618d44663ee936132b76c015f28bda6ae96d898c5bc627df9bf8d24d8c73ef653"},"out":{"h":"8320038089324719191"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"cff60c351497750477ca2c68bb9cd58b95"},"out":{"h":"969963683042061548"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"ddc42e8fad36dc1dd84ae1"},"out":{"h":"-8235989095180529740"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"72e1a6ad66e177a4ad0237d839bf"},"out":{"h":"2386749422536271875"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"7d9922780b79be609db0052e1486dcc2d51c176032e8b39ba892"},"out":{"h":"-7624604444967430751"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"0125f533cda6ddf6a656dbd82b"},"out":{"h":"1125868579006716685"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"d8a39bf1c6e8199856"},"out":{"h":"-5952701841224908777"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"70678eb9bf871da08aa9e69bd7"},"out":{"h":"-1869642904293141879"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"af58c190192b0801c9bc155643978bc5"},"out":{"h":"67975492149033244"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"d24eedfd2dcf8982f26e"},"out":{"h":"-2301576407482685504"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"42b7352fade22f8b8823495759fe51140980ba0470827c5c5250735bdb522100c2014294b326"},"out":{"h":"-1840061840783440453"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"015357e4f5c91f1d74d17e"},"out":{"h":"-765049084739322301"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"887efc861d2f21266ed3ff25386821b18a22fb2dfa29f2026455"},"out":{"h":"-824949169741798975"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"f912e707f2e9b09f8f"},"out":{"h":"4778816329620628157"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"c94fe44a606a97cbc8034ba3b83bc8e68a156df1"},"out":{"h":"-2206994674516649304"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"c118e081a429291a9aa79383cc00e7c29d9614ccaba0fb16"},"out":{"h":"-2648410959197012410"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"d3d1cb39b6616f"},"out":{"h":"-3432673584517732579"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"e919ef60922abbb2f2d3537288"},"out":{"h":"6396443871073064257"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"c616aab9373a1cece02c42d8c1ac7bdfa1a959f9ea87fac9e97f465c6bd2531797f4021633"},"out":{"h":"-2584156293821821499"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"6db9f8df6ad631fe89e94cf8350063"},"out":{"h":"6331053114670873591"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"82e779c71bda26ba383758611ed72e27d747fd3bd7f04a5cd882c789d5ac"},"out":{"h":"2395906487569778469"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"056318"},"out":{"h":"-5998366889171318861"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"a55f5b47d37eca9f"},"out":{"h":"4828530754138054217"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"d42adf97683c451eda"},"out":{"h":"1994904240773853248"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"76a7c4c4987f2e42118c58dda7f646"},"out":{"h":"1570429183096084782"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"b492afa058cb67c6330f8ed7cc8a303dc6e10046da301788a2d20984a6"},"out":{"h":"1728116320536953791"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"d481560d3fadd2"},"out":{"h":"-6196910090748138953"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"802920f770f7bb"},"out":{"h":"-2468568958868394445"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"e4a940b0768cac6a4b25520a560fe9902c"},"out":{"h":"-4505387867778655620"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"f2f9caaf5facf64784809b53367818255d06719fcef35b2e0234943486a402144fe66ad9"},"out":{"h":"3334838242614803227"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"cbe40e94"},"out":{"h":"2357349682932144584"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"ed0d0b62bbc5867fc6b3fa3b892323"},"out":{"h":"4849020211031917734"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"21066a"},"out":{"h":"-4941151276980127044"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"7ff2"},"out":{"h":"641151651545289364"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"d4eced2accceb9dfe3e5f7121b57b1c37467441537b265d36d20b7498b703c4f39b376057c"},"out":{"h":"8091895212163977542"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"e8e1f9877e928db3ddbf4594"},"out":{"h":"2382890272119383183"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"8afd7d97ca2c8176e03faa33b5cac2c39cbc3e0567c76ea8d2583b9e91abbef8902dc5"},"out":{"h":"6018421881970764191"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"a14407135b916069c6d48044b711df2f475c4281f870932f9be8dd"},"out":{"h":"-3067436512942992863"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"37af0c918b2e2e149b331dc4200e113bbba09357537688b7"},"out":{"h":"7895475792082546615"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"f3b751f89006ac703f96cf"},"out":{"h":"-8703899852031237670"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"1867a000c73241cfb8870c3c702ac034c9c4347db878e39ba56ad8dc9923e133b30f0ffd52"},"out":{"h":"9137819173198834567"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"3e31cc56999d6d17446025426a290d53"},"out":{"h":"8262191880687352630"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"0a8cf6e060ef432e7b29a16599b9"},"out":{"h":"-4870613325644556975"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"ccc0553c49e950046f9fe67514fbb4ecd1ed9f1387"},"out":{"h":"5301807026841181193"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"ebd9b11f1b4b6a4bc2b983263411b1117e797aa5116517f6a2261d"},"out":{"h":"-6780374700760624195"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"8727a24fbfc9"},"out":{"h":"2285796867683447672"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"8edb49f6866562d96b8f24cd555651ba10bb8643b5"},"out":{"h":"2853701546713191525"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"d41b17157305"},"out":{"h":"7484290764566476012"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"cf04e5a961"},"out":{"h":"-3514415846742793365"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"0aa1a173fee288540105a45a0a"},"out":{"h":"-4157836392355066826"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"9abf"},"out":{"h":"737896580180835318"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"2670c0875e3c814043e1ba02815e8bf6ed7091143436ab95295efd4c3bd4d70c"},"out":{"h":"-7775588398042998489"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"3e86b511cda52dd0b93aa2b3ced1ddce9b5babf48c306e3626c864fd7206c04dddad0d4d766005"},"out":{"h":"-7029245331409074818"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"d2211b048a19d6fefc09870ba83fbb505a9fc864e620bf01e0fc9ed2b926ece8dbbf"},"out":{"h":"-293121014164833227"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"f2ebbf0dd6895289ec57e06a"},"out":{"h":"-4667396721550679599"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"6a60caed6c556e6b8cea2ca93be584"},"out":{"h":"4301520899014564861"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"15"},"out":{"h":"-5808578863386473840"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"7f592373f46415f9"},"out":{"h":"-8030716553012926175"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"6afd078c9a8ac07b9f11ea81b4e48f6f8b72adb06ab25ca2fa"},"out":{"h":"-2826766239255677013"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"929052aa66"},"out":{"h":"-5467104531503716813"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"cc4e460c97548675afc4060b1ae18b2c75"},"out":{"h":"5728662213496619064"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"c61c2f9dcb55cd5d8117694bae"},"out":{"h":"932928419189289637"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"4590d6863bb34266397108a9172004"},"out":{"h":"-6176428093536725744"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"aaadea5fe9"},"out":{"h":"-3749276605632896610"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"6fb48db00018b62e13e7408764ee523c15ffead0d896e8ad4d0c3ebf2001d5bb19226d"},"out":{"h":"6664267422342023060"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"8db3b508e4959e1439426e842e4bcd7ca6aa4e47c52a270ccdaa"},"out":{"h":"3897215972560109154"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"1125ab3308b69baff01c1f3e6dbe8d37bf5e77548ce7a7845516e2b3ab92e6da69"},"out":{"h":"-1453614614530011923"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"36a401c95f611fda05a6ba6cac1bb25d64483ef67379ac2aa34ea84268"},"out":{"h":"7562012737791450632"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"4395a3"},"out":{"h":"1000727215354761138"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"e2435521d0bd0b"},"out":{"h":"695877649625422368"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"6ae8cf0763b2591d6b2c53"},"out":{"h":"-3955080782151887374"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"f02e2abdf5306a"},"out":{"h":"2425646704083652287"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"40a3c4da2fae6cd3f6f7e30d23c87b7363b27070bec133150ad56033ec4fa0f8cb67ada7"},"out":{"h":"-7423607522897540413"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"88d11c36101d5775250475ac596cf8017cacdc8592ecc617fdad62"},"out":{"h":"-7606110937380765607"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"235ff7ec4bb2e64029026ca05ae4d8e7a6f2d764582af9e4b39aeb5f74264be518"},"out":{"h":"4952729035223458066"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"92ae3ab98ddcc883b890f6"},"out":{"h":"-1091503816221994502"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"2774685049ff584a6d7ff26fc4d796fddbea5c6ed297ec5d1c008889d3ec434a28f7e62f"},"out":{"h":"2217814190243137607"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"71c8c5f7"},"out":{"h":"4540282659889023780"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"6deed073dfdd4be2279fd8aedca9f02053323a1da3c7bc7f9b"},"out":{"h":"-588544846293815453"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"9538c2c76e8d3d56"},"out":{"h":"5835353116222191653"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"0419f79487b015aa708773eceb38cdf9270ac99cfb3595fcbd2607873d66125720e9f50e"},"out":{"h":"1068334780686841550"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"b034f4be4ab2f2b7b410c559c64432dda606b3"},"out":{"h":"5356220840021532038"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"2c305bcbbed0"},"out":{"h":"-1755322752364306407"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"8b08d05a"},"out":{"h":"-6480850332745810520"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"374556caa07242f427b5b12a60fb977f0259cb94333ce2315a"},"out":{"h":"-6409916623119094007"}}
+{"fn":"fnv1a64Bytes","in":{"hex":"42b4b323d143"},"out":{"h":"-8206057749067448239"}}
+{"fn":"splitmix64","in":{"state":"0"},"out":{"z":"-2152535657050944081"}}
+{"fn":"splitmix64","in":{"state":"-1"},"out":{"z":"-1956407806741107680"}}
+{"fn":"splitmix64","in":{"state":"1"},"out":{"z":"-7995527694508729151"}}
+{"fn":"splitmix64","in":{"state":"-9223372036854775808"},"out":{"z":"5196802822362493915"}}
+{"fn":"splitmix64","in":{"state":"2134353892080031156"},"out":{"z":"-7930446415666898276"}}
+{"fn":"splitmix64","in":{"state":"-8860613739892221095"},"out":{"z":"-6697945595486033161"}}
+{"fn":"splitmix64","in":{"state":"-578174382899264481"},"out":{"z":"1580435122408286530"}}
+{"fn":"splitmix64","in":{"state":"-7453326564562945007"},"out":{"z":"4855710701960105062"}}
+{"fn":"splitmix64","in":{"state":"-4494923865191754096"},"out":{"z":"8394064356645024192"}}
+{"fn":"splitmix64","in":{"state":"1098449926953726432"},"out":{"z":"-6263271080265499439"}}
+{"fn":"splitmix64","in":{"state":"81433350947186167"},"out":{"z":"-8131919182299127427"}}
+{"fn":"splitmix64","in":{"state":"4678888688613747913"},"out":{"z":"2461122030885265555"}}
+{"fn":"splitmix64","in":{"state":"-5272975984467362669"},"out":{"z":"3320613946084160872"}}
+{"fn":"splitmix64","in":{"state":"8982786994811683753"},"out":{"z":"-7964659000323045774"}}
+{"fn":"splitmix64","in":{"state":"-3089201567031530194"},"out":{"z":"-8634520458781339995"}}
+{"fn":"splitmix64","in":{"state":"-2594193623530440950"},"out":{"z":"-1515154589857169193"}}
+{"fn":"splitmix64","in":{"state":"-2118675425356230146"},"out":{"z":"-1068759868005656216"}}
+{"fn":"splitmix64","in":{"state":"-2929350238550426395"},"out":{"z":"-5651004951657376476"}}
+{"fn":"splitmix64","in":{"state":"-8508340446718931154"},"out":{"z":"9215044858671647649"}}
+{"fn":"splitmix64","in":{"state":"-8490465874803983275"},"out":{"z":"-4617685966844653066"}}
+{"fn":"splitmix64","in":{"state":"9191585896905187638"},"out":{"z":"-5259871833914686820"}}
+{"fn":"splitmix64","in":{"state":"7032760040900681114"},"out":{"z":"2476707538407724554"}}
+{"fn":"splitmix64","in":{"state":"5692651271870288010"},"out":{"z":"4742549863445092522"}}
+{"fn":"splitmix64","in":{"state":"-3635666586600133893"},"out":{"z":"-837826085084577506"}}
+{"fn":"splitmix64","in":{"state":"6368578673888115610"},"out":{"z":"2136738848479240183"}}
+{"fn":"splitmix64","in":{"state":"8095612218485947297"},"out":{"z":"-7366305594389670869"}}
+{"fn":"splitmix64","in":{"state":"3865173546889129628"},"out":{"z":"8931502634802085402"}}
+{"fn":"splitmix64","in":{"state":"1518068154500872754"},"out":{"z":"-2998595518738975073"}}
+{"fn":"splitmix64","in":{"state":"-6213304677604409657"},"out":{"z":"-7745793925553692651"}}
+{"fn":"splitmix64","in":{"state":"-6732598538508272756"},"out":{"z":"5393869765059295719"}}
+{"fn":"splitmix64","in":{"state":"-826527472423760311"},"out":{"z":"3766490954323073281"}}
+{"fn":"splitmix64","in":{"state":"-7413359891736501025"},"out":{"z":"-519263494938830318"}}
+{"fn":"splitmix64","in":{"state":"-6926781554448901992"},"out":{"z":"-4380447811468789783"}}
+{"fn":"splitmix64","in":{"state":"-3791321353723480287"},"out":{"z":"6359433286788101216"}}
+{"fn":"splitmix64","in":{"state":"6046326980640113959"},"out":{"z":"-7366393585061881152"}}
+{"fn":"splitmix64","in":{"state":"2963785531363175842"},"out":{"z":"-5531266110372086667"}}
+{"fn":"splitmix64","in":{"state":"-7726330586977739854"},"out":{"z":"-3628895803555472707"}}
+{"fn":"splitmix64","in":{"state":"1570872830293564946"},"out":{"z":"5090189923361711325"}}
+{"fn":"splitmix64","in":{"state":"7045151280781129616"},"out":{"z":"8845250700343738730"}}
+{"fn":"splitmix64","in":{"state":"-6129735254928320624"},"out":{"z":"-4627709820783614099"}}
+{"fn":"splitmix64","in":{"state":"1454173026478508847"},"out":{"z":"-5460842827571678557"}}
+{"fn":"splitmix64","in":{"state":"-4184703201577828108"},"out":{"z":"4482491469104015805"}}
+{"fn":"splitmix64","in":{"state":"-508363888679722523"},"out":{"z":"3614960029212343894"}}
+{"fn":"splitmix64","in":{"state":"-179399353744661810"},"out":{"z":"5069779076039034295"}}
+{"fn":"splitmix64","in":{"state":"5819976977263953204"},"out":{"z":"-4996362613372186449"}}
+{"fn":"splitmix64","in":{"state":"-4848051958705713362"},"out":{"z":"-448315418028093923"}}
+{"fn":"splitmix64","in":{"state":"-704090021389960828"},"out":{"z":"-7975221237541436236"}}
+{"fn":"splitmix64","in":{"state":"-6026695745839817909"},"out":{"z":"-6098825841056983928"}}
+{"fn":"splitmix64","in":{"state":"877512283961448795"},"out":{"z":"5865468995073289540"}}
+{"fn":"splitmix64","in":{"state":"7098560846143176062"},"out":{"z":"9035233442802352326"}}
+{"fn":"splitmix64","in":{"state":"-3640738756118436737"},"out":{"z":"-4488447349100058678"}}
+{"fn":"splitmix64","in":{"state":"4967569327744048028"},"out":{"z":"-2844115014541698543"}}
+{"fn":"splitmix64","in":{"state":"5320199571677483449"},"out":{"z":"2545367253258597923"}}
+{"fn":"splitmix64","in":{"state":"7790088944146273212"},"out":{"z":"-2732841608218110226"}}
+{"fn":"splitmix64","in":{"state":"7927103088443911413"},"out":{"z":"-6384982672001704544"}}
+{"fn":"splitmix64","in":{"state":"-7573189846493556020"},"out":{"z":"6471216035816420484"}}
+{"fn":"splitmix64","in":{"state":"-8330168500811883194"},"out":{"z":"-2680579987505164705"}}
+{"fn":"splitmix64","in":{"state":"-5630637177517748337"},"out":{"z":"2138322314290352935"}}
+{"fn":"splitmix64","in":{"state":"6307174572248838676"},"out":{"z":"1739560484523135784"}}
+{"fn":"splitmix64","in":{"state":"-6806612602809620625"},"out":{"z":"-1399757354806925004"}}
+{"fn":"splitmix64","in":{"state":"7953549610062921335"},"out":{"z":"-2542826278768066072"}}
+{"fn":"splitmix64","in":{"state":"2006828419790418704"},"out":{"z":"-4104409318171149179"}}
+{"fn":"splitmix64","in":{"state":"-4657652429560701146"},"out":{"z":"8855083384478953614"}}
+{"fn":"splitmix64","in":{"state":"1739360643732108788"},"out":{"z":"-7103279983531896577"}}
+{"fn":"splitmix64","in":{"state":"-8197188570741479440"},"out":{"z":"-4823253596402067920"}}
+{"fn":"splitmix64","in":{"state":"4016010784023838821"},"out":{"z":"-4324457883118697104"}}
+{"fn":"splitmix64","in":{"state":"-2159239089218675931"},"out":{"z":"-4797320281674740072"}}
+{"fn":"splitmix64","in":{"state":"-131549443108254599"},"out":{"z":"-6710828192609754798"}}
+{"fn":"splitmix64","in":{"state":"-5098194048355905936"},"out":{"z":"6401192008404112517"}}
+{"fn":"splitmix64","in":{"state":"2438459586617171520"},"out":{"z":"3433029111500881686"}}
+{"fn":"splitmix64","in":{"state":"7138028315906101832"},"out":{"z":"5666140536352143997"}}
+{"fn":"splitmix64","in":{"state":"-6922531825039945792"},"out":{"z":"-3004046051455303019"}}
+{"fn":"splitmix64","in":{"state":"5215401463477476817"},"out":{"z":"-1042963401566395816"}}
+{"fn":"splitmix64","in":{"state":"-7730117730793806629"},"out":{"z":"-3242992296926897988"}}
+{"fn":"splitmix64","in":{"state":"-5078044368146331194"},"out":{"z":"8602615069043386239"}}
+{"fn":"splitmix64","in":{"state":"-6321261075338822032"},"out":{"z":"-3013055830725029266"}}
+{"fn":"splitmix64","in":{"state":"-7171356238384450188"},"out":{"z":"-7549952826833590220"}}
+{"fn":"splitmix64","in":{"state":"-3671061717598927221"},"out":{"z":"-853685456455925273"}}
+{"fn":"splitmix64","in":{"state":"2704760961733610562"},"out":{"z":"-1444813870417057001"}}
+{"fn":"splitmix64","in":{"state":"1698417234767830476"},"out":{"z":"-5164840924803585891"}}
+{"fn":"splitmix64","in":{"state":"8463077022103369821"},"out":{"z":"-4157224491293833796"}}
+{"fn":"splitmix64","in":{"state":"-3256370132291943515"},"out":{"z":"-5182656048691109211"}}
+{"fn":"splitmix64","in":{"state":"8528396583677443712"},"out":{"z":"7001973126847448538"}}
+{"fn":"splitmix64","in":{"state":"-6184209513500837407"},"out":{"z":"3775141159841679886"}}
+{"fn":"splitmix64","in":{"state":"-3931681192018070860"},"out":{"z":"-7181802643049480022"}}
+{"fn":"splitmix64","in":{"state":"4015971268843227450"},"out":{"z":"-8540124115948910155"}}
+{"fn":"splitmix64","in":{"state":"7933583893860204319"},"out":{"z":"-6710477516004059323"}}
+{"fn":"splitmix64","in":{"state":"2298797302545346521"},"out":{"z":"5804244988340018567"}}
+{"fn":"splitmix64","in":{"state":"-7056716818006491279"},"out":{"z":"-5404507201885306938"}}
+{"fn":"splitmix64","in":{"state":"-6697725990251330278"},"out":{"z":"3822320748106568912"}}
+{"fn":"splitmix64","in":{"state":"-4019332141781866176"},"out":{"z":"-5162103837686650840"}}
+{"fn":"splitmix64","in":{"state":"5820728112165636107"},"out":{"z":"-3110729805383488503"}}
+{"fn":"splitmix64","in":{"state":"-2586001219428984019"},"out":{"z":"-1437852745133493151"}}
+{"fn":"splitmix64","in":{"state":"-6346433818742430859"},"out":{"z":"-5380556558829232266"}}
+{"fn":"splitmix64","in":{"state":"3194899735583590295"},"out":{"z":"9108419399840923448"}}
+{"fn":"splitmix64","in":{"state":"1633811582717584200"},"out":{"z":"8865169775338133773"}}
+{"fn":"splitmix64","in":{"state":"-3883988795449407453"},"out":{"z":"2939205881633604804"}}
+{"fn":"splitmix64","in":{"state":"3913911615114065437"},"out":{"z":"-7604410621602980365"}}
+{"fn":"splitmix64","in":{"state":"-7706691924734517902"},"out":{"z":"922085712285261314"}}
+{"fn":"splitmix64","in":{"state":"-6382037959803895038"},"out":{"z":"966748822154647176"}}
+{"fn":"splitmix64","in":{"state":"-6899534079024929899"},"out":{"z":"-6320921424199589590"}}
+{"fn":"splitmix64","in":{"state":"3769923115649909474"},"out":{"z":"5164666149560064359"}}
+{"fn":"splitmix64","in":{"state":"3896843324482143861"},"out":{"z":"-654627818403467843"}}
+{"fn":"splitmix64","in":{"state":"8613143921744136599"},"out":{"z":"-990766307442546388"}}
+{"fn":"splitmix64","in":{"state":"2793806217854908959"},"out":{"z":"4003136340388790719"}}
+{"fn":"splitmix64","in":{"state":"-8021876543399693190"},"out":{"z":"-1211641168956614765"}}
+{"fn":"splitmix64","in":{"state":"-6562472066474069884"},"out":{"z":"-4764630586962194265"}}
+{"fn":"splitmix64","in":{"state":"9219707900468223060"},"out":{"z":"5567527243851998000"}}
+{"fn":"splitmix64","in":{"state":"-5386405994214682509"},"out":{"z":"8781031291287104506"}}
+{"fn":"splitmix64","in":{"state":"-8001149598991544234"},"out":{"z":"8406502233254688813"}}
+{"fn":"splitmix64","in":{"state":"-833466223393763521"},"out":{"z":"-3161794197139718988"}}
+{"fn":"splitmix64","in":{"state":"-6337122183957754373"},"out":{"z":"1893227930807565719"}}
+{"fn":"splitmix64","in":{"state":"5783039777655406766"},"out":{"z":"-3875087891519268097"}}
+{"fn":"splitmix64","in":{"state":"2771917164261545142"},"out":{"z":"8767116895123234434"}}
+{"fn":"splitmix64","in":{"state":"2064523549548759207"},"out":{"z":"3746838292967647132"}}
+{"fn":"splitmix64","in":{"state":"-1914588542874819530"},"out":{"z":"3923420949026899976"}}
+{"fn":"splitmix64","in":{"state":"-7294356563372658325"},"out":{"z":"-4916859795958933144"}}
+{"fn":"splitmix64","in":{"state":"7256050717101190683"},"out":{"z":"2296046955714490108"}}
+{"fn":"splitmix64","in":{"state":"6840460058881955331"},"out":{"z":"-5096800532584499092"}}
+{"fn":"splitmix64","in":{"state":"-6569561375612584750"},"out":{"z":"-9035976812569590371"}}
+{"fn":"splitmix64","in":{"state":"4259770923774309641"},"out":{"z":"-2374948963595821502"}}
+{"fn":"splitmix64","in":{"state":"2271198170565841404"},"out":{"z":"-5645737491898945276"}}
+{"fn":"splitmix64","in":{"state":"8729059715516275026"},"out":{"z":"-6634706288689759123"}}
+{"fn":"splitmix64","in":{"state":"-5225972167049932976"},"out":{"z":"7675301254122706467"}}
+{"fn":"splitmix64","in":{"state":"4605384015634353007"},"out":{"z":"8341347970442130002"}}
+{"fn":"splitmix64","in":{"state":"-9197669052248681194"},"out":{"z":"-901785965379639059"}}
+{"fn":"splitmix64","in":{"state":"7857326279125948998"},"out":{"z":"7535906526355051427"}}
+{"fn":"splitmix64","in":{"state":"1037903312299877946"},"out":{"z":"-8528274893236826793"}}
+{"fn":"splitmix64","in":{"state":"-7488361914719761106"},"out":{"z":"3682374100653539429"}}
+{"fn":"splitmix64","in":{"state":"-1433924792382385282"},"out":{"z":"-7718867029589233777"}}
+{"fn":"splitmix64","in":{"state":"4954000814363695973"},"out":{"z":"8150434474307377862"}}
+{"fn":"splitmix64","in":{"state":"-2697277504759452267"},"out":{"z":"7592526701060344553"}}
+{"fn":"splitmix64","in":{"state":"-7772586204675210021"},"out":{"z":"-601824509291719386"}}
+{"fn":"splitmix64","in":{"state":"355146649173845555"},"out":{"z":"-7897140530329569610"}}
+{"fn":"splitmix64","in":{"state":"-2043810253977103610"},"out":{"z":"827882968712824398"}}
+{"fn":"splitmix64","in":{"state":"-7483802142821550256"},"out":{"z":"-2616952867169162653"}}
+{"fn":"splitmix64","in":{"state":"-6499727270563755679"},"out":{"z":"-7223003617665524313"}}
+{"fn":"splitmix64","in":{"state":"625137042348962957"},"out":{"z":"-8218478257343602022"}}
+{"fn":"splitmix64","in":{"state":"-2426971917460357281"},"out":{"z":"-7224390315888968494"}}
+{"fn":"splitmix64","in":{"state":"-2292604446368309680"},"out":{"z":"2533246797089705533"}}
+{"fn":"splitmix64","in":{"state":"-7660538770624505388"},"out":{"z":"-8708397851965857138"}}
+{"fn":"splitmix64","in":{"state":"-8969220971303263242"},"out":{"z":"-4583873456101636486"}}
+{"fn":"splitmix64","in":{"state":"-3325156181869270863"},"out":{"z":"6649025202953911860"}}
+{"fn":"splitmix64","in":{"state":"-7827407211437919522"},"out":{"z":"7303615015834632086"}}
+{"fn":"splitmix64","in":{"state":"-3761749866360903660"},"out":{"z":"666634302216219883"}}
+{"fn":"splitmix64","in":{"state":"-1768873208932155768"},"out":{"z":"2522460048128465494"}}
+{"fn":"splitmix64","in":{"state":"4475738268100204042"},"out":{"z":"4930693324803425694"}}
+{"fn":"splitmix64","in":{"state":"5008593754539188732"},"out":{"z":"1618519209666632344"}}
+{"fn":"splitmix64","in":{"state":"3481369991290489638"},"out":{"z":"-5089990736962878407"}}
+{"fn":"splitmix64","in":{"state":"9054060612250451218"},"out":{"z":"4391021725560693368"}}
+{"fn":"splitmix64","in":{"state":"-1366616775309885673"},"out":{"z":"3409614002029653613"}}
+{"fn":"splitmix64","in":{"state":"6221277049707073610"},"out":{"z":"278387254842474999"}}
+{"fn":"splitmix64","in":{"state":"-985094783071686818"},"out":{"z":"-6233693706616270086"}}
+{"fn":"splitmix64","in":{"state":"-1293044431498417598"},"out":{"z":"-7258356109422236807"}}
+{"fn":"splitmix64","in":{"state":"1805216555674764323"},"out":{"z":"-7902304762397147601"}}
+{"fn":"splitmix64","in":{"state":"-8652817355904354191"},"out":{"z":"8792867224923277577"}}
+{"fn":"splitmix64","in":{"state":"3915601842594338127"},"out":{"z":"-4346323809121540807"}}
+{"fn":"splitmix64","in":{"state":"1249144379470847959"},"out":{"z":"-8978514043485590111"}}
+{"fn":"splitmix64","in":{"state":"-1396644745764477857"},"out":{"z":"-2265624281887288523"}}
+{"fn":"splitmix64","in":{"state":"2673759808786306522"},"out":{"z":"-8999793837386737964"}}
+{"fn":"splitmix64","in":{"state":"5443597270898884472"},"out":{"z":"7461743375133088144"}}
+{"fn":"splitmix64","in":{"state":"4464556693242488505"},"out":{"z":"-4436527140115478183"}}
+{"fn":"splitmix64","in":{"state":"7558280784509718588"},"out":{"z":"-4300483890382029000"}}
+{"fn":"splitmix64","in":{"state":"7949374779402419883"},"out":{"z":"8076427519588202382"}}
+{"fn":"splitmix64","in":{"state":"-6991302424688697604"},"out":{"z":"1367634318215349819"}}
+{"fn":"splitmix64","in":{"state":"5706344951333097058"},"out":{"z":"5344870467410635182"}}
+{"fn":"splitmix64","in":{"state":"6941862033737420248"},"out":{"z":"7794725798991821804"}}
+{"fn":"splitmix64","in":{"state":"-8496697909607964850"},"out":{"z":"-3809421446008165486"}}
+{"fn":"splitmix64","in":{"state":"6916690878417138674"},"out":{"z":"4158657876115948963"}}
+{"fn":"splitmix64","in":{"state":"-4765598446871041414"},"out":{"z":"4156326162106153140"}}
+{"fn":"splitmix64","in":{"state":"-8995964848214598883"},"out":{"z":"-1681635769732177592"}}
+{"fn":"splitmix64","in":{"state":"-3374223615469715711"},"out":{"z":"-199050508360343102"}}
+{"fn":"splitmix64","in":{"state":"2554075427716461488"},"out":{"z":"3525433673929137527"}}
+{"fn":"splitmix64","in":{"state":"-8243247671037899851"},"out":{"z":"-7483211241189245421"}}
+{"fn":"splitmix64","in":{"state":"-6498677038023466395"},"out":{"z":"-8432372081575119435"}}
+{"fn":"splitmix64","in":{"state":"368827130752468275"},"out":{"z":"-2643899765418585885"}}
+{"fn":"splitmix64","in":{"state":"8746659233690143994"},"out":{"z":"5054361541120667188"}}
+{"fn":"splitmix64","in":{"state":"-4606938643462979972"},"out":{"z":"-1376988686859585048"}}
+{"fn":"splitmix64","in":{"state":"5179100770614806030"},"out":{"z":"-828976742028905883"}}
+{"fn":"splitmix64","in":{"state":"-9088528516181174523"},"out":{"z":"1807697154207299872"}}
+{"fn":"splitmix64","in":{"state":"6333890906925850565"},"out":{"z":"1256665838149403638"}}
+{"fn":"splitmix64","in":{"state":"1658342855472609315"},"out":{"z":"9060639528409893942"}}
+{"fn":"splitmix64","in":{"state":"-4044156300459380897"},"out":{"z":"1684390498738009229"}}
+{"fn":"splitmix64","in":{"state":"5839150335721822572"},"out":{"z":"-8665170969851314055"}}
+{"fn":"splitmix64","in":{"state":"3937582936843237186"},"out":{"z":"-7974550170514546976"}}
+{"fn":"splitmix64","in":{"state":"-1354682864560517573"},"out":{"z":"8221891682878826520"}}
+{"fn":"splitmix64","in":{"state":"-4630993484821304391"},"out":{"z":"-7940820197901316330"}}
+{"fn":"splitmix64","in":{"state":"4458136357445701973"},"out":{"z":"7411376186880953226"}}
+{"fn":"splitmix64","in":{"state":"8873845553611454932"},"out":{"z":"-6848289631631185184"}}
+{"fn":"splitmix64","in":{"state":"-938609832455048980"},"out":{"z":"5682244734167877375"}}
+{"fn":"splitmix64","in":{"state":"-271333528809025300"},"out":{"z":"-6326096610610713386"}}
+{"fn":"splitmix64","in":{"state":"-4464661979307862286"},"out":{"z":"9095482650492822094"}}
+{"fn":"splitmix64","in":{"state":"-3244004999340156510"},"out":{"z":"-1689708285919175171"}}
+{"fn":"splitmix64","in":{"state":"-5792420753811408832"},"out":{"z":"7323946006265071377"}}
+{"fn":"splitmix64","in":{"state":"-31248261974054748"},"out":{"z":"6638378757982796024"}}
+{"fn":"splitmix64","in":{"state":"-1895494627748468113"},"out":{"z":"1161247657541418926"}}
+{"fn":"splitmix64","in":{"state":"5368250358593535958"},"out":{"z":"4933946772487017824"}}
+{"fn":"splitmix64","in":{"state":"6501545823529338191"},"out":{"z":"2010170437091480967"}}
+{"fn":"splitmix64","in":{"state":"-1054195135144167715"},"out":{"z":"6406497100099409051"}}
+{"fn":"splitmix64","in":{"state":"8423463077172939745"},"out":{"z":"-8512038792854236823"}}
+{"fn":"splitmix64","in":{"state":"1862220582627198534"},"out":{"z":"-369831388103456926"}}
+{"fn":"splitmix64","in":{"state":"-4216521926752050156"},"out":{"z":"-1612339008462081939"}}
+{"fn":"splitmix64","in":{"state":"4552876701978815814"},"out":{"z":"-3236863497028509737"}}
+{"fn":"splitmix64","in":{"state":"-8262568597138575762"},"out":{"z":"-6628879725257157470"}}
+{"fn":"splitmix64","in":{"state":"716621991769620829"},"out":{"z":"-8131643492945389570"}}
+{"fn":"splitmix64","in":{"state":"7981390038811548153"},"out":{"z":"-5785387738290428233"}}
+{"fn":"splitmix64","in":{"state":"-1373285683879602378"},"out":{"z":"-3427850604745463196"}}
+{"fn":"splitmix64","in":{"state":"7487948238935523613"},"out":{"z":"8823497437609584831"}}
+{"fn":"splitmix64","in":{"state":"-525658050325470498"},"out":{"z":"-310357274665449180"}}
+{"fn":"splitmix64","in":{"state":"-5219112118516237046"},"out":{"z":"3183527110293107406"}}
+{"fn":"splitmix64","in":{"state":"2500593149914345049"},"out":{"z":"-5453642102593801684"}}
+{"fn":"splitmix64","in":{"state":"8666218631432888205"},"out":{"z":"-3545082948287791839"}}
+{"fn":"splitmix64","in":{"state":"518130928030509763"},"out":{"z":"8251135515505090877"}}
+{"fn":"splitmix64","in":{"state":"-7498823078870082134"},"out":{"z":"260947238075027938"}}
+{"fn":"splitmix64","in":{"state":"6860568804838546064"},"out":{"z":"5653941481112364069"}}
+{"fn":"splitmix64","in":{"state":"-1370036984700605066"},"out":{"z":"-4646234054724414926"}}
+{"fn":"splitmix64","in":{"state":"2739808274870147695"},"out":{"z":"4911705407351315747"}}
+{"fn":"splitmix64","in":{"state":"-5924424233500827636"},"out":{"z":"2151284886812135920"}}
+{"fn":"splitmix64","in":{"state":"-1567588524456564235"},"out":{"z":"-7914844794660713062"}}
+{"fn":"splitmix64","in":{"state":"4186119974621426429"},"out":{"z":"-3878033302305280437"}}
+{"fn":"splitmix64","in":{"state":"7092912413172240278"},"out":{"z":"2848899391109424008"}}
+{"fn":"splitmix64","in":{"state":"-3291173317500552313"},"out":{"z":"2978763091488709340"}}
+{"fn":"splitmix64","in":{"state":"-5298627583236246727"},"out":{"z":"-3519680433766309692"}}
+{"fn":"splitmix64","in":{"state":"-7128787201215976273"},"out":{"z":"3372583900785710701"}}
+{"fn":"splitmix64","in":{"state":"-4575181859135443622"},"out":{"z":"6976183254282937004"}}
+{"fn":"splitmix64","in":{"state":"4436159953444272217"},"out":{"z":"-1656198377229715097"}}
+{"fn":"splitmix64","in":{"state":"1049223430757484444"},"out":{"z":"275111113906039961"}}
+{"fn":"splitmix64","in":{"state":"-1734325928081049026"},"out":{"z":"7938685462192354409"}}
+{"fn":"splitmix64","in":{"state":"9110144169241989825"},"out":{"z":"-1677864460833907932"}}
+{"fn":"splitmix64","in":{"state":"9072034835156462473"},"out":{"z":"-2569921289491901560"}}
+{"fn":"splitmix64","in":{"state":"6886693693626002948"},"out":{"z":"3486224802093998605"}}
+{"fn":"splitmix64","in":{"state":"-9064017159544942209"},"out":{"z":"-4189852679473149899"}}
+{"fn":"splitmix64","in":{"state":"-218570482621231791"},"out":{"z":"-8757066078319822648"}}
+{"fn":"splitmix64","in":{"state":"5264093558010685059"},"out":{"z":"1378729368409792159"}}
+{"fn":"splitmix64","in":{"state":"-5652637084823260740"},"out":{"z":"-2084572566641952245"}}
+{"fn":"splitmix64","in":{"state":"3922999112733673284"},"out":{"z":"-6601828314104279073"}}
+{"fn":"splitmix64","in":{"state":"2136223108581252899"},"out":{"z":"2362439830322538253"}}
+{"fn":"splitmix64","in":{"state":"9068883629308989199"},"out":{"z":"4255346117404551433"}}
+{"fn":"splitmix64","in":{"state":"8905905264216378565"},"out":{"z":"-2045187053461791032"}}
+{"fn":"splitmix64","in":{"state":"8160996742251145564"},"out":{"z":"5186063307337625012"}}
+{"fn":"splitmix64","in":{"state":"5806990051773700729"},"out":{"z":"-5964102631512061475"}}
+{"fn":"splitmix64","in":{"state":"7894662165075574778"},"out":{"z":"-7188385750683205988"}}
+{"fn":"splitmix64","in":{"state":"4813680848048057080"},"out":{"z":"7948198687640470949"}}
+{"fn":"splitmix64","in":{"state":"-6295546968843632349"},"out":{"z":"849991262357554602"}}
+{"fn":"splitmix64","in":{"state":"8541687742393399741"},"out":{"z":"-707635048232980641"}}
+{"fn":"splitmix64","in":{"state":"6293956616072526900"},"out":{"z":"-5382424174683165716"}}
+{"fn":"splitmix64","in":{"state":"6678423649264283302"},"out":{"z":"2801301416028436002"}}
+{"fn":"splitmix64","in":{"state":"1860996474437829444"},"out":{"z":"8630291864337849514"}}
+{"fn":"splitmix64","in":{"state":"-1998674683856776391"},"out":{"z":"55513261443461156"}}
+{"fn":"splitmix64","in":{"state":"913644828182492199"},"out":{"z":"9062585244236559213"}}
+{"fn":"splitmix64","in":{"state":"-7604443002444860648"},"out":{"z":"-6553314849636957721"}}
+{"fn":"splitmix64","in":{"state":"4276638512320809302"},"out":{"z":"-2957244640539546456"}}
+{"fn":"splitmix64","in":{"state":"-7402227106429393321"},"out":{"z":"-6939063007800405530"}}
+{"fn":"splitmix64","in":{"state":"4671950289124919667"},"out":{"z":"5437910926054501395"}}
+{"fn":"splitmix64","in":{"state":"-4711621111409549686"},"out":{"z":"-1104091879824534546"}}
+{"fn":"splitmix64","in":{"state":"-8844780964611379081"},"out":{"z":"-7406964581120167250"}}
+{"fn":"splitmix64","in":{"state":"-673702966449190853"},"out":{"z":"-192439295462970479"}}
+{"fn":"splitmix64","in":{"state":"-1016125655212411927"},"out":{"z":"8427213206079416592"}}
+{"fn":"splitmix64","in":{"state":"-5439458306872683859"},"out":{"z":"1263045247238098896"}}
+{"fn":"splitmix64","in":{"state":"-6226219232057359838"},"out":{"z":"-7823802543212634524"}}
+{"fn":"splitmix64","in":{"state":"7147213197513272914"},"out":{"z":"7182298347526155493"}}
+{"fn":"splitmix64","in":{"state":"496827458262707624"},"out":{"z":"2397326027154407247"}}
+{"fn":"splitmix64","in":{"state":"3989743167699694532"},"out":{"z":"2351708013928270416"}}
+{"fn":"splitmix64","in":{"state":"6564742717681679977"},"out":{"z":"-7411279839338571685"}}
+{"fn":"splitmix64","in":{"state":"9208114568138949310"},"out":{"z":"-7535187745182740852"}}
+{"fn":"splitmix64","in":{"state":"6961895984253668796"},"out":{"z":"-432394266049980398"}}
+{"fn":"splitmix64","in":{"state":"3441933254913892694"},"out":{"z":"6344292974935010183"}}
+{"fn":"splitmix64","in":{"state":"-3780742382215337814"},"out":{"z":"3817991851388472032"}}
+{"fn":"splitmix64","in":{"state":"-1831259720153591464"},"out":{"z":"-8534918194990144655"}}
+{"fn":"splitmix64","in":{"state":"7063756528412061458"},"out":{"z":"2656774774293526094"}}
+{"fn":"splitmix64","in":{"state":"6070864098016272219"},"out":{"z":"-1497147901630977892"}}
+{"fn":"splitmix64","in":{"state":"-7966549825073329916"},"out":{"z":"1789638016753151825"}}
+{"fn":"splitmix64","in":{"state":"-7189098237299548691"},"out":{"z":"3082087189815117914"}}
+{"fn":"splitmix64","in":{"state":"-7516563980799085684"},"out":{"z":"1747152993106291942"}}
+{"fn":"splitmix64","in":{"state":"-6441469542284587404"},"out":{"z":"6796899188090369107"}}
+{"fn":"splitmix64","in":{"state":"1465937560733792589"},"out":{"z":"-2661163435762409338"}}
+{"fn":"splitmix64","in":{"state":"-7735278319577215568"},"out":{"z":"2076900449868245400"}}
+{"fn":"splitmix64","in":{"state":"4721335884342744228"},"out":{"z":"8130549409441490077"}}
+{"fn":"splitmix64","in":{"state":"-3679729803964087676"},"out":{"z":"-5102003506690839636"}}
+{"fn":"splitmix64","in":{"state":"-2084366542087656534"},"out":{"z":"2215982962281231721"}}
+{"fn":"splitmix64","in":{"state":"-9066507673910048562"},"out":{"z":"5915889639068210442"}}
+{"fn":"splitmix64","in":{"state":"-8894064402240739132"},"out":{"z":"-4204680409439599154"}}
+{"fn":"splitmix64","in":{"state":"-741108883951205015"},"out":{"z":"-2199617124201750552"}}
+{"fn":"splitmix64","in":{"state":"-2996923978866298747"},"out":{"z":"3736758101517114896"}}
+{"fn":"splitmix64","in":{"state":"1906289004111775005"},"out":{"z":"1965973221591017862"}}
+{"fn":"splitmix64","in":{"state":"-2667674862912118599"},"out":{"z":"-2176164958665812328"}}
+{"fn":"splitmix64","in":{"state":"-7467025919830767055"},"out":{"z":"1325749792071743419"}}
+{"fn":"splitmix64","in":{"state":"-2823663617555695764"},"out":{"z":"-5935801532553224812"}}
+{"fn":"splitmix64","in":{"state":"-4685505317669012141"},"out":{"z":"-1603612090726445398"}}
+{"fn":"splitmix64","in":{"state":"-3932107165850435322"},"out":{"z":"-6929642091276579756"}}
+{"fn":"splitmix64","in":{"state":"4539195974154718205"},"out":{"z":"3858505566411764779"}}
+{"fn":"splitmix64","in":{"state":"2780712089121822027"},"out":{"z":"-7759387618157707242"}}
+{"fn":"splitmix64","in":{"state":"7142650188907481484"},"out":{"z":"-6206058579407191450"}}
+{"fn":"splitmix64","in":{"state":"-4541094912147923403"},"out":{"z":"-5200636740303153763"}}
+{"fn":"splitmix64","in":{"state":"4598040676529292650"},"out":{"z":"-5577707305317198224"}}
+{"fn":"splitmix64","in":{"state":"-2527030516251091936"},"out":{"z":"-8143101259433368377"}}
+{"fn":"splitmix64","in":{"state":"-8301565729353691435"},"out":{"z":"-5957279760913924040"}}
+{"fn":"splitmix64","in":{"state":"-7803868405322181744"},"out":{"z":"3153079837194706853"}}
+{"fn":"splitmix64","in":{"state":"-7178352418426676530"},"out":{"z":"-7476934838091373175"}}
+{"fn":"splitmix64","in":{"state":"-3807355855206078763"},"out":{"z":"2050889083966176904"}}
+{"fn":"rng","in":{"seed":"0","n":8},"out":{"uniform":["3fec4415072f63b9","3fdb9e279aa86e58","3f9b117462002500","3fef1177150e4990","3fbb39896a51a870","3fd4f2e7c31d1fa8","3fc6414d5f0fa298","3fe8b082675922d5"],"gaussian12":["3fa7ca0f5cf02580","3ff6208bbe841558","3fc18e177f03ffe0","bffb120f2e8b8694","3fe339046b551230","3fcf2987dce8c040","3fe5bb52a79f70f8","bff1abadb3aae9e8"]}}
+{"fn":"rng","in":{"seed":"-4654930253899324193","n":8},"out":{"uniform":["3febca7cf370c6f7","3feb3a6245e7afe7","3fdc715a322b6acc","3f8416db9adc3b80","3fe7ed78eb079dc9","3fd497211abe1c86","3fb61027335326a0","3fd47deafaccd322"],"gaussian12":["bff14eee7eb146e4","bfbbc6a728553f40","bfd18a18db5fc210","bfd225f9494b3510","bfecae036412f2b8","3fe8eb20ab14d000","40015c9052a042d4","c000d0a665e453c6"]}}
+{"fn":"rng","in":{"seed":"-1605637026097653196","n":8},"out":{"uniform":["3f95b034dfc67840","3feb6ae58ad9d83e","3fe67a7ee8a600e3","3fdebedda91c6ede","3fe7e2e5176b9424","3fec8495c95d876b","3fe3fd8ac055d429","3feb3996305378be"],"gaussian12":["3ffd8f9e61bbfc38","3fe30e4a99e91528","bffca1f5a8d378b8","3fc4ce2d8a14c080","bfe460ff6480e090","bfe976b5e3a28fe0","4003ab27997f1f88","bfcf91cae80d3140"]}}
+{"fn":"rng","in":{"seed":"4260836856182531345","n":8},"out":{"uniform":["3fe926e7153b7285","3fa6b72f3c5817e0","3fd88e7fa761eeb2","3fe6ebd4e68e6a42","3fc9e366bfe39c44","3fed01ded496fe09","3fe70fb4ad2950e1","3fea8aef2f9f19f6"],"gaussian12":["bfd80b05dcb7db20","3ff672516c631e60","3ffa83e2baa3d7b8","3ff04dcd1fcf99f4","3fd86840f9f24ba0","c001991f83e4e31e","3fde9dba861f2390","bfe2cfef1f2bb2c0"]}}
+{"fn":"rng","in":{"seed":"-3332447281562561696","n":8},"out":{"uniform":["3f9b1edd9b521500","3fe2d97052d892b1","3fdf3e95c971f58c","3fe2abf8d09a26b0","3fd0e7389bc4e3ea","3fef3eef960debe5","3fa433049aa109a0","3fcfe678bc8736c4"],"gaussian12":["bfdb593414eac840","bfc1da0857f031c0","3fd028f19c239d40","bfe581882b4b7d38","bff7f17894c89ef0","bfe65be5aebe6c88","3ffb8cc87fdca4c0","3fe3d0a928d95a98"]}}
+{"fn":"rng","in":{"seed":"-87746194659858252","n":8},"out":{"uniform":["3fe97039c797feb4","3fdff5de5f975728","3feada90e144f491","3fe3931b4323909b","3fd9ef05a3348a22","3fd591a89502b3aa","3fe3100b7f06531f","3fe74c270e4a818f"],"gaussian12":["3fe3a57fc53c5700","3fdb2ee7d76d5a10","3fbc55ee8ab91cc0","bfcf6841dcdcea20","bffb986f82391114","3fc14f914dba6680","bfe13366faf16038","bff933d6b358c3a0"]}}
+{"fn":"rng","in":{"seed":"387409135493829267","n":8},"out":{"uniform":["3febefa9e06eafdf","3feeea9d4b04b8f2","3fe5ee4675f37e91","3fe3b0fce7fd6219","3fe57215cff80b5b","3fe4b24fa19232e9","3feafaf25009eda5","3fe7298ad8874aff"],"gaussian12":["40047970c7056628","bff4ef8adaec7964","bfabaf5f070c1700","bffa7c551b90f924","bfe507d6a2eda880","3fc1dfacf39ef3c0","3ff873540c43f160","3fe0eba756ca9760"]}}
+{"fn":"rng","in":{"seed":"-8460377342177094684","n":8},"out":{"uniform":["3feb4b4e65b6d3bb","3fc9b0c3e066c9dc","3fe48189a3306615","3fcbeb8032281f60","3fa1f483bebc54a0","3fe26f84a8310212","3fe1359ac3550a05","3fd5f037cce7b9dc"],"gaussian12":["bff11b75aaf57dec","3ffa4bd63c703084","3ff55a51c05d4e80","3fefc260f89c33e0","bfe422d307072bb8","3ff87c4f97fd30a0","bff3dcd08d4a8e64","bfebc293befeae60"]}}
+{"fn":"rng","in":{"seed":"-1676080820539708060","n":8},"out":{"uniform":["3fe6b525a48eb576","3fb4829d922968e0","3fe6cfcc9a1aefbb","3fea93e4dc867a3e","3fc1a322f42bb058","3fc009921fe91668","3fa065a6737217b0","3fe5991300aae8c3"],"gaussian12":["bfed7e475bb041e0","bff6a09917a726e8","bff5205ff8ef1dec","3fae65e71b663480","3feb67cd4daa0770","bfc3f638ac5a6480","bfb47a79246e3980","3fde032db298cc40"]}}
+{"fn":"rng","in":{"seed":"-7531904016985241259","n":8},"out":{"uniform":["3fecd1c9cca593bb","3fc62105983390ac","3fb9466edbaa7408","3fc12faf4a5ed9b0","3f6b92cdca910e00","3fb1acd89ec1adc0","3fddd9c0d9a00e32","3fe376645b6cfe9b"],"gaussian12":["c002e930921be160","bff905c12b84e6ac","bfce4d191d0fa940","3ff2933271e0bc18","bfc41171b0f37320","bf8c3b0f094c2c00","bfed3a9057127bc8","c0015fea16100c6c"]}}
+{"fn":"rng","in":{"seed":"-1208364007875240630","n":8},"out":{"uniform":["3fdf8dc608cca0d6","3fee5e0163ea2d99","3fe919538c971b8f","3fe304867de50ac7","3fe6856fb15b510a","3fc1d7f4cb777ddc","3fe7f990cc37a452","3fdf98d670acd054"],"gaussian12":["3fea4658a108ba70","bff42f4998940050","bf990dcf5e8aaf00","bfe41eb14963f290","bfab43335027fe00","3ff2026b9f9b4d10","3fe3793b04636740","bfc723aaceb8b460"]}}
+{"fn":"rng","in":{"seed":"7188115231718421995","n":8},"out":{"uniform":["3fef41b9e621a739","3fe23a6f568e5759","3fe12b35c5ddfcec","3fe6121d28e823f3","3fcceff465e3a564","3fee6408b4949dad","3fdb0e457cf8436e","3f575cdc72b84c00"],"gaussian12":["bfd4e07bff54a370","3ff8464ce8f341a8","3fd6028118aaf880","bfdc9b3bc9c40740","bfe45c6690decd28","bfe33e5610a7ceb0","3fd914323c0f0b50","bff98d805144ea78"]}}
+{"fn":"rng","in":{"seed":"-6143629573128788625","n":8},"out":{"uniform":["3fe49bcb441bfd09","3fbbbdd2b6d62720","3fe39f0678c68fb5","3fefdc0224dc3ab5","3fbeaaa945c4f9c0","3fece9fcb1693d5b","3fc6fedde0406dc8","3fe776df8a7ce90c"],"gaussian12":["bfec3fca836ad3a0","3fff3a280d5764dc","bfc57c1c61f3d4c0","3fe946d7c33a7230","bfcf9d51b6797bc0","3fdcdff14384c200","3fb79f7661443a40","bffe0c22661be2e8"]}}
+{"fn":"rng","in":{"seed":"-3209011750198368716","n":8},"out":{"uniform":["3feb0f1eb614075b","3fa183cf3823acd0","3fe0b6798416f525","3f91f2836750d260","3fe5881b3ec1d5a6","3fe8d4d967c4c93d","3fec46b5d7da11ea","3fe46d7a5bc828ee"],"gaussian12":["3fc95aed6f05e820","bfe3f624c126aad0","3fce5244ea663600","3fd6e6bdb36bc2c0","3fda82849a4a5490","bfc70179f2906780","3fb17cd5a9fd3e40","bfd828166b8a7500"]}}
+{"fn":"rng","in":{"seed":"-5044873894129142061","n":8},"out":{"uniform":["3fec1466d56ef1ba","3fe60e2694b4f0d7","3fe7faec7cf9791c","3fd3b018d380e996","3fedfe060caebf83","3fd0e20e6ed0a924","3fe142cd7000eff2","3fb695101f427778"],"gaussian12":["bfc34bc07b307840","3ff89d1256601104","3fed651c80414410","bfc59899ab8f9540","3fedfa5d7b1c61a0","bfe9d46e2f3f0820","3fc7b225b82d5400","3fe599568f54f540"]}}
+{"fn":"rng","in":{"seed":"8109794740802741336","n":8},"out":{"uniform":["3fdbeda6e42fc596","3fd5b6e61596f8a0","3fdb9df3d478496a","3fded654dc9afab6","3fc4b013de9b4458","3fe8196387ee311c","3fd07e2474ce56fc","3fe439445bf125b7"],"gaussian12":["bfdcd1ed4f888850","bffa16eaa562baa0","3fe52849dcd27f80","bfb96d7c29322ec0","3fe1811c785102b0","3fe9b3c48adbb2b0","bff6ac47fecce618","bfe19d7a32ad4870"]}}
+{"fn":"rng","in":{"seed":"-3869792406690888111","n":8},"out":{"uniform":["3fe8393dc7d4a9d8","3fedf6f930a5b290","3fe8b09aa5153ed6","3fad380ebe330f30","3fdb3b3b4c885748","3fedeed549fc4833","3fd865be439cc586","3fb86199011b0ad8"],"gaussian12":["bf931d8bd31f1d00","bff1485b090ab49c","bfe219c26d802810","3ffd8d7296715530","3ff24c1132ebf900","bfcfcc0d18aafd60","bfd051aeeaada2d0","4005aa807f8ee630"]}}
+{"fn":"rng","in":{"seed":"4853622430781296238","n":8},"out":{"uniform":["3fd4a16d1e04dc0a","3fe6d0f523759eb8","3fe429d5882a3c3c","3feeecf2eb58adfe","3fba1b21a7af2b20","3fddb4d6a9cca09e","3fe77a4ff2ad3fe2","3fe6178fb84a45dd"],"gaussian12":["bfd697b5ff0824c0","3fd315f9c30b2aa0","bfe30f6f74c12898","3ff540f6d2e2b304","bff885ae2a9b9210","3ff3cb8f3a234c68","bfe9e063567a6638","bffa9d35cd02ffd0"]}}
+{"fn":"rng","in":{"seed":"5343403753091865116","n":8},"out":{"uniform":["3fe5c74371115c84","3fd34c79ddf43fe8","3fc9756dc02c2414","3fe5f4dce4d4aabe","3fe9450cad7832d5","3fdaba10f4135a5c","3fe35472a9de6a16","3fd61b7090a1ac42"],"gaussian12":["bfeff2cdb14af118","bfff203253d535f4","bff5d387a33a6378","bfec9742eb1643c0","bfe338ae3f97b610","bfded62c87c4c750","3fcd55205e5341e0","3fe08ce3c3cec098"]}}
+{"fn":"rng","in":{"seed":"6693097015677066287","n":8},"out":{"uniform":["3fe0772c8a440eed","3f97643eca6c5540","3fe948f3900226e5","3fc582cc420cbf30","3fc37d751117eecc","3fa7846cdaefd970","3feb66aec5cc82da","3fe42953999b40b6"],"gaussian12":["bfedba7218fbfcb8","3fd9d724ad30f930","3fdef673fb80b8d0","bffd684915809cd0","bfed057c896d5bd0","3fdd06781e3699f0","bfd7eac3f3e27300","bfdde92401829250"]}}
+{"fn":"rng","in":{"seed":"7225982544124254917","n":8},"out":{"uniform":["3fe31e21fee9a38a","3fd4a9e432343d3c","3fe1a0edde3f5593","3fd86ccc47d57606","3fe1a905fff42d39","3fc4042a6679e8d0","3fda6c192a19dd88","3fcc43ff03e82228"],"gaussian12":["bfce6439afa75220","bfede7866c612b28","bff02244ecdc508c","3ff85f4fe53cc268","3fec301e860ebe90","bfa6600d138abb00","bff5bd83cd805428","bfec39caac306448"]}}
+{"fn":"rng","in":{"seed":"-6420403943980941800","n":8},"out":{"uniform":["3fd6892fb371c6f0","3fe6172755ffb34e","3fea4017cd4da989","3fd22b369da95ad4","3fdadce1033f60ae","3fe2c637ede36c09","3fe776b913f6604d","3fec95f9f36b428b"],"gaussian12":["3fffd97fae51e2bc","3fe020c749a576f0","bfb4896234911200","bfe1e9fecd61fae0","c001781fcc8b19c7","3ffca2a5dbc112c0","3fedbb3bf97e6460","3faeacd0f91f0100"]}}
+{"fn":"rng","in":{"seed":"174852522937919683","n":8},"out":{"uniform":["3fc080560bfd9fd8","3fcf3effef8d60d4","3fdd47a01b571bc2","3f9a0ea03d724680","3fd1ab319010ed06","3feecd2bb74c7f34","3fe4419a1b528c8a","3fe81f5e84c0317b"],"gaussian12":["3fb28f77dbf76400","bfed5e3b1e51aca0","3fd6c607706135e0","c000cc6f54941567","3fe47dcf37ceb710","40008be1ee32a87c","3fc93c4e9b8f5440","bfe49b14daa7bc70"]}}
+{"fn":"rng","in":{"seed":"100405022053846393","n":8},"out":{"uniform":["3fc459522335ccc4","3fd7d2630036be6e","3fdea9a77da5d274","3fd04f487e52474c","3fee3cfa59e69dc7","3fdaabdb1ebb52b2","3fe3fdff5663223c","3fe8de42b4cb5195"],"gaussian12":["3fcc05178d8b8400","bff94986872294a0","bfd85bbd4e2d19e0","3fd0b7c9f580d830","3fe92603dc0983d8","bff8fde2ec749ad8","bff04dff57a98e4c","3fcf8e5371f720c0"]}}
+{"fn":"rng","in":{"seed":"-4094523109730848361","n":8},"out":{"uniform":["3f929ef0caf43b40","3fd14ea3151fe474","3fa8d31b63afa5c0","3fca27b765529cf8","3fe8a3c2ac98fe72","3fdc18ba821de544","3fa6d7adec2117c0","3fdab482d9adadda"],"gaussian12":["bff6a24de1943b34","3fd7006ef65b4480","bfcce303ffd9d040","3fb8050e5b3277c0","3fe3cdb35f67eda8","bfb76e61abdb0b40","3fedd6826e733900","3fd173c6835cba60"]}}
+{"fn":"rng","in":{"seed":"-415412475340008412","n":8},"out":{"uniform":["3fbecb780bbce470","3fd0a78d96fc5c32","3fc071f877b25544","3fe81a5a65fd809e","3fde39354f77b57e","3fcf7b0e51978148","3fca251864d71654","3fc113a622eb7fdc"],"gaussian12":["bff1d1b7ab850a88","c0002242d3b957ec","3ff3d0076f872bc8","3fe4b6f45f384f00","bf8793b3508be200","bfcd7960bfb22400","bff136e2c6b74a44","3ff009e6163b4868"]}}
+{"fn":"rng","in":{"seed":"-3747737153342780123","n":8},"out":{"uniform":["3fd2b593e02afb1c","3fef1a5854226193","3febed64b2428db4","3fef11a41d283e61","3fdad90175253d10","3fdaf207a3d0b8ba","3f9ac02484420120","3fe00f2193c46b69"],"gaussian12":["3fe8de61b896ff98","3ff6b9e259432928","bfa4364900ff9f00","bfe79679d8489fc0","bfd3cc06f20040c0","3fcfd8c22a6489c0","bfa3a91b4f00b800","bfdcc9c731620960"]}}
+{"fn":"rng","in":{"seed":"-4681964150879851728","n":8},"out":{"uniform":["3fea66447922ac91","3fedb8fa06fd7c93","3fe216ffcc90c902","3fe8e664d86166d8","3fcde98524c23428","3fc81fc745349644","3feb30d1b925f0ab","3fdf0d163e084a5c"],"gaussian12":["3fd3a2e72daa9dc0","3fec8a0bab4b0e40","40008b86cd63a278","bffb0c856227da98","400471d66aa19de4","bfd73e9f64bd6cc0","400133d650758c10","3fc49ba5b886fb40"]}}
+{"fn":"rng","in":{"seed":"804917390575124043","n":8},"out":{"uniform":["3fe487a297ca8b18","3fe46f2ef13b3717","3fc55d7664a23784","3fee8036d025723d","3fbda801b6a74d20","3fe2aabf925cc949","3fdebf88abc05846","3fb562ee4b729400"],"gaussian12":["bfc6140fbedd5740","bfee4027c749de78","3fce6fa10bfc2ae0","3fb5443460c6ac00","bf9a6a56bddf6400","3fff5be00324ce48","bfe59fcd9dc95b80","bffbe616eb10b564"]}}
+{"fn":"rng","in":{"seed":"-4726419150198644779","n":8},"out":{"uniform":["3faac6e829d78520","3fef573aa892d494","3fdc008493c1d880","3fc5d32187d78ecc","3fe2c5180f98ee14","3fce9445dcafde68","3fd6caffb22ec3a6","3fd9c684a94b7970"],"gaussian12":["bfe8b140d17b6b90","bfb8d0e2b703dec0","3ff302353dfd7780","3fe1bf47087bc8b8","bff3d13792271848","3fd974918a6ddc20","bfca5bc996df02c0","bfa2ccc5c61aaa00"]}}
+{"fn":"rng","in":{"seed":"-4595470315455367402","n":8},"out":{"uniform":["3fbe657771c7b290","3f7c4d6971453680","3fec7180bc8538cf","3fcbdf29473330d0","3fd29bde6c949882","3fee636ab7cf8db0","3feb4622c10cf3de","3fcd408351e3ac10"],"gaussian12":["3fe1d1930ad5c5e8","3fe30c1825a40088","3ff9fcee733dbfac","3f95cabd65105700","3fe2af5e1a059770","bfea1f788655ad00","bfe1f2d6d93681c0","bfe4b3b410559700"]}}
+{"fn":"rng","in":{"seed":"-3895816100974364191","n":8},"out":{"uniform":["3fe9cd8e5199c259","3fdb805972cd6c8e","3fd7565467464c36","3fed5817211f5bcb","3fe7e575ba0a255f","3fdf1701fb99dc68","3fe61770f6d2981a","3fe318a05e0f0935"],"gaussian12":["3fd3db6399b99d00","3fd9e62047b31c30","3ff79661b6448938","3ffbcb50c4ae2dc8","bffc646f8390e368","3ff29e278a5498d0","3fe3bbda91035f70","bff4553b0776fb28"]}}
+{"fn":"rng","in":{"seed":"1186110182563679999","n":8},"out":{"uniform":["3fef614e2dc548ee","3fcd1f13675eb6bc","3fe21b2ef4848ae6","3fe1380f51d15193","3fc95507d56c8a10","3fe3a5ef68ca6d7c","3fece37871358894","3fe92fed41a38d7c"],"gaussian12":["3ff72d378e2b7c34","bfe2d35e81ebc780","bfe7abb0684bc680","3fceb15a9996a680","bfe72d914d361590","bf80d260f4f1ca00","bfe2c482155e6350","3ff15de185e083fc"]}}
+{"fn":"rng","in":{"seed":"2115991655245254187","n":8},"out":{"uniform":["3fe4195b860b2117","3f9fb7c546a9db80","3fdec6265a78f916","3fe9f8b7cd0e6a05","3fe84ceda9f8ae52","3fe755d7eb8c72a8","3fe1d7962f1608d8","3fd28b8d5ac250da"],"gaussian12":["bfbc257ef70ccb80","bf973fdbd0167800","bfcec2098bffa700","bff2958fe7aef060","bfb552c65237e180","3fef621c71345cf0","3fe50f397d29b790","bff665793db99c70"]}}
+{"fn":"rng","in":{"seed":"2641989398934528608","n":8},"out":{"uniform":["3fe6814bd9310ce9","3fd86392e6fe2208","3fdd309f8499063e","3fe0b9f3e8795342","3faf8c1c3a4e83b0","3fec598c72627b02","3fdf205994df81ec","3fe42a7c3e60d13f"],"gaussian12":["bfec554402adbb20","bfea316269920348","3ff5e708b02ecc04","bff64dcaad0be98c","bff65b96ff05a064","bff04bf5d8f071a0","3f936048ea5a3200","3fd65732c3e70710"]}}
+{"fn":"rng","in":{"seed":"-1229810271479770437","n":8},"out":{"uniform":["3fdc824c2a015174","3fcca785718b2ad4","3fa0a1d39f33e370","3fce10fd6d893f94","3faf716465e6d9d0","3fe51a7abe3786cb","3fed15497014a1c5","3fda7d6b19419404"],"gaussian12":["bff323c05ef358b8","3fdd4412946730e0","bfecdf29a6f35e78","3ff87c485c734d58","bff4010a7a40d0d4","3fe8d0165db01628","3fef6ca45f8ceb60","bfd497b844796230"]}}
+{"fn":"rng","in":{"seed":"4057336730334103781","n":8},"out":{"uniform":["3feb1d236c224878","3fec42d649246274","3fed67f215582081","3fe5abdd85b73bf0","3fee10ebc6d7ef79","3fe9177ee02b3a18","3fedbc52d7d550b3","3fda563d5bdb1ba2"],"gaussian12":["4001d39b2d4cbd78","3fe6bbade1cba6c0","bfe8ff8100be9150","3f9255e73dd7d900","bfca3cd440492800","bfdbdb7a35e47080","3fa6bd4d5a18e800","3fec06c1d4d0b400"]}}
+{"fn":"rng","in":{"seed":"-6365623664574296809","n":8},"out":{"uniform":["3fe57e06b4dc8a5e","3fd29780778a6d74","3fe7f9cc30ab190f","3fc10412e27ffdd4","3fed934a26e54d25","3fb06f77453f9f70","3fe425de6c887a47","3fb9d93eed422780"],"gaussian12":["bff81920b6d438d4","bfe549b055bfd1b8","bfc1c13e3dc7f0c0","3fb8e068c2d15f00","3fd50f72c5582b70","bfe6f638d644ae40","3fc6bfef593de520","3fd090cf43e65fc0"]}}
+{"fn":"rng","in":{"seed":"-4915534140414717349","n":8},"out":{"uniform":["3fe3831ef941c6ce","3fef8b49067b3b22","3fe07adaff9a44b5","3f949894419d31c0","3fdddda43f87e06a","3fb7d8d18a61b8d8","3fece4f07faca5fe","3fe1398d22e44326"],"gaussian12":["bfc5e9eaae5d4ce0","bfec70eea3766c98","bff48a74e53820b8","bfdfa5e61bcf7580","3febf9be26aac2c0","bfb7a4a7e1cb2b40","3ff0f55757d7847c","3fec10301e875660"]}}
+{"fn":"rng","in":{"seed":"2904940018102712213","n":8},"out":{"uniform":["3fe5f47700e1336d","3feab723ee1eb838","3fc2add281806584","3fe68361bbf765d1","3fe05eaa52d0e05e","3fdb6eb0758ee304","3fe85ad50304e6ca","3fe18d685da00549"],"gaussian12":["3fe67d8a02020940","bfed9e4261dacb60","bfcddb17581344c0","bfe674fd81110d30","3ff0f78b0bfb8768","3fd0e814b85c0900","3fffaa426df87d60","bfd2286250261b70"]}}
+{"fn":"rng","in":{"seed":"5913163279290949609","n":8},"out":{"uniform":["3fdf89d5cfef5346","3fb78f61a6c77178","3fec23c906fd4b2e","3fce26964f41d0a4","3fe078b3bdb7f785","3fede79c8a30c457","3fee8a2e551c5b72","3fea4d0efdbd28f8"],"gaussian12":["4000ccd13568188c","3ff6c2957dda6a18","bfe71663f5d54008","3ffc16fec56968f8","bfe4c377ddbf76e8","bfeeac37c665ad08","bfeef8f2609c13c0","bfaa6a295e0cdb80"]}}
+{"fn":"rng","in":{"seed":"-6300347033127549636","n":8},"out":{"uniform":["3fec2254f09235af","3fe10eff826f5672","3f9b2b6ad4393e60","3fc75761c6a53e70","3fce789777aa7984","3faf107666539060","3fa0165dec935a90","3fd52f45ee0c2018"],"gaussian12":["bff990770a9726c8","3fc7e8d209cd24c0","bfb38dd834aa95c0","3ff78be9b9ff2894","bfd55944c29496e0","bfcf6691f3621220","3fff1ac92bab3c28","c000400ea5f994d2"]}}
+{"fn":"rng","in":{"seed":"2184907488897155994","n":8},"out":{"uniform":["3feb5d4763ce856f","3fc48b8fb7e77cbc","3fc42f435625a224","3fc8432a774598f8","3fe342a0995b761e","3fa86619cbcc1030","3fdb092e2d20c692","3fe7972da323b9e6"],"gaussian12":["bfeca802d9080be8","3fc29e381fbfc380","bfe9248cad22f230","bfe44ad814564608","3fefdd2fd706a7d8","bfeb94305a2e3228","3ff19af567c9ff80","3fe59203d083be48"]}}
+{"fn":"rng","in":{"seed":"5120329959507251616","n":8},"out":{"uniform":["3fed2d99b51f89a0","3f92b6f7ed92b7c0","3fe77ceff425b25c","3fd2e3453c6e01fe","3faaceb1b08ef2a0","3f2676c77412f000","3fea758565378266","3fe2730fdf924716"],"gaussian12":["bffc3e7401b04c38","3feeef27841f7688","3fe27e98f0960e28","bff0f60f14cca5d0","3fd40818e309d410","bffa2bef759904f4","3ff8a0cf7093e3e0","bfe04e8af167a338"]}}
+{"fn":"rng","in":{"seed":"-7446610183628911632","n":8},"out":{"uniform":["3fc7af297af86b94","3fe974670015164e","3fe43342db6467ad","3fe6b40ff25f5ed3","3fe879b0ad148df1","3fe5fcacedd9c6ef","3fdb0e1565cba726","3fe85473f1ae04e2"],"gaussian12":["3ff4b309cfa478fc","3fe7150096a890f8","3fa81f66e5f26080","3ff3048a5100541c","3ff252df820f4218","bfd3f7a74c101a10","bfd12979bdd66a50","bfca73ff7b48f6c0"]}}
+{"fn":"rng","in":{"seed":"-221125573348282268","n":8},"out":{"uniform":["3fec1e759c652b7f","3fe3e75737c99af7","3fee821be20cb2a1","3feb11201851b2a0","3fe9fc7f41a1ca75","3fe817f58be502b5","3fd8fc83610fdf9c","3fee68dfc32e7d89"],"gaussian12":["3ff81e243039cf70","bfd5ebc35738d190","3fffe41002844bc0","3ff604409a1653e8","bffc8c110a088264","3ff00caad92bf2ac","3fc2b01315ce37e0","3ff8d76cbc1d2ed0"]}}
+{"fn":"rng","in":{"seed":"5777430172480638213","n":8},"out":{"uniform":["3fedd636d48d212f","3fd40cf192e981c8","3feaeda3c1369ad9","3fcad17ff8c9146c","3fcb4db95e9b8c54","3fe976a19b886fbc","3fdb843829975342","3fe983f0eb70c372"],"gaussian12":["3fd2e7b2c1a92780","3fe0e710de601058","bfce5f2c5f4a1de0","bfe64329171165d0","bfcafa1d2f497a40","3ff6505fee1170e8","bfff6d62d0694104","bffcfee93247ef04"]}}
+{"fn":"rng","in":{"seed":"-6100443768897499229","n":8},"out":{"uniform":["3fd0646ea191ba48","3fe375c8573e48c4","3fed58a3714f4094","3fe9f1edcc742c78","3fd8d70c2ae1b406","3fd1f2ef2ab9d532","3fea6daa6f98fe16","3fedc9884d7ce824"],"gaussian12":["bfc6e153b2a5b8e0","bff6ebbfb8aaed74","bfdb1adae0f38680","bfd4a382df831f20","3fe6e1861c8903f8","bfc70d2506d6a840","3ff7c83b123acf54","bfe480ec21fa9050"]}}
+{"fn":"rng","in":{"seed":"-1626071623988817037","n":8},"out":{"uniform":["3fd74f9ed096dfb6","3fa45db463cb1000","3fcb21891d8c2004","3fda1d1096cf0d28","3fd580955bd8b8d0","3fd86b8edfabf932","3fe2616a5dc93f79","3fe5eabeed06ebbb"],"gaussian12":["bff0ab67793207cc","bfe86a8b96c957c8","3ff8fec49fb79bb4","bfeb4e93b3046660","bfdb1d1686fb0410","3fe130c1717c6af0","bfd508114b9d5c90","bfffdec183473a7c"]}}
+{"fn":"rng","in":{"seed":"-177886134269362090","n":8},"out":{"uniform":["3fb306deccc34928","3fd8db30cf96e3a0","3fdb6a8ac41b83f6","3fc5ffd00fcc221c","3fe339be5290276d","3fc1a8c5de13636c","3fe5e2d3bd59ec04","3fdb7feb8d6676c8"],"gaussian12":["bff6355194b68120","3ff5ccd512ad3030","bfd29eb479c79a30","3fd59d81504ea920","bfe4a3a9ef393910","4000c855ee66307c","3fad9a8583f2e080","bfdbd3333af7b6a0"]}}
+{"fn":"rng","in":{"seed":"4147183461891911414","n":8},"out":{"uniform":["3fdeef36301cdf7a","3fba51e8d7371a60","3fdacb0c13e91cc8","3fe78dc60cd112de","3fb5eb0c29073b10","3fc1aa10b7d35c44","3fef6a1d3d65befd","3fe6cfee9c24db50"],"gaussian12":["bfd84031b2ba9220","bfb8e3efb8201400","bfd70a6f73fd2b60","bfc26c3c697252c0","bff2d8fc57a478bc","bfd136fd83dc2b10","3fedbe250187de18","3ff347720b8feec8"]}}
+{"fn":"rng","in":{"seed":"-8230707763055586171","n":8},"out":{"uniform":["3fe3f1044f102d94","3fa3fc4bfc5334f0","3fedf3244c27359d","3fec5664bc477c22","3fd2a308f1c1d9a4","3fe28451b7cf5708","3fed2c05a2680190","3fe7d2bfb1e7a5a8"],"gaussian12":["3fd5498dadb05880","bfe7088b34890038","bfec792e97a11c30","3fe4749240b0de58","bfdd03f5e20177e0","3fd12acd057635a0","3ff54457e2f28eac","3fe390ee59cb9d60"]}}
+{"fn":"rng","in":{"seed":"-1837147370648783511","n":8},"out":{"uniform":["3fdfd2419782eeaa","3fca0cb8045ffa2c","3fd86bea343b3f0e","3fc42018827e480c","3feb2502cd9d825c","3feb695cc3d35e3b","3fd23c93ba8ddaea","3fd6a97538de672a"],"gaussian12":["bfe8e2a9456fc748","400441f06fbe52a4","3fb0d8c88a7df900","bff141fed85477a8","bfe8b13dcd4f8b20","bfdc22f264db7c00","3ffe5e76f05098fc","bfefdac1d491dfd0"]}}
+{"fn":"rng","in":{"seed":"994461622351680773","n":8},"out":{"uniform":["3fe2e2691a8c7170","3fe778b65ba0fa7f","3fc7dbc45d72e750","3fb2e820fe3e9018","3fb7972f974b2a30","3fdfa939a12baf8a","3feb6e7deb1a113a","3fe894fa94261abd"],"gaussian12":["3fdb14a208610db0","3fe4c83d43835bd8","3f8cd0dbca9e3200","4000e406a30547d8","3ffb96f795463d6c","bfcddc522d44eea0","3fe9bc7b1dca42b8","3ffe1a9a711f4820"]}}
+{"fn":"rng","in":{"seed":"6242923737652866763","n":8},"out":{"uniform":["3fed111743c7d57f","3fe206619d9eecb3","3fef088e79266e18","3fe30f8c8e9c3413","3fccea8cbf073214","3fe11a485d82b00a","3fcbf49980d35e9c","3feae1676073445a"],"gaussian12":["3fe5ebbb9bd464f8","3fe4dfd8045967a0","bfe4c9704b9e2a78","bff09a38b1c5259c","bfcecee510616860","3ffa37be5a9b94e0","bfcf8fd4c32922a0","bfd8ed67df8c1710"]}}
+{"fn":"rng","in":{"seed":"8081885431614562763","n":8},"out":{"uniform":["3feaff31333dc40a","3fede2296c4aeabe","3faa6828e3ddd720","3fd7f959a1abf22c","3fea4779b941261a","3fc150fd81c948fc","3fdc499d55b00e76","3faf2f2bb1b6e2f0"],"gaussian12":["bfd3e28f1ecd2480","bfeb3082e68028d0","bfe77b6169e24b18","3ff88ebdc7850f80","3fdb72b27c94ffc0","3fe6f8be9e4615d8","3fcdafb1dfcfeec0","400421156cb06f80"]}}
+{"fn":"rng","in":{"seed":"1126648794418104554","n":8},"out":{"uniform":["3fc2b15665ba02dc","3fb33ff01f9f22d8","3fd9991ffdc3c354","3fe65fbfcdd3c542","3fe451593ff3be3b","3fc94a4f78194b20","3fe866f3df32a941","3fdf521f6260ceda"],"gaussian12":["3fe4c5a2d0f7a470","3fe20359fc1eab80","bff1798facc04530","bfd2dc790af7b950","3ffcfe845a8f6814","bfb54256aab6ac00","bfd38bd138906810","bfe6af38448bf230"]}}
+{"fn":"rng","in":{"seed":"4404810240207726024","n":8},"out":{"uniform":["3fecddd38510c78a","3fb08d1809042cc0","3fe7cfcd32a78e4b","3f9bc5c527caad40","3fd0383566aab922","3fe66f76d14c7d8d","3fe62cf885476eb0","3fecab28d8bc6c00"],"gaussian12":["3fd94e4a9e249050","bfc16e63bd98f140","bfeff31a7947c828","3fe88973aff6e8f8","bff443760e5ef4c8","bfe4b48d29f74ee0","bfe732f1d0429ec0","40003ed2839af2c8"]}}
+{"fn":"rng","in":{"seed":"-1362930722300464467","n":8},"out":{"uniform":["3febcde83a6fcddb","3fcc205d245e52cc","3fedb2ec6a91fd9b","3fedcfeea8c5215a","3fddda100118ccd4","3faa14abdf32e090","3fdeb59e2e7186e8","3fc45db5c6382144"],"gaussian12":["3fe23bc3cbce9fe0","bfb9eff78f09da00","bff034cbfe6e7fa8","3fc553418d676880","bffdc2d8c0d750d0","bff240d867881900","3ff09c7acac931d8","3fadd75bf0a1ec00"]}}
+{"fn":"rng","in":{"seed":"6134822225064483577","n":8},"out":{"uniform":["3fcf3c35e50dfd78","3feb0a6c9e9b4ad3","3fdffa86404a1892","3fed498216d4ae81","3fdcecb5320c572c","3fdb0531d755046c","3fe74e9d72e4ba71","3fb766523846dab8"],"gaussian12":["3fd5c527948b4a70","bff00a8af564b010","4005e285565f5bd8","3fd9703afba09230","bffa2ea11ade4114","3fd64d7bbd6f3770","3fe32ee396fd8550","3ff07a16bc9ab1bc"]}}
+{"fn":"rng","in":{"seed":"-1872159614095589711","n":8},"out":{"uniform":["3fddaa2b97f350a0","3fd7633ba6a0633a","3fd69959196d79fe","3fea4d088c6f08e6","3fe1219be7971c77","3fe99e3154ac5d81","3fde26023a9cb43c","3fd4a1c18da4f5f8"],"gaussian12":["3fd64d25c6ba6b10","3ff2125c65995cb4","3fcbed22e2f183c0","bfd4fdf1c46e8e00","3febea34cbd15530","bfe63bb810062a88","3fec2c89fd3c3098","3fd7a1fa47cce9a0"]}}
+{"fn":"rng","in":{"seed":"-8654183003874170092","n":8},"out":{"uniform":["3fef936106065645","3fcdc795efb756a4","3fe81dd4a4c99661","3fddd44366915cec","3fee28b1ffb43936","3fe1d7edbe7070a1","3fe7de72ca3fe42e","3fe0c00af019b4f0"],"gaussian12":["3ff4de35fe68396c","3fda5a47ffb536e0","bfd19577a33c59e0","bfe4fec6a4969c48","3fd1382a69520100","3fe6809f6c93ea80","3fe7e522a8e043e0","3fde7335c3b32c30"]}}
+{"fn":"rng","in":{"seed":"3911344322641082175","n":8},"out":{"uniform":["3fd22bc4e05aeb90","3fcf89ee61bc67b8","3fb29c232ef48458","3fba3f2d50d64ec8","3fcdb6d1bd464ea0","3fea6ac630b5fc70","3fcec8544a3aa7c0","3fdaf68cb2c87ee2"],"gaussian12":["bfeacc29b75d5858","3fe20db6c651d320","bfa7906136c16700","bfe7db7cd4ad36e0","bfc4519fd8144760","bff73c0f8049bb0c","bffc06c77d559a0c","3fb2197578d76600"]}}
+{"fn":"rng","in":{"seed":"-2034988111065559333","n":8},"out":{"uniform":["3fd4321a041c9b88","3fdd3e7778110f02","3fb82d5c084b1e20","3fd326a9824bf6a0","3fea31263d6ba54a","3fe6ca90b05ffa88","3fe8fa70b954ef28","3fe1b64ca6935ea6"],"gaussian12":["3fd2b10e67574780","3ff553c04c2f3a70","3fbf2fc08346f6c0","bfb28ce143fe27c0","3fd623f02f8b7740","c0016e9611fd7bca","3ff614aa62896490","3feccbb1015e3e58"]}}
+{"fn":"rng","in":{"seed":"-3922084279509782511","n":8},"out":{"uniform":["3febba83e18af933","3fd9c0245bf49496","3fe2081435c4ec70","3fbc210ed31a9c60","3f82eb7909919f00","3fe3c4acbb6dcb32","3fe500874d6401c7","3fe8a3a6a2ad28ce"],"gaussian12":["bff099356778c5d8","3ffe3b18a61af340","3fe91ae5483c66a0","bfe13d6ed4313530","3fecf2bd945a8f80","3fddb0ed0f350330","3ffe3570edf150c8","3fb2c2c8661ba780"]}}
+{"fn":"rng","in":{"seed":"-1310739352818935906","n":8},"out":{"uniform":["3fd01ff58881f8c6","3fc82e1b62d016bc","3fe583e87f3bf865","3fc53a1f1290f800","3f88b622b13c8140","3fd6c54a92f74c34","3fe93bb41d757c31","3fa74a3a4ed91040"],"gaussian12":["bff5769fbe3c11b4","bfe80e41f8dd9f70","3f7c7359d3b6f800","3feb214af38a2088","bff0294f82837ce0","bfeab4a3deb744e0","3ff73074b72168e0","3fce6d61b2cee600"]}}
+{"fn":"rng","in":{"seed":"-7919604886365163241","n":8},"out":{"uniform":["3fe6bd4845b92da0","3fd1900153519bb2","3fb529f1b93e8ee8","3fd65de822ae4046","3fe8ffda4c89214a","3fee8f837a9e29ae","3fc6771a1fcd3440","3fe7697d27707ce5"],"gaussian12":["3fe084524f403448","3fff27eb691dfa20","3fd5f2dd6ab74780","3fba2ab28122ed40","3ff7e43e51615850","3ff6cebf5e0180b4","bfdae3f16060fd30","bfe0765ad978bca8"]}}
+{"fn":"rng","in":{"seed":"-1962737278165805433","n":8},"out":{"uniform":["3fef559fc6bcebfd","3fe293befde286cc","3fec8a96d51f0fad","3fc5f817dd6be428","3fe640c80d8aa27a","3fd0867a154889e0","3fc592dac214cf20","3fad611f3b3f1370"],"gaussian12":["bfd8f23100b011e0","bfb8368cbedfd780","3fe97612f85f3328","4002b59d97541e40","3ff184fcb4d73558","bfeadf2898d4bc18","bfe5f7b6a6823128","bff6c414f22bf33c"]}}
+{"fn":"rng","in":{"seed":"444162440154454202","n":8},"out":{"uniform":["3f9a421e2e0ac9a0","3f9a7b4d23cc9040","3fd4d438065a3c9c","3fea284e66f624a7","3fee4ca2af8bb2e5","3fecdc5ce88fe894","3fdb3c6062d80da6","3feedf50cda3d6dc"],"gaussian12":["3fe0f6d508e88648","bfe9f597a2162b48","3ffdefc7446fc4b4","3ffccf7200f7d8d8","bfdaa7549512d0b0","bfe8eeb5f7549290","3fe13be50df56550","bfe5900e678ad578"]}}
+{"fn":"rng","in":{"seed":"5397301033229133899","n":8},"out":{"uniform":["3fa2014e072885d0","3fcaae7b2e307df4","3fcb42faf09ff2fc","3fde542f392839f8","3fd865f0c522be5a","3fef38e65e4e5129","3fe184296e5d5a6e","3fe68f9ce13f5789"],"gaussian12":["bfd48c34619a0420","bfd4348e0dd510c0","40034be6935d1b2c","3ff3d41daa79e8e8","bfdfad1465ad11b0","bfe2cdadd802f4f0","3ff9b2814ec6db38","3ffc726dfc77eb30"]}}
+{"fn":"rng","in":{"seed":"-2361183658818725137","n":8},"out":{"uniform":["3fd2d08e2513a75c","3fc2dd4664f08d9c","3fe5306ff45b3d48","3fcb347c57b06824","3fb6ebfd91c007e8","3fe90ec46fd670a2","3fee793a1cac1eb3","3fd0fd72b31e8ad0"],"gaussian12":["3fdf7ec13af73e80","bffce66219daa1f0","bfe148ab3df0a300","bff6b0f9dfce18b8","bfece835e3f8a7a8","3fcee75975c23b20","3ff2d3ebf522d598","3fdf5b482a25bb60"]}}
+{"fn":"rng","in":{"seed":"8579117835215684179","n":8},"out":{"uniform":["3fdbebc47634cc36","3fe11f2f9ad70f2e","3fe92abc94ae792f","3fe0e7f62fb51456","3fe2396c3638363d","3fd01afce4b5c7d2","3fda9fbfd42a3510","3fed951255bd6de4"],"gaussian12":["bfbc7e967f06aa40","3fef9babafe76cc8","bfe74b93b186a780","bff2d218a6d09a14","bfe167d90ba30c60","bff40991ff6345ac","bfc184cc93076da0","bfd53560159b6c80"]}}
+{"fn":"rng","in":{"seed":"-5756400309051571560","n":8},"out":{"uniform":["3fc27b66e831dae0","3fd0e269d4d7c8f6","3fde6074359ce49e","3fd008a379dd6128","3fe29aa74608ccc9","3fd19c43a8c77524","3fe4341c68d045a9","3fd16c910b1b1aee"],"gaussian12":["bfd60301462d5040","3fd20ec9e224bda0","3fde7a36781a8160","3fe720cfcd572270","3fe9113f21504050","bfe7e5e41f4e0d38","bfe0ce3fa434d720","bff06563d6279908"]}}
+{"fn":"rng","in":{"seed":"5165758210887587800","n":8},"out":{"uniform":["3fe2a07ea65ecff4","3fe47b9c5f291c6e","3fe0339ca8f19848","3fed2dbf974a0f2d","3fed29641ddc82c1","3fe4b7d6dcf66aee","3fd0a1c5bb877240","3fd425a9ca8c8d0a"],"gaussian12":["3fcfa36b3305ca80","3fd9ba5ff96bab40","c0032ebbb75b4310","3ff0e28c970af848","bfcfa0903ccb0940","3ffbc91976f059a0","bff2a69feb8653d8","3fd1d3b557e7ebc0"]}}
+{"fn":"rng","in":{"seed":"-4841875820141881035","n":8},"out":{"uniform":["3fe66400c5145263","3fd336e7b4881890","3fe5752ea06687ec","3fce41bcedabefe4","3fe5cb5724f8b118","3fc87c95579792b0","3fd4472c79b34550","3fdd8d98ab75af0a"],"gaussian12":["bfec31f50d30c900","bffe5fd452c85084","3fe7e93d834ad078","bff5aecfd9f35bc8","bfceebcf591ceec0","c000b1a42c1819a3","bff6a1cda1795f48","3fb176c2df551c00"]}}
+{"fn":"rng","in":{"seed":"1709737070891299692","n":8},"out":{"uniform":["3fe96b81f062b713","3fda7283420454fa","3fe6da2efc69cb14","3fc54203e7a580ec","3f9e84bdf847b8a0","3fe22732ae58a73c","3fd86a0cc0f1299c","3fd5468bc37e88cc"],"gaussian12":["bff5c2a281dec964","3fe45d533b512e18","3fec2ef4543265e0","3fd4fde596fdbe90","3fde3f1b33450950","bfccd24127ee6ba0","3ff750edc1e79a40","3ffbcd27450e73e8"]}}
+{"fn":"rng","in":{"seed":"2515663940967482900","n":8},"out":{"uniform":["3fe2e0c4f269245c","3fea8ccb7820570d","3fe15d932bc78da9","3fcbb565c435fca4","3fe3423efc6b1277","3fdb7bf6908e9410","3fd72fe7950f17c4","3fe70a9c69de1e81"],"gaussian12":["bfc3e9af8715b5c0","3f9472f0ec44dd00","3ffb18ea3b303498","bfefe54ad626f8b0","3ff7f6899a3032c4","3fc3b103b9051840","bff0483e61a29730","bff6aec5bbe0e578"]}}
+{"fn":"rng","in":{"seed":"-8354731853782163753","n":8},"out":{"uniform":["3fe17bdb650a9cd8","3fc929a97a03f298","3fc2c3cf1fd8b654","3fe8c372b62af460","3febf4ee6bb77c59","3fe2fe223eb797ac","3fec9d6c1c2f9cf4","3fde52e428cb997a"],"gaussian12":["3fbd0a3119464900","3fe668313b93c870","bfb7538388eab180","3fed65b116d7c598","3fd867879f1b7ed0","bfd85e1eaebc79b0","bfd08f30c1fc3cb0","c002358e8f419b69"]}}
+{"fn":"rng","in":{"seed":"-7340699443981536058","n":8},"out":{"uniform":["3fd987bdcd38e306","3fe39a131ebb9b4a","3fedcf2430de7d08","3feec3b1b473e388","3fe3f5ba79645862","3fe80320c9407b89","3fc4c9ecf3b92d80","3fce61a08abdc16c"],"gaussian12":["3ff56692af6d5d98","bfeffcd100fa6700","3ff164923c47c908","bff5dc6ed0c719b0","3fd58249837f7240","bfec1cfb646ab1a8","bfea61735ec5b460","3ff1577caa6ee54c"]}}
+{"fn":"rng","in":{"seed":"5247449240834679122","n":8},"out":{"uniform":["3fd4a4da0d3d9e2c","3fd8442e90b589de","3fe47564732428ad","3fed7b1367107623","3fd2e3d57284f1ee","3fd388bdd4ab3e7c","3fd66eef6da5e2f4","3fdfe1302d4d1cc4"],"gaussian12":["bfc59ca59844e3e0","3fe7289e825939b0","3fd67a7fae367d30","bff801f6c540716c","bf8ca5d97062b400","3ffdaf3bb95be128","3fe0dd4d055816f8","bfe60634ea59f138"]}}
+{"fn":"rng","in":{"seed":"-5856474215452942404","n":8},"out":{"uniform":["3fd4d996126296c8","3fe5dac8ed31f35f","3fcdcd0e50182c30","3fd80c5c8b0f9f0e","3fe3ee67561ae3c0","3fa1096015ce0f50","3fe0119501f47506","3fe9bc5a306c8f1a"],"gaussian12":["bfca411cc9bd1040","bfdea74d3f9dc140","3fc20e37034b9f40","bfe35f9256171670","bfda8f1b00780980","bfb1a0e2a412ce40","bfd2592c3962d840","3fe5fc9c50ba1ad0"]}}
+{"fn":"rng","in":{"seed":"1431801494896728801","n":8},"out":{"uniform":["3fcba66ad5f60244","3fe5f685da8411fb","3fe93283e9d1dada","3fe1769566129fe7","3fc036f87fbf006c","3fb527800d34cc28","3fd058dffee7adb6","3fdb661df6f38c20"],"gaussian12":["3fd5847c30635ed0","3fbe4750613effc0","bfacfa2e03f83c80","3fe799bb2d7cfe60","bff2a6722fe42a28","3ff7c05bb344a288","3fe122b09d994ab8","3fb20fa3a0d7e2c0"]}}
+{"fn":"rng","in":{"seed":"7987487949674077875","n":8},"out":{"uniform":["3fd2eafcfc24ff2a","3febc5b51c075700","3fbfec217597ac60","3fe2f3bb5a08d48b","3fd8477ab89e8242","3fb90d1d82cf8a58","3fd27b3fda55ed70","3fd806594edc89ea"],"gaussian12":["bfdea114dd00de60","bfe8c59656347d30","bfce6cc1c698d9e0","bff6d28b6e60bc00","bfda731c0d922210","bff94cfd5eafcae8","3fe8ce4d31860d40","3fd0595d73f1cf80"]}}
+{"fn":"rng","in":{"seed":"-1801918040630084280","n":8},"out":{"uniform":["3fd3f4c61c677b5a","3fbe84c75f67bb60","3fe61e9dee6c344a","3fcd9f2e39995f70","3fccde167fa54ef0","3feed15d0cc83b2f","3febec5403596206","3fd46a2e5c969b3e"],"gaussian12":["bff5d0f0daa4ee04","3febe211172086d0","3fd8764c3bb06f50","bfee25bba618d9c0","bfdfad41663b8b90","3fb48ead3394ad40","3ff37c5497edcf34","bf8544de71b18000"]}}
+{"fn":"rng","in":{"seed":"8672035498468769810","n":8},"out":{"uniform":["3fd5afbd1a41e634","3feb0500e8d8fc2d","3fefa51ea03ab86e","3fd2a4485e8158ce","3fe16f9e31d2f541","3feb5780c02f12c8","3fba0724a86ab630","3fe83cef6c8b8e03"],"gaussian12":["bfc4f40b77480d40","bfe4ebe55cc10f08","3fd870a0bcc09d30","3fd2f6191cf58880","3fe7f92253b7fef0","3fea7810532a8d88","3fc00420dab99900","bfea265bcb2aa208"]}}
+{"fn":"rng","in":{"seed":"5095086370257961623","n":8},"out":{"uniform":["3fa440610ce51fa0","3fda449f89bd8f1a","3fe00307d39822fc","3fe8c288f704adf3","3fb0d4207fb454b8","3fd5bd520115ac12","3fea1ae8e92ffd8a","3fd07c9c67bbc816"],"gaussian12":["bfcf143d958c6f80","bfd6482589ca1600","3ff7d18968ea12c0","bfcf4e3e0ee61800","bfe5439250f23360","bfe78e5976cd4660","bffadacbab02bfec","3ff2a7de56da7e04"]}}
+{"fn":"rng","in":{"seed":"-3872227022423272516","n":8},"out":{"uniform":["3fb8b0f8ed2b84f0","3fed7989c0803da7","3fedb6b899252022","3fc96b578e7ea098","3fe119153d9740c5","3febfeed5f466b91","3fd514f99ac6817e","3fe7a4f52a07ddc7"],"gaussian12":["3ff0577b7e335424","3ff6140162bbd1e8","3feaea564b815260","4003b969e76e010c","bfecffb3c6921640","3fe4086edc30d8d8","3fd55958753d3450","3fedf1cd16868048"]}}
+{"fn":"rng","in":{"seed":"-1374765647929560180","n":8},"out":{"uniform":["3fe9569c2a9b3939","3fa99a35913f9cf0","3fbcb5985c63ff08","3fd63dfcc3938940","3fb66839c7d1ac30","3fe3c89b43e763b2","3feae22660b12c10","3fc8e58ba5b027a0"],"gaussian12":["bff90e73eaf29abc","3ff987aea42f3bd0","c003353e08ee9127","3fe7045aa2244478","bfe7fd9fd8ddd970","3fe1e739d2205a50","3ff02c4d80777058","bfd55cf679de8260"]}}
+{"fn":"rng","in":{"seed":"5849608707160346850","n":8},"out":{"uniform":["3fbaeee959c79bd0","3faa9904d6b8aad0","3fde1f91e5e8813a","3fe09ad89f845647","3fecc39522fe4eb3","3fdbf2579d025738","3fe54fecb5e49ed2","3fd20a1d0fc149a8"],"gaussian12":["bfe7a6038acbe0e0","bff3961f56a531e8","bff1c63a3d248e50","3fe51bdb603dd988","3ff4163642b8bd80","bfea6adcc8b55cd0","bfff684b3310e0f8","bfd640380f62d850"]}}
+{"fn":"rng","in":{"seed":"4713351154231298763","n":8},"out":{"uniform":["3fe2e417f1f96b19","3fe98137d53b95ae","3fdbd5a9a274ad8c","3fe3c5870400d366","3fcf5d98601a1640","3fe6ef77abcda283","3fe9baf635785aa7","3fc19b49c0842c14"],"gaussian12":["3ff8475274f175dc","bff6810219919104","4000e3aa65c0f054","bfe96da3a00d2b18","bff3dfaf96d000dc","40016b0baf373884","400125542b7c7d2c","bfc70f6071317540"]}}
+{"fn":"rng","in":{"seed":"-693115583097792378","n":8},"out":{"uniform":["3fe449f612502629","3fe00a6a17a06dab","3fe0a891ebb7e4f4","3fc85a6d59c4998c","3fcba71aacb97b28","3fe081671dee1175","3fcae736c69f8f3c","3fd5302ca58ca220"],"gaussian12":["bff4251813c8f26c","3ff644e6d12f5e4c","3fc52c1137278840","3fe0f8cac38f6050","3ff26c7ebaa7a880","bfe19938ec22d5c0","3fa68e9e56057c80","3fe92906e097cae0"]}}
+{"fn":"rng","in":{"seed":"-1554683665259516904","n":8},"out":{"uniform":["3fd43209e63dc3e8","3fd45190b673e93e","3feb8c57fef29fe0","3fe0746d5e092982","3fcd42ba217a54c4","3fcea622b84a7074","3fd2222de24e3112","3feca8cfe496f64c"],"gaussian12":["3fbefed24d3b0780","3ff6e4c9609f8c28","3ffd16f0d2f2cf20","bff9aaed4449778c","3ff1554493da62fc","3faebf430c909800","3ff1fef73c2cae68","3fe2eb5b44f2f4d8"]}}
+{"fn":"rng","in":{"seed":"-7405067574739823692","n":8},"out":{"uniform":["3fe6b86749c04730","3fefcb4a41297daf","3fda84f3f78997e0","3fe29bf2621684f7","3fc5497b815a91f0","3fe1c0b3e8ca9aca","3fef66d10a896f14","3fe86d94bfb92a50"],"gaussian12":["3ffc9a0eebcc0e10","bff7d20def01fd18","3feab16d81d31db8","bffb6808f28078e8","c0004b1676f56cdc","3fd08d0b8be8d850","bff1a6fd8df81cdc","3fe7f2f49e78b4d8"]}}
+{"fn":"rng","in":{"seed":"-6844302944410095562","n":8},"out":{"uniform":["3fe45bdb159b2564","3fe049044ce9c3ec","3fcb992540d870c8","3feddcad57d10b69","3fdc3bacf58ab92a","3fdaeb15653e1c46","3fd0cd2e9a27ef50","3fd4613b9fe608ee"],"gaussian12":["bfea55ad883ce8b0","3fe9d43df3c71598","bfccafd6f67cc660","3ff48e492e21b814","bfd0fa3b30ac7800","3fe992658bb9f5d0","3f5cff37354de000","3fe0e27abc80d510"]}}
+{"fn":"rng","in":{"seed":"5152863547315334168","n":8},"out":{"uniform":["3fef7466a43e489b","3fe2f3646b7a1236","3fd041226f6ee3c4","3fe6c856d419f43b","3febfa5b70a0224b","3faf6ebbdb44b710","3fe45fc656096cd6","3fc92cf22453e538"],"gaussian12":["3fd5228284dfd6c0","bfe837f3ab415f58","3fdef404ef31cef0","3fec57598dc27088","c005b83e94594f4e","bfeab3a554fd98e8","3faf2998d5843c00","3fe54cab0c1b73e0"]}}
+{"fn":"rng","in":{"seed":"-7271477113487990332","n":8},"out":{"uniform":["3fe921f345ce2412","3fe66faa9a2b8fd0","3fe98db9716823f2","3fee5adce47ae5a6","3fdda8f7a5be3006","3feed6f997b560ca","3fe7b5fcd61e5951","3fe66bf7317fc6d5"],"gaussian12":["400236228dda5598","3ff51cc7f2e363a0","bfe3ff26908ab0a8","bfe37ece216a8718","bfbfcfae4ef8cf00","3fe325da41c325d0","3ff2224a81d1c484","3ffebae8a7611ed8"]}}
+{"fn":"rng","in":{"seed":"-7137139640048502671","n":8},"out":{"uniform":["3fd91b55fadd1a84","3fb4ca7a6f102880","3fe7200734656091","3feef51baee78240","3fd3e3e08a20c3f2","3fe7d54af9a7b42d","3fe06a4234be2e73","3fe34cf116481bcc"],"gaussian12":["3fdcd96ced55a4f0","3fae70d6d11bc480","4001a1db983343ec","bfef7ef8d3518208","bfc64dee2d1c0ec0","3fd9647367381da0","bfe00ce773edeea0","3ff302b445170200"]}}
+{"fn":"rng","in":{"seed":"-2121624746977829421","n":8},"out":{"uniform":["3fe52c2ed551e1a8","3fdbcd6f66122768","3fb5b9db94d00278","3fb753ea35b8e358","3fc76908b10ea328","3fc7d5b5577f34a8","3f9d4896872bb8a0","3fdb23890a89f3c0"],"gaussian12":["bfec8dd343b7fdb8","bfc8585219c2c1e0","3f89841cecabd800","3fe7e4f3d575f9d0","3fdb3f8cfbdcc770","3ff0672fec584ec8","3ffb2128c69b5188","bffb1683d39028b0"]}}
+{"fn":"rng","in":{"seed":"5225843832363501581","n":8},"out":{"uniform":["3fd410ba71563d70","3fd59b6a4f82d260","3fe05d74b72a6562","3fd7c4da1af9693c","3fe056a3d2c61888","3fd7de1f0b9ccd6e","3fd306f7e8c15bf8","3fdee32a6b39848e"],"gaussian12":["bfeed50ed65d8ba8","3fe2bf23aa503dc0","3fe0b9de28723728","bfe91c94d094a1b0","bfd956db96940b90","bfdcd7e1b5fb5dc0","4002e001957da268","bfd55d53484e4570"]}}
+{"fn":"rng","in":{"seed":"558806624086739560","n":8},"out":{"uniform":["3fd1a96fc9cbc5a8","3fe1875390ee9b0a","3fe7821d5ff696be","3fea583d44122e8d","3fe2dfcb76aecd90","3fd3dcd8a7ce90ec","3fa18f85a5e8e010","3feed3dcb7225cf7"],"gaussian12":["bfd53b01c3d203e0","3ffca7513d7a3d2c","bfd3c1f15ccb6930","3fed2868a11352a0","3ff9b4d792fd7290","3fea15c97a4c7630","3fe6e9e581059f38","3ff95272fe5fcb40"]}}
+{"fn":"unsigned","in":{"h":"7088824774354458744"},"out":{"mod6":0,"mod10":4,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"-8659126593757306899"},"out":{"mod6":1,"mod10":7,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"250987527711003398"},"out":{"mod6":2,"mod10":8,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"-331724680400218567"},"out":{"mod6":3,"mod10":9,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"-2426788663299980444"},"out":{"mod6":2,"mod10":2,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"1112487087650564544"},"out":{"mod6":0,"mod10":4,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"-415707985697731711"},"out":{"mod6":3,"mod10":5,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"6124424462207907613"},"out":{"mod6":1,"mod10":3,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"-6265381465194594694"},"out":{"mod6":0,"mod10":2,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"-2938626788899915888"},"out":{"mod6":0,"mod10":8,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"5504336533915807132"},"out":{"mod6":4,"mod10":2,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"-1910167242524245333"},"out":{"mod6":3,"mod10":3,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"5729746699863398010"},"out":{"mod6":0,"mod10":0,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"-2401928836345595411"},"out":{"mod6":5,"mod10":5,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"4121425035024770076"},"out":{"mod6":0,"mod10":6,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"-6334318549342151603"},"out":{"mod6":5,"mod10":3,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"3481425050810501880"},"out":{"mod6":0,"mod10":0,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"7498250230151531911"},"out":{"mod6":1,"mod10":1,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"-8976217894116441990"},"out":{"mod6":4,"mod10":6,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"8222913585156676960"},"out":{"mod6":4,"mod10":0,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"1563044588331499171"},"out":{"mod6":1,"mod10":1,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"4772364667681117698"},"out":{"mod6":0,"mod10":8,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"-6355849672814763629"},"out":{"mod6":5,"mod10":7,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"717336311129366087"},"out":{"mod6":5,"mod10":7,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"-927009982755224026"},"out":{"mod6":0,"mod10":0,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"7606173437541863393"},"out":{"mod6":5,"mod10":3,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"-8545810887428302062"},"out":{"mod6":4,"mod10":4,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"-2915101119219409273"},"out":{"mod6":3,"mod10":3,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"-3069319635699634845"},"out":{"mod6":1,"mod10":1,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"5776155137601388536"},"out":{"mod6":0,"mod10":6,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"7213457645239360525"},"out":{"mod6":1,"mod10":5,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"-6692846474318536569"},"out":{"mod6":1,"mod10":7,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"836781208341186250"},"out":{"mod6":4,"mod10":0,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"-8713363373220490410"},"out":{"mod6":4,"mod10":6,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"6088903541449420325"},"out":{"mod6":5,"mod10":5,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"6833935280280840274"},"out":{"mod6":4,"mod10":4,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"8908176291319380355"},"out":{"mod6":1,"mod10":5,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"-3688842172936279042"},"out":{"mod6":0,"mod10":4,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"-6992368028046544694"},"out":{"mod6":2,"mod10":2,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"-8706041040307645606"},"out":{"mod6":0,"mod10":0,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"1867984942817290114"},"out":{"mod6":4,"mod10":4,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"8814277115206991438"},"out":{"mod6":2,"mod10":8,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"1501303411354024555"},"out":{"mod6":1,"mod10":5,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"-5237013067098939265"},"out":{"mod6":3,"mod10":1,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"-1431987130409121599"},"out":{"mod6":5,"mod10":7,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"7070981714358719003"},"out":{"mod6":5,"mod10":3,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"7625990795268132661"},"out":{"mod6":1,"mod10":1,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"7614443229245575519"},"out":{"mod6":1,"mod10":9,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"8480025107429965353"},"out":{"mod6":3,"mod10":3,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"-7701496692307374013"},"out":{"mod6":3,"mod10":3,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"8246341773205208146"},"out":{"mod6":4,"mod10":6,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"-6098593532756644853"},"out":{"mod6":5,"mod10":3,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"7821714855789669575"},"out":{"mod6":5,"mod10":5,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"4116223273886129526"},"out":{"mod6":0,"mod10":6,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"6103327116301381208"},"out":{"mod6":2,"mod10":8,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"1582030395027224177"},"out":{"mod6":5,"mod10":7,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"-4162854969153792514"},"out":{"mod6":0,"mod10":2,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"2760223894536060847"},"out":{"mod6":1,"mod10":7,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"8787798355653272839"},"out":{"mod6":1,"mod10":9,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"8345739866126187968"},"out":{"mod6":2,"mod10":8,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"-8313530640624109549"},"out":{"mod6":3,"mod10":7,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"-3996897510808311492"},"out":{"mod6":4,"mod10":4,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"-3109797964007132"},"out":{"mod6":2,"mod10":4,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"241508077634218451"},"out":{"mod6":5,"mod10":1,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"-2893708267371608158"},"out":{"mod6":0,"mod10":8,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"-8682725114778840942"},"out":{"mod6":4,"mod10":4,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"-6184696309274550095"},"out":{"mod6":5,"mod10":1,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"-1195597580664228964"},"out":{"mod6":0,"mod10":2,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"-5224275894130336985"},"out":{"mod6":5,"mod10":1,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"3260991854319476194"},"out":{"mod6":4,"mod10":4,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"3909589768072870872"},"out":{"mod6":0,"mod10":2,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"-7618048886896511310"},"out":{"mod6":4,"mod10":6,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"6963501189149592056"},"out":{"mod6":2,"mod10":6,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"1972699535450694268"},"out":{"mod6":4,"mod10":8,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"-2150737359138553717"},"out":{"mod6":3,"mod10":9,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"-4515122273592299842"},"out":{"mod6":0,"mod10":4,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"4136630259013186129"},"out":{"mod6":1,"mod10":9,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"5151284232814406729"},"out":{"mod6":5,"mod10":9,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"-7640719702122620808"},"out":{"mod6":4,"mod10":8,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"1362715150334899347"},"out":{"mod6":3,"mod10":7,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"8450009016937884291"},"out":{"mod6":3,"mod10":1,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"5450762862174369115"},"out":{"mod6":1,"mod10":5,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"-6018651405308112467"},"out":{"mod6":5,"mod10":9,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"-3075877641838009660"},"out":{"mod6":0,"mod10":6,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"153676480284194023"},"out":{"mod6":1,"mod10":3,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"708756411399584387"},"out":{"mod6":5,"mod10":7,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"9036586340475044990"},"out":{"mod6":2,"mod10":0,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"-1675778162317418957"},"out":{"mod6":5,"mod10":9,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"1345725326609691223"},"out":{"mod6":1,"mod10":3,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"1467514070570966348"},"out":{"mod6":2,"mod10":8,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"-6470897227066634893"},"out":{"mod6":3,"mod10":3,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"7379781629343958923"},"out":{"mod6":3,"mod10":3,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"-1804897454332803681"},"out":{"mod6":1,"mod10":5,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"381443747681685978"},"out":{"mod6":0,"mod10":8,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"28623015387062140"},"out":{"mod6":4,"mod10":0,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"-7480437626172018682"},"out":{"mod6":0,"mod10":4,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"-3983062532972726991"},"out":{"mod6":1,"mod10":5,"lessThanMixed":false}}
+{"fn":"unsigned","in":{"h":"1486318461848802765"},"out":{"mod6":3,"mod10":5,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"4901592776153817957"},"out":{"mod6":3,"mod10":7,"lessThanMixed":true}}
+{"fn":"unsigned","in":{"h":"6793125386990458238"},"out":{"mod6":2,"mod10":8,"lessThanMixed":true}}
