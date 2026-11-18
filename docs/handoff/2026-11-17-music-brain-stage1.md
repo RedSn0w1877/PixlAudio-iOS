@@ -888,5 +888,20 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ci/parse-check.ps1
 
 The filtered run: 197 tests in 26 suites, 0 failed. The full suite: exit 0, 2,155 tests in 8 bundles, 0 failed (34
 more than 1c). `check-forbidden.sh`: OK. `parse-check.ps1`: 135 files OK (syntax only: nothing under `App/` is
-type-checked on this machine). The CI result of this round is written below once the run has finished.
+type-checked on this machine).
+
+**CI for the review fixes: run `44307349413` (workflow `ci`, commit `e380be9`) finished green on its fourth
+attempt.** The app BUILT on the first attempt, with no compile error to fix, and `core` (Linux) passed on the first
+attempt. The `app` job (Xcode 27, iOS simulator) ran 657 unit tests each time; every failure was a timing test that
+passed on another attempt, none of them in code this round touched:
+
+- attempt 1: only `SpotifyMatchCoordinatorTests.testConcurrentMatchesOfOneSongRunTheSearchOnce` (two `async let`
+  matches raced; not on the list of known flaky tests before, it is now);
+- attempt 2: only the Sing seek test, `testASeekWhileTheOtherAudioIsBeingSetUpEndsTheAttemptAndTheSongPlaysOn`;
+- attempt 3: only `DualDeckEngineTests.testCrossfadeOverlapsBothDecksWithTheirGainCurves` and
+  `SpatialPlaybackTests.testTheRenditionSwitchFadesForAQuarterSecondAndKeepsTheTwentySecondRule`;
+- attempt 4: all 657 passed.
+
+`ipa` was skipped, as on every push. No screenshot (`[shots]`) run was made. CI green means `App/` compiles and
+its unit tests pass; none of them drives `AutoplayController`, so it says nothing about whether the trigger works.
 
