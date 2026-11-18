@@ -30,7 +30,9 @@ struct SongOptionsSheet: View {
     @State private var confirmsDelete = false
 
     var body: some View {
-        if let song = library.song(id: songId) {
+        // A track Autoplay queued from outside the library has no library row: the sheet shows the queue's own song
+        // (Like and "Playlist" then save it, docs/brain-spec.md 7.2).
+        if let song = library.song(id: songId) ?? env.brain.song(id: songId) {
             content(song)
         } else {
             LibraryEmptyState(systemImage: "music.note", title: "Song not found", subtitle: "")

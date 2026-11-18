@@ -113,6 +113,8 @@ struct LibraryEditor {
 
     func setFavorite(_ songIds: [String], _ isFavorite: Bool) {
         guard !songIds.isEmpty else { return }
+        // Liking a track Autoplay played from outside the library makes it a library track first.
+        if isFavorite { saveEngineTracks(songIds) }
         let ids = Set(songIds)
         var snapshot = store.snapshot
         var changed: [Song] = []
@@ -123,6 +125,50 @@ struct LibraryEditor {
         commit(snapshot, changedSongs: changed) { persistence in
             try await persistence.setFavorites(songIds, isFavorite: isFavorite, timestamp: currentTimeMillis())
         }
+    }
+
+    // MARK: Tracks from outside the library (docs/brain-spec.md, 7.2)
+
+    /// Like, "Add to playlist" and a new playlist turn a track Autoplay played from outside the library into a
+    /// library track for good: the rows the YouTube Music importer writes for the same video, under the id the track
+    /// already plays as (`yt:<videoId>`), so the queue item, the history entry and the new row agree. Ids the library
+    /// already has, and ids the engine never queued, are left alone (one dictionary lookup each). Returns how many
+    /// were saved.
+    @discardableResult
+    func saveEngineTracks(_ songIds: [String]) -> Int {
+        guard let brain = BrainService.shared else { return 0 }
+        let now = currentTimeMillis()
+        var snapshot = store.snapshot
+        var songs: [Song] = [], albums: [Album] = [], artists: [Artist] = []
+        var rows: [(song: Song, album: Album, artist: Artist)] = []
+        var seen = Set<String>()
+        for songId in songIds where store.song(id: songId) == nil && seen.insert(songId).inserted {
+            guard let row = brain.libraryRows(songId: songId, nowMs: now) else { continue }
+            snapshot.songs.append(row.song)
+            songs.append(row.song)
+            if store.album(id: row.album.id) == nil, !albums.contains(where: { $0.id == row.album.id }) {
+                snapshot.albums.append(row.album)
+                albums.append(row.album)
+            }
+            if store.artist(id: row.artist.id) == nil, !artists.contains(where: { $0.id == row.artist.id }) {
+                snapshot.artists.append(row.artist)
+                artists.append(row.artist)
+            }
+            rows.append(row)
+        }
+        guard !rows.isEmpty else { return 0 }
+        store.applyEdit(snapshot, changedSongs: songs, addedAlbums: albums, addedArtists: artists)
+        guard let persistence else { return rows.count }
+        let writesCache = self.writesCache, saved = rows, latest = snapshot
+        Task.detached(priority: .utility) {
+            for row in saved {
+                try? await persistence.upsertStreamSong(row.song, album: row.album, artist: row.artist, favoriteAt: nil)
+            }
+            if writesCache {
+                SnapshotLoader(persistence: persistence, cacheURL: SnapshotLoader.defaultCacheURL()).writeCache(latest)
+            }
+        }
+        return rows.count
     }
 
     // MARK: Playlists
@@ -140,6 +186,7 @@ struct LibraryEditor {
                                 coverShapeType: coverShapeType, coverShapeDetail1: detail(0),
                                 coverShapeDetail2: detail(1), coverShapeDetail3: detail(2), coverShapeDetail4: detail(3),
                                 sortOrder: (store.playlists.map(\.sortOrder).max() ?? -1) + 1)
+        saveEngineTracks(songIds)
         var snapshot = store.snapshot
         snapshot.playlists.append(playlist)
         commit(snapshot) { try await $0.upsertPlaylist(playlist, smartRuleKey: smartRuleKey) }
@@ -167,6 +214,7 @@ struct LibraryEditor {
     /// Adds songs that are not in the playlist yet, at the end (Android `addSongsToPlaylist`).
     func addSongs(_ songIds: [String], toPlaylist playlistId: String) {
         guard var playlist = store.playlist(id: playlistId) else { return }
+        saveEngineTracks(songIds)
         let existing = Set(playlist.songIds)
         playlist.songIds += songIds.filter { !existing.contains($0) }.kotlinDistinctIds()
         updatePlaylist(playlist)
@@ -219,7 +267,10 @@ struct LibraryEditor {
         guard writesCache else { return }
         let files = removed.filter(SongFileRemoval.deletesFile)
         let fileIds = Set(files.map(\.id))
-        HiddenSongs.hide(songIds.filter { !fileIds.contains($0) })
+        // Only what was in the library is remembered as hidden: "Remove" on a track from outside it (an Autoplay pick
+        // shown in the song sheet) must not keep that track from being saved later.
+        let removedIds = Set(removed.map(\.id))
+        HiddenSongs.hide(songIds.filter { removedIds.contains($0) && !fileIds.contains($0) })
         guard !files.isEmpty else { return }
         Task.detached(priority: .utility) {
             let failed = await SongFileRemoval.deleteFiles(of: files)

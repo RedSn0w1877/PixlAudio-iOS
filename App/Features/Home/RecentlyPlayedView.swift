@@ -119,12 +119,15 @@ struct RecentlyPlayedView: View {
         await home.history.ensureLoaded()
         let clock = home.history.clock
         let events = home.history.events
-        let songsById = library.songsById
+        let librarySongsById = library.songsById
+        // Tracks Autoplay played from outside the library are listed too (and can be liked or added to a playlist).
+        let engineSongs = await env.brain.engineSongs()
         let range = self.range
         let stamp = self.stamp
         let use24Hour = HomeLogic.uses24HourClock
         let result = await Task.detached(priority: .userInitiated) { () -> ([HomeLogic.TimestampGroup], [Song]) in
             let now = clock.nowMs()
+            let songsById = HomeLogic.withEngineSongs(librarySongsById, engineSongs)
             let items = HomeLogic.mapRecentlyPlayed(history: PlaybackStats.playbackHistory(events), songsById: songsById,
                                                     range: range, nowMs: now, timeZone: clock.timeZone)
             let groups = HomeLogic.timestampGroups(items, range: range, nowMs: now, timeZone: clock.timeZone,

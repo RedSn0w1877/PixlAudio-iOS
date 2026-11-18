@@ -77,6 +77,9 @@ final class HomeStore {
     /// shelf and pool Home computes. Set by `AppEnvironment` (nil for previews).
     @ObservationIgnored var adjustments: TasteAdjustmentStore?
     @ObservationIgnored var explorationFraction: () -> Float = { 0.25 }
+    /// The tracks from outside the library that Autoplay played, by id (docs/brain-spec.md, 7.2): Recently Played
+    /// resolves ids the library does not have through them. Set by `AppEnvironment` (nil for previews).
+    @ObservationIgnored var engineSongs: (() async -> [String: Song])?
     /// Blocked artists: their songs are left out of every mix, shelf and list Home computes.
     @ObservationIgnored private(set) var blockedMatcher: BlockedArtistMatcher = .empty
     @ObservationIgnored private var blockedRevision = 0
@@ -154,6 +157,7 @@ final class HomeStore {
         await imported?.ensureLoaded()
         let importedAggregate = imported?.aggregate ?? .empty
         let adjustmentSet = await tasteSet()
+        let engineSongs = await self.engineSongs?() ?? [:]
         let clock = history.clock
         let now = clock.nowMs()
         let epochDay = ZoneClock(clock.timeZone).localDate(at: now).epochDay
@@ -182,7 +186,8 @@ final class HomeStore {
         let task = Task.detached(priority: force ? .userInitiated : .utility) { () -> (content: HomeContent, generatedMixes: Bool)? in
             HomeStore.computeIfActive(snapshot: snapshot, events: events, nowMs: now, timeZone: clock.timeZone,
                               savedDaily: saved.daily, savedYourMix: saved.yourMix, storedSignals: signals,
-                              exploration: exploration, importedHistory: importedAggregate, adjustments: adjustmentSet)
+                              exploration: exploration, importedHistory: importedAggregate, adjustments: adjustmentSet,
+                              engineSongs: engineSongs)
         }
         let stamp = ScreenDataCache.Stamp(historyRevision: history.revision, songCount: snapshot.songs.count)
         let day = ZoneClock(clock.timeZone).localDate(at: now).description
@@ -412,7 +417,8 @@ final class HomeStore {
                                             storedSignals storedLocalSignals: [String: MusicRecommendationEngine.Signal] = [:],
                                             exploration: Float = 0.25,
                                             importedHistory: ImportedHistoryAggregate = .empty,
-                                            adjustments: TasteAdjustmentSet = .empty)
+                                            adjustments: TasteAdjustmentSet = .empty,
+                                            engineSongs: [String: Song] = [:])
         -> (content: HomeContent, generatedMixes: Bool)?
     {
         let songs = snapshot.songs
@@ -439,8 +445,10 @@ final class HomeStore {
 
         // History → recently played.
         content.history = PlaybackStats.playbackHistory(events)
-        content.recentlyPlayed = HomeLogic.mapRecentlyPlayed(history: content.history, songsById: songsById, nowMs: nowMs,
-                                                             timeZone: timeZone, maxItems: recentlyPlayedLimit)
+        // Tracks Autoplay played from outside the library are listed too; everything else below stays library-only.
+        content.recentlyPlayed = HomeLogic.mapRecentlyPlayed(
+            history: content.history, songsById: HomeLogic.withEngineSongs(songsById, engineSongs), nowMs: nowMs,
+            timeZone: timeZone, maxItems: recentlyPlayedLimit)
 
         if Task.isCancelled { return nil }
         // Stats overview card.

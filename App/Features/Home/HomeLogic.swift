@@ -148,6 +148,16 @@ nonisolated enum HomeLogic {
     }
 
     /// `mapRecentlyPlayedSongs`: one item per song (its latest play) for songs still in the library.
+    /// The library's songs plus the tracks from outside it that the engine played (docs/brain-spec.md, 7.2):
+    /// Recently Played resolves an id the library does not have through them. The library wins on a shared id (a
+    /// track the listener saved since). No copy is made when there is nothing to add.
+    static func withEngineSongs(_ songsById: [String: Song], _ engineSongs: [String: Song]) -> [String: Song] {
+        guard !engineSongs.isEmpty else { return songsById }
+        var merged = songsById
+        for (id, song) in engineSongs where merged[id] == nil { merged[id] = song }
+        return merged
+    }
+
     static func mapRecentlyPlayed(history: [PlaybackHistoryEntry], songsById: [String: Song],
                                   range: StatsTimeRange? = nil, nowMs: Int64, timeZone: TimeZone,
                                   maxItems: Int = .max) -> [RecentlyPlayedItem] {
