@@ -14,6 +14,12 @@ PixlCore test bundles passed, 2,047 tests. `app` (Xcode 27, iOS 27 simulator): t
 passed, `AutoplayQueueTests` among them. The separate, non-blocking live YouTube smoke step reported one issue, as
 it may by design; it does not test this work. No screenshot (`[shots]`) run was made.
 
+CI for milestone 1b: run `44274448070` (workflow `ci`, commit `9644d96`) finished green on its first try. `core`
+(Linux): the eight PixlCore test bundles passed, 2,089 tests, `BrainGoldenTests` among them (so the golden vectors
+hold on Linux as well as on Windows). `app` (Xcode 27, iOS simulator): the app built and 652 unit tests passed, the
+three new cases of `AutoplayQueueTests` among them. The non-blocking live YouTube smoke step reported one issue
+again; it does not test this work. No screenshot (`[shots]`) run was made.
+
 ---
 
 ## Milestone 1a: "a track from outside the library plays, and the queue does not end"
@@ -434,7 +440,7 @@ affinity outside the artists skipped this session.
 
 ### Not verified (all of it on a phone; the specific risks)
 
-1. **Everything under `App/` compiles only on CI.** The CI run for this milestone is named at the end of this file.
+1. **Everything under `App/` compiles only on CI** (run `44274448070`: built, 652 unit tests passed). Compiling is all that is known about it: no test drives `AutoplayController`, `PlaybackServices` or the engine's new calls.
 2. Which engine callbacks arrive, and in what order, for a tap, next, previous, a queue edit, repeat, a failed load
    and above all a crossfade hand-over. A wrong order would show as plays cut in two or `unknown` reasons.
    `queueChangedThisTurn` assumes a track change caused by a queue change arrives in the same main-actor turn.
