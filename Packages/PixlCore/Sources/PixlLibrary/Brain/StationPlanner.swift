@@ -10,6 +10,10 @@ public enum StationPlanner {
     public static let modeAutoplay: Int32 = 0
     public static let modeStation: Int32 = 1
     public static let modeHomeRow: Int32 = 2
+    /// Daily Mix and Your Mix (6.2, stage 2a): the pool is the library plus the cached radios of the listener's own
+    /// tracks, no library track has to be close to a seed, and nothing the session did applies (a mix is built from
+    /// a fresh session). `MixPlanner` is the way in.
+    public static let modeMix: Int32 = 3
 
     public static let fourHoursMs: Int64 = 4 * 60 * 60 * 1000
 
@@ -40,10 +44,20 @@ public enum StationPlanner {
         /// The first slot is the bridge of 7.1 (the first track autoplay appends to a queue).
         public var bridge: Bool
         public var finite: Bool
+        /// At least 0: the novelty share to use as it is (a mix has its own, 8.2); negative: the session's.
+        public var nu: Double
+        /// How often each recording was served in a generated list in the last 30 days (6.5 `servedPen`).
+        public var servedTimes: [Int64: Int32]
+        /// The width of the per-list jitter of a mix (see `MixPlanner.jitter`); 0 for none.
+        public var jitter: Double
+        /// The penalty at three serves or more (see `Repetition.maxPenalty`).
+        public var servedMax: Double
 
         public init(mode: Int32, count: Int, candidates: [Candidate], seeds: [Retrieval.SeedList],
                     prior: [ListBuilder.Prior] = [], nowMs: Int64, tzOffsetMin: Int32 = 0, nuMultiplier: Double = 1.0,
-                    tieSeed: Int64 = 0, excludedRids: Set<Int64> = [], bridge: Bool = false, finite: Bool = false) {
+                    tieSeed: Int64 = 0, excludedRids: Set<Int64> = [], bridge: Bool = false, finite: Bool = false,
+                    nu: Double = -1.0, servedTimes: [Int64: Int32] = [:], jitter: Double = 0.0,
+                    servedMax: Double = Repetition.maxPenalty) {
             self.mode = mode
             self.count = count
             self.candidates = candidates
@@ -56,6 +70,10 @@ public enum StationPlanner {
             self.excludedRids = excludedRids
             self.bridge = bridge
             self.finite = finite
+            self.nu = nu
+            self.servedTimes = servedTimes
+            self.jitter = jitter
+            self.servedMax = servedMax
         }
     }
 
@@ -95,6 +113,7 @@ public enum StationPlanner {
         let cooc = Retrieval.cooc(request.seeds, affinity: affinity, nowMs: nowMs, p0: p0)
         let homeRow = request.mode == modeHomeRow
         let station = request.mode == modeStation
+        let mix = request.mode == modeMix
         let stationSeed: Retrieval.SeedList? = ((station || homeRow) && !request.seeds.isEmpty) ? request.seeds[0] : nil
         let newest: Retrieval.SeedList? = !request.seeds.isEmpty ? request.seeds[0] : nil
         var newestRank: [Int64: Int32] = [:]
@@ -111,7 +130,8 @@ public enum StationPlanner {
         arms.reserveCapacity(request.candidates.count)
         var seen: Set<Int64> = []
         // A seed is what the listener is hearing: it is never its own recommendation.
-        for seed in request.seeds { seen.insert(seed.seedRid) }
+        // (A mix is the listener's own music: its seeds are tracks they chose, and they may be in it.)
+        if !mix { for seed in request.seeds { seen.insert(seed.seedRid) } }
         for c in request.candidates {
             if c.rid == 0 || request.excludedRids.contains(c.rid) || !seen.insert(c.rid).inserted { continue }
             if session.isBlocked(c.aid) { continue }
@@ -122,7 +142,7 @@ public enum StationPlanner {
             if let stationSeed, station {
                 let s = Similarity.sim(graph, c.rid, c.aid, stationSeed.seedRid, stationSeed.seedAid)
                 if s < (c.inLibrary ? familiarFloor : stationFloor) { continue }
-            } else if c.inLibrary {
+            } else if c.inLibrary && !mix {
                 var close = 0.0
                 for seed in request.seeds {
                     let s = Similarity.sim(graph, c.rid, c.aid, seed.seedRid, seed.seedAid)
@@ -177,7 +197,11 @@ public enum StationPlanner {
                 bestSeed: entry?.bestSeed ?? -1,
                 newestSeedRank: newestRank[c.rid] ?? 0,
                 lastMs: Affinity.lastMs(affinity, family: Family.track, key: c.rid),
-                retrQ: Int32(truncatingIfNeeded: BrainMath.floorToLong(pct[i] * 1000.0 + 0.5))
+                retrQ: Int32(truncatingIfNeeded: BrainMath.floorToLong(pct[i] * 1000.0 + 0.5)),
+                servedPen: mix ? Repetition.servedPenalty(request.servedTimes[c.rid] ?? 0, max: request.servedMax) : 0.0,
+                noise: (mix && request.jitter > 0.0)
+                    ? request.jitter * (BrainHash.unit(BrainHash.splitmix64(UInt64(bitPattern: c.rid ^ request.tieSeed))) - 0.5)
+                    : 0.0
             ))
         }
 
@@ -198,7 +222,14 @@ public enum StationPlanner {
             firstSlotAids = aids
         }
         let liked = session.likedWithin > 0 && !homeRow
-        let nu: Double = homeRow ? 1.0 : BrainMath.clip(session.nuSession * request.nuMultiplier, 0.0, 1.0)
+        let nu: Double
+        if homeRow {
+            nu = 1.0
+        } else if request.nu >= 0.0 {
+            nu = BrainMath.clip(request.nu, 0.0, 1.0)
+        } else {
+            nu = BrainMath.clip(session.nuSession * request.nuMultiplier, 0.0, 1.0)
+        }
         let built = ListBuilder.build(
             ListBuilder.Request(
                 count: request.count,
@@ -235,7 +266,9 @@ public enum StationPlanner {
                 bestRank: s.bestRank,
                 likedRid: session.likedRid,
                 homeSeedRid: stationSeed?.seedRid ?? 0,
-                trackAffRecent: Affinity.affRecent(affinity, family: Family.track, key: s.c.rid, nowMs: nowMs, p0: p0)
+                trackAffRecent: Affinity.affRecent(affinity, family: Family.track, key: s.c.rid, nowMs: nowMs, p0: p0),
+                trackPosRecent: affinity.counter(Family.track, s.c.rid).map { Affinity.posRecent($0, nowMs: nowMs) } ?? 0.0,
+                mix: mix
             )
             picks.append(Pick(
                 rid: s.c.rid,

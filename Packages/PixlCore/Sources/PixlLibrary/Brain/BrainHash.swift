@@ -43,6 +43,9 @@ public enum BrainHash {
     /// One SplitMix64 step from `state`: advance by the gamma, then mix. Stateless form.
     public static func splitmix64(_ state: UInt64) -> UInt64 { mix(state &+ splitmixGamma) }
 
+    /// The top 53 bits of `h` as a number in [0, 1): `(h >>> 11) * 2^-53`.
+    public static func unit(_ h: UInt64) -> Double { Double(h >> 11) * twoPowMinus53 }
+
     /// A SplitMix64 stream. `uniform` advances the state once; `gaussian12` twelve times.
     public struct Rng: Sendable {
         public private(set) var state: UInt64

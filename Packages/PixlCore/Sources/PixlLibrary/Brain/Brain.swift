@@ -5,7 +5,7 @@
 /// The live step of the brain.
 public enum Brain {
     /// Bumped whenever the pure logic changes its output: new golden files, and a rebuild on first use.
-    public static let specVersion: Int32 = 1
+    public static let specVersion: Int32 = 2
 
     @discardableResult
     public static func onEvent(affinity: inout Affinity.State, tracker: inout GradeTracker, session: inout SessionState,

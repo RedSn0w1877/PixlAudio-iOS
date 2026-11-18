@@ -101,6 +101,12 @@ public struct Graph: Sendable {
             for i in rids.indices { put(seed, rids[i], factor / BrainMath.log2(2.0 + Double(i + 1))) }
         }
 
+        /// One stored edge (the `graph_edge` table of 3.8, read back): the pair gets `weight`, the largest when it
+        /// already has one. Used for the lists the radios of earlier days left behind.
+        public mutating func addEdge(_ a: Int64, _ b: Int64, weight: Double) {
+            put(a, b, weight)
+        }
+
         /// A track and its primary artist: an edge of weight `trackArtist`, and what "same artist" reads.
         public mutating func addTrack(rid: Int64, primaryAid: Int64) {
             if rid == 0 || primaryAid == 0 { return }

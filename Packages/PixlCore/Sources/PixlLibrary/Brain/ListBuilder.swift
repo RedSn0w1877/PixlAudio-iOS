@@ -2,8 +2,8 @@
 // special first slot), and within the kind the candidate with the best value that breaks no hard rule takes it. A
 // transliteration of the Android `:brain` module's `ListBuilder.kt`.
 //
-// Stage 1 has the hard constraints of 6.4, the slot plan and `lambda`; no calibration, flow cost or served penalty
-// yet. Ordering is by a quantised key with a total tie-break, so sort stability and floating-point noise below
+// Stage 1 has the hard constraints of 6.4, the slot plan and `lambda`; stage 2a adds the served-log penalty
+// (`Scored.servedPen`); no calibration or flow cost yet. Ordering is by a quantised key with a total tie-break, so sort stability and floating-point noise below
 // 2^-20 cannot change a list.
 
 /// The list builder.
@@ -43,9 +43,13 @@ public enum ListBuilder {
         public var lastMs: Int64
         /// Retrieval percentile x 1000.
         public var retrQ: Int32
+        /// The served-log penalty of 6.5 (0 for lists that make no repetition promise).
+        public var servedPen: Double
+        /// A per-list jitter in the value (a mix draws one per list so "Regenerate" gives another list); 0 for none.
+        public var noise: Double
 
         public init(c: Candidate, arm: Int32, z: Double, p: Double, novel: Bool, bestRank: Int32, bestSeed: Int32,
-                    newestSeedRank: Int32, lastMs: Int64, retrQ: Int32) {
+                    newestSeedRank: Int32, lastMs: Int64, retrQ: Int32, servedPen: Double = 0.0, noise: Double = 0.0) {
             self.c = c
             self.arm = arm
             self.z = z
@@ -56,6 +60,8 @@ public enum ListBuilder {
             self.newestSeedRank = newestSeedRank
             self.lastMs = lastMs
             self.retrQ = retrQ
+            self.servedPen = servedPen
+            self.noise = noise
         }
     }
 
@@ -234,7 +240,7 @@ public enum ListBuilder {
                 for s in scored {
                     if s.novel || used.contains(s.c.rid) || !fits(list, s.c, thinAid: request.thinAid) { continue }
                     if s.lastMs != 0 && BrainMath.localDay(s.lastMs, tzOffsetMin: request.tzOffsetMin) == today { continue }
-                    let key = BrainMath.orderKey(s.p)
+                    let key = BrainMath.orderKey(s.p - s.servedPen + s.noise)
                     if chosen == nil || better(key, s.c.rid, chosenKey, chosen!.c.rid, request.tieSeed) {
                         chosen = s
                         chosenKey = key
@@ -246,7 +252,7 @@ public enum ListBuilder {
             if chosen == nil && kind == slotCloser {
                 for s in scored {
                     if s.novel || used.contains(s.c.rid) || !fits(list, s.c, thinAid: request.thinAid) { continue }
-                    let key = BrainMath.orderKey(s.p)
+                    let key = BrainMath.orderKey(s.p - s.servedPen + s.noise)
                     if chosen == nil || better(key, s.c.rid, chosenKey, chosen!.c.rid, request.tieSeed) {
                         chosen = s
                         chosenKey = key
@@ -296,7 +302,7 @@ public enum ListBuilder {
             if sim > maxSim { maxSim = sim }
             back += 1
         }
-        return lambda * s.z - (1.0 - lambda) * maxSim
+        return lambda * s.z - (1.0 - lambda) * maxSim - s.servedPen + s.noise
     }
 
     /// Order: the key descending, then `splitmix64(rid xor seed)` ascending (unsigned), then rid ascending.
