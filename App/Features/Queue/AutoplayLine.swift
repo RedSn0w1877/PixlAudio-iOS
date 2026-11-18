@@ -1,8 +1,11 @@
+import PixlLibrary
 import SwiftUI
 
-/// The Autoplay line of the queue (docs/brain-spec.md, 8.4; Android `AutoplayDivider`): everything under it was
-/// picked by Autoplay, and the switch turns the picking off. Shown above the first pick that is still to come, or at
-/// the end of the queue while there is none.
+/// The Autoplay line of the queue (docs/brain-spec.md, 8.3, 8.4; Android `AutoplayDivider`): everything under it was
+/// picked by the engine. For plain autoplay it is "Autoplay" with its off switch; when the queue is a station it is
+/// "Station · X", which has no switch (the listener asked for it by hand). Under it sits the Familiar / Blend /
+/// Discover switch, and beside the title the way to "How picks work". Shown above the first pick that is still to
+/// come, or at the end of the queue while there is none.
 ///
 /// Plain text on the sheet's own glass, with the system switch: no glass of its own (the rows around it are glass).
 struct AutoplayLine: View {
@@ -13,27 +16,61 @@ struct AutoplayLine: View {
     let fromLibrary: Bool
     /// Three skips in a row: Autoplay just turned to something else (shown for a few seconds).
     var changedDirection = false
+    /// The queue is a station: what it is named after (a song's title, an artist's name). Nil for plain autoplay.
+    var stationTitle: String?
+    var stationIsArtist = false
+    /// `Novelty.familiar`, `.blend` or `.discover`.
+    var novelty = Novelty.blend
     let onToggle: (Bool) -> Void
+    var onNovelty: ((Int) -> Void)?
+    var onHowPicksWork: (() -> Void)?
 
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Autoplay")
-                    .pixlFont(.titleSmall)
+        let isStation = stationTitle != nil
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Group {
+                        if isStation {
+                            Text(title).pixlFont(.titleMedium, weight: .semibold)
+                        } else {
+                            Text(title).pixlFont(.titleSmall)
+                        }
+                    }
                     .foregroundStyle(theme.onSurface)
                     .lineLimit(1)
-                Text(subtitle)
-                    .pixlFont(.bodySmall)
-                    .foregroundStyle(theme.onSurfaceVariant)
-                    .lineLimit(1)
+                    Text(subtitle)
+                        .pixlFont(.bodySmall)
+                        .foregroundStyle(theme.onSurfaceVariant)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if let onHowPicksWork {
+                    Button(action: onHowPicksWork) {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 19, weight: .medium))
+                            .foregroundStyle(theme.onSurfaceVariant)
+                            .frame(width: 40, height: 40)
+                            .contentShape(.circle)
+                    }
+                    .buttonStyle(PressScaleButtonStyle())
+                    .accessibilityLabel(BrainStrings.howPicksWork)
+                    .accessibilityIdentifier("queue.howPicksWork")
+                }
+                if !isStation {
+                    Toggle("Autoplay", isOn: Binding(get: { isOn }, set: { onToggle($0) }))
+                        .labelsHidden()
+                        .tint(theme.primary)
+                        .accessibilityIdentifier("queue.autoplay")
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            Toggle("Autoplay", isOn: Binding(get: { isOn }, set: { onToggle($0) }))
-                .labelsHidden()
-                .tint(theme.primary)
-                .accessibilityIdentifier("queue.autoplay")
+            if let onNovelty, isStation || isOn, !fromLibrary {
+                NoveltySwitch(level: novelty, onChange: onNovelty)
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
+            }
         }
         .padding(.leading, 20)
         .padding(.trailing, 16)
@@ -41,11 +78,18 @@ struct AutoplayLine: View {
         .padding(.bottom, 6)
     }
 
-    private var subtitle: LocalizedStringKey {
-        if !isOn { return "Off. The queue ends after the last song" }
-        if finding { return "Finding more like this" }
-        if changedDirection { return "Skipped three. Changing direction." }
-        if fromLibrary { return "From your library" }
-        return "Taizo picks more after this"
+    private var title: String {
+        if let stationTitle { return BrainStrings.stationTitle(stationTitle) }
+        return String(localized: "Autoplay")
+    }
+
+    private var subtitle: String {
+        let isStation = stationTitle != nil
+        if !isStation, !isOn { return String(localized: "Off. The queue ends after the last song") }
+        if finding { return String(localized: "Finding more like this") }
+        if changedDirection { return String(localized: "Skipped three. Changing direction.") }
+        if fromLibrary { return String(localized: "From your library") }
+        if isStation { return stationIsArtist ? BrainStrings.stationSubtitleArtist : BrainStrings.stationSubtitleSong }
+        return String(localized: "Taizo picks more after this")
     }
 }

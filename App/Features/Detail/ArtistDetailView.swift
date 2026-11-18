@@ -330,7 +330,8 @@ private struct ArtistDetailContent: View {
         }
     }
 
-    /// The ⋯ menu (system liquid menu): the artist image (Android's pencil: pick a photo; remove a custom one) and
+    /// The ⋯ menu (system liquid menu): Start station (docs/brain-spec.md, 8.3: the listener's most-played track by
+    /// the artist plays first), the artist image (Android's pencil: pick a photo; remove a custom one) and
     /// Block / Unblock.
     @ViewBuilder
     private func moreMenu(_ artist: Artist) -> some View {
@@ -338,6 +339,11 @@ private struct ArtistDetailContent: View {
         let hasCustomImage = !(artist.customImageUri ?? "").isEmpty
         let imageTitle: LocalizedStringKey = hasCustomImage ? "Choose a new image" : "Choose artist image"
         GlassCircleMenu(systemImage: "ellipsis", accessibilityLabel: "More options") {
+            Button(BrainStrings.startStation, systemImage: "dot.radiowaves.left.and.right") {
+                env.brainActions.startArtistStation(name: artist.name, knownSongs: content.allSongs)
+            }
+            .accessibilityIdentifier("artist.startStation")
+            Divider()
             Button(imageTitle, systemImage: "photo") {
                 showsPhotoPicker = true
             }

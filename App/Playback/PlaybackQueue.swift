@@ -57,10 +57,17 @@ nonisolated struct PlaybackQueue: Sendable {
     /// Replaces the queue (Android `playSongs`). With `shuffle`, the start song keeps its position and the rest is
     /// shuffled around it (`prepareShuffledQueueWithStart` → `buildAnchoredShuffleQueue`).
     /// `source` says where the listener started the queue from (an album, a playlist, search); every entry carries
-    /// it, so the event log knows the surface of each play (docs/brain-spec.md, 4.2).
+    /// it, so the event log knows the surface of each play (docs/brain-spec.md, 4.2). `tagsBySongId` wins over it
+    /// for the songs it names: a Home row's cards each carry their own pick (8.1).
     mutating func replace<R: ShuffleRandom>(with songs: [Song], startIndex: Int, shuffle: Bool, random: inout R,
-                                            source: BrainItemTag? = nil) {
-        let fresh = makeEntries(songs, tags: source.map { [BrainItemTag?](repeating: $0, count: songs.count) } ?? [])
+                                            source: BrainItemTag? = nil, tagsBySongId: [String: BrainItemTag] = [:]) {
+        let tags: [BrainItemTag?]
+        if tagsBySongId.isEmpty {
+            tags = source.map { [BrainItemTag?](repeating: $0, count: songs.count) } ?? []
+        } else {
+            tags = songs.map { tagsBySongId[$0.id] ?? source }
+        }
+        let fresh = makeEntries(songs, tags: tags)
         guard !fresh.isEmpty else {
             entries = []
             originalOrder = nil
@@ -78,9 +85,11 @@ nonisolated struct PlaybackQueue: Sendable {
         currentIndex = start
     }
 
-    mutating func replace(with songs: [Song], startIndex: Int, shuffle: Bool, source: BrainItemTag? = nil) {
+    mutating func replace(with songs: [Song], startIndex: Int, shuffle: Bool, source: BrainItemTag? = nil,
+                          tagsBySongId: [String: BrainItemTag] = [:]) {
         var random = SystemShuffleRandom()
-        replace(with: songs, startIndex: startIndex, shuffle: shuffle, random: &random, source: source)
+        replace(with: songs, startIndex: startIndex, shuffle: shuffle, random: &random, source: source,
+                tagsBySongId: tagsBySongId)
     }
 
     /// Restores a saved queue as it was (no reshuffle). `originalSongs` is the unshuffled order when shuffled.
@@ -219,6 +228,34 @@ nonisolated struct PlaybackQueue: Sendable {
             originalOrder?.removeAll { dropped.contains($0.id) }
             originalOrder?.append(contentsOf: fresh)
         }
+        return true
+    }
+
+    /// Gives the current entry another tag. A station started from the track that is playing makes that track its
+    /// seed (docs/brain-spec.md, 8.3): the entry stays where it is and keeps playing. False without a current entry.
+    @discardableResult
+    mutating func retagCurrent(_ tag: BrainItemTag?) -> Bool {
+        guard let currentIndex, entries.indices.contains(currentIndex) else { return false }
+        entries[currentIndex].brain = tag
+        let id = entries[currentIndex].id
+        if let position = originalOrder?.firstIndex(where: { $0.id == id }) { originalOrder?[position].brain = tag }
+        return true
+    }
+
+    /// Removes the engine's picks after the current entry whose song id is in `ids`, in one edit: what a taste
+    /// change excludes leaves the queue at once (docs/brain-spec.md, 8.5). The current entry and everything the
+    /// listener queued stay. False when nothing was removed.
+    @discardableResult
+    mutating func removeUpcomingEngine(ids: Set<String>) -> Bool {
+        guard let currentIndex, !ids.isEmpty, currentIndex + 1 < entries.count else { return false }
+        var dropped = Set<Int>()
+        for position in (currentIndex + 1)..<entries.count
+        where entries[position].isEngineOwned && ids.contains(entries[position].song.id) {
+            dropped.insert(entries[position].id)
+        }
+        guard !dropped.isEmpty else { return false }
+        entries.removeAll { dropped.contains($0.id) }
+        originalOrder?.removeAll { dropped.contains($0.id) }
         return true
     }
 

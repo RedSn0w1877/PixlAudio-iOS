@@ -61,6 +61,15 @@ struct HomeView: View {
 
                 yourMix(content: content, isPreparing: home.isPreparing)
 
+                // The music brain's "Because you listened to X" rows (docs/brain-spec.md, 8.1): music the listener does
+                // not have yet, in front of the legacy shelves. A card plays with the row as the queue.
+                ForEach(home.brainShelves) { shelf in
+                    CurrentSongState { currentSongId in
+                        HomeDiscoveryShelf(section: shelf.section, currentSongId: currentSongId,
+                                           onPlay: { song in env.brainActions.play(shelf, startingAt: song) })
+                    }
+                }
+
                 ForEach(content.shelves) { section in
                     CurrentSongState { currentSongId in
                         HomeDiscoveryShelf(section: section, currentSongId: currentSongId,
@@ -112,6 +121,10 @@ struct HomeView: View {
                                  importedRevision: env.importedHistory.revision,
                                  adjustmentsRevision: env.tasteAdjustments.revision)) {
             await home.refresh(snapshot: library.snapshot, libraryRevision: library.songsRevision)
+        }
+        // Rows the music brain rebuilt while Home was away are shown when Home is back on screen, never under the thumb.
+        .onChange(of: router.selection) { _, tab in
+            if tab == .home { home.showPendingBrainRows() }
         }
         // Cloud Studio's stored jobs (read once, off the main actor): its work may have moved on while the app was closed,
         // and the jobs button should show it.

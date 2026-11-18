@@ -39,6 +39,17 @@ nonisolated struct HomeContent: Sendable, Equatable {
     var usesFallbackYourMix: Bool { curatedYourMix.isEmpty && dailyMix.isEmpty }
 }
 
+/// Where Home gets the music brain's "Because you listened to" rows from (docs/brain-spec.md, 8.1). Closures set by
+/// `AppEnvironment`; nil in UI tests and previews.
+struct HomeBrainRowsSource {
+    /// The existing discovery switch (the queue's Autoplay switch): off, the rows are hidden too.
+    var isEnabled: @MainActor () -> Bool
+    /// The saved rows: one small file, never the brain's own state.
+    var cached: @MainActor () async -> [BrainHomeRow]
+    /// Rebuilds the rows when they are due; nil when nothing was rebuilt (always, until music played in this run).
+    var refreshIfDue: @MainActor () async -> [BrainHomeRow]?
+}
+
 /// The Home tab's state holder. Lives in `AppEnvironment` (process-scoped like Android's `@Singleton` holders),
 /// so Home keeps its snapshot across navigation.
 @Observable
@@ -80,6 +91,13 @@ final class HomeStore {
     /// The tracks from outside the library that Autoplay played, by id (docs/brain-spec.md, 7.2): Recently Played
     /// resolves ids the library does not have through them. Set by `AppEnvironment` (nil for previews).
     @ObservationIgnored var engineSongs: (() async -> [String: Song])?
+    /// The music brain's "Because you listened to X" rows, in front of the legacy shelves (decision D10). Shown
+    /// from their saved file; a rebuild is what the next visit shows.
+    private(set) var brainShelves: [BrainHomeShelf] = []
+    @ObservationIgnored var brainRows: HomeBrainRowsSource?
+    @ObservationIgnored private var brainRowsLoaded = false
+    @ObservationIgnored private var pendingBrainRows: [BrainHomeShelf]?
+    @ObservationIgnored private var brainRowsTask: Task<Void, Never>?
     /// Blocked artists: their songs are left out of every mix, shelf and list Home computes.
     @ObservationIgnored private(set) var blockedMatcher: BlockedArtistMatcher = .empty
     @ObservationIgnored private var blockedRevision = 0
@@ -151,6 +169,7 @@ final class HomeStore {
     /// Recomputes when the library (`libraryRevision`), the history or the day changed (`force` = the refresh
     /// button).
     func refresh(snapshot: LibrarySnapshot, libraryRevision: Int, force: Bool = false) async {
+        refreshBrainRows()
         let snapshot = unblocked(snapshot)
         await history.ensureLoaded()
         await taste?.ensureLoaded()
@@ -210,6 +229,52 @@ final class HomeStore {
         }
         computeTask = computation
         await computation.value
+    }
+
+    // MARK: The music brain's rows (docs/brain-spec.md, 8.1)
+
+    /// Shows the saved rows the first time, then asks for a rebuild. Never waits: Home's own computation goes on
+    /// beside it. A rebuilt row is what the NEXT visit shows (`showPendingBrainRows`); only a Home with no row yet
+    /// takes a new one right away, so nothing changes under the thumb.
+    private func refreshBrainRows() {
+        guard let source = brainRows, brainRowsTask == nil else { return }
+        guard source.isEnabled() else {
+            if !brainShelves.isEmpty { brainShelves = [] }
+            pendingBrainRows = nil
+            brainRowsLoaded = false
+            return
+        }
+        let loaded = brainRowsLoaded
+        brainRowsLoaded = true
+        brainRowsTask = Task { [weak self] in
+            if !loaded {
+                let shelves = await HomeStore.shelves(of: await source.cached())
+                if let self, self.brainShelves != shelves { self.brainShelves = shelves }
+            }
+            var shelves: [BrainHomeShelf]?
+            if let rebuilt = await source.refreshIfDue() { shelves = await HomeStore.shelves(of: rebuilt) }
+            guard let self else { return }
+            self.brainRowsTask = nil
+            guard let shelves else { return }
+            if self.brainShelves.isEmpty {
+                self.brainShelves = shelves
+            } else if self.brainShelves != shelves {
+                self.pendingBrainRows = shelves
+            }
+        }
+    }
+
+    /// Home came back on screen: rows rebuilt while it was away are shown now.
+    func showPendingBrainRows() {
+        guard let pending = pendingBrainRows else { return }
+        pendingBrainRows = nil
+        if brainShelves != pending { brainShelves = pending }
+    }
+
+    /// The rows as Home draws them (songs and reason lines), built off the main actor.
+    @concurrent
+    private nonisolated static func shelves(of rows: [BrainHomeRow]) async -> [BrainHomeShelf] {
+        BrainHomeShelf.make(rows, nowMs: currentTimeMillis())
     }
 
     /// Expands the card and asks for the AI insight (Android `expandInsight`: on demand, not cached), or collapses

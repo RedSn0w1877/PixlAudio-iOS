@@ -158,6 +158,10 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case nowPlayingSpatialHeld = "nowPlaying.spatialHeld"
     case settingsPlaybackSpatial = "settingsCategory.playback.spatial"
 
+    // The music brain (stage 1, docs/brain-spec.md 8.8 and 8.9): "How picks work", and "Why this song" for the first
+    // demo song with a radio reason
+    case howPicksWork, whyThisSong
+
     /// The accessibility identifier present once the screen is up (`screen.<id>`).
     var readyIdentifier: String {
         switch self {
@@ -268,6 +272,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
              .nowPlayingSpatial, .nowPlayingSpatialHeld:
             return nil
         case .settingsPlaybackSpatial: return .settingsCategory(.playback)
+        case .howPicksWork, .whyThisSong: return nil
         }
     }
 
@@ -307,6 +312,9 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
              .spatialAudioGettingCloudVersion, .spatialAudioCloudVersion, .spatialAudioOnPhoneOnly,
              .spatialAudioCloudFailed, .spatialAudioHeadphonesOnly, .spatialAudioPausedForSing:
             return .spatialAudio(fromPlayer: true)
+        case .howPicksWork: return .howPicksWork
+        case .whyThisSong:
+            return .whyThisSong(songId: songId, whyKey: "radio_fans", whyArg: DemoLibrary.songs.first?.artist ?? "")
         default: return nil
         }
     }

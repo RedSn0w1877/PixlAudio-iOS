@@ -8,7 +8,8 @@ import SwiftUI
 ///   did; the subtitle names the profile) and **Sing** (vocals off / on through the song's instrumental, the same
 ///   request as the lyrics screen's Sing segment, with its state as the subtitle), then Ask Taizo (the sparkles circle
 ///   that sat beside the title);
-/// - the song: Add to playlist, Go to album, Go to artist (the picker when there are several), Share;
+/// - the song: Start station and Not for me (the music brain, docs/brain-spec.md 8.3 and 8.5), Add to playlist, Go to
+///   album, Go to artist (the picker when there are several), Share;
 /// - Sleep timer and Song details.
 ///
 /// Its own view: the Spatial audio profile and the Sing job's progress redraw this button only, never the player.
@@ -49,6 +50,12 @@ struct PlayerMoreMenu<MenuShape: Shape>: View {
                 }
             }
             Section {
+                Button(BrainStrings.startStation, systemImage: "dot.radiowaves.left.and.right") {
+                    env.brainActions.startSongStation(song)
+                }
+                Button(BrainStrings.notForMe, systemImage: "hand.thumbsdown") {
+                    env.brainActions.notForMe(song)
+                }
                 Button("Add to playlist", systemImage: "text.badge.plus") { showsAddToPlaylist = true }
                 if song.albumId != -1 {
                     Button("Go to album", systemImage: "opticaldisc") { openAlbum() }

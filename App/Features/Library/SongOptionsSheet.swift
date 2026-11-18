@@ -166,6 +166,8 @@ struct SongOptionsSheet: View {
                     confirmsDelete = true
                 }
             }
+            // The music brain (docs/brain-spec.md, 8.3, 8.5): a station from this song, and "Not for me".
+            BrainSongActions(song: song, onDone: { dismiss() })
             // Blocked artists: one tile per credited artist (Block X / Unblock X).
             ForEach(creditedArtists(of: song).prefix(3), id: \.id) { artist in
                 let isBlocked = blocked.isBlocked(artistId: artist.id, name: artist.name)

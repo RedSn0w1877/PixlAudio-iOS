@@ -63,6 +63,9 @@ struct SheetDestination: View {
             case .aiPlaylist: AiPlaylistSheet().pixlSheet(detents: [.tallGlass])
             case .taisChat: TaisChatSheet().pixlSheet(detents: [.tallGlass])
             case .spatialAudio(let fromPlayer): SpatialAudioSheet(fromPlayer: fromPlayer) // sizes its own detent
+            case .howPicksWork: HowPicksWorkSheet().pixlSheet()
+            case .whyThisSong(let songId, let whyKey, let whyArg):
+                WhyThisSongRoute(songId: songId, whyKey: whyKey, whyArg: whyArg).pixlSheet()
             }
         }
         // The Connect volume pop-up: the shell's copy doesn't reach into a sheet.

@@ -17,6 +17,13 @@ final class AutoplayState {
     var lineIndex: Int?
     /// Three skips in a row: Autoplay turned to something else (shown on the line for a few seconds).
     var changedDirection = false
+    /// The queue is a station (8.3): what it is named after, a song's title or an artist's name. Nil for none.
+    var stationTitle: String?
+    var stationIsArtist = false
+    /// The Familiar / Blend / Discover switch (`Novelty.familiar`, `.blend`, `.discover`).
+    var novelty = Novelty.blend
+    /// The reason line of every queue entry that has one, by song id (8.8).
+    var why: [String: QueueWhy] = [:]
 }
 
 /// The app's side of the music brain (docs/brain-spec.md, 2.1): it owns the brain's files through `BrainRepository`
@@ -31,10 +38,14 @@ final class BrainService {
     static weak var shared: BrainService?
 
     let autoplay = AutoplayState()
+    /// The station of the queue and the novelty switch (8.3): two small stored values, read on first use.
+    let stations: StationStore
     /// Nil in UI tests: no files, no network.
     let repository: BrainRepository?
     /// The affinity tables, the session and the event log, behind one actor. Nil in UI tests.
     let engine: BrainEngine?
+    /// Home's "Because you listened to" rows (8.1). Nil in UI tests.
+    let homeRows: BrainHomeRows?
     /// Called on the main actor after each recorded play (Autoplay reacts to skips and likes).
     var onReaction: ((Reaction) -> Void)?
     /// Marks the song that is playing (an `EventFlags` bit): set by `AppEnvironment` to the listening stats.
@@ -57,13 +68,17 @@ final class BrainService {
     /// `sources` is what a rebuild of the brain's state reads from the rest of the app (4.4); nothing is read
     /// until one runs.
     init(radioSource: (any RadioSource)?, isEnabled: Bool, sources: BrainEngine.Sources? = nil) {
+        stations = StationStore(defaults: isEnabled ? UserDefaults.standard : nil)
         if isEnabled, let directory = Self.defaultDirectory() {
             let repository = BrainRepository(directory: directory, radioSource: radioSource)
             self.repository = repository
-            engine = BrainEngine(directory: directory, repository: repository, sources: sources)
+            let engine = BrainEngine(directory: directory, repository: repository, sources: sources)
+            self.engine = engine
+            homeRows = BrainHomeRows(directory: directory, repository: repository, engine: engine)
         } else {
             repository = nil
             engine = nil
+            homeRows = nil
         }
     }
 

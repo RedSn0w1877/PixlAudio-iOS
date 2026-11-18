@@ -73,6 +73,9 @@ protocol PlaybackEngine: AnyObject {
     /// Where the listener starts the next queue from (an album, a playlist, search): the tag `setQueue` puts on its
     /// entries. Engines without a queue model ignore it.
     func setQueueSource(_ tag: BrainItemTag?)
+    /// Tags for single songs of the next queue, by song id (a Home row's cards each carry their own pick); they
+    /// win over the queue's source. Engines without a queue model ignore them.
+    func setQueueTags(_ tags: [String: BrainItemTag])
 }
 
 extension PlaybackEngine {
@@ -84,4 +87,5 @@ extension PlaybackEngine {
     func setPlaybackRate(_ rate: Float) {}
     func setBlocklist(_ matcher: BlockedArtistMatcher) {}
     func setQueueSource(_ tag: BrainItemTag?) {}
+    func setQueueTags(_ tags: [String: BrainItemTag]) {}
 }

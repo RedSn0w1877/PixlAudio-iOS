@@ -61,6 +61,14 @@ final class FeaturesScreenshotTests: XCTestCase {
     func testTasteChangesLight() throws { try capture("tasteChanges", "light", ready: "screen.tasteChanges") }
     func testTasteChangesDark() throws { try capture("tasteChanges", "dark", ready: "screen.tasteChanges") }
     func testTasteChangesEmptyLight() throws { try capture("tasteChangesEmpty", "light", ready: "screen.tasteChanges") }
+
+    // MARK: The music brain (docs/brain-spec.md, 8.8 and 8.9)
+
+    func testHowPicksWorkLight() throws { try capture("howPicksWork", "light", ready: "screen.howPicksWork") }
+    func testHowPicksWorkDark() throws { try capture("howPicksWork", "dark", ready: "screen.howPicksWork") }
+    func testWhyThisSongLight() throws { try capture("whyThisSong", "light", ready: "screen.whyThisSong") }
+    func testWhyThisSongDark() throws { try capture("whyThisSong", "dark", ready: "screen.whyThisSong") }
+
     func testBlockedArtistsEmptyLight() throws {
         try capture("blockedArtistsEmpty", "light", ready: "screen.blockedArtists")
     }

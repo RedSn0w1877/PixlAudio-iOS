@@ -72,9 +72,10 @@ final class PlaybackStore {
     /// choice, so both play as asked.
     ///
     /// `source` says where the listener started it from (docs/brain-spec.md, 4.2: an album, a playlist, search);
-    /// the queue's entries carry it, and nothing else reads it.
+    /// the queue's entries carry it, and nothing else reads it. `tags` are per-song tags that win over it (a Home
+    /// row's cards).
     func play(_ songs: [Song], startIndex: Int = 0, startPositionMs: Int64 = 0, playWhenReady: Bool = true,
-              allowsBlockedStart: Bool = false, source: BrainItemTag? = nil) {
+              allowsBlockedStart: Bool = false, source: BrainItemTag? = nil, tags: [String: BrainItemTag] = [:]) {
         guard !songs.isEmpty else { return }
         var startIndex = startIndex
         if !allowsBlockedStart, songs.count > 1, !blocklist.isEmpty {
@@ -93,6 +94,7 @@ final class PlaybackStore {
         currentIndex = min(max(startIndex, 0), songs.count - 1)
         syncCurrent()
         engine.setQueueSource(source)
+        engine.setQueueTags(tags)
         if let remote {
             // The new queue plays on the remote device; the engine only holds it.
             engine.setQueue(songs, startIndex: currentIndex ?? 0, startPositionMs: startPositionMs, playWhenReady: false)
@@ -104,10 +106,11 @@ final class PlaybackStore {
     }
 
     /// Plays one song within `context` (defaults to just that song).
-    func play(_ song: Song, in context: [Song]? = nil, allowsBlockedStart: Bool = false, source: BrainItemTag? = nil) {
+    func play(_ song: Song, in context: [Song]? = nil, allowsBlockedStart: Bool = false, source: BrainItemTag? = nil,
+              tags: [String: BrainItemTag] = [:]) {
         let list = context ?? [song]
         play(list, startIndex: list.firstIndex(where: { $0.id == song.id }) ?? 0, allowsBlockedStart: allowsBlockedStart,
-             source: source)
+             source: source, tags: tags)
     }
 
     // MARK: Blocked artists

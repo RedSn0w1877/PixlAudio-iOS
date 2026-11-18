@@ -1,3 +1,4 @@
+import PixlLibrary
 import PixlModel
 import SwiftUI
 import UIKit
@@ -30,6 +31,9 @@ struct QueueSheet: View {
     @State private var confirmsClear = false
     @State private var showsSaveAsPlaylist = false
     @State private var songInfo: QueueSongRef?
+    /// "Why this song" for the row whose reason line was tapped (docs/brain-spec.md, 8.8).
+    @State private var whyRef: QueueWhyRef?
+    @State private var showsHowPicksWork = false
     /// The drag's state lives in its own observable model: a drag event re-runs the visible rows' offset modifiers,
     /// not this sheet's body.
     @State private var reorder = QueueReorderState()
@@ -113,6 +117,14 @@ struct QueueSheet: View {
         .sheet(isPresented: $showsTimer) {
             SleepTimerSheet().sleepTimerPresentation()
         }
+        .sheet(item: $whyRef) { ref in
+            WhyThisSongSheet(song: ref.song, why: ref.why).pixlSheet()
+        }
+        .sheet(isPresented: $showsHowPicksWork) {
+            HowPicksWorkSheet().pixlSheet()
+        }
+        // "Not for me" from a row's song sheet or from "Why this song": the bar with Undo shows over the queue.
+        .brainNoticeBar(bottomPadding: 96)
         .fullScreenCover(isPresented: $showsSaveAsPlaylist) {
             SaveQueueAsPlaylistSheet(songs: queue, defaultName: String(localized: "Current queue"))
         }
@@ -178,21 +190,29 @@ struct QueueSheet: View {
 
     // MARK: List
 
-    /// The queue's Autoplay line (docs/brain-spec.md, 8.4): what follows it was picked by Autoplay; its switch turns
-    /// the picking off.
+    /// The queue's Autoplay line (docs/brain-spec.md, 8.3, 8.4): what follows it was picked by the engine; its switch
+    /// turns the picking off. When the queue is a station it names the station instead. Under it, Familiar / Blend /
+    /// Discover; beside it, the way to "How picks work".
     private var autoplayLineView: some View {
         let state = env.brain.autoplay
         let ai = settings.ai
         let autoplayController = env.autoplayController
+        let actions = env.brainActions
         return AutoplayLine(isOn: ai.musicDiscoveryEnabled, finding: state.finding, fromLibrary: state.fromLibrary,
-                            changedDirection: state.changedDirection) { isOn in
-            ai.musicDiscoveryEnabled = isOn
-            autoplayController?.settingChanged()
-        }
+                            changedDirection: state.changedDirection, stationTitle: state.stationTitle,
+                            stationIsArtist: state.stationIsArtist, novelty: state.novelty,
+                            onToggle: { isOn in
+                                ai.musicDiscoveryEnabled = isOn
+                                autoplayController?.settingChanged()
+                            },
+                            onNovelty: { level in actions.setNovelty(level) },
+                            onHowPicksWork: { showsHowPicksWork = true })
     }
 
     private func list(queue: [Song], count: Int, offset: Int, currentDisplay: Int, autoplayLine: Int?) -> some View {
-        ScrollViewReader { proxy in
+        // The reason line of every pick that has one, by song id (kept in step with the queue by Autoplay).
+        let whyLines = env.brain.autoplay.why
+        return ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 8) {
                     Spacer().frame(height: 6)
@@ -202,9 +222,12 @@ struct QueueSheet: View {
                         let song = queue[index + offset]
                         let canReorder = index > currentDisplay
                         let isCurrent = index == currentDisplay
+                        let why = whyLines.isEmpty ? nil : whyLines[song.id]
                         QueueSongRow(song: song, isCurrent: isCurrent,
                                      isPlaying: isCurrent && playback.isPlaying, canReorder: canReorder,
                                      isDragging: reorder.draggingIndex == index,
+                                     why: why?.line.map(BrainStrings.whyLine),
+                                     onWhy: { if let why { whyRef = QueueWhyRef(song: song, why: why) } },
                                      onTap: { playback.skipToQueueItem(at: index + offset) },
                                      onMore: { songInfo = QueueSongRef(id: song.id) },
                                      onDismiss: { remove(song, at: index + offset) },
@@ -479,6 +502,14 @@ private struct QueueSongRef: Identifiable {
     let id: String
 }
 
+/// The row whose reason line was tapped, for "Why this song".
+private struct QueueWhyRef: Identifiable {
+    let song: Song
+    let why: QueueWhy
+
+    var id: String { song.id }
+}
+
 /// A removed song kept for "Undo".
 private struct QueueUndo {
     let id = UUID()
@@ -571,6 +602,10 @@ private struct QueueSongRow<Handle: Gesture>: View {
     let isPlaying: Bool
     let canReorder: Bool
     let isDragging: Bool
+    /// Why the engine picked this song (docs/brain-spec.md, 8.8); nil for a song the listener queued and for a pick
+    /// with nothing true to say. A tap on the line opens "Why this song".
+    let why: String?
+    let onWhy: () -> Void
     let onTap: () -> Void
     let onMore: () -> Void
     let onDismiss: () -> Void
@@ -634,6 +669,19 @@ private struct QueueSongRow<Handle: Gesture>: View {
                     .pixlFont(.bodyMedium)
                     .foregroundStyle(isCurrent ? theme.primary.opacity(0.8) : theme.onSurfaceVariant)
                     .lineLimit(1)
+                if let why {
+                    // One quiet line in `primary`; its own tap (the row's tap still plays the song).
+                    Button(action: onWhy) {
+                        Text(why)
+                            .pixlFont(.labelMedium)
+                            .foregroundStyle(theme.primary)
+                            .lineLimit(1)
+                            .padding(.vertical, 2)
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(BrainStrings.whyDescription)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if isCurrent {
@@ -674,6 +722,9 @@ private struct QueueSongRow<Handle: Gesture>: View {
         .accessibilityAction(named: "More options") { onMore() }
         // Only the upcoming songs can be removed or moved: the current song and the history offer neither.
         .accessibilityActions {
+            if why != nil {
+                Button(BrainStrings.whySheetTitle, action: onWhy)
+            }
             if canReorder {
                 Button("Remove from queue", action: onDismiss)
             }

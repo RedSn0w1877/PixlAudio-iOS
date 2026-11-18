@@ -225,6 +225,11 @@ nonisolated enum AppSheet: Hashable, Sendable, Identifiable {
     /// Spatial audio (2026-11-11, cloud audio spec 6.5): the profiles and the playing song's status line, from the full
     /// player's button (album colours) or from Settings › Playback › Sound (the app's).
     case spatialAudio(fromPlayer: Bool)
+    /// The music brain (docs/brain-spec.md, 8.9): the promises the picks keep, the Autoplay switch, Taste changes.
+    /// The queue and "Why this song" present it themselves, over their own sheet.
+    case howPicksWork
+    /// The music brain (docs/brain-spec.md, 8.8): the sheet behind a pick's reason line. The queue presents it itself.
+    case whyThisSong(songId: String, whyKey: String, whyArg: String)
 
     var id: String {
         switch self {
@@ -240,6 +245,8 @@ nonisolated enum AppSheet: Hashable, Sendable, Identifiable {
         case .aiPlaylist: "aiPlaylist"
         case .taisChat: "taisChat"
         case .spatialAudio(let fromPlayer): fromPlayer ? "spatialAudio.player" : "spatialAudio.settings"
+        case .howPicksWork: "howPicksWork"
+        case .whyThisSong(let id, _, _): "whyThisSong.\(id)"
         }
     }
 }

@@ -184,6 +184,10 @@ nonisolated enum PreferenceKeys {
     /// The music brain (docs/brain-spec.md, 7.1, 12.3): whether YouTube Music may be asked for related music. Off,
     /// Autoplay continues from the library alone. No Settings row yet (Android `brain_youtube_source_enabled`).
     static let brainYouTubeSourceEnabled = "brain_youtube_source_enabled"
+    /// The music brain (docs/brain-spec.md, 8.3): the station the queue is (one line of text, `Station.encode`) and
+    /// the Familiar / Blend / Discover switch (0, 1, 2). Android `brain_station` / `brain_novelty`.
+    static let brainStation = "brain_station"
+    static let brainNovelty = "brain_novelty"
     /// iOS only (2026-10-26): the one-time switch of learning and discovery to on, run when their Settings screen
     /// (Music intelligence) was removed, so a switch an older build left off cannot stay off with nowhere to undo it.
     static let smartFeaturesOnMigrated = "smart_features_on_v1"

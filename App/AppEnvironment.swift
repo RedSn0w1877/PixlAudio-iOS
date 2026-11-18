@@ -61,6 +61,9 @@ final class AppEnvironment {
     let brain: BrainService
     /// Autoplay (docs/brain-spec.md, 7.1): keeps the queue going with related music. Nil in UI tests.
     let autoplayController: AutoplayController?
+    /// What the listener does to the music brain by hand (docs/brain-spec.md, 8.3, 8.5): "Start station", "Not for
+    /// me" and its bar, the Familiar / Blend / Discover switch, a Home row's card.
+    let brainActions: BrainActions
 
     @ObservationIgnored private var aiStorage: AIService?
 
@@ -311,9 +314,37 @@ final class AppEnvironment {
                 matchedVideoId: { spotifyId in try? await persistence?.matchedVideoId(spotifyId: spotifyId) }))
             realPlayback.autoplay = autoplay
             brain.onReaction = { [weak autoplay] reaction in autoplay?.reaction(reaction) }
+            // "Not for me", "Less from ...", a mute or an undo from anywhere: what it excludes leaves the engine's
+            // picks at once (docs/brain-spec.md, 8.5). Nothing runs until a change is made.
+            autoplay.observeTasteChanges { tasteAdjustments.revision }
             autoplayController = autoplay
         } else {
             autoplayController = nil
+        }
+        brainActions = BrainActions(brain: brain, playback: playback, library: library, taste: tasteAdjustments,
+                                    playCounts: playCounts, engine: realPlayback?.engine, autoplay: autoplayController)
+        if let homeRows = brain.homeRows {
+            // Home's "Because you listened to" rows (docs/brain-spec.md, 8.1): the saved rows at once; a rebuild only
+            // once music has played in this run, off the main actor, with what it reads captured when it is due.
+            let rowsLibrary = library, rowsBlocked = settings.blocked, rowsSettings = settings.ai
+            let rowsTaste = tasteAdjustments, rowsAutoplay = autoplayController, rowsPersistence = persistence
+            home.brainRows = HomeBrainRowsSource(
+                isEnabled: { rowsSettings.musicDiscoveryEnabled },
+                cached: { await homeRows.cached() },
+                refreshIfDue: {
+                    await rowsTaste.ensureLoaded()
+                    // What the rows depend on besides their anchors: the taste changes in force and the blocked artists.
+                    let tasteSignature = Int(truncatingIfNeeded: BrainHash.fnv1a64(rowsTaste.items.map(\.id).joined(separator: ",")))
+                    return await homeRows.refreshIfDue(tasteRevision: tasteSignature, blockedCount: rowsBlocked.count) { @MainActor in
+                        let now = currentTimeMillis()
+                        return HomeRowInputs(
+                            library: rowsLibrary.songs, blocked: rowsBlocked.matcher,
+                            adjustments: rowsTaste.activeSet(nowMs: now),
+                            allowNetwork: rowsAutoplay?.mayUseNetwork() ?? false,
+                            tzOffsetMin: Int32(clamping: TimeZone.current.secondsFromGMT() / 60),
+                            matchedVideoId: { spotifyId in try? await rowsPersistence?.matchedVideoId(spotifyId: spotifyId) })
+                    }
+                })
         }
         historySync = ListeningHistorySync(store: importedHistory, spotify: spotify, youtube: youtube)
         let historyLibrary = library

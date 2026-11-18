@@ -2,7 +2,8 @@ import PixlModel
 import SwiftUI
 
 /// The quick actions a long press on the full player's artwork or on the mini player offers (Settings › Gestures &
-/// haptics): add to playlist, share, go to the artist. A context menu (the system's), so it needs no drag and cannot
+/// haptics): start a station, "Not for me" (the music brain, docs/brain-spec.md 8.3 and 8.5), add to playlist, share,
+/// go to the artist. A context menu (the system's), so it needs no drag and cannot
 /// fight scrolling or the sheet; the add-to-playlist sheet is presented from the view the menu is attached to.
 struct SongQuickActionsModifier: ViewModifier {
     let song: Song
@@ -29,6 +30,10 @@ struct SongQuickActionsModifier: ViewModifier {
 
     @ViewBuilder
     private var menuItems: some View {
+        Button(BrainStrings.startStation, systemImage: "dot.radiowaves.left.and.right") {
+            env.brainActions.startSongStation(song)
+        }
+        Button(BrainStrings.notForMe, systemImage: "hand.thumbsdown") { env.brainActions.notForMe(song) }
         Button("Add to playlist", systemImage: "text.badge.plus") { showsAddToPlaylist = true }
         if let url = SongQuickActions.shareURL(song) {
             ShareLink(item: url) { Label("Share", systemImage: "square.and.arrow.up") }

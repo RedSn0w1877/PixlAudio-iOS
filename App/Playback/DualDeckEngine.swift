@@ -91,6 +91,7 @@ final class DualDeckEngine: PlaybackEngine {
     /// stats read this to tell an error from a finished track.
     private(set) var loadFailureCount = 0
     private var pendingQueueSource: BrainItemTag?
+    private var pendingQueueTags: [String: BrainItemTag] = [:]
     /// The same queue entry started again on its own (repeat-one loop, or a crossfade into itself).
     var onRepeatLoop: (() -> Void)?
     /// The queue ended (repeat off).
@@ -130,11 +131,16 @@ final class DualDeckEngine: PlaybackEngine {
     /// puts it on every entry and clears it.
     func setQueueSource(_ tag: BrainItemTag?) { pendingQueueSource = tag }
 
+    /// Per-song tags of the next queue (a Home row's cards). Set right before `setQueue`, which uses and clears them.
+    func setQueueTags(_ tags: [String: BrainItemTag]) { pendingQueueTags = tags }
+
     func setQueue(_ songs: [Song], startIndex: Int, startPositionMs: Int64, playWhenReady: Bool) {
         let previous = queue.current?.song
         let source = pendingQueueSource
         pendingQueueSource = nil
-        queue.replace(with: songs, startIndex: startIndex, shuffle: shuffleEnabled, source: source)
+        let tags = pendingQueueTags
+        if !tags.isEmpty { pendingQueueTags = [:] }
+        queue.replace(with: songs, startIndex: startIndex, shuffle: shuffleEnabled, source: source, tagsBySongId: tags)
         hasEnded = false
         consecutiveFailures = 0
         self.playWhenReady = playWhenReady && !queue.isEmpty
@@ -271,6 +277,26 @@ final class DualDeckEngine: PlaybackEngine {
         guard !songs.isEmpty, songs.count == tags.count, !isHandOverPrepared,
               let current = queue.currentIndex, index > current + 1 else { return false }
         guard queue.replaceTail(from: index, songs: songs, tags: tags) else { return false }
+        queueEdited(currentChanged: false)
+        return true
+    }
+
+    /// A station started from the track that is playing (docs/brain-spec.md, 8.3): the track keeps playing and
+    /// becomes the station's seed (`tag`), and what was queued behind it goes, in one edit. False with no track.
+    @discardableResult
+    func startStationInPlace(tag: BrainItemTag) -> Bool {
+        guard queue.retagCurrent(tag) else { return false }
+        queue.clearUpcoming()
+        queueEdited(currentChanged: false)
+        return true
+    }
+
+    /// Takes the engine's upcoming picks with these song ids out of the queue in one edit: what a taste change
+    /// excludes (docs/brain-spec.md, 8.5). Refused while a hand-over is prepared; the listener's own items and the
+    /// current track are never touched. False when nothing changed.
+    @discardableResult
+    func removeUpcomingEnginePicks(ids: Set<String>) -> Bool {
+        guard !isHandOverPrepared, queue.removeUpcomingEngine(ids: ids) else { return false }
         queueEdited(currentChanged: false)
         return true
     }
