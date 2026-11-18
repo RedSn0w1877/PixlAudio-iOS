@@ -473,3 +473,202 @@ On a phone, after 1a's list: play a song, skip the next one after two seconds, a
 `Application Support/Brain/play_event.pbl` for a line with `"endReason":1` and `playedMs` near 2000; skip two
 Autoplay picks by one artist and check that artist is gone from the end of the queue; skip three in a row and read
 the Autoplay line; like an Autoplay pick and look for a track by that artist in the next batch.
+
+---
+
+## Milestone 1c: "it shows"
+
+Spec section 14, stage 1, items 10 to 13, with 8.1 (the stage 1 row), 8.3, 8.4, 8.5, 8.8, 8.9 and 13.2. A port of
+Android's commits `b361670` to `c8514fd`. Built on 1b after checking that 1b's CI run (`44274448070`) was green.
+
+**Nothing below has been run on a phone, and no screen of this milestone was ever looked at.** PixlCore is compiled
+and tested on Windows; everything under `App/` passed a syntax check (`ci/parse-check.ps1`) here and is compiled by
+CI only. No `[shots]` run was made.
+
+### What the listener gets (once checked on a phone)
+
+- **Start station** in the song sheet (every song row's ⋮), in the full player's ⋯ menu, in the long-press menu of
+  the artwork and the mini player, and in the artist page's ⋯ menu. The seed plays first (the song itself; for an
+  artist, the listener's most-played library track by them); twenty picks follow once the seed is 1.5 s in and its
+  radio has answered, then five at a time. The queue's line reads "Station · Espresso". A station keeps going with
+  the Autoplay switch off and is still a station after a restart.
+- **"Because you listened to X"** on Home, at most two rows, twelve cards each of music the listener does not have.
+  A tap plays the card with the row as the queue; Autoplay continues from there.
+- **Not for me** in the same four places and on the sheet behind a reason line: the song is muted (it shows in
+  Taste changes), skipped if it is playing, and a bar offers Undo and "Less from <artist>".
+- **A reason under every engine pick** in the queue ("Fans of d4vd also play this", "More from X", "Because you
+  liked X", "On repeat this month", "Because you listened to X"). A tap opens "Why this song": the reason, Like,
+  Not for me, Less from the artist, and "How picks work".
+- **How picks work**: the stage 1 promises, the Autoplay switch, the way to Taste changes. Reached from the (i) on
+  the Autoplay or Station line and from "Why this song".
+- **Familiar / Blend / Discover** under the Autoplay or Station line (0.4 / 1 / 2). It re-plans the engine's tail.
+- The reasons, and everything else an engine pick carries, now survive a restart.
+- A song skipped three times as an engine pick, and never heard for 30 s, stays out of the picks for 60 days.
+
+### Where things are
+
+**`Packages/PixlCore/Sources/PixlLibrary/BrainStore/`** (decisions; compiled and tested here)
+
+| File | What | Android twin |
+|---|---|---|
+| `Station.swift` | `Station` (kind, seed, title, artist; `encode` / `decode`; `seedTag`, `isSeed`), `Novelty` (0.4 / 1 / 2), `StationRules` (what a queue says about a station, batch sizes, the surface's novelty factor, the artist seed) | `Station.kt`, `BrainPlayTags.kt`, the seed half of `StationStateHolder.kt` |
+| `BrainHomeRows.swift` | `HomeAnchor`, `HomeAnchors` (`qualifies`, `push`, `pick`), `BrainHomeRows` (actor: `cached`, `refreshIfDue`, the file `brain_home_rows_v1.json`), `BrainHomeRow` (`tags`, `cardReason`), `HomeRowInputs` | `HomeAnchorStore.kt`, `BrainHomeRows.kt` |
+| `BrainFeedback.swift` | `BrainFeedback` (the mute behind "Not for me", the reduce behind "Less from"), `BrainNotice` (the bar), `WhyLineText` (reason key to sentence case), `QueueWhy` | `BrainFeedback.kt`, `WhyLineText.kt`, state of `BrainActionsStateHolder.kt` |
+| `BrainIgnored.swift` | `IgnoreTally`: "ignored three times" (6.1) | the `ignoredThreeTimes` query |
+| `BrainEngine.swift` | station plans (mode, tie seed, the session's seed fields), `planHomeRow` (a fresh session), `homeAnchors`, `isLoaded`, `ignoredRids`; a home anchor and the tally are written beside each event | `AutoplayController.planOnBrain`, `BrainEngine.kt` |
+| `BrainEventLog.swift` | `engine_plays.pbl`, `engineServedEvents`, the two new named values | |
+| `BrainRepository.swift` | `artistRadio` (the artist page's top songs, then the artist radio, stored under chip `+artist`), the channel id lookup | `artistRadioFor`, `channelIdFor` |
+| `AutoplayPool.swift` | the artist station's own list in front; ignored recordings left out | `buildPool` |
+| `AutoplayPlanning.swift` | `station` and `noveltyFactor` in the plan inputs; a station's picks are tagged `surface = station`; a pick in pool order from a radio says "Fans of ..."; `AutoplayTasteFilter` | `planInputs`, `mediaItemFor`, `onTasteChanged` |
+
+`PixlModel/BrainRows.swift`: `BrainItemTag.chosen`; `PixlModel/LibraryValues.swift`: `PlaybackQueueItemSnapshot` gains
+the six optional fields `brainWhyKey`, `brainWhyArg`, `brainPrimaryArtist`, `brainChosen`, `brainRetrQ`,
+`brainRadioRank` (Android's names). `Brain/Arms.swift`: a chosen pick is not engine-owned. The pure core and the
+golden files are unchanged.
+
+**`App/`** (not compiled locally)
+
+| File | Change |
+|---|---|
+| `Features/Brain/BrainStrings.swift` (new) | every string of this milestone, Android's sentences |
+| `Features/Brain/NoveltySwitch.swift`, `WhyThisSongSheet.swift`, `HowPicksWorkSheet.swift`, `BrainNoticeBar.swift`, `BrainSongActions.swift` (new) | the three-stop switch, the two sheets, the bar, the song sheet's two rows |
+| `Services/Brain/BrainActions.swift` (new) | start a station, play a Home card, Not for me / Undo / Less from, the switch; `BrainHomeShelf` |
+| `Services/Brain/StationStore.swift` (new) | the station and the switch in `UserDefaults` (`brain_station`, `brain_novelty`), read on first use |
+| `Services/Brain/BrainService.swift` | owns `StationStore` and `BrainHomeRows`; `AutoplayState.stationTitle`, `stationIsArtist`, `novelty`, `why` |
+| `Playback/AutoplayController.swift` | station mode (`refreshStation`, one anchor, first batch 20, active with the switch off), the novelty factor, `tasteChanged` (observes the taste changes' revision), the queue's reason map |
+| `Playback/PlaybackQueue.swift`, `DualDeckEngine.swift`, `Core/PlaybackEngine.swift`, `Stores/PlaybackStore.swift` | per-song tags for a play (`setQueueTags`, `play(... tags:)`); `retagCurrent` + `startStationInPlace`; `removeUpcomingEngine` + `removeUpcomingEnginePicks` |
+| `Features/Queue/AutoplayLine.swift`, `QueueSheet.swift` | "Station · X", the (i), the switch; the reason line on a row; the two sheets and the bar over the queue |
+| `Features/Library/SongOptionsSheet.swift`, `Features/NowPlaying/PlayerMoreMenu.swift`, `Features/Gestures/SongQuickActions.swift`, `Features/Detail/ArtistDetailView.swift` | Start station, Not for me |
+| `Features/Home/HomeStore.swift`, `HomeView.swift` | `brainShelves` in front of the legacy shelves; rebuilt rows wait until Home is selected again |
+| `AppEnvironment.swift`, `Shell/RootView.swift` | builds `BrainActions`, wires Home's rows and the taste observation; the bar over the tabs and the player |
+| `Core/Routes.swift`, `Shell/RouteDestinations.swift`, `Demo/UITestLaunchRouter.swift`, `UITests/FeaturesScreenshotTests.swift` | `AppSheet.howPicksWork`, `.whyThisSong`; demo screens `howPicksWork`, `whyThisSong` |
+| `AppTests/AutoplayQueueTests.swift` | + a station's seed in the queue, a Home card's tags, the taste edit, `StationStore`, the words of a reason |
+
+### Item 10: stations
+
+1. `BrainActions.startSongStation` writes the `Station` to `StationStore`, then either (the seed is already
+   playing) gives the current queue entry the station's tag and drops what was queued behind it
+   (`DualDeckEngine.startStationInPlace`), or plays a queue of just the seed with that tag.
+2. `AutoplayController.refreshStation` reads the queue at every trigger: the queue is the station's for as long as
+   it holds an entry that is the seed AND carries the station's tag (`Station.isSeed`). The anchors are then the
+   seed alone and Autoplay is active even with its switch off.
+3. The pool is the seed's radio and, for an artist station, in front of it `BrainRepository.artistRadio`.
+4. `BrainEngine.plan` runs `StationPlanner.modeStation` with `nu x 1.2 x` the switch, 20 picks the first time and 5
+   after, the tie seed `seedRid ^ localDay ^ batch`, and sets the session's `seed` / `seedAid` / `seedKind`.
+5. Picks are tagged `surface = station`, `surfaceId = Station.id` (a hash) and carry reasons like any pick.
+6. Any other play replaces every queue entry, so the seed entry is gone and the next trigger forgets the station.
+
+### Item 11: the Home row
+
+1. `BrainEngine.record` writes a `HomeAnchor` beside a qualifying event (`home_anchors_v1` in `brain_state.pbl`).
+2. `HomeStore.refresh` (library, history or taste changed) first shows `BrainHomeRows.cached()` once, then asks
+   `refreshIfDue`. That returns at once until the brain is in memory in this process, and unless the two newest
+   anchors by different artists, the taste changes or the blocked artists moved (or the rows are six hours old).
+3. A rebuild reads each anchor's radio (one request per anchor at most, only when not cached), filters (6.1), plans
+   `modeHomeRow` against a fresh session, and saves. Rebuilt rows are shown at once only when Home had none;
+   otherwise when the Home tab is selected again.
+4. A tap registers the row's tracks with `BrainService`, and plays through `PlaybackStore.play(... tags:)`: each
+   card carries its arm, slot and `because_listened`, and `chosen`.
+
+### Deviations from the spec and from Android (continuing the list)
+
+40. **A station is "the queue holds its seed ENTRY, tagged by the station"**, not "the queue holds the seed's media
+    id" plus `BrainPlayTags.take`. On iOS every play replaces all queue entries and their tags, so the tag alone
+    says whether the queue is still the station's: no announcement, no 15 s window, no 30 s grace. Starting a
+    station from the track that is playing re-tags that entry (`retagCurrent`); the play in flight keeps the
+    context it started with.
+41. **`StationStore` is not observable**; the queue's line reads `AutoplayState`, which `BrainActions` and the
+    controller keep in step. After a restart the station is shown once the saved queue is restored.
+42. **Android's 49 to 53 hold**: an artist station needs a library track by the artist ("Nothing to start from
+    yet. Add a song by X first."); no similar artists' top songs; 6.4's spacing instead of "1 in 3"; a station does
+    not change direction; the session's seed fields are set when a batch is planned. The artist seed's play counts
+    are `PlayCountStore`'s rows, which may not be loaded yet (then the first library track by the artist).
+43. **A home anchor also stores the YouTube audio id** when the play named one; the "same artist" test of `pick` is
+    by folded name (Android: a case-insensitive compare).
+44. **The taste part of the rows' signature is a hash of the active changes' ids** (Android: an in-process version
+    counter), so a restart alone does not rebuild the rows.
+45. **When rebuilt rows are shown.** `refreshIfDue` runs with `HomeStore.refresh` (Android: at every Home start),
+    and rows rebuilt while others are on screen wait until the Home tab is selected again.
+46. **Android's 55 to 58 hold**: 12 of 12 new tracks; a fresh session; cards show the pick's arm reason; the rows
+    sit in front of the legacy shelves and are hidden with the discovery switch off.
+47. **Nothing was switched off for "Beyond your library".** iOS never ran that text search and has no eager import:
+    `HomeStore` never passed `discoveries` to the legacy planner. `BrainSwitch.LEGACY_EAGER_DISCOVERY` has no twin.
+48. **"Not for me" is a mute keyed by `TasteKey.recording(song)`** (iOS's `artist|title` key), labelled "Title —
+    Artist". Android's 60 to 63 hold (no long-press on a queue row; no event for a track that is not playing; Undo
+    takes the mute back, not the flagged play; "Less from X" is the default reduce, no second tap).
+49. **A taste change removes every upcoming engine pick it excludes** (`PlaybackQueue.removeUpcomingEngine`), not
+    only those in the unbroken run at the end of the queue. While a hand-over is prepared the edit waits for the
+    next trigger. The controller observes `TasteAdjustmentStore.revision`, so a change made by Ask Taizo or in
+    Settings does the same.
+50. **"Ignored three times" is a tally file, not a query** (`engine_plays.pbl`: per recording, its newest three
+    short plays and its newest long one), written when an engine-served play is recorded and built once from the
+    log if it is missing. This closes deviation 37.
+51. **Familiar / Blend / Discover is one global switch** (Android 65): three glass capsules, hidden while the picks
+    come from the library alone.
+52. **The reason is a third line of a queue row**, so rows with a reason are taller; the drag-reorder preview
+    assumes one row pitch and is off by that much while a row is in the air.
+53. **The two sheets are presented by the queue itself** (a sheet over a sheet), as its song sheet is.
+    `AppSheet.howPicksWork` and `.whyThisSong` exist for the demo screens. "How picks work" is reached from the (i)
+    (Android 67) and says only the stage 1 half of "less repetition" (Android 68).
+54. **Strings are `String(localized:)` keys in `BrainStrings.swift`**, English only, not in `Localizable.xcstrings`.
+55. **The six new snapshot fields close deviation 39's last sentence**: `retrQ`, `radioRank`, `whyKey`, `whyArg`
+    and `primaryArtist` now survive a restart. `chosen` is Android's 66.
+56. **The feedback bar is on the shell and on the queue sheet.** A sheet that is neither (Ask Taizo, the devices
+    sheet) would cover it; nothing there offers "Not for me".
+57. **Android's 69 holds**: a pick appended in pool order from an anchor's radio says "Fans of <anchor's artist>
+    also play this"; a plain library pick shows no line.
+
+### Cut or left for later (say so to the owner)
+
+- **"Refresh picks"** on the Autoplay line (8.4).
+- **Swipe on an engine row as a weak negative** (8.4): a swipe removes the row as it always did.
+- **A dedicated "Save" on Recently Played** (Like and "Add to playlist" save an engine track).
+- **The artist station for an artist with no library track**, similar artists' top songs, the station re-seed.
+- **The second tap on "Less from X"**; the supporting facts on "Why this song".
+- `BrainSwitch.engine`, `Snapshot`, `Bandit`, `MixPlanner`, `TasteConstraintAdapter`: not written (nothing in stage
+  1 calls them).
+- No test drives `AutoplayController` (station mode, `tasteChanged`), `BrainActions`, `HomeStore`'s rows or any
+  view. `DemoPlaybackEngine` has no queue tags, so no screenshot shows a queue with picks, reasons or a station.
+- Android's `StationAndPlayTagsTest` cases about `BrainPlayTags` (announce and take) have no twin: iOS has no such
+  object (deviation 40).
+
+### Not verified (all of it on a phone; the specific risks)
+
+1. **Every screen of this milestone**: the Autoplay / Station line with the (i) and the three capsules under it, a
+   queue row with a reason line, the two rows in the song sheet, both sheets, the bar above the mini player, over
+   the full player and over the queue, dark and light, long titles, Dynamic Type, VoiceOver.
+2. **Station start**: that the seed plays and twenty picks follow; the in-place start (the playing track stays, the
+   rest of the queue goes, and the hand-over that was prepared is re-planned); a station started from an Autoplay
+   pick; ending a station by playing something else; a station across a restart; a station under Spotify Connect.
+3. **Artist station**: the channel id lookup, the artist page and the artist radio on a real artist.
+4. **The Home row end to end**: that an anchor is written, that the row appears, that a card plays, that the queue
+   shows "Because you listened to X", that Autoplay continues after it, that the rows do not jump under the thumb.
+5. **"Not for me"**: the skip carrying the flag (the flag is set first, then `skipToNext`), the engine's picks
+   losing the muted track, Undo, "Less from X", the Taste changes screen showing both.
+6. **Sheets over sheets**: "Why this song" over the queue, "How picks work" over that, and "Taste changes" closing
+   all of them and collapsing the player before it pushes.
+7. Whether Discover audibly changes the next batch; the tail re-plan under the thumb.
+8. Reasons on restored rows after a kill.
+9. Cost: nothing was measured. Traced only: a taste change is matched off the main actor; a Home rebuild folds the
+   library once, on the rows' actor, and only when a radio is there to filter; the queue's reason map is rebuilt
+   on the main actor at each queue or track change (one pass over the queue, a dictionary of the picks only).
+10. That nothing runs at app start: `StationStore` reads two `UserDefaults` values when the saved queue is restored;
+    Home reads `brain_home_rows_v1.json` at its first refresh; `refreshIfDue` returns before touching the brain.
+11. Everything on 1a's and 1b's lists.
+
+### How to test
+
+```
+cmd //c "ci\\swiftw.cmd test --package-path Packages\\PixlCore --filter Brain --filter Autoplay --filter QueueSnapshot"
+cmd //c "ci\\swiftw.cmd test --package-path Packages\\PixlCore"
+bash ci/check-forbidden.sh
+powershell -NoProfile -ExecutionPolicy Bypass -File ci/parse-check.ps1     # syntax of the changed App files
+```
+
+On a phone, after 1a's and 1b's lists: open a song's ⋮ and tap "Start station" (the song should play, the queue
+should say "Station · <title>" and fill with twenty picks, each with a reason); do the same on the track that is
+playing, from the player's ⋯; open an artist and start a station from its ⋯; tap a reason and read the sheet; tap
+"Not for me" on a pick that is playing (it should skip, the bar should offer Undo and "Less from ..."), then look
+at Settings › Taste changes; move the switch to Discover and watch the end of the queue change; finish a song you
+chose, switch to another tab and back to Home and look for "Because you listened to ..."; play a card, then check
+the library does not have it; kill the app mid-station and reopen the queue.
