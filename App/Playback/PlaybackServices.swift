@@ -26,6 +26,9 @@ final class PlaybackServices {
     var onUpcomingChanged: (() -> Void)?
     /// Playback started or paused (the prefetcher prepares upcoming streamed songs only while playing).
     var onPlayStateChanged: ((Bool) -> Void)?
+    /// Autoplay (docs/brain-spec.md, 7.1): told about track changes, queue changes, play state and the end of the
+    /// queue, next to the hooks above (which the prefetcher owns and which stay as they are).
+    var autoplay: AutoplayController?
     /// A finished listening session's engagement row (its play count) has been written. `recordHistory` bumps the
     /// history revision before that write lands, so `AppEnvironment` re-reads the play counts from here.
     var onEngagementRecorded: (() -> Void)?
@@ -96,6 +99,8 @@ final class PlaybackServices {
         if let beforeRestore, !songs.isEmpty {
             await beforeRestore(songs[DualDeckEngine.restoredIndex(snapshot, songs: songs)])
         }
+        // A restored queue brings its own engine items back; Autoplay adds nothing until playback starts.
+        autoplay?.isRestoringQueue = true
         engine.restore(snapshot, songs: songs)
     }
 
@@ -123,6 +128,7 @@ final class PlaybackServices {
             self.nowPlaying.update()
             self.snapshots.scheduleSave()
             self.onUpcomingChanged?()
+            self.autoplay?.itemTransition()
         }
         engine.onRepeatLoop = { [weak self] in
             guard let self else { return }
@@ -134,9 +140,12 @@ final class PlaybackServices {
         }
         engine.onQueueEnded = { [weak self] in
             guard let self else { return }
+            // Read before the timer hears about the end: an "end of track" timer that ended the queue stays ended.
+            let stoppedByTimer = self.engine.stopAfterCurrentItem
             self.sleepTimer.queueEnded()
             self.stats.finalizeCurrentSession()
             self.nowPlaying.update()
+            self.autoplay?.queueEnded(stoppedByTimer: stoppedByTimer)
         }
         engine.onPlayingChanged = { [weak self] playing in
             guard let self else { return }
@@ -145,11 +154,13 @@ final class PlaybackServices {
             // Coalesced and encoded off the main actor (the pause position is the same a second later).
             if !playing { self.snapshots.scheduleSave() }
             self.onPlayStateChanged?(playing)
+            self.autoplay?.playingChanged(playing)
         }
         engine.onQueueChanged = { [weak self] in
             self?.nowPlaying.update()
             self?.snapshots.scheduleSave()
             self?.onUpcomingChanged?()
+            self?.autoplay?.queueChanged()
         }
         engine.onTimingChanged = { [weak self] in
             guard let self else { return }

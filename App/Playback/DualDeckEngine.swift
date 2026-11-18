@@ -240,6 +240,34 @@ final class DualDeckEngine: PlaybackEngine {
         queueEdited(currentChanged: wasEmpty)
     }
 
+    // MARK: Autoplay (docs/brain-spec.md, 7.1)
+
+    /// Appends Autoplay's picks at the end of the queue in one edit, each with its tag. Nothing happens on an empty
+    /// queue: Autoplay only continues one.
+    func appendEngineItems(_ songs: [Song], tags: [BrainItemTag]) {
+        guard !queue.isEmpty, !songs.isEmpty, songs.count == tags.count else { return }
+        queue.appendEngine(songs, tags: tags)
+        queueEdited(currentChanged: false)
+    }
+
+    /// One deck is handing over to the other, or the next song is already prepared for it: a queue edit now would
+    /// cancel that plan and build it again. Autoplay holds its append until this is false.
+    var isHandOverPrepared: Bool { fade != nil || scheduledHandOver != nil || preparedIncoming != nil }
+
+    /// Autoplay's backstop: the queue had ended and more was appended in time. Moves on to the next entry and plays,
+    /// as if the last song had just ended. False when there is nothing to move on to.
+    @discardableResult
+    func continueAfterQueueEnd() -> Bool {
+        guard hasEnded, let next = queue.nextIndexForAutoAdvance, next != queue.currentIndex else { return false }
+        hasEnded = false
+        playWhenReady = true
+        session.clearRouteLossPause()
+        session.prepareActivation()
+        emitPlaying()
+        advance(to: next, automatic: true, previous: queue.current?.song)
+        return true
+    }
+
     func moveQueueItem(from: Int, to: Int) {
         queue.move(from: from, to: to)
         queueEdited(currentChanged: false)
@@ -344,7 +372,10 @@ final class DualDeckEngine: PlaybackEngine {
         let index = Self.restoredIndex(snapshot, songs: songs)
         // The snapshot keeps no unshuffled order: a restored shuffled queue takes its current order as the original,
         // so turning shuffle off afterwards keeps the order and the button's state agrees with the queue.
-        queue.restore(songs: songs, currentIndex: index, originalSongs: snapshot.shuffleEnabled ? songs : nil)
+        // The saved brain tags, by position (only when every saved item is there to be matched).
+        let tags = snapshot.items.count == songs.count ? snapshot.items.map { $0.brainTag() } : []
+        queue.restore(songs: songs, currentIndex: index, originalSongs: snapshot.shuffleEnabled ? songs : nil,
+                      tags: tags)
         queue.repeatMode = RepeatMode(rawValue: snapshot.repeatMode) ?? .off
         shuffleEnabled = snapshot.shuffleEnabled
         playWhenReady = false

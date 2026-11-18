@@ -7,6 +7,12 @@ import PixlModel
 nonisolated struct QueueEntry: Hashable, Sendable, Identifiable {
     let id: Int
     let song: Song
+    /// Where the entry came from (docs/brain-spec.md, 4.2). An entry with an arm was put here by Autoplay: it sits
+    /// under the Autoplay line. Nil for everything the listener queued.
+    var brain: BrainItemTag? = nil
+
+    /// The engine put this entry in the queue.
+    var isEngineOwned: Bool { brain?.isEngineOwned ?? false }
 }
 
 /// The play queue with Android's semantics (Media3 playlist + `QueueStateHolder`): an order that may be shuffled
@@ -39,10 +45,10 @@ nonisolated struct PlaybackQueue: Sendable {
 
     func entry(at index: Int) -> QueueEntry? { entries.indices.contains(index) ? entries[index] : nil }
 
-    private mutating func makeEntries(_ songs: [Song]) -> [QueueEntry] {
-        songs.map { song in
+    private mutating func makeEntries(_ songs: [Song], tags: [BrainItemTag?] = []) -> [QueueEntry] {
+        songs.indices.map { index in
             defer { nextId += 1 }
-            return QueueEntry(id: nextId, song: song)
+            return QueueEntry(id: nextId, song: songs[index], brain: index < tags.count ? tags[index] : nil)
         }
     }
 
@@ -75,9 +81,10 @@ nonisolated struct PlaybackQueue: Sendable {
     }
 
     /// Restores a saved queue as it was (no reshuffle). `originalSongs` is the unshuffled order when shuffled.
-    mutating func restore(songs: [Song], currentIndex index: Int, originalSongs: [Song]?) {
-        entries = makeEntries(songs)
-        originalOrder = originalSongs.map { makeEntries($0) }
+    /// `tags` are the saved brain tags of `songs`, by position (engine entries come back as engine entries).
+    mutating func restore(songs: [Song], currentIndex index: Int, originalSongs: [Song]?, tags: [BrainItemTag?] = []) {
+        entries = makeEntries(songs, tags: tags)
+        originalOrder = originalSongs.map { makeEntries($0, tags: tags) }
         currentIndex = entries.isEmpty ? nil : min(max(index, 0), entries.count - 1)
     }
 
@@ -171,13 +178,33 @@ nonisolated struct PlaybackQueue: Sendable {
         originalOrder?.append(contentsOf: fresh)
     }
 
-    /// Appends songs at the end ("Add to queue").
+    /// Appends songs ("Add to queue"). What the listener queues goes above the Autoplay line: the engine's picks
+    /// stay last (docs/brain-spec.md, 7.1 "Ownership").
     mutating func append(_ songs: [Song]) {
         let fresh = makeEntries(songs)
+        guard !fresh.isEmpty else { return }
+        if let line = firstUpcomingEngineIndex {
+            entries.insert(contentsOf: fresh, at: line)
+        } else {
+            entries.append(contentsOf: fresh)
+        }
+        originalOrder?.append(contentsOf: fresh)
+        if currentIndex == nil { currentIndex = 0 }
+    }
+
+    /// Appends Autoplay's picks at the very end, each with its tag (same count as `songs`).
+    mutating func appendEngine(_ songs: [Song], tags: [BrainItemTag]) {
+        let fresh = makeEntries(songs, tags: tags)
         guard !fresh.isEmpty else { return }
         entries.append(contentsOf: fresh)
         originalOrder?.append(contentsOf: fresh)
         if currentIndex == nil { currentIndex = 0 }
+    }
+
+    /// The first engine-owned entry after the current one (where the Autoplay line is drawn), or nil.
+    var firstUpcomingEngineIndex: Int? {
+        guard let currentIndex, currentIndex + 1 < entries.count else { return nil }
+        return entries[(currentIndex + 1)...].firstIndex { $0.isEngineOwned }
     }
 
     /// Moves the entry at `from` to `to` (both positions in the current order), keeping the current entry current.

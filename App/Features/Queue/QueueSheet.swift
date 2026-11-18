@@ -53,6 +53,12 @@ struct QueueSheet: View {
         // The shown rows are the queue from `offset` on, addressed by index (no copy of the queue per pass).
         let displayCount = max(queue.count - offset, 0)
         let currentDisplay = current - offset
+        // The Autoplay line sits above the first song Autoplay added that is still to come (its display position),
+        // or closes the queue while there is none.
+        let autoplayLine = env.brain.autoplay.lineIndex.flatMap { line -> Int? in
+            let display = line - offset
+            return display > currentDisplay && display < displayCount ? display : nil
+        }
         ZStack(alignment: .bottom) {
             VStack(spacing: 0) {
                 if displayCount == 0 {
@@ -67,7 +73,8 @@ struct QueueSheet: View {
                         .padding(32)
                     Spacer(minLength: 0)
                 } else {
-                    list(queue: queue, count: displayCount, offset: offset, currentDisplay: currentDisplay)
+                    list(queue: queue, count: displayCount, offset: offset, currentDisplay: currentDisplay,
+                         autoplayLine: autoplayLine)
                 }
             }
             .accessibilityHidden(isMenuExpanded)
@@ -171,13 +178,26 @@ struct QueueSheet: View {
 
     // MARK: List
 
-    private func list(queue: [Song], count: Int, offset: Int, currentDisplay: Int) -> some View {
+    /// The queue's Autoplay line (docs/brain-spec.md, 8.4): what follows it was picked by Autoplay; its switch turns
+    /// the picking off.
+    private var autoplayLineView: some View {
+        let state = env.brain.autoplay
+        let ai = settings.ai
+        let autoplayController = env.autoplayController
+        return AutoplayLine(isOn: ai.musicDiscoveryEnabled, finding: state.finding, fromLibrary: state.fromLibrary) { isOn in
+            ai.musicDiscoveryEnabled = isOn
+            autoplayController?.settingChanged()
+        }
+    }
+
+    private func list(queue: [Song], count: Int, offset: Int, currentDisplay: Int, autoplayLine: Int?) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 8) {
                     Spacer().frame(height: 6)
                     // Display positions as ids, as before (a row's slot is reused when the queue shifts).
                     ForEach(0..<count, id: \.self) { index in
+                        if index == autoplayLine { autoplayLineView }
                         let song = queue[index + offset]
                         let canReorder = index > currentDisplay
                         let isCurrent = index == currentDisplay
@@ -201,6 +221,8 @@ struct QueueSheet: View {
                             }
                             .id(index)
                     }
+                    // No pick of Autoplay's is waiting: the line closes the queue, so its switch is always in reach.
+                    if autoplayLine == nil { autoplayLineView }
                 }
                 .padding(.bottom, 120)
             }

@@ -181,6 +181,9 @@ nonisolated enum PreferenceKeys {
     static let musicLearningEnabled = "learning_enabled"
     static let musicDiscoveryEnabled = "discovery_enabled"
     static let musicExplorationFraction = "exploration_fraction"
+    /// The music brain (docs/brain-spec.md, 7.1, 12.3): whether YouTube Music may be asked for related music. Off,
+    /// Autoplay continues from the library alone. No Settings row yet (Android `brain_youtube_source_enabled`).
+    static let brainYouTubeSourceEnabled = "brain_youtube_source_enabled"
     /// iOS only (2026-10-26): the one-time switch of learning and discovery to on, run when their Settings screen
     /// (Music intelligence) was removed, so a switch an older build left off cannot stay off with nowhere to undo it.
     static let smartFeaturesOnMigrated = "smart_features_on_v1"
@@ -733,8 +736,13 @@ final class AISettings {
     var musicLearningEnabled: Bool {
         didSet { defaults.set(musicLearningEnabled, forKey: PreferenceKeys.musicLearningEnabled) }
     }
+    /// The Autoplay switch of the queue (docs/brain-spec.md, 7.1): when the queue runs out, related music follows.
     var musicDiscoveryEnabled: Bool {
         didSet { defaults.set(musicDiscoveryEnabled, forKey: PreferenceKeys.musicDiscoveryEnabled) }
+    }
+    /// Whether Autoplay may ask YouTube Music for related music (on by default; off = from the library alone).
+    var brainYouTubeSourceEnabled: Bool {
+        didSet { defaults.set(brainYouTubeSourceEnabled, forKey: PreferenceKeys.brainYouTubeSourceEnabled) }
     }
     /// 0…0.6 (Android `exploration_fraction`).
     var musicExploration: Double {
@@ -772,6 +780,7 @@ final class AISettings {
         includeExtendedFields = defaults.bool(PreferenceKeys.aiIncludeExtendedFields, default: false)
         musicLearningEnabled = defaults.bool(PreferenceKeys.musicLearningEnabled, default: true)
         musicDiscoveryEnabled = defaults.bool(PreferenceKeys.musicDiscoveryEnabled, default: true)
+        brainYouTubeSourceEnabled = defaults.bool(PreferenceKeys.brainYouTubeSourceEnabled, default: true)
         musicExploration = defaults.double(PreferenceKeys.musicExplorationFraction, default: 0.25)
         claudeMonthlyCap = ClaudeBudget.clampCap(defaults.double(PreferenceKeys.aiClaudeMonthlyCap,
                                                                  default: ClaudeBudget.defaultCapDollars))

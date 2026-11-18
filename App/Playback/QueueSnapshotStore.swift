@@ -194,6 +194,8 @@ nonisolated struct QueueSnapshotCapture: Sendable {
                                       title: entry.song.title, artist: entry.song.displayArtist,
                                       albumTitle: entry.song.album, artworkUri: entry.song.albumArtUriString,
                                       durationMs: entry.song.duration)
+                // Engine entries keep their brain fields, so the Autoplay line is drawn again after a restart.
+                .withBrainTag(entry.brain)
         }
         return PlaybackQueueSnapshot(items: items, currentMediaId: queue.current?.song.id,
                                      currentIndex: queue.currentIndex ?? 0, currentPositionMs: positionMs,

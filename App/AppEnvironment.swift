@@ -56,6 +56,11 @@ final class AppEnvironment {
     let spotify: SpotifyService
     /// Spotify Connect output: plays the queue on a Connect device and drives it (the devices sheet's section).
     let spotifyConnect: SpotifyConnectController
+    /// The music brain (docs/brain-spec.md): the tracks Autoplay played from outside the library, and the state of
+    /// the queue's Autoplay line. Its files are read on first use, never at launch.
+    let brain: BrainService
+    /// Autoplay (docs/brain-spec.md, 7.1): keeps the queue going with related music. Nil in UI tests.
+    let autoplayController: AutoplayController?
 
     @ObservationIgnored private var aiStorage: AIService?
 
@@ -256,6 +261,33 @@ final class AppEnvironment {
         }
 
         self.spotifyConnect = spotifyConnect
+        // The music brain: Autoplay continues the queue; Recently Played, Like and "Add to playlist" know the tracks
+        // it played from outside the library. Nothing is read or fetched here.
+        let brain = BrainService(radioSource: youtube.radioSource, isEnabled: !isUITest)
+        self.brain = brain
+        BrainService.shared = brain
+        home.engineSongs = { await brain.engineSongs() }
+        if let realPlayback {
+            let libraryStore = library, playbackStore = playback, blockedStore = settings.blocked
+            let aiSettings = settings.ai
+            let autoplay = AutoplayController(engine: realPlayback.engine, brain: brain, sources: AutoplayController.Sources(
+                isEnabled: { aiSettings.musicDiscoveryEnabled },
+                youTubeSourceEnabled: { aiSettings.brainYouTubeSourceEnabled },
+                isRemoteSession: { playbackStore.isRemoteActive },
+                library: { libraryStore.songs },
+                librarySong: { libraryStore.song(id: $0) },
+                events: { home.history.events },
+                blocked: { blockedStore.matcher },
+                adjustments: { tasteAdjustments.activeSet(nowMs: currentTimeMillis()) },
+                signals: { musicTaste.learnedSignals },
+                imported: { importedHistory.aggregate },
+                exploration: { Float(aiSettings.musicExploration) },
+                matchedVideoId: { spotifyId in try? await persistence?.matchedVideoId(spotifyId: spotifyId) }))
+            realPlayback.autoplay = autoplay
+            autoplayController = autoplay
+        } else {
+            autoplayController = nil
+        }
         historySync = ListeningHistorySync(store: importedHistory, spotify: spotify, youtube: youtube)
         let historyLibrary = library
         importedHistory.localSource = { (home.history.events, historyLibrary.songs) }

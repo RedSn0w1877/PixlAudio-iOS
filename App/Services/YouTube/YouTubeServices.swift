@@ -23,6 +23,9 @@ final class YouTubeServices {
     @ObservationIgnored let searchProvider: (any SearchProviding)?
     /// YouTube Music's history page (listening-history import; cookie sessions only).
     @ObservationIgnored let historyClient: YouTubeMusicHistoryClient?
+    /// YouTube Music radios for the music brain (docs/brain-spec.md, 3.3): anonymous calls on the plain session, under
+    /// the YouTube request budget. Nil in UI tests.
+    @ObservationIgnored let radioSource: (any RadioSource)?
     @ObservationIgnored private let loader: YouTubeResourceLoader?
     @ObservationIgnored private var prefetcher: YouTubePrefetcher?
     @ObservationIgnored private let accounts: AccountsStore
@@ -42,6 +45,7 @@ final class YouTubeServices {
             poTokens = nil
             searchProvider = nil
             historyClient = nil
+            radioSource = nil
             loader = nil
             downloads = DownloadManager(service: nil, fetcher: nil)
             return
@@ -59,6 +63,10 @@ final class YouTubeServices {
         let account = YouTubeAccount(http: plain, poTokens: poTokens)
         self.account = account
         historyClient = YouTubeMusicHistoryClient(http: plain, session: account)
+        // No cookie and no sign-in visitor id: only the process-wide anonymous one (nil until it was fetched).
+        radioSource = YouTubeRadioSource(
+            client: InnerTubeRadioClient(http: plain, visitorData: { await account.anonymousVisitorData() }),
+            budget: HostBudget())
         let deviceAuth = GoogleDeviceAuthClient(http: plain, store: account)
         self.deviceAuth = deviceAuth
         let innerTube = GoogleBearerHTTPClient(inner: plain, accessToken: { await deviceAuth.validAccessToken() })
