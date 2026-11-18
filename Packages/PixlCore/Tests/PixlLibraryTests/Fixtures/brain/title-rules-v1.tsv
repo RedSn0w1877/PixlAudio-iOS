@@ -1,0 +1,50 @@
+# title-rules-v1: kind TAB token sequence (already folded: lower case, single spaces).
+# Flag kinds set a versionFlags bit when a segment CONTAINS the token sequence.
+# neutral-prefix drops a segment that STARTS with the sequence; neutral-equals one that EQUALS it.
+# Flag rules are tested first; a segment that matches several flag rules sets every one of them.
+live	live
+live	concert
+live	unplugged
+remix	remix
+remix	rmx
+remix	bootleg
+remix	mashup
+remix	rework
+remix	flip
+acoustic	acoustic
+acoustic	stripped
+acoustic	piano version
+instrumental	instrumental
+instrumental	inst
+remaster	remaster
+remaster	remastered
+cover	cover
+cover	tribute
+karaoke	karaoke
+karaoke	backing track
+sped-up	sped up
+sped-up	speed up
+sped-up	nightcore
+slowed	slowed
+slowed	reverb
+re-recorded	re recorded
+re-recorded	rerecorded
+re-recorded	s version
+neutral-prefix	feat
+neutral-prefix	ft
+neutral-prefix	featuring
+neutral-prefix	with
+neutral-prefix	prod
+neutral-prefix	from
+neutral-equals	radio edit
+neutral-equals	single version
+neutral-equals	album version
+neutral-equals	original mix
+neutral-equals	original version
+neutral-equals	explicit
+neutral-equals	clean
+neutral-equals	mono
+neutral-equals	stereo
+neutral-equals	bonus track
+neutral-equals	deluxe
+neutral-equals	deluxe edition
