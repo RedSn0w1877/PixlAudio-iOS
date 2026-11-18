@@ -4,6 +4,7 @@
 //   play_event.pbl    eventId -> the event's canonical JSON line (`PlayEvent.encode`)      truth, never trimmed
 //   affinity.pbl      storedFamily|key -> [posQ,negQ,lastMs,posRQ,negRQ,lastRMs]          cache of the log
 //   brain_state.pbl   name -> text                                                        small values
+//   engine_plays.pbl  rid -> [longAtMs,shortAtMs...]                                      cache of the log (6.1)
 //
 // Read on first use, never at app start. Not thread-safe: `BrainEngine` (an actor) owns it. The iOS twin of
 // Android's `play_event`, `affinity` and `brain_state` tables and its `BrainStore.kt`.
@@ -18,10 +19,15 @@ public final class BrainEventLog {
     public static let keySpecVersion = "affinity_spec_version"
     public static let keyImportCount = "import_count"
     public static let keyRebuiltAtMs = "affinity_rebuilt_at_ms"
+    /// The newest plays a Home row may be built around (`HomeAnchors`).
+    public static let keyHomeAnchors = "home_anchors_v1"
+    /// Set once the ignore tally holds every engine-served play of the log.
+    public static let keyIgnoreTally = "ignore_tally_v1"
 
     private let eventFile: KeyedLogStore
     private let affinityFile: KeyedLogStore
     private let stateFile: KeyedLogStore
+    private let ignoreFile: KeyedLogStore
 
     private var stateLoaded = false
     private var state: [BrainKey: String] = [:]
@@ -34,6 +40,7 @@ public final class BrainEventLog {
         eventFile = file("play_event.pbl")
         affinityFile = file("affinity.pbl")
         stateFile = file("brain_state.pbl")
+        ignoreFile = file("engine_plays.pbl")
     }
 
     private var eventsOpened = false
@@ -94,6 +101,69 @@ public final class BrainEventLog {
     public var eventCount: Int {
         openEvents()
         return eventFile.count
+    }
+
+    /// Every stored event the engine served (it has an arm), in no particular order. Reads the whole file, but
+    /// decodes only those lines: a line that says `"arm":9` (none) is skipped on its bytes.
+    public func engineServedEvents() -> [PlayEvent] {
+        var out: [PlayEvent] = []
+        let none = Array("\"arm\":\(Arm.none),".utf8)
+        eventsOpened = true
+        eventFile.open { _, payload in
+            if Self.contains(payload, none) { return }
+            if let event = PlayEvent.decode(String(decoding: payload, as: UTF8.self)), event.arm != Arm.none {
+                out.append(event)
+            }
+        }
+        return out
+    }
+
+    static func contains(_ haystack: ArraySlice<UInt8>, _ needle: [UInt8]) -> Bool {
+        guard !needle.isEmpty, haystack.count >= needle.count else { return false }
+        let first = needle[0]
+        var i = haystack.startIndex
+        let last = haystack.endIndex - needle.count
+        while i <= last {
+            if haystack[i] == first {
+                var j = 1
+                while j < needle.count && haystack[i + j] == needle[j] { j += 1 }
+                if j == needle.count { return true }
+            }
+            i += 1
+        }
+        return false
+    }
+
+    // MARK: Ignored three times (6.1)
+
+    /// The tally as stored. The first time ever it is built from the log's own engine-served plays, then kept
+    /// current by `noteEngineServed`.
+    public func loadIgnoreTally(nowMs: Int64) -> IgnoreTally {
+        var tally = IgnoreTally()
+        ignoreFile.open { key, payload in
+            guard let rid = Int64(key), let numbers = Self.decodeNumbers(payload),
+                  let row = IgnoreTally.decode(numbers) else { return }
+            tally.load(rid: rid, row: row)
+        }
+        if value(Self.keyIgnoreTally) == nil {
+            var records: [(key: String, payload: [UInt8])] = []
+            for event in engineServedEvents() {
+                if let row = tally.note(event) { records.append((String(event.rid), IgnoreTally.encode(row))) }
+            }
+            if !records.isEmpty { ignoreFile.put(records) }
+            setValue(Self.keyIgnoreTally, "1")
+        }
+        let expired = tally.expired(nowMs: nowMs)
+        if !expired.isEmpty {
+            tally.remove(expired)
+            ignoreFile.remove(expired.map { String($0) })
+            ignoreFile.compactIfNeeded()
+        }
+        return tally
+    }
+
+    public func putIgnoreRow(rid: Int64, _ row: IgnoreTally.Row) {
+        ignoreFile.put(String(rid), IgnoreTally.encode(row))
     }
 
     // MARK: Affinity rows (5.2)

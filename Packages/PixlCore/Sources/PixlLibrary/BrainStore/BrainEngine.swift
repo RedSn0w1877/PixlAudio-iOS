@@ -63,9 +63,11 @@ public struct AutoplayPlanInputs: Sendable {
     public var nowMs: Int64
     public var tzOffsetMin: Int32
     public var batch: Int64
+    /// The station the plan is for (8.3); nil for plain autoplay.
+    public var station: Station?
 
     public init(candidates: [Candidate], prior: [ListBuilder.Prior], excludedRids: Set<Int64>, seeds: [Retrieval.SeedList],
-                nuMultiplier: Double, nowMs: Int64, tzOffsetMin: Int32, batch: Int64) {
+                nuMultiplier: Double, nowMs: Int64, tzOffsetMin: Int32, batch: Int64, station: Station? = nil) {
         self.candidates = candidates
         self.prior = prior
         self.excludedRids = excludedRids
@@ -74,6 +76,7 @@ public struct AutoplayPlanInputs: Sendable {
         self.nowMs = nowMs
         self.tzOffsetMin = tzOffsetMin
         self.batch = batch
+        self.station = station
     }
 }
 
@@ -128,6 +131,8 @@ public actor BrainEngine {
     private var rebuildTask: Task<Void, Never>?
     private var recordedDuringRebuild: [PlayEvent]?
     private var recoveredKilledPlay = false
+    /// 6.1 "ignored three times": read with the first pool or Home row that asks, then kept current.
+    private var ignoreTally: IgnoreTally?
 
     public init(directory: URL, repository: BrainRepository, sources: Sources?,
                 clock: @escaping @Sendable () -> Int64 = { currentTimeMillis() }) {
@@ -162,8 +167,13 @@ public actor BrainEngine {
         for ref in state.affinity.drainTouched() where seen.insert(ref).inserted {
             if let row = state.affinity.row(ref) { rows.append(row) }
         }
+        // The tally of 6.1 is read BEFORE the event is stored: the first time ever it is built from the log, and
+        // the event must not be in it twice.
+        let countsForTally = IgnoreTally.counts(event)
+        if countsForTally, ignoreTally == nil { ignoreTally = log.loadIgnoreTally(nowMs: clock()) }
         log.insert([event])
         log.upsertAffinity(rows)
+        if countsForTally, let row = ignoreTally?.note(event) { log.putIgnoreRow(rid: event.rid, row) }
         recordedDuringRebuild?.append(event)
         if Affinity.clockJumpedBack(state.affinity, nowMs: clock()) { requestRebuild(force: true) }
         return graded
@@ -236,6 +246,15 @@ public actor BrainEngine {
         )
         let directionBefore = state.session.reseedCount
         guard let graded = apply(event, to: &state) else { return nil }
+        // A play a Home row may be built around is written down beside the event (8.1): the event itself holds
+        // ids, not a title or a media id.
+        if HomeAnchors.qualifies(event, graded) {
+            let anchor = HomeAnchor(rid: rid, aid: event.primaryAid, mediaId: play.songId, title: facts.title,
+                                    primaryArtist: facts.primaryArtist, spotifyId: facts.spotifyId,
+                                    videoId: facts.videoId, durationMs: facts.durationMs, heardAtMs: event.endedAtMs)
+            let current = HomeAnchors.decode(log.value(BrainEventLog.keyHomeAnchors))
+            log.setValue(BrainEventLog.keyHomeAnchors, HomeAnchors.encode(HomeAnchors.push(current, anchor)))
+        }
         // Keep what a radio request needs for the tracks the session now anchors on.
         let session = state.session
         let anchorRids = Array(session.anchors[0..<session.anchorCount])
@@ -288,12 +307,29 @@ public actor BrainEngine {
     /// "nothing changes"). The plan is consumed: a like's scheduled slot and the "second skip" slot are spent.
     public func plan(_ inputs: AutoplayPlanInputs, count: Int, bridge: Bool, tail: [Int64]?) -> StationPlanner.Plan? {
         return withState { state -> StationPlanner.Plan? in
+        // What the session's skip rules need to know about a station: its seed artist is thinned out after skips,
+        // never blocked (5.5). Plain autoplay has no seed.
+        let stationSeed = inputs.station != nil ? inputs.seeds.first : nil
+        if let station = inputs.station, let stationSeed {
+            state.session.seed = stationSeed.seedRid
+            state.session.seedAid = stationSeed.seedAid
+            state.session.seedKind = station.kind
+        } else {
+            state.session.seed = 0
+            state.session.seedAid = 0
+            state.session.seedKind = Session.seedNone
+        }
         let session = state.session
         let graph = StationPlanner.buildGraph(seeds: inputs.seeds, candidates: inputs.candidates, session: session)
+        // 6.2: a station's ties break by its seed and the day; autoplay's by the session.
+        let tieSeed = stationSeed.map {
+            $0.seedRid ^ BrainMath.localDay(inputs.nowMs, tzOffsetMin: inputs.tzOffsetMin) ^ inputs.batch
+        } ?? (session.sessionId ^ inputs.batch)
         let request = StationPlanner.Request(
-            mode: StationPlanner.modeAutoplay, count: count, candidates: inputs.candidates, seeds: inputs.seeds,
+            mode: inputs.station != nil ? StationPlanner.modeStation : StationPlanner.modeAutoplay, count: count,
+            candidates: inputs.candidates, seeds: inputs.seeds,
             prior: inputs.prior, nowMs: inputs.nowMs, tzOffsetMin: inputs.tzOffsetMin, nuMultiplier: inputs.nuMultiplier,
-            tieSeed: session.sessionId ^ inputs.batch, excludedRids: inputs.excludedRids, bridge: bridge)
+            tieSeed: tieSeed, excludedRids: inputs.excludedRids, bridge: bridge)
         let plan: StationPlanner.Plan?
         if let tail {
             plan = Session.patchQueue(session, tail: tail, request: request, affinity: state.affinity, graph: graph)
@@ -303,6 +339,39 @@ public actor BrainEngine {
         if let plan { StationPlanner.consume(&state.session, plan) }
         return plan
         }
+    }
+
+    // MARK: Home rows (8.1) and what the engine keeps out (6.1)
+
+    /// True once the brain's state is in memory in this process: something played, or a plan was made. Home never
+    /// loads it (nothing at app start).
+    public var isLoaded: Bool { loaded != nil }
+
+    /// The newest plays a Home row may be built around, newest first.
+    public func homeAnchors() -> [HomeAnchor] {
+        HomeAnchors.decode(log.value(BrainEventLog.keyHomeAnchors))
+    }
+
+    /// Plans one "Because you listened to" row. Home is not part of the listening session: the plan runs against a
+    /// FRESH session, so a skip a minute ago does not reshuffle the page, and consumes nothing.
+    public func planHomeRow(candidates: [Candidate], seed: Retrieval.SeedList, count: Int, nowMs: Int64, tzOffsetMin: Int32,
+                            excludedRids: Set<Int64>) -> StationPlanner.Plan {
+        withState { state in
+            let session = SessionState()
+            let graph = StationPlanner.buildGraph(seeds: [seed], candidates: candidates, session: session)
+            let request = StationPlanner.Request(
+                mode: StationPlanner.modeHomeRow, count: count, candidates: candidates, seeds: [seed], nowMs: nowMs,
+                tzOffsetMin: tzOffsetMin, tieSeed: seed.seedRid ^ BrainMath.localDay(nowMs, tzOffsetMin: tzOffsetMin),
+                excludedRids: excludedRids)
+            return StationPlanner.plan(request, affinity: state.affinity, session: session, graph: graph)
+        }
+    }
+
+    /// Recordings the listener ignored three times in the last 60 days (6.1): three or more engine-served plays
+    /// under 30 s and none of 30 s or more.
+    public func ignoredRids(nowMs: Int64) -> Set<Int64> {
+        if ignoreTally == nil { ignoreTally = log.loadIgnoreTally(nowMs: nowMs) }
+        return ignoreTally?.ignored(nowMs: nowMs) ?? []
     }
 
     /// For a change of direction with no other anchor (7.3): which of `aids` to try, best first. Artists the

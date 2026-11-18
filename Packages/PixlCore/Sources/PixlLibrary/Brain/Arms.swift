@@ -72,9 +72,10 @@ public enum Surface {
 
 extension BrainItemTag {
     /// True when the engine put the item in the queue: it sits under the Autoplay line, and only the engine may
-    /// reorder or replace it. An item without an arm was chosen by the listener and is never touched.
+    /// reorder or replace it. An item without an arm was chosen by the listener and is never touched; neither is a
+    /// pick the listener queued themselves (a Home row's card, `chosen`).
     public var isEngineOwned: Bool {
-        guard let arm else { return false }
+        guard !chosen, let arm else { return false }
         return Arm.codeOf(arm) != Arm.none
     }
 }

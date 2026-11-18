@@ -51,11 +51,14 @@ public enum AutoplayPlanning {
 
     /// `tailStart` is the first index a re-score replaces (`queue.count` for a top-up); `tailEntries` its tracks.
     /// `served` are the engine items this process put in a queue, by media id; `recentlyPlayed` the media ids
-    /// played in the last four hours (6.4). `batch` seeds the tie-break and names the list.
+    /// played in the last four hours (6.4). `batch` seeds the tie-break and names the list. `station` is the station
+    /// the queue is (8.3), nil for plain autoplay; `noveltyFactor` the listener's Familiar / Blend / Discover switch
+    /// (`Novelty.factor`).
     public static func inputs(queue: [AutoplayQueueItem], tailStart: Int, tailEntries: [AutoplayPoolEntry],
                               pool: [AutoplayPoolEntry], served: [BrainKey: AutoplayPoolEntry],
                               recentlyPlayed: Set<BrainKey>, seeds: [Retrieval.SeedList], nowMs: Int64,
-                              tzOffsetMin: Int32, batch: Int64) -> AutoplayPlanContext {
+                              tzOffsetMin: Int32, batch: Int64, station: Station? = nil,
+                              noveltyFactor: Double = 1.0) -> AutoplayPlanContext {
         var queuedIds = recentlyPlayed
         var prior: [ListBuilder.Prior] = []
         var excludedRids: Set<Int64> = []
@@ -97,17 +100,20 @@ public enum AutoplayPlanning {
             excludedRids: excludedRids,
             seeds: seeds,
             // After a single track the listener asked for "more like this"; after an album or a playlist autoplay
-            // stays closer to home (6.2).
-            nuMultiplier: listenerItems <= 1 ? 1.0 : 0.8,
+            // stays closer to home; a station leans further out (6.2). The listener's switch scales whichever applies.
+            nuMultiplier: noveltyFactor * StationRules.surfaceNu(isStation: station != nil, listenerItems: listenerItems),
             nowMs: nowMs,
             tzOffsetMin: tzOffsetMin,
-            batch: batch)
+            batch: batch,
+            station: station)
         return AutoplayPlanContext(inputs: inputs, entriesByRid: entriesByRid)
     }
 
-    /// The queue tag of one engine pick. `pick` nil is a pick in pool order (the library-only pool).
+    /// The queue tag of one engine pick. `pick` nil is a pick in pool order (the library-only pool). A station's
+    /// picks are logged under the station (`surface = station`, its hashed id), everything else under autoplay.
     public static func tag(entry: AutoplayPoolEntry, pick: StationPlanner.Pick?, recId: Int64, slot: Int, surfaceId: String,
-                           artistNames: [Int64: String], likedTitles: [Int64: String]) -> BrainItemTag {
+                           artistNames: [Int64: String], likedTitles: [Int64: String],
+                           station: Station? = nil) -> BrainItemTag {
         // The reason line (8.8): a key from the pure core and the name its argument stands for.
         var whyName = entry.whyArtist
         var whyKey: String?
@@ -120,9 +126,14 @@ public enum AutoplayPlanning {
                 whyName = ""
             }
             if pick.whyKey != WhyLine.none { whyKey = WhyLine.nameOf(pick.whyKey) }
+        } else if entry.candidate.radioRank > 0 && !BrainText.isBlank(whyName) {
+            // Picked in pool order (no planner): a row of an anchor's radio is still what that anchor's artist's
+            // listeners play. A plain library pick says nothing; the line says "From your library".
+            whyKey = WhyLine.nameOf(WhyLine.radioFans)
         }
         let rank = pick.map { Int($0.radioRank) } ?? (entry.candidate.radioRank > 0 ? Int(entry.candidate.radioRank) : -1)
-        return BrainItemTag(surface: Surface.nameOf(Surface.autoplay), surfaceId: surfaceId, recId: recId, slot: slot,
+        return BrainItemTag(surface: Surface.nameOf(station != nil ? Surface.station : Surface.autoplay),
+                            surfaceId: station?.id ?? surfaceId, recId: recId, slot: slot,
                             arm: Arm.nameOf(pick?.arm ?? entry.candidate.arm),
                             whyArg: BrainText.isBlank(whyName) ? nil : whyName, radioRank: rank,
                             retrQ: pick.map { Int($0.retrQ) } ?? -1, whyKey: whyKey,
@@ -131,7 +142,8 @@ public enum AutoplayPlanning {
 
     /// The picks of `plan` as queue items, in plan order. `recId` names the list (`nowMs << 8 | batch`).
     public static func items(plan: StationPlanner.Plan, context: AutoplayPlanContext, surfaceId: String,
-                             artistNames: [Int64: String], likedTitles: [Int64: String]) -> [AutoplayPlannedItem] {
+                             artistNames: [Int64: String], likedTitles: [Int64: String],
+                             station: Station? = nil) -> [AutoplayPlannedItem] {
         let recId = (context.inputs.nowMs << 8) | (context.inputs.batch & 0xff)
         var out: [AutoplayPlannedItem] = []
         out.reserveCapacity(plan.picks.count)
@@ -139,7 +151,27 @@ public enum AutoplayPlanning {
             guard let entry = context.entriesByRid[pick.rid] else { continue }
             out.append(AutoplayPlannedItem(entry: entry, tag: tag(entry: entry, pick: pick, recId: recId,
                                                                   slot: Int(pick.slot), surfaceId: surfaceId,
-                                                                  artistNames: artistNames, likedTitles: likedTitles)))
+                                                                  artistNames: artistNames, likedTitles: likedTitles,
+                                                                  station: station)))
+        }
+        return out
+    }
+}
+
+/// What a taste change takes out of the engine's hands at once (docs/brain-spec.md, 8.5): "Not for me", "Less from
+/// ...", a mute or a block. A port of the decision half of `onTasteChanged` in Android's `AutoplayController.kt`.
+public enum AutoplayTasteFilter {
+    /// The media ids among `held` (the pool and what was served) that the listener's changes now exclude. Folds
+    /// every artist name: call it off the main actor.
+    public static func excludedIds(held: [AutoplayPoolEntry], blocked: BlockedArtistMatcher,
+                                   adjustments: TasteAdjustmentSet) -> Set<String> {
+        var out: Set<String> = []
+        if blocked.isEmpty && adjustments.isEmpty { return out }
+        for entry in held {
+            guard let song = entry.librarySong ?? entry.engineTrack?.song() else { continue }
+            if blocked.isBlocked(song) || adjustments.isExcluded(song) || adjustments.isBlocked(song) {
+                out.insert(entry.candidate.mediaId)
+            }
         }
         return out
     }

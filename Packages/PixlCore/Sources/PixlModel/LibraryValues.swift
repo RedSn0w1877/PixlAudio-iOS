@@ -83,6 +83,14 @@ public struct PlaybackQueueItemSnapshot: Sendable, Hashable, Codable {
     public var brainRecId: Int64?
     public var brainSlot: Int?
     public var brainArm: String?
+    // The reason line and the rest of an engine pick's context (docs/brain-spec.md, 8.8; Android's six fields), so
+    // a restored queue still says why. Set through `withBrainTag`.
+    public var brainWhyKey: String?
+    public var brainWhyArg: String?
+    public var brainPrimaryArtist: String?
+    public var brainChosen: Bool?
+    public var brainRetrQ: Int?
+    public var brainRadioRank: Int?
 
     public init(mediaId: String, uri: String, title: String? = nil, artist: String? = nil, albumTitle: String? = nil,
                 artworkUri: String? = nil, durationMs: Int64? = nil, brainSurface: String? = nil,

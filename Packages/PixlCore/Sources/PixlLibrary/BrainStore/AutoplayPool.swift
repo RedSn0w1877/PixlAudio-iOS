@@ -78,6 +78,9 @@ public struct AutoplayPoolRequest: Sendable {
     /// The stored YouTube match of a Spotify track id (for the other-direction seed).
     public var matchedVideoId: @Sendable (String) async -> String? = { _ in nil }
     public var nowMs: Int64 = 0
+    /// The station the pool is for (8.3); nil for plain autoplay. An artist station leads with the artist's own
+    /// radio.
+    public var station: Station? = nil
 
     public init(anchors: [AutoplayAnchor], deepen: Bool, allowNetwork: Bool, library: [Song], everPlayed: Set<String>,
                 blocked: BlockedArtistMatcher = .empty, adjustments: TasteAdjustmentSet = .empty,
@@ -128,7 +131,9 @@ public enum AutoplayPool {
     public static func build(_ request: AutoplayPoolRequest, index: BrainLibraryIndex,
                              repository: BrainRepository?, engine: BrainEngine? = nil) async -> BuiltAutoplayPool {
         var request = request
-        if request.otherDirection, let repository, let engine,
+        // Recordings the listener ignored three times stay away for 60 days (6.1).
+        if let engine, request.ignoredRids.isEmpty { request.ignoredRids = await engine.ignoredRids(nowMs: request.nowMs) }
+        if request.otherDirection, request.station == nil, let repository, let engine,
            let anchor = await otherDirectionAnchor(request, index: index, repository: repository, engine: engine) {
             request.anchors = [anchor]
         }
@@ -180,6 +185,28 @@ public enum AutoplayPool {
                 return collected
             }
             fetched = collected.compactMap { $0 }
+            if let station = request.station, station.isArtist, let first = seeds.first {
+                // An artist station leads with the artist's own radio (6.2): the artist page's top songs and the
+                // radio its button starts. Asked after the seed's song radio, whose rows usually name the artist's
+                // channel, so the first request is not made twice. Only the artist's own tracks count as "more
+                // from" them; the rest are what their listeners also play.
+                let artistKey = BrainText.fold(first.whyArtist)
+                if let radio = await repository.artistRadio(seed: first.seed, allowNetwork: request.allowNetwork) {
+                    var list: [AutoplayPoolEntry] = []
+                    list.reserveCapacity(radio.rows.count)
+                    for (rank, stored) in radio.rows.enumerated() {
+                        let own = !artistKey.isEmpty
+                            && BrainKey.sameBytes(BrainLibraryIndex.artistKey(of: stored.row), artistKey)
+                        if let entry = entry(for: stored, rank: Int32(rank + 1), index: index,
+                                             everPlayed: request.everPlayed, anchorArtist: first.whyArtist,
+                                             artistRadio: own, adjustments: request.adjustments) {
+                            list.append(entry)
+                        }
+                    }
+                    fetched.insert(Fetched(entries: list, seedRid: radio.seedRid, rids: radio.rows.map(\.rid),
+                                           related: false, artist: first.whyArtist), at: 0)
+                }
+            }
         }
         let lists = fetched.map(\.entries)
 

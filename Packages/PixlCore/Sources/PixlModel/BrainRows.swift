@@ -356,20 +356,23 @@ public struct BrainItemTag: Sendable, Hashable {
     public var slot: Int
     /// `Arm` name: "RADIO", "FAV", ...; nil for a track the listener chose.
     public var arm: String?
-    /// The name of the artist the pick is explained by; display only, not saved with the queue.
+    /// The name the reason is about ("Fans of X also play this"); display only.
     public var whyArg: String?
-    /// The pick's best radio rank at serve time, -1 when it had none; not saved with the queue.
+    /// The pick's best radio rank at serve time, -1 when it had none.
     public var radioRank: Int
-    /// The pick's retrieval percentile x 1000 at serve time, -1 when it had none; not saved with the queue.
+    /// The pick's retrieval percentile x 1000 at serve time, -1 when it had none.
     public var retrQ: Int
-    /// The reason key of the pick (`WhyLine` name: "radio_fans", ...); nil for none. Not saved with the queue.
+    /// The reason key of the pick (`WhyLine` name: "radio_fans", ...); nil for none.
     public var whyKey: String?
-    /// ONE artist name: the track's own primary artist, when whoever queued it knew. Not saved with the queue.
+    /// ONE artist name: the track's own primary artist, when whoever queued it knew.
     public var primaryArtist: String?
+    /// The listener put this pick in the queue themselves (they played a Home row): it has an `arm`, because it
+    /// was a recommendation, but it is theirs like a playlist's track, not the engine's tail.
+    public var chosen: Bool
 
     public init(surface: String? = nil, surfaceId: String? = nil, recId: Int64 = 0, slot: Int = -1, arm: String? = nil,
                 whyArg: String? = nil, radioRank: Int = -1, retrQ: Int = -1, whyKey: String? = nil,
-                primaryArtist: String? = nil) {
+                primaryArtist: String? = nil, chosen: Bool = false) {
         self.surface = surface
         self.surfaceId = surfaceId.map { String($0.unicodeScalars.prefix(Self.maxSurfaceIdLength)) }
         self.recId = recId
@@ -380,17 +383,23 @@ public struct BrainItemTag: Sendable, Hashable {
         self.retrQ = retrQ
         self.whyKey = whyKey
         self.primaryArtist = primaryArtist
+        self.chosen = chosen
     }
 
-    /// True when nothing that is saved with the queue is set.
-    public var isEmpty: Bool { surface == nil && surfaceId == nil && recId == 0 && slot < 0 && arm == nil }
+    /// True when nothing is set: such a tag is not saved with the queue.
+    public var isEmpty: Bool {
+        surface == nil && surfaceId == nil && recId == 0 && slot < 0 && arm == nil && whyKey == nil && whyArg == nil
+            && primaryArtist == nil && !chosen && retrQ < 0 && radioRank < 0
+    }
 }
 
 extension PlaybackQueueItemSnapshot {
     /// The item's brain context, or nil when it has none (a track the listener chose, an old snapshot).
     public func brainTag() -> BrainItemTag? {
         let tag = BrainItemTag(surface: brainSurface, surfaceId: brainSurfaceId, recId: brainRecId ?? 0,
-                               slot: brainSlot ?? -1, arm: brainArm)
+                               slot: brainSlot ?? -1, arm: brainArm, whyArg: brainWhyArg,
+                               radioRank: brainRadioRank ?? -1, retrQ: brainRetrQ ?? -1, whyKey: brainWhyKey,
+                               primaryArtist: brainPrimaryArtist, chosen: brainChosen == true)
         return tag.isEmpty ? nil : tag
     }
 
@@ -403,6 +412,12 @@ extension PlaybackQueueItemSnapshot {
         copy.brainRecId = tag.recId != 0 ? tag.recId : nil
         copy.brainSlot = tag.slot >= 0 ? tag.slot : nil
         copy.brainArm = tag.arm
+        copy.brainWhyKey = tag.whyKey
+        copy.brainWhyArg = tag.whyArg
+        copy.brainPrimaryArtist = tag.primaryArtist
+        copy.brainChosen = tag.chosen ? true : nil
+        copy.brainRetrQ = tag.retrQ >= 0 ? tag.retrQ : nil
+        copy.brainRadioRank = tag.radioRank >= 0 ? tag.radioRank : nil
         return copy
     }
 }
