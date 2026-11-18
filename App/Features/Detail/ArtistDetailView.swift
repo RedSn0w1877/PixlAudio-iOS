@@ -199,7 +199,7 @@ private struct ArtistDetailContent: View {
                 hero(artist, width: width, height: heroHeight, safeTop: safeTop)
                 if !topSongs.isEmpty {
                     sectionTitle("Most played") {
-                        if let first = topSongs.first { playback.play(first, in: topSongs) }
+                        if let first = topSongs.first { playback.play(first, in: topSongs, source: .artist) }
                     }
                     ForEach(Array(topSongs.enumerated()), id: \.element.id) { index, song in
                         topSongRow(song, index: index)
@@ -293,11 +293,11 @@ private struct ArtistDetailContent: View {
                     guard let first = allSongs.first else { return }
                     if blocked.isBlocked(first) {
                         // "Play anyway?" decides; shuffle is left alone (a cancel must not have changed it).
-                        blocked.playTapped(first, in: allSongs, using: playback)
+                        blocked.playTapped(first, in: allSongs, using: playback, source: .artist)
                     } else {
                         // In order, like the playlist page's Play: shuffle off only when playback starts.
                         if playback.isShuffleEnabled { playback.setShuffleEnabled(false) }
-                        playback.play(first, in: allSongs)
+                        playback.play(first, in: allSongs, source: .artist)
                     }
                 } label: {
                     HStack(spacing: 7) {
@@ -413,7 +413,7 @@ private struct ArtistDetailContent: View {
     private func topSongRow(_ song: Song, index: Int) -> some View {
         PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
             SongCard(song: song, isCurrent: isCurrent, isPlaying: isPlaying,
-                     onTap: { blocked.playTapped(song, in: topSongs, using: playback) },
+                     onTap: { blocked.playTapped(song, in: topSongs, using: playback, source: .artist) },
                      onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
                      corners: .grouped(index: index, count: topSongs.count),
                      subtitle: content.plays[song.id])
@@ -472,7 +472,7 @@ private struct ArtistDetailContent: View {
     }
 
     private func playSection(_ section: ArtistAlbumSection) {
-        if let first = section.songs.first { playback.play(first, in: section.songs) }
+        if let first = section.songs.first { playback.play(first, in: section.songs, source: .artist) }
     }
 
     /// Android `ArtistAlbumSectionSongItem`: a row in the 50 % `surfaceContainerLow` group (8 pt inset, 2 pt between
@@ -483,7 +483,7 @@ private struct ArtistDetailContent: View {
             if index > 0 { Spacer().frame(height: 2) }
             PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
                 SongCard(song: song, isCurrent: isCurrent, isPlaying: isPlaying,
-                         onTap: { blocked.playTapped(song, in: context, using: playback) },
+                         onTap: { blocked.playTapped(song, in: context, using: playback, source: .artist) },
                          onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
                          showsArtwork: false, corners: .grouped(index: index, count: count))
                     .swipeToQueue(song: song)

@@ -85,6 +85,12 @@ final class DualDeckEngine: PlaybackEngine {
     // MARK: Hooks (PlaybackServices fans these out to the sleep timer, stats, Now Playing and the snapshot)
     /// The current song changed: (new, previous, automatic).
     var onItemTransition: ((Song?, Song?, Bool) -> Void)?
+    /// A seek inside the current track: the position it left and the one it went to, in milliseconds.
+    var onSeek: ((Int64, Int64) -> Void)?
+    /// How many loads have failed so far. A track change right after a failure did not play out: the listening
+    /// stats read this to tell an error from a finished track.
+    private(set) var loadFailureCount = 0
+    private var pendingQueueSource: BrainItemTag?
     /// The same queue entry started again on its own (repeat-one loop, or a crossfade into itself).
     var onRepeatLoop: (() -> Void)?
     /// The queue ended (repeat off).
@@ -120,9 +126,15 @@ final class DualDeckEngine: PlaybackEngine {
 
     // MARK: - PlaybackEngine
 
+    /// Where the listener starts the next queue from (docs/brain-spec.md, 4.2). Set right before `setQueue`, which
+    /// puts it on every entry and clears it.
+    func setQueueSource(_ tag: BrainItemTag?) { pendingQueueSource = tag }
+
     func setQueue(_ songs: [Song], startIndex: Int, startPositionMs: Int64, playWhenReady: Bool) {
         let previous = queue.current?.song
-        queue.replace(with: songs, startIndex: startIndex, shuffle: shuffleEnabled)
+        let source = pendingQueueSource
+        pendingQueueSource = nil
+        queue.replace(with: songs, startIndex: startIndex, shuffle: shuffleEnabled, source: source)
         hasEnded = false
         consecutiveFailures = 0
         self.playWhenReady = playWhenReady && !queue.isEmpty
@@ -181,6 +193,7 @@ final class DualDeckEngine: PlaybackEngine {
     }
 
     func seek(toMs positionMs: Int64) {
+        if let onSeek { onSeek(currentPositionMs(), max(positionMs, 0)) }
         finishFadeNow()
         hasEnded = false
         let seconds = Double(max(positionMs, 0)) / 1000
@@ -248,6 +261,18 @@ final class DualDeckEngine: PlaybackEngine {
         guard !queue.isEmpty, !songs.isEmpty, songs.count == tags.count else { return }
         queue.appendEngine(songs, tags: tags)
         queueEdited(currentChanged: false)
+    }
+
+    /// Replaces the engine-owned end of the queue, from `index` on, with re-scored picks: ONE queue edit
+    /// (docs/brain-spec.md, 7.3). Refused while a hand-over is prepared, and for anything at or before the track
+    /// after the current one (decision D8: the next track is never swapped).
+    @discardableResult
+    func replaceEngineTail(from index: Int, songs: [Song], tags: [BrainItemTag]) -> Bool {
+        guard !songs.isEmpty, songs.count == tags.count, !isHandOverPrepared,
+              let current = queue.currentIndex, index > current + 1 else { return false }
+        guard queue.replaceTail(from: index, songs: songs, tags: tags) else { return false }
+        queueEdited(currentChanged: false)
+        return true
     }
 
     /// One deck is handing over to the other, or the next song is already prepared for it: a queue edit now would
@@ -471,6 +496,7 @@ final class DualDeckEngine: PlaybackEngine {
         }
         emit(.failed(message: "Couldn't play \"\(entry.song.title)\" (\(error.localizedDescription))"))
         consecutiveFailures += 1
+        loadFailureCount &+= 1
         if playWhenReady, consecutiveFailures < queue.count, let next = queue.nextIndexForSkip {
             advance(to: next, automatic: true, previous: entry.song)
         } else {

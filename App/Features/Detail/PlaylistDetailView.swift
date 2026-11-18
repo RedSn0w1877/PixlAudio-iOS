@@ -369,7 +369,7 @@ private struct PlaylistDetailContent: View {
                 Button {
                     guard let first = songs.first else { return }
                     if playback.isShuffleEnabled { playback.setShuffleEnabled(false) }
-                    playback.play(first, in: songs)
+                    playback.play(first, in: songs, source: .playlist(id: playlistId))
                 } label: {
                     actionLabel("Play", systemImage: "play.fill", foreground: theme.onPrimary)
                 }
@@ -502,7 +502,7 @@ private struct PlaylistDetailContent: View {
                 PlaylistSongRow(song: song, isCurrent: isCurrent, isPlaying: isPlaying,
                                 showsDragHandle: isReorderMode,
                                 showsRemove: isRemoveMode,
-                                onTap: { blocked.playTapped(song, in: list, using: playback) },
+                                onTap: { blocked.playTapped(song, in: list, using: playback, source: .playlist(id: playlistId)) },
                                 onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
                                 onRemove: { env.libraryEditor.removeSong(song.id, fromPlaylist: playlistId) })
             }

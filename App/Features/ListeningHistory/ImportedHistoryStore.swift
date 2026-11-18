@@ -285,6 +285,13 @@ final class ImportedHistoryStore {
         return (plays, taste)
     }
 
+    /// The imported plays and Spotify's lists as they are stored (the music brain reads them when it rebuilds its
+    /// state; it never copies them). Off the main thread.
+    func importedContents() async -> (plays: [ImportedPlay], taste: ExternalTasteSnapshot) {
+        await ensureLoaded()
+        return await box.contents()
+    }
+
     /// What the taste profile and the library stats read (Ask Taizo): every play, the app's and the imported ones, as
     /// listening plays; the imported plays themselves (they carry completions and skips); Spotify's own lists. Gathered
     /// off the main thread.

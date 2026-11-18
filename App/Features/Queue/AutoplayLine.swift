@@ -11,6 +11,8 @@ struct AutoplayLine: View {
     let finding: Bool
     /// The picks come from the library alone.
     let fromLibrary: Bool
+    /// Three skips in a row: Autoplay just turned to something else (shown for a few seconds).
+    var changedDirection = false
     let onToggle: (Bool) -> Void
 
     @Environment(\.appTheme) private var theme
@@ -42,6 +44,7 @@ struct AutoplayLine: View {
     private var subtitle: LocalizedStringKey {
         if !isOn { return "Off. The queue ends after the last song" }
         if finding { return "Finding more like this" }
+        if changedDirection { return "Skipped three. Changing direction." }
         if fromLibrary { return "From your library" }
         return "Taizo picks more after this"
     }

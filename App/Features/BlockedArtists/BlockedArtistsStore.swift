@@ -81,11 +81,12 @@ final class BlockedArtistsStore {
     // MARK: Tapping a blocked song
 
     /// A tap on a song row: plays within `songs`, or asks "Play anyway?" when the song is blocked.
-    func playTapped(_ song: Song, in songs: [Song], using playback: PlaybackStore) {
+    /// `source` says where the list is (an album, a playlist): the queue's entries carry it.
+    func playTapped(_ song: Song, in songs: [Song], using playback: PlaybackStore, source: BrainItemTag? = nil) {
         if matcher.isBlocked(song) {
             pendingPlay = PendingBlockedPlay(song: song, list: songs)
         } else {
-            playback.play(song, in: songs)
+            playback.play(song, in: songs, source: source)
         }
     }
 

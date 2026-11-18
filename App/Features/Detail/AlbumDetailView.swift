@@ -78,7 +78,7 @@ private struct AlbumDetailContent: View {
                     ForEach(byDisc[disc] ?? []) { song in
                         PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
                             SongCard(song: song, isCurrent: isCurrent, isPlaying: isPlaying,
-                                     onTap: { blocked.playTapped(song, in: songs, using: playback) },
+                                     onTap: { blocked.playTapped(song, in: songs, using: playback, source: .album) },
                                      onMore: { router.present(AppSheet.songInfo(songId: song.id)) },
                                      showsArtwork: false)
                             .swipeToQueue(song: song)
@@ -98,6 +98,6 @@ private struct AlbumDetailContent: View {
 
     private func shuffle() {
         guard let start = songs.randomElement() else { return }
-        playback.play(start, in: songs)
+        playback.play(start, in: songs, source: .album)
     }
 }

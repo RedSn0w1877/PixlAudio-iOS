@@ -27,6 +27,11 @@ public struct AutoplayPlanContext: Sendable {
 public struct AutoplayPlannedItem: Sendable {
     public var entry: AutoplayPoolEntry
     public var tag: BrainItemTag
+
+    public init(entry: AutoplayPoolEntry, tag: BrainItemTag) {
+        self.entry = entry
+        self.tag = tag
+    }
 }
 
 public enum AutoplayPlanning {

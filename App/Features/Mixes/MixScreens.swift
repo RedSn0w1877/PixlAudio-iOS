@@ -75,7 +75,7 @@ struct MixScreen: View {
                     height: 76, verticalPadding: 8, horizontalPadding: 20, outerRadius: 60,
                     onPlay: { play(from: songs[0]); if playback.isShuffleEnabled { playback.setShuffleEnabled(false) } },
                     onShuffle: {
-                        if playsFromLibrary { playback.play(library.songs.shuffled()) } else { playback.play(songs.shuffled()) }
+                        if playsFromLibrary { playback.play(library.songs.shuffled()) } else { playback.play(songs.shuffled(), source: mixSource) }
                     })
                 ForEach(songs) { song in
                     PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
@@ -93,8 +93,15 @@ struct MixScreen: View {
     }
 
     private func play(from song: Song) {
-        playback.play(song, in: playsFromLibrary ? library.songs : songs)
+        if playsFromLibrary {
+            playback.play(song, in: library.songs)
+        } else {
+            playback.play(song, in: songs, source: mixSource)
+        }
     }
+
+    /// Where these plays come from, for the event log (docs/brain-spec.md, 4.1 `surface`).
+    private var mixSource: BrainItemTag { screenID == "dailyMix" ? .dailyMix : .yourMix }
 
     /// `Brush.verticalGradient(primary 25 %, surface 50 %, surface, endY = 1200 px)`.
     private var background: some View {

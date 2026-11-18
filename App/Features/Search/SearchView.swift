@@ -181,7 +181,7 @@ struct SearchView: View {
 
     private func playSong(_ song: Song) {
         let queue = model.songResults
-        playback.play(song, in: queue.contains { $0.id == song.id } ? queue : [song])
+        playback.play(song, in: queue.contains { $0.id == song.id } ? queue : [song], source: .search)
         itemSelected()
     }
 
@@ -189,7 +189,7 @@ struct SearchView: View {
         let songs = library.songs.filter { $0.albumId == album.id }
             .sorted { ($0.discNumber ?? 0, $0.trackNumber) < ($1.discNumber ?? 0, $1.trackNumber) }
         guard !songs.isEmpty else { return }
-        playback.play(songs)
+        playback.play(songs, source: .search)
     }
 
     private func playArtist(_ artist: Artist) {
@@ -197,13 +197,13 @@ struct SearchView: View {
             song.artistId == artist.id || song.artists.contains { $0.id == artist.id }
         }
         guard !songs.isEmpty else { return }
-        playback.play(songs)
+        playback.play(songs, source: .search)
     }
 
     private func playPlaylist(_ playlist: Playlist) {
         let songs = playlist.songIds.compactMap { library.song(id: $0) }
         guard !songs.isEmpty else { return }
-        playback.play(songs)
+        playback.play(songs, source: .search)
         if playback.isShuffleEnabled { playback.setShuffleEnabled(false) }
     }
 
@@ -211,7 +211,7 @@ struct SearchView: View {
         guard !isBusy(item) else { return }
         Task {
             if let song = await model.importRemote(item, play: play) {
-                if play { playback.play(song) }
+                if play { playback.play(song, source: .search) }
             } else if play {
                 // The row has left its section: say why nothing plays.
                 playback.notices.show("Couldn't find this song to play. Try again later.")

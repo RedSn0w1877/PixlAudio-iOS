@@ -56,7 +56,7 @@ struct HomeView: View {
                                                                   libraryRevision: library.songsRevision, force: true)
                                            }
                                        },
-                                       onPlay: { section, song in playback.play(song, in: section.songs) })
+                                       onPlay: { section, song in playback.play(song, in: section.songs, source: .homeShelf) })
                 }
 
                 yourMix(content: content, isPreparing: home.isPreparing)
@@ -64,7 +64,7 @@ struct HomeView: View {
                 ForEach(content.shelves) { section in
                     CurrentSongState { currentSongId in
                         HomeDiscoveryShelf(section: section, currentSongId: currentSongId,
-                                           onPlay: { song in playback.play(song, in: section.songs) })
+                                           onPlay: { song in playback.play(song, in: section.songs, source: .homeShelf) })
                     }
                 }
 

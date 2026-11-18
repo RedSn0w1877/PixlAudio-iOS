@@ -473,7 +473,7 @@ final class TaisChatModel {
     /// Plays `songs` from the first (queue name "TAIS DJ" on Android).
     func play(_ songs: [Song]) {
         guard !songs.isEmpty else { return }
-        playback.play(songs, startIndex: 0)
+        playback.play(songs, startIndex: 0, source: .assistant)
     }
 
     /// Appends `songs` to the queue.

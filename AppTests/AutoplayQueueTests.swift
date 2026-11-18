@@ -105,4 +105,71 @@ final class AutoplayQueueTests: XCTestCase {
         XCTAssertTrue(AutoplayController.isSyntheticId("0123456789abcdef012345"))
         XCTAssertFalse(AutoplayController.isSyntheticId("4uLU6hMCjMI75M1A2tKUQC"))
     }
+
+    // MARK: Stage 1b: the tail edit, the play source, the brain's play
+
+    func testATailReplacementTouchesOnlyTheEnginesOwnRunAfterTheCurrentSong() {
+        var queue = PlaybackQueue()
+        queue.replace(with: [song("u0"), song("u1")], startIndex: 0, shuffle: false)
+        queue.appendEngine([song("e0"), song("e1"), song("e2")], tags: [tag(0), tag(1), tag(2)])
+        // From the second engine entry on, in one edit.
+        XCTAssertTrue(queue.replaceTail(from: 3, songs: [song("n0"), song("n1")], tags: [tag(1), tag(2)]))
+        XCTAssertEqual(ids(queue), ["u0", "u1", "e0", "n0", "n1"])
+        XCTAssertEqual(queue.entries.map(\.isEngineOwned), [false, false, true, true, true])
+        XCTAssertEqual(queue.currentIndex, 0)
+        // Never a track the listener queued, never the current song, never with mismatched tags or past the end.
+        XCTAssertFalse(queue.replaceTail(from: 1, songs: [song("x")], tags: [tag(0)]))
+        XCTAssertFalse(queue.replaceTail(from: 0, songs: [song("x")], tags: [tag(0)]))
+        XCTAssertFalse(queue.replaceTail(from: 3, songs: [song("x")], tags: []))
+        XCTAssertFalse(queue.replaceTail(from: 9, songs: [song("x")], tags: [tag(0)]))
+        XCTAssertEqual(ids(queue), ["u0", "u1", "e0", "n0", "n1"])
+    }
+
+    func testWhereAQueueWasStartedFromIsOnItsEntries() {
+        var queue = PlaybackQueue()
+        queue.replace(with: [song("u0"), song("u1")], startIndex: 0, shuffle: false, source: .album)
+        XCTAssertEqual(queue.entries.map { $0.brain?.surface }, ["album", "album"])
+        XCTAssertEqual(queue.entries.map(\.isEngineOwned), [false, false])
+        queue.append([song("u2")])
+        queue.playNext([song("u3")])
+        XCTAssertEqual(queue.entries.map { $0.brain?.surface }, ["album", "manualQueue", "album", "manualQueue"])
+        XCTAssertNil(queue.firstUpcomingEngineIndex)
+        let playlist = BrainItemTag.playlist(id: "abc")
+        XCTAssertEqual(playlist.surface, "playlist")
+        XCTAssertNotEqual(playlist.surfaceId, "abc")
+    }
+
+    func testEveryPlayReachesTheBrainWithNoFiveSecondFloor() {
+        let tracker = ListeningStatsTracker()
+        var clock: Int64 = 1_000
+        tracker.realtimeMs = { clock }
+        tracker.epochMs = { 1_700_000_000_000 + clock }
+        tracker.tzOffsetMin = { 60 }
+        var plays: [FinishedPlay] = []
+        var records: [ListeningStatsTracker.Record] = []
+        tracker.onBrainPlay = { plays.append($0) }
+        tracker.onRecord = { records.append($0) }
+        let first = PlayContext(title: "Song a", artistDisplay: "A", startReason: StartReason.tap)
+        tracker.onTrackChanged(songId: "a", positionMs: 0, durationMs: 200_000, isPlaying: true, context: first)
+        clock += 2_000
+        let second = PlayContext(title: "Song b", artistDisplay: "A", startReason: StartReason.next)
+        tracker.onTrackChanged(songId: "b", positionMs: 0, durationMs: 200_000, isPlaying: true, context: second,
+                               endReason: EndReason.next, isOutsideLibrary: true)
+        // A two-second skip is a play for the brain and nothing for the legacy stores.
+        XCTAssertEqual(plays.count, 1)
+        XCTAssertEqual(plays.first?.songId, "a")
+        XCTAssertEqual(plays.first?.playedMs, 2_000)
+        XCTAssertEqual(plays.first?.endReason, EndReason.next)
+        XCTAssertEqual(plays.first?.tzOffsetMin, 60)
+        XCTAssertTrue(records.isEmpty)
+        tracker.markFlag(songId: "b", flag: EventFlags.likedDuring)
+        clock += 60_000
+        tracker.finalizeCurrentSession(endReason: EndReason.trackDone)
+        XCTAssertEqual(plays.count, 2)
+        XCTAssertEqual(plays.last?.flags, EventFlags.likedDuring)
+        XCTAssertEqual(plays.last?.context.startReason, StartReason.next)
+        // The legacy record is still made (the play history shows the track), marked as from outside the library.
+        XCTAssertEqual(records.count, 1)
+        XCTAssertEqual(records.first?.isOutsideLibrary, true)
+    }
 }

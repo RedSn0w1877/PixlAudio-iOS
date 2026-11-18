@@ -125,7 +125,7 @@ final class AIPlaylistController {
                 status = "Starting playback..."
                 isSuccess = true
                 home.setDailyMix(songs)
-                playback.play(songs, startIndex: 0)
+                playback.play(songs, startIndex: 0, source: .assistant)
                 try? await Task.sleep(for: .milliseconds(800))
                 guard !Task.isCancelled else { return }
                 router.dismissSheet()

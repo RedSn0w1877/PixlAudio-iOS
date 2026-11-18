@@ -15,12 +15,14 @@ final class AutoplayState {
     /// Where the Autoplay line is drawn: the queue index of the first entry Autoplay added that is still to come.
     /// Nil while there is none (the line then closes the queue).
     var lineIndex: Int?
+    /// Three skips in a row: Autoplay turned to something else (shown on the line for a few seconds).
+    var changedDirection = false
 }
 
-/// The app's side of the music brain in stage 1a (docs/brain-spec.md, 2.1): it owns the brain's files through
-/// `BrainRepository` (PixlLibrary, where every decision and all storage live) and knows the tracks from outside
-/// the library that the engine put in a queue, so the app can show them (Recently Played, the song sheet) and save
-/// them (Like, "Add to playlist").
+/// The app's side of the music brain (docs/brain-spec.md, 2.1): it owns the brain's files through `BrainRepository`
+/// and `BrainEngine` (PixlLibrary, where every decision and all storage live), hands every finished play to the
+/// event recorder, and knows the tracks from outside the library that the engine put in a queue, so the app can
+/// show them (Recently Played, the song sheet) and save them (Like, "Add to playlist").
 ///
 /// Nothing here runs at app start: the files under `Application Support/Brain/` are read on first use.
 final class BrainService {
@@ -31,17 +33,52 @@ final class BrainService {
     let autoplay = AutoplayState()
     /// Nil in UI tests: no files, no network.
     let repository: BrainRepository?
+    /// The affinity tables, the session and the event log, behind one actor. Nil in UI tests.
+    let engine: BrainEngine?
+    /// Called on the main actor after each recorded play (Autoplay reacts to skips and likes).
+    var onReaction: ((Reaction) -> Void)?
+    /// Marks the song that is playing (an `EventFlags` bit): set by `AppEnvironment` to the listening stats.
+    var markPlaying: ((String, Int32) -> Void)?
+    /// Created with the first play that ends, never at launch.
+    private lazy var recorder: BrainRecorder? = engine.map { engine in
+        BrainRecorder(engine: engine) { [weak self] reaction in
+            await self?.deliver(reaction)
+        }
+    }
+
+    private func deliver(_ reaction: Reaction) {
+        onReaction?(reaction)
+    }
 
     /// Tracks from outside the library known in this run: what Autoplay queued, and what the files hold.
     private var tracks: [String: EngineTrack] = [:]
     private var storedTracksTask: Task<Void, Never>?
 
-    init(radioSource: (any RadioSource)?, isEnabled: Bool) {
+    /// `sources` is what a rebuild of the brain's state reads from the rest of the app (4.4); nothing is read
+    /// until one runs.
+    init(radioSource: (any RadioSource)?, isEnabled: Bool, sources: BrainEngine.Sources? = nil) {
         if isEnabled, let directory = Self.defaultDirectory() {
-            repository = BrainRepository(directory: directory, radioSource: radioSource)
+            let repository = BrainRepository(directory: directory, radioSource: radioSource)
+            self.repository = repository
+            engine = BrainEngine(directory: directory, repository: repository, sources: sources)
         } else {
             repository = nil
+            engine = nil
         }
+    }
+
+    // MARK: The event log (docs/brain-spec.md, 4.2)
+
+    /// A play ended, however short. Returns at once: the recorder works off the main actor, one play at a time.
+    func playFinished(_ play: FinishedPlay) { recorder?.playFinished(play) }
+
+    /// The play in flight, as far as it got; nil clears it.
+    func playOpen(_ play: FinishedPlay?) { recorder?.playOpen(play) }
+
+    /// The listener liked or saved these songs: the one that is playing carries it into its event.
+    func mark(_ songIds: [String], flag: Int32) {
+        guard let markPlaying else { return }
+        for songId in songIds { markPlaying(songId, flag) }
     }
 
     static func defaultDirectory() -> URL? {

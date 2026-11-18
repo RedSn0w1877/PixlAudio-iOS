@@ -91,6 +91,9 @@ final class TasteAdjustmentStore {
     /// The engine's view of the changes in force (empty before the file is read: callers `ensureLoaded()` first).
     func activeSet(nowMs: Int64) -> TasteAdjustmentSet { list.set(nowMs: nowMs) }
 
+    /// The changes in force, one by one (the music brain turns boosts and reductions into prior counts).
+    func activeAdjustments(nowMs: Int64) -> [TasteAdjustment] { list.active(nowMs: nowMs) }
+
     // MARK: Changing
 
     /// Applies the changes in order and returns what each did. One save and one revision bump for the whole call.

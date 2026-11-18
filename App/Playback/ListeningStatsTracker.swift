@@ -7,6 +7,10 @@ import SwiftData
 /// time while playing; when the song changes or playback stops, a session of at least 5 s is recorded — to
 /// `playback_history.json` (Android's exact format, `PlaybackHistoryCodec`) and to the song's engagement row
 /// (`EngagementRecord`: play count, total time, last played; Android `DailyMixManager.recordPlay`).
+///
+/// The music brain's play (docs/brain-spec.md, 4.2) is kept beside the legacy session: every play that ends, however
+/// short, is handed to `onBrainPlay` with its context and the reason it ended, BEFORE the five-second floor, which
+/// only guards the legacy stores. The arithmetic of that play is `OpenPlay` in PixlLibrary.
 @MainActor
 final class ListeningStatsTracker {
     /// `MIN_SESSION_LISTEN_MS`.
@@ -22,6 +26,8 @@ final class ListeningStatsTracker {
         var lastUpdateEpochMs: Int64
         var isPlaying: Bool
         let isVoluntary: Bool
+        /// A track from outside the library that has no library row: the legacy counters are not written for it.
+        var isOutsideLibrary = false
     }
 
     /// A finished session to persist.
@@ -34,9 +40,21 @@ final class ListeningStatsTracker {
         /// The session ended because another song started (Android's `trackChanged`: an early skip counts as one
         /// for music intelligence).
         var changedTrack = false
+        /// A track Autoplay played from outside the library, not saved: it is in the play history (so it shows in
+        /// Recently Played) but not in the taste counters or the engagement rows (docs/brain-spec.md, 4.2).
+        var isOutsideLibrary = false
     }
 
     private(set) var session: Session?
+    /// The same play as the music brain records it.
+    private(set) var brainPlay: OpenPlay?
+    /// Every play that ended, however short: there is no five-second floor here.
+    var onBrainPlay: ((FinishedPlay) -> Void)?
+    /// The play in flight, when it starts playing and when it pauses (nil clears it): a play cut off by the process
+    /// ending is then still recorded.
+    var onBrainOpen: ((FinishedPlay?) -> Void)?
+    /// Minutes east of UTC; injectable for tests.
+    var tzOffsetMin: () -> Int32 = { Int32(clamping: TimeZone.current.secondsFromGMT() / 60) }
     private var pendingVoluntarySongId: String?
     /// Monotonic milliseconds (`SystemClock.elapsedRealtime`); injectable for tests.
     var realtimeMs: () -> Int64 = { Int64(ProcessInfo.processInfo.systemUptime * 1000) }
@@ -49,15 +67,25 @@ final class ListeningStatsTracker {
     /// The user picked this song (vs. auto-advance).
     func onVoluntarySelection(songId: String) { pendingVoluntarySongId = songId }
 
-    func onTrackChanged(songId: String?, positionMs: Int64, durationMs: Int64, isPlaying: Bool) {
-        finalizeCurrentSession(changedTrack: songId != nil && songId != session?.songId)
+    /// A new track became current. `context` says what it is and how it started; `endReason` (an `EndReason` code)
+    /// why the track before it ended; `isOutsideLibrary` that it has no library row and Autoplay brought it.
+    func onTrackChanged(songId: String?, positionMs: Int64, durationMs: Int64, isPlaying: Bool,
+                        context: PlayContext? = nil, endReason: Int32 = EndReason.unknown, isOutsideLibrary: Bool = false) {
+        finalizeCurrentSession(changedTrack: songId != nil && songId != session?.songId, endReason: endReason)
         guard let songId, !songId.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         let now = epochMs()
+        let realtime = realtimeMs()
         session = Session(songId: songId, totalDurationMs: max(durationMs, 0), startedAtEpochMs: now,
                           lastKnownPositionMs: max(positionMs, 0), accumulatedListeningMs: 0,
-                          lastRealtimeMs: realtimeMs(), lastUpdateEpochMs: now, isPlaying: isPlaying,
-                          isVoluntary: pendingVoluntarySongId == songId)
+                          lastRealtimeMs: realtime, lastUpdateEpochMs: now, isPlaying: isPlaying,
+                          isVoluntary: pendingVoluntarySongId == songId, isOutsideLibrary: isOutsideLibrary)
         if pendingVoluntarySongId == songId { pendingVoluntarySongId = nil }
+        if let context {
+            let play = OpenPlay(songId: songId, context: context, startedAtEpochMs: now, tzOffsetMin: tzOffsetMin(),
+                                durationMs: durationMs, isPlaying: isPlaying, realtimeMs: realtime)
+            brainPlay = play
+            if isPlaying { onBrainOpen?(play.snapshot(endReason: EndReason.killed)) }
+        }
     }
 
     func onPlayStateChanged(isPlaying: Bool, positionMs: Int64) {
@@ -69,15 +97,47 @@ final class ListeningStatsTracker {
         current.lastKnownPositionMs = max(positionMs, 0)
         current.lastUpdateEpochMs = epochMs()
         session = current
+        if var play = brainPlay {
+            let writeDown = play.update(realtimeMs: now, playing: isPlaying)
+            brainPlay = play
+            if writeDown { onBrainOpen?(play.snapshot(endReason: EndReason.killed)) }
+        }
     }
 
     func updateDuration(_ durationMs: Int64) {
         guard durationMs > 0 else { return }
         session?.totalDurationMs = durationMs
+        if var play = brainPlay, play.durationMs != durationMs {
+            play.update(realtimeMs: realtimeMs(), playing: play.isPlaying, durationMs: durationMs)
+            brainPlay = play
+        }
     }
 
-    /// Records the session if long enough and clears it (`finalizeCurrentSession`).
-    func finalizeCurrentSession(changedTrack: Bool = false) {
+    /// Something happened to `songId` while it plays (an `EventFlags` bit: liked, saved, added to a playlist). A
+    /// flag for a song that is not playing is dropped: the like still reaches the brain as a library fact.
+    func markFlag(songId: String, flag: Int32) {
+        guard var play = brainPlay, play.songId == songId else { return }
+        play.mark(flag)
+        brainPlay = play
+    }
+
+    /// A seek inside the current track (a replay, or a seek back).
+    func onSeek(fromPositionMs: Int64, toPositionMs: Int64) {
+        guard var play = brainPlay else { return }
+        play.seek(fromPositionMs: fromPositionMs, toPositionMs: toPositionMs, realtimeMs: realtimeMs())
+        brainPlay = play
+    }
+
+    /// Records the session if long enough and clears it (`finalizeCurrentSession`). `endReason` is an `EndReason`
+    /// code: why the play ended. The brain's play is handed over first, whatever its length.
+    func finalizeCurrentSession(changedTrack: Bool = false, endReason: Int32 = EndReason.unknown) {
+        if var play = brainPlay {
+            brainPlay = nil
+            if let finished = play.finish(endReason: endReason, realtimeMs: realtimeMs()) {
+                onBrainPlay?(finished)
+                if play.everPlayed { onBrainOpen?(nil) }
+            }
+        }
         guard var current = session else { return }
         let nowEpoch = epochMs()
         accumulate(&current, now: realtimeMs())
@@ -94,7 +154,7 @@ final class ListeningStatsTracker {
             let timestamp = min(max(rawEnd, max(current.startedAtEpochMs, 0)), nowEpoch)
             onRecord?(Record(songId: current.songId, listenedMs: listened, timestamp: timestamp,
                              totalDurationMs: current.totalDurationMs, isVoluntary: current.isVoluntary,
-                             changedTrack: changedTrack))
+                             changedTrack: changedTrack, isOutsideLibrary: current.isOutsideLibrary))
         }
         session = nil
         if pendingVoluntarySongId == current.songId { pendingVoluntarySongId = nil }

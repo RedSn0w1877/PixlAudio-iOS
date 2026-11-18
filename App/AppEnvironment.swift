@@ -263,10 +263,36 @@ final class AppEnvironment {
         self.spotifyConnect = spotifyConnect
         // The music brain: Autoplay continues the queue; Recently Played, Like and "Add to playlist" know the tracks
         // it played from outside the library. Nothing is read or fetched here.
-        let brain = BrainService(radioSource: youtube.radioSource, isEnabled: !isUITest)
+        let brainLibrary = library, brainHistory = home.history, brainImports = importedHistory
+        let brainTaste = tasteAdjustments
+        let brain = BrainService(radioSource: youtube.radioSource, isEnabled: !isUITest, sources: BrainEngine.Sources(
+            library: { @MainActor in brainLibrary.songs },
+            history: { @MainActor in
+                await brainHistory.ensureLoaded()
+                return brainHistory.events
+            },
+            importSignature: { @MainActor in
+                await brainImports.ensureLoaded()
+                let aggregate = brainImports.aggregate
+                return "\(aggregate.totalPlays)|\(aggregate.lastPlayMs)"
+            },
+            imported: { @MainActor in await brainImports.importedContents() },
+            adjustments: { @MainActor in
+                await brainTaste.ensureLoaded()
+                return brainTaste.activeAdjustments(nowMs: currentTimeMillis())
+            }))
         self.brain = brain
         BrainService.shared = brain
         home.engineSongs = { await brain.engineSongs() }
+        if let realPlayback {
+            // Every play that ends reaches the event log, with no five-second floor (docs/brain-spec.md, 4.2).
+            let stats = realPlayback.stats
+            stats.onBrainPlay = { [weak brain] play in brain?.playFinished(play) }
+            stats.onBrainOpen = { [weak brain] play in brain?.playOpen(play) }
+            brain.markPlaying = { [weak stats] songId, flag in stats?.markFlag(songId: songId, flag: flag) }
+            realPlayback.isInLibrary = { brainLibrary.song(id: $0) != nil }
+            realPlayback.isEngineTrack = { [weak brain] songId in brain?.track(songId: songId) != nil }
+        }
         if let realPlayback {
             let libraryStore = library, playbackStore = playback, blockedStore = settings.blocked
             let aiSettings = settings.ai
@@ -284,6 +310,7 @@ final class AppEnvironment {
                 exploration: { Float(aiSettings.musicExploration) },
                 matchedVideoId: { spotifyId in try? await persistence?.matchedVideoId(spotifyId: spotifyId) }))
             realPlayback.autoplay = autoplay
+            brain.onReaction = { [weak autoplay] reaction in autoplay?.reaction(reaction) }
             autoplayController = autoplay
         } else {
             autoplayController = nil

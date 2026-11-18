@@ -56,8 +56,11 @@ nonisolated struct PlaybackQueue: Sendable {
 
     /// Replaces the queue (Android `playSongs`). With `shuffle`, the start song keeps its position and the rest is
     /// shuffled around it (`prepareShuffledQueueWithStart` → `buildAnchoredShuffleQueue`).
-    mutating func replace<R: ShuffleRandom>(with songs: [Song], startIndex: Int, shuffle: Bool, random: inout R) {
-        let fresh = makeEntries(songs)
+    /// `source` says where the listener started the queue from (an album, a playlist, search); every entry carries
+    /// it, so the event log knows the surface of each play (docs/brain-spec.md, 4.2).
+    mutating func replace<R: ShuffleRandom>(with songs: [Song], startIndex: Int, shuffle: Bool, random: inout R,
+                                            source: BrainItemTag? = nil) {
+        let fresh = makeEntries(songs, tags: source.map { [BrainItemTag?](repeating: $0, count: songs.count) } ?? [])
         guard !fresh.isEmpty else {
             entries = []
             originalOrder = nil
@@ -75,9 +78,9 @@ nonisolated struct PlaybackQueue: Sendable {
         currentIndex = start
     }
 
-    mutating func replace(with songs: [Song], startIndex: Int, shuffle: Bool) {
+    mutating func replace(with songs: [Song], startIndex: Int, shuffle: Bool, source: BrainItemTag? = nil) {
         var random = SystemShuffleRandom()
-        replace(with: songs, startIndex: startIndex, shuffle: shuffle, random: &random)
+        replace(with: songs, startIndex: startIndex, shuffle: shuffle, random: &random, source: source)
     }
 
     /// Restores a saved queue as it was (no reshuffle). `originalSongs` is the unshuffled order when shuffled.
@@ -167,7 +170,7 @@ nonisolated struct PlaybackQueue: Sendable {
 
     /// Inserts songs right after the current entry ("Play next").
     mutating func playNext(_ songs: [Song]) {
-        let fresh = makeEntries(songs)
+        let fresh = makeEntries(songs, tags: [BrainItemTag?](repeating: BrainSurfaces.manualQueue, count: songs.count))
         guard !fresh.isEmpty else { return }
         guard let currentIndex else {
             entries = fresh
@@ -181,7 +184,7 @@ nonisolated struct PlaybackQueue: Sendable {
     /// Appends songs ("Add to queue"). What the listener queues goes above the Autoplay line: the engine's picks
     /// stay last (docs/brain-spec.md, 7.1 "Ownership").
     mutating func append(_ songs: [Song]) {
-        let fresh = makeEntries(songs)
+        let fresh = makeEntries(songs, tags: [BrainItemTag?](repeating: BrainSurfaces.manualQueue, count: songs.count))
         guard !fresh.isEmpty else { return }
         if let line = firstUpcomingEngineIndex {
             entries.insert(contentsOf: fresh, at: line)
@@ -199,6 +202,24 @@ nonisolated struct PlaybackQueue: Sendable {
         entries.append(contentsOf: fresh)
         originalOrder?.append(contentsOf: fresh)
         if currentIndex == nil { currentIndex = 0 }
+    }
+
+    /// Replaces everything from `index` to the end with Autoplay's re-scored picks, in one edit (docs/brain-spec.md,
+    /// 7.3). Only an unbroken run of engine entries after the current one may be replaced: tracks the listener
+    /// queued are never touched. False (and nothing changes) otherwise.
+    @discardableResult
+    mutating func replaceTail(from index: Int, songs: [Song], tags: [BrainItemTag]) -> Bool {
+        guard let currentIndex, index > currentIndex, index < entries.count, songs.count == tags.count else { return false }
+        for position in index..<entries.count where !entries[position].isEngineOwned { return false }
+        let dropped = Set(entries[index...].map(\.id))
+        let fresh = makeEntries(songs, tags: tags)
+        entries.removeSubrange(index...)
+        entries.append(contentsOf: fresh)
+        if originalOrder != nil {
+            originalOrder?.removeAll { dropped.contains($0.id) }
+            originalOrder?.append(contentsOf: fresh)
+        }
+        return true
     }
 
     /// The first engine-owned entry after the current one (where the Autoplay line is drawn), or nil.

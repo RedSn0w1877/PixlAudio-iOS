@@ -114,7 +114,10 @@ struct LibraryEditor {
     func setFavorite(_ songIds: [String], _ isFavorite: Bool) {
         guard !songIds.isEmpty else { return }
         // Liking a track Autoplay played from outside the library makes it a library track first.
-        if isFavorite { saveEngineTracks(songIds) }
+        if isFavorite {
+            saveEngineTracks(songIds)
+            BrainService.shared?.mark(songIds, flag: EventFlags.likedDuring)
+        }
         let ids = Set(songIds)
         var snapshot = store.snapshot
         var changed: [Song] = []
@@ -158,6 +161,7 @@ struct LibraryEditor {
         }
         guard !rows.isEmpty else { return 0 }
         store.applyEdit(snapshot, changedSongs: songs, addedAlbums: albums, addedArtists: artists)
+        brain.mark(songs.map(\.id), flag: EventFlags.savedDuring)
         guard let persistence else { return rows.count }
         let writesCache = self.writesCache, saved = rows, latest = snapshot
         Task.detached(priority: .utility) {
@@ -187,6 +191,7 @@ struct LibraryEditor {
                                 coverShapeDetail2: detail(1), coverShapeDetail3: detail(2), coverShapeDetail4: detail(3),
                                 sortOrder: (store.playlists.map(\.sortOrder).max() ?? -1) + 1)
         saveEngineTracks(songIds)
+        BrainService.shared?.mark(songIds, flag: EventFlags.addedToPlaylist)
         var snapshot = store.snapshot
         snapshot.playlists.append(playlist)
         commit(snapshot) { try await $0.upsertPlaylist(playlist, smartRuleKey: smartRuleKey) }
@@ -215,6 +220,7 @@ struct LibraryEditor {
     func addSongs(_ songIds: [String], toPlaylist playlistId: String) {
         guard var playlist = store.playlist(id: playlistId) else { return }
         saveEngineTracks(songIds)
+        BrainService.shared?.mark(songIds, flag: EventFlags.addedToPlaylist)
         let existing = Set(playlist.songIds)
         playlist.songIds += songIds.filter { !existing.contains($0) }.kotlinDistinctIds()
         updatePlaylist(playlist)

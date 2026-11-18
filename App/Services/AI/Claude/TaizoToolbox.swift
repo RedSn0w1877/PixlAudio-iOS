@@ -285,7 +285,7 @@ enum TaizoToolRunner {
         let (songs, blocked) = withoutBlocked(env, resolved)
         guard !songs.isEmpty else { return .error(allBlockedMessage) }
         let start = min(clamp(input["start_index"], default: 0, range: 0...Int.max), songs.count - 1)
-        env.playback.play(songs, startIndex: start)
+        env.playback.play(songs, startIndex: start, source: .assistant)
         var members: [(String, JSONValue)] = [
             ("now_playing", .string("\(songs[start].title) — \(songs[start].displayArtist)")),
             ("queue_length", .integer(songs.count)), ("not_found", .array(missing.map(JSONValue.string))),
@@ -302,7 +302,7 @@ enum TaizoToolRunner {
         guard !songs.isEmpty else { return .error(allBlockedMessage) }
         let next = input["play_next"]?.boolValue ?? false
         if !env.playback.hasItem {
-            env.playback.play(songs, startIndex: 0)
+            env.playback.play(songs, startIndex: 0, source: .assistant)
         } else if next {
             env.playback.playNext(songs)
         } else {
