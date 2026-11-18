@@ -89,11 +89,11 @@ nonisolated enum BrainStrings {
     static var promiseRepeatBody: String { String(localized: "A new song you skipped three times stays away for 60 days.") }
     static var promiseWhyTitle: String { String(localized: "You can see why, and change it") }
     static var promiseWhyBody: String {
-        String(localized: "Every pick says why it is there. Changes apply from the next track and can be undone.")
+        String(localized: "A pick shows why it is there when there is a reason to give. Changes apply from the next track and can be undone.")
     }
     static var promisePlaylistsTitle: String { String(localized: "Nothing is slipped into your playlists") }
     static var promisePlaylistsBody: String {
-        String(localized: "Picks live only under the Autoplay line, which has an off switch.")
+        String(localized: "Picks are never added to your playlists or your library. Autoplay has an off switch, and a station plays until you start something else.")
     }
     static var promisePhoneTitle: String { String(localized: "It stays on your phone") }
     static var promisePhoneBody: String {

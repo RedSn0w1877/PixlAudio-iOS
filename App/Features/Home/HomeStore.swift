@@ -91,6 +91,7 @@ final class HomeStore {
     /// The tracks from outside the library that Autoplay played, by id (docs/brain-spec.md, 7.2): Recently Played
     /// resolves ids the library does not have through them. Set by `AppEnvironment` (nil for previews).
     @ObservationIgnored var engineSongs: (() async -> [String: Song])?
+    @ObservationIgnored private var engineTracksRevision = 0
     /// The music brain's "Because you listened to X" rows, in front of the legacy shelves (decision D10). Shown
     /// from their saved file; a rebuild is what the next visit shows.
     private(set) var brainShelves: [BrainHomeShelf] = []
@@ -136,6 +137,8 @@ final class HomeStore {
         var blocked = 0
         var importedRevision = 0
         var adjustmentsRevision = 0
+        /// The brain's stored tracks were read after launch: Recently Played can resolve more ids.
+        var engineTracksRevision = 0
 
         /// The same library, day and taste: only the listening history moved.
         func onlyHistoryDiffers(from other: Key) -> Bool {
@@ -143,6 +146,7 @@ final class HomeStore {
                 && tasteRevision == other.tasteRevision && exploration == other.exploration && blocked == other.blocked
                 && learning == other.learning && importedRevision == other.importedRevision
                 && adjustmentsRevision == other.adjustmentsRevision
+                && engineTracksRevision == other.engineTracksRevision
         }
     }
 
@@ -176,7 +180,6 @@ final class HomeStore {
         await imported?.ensureLoaded()
         let importedAggregate = imported?.aggregate ?? .empty
         let adjustmentSet = await tasteSet()
-        let engineSongs = await self.engineSongs?() ?? [:]
         let clock = history.clock
         let now = clock.nowMs()
         let epochDay = ZoneClock(clock.timeZone).localDate(at: now).epochDay
@@ -185,8 +188,11 @@ final class HomeStore {
         let key = Key(libraryRevision: libraryRevision, revision: history.revision, epochDay: epochDay,
                       tasteRevision: taste?.revision ?? 0, exploration: exploration, learning: !signals.isEmpty,
                       blocked: blockedRevision, importedRevision: imported?.revision ?? 0,
-                      adjustmentsRevision: adjustments?.revision ?? 0)
+                      adjustmentsRevision: adjustments?.revision ?? 0, engineTracksRevision: engineTracksRevision)
         if !force, key == lastKey { return }
+        // Only a refresh that will compute asks for the tracks from outside the library (Recently Played shows
+        // them), and at launch that answer does not wait for a file (`BrainService.engineSongsForHome`).
+        let engineSongs = await self.engineSongs?() ?? [:]
         // A finished song or skip changes only the history: wait until the skip, the carousel and the re-theme are
         // done before the (cancellable) recomputation starts. A newer change cancels this task during the wait.
         if !force, let last = lastKey, last.onlyHistoryDiffers(from: key) {
@@ -263,6 +269,9 @@ final class HomeStore {
             }
         }
     }
+
+    /// The brain's stored tracks were read a moment after launch: the next refresh resolves the history with them.
+    func engineTracksChanged() { engineTracksRevision &+= 1 }
 
     /// Home came back on screen: rows rebuilt while it was away are shown now.
     func showPendingBrainRows() {

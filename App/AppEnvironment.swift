@@ -286,7 +286,15 @@ final class AppEnvironment {
             }))
         self.brain = brain
         BrainService.shared = brain
-        home.engineSongs = { await brain.engineSongs() }
+        home.engineSongs = { await brain.engineSongsForHome() }
+        // The stored tracks are read a moment after launch; Home then resolves the rest of its history.
+        let brainHome = home
+        brain.onStoredTracksLoaded = {
+            brainHome.engineTracksChanged()
+            Task { await brainHome.refresh(snapshot: brainLibrary.snapshot, libraryRevision: brainLibrary.songsRevision) }
+        }
+        // "Go to artist" on a track from outside the library opens the library's own artist of that name.
+        brain.libraryLinks = (hasArtist: { brainLibrary.artist(id: $0) != nil }, hasAlbum: { brainLibrary.album(id: $0) != nil })
         if let realPlayback {
             // Every play that ends reaches the event log, with no five-second floor (docs/brain-spec.md, 4.2).
             let stats = realPlayback.stats
@@ -295,10 +303,16 @@ final class AppEnvironment {
             brain.markPlaying = { [weak stats] songId, flag in stats?.markFlag(songId: songId, flag: flag) }
             realPlayback.isInLibrary = { brainLibrary.song(id: $0) != nil }
             realPlayback.isEngineTrack = { [weak brain] songId in brain?.track(songId: songId) != nil }
+            // After a restart the restored queue knows its picks before the brain's files are read.
+            let pickEngine = realPlayback.engine
+            brain.queuedPick = { [weak pickEngine] songId in
+                pickEngine?.queue.entries.first { $0.song.id == songId && $0.brain?.arm != nil }?.song
+            }
         }
         if let realPlayback {
             let libraryStore = library, playbackStore = playback, blockedStore = settings.blocked
             let aiSettings = settings.ai
+            let streamCache = youtube.cache
             let autoplay = AutoplayController(engine: realPlayback.engine, brain: brain, sources: AutoplayController.Sources(
                 isEnabled: { aiSettings.musicDiscoveryEnabled },
                 youTubeSourceEnabled: { aiSettings.brainYouTubeSourceEnabled },
@@ -311,7 +325,10 @@ final class AppEnvironment {
                 signals: { musicTaste.learnedSignals },
                 imported: { importedHistory.aggregate },
                 exploration: { Float(aiSettings.musicExploration) },
-                matchedVideoId: { spotifyId in try? await persistence?.matchedVideoId(spotifyId: spotifyId) }))
+                matchedVideoId: { spotifyId in try? await persistence?.matchedVideoId(spotifyId: spotifyId) },
+                offlinePlayable: { songs in
+                    await AutoplayOffline.playable(songs, persistence: persistence, cache: streamCache)
+                }))
             realPlayback.autoplay = autoplay
             brain.onReaction = { [weak autoplay] reaction in autoplay?.reaction(reaction) }
             // "Not for me", "Less from ...", a mute or an undo from anywhere: what it excludes leaves the engine's

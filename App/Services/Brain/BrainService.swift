@@ -63,7 +63,23 @@ final class BrainService {
 
     /// Tracks from outside the library known in this run: what Autoplay queued, and what the files hold.
     private var tracks: [String: EngineTrack] = [:]
+    /// Bumped whenever `tracks` gains or replaces a track: the songs built from them are built once per value.
+    private var tracksRevision = 0
     private var storedTracksTask: Task<Void, Never>?
+    private var storedTracksLoaded = false
+    private var deferredLoadTask: Task<Void, Never>?
+    private var songsCache: [String: Song] = [:]
+    private var songsCacheRevision = -1
+    private let launchedAtMs = currentTimeMillis()
+
+    /// Whether the library has an artist or an album under an id (set by `AppEnvironment`): a track from outside
+    /// the library is pointed at the library's own artist of the same name (`EngineSongLinks`).
+    var libraryLinks: (hasArtist: (Int64) -> Bool, hasAlbum: (Int64) -> Bool)?
+    /// The queue's own song for a pick it still holds (set by `AppEnvironment`): after a restart the restored
+    /// queue knows a pick before the stored tracks are read.
+    var queuedPick: ((String) -> Song?)?
+    /// The stored tracks were read after launch and Home may resolve more of the history (set by `AppEnvironment`).
+    var onStoredTracksLoaded: (() -> Void)?
 
     /// `sources` is what a rebuild of the brain's state reads from the rest of the app (4.4); nothing is read
     /// until one runs.
@@ -117,20 +133,36 @@ final class BrainService {
     func register(_ newTracks: [EngineTrack]) {
         guard !newTracks.isEmpty else { return }
         for track in newTracks { tracks[track.songId] = track }
+        tracksRevision &+= 1
         guard let repository else { return }
         Task.detached(priority: .utility) { await repository.registerPlayable(newTracks) }
     }
 
-    /// The track that plays under `songId`, when the engine queued it in this run or the files were read.
-    func track(songId: String) -> EngineTrack? { tracks[songId] }
+    /// The track that plays under `songId`: one the engine queued in this run, one the files hold (once they were
+    /// read), or a pick the queue itself still holds (a queue restored after a restart, before the files are read).
+    func track(songId: String) -> EngineTrack? {
+        if let known = tracks[songId] { return known }
+        guard let song = queuedPick?(songId), let track = EngineTrack(queueSong: song) else { return nil }
+        tracks[songId] = track
+        tracksRevision &+= 1
+        return track
+    }
 
     /// The queue's song for an id the library does not have (the song sheet of an engine item).
-    func song(id: String) -> Song? { tracks[id].map { Self.queueSong(for: $0) } }
+    func song(id: String) -> Song? { track(songId: id).map { linked(Self.queueSong(for: $0)) } }
+
+    /// `song` with its artists pointed at the library's own artists of the same name, and no album when the
+    /// library has none for it: "Go to artist" then opens the artist the listener has, not an empty page.
+    func linked(_ song: Song) -> Song {
+        guard let libraryLinks else { return song }
+        return EngineSongLinks.link(song, hasArtist: libraryLinks.hasArtist, hasAlbum: libraryLinks.hasAlbum,
+                                    libraryArtistId: { SpotifyLibrary.unifiedArtistId(KotlinText.lowercase($0)) })
+    }
 
     /// The library rows a saved engine track gets: exactly what the YouTube Music importer writes for the same
     /// video, so the id (`yt:<videoId>`) and the rows agree whichever way the track came in.
     func libraryRows(songId: String, nowMs: Int64) -> (song: Song, album: Album, artist: Artist)? {
-        guard let track = tracks[songId] else { return nil }
+        guard let track = track(songId: songId) else { return nil }
         let song = YouTubeSongFactory.song(
             YouTubeMusicTrack(videoId: track.videoId, title: track.title, artist: track.artistDisplay, album: track.album,
                               thumbnailUrl: track.artUrl, durationMs: track.durationMs),
@@ -138,26 +170,61 @@ final class BrainService {
         return (song, YouTubeSongFactory.album(for: song, now: nowMs), YouTubeSongFactory.artist(for: song))
     }
 
-    /// Reads the stored tracks once (a small file, off the main actor) and returns every known engine track as a
-    /// song by id: Recently Played resolves ids the library does not have through this.
+    /// Reads the stored tracks once (off the main actor) and returns every known engine track as a song by id:
+    /// Recently Played resolves ids the library does not have through this. The songs are built once per set of
+    /// tracks, not once per call.
     func engineSongs() async -> [String: Song] {
         guard let repository else { return [:] }
         if storedTracksTask == nil {
             storedTracksTask = Task { [weak self] in
                 let stored = await repository.engineTracks()
                 guard let self else { return }
-                for track in stored where self.tracks[track.songId] == nil { self.tracks[track.songId] = track }
+                var added = false
+                // A stored row replaces what was read back from a restored queue entry (which has no recording id).
+                for track in stored where (self.tracks[track.songId]?.rid ?? 0) == 0 {
+                    self.tracks[track.songId] = track
+                    added = true
+                }
+                if added { self.tracksRevision &+= 1 }
+                self.storedTracksLoaded = true
             }
         }
         await storedTracksTask?.value
+        if songsCacheRevision == tracksRevision { return songsCache }
+        let revision = tracksRevision
         let known = Array(tracks.values)
-        if known.isEmpty { return [:] }
-        return await Task.detached(priority: .utility) {
-            let now = currentTimeMillis()
-            var songs: [String: Song] = [:]
-            songs.reserveCapacity(known.count)
-            for track in known { songs[track.songId] = BrainService.queueSong(for: track, nowMs: now) }
-            return songs
-        }.value
+        var songs: [String: Song] = [:]
+        if !known.isEmpty {
+            songs = await Task.detached(priority: .utility) {
+                let now = currentTimeMillis()
+                var built: [String: Song] = [:]
+                built.reserveCapacity(known.count)
+                for track in known { built[track.songId] = BrainService.queueSong(for: track, nowMs: now) }
+                return built
+            }.value
+        }
+        songsCache = songs
+        songsCacheRevision = revision
+        return songs
+    }
+
+    /// For Home's own refresh, which also runs at launch: what is known by now, without waiting for a file. In the
+    /// app's first seconds the stored tracks are not read; they are read a moment later, and Home is told when
+    /// that turned up anything (docs/brain-spec.md, 12.1 "App start").
+    func engineSongsForHome() async -> [String: Song] {
+        guard repository != nil else { return [:] }
+        if storedTracksLoaded || storedTracksTask != nil { return await engineSongs() }
+        let wait = BrainStartup.storedTracksWaitMs(sinceLaunchMs: currentTimeMillis() - launchedAtMs)
+        if wait == 0 { return await engineSongs() }
+        if deferredLoadTask == nil {
+            deferredLoadTask = Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(wait))
+                guard let self else { return }
+                let before = self.tracksRevision
+                _ = await self.engineSongs()
+                if self.tracksRevision != before { self.onStoredTracksLoaded?() }
+            }
+        }
+        return songsCacheRevision == tracksRevision ? songsCache : [:]
     }
 }

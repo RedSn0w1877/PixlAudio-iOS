@@ -77,6 +77,9 @@ final class BrainActions {
             // A one-song queue is the listener's explicit choice (it plays even when its artist is blocked). The
             // seed's tag is what makes the queue this station's: any other play replaces it, which ends the station.
             playback.play([seed], source: station.seedTag)
+        } else if StationRules.inPlaceStartMustPlay(isPlaying: playback.isPlaying) {
+            // "Start station" on a paused track is still a request for music: the seed plays on from where it is.
+            playback.resume()
         }
         let state = brain.autoplay
         if state.stationTitle != station.title { state.stationTitle = station.title }
@@ -91,7 +94,9 @@ final class BrainActions {
     /// pick into the queue and the event log.
     func play(_ shelf: BrainHomeShelf, startingAt song: Song) {
         brain.register(shelf.row.items.map(\.track))
-        playback.play(song, in: shelf.section.songs, tags: shelf.tags)
+        // The cards were built off the main actor; here each is pointed at the library's own artist, when it has one.
+        let songs = shelf.section.songs.map { brain.linked($0) }
+        playback.play(songs.first { $0.id == song.id } ?? song, in: songs, tags: shelf.tags)
     }
 
     // MARK: Feedback (8.5)

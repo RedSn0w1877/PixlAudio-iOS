@@ -38,7 +38,8 @@ struct SongQuickActionsModifier: ViewModifier {
         if let url = SongQuickActions.shareURL(song) {
             ShareLink(item: url) { Label("Share", systemImage: "square.and.arrow.up") }
         }
-        ForEach(SongQuickActions.artists(of: song).prefix(3), id: \.id) { artist in
+        // Only artists the library has a page for (a song from outside the library may name others).
+        ForEach(SongQuickActions.artists(of: song).filter { env.library.artist(id: $0.id) != nil }.prefix(3), id: \.id) { artist in
             Button("Go to \(artist.name)", systemImage: "music.mic") { openArtist(artist.id) }
         }
     }

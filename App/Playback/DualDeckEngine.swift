@@ -98,6 +98,10 @@ final class DualDeckEngine: PlaybackEngine {
     var onQueueEnded: (() -> Void)?
     var onPlayingChanged: ((Bool) -> Void)?
     var onQueueChanged: (() -> Void)?
+    /// Next was pressed with nothing after the current track (Autoplay remembers it for a few seconds).
+    var onNextWithNothingQueued: (() -> Void)?
+    /// A pick of the engine's could not be loaded: its song id.
+    var onEnginePickFailed: ((String) -> Void)?
     /// A seek or a rate change (Now Playing elapsed time).
     var onTimingChanged: (() -> Void)?
     var onRepeatModeChanged: ((RepeatMode) -> Void)?
@@ -186,7 +190,12 @@ final class DualDeckEngine: PlaybackEngine {
     }
 
     func skipToNext() {
-        guard let target = queue.nextIndexForSkip else { return }
+        guard let target = queue.nextIndexForSkip else {
+            // Nothing follows (a song tapped on its own, before Autoplay's first picks are in): the press is
+            // remembered, and the player moves on when picks land in time.
+            onNextWithNothingQueued?()
+            return
+        }
         jump(to: target)
     }
 
@@ -262,23 +271,26 @@ final class DualDeckEngine: PlaybackEngine {
     // MARK: Autoplay (docs/brain-spec.md, 7.1)
 
     /// Appends Autoplay's picks at the end of the queue in one edit, each with its tag. Nothing happens on an empty
-    /// queue: Autoplay only continues one.
+    /// queue: Autoplay only continues one. An append behind the track that is already next leaves the player's plan
+    /// for that track alone (a prepared crossfade, a scheduled hand-over), so it never has to wait.
     func appendEngineItems(_ songs: [Song], tags: [BrainItemTag]) {
         guard !queue.isEmpty, !songs.isEmpty, songs.count == tags.count else { return }
-        queue.appendEngine(songs, tags: tags)
-        queueEdited(currentChanged: false)
+        var edited = queue
+        edited.appendEngine(songs, tags: tags)
+        commitEngineEdit(edited, mayWait: false)
     }
 
     /// Replaces the engine-owned end of the queue, from `index` on, with re-scored picks: ONE queue edit
-    /// (docs/brain-spec.md, 7.3). Refused while a hand-over is prepared, and for anything at or before the track
-    /// after the current one (decision D8: the next track is never swapped).
+    /// (docs/brain-spec.md, 7.3). Refused for anything at or before the track after the current one (decision D8:
+    /// the next track is never swapped), and while a hand-over that it would change is already on the host clock.
     @discardableResult
     func replaceEngineTail(from index: Int, songs: [Song], tags: [BrainItemTag]) -> Bool {
-        guard !songs.isEmpty, songs.count == tags.count, !isHandOverPrepared,
-              let current = queue.currentIndex, index > current + 1 else { return false }
-        guard queue.replaceTail(from: index, songs: songs, tags: tags) else { return false }
-        queueEdited(currentChanged: false)
-        return true
+        guard !songs.isEmpty, songs.count == tags.count, let current = queue.currentIndex, index > current + 1 else {
+            return false
+        }
+        var edited = queue
+        guard edited.replaceTail(from: index, songs: songs, tags: tags) else { return false }
+        return commitEngineEdit(edited, mayWait: true)
     }
 
     /// A station started from the track that is playing (docs/brain-spec.md, 8.3): the track keeps playing and
@@ -292,18 +304,38 @@ final class DualDeckEngine: PlaybackEngine {
     }
 
     /// Takes the engine's upcoming picks with these song ids out of the queue in one edit: what a taste change
-    /// excludes (docs/brain-spec.md, 8.5). Refused while a hand-over is prepared; the listener's own items and the
-    /// current track are never touched. False when nothing changed.
+    /// excludes (docs/brain-spec.md, 8.5), or the artist that was just skipped. The listener's own items and the
+    /// current track are never touched. False when nothing changed, or when the pick that goes is the next track
+    /// and its hand-over is already on the host clock (`isHandOverScheduled`): the caller tries again.
     @discardableResult
     func removeUpcomingEnginePicks(ids: Set<String>) -> Bool {
-        guard !isHandOverPrepared, queue.removeUpcomingEngine(ids: ids) else { return false }
-        queueEdited(currentChanged: false)
-        return true
+        var edited = queue
+        guard edited.removeUpcomingEngine(ids: ids) else { return false }
+        return commitEngineEdit(edited, mayWait: true)
     }
 
-    /// One deck is handing over to the other, or the next song is already prepared for it: a queue edit now would
-    /// cancel that plan and build it again. Autoplay holds its append until this is false.
-    var isHandOverPrepared: Bool { fade != nil || scheduledHandOver != nil || preparedIncoming != nil }
+    /// The incoming deck is already started on the host clock: the last moments of a track.
+    var isHandOverScheduled: Bool { scheduledHandOver != nil }
+
+    private static func nextEntryId(of queue: PlaybackQueue) -> Int? {
+        queue.nextIndexForAutoAdvance.flatMap { queue.entry(at: $0) }?.id
+    }
+
+    /// Puts an edit of the engine's part of the queue in place. The player's plan for what comes next is built
+    /// again only when the edit changes WHICH entry is next; an edit that does so while that hand-over is already
+    /// scheduled is refused when it may wait (`AutoplayPolicy.mustDeferQueueEdit`).
+    @discardableResult
+    private func commitEngineEdit(_ edited: PlaybackQueue, mayWait: Bool) -> Bool {
+        let changesNext = Self.nextEntryId(of: edited) != Self.nextEntryId(of: queue)
+        if mayWait, AutoplayPolicy.mustDeferQueueEdit(changesNext: changesNext, handOverScheduled: isHandOverScheduled) {
+            return false
+        }
+        queue = edited
+        emit(.queueChanged(queue.songs, currentIndex: queue.currentIndex))
+        onQueueChanged?()
+        if changesNext { rescheduleNext() }
+        return true
+    }
 
     /// Autoplay's backstop: the queue had ended and more was appended in time. Moves on to the next entry and plays,
     /// as if the last song had just ended. False when there is nothing to move on to.
@@ -520,10 +552,18 @@ final class DualDeckEngine: PlaybackEngine {
             PlaybackStartTimings.shared.failed(timing, error.localizedDescription)
             startTiming = nil
         }
-        emit(.failed(message: "Couldn't play \"\(entry.song.title)\" (\(error.localizedDescription))"))
         consecutiveFailures += 1
         loadFailureCount &+= 1
-        if playWhenReady, consecutiveFailures < queue.count, let next = queue.nextIndexForSkip {
+        let next = playWhenReady && consecutiveFailures < queue.count ? queue.nextIndexForSkip : nil
+        // A pick the listener never chose fails without a message when music goes on behind it; Autoplay is told,
+        // so the track leaves its pool. Everything else says what could not be played.
+        if AutoplayPolicy.failedPickIsSilent(entryIsEnginePick: entry.isEngineOwned, nextWillPlay: next != nil) {
+            onEnginePickFailed?(entry.song.id)
+        } else {
+            emit(.failed(message: "Couldn't play \"\(entry.song.title)\" (\(error.localizedDescription))"))
+            if entry.isEngineOwned { onEnginePickFailed?(entry.song.id) }
+        }
+        if let next {
             advance(to: next, automatic: true, previous: entry.song)
         } else {
             playWhenReady = false

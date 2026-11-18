@@ -57,10 +57,13 @@ struct PlayerMoreMenu<MenuShape: Shape>: View {
                     env.brainActions.notForMe(song)
                 }
                 Button("Add to playlist", systemImage: "text.badge.plus") { showsAddToPlaylist = true }
-                if song.albumId != -1 {
+                // A song from outside the library may name an album or an artist the library has no page for.
+                if library.album(id: song.albumId) != nil {
                     Button("Go to album", systemImage: "opticaldisc") { openAlbum() }
                 }
-                Button("Go to artist", systemImage: "person") { openArtist() }
+                if SongQuickActions.artists(of: song).contains(where: { library.artist(id: $0.id) != nil }) {
+                    Button("Go to artist", systemImage: "person") { openArtist() }
+                }
                 if let shareURL {
                     ShareLink(item: shareURL) { Label("Share", systemImage: "square.and.arrow.up") }
                 }

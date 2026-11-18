@@ -192,6 +192,12 @@ final class PlaybackServices {
             self?.onUpcomingChanged?()
             self?.autoplay?.queueChanged()
         }
+        engine.onNextWithNothingQueued = { [weak self] in
+            self?.autoplay?.nextWithNothingQueued()
+        }
+        engine.onEnginePickFailed = { [weak self] songId in
+            self?.autoplay?.enginePickFailed(songId: songId)
+        }
         engine.onTimingChanged = { [weak self] in
             guard let self else { return }
             self.stats.updateDuration(self.engine.currentDurationMs())
@@ -283,12 +289,21 @@ final class PlaybackServices {
 
     /// A track Autoplay brought from outside the library, not saved since.
     private func isOutsideLibrary(_ song: Song?) -> Bool {
-        guard let song, isEngineTrack?(song.id) == true else { return false }
-        return !(isInLibrary?(song.id) ?? true)
+        guard let song else { return false }
+        // Right after a restart the brain's files are not read yet: the restored queue entry still says that the
+        // engine picked it.
+        let current = engine.queue.current
+        let isPick = current?.song.id == song.id && (current?.isEngineOwned ?? false)
+        return AutoplayPolicy.isOutsideLibrary(inLibrary: isInLibrary?(song.id) ?? true,
+                                               knownEngineTrack: isEngineTrack?(song.id) ?? false,
+                                               entryIsEnginePick: isPick,
+                                               hasYouTubeId: TrackCatalog.videoId(ofSongId: song.id) != nil)
     }
 
     /// The audio route as the event log stores it. Read from the audio session at most twice a minute.
     private func currentRoute() -> Int32 {
+        // Not while a saved queue is restored at launch: the audio session is asked when something plays.
+        if isRestoringQueue { return routeCode }
         let now = Int64(ProcessInfo.processInfo.systemUptime * 1000)
         if routeReadAtMs != 0, now - routeReadAtMs < 30_000 { return routeCode }
         routeReadAtMs = now

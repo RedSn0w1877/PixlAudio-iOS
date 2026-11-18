@@ -18,8 +18,11 @@ import PixlNet
 ///  - The trigger asks the in-memory pool, never the network. A radio request starts no earlier than 1.5 s into a
 ///    track, and all of a pool's work (files, network, text folding) runs off the main actor. A plan is a few
 ///    milliseconds of arithmetic on the brain's actor.
-///  - One queue edit per top-up and per re-score, never while one deck hands over to the other or the next song is
-///    already prepared for that; and never from inside an engine callback (the edit runs on a later main-actor turn).
+///  - One queue edit per top-up and per re-score, and never from inside an engine callback (the edit runs on a later
+///    main-actor turn). An append goes in at once: behind the track that is already next it changes nothing the
+///    player has prepared. Only an edit that would replace the next track during the last moments of a hand-over
+///    waits for the track change (`AutoplayPolicy.mustDeferQueueEdit`).
+///  - One plan at a time: a top-up waits for a re-score, and a pick that is already in the queue is not queued again.
 ///  - A re-score never touches the track after the current one, nor the one after that on unmetered Wi-Fi (the
 ///    prefetcher has warmed them), and only the unbroken run of engine items at the end of the queue.
 ///  - Never at the end of the queue, except as the backstop: picks that land within 10 s of the end resume playback,
@@ -28,6 +31,10 @@ import PixlNet
 ///    not, so an hour of autoplay is still about what the listener started with.
 ///  - Tracks the listener queued are never moved or removed.
 ///  - Off under repeat, during Spotify Connect, and while a saved queue is being restored.
+///  - Three of the engine's picks skipped in a row turn it to another anchor (`Direction`); the listener's next own
+///    track turns it back, and while a track of theirs plays autoplay follows that track.
+///  - With no network the pool is the library alone, and only tracks with a copy on the phone; such a pool, and a
+///    library pool that stands in for radios that could not be had, is built again after a while.
 ///  - A station (8.3) is the same machinery with one fixed anchor, its seed: the first batch is 20, the planner runs
 ///    in station mode, and it keeps going with the Autoplay switch off, because the listener asked for it. It ends
 ///    when the queue no longer holds its seed.
@@ -47,6 +54,22 @@ final class AutoplayController {
         var exploration: () -> Float
         /// The stored YouTube match of a Spotify song (one indexed read, off the main actor).
         var matchedVideoId: @Sendable (String) async -> String?
+        /// Which of these library songs play with no network, by song id (asked only when the phone is offline).
+        var offlinePlayable: @Sendable ([Song]) async -> Set<String>
+    }
+
+    /// What a pool is seeded from, and whether that is a change of direction (`Reaction.turn`).
+    private struct Seeding {
+        var anchors: [Song]
+        var turn = 0
+        /// Turned, with nothing of the session left to turn to: the pool is seeded from the library.
+        var otherDirection = false
+    }
+
+    /// Why a pool is being built: one that is only wanted to top the queue up is dropped once the queue is long
+    /// enough again.
+    private enum FillPurpose {
+        case topUp, refill, turn, backstop
     }
 
     private static let fourHoursMs: Int64 = 4 * 60 * 60 * 1000
@@ -57,9 +80,9 @@ final class AutoplayController {
     private static let emptyBuildRetryMs: Int64 = 5 * 60 * 1000
     /// How many of the newest history entries the 4-hour rule reads (a few hours of listening is far fewer).
     private static let recentHistoryScan = 400
-    /// How often, and how many times, a held append looks again while a crossfade runs (12 s at most).
-    private static let heldAppendPoll: Duration = .seconds(2)
-    private static let heldAppendPolls = 8
+    /// A pick that could not be loaded is kept out of new pools for this long.
+    private static let failedMemoryMs: Int64 = 30 * 60 * 1000
+    private static let failedLimit = 64
     /// Engine items this process put in a queue that a re-score may still need to know.
     private static let servedLimit = 400
     private static let directionNote: Duration = .seconds(12)
@@ -78,20 +101,29 @@ final class AutoplayController {
     /// The radios the pool came from, newest anchor first; empty for a pool that is picked in its own order.
     private var poolSeeds: [Retrieval.SeedList] = []
     private var poolArtistNames: [Int64: String] = [:]
+    /// When the pool was built, and how long it may be used (`AutoplayPolicy.poolTtlMs`; nil: until it runs out).
+    private var poolBuiltAtMs: Int64 = 0
+    private var poolTtlMs: Int64?
     private var fillTask: Task<Void, Never>?
     private var fillKey = ""
     private var fillGeneration = 0
+    private var fillPurpose = FillPurpose.topUp
+    /// The running fill is still waiting for the current track to settle.
+    private var fillSettling = false
     /// A plan for a top-up is being made on the brain's actor.
     private var planTask: Task<Void, Never>?
     private var rescoreTask: Task<Void, Never>?
     private var pendingRescore = false
-    /// A batch held until a hand-over is done, with the pool key it was picked for.
-    private var pendingAppend: (songs: [Song], tags: [BrainItemTag], key: String)?
-    private var heldAppendTask: Task<Void, Never>?
     private var queueEndedAtMs: Int64 = 0
+    /// Next was pressed with nothing queued: when, and on which song.
+    private var nextAskedAtMs: Int64 = 0
+    private var nextAskedSongId: String?
     private var batchSeq: Int64 = 0
     private var emptyBuildKey = ""
     private var emptyBuildAtMs: Int64 = 0
+    private var emptyBuildRetry: Int64 = AutoplayController.emptyBuildRetryMs
+    /// Picks that could not be loaded, by song id, with when.
+    private var failedAtMs: [String: Int64] = [:]
     private var evaluateScheduled = false
     private var libraryIndex: (index: BrainLibraryIndex, count: Int, builtAtMs: Int64)?
     private var lastPruneAtMs: Int64 = 0
@@ -103,10 +135,9 @@ final class AutoplayController {
     // What the event recorder last said about the session.
     private var sessionAnchors: [AnchorInfo] = []
     private var sessionAnchorsAtMs: Int64 = 0
-    private var needsOtherDirection = false
-    private var sessionTurned = false
-    /// Bumped at every change of direction that has no other anchor to turn to: the same anchors, another pool.
-    private var directionEpoch = 0
+    /// 0 while the engine follows the session's anchors; otherwise the number of the turn (`Direction`).
+    private var sessionTurn = 0
+    private var turnAnchors: [AnchorInfo] = []
     private var likedTitles: [Int64: String] = [:]
     private var noteTask: Task<Void, Never>?
 
@@ -119,7 +150,10 @@ final class AutoplayController {
     private var noveltyFactor = 1.0
     private var tasteTask: Task<Void, Never>?
     private var tasteDirty = false
-    /// A taste change arrived while a hand-over was prepared: its queue edit waits for the track change.
+    /// Bumped at every taste change: a pool that was being built meanwhile is matched against the change again.
+    private var tasteEpoch = 0
+    /// A taste change wanted the next track out during the last moments of a hand-over: it is tried again at the
+    /// track change.
     private var pendingTasteFilter = false
     private var tasteRevision: (() -> Int)?
 
@@ -141,6 +175,7 @@ final class AutoplayController {
     /// A new track became current.
     func itemTransition() {
         queueEndedAtMs = 0
+        nextAskedAtMs = 0
         setFinding(false)
         syncLine()
         scheduleEvaluate()
@@ -187,34 +222,91 @@ final class AutoplayController {
     private func backstop() {
         refreshStation()
         guard engine.hasEnded, decide() == .topUp, engine.queue.nextIndexForAutoAdvance == nil else { return }
-        let anchors = anchorSongs()
-        guard !anchors.isEmpty else { return }
-        adoptPool(for: anchors)
+        let seeding = currentSeeding()
+        guard !seeding.anchors.isEmpty else { return }
+        adoptPool(for: seeding)
+        expirePool()
         let endedAt = now()
         queueEndedAtMs = endedAt
-        if let held = pendingAppend {
-            // A batch that was waiting for a hand-over which never came: it goes in now, if it is still for this queue.
-            pendingAppend = nil
-            heldAppendTask?.cancel()
-            heldAppendTask = nil
-            if held.key == poolKey {
-                engine.appendEngineItems(held.songs, tags: held.tags)
-                if resumeAfterQueueEnd() { return }
-            }
+        nextAskedAtMs = 0
+        // The window closes by itself, whatever becomes of the plan and the fill below.
+        Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(AutoplayPolicy.backstopWindowMs + 250))
+            guard let self, self.queueEndedAtMs == endedAt else { return }
+            // Nothing landed in time: the queue simply ended, as it always did.
+            self.queueEndedAtMs = 0
+            self.setFinding(false)
         }
         appendFromPool { [weak self] _ in
             // A batch that went in has resumed playback and cleared the mark (`deliver`).
             guard let self, self.queueEndedAtMs == endedAt else { return }
             self.setFinding(true)
-            self.startFill(anchors: anchors, settle: false, deepen: false)
-            Task { [weak self] in
-                try? await Task.sleep(for: .milliseconds(AutoplayPolicy.backstopWindowMs + 250))
-                guard let self, self.queueEndedAtMs == endedAt else { return }
-                // Nothing landed in time: the queue simply ended, as it always did.
-                self.queueEndedAtMs = 0
-                self.setFinding(false)
-            }
+            self.startFill(seeding, settle: false, deepen: false, purpose: .backstop)
         }
+    }
+
+    /// Next was pressed with nothing after the current track (a song tapped on its own, skipped before the first
+    /// picks were in, or "Not for me" on it). The press itself did nothing. Picks are looked for at once, with no
+    /// settle wait since the listener wants to leave this track, and when they land inside the backstop window
+    /// while the same track is still current, the player moves on to the first of them.
+    func nextWithNothingQueued() {
+        // On the next main-actor turn: the engine calls this from inside its own `skipToNext`.
+        Task { [weak self] in
+            guard let self else { return }
+            self.rememberNext()
+        }
+    }
+
+    private func rememberNext() {
+        refreshStation()
+        guard !engine.hasEnded, decide() == .topUp, engine.queue.nextIndexForSkip == nil else { return }
+        let seeding = currentSeeding()
+        guard !seeding.anchors.isEmpty else { return }
+        let askedAt = now()
+        nextAskedAtMs = askedAt
+        nextAskedSongId = engine.queue.current?.song.id
+        setFinding(true)
+        Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(AutoplayPolicy.backstopWindowMs + 250))
+            guard let self, self.nextAskedAtMs == askedAt else { return }
+            self.nextAskedAtMs = 0
+            if self.queueEndedAtMs == 0 { self.setFinding(false) }
+        }
+        adoptPool(for: seeding)
+        expirePool()
+        appendFromPool { [weak self] appended in
+            guard let self, !appended else { return }
+            self.startFill(seeding, settle: false, deepen: false, purpose: .backstop)
+        }
+    }
+
+    /// The picks a pressed Next was waiting for are in: move on to them, if it is still wanted. On the next
+    /// main-actor turn, so the move is the listener's Next and not part of the append that made it possible.
+    private func skipToPicksIfAsked() {
+        let askedAt = nextAskedAtMs
+        guard askedAt != 0, engine.queue.nextIndexForSkip != nil else { return }
+        nextAskedAtMs = 0
+        if queueEndedAtMs == 0 { setFinding(false) }
+        let askedSongId = nextAskedSongId
+        Task { [weak self] in
+            guard let self,
+                  AutoplayPolicy.nextMayStillSkip(askedAtMs: askedAt, nowMs: self.now(), askedMediaId: askedSongId,
+                                                  currentMediaId: self.engine.queue.current?.song.id) else { return }
+            self.engine.skipToNext()
+        }
+    }
+
+    /// A pick of the engine's could not be loaded (the player has already moved on, without a message). It leaves
+    /// the pool and stays out of new ones for a while; the trigger tops the queue up from what is left.
+    func enginePickFailed(songId: String) {
+        if failedAtMs.count > Self.failedLimit { failedAtMs.removeAll() }
+        failedAtMs[songId] = now()
+        pool.removeAll { $0.candidate.mediaId == songId }
+    }
+
+    private func failedRecently(_ songId: String, nowMs: Int64) -> Bool {
+        guard let at = failedAtMs[songId] else { return false }
+        return nowMs - at >= 0 && nowMs - at < Self.failedMemoryMs
     }
 
     // MARK: Reactions (docs/brain-spec.md, 7.3)
@@ -224,8 +316,8 @@ final class AutoplayController {
     func reaction(_ reaction: Reaction) {
         sessionAnchors = reaction.anchors
         sessionAnchorsAtMs = now()
-        needsOtherDirection = reaction.needsOtherDirection
-        sessionTurned = reaction.turned
+        sessionTurn = reaction.turn
+        turnAnchors = reaction.turnAnchors
         if reaction.liked {
             if likedTitles.count > 32 { likedTitles.removeAll() }
             likedTitles[reaction.event.rid] = reaction.title
@@ -233,23 +325,24 @@ final class AutoplayController {
         refreshStation()
         // A station stays on its seed: three skips there thin out what was skipped (the session's blocks), they do
         // not turn the station into another one.
-        if reaction.changedDirection, station == nil {
-            if reaction.needsOtherDirection { directionEpoch += 1 }
-            showDirectionNote()
-        }
+        if reaction.changedDirection, station == nil { showDirectionNote() }
         guard isActive else { return }
         if reaction.changedDirection, station == nil, !sources.isRemoteSession(), !isRestoringQueue {
             // Turning does not wait for the queue to run low: the pool of the new direction is built now, and when
             // it is ready the engine's tail is re-scored against it (`poolReady`).
-            let anchors = anchorSongs()
-            if !anchors.isEmpty {
-                adoptPool(for: anchors)
-                if pool.isEmpty { startFill(anchors: anchors, settle: true, deepen: false) }
+            let seeding = currentSeeding()
+            if !seeding.anchors.isEmpty {
+                adoptPool(for: seeding)
+                if pool.isEmpty { startFill(seeding, settle: true, deepen: false, purpose: .turn) }
             }
         }
         // A skip, a like or a change of direction changes what should come next; a plain completion does not move
         // the tail.
-        if reaction.graded.h > 0.0 || reaction.liked || reaction.changedDirection { rescoreTail() }
+        if reaction.graded.h > 0.0 || reaction.liked || reaction.changedDirection {
+            // A tail that cannot be planned again (after a restart, picked from the library, or behind a pool the
+            // library carries on) still loses the artist that was just skipped.
+            if !rescoreTail(), reaction.graded.h > 0.0, reaction.artistBlocked { dropArtistFromTail(reaction.artistKey) }
+        }
         // New anchors mean another pool; the trigger decides whether anything is needed now.
         scheduleEvaluate()
     }
@@ -266,28 +359,23 @@ final class AutoplayController {
 
     /// Re-scores the engine-owned end of the queue against the pool, as ONE queue edit, and only when the result
     /// differs. The track after the current one is never touched, nor the one after that on unmetered Wi-Fi: the
-    /// prefetcher has warmed them (2.3 step 7, decision D8).
-    private func rescoreTail() {
+    /// prefetcher has warmed them (2.3 step 7, decision D8). False when this tail cannot be planned again.
+    @discardableResult
+    private func rescoreTail() -> Bool {
         guard isActive, !poolFromLibrary, !poolSeeds.isEmpty, !sources.isRemoteSession(), !isRestoringQueue,
-              let brainEngine = brain.engine else { return }
-        if rescoreTask != nil || planTask != nil || pendingAppend != nil || engine.isHandOverPrepared {
+              let brainEngine = brain.engine else { return false }
+        if !AutoplayPolicy.mayPlanNow(topUpRunning: planTask != nil, rescoreRunning: rescoreTask != nil) {
             pendingRescore = true
-            return
+            return true
         }
         let queue = queueItems()
-        network.startIfNeeded()
-        let conditions = network.conditions
-        let unmetered = (conditions.network == .wifi || conditions.network == .wired) && !conditions.isExpensive
-            && !conditions.isConstrained
-        let start = AutoplayPolicy.rescoreStart(queueSize: queue.count, currentAbsoluteIndex: engine.queue.currentIndex ?? -1,
-                                                warmedAhead: AutoplayPolicy.warmedAhead(unmeteredWifi: unmetered),
-                                                engineOwned: { queue[$0].engineOwned })
+        let start = rescoreStart(of: queue)
         // An engine item this process did not put there (a restored queue): the tail is left alone.
         guard start >= 0, let tailEntries = AutoplayPlanning.tailEntries(queue: queue, start: start, served: served) else {
-            return
+            return false
         }
         let tailRids = tailEntries.compactMap { $0.brain?.rid }
-        guard tailRids.count == tailEntries.count else { return }
+        guard tailRids.count == tailEntries.count else { return false }
         let tailIds = queue[start...].map(\.mediaId)
         let context = planContext(queue: queue, tailStart: start, tailEntries: tailEntries)
         let key = poolKey
@@ -296,26 +384,45 @@ final class AutoplayController {
             guard let self else { return }
             self.rescoreTask = nil
             self.applyRescore(plan, context: context, start: start, tailIds: tailIds, tailEntries: tailEntries, key: key)
-            // A second reaction arrived while this one was planned: look once more.
+            // A second reaction arrived while this one was planned: look once more. A top-up that waited for this
+            // plan gets its turn; the backstop, which owns an ended queue, picks up where it was.
             self.runPendingRescore()
+            if self.queueEndedAtMs != 0 || self.nextAskedAtMs != 0 { self.poolReady() } else { self.scheduleEvaluate() }
         }
+        return true
+    }
+
+    /// The first index a re-score may replace: past the current track and the warmed ones, and only the unbroken
+    /// run of engine items at the end; -1 for none.
+    private func rescoreStart(of queue: [AutoplayQueueItem]) -> Int {
+        network.startIfNeeded()
+        let conditions = network.conditions
+        let unmetered = (conditions.network == .wifi || conditions.network == .wired) && !conditions.isExpensive
+            && !conditions.isConstrained
+        return AutoplayPolicy.rescoreStart(queueSize: queue.count, currentAbsoluteIndex: engine.queue.currentIndex ?? -1,
+                                           warmedAhead: AutoplayPolicy.warmedAhead(unmeteredWifi: unmetered),
+                                           engineOwned: { queue[$0].engineOwned })
     }
 
     private func applyRescore(_ plan: StationPlanner.Plan?, context: AutoplayPlanContext, start: Int, tailIds: [String],
                               tailEntries: [AutoplayPoolEntry], key: String) {
         guard let plan, key == poolKey, isActive else { return }
-        // The queue may have moved on while the plan was made: only an unchanged tail is replaced, and never during
-        // a hand-over.
+        // The queue may have moved on while the plan was made: only an unchanged tail is replaced.
         let entries = engine.queue.entries
         let protectedUntil = (engine.queue.currentIndex ?? -1) + 1
-        guard entries.count == start + tailIds.count, start > protectedUntil, !engine.isHandOverPrepared else { return }
+        guard entries.count == start + tailIds.count, start > protectedUntil else { return }
         for (offset, id) in tailIds.enumerated() where entries[start + offset].song.id != id { return }
 
         let items = AutoplayPlanning.items(plan: plan, context: context, surfaceId: surfaceId(),
                                            artistNames: poolArtistNames, likedTitles: likedTitles,
                                            station: context.inputs.station)
         let made = materialize(items, nowMs: context.inputs.nowMs)
-        guard !made.songs.isEmpty, engine.replaceEngineTail(from: start, songs: made.songs, tags: made.tags) else { return }
+        guard !made.songs.isEmpty else { return }
+        guard engine.replaceEngineTail(from: start, songs: made.songs, tags: made.tags) else {
+            // Refused in the last moments of a hand-over: the track change looks again.
+            if engine.isHandOverScheduled { pendingRescore = true }
+            return
+        }
         // What left the tail goes back to the pool; what came from the pool is now served.
         let kept = Set(made.entries.map { BrainKey($0.candidate.mediaId) })
         for entry in tailEntries where !kept.contains(BrainKey(entry.candidate.mediaId)) {
@@ -326,11 +433,37 @@ final class AutoplayController {
         for entry in made.entries { remember(entry) }
     }
 
-    /// A re-score that had to wait (for a plan in flight, or a hand-over) runs once that is over.
+    /// A re-score that had to wait for a plan in flight runs once that is over.
     private func runPendingRescore() {
-        guard pendingRescore, !engine.isHandOverPrepared, planTask == nil, rescoreTask == nil else { return }
+        guard pendingRescore, AutoplayPolicy.mayPlanNow(topUpRunning: planTask != nil, rescoreRunning: rescoreTask != nil),
+              !engine.isHandOverScheduled else { return }
         pendingRescore = false
         rescoreTail()
+    }
+
+    /// Takes the upcoming picks by `artistKey` out of the engine's end of the queue, in one edit: what a hard skip
+    /// asks for in a tail that cannot be planned again (restored after a restart, picked from the library, or
+    /// behind a pool the library carries on). The track that is next and the warmed ones stay (decision D8), and
+    /// so does everything the listener queued. Not in a station, whose own artist is thinned out by the planner.
+    private func dropArtistFromTail(_ artistKey: String) {
+        guard !artistKey.isEmpty, isActive, station == nil, !sources.isRemoteSession(), !isRestoringQueue else { return }
+        // A pool that is picked in its own order hears of the skip no other way.
+        if poolFromLibrary || poolSeeds.isEmpty {
+            pool.removeAll { BrainKey.sameBytes($0.candidate.artistKey, artistKey) }
+        }
+        let entries = engine.queue.entries
+        let start = rescoreStart(of: queueItems())
+        guard start >= 0 else { return }
+        // A handful of names at most: the engine's upcoming picks.
+        let keys = entries.map { $0.isEngineOwned ? BrainLibraryIndex.artistKey(of: $0.song) : "" }
+        let first = AutoplayPolicy.firstIndexOfArtist(start: start, size: entries.count, artistKey: artistKey) { keys[$0] }
+        guard first >= 0 else { return }
+        var ids = Set<String>()
+        for index in first..<entries.count where BrainKey.sameBytes(keys[index], artistKey) { ids.insert(entries[index].song.id) }
+        if engine.removeUpcomingEnginePicks(ids: ids) {
+            for id in ids { served[BrainKey(id)] = nil }
+            servedOrder.removeAll { ids.contains($0.text) }
+        }
     }
 
     // MARK: Trigger
@@ -354,54 +487,72 @@ final class AutoplayController {
     }
 
     private func evaluate(settle: Bool) {
-        if pendingAppend != nil {
-            releaseHeldAppend()
-            // Still held (a crossfade is running, or the next song is prepared): look again shortly.
-            if pendingAppend != nil { watchHeldAppend() }
-            return
-        }
         refreshStation()
-        if pendingTasteFilter, !engine.isHandOverPrepared {
+        if pendingTasteFilter, !engine.isHandOverScheduled {
             pendingTasteFilter = false
             tasteChanged()
         }
         runPendingRescore()
         let decision = decide()
         guard decision == .topUp else {
-            if decision != .enoughQueued { cancelWork() }
+            // Enough is queued: nothing is needed, and neither is a pool that was being built only to top this
+            // queue up. Anything else (off, repeat, Connect, a restore) stops the work.
+            if decision == .enoughQueued { cancelTopUpFill() } else { cancelWork() }
             return
         }
         // The backstop owns the queue's end: its own fill and timer finish the job.
         guard queueEndedAtMs == 0 else { return }
-        let anchors = anchorSongs()
-        guard !anchors.isEmpty else { return }
-        adoptPool(for: anchors)
+        let seeding = currentSeeding()
+        guard !seeding.anchors.isEmpty else { return }
+        adoptPool(for: seeding)
+        expirePool()
         appendFromPool { [weak self] appended in
             guard let self else { return }
             if appended {
                 if self.pool.count < AutoplayPolicy.poolRefillBelow, !self.poolFromLibrary, !self.poolDeepened {
-                    self.startFill(anchors: anchors, settle: true, deepen: true)
+                    self.startFill(seeding, settle: true, deepen: true, purpose: .refill)
                 }
                 return
             }
             // Nothing fits from what is in memory: build it, or once per set of anchors rebuild it deeper
             // (continuation pages, then the library behind them). After that the queue is allowed to end.
             if !self.pool.isEmpty, self.poolDeepened { return }
-            self.startFill(anchors: anchors, settle: settle, deepen: !self.pool.isEmpty)
+            self.startFill(seeding, settle: settle, deepen: !self.pool.isEmpty, purpose: .topUp)
         }
     }
 
-    /// The key of the pool these anchors ask for. A change of direction with no other anchor asks for another pool
-    /// from the same anchors.
-    private func keyOfPool(for anchors: [Song]) -> String {
-        let key = AutoplayPool.key(of: anchors.map(\.id))
-        if let station { return key + "|station:" + station.id }
-        return needsOtherDirection ? key + "|#\(directionEpoch)" : key
+    /// A pool that is being built only because the queue ran low is not needed once it no longer is.
+    private func cancelTopUpFill() {
+        guard fillPurpose == .topUp, fillTask != nil else { return }
+        fillTask?.cancel()
+        fillTask = nil
+        fillSettling = false
     }
 
-    /// A pool belongs to its anchors: other anchors, another pool.
-    private func adoptPool(for anchors: [Song]) {
-        let key = keyOfPool(for: anchors)
+    /// A pool built without the network, or one where the library stands in for radios that could not be had, is
+    /// not kept until it runs out: the network, or the request allowance, may be back.
+    private func expirePool() {
+        guard poolBuiltAtMs != 0,
+              AutoplayPolicy.poolExpired(builtAtMs: poolBuiltAtMs, nowMs: now(), ttlMs: poolTtlMs) else { return }
+        pool = []
+        poolFromLibrary = false
+        poolDeepened = false
+        poolSeeds = []
+        poolBuiltAtMs = 0
+        poolTtlMs = nil
+        if emptyBuildKey == poolKey { emptyBuildKey = "" }
+    }
+
+    /// The key of the pool this seeding asks for: other anchors, a station or another direction, another pool.
+    private func keyOfPool(for seeding: Seeding) -> String {
+        let key = AutoplayPool.key(of: seeding.anchors.map(\.id))
+        if let station { return key + "|station:" + station.id }
+        return seeding.turn != 0 ? key + "|turn:\(seeding.turn)" : key
+    }
+
+    /// A pool belongs to what it was seeded from.
+    private func adoptPool(for seeding: Seeding) {
+        let key = keyOfPool(for: seeding)
         guard key != poolKey else { return }
         poolKey = key
         pool = []
@@ -409,37 +560,59 @@ final class AutoplayController {
         poolDeepened = false
         poolSeeds = []
         poolArtistNames = [:]
+        poolBuiltAtMs = 0
+        poolTtlMs = nil
         if fillKey != key {
             fillTask?.cancel()
             fillTask = nil
+            fillSettling = false
         }
     }
 
     /// What the pool is seeded from (7.1 "Seed set"): the track the listener chose and is hearing now, then the
     /// session's anchors as the recorder last gave them, three at most. While the session has none yet, the last
     /// track the listener chose at or before the current one.
-    private func anchorSongs() -> [Song] {
+    ///
+    /// After three skipped picks the engine is turned (`Reaction.turn`) and follows what it turned to. That holds
+    /// only while the engine's own picks play: when the track that is playing is one the listener chose, they are
+    /// steering, and autoplay follows that track.
+    private func currentSeeding() -> Seeding {
         let entries = engine.queue.entries
         // A station has one anchor for as long as it lasts: its seed (8.3).
         if let station {
-            return entries.first { station.isSeed(mediaId: $0.song.id, tag: $0.brain) }.map { [$0.song] } ?? []
+            return Seeding(anchors: entries.first { station.isSeed(mediaId: $0.song.id, tag: $0.brain) }.map { [$0.song] } ?? [])
         }
-        let nowMs = now()
-        let fresh = !sessionAnchors.isEmpty && nowMs - sessionAnchorsAtMs >= 0 && nowMs - sessionAnchorsAtMs < Session.gapMs
-        if fresh {
+        let age = now() - sessionAnchorsAtMs
+        let fresh = sessionAnchorsAtMs != 0 && age >= 0 && age < Session.gapMs
+        let current = engine.queue.current
+        let currentIsListeners = current.map { !$0.isEngineOwned } ?? false
+        if AutoplayPolicy.turnApplies(turn: sessionTurn, reactionIsFresh: fresh, currentIsListenersChoice: currentIsListeners) {
+            let followed = turnAnchors.prefix(Session.maxAnchors).compactMap { anchorSong(for: $0, in: entries) }
+            if !followed.isEmpty { return Seeding(anchors: followed, turn: sessionTurn) }
+            // Nothing of the session is left to turn to: the pool is seeded from the library, around the artist
+            // the listener finishes most outside the ones just skipped (`AutoplayPool.otherDirectionAnchor`).
+            return Seeding(anchors: normalAnchors(entries, current: current, currentIsListeners: currentIsListeners,
+                                                  fresh: fresh),
+                           turn: sessionTurn, otherDirection: true)
+        }
+        return Seeding(anchors: normalAnchors(entries, current: current, currentIsListeners: currentIsListeners, fresh: fresh))
+    }
+
+    private func anchorSong(for info: AnchorInfo, in entries: [QueueEntry]) -> Song? {
+        sources.librarySong(info.mediaId) ?? entries.first(where: { $0.song.id == info.mediaId })?.song
+            ?? brain.song(id: info.mediaId)
+    }
+
+    private func normalAnchors(_ entries: [QueueEntry], current: QueueEntry?, currentIsListeners: Bool, fresh: Bool) -> [Song] {
+        if fresh, !sessionAnchors.isEmpty {
             var anchors: [Song] = []
             // The track the listener chose and is hearing right now leads, though the session has not heard it out
-            // yet: tap one song after an album, and autoplay follows the song. Not after a change of direction,
-            // which follows the one anchor it turned to.
-            if !sessionTurned, let current = engine.queue.current, !current.isEngineOwned,
-               !sessionAnchors.contains(where: { $0.mediaId == current.song.id }) {
+            // yet: tap one song after an album, and autoplay follows the song.
+            if let current, currentIsListeners, !sessionAnchors.contains(where: { $0.mediaId == current.song.id }) {
                 anchors.append(current.song)
             }
             for info in sessionAnchors where anchors.count < Session.maxAnchors {
-                if let song = sources.librarySong(info.mediaId) ?? entries.first(where: { $0.song.id == info.mediaId })?.song
-                    ?? brain.song(id: info.mediaId) {
-                    anchors.append(song)
-                }
+                if let song = anchorSong(for: info, in: entries) { anchors.append(song) }
             }
             if !anchors.isEmpty { return anchors }
         }
@@ -481,12 +654,12 @@ final class AutoplayController {
                                        batch: batchSeq, station: station, noveltyFactor: noveltyFactor)
     }
 
-    /// Appends one batch from the in-memory pool and tells `onDone` whether one went in (or is held until a
-    /// hand-over is done). No network. The plan itself runs on the brain's actor; the library-only pool is picked in
-    /// place. Nothing happens, and `onDone` is not called, while another plan is in flight: that plan's own callback
-    /// finishes the job.
+    /// Appends one batch from the in-memory pool and tells `onDone` whether one went in. No network. The plan
+    /// itself runs on the brain's actor; the library-only pool is picked in place. Nothing happens, and `onDone` is
+    /// not called, while another plan is in flight (a top-up or a re-score: both read the same pool, and two plans
+    /// side by side can pick the same track): that plan's end looks at the queue again.
     private func appendFromPool(_ onDone: @escaping @MainActor (Bool) -> Void) {
-        guard planTask == nil else { return }
+        guard AutoplayPolicy.mayPlanNow(topUpRunning: planTask != nil, rescoreRunning: rescoreTask != nil) else { return }
         guard !pool.isEmpty else {
             onDone(false)
             return
@@ -525,9 +698,12 @@ final class AutoplayController {
 
     /// Puts a plan's picks at the end of the queue in one edit. True when anything went in.
     private func commit(_ plan: StationPlanner.Plan, context: AutoplayPlanContext) -> Bool {
-        let items = AutoplayPlanning.items(plan: plan, context: context, surfaceId: surfaceId(),
-                                           artistNames: poolArtistNames, likedTitles: likedTitles,
-                                           station: context.inputs.station)
+        // A pick that got into the queue while the plan was made is not queued a second time.
+        let queued = Set(engine.queue.entries.map { BrainKey($0.song.id) })
+        let items = AutoplayPlanning.notQueued(
+            AutoplayPlanning.items(plan: plan, context: context, surfaceId: surfaceId(), artistNames: poolArtistNames,
+                                   likedTitles: likedTitles, station: context.inputs.station),
+            queuedIds: queued)
         let made = materialize(items, nowMs: context.inputs.nowMs)
         guard !made.songs.isEmpty else { return false }
         if let planned = context.inputs.station, planned == station { stationBatches += 1 }
@@ -552,7 +728,7 @@ final class AutoplayController {
                 // The library's current row (a favourite flag set since the pool was built).
                 song = sources.librarySong(librarySong.id) ?? librarySong
             } else if let track = item.entry.engineTrack {
-                song = BrainService.queueSong(for: track, nowMs: nowMs)
+                song = brain.linked(BrainService.queueSong(for: track, nowMs: nowMs))
                 engineTracks.append(track)
             } else {
                 continue
@@ -610,16 +786,16 @@ final class AutoplayController {
         return true
     }
 
-    /// Appends now, or holds the batch until a prepared hand-over is done; then resumes an ended queue.
+    /// Appends the batch, then resumes an ended queue, or moves on when Next was pressed with nothing queued. An
+    /// append never waits: behind the track that is already next it changes nothing the player has prepared.
     private func deliver(songs: [Song], tags: [BrainItemTag]) {
         if brain.autoplay.fromLibrary != poolFromLibrary { brain.autoplay.fromLibrary = poolFromLibrary }
-        if AutoplayPolicy.mustDeferQueueEdit(isTransitionRunning: engine.isHandOverPrepared) {
-            pendingAppend = (songs, tags, poolKey)
-            watchHeldAppend()
+        engine.appendEngineItems(songs, tags: tags)
+        if queueEndedAtMs != 0 {
+            _ = resumeAfterQueueEnd()
         } else {
-            engine.appendEngineItems(songs, tags: tags)
+            skipToPicksIfAsked()
         }
-        if queueEndedAtMs != 0 { _ = resumeAfterQueueEnd() }
     }
 
     private func remember(_ entry: AutoplayPoolEntry) {
@@ -632,40 +808,11 @@ final class AutoplayController {
         }
     }
 
-    /// An append held during a hand-over goes in as soon as the hand-over is done.
-    private func releaseHeldAppend() {
-        guard let held = pendingAppend, !engine.isHandOverPrepared else { return }
-        pendingAppend = nil
-        heldAppendTask?.cancel()
-        heldAppendTask = nil
-        // Dropped when the queue no longer needs it, or is no longer the one it was picked for.
-        guard decide() == .topUp, held.key == keyOfPool(for: anchorSongs()) else { return }
-        engine.appendEngineItems(held.songs, tags: held.tags)
-    }
-
-    /// Looks again a few times while a crossfade finishes. When the next song is merely prepared, the next track
-    /// change releases the append instead (`itemTransition`).
-    private func watchHeldAppend() {
-        guard heldAppendTask == nil else { return }
-        heldAppendTask = Task { [weak self] in
-            for _ in 0..<AutoplayController.heldAppendPolls {
-                try? await Task.sleep(for: AutoplayController.heldAppendPoll)
-                guard let self, !Task.isCancelled, self.pendingAppend != nil else { return }
-                if !self.engine.isHandOverPrepared {
-                    self.heldAppendTask = nil
-                    self.releaseHeldAppend()
-                    return
-                }
-            }
-            self?.heldAppendTask = nil
-        }
-    }
-
     /// After the backstop appended: start the first appended track, if the listener still wants music.
     @discardableResult
     private func resumeAfterQueueEnd() -> Bool {
         let endedAt = queueEndedAtMs
-        guard endedAt != 0, pendingAppend == nil,
+        guard endedAt != 0,
               AutoplayPolicy.backstopMayResume(endedAtMs: endedAt, nowMs: now(), playWhenReady: true) else { return false }
         // Cleared first: the engine reports "playing" on the way, which would otherwise read as the listener's touch.
         queueEndedAtMs = 0
@@ -675,43 +822,67 @@ final class AutoplayController {
 
     // MARK: Pool
 
-    private func startFill(anchors: [Song], settle: Bool, deepen: Bool) {
-        if fillTask != nil, fillKey == poolKey { return }
+    private func startFill(_ seeding: Seeding, settle: Bool, deepen: Bool, purpose: FillPurpose) {
+        if fillTask != nil, fillKey == poolKey {
+            // One fill per pool. The backstop does not wait behind one that is waiting for the settle time of a
+            // track that has ended (or that the listener wants to leave): that one would never see it.
+            guard purpose == .backstop,
+                  AutoplayPolicy.backstopReplacesFill(fillRunning: true, fillIsWaitingToSettle: fillSettling) else { return }
+        }
         let key = poolKey
         let startedAt = now()
         // A build that found nothing at all is not repeated on every play and pause for a while.
-        if key == emptyBuildKey, startedAt - emptyBuildAtMs >= 0, startedAt - emptyBuildAtMs < Self.emptyBuildRetryMs {
+        if key == emptyBuildKey, startedAt - emptyBuildAtMs >= 0, startedAt - emptyBuildAtMs < emptyBuildRetry {
             setFinding(false)
             return
         }
         fillKey = key
         fillTask?.cancel()
         fillGeneration &+= 1
+        fillPurpose = purpose
+        fillSettling = settle
         let generation = fillGeneration
         let currentSongId = engine.queue.current?.song.id
         let fillStation = station
-        let otherDirection = needsOtherDirection && fillStation == nil
+        let anchors = seeding.anchors
+        let otherDirection = seeding.otherDirection && fillStation == nil
+        let tasteAtStart = tasteEpoch
         fillTask = Task { [weak self] in
             guard let self else { return }
             // Only the newest fill clears the slot: an older, cancelled one must not free it under a running one.
-            defer { if self.fillGeneration == generation { self.fillTask = nil } }
+            defer {
+                if self.fillGeneration == generation {
+                    self.fillTask = nil
+                    self.fillSettling = false
+                }
+            }
             if settle {
                 let settled = await self.waitUntilSettled(songId: currentSongId)
                 if !settled { return }
+                if self.fillGeneration == generation { self.fillSettling = false }
             }
             guard !Task.isCancelled,
                   let built = await self.buildPool(anchors: anchors, deepen: deepen, otherDirection: otherDirection,
                                                    station: fillStation) else { return }
             guard !Task.isCancelled, key == self.poolKey else { return }
-            self.pool = built.entries
+            let builtAt = self.now()
+            // A pick that just failed to load does not come straight back.
+            self.pool = self.failedAtMs.isEmpty ? built.entries
+                : built.entries.filter { !self.failedRecently($0.candidate.mediaId, nowMs: builtAt) }
             self.poolFromLibrary = built.fromLibrary
             self.poolSeeds = built.seeds
             self.poolArtistNames = built.artistNames
+            self.poolBuiltAtMs = builtAt
+            self.poolTtlMs = AutoplayPolicy.poolTtlMs(offline: built.offline, fellBack: built.fellBack)
             if deepen { self.poolDeepened = true }
             if built.entries.isEmpty {
                 self.emptyBuildKey = key
-                self.emptyBuildAtMs = self.now()
+                self.emptyBuildAtMs = builtAt
+                // Without the network "nothing" may only mean "nothing that plays offline".
+                self.emptyBuildRetry = built.offline ? AutoplayPolicy.offlinePoolTtlMs : AutoplayController.emptyBuildRetryMs
             }
+            // The listener changed their taste while this pool was being built: it is matched against that too.
+            if self.tasteEpoch != tasteAtStart { self.tasteChanged() }
             self.poolReady()
         }
     }
@@ -732,7 +903,7 @@ final class AutoplayController {
 
     private func poolReady() {
         let decision = decide()
-        guard decision == .topUp, pendingAppend == nil else {
+        guard decision == .topUp else {
             // The queue is long enough, but its engine tail may be from the direction just left.
             if decision == .enoughQueued { rescoreTail() }
             return
@@ -767,6 +938,7 @@ final class AutoplayController {
         let imported = sources.imported()
         let exploration = sources.exploration()
         let matchedVideoId = sources.matchedVideoId
+        let offlinePlayable = sources.offlinePlayable
         let repository = brain.repository
         let brainEngine = brain.engine
         let queueIds = Set(engine.queue.entries.map(\.song.id))
@@ -811,6 +983,9 @@ final class AutoplayController {
             request.matchedVideoId = matchedVideoId
             request.nowMs = nowMs
             request.station = station
+            // With no network at all, only what plays from the phone may be queued.
+            request.offline = !online
+            request.offlinePlayable = offlinePlayable
             let pool = await AutoplayPool.build(request, index: index, repository: repository, engine: brainEngine)
             if prune, let repository {
                 // `playable` rows nobody used for 60 days go, except what the queue or the history still names.
@@ -910,22 +1085,25 @@ final class AutoplayController {
     /// leaves the pool at once, and the engine's upcoming picks that match leave the queue in one edit (never the
     /// listener's own items, never during a hand-over). A reduce changes scores, so the tail is planned again.
     func tasteChanged() {
+        tasteEpoch &+= 1
         if tasteTask != nil {
             tasteDirty = true
             return
         }
-        // Which tracks the engine holds are now excluded is worked out off the main actor (it folds every artist
-        // name); the main actor only drops them by id.
+        // Which tracks the engine holds are now excluded, and what the listener's boosts and reduces now add to
+        // each score, is worked out off the main actor (it folds every artist name); the main actor only drops
+        // and updates them by id.
         let held = pool + Array(served.values)
         let blocked = sources.blocked()
         let adjustments = sources.adjustments()
         tasteTask = Task { [weak self] in
-            let gone = await Task.detached(priority: .utility) {
-                AutoplayTasteFilter.excludedIds(held: held, blocked: blocked, adjustments: adjustments)
+            let change = await Task.detached(priority: .utility) {
+                (gone: AutoplayTasteFilter.excludedIds(held: held, blocked: blocked, adjustments: adjustments),
+                 boosts: AutoplayTasteFilter.boosts(held: held, adjustments: adjustments))
             }.value
             guard let self else { return }
             self.tasteTask = nil
-            self.dropExcluded(gone)
+            self.applyTaste(gone: change.gone, boosts: change.boosts)
             // A second change arrived while this one was applied: look once more.
             if self.tasteDirty {
                 self.tasteDirty = false
@@ -934,23 +1112,31 @@ final class AutoplayController {
         }
     }
 
-    private func dropExcluded(_ gone: Set<String>) {
+    private func applyTaste(gone: Set<String>, boosts: [String: Double]) {
         if !gone.isEmpty {
             pool.removeAll { gone.contains($0.candidate.mediaId) }
             let entries = engine.queue.entries
             let current = engine.queue.currentIndex ?? -1
             let queued = entries.indices.contains { $0 > current && entries[$0].isEngineOwned && gone.contains(entries[$0].song.id) }
             if queued {
-                if AutoplayPolicy.mustDeferQueueEdit(isTransitionRunning: engine.isHandOverPrepared) {
-                    // The edit waits for the track change (`evaluate`), which works the list out again.
-                    pendingTasteFilter = true
-                    return
-                }
                 if engine.removeUpcomingEnginePicks(ids: gone) {
                     for id in gone { served[BrainKey(id)] = nil }
                     servedOrder.removeAll { gone.contains($0.text) }
+                } else {
+                    // The pick that must go is the next track and its hand-over is already on the host clock: the
+                    // track change (`evaluate`) works the list out again.
+                    pendingTasteFilter = true
                 }
             }
+        }
+        // "Less from X" and every other boost or reduce: the scores of what the engine already holds follow, so
+        // the re-score below and every later top-up use them (a pool is built once per set of anchors).
+        let pooled = AutoplayTasteFilter.applying(boosts, to: pool)
+        if pooled.changed { pool = pooled.entries }
+        for key in servedOrder {
+            guard let entry = served[key], let boost = boosts[entry.candidate.mediaId], let scored = entry.brain,
+                  scored.boostLn != boost else { continue }
+            served[key]?.brain?.boostLn = boost
         }
         rescoreTail()
         scheduleEvaluate()
@@ -961,10 +1147,9 @@ final class AutoplayController {
     private func cancelWork() {
         fillTask?.cancel()
         fillTask = nil
-        heldAppendTask?.cancel()
-        heldAppendTask = nil
-        pendingAppend = nil
+        fillSettling = false
         pendingRescore = false
+        nextAskedAtMs = 0
         pendingTasteFilter = false
         queueEndedAtMs = 0
         setFinding(false)

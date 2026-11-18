@@ -184,6 +184,8 @@ struct NowPlayingView: View {
     /// Android `triggerAlbumNavigationFromPlayer`: collapse the sheet, then open the album (once the collapse is
     /// nearly done, so the push and the collapse don't share their frames).
     private func openAlbum(_ song: Song) {
+        // A song from outside the library may name an album the library has no page for.
+        guard library.album(id: song.albumId) != nil else { return }
         let router = self.router
         env.playerSheet.collapse { router.push(.albumDetail(albumId: song.albumId)) }
     }
@@ -423,6 +425,8 @@ private struct PlayerMetadataRow: View {
 
     /// Android `triggerArtistNavigationFromPlayer`: collapse, then push once the collapse is nearly done.
     private func navigateToArtist(_ artistId: Int64) {
+        // A song from outside the library may name an artist the library has no page for.
+        guard env.library.artist(id: artistId) != nil else { return }
         let router = self.router
         env.playerSheet.collapse { router.push(.artistDetail(artistId: artistId)) }
     }
