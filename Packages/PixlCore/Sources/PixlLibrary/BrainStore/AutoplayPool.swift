@@ -29,18 +29,30 @@ public struct AutoplayPoolEntry: Sendable {
     public var librarySong: Song?
     /// Set for a track from outside the library: it must be in `playable` before it reaches the player.
     public var engineTrack: EngineTrack?
-    /// The artist the pick is explained by: the anchor's primary artist.
+    /// The artist the pick is explained by when the planner names none: the anchor's primary artist.
     public var whyArtist: String
+    /// ONE artist name: the track's own primary artist.
+    public var primaryArtist: String = ""
+    /// The same track as the pure core sees it; nil in the library-only pool.
+    public var brain: Candidate? = nil
 }
 
 public struct BuiltAutoplayPool: Sendable {
     public var entries: [AutoplayPoolEntry]
     /// The picks come from the library alone.
     public var fromLibrary: Bool
+    /// The radios the entries came from, newest anchor first; empty for a pool that is picked in its own order
+    /// (the library-only pool, and a radio pool the library had to carry on behind).
+    public var seeds: [Retrieval.SeedList]
+    /// Artist names by aid, for the reason line.
+    public var artistNames: [Int64: String]
 
-    public init(entries: [AutoplayPoolEntry], fromLibrary: Bool) {
+    public init(entries: [AutoplayPoolEntry], fromLibrary: Bool, seeds: [Retrieval.SeedList] = [],
+                artistNames: [Int64: String] = [:]) {
         self.entries = entries
         self.fromLibrary = fromLibrary
+        self.seeds = seeds
+        self.artistNames = artistNames
     }
 }
 
@@ -60,6 +72,12 @@ public struct AutoplayPoolRequest: Sendable {
     public var ignoredRids: Set<Int64>
     /// The existing ranking's picks from the library, asked for only when the library pool is needed.
     public var libraryPicks: @Sendable () async -> [Song]
+    /// Three skips in a row with no other anchor to turn to (7.3): seed from the listener's best-loved library
+    /// artist outside the ones just skipped, when one has a known YouTube audio id.
+    public var otherDirection = false
+    /// The stored YouTube match of a Spotify track id (for the other-direction seed).
+    public var matchedVideoId: @Sendable (String) async -> String? = { _ in nil }
+    public var nowMs: Int64 = 0
 
     public init(anchors: [AutoplayAnchor], deepen: Bool, allowNetwork: Bool, library: [Song], everPlayed: Set<String>,
                 blocked: BlockedArtistMatcher = .empty, adjustments: TasteAdjustmentSet = .empty,
@@ -79,12 +97,41 @@ public struct AutoplayPoolRequest: Sendable {
 /// The pool Autoplay picks from.
 public enum AutoplayPool {
     static let deepenContinuations = 2
+    /// Library tracks by each anchor's artist that join the radio rows as candidates (6.1 FAV and DEEP).
+    static let libraryPerAnchorArtist = 30
+    static let otherDirectionTries = 5
+
+    /// One radio as it came back: its entries, and what the retrieval step needs.
+    struct Fetched: Sendable {
+        var entries: [AutoplayPoolEntry]
+        var seedRid: Int64
+        var rids: [Int64]
+        var related: Bool
+        var artist: String
+    }
+
+    static func albumHash(_ albumKey: String?) -> Int64 {
+        guard let albumKey else { return 0 }
+        return BrainHash.id(BrainHash.fnv1a64(albumKey))
+    }
+
+    /// The listener's boost / reduce for a song, as the planner adds it: `ln(product)`, 0 for none (5.11).
+    static func boostLn(_ adjustments: TasteAdjustmentSet, _ song: Song) -> Double {
+        if adjustments.isEmpty { return 0.0 }
+        let multiplier = adjustments.factor(for: song)
+        return multiplier == 1.0 || multiplier <= 0.0 ? 0.0 : BrainMath.ln(multiplier)
+    }
 
     /// The key of a set of anchors: a pool belongs to its anchors; other anchors, another pool.
     public static func key(of mediaIds: [String]) -> String { mediaIds.joined(separator: "|") }
 
     public static func build(_ request: AutoplayPoolRequest, index: BrainLibraryIndex,
-                             repository: BrainRepository?) async -> BuiltAutoplayPool {
+                             repository: BrainRepository?, engine: BrainEngine? = nil) async -> BuiltAutoplayPool {
+        var request = request
+        if request.otherDirection, let repository, let engine,
+           let anchor = await otherDirectionAnchor(request, index: index, repository: repository, engine: engine) {
+            request.anchors = [anchor]
+        }
         var seedFlags: Int32 = 0
         var anchorArtistKeys: [String] = []
         var seeds: [(seed: RadioSeed, whyArtist: String)] = []
@@ -102,34 +149,39 @@ public enum AutoplayPool {
             }
         }
 
-        var lists: [[AutoplayPoolEntry]] = []
+        var fetched: [Fetched] = []
         if let repository {
             // At most two radio requests run at a time (the budget's own limit); the anchors are asked together.
-            lists = await withTaskGroup(of: (Int, [AutoplayPoolEntry]).self) { group in
+            let collected = await withTaskGroup(of: (Int, Fetched?).self) { group in
                 for (i, item) in seeds.enumerated() {
                     let continuations = request.deepen && i == 0 ? deepenContinuations : 0
                     let everPlayed = request.everPlayed
                     let allowNetwork = request.allowNetwork
+                    let adjustments = request.adjustments
                     group.addTask {
                         guard let radio = await repository.radioFor(seed: item.seed, allowNetwork: allowNetwork,
-                                                                    continuations: continuations) else { return (i, []) }
+                                                                    continuations: continuations) else { return (i, nil) }
                         let artistRadio = radio.kind == RadioList.kindArtist
                         var list: [AutoplayPoolEntry] = []
                         list.reserveCapacity(radio.rows.count)
                         for (rank, stored) in radio.rows.enumerated() {
                             if let entry = entry(for: stored, rank: Int32(rank + 1), index: index, everPlayed: everPlayed,
-                                                 anchorArtist: item.whyArtist, artistRadio: artistRadio) {
+                                                 anchorArtist: item.whyArtist, artistRadio: artistRadio,
+                                                 adjustments: adjustments) {
                                 list.append(entry)
                             }
                         }
-                        return (i, list)
+                        return (i, Fetched(entries: list, seedRid: radio.seedRid, rids: radio.rows.map(\.rid),
+                                           related: radio.kind == RadioList.kindRelated, artist: item.whyArtist))
                     }
                 }
-                var collected = [[AutoplayPoolEntry]](repeating: [], count: seeds.count)
+                var collected = [Fetched?](repeating: nil, count: seeds.count)
                 for await (i, list) in group { collected[i] = list }
                 return collected
             }
+            fetched = collected.compactMap { $0 }
         }
+        let lists = fetched.map(\.entries)
 
         var byMediaId: [BrainKey: AutoplayPoolEntry] = [:]
         for list in lists {
@@ -147,17 +199,68 @@ public enum AutoplayPool {
             entries.append(entry)
         }
 
-        if !entries.isEmpty {
-            if request.deepen && entries.count < AutoplayPolicy.poolRefillBelow {
-                // The radios are running dry even with their continuation pages: the library carries on behind them,
-                // so the queue does not end while there is anything left to play.
-                var known = Set(entries.map { BrainKey($0.candidate.mediaId) })
-                for entry in await libraryPool(request, index: index, anchorArtistKeys: anchorArtistKeys)
-                where known.insert(BrainKey(entry.candidate.mediaId)).inserted {
-                    entries.append(entry)
+        if !entries.isEmpty, let repository {
+            // Library tracks by the anchors' artists are candidates too (6.1 FAV and DEEP), whether or not a radio
+            // names them.
+            var known = Set(entries.map { BrainKey($0.candidate.mediaId) })
+            let anchorIds = Set(request.anchors.map { BrainKey($0.song.id) })
+            var extra: [Song] = []
+            for artistKey in anchorArtistKeys {
+                var taken = 0
+                for song in index.byPrimaryArtist(artistKey) {
+                    if taken >= libraryPerAnchorArtist { break }
+                    if anchorIds.contains(BrainKey(song.id)) || !isAllowed(song, request) { continue }
+                    if !known.insert(BrainKey(song.id)).inserted { continue }
+                    extra.append(song)
+                    taken += 1
                 }
             }
-            return BuiltAutoplayPool(entries: entries, fromLibrary: false)
+            let extraFacts = extra.map(TrackCatalog.facts(of:))
+            let extraRids = await repository.resolveTracks(extraFacts.map { facts in
+                TrackRequest(keys: facts?.keys ?? Ids.TrackKeys(), durationMs: Int32(clamping: max(facts?.durationMs ?? 0, 0)))
+            })
+            for (i, song) in extra.enumerated() where extraRids[i] != 0 && !request.ignoredRids.contains(extraRids[i]) {
+                let entry = libraryEntry(song, rid: extraRids[i], rank: 0, everPlayed: request.everPlayed,
+                                         anchorArtist: "", adjustments: request.adjustments)
+                if AutoplayPolicy.passesFilters(entry.candidate, seedFlags: seedFlags) { entries.append(entry) }
+            }
+
+            // Artists by id: stage 1 joins them by folded name (3.1), through the alias table.
+            var names: [String] = []
+            var seenNames: Set<BrainKey> = []
+            for list in fetched where !BrainText.isBlank(list.artist) && seenNames.insert(BrainKey(list.artist)).inserted {
+                names.append(list.artist)
+            }
+            for entry in entries where !BrainText.isBlank(entry.primaryArtist)
+                && seenNames.insert(BrainKey(entry.primaryArtist)).inserted {
+                names.append(entry.primaryArtist)
+            }
+            let aids = await repository.resolveArtistNames(names)
+            var aidByName: [BrainKey: Int64] = [:]
+            var nameByAid: [Int64: String] = [:]
+            for (i, name) in names.enumerated() {
+                aidByName[BrainKey(name)] = aids[i]
+                if aids[i] != 0 && nameByAid[aids[i]] == nil { nameByAid[aids[i]] = name }
+            }
+            for i in entries.indices where entries[i].brain != nil {
+                entries[i].brain!.aid = aidByName[BrainKey(entries[i].primaryArtist)] ?? 0
+            }
+            let seedLists = fetched.map { list in
+                Retrieval.SeedList(seedRid: list.seedRid, seedAid: aidByName[BrainKey(list.artist)] ?? 0, rids: list.rids,
+                                   edgeFactor: list.related ? Graph.related : Graph.radio)
+            }
+            if request.deepen && entries.count < AutoplayPolicy.poolRefillBelow {
+                // The radios are running dry even with their continuation pages: the library carries on behind them,
+                // so the queue does not end while there is anything left to play. That pool has no recording ids,
+                // so it is picked in its own order.
+                var seen = Set(entries.map { BrainKey($0.candidate.mediaId) })
+                for entry in await libraryPool(request, index: index, anchorArtistKeys: anchorArtistKeys)
+                where seen.insert(BrainKey(entry.candidate.mediaId)).inserted {
+                    entries.append(entry)
+                }
+                return BuiltAutoplayPool(entries: entries, fromLibrary: false)
+            }
+            return BuiltAutoplayPool(entries: entries, fromLibrary: false, seeds: seedLists, artistNames: nameByAid)
         }
         return BuiltAutoplayPool(entries: await libraryPool(request, index: index, anchorArtistKeys: anchorArtistKeys),
                                  fromLibrary: true)
@@ -173,27 +276,64 @@ public enum AutoplayPool {
     }
 
     static func entry(for stored: StoredRadioRow, rank: Int32, index: BrainLibraryIndex, everPlayed: Set<String>,
-                      anchorArtist: String, artistRadio: Bool) -> AutoplayPoolEntry? {
+                      anchorArtist: String, artistRadio: Bool,
+                      adjustments: TasteAdjustmentSet = .empty) -> AutoplayPoolEntry? {
         let row = stored.row
         if let librarySong = index.match(row) {
-            return AutoplayPoolEntry(
-                candidate: AutoplayPolicy.Candidate(
-                    mediaId: librarySong.id, rid: stored.rid, artistKey: BrainLibraryIndex.artistKey(of: librarySong),
-                    albumKey: BrainLibraryIndex.albumKey(of: librarySong.album), durationMs: librarySong.duration,
-                    versionFlags: BrainText.cleanTitle(librarySong.title).versionFlags, officialAudio: true,
-                    inLibrary: true, arm: AutoplayPolicy.libraryArm(everPlayed: everPlayed.contains(librarySong.id)),
-                    radioRank: rank),
-                librarySong: librarySong, engineTrack: nil, whyArtist: anchorArtist)
+            return libraryEntry(librarySong, rid: stored.rid, rank: rank, everPlayed: everPlayed,
+                                anchorArtist: anchorArtist, adjustments: adjustments)
         }
         if row.artists.isEmpty { return nil }
         let track = EngineTrack(row: row, rid: stored.rid)
+        let albumKey = row.album.flatMap(BrainLibraryIndex.albumKey(of:))
         return AutoplayPoolEntry(
             candidate: AutoplayPolicy.Candidate(
                 mediaId: track.songId, rid: stored.rid, artistKey: BrainLibraryIndex.artistKey(of: row),
-                albumKey: row.album.flatMap(BrainLibraryIndex.albumKey(of:)), durationMs: track.durationMs,
+                albumKey: albumKey, durationMs: track.durationMs,
                 versionFlags: BrainText.cleanTitle(row.title).versionFlags, officialAudio: row.isOfficialAudio,
                 inLibrary: false, arm: artistRadio ? Arm.artist : Arm.radio, radioRank: rank),
-            librarySong: nil, engineTrack: track, whyArtist: anchorArtist)
+            librarySong: nil, engineTrack: track, whyArtist: anchorArtist,
+            primaryArtist: row.artists.first?.name ?? "",
+            brain: Candidate(rid: stored.rid, aid: 0, albumKey: albumHash(albumKey), inLibrary: false,
+                             fromArtistRadio: artistRadio, boostLn: adjustments.isEmpty ? 0.0 : boostLn(adjustments, track.song())))
+    }
+
+    /// A library track as a pool entry: it plays from its library row.
+    static func libraryEntry(_ song: Song, rid: Int64, rank: Int32, everPlayed: Set<String>, anchorArtist: String,
+                             adjustments: TasteAdjustmentSet) -> AutoplayPoolEntry {
+        let albumKey = BrainLibraryIndex.albumKey(of: song.album)
+        return AutoplayPoolEntry(
+            candidate: AutoplayPolicy.Candidate(
+                mediaId: song.id, rid: rid, artistKey: BrainLibraryIndex.artistKey(of: song), albumKey: albumKey,
+                durationMs: song.duration, versionFlags: BrainText.cleanTitle(song.title).versionFlags,
+                officialAudio: true, inLibrary: true,
+                arm: AutoplayPolicy.libraryArm(everPlayed: everPlayed.contains(song.id)), radioRank: rank),
+            librarySong: song, engineTrack: nil, whyArtist: anchorArtist,
+            primaryArtist: BrainLibraryIndex.primaryArtistName(song),
+            brain: Candidate(rid: rid, aid: 0, albumKey: albumHash(albumKey), inLibrary: true, liked: song.isFavorite,
+                             boostLn: boostLn(adjustments, song)))
+    }
+
+    /// The seed for a change of direction when the session has no other anchor: a library track with a known
+    /// YouTube audio id, by the library artist the listener finishes most, outside the artists just skipped.
+    static func otherDirectionAnchor(_ request: AutoplayPoolRequest, index: BrainLibraryIndex,
+                                     repository: BrainRepository, engine: BrainEngine) async -> AutoplayAnchor? {
+        if request.library.isEmpty { return nil }
+        let keys = index.artistKeys()
+        let names = keys.map { key in index.byPrimaryArtist(key).first.map(BrainLibraryIndex.primaryArtistName) ?? "" }
+        let aids = await repository.resolveArtistNames(names)
+        let order = await engine.otherDirectionOrder(aids: aids, nowMs: request.nowMs, limit: otherDirectionTries)
+        for i in order {
+            for song in index.byPrimaryArtist(keys[i]).prefix(otherDirectionTries) {
+                var spotifyId = song.spotifyId
+                if let id = spotifyId, BrainText.isBlank(id) || TrackCatalog.isSyntheticId(id) { spotifyId = nil }
+                var videoId = TrackCatalog.videoId(ofSongId: song.id)
+                if videoId == nil, let spotifyId { videoId = await request.matchedVideoId(spotifyId) }
+                guard let videoId else { continue }
+                return AutoplayAnchor(song: song, videoId: videoId, spotifyId: spotifyId)
+            }
+        }
+        return nil
     }
 
     /// Offline, the YouTube source switched off, or no radio had anything: tracks by the anchors' primary artists

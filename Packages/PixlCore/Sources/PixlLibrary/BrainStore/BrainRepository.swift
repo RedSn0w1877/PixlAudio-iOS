@@ -242,6 +242,26 @@ public actor BrainRepository {
         tables.prunePlayable(keepSongIds: keepSongIds, nowMs: nowMs ?? clock())
     }
 
+    // MARK: Identity (3.1), for the event recorder and the migration
+
+    /// Rids for `requests`, in order; 0 for a request with no usable key.
+    public func resolveTracks(_ requests: [TrackRequest]) -> [Int64] { tables.resolveTracks(requests) }
+
+    /// Aids for `names` (ONE artist name each), in order; 0 for a name that folds to nothing.
+    public func resolveArtistNames(_ names: [String]) -> [Int64] { tables.resolveArtistNames(names) }
+
+    /// Every merged recording and the one it was merged into.
+    public func trackMerges() -> [Int64: Int64] { tables.trackMerges() }
+
+    /// One track resolved together with its artists: one hop for the recorder.
+    public func resolve(keys: Ids.TrackKeys, durationMs: Int32, artistNames: [String]) -> (rid: Int64, aids: [Int64]) {
+        let rid = tables.resolveTrack(keys, durationMs: durationMs)
+        return (rid, tables.resolveArtistNames(artistNames))
+    }
+
+    /// The stored `playable` row of `songId`, when the engine queued it.
+    public func playable(songId: String) -> PlayableRecord? { tables.playable(songId: songId) }
+
     // MARK: Tests and diagnostics
 
     public func radioListCount() -> Int { tables.radioCount }

@@ -114,6 +114,12 @@ public struct BrainLibraryIndex: Sendable {
         return nil
     }
 
+    /// Every folded primary-artist name of the library, in ascending UTF-8 byte order (a fixed order: nothing here
+    /// may depend on a dictionary's).
+    public func artistKeys() -> [String] {
+        byArtistKey.keys.map(\.text).sorted { $0.utf8.lexicographicallyPrecedes($1.utf8) }
+    }
+
     /// Library songs whose primary artist folds to `artistKey`, in library order.
     public func byPrimaryArtist(_ artistKey: String) -> [Song] { byArtistKey[BrainKey(artistKey)] ?? [] }
 

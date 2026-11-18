@@ -360,9 +360,16 @@ public struct BrainItemTag: Sendable, Hashable {
     public var whyArg: String?
     /// The pick's best radio rank at serve time, -1 when it had none; not saved with the queue.
     public var radioRank: Int
+    /// The pick's retrieval percentile x 1000 at serve time, -1 when it had none; not saved with the queue.
+    public var retrQ: Int
+    /// The reason key of the pick (`WhyLine` name: "radio_fans", ...); nil for none. Not saved with the queue.
+    public var whyKey: String?
+    /// ONE artist name: the track's own primary artist, when whoever queued it knew. Not saved with the queue.
+    public var primaryArtist: String?
 
     public init(surface: String? = nil, surfaceId: String? = nil, recId: Int64 = 0, slot: Int = -1, arm: String? = nil,
-                whyArg: String? = nil, radioRank: Int = -1) {
+                whyArg: String? = nil, radioRank: Int = -1, retrQ: Int = -1, whyKey: String? = nil,
+                primaryArtist: String? = nil) {
         self.surface = surface
         self.surfaceId = surfaceId.map { String($0.unicodeScalars.prefix(Self.maxSurfaceIdLength)) }
         self.recId = recId
@@ -370,6 +377,9 @@ public struct BrainItemTag: Sendable, Hashable {
         self.arm = arm
         self.whyArg = whyArg
         self.radioRank = radioRank
+        self.retrQ = retrQ
+        self.whyKey = whyKey
+        self.primaryArtist = primaryArtist
     }
 
     /// True when nothing that is saved with the queue is set.

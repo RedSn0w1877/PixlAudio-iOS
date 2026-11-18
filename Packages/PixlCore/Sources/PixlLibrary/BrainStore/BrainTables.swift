@@ -89,6 +89,10 @@ public final class BrainTables {
     private var videoIdsByRid: [Int64: [String]] = [:]
     private var merged: [Int64: Int64] = [:]
 
+    private var artistsLoaded = false
+    private var artistAlias: [BrainKey: Int64] = [:]
+    private var artistTaken: Set<Int64> = []
+
     private var radiosLoaded = false
     private var radioFacts: [BrainKey: RadioListFacts] = [:]
 
@@ -185,6 +189,52 @@ public final class BrainTables {
             guard let exceptVideoId else { return true }
             return !BrainKey.sameBytes(id, exceptVideoId)
         }
+    }
+
+    /// Every merged recording and the one it was merged into (already flattened).
+    public func trackMerges() -> [Int64: Int64] {
+        loadIdentity()
+        return merged
+    }
+
+    // MARK: Artists (3.1: stage 1 joins artists by folded name)
+
+    private func loadArtists() {
+        if artistsLoaded { return }
+        artistsLoaded = true
+        artistAliasFile.open { key, payload in
+            guard let pair = Self.decodePair(payload) else { return }
+            self.artistAlias[BrainKey(key)] = pair.0
+            self.artistTaken.insert(pair.0)
+        }
+    }
+
+    private struct ArtistLookup: Ids.AliasLookup {
+        let tables: BrainTables
+        func idOf(_ key: String) -> Int64? { tables.artistAlias[BrainKey(key)] }
+        func isTaken(_ id: Int64) -> Bool { tables.artistTaken.contains(id) }
+        func survivorOf(_ id: Int64) -> Int64 { id }
+        func durationMsOf(_ key: String) -> Int32 { 0 }
+    }
+
+    /// Aids for `names` (ONE artist name each), in order; 0 for a name that folds to nothing. What is new is stored
+    /// in one write.
+    public func resolveArtistNames(_ names: [String]) -> [Int64] {
+        loadArtists()
+        var out = [Int64](repeating: 0, count: names.count)
+        var writes: [(key: String, payload: [UInt8])] = []
+        let lookup = ArtistLookup(tables: self)
+        for (i, name) in names.enumerated() {
+            guard let resolution = Ids.resolveArtist(Ids.ArtistKeys(name: name), table: lookup) else { continue }
+            artistTaken.insert(resolution.id)
+            for alias in resolution.aliases {
+                artistAlias[BrainKey(alias.key)] = alias.id
+                writes.append((alias.key, Self.encodePair(alias.id, 0)))
+            }
+            out[i] = resolution.id
+        }
+        if !writes.isEmpty { artistAliasFile.put(writes) }
+        return out
     }
 
     public var trackAliasCount: Int {
