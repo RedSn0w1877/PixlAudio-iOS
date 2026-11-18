@@ -244,3 +244,226 @@ caused by this work.
 On a phone, in this order: tap one song and let it end (related music should follow, the queue should show the
 Autoplay line); tap one song and skip to its end at once (the backstop); turn the switch off; airplane mode ("From
 your library"); kill the app mid-autoplay and reopen; Like an engine track and find it in the library.
+
+---
+
+## Milestone 1b: "it listens"
+
+Spec section 14, stage 1, items 6 to 9. A port of Android's commits `330c269` to `3a7617a`. Built on 1a after
+checking that 1a's CI run (`44254580118`) was green.
+
+**Nothing below has been run on a phone either.** PixlCore is compiled and tested on Windows; everything under
+`App/` is compiled by CI only.
+
+### What the listener gets (once checked on a phone)
+
+- Every play is recorded with how it started, how it ended and where it came from, including a skip after two
+  seconds. Nothing is shown for it yet; every later stage reads this log.
+- A skip changes what comes next: a hard skip keeps that artist out of Autoplay's picks for ten tracks (a second
+  one, for the rest of the session), and the engine's end of the queue is re-scored at once. Two skips in a row
+  bring a library track by the artist last finished. Three in a row change direction, and the Autoplay line says
+  "Skipped three. Changing direction." for 12 seconds.
+- A like puts one more track by that artist (or its nearest neighbour) into the next picks.
+- Autoplay's picks are ordered by the scorer (fixed prior weights) instead of plain radio order, with library
+  tracks close to what is playing mixed in. With no history at all the order is the radio's own.
+- A track Autoplay played from outside the library, not saved, no longer lands in `music_taste.json` or in the
+  engagement rows. It is still in the play history (Recently Played).
+
+### Where things are
+
+**`Packages/PixlCore/Sources/PixlLibrary/Brain/`** (pure; scanned by `BrainPurityTests`; same file names as `:brain`)
+
+| File | What |
+|---|---|
+| `BrainMath.swift` | `ln`, `exp`, `sigmoid`, `log2`, `powNeg`, `logit`, `toQ` / `fromQ`, `orderKey`, `floorDiv`, `localDay`, `weekday`, `clip`. Constants as bit patterns; the polynomial of `ln` is written one operation per line, in Kotlin's order |
+| `BrainJson.swift` | the canonical text form: a writer (`[UInt8]` buffer) and a small reader (`BrainJson.Value`) |
+| `PlayEvent.swift` | the record of 4.1, `Origin`, `StartReason`, `EndReason`, `Route`, `EventFlags`, `encode` / `decode`, `mintId` |
+| `Reward.swift`, `Affinity.swift`, `Replay.swift`, `Brain.swift` | grading; the Q20 counters (`Affinity.State` is a value type); `LibraryFacts`, `GradeTracker`, `Replay.rebuild`; `Brain.onEvent` |
+| `Graph.swift`, `Session.swift`, `Features.swift`, `Ranker.swift`, `Retrieval.swift`, `ListBuilder.swift`, `StationPlanner.swift`, `WhyLine.swift` | as on Android |
+| `AutoplayPolicy.swift` | + `rescoreStart`, `warmedAhead`, `anchorIndices(max:)` |
+
+**`Packages/PixlCore/Sources/PixlLibrary/BrainStore/`** (files, `Song`, actors: outside the purity scan)
+
+| File | What | Android twin |
+|---|---|---|
+| `BrainEventLog.swift` | `play_event.pbl`, `affinity.pbl`, `brain_state.pbl` over `KeyedLogStore` | `BrainStore.kt`, the DAOs |
+| `BrainEngine.swift` | the actor: `record` (resolve, stamp, write, apply), `plan` (a batch, or a patch of the tail), `otherDirectionOrder`, the rebuild beside the live state; `Reaction`, `AnchorInfo`; `OpenPlayCodec`; `BrainRecorder` (plays one at a time, in order) | `BrainEngine.kt`, `BrainEventRecorder.kt`, `AppStateRebuilder` |
+| `PlayContext.swift` | `PlayContext`, `FinishedPlay`, `OpenPlay` (the brain's play in flight), `PlayReasons`, `BrainSurfaces`, `TrackFacts`, `TrackCatalog` | `PlayContext.kt`, `BrainPlay` in the tracker, `TrackCatalog.kt` |
+| `BrainMigration.swift` | `LegacyMigration`, `ImportedPlayAdapter`, `ReplayMerger`, `LibraryFactsBuilder` | `LegacyMigration.kt`, `ImportedPlayAdapter.kt`, `BrainRebuilder.kt` |
+| `AutoplayPlanning.swift` | what a plan reads from the queue and the pool, and the queue tags it gives back | `planInputs`, `commit`, `mediaItemFor` in `AutoplayController.kt` |
+| `AutoplayPool.swift` | + recording ids, artist ids, seed lists, library tracks by the anchors' artists, the other-direction seed | the pool half of `AutoplayController.kt` |
+| `BrainTables.swift`, `BrainRepository.swift` | + artists through `artist_alias.pbl` (`resolveArtistNames`), `trackMerges`, `resolve` | `BrainIdentity.kt` |
+
+`PixlModel/BrainRows.swift`: `BrainItemTag` gains `retrQ`, `whyKey` and `primaryArtist` (none saved with the queue).
+
+**`App/`** (not compiled locally)
+
+| File | Change |
+|---|---|
+| `Playback/ListeningStatsTracker.swift` | an `OpenPlay` beside the legacy session; `context`, `endReason`, `isOutsideLibrary` on `onTrackChanged`; `endReason` on `finalizeCurrentSession`; `markFlag`, `onSeek`; `onBrainPlay` is called before the five-second floor; `Record.isOutsideLibrary` |
+| `Playback/PlaybackServices.swift` | reasons from the engine's callbacks (`transitionReasons`), the `PlayContext` of the current entry, the audio route, the legacy counters skipped for a track from outside the library |
+| `Playback/DualDeckEngine.swift` | `replaceEngineTail` (one edit), `setQueueSource`, `onSeek`, `loadFailureCount` |
+| `Playback/PlaybackQueue.swift` | `replaceTail`; the play source on entries (`replace(... source:)`); "Add to queue" and "Play next" tag `manualQueue` |
+| `Core/PlaybackEngine.swift`, `Stores/PlaybackStore.swift` | `setQueueSource`; `play(... source:)` |
+| `Services/Brain/BrainService.swift` | owns `BrainEngine` and (lazily) `BrainRecorder`; `playFinished`, `playOpen`, `mark`, `onReaction`; `AutoplayState.changedDirection` |
+| `Services/Brain/PlaySources.swift` (new) | `BrainItemTag.album`, `.artist`, `.search`, `.dailyMix`, `.yourMix`, `.homeShelf`, `.assistant`, `.playlist(id:)` |
+| `Playback/AutoplayController.swift` | the planner instead of radio order; session anchors; `reaction`; `rescoreTail`; the change of direction |
+| `AppEnvironment.swift` | wires the tracker to the recorder, the recorder to Autoplay, and what a rebuild reads |
+| `Features/Queue/AutoplayLine.swift`, `QueueSheet.swift` | the note "Skipped three. Changing direction." |
+| play call sites (album, artist, playlist, search, mixes, Home shelves, Ask Taizo, AI playlists), `BlockedArtistsStore.playTapped` | pass `source:` |
+| `Features/Library/LibraryEditing.swift` | liked / saved / added-to-playlist flags on the play in flight |
+| `Features/ListeningHistory/ImportedHistoryStore.swift`, `Features/Taste/TasteAdjustmentStore.swift` | `importedContents()`, `activeAdjustments(nowMs:)` |
+| `AppTests/AutoplayQueueTests.swift` | + the tail edit, the play source, the tracker's brain play |
+
+### Item 6: the event recorder
+
+How one play reaches the log, traced in code:
+
+1. `PlaybackServices` builds a `PlayContext` from the queue entry that became current (the `Song` itself, its tag,
+   shuffle, repeat-one, the audio route) and hands it, with the reasons, to `ListeningStatsTracker.onTrackChanged`.
+2. The tracker keeps an `OpenPlay` beside its legacy session. When the play ends it calls `onBrainPlay` BEFORE the
+   five-second floor, which now only guards the legacy stores.
+3. `BrainService.playFinished` posts it to `BrainRecorder`, which hands plays to `BrainEngine.record` one at a time:
+   resolve the track and its artists (`BrainRepository`), stamp it (`Session.begin`), build the `PlayEvent`, apply it
+   (`Brain.onEvent`), append the event and the affinity rows it touched.
+4. A `Reaction` goes back to `AutoplayController.reaction` on the main actor.
+
+Reasons, per engine callback (`PlayReasons` is the table; `PlaybackServices.transitionReasons` feeds it):
+
+| Engine callback | End reason of the play that ends | Start reason of the next |
+|---|---|---|
+| `onItemTransition`, `automatic` (gapless or crossfade hand-over, the backstop) | `trackDone` | `autoplay` when the new entry has an arm, else `autoAdvance` |
+| `onItemTransition`, `automatic`, right after a failed load | `error` | `autoplay` / `autoAdvance` |
+| `onItemTransition`, not automatic, queue index +1 / -1 / other | `next` / `prev` / `pickedOther` | `next` / `prev` / `tap` |
+| `onItemTransition` in the same turn as `onQueueChanged` (`setQueue`, the current entry removed) | `queueEdit` when the queue is exactly one shorter, else `pickedOther` | `tap`; `restore` while a saved queue is restored |
+| `onRepeatLoop` | `trackDone` | `autoAdvance` (the `repeatOne` flag comes from the queue's repeat mode) |
+| `onQueueEnded` | `trackDone` | - |
+| the app is about to terminate | `stopped` | - |
+| an open play found by the next process | `killed`, with what was heard by its last pause | - |
+
+### Item 7: the pure core and the golden vectors
+
+`Tests/PixlLibraryTests/Fixtures/brain/` holds Android's ten golden files, `README.md`, `MANIFEST.sha256` and
+`SPEC_VERSION`, copied unchanged from `brain/src/test/resources/brain-golden/` at Android commit `3a7617a`.
+`BrainGoldenTests` replays every line as the README says, rebuilds the canonical `"out":{...}` text and compares it
+with the bytes of the line; it also checks every file against the manifest (a SHA-256 written out in the test) and
+`SPEC_VERSION` against `Brain.specVersion`. All ten files passed bit for bit on the first run; no divergence from
+Android was found. To update: copy the folder again; never edit a file.
+
+### Item 8: the migration
+
+Runs in the background the first time the brain is needed (the first play that ends, or the first autoplay plan),
+never at app start, with the stored state serving meanwhile (`BrainEngine.runRebuild`):
+
+1. `LegacyMigration.events`: every `playback_history.json` row that ended before the brain's first use becomes a
+   `migratedHistory` event. Idempotent: the event id is a function of the row and the log ignores a stored id.
+2. `ImportedPlayAdapter.events`: the imported plays as events, resolved once per distinct track, never stored.
+3. `ReplayMerger.rebuild`: an imported play that ended within 90 s of a stored play of the same recording is
+   dropped; both streams are merged in ascending event id; merged recordings map to their survivor; the fold
+   itself runs off the engine's actor.
+4. `LibraryFactsBuilder`: favourites, Spotify top artists / top tracks / followed artists (`ExternalTasteSnapshot`),
+   boost and reduce adjustments for artists and songs, as pseudo-counts.
+5. The rows replace `affinity.pbl`; plays recorded while it ran are applied to the new state first, not twice.
+
+It runs again when `Brain.specVersion` changes, when the imported history changes (its size or newest play), when a
+live update sees the clock 48 hours behind the newest counter, and once a week (to refresh the facts).
+
+### Item 9: session reactions
+
+`AutoplayController.reaction`, after each recorded play: a skip (`h > 0`), a like or a change of direction re-scores
+the engine's tail. `rescoreTail` asks `BrainEngine.plan(... tail:)` (`Session.patchQueue`) for the same number of
+tracks from the tail's own tracks plus the pool, and when the answer differs applies it with ONE
+`DualDeckEngine.replaceEngineTail`. It starts at `AutoplayPolicy.rescoreStart` (after the current track and the
+next one, the next two on unmetered Wi-Fi; only the unbroken run of engine entries at the end), waits while a
+hand-over is prepared, and is dropped when the queue changed while it was planned. Anchors come from the session;
+the listener-chosen track that is playing leads them. Third skip in a row: the next anchor alone seeds the pool;
+with no other anchor, a library track with a known YouTube audio id by the library artist with the highest
+affinity outside the artists skipped this session.
+
+### Deviations from the spec and from Android (continuing the list)
+
+22. **The value types.** `Affinity.State`, `SessionState`, `GradeTracker` and `Graph` are structs. `GradeTracker`
+    takes the completion counts as an argument of `grade` instead of holding a reference to the state's map; the
+    order of reads and writes is Kotlin's (golden-tested).
+23. **`ln`'s polynomial is written one operation per line** (Swift's type checker gives up on the nested
+    expression). Same operations, same order.
+24. **`BrainJson` strings**: an escaped lone surrogate decodes to U+FFFD (a Swift string cannot hold one).
+25. **Storage**: `play_event` is ONE record file keyed by event id, not monthly segments; its index (one entry per
+    event) is in memory once the log is opened. `affinity` rows are JSON arrays keyed `family|key`. The spec's
+    `App/Services/Brain/BrainEventLog.swift` is `PixlLibrary/BrainStore/BrainEventLog.swift` (as in deviation 5).
+26. **The recorder needs no catalogue lookup.** The queue entry is the whole `Song`, so `PlayContext` carries the
+    track's own facts (split artists, Spotify id, video id). "In the library" is one dictionary lookup at track start.
+27. **Audible time is "play was wanted" time.** `OpenPlay` counts while the engine's `playWhenReady` is true (what
+    the legacy session counts too), so the time a stream takes to start is counted as heard. A skip in the first
+    two seconds of a slow load is still a skip; its `playedMs` is too high by the load time.
+28. **The open play is written when a play starts playing** and at every pause (Android: at its first sound and at
+    every pause).
+29. **`isOutsideLibrary`** (legacy counters skipped): no library row AND the id is an engine track known to
+    `BrainService` in this run (queued by Autoplay, or read from `playable`). An unsaved YouTube Music search result
+    is counted as before.
+30. **The play source is threaded for more surfaces than Android**: album, artist, playlist (hashed id), search,
+    Daily Mix, Your Mix, the Home shelves (`homeShelf`), Ask Taizo and AI playlists (`assistant`), "Add to queue" /
+    "Play next" (`manualQueue`). Liked Songs, Recently Played, genre pages, the library's own lists and the
+    "Play anyway" path record `unknown`. `homeShelf` and `assistant` are engine surfaces for the reward (4.3).
+31. **Imported plays**: `playedMs` is -1 when the file has 0; the end reason is `trackDone` for `reason_end ==
+    trackdone`, `next` for `fwdbtn` / `backbtn` / `skipped == true`, else `unknown`, and only for Spotify export
+    rows; the length is the library's (the file's own `durationMs` is not used, as on Android).
+32. **"The import changed"** is its size and newest play (`ImportedHistoryAggregate`), not a highest row id.
+33. **Song adjustments** are matched by `TasteKey.recording`; artist adjustments by their label through the artist
+    alias table.
+34. **The other-direction seed** needs a known YouTube audio id: a `yt:` library song, or a stored match of its
+    Spotify id.
+35. **The pool key gains `|#n`** after a change of direction with no other anchor, so the same anchors get another
+    pool.
+36. **Before the session has anchors, one anchor** (the last listener-chosen track at or before the current one),
+    as Android 1b; 1a used three.
+37. **`ignoredRids`** (6.1, "ignored three times") is still empty: no query over the event log was written.
+38. **The Autoplay line's note** replaces the subtitle for 12 s; there is no separate row.
+39. **Android's deviations 22 to 34 and 44 to 46 hold here too** (they are in the pure core or ported as they are).
+    Its 47 holds: `retrQ`, `radioRank`, `whyKey`, `whyArg` and `primaryArtist` are lost on a restart.
+
+### Cut or left for 1c
+
+- No UI for "Not for me" (the flag, the rule and the session effect exist; `ListeningStatsTracker.markFlag` takes
+  it) and none for Familiar / Blend / Discover (`nuMultiplier`).
+- The why-line UI (entries carry `whyKey` and `whyArg`). Stations and the Home row (the planner modes are
+  golden-tested; nothing in the app calls them). `BrainSwitch`. The bridge slot is planned, never shown as such.
+- Android's `BrainMathTest`, `RewardAffinityTest` and `SessionPlannerTest` are not ported case by case (the golden
+  files cover them).
+- Spotify Connect and AirPlay: a play that continues on a Connect device is not recorded (as before).
+
+### Not verified (all of it on a phone; the specific risks)
+
+1. **Everything under `App/` compiles only on CI.** The CI run for this milestone is named at the end of this file.
+2. Which engine callbacks arrive, and in what order, for a tap, next, previous, a queue edit, repeat, a failed load
+   and above all a crossfade hand-over. A wrong order would show as plays cut in two or `unknown` reasons.
+   `queueChangedThisTurn` assumes a track change caused by a queue change arrives in the same main-actor turn.
+3. That `play_event.pbl` is written at all on an iPhone, and what the first load, the migration and a rebuild cost
+   on a real library and a real import (150,000 imported plays are held in memory during a rebuild).
+4. `replaceEngineTail` on the real engine: with and without crossfade, right before a gapless hand-over; whether
+   the reaction is fast enough to be felt; the queue sheet while its tail is replaced under the thumb.
+5. The change of direction end to end, and the note on the Autoplay line.
+6. Audio route detection (`AVAudioSession.currentRoute`, read at most twice a minute, on the main actor).
+7. That nothing runs at app start: traced (the recorder is created by the first play that ends; a restored, paused
+   queue sends nothing), not measured.
+8. Bit-equality of `BrainMath` on arm64 (the golden tests ran on x86-64 Windows, and run on Linux in CI; the
+   iPhone's own CPU was not tested).
+9. Everything on 1a's list.
+
+### How to test
+
+```
+cmd //c "ci\\swiftw.cmd test --package-path Packages\\PixlCore --filter Brain --filter Autoplay"
+cmd //c "ci\\swiftw.cmd test --package-path Packages\\PixlCore"
+bash ci/check-forbidden.sh
+```
+
+Last local run (2026-11-18): the filtered run, 131 tests in 18 suites, 0 failed (`BrainGoldenTests` 12,
+`BrainEventRecorderTests` 11, `BrainPlayContextTests` 6, `BrainMigrationTests` 9, `BrainAutoplayPlanningTests` 3 are
+new). The full suite: exit 0, 2,089 tests in 8 bundles, 0 failed. `recommendationMatchesAndroid` and
+`Recommendation.swift` are untouched.
+
+On a phone, after 1a's list: play a song, skip the next one after two seconds, and look in
+`Application Support/Brain/play_event.pbl` for a line with `"endReason":1` and `playedMs` near 2000; skip two
+Autoplay picks by one artist and check that artist is gone from the end of the queue; skip three in a row and read
+the Autoplay line; like an Autoplay pick and look for a track by that artist in the next batch.
