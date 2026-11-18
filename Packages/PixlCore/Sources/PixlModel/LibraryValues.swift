@@ -76,9 +76,18 @@ public struct PlaybackQueueItemSnapshot: Sendable, Hashable, Codable {
     public var albumTitle: String?
     public var artworkUri: String?
     public var durationMs: Int64?
+    // Where the item came from (docs/brain-spec.md, 4.2; the same five fields as Android). Optional, so a queue
+    // saved by an earlier version decodes unchanged and a queue with no engine items encodes exactly as before.
+    public var brainSurface: String?
+    public var brainSurfaceId: String?
+    public var brainRecId: Int64?
+    public var brainSlot: Int?
+    public var brainArm: String?
 
     public init(mediaId: String, uri: String, title: String? = nil, artist: String? = nil, albumTitle: String? = nil,
-                artworkUri: String? = nil, durationMs: Int64? = nil) {
+                artworkUri: String? = nil, durationMs: Int64? = nil, brainSurface: String? = nil,
+                brainSurfaceId: String? = nil, brainRecId: Int64? = nil, brainSlot: Int? = nil,
+                brainArm: String? = nil) {
         self.mediaId = mediaId
         self.uri = uri
         self.title = title
@@ -86,6 +95,11 @@ public struct PlaybackQueueItemSnapshot: Sendable, Hashable, Codable {
         self.albumTitle = albumTitle
         self.artworkUri = artworkUri
         self.durationMs = durationMs
+        self.brainSurface = brainSurface
+        self.brainSurfaceId = brainSurfaceId
+        self.brainRecId = brainRecId
+        self.brainSlot = brainSlot
+        self.brainArm = brainArm
     }
 }
 

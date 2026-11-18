@@ -1,0 +1,258 @@
+{
+ "name": "The Weeknd",
+ "radio": {
+  "videoId": "VtCJ_ABaHQY",
+  "playlistId": "RDEMHSpo_Uv9STIRtF73zMywLg",
+  "params": "wAEB"
+ },
+ "topSongs": [
+  {
+   "videoId": "RmYCOm4ehKs",
+   "title": "Save Your Tears",
+   "artists": [
+    {
+     "name": "The Weeknd",
+     "id": "UClYV6hHlupm_S_ObS1W-DYw"
+    }
+   ],
+   "album": "After Hours",
+   "albumId": "MPREb_TH6Wut5eTMQ",
+   "year": 0,
+   "durationSec": 0,
+   "thumb": "https://yt3.googleusercontent.com/JDKz3Anlyo49xBhFcFx13QD_Tk4-kqdiYTo15gtkL93nE8biWyZ7o0BPyW6RnXVxcXaJ5DgU5nJ_0NjJ=w120-h120-l90-rj",
+   "explicit": false,
+   "type": "ATV",
+   "plays": 3400000000
+  },
+  {
+   "videoId": "3_g2un5M350",
+   "title": "Starboy (feat. Daft Punk)",
+   "artists": [
+    {
+     "name": "The Weeknd",
+     "id": "UClYV6hHlupm_S_ObS1W-DYw"
+    }
+   ],
+   "album": "Starboy",
+   "albumId": "MPREb_FWIMEPTHFsY",
+   "year": 0,
+   "durationSec": 0,
+   "thumb": "https://yt3.googleusercontent.com/dcxXIIlest09vnvKznWM9VWQXu1EL7lKxBzXGzwgmVjmMNBm1dEWT_0qn1xrEZYyKF_qRE1TLq8P_JY_mQ=w120-h120-l90-rj",
+   "explicit": true,
+   "type": "ATV",
+   "plays": 4100000000
+  },
+  {
+   "videoId": "HgLfYfJtc8M",
+   "title": "One Of The Girls",
+   "artists": [
+    {
+     "name": "The Weeknd",
+     "id": "UClYV6hHlupm_S_ObS1W-DYw"
+    },
+    {
+     "name": "JENNIE",
+     "id": "UCAl7xQ6q0PEgZMQD7zr4AKQ"
+    },
+    {
+     "name": "Lily Rose Depp",
+     "id": "UChGTI8sivCDh1AWues5lrDA"
+    }
+   ],
+   "album": "The Idol Episode 4 (Music from the HBO Original Series)",
+   "albumId": "MPREb_a2tRnW1Y5LY",
+   "year": 0,
+   "durationSec": 0,
+   "thumb": "https://yt3.googleusercontent.com/mxqDOrw4zbfDBdd4kOnD2qBUtMklnAucEfrQUbr30pRLie0P3JIhJhBJ9wJq3NEeg2yVrT9lgrYid-w=w120-h120-l90-rj",
+   "explicit": false,
+   "type": "ATV",
+   "plays": 1600000000
+  },
+  {
+   "videoId": "AySMGpXQ1Mo",
+   "title": "Die For You (Remix)",
+   "artists": [
+    {
+     "name": "The Weeknd",
+     "id": "UClYV6hHlupm_S_ObS1W-DYw"
+    },
+    {
+     "name": "Ariana Grande",
+     "id": "UC0076UMUgEng8HORUw_MYHA"
+    }
+   ],
+   "album": "Starboy (Deluxe)",
+   "albumId": "MPREb_mD2jEs9HuqV",
+   "year": 0,
+   "durationSec": 0,
+   "thumb": "https://yt3.googleusercontent.com/liKrw5t_WphMbkiYKDHQj1rf8S8GSwxgMRUmB7tkHhPF862BRcqIYxFEj9QwKr51ge2ma6u0C_wI4jNo=w120-h120-l90-rj",
+   "explicit": false,
+   "type": "ATV",
+   "plays": 1000000000
+  },
+  {
+   "videoId": "J7p4bzqLvCw",
+   "title": "Blinding Lights",
+   "artists": [
+    {
+     "name": "The Weeknd",
+     "id": "UClYV6hHlupm_S_ObS1W-DYw"
+    }
+   ],
+   "album": "Blinding Lights",
+   "albumId": "MPREb_4U7yfKKFZLv",
+   "year": 0,
+   "durationSec": 0,
+   "thumb": "https://yt3.googleusercontent.com/R_cjQK3wwLPEzri1jerx-79zgzGocoKvwGU3NMONaTsaMM0Idd641pfB8r5jgfpn6I8JAoFtf9RBIcI=w120-h120-l90-rj",
+   "explicit": false,
+   "type": "ATV",
+   "plays": 3700000000
+  }
+ ],
+ "albums": [
+  {
+   "browseId": "MPREb_YWjvGjCFaW6",
+   "title": "Hurry Up Tomorrow",
+   "year": 2025
+  },
+  {
+   "browseId": "MPREb_Ulsj5v7BPir",
+   "title": "The Highlights (Deluxe)",
+   "year": 2024
+  },
+  {
+   "browseId": "MPREb_zkvlkWx0ytJ",
+   "title": "Dawn FM",
+   "year": 2022
+  },
+  {
+   "browseId": "MPREb_k32fgfM2x9F",
+   "title": "Dawn FM (Alternate World)",
+   "year": 2022
+  },
+  {
+   "browseId": "MPREb_TH6Wut5eTMQ",
+   "title": "After Hours",
+   "year": 2020
+  },
+  {
+   "browseId": "MPREb_FWIMEPTHFsY",
+   "title": "Starboy",
+   "year": 2016
+  },
+  {
+   "browseId": "MPREb_phyP9K8SlD7",
+   "title": "Beauty Behind The Madness",
+   "year": 2015
+  },
+  {
+   "browseId": "MPREb_X7QI7AnnRrm",
+   "title": "Kiss Land",
+   "year": 2013
+  },
+  {
+   "browseId": "MPREb_Pq7VLMb1aUy",
+   "title": "Trilogy",
+   "year": 2012
+  },
+  {
+   "browseId": "MPREb_LcxxM8hMoTk",
+   "title": "Echoes of Silence",
+   "year": 2011
+  }
+ ],
+ "singles": [
+  {
+   "browseId": "MPREb_Pv61ElWkui1",
+   "title": "Open Hearts (Single Version)",
+   "year": 2025
+  },
+  {
+   "browseId": "MPREb_7lAOwJ5RVOw",
+   "title": "Wake Me Up (Single Version) (feat. Justice)",
+   "year": 2025
+  },
+  {
+   "browseId": "MPREb_R3IQaViqEwV",
+   "title": "Enjoy The Show (Single Version) (feat. Future)",
+   "year": 2025
+  },
+  {
+   "browseId": "MPREb_xIpkZvoCFLc",
+   "title": "São Paulo",
+   "year": 2024
+  },
+  {
+   "browseId": "MPREb_Iwhe5vT80kQ",
+   "title": "Dancing In The Flames",
+   "year": 2024
+  },
+  {
+   "browseId": "MPREb_FHs1OatWGRl",
+   "title": "Dancing In The Flames",
+   "year": 2024
+  },
+  {
+   "browseId": "MPREb_gicdE4iOSBb",
+   "title": "Popular (feat. Playboi Carti)",
+   "year": 2024
+  },
+  {
+   "browseId": "MPREb_FRMkfnpTV4Y",
+   "title": "One of the Girls",
+   "year": 2023
+  },
+  {
+   "browseId": "MPREb_IkMmXyxP8Qt",
+   "title": "K-POP",
+   "year": 2023
+  },
+  {
+   "browseId": "MPREb_DjIUScFSfdG",
+   "title": "K-POP (Chopped & Screwed)",
+   "year": 2023
+  }
+ ],
+ "fansAlsoLike": [
+  {
+   "name": "Khalid",
+   "id": "UCnfeNQJ7TgUCPCBD0q5Zh-Q"
+  },
+  {
+   "name": "Post Malone",
+   "id": "UCyD3XWRK9ko-izf2nBSFitw"
+  },
+  {
+   "name": "ZAYN",
+   "id": "UCYR9erHSNBPjjNswR4FrMaw"
+  },
+  {
+   "name": "benny blanco",
+   "id": "UCzqz_ksRu_WkIzmivMdIS7A"
+  },
+  {
+   "name": "Jaden",
+   "id": "UCRCRHG4OKZDdvIdRZj4jVBQ"
+  },
+  {
+   "name": "Bazzi",
+   "id": "UCoBD_yd06t7kBn1wLGH7nzg"
+  },
+  {
+   "name": "Lily Rose Depp",
+   "id": "UChGTI8sivCDh1AWues5lrDA"
+  },
+  {
+   "name": "Drake",
+   "id": "UCU6cE7pdJPc6DU2jSrKEsdQ"
+  },
+  {
+   "name": "Metro Boomin",
+   "id": "UCFYaIRiUe_1hvOtXu5IiBWQ"
+  },
+  {
+   "name": "070 Shake",
+   "id": "UC4CVrwAB1TblttvcZi7-qcw"
+  }
+ ]
+}
