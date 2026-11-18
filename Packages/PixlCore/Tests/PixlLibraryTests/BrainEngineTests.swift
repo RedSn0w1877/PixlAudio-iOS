@@ -170,7 +170,9 @@ struct BrainEventRecorderTests {
         #expect(liked?.anchors.first?.videoId == "v3")
     }
 
-    @Test func threeHardSkipsInARowChangeDirectionToTheNextAnchorOnly() async {
+    private static let pickTag = BrainItemTag(surface: "autoplay", surfaceId: "a2", recId: 9, slot: 0, arm: "RADIO")
+
+    @Test func threeEnginePicksSkippedInARowTurnTheEngineToTheNextAnchorOnly() async {
         let h = Harness()
         defer { h.cleanUp() }
         var t = Harness.t0
@@ -180,19 +182,66 @@ struct BrainEventRecorderTests {
         }
         var last: Reaction?
         for n in 0..<3 {
+            last = await h.engine.record(play("yt:k\(n)", context("Skip \(n)", "Skipped \(n)", videoId: "k\(n)", inLibrary: false,
+                                                                 start: StartReason.autoplay, tag: Self.pickTag),
+                                              at: t, played: 3_000, end: EndReason.next))
+            t += 4_000
+            if n < 2 {
+                #expect(last?.changedDirection == false)
+                #expect(last?.turn == 0)
+            }
+        }
+        #expect(last?.changedDirection == true)
+        #expect(last?.turn == 1)
+        // The session's anchors stay as they are, newest first; turned, the engine follows a1 alone.
+        #expect(last?.anchors.map(\.mediaId) == ["a2", "a1"])
+        #expect(last?.turnAnchors.map(\.mediaId) == ["a1"])
+        #expect(last?.needsOtherDirection == false)
+        #expect(last?.artistKey == "skipped 2")
+        #expect(last?.artistBlocked == true)
+
+        // The listener's next own track ends the turn, even one they skip.
+        let own = await h.engine.record(play("a3", context("Three", "Artist a3", start: StartReason.tap),
+                                             at: t, played: 3_000, end: EndReason.next))
+        #expect(own?.turn == 0 && own?.turnAnchors.isEmpty == true && own?.changedDirection == false)
+        #expect(own?.anchors.map(\.mediaId) == ["a2", "a1"])
+    }
+
+    @Test func skippingThroughOnesOwnPlaylistNeverTurnsTheEngine() async {
+        let h = Harness()
+        defer { h.cleanUp() }
+        var t = Harness.t0
+        _ = await h.engine.record(play("a1", context("One", "Artist a1"), at: t, played: 200_000))
+        t += 205_000
+        var last: Reaction?
+        for n in 0..<6 {
             last = await h.engine.record(play("k\(n)", context("Skip \(n)", "Skipped \(n)", start: StartReason.next),
                                               at: t, played: 3_000, end: EndReason.next))
             t += 4_000
-            if n < 2 { #expect(last?.changedDirection == false) }
+            #expect(last?.changedDirection == false)
+            #expect(last?.turn == 0)
         }
-        #expect(last?.changedDirection == true)
-        #expect(last?.turned == true)
-        // Newest first is a2, a1; turned by one place the engine follows a1 alone.
+        // What the pool is seeded from is unchanged: the anchors, newest first, with nothing to turn to or from.
         #expect(last?.anchors.map(\.mediaId) == ["a1"])
         #expect(last?.needsOtherDirection == false)
-        let session = await h.engine.sessionSnapshot()
-        #expect(session.reseedCount == 1)
-        #expect(session.skipRun == 0)
+    }
+
+    @Test func threeSkippedPicksWithOneAnchorTurnToTheLibrary() async {
+        let h = Harness()
+        defer { h.cleanUp() }
+        var t = Harness.t0
+        _ = await h.engine.record(play("a1", context("One", "Artist a1"), at: t, played: 200_000))
+        t += 205_000
+        var last: Reaction?
+        for n in 0..<3 {
+            last = await h.engine.record(play("yt:k\(n)", context("Skip \(n)", "Skipped \(n)", videoId: "k\(n)", inLibrary: false,
+                                                                 start: StartReason.autoplay, tag: Self.pickTag),
+                                              at: t, played: 3_000, end: EndReason.next))
+            t += 4_000
+        }
+        #expect(last?.changedDirection == true && last?.turn == 1)
+        #expect(last?.turnAnchors.isEmpty == true)
+        #expect(last?.needsOtherDirection == true)
     }
 
     @Test func aPlayThatWasCutOffByAProcessDeathIsRecordedAsKilled() async {
@@ -344,6 +393,35 @@ struct BrainPlayContextTests {
         #expect(forward.flags == 0)
         early.mark(EventFlags.likedDuring)
         #expect(early.flags == EventFlags.likedDuring)
+    }
+
+    @Test func previousPressedTwiceToGoBackATrackIsNotAReplay() {
+        let ctx = context("Dreams", "Fleetwood Mac")
+        func heardFortySeconds() -> OpenPlay {
+            OpenPlay(songId: "s1", context: ctx, startedAtEpochMs: 0, tzOffsetMin: 0, durationMs: 200_000, isPlaying: true,
+                     realtimeMs: 0)
+        }
+        // First press: back to the start (it looks like a replay). Second press, a moment later: the track is left.
+        var left = heardFortySeconds()
+        left.seek(fromPositionMs: 40_000, toPositionMs: 0, realtimeMs: 40_000)
+        #expect(left.flags == EventFlags.replayed)
+        let gone = left.finish(endReason: EndReason.prev, realtimeMs: 41_200)
+        #expect(gone?.endReason == EndReason.prev)
+        #expect(gone?.flags == 0, "the way out, not a wish to hear it again")
+        // A real restart that is heard again for a while, then left by Previous: still a replay.
+        var restarted = heardFortySeconds()
+        restarted.seek(fromPositionMs: 40_000, toPositionMs: 0, realtimeMs: 40_000)
+        #expect(restarted.finish(endReason: EndReason.prev, realtimeMs: 40_000 + OpenPlay.replayConfirmMs)?.flags
+            == EventFlags.replayed)
+        // Left at once, but by Next or by ending: the flag stays (only Previous is the two-press gesture).
+        var skipped = heardFortySeconds()
+        skipped.seek(fromPositionMs: 40_000, toPositionMs: 0, realtimeMs: 40_000)
+        #expect(skipped.finish(endReason: EndReason.next, realtimeMs: 41_000)?.flags == EventFlags.replayed)
+        // The window runs from the FIRST seek to the start, not from a later one.
+        var twice = heardFortySeconds()
+        twice.seek(fromPositionMs: 40_000, toPositionMs: 0, realtimeMs: 40_000)
+        twice.seek(fromPositionMs: 31_000, toPositionMs: 0, realtimeMs: 71_000)
+        #expect(twice.finish(endReason: EndReason.prev, realtimeMs: 71_500)?.flags == EventFlags.replayed)
     }
 
     @Test func aSongsFactsAndAContextsFactsAgree() {
@@ -534,6 +612,40 @@ struct BrainMigrationTests {
         #expect(facts.adjustments[1].family == Family.track && facts.adjustments[1].key == 11 && !facts.adjustments[1].more)
     }
 
+    @Test func theLiveLogBeginsAtTheStartOfItsFirstLivePlay() {
+        // First use is written down after the first play ended; the log is live from that play's start.
+        #expect(LegacyMigration.cutoff(firstUseMs: 10_000, firstLiveStartMs: 4_000) == 4_000)
+        #expect(LegacyMigration.cutoff(firstUseMs: 10_000, firstLiveStartMs: nil) == 10_000)
+        // A first live play that started after first use (a plan loaded the state first) changes nothing.
+        #expect(LegacyMigration.cutoff(firstUseMs: 10_000, firstLiveStartMs: 12_000) == 10_000)
+        #expect(LegacyMigration.cutoff(firstUseMs: 10_000, firstLiveStartMs: 10_000) == 10_000)
+        #expect(LegacyMigration.cutoff(firstUseMs: 10_000, firstLiveStartMs: 0) == 10_000)
+    }
+
+    @Test func thePlayThatFirstWakesTheBrainIsStoredOnce() async {
+        let library = [librarySong("a", "Dreams", "Fleetwood Mac", spotifyId: "4uLU6hMCjMI75M1A2tKUQC")]
+        let old = Harness.t0 - 5 * 86_400_000
+        // The legacy history holds an older play and the very play that is recorded live below (it ended at
+        // t0 + 200 s, a second before the brain's state was first loaded).
+        let history = [PlaybackEvent(songId: "a", timestamp: old, durationMs: 200_000),
+                       PlaybackEvent(songId: "a", timestamp: Harness.t0 + 200_000, durationMs: 200_000)]
+        let sources = BrainEngine.Sources(library: { library }, history: { history }, importSignature: { "0|" },
+                                          imported: { ([], ExternalTasteSnapshot()) }, adjustments: { [] })
+        let h = Harness(sources: sources, now: Harness.t0 + 201_000)
+        defer { h.cleanUp() }
+        let live = play("a", PlayContext.of(song: library[0], inLibrary: true, videoId: nil, tag: nil, startReason: StartReason.tap,
+                                            shuffle: false, repeatOne: false),
+                        at: Harness.t0, played: 200_000)
+        #expect(await h.engine.record(live) != nil)
+        await h.engine.awaitRebuild()
+        let events = await h.engine.events()
+        #expect(events.filter { $0.origin == Origin.live }.count == 1)
+        #expect(events.filter { $0.origin == Origin.migratedHistory }.map(\.startedAtMs) == [old - 200_000],
+                "only the older play is copied")
+        #expect(await h.engine.storedValue(BrainEventLog.keyFirstLiveStartMs) == String(Harness.t0))
+        #expect(await h.engine.storedValue(BrainEventLog.keyFirstUseMs) == String(Harness.t0 + 201_000))
+    }
+
     @Test func theFirstUseTriggersTheRebuildOnceAndPlaysRecordedMeanwhileAreNotLostOrDoubled() async {
         let library = [librarySong("a", "Dreams", "Fleetwood Mac", spotifyId: "4uLU6hMCjMI75M1A2tKUQC", favorite: true),
                        librarySong("b", "Sara", "Stevie Nicks")]
@@ -595,6 +707,17 @@ struct BrainAutoplayPlanningTests {
                                                 arm: inLibrary ? Arm.deep : Arm.radio, radioRank: rank),
             librarySong: nil, engineTrack: nil, whyArtist: "Anchor Artist", primaryArtist: "Artist \(aid)",
             brain: Candidate(rid: rid, aid: aid, inLibrary: inLibrary))
+    }
+
+    @Test func aPickThatIsAlreadyInTheQueueIsNotQueuedTwice() {
+        let tag = BrainItemTag(surface: "autoplay", surfaceId: "s", recId: 1, slot: 0, arm: "RADIO")
+        let items = ["a", "b", "c", "b"].enumerated().map { i, id in
+            AutoplayPlannedItem(entry: entry(id, rid: Int64(i + 1), aid: 1), tag: tag)
+        }
+        // A re-score landed while the top-up was planned and put "c" in the tail; "b" came twice in one plan.
+        let kept = AutoplayPlanning.notQueued(items, queuedIds: [BrainKey("x"), BrainKey("c")])
+        #expect(kept.map(\.entry.candidate.mediaId) == ["a", "b"])
+        #expect(AutoplayPlanning.notQueued(items, queuedIds: []).map(\.entry.candidate.mediaId) == ["a", "b", "c"])
     }
 
     @Test func rescoreStartLeavesTheCurrentTrackAndTheWarmedOnesAlone() {

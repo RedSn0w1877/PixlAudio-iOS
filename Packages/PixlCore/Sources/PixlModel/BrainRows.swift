@@ -440,16 +440,23 @@ public protocol RadioSource: Sendable {
 
 /// One token bucket and one parallelism limit per host (docs/brain-spec.md, 2.1 and 12.1). Stage 1 has a single
 /// bucket, for YouTube Music: radios are fetched on demand while music plays, about 2 per 10 autoplayed tracks, at
-/// most `dailyLimit` a day and `maxParallel` at a time.
+/// most `dailyLimit` requests in any 24 hours and `maxParallel` at a time.
+///
+/// The shape is a large burst and a slow trickle: `burst` requests may go out as fast as they are asked for (an
+/// evening of tapping songs and starting stations), and the rest of the day's allowance comes back one request at
+/// a time. Twelve and then one per 24 minutes, as it first was, left a listener on library-only picks after an
+/// hour of ordinary use.
 ///
 /// The bucket lives in memory; the caller also counts the radios stored in the last 24 hours, so a restart cannot
 /// reset the daily limit.
 public actor HostBudget {
     public static let dailyLimit = 60
     public static let maxParallel = 2
-    /// Requests that may go out back to back: three anchors plus one continuation chain, with room.
-    public static let burst = 12
+    /// Requests that may go out back to back.
+    public static let burst = 24
     public static let dayMs: Int64 = 24 * 60 * 60 * 1000
+    /// One request comes back this often: what is left of the day's allowance after the burst, spread over the day.
+    public static let refillIntervalMs: Int64 = dayMs / Int64(dailyLimit - burst)
 
     private let capacity: Int
     private let refillIntervalMs: Int64
@@ -460,7 +467,7 @@ public actor HostBudget {
     private var running = 0
     private var waiters: [CheckedContinuation<Void, Never>] = []
 
-    public init(capacity: Int = HostBudget.burst, refillIntervalMs: Int64 = HostBudget.dayMs / Int64(HostBudget.dailyLimit),
+    public init(capacity: Int = HostBudget.burst, refillIntervalMs: Int64 = HostBudget.refillIntervalMs,
                 maxParallel: Int = HostBudget.maxParallel,
                 clock: @escaping @Sendable () -> Int64 = { currentTimeMillis() }) {
         self.capacity = capacity

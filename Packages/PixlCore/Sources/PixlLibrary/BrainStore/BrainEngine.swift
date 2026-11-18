@@ -37,15 +37,37 @@ public struct Reaction: Sendable {
     public let graded: Reward.Graded
     /// The title of the track that played, for "Because you liked ...".
     public let title: String
-    /// The third hard skip in a row: the engine changes direction.
+    /// The third engine pick skipped hard in a row: the engine changes direction (`Direction`).
     public let changedDirection: Bool
-    /// What the engine seeds from now, best first: the session's anchors, or after a change of direction only the
-    /// anchor it turned to. Empty when the session has none yet.
+    /// The session's anchors, newest first: what the engine seeds from when it is not turned. Empty when the
+    /// session has none yet.
     public let anchors: [AnchorInfo]
-    /// The engine changed direction but the session has no other anchor to turn to.
-    public let needsOtherDirection: Bool
-    /// The session has changed direction at least once: `anchors` is the one anchor it follows.
-    public let turned: Bool
+    /// 0 while the engine follows `anchors`; otherwise the number of the turn it is on. A turn lasts while the
+    /// engine's own picks play: the listener's next own track ends it.
+    public let turn: Int
+    /// What the engine seeds from while turned, best first. Empty with `turn` set means the session has nothing
+    /// left to turn to, and the pool is seeded from the library.
+    public let turnAnchors: [AnchorInfo]
+    /// The folded primary artist of the track that played; "" when unknown.
+    public let artistKey: String
+    /// That artist is not to be queued for now (a hard skip): their picks leave the engine's tail.
+    public let artistBlocked: Bool
+
+    public init(event: PlayEvent, graded: Reward.Graded, title: String, changedDirection: Bool, anchors: [AnchorInfo],
+                turn: Int = 0, turnAnchors: [AnchorInfo] = [], artistKey: String = "", artistBlocked: Bool = false) {
+        self.event = event
+        self.graded = graded
+        self.title = title
+        self.changedDirection = changedDirection
+        self.anchors = anchors
+        self.turn = turn
+        self.turnAnchors = turnAnchors
+        self.artistKey = artistKey
+        self.artistBlocked = artistBlocked
+    }
+
+    /// Turned, with no anchor of the session to follow.
+    public var needsOtherDirection: Bool { turn != 0 && turnAnchors.isEmpty }
 
     public var liked: Bool {
         let positive = EventFlags.likedDuring | EventFlags.savedDuring | EventFlags.addedToPlaylist | EventFlags.replayed
@@ -115,11 +137,14 @@ public actor BrainEngine {
         var session = SessionState()
         /// What a radio request needs for each of the session's anchors, by rid.
         var anchors: [Int64: AnchorInfo] = [:]
+        /// Which way three skipped picks turned the engine, for this session.
+        var direction = Direction()
 
-        /// Starts a new session: the old one's lists, blocks and anchors are gone.
+        /// Starts a new session: the old one's lists, blocks, anchors and direction are gone.
         mutating func newSession() {
             session = SessionState()
             anchors.removeAll()
+            direction = Direction()
         }
     }
 
@@ -172,6 +197,10 @@ public actor BrainEngine {
         let countsForTally = IgnoreTally.counts(event)
         if countsForTally, ignoreTally == nil { ignoreTally = log.loadIgnoreTally(nowMs: clock()) }
         log.insert([event])
+        // Where the live log begins (`LegacyMigration.cutoff`): the start of its first live play.
+        if event.origin == Origin.live, log.value(BrainEventLog.keyFirstLiveStartMs) == nil {
+            log.setValue(BrainEventLog.keyFirstLiveStartMs, String(event.startedAtMs))
+        }
         log.upsertAffinity(rows)
         if countsForTally, let row = ignoreTally?.note(event) { log.putIgnoreRow(rid: event.rid, row) }
         recordedDuringRebuild?.append(event)
@@ -244,7 +273,6 @@ public actor BrainEngine {
             retrQ: Int32(clamping: tag?.retrQ ?? -1),
             radioRank: Int32(clamping: tag?.radioRank ?? -1)
         )
-        let directionBefore = state.session.reseedCount
         guard let graded = apply(event, to: &state) else { return nil }
         // A play a Home row may be built around is written down beside the event (8.1): the event itself holds
         // ids, not a title or a media id.
@@ -266,19 +294,30 @@ public actor BrainEngine {
         if state.anchors.count > Session.maxAnchors {
             for key in Array(state.anchors.keys) where !anchorRids.contains(key) { state.anchors[key] = nil }
         }
-        let changed = session.reseedCount != directionBefore
+        // Only the engine's own picks, skipped hard three times in a row, turn it; the listener's next own track
+        // turns it back (`Direction`).
+        let notForMe = event.has(EventFlags.notForMe)
+        let positiveFlags = EventFlags.likedDuring | EventFlags.savedDuring | EventFlags.addedToPlaylist | EventFlags.replayed
+        let likedNow = !notForMe && event.flags & positiveFlags != 0
+        let h = notForMe ? 1.0 : graded.h
+        let changed = state.direction.onEvent(
+            enginePick: context.isEngineOwned,
+            station: event.surface == Surface.station,
+            hardSkip: graded.c > 0.0 && h >= Session.hardSkip,
+            positive: graded.c > 0.0 && h == 0.0 && (graded.isCompletion || likedNow),
+            anchors: anchorRids)
         let known = state.anchors
-        let order = Session.seedOrder(session).compactMap { known[$0] }
+        let turn = state.direction.turn
         return Reaction(
             event: event,
             graded: graded,
             title: facts.title,
             changedDirection: changed,
-            // After a change of direction the engine follows ONE anchor, the one it turned to: the same set of
-            // anchors in another order would be the same pool again.
-            anchors: session.reseedCount == 0 ? order : Array(order.prefix(1)),
-            needsOtherDirection: session.reseedCount > 0 && session.anchorCount <= 1,
-            turned: session.reseedCount > 0
+            anchors: anchorRids.compactMap { known[$0] },
+            turn: turn,
+            turnAnchors: turn == 0 ? [] : state.direction.follow(anchorRids).compactMap { known[$0] },
+            artistKey: BrainText.fold(facts.primaryArtist),
+            artistBlocked: session.isBlocked(event.primaryAid)
         )
         }
     }
@@ -434,8 +473,10 @@ public actor BrainEngine {
         songById.reserveCapacity(library.count)
         for song in library where songById[BrainKey(song.id)] == nil { songById[BrainKey(song.id)] = song }
 
-        // The library by recording id: lengths for imported plays, and the facts below.
-        let libraryFacts = library.map(TrackCatalog.facts(of:))
+        // The library by recording id: lengths for imported plays, and the facts below. Folding every title and
+        // artist of the library is seconds of text work on a big one: off this actor, so a plan or a play that
+        // ends meanwhile does not wait behind it.
+        let libraryFacts = await Task.detached(priority: .utility) { library.map(TrackCatalog.facts(of:)) }.value
         var libraryRids = [Int64](repeating: 0, count: library.count)
         var from = 0
         while from < library.count {
@@ -457,7 +498,9 @@ public actor BrainEngine {
 
         // Step 2: the app's own older plays, once.
         if log.value(BrainEventLog.keyHistoryMigrated) == nil {
-            let cutoff = log.value(BrainEventLog.keyFirstUseMs).flatMap { Int64($0) } ?? nowMs
+            let cutoff = LegacyMigration.cutoff(
+                firstUseMs: log.value(BrainEventLog.keyFirstUseMs).flatMap { Int64($0) } ?? nowMs,
+                firstLiveStartMs: log.value(BrainEventLog.keyFirstLiveStartMs).flatMap { Int64($0) })
             let rows = await sources.history()
             var resolved: [BrainKey: ResolvedTrack] = [:]
             var seen: Set<BrainKey> = []
@@ -486,19 +529,29 @@ public actor BrainEngine {
         // Step 1: imported history is read, not copied. One resolution per distinct track.
         let imported = await sources.imported()
         var importedResolved: [BrainKey: ResolvedTrack] = [:]
-        var pendingKeys: [BrainKey] = []
-        var pendingRequests: [TrackRequest] = []
-        var pendingArtists: [String] = []
-        var pendingKeyTexts: [String] = []
-        var seenImported: Set<BrainKey> = []
-        for play in imported.plays {
-            let cacheKey = BrainKey(ImportedPlayAdapter.cacheKey(play))
-            guard seenImported.insert(cacheKey).inserted, let keys = ImportedPlayAdapter.keys(play) else { continue }
-            pendingKeys.append(cacheKey)
-            pendingRequests.append(TrackRequest(keys: keys.keys, durationMs: 0))
-            pendingArtists.append(play.artist)
-            pendingKeyTexts.append(keys.key)
-        }
+        // One key per imported play (50,000 and more of them, each a fold and a title clean): off this actor too.
+        let importedPlays = imported.plays
+        let pending = await Task.detached(priority: .utility) {
+            () -> (keys: [BrainKey], requests: [TrackRequest], artists: [String], keyTexts: [String]) in
+            var keys: [BrainKey] = []
+            var requests: [TrackRequest] = []
+            var artists: [String] = []
+            var keyTexts: [String] = []
+            var seen: Set<BrainKey> = []
+            for play in importedPlays {
+                let cacheKey = BrainKey(ImportedPlayAdapter.cacheKey(play))
+                guard seen.insert(cacheKey).inserted, let found = ImportedPlayAdapter.keys(play) else { continue }
+                keys.append(cacheKey)
+                requests.append(TrackRequest(keys: found.keys, durationMs: 0))
+                artists.append(play.artist)
+                keyTexts.append(found.key)
+            }
+            return (keys, requests, artists, keyTexts)
+        }.value
+        let pendingKeys = pending.keys
+        let pendingRequests = pending.requests
+        let pendingArtists = pending.artists
+        let pendingKeyTexts = pending.keyTexts
         from = 0
         while from < pendingRequests.count {
             let to = min(from + Self.resolveBatch, pendingRequests.count)
@@ -518,8 +571,13 @@ public actor BrainEngine {
         var aidByName: [BrainKey: Int64] = [:]
         for (i, name) in names.artists.enumerated() { aidByName[BrainKey(name)] = aids[i] }
         let topTrackRids = await repository.resolveTracks(names.topTracks)
-        let facts = LibraryFactsBuilder.build(library: library, ridBySongId: ridBySongId, taste: imported.taste,
-                                              adjustments: adjustments, aidByName: aidByName, topTrackRids: topTrackRids)
+        let taste = imported.taste
+        let ridsBySong = ridBySongId
+        let aidsByName = aidByName
+        let facts = await Task.detached(priority: .utility) {
+            LibraryFactsBuilder.build(library: library, ridBySongId: ridsBySong, taste: taste, adjustments: adjustments,
+                                      aidByName: aidsByName, topTrackRids: topTrackRids)
+        }.value
 
         let merges = await repository.trackMerges()
         let stored = log.allEvents()

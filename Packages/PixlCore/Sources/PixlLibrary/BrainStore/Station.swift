@@ -99,6 +99,10 @@ public enum StationRules {
     public static let firstBatch = 20
     public static let nuFactor: Double = 1.2
 
+    /// A station started from the track that is current keeps that track where it is. When it is paused, the
+    /// listener still asked for music: it plays on. (A track that is playing is left alone.)
+    public static func inPlaceStartMustPlay(isPlaying: Bool) -> Bool { !isPlaying }
+
     public enum QueueState: Sendable, Equatable {
         /// The queue holds the station's seed: it is the station's.
         case running

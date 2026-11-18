@@ -33,6 +33,17 @@ public struct ResolvedTrack: Sendable, Equatable {
 /// them would count them twice. The counters (`music_taste.json`, the engagement rows) are not migrated: they
 /// aggregate the same sessions this history holds.
 public enum LegacyMigration {
+    /// Where the live log begins: legacy rows that ended at or after this are not copied.
+    ///
+    /// First use is written down when the brain's state is first loaded, which for most listeners is while the
+    /// first finished play is being recorded, a moment AFTER that play ended. Its legacy row would then be copied
+    /// although the same listen is already in the log as a live event. So the log is live from the START of its
+    /// first live play, when that is earlier.
+    public static func cutoff(firstUseMs: Int64, firstLiveStartMs: Int64?) -> Int64 {
+        if let start = firstLiveStartMs, start >= 1, start < firstUseMs { return start }
+        return firstUseMs
+    }
+
     /// The events for `rows` that ended before `cutoffMs`. `resolved` says what a song id is; a row whose song is
     /// gone is skipped: nothing identifies it any more. `identityAt` answers for ids the log already holds.
     public static func events(rows: [PlaybackEvent], cutoffMs: Int64, resolved: [BrainKey: ResolvedTrack],

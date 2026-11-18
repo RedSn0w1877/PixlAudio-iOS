@@ -45,6 +45,31 @@ public struct EngineTrack: Sendable, Hashable {
         artUrl = record.artUrl
     }
 
+    /// The track a queue's own `yt:` song stands for, read back from that song: what the app knows about a pick
+    /// right after a restart, before the brain's files are read (the restored queue still holds the song). Nil
+    /// for a song that is not `yt:<videoId>`. `rid` is 0: the stored row, once read, takes its place.
+    public init?(queueSong song: Song) {
+        guard let videoId = TrackCatalog.videoId(ofSongId: song.id) else { return nil }
+        songId = song.id
+        rid = 0
+        self.videoId = videoId
+        title = song.title
+        let ordered = song.artists.filter(\.isPrimary) + song.artists.filter { !$0.isPrimary }
+        var refs: [RadioArtistRef] = []
+        for artist in ordered where !BrainText.isBlank(artist.name) {
+            if !refs.contains(where: { BrainKey.sameBytes($0.name, artist.name) }) {
+                refs.append(RadioArtistRef(name: artist.name, channelId: nil))
+            }
+        }
+        if refs.isEmpty, !BrainText.isBlank(song.artist), !BrainKey.sameBytes(song.artist, Self.unknownArtist) {
+            refs.append(RadioArtistRef(name: song.artist, channelId: nil))
+        }
+        artists = refs
+        album = BrainText.isBlank(song.album) || BrainKey.sameBytes(song.album, Self.unknownAlbum) ? nil : song.album
+        durationMs = song.duration
+        artUrl = song.albumArtUriString
+    }
+
     public static func songId(videoId: String) -> String { songIdPrefix + videoId }
 
     public var artistDisplay: String {
@@ -74,6 +99,50 @@ public struct EngineTrack: Sendable, Hashable {
                     album: albumName, albumId: albumId(albumName, display), path: "", contentUriString: contentUri,
                     albumArtUriString: artUrl, duration: durationMs, dateAdded: nowMs, dateModified: nowMs,
                     mimeType: "audio/mp4", bitrate: nil, sampleRate: nil)
+    }
+}
+
+/// Where "Go to artist" and "Go to album" lead for a track from outside the library.
+///
+/// Such a track's song carries the artist and album ids the YouTube Music importer would give it, so that the rows
+/// agree once it is saved. Until then the library has no artist or album under those ids, and the pages opened
+/// with them are empty, although the listener often has that very artist: the library's own artists come from
+/// Spotify, under another id made from the same name. This points the song at what the library does have.
+public enum EngineSongLinks {
+    public static let noAlbum: Int64 = -1
+
+    /// `song` with every credited artist the library has under `libraryArtistId(name)` pointed there, and no album
+    /// (`noAlbum`, which hides "Go to album") when the library has none under its album id. Ids the library
+    /// already knows are kept. A handful of dictionary lookups: fine on the main actor.
+    public static func link(_ song: Song, hasArtist: (Int64) -> Bool, hasAlbum: (Int64) -> Bool,
+                            libraryArtistId: (String) -> Int64) -> Song {
+        var linked = song
+        func resolved(_ id: Int64, _ name: String) -> Int64 {
+            if hasArtist(id) || BrainText.isBlank(name) { return id }
+            let byName = libraryArtistId(name)
+            return hasArtist(byName) ? byName : id
+        }
+        linked.artists = song.artists.map { ArtistRef(id: resolved($0.id, $0.name), name: $0.name, isPrimary: $0.isPrimary) }
+        if let primary = linked.artists.first(where: \.isPrimary) ?? linked.artists.first {
+            linked.artistId = primary.id
+        } else {
+            linked.artistId = resolved(song.artistId, song.artist)
+        }
+        if !hasAlbum(song.albumId) { linked.albumId = noAlbum }
+        return linked
+    }
+}
+
+/// What the brain may do in the app's first seconds (docs/brain-spec.md, 12.1 "App start"): nothing but show what
+/// is already in memory.
+public enum BrainStartup {
+    /// Home's first refresh does not wait for the brain's stored tracks: they are read this long after launch.
+    public static let storedTracksDelayMs: Int64 = 4_000
+
+    /// How long to wait before the stored tracks may be read, `sinceLaunchMs` after the app started; 0 for "now".
+    public static func storedTracksWaitMs(sinceLaunchMs: Int64) -> Int64 {
+        if sinceLaunchMs < 0 { return storedTracksDelayMs }
+        return max(storedTracksDelayMs - sinceLaunchMs, 0)
     }
 }
 

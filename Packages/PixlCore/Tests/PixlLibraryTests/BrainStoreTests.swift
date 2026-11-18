@@ -221,6 +221,70 @@ struct BrainTablesTests {
     }
 }
 
+@Suite("Brain tracks from outside the library")
+struct BrainOutsideTrackTests {
+    private func outside() -> Song {
+        Song(id: "yt:abc12345678", title: "New Song", artist: "Known Band, Stranger", artistId: 901,
+             artists: [ArtistRef(id: 901, name: "Known Band", isPrimary: true), ArtistRef(id: 902, name: "Stranger", isPrimary: false)],
+             album: "Some Album", albumId: 700, path: "", contentUriString: "pixlstream://abc12345678",
+             albumArtUriString: "https://img/x.jpg", duration: 201_000, mimeType: "audio/mp4", bitrate: nil, sampleRate: nil)
+    }
+
+    @Test func goToArtistLeadsToTheLibrarysArtistOfTheSameName() {
+        // The library has "Known Band" (from Spotify, id 11) but nothing under the importer's ids 901 and 700.
+        let linked = EngineSongLinks.link(outside(), hasArtist: { $0 == 11 }, hasAlbum: { _ in false },
+                                          libraryArtistId: { $0 == "Known Band" ? 11 : 12 })
+        #expect(linked.artistId == 11)
+        #expect(linked.artists.map(\.id) == [11, 902], "an artist the library does not have keeps its id")
+        #expect(linked.artists.map(\.name) == ["Known Band", "Stranger"])
+        #expect(linked.primaryArtist.id == 11)
+        #expect(linked.albumId == EngineSongLinks.noAlbum, "no album page to go to")
+        #expect(linked.id == "yt:abc12345678" && linked.title == "New Song")
+    }
+
+    @Test func idsTheLibraryAlreadyKnowsAreKept() {
+        // Saved since (the importer's rows exist), or a library track to begin with.
+        let song = outside()
+        let linked = EngineSongLinks.link(song, hasArtist: { $0 == 901 || $0 == 902 }, hasAlbum: { $0 == 700 },
+                                          libraryArtistId: { _ in 11 })
+        #expect(linked == song)
+        // A song with no artist list: the legacy field decides.
+        var plain = song
+        plain.artists = []
+        let byName = EngineSongLinks.link(plain, hasArtist: { $0 == 11 }, hasAlbum: { _ in true }, libraryArtistId: { _ in 11 })
+        #expect(byName.artistId == 11 && byName.albumId == 700)
+    }
+
+    @Test func aRestoredQueueSongIsEnoughToShowAndSaveTheTrack() throws {
+        let track = try #require(EngineTrack(queueSong: outside()))
+        #expect(track.songId == "yt:abc12345678" && track.videoId == "abc12345678" && track.rid == 0)
+        #expect(track.title == "New Song" && track.album == "Some Album" && track.durationMs == 201_000)
+        #expect(track.artists.map(\.name) == ["Known Band", "Stranger"])
+        #expect(track.artUrl == "https://img/x.jpg")
+        // It reads back as the same song the queue held.
+        let again = track.song()
+        #expect(again.id == "yt:abc12345678" && again.artist == "Known Band, Stranger" && again.album == "Some Album")
+        // Unknown names stay unknown, and a library song is not a track from outside.
+        var bare = outside()
+        bare.artists = []
+        bare.artist = EngineTrack.unknownArtist
+        bare.album = EngineTrack.unknownAlbum
+        let unknown = try #require(EngineTrack(queueSong: bare))
+        #expect(unknown.artists.isEmpty && unknown.album == nil)
+        var library = outside()
+        library.id = "sp:1"
+        #expect(EngineTrack(queueSong: library) == nil)
+    }
+
+    @Test func theStoredTracksAreNotReadInTheAppsFirstSeconds() {
+        #expect(BrainStartup.storedTracksWaitMs(sinceLaunchMs: 0) == 4_000)
+        #expect(BrainStartup.storedTracksWaitMs(sinceLaunchMs: 1_500) == 2_500)
+        #expect(BrainStartup.storedTracksWaitMs(sinceLaunchMs: 4_000) == 0)
+        #expect(BrainStartup.storedTracksWaitMs(sinceLaunchMs: 90_000) == 0)
+        #expect(BrainStartup.storedTracksWaitMs(sinceLaunchMs: -5) == 4_000, "a clock that went back waits")
+    }
+}
+
 @Suite("Brain library index")
 struct BrainLibraryIndexTests {
     private func song(_ id: String, _ title: String, _ artist: String, durationMs: Int64 = 200_000, artists: [String] = []) -> Song {

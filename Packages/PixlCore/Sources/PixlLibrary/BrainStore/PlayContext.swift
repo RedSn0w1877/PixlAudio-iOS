@@ -112,6 +112,8 @@ public struct OpenPlay: Sendable, Equatable {
     public static let seekSignalMinPlayedMs: Int64 = 30_000
     public static let seekBackMinMs: Int64 = 10_000
     public static let replayPositionMs: Int64 = 3_000
+    /// A "replay" that is left by Previous within this long was the way out, not a wish to hear the track again.
+    public static let replayConfirmMs: Int64 = 5_000
 
     public let songId: String
     public var context: PlayContext
@@ -124,6 +126,8 @@ public struct OpenPlay: Sendable, Equatable {
     public private(set) var flags: Int32 = 0
     /// True once it made a sound.
     public private(set) var everPlayed: Bool
+    /// When a seek to the start first flagged this play as replayed (monotonic); nil when it never did.
+    private var replayFlaggedAtRealtimeMs: Int64?
 
     public init(songId: String, context: PlayContext, startedAtEpochMs: Int64, tzOffsetMin: Int32, durationMs: Int64,
                 isPlaying: Bool, realtimeMs: Int64) {
@@ -160,6 +164,7 @@ public struct OpenPlay: Sendable, Equatable {
         update(realtimeMs: realtimeMs, playing: isPlaying)
         if playedMs < Self.seekSignalMinPlayedMs { return }
         if toPositionMs <= Self.replayPositionMs && fromPositionMs >= Self.seekSignalMinPlayedMs {
+            if flags & EventFlags.replayed == 0 { replayFlaggedAtRealtimeMs = realtimeMs }
             flags |= EventFlags.replayed
         } else if fromPositionMs - toPositionMs >= Self.seekBackMinMs {
             flags |= EventFlags.seekBack
@@ -177,6 +182,12 @@ public struct OpenPlay: Sendable, Equatable {
     /// a sound but was skipped or failed is returned flagged `neverAudible`, which is worth nothing (4.3).
     public mutating func finish(endReason: Int32, realtimeMs: Int64) -> FinishedPlay? {
         update(realtimeMs: realtimeMs, playing: isPlaying)
+        // Previous pressed twice goes back a track: the first press seeks to the start (which looks like a replay),
+        // the second leaves. That is the way out, not a like.
+        if endReason == EndReason.prev, let flaggedAt = replayFlaggedAtRealtimeMs,
+           realtimeMs - flaggedAt < Self.replayConfirmMs {
+            flags &= ~EventFlags.replayed
+        }
         let ended = endReason == EndReason.next || endReason == EndReason.prev || endReason == EndReason.pickedOther
             || endReason == EndReason.queueEdit || endReason == EndReason.error
         if !everPlayed && !ended { return nil }

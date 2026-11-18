@@ -64,9 +64,87 @@ public enum AutoplayPolicy {
         return .topUp
     }
 
-    /// A queue edit must not land while one deck hands over to the other (a crossfade in progress, or a gapless
-    /// hand-over already scheduled on the host clock): it is held and released when the hand-over is done.
-    public static func mustDeferQueueEdit(isTransitionRunning: Bool) -> Bool { isTransitionRunning }
+    /// Whether an edit of the engine's part of the queue has to wait. Only one that would change WHICH track plays
+    /// next, and only while that hand-over is already scheduled on the host clock (the last moments of a track):
+    /// re-planning there would stop the incoming deck mid-start. Anything else goes in at once: an append behind
+    /// the track that is already next changes nothing the player has prepared, and a merely prepared next track is
+    /// rebuilt by the player when the edit replaces it.
+    ///
+    /// (Android defers during a running transition, because its queue edit re-plans the player's next item. Here
+    /// the first version deferred whenever the next song was prepared, which with crossfade on is nearly the whole
+    /// song: batches were held and then dropped.)
+    public static func mustDeferQueueEdit(changesNext: Bool, handOverScheduled: Bool) -> Bool {
+        changesNext && handOverScheduled
+    }
+
+    /// Whether a change of direction (three skipped picks) decides the seeds right now. It does while the engine's
+    /// own picks play. When the track that is playing is one the listener chose, they are steering: autoplay
+    /// follows that track, whatever was skipped before. `turn` is 0 for "not turned"; `reactionIsFresh` is false
+    /// once the session that turned has gone quiet.
+    public static func turnApplies(turn: Int, reactionIsFresh: Bool, currentIsListenersChoice: Bool) -> Bool {
+        turn != 0 && reactionIsFresh && !currentIsListenersChoice
+    }
+
+    /// One plan at a time: a top-up and a re-score read the same pool, and two plans made side by side can pick
+    /// the same track twice. `busy` is "a plan of either kind is being made".
+    public static func mayPlanNow(topUpRunning: Bool, rescoreRunning: Bool) -> Bool { !topUpRunning && !rescoreRunning }
+
+    /// The first index in `[start, size)` whose item is by `artistKey`, or -1. From there on the caller rebuilds
+    /// the tail without that artist, in one queue edit.
+    public static func firstIndexOfArtist(start: Int, size: Int, artistKey: String, artistKeyAt: (Int) -> String) -> Int {
+        if artistKey.isEmpty || start < 0 || start >= size { return -1 }
+        for i in start..<size where BrainKey.sameBytes(artistKeyAt(i), artistKey) { return i }
+        return -1
+    }
+
+    /// Next was pressed with nothing queued, and picks have landed. The player moves on to them only inside the
+    /// backstop window and only if the track the press was about is still the current one.
+    public static func nextMayStillSkip(askedAtMs: Int64, nowMs: Int64, askedMediaId: String?, currentMediaId: String?) -> Bool {
+        guard let askedMediaId, let currentMediaId, BrainKey.sameBytes(askedMediaId, currentMediaId) else { return false }
+        return nowMs >= askedAtMs && nowMs - askedAtMs <= backstopWindowMs
+    }
+
+    /// A track that could not be loaded is skipped without a message when it was the engine's pick and music goes
+    /// on behind it: the listener never chose it, so there is nothing to tell them. The listener's own track, and a
+    /// failure that stops the music, say what happened.
+    public static func failedPickIsSilent(entryIsEnginePick: Bool, nextWillPlay: Bool) -> Bool {
+        entryIsEnginePick && nextWillPlay
+    }
+
+    /// A track counts as "from outside the library" for the legacy stores (the taste counters, the engagement rows)
+    /// when the library has no row for it and it is one of the engine's: known as such in this run, or sitting in
+    /// the queue as an engine pick under a `yt:` id (after a restart the queue knows before the files are read).
+    public static func isOutsideLibrary(inLibrary: Bool, knownEngineTrack: Bool, entryIsEnginePick: Bool,
+                                        hasYouTubeId: Bool) -> Bool {
+        if inLibrary { return false }
+        return knownEngineTrack || (entryIsEnginePick && hasYouTubeId)
+    }
+
+    /// A pool built without the network is not kept for long: the network may be back.
+    public static let offlinePoolTtlMs: Int64 = 2 * 60 * 1000
+    /// A library pool that stands in for radios that could not be had (the request budget, a failed request, no
+    /// match yet) is tried again after this long, instead of being played to its end.
+    public static let fallbackPoolTtlMs: Int64 = 10 * 60 * 1000
+
+    /// How long a pool may be used before it is built again; nil for "until it runs out". `offline`: built with no
+    /// network. `fellBack`: the network was allowed but no radio gave anything.
+    public static func poolTtlMs(offline: Bool, fellBack: Bool) -> Int64? {
+        if offline { return offlinePoolTtlMs }
+        return fellBack ? fallbackPoolTtlMs : nil
+    }
+
+    /// True when a pool built at `builtAtMs` is past `ttlMs`. A clock that went back expires it too.
+    public static func poolExpired(builtAtMs: Int64, nowMs: Int64, ttlMs: Int64?) -> Bool {
+        guard let ttlMs else { return false }
+        let age = nowMs - builtAtMs
+        return age < 0 || age >= ttlMs
+    }
+
+    /// The backstop needs picks now. A fill that is still waiting for the settle time of a track that has ended
+    /// will never see it: it is replaced by one that does not wait.
+    public static func backstopReplacesFill(fillRunning: Bool, fillIsWaitingToSettle: Bool) -> Bool {
+        !fillRunning || fillIsWaitingToSettle
+    }
 
     /// The current track is far enough in for a radio request not to compete with its first bytes.
     public static func isSettled(positionMs: Int64) -> Bool { positionMs >= settleMs }

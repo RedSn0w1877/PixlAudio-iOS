@@ -188,6 +188,41 @@ struct BrainRepositoryTests {
         #expect(source.calls.isEmpty)
     }
 
+    @Test func anAnswerWithNoRadioInItIsNothingLearnedTheStoredListStaysAndTheSeedIsNotMarkedJunk() async throws {
+        defer { cleanUp() }
+        let repository = makeRepository()
+        let seed = row(1, "Adele", title: "Hello")
+        source.setSongRadio(seed.videoId, healthyRadio(seed))
+        let good = try #require(await repository.radioFor(seed: seedOf(seed), allowNetwork: true))
+        // Two weeks on the list is stale, and upstream answers with a valid page that holds no rows.
+        clock.now += BrainRepository.cacheTtlMs + 1
+        source.setSongRadio(seed.videoId, FetchedRadio(rows: [], relatedBrowseId: nil))
+        let stale = try #require(await repository.radioFor(seed: seedOf(seed), allowNetwork: true))
+        #expect(stale.fromCache)
+        #expect(stale.rows == good.rows, "the stored list was not overwritten")
+        // The seed is left alone for a while, not hammered ...
+        let calls = source.calls.count
+        _ = await repository.radioFor(seed: seedOf(seed), allowNetwork: true)
+        #expect(source.calls.count == calls)
+        // ... and asked again long before a junk seed's day is over.
+        clock.now += BrainRepository.emptyAnswerRetryMs + 1
+        source.setSongRadio(seed.videoId, healthyRadio(seed))
+        let fresh = try #require(await repository.radioFor(seed: seedOf(seed), allowNetwork: true))
+        #expect(!fresh.fromCache)
+    }
+
+    @Test func anEmptyAnswerForASeedWithNothingStoredIsNotRememberedAsJunk() async throws {
+        defer { cleanUp() }
+        let repository = makeRepository()
+        let seed = row(1, "Adele", title: "Hello")
+        source.setSongRadio(seed.videoId, FetchedRadio(rows: [], relatedBrowseId: nil))
+        #expect(await repository.radioFor(seed: seedOf(seed), allowNetwork: true) == nil)
+        // Half an hour later a real answer is taken; a junk mark would have kept the seed out for a day.
+        clock.now += BrainRepository.emptyAnswerRetryMs + 1
+        source.setSongRadio(seed.videoId, healthyRadio(seed))
+        #expect(await repository.radioFor(seed: seedOf(seed), allowNetwork: true) != nil)
+    }
+
     @Test func aStaleListIsRefetchedWhenTheNetworkIsAllowed() async throws {
         defer { cleanUp() }
         let repository = makeRepository()
@@ -436,6 +471,87 @@ struct AutoplayPoolTests {
         // The order is fixed for a set of anchors.
         let again = await AutoplayPool.build(request, index: BrainLibraryIndex(songs: library), repository: nil)
         #expect(again.entries.map(\.candidate.mediaId) == ids)
+    }
+
+    @Test func withNoNetworkOnlyLibraryTracksWithACopyOnThePhoneAreQueuedAndCachedRadiosAreNotRead() async throws {
+        defer { cleanUp() }
+        let repository = BrainRepository(directory: directory, radioSource: source, clock: { 1_000 })
+        let seedRow = row(1, "Seed", title: "Anchor")
+        source.setSongRadio(seedRow.videoId, healthyRadio(seedRow))
+        let anchor = librarySong("sp:anchor", "Anchor", "Seed")
+        let library = [anchor, librarySong("sp:s1", "One", "Seed"), librarySong("sp:s2", "Two", "Seed"),
+                       librarySong("sp:p1", "Pick", "Else")]
+        let seeds = [AutoplayAnchor(song: anchor, videoId: seedRow.videoId, spotifyId: "anchor")]
+        // Online first: the radio is fetched and cached, and the pool holds music from outside the library.
+        let online = AutoplayPoolRequest(anchors: seeds, deepen: false, allowNetwork: true, library: library, everPlayed: [])
+        let radioPool = await AutoplayPool.build(online, index: BrainLibraryIndex(songs: library), repository: repository)
+        #expect(!radioPool.fromLibrary && !radioPool.offline && !radioPool.fellBack)
+        #expect(radioPool.entries.contains { $0.engineTrack != nil })
+        source.clearCalls()
+
+        // Airplane mode. The cached radio would name tracks that need the network to play: it is not read.
+        var offline = AutoplayPoolRequest(anchors: seeds, deepen: false, allowNetwork: false, library: library, everPlayed: [],
+                                          libraryPicks: { [library[3]] })
+        offline.offline = true
+        offline.offlinePlayable = { songs in
+            // Asked about the pool's own songs only, never the whole library or the anchor.
+            Set(songs.map(\.id)).intersection(["sp:s2", "sp:p1", "sp:anchor"])
+        }
+        let pool = await AutoplayPool.build(offline, index: BrainLibraryIndex(songs: library), repository: repository)
+        #expect(pool.fromLibrary && pool.offline && !pool.fellBack)
+        #expect(source.calls.isEmpty)
+        #expect(pool.entries.allSatisfy { $0.engineTrack == nil && $0.librarySong != nil })
+        #expect(pool.entries.map(\.candidate.mediaId) == ["sp:s2", "sp:p1"], "only what plays from the phone, never the anchor")
+
+        // Nothing on the phone: nothing is queued, and the queue ends as it always did.
+        offline.offlinePlayable = { _ in [] }
+        let none = await AutoplayPool.build(offline, index: BrainLibraryIndex(songs: library), repository: repository)
+        #expect(none.entries.isEmpty && none.fromLibrary && none.offline)
+
+        // The YouTube source switched off but online: the library alone, and its streamed tracks may play.
+        let sourceOff = AutoplayPoolRequest(anchors: seeds, deepen: false, allowNetwork: false, library: library, everPlayed: [],
+                                            libraryPicks: { [library[3]] })
+        let off = await AutoplayPool.build(sourceOff, index: BrainLibraryIndex(songs: library), repository: repository)
+        #expect(off.fromLibrary && !off.offline)
+        #expect(Set(off.entries.map(\.candidate.mediaId)) == ["sp:s1", "sp:s2", "sp:p1"])
+        #expect(source.calls.isEmpty)
+    }
+
+    @Test func onlyTheNewestAnchorMayCostARequestTheOlderOnesAnswerFromTheCache() async throws {
+        defer { cleanUp() }
+        let repository = BrainRepository(directory: directory, radioSource: source, clock: { 1_000 })
+        let rows = [row(1, "First", title: "Newest"), row(2, "Second", title: "Older"), row(3, "Third", title: "Oldest")]
+        for seedRow in rows { source.setSongRadio(seedRow.videoId, healthyRadio(seedRow)) }
+        let songs = [librarySong("sp:n", "Newest", "First"), librarySong("sp:o", "Older", "Second"),
+                     librarySong("sp:z", "Oldest", "Third")]
+        func anchors(_ order: [Int]) -> [AutoplayAnchor] {
+            order.map { AutoplayAnchor(song: songs[$0], videoId: rows[$0].videoId, spotifyId: String(songs[$0].id.dropFirst(3))) }
+        }
+        // An album ended: three anchors nobody asked about yet. One request, not three.
+        let first = AutoplayPoolRequest(anchors: anchors([0, 1, 2]), deepen: false, allowNetwork: true, library: songs, everPlayed: [])
+        let pool = await AutoplayPool.build(first, index: BrainLibraryIndex(songs: songs), repository: repository)
+        #expect(source.calls == ["song:\(rows[0].videoId):0"])
+        #expect(pool.seeds.count == 1 && !pool.fromLibrary && !pool.fellBack)
+        // Later the second track leads: its radio is asked, and the first one's joins it from the cache.
+        source.clearCalls()
+        let second = AutoplayPoolRequest(anchors: anchors([1, 0, 2]), deepen: false, allowNetwork: true, library: songs, everPlayed: [])
+        let wider = await AutoplayPool.build(second, index: BrainLibraryIndex(songs: songs), repository: repository)
+        #expect(source.calls == ["song:\(rows[1].videoId):0"])
+        #expect(wider.seeds.count == 2)
+    }
+
+    @Test func aLibraryPoolThatStandsInForRadiosSaysSo() async throws {
+        defer { cleanUp() }
+        // The request budget is spent, or the request failed: the source answers nil.
+        let repository = BrainRepository(directory: directory, radioSource: source, clock: { 1_000 })
+        let anchor = librarySong("sp:anchor", "Anchor", "Seed")
+        let other = librarySong("sp:o", "Other", "Seed")
+        let request = AutoplayPoolRequest(anchors: [AutoplayAnchor(song: anchor, videoId: "vid0000001", spotifyId: "anchor")],
+                                          deepen: false, allowNetwork: true, library: [anchor, other], everPlayed: [])
+        let pool = await AutoplayPool.build(request, index: BrainLibraryIndex(songs: request.library), repository: repository)
+        #expect(source.calls.count == 1)
+        #expect(pool.fromLibrary && pool.fellBack && !pool.offline)
+        #expect(AutoplayPolicy.poolTtlMs(offline: pool.offline, fellBack: pool.fellBack) == AutoplayPolicy.fallbackPoolTtlMs)
     }
 
     @Test func anAnchorWithoutAKnownAudioIdHasNoRadioAndTheLibraryAnswers() async throws {

@@ -126,6 +126,11 @@ private func radio(seedVideoId: String, seedTitle: String, seedArtist: String, p
 
 @Suite("Brain stations")
 struct BrainStationTests {
+    @Test func startStationOnAPausedTrackPlaysIt() {
+        #expect(StationRules.inPlaceStartMustPlay(isPlaying: false))
+        #expect(!StationRules.inPlaceStartMustPlay(isPlaying: true))
+    }
+
     @Test func aStationSurvivesBeingWrittenDownAndReadBack() {
         let song = Station.song(seedMediaId: "sp:4uLU6hMCjMI75M1A2tKUQC", title: "Espresso",
                                 primaryArtist: "Sabrina Carpenter", nowMs: 42)
@@ -329,6 +334,37 @@ struct BrainStationTests {
         ]
         #expect(AutoplayTasteFilter.excludedIds(held: held, blocked: .empty, adjustments: list.set(nowMs: 2)) == ["yt:m"])
         #expect(AutoplayTasteFilter.excludedIds(held: held, blocked: .empty, adjustments: .empty).isEmpty)
+    }
+
+    @Test func lessFromAnArtistChangesTheScoresOfWhatTheEngineAlreadyHolds() throws {
+        func entry(_ id: String, _ artist: String, rid: Int64, scored: Bool = true) -> AutoplayPoolEntry {
+            AutoplayPoolEntry(candidate: AutoplayPolicy.Candidate(mediaId: id, rid: rid, artistKey: BrainText.fold(artist),
+                                                                  albumKey: nil, durationMs: 200_000, versionFlags: 0,
+                                                                  officialAudio: true, inLibrary: true, arm: Arm.fav, radioRank: 1),
+                              librarySong: testSong(id, title: "Song \(id)", artist: artist,
+                                                    artists: [ArtistRef(id: 1, name: artist, isPrimary: true)]),
+                              engineTrack: nil, whyArtist: "", primaryArtist: artist,
+                              brain: scored ? Candidate(rid: rid, aid: 0, inLibrary: true) : nil)
+        }
+        let held = [entry("a", "Loud Band", rid: 1), entry("b", "Else", rid: 2), entry("c", "Loud Band", rid: 3, scored: false)]
+        var list = TasteAdjustmentList()
+        list.apply(try #require(BrainFeedback.lessFromChange(artistName: "Loud Band")), nowMs: 1)
+        let boosts = AutoplayTasteFilter.boosts(held: held, adjustments: list.set(nowMs: 2))
+        // The pool was built before the change: its entries still score as if nothing was said.
+        #expect(held[0].brain?.boostLn == 0.0)
+        #expect((boosts["a"] ?? 0.0) < 0.0, "a reduce is a negative term in the planner's score")
+        #expect(boosts["b"] == 0.0)
+        #expect(boosts["c"] == nil, "an entry the planner does not score has no boost")
+        let applied = AutoplayTasteFilter.applying(boosts, to: held)
+        #expect(applied.changed)
+        #expect(applied.entries[0].brain?.boostLn == boosts["a"])
+        #expect(applied.entries[1].brain?.boostLn == 0.0)
+        // Applied twice nothing moves, so the tail is not planned again for nothing.
+        #expect(!AutoplayTasteFilter.applying(boosts, to: applied.entries).changed)
+        // Undo: the boost goes back to none.
+        let undone = AutoplayTasteFilter.applying(AutoplayTasteFilter.boosts(held: applied.entries, adjustments: .empty),
+                                                  to: applied.entries)
+        #expect(undone.changed && undone.entries[0].brain?.boostLn == 0.0)
     }
 }
 
@@ -616,35 +652,32 @@ struct BrainFeedbackTests {
 
 @Suite("Brain ignored three times")
 struct BrainIgnoredTests {
-    private func event(rid: Int64, at ms: Int64, played: Int32, arm: Int32 = Arm.radio) -> PlayEvent {
+    private func event(rid: Int64, at ms: Int64, played: Int32, arm: Int32 = Arm.radio, end: Int32 = EndReason.next,
+                       flags: Int32 = 0) -> PlayEvent {
         PlayEvent(eventId: ms, origin: Origin.live, rid: rid, primaryAid: 1, otherAids: [], keyAtWrite: "y:\(rid)",
                   startedAtMs: ms, tzOffsetMin: 0, playedMs: played, durationMs: 200_000, startReason: StartReason.autoplay,
-                  endReason: EndReason.next, flags: 0, surface: Surface.autoplay, surfaceId: "", recId: 1, slot: 0, arm: arm,
+                  endReason: end, flags: flags, surface: Surface.autoplay, surfaceId: "", recId: 1, slot: 0, arm: arm,
                   sessionId: 1, posInSession: 0, passiveRun: 0, route: Route.unknown, retrQ: -1, radioRank: -1)
     }
 
-    @Test func threeShortEngineServedPlaysAndNoLongOneWithinSixtyDays() {
+    @Test func threePicksTheListenerSkippedAndNoLongPlayKeepASongAwayForSixtyDaysFromTheLastSkip() {
         let day: Int64 = 24 * 60 * 60 * 1000
         var tally = IgnoreTally()
         let first = tally.note(event(rid: 7, at: t0, played: 3_000))
         #expect(first == IgnoreTally.Row(shorts: [t0]))
-        tally.note(event(rid: 7, at: t0 + day, played: 29_999))
+        tally.note(event(rid: 7, at: t0 + day, played: 29_999, end: EndReason.pickedOther))
         #expect(tally.ignored(nowMs: t0 + 2 * day).isEmpty, "twice is not three times")
-        tally.note(event(rid: 7, at: t0 + 2 * day, played: 0))
+        tally.note(event(rid: 7, at: t0 + 2 * day, played: 1_000, end: EndReason.queueEdit))
         #expect(tally.ignored(nowMs: t0 + 2 * day) == [7])
         // The same play handed over again changes nothing.
-        let again = tally.note(event(rid: 7, at: t0 + 2 * day, played: 0))
+        let again = tally.note(event(rid: 7, at: t0 + 2 * day, played: 1_000))
         #expect(again == nil && tally.rows[7]?.shorts.count == 3)
-        // 61 days after the first of the three it is back.
-        #expect(tally.ignored(nowMs: t0 + 61 * day).isEmpty)
-        #expect(tally.ignored(nowMs: t0 + 59 * day) == [7])
-        // One play of 30 s or more clears it.
-        tally.note(event(rid: 7, at: t0 + 3 * day, played: 30_000))
+        // The 60 days run from the LAST of the three (day 2), not the first.
+        #expect(tally.ignored(nowMs: t0 + 61 * day) == [7])
+        #expect(tally.ignored(nowMs: t0 + 62 * day + 1).isEmpty)
+        // One play of 30 s or more clears it, from anywhere: here the listener's own play (no arm).
+        tally.note(event(rid: 7, at: t0 + 3 * day, played: 30_000, arm: Arm.none, end: EndReason.trackDone))
         #expect(tally.ignored(nowMs: t0 + 4 * day).isEmpty)
-        // A track the listener chose (no arm) and a play of unknown length never count.
-        let own = tally.note(event(rid: 8, at: t0, played: 1_000, arm: Arm.none))
-        let unknownLength = tally.note(event(rid: 8, at: t0, played: -1))
-        #expect(own == nil && unknownLength == nil)
         // The newest three are kept, in order, whatever order they arrive in.
         var late = IgnoreTally()
         for offset in [5, 1, 3, 9, 7] as [Int64] { late.note(event(rid: 9, at: t0 + offset, played: 1)) }
@@ -654,6 +687,28 @@ struct BrainIgnoredTests {
         let numbers = BrainEventLog.decodeNumbers(ArraySlice(IgnoreTally.encode(row)))
         #expect(numbers.flatMap(IgnoreTally.decode) == row)
         #expect(late.expired(nowMs: t0 + 61 * day) == [9])
+    }
+
+    @Test func aPickThatNeverSoundedOrThatTheListenerDidNotEndIsNotAnIgnore() {
+        var tally = IgnoreTally()
+        // A load that failed three times, a pick cut by the app being closed, by a stop, or that played out short.
+        for (i, end) in [EndReason.error, EndReason.error, EndReason.error, EndReason.killed, EndReason.stopped,
+                         EndReason.trackDone, EndReason.unknown, EndReason.prev].enumerated() {
+            #expect(tally.note(event(rid: 7, at: t0 + Int64(i), played: 4_000, end: end)) == nil)
+        }
+        // Skipped before it made a sound: nothing was heard, so nothing was rejected.
+        #expect(tally.note(event(rid: 7, at: t0 + 20, played: 0)) == nil)
+        #expect(tally.note(event(rid: 7, at: t0 + 21, played: 2_000, flags: EventFlags.neverAudible)) == nil)
+        // A track the listener chose (no arm) and a play of unknown length never count.
+        #expect(tally.note(event(rid: 7, at: t0 + 22, played: 1_000, arm: Arm.none)) == nil)
+        #expect(tally.note(event(rid: 7, at: t0 + 23, played: -1)) == nil)
+        #expect(tally.rows.isEmpty && tally.ignored(nowMs: t0 + 100).isEmpty)
+        #expect(!IgnoreTally.isIgnore(event(rid: 0, at: t0, played: 1_000)))
+        // A long play of music the engine never offered leaves no row behind.
+        #expect(tally.note(event(rid: 8, at: t0, played: 90_000, arm: Arm.none, end: EndReason.trackDone)) == nil)
+        #expect(IgnoreTally.counts(event(rid: 8, at: t0, played: 90_000, arm: Arm.none, end: EndReason.trackDone)))
+        // One the engine served does.
+        #expect(tally.note(event(rid: 8, at: t0, played: 90_000, end: EndReason.trackDone)) == IgnoreTally.Row(longAtMs: t0))
     }
 
     @Test func theEngineKeepsTheTallyAsPlaysAreRecordedAndAcrossARestart() async {

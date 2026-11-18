@@ -140,6 +140,13 @@ public enum AutoplayPlanning {
                             primaryArtist: BrainText.isBlank(entry.primaryArtist) ? nil : entry.primaryArtist)
     }
 
+    /// `items` without what the queue already holds. A plan is made off the main actor; meanwhile another edit (a
+    /// re-score, the listener's own "Add to queue") can have put one of its picks in the queue.
+    public static func notQueued(_ items: [AutoplayPlannedItem], queuedIds: Set<BrainKey>) -> [AutoplayPlannedItem] {
+        var seen = queuedIds
+        return items.filter { seen.insert(BrainKey($0.entry.candidate.mediaId)).inserted }
+    }
+
     /// The picks of `plan` as queue items, in plan order. `recId` names the list (`nowMs << 8 | batch`).
     public static func items(plan: StationPlanner.Plan, context: AutoplayPlanContext, surfaceId: String,
                              artistNames: [Int64: String], likedTitles: [Int64: String],
@@ -174,5 +181,30 @@ public enum AutoplayTasteFilter {
             }
         }
         return out
+    }
+
+    /// The listener's boost or reduce for every track the engine holds that the planner scores, by media id: the
+    /// value the planner adds (`ln` of the factor, 0 for none). A pool is built once per set of anchors, so "Less
+    /// from X" would otherwise change nothing until the anchors do. Folds artist names: call it off the main actor.
+    public static func boosts(held: [AutoplayPoolEntry], adjustments: TasteAdjustmentSet) -> [String: Double] {
+        var out: [String: Double] = [:]
+        out.reserveCapacity(held.count)
+        for entry in held where entry.brain != nil {
+            guard let song = entry.librarySong ?? entry.engineTrack?.song() else { continue }
+            out[entry.candidate.mediaId] = AutoplayPool.boostLn(adjustments, song)
+        }
+        return out
+    }
+
+    /// `entries` with the boosts of `boosts` written in. True in `changed` when any score moved.
+    public static func applying(_ boosts: [String: Double], to entries: [AutoplayPoolEntry]) -> (entries: [AutoplayPoolEntry], changed: Bool) {
+        var out = entries
+        var changed = false
+        for i in out.indices {
+            guard let boost = boosts[out[i].candidate.mediaId], let brain = out[i].brain, brain.boostLn != boost else { continue }
+            out[i].brain!.boostLn = boost
+            changed = true
+        }
+        return (out, changed)
     }
 }

@@ -46,13 +46,20 @@ public struct BuiltAutoplayPool: Sendable {
     public var seeds: [Retrieval.SeedList]
     /// Artist names by aid, for the reason line.
     public var artistNames: [Int64: String]
+    /// Built with no network: only tracks that play from the phone. Not kept for long (`AutoplayPolicy.poolTtlMs`).
+    public var offline: Bool
+    /// The network was allowed, but no radio gave anything (the request budget, a failed request, an anchor with no
+    /// match): the library stands in, and the radios are tried again after a while.
+    public var fellBack: Bool
 
     public init(entries: [AutoplayPoolEntry], fromLibrary: Bool, seeds: [Retrieval.SeedList] = [],
-                artistNames: [Int64: String] = [:]) {
+                artistNames: [Int64: String] = [:], offline: Bool = false, fellBack: Bool = false) {
         self.entries = entries
         self.fromLibrary = fromLibrary
         self.seeds = seeds
         self.artistNames = artistNames
+        self.offline = offline
+        self.fellBack = fellBack
     }
 }
 
@@ -81,6 +88,12 @@ public struct AutoplayPoolRequest: Sendable {
     /// The station the pool is for (8.3); nil for plain autoplay. An artist station leads with the artist's own
     /// radio.
     public var station: Station? = nil
+    /// The phone has no network at all (as opposed to the YouTube source being switched off): only tracks that
+    /// play from the phone may be queued.
+    public var offline = false
+    /// Which of these library songs play with no network (a file on the phone, a finished download, a complete
+    /// copy in the audio cache), by song id. Asked only when `offline`, with the songs the pool would hold.
+    public var offlinePlayable: @Sendable ([Song]) async -> Set<String> = { _ in [] }
 
     public init(anchors: [AutoplayAnchor], deepen: Bool, allowNetwork: Bool, library: [Song], everPlayed: Set<String>,
                 blocked: BlockedArtistMatcher = .empty, adjustments: TasteAdjustmentSet = .empty,
@@ -154,14 +167,30 @@ public enum AutoplayPool {
             }
         }
 
+        if !request.allowNetwork {
+            // 7.1: offline, or with the YouTube source switched off, the pool is the library alone. A radio that is
+            // still in the cache names tracks from outside the library, and those need the network to play. With
+            // no network at all, a library track without a copy on the phone needs it too: such a track would fail
+            // to load, one after another, where the queue used to end.
+            var entries = await libraryPool(request, index: index, anchorArtistKeys: anchorArtistKeys)
+            if request.offline {
+                let playable = await request.offlinePlayable(entries.compactMap(\.librarySong))
+                entries = entries.filter { playable.contains($0.candidate.mediaId) }
+            }
+            return BuiltAutoplayPool(entries: entries, fromLibrary: true, offline: request.offline)
+        }
+
         var fetched: [Fetched] = []
         if let repository {
             // At most two radio requests run at a time (the budget's own limit); the anchors are asked together.
+            // Only the newest anchor may cost a request: the older ones were the newest in their turn, and are
+            // answered from the cache or not at all. Three new anchors after an album would otherwise spend three
+            // requests of a small daily allowance on one top-up.
             let collected = await withTaskGroup(of: (Int, Fetched?).self) { group in
                 for (i, item) in seeds.enumerated() {
                     let continuations = request.deepen && i == 0 ? deepenContinuations : 0
                     let everPlayed = request.everPlayed
-                    let allowNetwork = request.allowNetwork
+                    let allowNetwork = i == 0
                     let adjustments = request.adjustments
                     group.addTask {
                         guard let radio = await repository.radioFor(seed: item.seed, allowNetwork: allowNetwork,
@@ -290,7 +319,7 @@ public enum AutoplayPool {
             return BuiltAutoplayPool(entries: entries, fromLibrary: false, seeds: seedLists, artistNames: nameByAid)
         }
         return BuiltAutoplayPool(entries: await libraryPool(request, index: index, anchorArtistKeys: anchorArtistKeys),
-                                 fromLibrary: true)
+                                 fromLibrary: true, fellBack: true)
     }
 
     static func isAllowed(_ entry: AutoplayPoolEntry, _ request: AutoplayPoolRequest) -> Bool {

@@ -48,6 +48,9 @@ public actor BrainRepository {
     /// A radio is good for two weeks: related music does not change faster than that.
     public static let cacheTtlMs: Int64 = 14 * 24 * 60 * 60 * 1000
     public static let junkRetryMs: Int64 = 24 * 60 * 60 * 1000
+    /// A seed whose radio came back empty (no rows at all) is not asked again for this long.
+    public static let emptyAnswerRetryMs: Int64 = 30 * 60 * 1000
+    static let emptyAnswerLimit = 256
     public static let minFallbackRows = 5
     /// A song radio with fewer official-audio rows than this is treated as junk.
     public static let minOfficialAudioRows = 10
@@ -63,6 +66,8 @@ public actor BrainRepository {
     private let clock: @Sendable () -> Int64
     /// One seed is fetched once: a second caller for the same seed waits and then reads the cache.
     private var inFlight: [Int64: Task<StoredRadio?, Never>] = [:]
+    /// Seeds whose radio came back with no rows at all, by rid, with when. Memory only: see `radioForLocked`.
+    private var emptyAnswerAtMs: [Int64: Int64] = [:]
 
     public init(directory: URL, radioSource: (any RadioSource)?,
                 clock: @escaping @Sendable () -> Int64 = { currentTimeMillis() }) {
@@ -129,6 +134,7 @@ public actor BrainRepository {
             if age >= 0 && age < Self.junkRetryMs { return staleOrNil() }
         }
         if tables.radiosFetchedSince(now - HostBudget.dayMs) >= HostBudget.dailyLimit { return staleOrNil() }
+        if let at = emptyAnswerAtMs[seedRid], now - at >= 0, now - at < Self.emptyAnswerRetryMs { return staleOrNil() }
 
         let fetched = await radioSource.songRadio(videoId: seed.videoId, continuations: continuations)
         if let fetched, !isJunk(fetched, seed) {
@@ -136,6 +142,15 @@ public actor BrainRepository {
                          chips: fetched.chips, now: now, chip: songChip)
         }
         guard let fetched else { return staleOrNil() } // transport failure or no budget: nothing learned
+        if fetched.rows.isEmpty && fetched.relatedBrowseId == nil {
+            // An answer with nothing of a radio page in it (no rows, no Related tab): a glitch upstream or a bot
+            // wall, not a junk radio. Nothing was learned about the seed, so the list already stored stays and the
+            // seed is not marked as junk for a day. It is only left alone for a while, in memory. (A page that
+            // names its Related tab but has no rows is a real page: that one takes the junk path below.)
+            if emptyAnswerAtMs.count > Self.emptyAnswerLimit { emptyAnswerAtMs.removeAll() }
+            emptyAnswerAtMs[seedRid] = now
+            return staleOrNil()
+        }
 
         // Junk (3.3, rule 6): remember it, then the Related tab, another audio id, the artist radio.
         tables.upsertRadio(RadioList(seedRid: seedRid, kind: RadioList.kindSong, chip: "", fetchedAt: now,

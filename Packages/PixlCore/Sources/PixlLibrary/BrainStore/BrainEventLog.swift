@@ -15,6 +15,8 @@ import Foundation
 public final class BrainEventLog {
     public static let keyOpenPlay = "open_play"
     public static let keyFirstUseMs = "first_use_ms"
+    /// When the first play recorded live started: the legacy history is copied only up to there.
+    public static let keyFirstLiveStartMs = "first_live_start_ms"
     public static let keyHistoryMigrated = "history_migrated_ms"
     public static let keySpecVersion = "affinity_spec_version"
     public static let keyImportCount = "import_count"

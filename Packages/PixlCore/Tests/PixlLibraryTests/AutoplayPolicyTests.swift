@@ -75,9 +75,97 @@ struct AutoplayPolicyTests {
         #expect(decide(enabled: false, repeatMode: repeatAll, remote: true, size: 1, index: 0) == .off)
     }
 
-    @Test func aQueueEditIsDeferredDuringATransition() {
-        #expect(AutoplayPolicy.mustDeferQueueEdit(isTransitionRunning: true))
-        #expect(!AutoplayPolicy.mustDeferQueueEdit(isTransitionRunning: false))
+    @Test func aQueueEditWaitsOnlyWhenItWouldChangeTheNextTrackDuringAScheduledHandOver() {
+        // An append behind the track that is already next, a re-score of the tracks after it: at once, whatever
+        // the player has prepared (with crossfade on the next song is prepared for nearly the whole track).
+        #expect(!AutoplayPolicy.mustDeferQueueEdit(changesNext: false, handOverScheduled: false))
+        #expect(!AutoplayPolicy.mustDeferQueueEdit(changesNext: false, handOverScheduled: true))
+        // Replacing the next track is fine while it is merely prepared: the player builds the new one.
+        #expect(!AutoplayPolicy.mustDeferQueueEdit(changesNext: true, handOverScheduled: false))
+        // Only in the last moments, when the incoming deck is already started on the host clock, it waits.
+        #expect(AutoplayPolicy.mustDeferQueueEdit(changesNext: true, handOverScheduled: true))
+    }
+
+    @Test func aChangeOfDirectionDecidesTheSeedsOnlyWhileTheEnginesOwnPicksPlay() {
+        #expect(AutoplayPolicy.turnApplies(turn: 1, reactionIsFresh: true, currentIsListenersChoice: false))
+        // The listener tapped a song: autoplay follows that song, whatever was skipped before.
+        #expect(!AutoplayPolicy.turnApplies(turn: 1, reactionIsFresh: true, currentIsListenersChoice: true))
+        #expect(!AutoplayPolicy.turnApplies(turn: 0, reactionIsFresh: true, currentIsListenersChoice: false))
+        // The session that turned has gone quiet.
+        #expect(!AutoplayPolicy.turnApplies(turn: 2, reactionIsFresh: false, currentIsListenersChoice: false))
+    }
+
+    @Test func oneplanAtATime() {
+        #expect(AutoplayPolicy.mayPlanNow(topUpRunning: false, rescoreRunning: false))
+        #expect(!AutoplayPolicy.mayPlanNow(topUpRunning: true, rescoreRunning: false))
+        // A top-up waits for a re-score: both read the same pool and could pick the same track.
+        #expect(!AutoplayPolicy.mayPlanNow(topUpRunning: false, rescoreRunning: true))
+    }
+
+    @Test func theFirstTrackOfASkippedArtistInTheTail() {
+        let keys = ["a", "b", "c", "b", "d"]
+        #expect(AutoplayPolicy.firstIndexOfArtist(start: 0, size: 5, artistKey: "b") { keys[$0] } == 1)
+        // The warmed tracks before `start` stay.
+        #expect(AutoplayPolicy.firstIndexOfArtist(start: 2, size: 5, artistKey: "b") { keys[$0] } == 3)
+        #expect(AutoplayPolicy.firstIndexOfArtist(start: 4, size: 5, artistKey: "b") { keys[$0] } == -1)
+        #expect(AutoplayPolicy.firstIndexOfArtist(start: 0, size: 5, artistKey: "") { keys[$0] } == -1)
+        #expect(AutoplayPolicy.firstIndexOfArtist(start: -1, size: 5, artistKey: "b") { keys[$0] } == -1)
+        #expect(AutoplayPolicy.firstIndexOfArtist(start: 5, size: 5, artistKey: "b") { keys[$0] } == -1)
+    }
+
+    @Test func nextPressedWithNothingQueuedMovesOnOnlyInsideTheWindowAndOnTheSameTrack() {
+        #expect(AutoplayPolicy.nextMayStillSkip(askedAtMs: 1_000, nowMs: 4_000, askedMediaId: "a", currentMediaId: "a"))
+        #expect(AutoplayPolicy.nextMayStillSkip(askedAtMs: 1_000, nowMs: 11_000, askedMediaId: "a", currentMediaId: "a"))
+        #expect(!AutoplayPolicy.nextMayStillSkip(askedAtMs: 1_000, nowMs: 11_001, askedMediaId: "a", currentMediaId: "a"))
+        // The listener started something else meanwhile.
+        #expect(!AutoplayPolicy.nextMayStillSkip(askedAtMs: 1_000, nowMs: 4_000, askedMediaId: "a", currentMediaId: "b"))
+        #expect(!AutoplayPolicy.nextMayStillSkip(askedAtMs: 1_000, nowMs: 4_000, askedMediaId: nil, currentMediaId: "a"))
+        #expect(!AutoplayPolicy.nextMayStillSkip(askedAtMs: 1_000, nowMs: 4_000, askedMediaId: "a", currentMediaId: nil))
+        #expect(!AutoplayPolicy.nextMayStillSkip(askedAtMs: 5_000, nowMs: 4_000, askedMediaId: "a", currentMediaId: "a"))
+    }
+
+    @Test func aPoolBuiltWithoutTheNetworkOrInPlaceOfRadiosIsNotKeptForLong() {
+        #expect(AutoplayPolicy.poolTtlMs(offline: false, fellBack: false) == nil)
+        #expect(AutoplayPolicy.poolTtlMs(offline: true, fellBack: false) == AutoplayPolicy.offlinePoolTtlMs)
+        #expect(AutoplayPolicy.poolTtlMs(offline: false, fellBack: true) == AutoplayPolicy.fallbackPoolTtlMs)
+        #expect(AutoplayPolicy.poolTtlMs(offline: true, fellBack: true) == AutoplayPolicy.offlinePoolTtlMs)
+        // A radio pool is used until it runs out.
+        #expect(!AutoplayPolicy.poolExpired(builtAtMs: 0, nowMs: 99_999_999, ttlMs: nil))
+        #expect(!AutoplayPolicy.poolExpired(builtAtMs: 1_000, nowMs: 1_000 + 119_999, ttlMs: AutoplayPolicy.offlinePoolTtlMs))
+        #expect(AutoplayPolicy.poolExpired(builtAtMs: 1_000, nowMs: 1_000 + 120_000, ttlMs: AutoplayPolicy.offlinePoolTtlMs))
+        #expect(AutoplayPolicy.poolExpired(builtAtMs: 5_000, nowMs: 1_000, ttlMs: AutoplayPolicy.fallbackPoolTtlMs),
+                "a clock that went back")
+    }
+
+    @Test func aFailedPickIsSilentOnlyWhenTheListenerNeverChoseItAndMusicGoesOn() {
+        #expect(AutoplayPolicy.failedPickIsSilent(entryIsEnginePick: true, nextWillPlay: true))
+        // The listener's own track says what could not be played.
+        #expect(!AutoplayPolicy.failedPickIsSilent(entryIsEnginePick: false, nextWillPlay: true))
+        // Music stops: silence would look like a bug.
+        #expect(!AutoplayPolicy.failedPickIsSilent(entryIsEnginePick: true, nextWillPlay: false))
+    }
+
+    @Test func aTrackFromOutsideTheLibraryIsKnownFromTheQueueBeforeTheFilesAreRead() {
+        func outside(inLibrary: Bool = false, known: Bool = false, pick: Bool = false, yt: Bool = true) -> Bool {
+            AutoplayPolicy.isOutsideLibrary(inLibrary: inLibrary, knownEngineTrack: known, entryIsEnginePick: pick,
+                                            hasYouTubeId: yt)
+        }
+        #expect(outside(known: true))
+        // Right after a restart nothing is known yet, but the restored queue entry carries its pick.
+        #expect(outside(pick: true))
+        // Saved since: it is the listener's now.
+        #expect(!outside(inLibrary: true, known: true, pick: true))
+        // A song the listener searched for and played by hand is theirs, saved or not.
+        #expect(!outside())
+        // A library pick whose row is momentarily missing is not a track from outside.
+        #expect(!outside(pick: true, yt: false))
+    }
+
+    @Test func theBackstopDoesNotWaitBehindAFillThatIsWaitingToSettle() {
+        #expect(AutoplayPolicy.backstopReplacesFill(fillRunning: false, fillIsWaitingToSettle: false))
+        #expect(AutoplayPolicy.backstopReplacesFill(fillRunning: true, fillIsWaitingToSettle: true))
+        // A fill that is already asking the network is the one the backstop wants.
+        #expect(!AutoplayPolicy.backstopReplacesFill(fillRunning: true, fillIsWaitingToSettle: false))
     }
 
     @Test func aRadioRequestWaitsForTheSettleTimeAndNeedsTheSource() {
