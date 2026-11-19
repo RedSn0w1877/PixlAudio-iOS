@@ -628,4 +628,12 @@ releases lane's per-request cap on a real day; the Swift 6 concurrency of the ne
 
 ### Commands and results, review pass
 
-See "CI, review pass" below once the run has finished.
+```
+cmd //c "ci\swiftw.cmd test --package-path Packages\PixlCore"       # exit 0, 2,305 tests in 8 bundles, 0 failed (before the lane-1 reserve; the four suites it touches were run again: 94 tests, 0 failed)
+bash ./ci/check-forbidden.sh                                           # OK
+powershell -NoProfile -ExecutionPolicy Bypass -File ci/parse-check.ps1  # 180 files OK
+```
+
+CI (workflow `ci`, branch `music-brain`): the first push (`0c4ef6a`, run 44458134885) was cancelled by the second push; run **44458824484**
+(`225654b`) is **green**: `core` passed, `app` built and executed 664 unit tests with 0 failures, `ipa` skipped as on every push. First round, no
+failure to fix. As before, green CI says nothing about whether the new screens and flows work on a phone.
