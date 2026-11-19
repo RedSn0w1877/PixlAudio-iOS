@@ -586,7 +586,7 @@ struct BrainGoldenTests {
 
     @Test func theManifestListsEveryFileWithItsHash() throws {
         let manifest = try Self.lines("MANIFEST.sha256")
-        #expect(manifest.count == 21)
+        #expect(manifest.count == 29)
         for entry in manifest {
             let hash = String(entry.prefix(64))
             let name = String(entry.dropFirst(66))

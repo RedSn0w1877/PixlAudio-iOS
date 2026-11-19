@@ -15,6 +15,18 @@
 public enum MixPlanner {
     public static let kindDaily: Int32 = 0
     public static let kindYour: Int32 = 1
+    /// First Listen (6.2, stage 2b): weekly, music never played here.
+    public static let kindFirstListen: Int32 = 2
+
+    /// A Daily Mix of one island: every track must be at least this close to it (6.2).
+    public static let islandFloor = 0.2
+
+    /// The novelty share of a Daily Mix of an island: `clip(nuLong, 0.15, 0.40)` (6.2).
+    public static let islandNuMin = 0.15
+    public static let islandNuMax = 0.40
+
+    /// `lambda` of 6.5 across islands.
+    public static let lambdaAcross = 0.6
 
     /// A Daily Mix holds 30 tracks, ending on a familiar one; Your Mix starts with 60 and is endless.
     public static let dailyCount = 30
@@ -74,11 +86,25 @@ public enum MixPlanner {
         public var jitter: Double
         /// The served-log penalty at three serves or more (`Repetition.maxPenalty`).
         public var servedMax: Double
+        /// Stage 2b: the listener's islands. With them the island features (5, 6, 19) are live.
+        public var islands: IslandContext?
+        /// A Daily Mix of one island: the index in `islands`, or -1 (the one Daily Mix of stage 2a).
+        public var islandIdx: Int
+        /// Stage 2b: the graph embeddings (version of `FastRp`), for the diversity term.
+        public var embeddings: Embeddings?
+        /// Stage 2b: tag vectors by rid, for the diversity term.
+        public var tagsByRid: [Int64: Tags.Vector]
 
         public init(kind: Int32, candidates: [Candidate], seeds: [Retrieval.SeedList], nowMs: Int64, tzOffsetMin: Int32,
                     nuMultiplier: Double = 1.0, salt: Int64 = 0, regenerate: Int32 = 0, excludedRids: Set<Int64> = [],
                     servedTimes: [Int64: Int32] = [:], edges: [Edge] = [], count: Int = 0,
-                    jitter: Double = MixPlanner.jitter, servedMax: Double = Repetition.maxPenalty) {
+                    jitter: Double = MixPlanner.jitter, servedMax: Double = Repetition.maxPenalty,
+                    islands: IslandContext? = nil, islandIdx: Int = -1, embeddings: Embeddings? = nil,
+                    tagsByRid: [Int64: Tags.Vector] = [:]) {
+            self.islands = islands
+            self.islandIdx = islandIdx
+            self.embeddings = embeddings
+            self.tagsByRid = tagsByRid
             self.kind = kind
             self.candidates = candidates
             self.seeds = seeds
@@ -104,14 +130,22 @@ public enum MixPlanner {
         return BrainMath.clip(base * multiplier, 0.0, nuMax)
     }
 
+    /// The novelty share of one island's Daily Mix.
+    public static func nuOfIsland(multiplier: Double) -> Double {
+        BrainMath.clip(nu0 * multiplier, islandNuMin, islandNuMax)
+    }
+
     /// The surface a kind of mix is logged under.
-    public static func surfaceOf(_ kind: Int32) -> Int32 { kind == kindYour ? Surface.yourMix : Surface.dailyMix }
+    public static func surfaceOf(_ kind: Int32) -> Int32 {
+        kind == kindYour ? Surface.yourMix : (kind == kindFirstListen ? Surface.namedMix : Surface.dailyMix)
+    }
 
     /// What breaks ties: the same on the same local day, different after "Regenerate" and between installs.
     public static func tieSeedOf(_ request: Request) -> Int64 {
         let day = Repetition.mixDay(request.nowMs, tzOffsetMin: request.tzOffsetMin)
+        let island: Int64 = request.islandIdx >= 0 ? Int64(request.islandIdx + 1) &* 65536 : 0
         let inner = Int64(bitPattern: BrainHash.splitmix64(
-            UInt64(bitPattern: day &* 4 &+ Int64(request.kind) &+ Int64(request.regenerate) &* 1024)))
+            UInt64(bitPattern: day &* 4 &+ Int64(request.kind) &+ Int64(request.regenerate) &* 1024 &+ island)))
         return Int64(bitPattern: BrainHash.splitmix64(UInt64(bitPattern: request.salt ^ inner)))
     }
 
@@ -126,11 +160,43 @@ public enum MixPlanner {
         for e in request.edges { builder.addEdge(e.a, e.b, weight: e.weight) }
         let graph = builder.build()
         let kind = request.kind
+        let islands = request.islands
+        var candidates = request.candidates
+        var calibration: Calibration?
+        var lambda = ListBuilder.lambdaDefault
+        var nu = nuOf(kind, multiplier: request.nuMultiplier)
+        if let islands, !islands.islands.isEmpty {
+            if request.islandIdx >= 0 && request.islandIdx < islands.islands.count {
+                // A Daily Mix of one island: every track must be close to it (6.2).
+                let island = islands.islands[request.islandIdx]
+                var kept: [Candidate] = []
+                kept.reserveCapacity(candidates.count)
+                for c in candidates {
+                    guard let p = c.point else { continue }
+                    if Islands.similarity(island, p) >= islandFloor { kept.append(c) }
+                }
+                candidates = kept
+                nu = nuOfIsland(multiplier: request.nuMultiplier)
+            } else if kind == kindYour && islands.islands.count > 1 {
+                // Your Mix: every island, kept in the listener's proportions (6.5).
+                calibration = Calibration(islands.islands.map { $0.weight })
+                lambda = lambdaAcross
+                var placed: [Candidate] = []
+                placed.reserveCapacity(candidates.count)
+                for c in candidates { placed.append(c.withIsland(islands.best(c.point).index)) }
+                candidates = placed
+            }
+        }
+        var simSource: (any SimilaritySource)?
+        if islands != nil && (request.embeddings != nil || !request.tagsByRid.isEmpty) {
+            simSource = SimilarityIndex(graph, request.embeddings, request.tagsByRid)
+        }
+        let first = kind == kindFirstListen
         return StationPlanner.plan(
             StationPlanner.Request(
-                mode: StationPlanner.modeMix,
+                mode: first ? StationPlanner.modeFirstListen : StationPlanner.modeMix,
                 count: request.count > 0 ? request.count : countOf(kind),
-                candidates: request.candidates,
+                candidates: candidates,
                 seeds: request.seeds,
                 nowMs: request.nowMs,
                 tzOffsetMin: request.tzOffsetMin,
@@ -138,10 +204,16 @@ public enum MixPlanner {
                 tieSeed: tieSeedOf(request),
                 excludedRids: request.excludedRids,
                 finite: kind == kindDaily,
-                nu: nuOf(kind, multiplier: request.nuMultiplier),
+                nu: first ? 1.0 : nu,
                 servedTimes: request.servedTimes,
                 jitter: request.jitter,
-                servedMax: request.servedMax
+                servedMax: request.servedMax,
+                islands: islands,
+                calibration: calibration,
+                lambda: lambda,
+                simSource: simSource,
+                maxPerArtist: first ? 2 : 0,
+                minNewArtistShare: first ? 0.4 : 0.0
             ),
             affinity: affinity,
             session: session,

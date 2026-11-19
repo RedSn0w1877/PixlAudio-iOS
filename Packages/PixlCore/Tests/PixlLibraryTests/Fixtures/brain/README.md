@@ -81,3 +81,23 @@ How each `fn` is replayed:
   state and reads `Features.tagAff(tags, state, nowMs, p0)` (feature 4). `sessTagPen` runs `Session.applyTags(session,
   tags, h, completed)` for each step on one fresh `SessionState`; `penalties` are the session's `tagPen` entries in ascending
   atlas id, `feature` is `Features.sessTagPen(tags, session)` (feature 24).
+- `fastrp.jsonl`, `ppr.jsonl`, `islands.jsonl`, `arms.jsonl`, `listmixes.jsonl`, `islandfeatures.jsonl`, `islandmixes.jsonl`,
+  `homeplan.jsonl` (stage 2b, milestone 2; new files, nothing before them changed). Doubles are bit patterns; Int64 are strings.
+- `fastrp.jsonl`: `embed` builds a graph with `Graph.Builder.addEdge(a, b, w)` for each edge in order, then `FastRp.embed(graph)`;
+  `vectors` are `[nodeId, hexBytes]` in ascending node id (an empty hex means the zero vector); `cos` is `Embeddings.cos`.
+  `projection` is `FastRp.nodeHash(id)` and the row `FastRp.projection(hash, j)` for j in 0..63.
+- `ppr.jsonl`: `Ppr.run(graph, seeds, weights, top)`; `result` is `[id, score]`, best first.
+- `islands.jsonl`: `fit` is `Islands.fit(tracks)` (`emb` is hex, empty for none; `tags` are `"atlasId:q"`; `w` is the weight);
+  `match` fits `first`, then fits `second` with the first fit's islands and its `maxId` (`firstMaxId`); the output is the second
+  fit. `centroidHash` is FNV-1a 64 over the 8 little-endian bytes of each centroid double, `head` its first numbers. `point` is
+  `Islands.point(emb, tags)`. `name` is `IslandNames.pick(atlas, liftTags)` (two atlas ids).
+- `arms.jsonl`: `ArmRules.isBack`, `simSources`, `adjacentGenres` (needs the atlas; `shares` are the tags the listener plays).
+- `listmixes.jsonl`: `lists` rebuilds one `Affinity.State` by `Affinity.apply(TRACK, rid, r = s[2] / 10, c = 0.5 + s[3] / 2, part 1,
+  t)` for each step, then `ListMixes.onRepeat`/`rediscover`/`justDropped` followed by `ListMixes.fill(items, 30, excluded, tieSeed
+  [, maxPerArtist 2 for justDropped])`; items are `[rid, aid, score, arm]`.
+- `islandfeatures.jsonl`: `calibration` is `Calibration(weights)` with `add(pick)` for each pick, `gain(i)` per island and
+  `divergence()`; `sim` is `SimilarityIndex(graph, embeddings or none, tags).sim(a, 0, b, 0)` over the `edges` (`Graph.Builder.addEdge`),
+  `emb` (hex, 64 bytes a track in ascending rid, `Embeddings.of(1, ...)`) and `tagList` (parallel to `rids`).
+- `islandmixes.jsonl`: `Islands.fit(fitTracks)`, then `MixPlanner.plan` on `candidates` with `islands = IslandContext(fit.islands)`,
+  `islandIdx`, `tagsByRid` (from the candidates' tags), an empty affinity state, no seeds, `salt` of the case, `nuMultiplier` 1.
+- `homeplan.jsonl`: `plan` is `HomePlanner.plan(shelves)`; `hero` is `HomePlanner.hero(...)` plus `daypart`, `weekday`, `planKey`.

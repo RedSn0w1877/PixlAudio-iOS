@@ -24,10 +24,37 @@ public struct Candidate: Sendable {
     public var actr: Double
     /// The track's tag vector (3.4); nil or empty when its genres are unknown (features 4 and 24 are then exactly 0).
     public var tags: Tags.Vector?
+    /// The graph embedding of the track (5.3); nil when it has none.
+    public var emb: [UInt8]?
+    /// `popPermille` of its DNA, 0..1000; -1 unknown (feature 20 is then 0).
+    public var popPermille: Int
+    /// First seen as a new release in the last 28 days (feature 39; arm NEW).
+    public var fresh: Bool
+    /// A forgotten favourite (arm BACK, 6.1).
+    public var back: Bool
+    /// From an adjacent genre (arm EDGE, 6.1).
+    public var edge: Bool
+    /// The index of its island in the request's `Calibration`; -1 when it is in none.
+    public var islandIdx: Int
+    /// True when its artist is one the listener never played (First Listen's 40% rule, 6.2).
+    public var artistNew: Bool
+
+    /// The point of the track in island space (5.4); nil when it has neither an embedding nor a tag. Computed on
+    /// demand (a struct cannot cache it); it is a few hundred multiplications.
+    public var point: [Double]? { Islands.point(emb, tags) }
 
     public init(rid: Int64, aid: Int64, albumKey: Int64 = 0, inLibrary: Bool = false, liked: Bool = false,
                 fromArtistRadio: Bool = false, boostLn: Double = 0.0, fromSimilarArtist: Bool = false,
-                actr: Double = 0.0, tags: Tags.Vector? = nil) {
+                actr: Double = 0.0, tags: Tags.Vector? = nil, emb: [UInt8]? = nil, popPermille: Int = -1,
+                fresh: Bool = false, back: Bool = false, edge: Bool = false, islandIdx: Int = -1,
+                artistNew: Bool = false) {
+        self.emb = emb
+        self.popPermille = popPermille
+        self.fresh = fresh
+        self.back = back
+        self.edge = edge
+        self.islandIdx = islandIdx
+        self.artistNew = artistNew
         self.tags = tags
         self.fromSimilarArtist = fromSimilarArtist
         self.actr = actr
@@ -38,6 +65,71 @@ public struct Candidate: Sendable {
         self.liked = liked
         self.fromArtistRadio = fromArtistRadio
         self.boostLn = boostLn
+    }
+
+    /// The same candidate with what the DNA and the embeddings know about it (stage 2b).
+    public func withDna(emb: [UInt8]?, tags: Tags.Vector?, popPermille: Int) -> Candidate {
+        var c = self
+        if let tags { c.tags = tags }
+        if let emb { c.emb = emb }
+        if popPermille >= 0 { c.popPermille = popPermille }
+        return c
+    }
+
+    /// The same candidate with the arm flags of 6.1 and the First Listen artist flag set.
+    public func withFlags(fresh: Bool? = nil, back: Bool? = nil, edge: Bool? = nil, artistNew: Bool? = nil) -> Candidate {
+        var c = self
+        if let fresh { c.fresh = fresh }
+        if let back { c.back = back }
+        if let edge { c.edge = edge }
+        if let artistNew { c.artistNew = artistNew }
+        return c
+    }
+
+    /// The same candidate placed in island `index` of a `Calibration`.
+    public func withIsland(_ index: Int) -> Candidate {
+        var c = self
+        c.islandIdx = index
+        return c
+    }
+}
+
+/// The listener's islands as the scorer reads them (5.8 features 5, 6 and 19): the best island for a track is the one
+/// whose centroid is closest to its point.
+public struct IslandContext: Sendable {
+    public let islands: [Islands.Island]
+    private let totalWeight: Double
+
+    public init(_ islands: [Islands.Island]) {
+        self.islands = islands
+        var t = 0.0
+        for i in islands { t += i.weight }
+        totalWeight = t
+    }
+
+    public struct Best: Sendable {
+        public let index: Int
+        public let sim: Double
+    }
+
+    private static let none = Best(index: -1, sim: 0.0)
+
+    /// The closest island and its similarity; index -1 for a track with no point.
+    public func best(_ point: [Double]?) -> Best {
+        guard let point, !islands.isEmpty else { return Self.none }
+        var best = -1
+        var bestSim = 0.0
+        for i in 0..<islands.count {
+            let s = Islands.similarity(islands[i], point)
+            if best < 0 || s > bestSim { best = i; bestSim = s }
+        }
+        return Best(index: best, sim: bestSim)
+    }
+
+    /// `sqrt(W_c share)` of island `index`.
+    public func weightFeature(_ index: Int) -> Double {
+        if index < 0 || totalWeight <= 0.0 { return 0.0 }
+        return BrainMath.sqrt(islands[index].weight / totalWeight)
     }
 }
 
@@ -50,6 +142,11 @@ public enum Features {
     public static let artistAff = 2
     public static let artistAffRecent = 3
     public static let tagAff = 4
+    public static let islandSim = 5
+    public static let islandWeight = 6
+    public static let noveltyDist = 19
+    public static let pop = 20
+    public static let fresh = 39
     public static let liked = 8
     public static let actr = 10
     public static let actrSq = 11
@@ -72,7 +169,7 @@ public enum Features {
     /// unheard music, 5.12 rule 6) features 1 and 8 are zeroed.
     public static func compute(_ c: Candidate, arm: Int32, retrieval: Double, bestRank: Int32,
                                affinity: Affinity.State, session: SessionState, graph: Graph, nowMs: Int64,
-                               p0: Double, allNovel: Bool, out: inout [Double]) {
+                               p0: Double, allNovel: Bool, out: inout [Double], islands: IslandContext? = nil) {
         for i in 0..<d { out[i] = 0.0 }
         out[bias] = 1.0
         if !allNovel {
@@ -120,6 +217,17 @@ public enum Features {
             out[armAff] = Affinity.aff(affinity, family: Family.arm, key: Int64(arm), nowMs: nowMs, p0: p0) / 3.0
         }
         out[Features.retrieval] = retrieval
+        if c.popPermille >= 0 { out[pop] = Double(c.popPermille) / 1000.0 - 0.5 }
+        if c.fresh { out[Features.fresh] = 1.0 }
+        if let islands {
+            let best = islands.best(c.point)
+            if best.index >= 0 {
+                out[islandSim] = best.sim
+                out[islandWeight] = islands.weightFeature(best.index)
+                // Novelty distance: how far an unheard track sits from every island the listener has (5.8 feature 19).
+                if !Affinity.isHeard(affinity, family: Family.track, key: c.rid) { out[noveltyDist] = 1.0 - best.sim }
+            }
+        }
         if bestRank > 0 { out[radioRank] = 1.0 / BrainMath.log2(2.0 + Double(bestRank)) }
     }
 

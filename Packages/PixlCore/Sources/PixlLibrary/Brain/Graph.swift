@@ -35,6 +35,17 @@ public struct Graph: Sendable {
 
     public var nodeCount: Int { neighbours.count }
 
+    /// Every node that has at least one edge, ascending (the order every sum over the graph runs in, 10.3 rule 2).
+    public func nodeIds() -> [Int64] { neighbours.keys.sorted() }
+
+    /// The sum of the weights of the edges `node` kept, added in neighbour order.
+    public func weightedDegree(_ node: Int64) -> Double {
+        guard let w = weights[node] else { return 0.0 }
+        var sum = 0.0
+        for v in w { sum += v }
+        return sum
+    }
+
     /// Neighbour ids of `node`, ascending. Empty when the node is unknown.
     public func neighboursOf(_ node: Int64) -> [Int64] { neighbours[node] ?? [] }
 
@@ -140,6 +151,11 @@ public struct Graph: Sendable {
     }
 }
 
+/// Anything that can say how alike two tracks are: the `adj` branch (`Similarity.sim`) or `SimilarityIndex`.
+public protocol SimilaritySource: Sendable {
+    func sim(_ a: Int64, _ aAid: Int64, _ b: Int64, _ bAid: Int64) -> Double
+}
+
 /// How alike two tracks are, in 0...1 (docs/brain-spec.md, 5.3). Stage 1 has no embeddings and no tags, so this is
 /// the `adj` branch alone: 0.8 for the same primary artist, the edge weight between the two, or half the weakest
 /// link through a common neighbour.
@@ -149,6 +165,8 @@ public struct Graph: Sendable {
 /// artist, or among the first 8 rows of a seed's radio".
 public enum Similarity {
     public static let sameArtist: Double = 0.8
+
+    public typealias Source = SimilaritySource
 
     public static func sim(_ graph: Graph, _ a: Int64, _ aArtist: Int64, _ b: Int64, _ bArtist: Int64) -> Double {
         if a == b { return 1.0 }

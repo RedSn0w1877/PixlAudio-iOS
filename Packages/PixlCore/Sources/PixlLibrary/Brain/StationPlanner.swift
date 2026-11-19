@@ -14,6 +14,9 @@ public enum StationPlanner {
     /// tracks, no library track has to be close to a seed, and nothing the session did applies (a mix is built from
     /// a fresh session). `MixPlanner` is the way in.
     public static let modeMix: Int32 = 3
+    /// First Listen (6.2, stage 2b): unheard music only, a mix-like list built from a fresh session, with the features
+    /// that need a history zeroed (5.12 rule 6) and novelty 1.
+    public static let modeFirstListen: Int32 = 4
 
     public static let fourHoursMs: Int64 = 4 * 60 * 60 * 1000
 
@@ -55,12 +58,32 @@ public enum StationPlanner {
         /// Station mode only. False (stage 1): a track must be close to the first seed. True (an album or playlist
         /// station has up to five, 6.2): close to the nearest of them. Off by default so no earlier plan changes.
         public var closestOfSeeds: Bool
+        /// Stage 2b: the listener's islands (features 5, 6 and 19, 5.8); nil leaves those three at 0.
+        public var islands: IslandContext?
+        /// Stage 2b: the island mix a list across islands keeps (6.5); mutated as picks are made.
+        public var calibration: Calibration?
+        /// 0.75 inside one island, 0.6 across islands (6.5).
+        public var lambda: Double
+        /// Stage 2b: similarity with embeddings and tags for the diversity term; nil for the `adj` branch alone.
+        public var simSource: (any SimilaritySource)?
+        /// First Listen: at most two tracks by one artist, at least 40% from artists never played.
+        public var maxPerArtist: Int
+        public var minNewArtistShare: Double
 
         public init(mode: Int32, count: Int, candidates: [Candidate], seeds: [Retrieval.SeedList],
                     prior: [ListBuilder.Prior] = [], nowMs: Int64, tzOffsetMin: Int32 = 0, nuMultiplier: Double = 1.0,
                     tieSeed: Int64 = 0, excludedRids: Set<Int64> = [], bridge: Bool = false, finite: Bool = false,
                     nu: Double = -1.0, servedTimes: [Int64: Int32] = [:], jitter: Double = 0.0,
-                    servedMax: Double = Repetition.maxPenalty, closestOfSeeds: Bool = false) {
+                    servedMax: Double = Repetition.maxPenalty, closestOfSeeds: Bool = false,
+                    islands: IslandContext? = nil, calibration: Calibration? = nil,
+                    lambda: Double = ListBuilder.lambdaDefault, simSource: (any SimilaritySource)? = nil,
+                    maxPerArtist: Int = 0, minNewArtistShare: Double = 0.0) {
+            self.islands = islands
+            self.calibration = calibration
+            self.lambda = lambda
+            self.simSource = simSource
+            self.maxPerArtist = maxPerArtist
+            self.minNewArtistShare = minNewArtistShare
             self.closestOfSeeds = closestOfSeeds
             self.mode = mode
             self.count = count
@@ -117,7 +140,8 @@ public enum StationPlanner {
         let cooc = Retrieval.cooc(request.seeds, affinity: affinity, nowMs: nowMs, p0: p0)
         let homeRow = request.mode == modeHomeRow
         let station = request.mode == modeStation
-        let mix = request.mode == modeMix
+        let firstListen = request.mode == modeFirstListen
+        let mix = request.mode == modeMix || firstListen
         let stationSeed: Retrieval.SeedList? = ((station || homeRow) && !request.seeds.isEmpty) ? request.seeds[0] : nil
         let newest: Retrieval.SeedList? = !request.seeds.isEmpty ? request.seeds[0] : nil
         var newestRank: [Int64: Int32] = [:]
@@ -143,6 +167,8 @@ public enum StationPlanner {
             let last = Affinity.lastMs(affinity, family: Family.track, key: c.rid)
             if last != 0 && nowMs &- last < fourHoursMs { continue }
             if homeRow && c.inLibrary { continue }
+            // First Listen is unheard music only (6.2).
+            if firstListen && Affinity.isHeard(affinity, family: Family.track, key: c.rid) { continue }
             if let stationSeed, station {
                 let s = request.closestOfSeeds
                     ? closestSeed(graph, c, request.seeds)
@@ -157,7 +183,14 @@ public enum StationPlanner {
                 if close < familiarFloor { continue }
             }
             let arm: Int32
-            if c.inLibrary {
+            if c.fresh {
+                // The arms of stage 2b (6.1): a flag set by the pool builder names the arm.
+                arm = Arm.new
+            } else if c.back {
+                arm = Arm.back
+            } else if c.edge {
+                arm = Arm.edge
+            } else if c.inLibrary {
                 arm = (affinity.completions[c.rid] ?? 0) >= 1 ? Arm.fav : Arm.deep
             } else if c.fromSimilarArtist {
                 arm = Arm.sim
@@ -186,7 +219,8 @@ public enum StationPlanner {
             let entry = cooc[c.rid]
             let bestRank: Int32 = entry?.bestRank ?? 0
             Features.compute(c, arm: arms[i], retrieval: pct[i], bestRank: bestRank, affinity: affinity,
-                             session: session, graph: graph, nowMs: nowMs, p0: p0, allNovel: homeRow, out: &x)
+                             session: session, graph: graph, nowMs: nowMs, p0: p0, allNovel: homeRow || firstListen,
+                             out: &x, islands: request.islands)
             var z = Ranker.z(weights, x)
             if let stationSeed, station {
                 let s = request.closestOfSeeds
@@ -233,7 +267,7 @@ public enum StationPlanner {
         }
         let liked = session.likedWithin > 0 && !homeRow
         let nu: Double
-        if homeRow {
+        if homeRow || firstListen {
             nu = 1.0
         } else if request.nu >= 0.0 {
             nu = BrainMath.clip(request.nu, 0.0, 1.0)
@@ -252,7 +286,12 @@ public enum StationPlanner {
                 likedAid: liked ? session.likedAid : 0,
                 likedRid: liked ? session.likedRid : 0,
                 finite: request.finite,
-                thinAid: session.seedLimit == 1 ? session.seedAid : 0
+                thinAid: session.seedLimit == 1 ? session.seedAid : 0,
+                lambda: request.lambda,
+                calibration: request.calibration,
+                simSource: request.simSource,
+                maxPerArtist: request.maxPerArtist,
+                minNewArtistShare: request.minNewArtistShare
             ),
             scored: scored,
             graph: graph

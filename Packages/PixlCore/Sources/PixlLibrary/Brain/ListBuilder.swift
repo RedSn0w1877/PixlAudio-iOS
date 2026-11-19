@@ -99,10 +99,21 @@ public enum ListBuilder {
         /// This artist is spaced `thinArtistGap` apart instead of `artistGap`.
         public var thinAid: Int64
         public var lambda: Double
+        /// Stage 2b: the island mix of a list across islands (6.5 `calibGain`); nil for none. Mutated as picks are made.
+        public var calibration: Calibration?
+        public var kappa: Double
+        /// Stage 2b: how alike two tracks are, with embeddings and tags; nil for the `adj` branch alone.
+        public var simSource: (any SimilaritySource)?
+        /// At most this many tracks by one artist in the whole list (First Listen: 2); 0 for no cap.
+        public var maxPerArtist: Int
+        /// At least this share of the picks from artists the listener never played (First Listen: 0.4); 0 for none.
+        public var minNewArtistShare: Double
 
         public init(count: Int, prior: [Prior], nu: Double, tieSeed: Int64, nowMs: Int64, tzOffsetMin: Int32,
                     firstSlotAids: [Int64]? = nil, likedAid: Int64 = 0, likedRid: Int64 = 0, finite: Bool = false,
-                    thinAid: Int64 = 0, lambda: Double = ListBuilder.lambdaDefault) {
+                    thinAid: Int64 = 0, lambda: Double = ListBuilder.lambdaDefault,
+                    calibration: Calibration? = nil, kappa: Double = Calibration.kappa,
+                    simSource: (any SimilaritySource)? = nil, maxPerArtist: Int = 0, minNewArtistShare: Double = 0.0) {
             self.count = count
             self.prior = prior
             self.nu = nu
@@ -115,6 +126,11 @@ public enum ListBuilder {
             self.finite = finite
             self.thinAid = thinAid
             self.lambda = lambda
+            self.calibration = calibration
+            self.kappa = kappa
+            self.simSource = simSource
+            self.maxPerArtist = maxPerArtist
+            self.minNewArtistShare = minNewArtistShare
         }
     }
 
@@ -133,6 +149,11 @@ public enum ListBuilder {
         list.reserveCapacity(request.prior.count + request.count)
         var used: Set<Int64> = []
         var novelSoFar = 0
+        var newArtistSoFar = 0
+        // The spacing rules of 6.4 and, when the list has one, the cap per artist.
+        func okSlot(_ c: Candidate) -> Bool {
+            fits(list, c, thinAid: request.thinAid) && withinCap(list, c, request.maxPerArtist)
+        }
         for p in list {
             used.insert(p.rid)
             if p.novel { novelSoFar += 1 }
@@ -167,7 +188,7 @@ public enum ListBuilder {
                 var best: Scored?
                 var bestKey: Int64 = 0
                 for s in scored {
-                    if s.novel || used.contains(s.c.rid) || !contains(aids, s.c.aid) || !fits(list, s.c, thinAid: request.thinAid) {
+                    if s.novel || used.contains(s.c.rid) || !contains(aids, s.c.aid) || !okSlot(s.c) {
                         continue
                     }
                     let key = BrainMath.orderKey(s.p)
@@ -179,7 +200,7 @@ public enum ListBuilder {
                 if best == nil {
                     // The best radio row of the newest anchor.
                     for s in scored {
-                        if s.newestSeedRank <= 0 || used.contains(s.c.rid) || !fits(list, s.c, thinAid: request.thinAid) {
+                        if s.newestSeedRank <= 0 || used.contains(s.c.rid) || !okSlot(s.c) {
                             continue
                         }
                         let key = -Int64(s.newestSeedRank)
@@ -200,10 +221,10 @@ public enum ListBuilder {
                 var bestKey: Int64 = 0
                 if request.likedAid != 0 {
                     for s in scored {
-                        if s.c.aid != request.likedAid || used.contains(s.c.rid) || !fits(list, s.c, thinAid: request.thinAid) {
+                        if s.c.aid != request.likedAid || used.contains(s.c.rid) || !okSlot(s.c) {
                             continue
                         }
-                        let key = BrainMath.orderKey(value(s, list, graph, request.lambda))
+                        let key = BrainMath.orderKey(value(s, list, graph, request))
                         if best == nil || better(key, s.c.rid, bestKey, best!.c.rid, request.tieSeed) {
                             best = s
                             bestKey = key
@@ -212,7 +233,7 @@ public enum ListBuilder {
                 }
                 if best == nil && request.likedRid != 0 {
                     for s in scored {
-                        if used.contains(s.c.rid) || !fits(list, s.c, thinAid: request.thinAid) { continue }
+                        if used.contains(s.c.rid) || !okSlot(s.c) { continue }
                         let sim = Similarity.sim(graph, s.c.rid, s.c.aid, request.likedRid, request.likedAid)
                         if sim <= 0.0 { continue }
                         let key = BrainMath.orderKey(sim)
@@ -238,7 +259,7 @@ public enum ListBuilder {
             if chosen == nil && kind == slotOpener {
                 // The trust opener: familiar, highest p, not played today.
                 for s in scored {
-                    if s.novel || used.contains(s.c.rid) || !fits(list, s.c, thinAid: request.thinAid) { continue }
+                    if s.novel || used.contains(s.c.rid) || !okSlot(s.c) { continue }
                     if s.lastMs != 0 && BrainMath.localDay(s.lastMs, tzOffsetMin: request.tzOffsetMin) == today { continue }
                     let key = BrainMath.orderKey(s.p - s.servedPen + s.noise)
                     if chosen == nil || better(key, s.c.rid, chosenKey, chosen!.c.rid, request.tieSeed) {
@@ -251,7 +272,7 @@ public enum ListBuilder {
 
             if chosen == nil && kind == slotCloser {
                 for s in scored {
-                    if s.novel || used.contains(s.c.rid) || !fits(list, s.c, thinAid: request.thinAid) { continue }
+                    if s.novel || used.contains(s.c.rid) || !okSlot(s.c) { continue }
                     let key = BrainMath.orderKey(s.p - s.servedPen + s.noise)
                     if chosen == nil || better(key, s.c.rid, chosenKey, chosen!.c.rid, request.tieSeed) {
                         chosen = s
@@ -265,17 +286,25 @@ public enum ListBuilder {
                 // A familiar or a novel slot; when its own kind has nobody, the other kind takes it (staying on
                 // topic beats the quota).
                 var wantNovel = kind == slotNovel
+                // First Listen (6.2): at least this share of the list comes from artists the listener never played.
+                let needNewArtist = request.minNewArtistShare > 0.0
+                    && Double(newArtistSoFar) < request.minNewArtistShare * Double(picks.count + 1)
                 var pass = 0
                 while pass < 2 && chosen == nil {
-                    for s in scored {
-                        if s.novel != wantNovel || used.contains(s.c.rid) || !fits(list, s.c, thinAid: request.thinAid) {
-                            continue
+                    var restrict = needNewArtist
+                    while chosen == nil {
+                        for s in scored {
+                            if s.novel != wantNovel || used.contains(s.c.rid) || !okSlot(s.c) {
+                                continue
+                            }
+                            if restrict && !s.c.artistNew { continue }
+                            let key = BrainMath.orderKey(value(s, list, graph, request))
+                            if chosen == nil || better(key, s.c.rid, chosenKey, chosen!.c.rid, request.tieSeed) {
+                                chosen = s
+                                chosenKey = key
+                            }
                         }
-                        let key = BrainMath.orderKey(value(s, list, graph, request.lambda))
-                        if chosen == nil || better(key, s.c.rid, chosenKey, chosen!.c.rid, request.tieSeed) {
-                            chosen = s
-                            chosenKey = key
-                        }
+                        if chosen == nil && restrict { restrict = false } else { break }
                     }
                     if chosen == nil { wantNovel = !wantNovel }
                     pass += 1
@@ -287,22 +316,36 @@ public enum ListBuilder {
             picks.append(Pick(scored: pick, kind: kind, key: chosenKey))
             used.insert(pick.c.rid)
             if pick.novel { novelSoFar += 1 }
+            if pick.c.artistNew { newArtistSoFar += 1 }
+            request.calibration?.add(pick.c.islandIdx)
             list.append(Prior(rid: pick.c.rid, aid: pick.c.aid, albumKey: pick.c.albumKey, novel: pick.novel))
         }
         return picks
     }
 
     /// `lambda * z - (1 - lambda) * max over the last slots j of sim(i, j)`.
-    private static func value(_ s: Scored, _ list: [Prior], _ graph: Graph, _ lambda: Double) -> Double {
+    private static func value(_ s: Scored, _ list: [Prior], _ graph: Graph, _ request: Request) -> Double {
         var maxSim = 0.0
         var back = 1
+        let source = request.simSource
         while back <= mmrWindow && list.count - back >= 0 {
             let p = list[list.count - back]
-            let sim = Similarity.sim(graph, s.c.rid, s.c.aid, p.rid, p.aid)
+            let sim = source != nil
+                ? source!.sim(s.c.rid, s.c.aid, p.rid, p.aid)
+                : Similarity.sim(graph, s.c.rid, s.c.aid, p.rid, p.aid)
             if sim > maxSim { maxSim = sim }
             back += 1
         }
-        return lambda * s.z - (1.0 - lambda) * maxSim - s.servedPen + s.noise
+        let gain = request.calibration != nil ? request.kappa * request.calibration!.gain(s.c.islandIdx) : 0.0
+        return request.lambda * s.z - (1.0 - request.lambda) * maxSim + gain - s.servedPen + s.noise
+    }
+
+    /// True when `c` may take the next slot under the cap per artist (First Listen); always true without a cap.
+    private static func withinCap(_ list: [Prior], _ c: Candidate, _ cap: Int) -> Bool {
+        if cap <= 0 || c.aid == 0 { return true }
+        var n = 0
+        for p in list where p.aid == c.aid { n += 1 }
+        return n < cap
     }
 
     /// Order: the key descending, then `splitmix64(rid xor seed)` ascending (unsigned), then rid ascending.

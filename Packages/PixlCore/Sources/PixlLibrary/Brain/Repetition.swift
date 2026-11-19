@@ -41,11 +41,14 @@ public enum Repetition {
         public var surface: Int32
         public var builtAtMs: Int64
         public var rids: [Int64]
+        /// Stage 2b: which list of its surface it was (`daily:<islandId>`, `your`, ...); empty for a stage 2a row.
+        public var surfaceId: String
 
-        public init(surface: Int32, builtAtMs: Int64, rids: [Int64]) {
+        public init(surface: Int32, builtAtMs: Int64, rids: [Int64], surfaceId: String = "") {
             self.surface = surface
             self.builtAtMs = builtAtMs
             self.rids = rids
+            self.surfaceId = surfaceId
         }
     }
 
@@ -69,11 +72,18 @@ public enum Repetition {
 
     /// The recordings that mixes of the same local day as `nowMs` already hold, except the lists of `exceptSurface`
     /// (a list that is being rebuilt replaces its own earlier build).
-    public static func takenOnDay(_ lists: [Served], nowMs: Int64, tzOffsetMin: Int32, exceptSurface: Int32 = -1) -> Set<Int64> {
+    public static func takenOnDay(_ lists: [Served], nowMs: Int64, tzOffsetMin: Int32, exceptSurface: Int32 = -1,
+                                  exceptId: String? = nil) -> Set<Int64> {
         let today = mixDay(nowMs, tzOffsetMin: tzOffsetMin)
         var out: Set<Int64> = []
         for list in lists {
-            if !isMixSurface(list.surface) || list.surface == exceptSurface { continue }
+            if !isMixSurface(list.surface) { continue }
+            // Stage 2b: with an id, only the very list being rebuilt is skipped; the other lists of its surface count.
+            if let exceptId {
+                if list.surface == exceptSurface && list.surfaceId == exceptId { continue }
+            } else if list.surface == exceptSurface {
+                continue
+            }
             if mixDay(list.builtAtMs, tzOffsetMin: tzOffsetMin) != today { continue }
             for rid in list.rids where rid != 0 { out.insert(rid) }
         }
