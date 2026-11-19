@@ -62,6 +62,16 @@ final class LyricsFeatureTests: XCTestCase {
         XCTAssertEqual(driver.rows.count, prepared.rows.count)
     }
 
+    func testChangingOffsetDuringPlaybackAcceptsABackwardNudgeOnTheNextFrame() {
+        let driver = LyricsDriver()
+        driver.setPlaying(true)
+        driver.engine.clock.tick(frameNanos: 0, rawMs: 2_000)
+        driver.offsetMs = -100
+        driver.engine.clock.tick(frameNanos: 40_000_000, positionMs: 2_040, offsetMs: driver.offsetMs)
+        XCTAssertEqual(driver.engine.clock.currentMs, 1_940)
+        XCTAssertTrue(driver.engine.clock.consumeSeek())
+    }
+
     func testLaunchOptionsParse() {
         let options = LyricsLaunchOptions(arguments: ["-lyricsDemo", "duet", "-lyricsFreezeMs", "42300", "-lyricsBrightArt"])
         XCTAssertEqual(options.demo, .duet)
@@ -81,6 +91,29 @@ final class LyricsFeatureTests: XCTestCase {
         XCTAssertEqual(preferences.offset(for: "b"), 500)
         preferences.setOffset(0, for: "a")
         XCTAssertEqual(preferences.offset(for: "a"), 0)
+    }
+
+    func testAdjustSyncUsesTheCurrentSongsSavedOffset() throws {
+        var first = try XCTUnwrap(DemoLibrary.songs.first)
+        first.id = UUID().uuidString
+        var second = first
+        second.id = UUID().uuidString
+        let store = LyricsStore()
+        let controller = LyricsController(store: store, settings: .ephemeral(), persistence: nil, isUITest: true)
+        defer { controller.preferences.setOffset(0, for: first.id) }
+
+        controller.preferences.setOffset(-300, for: first.id)
+        controller.ensureLoaded(for: first)
+        XCTAssertEqual(store.offsetMs, -300)
+        controller.setOffset(500, songId: first.id)
+        XCTAssertEqual(store.offsetMs, 500)
+        controller.ensureLoaded(for: second)
+        controller.setOffset(100, songId: first.id)
+        XCTAssertEqual(store.offsetMs, 0)
+        controller.ensureLoaded(for: first)
+        XCTAssertEqual(store.offsetMs, 500)
+        controller.setOffset(0, songId: first.id)
+        XCTAssertEqual(controller.preferences.offset(for: first.id), 0)
     }
 
     func testServiceStoresAndResetsLyrics() async throws {

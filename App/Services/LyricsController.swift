@@ -55,6 +55,7 @@ final class LyricsController {
         guard let song else {
             loadTask?.cancel()
             loadedSongId = nil
+            store.offsetMs = 0
             store.set(.idle)
             setLyrics(nil, songId: nil)
             return
@@ -66,8 +67,7 @@ final class LyricsController {
     func load(_ song: Song, forceRefresh: Bool) {
         loadTask?.cancel()
         loadedSongId = song.id
-        // Adjust sync is locked as broken (owner, 2026-10-26): whatever offset was stored is not applied (it is kept).
-        store.offsetMs = BrokenFeature.lyricsOffsetMs(stored: preferences.offset(for: song.id))
+        store.offsetMs = preferences.offset(for: song.id)
         if isUITest {
             if let demo = LyricsDemoContent.lyrics(LyricsLaunchOptions.current.demo) {
                 apply(LoadedLyrics(lyrics: demo, source: "demo"), songId: song.id)
@@ -119,8 +119,7 @@ final class LyricsController {
     // MARK: Offset
 
     func setOffset(_ ms: Int, songId: String) {
-        // Locked while Adjust sync is broken: nothing changes the offset, in memory or stored.
-        guard !BrokenFeature.lyricsAdjustSync.isLocked else { return }
+        guard loadedSongId == songId else { return }
         store.offsetMs = ms
         preferences.setOffset(ms, for: songId)
     }

@@ -81,7 +81,8 @@ struct LyricsView: View {
     }
 
     private var immersiveActive: Bool {
-        settings.lyrics.immersiveLyricsEnabled && showSyncedLyrics == true && !immersiveTemporarilyDisabled
+        settings.lyrics.immersiveLyricsEnabled && showSyncedLyrics == true
+            && !immersiveTemporarilyDisabled && !showSyncControls && !showMoreSheet
     }
 
     private var appearance: KaraokeLyricsAppearance {
@@ -307,9 +308,7 @@ struct LyricsView: View {
         // Android's floating instrumental toggle is the toolbar's Sing segment now (owner, 2026-10-07).
         LyricsControlCluster(
             chrome: chrome, brightArt: brightArt, isPlaying: playback.isPlaying,
-            // Adjust sync is locked as broken (owner, 2026-10-26): its offset row never shows.
-            showSyncControls: !BrokenFeature.lyricsAdjustSync.isLocked && showSyncedLyrics == true && lyrics?.synced != nil
-                && showSyncControls,
+            showSyncControls: showSyncedLyrics == true && showSyncControls,
             offsetMs: lyricsStore.offsetMs, hasLyrics: showSyncedLyrics != nil, song: song,
             canTranslate: lyrics != nil, clock: playback.clock,
             onOffsetChange: { ms in
@@ -382,8 +381,7 @@ struct LyricsView: View {
                 onReset: { if let song { controller.reset(song: song) } },
                 onToggleSyncControls: {
                     resetImmersive()
-                    // Animated, so the row's glass materialises (`glassEffectTransition(.materialize)`).
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) { showSyncControls.toggle() }
+                    showSyncControls.toggle()
                 },
                 onShuffle: { playback.setShuffleEnabled(!playback.isShuffleEnabled) },
                 onRepeat: { playback.setRepeatMode(LyricsView.nextRepeatMode(playback.repeatMode)) },
