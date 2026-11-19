@@ -534,3 +534,93 @@ Pushes of `music-brain` (workflow `ci`):
 
 Green CI means `App/` compiles and its unit tests pass. No test drives `HomeStore`'s release row, `BrainActions`' new methods, the new
 sheet rows or the queue's "Refresh picks" button, so it says nothing about whether they work on screen.
+
+## Review pass (an independent read of the whole stage 2a diff)
+
+The reviewer found nothing in the pure core (the golden files replay, the blob ids still equal Android's `music-brain` HEAD `5dde09d`, which
+changed no `:brain` file, so there was nothing to re-copy). The defects were in the privacy controls, the mixes, the refresh and the app glue:
+places no golden file covers. Every finding was read against the code; what was real is fixed, with a PixlCore test where the decision lives
+in PixlCore, and one AppTests test for the tracker. Nothing was run on a device.
+
+| Finding | Verdict |
+| --- | --- |
+| HomeAnchors ignored `learnExcluded` | real, fixed (`HomeAnchors.qualifies`) |
+| Seed queries ignored `learnExcluded` | real, fixed (`SeedQueries`, and `IgnoreTally.counts`, which is Android's `flags & 4096 = 0` on the ignore query too) |
+| Private and Don't count still fed the legacy counters | real, fixed (tracker `Record.learnExcluded`, taste and engagement skipped); history deliberately kept, deviation 96 |
+| Don't count did not reach imported plays | real, fixed (`excluded` map in `ReplayMerger.rebuild`, `importedPlayCount`, `ExcludedPlays.importedPlays`) |
+| Undo did not unflag the play in flight | real, fixed (`flaggedSongId`, `unmarkFlag`, `OpenPlay.unmark`) |
+| A forced rebuild was dropped while another ran | real, fixed (`rebuildAgain`) |
+| A private play cut off by a kill came back counted | real, fixed (tracker rewrites the saved open play when Private goes on; the engine also stamps it) |
+| `isStale` rebuilt the mix over and over | real, fixed (deviation 94) |
+| The brain overlay reverted an AI-refined Daily Mix | real, fixed (deviation 102) |
+| `topArtistSeeds` lacked `NO_ARTIST_NAMES`, and unresolvable artists starved the releases lane | real, fixed (filter, misses back off, deviation 100) |
+| Shortlist cache key had no favourites; saved-mix floor 10 vs 3 | real, fixed (key carries a favourites hash; floor 3, as Android) |
+| Off switch did not stop the BG task being requested | real, fixed (`scheduleFromLastRun` cancels the pending request) |
+| BG and foreground refresh could overlap | real, fixed (one `refreshRunning` flag in `runRefresh`) |
+| `KeyedLogStore.remove` was quadratic | real, fixed (a `Set`) |
+| Connect: a failed lookup drained the pool; no words; Refresh did nothing | real, fixed (tri-state answer, a line, the button is hidden); the mix-row marker is deferred |
+| Refresh picks offered on Connect | real, fixed (hidden) |
+| First open of the day did brain work 4 s after launch | partly real: the state load is needed to build the day's first mix; the rebuild it used to start now waits 15 s (deviation 99) |
+| Releases lane could exceed its 14 requests | real, fixed (each request is checked against what is left; the channel lookup is counted) |
+| Copy promised more than the code did | the leaks it described are fixed; "never in two mixes" is the spec's promise 2 and holds when the brain owns the mixes (see "Not met" below) |
+| Library-less artist station matched names with `lowercased()` | real, fixed (`BrainText.fold` passed from the app) |
+| The top seed group could be filled by engine picks | real, fixed for tracks outside the library (deviation 95); Android has the same code |
+
+### Deviations 93 and on
+
+93. **`learnExcluded` is honoured by `HomeAnchors`, `SeedQueries.recentChosen` / `recentlySaved` and `IgnoreTally.counts`** (Android: `LEARN_EXCLUDED` in
+    `HomeAnchorStore.qualifies`, `(flags & 4096) = 0` in the three queries). An Undo of Don't count does not rewrite the ignore tally (it is a cache;
+    the rows rebuild from the log when it is next read).
+94. **A stale mix is built again once**, not "whenever radios are cached and ten minutes passed": `isStale` also needs fewer than two builds of the
+    surface today. Android has the loop the reviewer found (`seedLists == 0` after the rebuild too); not changed there.
+95. **Seeds of the "top" group from outside the library need a chosen play** (finished or saved in the seed windows); library tracks are as before.
+96. **The play history file is not flagged**: a private or Don't-count play is still in `playback_history.json` (Recently Played, listening time), as on
+    Android (its deviation 124), because that file is Android-exact and has no field for it. The legacy taste counters and engagement rows skip it.
+    The legacy Home rankers read engagement from that history, so a private song can still lift a legacy-ranked list. Not closed.
+97. **Imported plays of a song are counted by key** (Spotify id, YouTube id, name key) in `BrainEngine.importedPlayCount`, off the actor, where Android
+    asks its table for `countOfSpotifyTrack`. The count is the number the bar reports; the rebuild leaves them out through the `feedback` row
+    (`ReplayMerger.rebuild(excluded:)`, targets of kind song only, as Android). Album, playlist and last-hour rows reach stored plays only.
+98. **A forced rebuild asked for during a rebuild is queued**: one more full run follows the current one (`rebuildAgain`); a delayed first run is cut short.
+99. **A rebuild started by the first use of the state waits 15 s** (`BrainEngine.appRebuildDelayMs`; tests wait for nothing). A forced one never waits.
+100. **The releases lane**: `check(maxRequests:)` stops before the request that would pass the lane's share, the channel lookup is counted through
+     `noteRequests`, and an artist whose channel or page could not be had is written as a state with an empty channel id (`noteMiss`), so
+     `checkOrder` puts it after the ones not yet looked at. `channelOf` ignores such an entry.
+101. **`canPlay` answers `[Bool?]`**: nil is a lookup that failed or hit the limit (the pick stays in the pool, only left out of this plan); false is
+     "Spotify does not have it" (as before). The queue's Autoplay line says "On Spotify, picks Spotify has are queued" while the output is Connect.
+102. **A Daily Mix refined with AI stays for the local day**: `setDailyMix` stores the epoch day; the brain's overlay and its legacy-key writes leave Daily
+     Mix alone that day. A regenerate ends it. Your Mix is not affected. After a restart the legacy saved ids (the AI list) show.
+103. **The pending BG request is cancelled when the refresh is off**; `runRefresh` is single-flight for both entry points.
+104. **`BrainMixes.minSongs` is 3** (Android's `MIN_SAVED_SONGS`), and `topArtistSeeds` skips "various artists", "unknown artist", "unknown", "va", "<unknown>".
+105. **`KeyedLogStore.remove`** is linear; a large prune is one append.
+
+### Not met, said plainly
+
+- A private play still reaches Recently Played and the legacy rankers' engagement (deviation 96).
+- Connect: a Daily Mix row that Spotify lacks is still skipped without a word (no marker in the mix screens).
+- "A song is never in two mixes on the same day" holds only when the brain owns the mixes: not with the engine switch on legacy, not below ten
+  heard tracks, and not for an AI-refined Daily Mix beside Your Mix.
+- The BG task can only ask for a network; "battery not low" has no iOS equivalent beyond Low Power Mode.
+- The first mix of a day still loads the brain's state about 4 s after launch (a small read); only the rebuild moved.
+
+### How to test on a phone, review pass
+
+1. Private session on (How picks work), play three songs to the end, switch it off. Home, "Because you listened to": none of the three. Daily Mix
+   tomorrow and "Fans of" rows: none about them. Kill the app in the middle of a private song and reopen: that song counts for nothing.
+2. A song with Spotify history imported, none played here: song sheet, "Don't count this". The bar must not say "nothing to leave out". After about a
+   minute its picks stop leaning on it; Undo brings it back.
+3. "Don't count this" on the playing song, then Undo before the song ends: the play counts.
+4. Refine Daily Mix with AI, scroll Home away and back, play a song to the end: the AI list stays. Kill and reopen: it stays.
+5. A fresh day: open Home first with Wi-Fi off, then on; the Daily Mix does not change under you more than once.
+6. Settings > Background music search off: Settings app > PixlAudio > Background App Refresh shows no new wake-ups next day.
+7. On a Spotify Connect speaker: Autoplay line reads "On Spotify, picks Spotify has are queued"; no "Refresh picks".
+8. Artist station for "Sigur Rós" typed as "Sigur Ros" in a library-less search: it starts.
+
+### Unverified on a device (all of it), beyond milestone 2's list
+
+The tracker flags (`setPrivate`, `markFlag`, `unmarkFlag`) and the saved open play across a kill; the imported-play exclusion on a real Spotify export;
+Home across the AI refine; the 15 s delayed rebuild; the pending-request cancel; the Connect line and a failed lookup keeping its picks; the
+releases lane's per-request cap on a real day; the Swift 6 concurrency of the new `App/` lines (CI says).
+
+### Commands and results, review pass
+
+See "CI, review pass" below once the run has finished.

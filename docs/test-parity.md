@@ -131,6 +131,9 @@ Status: **ported** (all cases) · **partial** (list what's missing) · **n/a** (
 | _Android backup code (not an app test)_ | 764 vectors | `BackupGoldenTests` (15 tests) | PixlBackup | new | See below. |
 | _JDK `Deflater` (not an app test)_ | 44 streams | `InflateTests.inflatesJavaDeflaterOutput` | PixlBackup | new | Fixture `inflate-cases.jsonl`. |
 
+### Swift-only tests added in the stage 2a review pass (iOS)
+`BrainMixesTests` (a mix with no new music is built again once, not every ten minutes; a saved mix with three rows left is the day's mix; a like reaches the shortlist; a credit that names nobody is never a top-artist seed; an engine pick that ran through on Autoplay seeds nothing), `BrainStage2aM2Tests` (a private play is no Home anchor, seed or ignore; a play cut off while private is saved as left out; Don't count reaches imported plays and Undo brings them back; nothing stored, imported or in flight leaves nothing to exclude; a forced rebuild during a rebuild is not dropped; a page that does not load goes to the back of the order; a check never spends more than it was given), `AppTests/AutoplayQueueTests` (the tracker leaves a private or Don't-count play out of the legacy counters; Undo puts it back unless Private overlapped it). Android's twins: `LearnExclusionTest`, `ListeningStatsTrackerBrainTest`, `DailyMixBrainPathTest`, `BrainRefreshReleasesLaneTest` (its review additions); several of these have no Android test.
+
 ### Swift-only tests added in stage 2a
 `SpringTests` (textbook closed forms for under/critically/over-damped and undamped springs, ms truncation,
 convergence with the lyrics engine's rest thresholds, retarget continuity), `EasingTests` (bisection reference,
