@@ -226,11 +226,21 @@ public struct BrainRefreshWork: RefreshWork {
         let since = clock() - HostBudget.dayMs
         if await newReleases.requestsSince(since) >= Self.releasesDailyCeiling { return .none }
         var channel = await newReleases.channelOf(target.artistName)
-        if channel == nil { channel = await repository.artistChannelId(seed: target.seed, allowNetwork: true) }
+        if channel == nil {
+            // The lookup is one request of the lane's day (counted whatever it finds: a failed call took a token too).
+            channel = await repository.artistChannelId(seed: target.seed, allowNetwork: true)
+            await newReleases.noteRequests(1)
+            if channel == nil { await newReleases.noteMiss(artistName: target.artistName) }
+        }
         guard let channel else { return .none }
         if await newReleases.isFresh(channel) { return .cached }
+        // What is left of the lane's share: no single request of the check goes past it.
+        let left = Self.releasesDailyCeiling - (await newReleases.requestsSince(since))
+        if left < 1 { return .none }
         let index = BrainLibraryIndex(songs: await librarySongs())
-        return await newReleases.check(channelId: channel, artistName: target.artistName) { row in index.match(row) != nil }
+        return await newReleases.check(channelId: channel, artistName: target.artistName, maxRequests: left) { row in
+            index.match(row) != nil
+        }
     }
 
     /// A seed without a known YouTube audio id is not a seed: matching it is the matcher's job (3.6).

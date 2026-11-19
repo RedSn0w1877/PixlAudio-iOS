@@ -63,15 +63,16 @@ struct BrainMixesTests {
 
         /// Resolves the library into recordings and writes the listener's history: songs 0..<30 played to the end twice.
         func listen(_ repository: BrainRepository, songs: Range<Int> = 0..<30) async {
-            let requests = library.map { TrackRequest(keys: TrackCatalog.facts(of: $0)!.keys, durationMs: 200_000) }
+            let lib = libraryOverride.value ?? library
+            let requests = lib.map { TrackRequest(keys: TrackCatalog.facts(of: $0)!.keys, durationMs: 200_000) }
             let rids = await repository.resolveTracks(requests)
-            let aids = await repository.resolveArtistNames(library.map { BrainLibraryIndex.primaryArtistName($0) })
+            let aids = await repository.resolveArtistNames(lib.map { BrainLibraryIndex.primaryArtistName($0) })
             var events: [PlayEvent] = []
             var session: Int64 = 1
             let order = Array(songs) + Array(songs)
             for (round, i) in order.enumerated() {
                 let at = BrainMixesTests.start - Int64(72 - round) * 3_600_000
-                let key = "s:\(library[i].spotifyId ?? "")"
+                let key = "s:\(lib[i].spotifyId ?? "")"
                 events.append(PlayEvent(
                     eventId: PlayEvent.mintId(startedAtMs: at, origin: Origin.live, keyAtWrite: key + "#\(round)") { _ in nil },
                     origin: Origin.live, rid: rids[i], primaryAid: aids[i], keyAtWrite: key + "#\(round)", startedAtMs: at,
@@ -301,9 +302,10 @@ struct BrainMixesTests {
         world.libraryOverride.value = world.library.filter { !leaving.contains($0.id) }
         let trimmed = try #require(await mixes.saved(kind: MixPlanner.kindDaily))
         #expect(trimmed.songs.count == 26 && Set(ids(trimmed)).isDisjoint(with: leaving))
-        // Everything of the library gone: too little is left to be a mix, so the caller builds another.
+        // Everything of the library gone: what is left (the outside rows) is a mix while at least `minSongs` remain.
         world.libraryOverride.value = []
-        #expect(await mixes.saved(kind: MixPlanner.kindDaily) == nil)
+        let outsideOnly = await mixes.saved(kind: MixPlanner.kindDaily)
+        #expect((outsideOnly == nil) == (daily.novelIds.count < BrainMixes.minSongs))
         world.libraryOverride.value = nil
 
         // A blocked artist: not in the list that is built next, library or outside.
@@ -448,5 +450,130 @@ struct BrainMixesTests {
         #expect(!targets.isEmpty)
         #expect(targets.allSatisfy { $0.seed.videoId.hasPrefix("vid-lib") && $0.seed.spotifyId != nil })
         #expect(await work.requestsLeft() == BrainRefreshWork.workerDailyCeiling)
+    }
+
+    // MARK: Review fixes (stage 2a, iOS)
+
+    @Test func aMixBuiltWithoutNewMusicIsBuiltAgainOnceNotEveryTenMinutes() async throws {
+        let world = World()
+        defer { world.tidy() }
+        let repository = world.repository()
+        await world.listen(repository)
+        let mixes = world.mixes(repository, world.engine(repository))
+        let plain = try #require(await mixes.today(kind: MixPlanner.kindDaily))
+        #expect(plain.seedLists == 0 && plain.novelIds.isEmpty)
+        // A radio exists in the cache (Autoplay fetched one for a track outside the library), but none for today's seeds.
+        var foreign = world.radio(forLibrarySong: 59)
+        foreign = FetchedRadio(rows: foreign.rows, relatedBrowseId: foreign.relatedBrowseId)
+        world.source.set("foreign", foreign)
+        _ = await repository.radioFor(seed: RadioSeed(mediaId: "yt:foreign", videoId: "foreign", title: "Foreign Song",
+                                                        primaryArtist: "Foreign Artist", durationMs: 200_000), allowNetwork: true)
+        world.clock.value += 11 * 60_000
+        #expect(await mixes.saved(kind: MixPlanner.kindDaily) == nil, "stale once: the radio is in the cache now")
+        let again = try #require(await mixes.today(kind: MixPlanner.kindDaily))
+        #expect(again.seedLists == 0, "none of today's seeds has a radio")
+        // Later the same day: it is the day's mix. It is not drawn again, and no more builds are served.
+        world.clock.value += 11 * 60_000
+        let saved = try #require(await mixes.saved(kind: MixPlanner.kindDaily))
+        #expect(ids(saved) == ids(again))
+        let builtBefore = world.built.value
+        world.clock.value += 11 * 60_000
+        _ = try #require(await mixes.today(kind: MixPlanner.kindDaily))
+        #expect(world.built.value == builtBefore, "no third build")
+    }
+
+    @Test func aSavedMixThatLostMostOfItsRowsIsStillTheDaysMixWhileThreeRemain() async throws {
+        let world = World()
+        defer { world.tidy() }
+        let repository = world.repository()
+        await world.listen(repository)
+        let mixes = world.mixes(repository, world.engine(repository))
+        let first = try #require(await mixes.today(kind: MixPlanner.kindDaily))
+        #expect(first.songs.count == 30)
+        // The library loses all but five of the mix's songs.
+        let keep = Set(first.songs.prefix(5).map(\.id))
+        world.libraryOverride.value = world.library.filter { keep.contains($0.id) }
+        let after = try #require(await mixes.saved(kind: MixPlanner.kindDaily))
+        #expect(after.songs.count == 5 && BrainMixes.minSongs == 3)
+        world.libraryOverride.value = world.library.filter { Set(first.songs.prefix(2).map(\.id)).contains($0.id) }
+        #expect(await mixes.saved(kind: MixPlanner.kindDaily) == nil, "two left is not a mix")
+    }
+
+    @Test func aLikeChangesWhatTheShortlistMarksAsLikedAtOnce() async throws {
+        let world = World()
+        defer { world.tidy() }
+        let repository = world.repository()
+        await world.listen(repository)
+        let mixes = world.mixes(repository, world.engine(repository))
+        _ = try #require(await mixes.today(kind: MixPlanner.kindDaily))
+        let before = await mixes.topArtistSeeds()
+        #expect(!before.isEmpty)
+        // A like changes the library rows (the same size, the same day): the cached slice must not be reused.
+        var liked = world.library
+        liked[40].isFavorite = true
+        world.libraryOverride.value = liked
+        let seeds = await mixes.seedsForRefresh()
+        #expect(!seeds.isEmpty)
+        let shortlisted = seeds.compactMap(\.song).first { $0.id == liked[40].id }
+        if let shortlisted { #expect(shortlisted.isFavorite) }
+    }
+
+    @Test func aCreditThatNamesNobodyIsNeverATopArtistSeed() async throws {
+        let world = World()
+        defer { world.tidy() }
+        let repository = world.repository()
+        // Artist 0 and artist 1 of the library are credited as compilations and as nobody.
+        world.libraryOverride.value = world.library.enumerated().map { i, song in
+            guard i % 12 < 2 else { return song }
+            var renamed = song
+            renamed.artist = i % 12 == 0 ? "Various Artists" : "Unknown Artist"
+            renamed.artists = []
+            return renamed
+        }
+        await world.listen(repository)
+        let mixes = world.mixes(repository, world.engine(repository))
+        let artists = await mixes.topArtistSeeds()
+        #expect(!artists.isEmpty)
+        for seed in artists {
+            let folded = BrainText.fold(seed.artist)
+            #expect(folded != "various artists" && folded != "unknown artist", "\(seed.artist)")
+        }
+    }
+
+    @Test func anEnginePickThatMerelyRanThroughIsNotATopSeedButOneTheListenerChoseIs() async throws {
+        let world = World()
+        defer { world.tidy() }
+        let repository = world.repository()
+        await world.listen(repository)
+        // Two outside tracks, each played through 40 times (so each is in the top 40 by affinity): one from Autoplay (arm 1),
+        // one the listener chose (arm none).
+        let picks = [(video: "ride-auto", arm: Arm.radio), (video: "ride-chosen", arm: Arm.none)]
+        var events: [PlayEvent] = []
+        var tracks: [EngineTrack] = []
+        for (n, pick) in picks.enumerated() {
+            let row = RadioRow(videoId: pick.video, title: "Outside \(n)",
+                               artists: [RadioArtistRef(name: "Outside Artist \(n)", channelId: "UCo\(n)")], durationSec: 200, kind: .atv)
+            let rid = await repository.resolveTracks([TrackRequest(keys: Ids.TrackKeys(videoId: pick.video), durationMs: 200_000)])[0]
+            let aid = await repository.resolveArtistNames(["Outside Artist \(n)"])[0]
+            tracks.append(EngineTrack(row: row, rid: rid))
+            for k in 0..<40 {
+                let at = BrainMixesTests.start - Int64(300 - k - n * 50) * 60_000
+                events.append(PlayEvent(
+                    eventId: PlayEvent.mintId(startedAtMs: at, origin: Origin.live, keyAtWrite: "y:\(pick.video)#\(k)") { _ in nil },
+                    origin: Origin.live, rid: rid, primaryAid: aid, keyAtWrite: "y:\(pick.video)#\(k)", startedAtMs: at,
+                    tzOffsetMin: 60, playedMs: 200_000, durationMs: 200_000, startReason: StartReason.autoAdvance,
+                    endReason: EndReason.trackDone, surface: Surface.autoplay, arm: pick.arm, sessionId: 9))
+            }
+        }
+        await repository.registerPlayable(tracks, nowMs: BrainMixesTests.start)
+        let log = BrainEventLog(directory: world.directory)
+        let state = Replay.rebuild(events, facts: .empty, nowMs: BrainMixesTests.start)
+        log.insert(events)
+        log.upsertAffinity(state.rows())
+        let mixes = world.mixes(repository, world.engine(repository))
+        let seeds = await mixes.seedsForRefresh()
+        let videoIds = Set(seeds.compactMap { $0.playable?.videoId })
+        #expect(!videoIds.contains("ride-auto"), "an engine pick that ran through on Autoplay seeds nothing")
+        #expect(videoIds.contains("ride-chosen"), "a track the listener chose and finished does")
     }
 }

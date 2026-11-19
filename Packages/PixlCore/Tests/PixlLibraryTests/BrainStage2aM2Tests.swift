@@ -487,7 +487,54 @@ struct BrainNewReleasesTests {
         #expect(order.first == "Never")
         #expect(await releases.channelOf("B") == "UCB")
     }
+
+    @Test func aPageThatDoesNotLoadSendsTheArtistToTheBackOfTheOrder() async {
+        let dir = makeDirectory("new-releases-miss")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let source = FakeSource()
+        let clock = Clock(t0)
+        let releases = newReleases(dir, source, clock: clock)
+        // "Bad" has no page; "Good" was never looked at. Never-checked artists go first, so "Bad" would lead at every run.
+        #expect(await releases.check(channelId: "UCBad", artistName: "Bad") == .none)
+        let order = await releases.checkOrder(["Bad", "Good"])
+        #expect(order == ["Good", "Bad"], "the one that failed is looked at after the ones never looked at")
+        // An artist whose channel could not be found is a miss too, and a miss is not a channel.
+        await releases.noteMiss(artistName: "Various Artists")
+        #expect(await releases.checkOrder(["Various Artists", "Fresh"]) == ["Fresh", "Various Artists"])
+        #expect(await releases.channelOf("Various Artists") == nil)
+        // The lookup of a channel is a request of the day.
+        let before = await releases.requestsSince(0)
+        await releases.noteRequests(2)
+        #expect(await releases.requestsSince(0) == before + 2)
+    }
+
+    @Test func aCheckNeverSpendsMoreThanItWasGiven() async {
+        let dir = makeDirectory("new-releases-cap")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let source = FakeSource()
+        let clock = Clock(t0)
+        let releases = newReleases(dir, source, clock: clock)
+        let ten = (1...10).map { release("MPREb_\($0)", "Title \($0)") }
+        source.setPage("UCA", artistPage("A", albums: ten))
+        source.setDiscography("UCA", ten)
+        #expect(await releases.check(channelId: "UCA", artistName: "A") == .network)
+        // A day later a new release: the page, the discography and the release's tracks would be three requests. Given two,
+        // the tracks are not asked for, and the release stays "not seen" for the next check.
+        clock.now = t0 + 25 * 3_600_000
+        let fresh = release("MPREb_new", "New One")
+        source.setPage("UCA", artistPage("A", albums: [fresh] + ten.dropLast()))
+        source.setDiscography("UCA", [fresh] + ten)
+        source.setTracks("MPREb_new", (1...4).map { radioRow(900 + $0, "A") })
+        #expect(await releases.check(channelId: "UCA", artistName: "A", maxRequests: 2) == .network)
+        #expect(await releases.requestsSince(clock.now) == 2, "the page and the discography, nothing more")
+        #expect(!source.log.contains("release:MPREb_new"))
+        // With room, the next check reads it.
+        clock.now = t0 + 50 * 3_600_000
+        #expect(await releases.check(channelId: "UCA", artistName: "A") == .network)
+        #expect(source.log.contains("release:MPREb_new"))
+    }
 }
+
 
 // MARK: - Feedback and the engine
 
@@ -497,12 +544,12 @@ private struct Harness {
     let repository: BrainRepository
     let engine: BrainEngine
 
-    init() {
+    init(sources: BrainEngine.Sources? = nil) {
         directory = makeDirectory("brain-m2")
         let clock = Clock(t0)
         self.clock = clock
         repository = BrainRepository(directory: directory, radioSource: nil, clock: { clock.now })
-        engine = BrainEngine(directory: directory, repository: repository, sources: nil, clock: { clock.now })
+        engine = BrainEngine(directory: directory, repository: repository, sources: sources, clock: { clock.now })
     }
 
     func cleanUp() { try? FileManager.default.removeItem(at: directory) }
@@ -698,7 +745,150 @@ struct BrainFeedbackActionsTests {
         #expect(BrainEventLog.decodeSorted(log.eventPayloads(startedSince: t0 + 600_000)).count == 3)
         #expect(BrainEventLog.decodeSorted([[0x7B], Array("not json".utf8)]).isEmpty)
     }
+
+    // MARK: Review fixes (stage 2a, iOS)
+
+    @Test func aPrivatePlayIsNeitherAHomeAnchorNorASeedNorAnIgnoreButAnOrdinaryOneIs() async {
+        let h = Harness()
+        defer { h.cleanUp() }
+        await h.engine.setPrivate(true)
+        await h.play("1", "Private song", "Zed", at: t0 + 1_000)
+        h.clock.now = t0 + 400_000
+        await h.engine.setPrivate(false)
+        await h.play("2", "Ordinary song", "Zed", at: t0 + 600_000)
+        let events = await h.engine.events()
+        #expect(events.count == 2 && events[0].has(EventFlags.learnExcluded) && !events[1].has(EventFlags.learnExcluded))
+        // Home anchors: only the ordinary play.
+        let anchors = await h.engine.homeAnchors()
+        #expect(anchors.map(\.title) == ["Ordinary song"])
+        // The refresh's seeds: only the ordinary play, in both groups.
+        let recent = SeedQueries.recentChosen(events, sinceMs: 0, limit: 10)
+        #expect(recent.map(\.rid) == [events[1].rid])
+        var liked = events
+        for i in liked.indices { liked[i].flags |= EventFlags.likedDuring }
+        #expect(SeedQueries.recentlySaved(liked, sinceMs: 0, limit: 10).map(\.rid) == [events[1].rid])
+        // The ignore tally of 6.1: a flagged play counts for neither an ignore nor a clearing play.
+        var skipped = events[0]
+        skipped.arm = Arm.radio
+        skipped.playedMs = 5_000
+        skipped.endReason = EndReason.next
+        #expect(IgnoreTally.counts(skipped) == false)
+        skipped.flags &= ~EventFlags.learnExcluded
+        #expect(IgnoreTally.counts(skipped) == true)
+    }
+
+    @Test func aPlayCutOffWhilePrivateIsSavedAsLeftOut() async throws {
+        let h = Harness()
+        defer { h.cleanUp() }
+        let context = PlayContext(title: "Song", artistDisplay: "Zed", artists: ["Zed"], spotifyId: nil, videoId: "v1",
+                                  inLibrary: false, startReason: StartReason.tap, tag: nil)
+        let open = FinishedPlay(songId: "yt:v1", context: context, startedAtMs: t0, playedMs: 60_000, durationMs: 200_000,
+                                endReason: EndReason.killed, flags: 0, tzOffsetMin: 0)
+        await h.engine.setOpenPlay(open)
+        var saved = try #require(await h.engine.storedValue(BrainEventLog.keyOpenPlay))
+        #expect(try #require(OpenPlayCodec.decode(saved)).flags & EventFlags.learnExcluded == 0)
+        await h.engine.setPrivate(true)
+        await h.engine.setOpenPlay(open)
+        saved = try #require(await h.engine.storedValue(BrainEventLog.keyOpenPlay))
+        #expect(try #require(OpenPlayCodec.decode(saved)).flags & EventFlags.learnExcluded != 0)
+    }
+
+    @Test func anOpenPlayTakesAFlagBack() {
+        let context = PlayContext(title: "Song", artistDisplay: "Zed", artists: ["Zed"], spotifyId: nil, videoId: "v1",
+                                  inLibrary: false, startReason: StartReason.tap, tag: nil)
+        var play = OpenPlay(songId: "yt:v1", context: context, startedAtEpochMs: t0, tzOffsetMin: 0, durationMs: 200_000,
+                            isPlaying: true, realtimeMs: 0)
+        play.mark(EventFlags.learnExcluded | EventFlags.likedDuring)
+        play.unmark(EventFlags.learnExcluded)
+        #expect(play.flags & EventFlags.learnExcluded == 0 && play.flags & EventFlags.likedDuring != 0)
+    }
+
+    private func dreams() -> (song: Song, imported: [ImportedPlay]) {
+        let song = testSong("a", title: "Dreams", artist: "Fleetwood Mac", duration: 257_000, spotifyId: "4uLU6hMCjMI75M1A2tKUQC")
+        let imported = (0..<3).map { i in
+            ImportedPlay(source: .spotifyExport, timestampMs: t0 - Int64(10 - i) * 86_400_000, title: "Dreams", artist: "Fleetwood Mac",
+                         spotifyTrackId: "4uLU6hMCjMI75M1A2tKUQC", msPlayed: 200_000, reasonEnd: "trackdone")
+        }
+        return (song, imported)
+    }
+
+    @Test func dontCountReachesTheImportedPlaysOfASongAndUndoBringsThemBack() async throws {
+        let (song, imported) = dreams()
+        let sources = BrainEngine.Sources(library: { [song] }, history: { [] }, importSignature: { "3|x" },
+                                          imported: { (imported, ExternalTasteSnapshot()) }, adjustments: { [] })
+        let h = Harness(sources: sources)
+        defer { h.cleanUp() }
+        // The state loads and the first rebuild reads the import.
+        _ = await h.engine.heardTrackCount()
+        await h.engine.awaitRebuild()
+        let keys = try #require(TrackCatalog.facts(of: song)).keys
+        let rid = await h.repository.resolveTracks([TrackRequest(keys: keys, durationMs: 257_000)])[0]
+        #expect(await h.engine.readAffinity { $0.completions[rid] } == 3)
+        // There is no stored play at all: only the import. The old code answered "nothing to leave out" here.
+        let count = await h.engine.importedPlayCount(keys: keys)
+        #expect(count == 3)
+        let excluded = try #require(await h.engine.excludeRecordings(rids: [rid], targetKind: FeedbackKinds.targetSong,
+                                                                     targetId: rid, importedPlays: count))
+        #expect(excluded.count == 3 && excluded.eventIds.isEmpty)
+        await h.engine.awaitRebuild()
+        #expect(await h.engine.readAffinity { $0.completions[rid] } == nil, "the rebuild left the imported plays out")
+        // Undo: the plays count again, from the rebuild that follows.
+        await h.engine.undoExclusion(excluded)
+        await h.engine.awaitRebuild()
+        #expect(await h.engine.readAffinity { $0.completions[rid] } == 3)
+    }
+
+    @Test func nothingStoredNothingImportedAndNothingInFlightLeavesNothingToExclude() async throws {
+        let h = Harness()
+        defer { h.cleanUp() }
+        await h.play("1", "Song", "Zed", at: t0)
+        let rid = try #require(await h.engine.events().first?.rid)
+        let first = try #require(await h.engine.excludeRecordings(rids: [rid], targetKind: FeedbackKinds.targetSong, targetId: rid))
+        #expect(first.count == 1)
+        // Already flagged: no row, no rebuild.
+        let rows = await h.engine.feedbackCount()
+        #expect(await h.engine.excludeRecordings(rids: [rid], targetKind: FeedbackKinds.targetSong, targetId: rid) == nil)
+        #expect(await h.engine.feedbackCount() == rows)
+        // A play in flight alone is enough for a row (and an Undo), and asks for no rebuild.
+        let inFlight = try #require(await h.engine.excludeRecordings(rids: [rid], targetKind: FeedbackKinds.targetSong, targetId: rid,
+                                                                     flaggedSongId: "yt:v1"))
+        #expect(inFlight.count == 1 && inFlight.flaggedSongId == "yt:v1" && inFlight.eventIds.isEmpty)
+    }
+
+    private final class Counter: @unchecked Sendable {
+        private let lock = NSLock()
+        private var stored = 0
+        var value: Int { lock.lock(); defer { lock.unlock() }; return stored }
+        func bump() { lock.lock(); stored += 1; lock.unlock() }
+    }
+
+    @Test func aForcedRebuildAskedForWhileAnotherRunsIsNotDropped() async throws {
+        let (song, imported) = dreams()
+        let signatures = Counter()
+        let slow = Counter()
+        let sources = BrainEngine.Sources(
+            library: { [song] }, history: { [] },
+            importSignature: {
+                signatures.bump()
+                // The first run is slow to start, so the request below lands while it is in flight.
+                if slow.value == 0 {
+                    slow.bump()
+                    try? await Task.sleep(for: .milliseconds(400))
+                }
+                return "3|x"
+            },
+            imported: { (imported, ExternalTasteSnapshot()) }, adjustments: { [] })
+        let h = Harness(sources: sources)
+        defer { h.cleanUp() }
+        _ = await h.engine.heardTrackCount()
+        for _ in 0..<100 where signatures.value == 0 { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(signatures.value == 1)
+        await h.engine.requestRebuild(force: true)
+        await h.engine.awaitRebuild()
+        #expect(signatures.value == 2, "the forced request ran after the first rebuild instead of being dropped")
+    }
 }
+
 
 // MARK: - The controls' decisions
 

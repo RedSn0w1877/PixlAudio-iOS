@@ -275,13 +275,15 @@ public enum SeedQueries {
     public static func recentChosen(_ events: [PlayEvent], sinceMs: Int64, limit: Int) -> [RecentTrack] {
         newest(events.filter {
             $0.startedAtMs >= sinceMs && $0.endReason == EndReason.trackDone && !$0.has(EventFlags.neverAudible)
-                && $0.playedMs >= finishedMs && ($0.arm == Arm.none || $0.flags & chosenFlags != 0)
+                && !$0.has(EventFlags.learnExcluded) && $0.playedMs >= finishedMs && ($0.arm == Arm.none || $0.flags & chosenFlags != 0)
         }, limit: limit)
     }
 
     /// Tracks liked or saved while they played since `sinceMs`, newest first.
     public static func recentlySaved(_ events: [PlayEvent], sinceMs: Int64, limit: Int) -> [RecentTrack] {
-        newest(events.filter { $0.startedAtMs >= sinceMs && $0.flags & likedOrSaved != 0 }, limit: limit)
+        newest(events.filter {
+            $0.startedAtMs >= sinceMs && $0.flags & likedOrSaved != 0 && !$0.has(EventFlags.learnExcluded)
+        }, limit: limit)
     }
 
     /// One row per recording, with its newest play; newest first, ties by recording id.

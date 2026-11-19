@@ -172,16 +172,25 @@ public actor BrainEngine {
     /// Private session (8.5): the spans of this process, memory only.
     var privateSpans = PrivateSpans()
     var privateRowId: Int64 = 0
-    private let sources: Sources?
+    let sources: Sources?
     var loaded: Loaded?
     private var rebuildTask: Task<Void, Never>?
+    /// A forced rebuild asked for while another ran: the running one read the log before the change, so one more follows.
+    private var rebuildAgain = false
     private var recordedDuringRebuild: [PlayEvent]?
     private var recoveredKilledPlay = false
     /// 6.1 "ignored three times": read with the first pool or Home row that asks, then kept current.
     private var ignoreTally: IgnoreTally?
 
-    public init(directory: URL, repository: BrainRepository, sources: Sources?,
+    /// How long a rebuild that the first use of the state asked for (not a forced one) waits: the listener is scrolling Home or
+    /// starting a song then, and a rebuild reads the whole log. The app passes `BrainEngine.appRebuildDelayMs`; tests wait for nothing.
+    public static let appRebuildDelayMs: Int64 = 15_000
+    private let rebuildDelayMs: Int64
+    private var rebuildDelayCut = false
+
+    public init(directory: URL, repository: BrainRepository, sources: Sources?, rebuildDelayMs: Int64 = 0,
                 clock: @escaping @Sendable () -> Int64 = { currentTimeMillis() }) {
+        self.rebuildDelayMs = rebuildDelayMs
         log = BrainEventLog(directory: directory)
         feedbackStore = FeedbackStore(directory: directory)
         self.repository = repository
@@ -353,6 +362,9 @@ public actor BrainEngine {
     /// The play in flight, as far as it got; nil clears it. Written down so that a play cut off by a process death
     /// is still recorded, as `killed`.
     public func setOpenPlay(_ play: FinishedPlay?) {
+        var play = play
+        // A play that overlaps a private session is saved as left out, so one cut off by the process ending is not counted.
+        if let p = play, privateSpans.overlaps(startMs: p.startedAtMs, endMs: clock()) { play?.flags |= EventFlags.learnExcluded }
         log.setValue(BrainEventLog.keyOpenPlay, play.map(OpenPlayCodec.encode))
     }
 
@@ -504,10 +516,38 @@ public actor BrainEngine {
 
     /// Asks for a rebuild in the background. Without `force` it only runs when one is needed.
     public func requestRebuild(force: Bool) {
-        guard rebuildTask == nil, sources != nil else { return }
-        rebuildTask = Task { [weak self] in
-            await self?.runRebuild(force: force)
+        guard sources != nil else { return }
+        if rebuildTask != nil {
+            // Not dropped: an exclusion, its Undo or the Spotify switch changed what the running rebuild reads.
+            if force {
+                rebuildAgain = true
+                rebuildDelayCut = true
+            }
+            return
         }
+        rebuildDelayCut = false
+        let delay = force ? 0 : rebuildDelayMs
+        rebuildTask = Task { [weak self] in
+            await self?.waitBeforeRebuild(delay)
+            await self?.runRebuild(force: force)
+            await self?.finishRebuilds()
+        }
+    }
+
+    private func waitBeforeRebuild(_ ms: Int64) async {
+        var left = ms
+        while left > 0 && !rebuildDelayCut {
+            try? await Task.sleep(for: .milliseconds(250))
+            left -= 250
+        }
+    }
+
+    private func finishRebuilds() async {
+        while rebuildAgain {
+            rebuildAgain = false
+            await runRebuild(force: true)
+        }
+        rebuildTask = nil
     }
 
     /// Waits for a rebuild that is running. For tests; nothing in the app blocks on it.
@@ -529,7 +569,6 @@ public actor BrainEngine {
     }
 
     private func runRebuild(force: Bool) async {
-        defer { rebuildTask = nil }
         guard let sources else { return }
         let nowMs = clock()
         let importSignature = await sources.importSignature()
@@ -651,6 +690,13 @@ public actor BrainEngine {
         }.value
 
         let merges = await repository.trackMerges()
+        // "Don't count this" on a song reaches its imported plays too: the log holds only the plays made here.
+        var excludedAt: [Int64: Int64] = [:]
+        for row in feedbackStore.active() where row.kind == FeedbackKinds.dontCount && row.targetKind == FeedbackKinds.targetSong {
+            let survivor = merges[row.targetId] ?? row.targetId
+            excludedAt[survivor] = max(excludedAt[survivor] ?? 0, row.createdAtMs)
+        }
+        let excludedMap = excludedAt
         // The stored events are read as bytes here and decoded off the actor (a long history is tens of thousands of
         // lines of JSON): a play that ends meanwhile is recorded without waiting for them.
         let storedPayloads = log.allEventPayloads()
@@ -664,7 +710,7 @@ public actor BrainEngine {
             let events = ImportedPlayAdapter.events(plays: plays, resolved: resolvedImports,
                                                     durationOfRid: { lengths[$0] ?? 0 })
             return ReplayMerger.rebuild(stored: stored, imported: events, facts: facts, nowMs: nowMs,
-                                        survivorOf: { merges[$0] ?? $0 })
+                                        excluded: excludedMap, survivorOf: { merges[$0] ?? $0 })
         }.value
 
         // Plays that ended while the rebuild ran and that it did not read from the log.

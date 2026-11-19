@@ -16,10 +16,13 @@ public actor BrainMixes {
     public static let picks = 300
     public static let favourites = 150
     public static let deep = 100
-    /// A saved mix with fewer songs left than this is not a mix: the caller builds a new one.
-    public static let minSongs = 10
+    /// A saved mix with fewer songs left than this is not a mix: the caller builds a new one. Android's `MIN_SAVED_SONGS`:
+    /// a day's mix that lost most of its rows (library cleared, taste edited) is still the day's mix, not a reason to draw another.
+    public static let minSongs = 3
     public static let topArtists = 20
     static let rebuildMinAgeMs: Int64 = 10 * 60 * 1000
+    /// Folded credits that name nobody: never a top-artist seed.
+    static let noArtistNames = ["various artists", "unknown artist", "unknown", "va", "<unknown>"]
 
     private let engine: BrainEngine
     private let repository: BrainRepository
@@ -109,7 +112,7 @@ public actor BrainMixes {
         let now = clock()
         let tz = sources.tzOffsetMin(now)
         guard let stored = served.todays(surface: MixPlanner.surfaceOf(kind), nowMs: now, tzOffsetMin: tz) else { return nil }
-        if await isStale(stored, now: now) { return nil }
+        if await isStale(stored, now: now, tz: tz) { return nil }
         return await materialize(stored, now: now)
     }
 
@@ -139,7 +142,7 @@ public actor BrainMixes {
         let tz = sources.tzOffsetMin(now)
         let surface = MixPlanner.surfaceOf(kind)
         if !regenerate, let saved = served.todays(surface: surface, nowMs: now, tzOffsetMin: tz) {
-            let stale = await isStale(saved, now: now)
+            let stale = await isStale(saved, now: now, tz: tz)
             if !stale, let view = await materialize(saved, now: now) { return view }
         }
         let drawn: Int32 = regenerate ? served.buildsToday(surface: surface, nowMs: now, tzOffsetMin: tz) : 0
@@ -155,9 +158,13 @@ public actor BrainMixes {
 
     /// A mix built when no radio was cached holds no new music. Once lists are in the cache it is built again, once:
     /// the listener should not wait a day for the first new music. A mix with new music is the day's mix and stays.
-    private func isStale(_ saved: StoredMix, now: Int64) async -> Bool {
+    private func isStale(_ saved: StoredMix, now: Int64, tz: Int32) async -> Bool {
         if saved.seedLists > 0 || saved.novelCount > 0 { return false }
         if now - saved.builtAtMs < Self.rebuildMinAgeMs { return false }
+        // "Once": the rebuild is itself a build of the day. When the day already has two, the mix stays even if it again
+        // holds no new music (none of today's seeds has a cached radio): it would otherwise be drawn again every ten minutes,
+        // each draw raising the served penalty (deviation 94).
+        if served.buildsToday(surface: MixPlanner.surfaceOf(saved.kind), nowMs: now, tzOffsetMin: tz) >= 2 { return false }
         return await repository.radiosFetchedSince(0) > 0
     }
 
@@ -254,7 +261,14 @@ public actor BrainMixes {
     /// its recording id; the whole library is not resolved.
     private func shortlist(_ all: [Song], now: Int64, tz: Int32, salt: Int64, taste: MixConstraints) async -> [LibraryTrack] {
         let day = Repetition.mixDay(now, tzOffsetMin: tz)
-        let key = "\(all.count):\(day):\(taste.signature)"
+        // The favourites are part of the key: a song liked since is a "liked" row at once, not tomorrow.
+        var favouriteHash: UInt64 = 0
+        var favouriteCount = 0
+        for song in all where song.isFavorite || taste.favoriteIds.contains(song.id) {
+            favouriteHash ^= BrainHash.fnv1a64(song.id)
+            favouriteCount += 1
+        }
+        let key = "\(all.count):\(day):\(taste.signature):\(favouriteCount):\(favouriteHash)"
         if BrainKey.sameBytes(key, sliceKey) && !slice.isEmpty { return slice }
         var chosen: [Song] = []
         var chosenIds: Set<BrainKey> = []
@@ -337,6 +351,9 @@ public actor BrainMixes {
             var best: [Int64: LibraryTrack] = [:]
             var bestWeight: [Int64: Double] = [:]
             for t in library where t.aid != 0 {
+                // A credit that names no artist is not one to look up music for (Android: NO_ARTIST_NAMES).
+                let folded = BrainText.fold(BrainLibraryIndex.primaryArtistName(t.song))
+                if Self.noArtistNames.contains(where: { BrainKey.sameBytes($0, folded) }) { continue }
                 let w = Affinity.weight(state, family: Family.track, key: t.rid, nowMs: now)
                 if let old = bestWeight[t.aid], old >= w { continue }
                 best[t.aid] = t
@@ -367,7 +384,7 @@ public actor BrainMixes {
         let recent = SeedQueries.recentChosen(events, sinceMs: now - Seeds.recentWindowMs, limit: 40)
         let saved = SeedQueries.recentlySaved(events, sinceMs: now - Seeds.savedWindowMs, limit: 20)
         let day = Repetition.mixDay(now, tzOffsetMin: tz)
-        let (top, random) = await engine.readAffinity { state -> ([Int64], [Int64]) in
+        let (topAll, random) = await engine.readAffinity { state -> ([Int64], [Int64]) in
             let p0 = Affinity.p0(state, nowMs: now)
             let keys = state.sortedKeys(Family.track)
             var weights: [Int64: Double] = [:]
@@ -377,6 +394,12 @@ public actor BrainMixes {
             let nonNegative = byRid.keys.filter { Affinity.aff(state, family: Family.track, key: $0, nowMs: now, p0: p0) >= 0.0 }
             return (Array(topRids), Seeds.pseudoRandomOrder(Array(nonNegative), salt: salt, day: day))
         }
+        // A track from outside the library is a seed only when the listener chose it (a finished or saved play): an engine
+        // pick that merely ran through on Autoplay earns affinity too, and must not seed more engine picks (deviation 95).
+        var chosenOutside: Set<Int64> = []
+        for row in recent { chosenOutside.insert(row.rid) }
+        for row in saved { chosenOutside.insert(row.rid) }
+        let top = topAll.filter { byRid[$0] != nil || chosenOutside.contains($0) }
         // Tracks outside the shortlist: the ones the engine has played and kept (`playable`), by recording.
         var playables: [Int64: EngineTrack] = [:]
         var wanted: Set<Int64> = Set(top)

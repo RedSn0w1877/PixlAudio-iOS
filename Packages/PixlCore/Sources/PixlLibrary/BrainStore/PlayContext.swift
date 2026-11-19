@@ -158,6 +158,9 @@ public struct OpenPlay: Sendable, Equatable {
     /// Something happened to the song while it played (liked, saved, added to a playlist, "Not for me").
     public mutating func mark(_ flag: Int32) { flags |= flag }
 
+    /// Takes a flag back (Undo of "Don't count this").
+    public mutating func unmark(_ flag: Int32) { flags &= ~flag }
+
     /// A seek inside the track. Back to the start after 30 s of listening is a replay; back by 10 s or more after
     /// 30 s is a seek-back (4.3).
     public mutating func seek(fromPositionMs: Int64, toPositionMs: Int64, realtimeMs: Int64) {

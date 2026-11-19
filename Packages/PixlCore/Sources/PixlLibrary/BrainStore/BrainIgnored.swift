@@ -40,8 +40,9 @@ public struct IgnoreTally: Sendable, Equatable {
     }
 
     /// True when `event` may change a row: an ignore, or a play of 30 s or more from anywhere.
+    /// A play flagged `learnExcluded` (a private session, "Don't count this") counts for neither, as on Android.
     public static func counts(_ event: PlayEvent) -> Bool {
-        event.rid != 0 && (isIgnore(event) || event.playedMs >= longPlayMs)
+        event.rid != 0 && !event.has(EventFlags.learnExcluded) && (isIgnore(event) || event.playedMs >= longPlayMs)
     }
 
     /// Folds one play in. Returns the row to store, or nil when the play does not count or changed nothing. A long

@@ -54,6 +54,8 @@ public enum HomeAnchors {
     public static func qualifies(_ event: PlayEvent, _ graded: Reward.Graded) -> Bool {
         if event.origin != Origin.live || event.rid == 0 { return false }
         if event.has(EventFlags.notForMe) || event.has(EventFlags.neverAudible) { return false }
+        // A private play, a "Don't count this" play, or the rest of a track whose play was already counted.
+        if event.has(EventFlags.learnExcluded) { return false }
         return event.arm == Arm.none ? graded.r >= Reward.completionR : event.flags & actedOn != 0
     }
 

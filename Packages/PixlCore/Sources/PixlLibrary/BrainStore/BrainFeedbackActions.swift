@@ -115,11 +115,17 @@ public enum WhyFactsInputs {
 public struct ExcludedPlays: Sendable, Equatable {
     public var feedbackId: Int64
     public var eventIds: [Int64]
-    public var count: Int { eventIds.count }
+    /// The song whose play in flight was flagged too (Undo clears it).
+    public var flaggedSongId: String?
+    /// How many plays of an earlier history import the rebuild leaves out (the log holds none of them).
+    public var importedPlays: Int
+    public var count: Int { eventIds.count + importedPlays + (flaggedSongId == nil ? 0 : 1) }
 
-    public init(feedbackId: Int64, eventIds: [Int64]) {
+    public init(feedbackId: Int64, eventIds: [Int64], flaggedSongId: String? = nil, importedPlays: Int = 0) {
         self.feedbackId = feedbackId
         self.eventIds = eventIds
+        self.flaggedSongId = flaggedSongId
+        self.importedPlays = importedPlays
     }
 }
 
@@ -133,53 +139,77 @@ extension BrainEngine {
     /// what they added to the affinity tables is taken out at once, a `feedback` row is written, and a full rebuild
     /// from the log follows in the background (which makes the tables exact). Nothing is deleted. Nil when there is
     /// nothing to exclude.
-    public func excludeRecordings(rids: Set<Int64>, targetKind: Int32, targetId: Int64) async -> ExcludedPlays? {
+    public func excludeRecordings(rids: Set<Int64>, targetKind: Int32, targetId: Int64, importedPlays: Int = 0,
+                                   flaggedSongId: String? = nil) async -> ExcludedPlays? {
         if rids.isEmpty { return nil }
         let payloads = log.allEventPayloads()
         let found = await Task.detached(priority: .utility) {
             BrainEventLog.decodeSorted(payloads).filter { rids.contains($0.rid) }
         }.value
-        return exclude(found, targetKind: targetKind, targetId: targetId)
+        return exclude(found, targetKind: targetKind, targetId: targetId, importedPlays: importedPlays, flaggedSongId: flaggedSongId)
     }
 
     /// Every live play of the last `windowMs` (an hour by default).
-    public func excludeLastHour(windowMs: Int64 = BrainEngine.hourMs) -> ExcludedPlays? {
+    public func excludeLastHour(windowMs: Int64 = BrainEngine.hourMs, flaggedSongId: String? = nil) -> ExcludedPlays? {
         let since = clock() - windowMs
         let found = log.events(startedSince: since).filter { $0.origin == Origin.live }
-        return exclude(found, targetKind: FeedbackKinds.targetLastHour, targetId: since)
+        return exclude(found, targetKind: FeedbackKinds.targetLastHour, targetId: since, importedPlays: 0, flaggedSongId: flaggedSongId)
     }
 
-    private func exclude(_ events: [PlayEvent], targetKind: Int32, targetId: Int64) -> ExcludedPlays? {
+    private func exclude(_ events: [PlayEvent], targetKind: Int32, targetId: Int64, importedPlays: Int,
+                         flaggedSongId: String?) -> ExcludedPlays? {
         let now = clock()
         let fresh = events.filter { !$0.has(EventFlags.learnExcluded) }
-        if fresh.isEmpty { return nil }
-        withState { state in
-            for event in fresh {
-                let graded = Reward.grade(event, Reward.Context(pastCompletions: 0, skipStreak: 0))
-                Affinity.subtract(&state.affinity, event, graded, tMs: event.startedAtMs > now ? now : event.startedAtMs)
+        // Nothing stored, nothing imported and no play in flight: nothing to leave out, so no row and no rebuild.
+        if fresh.isEmpty && importedPlays == 0 && flaggedSongId == nil { return nil }
+        if !fresh.isEmpty {
+            withState { state in
+                for event in fresh {
+                    let graded = Reward.grade(event, Reward.Context(pastCompletions: 0, skipStreak: 0))
+                    Affinity.subtract(&state.affinity, event, graded, tMs: event.startedAtMs > now ? now : event.startedAtMs)
+                }
+                var rows: [Affinity.Row] = []
+                var seen: Set<Affinity.RowRef> = []
+                for ref in state.affinity.drainTouched() where seen.insert(ref).inserted {
+                    if let row = state.affinity.row(ref) { rows.append(row) }
+                }
+                log.upsertAffinity(rows)
             }
-            var rows: [Affinity.Row] = []
-            var seen: Set<Affinity.RowRef> = []
-            for ref in state.affinity.drainTouched() where seen.insert(ref).inserted {
-                if let row = state.affinity.row(ref) { rows.append(row) }
-            }
-            log.upsertAffinity(rows)
+            log.setEventFlag(fresh.map(\.eventId), flag: EventFlags.learnExcluded, on: true)
         }
         let ids = fresh.map(\.eventId)
-        log.setEventFlag(ids, flag: EventFlags.learnExcluded, on: true)
         let id = FeedbackKinds.rowId(nowMs: now, kind: FeedbackKinds.dontCount)
         feedbackStore.insert(FeedbackStore.Record(id: id, kind: FeedbackKinds.dontCount, targetKind: targetKind,
                                                   targetId: targetId, createdAtMs: now))
-        // The quick subtraction is an approximation (the grade was made without its context); the rebuild is exact.
-        requestRebuild(force: true)
-        return ExcludedPlays(feedbackId: id, eventIds: ids)
+        // The quick subtraction is an approximation (the grade was made without its context); the rebuild is exact, and
+        // it is also what leaves out the imported plays. A play in flight alone needs neither.
+        if !ids.isEmpty || importedPlays > 0 { requestRebuild(force: true) }
+        return ExcludedPlays(feedbackId: id, eventIds: ids, flaggedSongId: flaggedSongId, importedPlays: importedPlays)
     }
 
     /// Takes `excluded` back: the plays count again, from the rebuild that follows.
     public func undoExclusion(_ excluded: ExcludedPlays) {
         log.setEventFlag(excluded.eventIds, flag: EventFlags.learnExcluded, on: false)
         feedbackStore.undo(id: excluded.feedbackId, nowMs: clock())
-        requestRebuild(force: true)
+        if !excluded.eventIds.isEmpty || excluded.importedPlays > 0 { requestRebuild(force: true) }
+    }
+
+    /// How many plays of an earlier history import belong to the track with `keys` (the log holds none of them; the rebuild
+    /// that "Don't count this" starts leaves them out). Plays of a Spotify export count only while the Spotify switch is on.
+    public func importedPlayCount(keys: Ids.TrackKeys) async -> Int {
+        guard let sources else { return 0 }
+        let shapes = sources.spotifyShapesPicks()
+        let plays = await sources.imported().plays
+        return await Task.detached(priority: .utility) {
+            var count = 0
+            for play in plays where shapes || !play.source.isSpotify {
+                guard let found = ImportedPlayAdapter.keys(play)?.keys else { continue }
+                if (keys.s != nil && found.s == keys.s) || (keys.y != nil && found.y == keys.y) || (keys.n != nil && found.n == keys.n) {
+                    count += 1
+                }
+            }
+            return count
+        }.value
     }
 
     /// The `feedback` rows that were not undone, oldest first (3.8).

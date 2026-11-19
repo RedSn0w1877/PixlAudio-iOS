@@ -313,7 +313,31 @@ public actor NewReleases {
     /// The channel id learned for `artistName` in an earlier check; nil when none.
     public func channelOf(_ artistName: String) -> String? {
         let key = BrainText.fold(artistName)
-        return state().artists.first { BrainKey.sameBytes(BrainText.fold($0.name), key) }?.channelId
+        // An entry with no channel is a miss (see `noteMiss`), not an answer.
+        return state().artists.first { !$0.channelId.isEmpty && BrainKey.sameBytes(BrainText.fold($0.name), key) }?.channelId
+    }
+
+    /// The artist's channel could not be found: it is looked at again after the others, not first at every run (a name that
+    /// never resolves, such as a credit that names nobody, would otherwise take the same place of the run each day).
+    public func noteMiss(artistName: String) async {
+        while busy { await Task.yield() }
+        busy = true
+        defer { busy = false }
+        let file = state()
+        let key = BrainText.fold(artistName)
+        var artists = file.artists.filter { !($0.channelId.isEmpty && BrainKey.sameBytes(BrainText.fold($0.name), key)) }
+        artists.append(ArtistReleaseState(channelId: "", name: artistName, checkedAtMs: clock()))
+        save(NewReleaseFile(artists: artists, found: file.found, requests: file.requests))
+    }
+
+    /// Requests the lane spent outside `check` (the lookup of an artist's channel), so the day's count is true.
+    public func noteRequests(_ count: Int) async {
+        if count <= 0 { return }
+        while busy { await Task.yield() }
+        busy = true
+        defer { busy = false }
+        let file = state()
+        save(NewReleaseFile(artists: file.artists, found: file.found, requests: withRequests(file.requests, clock(), count)))
     }
 
     /// Requests the releases lane spent since `sinceMs`.
@@ -329,7 +353,8 @@ public actor NewReleases {
     /// Looks at one artist. `libraryHas` says whether the listener already owns a row (a release's track they have is
     /// not news to them). `.network` when a request was made, `.cached` when none was needed, `.none` when the source
     /// gave nothing.
-    public func check(channelId: String, artistName: String, libraryHas: @Sendable (RadioRow) -> Bool = { _ in false }) async -> RefreshFetch {
+    public func check(channelId: String, artistName: String, maxRequests: Int = Int.max,
+                      libraryHas: @Sendable (RadioRow) -> Bool = { _ in false }) async -> RefreshFetch {
         guard let source else { return .none }
         // One check at a time: the file is read, changed and written back.
         while busy { await Task.yield() }
@@ -339,15 +364,27 @@ public actor NewReleases {
         let file = state()
         let known = file.artists.first { $0.channelId == channelId }
         if let known, now - known.checkedAtMs >= 0, now - known.checkedAtMs < NewReleaseRules.recheckMs { return .cached }
+        // `maxRequests` is what the lane may still spend today: every request below is checked against it first.
+        if maxRequests < 1 { return .none }
         var spent = 0
         let page = await source.artistPage(channelId: channelId)
         spent += 1
         guard let page else {
-            save(NewReleaseFile(artists: file.artists, found: file.found, requests: withRequests(file.requests, now, spent)))
+            // A page that does not load is not tried again at once: the artist goes to the back of the order.
+            var artists = file.artists
+            if let i = artists.firstIndex(where: { $0.channelId == channelId }) {
+                artists[i].checkedAtMs = now
+            } else {
+                let key = BrainText.fold(artistName)
+                artists.removeAll { $0.channelId.isEmpty && BrainKey.sameBytes(BrainText.fold($0.name), key) }
+                artists.append(ArtistReleaseState(channelId: "", name: artistName, checkedAtMs: now))
+            }
+            save(NewReleaseFile(artists: artists, found: file.found, requests: withRequests(file.requests, now, spent)))
             return .none
         }
         var releases = page.albums + page.singles
-        if page.albums.count >= NewReleaseRules.carouselFull || page.singles.count >= NewReleaseRules.carouselFull {
+        if (page.albums.count >= NewReleaseRules.carouselFull || page.singles.count >= NewReleaseRules.carouselFull)
+            && spent + 1 <= maxRequests {
             // A full carousel may be cut short: the whole discography is the list that can be diffed.
             spent += 1
             if let all = await source.discography(channelId: channelId) {
@@ -371,7 +408,13 @@ public actor NewReleases {
         var newFound: [FoundRelease] = []
         var unreadable: Set<String> = []
         for release in diff.surfaced.prefix(NewReleaseRules.maxNewPerArtist) {
-            spent += release.audioPlaylistId != nil ? 1 : 2
+            let cost = release.audioPlaylistId != nil ? 1 : 2
+            if spent + cost > maxRequests {
+                // Over the lane's share for today: left "not seen", read at a later check.
+                unreadable.insert(release.browseId)
+                continue
+            }
+            spent += cost
             guard let rows = await source.releaseTracks(release) else {
                 // Not read: it stays "not seen", so the next check tries it again.
                 unreadable.insert(release.browseId)

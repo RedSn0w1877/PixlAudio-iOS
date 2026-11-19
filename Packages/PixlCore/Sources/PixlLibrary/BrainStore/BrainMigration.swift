@@ -141,8 +141,10 @@ public enum ReplayMerger {
     /// `stored` in ascending event id; `imported` in any order. `survivorOf` maps a merged recording to the one it
     /// was merged into. An imported play whose end is within `duplicateWindowMs` of a stored play of the same
     /// recording is the same listen seen twice and is dropped.
+    /// `excluded` maps a surviving recording to the time a "Don't count this" was made on it: every play of it that
+    /// started at or before then, imported ones included (the log holds none of those), replays as `learnExcluded`.
     public static func rebuild(stored: [PlayEvent], imported: [PlayEvent], facts: LibraryFacts, nowMs: Int64,
-                               survivorOf: (Int64) -> Int64) -> Result {
+                               excluded: [Int64: Int64] = [:], survivorOf: (Int64) -> Int64) -> Result {
         // Pass 1 over the log: when each recording's stored plays ended.
         var endsByRid: [Int64: [Int64]] = [:]
         for e in stored { endsByRid[survivorOf(e.rid), default: []].append(e.endedAtMs) }
@@ -183,6 +185,9 @@ public enum ReplayMerger {
             }
             let survivor = survivorOf(next.rid)
             if survivor != next.rid { next.rid = survivor }
+            if !excluded.isEmpty, let cutoff = excluded[survivor], next.startedAtMs <= cutoff {
+                next.flags |= EventFlags.learnExcluded
+            }
             merged.append(next)
         }
         return Result(state: Replay.rebuild(merged, facts: facts, nowMs: nowMs), recentEventIds: recent,

@@ -165,9 +165,10 @@ public final class KeyedLogStore {
         ensureOpened()
         var buffer: [UInt8] = []
         var removed: [BrainKey] = []
+        var seen: Set<BrainKey> = []
         for key in keys {
             let brainKey = BrainKey(key)
-            if index[brainKey] == nil || removed.contains(brainKey) { continue }
+            if index[brainKey] == nil || !seen.insert(brainKey).inserted { continue }
             buffer.append(contentsOf: Self.escape(key))
             buffer.append(0x0A)
             removed.append(brainKey)
