@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import enum PixlLibrary.BrainText
 import PixlModel
 import PixlNet
 
@@ -72,7 +73,7 @@ final class YouTubeServices {
         self.radioBudget = radioBudget
         radioSource = YouTubeRadioSource(
             client: InnerTubeRadioClient(http: plain, visitorData: { await account.anonymousVisitorData() }),
-            budget: radioBudget)
+            budget: radioBudget, fold: { BrainText.fold($0) })
         let deviceAuth = GoogleDeviceAuthClient(http: plain, store: account)
         self.deviceAuth = deviceAuth
         let innerTube = GoogleBearerHTTPClient(inner: plain, accessToken: { await deviceAuth.validAccessToken() })

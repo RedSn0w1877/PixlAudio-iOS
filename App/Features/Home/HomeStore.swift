@@ -289,9 +289,18 @@ final class HomeStore {
 
     // MARK: The brain's mixes (docs/brain-spec.md, 8.2)
 
+    /// True when Daily Mix was refined with AI on the current local day (the brain then leaves that list alone until a regenerate).
+    private func aiOwnsDailyMixToday() -> Bool {
+        guard let defaults else { return false }
+        let clock = history.clock
+        let today = ZoneClock(clock.timeZone).localDate(at: clock.nowMs()).epochDay
+        return Int64(defaults.integer(forKey: PreferenceKeys.aiDailyMixEpochDay)) == today
+    }
+
     private func overlayBrainMixes(_ content: inout HomeContent) {
         guard brainEngineIsOn(), !brainDaily.isEmpty, !brainYour.isEmpty else { return }
-        content.dailyMix = brainDaily
+        // A Daily Mix the listener refined with AI today stays: the AI call was paid for.
+        if !aiOwnsDailyMixToday() { content.dailyMix = brainDaily }
         content.curatedYourMix = brainYour
     }
 
@@ -307,6 +316,8 @@ final class HomeStore {
             await self?.brainQuiet?()
             let pair = await mixes.publish(regenerate: regenerate)
             guard let self else { return }
+            // A regenerate draws Daily Mix again: the AI refinement of the day is over.
+            if regenerate, pair != nil { self.defaults?.removeObject(forKey: PreferenceKeys.aiDailyMixEpochDay) }
             self.brainMixesTask = nil
             self.publishBrainMixes(pair)
             if self.pendingBrainRegenerate {
@@ -338,13 +349,14 @@ final class HomeStore {
         details.daily = BrainMixDetails.Part(pair.daily)
         details.your = BrainMixDetails.Part(pair.your)
         if details != brainMixDetails { brainMixDetails = details }
+        let keepAIDaily = aiOwnsDailyMixToday()
         var next = content
-        next.dailyMix = daily
+        if !keepAIDaily { next.dailyMix = daily }
         next.curatedYourMix = your
         if next != content { content = next }
         // The legacy keys keep the library songs of the mixes, so a restart shows them before the brain is read.
         let libraryIds: ([Song], Set<String>) -> [String] = { songs, novel in songs.map(\.id).filter { !novel.contains($0) } }
-        defaults?.set(libraryIds(daily, pair.daily.novelIds), forKey: PreferenceKeys.dailyMixSongIds)
+        if !keepAIDaily { defaults?.set(libraryIds(daily, pair.daily.novelIds), forKey: PreferenceKeys.dailyMixSongIds) }
         defaults?.set(libraryIds(your, pair.your.novelIds), forKey: PreferenceKeys.yourMixSongIds)
         defaults?.set(Double(history.clock.nowMs()), forKey: PreferenceKeys.lastDailyMixUpdate)
         isPreparing = false

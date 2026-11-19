@@ -226,7 +226,10 @@ final class PlaybackServices {
             // The taste counters and the engagement rows are capped stores that feed rankers which spend money in
             // the cloud: a track Autoplay played from outside the library stays out of them until it is saved
             // (docs/brain-spec.md, 4.2).
-            let countsForLegacy = !record.isOutsideLibrary
+            // A private play, or one the listener said not to count, is left out of them too (Android: `legacyCounters`). It
+            // still goes to the play history above, which is the Recently Played list and Android-exact on disk, so it
+            // cannot carry the flag (deviation 96).
+            let countsForLegacy = !record.isOutsideLibrary && !record.learnExcluded
             if countsForLegacy { self.recordTaste?(record) }
             let persistence = self.persistence
             Task.detached(priority: .utility) { [weak self] in

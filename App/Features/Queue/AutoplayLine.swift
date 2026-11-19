@@ -14,6 +14,8 @@ struct AutoplayLine: View {
     let finding: Bool
     /// The picks come from the library alone.
     let fromLibrary: Bool
+    /// The queue plays on a Spotify Connect device.
+    var onConnect = false
     /// Three skips in a row: Autoplay just turned to something else (shown for a few seconds).
     var changedDirection = false
     /// The queue is a station: what it is named after (a song's title, an artist's name). Nil for plain autoplay.
@@ -75,7 +77,7 @@ struct AutoplayLine: View {
                     .padding(.top, 8)
                     .padding(.bottom, 4)
             }
-            if let onRefresh, isStation || isOn, !fromLibrary, !finding {
+            if let onRefresh, isStation || isOn, !fromLibrary, !finding, !onConnect {
                 Button(action: onRefresh) {
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.triangle.2.circlepath").font(.system(size: 14, weight: .semibold))
@@ -107,6 +109,7 @@ struct AutoplayLine: View {
         if finding { return String(localized: "Finding more like this") }
         if changedDirection { return String(localized: "Skipped three. Changing direction.") }
         if fromLibrary { return String(localized: "From your library") }
+        if onConnect { return BrainStrings.connectLine }
         if isStation {
             switch stationSource {
             case Station.sourceAlbum: return BrainStrings.stationSubtitleAlbum

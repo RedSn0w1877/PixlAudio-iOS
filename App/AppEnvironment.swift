@@ -304,6 +304,9 @@ final class AppEnvironment {
             stats.onBrainPlay = { [weak brain] play in brain?.playFinished(play) }
             stats.onBrainOpen = { [weak brain] play in brain?.playOpen(play) }
             brain.markPlaying = { [weak stats] songId, flag in stats?.markFlag(songId: songId, flag: flag) }
+            brain.flagPlaying = { [weak stats] songId, flag in stats?.markFlag(songId: songId, flag: flag) ?? false }
+            brain.unflagPlaying = { [weak stats] songId, flag in stats?.unmarkFlag(songId: songId, flag: flag) }
+            brain.privateChanged = { [weak stats] on in stats?.setPrivate(on) }
             realPlayback.isInLibrary = { brainLibrary.song(id: $0) != nil }
             realPlayback.isEngineTrack = { [weak brain] songId in brain?.track(songId: songId) != nil }
             // After a restart the restored queue knows its picks before the brain's files are read.

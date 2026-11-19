@@ -28,6 +28,11 @@ final class ListeningStatsTracker {
         let isVoluntary: Bool
         /// A track from outside the library that has no library row: the legacy counters are not written for it.
         var isOutsideLibrary = false
+        /// The play stays out of the picks: "Don't count this" was used on it, or a private session overlapped it. The legacy
+        /// counters are not written for it, as on Android (`legacyCounters = !outsideLibrary && !learnExcluded`).
+        var learnExcluded = false
+        /// A private session overlapped the play (an Undo of "Don't count this" then leaves it excluded).
+        var privateTouched = false
     }
 
     /// A finished session to persist.
@@ -43,6 +48,8 @@ final class ListeningStatsTracker {
         /// A track Autoplay played from outside the library, not saved: it is in the play history (so it shows in
         /// Recently Played) but not in the taste counters or the engagement rows (docs/brain-spec.md, 4.2).
         var isOutsideLibrary = false
+        /// The play is left out of the picks (see `Session.learnExcluded`): the legacy taste and engagement counters skip it.
+        var learnExcluded = false
     }
 
     private(set) var session: Session?
@@ -61,6 +68,9 @@ final class ListeningStatsTracker {
     var epochMs: () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1000) }
     /// Called with every recorded session.
     var onRecord: ((Record) -> Void)?
+    /// A private session is on: every play that overlaps it is left out of the picks (docs/brain-spec.md, 8.5). Set by the
+    /// brain service; never kept across launches.
+    private(set) var isPrivate = false
 
     init() {}
 
@@ -80,9 +90,14 @@ final class ListeningStatsTracker {
                           lastRealtimeMs: realtime, lastUpdateEpochMs: now, isPlaying: isPlaying,
                           isVoluntary: pendingVoluntarySongId == songId, isOutsideLibrary: isOutsideLibrary)
         if pendingVoluntarySongId == songId { pendingVoluntarySongId = nil }
+        if isPrivate {
+            session?.learnExcluded = true
+            session?.privateTouched = true
+        }
         if let context {
-            let play = OpenPlay(songId: songId, context: context, startedAtEpochMs: now, tzOffsetMin: tzOffsetMin(),
+            var play = OpenPlay(songId: songId, context: context, startedAtEpochMs: now, tzOffsetMin: tzOffsetMin(),
                                 durationMs: durationMs, isPlaying: isPlaying, realtimeMs: realtime)
+            if isPrivate { play.mark(EventFlags.learnExcluded) }
             brainPlay = play
             if isPlaying { onBrainOpen?(play.snapshot(endReason: EndReason.killed)) }
         }
@@ -114,11 +129,48 @@ final class ListeningStatsTracker {
     }
 
     /// Something happened to `songId` while it plays (an `EventFlags` bit: liked, saved, added to a playlist). A
-    /// flag for a song that is not playing is dropped: the like still reaches the brain as a library fact.
-    func markFlag(songId: String, flag: Int32) {
-        guard var play = brainPlay, play.songId == songId else { return }
-        play.mark(flag)
-        brainPlay = play
+    /// flag for a song that is not playing is dropped: the like still reaches the brain as a library fact. True when
+    /// the song is the one in flight.
+    @discardableResult
+    func markFlag(songId: String, flag: Int32) -> Bool {
+        var hit = false
+        if var play = brainPlay, play.songId == songId {
+            play.mark(flag)
+            brainPlay = play
+            hit = true
+            // "Don't count this" must outlive a process death in the middle of the play.
+            if flag & EventFlags.learnExcluded != 0, play.everPlayed { onBrainOpen?(play.snapshot(endReason: EndReason.killed)) }
+        }
+        if flag & EventFlags.learnExcluded != 0, session?.songId == songId {
+            session?.learnExcluded = true
+            hit = true
+        }
+        return hit
+    }
+
+    /// Takes a flag back (Undo of "Don't count this"). A play a private session overlapped stays excluded.
+    func unmarkFlag(songId: String, flag: Int32) {
+        guard flag & EventFlags.learnExcluded != 0, session?.songId == songId, session?.privateTouched != true else { return }
+        session?.learnExcluded = false
+        if var play = brainPlay, play.songId == songId {
+            play.unmark(flag)
+            brainPlay = play
+            if play.everPlayed { onBrainOpen?(play.snapshot(endReason: EndReason.killed)) }
+        }
+    }
+
+    /// The private session was switched on or off. Switching it on leaves out the play in flight too (and rewrites its
+    /// saved copy, so a play cut off by the process ending is not counted either).
+    func setPrivate(_ on: Bool) {
+        isPrivate = on
+        guard on, session != nil else { return }
+        session?.learnExcluded = true
+        session?.privateTouched = true
+        if var play = brainPlay {
+            play.mark(EventFlags.learnExcluded)
+            brainPlay = play
+            if play.everPlayed { onBrainOpen?(play.snapshot(endReason: EndReason.killed)) }
+        }
     }
 
     /// A seek inside the current track (a replay, or a seek back).
@@ -154,7 +206,8 @@ final class ListeningStatsTracker {
             let timestamp = min(max(rawEnd, max(current.startedAtEpochMs, 0)), nowEpoch)
             onRecord?(Record(songId: current.songId, listenedMs: listened, timestamp: timestamp,
                              totalDurationMs: current.totalDurationMs, isVoluntary: current.isVoluntary,
-                             changedTrack: changedTrack, isOutsideLibrary: current.isOutsideLibrary))
+                             changedTrack: changedTrack, isOutsideLibrary: current.isOutsideLibrary,
+                             learnExcluded: current.learnExcluded))
         }
         session = nil
         if pendingVoluntarySongId == current.songId { pendingVoluntarySongId = nil }

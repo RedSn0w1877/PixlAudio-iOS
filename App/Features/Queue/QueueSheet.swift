@@ -198,7 +198,7 @@ struct QueueSheet: View {
         let ai = settings.ai
         let autoplayController = env.autoplayController
         let actions = env.brainActions
-        return AutoplayLine(isOn: ai.musicDiscoveryEnabled, finding: state.finding, fromLibrary: state.fromLibrary,
+        return AutoplayLine(isOn: ai.musicDiscoveryEnabled, finding: state.finding, fromLibrary: state.fromLibrary, onConnect: state.onConnect,
                             changedDirection: state.changedDirection, stationTitle: state.stationTitle,
                             stationIsArtist: state.stationIsArtist, stationSource: state.stationSource, novelty: state.novelty,
                             onToggle: { isOn in

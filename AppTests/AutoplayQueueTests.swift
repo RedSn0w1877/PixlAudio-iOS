@@ -173,6 +173,51 @@ final class AutoplayQueueTests: XCTestCase {
         XCTAssertEqual(records.first?.isOutsideLibrary, true)
     }
 
+    func testAPrivateOrDontCountPlayIsLeftOutOfTheLegacyCountersAndUndoPutsItBack() {
+        let tracker = ListeningStatsTracker()
+        var clock: Int64 = 1_000
+        tracker.realtimeMs = { clock }
+        tracker.epochMs = { 1_700_000_000_000 + clock }
+        var plays: [FinishedPlay] = []
+        var records: [ListeningStatsTracker.Record] = []
+        tracker.onBrainPlay = { plays.append($0) }
+        tracker.onRecord = { records.append($0) }
+        let context = PlayContext(title: "Song a", artistDisplay: "A", startReason: StartReason.tap)
+        // "Don't count this" on the playing song, then Undo: the play counts again.
+        tracker.onTrackChanged(songId: "a", positionMs: 0, durationMs: 200_000, isPlaying: true, context: context)
+        XCTAssertTrue(tracker.markFlag(songId: "a", flag: EventFlags.learnExcluded))
+        XCTAssertFalse(tracker.markFlag(songId: "other", flag: EventFlags.learnExcluded))
+        tracker.unmarkFlag(songId: "a", flag: EventFlags.learnExcluded)
+        clock += 60_000
+        tracker.finalizeCurrentSession(endReason: EndReason.trackDone)
+        XCTAssertEqual(records.last?.learnExcluded, false)
+        XCTAssertEqual((plays.last?.flags ?? 0) & EventFlags.learnExcluded, 0)
+        // Left out: neither the record nor the brain's play counts it.
+        tracker.onTrackChanged(songId: "b", positionMs: 0, durationMs: 200_000, isPlaying: true, context: context)
+        tracker.markFlag(songId: "b", flag: EventFlags.learnExcluded)
+        clock += 60_000
+        tracker.finalizeCurrentSession(endReason: EndReason.trackDone)
+        XCTAssertEqual(records.last?.learnExcluded, true)
+        XCTAssertNotEqual((plays.last?.flags ?? 0) & EventFlags.learnExcluded, 0)
+        // A private session switched on in the middle of a play leaves it out, and Undo cannot put it back.
+        tracker.onTrackChanged(songId: "c", positionMs: 0, durationMs: 200_000, isPlaying: true, context: context)
+        tracker.setPrivate(true)
+        tracker.unmarkFlag(songId: "c", flag: EventFlags.learnExcluded)
+        clock += 60_000
+        tracker.finalizeCurrentSession(endReason: EndReason.trackDone)
+        XCTAssertEqual(records.last?.learnExcluded, true)
+        // A play that starts while private is left out from its first moment; after the session, plays count.
+        tracker.onTrackChanged(songId: "d", positionMs: 0, durationMs: 200_000, isPlaying: true, context: context)
+        clock += 60_000
+        tracker.setPrivate(false)
+        tracker.finalizeCurrentSession(endReason: EndReason.trackDone)
+        XCTAssertEqual(records.last?.learnExcluded, true)
+        tracker.onTrackChanged(songId: "e", positionMs: 0, durationMs: 200_000, isPlaying: true, context: context)
+        clock += 60_000
+        tracker.finalizeCurrentSession(endReason: EndReason.trackDone)
+        XCTAssertEqual(records.last?.learnExcluded, false)
+    }
+
     // MARK: Stage 1c: stations, a Home row's cards, taste changes
 
     func testAStationIsTheQueueThatHoldsItsTaggedSeed() throws {

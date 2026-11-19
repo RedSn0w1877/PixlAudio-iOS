@@ -12,6 +12,8 @@ final class AutoplayState {
     var finding = false
     /// The picks come from the library alone (offline, or the YouTube source is off or had nothing).
     var fromLibrary = false
+    /// The queue is sounding on a Spotify Connect device: picks are looked up on Spotify first, and "Refresh picks" is off.
+    var onConnect = false
     /// Where the Autoplay line is drawn: the queue index of the first entry Autoplay added that is still to come.
     /// Nil while there is none (the line then closes the queue).
     var lineIndex: Int?
@@ -63,12 +65,19 @@ final class BrainService {
     /// Created with the first refresh, never at launch (its path monitor starts then).
     private lazy var networkMonitor = NetworkConditionsMonitor()
     private var refreshTask: Task<Void, Never>?
+    private var refreshRunning = false
     private var idleCheckTask: Task<Void, Never>?
     private var sceneActiveAtMs: Int64 = 0
     /// Called on the main actor after each recorded play (Autoplay reacts to skips and likes).
     var onReaction: ((Reaction) -> Void)?
     /// Marks the song that is playing (an `EventFlags` bit): set by `AppEnvironment` to the listening stats.
     var markPlaying: ((String, Int32) -> Void)?
+    /// Like `markPlaying`, and says whether the song was the one in flight (so "Undo" has a play to unflag).
+    var flagPlaying: ((String, Int32) -> Bool)?
+    /// Takes a flag back from the play in flight.
+    var unflagPlaying: ((String, Int32) -> Void)?
+    /// The private session was switched: the listening stats leave the plays that overlap it out of the legacy counters.
+    var privateChanged: ((Bool) -> Void)?
     /// Created with the first play that ends, never at launch.
     private lazy var recorder: BrainRecorder? = engine.map { engine in
         BrainRecorder(engine: engine) { [weak self] reaction in
@@ -107,7 +116,8 @@ final class BrainService {
         if isEnabled, let directory = Self.defaultDirectory() {
             let repository = BrainRepository(directory: directory, radioSource: radioSource)
             self.repository = repository
-            let engine = BrainEngine(directory: directory, repository: repository, sources: sources)
+            let engine = BrainEngine(directory: directory, repository: repository, sources: sources,
+                                     rebuildDelayMs: BrainEngine.appRebuildDelayMs)
             self.engine = engine
             homeRows = BrainHomeRows(directory: directory, repository: repository, engine: engine)
             self.directory = directory
@@ -162,6 +172,11 @@ final class BrainService {
     /// Puts the system's request in place a day after the last run.
     func scheduleFromLastRun() async {
         guard let refresh else { return }
+        // Off (the local switch, or the remote one): no request is left with the system, so iOS does not wake the app for nothing.
+        guard refreshIsAllowed() else {
+            BrainBackground.cancelPending()
+            return
+        }
         let last = await refresh.lastRunMs()
         BrainBackground.schedule(lastRunMs: last)
     }
@@ -171,6 +186,10 @@ final class BrainService {
     @discardableResult
     func runRefresh() async -> BrainRefreshRunner.Report? {
         guard let refresh, refreshIsAllowed() else { return nil }
+        // One run at a time, whoever asked: the system's task and the foreground fallback share this entry.
+        guard !refreshRunning else { return nil }
+        refreshRunning = true
+        defer { refreshRunning = false }
         if ProcessInfo.processInfo.isLowPowerModeEnabled { return nil }
         guard await isOnUnmeteredNetwork() else { return nil }
         let playing: @Sendable () async -> Bool = { @MainActor [weak self] in self?.isMusicPlaying() ?? false }
@@ -244,27 +263,40 @@ final class BrainService {
     // MARK: Don't count this (8.5) and Private session
 
     /// "Don't count this" on one song: the plays of its recording leave the picks at once and a rebuild makes the tables
-    /// exact. The play in flight is flagged too, so it is logged as left out when it ends.
+    /// exact. The play in flight is flagged too, so it is logged as left out when it ends, and the imported plays of the
+    /// song (which the log does not hold) are left out by that rebuild.
     func excludeSong(_ song: Song) async -> ExcludedPlays? {
         guard let repository, let engine, let facts = TrackCatalog.facts(of: song) else { return nil }
-        markPlaying?(song.id, EventFlags.learnExcluded)
+        let flagged: String? = (flagPlaying?(song.id, EventFlags.learnExcluded) ?? false) ? song.id : nil
         let rid = await repository.resolveTracks([TrackRequest(keys: facts.keys,
                                                                durationMs: Int32(clamping: max(song.duration, 0)))])[0]
-        if rid == 0 { return nil }
-        return await engine.excludeRecordings(rids: [rid], targetKind: FeedbackKinds.targetSong, targetId: rid)
+        if rid == 0 {
+            if let flagged { unflagPlaying?(flagged, EventFlags.learnExcluded) }
+            return nil
+        }
+        let imported = await engine.importedPlayCount(keys: facts.keys)
+        return await engine.excludeRecordings(rids: [rid], targetKind: FeedbackKinds.targetSong, targetId: rid,
+                                              importedPlays: imported, flaggedSongId: flagged)
     }
 
     /// "Don't count the last hour": every live play of the last hour leaves the picks.
     func excludeLastHour(playingSongId: String?) async -> ExcludedPlays? {
         guard let engine else { return nil }
-        if let playingSongId { markPlaying?(playingSongId, EventFlags.learnExcluded) }
-        return await engine.excludeLastHour()
+        let flagged: String? = playingSongId.flatMap { (flagPlaying?($0, EventFlags.learnExcluded) ?? false) ? $0 : nil }
+        return await engine.excludeLastHour(flaggedSongId: flagged)
     }
 
-    func undoExclusion(_ excluded: ExcludedPlays) async { await engine?.undoExclusion(excluded) }
+    func undoExclusion(_ excluded: ExcludedPlays) async {
+        // The play that was in flight counts again (a private session that overlapped it keeps it out).
+        if let songId = excluded.flaggedSongId { unflagPlaying?(songId, EventFlags.learnExcluded) }
+        await engine?.undoExclusion(excluded)
+    }
 
     /// The private session (8.5): off at every app start (the engine holds it in memory only).
-    func setPrivate(_ on: Bool) { Task { [engine] in await engine?.setPrivate(on) } }
+    func setPrivate(_ on: Bool) {
+        privateChanged?(on)
+        Task { [engine] in await engine?.setPrivate(on) }
+    }
 
     /// The Spotify switch went off: what the sync kept goes now, and the next rebuild leaves the rest out.
     func spotifyShapesTurnedOff() {

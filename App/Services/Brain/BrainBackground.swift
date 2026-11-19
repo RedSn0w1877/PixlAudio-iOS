@@ -34,6 +34,11 @@ final class BrainBackground {
         }
     }
 
+    /// Takes the pending request back (the switch is off).
+    static func cancelPending() {
+        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: identifier)
+    }
+
     /// Asks the system for the next run: a day after the last one, plus up to an hour (a million phones should not ask
     /// at one minute), on a network, without needing the charger. A request replaces an earlier one.
     static func schedule(lastRunMs: Int64?) {

@@ -50,7 +50,8 @@ final class AutoplayController {
         var remoteOutput: () -> RemoteOutput
         /// Which of these songs the remote output can play, in order: on Spotify Connect a real Spotify id or a strict
         /// search match. Asked only on an output that plays some tracks and not others; it may search.
-        var playableOnRemote: @MainActor ([Song]) async -> [Bool]
+        /// One answer per song: true (Spotify has it), false (it does not), nil (the lookup failed or was cut off: not now).
+        var playableOnRemote: @MainActor ([Song]) async -> [Bool?]
         var library: () -> [Song]
         var librarySong: (String) -> Song?
         var events: () -> [PlaybackEvent]
@@ -749,6 +750,7 @@ final class AutoplayController {
     /// side by side can pick the same track): that plan's end looks at the queue again.
     private func appendFromPool(_ onDone: @escaping @MainActor (Bool) -> Void) {
         guard AutoplayPolicy.mayPlanNow(topUpRunning: planTask != nil, rescoreRunning: rescoreTask != nil) else { return }
+        syncConnectState()
         guard !pool.isEmpty else {
             onDone(false)
             return
@@ -803,16 +805,23 @@ final class AutoplayController {
             ids.append(entry.candidate.mediaId)
             songs.append(song)
         }
-        let playable = await sources.playableOnRemote(songs)
-        let kept = Set(AutoplayPolicy.keepPlayable(mediaIds: ids, playable: playable).map(BrainKey.init))
+        let answers = await sources.playableOnRemote(songs)
+        let kept = Set(AutoplayPolicy.keepPlayable(mediaIds: ids, playable: answers.map { $0 == true }).map(BrainKey.init))
         if kept.count == ids.count { return plan }
+        // A pick whose lookup failed (a rate limit, an expired token, no network) is not one Spotify lacks: it stays in the
+        // pool for a later plan and is only left out of this one.
+        var unknown: Set<BrainKey> = []
+        for index in ids.indices where index >= answers.count || answers[index] == nil { unknown.insert(BrainKey(ids[index])) }
         let nowMs = now()
-        for id in ids where !kept.contains(BrainKey(id)) {
+        for id in ids where !kept.contains(BrainKey(id)) && !unknown.contains(BrainKey(id)) {
             if failedAtMs.count > Self.failedLimit { failedAtMs.removeAll() }
             failedAtMs[id] = nowMs
         }
         let asked = Set(ids.map(BrainKey.init))
-        pool.removeAll { asked.contains(BrainKey($0.candidate.mediaId)) && !kept.contains(BrainKey($0.candidate.mediaId)) }
+        pool.removeAll {
+            let key = BrainKey($0.candidate.mediaId)
+            return asked.contains(key) && !kept.contains(key) && !unknown.contains(key)
+        }
         return AutoplayPlanning.narrowed(plan, context: context, kept: kept)
     }
 
@@ -912,7 +921,14 @@ final class AutoplayController {
 
     /// Appends the batch, then resumes an ended queue, or moves on when Next was pressed with nothing queued. An
     /// append never waits: behind the track that is already next it changes nothing the player has prepared.
+    /// The queue shows a line while the output plays only what Spotify has (and hides "Refresh picks", which it cannot do there).
+    private func syncConnectState() {
+        let connect = remoteRule().onlyWhatTheOutputPlays
+        if brain.autoplay.onConnect != connect { brain.autoplay.onConnect = connect }
+    }
+
     private func deliver(songs: [Song], tags: [BrainItemTag]) {
+        syncConnectState()
         if brain.autoplay.fromLibrary != poolFromLibrary { brain.autoplay.fromLibrary = poolFromLibrary }
         engine.appendEngineItems(songs, tags: tags)
         if queueEndedAtMs != 0 {

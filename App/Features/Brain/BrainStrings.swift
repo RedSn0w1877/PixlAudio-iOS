@@ -101,6 +101,7 @@ nonisolated enum BrainStrings {
     static var privatePill: String { String(localized: "Private") }
     static var privatePillDescription: String { String(localized: "Private session is on. Tap to end it.") }
     static var refreshPicks: String { String(localized: "Refresh picks") }
+    static var connectLine: String { String(localized: "On Spotify, picks Spotify has are queued") }
     static var recentSave: String { String(localized: "Save") }
     static var undo: String { String(localized: "Undo") }
     static var undone: String { String(localized: "Undone") }

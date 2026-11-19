@@ -84,6 +84,8 @@ nonisolated enum PreferenceKeys {
     static let lastDailyMixUpdate = "last_daily_mix_update"
     static let homeGreetingText = "home_greeting_text"
     static let homeGreetingDate = "home_greeting_date"
+    /// The local day (epoch day) on which the listener refined Daily Mix with AI: the brain keeps its hands off that day's Daily Mix.
+    static let aiDailyMixEpochDay = "home_ai_daily_mix_epoch_day"
     // Lyrics
     static let automaticLyrics = "automatic_lyrics"
     static let lyricsSourcePreference = "lyrics_source_preference"
