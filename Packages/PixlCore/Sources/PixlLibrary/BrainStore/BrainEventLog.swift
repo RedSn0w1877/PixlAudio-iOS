@@ -27,6 +27,14 @@ public final class BrainEventLog {
     public static let keyHomeAnchors = "home_anchors_v1"
     /// Set once the ignore tally holds every engine-served play of the log.
     public static let keyIgnoreTally = "ignore_tally_v1"
+    /// The learner's saved state (`LearnerCodec`); a value of `brain_state`, no file changed (stage 3).
+    public static let keyLearner = "learner_v1"
+    /// `LearnReplay.version` of the last replay; absent or different means the learner is rebuilt.
+    public static let keyLearnVersion = "learn_version"
+    /// The favourites the last replay used, base 36, comma separated.
+    public static let keyLearnerLiked = "learner_liked_v1"
+    /// The event id at or below which plays are not learned from (set by "Reset what I've learned").
+    public static let keyLearnAfter = "learn_after_event_id"
 
     private let eventFile: KeyedLogStore
     private let affinityFile: KeyedLogStore

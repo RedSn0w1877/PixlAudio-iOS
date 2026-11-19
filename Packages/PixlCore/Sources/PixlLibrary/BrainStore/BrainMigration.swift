@@ -136,6 +136,8 @@ public enum ReplayMerger {
         public let recentEventIds: Set<Int64>
         public let importedUsed: Int
         public let importedDropped: Int
+        /// Stage 3: the learner trained by the same pass; nil when `rebuild` was not asked to train it.
+        public let learned: LearnReplay.Result?
     }
 
     /// `stored` in ascending event id; `imported` in any order. `survivorOf` maps a merged recording to the one it
@@ -144,7 +146,9 @@ public enum ReplayMerger {
     /// `excluded` maps a surviving recording to the time a "Don't count this" was made on it: every play of it that
     /// started at or before then, imported ones included (the log holds none of those), replays as `learnExcluded`.
     public static func rebuild(stored: [PlayEvent], imported: [PlayEvent], facts: LibraryFacts, nowMs: Int64,
-                               excluded: [Int64: Int64] = [:], survivorOf: (Int64) -> Int64) -> Result {
+                               excluded: [Int64: Int64] = [:], learn: Bool = false, likedRids: Set<Int64> = [],
+                               learnAfterEventId: Int64 = Int64.min, tzNowMin: Int32 = 0,
+                               survivorOf: (Int64) -> Int64) -> Result {
         // Pass 1 over the log: when each recording's stored plays ended.
         var endsByRid: [Int64: [Int64]] = [:]
         for e in stored { endsByRid[survivorOf(e.rid), default: []].append(e.endedAtMs) }
@@ -190,8 +194,15 @@ public enum ReplayMerger {
             }
             merged.append(next)
         }
+        // Stage 3: the same pass trains the ranker (5.9).
+        if learn {
+            let learned = LearnReplay.run(merged, facts: facts, nowMs: nowMs, likedRids: likedRids, tzNowMin: tzNowMin,
+                                          learnAfterEventId: learnAfterEventId)
+            return Result(state: learned.state, recentEventIds: recent, importedUsed: kept.count, importedDropped: dropped,
+                          learned: learned)
+        }
         return Result(state: Replay.rebuild(merged, facts: facts, nowMs: nowMs), recentEventIds: recent,
-                      importedUsed: kept.count, importedDropped: dropped)
+                      importedUsed: kept.count, importedDropped: dropped, learned: nil)
     }
 }
 
