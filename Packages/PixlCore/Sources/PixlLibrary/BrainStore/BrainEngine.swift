@@ -121,12 +121,17 @@ public actor BrainEngine {
         public var imported: @Sendable () async -> (plays: [ImportedPlay], taste: ExternalTasteSnapshot)
         /// The active taste adjustments.
         public var adjustments: @Sendable () async -> [TasteAdjustment]
+        /// "Use my Spotify music to shape picks" (13.1): off, Spotify's own history and its top lists and follows are left
+        /// out of the picks at the next rebuild; the app's own plays stay.
+        public var spotifyShapesPicks: @Sendable () -> Bool
 
         public init(library: @escaping @Sendable () async -> [Song],
                     history: @escaping @Sendable () async -> [PlaybackEvent],
                     importSignature: @escaping @Sendable () async -> String,
                     imported: @escaping @Sendable () async -> (plays: [ImportedPlay], taste: ExternalTasteSnapshot),
-                    adjustments: @escaping @Sendable () async -> [TasteAdjustment]) {
+                    adjustments: @escaping @Sendable () async -> [TasteAdjustment],
+                    spotifyShapesPicks: @escaping @Sendable () -> Bool = { true }) {
+            self.spotifyShapesPicks = spotifyShapesPicks
             self.library = library
             self.history = history
             self.importSignature = importSignature
@@ -508,6 +513,8 @@ public actor BrainEngine {
         if log.value(BrainEventLog.keyHistoryMigrated) == nil { return true }
         if log.value(BrainEventLog.keySpecVersion) != String(Brain.specVersion) { return true }
         if log.value(BrainEventLog.keyImportCount) != importSignature { return true }
+        // "Use my Spotify music to shape picks" was flipped since the last rebuild: the tables change with it.
+        if (log.value(BrainEventLog.keySpotifyShapes) ?? "true") != String(sources?.spotifyShapesPicks() ?? true) { return true }
         // The facts (likes, top lists, follows, taste changes) are folded in at a rebuild; a weekly one keeps them
         // current without a background job.
         let rebuiltAt = log.value(BrainEventLog.keyRebuiltAtMs).flatMap { Int64($0) } ?? 0
@@ -582,7 +589,10 @@ public actor BrainEngine {
         }
 
         // Step 1: imported history is read, not copied. One resolution per distinct track.
-        let imported = await sources.imported()
+        let shapes = sources.spotifyShapesPicks()
+        var imported = await sources.imported()
+        // Off: Spotify's own history and its lists are left out of the picks (owner question 1); the app's own plays stay.
+        if !shapes { imported = (imported.plays.filter { !$0.source.isSpotify }, ExternalTasteSnapshot()) }
         var importedResolved: [BrainKey: ResolvedTrack] = [:]
         // One key per imported play (50,000 and more of them, each a fold and a title clean): off this actor too.
         let importedPlays = imported.plays
@@ -663,6 +673,7 @@ public actor BrainEngine {
         log.replaceAffinity(state.rows())
         log.setValue(BrainEventLog.keySpecVersion, String(Brain.specVersion))
         log.setValue(BrainEventLog.keyImportCount, importSignature)
+        log.setValue(BrainEventLog.keySpotifyShapes, String(shapes))
         log.setValue(BrainEventLog.keyRebuiltAtMs, String(nowMs))
         if loaded != nil {
             loaded!.affinity = state

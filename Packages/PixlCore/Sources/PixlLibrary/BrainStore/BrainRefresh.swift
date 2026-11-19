@@ -41,6 +41,16 @@ public protocol RefreshWork: Sendable {
     func requestsLeft() async -> Int
     func radio(_ target: RefreshTarget) async -> RefreshFetch
     func artist(_ target: RefreshTarget) async -> RefreshFetch
+    /// Lane 2 (3.7, 6.3): the artists whose releases are looked at, the one checked longest ago first. The default is
+    /// none, so a work that has no releases lane runs exactly as before.
+    func releaseTargets() async -> [RefreshTarget]
+    /// One artist's releases: the artist page, the discography when a carousel was full, the tracks of what is new.
+    func releases(_ target: RefreshTarget) async -> RefreshFetch
+}
+
+public extension RefreshWork {
+    func releaseTargets() async -> [RefreshTarget] { [] }
+    func releases(_ target: RefreshTarget) async -> RefreshFetch { .none }
 }
 
 /// The refresh's rules (3.7), as a plain value so they are unit-tested without the system's scheduler:
@@ -66,8 +76,10 @@ public struct BrainRefreshRunner: Sendable {
         public var artistsFetched: Int
         public var artistsCached: Int
         public var missed: Int
+        public var releasesFetched: Int = 0
+        public var releasesCached: Int = 0
 
-        public var fetched: Int { radiosFetched + artistsFetched }
+        public var fetched: Int { radiosFetched + artistsFetched + releasesFetched }
     }
 
     private let work: any RefreshWork
@@ -107,6 +119,22 @@ public struct BrainRefreshRunner: Sendable {
             }
         }
         if report.stopped == .none {
+            // Lane 2 of the spec: what is new from the artists the listener plays. It goes before the artist lists below
+            // so the daily budget cannot be spent before it is reached; it has its own share.
+            for target in await work.releaseTargets() {
+                let stop = await gate()
+                if stop != .none {
+                    report.stopped = stop
+                    break
+                }
+                switch await work.releases(target) {
+                case .network: report.releasesFetched += 1
+                case .cached: report.releasesCached += 1
+                case .none: report.missed += 1
+                }
+            }
+        }
+        if report.stopped == .none {
             for target in await work.artistSeeds() {
                 let stop = await gate()
                 if stop != .none {
@@ -133,13 +161,24 @@ public struct BrainRefreshWork: RefreshWork {
 
     private let mixes: BrainMixes
     private let repository: BrainRepository
+    /// The releases lane's share of the worker's day (6.3, 3.7 lane 2): artist pages, discographies, album playlists.
+    public static let releasesDailyCeiling = 14
+    /// Artists looked at per run: the top 20 are all covered within about four days, not daily (Android's deviation 101).
+    public static let releaseArtistsPerRun = 6
+
     private let budget: HostBudget?
     private let matchedVideoId: @Sendable (String) async -> String?
     private let clock: @Sendable () -> Int64
+    private let newReleases: NewReleases?
+    /// The library as it is now: a release's tracks the listener already has are not news to them.
+    private let librarySongs: @Sendable () async -> [Song]
 
     public init(mixes: BrainMixes, repository: BrainRepository, budget: HostBudget?,
                 matchedVideoId: @escaping @Sendable (String) async -> String?,
+                newReleases: NewReleases? = nil, librarySongs: @escaping @Sendable () async -> [Song] = { [] },
                 clock: @escaping @Sendable () -> Int64 = { currentTimeMillis() }) {
+        self.newReleases = newReleases
+        self.librarySongs = librarySongs
         self.mixes = mixes
         self.repository = repository
         self.budget = budget
@@ -152,7 +191,8 @@ public struct BrainRefreshWork: RefreshWork {
     public func artistSeeds() async -> [RefreshTarget] { await targets(of: await mixes.topArtistSeeds()) }
 
     public func requestsLeft() async -> Int {
-        let today = await repository.radiosFetchedSince(clock() - HostBudget.dayMs)
+        let since = clock() - HostBudget.dayMs
+        let today = await repository.radiosFetchedSince(since) + (await newReleases?.requestsSince(since) ?? 0)
         let byCeiling = Self.workerDailyCeiling - today
         guard let budget else { return byCeiling }
         let byBucket = await budget.available() - Self.foregroundReserve
@@ -167,6 +207,30 @@ public struct BrainRefreshWork: RefreshWork {
     public func artist(_ target: RefreshTarget) async -> RefreshFetch {
         guard let radio = await repository.artistRadio(seed: target.seed, allowNetwork: true) else { return .none }
         return radio.fromCache ? .cached : .network
+    }
+
+    public func releaseTargets() async -> [RefreshTarget] {
+        guard let newReleases else { return [] }
+        // The lane's own share of the day: the rest of the worker's requests belong to the radios.
+        let since = clock() - HostBudget.dayMs
+        if await newReleases.requestsSince(since) >= Self.releasesDailyCeiling { return [] }
+        let artists = await artistSeeds()
+        let order = await newReleases.checkOrder(artists.map(\.artistName))
+        var byKey: [BrainKey: RefreshTarget] = [:]
+        for a in artists where byKey[BrainKey(BrainText.fold(a.artistName))] == nil { byKey[BrainKey(BrainText.fold(a.artistName))] = a }
+        return Array(order.compactMap { byKey[BrainKey(BrainText.fold($0))] }.prefix(Self.releaseArtistsPerRun))
+    }
+
+    public func releases(_ target: RefreshTarget) async -> RefreshFetch {
+        guard let newReleases else { return .none }
+        let since = clock() - HostBudget.dayMs
+        if await newReleases.requestsSince(since) >= Self.releasesDailyCeiling { return .none }
+        var channel = await newReleases.channelOf(target.artistName)
+        if channel == nil { channel = await repository.artistChannelId(seed: target.seed, allowNetwork: true) }
+        guard let channel else { return .none }
+        if await newReleases.isFresh(channel) { return .cached }
+        let index = BrainLibraryIndex(songs: await librarySongs())
+        return await newReleases.check(channelId: channel, artistName: target.artistName) { row in index.match(row) != nil }
     }
 
     /// A seed without a known YouTube audio id is not a seed: matching it is the matcher's job (3.6).
@@ -245,7 +309,8 @@ public enum RefreshSchedule {
         case .budget: stop = "budget"
         case .cancelled: stop = "cancelled"
         }
-        return "\(nowMs)|r\(r.radiosFetched)+\(r.radiosCached)|a\(r.artistsFetched)+\(r.artistsCached)|m\(r.missed)|\(stop)"
+        return "\(nowMs)|r\(r.radiosFetched)+\(r.radiosCached)|a\(r.artistsFetched)+\(r.artistsCached)"
+            + "|n\(r.releasesFetched)+\(r.releasesCached)|m\(r.missed)|\(stop)"
     }
 
     /// When the last run that got to ask for something finished, from its note; nil for no note.

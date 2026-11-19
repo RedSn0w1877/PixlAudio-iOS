@@ -20,6 +20,8 @@ public final class BrainEventLog {
     public static let keyHistoryMigrated = "history_migrated_ms"
     public static let keySpecVersion = "affinity_spec_version"
     public static let keyImportCount = "import_count"
+    /// The switch "Use my Spotify music to shape picks" as of the last rebuild.
+    public static let keySpotifyShapes = "spotify_shapes_picks"
     public static let keyRebuiltAtMs = "affinity_rebuilt_at_ms"
     /// The newest plays a Home row may be built around (`HomeAnchors`).
     public static let keyHomeAnchors = "home_anchors_v1"

@@ -279,7 +279,7 @@ struct BrainRefreshTests {
     @Test func theNoteSaysHowTheRunWentAndAStoppedRunIsNotTheDaysRun() {
         let report = BrainRefreshRunner.Report(stopped: .none, radiosFetched: 3, radiosCached: 2, artistsFetched: 1, artistsCached: 0, missed: 4)
         let note = RefreshSchedule.note(nowMs: 123_456, report)
-        #expect(note == "123456|r3+2|a1+0|m4|none")
+        #expect(note == "123456|r3+2|a1+0|n0+0|m4|none")
         #expect(RefreshSchedule.lastRunMs(note: note) == 123_456)
         #expect(RefreshSchedule.countsAsRun(note: note))
         var playing = report

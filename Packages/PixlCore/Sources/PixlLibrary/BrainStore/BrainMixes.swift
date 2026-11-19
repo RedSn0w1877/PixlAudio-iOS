@@ -291,12 +291,15 @@ public actor BrainMixes {
         }
         let rids = await repository.resolveTracks(requests)
         let aids = await repository.resolveArtistNames(kept.map { BrainLibraryIndex.primaryArtistName($0) })
+        // Repeat activation (5.6): how hot each track still is in the listener's memory (features 10 and 11).
+        let activation = await engine.activation(rids: Set(rids.filter { $0 != 0 }), nowMs: now)
         var out: [LibraryTrack] = []
         out.reserveCapacity(kept.count)
         for i in kept.indices where rids[i] != 0 {
             let song = kept[i]
             out.append(LibraryTrack(song: song, rid: rids[i], aid: aids[i],
-                                    liked: song.isFavorite || taste.favoriteIds.contains(song.id), boostLn: taste.boostLn(song)))
+                                    liked: song.isFavorite || taste.favoriteIds.contains(song.id), boostLn: taste.boostLn(song),
+                                    actr: activation[rids[i]] ?? 0.0))
         }
         sliceKey = key
         slice = out

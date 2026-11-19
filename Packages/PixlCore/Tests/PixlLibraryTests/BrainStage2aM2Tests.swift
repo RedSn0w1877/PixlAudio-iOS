@@ -737,3 +737,62 @@ struct BrainFeedbackDecisionTests {
         #expect(cleared.count == 0)
     }
 }
+
+// MARK: - The releases lane of the refresh (3.7 lane 2, 6.3)
+
+@Suite("Brain refresh, the releases lane")
+struct BrainRefreshReleasesLaneTests {
+    private final class Work: RefreshWork, @unchecked Sendable {
+        private let lock = NSLock()
+        private var asked: [String] = []
+        var askedList: [String] { lock.withLock { asked } }
+
+        private func note(_ s: String) { lock.withLock { asked.append(s) } }
+
+        func radioSeeds() async -> [RefreshTarget] { [target("r1")] }
+        func artistSeeds() async -> [RefreshTarget] { [target("a1")] }
+        func requestsLeft() async -> Int { 100 }
+        func radio(_ target: RefreshTarget) async -> RefreshFetch { note("radio"); return .network }
+        func artist(_ target: RefreshTarget) async -> RefreshFetch { note("artist"); return .network }
+        func releaseTargets() async -> [RefreshTarget] { [target("x1"), target("x2"), target("x3")] }
+        func releases(_ target: RefreshTarget) async -> RefreshFetch {
+            note("releases:\(target.artistName)")
+            return target.artistName == "x2" ? .cached : (target.artistName == "x3" ? .none : .network)
+        }
+
+        private func target(_ name: String) -> RefreshTarget {
+            RefreshTarget(seed: RadioSeed(mediaId: name, videoId: "v" + name, title: name, primaryArtist: name, durationMs: 1),
+                          rid: 1, artistName: name)
+        }
+    }
+
+    @Test func releasesGoAfterTheRadiosAndBeforeTheArtistListsAndAreCounted() async {
+        let work = Work()
+        let report = await BrainRefreshRunner(work: work, allowed: { true }, playing: { false }).run()
+        #expect(work.askedList == ["radio", "releases:x1", "releases:x2", "releases:x3", "artist"])
+        #expect(report.releasesFetched == 1 && report.releasesCached == 1 && report.missed == 1)
+        #expect(report.fetched == 3)
+        #expect(RefreshSchedule.note(nowMs: 5, report).contains("|n1+1|m1|"))
+    }
+
+    @Test func aWorkWithoutAReleasesLaneRunsAsBefore() async {
+        struct Plain: RefreshWork {
+            func radioSeeds() async -> [RefreshTarget] { [] }
+            func artistSeeds() async -> [RefreshTarget] { [] }
+            func requestsLeft() async -> Int { 5 }
+            func radio(_ target: RefreshTarget) async -> RefreshFetch { .none }
+            func artist(_ target: RefreshTarget) async -> RefreshFetch { .none }
+        }
+        let report = await BrainRefreshRunner(work: Plain(), allowed: { true }, playing: { false }).run()
+        #expect(report.releasesFetched == 0 && report.releasesCached == 0 && report.stopped == .none)
+    }
+
+    @Test func theSwitchStopsTheLaneAtOnce() async {
+        let flag = Box(true)
+        let work = Work()
+        let runner = BrainRefreshRunner(work: work, allowed: { flag.value }, playing: { false })
+        flag.value = false
+        let report = await runner.run()
+        #expect(report.stopped == .off && work.askedList.isEmpty)
+    }
+}

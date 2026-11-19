@@ -97,8 +97,11 @@ public struct LibraryTrack: Sendable {
     public var liked: Bool
     /// `ln(product)` of the listener's boost / reduce (5.11); 0 for none.
     public var boostLn: Double
+    /// Feature 10 of the scorer (5.6): how hot the track still is in the listener's memory; 0 for none.
+    public var actr: Double
 
-    public init(song: Song, rid: Int64, aid: Int64, liked: Bool, boostLn: Double = 0.0) {
+    public init(song: Song, rid: Int64, aid: Int64, liked: Bool, boostLn: Double = 0.0, actr: Double = 0.0) {
+        self.actr = actr
         self.song = song
         self.rid = rid
         self.aid = aid
@@ -179,7 +182,7 @@ public enum MixPoolBuilder {
             candidates.append(Candidate(
                 rid: track.rid, aid: track.aid,
                 albumKey: AutoplayPool.albumHash(BrainLibraryIndex.albumKey(of: track.song.album)), inLibrary: true,
-                liked: track.liked, boostLn: track.boostLn))
+                liked: track.liked, boostLn: track.boostLn, actr: track.actr))
             if track.aid != 0 && artistNames[track.aid] == nil {
                 artistNames[track.aid] = BrainLibraryIndex.primaryArtistName(track.song)
             }
