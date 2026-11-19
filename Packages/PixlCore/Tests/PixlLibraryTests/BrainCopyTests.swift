@@ -3,14 +3,18 @@ import Testing
 @testable import PixlLibrary
 
 /// The words of this milestone (docs/brain-spec.md, section 8 "Copy rule", decision D15): the words the app never
-/// says, nothing that claims learning before stage 3, and the copy of section 8 as the listener reads it. The app's
-/// sources are read as text: nothing under `App/` compiles on this machine.
+/// says, nothing that claims learning except where stage 3 allows it, and the copy of section 8 as the listener reads it.
+/// The app's sources are read as text: nothing under `App/` compiles on this machine.
 @Suite("Brain copy")
 struct BrainCopyTests {
     private let forbidden = ["lossless", "hi-res", "hires", "dolby", "atmos", "360 reality", "claude", "anthropic",
-                             "binilyrics", "enhanced",
-                             // Decision D15: stages 1 and 2 say "based on what you play".
-                             "learn"]
+                             "binilyrics", "enhanced"]
+
+    /// Decision D15, as stage 3 relaxes it: "learn" may appear only in the strings the spec names for Your sound (8.6), each of
+    /// which the screen shows only when it is true of the model at that moment (`ModelVoice`): the one line that says the
+    /// model is learning, and the reset button and its question. Every other string still fails on it. The text is the
+    /// literal as written in the source, interpolation included.
+    private let learnAllowed: Set<String> = ["Learning from \\(count) plays.", "Reset what I've learned", "Reset what I've learned?"]
 
     private var appRoot: URL {
         URL(fileURLWithPath: #filePath)
@@ -72,9 +76,28 @@ struct BrainCopyTests {
                 for word in forbidden {
                     #expect(!lower.contains(word), "\(file.name) says \"\(word)\": \(literal)")
                 }
+                if !learnAllowed.contains(literal) {
+                    #expect(!lower.contains("learn"), "\(file.name) says \"learn\": \(literal)")
+                }
             }
         }
         #expect(count >= 40, "expected the brain's strings, found \(count)")
+    }
+
+    @Test func theWordLearnIsOnlyWhereTheSpecNamesIt() throws {
+        let strings = try String(contentsOf: appRoot.appendingPathComponent("Features/Brain/BrainStringsSound.swift"), encoding: .utf8)
+        let all = literals(strings)
+        // The allowance is not a loophole: the three strings are really there, each exactly once, and they are the only
+        // literals of the brain's screens that say "learn".
+        for text in learnAllowed { #expect(all.filter { $0 == text }.count == 1, "missing: \(text)") }
+        var said: [String] = []
+        for file in try sources() {
+            for literal in literals(file.text) where literal.lowercased().contains("learn") { said.append(literal) }
+        }
+        #expect(Set(said) == learnAllowed, "the strings that say learn: \(said)")
+        // A sentence that says it fails the test unless it is one of the three.
+        #expect(!learnAllowed.contains("The app learns what you like."))
+        #expect(!learnAllowed.contains("Learning your taste"))
     }
 
     @Test func theCopyOfSectionEightIsWhatTheListenerReads() throws {

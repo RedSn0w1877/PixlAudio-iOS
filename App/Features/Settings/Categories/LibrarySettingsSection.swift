@@ -89,6 +89,9 @@ struct LibrarySettingsSection: View {
                             subtitle: "Your Spotify or Google data download — years of listening",
                             systemImage: "square.and.arrow.down", showsChevron: true,
                             identifier: "settings.library.historyImport") { router.push(.listeningHistory) }
+            SettingsItemRow(title: YourSoundStrings.title, subtitle: YourSoundStrings.rowSubtitle,
+                            systemImage: "waveform.path", showsChevron: true,
+                            identifier: "settings.library.yourSound") { router.push(.yourSound) }
             SettingsItemRow(title: "Ask Taizo's taste changes",
                             subtitle: TasteChangeText.summary(count: env.tasteAdjustments.count),
                             systemImage: "slider.horizontal.3", showsChevron: true,

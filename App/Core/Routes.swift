@@ -153,6 +153,10 @@ nonisolated enum AppRoute: Hashable, Sendable {
     /// Settings › Developer mode › Brain data (docs/brain-spec.md, 3.7, stage 2b): the genre atlas, what is known about the
     /// listener's tracks and each open-data source with its switch.
     case brainData
+    /// Your sound (docs/brain-spec.md, 8.6, stage 3): Settings › Library & storage › Listening history, and the page of a genre
+    /// reached from it (8.7).
+    case yourSound
+    case genrePage(atlasId: Int)
     /// Cloud Studio (iOS-first, design §7.2): Settings › Sing › Cloud processing, and its queue.
     case cloudProcessing
     case cloudQueue
@@ -202,6 +206,8 @@ nonisolated enum AppRoute: Hashable, Sendable {
         case .quickFill: "quickFill"
         case .diagnostics: "diagnostics"
         case .brainData: "brainData"
+        case .yourSound: "yourSound"
+        case .genrePage: "genrePage"
         case .cloudProcessing: "cloudProcessing"
         case .cloudQueue: "cloudQueue"
         case .accounts: "accounts"

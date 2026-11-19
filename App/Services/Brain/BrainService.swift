@@ -63,6 +63,9 @@ final class BrainService {
     /// Plans Home in the background (8.1) and the first minute of a new listener (8.10). Nil in UI tests.
     private(set) var planBuilder: HomePlanBuilder?
     private(set) var coldStart: ColdStart?
+    /// Reads Your sound and the genre pages (8.6, 8.7, stage 3) and resets what was learned. Built with the mixes, never at launch;
+    /// nothing is computed until a screen asks. Nil in UI tests.
+    private(set) var yourSound: YourSoundReader?
     /// New releases by the artists the listener plays (6.3): one small file Home reads without the brain's state. Nil in UI tests.
     let newReleases: NewReleases?
     /// What the Spotify sync receives with a track and used to drop (13.1). Nil in UI tests.
@@ -189,6 +192,7 @@ final class BrainService {
         let allowed: @Sendable () async -> Bool = { @MainActor [weak self] in self?.refreshIsAllowed() ?? false }
         refresh = BrainRefresh(work: work, repository: repository, engine: engine, allowed: allowed)
         planBuilder = HomePlanBuilder(mixes: mixes, homeRows: homeRows, genre: kit.genre, store: kit.planStore)
+        yourSound = YourSoundReader(engine: engine, mixes: mixes, parts: kit.parts)
         // The first minute of a new listener (8.10) is lane 1 of the refresh, run while Home is on screen: the same work under
         // the same budget and switches, and never a second background job.
         coldStart = ColdStart(work: work, healthyLists: { await repository.radioListCount() }, allowed: allowed)

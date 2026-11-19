@@ -37,6 +37,8 @@ struct RouteDestination: View {
         case .quickFill: QuickFillView()
         case .diagnostics: DiagnosticsView()
         case .brainData: BrainDataView()
+        case .yourSound: YourSoundView()
+        case .genrePage(let atlasId): GenrePageView(atlasId: atlasId)
         case .cloudProcessing: CloudProcessingSettingsView()
         case .cloudQueue: CloudQueueView()
         case .accounts: AccountsView()
