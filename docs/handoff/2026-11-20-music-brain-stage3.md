@@ -177,4 +177,6 @@ The full run had exactly one failure, `BrainGoldenTests.theManifestListsEveryFil
 
 ## CI
 
-CI_PLACEHOLDER
+Run **44627072802** (`1e9fa56`, workflow `ci`, branch `music-brain`): `core` (PixlCore `swift test` on macOS) **passed**, `app` (build and unit tests,
+Xcode 27, Swift 6 strict concurrency, which is the only compiler for `App/`) **passed**, `ipa` skipped as for any branch push. Conclusion: **success**, on the first
+attempt, with no rerun and no known flake hit. Green CI says nothing about how the two new screens look or behave on a phone.
