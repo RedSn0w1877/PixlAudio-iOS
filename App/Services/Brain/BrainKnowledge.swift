@@ -13,11 +13,8 @@ import PixlModel
 /// `URLSession` with the app's User-Agent: it names the app and its public project page, never the listener. No cookies, no
 /// cache, no account.
 nonisolated struct KnowledgeURLTransport: KnowledgeTransport {
-    private let session: URLSession
-    private let userAgent: String
-
-    init(version: String) {
-        userAgent = KnowledgeUserAgent.value(version: version)
+    /// Made on the first request (a static is initialised on first use), never at app start.
+    private static let session: URLSession = {
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = 20
         config.timeoutIntervalForResource = 40
@@ -25,8 +22,12 @@ nonisolated struct KnowledgeURLTransport: KnowledgeTransport {
         config.httpShouldSetCookies = false
         config.urlCache = nil
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
-        session = URLSession(configuration: config)
-    }
+        return URLSession(configuration: config)
+    }()
+
+    private let userAgent: String
+
+    init(version: String) { userAgent = KnowledgeUserAgent.value(version: version) }
 
     func send(_ request: KnowledgeRequest) async throws -> KnowledgeReply {
         guard let url = URL(string: request.url) else { throw URLError(.badURL) }
@@ -38,7 +39,7 @@ nonisolated struct KnowledgeURLTransport: KnowledgeTransport {
             urlRequest.httpBody = Data(body.utf8)
             if let type = request.contentType { urlRequest.setValue(type, forHTTPHeaderField: "Content-Type") }
         }
-        let (data, response) = try await session.data(for: urlRequest)
+        let (data, response) = try await Self.session.data(for: urlRequest)
         guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
         let retry = Int(http.value(forHTTPHeaderField: "Retry-After") ?? "") ?? 0
         return KnowledgeReply(code: http.statusCode, body: String(decoding: data, as: UTF8.self), retryAfterSec: retry)
