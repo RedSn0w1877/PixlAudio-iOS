@@ -97,9 +97,12 @@ struct BrainStage2bM2Tests {
 
     // MARK: The fit
 
-    private func inputs(_ rids: [Int64], _ aids: [Int64], plays: Box<Int>, hasState: Bool = true, clock: Box<Int64>) -> IslandInputs {
+    private func inputs(_ rids: [Int64], _ aids: [Int64], plays: Box<Int>, hasState: Bool = true, clock: Box<Int64>,
+                        nothingWeighs: Box<Bool>? = nil, duplicates: Bool = false) -> IslandInputs {
         let songs = rids.indices.map { testSong("s\($0)", title: "Song \($0)", artist: "Artist \($0 % 9)") }
-        let tracks = rids.indices.map { LibraryTrack(song: songs[$0], rid: rids[$0], aid: aids[$0], liked: false) }
+        var tracks = rids.indices.map { LibraryTrack(song: songs[$0], rid: rids[$0], aid: aids[$0], liked: false) }
+        // A song on an album and on a compilation resolves to one recording: the library lists it twice.
+        if duplicates { tracks += tracks.prefix(40).map { LibraryTrack(song: $0.song, rid: $0.rid, aid: $0.aid, liked: false) } }
         let planted = Self.planted(rids: rids, aids: aids, clusters: 3, seed: "builder")
         var edges: [MixPlanner.Edge] = []
         var rng = BrainHash.Rng(seed: BrainHash.fnv1a64("builder edges"))
@@ -114,10 +117,12 @@ struct BrainStage2bM2Tests {
         }
         _ = planted
         let fixedEdges = edges
+        let fixedTracks = tracks
         return IslandInputs(
-            library: { _ in tracks }, edges: { fixedEdges }, hasState: { hasState },
+            library: { _ in fixedTracks }, edges: { fixedEdges }, hasState: { hasState },
             weights: { asked, _ in
                 var out: [Int64: [Double]] = [:]
+                if nothingWeighs?.value == true { return out }
                 for (i, r) in rids.enumerated() where asked.contains(r) { out[r] = [2.0 + Double(i % 5), 0.0] }
                 return out
             },
@@ -487,5 +492,143 @@ struct BrainStage2bM2Tests {
         let off = Work()
         await ColdStart(work: off, healthyLists: { 0 }, allowed: { false }).run { _ in }
         #expect(off.fetched.isEmpty)
+    }
+
+    // MARK: After the review
+
+    private func twoFits() -> (a: Islands.Fit, b: Islands.Fit) {
+        let rids = (0..<120).map { BrainHash.id(BrainHash.fnv1a64("rv rid \($0)")) }
+        let aids = (0..<120).map { BrainHash.id(BrainHash.fnv1a64("rv aid \($0 % 9)")) }
+        let a = Islands.fit(Self.planted(rids: rids, aids: aids, clusters: 3, seed: "rv a"))
+        let b = Islands.fit(Self.planted(rids: rids, aids: aids, clusters: 2, seed: "rv b"), previous: [], lastId: 50)
+        return (a, b)
+    }
+
+    @Test func aFitIsOneAppendAndAProcessKilledBeforeItsMemberRecordLeavesThePreviousFit() async throws {
+        let dir = Self.tempDirectory("islands-atomic")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let (a, b) = twoFits()
+        #expect(a.islands.count >= 2 && b.islands.count >= 2 && b.islands.allSatisfy { $0.id > 50 })
+        let values = Values()
+        let store = IslandStore(directory: dir, state: values.state)
+        #expect(await store.save(a, nowMs: 1_000))
+        // A fit that wrote its islands and died before its member record: the islands are on disk, the record that names them is not.
+        let file = KeyedLogStore(url: dir.appendingPathComponent("island.pbl"))
+        file.open()
+        let encoder = JSONEncoder()
+        for island in b.islands { #expect(file.put(String(island.id), [UInt8](try encoder.encode(IslandStore.recordOf(island, nowMs: 2_000))))) }
+        let restarted = IslandStore(directory: dir, state: values.state)
+        let set = try #require(await restarted.current())
+        #expect(set.islands.map(\.id).sorted() == a.islands.map(\.id).sorted(), "the previous fit still serves")
+        #expect(set.fitAtMs == 1_000)
+        #expect(set.memberOf.count == a.memberRids.count)
+        // The next fit lands whole and removes what is gone.
+        #expect(await restarted.save(b, nowMs: 3_000))
+        let after = IslandStore(directory: dir, state: values.state)
+        let now = try #require(await after.current())
+        #expect(now.islands.map(\.id).sorted() == b.islands.map(\.id).sorted())
+        let check = KeyedLogStore(url: dir.appendingPathComponent("island.pbl"))
+        check.open()
+        #expect(check.count == b.islands.count + 1, "the islands of the old fit were removed, the member record stays")
+        #expect(await after.lastId() == b.maxId)
+    }
+
+    @Test func islandsWithNoMemberRecordAreNoSetAndAnEmptyFitIsNeverSaved() async throws {
+        let dir = Self.tempDirectory("islands-unfinished")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let (a, _) = twoFits()
+        let file = KeyedLogStore(url: dir.appendingPathComponent("island.pbl"))
+        file.open()
+        for island in a.islands { _ = file.put(String(island.id), [UInt8](try JSONEncoder().encode(IslandStore.recordOf(island, nowMs: 1)))) }
+        let store = IslandStore(directory: dir, state: Values().state)
+        #expect(await store.current() == nil, "a first fit that never finished is no islands")
+        #expect(await store.save(Islands.Fit(islands: [], memberRids: [], memberIslandIds: [], maxId: 0), nowMs: 5) == false)
+    }
+
+    @Test func anEmptyFitKeepsTheStoredIslandsAndTheNextTryWaitsADay() async throws {
+        let dir = Self.tempDirectory("builder-empty")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let rids = (0..<150).map { BrainHash.id(BrainHash.fnv1a64("e rid \($0)")) }
+        let aids = (0..<150).map { BrainHash.id(BrainHash.fnv1a64("e aid \($0 % 15)")) }
+        let plays = Box<Int>(0)
+        let clock = Box<Int64>(1_700_000_000_000)
+        let nothing = Box<Bool>(false)
+        let values = Values()
+        let store = IslandStore(directory: dir, state: values.state)
+        let builder = IslandBuilder(store: store, inputs: inputs(rids, aids, plays: plays, clock: clock, nothingWeighs: nothing), state: values.state)
+        let first = try #require(await builder.ensure())
+        // A week on, the weights come back empty (a transient read): the fit places nothing.
+        clock.value += IslandBuilder.refitAgeMs + 10
+        nothing.value = true
+        let kept = try #require(await builder.ensure(), "the stored islands keep serving")
+        #expect(kept.islands.map(\.id) == first.islands.map(\.id))
+        #expect(kept.fitAtMs == first.fitAtMs)
+        let reopened = IslandStore(directory: dir, state: values.state)
+        #expect(await reopened.current()?.islands.count == first.islands.count, "nothing was wiped on disk")
+        // Not retried at every plan: waits a day, then is due again.
+        #expect(await builder.isDue(nowMs: clock.value + 1000) == false)
+        #expect(await builder.isDue(nowMs: clock.value + IslandBuilder.emptyFitRetryMs + 1))
+    }
+
+    @Test func embeddingRowsThatDoNotMatchTheirCountMakeTheFitDueAgainAndDuplicateRecordingsCountOnce() async throws {
+        let dir = Self.tempDirectory("builder-intact")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let rids = (0..<150).map { BrainHash.id(BrainHash.fnv1a64("i rid \($0)")) }
+        let aids = (0..<150).map { BrainHash.id(BrainHash.fnv1a64("i aid \($0 % 15)")) }
+        let clock = Box<Int64>(1_700_000_000_000)
+        let values = Values()
+        let store = IslandStore(directory: dir, state: values.state)
+        let builder = IslandBuilder(store: store, inputs: inputs(rids, aids, plays: Box<Int>(0), clock: clock, duplicates: true), state: values.state)
+        let set = try #require(await builder.ensure())
+        var counted = Set<Int64>()
+        for (rid, _) in set.memberOf { #expect(counted.insert(rid).inserted) }
+        #expect(await builder.isDue(nowMs: clock.value + 1000) == false)
+        // The embedding file is damaged (deleted): the next fit repairs it, not the next week.
+        try FileManager.default.removeItem(at: dir.appendingPathComponent("node_embedding.bin"))
+        let fresh = IslandBuilder(store: IslandStore(directory: dir, state: values.state),
+                                  inputs: inputs(rids, aids, plays: Box<Int>(0), clock: clock), state: values.state)
+        #expect(await fresh.isDue(nowMs: clock.value + 1000))
+    }
+
+    @Test func theGraphIsCappedWithEveryLibraryEdgeKeptAndTheHeaviestOfTheRest() {
+        let library: Set<Int64> = [1, 2, 3, 4]
+        var edges: [MixPlanner.Edge] = [MixPlanner.Edge(a: 1, b: 2, weight: 0.1), MixPlanner.Edge(a: 3, b: 4, weight: 0.1)]
+        for i in 0..<20 { edges.append(MixPlanner.Edge(a: 1, b: Int64(100 + i), weight: Double(i) / 20.0)) }
+        // Room for 4 library nodes and 3 more only.
+        let capped = IslandBuilder.capEdges(edges, library: library, maxNodes: 7)
+        #expect(capped.filter { library.contains($0.a) && library.contains($0.b) }.count == 2, "library edges always stay")
+        let outside = capped.filter { !library.contains($0.b) }
+        #expect(outside.count == 3)
+        #expect(outside.map(\.b).sorted() == [117, 118, 119], "the heaviest of the rest")
+        #expect(IslandBuilder.capEdges(edges, library: library, maxNodes: 1_000).count == edges.count)
+    }
+
+    @Test func aFailedAtlasLoadIsRememberedForTenMinutes() async {
+        let calls = Box<Int>(0)
+        let clock = Box<Int64>(1_000)
+        let provider = CachedAtlasProvider(load: { calls.value += 1; return nil }, clock: { clock.value })
+        #expect(await provider.atlas() == nil)
+        #expect(await provider.atlas() == nil)
+        #expect(await provider.atlas() == nil)
+        #expect(calls.value == 1, "one load, not one for every caller")
+        clock.value += CachedAtlasProvider.failureMemoryMs + 1
+        #expect(await provider.atlas() == nil)
+        #expect(calls.value == 2)
+    }
+
+    @Test func aDailyMixNumberFollowsTodaysIslandsAndAnIslandThatLeftTheSixIsNotShownOrBuilt() async throws {
+        let w = World()
+        defer { w.tidy() }
+        let x = await islanded(w)
+        let set = try #require(await x.store.current())
+        let id = set.dailyIslands()[0].id
+        let spec = MixSpec(kind: MixKinds.daily, islandId: id)
+        let first = try #require(await x.mixes.todayOf(spec))
+        #expect(first.number == 1)
+        // A refit moves the islands: other ids, and the old one is not among today's six any more.
+        let (_, b) = twoFits()
+        _ = await x.store.save(b, nowMs: w.clock.value + 1000)
+        #expect(await x.mixes.todayOf(spec) == nil, "no list for an island that is gone")
+        #expect(await x.mixes.savedOf(spec) == nil, "and no card for it")
     }
 }

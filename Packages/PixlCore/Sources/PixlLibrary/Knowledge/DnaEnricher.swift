@@ -25,25 +25,43 @@ public protocol AtlasProvider: Sendable {
 }
 
 /// Loads the atlas with `load` (the app reads and gunzips its bundled asset) the first time something needs a genre, and
-/// keeps it. Two callers at once share one load; a load that failed is tried again by the next caller.
+/// keeps it. Two callers at once share one load. A load that failed is remembered for `failureMemoryMs` and answered
+/// with nil at once (a missing or unreadable asset must not be gunzipped and parsed again by every caller of a Home plan);
+/// after that the next caller tries again.
 public actor CachedAtlasProvider: AtlasProvider {
+    public static let failureMemoryMs: Int64 = 10 * 60 * 1000
+
     private let load: @Sendable () async -> GenreAtlas?
+    private let clock: @Sendable () -> Int64
     private var cached: GenreAtlas?
     private var loading: Task<GenreAtlas?, Never>?
+    private var failedAtMs: Int64?
 
-    public init(load: @escaping @Sendable () async -> GenreAtlas?) { self.load = load }
+    public init(load: @escaping @Sendable () async -> GenreAtlas?, clock: @escaping @Sendable () -> Int64 = { currentTimeMillis() }) {
+        self.load = load
+        self.clock = clock
+    }
 
     public func loadedOrNil() -> GenreAtlas? { cached }
 
     public func atlas() async -> GenreAtlas? {
         if let cached { return cached }
         if let loading { return await loading.value }
+        if let failedAtMs {
+            let age = clock() - failedAtMs
+            if age >= 0, age < Self.failureMemoryMs { return nil }
+        }
         let load = self.load
         let task = Task.detached(priority: .utility) { await load() }
         loading = task
         let result = await task.value
         loading = nil
-        if let result { cached = result }
+        if let result {
+            cached = result
+            failedAtMs = nil
+        } else {
+            failedAtMs = clock()
+        }
         return result
     }
 }
@@ -52,9 +70,12 @@ public actor CachedAtlasProvider: AtlasProvider {
 public struct DnaLanes: Sendable {
     public let targets: DnaTargets
     public let enricher: DnaEnricher
-    public init(targets: DnaTargets, enricher: DnaEnricher) {
+    /// Takes Spotify's stored genres and years out of the rows when the Spotify switch is off (Android's `SpotifyDnaPurge`).
+    public let purge: SpotifyDnaPurge?
+    public init(targets: DnaTargets, enricher: DnaEnricher, purge: SpotifyDnaPurge? = nil) {
         self.targets = targets
         self.enricher = enricher
+        self.purge = purge
     }
 }
 

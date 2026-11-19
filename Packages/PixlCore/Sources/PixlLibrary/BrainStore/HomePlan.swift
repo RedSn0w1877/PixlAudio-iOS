@@ -131,9 +131,12 @@ public struct HomePlan: Codable, Sendable, Equatable {
     /// The made-for-you cards, in order (also the hero's pool).
     public var mixes: [PlanMix]
     public var shelves: [PlanShelf]
+    /// When the islands this plan was made from were fitted (0 for none, or a plan from before this field): a refit makes the
+    /// plan due, so a card never numbers an island the plan does not hold.
+    public var islandFitAtMs: Int64
 
     public init(generatedAtMs: Int64, planKey: Int64, taste: String = "", daypart: Int32 = 0, weekday: Int32 = 0, hero: PlanHero? = nil,
-                mixes: [PlanMix] = [], shelves: [PlanShelf] = []) {
+                mixes: [PlanMix] = [], shelves: [PlanShelf] = [], islandFitAtMs: Int64 = 0) {
         planVersion = Self.version
         self.generatedAtMs = generatedAtMs
         self.planKey = planKey
@@ -143,10 +146,29 @@ public struct HomePlan: Codable, Sendable, Equatable {
         self.hero = hero
         self.mixes = mixes
         self.shelves = shelves
+        self.islandFitAtMs = islandFitAtMs
+    }
+
+    /// True when the plan has something to show: a hero, a made-for-you card or a shelf. A plan with none is still saved (so
+    /// it is not rebuilt at every Home), but it does not own the page: the library rows carry it.
+    public var hasContent: Bool { hero != nil || !mixes.isEmpty || !shelves.isEmpty }
+
+    /// The same plan with at most `maxItems` in each shelf of songs and no more than two covers a card, for a plan over the
+    /// file's size limit.
+    public func shrunk(maxItems: Int) -> HomePlan {
+        var out = self
+        for i in out.shelves.indices {
+            if out.shelves[i].items.count > maxItems { out.shelves[i].items = Array(out.shelves[i].items.prefix(maxItems)) }
+            for k in out.shelves[i].mixes.indices where out.shelves[i].mixes[k].covers.count > 2 {
+                out.shelves[i].mixes[k].covers = Array(out.shelves[i].mixes[k].covers.prefix(2))
+            }
+        }
+        for k in out.mixes.indices where out.mixes[k].covers.count > 2 { out.mixes[k].covers = Array(out.mixes[k].covers.prefix(2)) }
+        return out
     }
 
     private enum CodingKeys: String, CodingKey {
-        case planVersion, generatedAtMs, planKey, taste, daypart, weekday, hero, mixes, shelves
+        case planVersion, generatedAtMs, planKey, taste, daypart, weekday, hero, mixes, shelves, islandFitAtMs
     }
 
     // Every field a later version adds is read with a default.
@@ -161,6 +183,7 @@ public struct HomePlan: Codable, Sendable, Equatable {
         hero = try c.decodeIfPresent(PlanHero.self, forKey: .hero)
         mixes = try c.decodeIfPresent([PlanMix].self, forKey: .mixes) ?? []
         shelves = try c.decodeIfPresent([PlanShelf].self, forKey: .shelves) ?? []
+        islandFitAtMs = try c.decodeIfPresent(Int64.self, forKey: .islandFitAtMs) ?? 0
     }
 }
 

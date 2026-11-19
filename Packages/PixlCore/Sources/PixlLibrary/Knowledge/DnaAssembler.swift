@@ -32,11 +32,14 @@ public struct DnaTarget: Sendable {
     public var ytPlays: Int64
     public var ytExplicit: Bool?
     public var videoId: String?
+    /// "Use my Spotify music to shape picks" is off: Spotify's artist genres and album year are taken out of the stored
+    /// rows, not only left out of new ones (a claim nobody replaces is otherwise kept for ever).
+    public var spotifyOff: Bool
 
     public init(rid: Int64, aid: Int64, spotifyId: String? = nil, isrc: String? = nil, title: String, artist: String,
                 artistDisplay: String? = nil, durationMs: Int, albumName: String? = nil, spotifyArtistIds: [String] = [],
                 spotifyReleaseDate: String? = nil, spotifyExplicit: Bool? = nil, spotifyGenres: [String] = [],
-                chipGenres: [String] = [], ytYear: Int = 0, ytPlays: Int64 = 0, ytExplicit: Bool? = nil, videoId: String? = nil) {
+                chipGenres: [String] = [], ytYear: Int = 0, ytPlays: Int64 = 0, ytExplicit: Bool? = nil, videoId: String? = nil, spotifyOff: Bool = false) {
         self.rid = rid
         self.aid = aid
         self.spotifyId = spotifyId
@@ -55,6 +58,7 @@ public struct DnaTarget: Sendable {
         self.ytPlays = ytPlays
         self.ytExplicit = ytExplicit
         self.videoId = videoId
+        self.spotifyOff = spotifyOff
     }
 }
 
@@ -125,7 +129,7 @@ public enum DnaAssembler {
         if e.lb != nil { out.insert(pLbRecording); out.insert(pLbArtist) }
         if e.wd != nil { out.insert(pWdArtist) }
         if e.itunes != nil { out.insert(pITunes) }
-        if !target.spotifyGenres.isEmpty { out.insert(pSpotify) }
+        if !target.spotifyGenres.isEmpty || target.spotifyOff { out.insert(pSpotify) }
         if !target.chipGenres.isEmpty { out.insert(pChip) }
         return out
     }
@@ -183,7 +187,7 @@ public enum DnaAssembler {
             let raws = w.genreMbids.enumerated().map { i, id in Tags.Raw(i < w.genreLabels.count ? w.genreLabels[i] : "", mbid: id) }
             out += claimsFor(atlas, pWdArtist, Tags.srcArtist, nil, raws)
         }
-        if !target.spotifyGenres.isEmpty {
+        if !target.spotifyGenres.isEmpty, !target.spotifyOff {
             out += claimsFor(atlas, pSpotify, Tags.srcSpotify, nil, target.spotifyGenres.map { Tags.Raw($0) })
         }
         if !target.chipGenres.isEmpty {
@@ -225,6 +229,40 @@ public enum DnaAssembler {
         return out
     }
 
+    /// True when a stored track row still carries something Spotify said: an artist-genre claim or the album year.
+    public static func carriesSpotify(_ row: TrackDnaRow) -> Bool {
+        row.yearSource == TrackDna.yearSpotify || decodeClaims([UInt8](row.tagInputs)).contains { $0.provider == pSpotify }
+    }
+
+    public static func carriesSpotify(_ row: ArtistDnaRow) -> Bool {
+        decodeClaims([UInt8](row.tagInputs)).contains { $0.provider == pSpotify }
+    }
+
+    /// The tag vector of a track row as its claims make it WITHOUT anything Spotify said. The island fit reads this and not the
+    /// stored vector: Spotify content is never used to fit a model (owner decision), so a genre only Spotify gave is not a
+    /// feature of any island. A row written with another atlas has unreadable claims and gives no tags (unknown, not guessed).
+    public static func tagVectorWithoutSpotify(_ row: TrackDnaRow, atlas: GenreAtlas, atlasVersion: Int) -> Tags.Vector {
+        guard row.atlasVersion == atlasVersion else { return .empty }
+        let claims = decodeClaims([UInt8](row.tagInputs))
+        if !claims.contains(where: { $0.provider == pSpotify }) { return row.tagVector }
+        return merged(atlas, claims.filter { $0.provider != pSpotify }, artistLevelOnly: false)
+    }
+
+    /// An artist row without its Spotify claims, its tags merged again from what is left. Nil when it carries none, or was
+    /// written with another atlas (its claims cannot be read; the next refresh rebuilds it).
+    public static func withoutSpotify(_ row: ArtistDnaRow, atlas: GenreAtlas, atlasVersion: Int, nowMs: Int64) -> ArtistDnaRow? {
+        guard row.atlasVersion == atlasVersion else { return nil }
+        let claims = decodeClaims([UInt8](row.tagInputs))
+        if !claims.contains(where: { $0.provider == pSpotify }) { return nil }
+        let kept = claims.filter { $0.provider != pSpotify }
+        var out = row
+        out.tagInputs = Data(encodeClaims(kept))
+        out.tags = Data(Tags.encode(merged(atlas, kept, artistLevelOnly: true)))
+        out.fetchedMask &= ~DnaSource.spotifyGenres
+        out.updatedAtMs = nowMs
+        return out
+    }
+
     public struct Result: Sendable {
         public var track: TrackDnaRow
         public var artist: ArtistDnaRow?
@@ -237,7 +275,7 @@ public enum DnaAssembler {
     public static func assemble(target: DnaTarget, evidence: DnaEvidence, prior: TrackDnaRow?, priorArtist: ArtistDnaRow?,
                                 atlas: GenreAtlas, atlasVersion: Int, nowMs: Int64, maxYear: Int) -> Result {
         var tried = evidence.tried
-        if !target.spotifyGenres.isEmpty { tried |= DnaSource.spotifyGenres }
+        if !target.spotifyGenres.isEmpty, !target.spotifyOff { tried |= DnaSource.spotifyGenres }
         if !target.chipGenres.isEmpty { tried |= DnaSource.youtubeChips }
         let fresh = claimsOf(target, evidence, atlas)
         let priorClaims = prior.flatMap { $0.atlasVersion == atlasVersion ? decodeClaims([UInt8]($0.tagInputs)) : nil } ?? []
@@ -264,7 +302,7 @@ public enum DnaAssembler {
         if let d = evidence.deezerTrack?.releaseDate { let y = TrackDna.parseYear(d); if y > 0 { newYear.append((TrackDna.yearDeezer, y)) } }
         // Spotify's album date and the YouTube row's year are facts the app already holds: they are claims on every pass.
         var own: [(Int, Int)] = []
-        let spotifyYear = TrackDna.parseYear(target.spotifyReleaseDate)
+        let spotifyYear = target.spotifyOff ? 0 : TrackDna.parseYear(target.spotifyReleaseDate)
         if spotifyYear > 0 { own.append((TrackDna.yearSpotify, spotifyYear)) }
         if target.ytYear > 0 { own.append((TrackDna.yearYouTube, target.ytYear)) }
         let kept = oldYear.filter { $0.0 != TrackDna.yearSpotify && $0.0 != TrackDna.yearYouTube }
@@ -354,7 +392,7 @@ public enum DnaAssembler {
             valence: feel.valence,
             embVersion: prior?.embVersion ?? 0,
             confidence: confidence,
-            fetchedMask: (prior?.fetchedMask ?? 0) | tried,
+            fetchedMask: ((prior?.fetchedMask ?? 0) | tried) & ~(target.spotifyOff ? DnaSource.spotifyGenres : 0),
             updatedAtMs: nowMs,
             tagsAtMs: tagsRefreshed ? nowMs : (prior?.tagsAtMs ?? 0),
             popAtMs: popRefreshed ? nowMs : (prior?.popAtMs ?? 0),
@@ -382,7 +420,7 @@ public enum DnaAssembler {
                 tags: Data(Tags.encode(artistTags)),
                 popPermille: priorArtist?.popPermille ?? -1,
                 releaseIds: priorArtist?.releaseIds ?? "",
-                fetchedMask: (priorArtist?.fetchedMask ?? 0) | (tried & artistSources),
+                fetchedMask: ((priorArtist?.fetchedMask ?? 0) | (tried & artistSources)) & ~(target.spotifyOff ? DnaSource.spotifyGenres : 0),
                 updatedAtMs: nowMs,
                 tagsAtMs: (evidence.mbArtist != nil || evidence.lb != nil || evidence.wd != nil) ? nowMs : (priorArtist?.tagsAtMs ?? 0),
                 atlasVersion: atlasVersion,

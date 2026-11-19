@@ -5,7 +5,11 @@
 //     node_embedding.bin   one binary table: "PEMB", format 1, embedding version, count, ids (Int64 LE, ascending), 64 bytes a node
 //     island.pbl           `<islandId>` -> {"v":1,"id":..,"c":<base64: 96 doubles, big endian>,"m":medoid,"tt":[..],"lt":[..],
 //                                          "ta":[..],"wq":..,"rq":..,"n":size,"at":fitAtMs}
-//     island_member.pbl    `all`        -> {"v":1,"r":[rid..],"i":[islandId..]}   (one record: the fit rewrites it whole)
+//                          `members`    -> {"v":1,"r":[rid..],"i":[islandId..],"ids":[islandId..]}   (the fit rewrites it whole)
+//
+// A fit is ONE append: every island and, last, the member record, which names the islands of that fit (`ids`). A reader
+// takes the islands the member record names and nothing else, so a process killed mid-fit leaves the previous fit (or, with
+// no previous fit, no islands), never a half set. Stale islands are removed only after the new ones are down.
 //
 // plus four values in `brain_state`: `island_last_id`, `island_tag_shares` (`id:share;...`), `emb_count`, `island_fit_at`.
 // Everything here is a cache of what the brain can fit again from its own history, so a file that cannot be read is no
@@ -62,6 +66,8 @@ public actor IslandStore {
     public static let keyTagShares = "island_tag_shares"
     public static let keyEmbCount = "emb_count"
     public static let keyFitAt = "island_fit_at"
+    public static let keyEmptyFitAt = "island_empty_fit_at"
+    public static let keyForceRefit = "island_force_refit"
     public static let formatVersion = 1
     static let magic: [UInt8] = [0x50, 0x45, 0x4D, 0x42] // "PEMB"
 
@@ -83,11 +89,14 @@ public actor IslandStore {
         var v: Int
         var r: [Int64]
         var i: [Int]
+        /// The islands of the fit this record belongs to. Absent only in a record from before this field.
+        var ids: [Int]?
     }
+
+    static let membersKey = "members"
 
     private let tableURL: URL
     private let islandFile: KeyedLogStore
-    private let memberFile: KeyedLogStore
     private let state: StateValues
     private var current_: IslandSet?
     private var currentLoaded = false
@@ -97,7 +106,6 @@ public actor IslandStore {
     public init(directory: URL, state: StateValues) {
         tableURL = directory.appendingPathComponent("node_embedding.bin", isDirectory: false)
         islandFile = KeyedLogStore(url: directory.appendingPathComponent("island.pbl", isDirectory: false))
-        memberFile = KeyedLogStore(url: directory.appendingPathComponent("island_member.pbl", isDirectory: false))
         self.state = state
     }
 
@@ -112,55 +120,86 @@ public actor IslandStore {
     }
 
     private func read() -> IslandSet? {
-        var records: [IslandRecord] = []
+        var records: [Int: IslandRecord] = [:]
+        var member: MemberRecord?
         let decoder = JSONDecoder()
-        islandFile.open { _, payload in
-            guard let r = try? decoder.decode(IslandRecord.self, from: Data(payload)), r.v >= 1, r.v <= Self.formatVersion else { return }
-            records.append(r)
+        islandFile.open { key, payload in
+            if key == Self.membersKey {
+                guard let r = try? decoder.decode(MemberRecord.self, from: Data(payload)), r.v >= 1, r.v <= Self.formatVersion,
+                      r.r.count == r.i.count else { return }
+                member = r
+            } else if let r = try? decoder.decode(IslandRecord.self, from: Data(payload)), r.v >= 1, r.v <= Self.formatVersion {
+                records[r.id] = r
+            }
         }
-        if records.isEmpty { return nil }
+        // No member record: a fit that never finished. The islands of an unfinished fit are not a set.
+        guard let member else { return nil }
+        let wanted = member.ids.map(Set.init)
+        let chosen = records.values.filter { wanted?.contains($0.id) ?? true }
+        if chosen.isEmpty { return nil }
         var members: [Int64: Int] = [:]
-        memberFile.open { _, payload in
-            guard let r = try? decoder.decode(MemberRecord.self, from: Data(payload)), r.v >= 1, r.v <= Self.formatVersion,
-                  r.r.count == r.i.count else { return }
-            for k in 0..<r.r.count { members[r.r[k]] = r.i[k] }
-        }
-        let islands = records.map(Self.islandOf).sorted { a, b in
+        for k in 0..<member.r.count { members[member.r[k]] = member.i[k] }
+        let islands = chosen.map(Self.islandOf).sorted { a, b in
             let ka = BrainMath.orderKey(a.weight)
             let kb = BrainMath.orderKey(b.weight)
             if ka != kb { return ka > kb }
             return a.medoidRid < b.medoidRid
         }
-        return IslandSet(islands: islands, fitAtMs: records.map(\.at).max() ?? 0, memberOf: members)
+        return IslandSet(islands: islands, fitAtMs: chosen.map(\.at).max() ?? 0, memberOf: members)
     }
 
-    /// Replaces the stored islands with `fit`. False when a file could not be written (what is in memory then is the fit).
+    /// Replaces the stored islands with `fit`: one append (the islands, then the member record), after the last island id is
+    /// stamped, then the islands that are gone are removed. A fit that placed no island keeps the stored ones and is not
+    /// written. False when the file could not be written (what is in memory then is the fit).
     @discardableResult
     public func save(_ fit: Islands.Fit, nowMs: Int64) async -> Bool {
         _ = current()
+        if fit.islands.isEmpty { return false }
+        // The id counter first: if the process dies after this, the next fit skips ids that never got stored, and never reuses one.
+        await state.set(Self.keyLastId, String(max(fit.maxId, await lastId())))
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        _ = islandFile.remove(islandFile.keys)
+        var records: [(key: String, payload: [UInt8])] = []
         var ok = true
         for island in fit.islands {
-            guard let data = try? encoder.encode(Self.recordOf(island, nowMs: nowMs)), islandFile.put(String(island.id), [UInt8](data)) else {
-                ok = false
-                continue
-            }
+            guard let data = try? encoder.encode(Self.recordOf(island, nowMs: nowMs)) else { ok = false; continue }
+            records.append((String(island.id), [UInt8](data)))
         }
-        _ = memberFile.remove(memberFile.keys)
-        if let data = try? encoder.encode(MemberRecord(v: Self.formatVersion, r: fit.memberRids, i: fit.memberIslandIds)),
-           memberFile.put("all", [UInt8](data)) {
+        let ids = fit.islands.map(\.id)
+        if ok, let data = try? encoder.encode(MemberRecord(v: Self.formatVersion, r: fit.memberRids, i: fit.memberIslandIds, ids: ids)) {
+            records.append((Self.membersKey, [UInt8](data)))
+            ok = islandFile.put(records)
         } else {
             ok = false
         }
-        await state.set(Self.keyLastId, String(fit.maxId))
+        if ok {
+            let keep = Set(records.map(\.key))
+            _ = islandFile.remove(islandFile.keys.filter { !keep.contains($0) })
+        }
         var members: [Int64: Int] = [:]
         members.reserveCapacity(fit.memberRids.count)
         for k in 0..<fit.memberRids.count { members[fit.memberRids[k]] = fit.memberIslandIds[k] }
-        current_ = fit.islands.isEmpty ? nil : IslandSet(islands: fit.islands, fitAtMs: nowMs, memberOf: members)
+        current_ = IslandSet(islands: fit.islands, fitAtMs: nowMs, memberOf: members)
         currentLoaded = true
         return ok
+    }
+
+    /// A fit that placed nothing: the stored islands stay, and the next try waits a day (a refit is not free).
+    public func noteEmptyFit(nowMs: Int64) async { await state.set(Self.keyEmptyFitAt, String(nowMs)) }
+
+    public func lastEmptyFitMs() async -> Int64 { await state.get(Self.keyEmptyFitAt).flatMap { Int64($0) } ?? 0 }
+
+    /// The DNA the islands were built from changed under them (the Spotify switch): the next fit is due at once.
+    public func markRefit() async { await state.set(Self.keyForceRefit, "1") }
+
+    public func refitMarked() async -> Bool { await state.get(Self.keyForceRefit) == "1" }
+
+    /// True when the embedding file holds as many rows as the last fit counted. A file that does not (a damaged write, a
+    /// deleted file) is repaired by the next fit, not in a week.
+    public func embeddingsIntact() async -> Bool {
+        let counted = await embeddingCount()
+        guard let all = loadTable() else { return counted == 0 }
+        return all.size == counted
     }
 
     public func lastId() async -> Int { await state.get(Self.keyLastId).flatMap { Int($0) } ?? 0 }
@@ -276,7 +315,6 @@ public actor IslandStore {
     /// Forgets everything (tests, the Developer screen's reset).
     public func clear() async {
         _ = islandFile.remove(islandFile.keys)
-        _ = memberFile.remove(memberFile.keys)
         try? FileManager.default.removeItem(at: tableURL)
         current_ = nil
         currentLoaded = true
@@ -286,6 +324,8 @@ public actor IslandStore {
         await state.set(Self.keyTagShares, nil)
         await state.set(Self.keyEmbCount, nil)
         await state.set(Self.keyFitAt, nil)
+        await state.set(Self.keyEmptyFitAt, nil)
+        await state.set(Self.keyForceRefit, nil)
     }
 }
 
@@ -333,6 +373,10 @@ public struct IslandInputs: Sendable {
 public actor IslandBuilder {
     public static let refitAgeMs: Int64 = 7 * 24 * 60 * 60 * 1000
     public static let refitPlays = 200
+    /// A fit that placed nothing waits this long before the next try.
+    public static let emptyFitRetryMs: Int64 = 24 * 60 * 60 * 1000
+    /// FastRP holds three dense arrays of nodes x 64 doubles; this bounds the graph (about 45 MB at the cap).
+    public static let maxNodes = 30_000
 
     private let store: IslandStore
     private let inputs: IslandInputs
@@ -360,9 +404,47 @@ public actor IslandBuilder {
 
     /// True when the stored islands are older than a week, or 200 plays have been finished since they were fitted.
     public func isDue(nowMs: Int64) async -> Bool {
+        // The DNA changed under the islands (the Spotify switch): due at once.
+        if await store.refitMarked() { return true }
+        // A fit that placed nothing waits a day before it tries again, so each Home plan does not refit.
+        let emptyAt = await store.lastEmptyFitMs()
+        if emptyAt > 0, nowMs - emptyAt >= 0, nowMs - emptyAt < Self.emptyFitRetryMs { return false }
         guard let set = await store.current() else { return true }
         if nowMs - set.fitAtMs > Self.refitAgeMs { return true }
+        // Embedding rows that do not match what the fit counted (a damaged write) are repaired by the next fit.
+        if !(await store.embeddingsIntact()) { return true }
         return await inputs.qualifiedPlaysSince(set.fitAtMs) >= Self.refitPlays
+    }
+
+    /// The edges to embed: every edge between two library nodes, then the heaviest of the rest, while the node count stays
+    /// within `maxNodes`. Deterministic (ties fall back to the ids). Library nodes always stay.
+    static func capEdges(_ edges: [MixPlanner.Edge], library: Set<Int64>, maxNodes: Int) -> [MixPlanner.Edge] {
+        var nodes = library
+        var keep: [MixPlanner.Edge] = []
+        keep.reserveCapacity(edges.count)
+        var rest: [MixPlanner.Edge] = []
+        for e in edges {
+            if library.contains(e.a) && library.contains(e.b) { keep.append(e) } else { rest.append(e) }
+        }
+        if nodes.count + rest.count * 2 <= maxNodes {
+            keep.append(contentsOf: rest)
+            return keep
+        }
+        rest.sort { x, y in
+            let kx = BrainMath.orderKey(x.weight)
+            let ky = BrainMath.orderKey(y.weight)
+            if kx != ky { return kx > ky }
+            if x.a != y.a { return x.a < y.a }
+            return x.b < y.b
+        }
+        for e in rest {
+            let add = (nodes.contains(e.a) ? 0 : 1) + (nodes.contains(e.b) ? 0 : 1)
+            if nodes.count + add > maxNodes { continue }
+            nodes.insert(e.a)
+            nodes.insert(e.b)
+            keep.append(e)
+        }
+        return keep
     }
 
     /// The islands, fitted now when they are due and the brain has enough to go on; the stored ones otherwise. Nil when there
@@ -379,11 +461,19 @@ public actor IslandBuilder {
 
     private func fit(_ now: Int64) async -> IslandSet? {
         let started = inputs.clock()
-        let tracks = await inputs.library(now)
+        // One recording is one node: a song on an album and on a compilation resolves to the same rid and counts once.
+        var seenRid = Set<Int64>()
+        let tracks = await inputs.library(now).filter { seenRid.insert($0.rid).inserted }
         if tracks.isEmpty { return nil }
         // The graph: the persisted radio edges plus the track-artist edge of every library track.
         var builder = Graph.Builder()
-        for e in await inputs.edges() { builder.addEdge(e.a, e.b, weight: e.weight) }
+        var libraryNodes = Set<Int64>()
+        libraryNodes.reserveCapacity(tracks.count * 2)
+        for t in tracks {
+            libraryNodes.insert(t.rid)
+            if t.aid != 0 { libraryNodes.insert(t.aid) }
+        }
+        for e in Self.capEdges(await inputs.edges(), library: libraryNodes, maxNodes: Self.maxNodes) { builder.addEdge(e.a, e.b, weight: e.weight) }
         for t in tracks { builder.addTrack(rid: t.rid, primaryAid: t.aid) }
         let table = FastRp.embed(builder.build())
         await store.saveEmbeddings(table)
@@ -404,9 +494,18 @@ public actor IslandBuilder {
         }
         let previous = await store.current()?.islands ?? []
         let fit = Islands.fit(input, previous: previous, lastId: await store.lastId())
+        if fit.islands.isEmpty {
+            // Nothing was placed (a transient empty read, a thin library): the stored islands keep serving, so every "Daily Mix N"
+            // stays the island it was, and the next try waits a day.
+            await store.noteEmptyFit(nowMs: now)
+            inputs.timing("brain_island_fit", max(inputs.clock() - started, 0))
+            return nil
+        }
         await store.save(fit, nowMs: now)
         await store.saveTagShares(fit)
         await state.set(IslandStore.keyFitAt, String(now))
+        await state.set(IslandStore.keyEmptyFitAt, "0")
+        await state.set(IslandStore.keyForceRefit, "0")
         inputs.timing("brain_island_fit", max(inputs.clock() - started, 0))
         return await store.current()
     }

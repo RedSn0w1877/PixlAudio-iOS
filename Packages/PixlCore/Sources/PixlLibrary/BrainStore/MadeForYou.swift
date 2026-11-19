@@ -110,9 +110,12 @@ extension BrainMixes {
     func islandSubtitle(_ island: Islands.Island, nowMs: Int64) async -> String {
         guard let parts else { return "" }
         var genres: [String] = []
-        if let atlas = await parts.atlas.atlas() {
-            for id in IslandNames.pick(atlas, island.liftTags) {
-                if let name = atlas.genre(id)?.name, !BrainText.isBlank(name) { genres.append(name) }
+        // An island is named only when enough of it has a genre (unknown stays unknown), and only by a genre among its biggest
+        // shares; otherwise the subtitle is the artists alone.
+        if let atlas = await parts.atlas.atlas(), await taggedShare(island) >= Self.nameMinTagged {
+            let lift = island.liftTags.filter { island.topTags.contains($0) }
+            for id in IslandNames.pick(atlas, lift) {
+                if let name = AtlasNames.genreName(atlas, id) { genres.append(name) }
             }
         }
         var names: [Int64: String] = [:]
@@ -123,6 +126,21 @@ extension BrainMixes {
         var genreText = genres.joined(separator: " & ")
         if let first = genreText.first { genreText = first.uppercased() + genreText.dropFirst() }
         return [genreText, artists.joined(separator: ", ")].filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
+    /// At least this share of an island's tracks must have a genre before the island gets a genre name.
+    static let nameMinTagged = 0.4
+
+    /// The share of the island's placed tracks that carry a genre at all (0...1), looked up in the DNA.
+    func taggedShare(_ island: Islands.Island) async -> Double {
+        guard let parts, let dna = parts.dna, let members = await parts.islands.current()?.memberOf else { return 0.0 }
+        var rids: [Int64] = []
+        rids.reserveCapacity(island.size)
+        for (rid, id) in members where id == island.id { rids.append(rid) }
+        if rids.isEmpty { return 0.0 }
+        var tagged = 0
+        for row in await dna.tracks(rids) where !row.tagVector.isEmpty { tagged += 1 }
+        return Double(tagged) / Double(rids.count)
     }
 
     /// The recording ids of this week's First Listen, or none.
@@ -140,7 +158,7 @@ extension BrainMixes {
         let salt = await engine.salt()
         let ignored = await engine.ignoredRids(nowMs: now)
         let log = served.recent(nowMs: now)
-        var taken = Repetition.takenOnDay(log, nowMs: now, tzOffsetMin: tz, exceptSurface: spec.surface, exceptId: spec.surfaceId)
+        var taken = Repetition.takenOnDay(ServedListStore.newestPerList(log), nowMs: now, tzOffsetMin: tz, exceptSurface: spec.surface, exceptId: spec.surfaceId)
         // This week's First Listen is held all week (8.2): no other list repeats it.
         taken.formUnion(firstListenRids(now: now, tz: tz))
         let times = Repetition.timesServed(log, nowMs: now)
@@ -220,7 +238,8 @@ public struct Stage2bKit: Sendable {
         let state = StateValues.of(engine)
         let islands = IslandStore(directory: directory, state: state)
         let libraryRids = LibraryRids(sources: sources, repository: repository)
-        let inputs = IslandInputs.live(engine: engine, repository: repository, library: libraryRids, dna: dna, timing: sources.timing)
+        let inputs = IslandInputs.live(engine: engine, repository: repository, library: libraryRids, dna: dna, atlas: atlas,
+                                       timing: sources.timing)
         let picked = PickedArtists(state: state, repository: repository)
         let parts = Stage2bParts(islands: islands, builder: IslandBuilder(store: islands, inputs: inputs, state: state),
                                  candidateDna: CandidateDna(store: islands, dna: dna), libraryRids: libraryRids, atlas: atlas,
@@ -234,7 +253,7 @@ public struct Stage2bKit: Sendable {
 public extension IslandInputs {
     /// The fit's inputs as the app has them: the library by id, the stored graph, the affinity tables, the event log and the DNA.
     static func live(engine: BrainEngine, repository: BrainRepository, library: LibraryRids, dna: DnaRepository?,
-                     timing: @escaping @Sendable (String, Int64) -> Void) -> IslandInputs {
+                     atlas: (any AtlasProvider)? = nil, timing: @escaping @Sendable (String, Int64) -> Void) -> IslandInputs {
         IslandInputs(
             library: { now in await library.all(nowMs: now) },
             edges: { await repository.allEdges() },
@@ -255,7 +274,13 @@ public extension IslandInputs {
             qualifiedPlaysSince: { since in BrainEventQueries.qualifiedPlays(await engine.recentEvents(sinceMs: since), sinceMs: since) },
             tags: { rids in
                 var out: [Int64: Tags.Vector] = [:]
-                if let dna { for row in await dna.tracks(rids) where !row.tagVector.isEmpty { out[row.rid] = row.tagVector } }
+                // Nothing Spotify said is a feature of the fit (it never trains a model): the vector is re-merged without it.
+                // Without an atlas the stored vector cannot be taken apart, so no tags are used at all.
+                guard let dna, let atlas = await atlas?.atlas() else { return out }
+                for row in await dna.tracks(rids) {
+                    let v = DnaAssembler.tagVectorWithoutSpotify(row, atlas: atlas, atlasVersion: atlas.version)
+                    if !v.isEmpty { out[row.rid] = v }
+                }
                 return out
             },
             timing: timing)

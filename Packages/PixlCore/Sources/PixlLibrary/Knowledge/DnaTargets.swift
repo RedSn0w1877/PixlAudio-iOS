@@ -219,6 +219,7 @@ public actor DnaTargets {
             rid: rid, aid: aid, spotifyId: spotifyId, isrc: isrc, title: title, artist: artist, artistDisplay: artistDisplay,
             durationMs: durationMs, albumName: albumName, spotifyArtistIds: fact?.artistIds ?? [],
             spotifyReleaseDate: fact?.releaseDate ?? ((songYear >= 1900 && songYear <= 2200) ? String(songYear) : nil),
-            spotifyExplicit: fact?.explicit, spotifyGenres: spotifyGenres, chipGenres: chips)
+            spotifyExplicit: fact?.explicit, spotifyGenres: spotifyGenres, chipGenres: chips,
+            spotifyOff: !sources.spotifyShapesPicks())
     }
 }

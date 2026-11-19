@@ -119,6 +119,23 @@ public final class ServedListStore {
             .map { Repetition.Served(surface: $0.surface, builtAtMs: $0.builtAtMs, rids: $0.rids, surfaceId: $0.surfaceId) }
     }
 
+    /// Only the newest build of each list: a list built again the same day (a stale rebuild, "Regenerate") replaced its earlier
+    /// build, so the tracks of the superseded one are not "taken" away from the other lists.
+    public static func newestPerList(_ log: [Repetition.Served]) -> [Repetition.Served] {
+        struct Key: Hashable { var surface: Int32; var surfaceId: String }
+        var newest: [Key: Repetition.Served] = [:]
+        for entry in log {
+            let key = Key(surface: entry.surface, surfaceId: entry.surfaceId)
+            if let old = newest[key], old.builtAtMs > entry.builtAtMs { continue }
+            newest[key] = entry
+        }
+        return newest.values.sorted { a, b in
+            if a.builtAtMs != b.builtAtMs { return a.builtAtMs < b.builtAtMs }
+            if a.surface != b.surface { return a.surface < b.surface }
+            return a.surfaceId < b.surfaceId
+        }
+    }
+
     public var count: Int {
         load()
         return headers.count

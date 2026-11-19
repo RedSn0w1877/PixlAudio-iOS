@@ -57,7 +57,8 @@ public actor GenreStations {
     /// The genres and moods of the library, by the DNA the knowledge lanes stored. A track with none is in none.
     private func index(_ nowMs: Int64) async -> Index {
         let all = await library.all(nowMs: nowMs)
-        let key = "\(all.count):\(all.first?.rid ?? 0):\(all.last?.rid ?? 0):\(await islands.embeddingCount())"
+        // The DNA changes while the library does not (the refresh job writes it): its row count and write counter are in the key.
+        let key = "\(all.count):\(all.first?.rid ?? 0):\(all.last?.rid ?? 0):\(await islands.embeddingCount()):\(await dna.count()):\(await dna.revision())"
         if let cache, BrainKey.sameBytes(cache.key, key) { return cache }
         var byRid: [Int64: LibraryTrack] = [:]
         byRid.reserveCapacity(all.count * 2)
@@ -82,7 +83,10 @@ public actor GenreStations {
     /// could not be read (nothing is then hidden or shown on its word).
     public func knownNames(_ names: [String]) async -> Set<String>? {
         guard let atlas = await atlasProvider.atlas() else { return nil }
-        return Set(names.filter { atlas.idForName($0) != GenreAtlas.none })
+        return Set(names.filter { name in
+            let id = atlas.idForName(name)
+            return id != GenreAtlas.none && AtlasNames.genreName(atlas, id) != nil
+        })
     }
 
     /// The listener's songs under the node, most played first; empty when there are none (nothing is guessed).
@@ -118,26 +122,58 @@ public actor GenreStations {
             var seen = Set<Int64>()
             return t.filter { seen.insert($0.rid).inserted }
         }
-        let genres = idx.byGenre.filter { (atlas.genre($0.key)?.depth ?? 0) >= 1 && distinct($0.value).count >= Self.minSongs }
-            .sorted { a, b in a.value.count != b.value.count ? a.value.count > b.value.count : a.key < b.key }
+        let candidates = idx.byGenre.filter {
+            (atlas.genre($0.key)?.depth ?? 0) >= 1 && AtlasNames.isShown(atlas.genre($0.key)?.name) && distinct($0.value).count >= Self.minSongs
+        }
+        // "Your top nodes": ranked by what the listener plays (decayed finished plays of the songs under each genre), then by how
+        // many songs sit under it; a genre the listener owns a lot of but never plays does not lead the shelf.
+        var wanted = Set<Int64>()
+        for entry in candidates { for t in entry.value { wanted.insert(t.rid) } }
+        let played = await playedWeight(wanted, nowMs: nowMs)
+        var score: [Int: Int64] = [:]
+        for entry in candidates {
+            var total = 0.0
+            for t in distinct(entry.value) { total += played[t.rid] ?? 0.0 }
+            score[entry.key] = BrainMath.orderKey(total)
+        }
+        let genres = candidates.sorted { a, b in
+            let sa = score[a.key] ?? 0, sb = score[b.key] ?? 0
+            if sa != sb { return sa > sb }
+            if a.value.count != b.value.count { return a.value.count > b.value.count }
+            return a.key < b.key
+        }
         for (id, tracks) in genres {
             if out.count >= Self.genreCards { break }
             if chosen.contains(where: { Self.related(atlas, $0, id) }) { continue }
-            guard let g = atlas.genre(id) else { continue }
+            guard let name = AtlasNames.genreName(atlas, id) else { continue }
             chosen.append(id)
-            out.append(card(StationCard.kindGenre, id, g.name, tracks))
+            out.append(card(StationCard.kindGenre, id, name, tracks))
         }
-        let moods = idx.byMood.filter { $0.key >= 0 && $0.key < atlas.moods.count && distinct($0.value).count >= Self.minSongs }
-            .sorted { a, b in a.value.count != b.value.count ? a.value.count > b.value.count : a.key < b.key }
-        if let (id, tracks) = moods.first { out.append(card(StationCard.kindMood, id, atlas.moods[id], tracks)) }
+        let moods = idx.byMood.filter {
+            $0.key >= 0 && $0.key < atlas.moods.count && AtlasNames.moodName(atlas, $0.key) != nil && distinct($0.value).count >= Self.minSongs
+        }.sorted { a, b in a.value.count != b.value.count ? a.value.count > b.value.count : a.key < b.key }
+        if let (id, tracks) = moods.first, let name = AtlasNames.moodName(atlas, id) { out.append(card(StationCard.kindMood, id, name, tracks)) }
         for id in adjacent {
             let tracks = idx.byGenre[id] ?? []
             if tracks.count < Self.minAdjacentSongs || out.contains(where: { $0.kind == StationCard.kindGenre && $0.atlasId == id }) { continue }
-            guard let g = atlas.genre(id) else { continue }
-            out.append(card(StationCard.kindGenre, id, g.name, tracks))
+            guard let name = AtlasNames.genreName(atlas, id) else { continue }
+            out.append(card(StationCard.kindGenre, id, name, tracks))
             break
         }
         return out
+    }
+
+    private func playedWeight(_ rids: Set<Int64>, nowMs: Int64) async -> [Int64: Double] {
+        let wanted = Array(rids)
+        return await engine.readAffinity { st in
+            var out: [Int64: Double] = [:]
+            out.reserveCapacity(wanted.count)
+            for r in wanted {
+                let w = Affinity.weight(st, family: Family.track, key: r, nowMs: nowMs)
+                if w > 0.0 { out[r] = w }
+            }
+            return out
+        }
     }
 
     private func card(_ kind: Int, _ id: Int, _ name: String, _ tracks: [LibraryTrack]) -> StationCard {

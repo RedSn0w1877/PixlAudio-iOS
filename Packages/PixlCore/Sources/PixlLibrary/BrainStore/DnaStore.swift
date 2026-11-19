@@ -212,6 +212,7 @@ public actor DnaRepository {
     private var tracks: [Int64: TrackDnaRow] = [:]
     private var artists: [Int64: ArtistDnaRow] = [:]
     private var misses: [BrainKey: Miss] = [:]
+    private var writes = 0
 
     public init(directory: URL, compactionFloorBytes: Int = 64 * 1024) {
         trackFile = KeyedLogStore(url: directory.appendingPathComponent("track_dna.pbl", isDirectory: false),
@@ -261,17 +262,43 @@ public actor DnaRepository {
         return rids.compactMap { tracks[$0] }
     }
 
-    /// Saves the rows; false when the file could not be written (the rows in memory are then unchanged).
+    /// Saves the rows; false when the file could not be written (the rows in memory are then unchanged). The artist row goes
+    /// down FIRST: a process killed between the two writes then leaves a track row that still says an artist lookup is
+    /// owed, never a track row that claims MusicBrainz answered and an artist row that was lost.
     @discardableResult
     public func upsert(track: TrackDnaRow, artist: ArtistDnaRow?) -> Bool {
         load()
-        guard let payload = Self.payload(track), trackFile.put(String(track.rid), payload) else { return false }
-        tracks[track.rid] = track
+        guard let trackPayload = Self.payload(track) else { return false }
         if let artist {
-            if let p = Self.payload(artist), artistFile.put(String(artist.aid), p) { artists[artist.aid] = artist }
+            if let p = Self.payload(artist), artistFile.put(String(artist.aid), p) { artists[artist.aid] = artist; writes += 1 }
         }
+        guard trackFile.put(String(track.rid), trackPayload) else { return false }
+        tracks[track.rid] = track
+        writes += 1
         return true
     }
+
+    /// Writes one artist row alone (the Spotify purge of artists no track row led to).
+    @discardableResult
+    public func upsert(artist: ArtistDnaRow) -> Bool {
+        load()
+        guard let p = Self.payload(artist), artistFile.put(String(artist.aid), p) else { return false }
+        artists[artist.aid] = artist
+        writes += 1
+        return true
+    }
+
+    /// Rows that still carry something Spotify said, for the purge (3.5, owner decision on the Spotify switch).
+    public func spotifyCarriers() -> (tracks: [TrackDnaRow], artists: [ArtistDnaRow]) {
+        load()
+        let t = tracks.values.filter { DnaAssembler.carriesSpotify($0) }.sorted { $0.rid < $1.rid }
+        let a = artists.values.filter { DnaAssembler.carriesSpotify($0) }.sorted { $0.aid < $1.aid }
+        return (t, a)
+    }
+
+    /// Moves on every write of a row (in this process): a cache keyed on it never serves DNA older than the rows. It loads
+    /// nothing; a cache built before the first write simply has the value 0.
+    public func revision() -> Int { writes }
 
     public func artists(_ aids: [Int64]) -> [ArtistDnaRow] {
         load()

@@ -47,6 +47,8 @@ public actor HomePlanBuilder {
     public func isDue(_ plan: HomePlan?, nowMs: Int64, taste: String) async -> Bool {
         guard let plan else { return true }
         if !BrainKey.sameBytes(plan.taste, taste) { return true }
+        // The islands were fitted again since this plan was made: its Daily Mix cards number islands that may have moved.
+        if let set = await mixes.parts?.islands.current(), set.fitAtMs != plan.islandFitAtMs { return true }
         let tz = mixes.sources.tzOffsetMin(nowMs)
         return plan.planKey != HomePlanner.planKey(nowMs: nowMs, tzOffsetMin: tz)
     }
@@ -58,8 +60,22 @@ public actor HomePlanBuilder {
         if BrainEngineChoice.clamp(await mixes.sources.engine()) != BrainEngineChoice.brain { return nil }
         if !(await mixes.hasState()) { return nil }
         let started = clock()
-        let plan = await plan(clock())
-        await store.write(plan)
+        var plan = await plan(clock())
+        // Over the file's limit: fewer songs a shelf, and again with fewer, before giving up on saving it. A plan that is not
+        // saved is shown this session but would be rebuilt (and Home would first paint a stale day) at every launch.
+        var saved = await store.write(plan)
+        if !saved {
+            for maxItems in [10, 8, HomePlanner.minTracks] {
+                let smaller = plan.shrunk(maxItems: maxItems)
+                if await store.write(smaller) {
+                    plan = smaller
+                    saved = true
+                    mixes.sources.timing("brain_home_plan_trimmed_\(maxItems)", 0)
+                    break
+                }
+            }
+            if !saved { mixes.sources.timing("brain_home_plan_not_saved", 0) }
+        }
         mixes.sources.timing("brain_home_plan", max(clock() - started, 0))
         return plan
     }
@@ -101,12 +117,28 @@ public actor HomePlanBuilder {
         specs.append(MixSpec(kind: MixKinds.your))
         specs.append(MixSpec(kind: MixKinds.justDropped))
         var built: [MixView] = []
+        // On Repeat is what the listener plays now: it takes its tracks first, so the lists drawn from the most played do not leave it short.
+        let repeatView = await mixes.todayOf(MixSpec(kind: MixKinds.onRepeat))
         for spec in specs {
             if let view = await mixes.todayOf(spec) { built.append(view) }
         }
-        let repeatView = await mixes.todayOf(MixSpec(kind: MixKinds.onRepeat))
         let rediscoverView = await mixes.todayOf(MixSpec(kind: MixKinds.rediscover))
         let cards = built.map(cardOf)
+
+        // New releases of the artists the listener loves, and the hero chosen from the page's inputs before any shelf is made:
+        // a track is on the page once, so the release the hero shows is taken out of the shelf of releases.
+        let allSongs = await mixes.sources.library()
+        var releaseCards: [NewReleaseRules.Card] = []
+        if let releases = await mixes.parts?.newReleases {
+            releaseCards = await releases.cards(blocked: constraints.blocked, adjustments: constraints.adjustments,
+                                                library: BrainLibraryIndex(songs: allSongs))
+        }
+        let dailyCards = cards.filter { $0.kind == MixKinds.daily }
+        let topRelease = await topArtistRelease(now, cards: releaseCards)
+        let salt = await mixes.engine.salt()
+        let hero = HomePlanner.hero(hasFirstListen: cards.contains { $0.kind == MixKinds.firstListen },
+                                    hasTopRelease: topRelease != nil, dailyCount: dailyCards.count, nowMs: now, tzOffsetMin: tz, salt: salt)
+        let heroRid: Int64? = hero.kind == HomePlanner.heroRelease ? topRelease?.rid : nil
 
         var shelves: [PlanShelf] = []
         var inputs: [HomePlanner.ShelfIn] = []
@@ -143,19 +175,14 @@ public actor HomePlanBuilder {
                                    titleArg: row.anchor.title, subtitleKey: "because_listened_subtitle", items: items, recId: row.recId))
             }
         }
-        // New from artists you love: the saved releases.
-        let allSongs = await mixes.sources.library()
-        var releaseCards: [NewReleaseRules.Card] = []
-        if let releases = await mixes.parts?.newReleases {
-            releaseCards = await releases.cards(blocked: constraints.blocked, adjustments: constraints.adjustments,
-                                                library: BrainLibraryIndex(songs: allSongs))
-        }
-        if !releaseCards.isEmpty {
-            let items = releaseCards.enumerated().map { slot, c in
+        // New from artists you love: the saved releases (not the one the hero plays).
+        let shelfCards = releaseCards.filter { $0.stored.rid != heroRid }
+        if !shelfCards.isEmpty {
+            let items = shelfCards.enumerated().map { slot, c in
                 PlanItem(rid: c.stored.rid, aid: nameHash(c.stored.row.artists.first?.name), row: c.stored, arm: Arm.new,
                          whyKey: WhyLine.newRelease, whyName: c.release.artistName, slot: slot)
             }
-            let found = releaseCards.map { $0.release.foundAtMs }.max() ?? now
+            let found = shelfCards.map { $0.release.foundAtMs }.max() ?? now
             addShelf(PlanShelf(type: HomePlanner.newFromLoved, id: "new_from_loved", titleKey: "new_from_loved",
                                subtitleKey: "new_from_loved_subtitle", items: items, recId: BrainReleaseRow.recId(builtAtMs: found)))
         }
@@ -197,12 +224,7 @@ public actor HomePlanBuilder {
             out.append(source)
         }
 
-        // The hero: First Listen on Mondays, a release from a top-5 artist, else a Daily Mix.
-        let dailyCards = cards.filter { $0.kind == MixKinds.daily }
-        let topRelease = await topArtistRelease(now, cards: releaseCards)
-        let salt = await mixes.engine.salt()
-        let hero = HomePlanner.hero(hasFirstListen: cards.contains { $0.kind == MixKinds.firstListen },
-                                    hasTopRelease: topRelease != nil, dailyCount: dailyCards.count, nowMs: now, tzOffsetMin: tz, salt: salt)
+        // The hero (chosen above): First Listen on Mondays, a release from a top-5 artist, else a Daily Mix.
         var planHero: PlanHero?
         switch hero.kind {
         case HomePlanner.heroFirstListen: planHero = PlanHero(kind: hero.kind, mixId: "first")
@@ -212,7 +234,7 @@ public actor HomePlanBuilder {
         }
         return HomePlan(generatedAtMs: now, planKey: HomePlanner.planKey(nowMs: now, tzOffsetMin: tz), taste: taste,
                         daypart: HomePlanner.daypart(nowMs: now, tzOffsetMin: tz), weekday: HomePlanner.weekday(nowMs: now, tzOffsetMin: tz),
-                        hero: planHero, mixes: cards, shelves: out)
+                        hero: planHero, mixes: cards, shelves: out, islandFitAtMs: islands?.fitAtMs ?? 0)
     }
 
     /// A release by one of the listener's five most played artists, or nil.
@@ -242,8 +264,7 @@ public actor HomePlanBuilder {
         let byGenre = await mixes.edgeByGenre(now)
         var best: (genre: Int, tracks: [LibraryTrack])?
         for g in byGenre where best == nil || g.tracks.count > best!.tracks.count { best = g }
-        guard let best, best.tracks.count >= HomePlanner.minTracks, let name = atlas.genre(best.genre)?.name,
-              !BrainText.isBlank(name) else { return nil }
+        guard let best, best.tracks.count >= HomePlanner.minTracks, let name = AtlasNames.genreName(atlas, best.genre) else { return nil }
         let items = best.tracks.prefix(HomePlanner.itemsPerShelf * 2).enumerated().map { slot, t in
             PlanItem(rid: t.rid, aid: nameHash(BrainLibraryIndex.primaryArtistName(t.song)), songId: t.song.id, arm: Arm.edge,
                      whyKey: WhyLine.adjacentGenre, slot: slot)

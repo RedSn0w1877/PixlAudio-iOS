@@ -58,10 +58,14 @@ public protocol RefreshWork: Sendable {
     /// After the lanes (stage 2b, 2.3 step 9): the embeddings and the taste islands, refitted when they are due (weekly, or after
     /// 200 qualified plays). Reads the files only. A no-op by default, so a work without islands runs exactly as before.
     func fitIslands() async
+    /// Before the islands are fitted: takes Spotify's stored genres and years out of the DNA when the Spotify switch is off.
+    /// A no-op by default.
+    func purgeSpotify() async
 }
 
 public extension RefreshWork {
     func fitIslands() async {}
+    func purgeSpotify() async {}
     func dnaTargets(lane: Int, limit: Int) async -> [DnaTarget] { [] }
     func enrich(_ targets: [DnaTarget], gate: @Sendable () async -> Bool) async -> DnaEnricher.Report {
         DnaEnricher.Report(tracks: 0, stopped: false)
@@ -241,6 +245,7 @@ public struct BrainRefreshRunner: Sendable {
         // The embeddings and the islands (2.3 step 9): the part of the job that needs no network, so it runs when the lanes could not.
         if !Task.isCancelled, await allowed(), !(await playing()), report.stopped != .off, report.stopped != .playing,
            report.stopped != .cancelled {
+            await work.purgeSpotify()
             await work.fitIslands()
         }
         return report
@@ -299,6 +304,12 @@ public struct BrainRefreshWork: RefreshWork {
     public func enrich(_ targets: [DnaTarget], gate: @Sendable () async -> Bool) async -> DnaEnricher.Report {
         guard let dna else { return DnaEnricher.Report(tracks: 0, stopped: false) }
         return await dna.enricher.enrich(targets, gate: gate)
+    }
+
+    public func purgeSpotify() async {
+        guard let purge = dna?.purge else { return }
+        let mixes = self.mixes
+        await purge.run(markRefit: { await mixes.parts?.islands.markRefit() })
     }
 
     public func fitIslands() async {

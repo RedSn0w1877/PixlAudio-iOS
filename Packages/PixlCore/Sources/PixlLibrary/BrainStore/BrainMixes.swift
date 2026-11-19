@@ -142,6 +142,7 @@ public actor BrainMixes {
     public func savedOf(_ spec: MixSpec) async -> MixView? {
         await lock()
         defer { unlock() }
+        if await isGoneIsland(spec) { return nil }
         let now = clock()
         let tz = sources.tzOffsetMin(now)
         guard let stored = served.todays(surface: spec.surface, nowMs: now, tzOffsetMin: tz, surfaceId: spec.surfaceId,
@@ -176,9 +177,26 @@ public actor BrainMixes {
         await todayOf(await specFor(kind: kind), regenerate: regenerate)
     }
 
+    /// The number a Daily Mix has among today's islands (1..K), read now: a refit after the list was saved can move an island, and
+    /// two cards must never share a number. Nil for a list that is not an island's, and for an island that is no longer one of
+    /// the six (or when no islands are stored: the saved number stands).
+    func liveNumber(of spec: MixSpec) async -> Int? {
+        guard spec.kind == MixKinds.daily, spec.islandId > 0, let set = await parts?.islands.current(), !set.isEmpty else { return nil }
+        guard let index = set.dailyIslands().firstIndex(where: { $0.id == spec.islandId }) else { return nil }
+        return index + 1
+    }
+
+    /// True for a Daily Mix of an island the stored islands no longer put among the six: it is neither shown nor built again
+    /// (a saved id that went stale would take tracks from the real lists).
+    private func isGoneIsland(_ spec: MixSpec) async -> Bool {
+        guard spec.kind == MixKinds.daily, spec.islandId > 0, let set = await parts?.islands.current(), !set.isEmpty else { return false }
+        return !set.dailyIslands().contains { $0.id == spec.islandId }
+    }
+
     public func todayOf(_ spec: MixSpec, regenerate: Bool = false) async -> MixView? {
         await lock()
         defer { unlock() }
+        if await isGoneIsland(spec) { return nil }
         let now = clock()
         let tz = sources.tzOffsetMin(now)
         let surface = spec.surface
@@ -242,7 +260,7 @@ public actor BrainMixes {
         }
         let ignored = await engine.ignoredRids(nowMs: now)
         let log = served.recent(nowMs: now)
-        var taken = Repetition.takenOnDay(log, nowMs: now, tzOffsetMin: tz, exceptSurface: surface, exceptId: spec.surfaceId)
+        var taken = Repetition.takenOnDay(ServedListStore.newestPerList(log), nowMs: now, tzOffsetMin: tz, exceptSurface: surface, exceptId: spec.surfaceId)
         // This week's First Listen is held all week (8.2): no other list repeats it.
         if kind != MixKinds.firstListen { taken.formUnion(firstListenRids(now: now, tz: tz)) }
         let times = Repetition.timesServed(log, nowMs: now)
@@ -608,6 +626,6 @@ public actor BrainMixes {
         if !tracks.isEmpty { await repository.registerPlayable(tracks, nowMs: now) }
         return MixView(kind: stored.kind, builtAtMs: stored.builtAtMs, recId: recId, songs: songs, reasons: reasons,
                        tags: tags, novelIds: novel, engineTracks: tracks, seedLists: stored.seedLists, spec: spec,
-                       number: stored.number, subtitle: stored.subtitle, rids: ridBySong)
+                       number: await liveNumber(of: spec) ?? stored.number, subtitle: stored.subtitle, rids: ridBySong)
     }
 }
