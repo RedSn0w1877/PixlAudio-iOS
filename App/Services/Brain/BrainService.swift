@@ -113,7 +113,12 @@ final class BrainService {
             self.directory = directory
             newReleases = NewReleases(store: AtomicReleaseFileStore(directory: directory), source: radioSource,
                                       repository: repository)
-            let shapes: @Sendable () -> Bool = sources?.spotifyShapesPicks ?? { true }
+            let shapes: @Sendable () -> Bool
+            if let given = sources?.spotifyShapesPicks {
+                shapes = given
+            } else {
+                shapes = { true }
+            }
             let facts = SpotifyFactStore(directory: directory, enabled: shapes)
             spotifyFacts = facts
             SpotifyFactsRelay.shared.set(facts)
