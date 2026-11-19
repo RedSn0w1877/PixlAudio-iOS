@@ -165,6 +165,25 @@ public enum AutoplayPlanning {
     }
 }
 
+extension AutoplayPlanning {
+    /// The pool entry of every pick of `plan`, in plan order (a pick the context does not know is left out).
+    public static func pickedEntries(plan: StationPlanner.Plan, context: AutoplayPlanContext) -> [AutoplayPoolEntry] {
+        plan.picks.compactMap { context.entriesByRid[$0.rid] }
+    }
+
+    /// `plan` with only the picks whose media id is in `kept`: what goes into the queue on an output that plays only
+    /// some tracks (Spotify Connect, `AutoplayPolicy.remoteRule`). The planned order is kept; a like's scheduled slot
+    /// and the second-skip slot count as used only while something of the plan is left.
+    public static func narrowed(_ plan: StationPlanner.Plan, context: AutoplayPlanContext, kept: Set<BrainKey>) -> StationPlanner.Plan {
+        let picks = plan.picks.filter { pick in
+            guard let entry = context.entriesByRid[pick.rid] else { return false }
+            return kept.contains(BrainKey(entry.candidate.mediaId))
+        }
+        return StationPlanner.Plan(picks: picks, usedLiked: plan.usedLiked && !picks.isEmpty,
+                                   usedFamiliarNext: plan.usedFamiliarNext && !picks.isEmpty, poolSize: plan.poolSize)
+    }
+}
+
 /// What a taste change takes out of the engine's hands at once (docs/brain-spec.md, 8.5): "Not for me", "Less from
 /// ...", a mute or a block. A port of the decision half of `onTasteChanged` in Android's `AutoplayController.kt`.
 public enum AutoplayTasteFilter {

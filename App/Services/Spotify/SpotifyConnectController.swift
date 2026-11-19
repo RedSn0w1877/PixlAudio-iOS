@@ -300,6 +300,31 @@ final class SpotifyConnectController: RemotePlaybackOutput {
 
     // MARK: Resolution
 
+    /// Searches one `canPlay` call may spend (a station's first batch is 20 picks).
+    static let autoplayLookupLimit = 24
+
+    /// Which of `songs` a Connect device can play, in order: a real Spotify id, or a strict search match (the same lookup
+    /// a queue entry gets when its window is sent, and the same cache, so that later lookup is answered from it). An
+    /// entry whose lookup failed counts as "not now" and nothing is remembered about it. Autoplay asks this before it
+    /// queues a pick during a session, so a pick Spotify does not have never reaches the queue. At most
+    /// `autoplayLookupLimit` searches a call.
+    func canPlay(_ songs: [Song]) async -> [Bool] {
+        var out = [Bool](repeating: false, count: songs.count)
+        var lookups = 0
+        for (index, queued) in songs.enumerated() {
+            let song = SpotifyConnectPlatform.song(queued)
+            var slot = await resolver.cached(song)
+            if slot == .pending {
+                if lookups >= Self.autoplayLookupLimit { continue }
+                lookups += 1
+                slot = (try? await resolver.resolve(song)) ?? .pending
+            }
+            if case .uri = slot { out[index] = true }
+        }
+        if lookups > 0 { await resolver.flush() }
+        return out
+    }
+
     /// Rebuilds `slots` for the current queue from what is known (direct ids, earlier answers); entries not known
     /// yet are `.pending`.
     private func rebuildSlots() {

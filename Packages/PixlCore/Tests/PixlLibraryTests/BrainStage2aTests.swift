@@ -57,6 +57,30 @@ struct BrainRemoteOutputTests {
         }
     }
 
+    @Test func aPlanLosesTheInOrderPicksTheOutputDoesNotHaveAndKeepsTheRest() {
+        func entry(_ id: String, _ rid: Int64) -> AutoplayPoolEntry {
+            AutoplayPoolEntry(
+                candidate: AutoplayPolicy.Candidate(mediaId: id, rid: rid, artistKey: "a", albumKey: nil, durationMs: 200_000,
+                                                    versionFlags: 0, officialAudio: true, inLibrary: false, arm: Arm.radio, radioRank: 1),
+                librarySong: nil, engineTrack: nil, whyArtist: "")
+        }
+        func pick(_ rid: Int64, _ slot: Int32) -> StationPlanner.Pick {
+            StationPlanner.Pick(rid: rid, arm: Arm.radio, slot: slot, slotKind: ListBuilder.slotNovel, whyKey: WhyLine.none,
+                                whyArg: 0, retrQ: 500, radioRank: 2, key: 1, pQ: 5000, novel: true)
+        }
+        let plan = StationPlanner.Plan(picks: [pick(1, 0), pick(2, 1), pick(3, 2)], usedLiked: true, usedFamiliarNext: false, poolSize: 40)
+        let inputs = AutoplayPlanInputs(candidates: [], prior: [], excludedRids: [], seeds: [], nuMultiplier: 1, nowMs: 0, tzOffsetMin: 0, batch: 0)
+        let context = AutoplayPlanContext(inputs: inputs, entriesByRid: [1: entry("yt:a", 1), 2: entry("yt:b", 2), 3: entry("yt:c", 3)])
+        let ids = AutoplayPlanning.pickedEntries(plan: plan, context: context).map(\.candidate.mediaId)
+        #expect(ids == ["yt:a", "yt:b", "yt:c"])
+        let kept = Set(AutoplayPolicy.keepPlayable(mediaIds: ids, playable: [true, false, true]).map(BrainKey.init))
+        let narrowed = AutoplayPlanning.narrowed(plan, context: context, kept: kept)
+        #expect(narrowed.picks.map(\.rid) == [1, 3])
+        #expect(narrowed.usedLiked, "something of the plan was used")
+        let none = AutoplayPlanning.narrowed(plan, context: context, kept: [])
+        #expect(none.picks.isEmpty && !none.usedLiked && none.poolSize == 40)
+    }
+
     /// The same table `SpotifyConnect.isTrackId` is checked against in PixlNet's tests (`SpotifyConnectIdTests`), so
     /// the two copies of the rule cannot drift apart.
     static let idTable: [(String?, Bool)] = [

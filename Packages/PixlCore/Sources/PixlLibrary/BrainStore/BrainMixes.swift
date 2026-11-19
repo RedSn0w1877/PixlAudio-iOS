@@ -72,6 +72,32 @@ public actor BrainMixes {
     /// True when the brain has played tracks to rank by. Loads the state on first use.
     public func hasState() async -> Bool { await engine.hasState() }
 
+    // MARK: What the screens ask for
+
+    /// Both of today's mixes when the brain owns them (docs/brain-spec.md, 14: the switch is on and the brain has
+    /// played tracks to rank by); nil means "the legacy mixes build as they always did". Today's saved mixes are read
+    /// back first and need no brain state, so a restart shows them at once. With `regenerate` both are drawn again.
+    /// Daily Mix is built first: Your Mix may not hold a track the Daily Mix of the same day holds.
+    public func publish(regenerate: Bool = false) async -> (daily: MixView, your: MixView)? {
+        if BrainEngineChoice.clamp(await sources.engine()) != BrainEngineChoice.brain { return nil }
+        var daily = regenerate ? nil : await saved(kind: MixPlanner.kindDaily)
+        var your = regenerate ? nil : await saved(kind: MixPlanner.kindYour)
+        if daily == nil || your == nil {
+            if !(await engine.hasState()) { return nil }
+            if daily == nil { daily = await today(kind: MixPlanner.kindDaily, regenerate: regenerate) }
+            if your == nil { your = await today(kind: MixPlanner.kindYour, regenerate: regenerate) }
+        }
+        guard let daily, let your else { return nil }
+        return (daily, your)
+    }
+
+    /// Your Mix's regenerate button: another list, and the served log counts the one it replaces (8.2). Nil when the
+    /// brain does not own the mixes (the legacy regenerate runs instead).
+    public func regenerateYourMix() async -> MixView? {
+        guard await ownsMixes() else { return nil }
+        return await today(kind: MixPlanner.kindYour, regenerate: true)
+    }
+
     // MARK: Reading and building
 
     /// Today's saved mix of `kind`, read back without building anything and without loading the brain's state: one

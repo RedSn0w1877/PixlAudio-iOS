@@ -374,6 +374,44 @@ struct BrainMixesTests {
         #expect(ids(try #require(await mixes.saved(kind: MixPlanner.kindDaily))) == ids(again))
     }
 
+    @Test func publishGivesBothMixesOrNothingAtAllWhenTheBrainDoesNotOwnThem() async throws {
+        let world = World()
+        defer { world.tidy() }
+        let repository = world.repository()
+        await world.listen(repository)
+        await world.fetchRadios(repository)
+        let mixes = world.mixes(repository, world.engine(repository))
+        let pair = try #require(await mixes.publish())
+        #expect(pair.daily.songs.count == 30 && pair.your.songs.count == 60)
+        #expect(Set(ids(pair.daily)).isDisjoint(with: Set(ids(pair.your))), "Daily Mix is built first")
+        // Asked again: the saved ones, not new ones.
+        let again = try #require(await mixes.publish())
+        #expect(ids(again.daily) == ids(pair.daily) && ids(again.your) == ids(pair.your))
+        #expect(world.built.value == 2)
+        // Regenerate draws both again.
+        world.clock.value += 60_000
+        let regenerated = try #require(await mixes.publish(regenerate: true))
+        #expect(ids(regenerated.daily) != ids(pair.daily) && ids(regenerated.your) != ids(pair.your))
+        // Your Mix alone.
+        world.clock.value += 60_000
+        let your = try #require(await mixes.regenerateYourMix())
+        #expect(ids(your) != ids(regenerated.your))
+        // The switch off: the legacy mixes build as before.
+        world.engineChoice.value = BrainEngineChoice.legacy
+        #expect(await mixes.publish() == nil)
+        #expect(await mixes.regenerateYourMix() == nil)
+    }
+
+    @Test func withTooLittleHeardTheBrainLeavesTheMixesToTheLegacyEngine() async throws {
+        let world = World()
+        defer { world.tidy() }
+        let repository = world.repository()
+        await world.listen(repository, songs: 0..<6)
+        let mixes = world.mixes(repository, world.engine(repository))
+        #expect(await mixes.publish() == nil)
+        #expect(world.built.value == 0, "nothing was built, so nothing was scheduled")
+    }
+
     // MARK: The refresh's seeds
 
     @Test func theRefreshSeedsFromWhatTheListenerChoseAtMostTwentyFourTwoPerArtist() async throws {

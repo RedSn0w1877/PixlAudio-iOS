@@ -30,7 +30,9 @@ import PixlNet
 ///  - Only tracks the listener chose, and engine picks they liked, are anchors. Engine picks that merely played are
 ///    not, so an hour of autoplay is still about what the listener started with.
 ///  - Tracks the listener queued are never moved or removed.
-///  - Off under repeat, during Spotify Connect, and while a saved queue is being restored.
+///  - Off under repeat and while a saved queue is being restored. On a Spotify Connect device it runs, limited to what
+///    Spotify has: a pick is looked up before it is queued, the tail is not re-scored, and the settle wait is a plain
+///    delay (`AutoplayPolicy.remoteRule`). An AirPlay route is the phone's own output and changes nothing.
 ///  - Three of the engine's picks skipped in a row turn it to another anchor (`Direction`); the listener's next own
 ///    track turns it back, and while a track of theirs plays autoplay follows that track.
 ///  - With no network the pool is the library alone, and only tracks with a copy on the phone; such a pool, and a
@@ -43,7 +45,12 @@ final class AutoplayController {
     struct Sources {
         var isEnabled: () -> Bool
         var youTubeSourceEnabled: () -> Bool
-        var isRemoteSession: () -> Bool
+        /// Where the queue is sounding: this phone (an AirPlay route included: the phone still plays the audio) or a
+        /// Spotify Connect device (`AutoplayPolicy.remoteRule`).
+        var remoteOutput: () -> RemoteOutput
+        /// Which of these songs the remote output can play, in order: on Spotify Connect a real Spotify id or a strict
+        /// search match. Asked only on an output that plays some tracks and not others; it may search.
+        var playableOnRemote: @MainActor ([Song]) async -> [Bool]
         var library: () -> [Song]
         var librarySong: (String) -> Song?
         var events: () -> [PlaybackEvent]
@@ -327,7 +334,7 @@ final class AutoplayController {
         // not turn the station into another one.
         if reaction.changedDirection, station == nil { showDirectionNote() }
         guard isActive else { return }
-        if reaction.changedDirection, station == nil, !sources.isRemoteSession(), !isRestoringQueue {
+        if reaction.changedDirection, station == nil, remoteRule().rescore, !isRestoringQueue {
             // Turning does not wait for the queue to run low: the pool of the new direction is built now, and when
             // it is ready the engine's tail is re-scored against it (`poolReady`).
             let seeding = currentSeeding()
@@ -362,7 +369,7 @@ final class AutoplayController {
     /// prefetcher has warmed them (2.3 step 7, decision D8). False when this tail cannot be planned again.
     @discardableResult
     private func rescoreTail() -> Bool {
-        guard isActive, !poolFromLibrary, !poolSeeds.isEmpty, !sources.isRemoteSession(), !isRestoringQueue,
+        guard isActive, !poolFromLibrary, !poolSeeds.isEmpty, remoteRule().rescore, !isRestoringQueue,
               let brainEngine = brain.engine else { return false }
         if !AutoplayPolicy.mayPlanNow(topUpRunning: planTask != nil, rescoreRunning: rescoreTask != nil) {
             pendingRescore = true
@@ -446,7 +453,7 @@ final class AutoplayController {
     /// behind a pool the library carries on). The track that is next and the warmed ones stay (decision D8), and
     /// so does everything the listener queued. Not in a station, whose own artist is thinned out by the planner.
     private func dropArtistFromTail(_ artistKey: String) {
-        guard !artistKey.isEmpty, isActive, station == nil, !sources.isRemoteSession(), !isRestoringQueue else { return }
+        guard !artistKey.isEmpty, isActive, station == nil, remoteRule().rescore, !isRestoringQueue else { return }
         // A pool that is picked in its own order hears of the skip no other way.
         if poolFromLibrary || poolSeeds.isEmpty {
             pool.removeAll { BrainKey.sameBytes($0.candidate.artistKey, artistKey) }
@@ -480,9 +487,12 @@ final class AutoplayController {
         }
     }
 
+    /// What the engine may do on the output the queue is sounding on (`AutoplayPolicy.remoteRule`).
+    private func remoteRule() -> RemoteRule { AutoplayPolicy.remoteRule(sources.remoteOutput()) }
+
     private func decide() -> AutoplayPolicy.Decision {
         AutoplayPolicy.decide(autoplayEnabled: isActive, repeatMode: Int32(engine.queue.repeatMode.rawValue),
-                              isRemoteSession: sources.isRemoteSession(), isRestoring: isRestoringQueue,
+                              isRemoteSession: !remoteRule().picks, isRestoring: isRestoringQueue,
                               fullQueueSize: engine.queue.count, currentAbsoluteIndex: engine.queue.currentIndex ?? -1)
     }
 
@@ -682,8 +692,13 @@ final class AutoplayController {
         let bridge = planStation == nil && context.inputs.prior.isEmpty
         let count = StationRules.batchSize(isStation: planStation != nil, batchesSoFar: stationBatches)
         planTask = Task { [weak self] in
-            let plan = await brainEngine.plan(context.inputs, count: count, bridge: bridge, tail: nil)
+            var plan = await brainEngine.plan(context.inputs, count: count, bridge: bridge, tail: nil)
             guard let self else { return }
+            // On an output that plays only some tracks (Spotify Connect) the picks are looked up first, and the ones
+            // it does not have never reach the queue. The plan stays "in flight" meanwhile: one plan at a time.
+            if let planned = plan, self.remoteRule().onlyWhatTheOutputPlays {
+                plan = await self.keepWhatTheOutputPlays(planned, context: context)
+            }
             self.planTask = nil
             guard key == self.poolKey, self.isActive else { return }
             // Someone else changed the queue while the plan was made: the trigger looks again.
@@ -694,6 +709,32 @@ final class AutoplayController {
             onDone(plan.map { self.commit($0, context: context) } ?? false)
             self.runPendingRescore()
         }
+    }
+
+    /// `plan` without the picks the remote output cannot play (Spotify Connect: a pick Spotify does not have). Those
+    /// leave the pool and are not offered again for a while. On this phone, and on an output that takes everything it
+    /// is given, the plan comes back as it is.
+    private func keepWhatTheOutputPlays(_ plan: StationPlanner.Plan, context: AutoplayPlanContext) async -> StationPlanner.Plan {
+        guard remoteRule().onlyWhatTheOutputPlays, !plan.picks.isEmpty else { return plan }
+        var ids: [String] = []
+        var songs: [Song] = []
+        for entry in AutoplayPlanning.pickedEntries(plan: plan, context: context) {
+            guard let song = entry.librarySong
+                ?? entry.engineTrack.map({ BrainService.queueSong(for: $0, nowMs: context.inputs.nowMs) }) else { continue }
+            ids.append(entry.candidate.mediaId)
+            songs.append(song)
+        }
+        let playable = await sources.playableOnRemote(songs)
+        let kept = Set(AutoplayPolicy.keepPlayable(mediaIds: ids, playable: playable).map(BrainKey.init))
+        if kept.count == ids.count { return plan }
+        let nowMs = now()
+        for id in ids where !kept.contains(BrainKey(id)) {
+            if failedAtMs.count > Self.failedLimit { failedAtMs.removeAll() }
+            failedAtMs[id] = nowMs
+        }
+        let asked = Set(ids.map(BrainKey.init))
+        pool.removeAll { asked.contains(BrainKey($0.candidate.mediaId)) && !kept.contains(BrainKey($0.candidate.mediaId)) }
+        return AutoplayPlanning.narrowed(plan, context: context, kept: kept)
     }
 
     /// Puts a plan's picks at the end of the queue in one edit. True when anything went in.
@@ -758,7 +799,11 @@ final class AutoplayController {
                                                 albumKey: BrainLibraryIndex.albumKey(of: entry.song.album)))
             }
         }
-        let picked = AutoplayPolicy.pickBatch(pool: pool.map(\.candidate), engineTail: Array(tail.suffix(50)),
+        // On Spotify Connect a library pick goes in only when it carries an id Spotify gave out: this path has no room
+        // for a lookup, and a track saved from YouTube Music may not be on Spotify.
+        let onlySpotifyIds = remoteRule().onlyWhatTheOutputPlays
+        let picked = AutoplayPolicy.pickBatch(pool: pool.filter { !onlySpotifyIds || AutoplayPolicy.isSpotifyTrackId($0.librarySong?.spotifyId) }
+                                                  .map(\.candidate), engineTail: Array(tail.suffix(50)),
                                               excludedMediaIds: excluded, excludedRids: [])
         guard !picked.isEmpty else { return false }
 
@@ -891,6 +936,13 @@ final class AutoplayController {
     /// track. False when the track changed (the new one re-triggers) or it stayed paused: `playingChanged` and the
     /// backstop pick that case up, without a polling loop.
     private func waitUntilSettled(songId: String?) async -> Bool {
+        if !remoteRule().settleOnLocalPlayer {
+            // The queue sounds on another device: this phone streams nothing and its own player sits paused at the
+            // start of the track, so there is no position to read. A plain wait keeps the request off the moment of
+            // the track change.
+            try? await Task.sleep(for: .milliseconds(AutoplayPolicy.settleMs))
+            return !Task.isCancelled && engine.queue.current?.song.id == songId
+        }
         for _ in 0..<Self.settlePolls {
             if Task.isCancelled || engine.queue.current?.song.id != songId { return false }
             let position = engine.currentPositionMs()

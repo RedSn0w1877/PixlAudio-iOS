@@ -310,13 +310,14 @@ final class AppEnvironment {
             }
         }
         if let realPlayback {
-            let libraryStore = library, playbackStore = playback, blockedStore = settings.blocked
+            let libraryStore = library, playbackStore = playback, blockedStore = settings.blocked, connectOutput = spotifyConnect
             let aiSettings = settings.ai
             let streamCache = youtube.cache
             let autoplay = AutoplayController(engine: realPlayback.engine, brain: brain, sources: AutoplayController.Sources(
                 isEnabled: { aiSettings.musicDiscoveryEnabled },
                 youTubeSourceEnabled: { aiSettings.brainYouTubeSourceEnabled },
-                isRemoteSession: { playbackStore.isRemoteActive },
+                remoteOutput: { playbackStore.isRemoteActive ? .connect : .none },
+                playableOnRemote: { songs in await connectOutput.canPlay(songs) },
                 library: { libraryStore.songs },
                 librarySong: { libraryStore.song(id: $0) },
                 events: { home.history.events },
