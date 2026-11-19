@@ -52,6 +52,9 @@ struct DeveloperSettingsSection: View {
                                  isOn: Binding(get: { settings.ai.brainSpotifyShapesPicks },
                                                set: { settings.ai.brainSpotifyShapesPicks = $0 }),
                                  systemImage: "music.note.list", iconColor: theme.secondary)
+                SettingsItemRow(title: BrainDataStrings.rowTitle, subtitle: BrainDataStrings.rowSubtitle,
+                                systemImage: "chart.bar.doc.horizontal", showsChevron: true,
+                                identifier: "settings.developer.brainData") { router.push(.brainData) }
                 ActionSettingRow(title: L10n.settingsForceDailyMixTitle, subtitle: L10n.settingsForceDailyMixSubtitle,
                                  systemImage: "slider.horizontal.3",
                                  primaryLabel: L10n.settingsActionRegenerateDailyMix) { showsDailyMix = true }

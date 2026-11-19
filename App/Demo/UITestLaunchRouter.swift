@@ -40,6 +40,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case settingsAbout = "settingsCategory.about"
     case paletteStyle, experimental, artistSettings, delimiterConfig, wordDelimiterConfig, equalizer, editTransition
     case deviceCapabilities, about, openSourceLicenses, easterEgg, quickFill, diagnostics
+    /// Settings › Developer mode › Brain data (stage 2b): the atlas, what is known and each source, with demo counts.
+    case brainData
     case accounts, spotifyDashboard, spotifyBrowse, youTubeLogin
     // Stage 11: YouTube sign-in states and the playback test
     case youTubeLoginCode, youTubeLoginCookie, youTubeLoginSignedIn, playbackDiagnostics, playbackDiagnosticsFailed
@@ -245,6 +247,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .easterEgg: return .easterEgg
         case .quickFill: return .quickFill
         case .diagnostics: return .diagnostics
+        case .brainData: return .brainData
         case .accounts, .accountsSignedIn: return .accounts
         case .spotifyDashboard, .spotifyDashboardSignedIn, .spotifyDashboardTested: return .spotifyDashboard
         case .spotifyBrowseResults: return .spotifyBrowse(query: "Luma")
@@ -459,7 +462,7 @@ nonisolated enum UITestLaunchRouter {
         "paletteStyle", "experimental", "artistSettings", "blockedArtists", "listeningHistory", "tasteChanges", "delimiterConfig",
         "wordDelimiterConfig", "equalizer",
         "editTransition", "deviceCapabilities", "about", "openSourceLicenses", "easterEgg", "quickFill",
-        "diagnostics", "accounts", "cloudProcessing", "cloudQueue",
+        "diagnostics", "brainData", "accounts", "cloudProcessing", "cloudQueue",
     ]
     private static let underAccounts: Set<String> = ["spotifyDashboard", "spotifyBrowse", "youTubeLogin", "playbackDiagnostics"]
 

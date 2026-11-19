@@ -193,6 +193,9 @@ nonisolated enum PreferenceKeys {
     static let brainRefreshEnabled = "brain_refresh_enabled"
     /// "Use my Spotify music to shape picks" (docs/brain-spec.md, 13.1), default on. Android `brain_spotify_shapes_picks`.
     static let brainSpotifyShapesPicks = "brain_spotify_shapes_picks"
+    /// The off switch of one open-data source the brain reads (docs/brain-spec.md, 3.7; Settings › Developer mode › Brain
+    /// data), by the host's key (`deezer`, `musicbrainz`, ...). Default on. Android `brain_source_<key>_enabled`.
+    static func brainSourceEnabled(_ key: String) -> String { "brain_source_\(key)_enabled" }
     /// The music brain (docs/brain-spec.md, 8.3): the station the queue is (one line of text, `Station.encode`) and
     /// the Familiar / Blend / Discover switch (0, 1, 2). Android `brain_station` / `brain_novelty`.
     static let brainStation = "brain_station"

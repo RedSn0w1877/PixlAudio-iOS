@@ -14,6 +14,14 @@
   },
   "brain": {
     "note": "The music brain's off switches (docs/brain-spec.md, 3.7). refresh: the once-a-day background search for new music. A missing key means on.",
-    "refresh": { "enabled": true }
+    "refresh": { "enabled": true },
+    "sourcesNote": "The open-data sources the brain reads (stage 2b). Set one to false to switch it off on every phone, for instance before charging anyone: deezer and musicbrainz and listenbrainz carry non-commercial terms. A missing key means on.",
+    "sources": {
+      "deezer": { "enabled": true },
+      "musicbrainz": { "enabled": true },
+      "listenbrainz": { "enabled": true },
+      "wikidata": { "enabled": true },
+      "itunes": { "enabled": true }
+    }
   }
 }

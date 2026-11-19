@@ -34,6 +34,7 @@ struct RouteDestination: View {
         case .easterEgg: EasterEggView()
         case .quickFill: QuickFillView()
         case .diagnostics: DiagnosticsView()
+        case .brainData: BrainDataView()
         case .cloudProcessing: CloudProcessingSettingsView()
         case .cloudQueue: CloudQueueView()
         case .accounts: AccountsView()

@@ -354,6 +354,15 @@ final class AppEnvironment {
             let mixLibrary = library, mixHistory = home.history, mixTaste = musicTaste, mixImported = importedHistory
             let mixAdjustments = tasteAdjustments, mixBlocked = settings.blocked, mixSettings = settings.ai
             let mixPersistence = persistence, mixPlayback = playback
+            // What the brain knows about a song (docs/brain-spec.md, 3.3 to 3.5, stage 2b): the atlas, the open-data sources
+            // behind their switches and the DNA lanes the one refresh runs. Closures only; nothing is read until a lane runs.
+            let factStore = brain.spotifyFacts
+            brain.configureKnowledge(sources: DnaSources(
+                library: { @MainActor in mixLibrary.songs },
+                spotifyShapesPicks: { UserDefaults.standard.object(forKey: PreferenceKeys.brainSpotifyShapesPicks) as? Bool ?? true },
+                spotifyTopArtists: { @MainActor in await mixImported.importedContents().taste.topArtists },
+                spotifyFacts: { ids in factStore?.get(ids) ?? [] }),
+                timing: { name, ms in DiagnosticsLog.shared.log("brain", "\(name) \(ms) ms") })
             brain.configureMixes(sources: MixSources(
                 library: { @MainActor in mixLibrary.songs },
                 librarySongs: { @MainActor ids in

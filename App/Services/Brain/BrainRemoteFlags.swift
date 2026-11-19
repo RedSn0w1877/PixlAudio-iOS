@@ -9,8 +9,18 @@ nonisolated enum BrainRemoteFlags {
     private static let maxBytes = 64 * 1024
 
     static func refreshAllowed() -> Bool {
+        BrainRemoteConfig.refreshAllowed(configText: savedText())
+    }
+
+    /// False only when the saved remote config switches the open-data source `key` off (`brain.sources.<key>.enabled`).
+    /// The owner can do that for every phone before charging anyone (docs/brain-spec.md, 15, question 2).
+    static func sourceAllowed(_ key: String) -> Bool {
+        BrainRemoteConfig.sourceAllowed(configText: savedText(), key: key)
+    }
+
+    private static func savedText() -> String? {
         let file = YouTubeNetwork.supportDirectory().appendingPathComponent("remote-config.json")
-        guard let data = try? Data(contentsOf: file), data.count < maxBytes else { return true }
-        return BrainRemoteConfig.refreshAllowed(configText: String(decoding: data, as: UTF8.self))
+        guard let data = try? Data(contentsOf: file), data.count < maxBytes else { return nil }
+        return String(decoding: data, as: UTF8.self)
     }
 }

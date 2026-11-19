@@ -54,6 +54,9 @@ final class BrainService {
     private(set) var mixes: BrainMixes?
     /// The once-a-day background search for new music (3.7, stage 2a). Nil in UI tests.
     private(set) var refresh: BrainRefresh?
+    /// What the brain knows about a song, from the open-data sources (3.3 to 3.5, stage 2b): built by `configureKnowledge`,
+    /// read by the refresh's lanes 3 to 5 and the Developer screen, never at launch. Nil in UI tests.
+    private(set) var knowledge: BrainKnowledge?
     /// New releases by the artists the listener plays (6.3): one small file Home reads without the brain's state. Nil in UI tests.
     let newReleases: NewReleases?
     /// What the Spotify sync receives with a track and used to drop (13.1). Nil in UI tests.
@@ -144,6 +147,26 @@ final class BrainService {
 
     // MARK: Daily Mix and Your Mix (8.2) and the refresh (3.7)
 
+    /// Builds the knowledge layer (stage 2b): the DNA files, the atlas loader, the five open-data sources behind their switches.
+    /// Reads nothing, fetches nothing: `sources` are closures. Call it before `configureMixes`, which hands the lanes to the
+    /// one refresh.
+    func configureKnowledge(sources: DnaSources, timing: @escaping @Sendable (String, Int64) -> Void) {
+        guard let directory, let repository, let engine else { return }
+        let releases = newReleases
+        let youTubeToday: @Sendable () async -> Int = {
+            let since = currentTimeMillis() - HostBudget.dayMs
+            return await repository.radiosFetchedSince(since) + (await releases?.requestsSince(since) ?? 0)
+        }
+        let spotifyArtists: @Sendable () async -> (total: Int, withGenres: Int) = {
+            DnaSources.genreCounts(await sources.spotifyTopArtists())
+        }
+        knowledge = BrainKnowledge(directory: directory, engine: engine, sources: sources, repository: repository,
+                                   youTubeToday: youTubeToday, spotifyArtists: spotifyArtists, timing: timing)
+    }
+
+    /// Everything Settings › Developer mode › Brain data shows, read now (off the main actor). Nil when the brain is off.
+    func brainDataReport() async -> BrainDataReport? { await knowledge?.reader.read() }
+
     /// Builds the objects behind the mixes and the refresh. Reads nothing, fetches nothing: `sources` are closures.
     func configureMixes(sources: MixSources, budget: HostBudget?) {
         guard let directory, let repository, let engine else { return }
@@ -152,7 +175,7 @@ final class BrainService {
         let library = sources.library
         let work = BrainRefreshWork(mixes: mixes, repository: repository, budget: budget,
                                     matchedVideoId: sources.matchedVideoId, newReleases: newReleases,
-                                    librarySongs: { await library() })
+                                    librarySongs: { await library() }, dna: knowledge?.lanes)
         let allowed: @Sendable () async -> Bool = { @MainActor [weak self] in self?.refreshIsAllowed() ?? false }
         refresh = BrainRefresh(work: work, repository: repository, engine: engine, allowed: allowed)
     }

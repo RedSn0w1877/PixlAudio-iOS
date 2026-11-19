@@ -146,6 +146,9 @@ nonisolated enum AppRoute: Hashable, Sendable {
     case easterEgg
     case quickFill
     case diagnostics
+    /// Settings › Developer mode › Brain data (docs/brain-spec.md, 3.7, stage 2b): the genre atlas, what is known about the
+    /// listener's tracks and each open-data source with its switch.
+    case brainData
     /// Cloud Studio (iOS-first, design §7.2): Settings › Sing › Cloud processing, and its queue.
     case cloudProcessing
     case cloudQueue
@@ -192,6 +195,7 @@ nonisolated enum AppRoute: Hashable, Sendable {
         case .easterEgg: "easterEgg"
         case .quickFill: "quickFill"
         case .diagnostics: "diagnostics"
+        case .brainData: "brainData"
         case .cloudProcessing: "cloudProcessing"
         case .cloudQueue: "cloudQueue"
         case .accounts: "accounts"
