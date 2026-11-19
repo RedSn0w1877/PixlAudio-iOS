@@ -27,6 +27,8 @@ final class DeckItem {
     var pendingSeekSeconds: Double?
     /// The target of a seek still in flight (the timebase only moves once it completes).
     var seekTargetSeconds: Double?
+    /// A completed accurate seek can leave the presentation clock briefly behind its destination while audio prerolls.
+    private var completedSeekFloor: Double?
     /// Distinguishes seeks so an older completion never clears a newer target.
     var seekGeneration = 0
 
@@ -62,17 +64,32 @@ final class DeckItem {
     var positionSeconds: Double {
         if let pendingSeekSeconds { return pendingSeekSeconds }
         if let seekTargetSeconds { return seekTargetSeconds }
-        if let timebase = playerItem.timebase {
-            let t = CMTimebaseGetTime(timebase)
-            if t.isValid && t.isNumeric { return max(t.seconds, 0) }
+        let timebaseTime = playerItem.timebase.map { CMTimebaseGetTime($0) } ?? .invalid
+        let time = timebaseTime.isNumeric ? timebaseTime : playerItem.currentTime()
+        let seconds = time.isNumeric ? max(0, time.seconds) : 0
+        if let floor = completedSeekFloor {
+            if seconds < floor { return floor }
+            completedSeekFloor = nil
         }
-        let t = playerItem.currentTime()
-        return t.isValid && t.isNumeric ? max(t.seconds, 0) : 0
+        return seconds
     }
 
     func seekTarget(_ seconds: Double) -> Double {
-        let end = playerItem.forwardPlaybackEndTime
-        return max(0, end.isNumeric ? min(seconds, end.seconds) : seconds)
+        max(0, durationSeconds > 0 ? min(seconds, durationSeconds) : seconds)
+    }
+
+    func completeSeek(generation: Int, finished: Bool) {
+        guard generation == seekGeneration else { return }
+        completedSeekFloor = finished ? seekTargetSeconds : nil
+        seekTargetSeconds = nil
+    }
+
+    func clearSeekForScheduledStart() {
+        // A host-clock start supplies its own position, independently of the earlier preroll seek.
+        seekGeneration += 1
+        pendingSeekSeconds = nil
+        seekTargetSeconds = nil
+        completedSeekFloor = nil
     }
 }
 
@@ -407,6 +424,7 @@ final class Deck {
 
     /// Starts the current item from its beginning at `hostTime` (host clock). Precise starts need stall waiting off.
     func start(rate: Float, atHostTime hostTime: CMTime) {
+        currentItem?.clearSeekForScheduledStart()
         player.automaticallyWaitsToMinimizeStalling = false
         player.defaultRate = rate
         player.setRate(rate, time: .zero, atHostTime: hostTime)
@@ -415,6 +433,7 @@ final class Deck {
     /// Starts the current item at `itemSeconds` (item time) at `hostTime` — stage 14's in-sync switch between a song
     /// and its instrumental. Call after `preroll`.
     func start(rate: Float, at itemSeconds: Double, atHostTime hostTime: CMTime) {
+        currentItem?.clearSeekForScheduledStart()
         player.automaticallyWaitsToMinimizeStalling = false
         player.defaultRate = rate
         player.setRate(rate, time: CMTime(seconds: itemSeconds, preferredTimescale: 1_000_000_000), atHostTime: hostTime)
@@ -445,11 +464,10 @@ final class Deck {
         item.seekGeneration += 1
         let generation = item.seekGeneration
         item.seekTargetSeconds = max(seconds, 0)
-        player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { @Sendable [weak item] _ in
+        player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { @Sendable [weak item] finished in
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
-                    guard let item, item.seekGeneration == generation else { return }
-                    item.seekTargetSeconds = nil
+                    item?.completeSeek(generation: generation, finished: finished)
                 }
             }
         }

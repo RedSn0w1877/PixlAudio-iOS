@@ -208,6 +208,7 @@ extension DualDeckEngine {
         if let placement {
             let earliest = outgoing.positionSeconds + Self.placedLeadSeconds * Double(rate)
             let placed = placement(earliest)
+            if playheadMoved() { return leave(.abortedBySeek, incoming, on: deck) }
             let planned = Swift.max(placed.startSeconds, earliest)
             fadeSeconds = clampedFade(placed.fadeSeconds)
             if abs(planned - target) > 0.02 {
@@ -235,6 +236,7 @@ extension DualDeckEngine {
             if let placement, replans < 2 {
                 replans += 1
                 let placed = placement(outgoing.positionSeconds + Self.placedLeadSeconds * Double(rate))
+                if playheadMoved() { return leave(.abortedBySeek, incoming, on: deck) }
                 target = Swift.max(placed.startSeconds, soonest)
                 fadeSeconds = clampedFade(placed.fadeSeconds)
             } else {

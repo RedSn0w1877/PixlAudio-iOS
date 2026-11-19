@@ -151,6 +151,30 @@ final class DualDeckEngineTests: XCTestCase {
         let item = try XCTUnwrap(engine.activeItem)
         XCTAssertEqual(item.durationSeconds, 4, accuracy: 0.001)
         XCTAssertFalse(item.playerItem.forwardPlaybackEndTime.isNumeric)
+        XCTAssertEqual(item.seekTarget(20), 4, "a seek cannot report a position beyond the imported file")
+    }
+
+    func testSeekCompletionWhileThePresentationClockIsStillBehind() async throws {
+        let file = try TestAudio.sine(frequency: 440, seconds: 4)
+        let engine = makeEngine()
+        defer { engine.stop() }
+        engine.setQueue([TestAudio.song(file, seconds: 4)], startIndex: 0, startPositionMs: 0, playWhenReady: false)
+        let ready = await waitUntil(timeout: 5) { engine.activeItem?.playerItem.status == .readyToPlay }
+        XCTAssertTrue(ready)
+        let item = try XCTUnwrap(engine.activeItem)
+        // Leave the actual clock paused at zero and deliver the callbacks in a controlled order.
+        item.seekGeneration = 1
+        item.seekTargetSeconds = 3
+        item.completeSeek(generation: 1, finished: true)
+        XCTAssertNil(item.seekTargetSeconds, "preroll is free to proceed after completion")
+        XCTAssertEqual(item.positionSeconds, 3)
+        item.seekGeneration = 2
+        item.seekTargetSeconds = 1
+        item.completeSeek(generation: 1, finished: false)
+        XCTAssertEqual(item.seekTargetSeconds, 1, "a superseded completion cannot consume a newer seek")
+        XCTAssertEqual(item.positionSeconds, 1, "a backward seek replaces the previous target immediately")
+        item.completeSeek(generation: 2, finished: false)
+        XCTAssertLessThan(item.positionSeconds, 0.1, "an interrupted seek returns to the actual clock")
     }
 
     func testCrossfadeOverlapsBothDecksWithTheirGainCurves() async throws {
