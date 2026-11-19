@@ -358,3 +358,10 @@ cmd //c "ci\swiftw.cmd test --package-path Packages\PixlCore --filter BrainStage
 bash ci/check-forbidden.sh                                              # OK
 powershell -NoProfile -ExecutionPolicy Bypass -File ci/parse-check.ps1  # 232 files OK
 ```
+
+## CI
+
+Run **44508593496** (`8b263f7`, workflow `ci`, branch `music-brain`) is **green on its first run**: `core` passed, `app` compiled
+everything (Swift 6, strict concurrency) and ran 664 unit tests with 0 failures, `ipa` skipped as on every push. The CI run that
+followed milestone 1 (44488832203) was green too, so nothing from it needed fixing. Green CI says nothing about how the new Home
+looks or behaves on a phone.
