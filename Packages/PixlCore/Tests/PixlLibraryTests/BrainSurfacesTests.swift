@@ -632,8 +632,13 @@ struct BrainFeedbackTests {
         #expect(WhyLineText.line(keyName: "radio_fans", arg: "") == nil)
         #expect(WhyLineText.line(keyName: "because_liked", arg: "  ") == nil)
         #expect(WhyLineText.line(keyName: "artist_more", arg: nil) == nil)
-        // Keys of arms stage 1 does not serve, and nonsense, show nothing.
-        #expect(WhyLineText.line(keyName: "new_release", arg: "X") == nil)
+        // Stage 2a serves the similar-artist and the new-release arms; they need a name too.
+        #expect(WhyLineText.line(keyName: "new_release", arg: "X") == .newRelease("X"))
+        #expect(WhyLineText.line(keyName: "similar_artist", arg: "X") == .similarArtist("X"))
+        #expect(WhyLineText.line(keyName: "new_release", arg: nil) == nil)
+        // The keys of arms nothing serves yet, and nonsense, show nothing.
+        #expect(WhyLineText.line(keyName: "forgotten", arg: "X") == nil)
+        #expect(WhyLineText.line(keyName: "adjacent_genre", arg: "X") == nil)
         #expect(WhyLineText.line(keyName: "nonsense", arg: "X") == nil)
         #expect(WhyLineText.line(keyName: nil, arg: "X") == nil)
     }

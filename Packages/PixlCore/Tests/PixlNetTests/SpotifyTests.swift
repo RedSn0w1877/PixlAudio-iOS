@@ -185,7 +185,7 @@ struct SpotifyWebAPITests {
         #expect(SpotifyAPI.savedTracks(authorization: auth).url == "https://api.spotify.com/v1/me/tracks?limit=50&offset=0")
         #expect(SpotifyAPI.userPlaylists(authorization: auth, offset: 50).url == "https://api.spotify.com/v1/me/playlists?limit=50&offset=50")
         #expect(SpotifyAPI.playlistTracks(authorization: auth, playlistId: "37i9", offset: 100).url
-                == "https://api.spotify.com/v1/playlists/37i9/items?limit=100&offset=100&fields=total%2Cnext%2Citems%28added_at%2Citem%28id%2Cname%2Cduration_ms%2Cis_local%2Ctype%2Cartists%28id%2Cname%29%2Calbum%28id%2Cname%2Cimages%28url%2Cwidth%2Cheight%29%29%2Cexternal_ids%28isrc%29%29%29")
+                == "https://api.spotify.com/v1/playlists/37i9/items?limit=100&offset=100&fields=total%2Cnext%2Citems%28added_at%2Citem%28id%2Cname%2Cduration_ms%2Cis_local%2Ctype%2Cexplicit%2Cartists%28id%2Cname%29%2Calbum%28id%2Cname%2Crelease_date%2Crelease_date_precision%2Cimages%28url%2Cwidth%2Cheight%29%29%2Cexternal_ids%28isrc%29%29%29")
         #expect(SpotifyAPI.playlistTracks(authorization: auth, playlistId: "p", fields: nil).url == "https://api.spotify.com/v1/playlists/p/items?limit=100&offset=0")
         #expect(SpotifyAPI.search(authorization: auth, query: "daft punk+1").url == "https://api.spotify.com/v1/search?q=daft%20punk%2B1&type=track%2Cartist%2Calbum")
         #expect(SpotifyAPI.search(authorization: auth, query: "x", type: "track", limit: 5, market: "US", offset: 10).url
