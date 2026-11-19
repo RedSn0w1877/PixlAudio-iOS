@@ -54,6 +54,8 @@ public struct RadioListFacts: Sendable, Hashable, Codable {
     public var lastUsedAt: Int64
     public var healthy: Bool
     public var chips: [RadioChip]
+    /// The token of the radio's next page; absent in a record a stage 1 install wrote.
+    public var continuation: String? = nil
 }
 
 /// One track to resolve: the keys the caller has and the length it knows.
@@ -282,7 +284,8 @@ public final class BrainTables {
         loadRadios()
         let key = Self.radioKey(list.seedRid, list.kind, list.chip)
         let facts = RadioListFacts(seedRid: list.seedRid, kind: list.kind, chip: list.chip, fetchedAt: list.fetchedAt,
-                                   lastUsedAt: list.lastUsedAt, healthy: list.healthy, chips: list.chips)
+                                   lastUsedAt: list.lastUsedAt, healthy: list.healthy, chips: list.chips,
+                                   continuation: list.continuation)
         guard let factsPayload = Self.encode(facts), let rowsPayload = Self.encode(list.rows) else { return }
         radioFacts[BrainKey(key)] = facts
         radioListFile.put(key, factsPayload)

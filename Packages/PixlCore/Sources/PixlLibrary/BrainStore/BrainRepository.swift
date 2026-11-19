@@ -140,10 +140,22 @@ public actor BrainRepository {
         if tables.radiosFetchedSince(now - HostBudget.dayMs) >= HostBudget.dailyLimit { return staleOrNil() }
         if let at = emptyAnswerAtMs[seedRid], now - at >= 0, now - at < Self.emptyAnswerRetryMs { return staleOrNil() }
 
+        // A deepening starts from the token the first-page list kept: page one is not fetched again.
+        if continuations > 0, let marker = songMarker, marker.healthy, let token = marker.continuation,
+           now - marker.fetchedAt >= 0, now - marker.fetchedAt < Self.cacheTtlMs,
+           let more = await radioSource.songRadioContinuation(token: token, pages: continuations), !more.rows.isEmpty {
+            var seen: Set<BrainKey> = []
+            var rows: [RadioRow] = []
+            for stored in tables.radioRows(seedRid: seedRid, kind: RadioList.kindSong, chip: "")
+            where seen.insert(BrainKey(stored.row.videoId)).inserted { rows.append(stored.row) }
+            for row in more.rows where seen.insert(BrainKey(row.videoId)).inserted { rows.append(row) }
+            return store(seedRid: seedRid, kind: RadioList.kindSong, rows: rows, chips: marker.chips, now: now,
+                         chip: songChip, continuation: more.continuation)
+        }
         let fetched = await radioSource.songRadio(videoId: seed.videoId, continuations: continuations)
         if let fetched, !isJunk(fetched, seed) {
             return store(seedRid: seedRid, kind: RadioList.kindSong, rows: withoutSeed(fetched.rows, seed),
-                         chips: fetched.chips, now: now, chip: songChip)
+                         chips: fetched.chips, now: now, chip: songChip, continuation: fetched.continuation)
         }
         guard let fetched else { return staleOrNil() } // transport failure or no budget: nothing learned
         if fetched.rows.isEmpty && fetched.relatedBrowseId == nil {
@@ -307,7 +319,7 @@ public actor BrainRepository {
     }
 
     private func store(seedRid: Int64, kind: Int, rows: [RadioRow], chips: [RadioChip], now: Int64,
-                       chip: String = "") -> StoredRadio {
+                       chip: String = "", continuation: String? = nil) -> StoredRadio {
         let rids = tables.resolveTracks(rows.map { row in
             TrackRequest(keys: Ids.TrackKeys(videoId: row.videoId,
                                              nameKey: row.artists.first.flatMap {
@@ -326,7 +338,7 @@ public actor BrainRepository {
             stored.append(StoredRadioRow(row: row, rid: rid))
         }
         tables.upsertRadio(RadioList(seedRid: seedRid, kind: kind, chip: chip, fetchedAt: now, lastUsedAt: now,
-                                     healthy: true, rows: stored, chips: chips))
+                                     healthy: true, rows: stored, chips: chips, continuation: continuation))
         // An artist station's list is the artist's top songs, not a ranking by closeness to the seed: it is not an
         // edge of the graph. Every other stored radio also becomes edges (3.6).
         if !BrainKey.sameBytes(chip, Self.artistStationChip) && !BrainKey.sameBytes(chip, Self.similarStationChip) {

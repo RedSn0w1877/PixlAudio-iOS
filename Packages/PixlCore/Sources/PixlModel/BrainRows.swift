@@ -209,8 +209,13 @@ public struct FetchedRadio: Sendable, Hashable {
     public var relatedBrowseId: String?
     /// How many network requests this took (first page, retry, continuations).
     public var requests: Int
+    /// The token of the page after the last one taken, when the chain goes on: a later deepening starts from it and
+    /// does not fetch page one again.
+    public var continuation: String?
 
-    public init(rows: [RadioRow], chips: [RadioChip] = [], relatedBrowseId: String? = nil, requests: Int = 1) {
+    public init(rows: [RadioRow], chips: [RadioChip] = [], relatedBrowseId: String? = nil, requests: Int = 1,
+                continuation: String? = nil) {
+        self.continuation = continuation
         self.rows = rows
         self.chips = chips
         self.relatedBrowseId = relatedBrowseId
@@ -248,9 +253,13 @@ public struct RadioList: Sendable, Hashable {
     public var healthy: Bool
     public var rows: [StoredRadioRow]
     public var chips: [RadioChip]
+    /// The token of the radio's next page, when the list is the first pages of a chain that goes on (deepening starts
+    /// from it, so page one is not fetched again).
+    public var continuation: String?
 
     public init(seedRid: Int64, kind: Int, chip: String, fetchedAt: Int64, lastUsedAt: Int64, healthy: Bool,
-                rows: [StoredRadioRow], chips: [RadioChip]) {
+                rows: [StoredRadioRow], chips: [RadioChip], continuation: String? = nil) {
+        self.continuation = continuation
         self.seedRid = seedRid
         self.kind = kind
         self.chip = chip
@@ -463,6 +472,8 @@ public protocol RadioSource: Sendable {
     func artistPage(channelId: String) async -> ArtistPage?
     /// An artist radio, from the endpoint an artist page carried.
     func artistRadio(endpoint: RadioEndpoint) async -> FetchedRadio?
+    /// Up to `pages` further pages of a radio, from the token its first page named: only the new rows, no page one.
+    func songRadioContinuation(token: String, pages: Int) async -> FetchedRadio?
     /// The whole discography of an artist (`MPAD<channelId>`), newest first. Nil when the source is unavailable or over
     /// budget; an empty list when the answer had no releases.
     func discography(channelId: String) async -> [ReleaseRef]?
@@ -478,6 +489,7 @@ public protocol RadioSource: Sendable {
 }
 
 public extension RadioSource {
+    func songRadioContinuation(token: String, pages: Int) async -> FetchedRadio? { nil }
     func discography(channelId: String) async -> [ReleaseRef]? { nil }
     func releaseTracks(_ release: ReleaseRef) async -> [RadioRow]? { nil }
     func playlistRows(playlistId: String, maxPages: Int) async -> [RadioRow]? { nil }

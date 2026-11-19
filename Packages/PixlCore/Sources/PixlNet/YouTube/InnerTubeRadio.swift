@@ -728,6 +728,27 @@ public struct YouTubeRadioSource: RadioSource {
     public static let hydrateBatch = 100
     public static let hydrateBisectRequests = 3
 
+    public func songRadioContinuation(token: String, pages: Int) async -> FetchedRadio? {
+        let client = self.client
+        var pager = RadioPager()
+        var next: String? = token
+        var requests = 0
+        var rows: [RadioRow] = []
+        var remaining = min(max(pages, 0), RadioPager.maxContinuations)
+        // The first page of the chain is accepted as the pager's own first: its rows are all new here.
+        while remaining > 0, let current = next {
+            guard let page = await budget.withPermit({ await client.nextRadioContinuation(current) }) else { break }
+            requests += 1
+            let before = pager.rows.count
+            pager.accept(page)
+            rows.append(contentsOf: pager.rows[before...])
+            next = pager.nextToken
+            remaining -= 1
+        }
+        if requests == 0 { return nil }
+        return FetchedRadio(rows: rows, chips: [], relatedBrowseId: nil, requests: requests, continuation: next)
+    }
+
     public func discography(channelId: String) async -> [ReleaseRef]? {
         guard channelId.hasPrefix("UC") else { return nil }
         let client = self.client
@@ -856,6 +877,7 @@ public struct YouTubeRadioSource: RadioSource {
             pager.accept(next)
             wanted -= 1
         }
-        return FetchedRadio(rows: pager.rows, chips: page.chips, relatedBrowseId: page.relatedBrowseId, requests: requests)
+        return FetchedRadio(rows: pager.rows, chips: page.chips, relatedBrowseId: page.relatedBrowseId, requests: requests,
+                            continuation: pager.nextToken)
     }
 }

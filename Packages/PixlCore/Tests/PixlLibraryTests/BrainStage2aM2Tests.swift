@@ -56,6 +56,14 @@ private final class FakeSource: RadioSource, @unchecked Sendable {
     private var tracks: [String: [RadioRow]] = [:]
     private var channels: [String: String] = [:]
     private var calls: [String] = []
+    private var continuations: [String: FetchedRadio] = [:]
+
+    func setContinuation(_ token: String, _ radio: FetchedRadio) { lock.lock(); continuations[token] = radio; lock.unlock() }
+
+    func songRadioContinuation(token: String, pages: Int) async -> FetchedRadio? {
+        note("continue:\(token):\(pages)")
+        return locked { continuations[token] }
+    }
 
     func setPage(_ id: String, _ page: ArtistPage) { lock.lock(); pages[id] = page; lock.unlock() }
     func setRadio(_ playlistId: String, _ radio: FetchedRadio) { lock.lock(); radios[playlistId] = radio; lock.unlock() }
@@ -274,6 +282,38 @@ struct BrainArtistStationTests {
         let before = source.log.count
         #expect(await repository.similarArtistSongs(seed: seed, allowNetwork: true).count == 12)
         #expect(source.log.count == before)
+    }
+
+    @Test func deepeningAStationsRadioStartsFromTheStoredTokenAndDoesNotFetchPageOneAgain() async throws {
+        let dir = makeDirectory("deepen")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let source = FakeSource()
+        let seedRow = radioRow(1, "Zed", channel: "UCZed")
+        let first = FetchedRadio(rows: [seedRow] + (100..<145).map { i in
+            i == 102 || i == 108 ? radioRow(i, "Zed", channel: "UCZed") : radioRow(i, "Other\(i % 9)")
+        }, relatedBrowseId: "MPTRt_seed", continuation: "TOKEN1")
+        source.setSongRadio(seedRow.videoId, first)
+        source.setContinuation("TOKEN1", FetchedRadio(rows: (200..<240).map { radioRow($0, "Other\($0 % 9)") }, requests: 2,
+                                                      continuation: "TOKEN2"))
+        let repository = BrainRepository(directory: dir, radioSource: source, clock: { t0 })
+        let seed = RadioSeed(mediaId: "m", videoId: seedRow.videoId, title: seedRow.title, primaryArtist: "Zed", durationMs: 200_000)
+        let page1 = try #require(await repository.radioFor(seed: seed, allowNetwork: true))
+        #expect(page1.rows.count > 40)
+        let deep = try #require(await repository.radioFor(seed: seed, allowNetwork: true, continuations: 2))
+        #expect(deep.rows.count >= page1.rows.count + 35)
+        #expect(deep.rows.contains { $0.row.videoId == "vid0000200" })
+        #expect(Set(deep.rows.map(\.rid)).count == deep.rows.count)
+        // One `next` for page one and one continuation call from the token; page one was not asked for twice.
+        #expect(source.log.filter { $0.hasPrefix("song:") }.count == 1)
+        #expect(source.log.contains("continue:TOKEN1:2"))
+        // The deeper list keeps the next token; asked again it is the cache.
+        let before = source.log.count
+        #expect(try #require(await repository.radioFor(seed: seed, allowNetwork: true, continuations: 2)).rows.count == deep.rows.count)
+        #expect(source.log.count == before)
+        // A list stored by stage 1 has no token: the old path (page one again, with its continuations) still works.
+        let old = RadioList(seedRid: 1, kind: RadioList.kindSong, chip: "", fetchedAt: t0, lastUsedAt: t0, healthy: true,
+                            rows: [], chips: [])
+        #expect(old.continuation == nil)
     }
 
     @Test func chipsOfARadioAreStoredAsTagsOnlyWhenTheyNameGenreDecadeOrMood() async throws {

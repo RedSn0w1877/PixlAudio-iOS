@@ -261,6 +261,23 @@ struct InnerTubeRadio2aTests {
         #expect(await source.channelId(forArtist: "   ") == nil)
     }
 
+    @Test func aDeepeningStartsFromTheTokenAndReturnsOnlyNewRows() async throws {
+        let more = try ok("radio_song_cont1.json")
+        let http = FixtureHTTPClient { _ in more }
+        let source = YouTubeRadioSource(client: InnerTubeRadioClient(http: http, visitorData: { nil }),
+                                        budget: HostBudget(clock: { 0 }))
+        let fetched = try #require(await source.songRadioContinuation(token: "TOKEN", pages: 2))
+        #expect(!fetched.rows.isEmpty && fetched.requests >= 1)
+        #expect(Set(fetched.rows.map(\.videoId)).count == fetched.rows.count)
+        #expect(http.requests.allSatisfy { String(decoding: $0.body ?? Data(), as: UTF8.self).contains("\"continuation\":\"TOKEN\"")
+            || String(decoding: $0.body ?? Data(), as: UTF8.self).contains("\"continuation\"") })
+        // Asked for no page: nothing is requested.
+        let none = FixtureHTTPClient { _ in more }
+        let idle = YouTubeRadioSource(client: InnerTubeRadioClient(http: none, visitorData: { nil }), budget: HostBudget(clock: { 0 }))
+        #expect(await idle.songRadioContinuation(token: "TOKEN", pages: 0) == nil)
+        #expect(none.requests.isEmpty)
+    }
+
     @Test func discographyNeedsAChannelId() async throws {
         let http = FixtureHTTPClient { _ in HTTPResponse(statusCode: 200, text: "{}") }
         let source = YouTubeRadioSource(client: InnerTubeRadioClient(http: http, visitorData: { nil }),
