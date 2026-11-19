@@ -1,0 +1,27 @@
+{
+ "resultCount": 2,
+ "results": [
+  {
+   "artistName": "The Weeknd & ROSALÍA",
+   "collectionName": "Blinding Lights (Remix) - Single",
+   "kind": "song",
+   "primaryGenreName": "R&B/Soul",
+   "releaseDate": "2020-12-04T12:00:00Z",
+   "trackExplicitness": "notExplicit",
+   "trackName": "Blinding Lights (Remix)",
+   "trackTimeMillis": 216123,
+   "wrapperType": "track"
+  },
+  {
+   "artistName": "The Weeknd",
+   "collectionName": "After Hours",
+   "kind": "song",
+   "primaryGenreName": "R&B/Soul",
+   "releaseDate": "2019-11-29T08:00:00Z",
+   "trackExplicitness": "notExplicit",
+   "trackName": "Blinding Lights",
+   "trackTimeMillis": 200046,
+   "wrapperType": "track"
+  }
+ ]
+}

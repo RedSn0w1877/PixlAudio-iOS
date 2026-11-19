@@ -1,0 +1,525 @@
+{
+ "8bee2202-0b48-42be-9e89-bf68e6ab742c": {
+  "artist": {
+   "artists": [
+    {
+     "area": "Canada",
+     "artist_mbid": "0b76f632-25fa-4681-9862-86499c28afd3",
+     "name": "Finger Eleven"
+    }
+   ]
+  },
+  "recording": {
+   "first_release_date": "2007-05-13",
+   "name": "Paralyzer"
+  },
+  "release": {
+   "year": 2007
+  },
+  "tag": {
+   "artist": [
+    {
+     "artist_mbid": "0b76f632-25fa-4681-9862-86499c28afd3",
+     "count": 4,
+     "genre_mbid": "bbb1310c-24cb-4fc9-97c4-f93e4549f1e2",
+     "tag": "post-grunge"
+    },
+    {
+     "artist_mbid": "0b76f632-25fa-4681-9862-86499c28afd3",
+     "count": 2,
+     "genre_mbid": "0e3fc579-2d24-4f20-9dae-736e1ec78798",
+     "tag": "rock"
+    },
+    {
+     "artist_mbid": "0b76f632-25fa-4681-9862-86499c28afd3",
+     "count": 1,
+     "tag": "canadian"
+    },
+    {
+     "artist_mbid": "0b76f632-25fa-4681-9862-86499c28afd3",
+     "count": 1,
+     "genre_mbid": "cc28f5aa-5e19-487c-88e1-e56b022f1fdd",
+     "tag": "metal"
+    },
+    {
+     "artist_mbid": "0b76f632-25fa-4681-9862-86499c28afd3",
+     "count": 1,
+     "genre_mbid": "7983ff25-ddf9-411e-a7f9-6cca238bff79",
+     "tag": "alternative metal"
+    },
+    {
+     "artist_mbid": "0b76f632-25fa-4681-9862-86499c28afd3",
+     "count": 1,
+     "genre_mbid": "51cb9f91-e6a2-41bf-891f-e78e3f1e52ab",
+     "tag": "hard rock"
+    },
+    {
+     "artist_mbid": "0b76f632-25fa-4681-9862-86499c28afd3",
+     "count": 1,
+     "genre_mbid": "bbad9cda-bde2-448e-821c-7ebf85a54020",
+     "tag": "nu metal"
+    },
+    {
+     "artist_mbid": "0b76f632-25fa-4681-9862-86499c28afd3",
+     "count": 2,
+     "genre_mbid": "ceeaa283-5d7b-4202-8d1d-e25d116b2a18",
+     "tag": "alternative rock"
+    }
+   ],
+   "recording": [],
+   "release_group": [
+    {
+     "count": 5,
+     "genre_mbid": "0e3fc579-2d24-4f20-9dae-736e1ec78798",
+     "tag": "rock"
+    },
+    {
+     "count": 2,
+     "genre_mbid": "ceeaa283-5d7b-4202-8d1d-e25d116b2a18",
+     "tag": "alternative rock"
+    },
+    {
+     "count": 1,
+     "genre_mbid": "a6719055-99c4-47eb-beaa-71081f2376f9",
+     "tag": "heavy metal"
+    },
+    {
+     "count": 2,
+     "genre_mbid": "51cb9f91-e6a2-41bf-891f-e78e3f1e52ab",
+     "tag": "hard rock"
+    },
+    {
+     "count": 1,
+     "tag": "alternative"
+    },
+    {
+     "count": 2,
+     "genre_mbid": "bbb1310c-24cb-4fc9-97c4-f93e4549f1e2",
+     "tag": "post-grunge"
+    },
+    {
+     "count": 3,
+     "genre_mbid": "7983ff25-ddf9-411e-a7f9-6cca238bff79",
+     "tag": "alternative metal"
+    },
+    {
+     "count": 1,
+     "tag": "pop/rock"
+    }
+   ]
+  }
+ },
+ "9c90d73a-920b-4edd-a239-7a6c2c233228": {
+  "artist": {
+   "artists": [
+    {
+     "area": "United States",
+     "artist_mbid": "020bfbb4-05c3-4c86-b372-17825c262094",
+     "name": "Audioslave"
+    }
+   ]
+  },
+  "recording": {
+   "first_release_date": "2003-01-14",
+   "name": "I Am The Highway"
+  },
+  "release": {
+   "year": 2002
+  },
+  "tag": {
+   "artist": [
+    {
+     "artist_mbid": "020bfbb4-05c3-4c86-b372-17825c262094",
+     "count": 1,
+     "tag": "supergroup"
+    },
+    {
+     "artist_mbid": "020bfbb4-05c3-4c86-b372-17825c262094",
+     "count": 6,
+     "genre_mbid": "bbb1310c-24cb-4fc9-97c4-f93e4549f1e2",
+     "tag": "post-grunge"
+    },
+    {
+     "artist_mbid": "020bfbb4-05c3-4c86-b372-17825c262094",
+     "count": 6,
+     "genre_mbid": "51cb9f91-e6a2-41bf-891f-e78e3f1e52ab",
+     "tag": "hard rock"
+    },
+    {
+     "artist_mbid": "020bfbb4-05c3-4c86-b372-17825c262094",
+     "count": 11,
+     "genre_mbid": "ceeaa283-5d7b-4202-8d1d-e25d116b2a18",
+     "tag": "alternative rock"
+    },
+    {
+     "artist_mbid": "020bfbb4-05c3-4c86-b372-17825c262094",
+     "count": 5,
+     "genre_mbid": "0e3fc579-2d24-4f20-9dae-736e1ec78798",
+     "tag": "rock"
+    }
+   ],
+   "recording": [],
+   "release_group": [
+    {
+     "count": 4,
+     "genre_mbid": "0e3fc579-2d24-4f20-9dae-736e1ec78798",
+     "tag": "rock"
+    },
+    {
+     "count": 5,
+     "genre_mbid": "ceeaa283-5d7b-4202-8d1d-e25d116b2a18",
+     "tag": "alternative rock"
+    },
+    {
+     "count": 10,
+     "genre_mbid": "51cb9f91-e6a2-41bf-891f-e78e3f1e52ab",
+     "tag": "hard rock"
+    },
+    {
+     "count": 5,
+     "genre_mbid": "bbb1310c-24cb-4fc9-97c4-f93e4549f1e2",
+     "tag": "post-grunge"
+    },
+    {
+     "count": 5,
+     "genre_mbid": "7983ff25-ddf9-411e-a7f9-6cca238bff79",
+     "tag": "alternative metal"
+    },
+    {
+     "count": 2,
+     "tag": "alternative and punk"
+    }
+   ]
+  }
+ },
+ "aa1e2c0b-27c1-4f4d-a879-f515993ce4f1": {
+  "artist": {
+   "artists": [
+    {
+     "area": "United States",
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "name": "Nirvana"
+    }
+   ]
+  },
+  "recording": {
+   "first_release_date": null,
+   "name": "Smells Like Teen Spirit"
+  },
+  "release": {
+   "year": 1991
+  },
+  "tag": {
+   "artist": [
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "genre_mbid": "c0e73bb6-37a4-485e-aaea-11c63b40c9f3",
+     "tag": "conscious hip hop"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "tag": "united states"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "genre_mbid": "aec382b7-b635-470c-9051-2f84e0b5ea1e",
+     "tag": "post-hardcore"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "genre_mbid": "7983ff25-ddf9-411e-a7f9-6cca238bff79",
+     "tag": "alternative metal"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 3,
+     "genre_mbid": "66544dbb-08a8-44c2-a21a-4d251481d2b6",
+     "tag": "sludge metal"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "tag": "estados unidos"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 4,
+     "tag": "90s"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 8,
+     "genre_mbid": "00055e8b-b951-46e2-af1e-58b5624e7952",
+     "tag": "acoustic rock"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 6,
+     "tag": "seattle"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 2,
+     "tag": "usa"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 30,
+     "genre_mbid": "ceeaa283-5d7b-4202-8d1d-e25d116b2a18",
+     "tag": "alternative rock"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 67,
+     "genre_mbid": "3f08faa9-6c3e-4b6d-b4b8-08eea45954e2",
+     "tag": "grunge"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "genre_mbid": "bd7e1d40-43b1-4ba5-97b3-05b891466962",
+     "tag": "punk rock"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "tag": "alternative"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 2,
+     "genre_mbid": "8cc9b280-230b-4a3a-b1e2-8acab0744dd3",
+     "tag": "punk"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "genre_mbid": "51cb9f91-e6a2-41bf-891f-e78e3f1e52ab",
+     "tag": "hard rock"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 26,
+     "genre_mbid": "0e3fc579-2d24-4f20-9dae-736e1ec78798",
+     "tag": "rock"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 8,
+     "tag": "american"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "genre_mbid": "911c7bbb-172d-4df8-9478-dbff4296e791",
+     "tag": "pop"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "genre_mbid": "608b0471-7531-4854-a348-e698c69cb699",
+     "tag": "ambient"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "tag": "alternative/indie rock"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "genre_mbid": "6c76d9ec-0924-4fc9-bb22-91a695ca09d6",
+     "tag": "new age"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "genre_mbid": "52faa157-6bad-4d86-a0ab-d4dec7d2513c",
+     "tag": "hip hop"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "genre_mbid": "d3ebe947-7c03-43f5-b333-09379881b0f6",
+     "tag": "alternative pop"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "tag": "grunge rock"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "genre_mbid": "89255676-1f14-4dd8-bbad-fca839d6aff4",
+     "tag": "electronic"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "tag": "meditative"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "tag": "ethnic"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "tag": "ethereal"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "genre_mbid": "2aeb5340-c474-4677-b9a6-35ddac9b6a58",
+     "tag": "psychedelic pop"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "tag": "diy"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "genre_mbid": "03a8749c-93e6-4b71-8204-b33de116d8fd",
+     "tag": "underground hip hop"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "genre_mbid": "b3cccf71-e843-4546-87fa-728055ba3147",
+     "tag": "psytrance"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "tag": "instrumental beats"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "genre_mbid": "24695813-4a26-4872-bc95-b3378e0ae1b4",
+     "tag": "instrumental hip hop"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "genre_mbid": "4a3546b4-ec9f-431f-8532-55434f1038ea",
+     "tag": "pigfuck"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 12,
+     "genre_mbid": "8e5474b7-f445-49a7-866d-0f8e34b0a519",
+     "tag": "noise rock"
+    },
+    {
+     "artist_mbid": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+     "count": 1,
+     "genre_mbid": "68c81274-5770-4e7b-a4bf-ab0d7d425d99",
+     "tag": "experimental"
+    }
+   ],
+   "recording": [],
+   "release_group": [
+    {
+     "count": 6,
+     "genre_mbid": "0e3fc579-2d24-4f20-9dae-736e1ec78798",
+     "tag": "rock"
+    },
+    {
+     "count": 1,
+     "genre_mbid": "911c7bbb-172d-4df8-9478-dbff4296e791",
+     "tag": "pop"
+    },
+    {
+     "count": 21,
+     "genre_mbid": "ceeaa283-5d7b-4202-8d1d-e25d116b2a18",
+     "tag": "alternative rock"
+    },
+    {
+     "count": 1,
+     "tag": "90s"
+    },
+    {
+     "count": 1,
+     "genre_mbid": "8cc9b280-230b-4a3a-b1e2-8acab0744dd3",
+     "tag": "punk"
+    },
+    {
+     "count": 4,
+     "genre_mbid": "bd7e1d40-43b1-4ba5-97b3-05b891466962",
+     "tag": "punk rock"
+    },
+    {
+     "count": 47,
+     "genre_mbid": "3f08faa9-6c3e-4b6d-b4b8-08eea45954e2",
+     "tag": "grunge"
+    },
+    {
+     "count": 1,
+     "tag": "melodic"
+    },
+    {
+     "count": 1,
+     "genre_mbid": "d3ebe947-7c03-43f5-b333-09379881b0f6",
+     "tag": "alternative pop"
+    },
+    {
+     "count": 1,
+     "tag": "energetic"
+    },
+    {
+     "count": 1,
+     "tag": "depressive"
+    },
+    {
+     "count": 1,
+     "tag": "male vocalist"
+    },
+    {
+     "count": 1,
+     "tag": "lonely"
+    },
+    {
+     "count": 1,
+     "tag": "nihilistic"
+    },
+    {
+     "count": 1,
+     "tag": "passionate"
+    },
+    {
+     "count": 1,
+     "tag": "sarcastic"
+    },
+    {
+     "count": 1,
+     "tag": "rebellious"
+    },
+    {
+     "count": 1,
+     "tag": "misanthropic"
+    },
+    {
+     "count": 1,
+     "tag": "pessimistic"
+    },
+    {
+     "count": 1,
+     "tag": "self-hatred"
+    },
+    {
+     "count": 1,
+     "tag": "apathetic"
+    }
+   ]
+  }
+ }
+}

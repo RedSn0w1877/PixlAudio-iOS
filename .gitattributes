@@ -8,3 +8,4 @@
 *.tar binary
 *.pxbpe binary
 *.enc binary
+*.gz binary

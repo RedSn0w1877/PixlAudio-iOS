@@ -49,9 +49,19 @@ public protocol RefreshWork: Sendable {
     /// Requests of the day the radios of lane 1 leave for the releases lane, so a day of radios cannot starve it (Android's
     /// `RELEASES_RESERVE`). The default is none.
     func releasesReserve() async -> Int
+    /// Lanes 3 to 5 (3.7, stage 2b): the tracks to enrich next, `lane` 3 the most played without DNA, 4 the rest of the
+    /// library, 5 the rows whose tags or popularity expired. Empty by default, so a work without DNA lanes runs exactly
+    /// as before.
+    func dnaTargets(lane: Int, limit: Int) async -> [DnaTarget]
+    /// Enriches `targets` from the open-data sources; `gate` false stops it, and what was gathered is still saved.
+    func enrich(_ targets: [DnaTarget], gate: @Sendable () async -> Bool) async -> DnaEnricher.Report
 }
 
 public extension RefreshWork {
+    func dnaTargets(lane: Int, limit: Int) async -> [DnaTarget] { [] }
+    func enrich(_ targets: [DnaTarget], gate: @Sendable () async -> Bool) async -> DnaEnricher.Report {
+        DnaEnricher.Report(tracks: 0, stopped: false)
+    }
     func releasesReserve() async -> Int { 0 }
     func releaseTargets() async -> [RefreshTarget] { [] }
     func releases(_ target: RefreshTarget) async -> RefreshFetch { .none }
@@ -71,6 +81,8 @@ public extension RefreshWork {
 public struct BrainRefreshRunner: Sendable {
     public enum Stop: Sendable, Equatable {
         case none, off, playing, budget, cancelled
+        /// The DNA lanes ran out of their own time (a background task gets about ten minutes; they stop at eight).
+        case time
     }
 
     public struct Report: Sendable, Equatable {
@@ -82,19 +94,34 @@ public struct BrainRefreshRunner: Sendable {
         public var missed: Int
         public var releasesFetched: Int = 0
         public var releasesCached: Int = 0
+        /// Tracks whose DNA was saved in lanes 3 to 5, per lane.
+        public var dnaLane3: Int = 0
+        public var dnaLane4: Int = 0
+        public var dnaLane5: Int = 0
 
         public var fetched: Int { radiosFetched + artistsFetched + releasesFetched }
+        public var dnaTracks: Int { dnaLane3 + dnaLane4 + dnaLane5 }
     }
+
+    /// Tracks per enrichment round: about three minutes of polite requests, so little is lost if the work is cancelled.
+    public static let dnaBatch = 16
+    /// Rounds per lane in one run (lane 3, 4, 5). The daily budgets are the real limit; this keeps one run bounded.
+    public static let maxRounds = [10, 10, 4]
+    /// A background task gets about ten minutes: the DNA lanes stop at eight.
+    public static let dnaTimeLimitMs: Int64 = 8 * 60 * 1000
 
     private let work: any RefreshWork
     private let allowed: @Sendable () async -> Bool
     private let playing: @Sendable () async -> Bool
+    /// Milliseconds since the run began; the DNA lanes stop on their own before the task's time is up.
+    private let elapsedMs: @Sendable () -> Int64
 
     public init(work: any RefreshWork, allowed: @escaping @Sendable () async -> Bool,
-                playing: @escaping @Sendable () async -> Bool) {
+                playing: @escaping @Sendable () async -> Bool, elapsedMs: @escaping @Sendable () -> Int64 = { 0 }) {
         self.work = work
         self.allowed = allowed
         self.playing = playing
+        self.elapsedMs = elapsedMs
     }
 
     private func gate(reserve: Int = 0) async -> Stop {
@@ -165,6 +192,48 @@ public struct BrainRefreshRunner: Sendable {
                 }
             }
         }
+        // Lanes 3 to 5 (stage 2b): the open-data sources. They have budgets of their own (3.7) and never spend YouTube's, so
+        // a day with no YouTube requests left still enriches; the same switches, the same "never while music plays", and a
+        // time limit. They run inside this one run: there is no second job.
+        if report.stopped == .none || report.stopped == .budget {
+            let gate: @Sendable () async -> Bool = {
+                if Task.isCancelled { return false }
+                if !(await allowed()) { return false }
+                if await playing() { return false }
+                return elapsedMs() < Self.dnaTimeLimitMs
+            }
+            func why() async -> Stop {
+                if Task.isCancelled { return .cancelled }
+                if !(await allowed()) { return .off }
+                if await playing() { return .playing }
+                return .time
+            }
+            lanes: for lane in 3...5 {
+                var rounds = 0
+                while rounds < Self.maxRounds[lane - 3] {
+                    rounds += 1
+                    if !(await gate()) {
+                        report.stopped = await why()
+                        break lanes
+                    }
+                    let targets = await work.dnaTargets(lane: lane, limit: Self.dnaBatch)
+                    if targets.isEmpty { break }
+                    let r = await work.enrich(targets, gate: gate)
+                    switch lane {
+                    case 3: report.dnaLane3 += r.tracks
+                    case 4: report.dnaLane4 += r.tracks
+                    default: report.dnaLane5 += r.tracks
+                    }
+                    if r.noAtlas { break lanes }
+                    if r.stopped {
+                        report.stopped = await why()
+                        break lanes
+                    }
+                    // A round that saved nothing asked nothing: every source is spent or off. The next lane would find the same.
+                    if r.tracks == 0 { break }
+                }
+            }
+        }
         return report
     }
 }
@@ -186,6 +255,8 @@ public struct BrainRefreshWork: RefreshWork {
     public static let releasesReserveRequests = 4
 
     private let budget: HostBudget?
+    /// Lanes 3 to 5 (stage 2b): the open-data sources. Nil runs the refresh as stage 2a did.
+    private let dna: DnaLanes?
     private let matchedVideoId: @Sendable (String) async -> String?
     private let clock: @Sendable () -> Int64
     private let newReleases: NewReleases?
@@ -195,7 +266,8 @@ public struct BrainRefreshWork: RefreshWork {
     public init(mixes: BrainMixes, repository: BrainRepository, budget: HostBudget?,
                 matchedVideoId: @escaping @Sendable (String) async -> String?,
                 newReleases: NewReleases? = nil, librarySongs: @escaping @Sendable () async -> [Song] = { [] },
-                clock: @escaping @Sendable () -> Int64 = { currentTimeMillis() }) {
+                dna: DnaLanes? = nil, clock: @escaping @Sendable () -> Int64 = { currentTimeMillis() }) {
+        self.dna = dna
         self.newReleases = newReleases
         self.librarySongs = librarySongs
         self.mixes = mixes
@@ -203,6 +275,21 @@ public struct BrainRefreshWork: RefreshWork {
         self.budget = budget
         self.matchedVideoId = matchedVideoId
         self.clock = clock
+    }
+
+    public func dnaTargets(lane: Int, limit: Int) async -> [DnaTarget] {
+        guard let dna else { return [] }
+        switch lane {
+        case 3: return await dna.targets.mostPlayed(limit: limit)
+        case 4: return await dna.targets.restOfLibrary(limit: limit)
+        case 5: return await dna.targets.expired(limit: limit)
+        default: return []
+        }
+    }
+
+    public func enrich(_ targets: [DnaTarget], gate: @Sendable () async -> Bool) async -> DnaEnricher.Report {
+        guard let dna else { return DnaEnricher.Report(tracks: 0, stopped: false) }
+        return await dna.enricher.enrich(targets, gate: gate)
     }
 
     public func radioSeeds() async -> [RefreshTarget] { await targets(of: await mixes.seedsForRefresh()) }
@@ -344,9 +431,45 @@ public enum RefreshSchedule {
         case .playing: stop = "playing"
         case .budget: stop = "budget"
         case .cancelled: stop = "cancelled"
+        case .time: stop = "time"
         }
         return "\(nowMs)|r\(r.radiosFetched)+\(r.radiosCached)|a\(r.artistsFetched)+\(r.artistsCached)"
-            + "|n\(r.releasesFetched)+\(r.releasesCached)|m\(r.missed)|\(stop)"
+            + "|n\(r.releasesFetched)+\(r.releasesCached)|m\(r.missed)|d\(r.dnaLane3)+\(r.dnaLane4)+\(r.dnaLane5)|\(stop)"
+    }
+
+    /// What the note of one run says, for the Developer screen. Radios, artists and releases are fetched plus cached.
+    public struct Note: Sendable, Equatable {
+        public var atMs: Int64
+        public var radios: Int
+        public var artists: Int
+        public var releases: Int
+        public var tracksEnriched: Int
+        public var stopped: String
+
+        public init(atMs: Int64, radios: Int, artists: Int, releases: Int, tracksEnriched: Int, stopped: String) {
+            self.atMs = atMs
+            self.radios = radios
+            self.artists = artists
+            self.releases = releases
+            self.tracksEnriched = tracksEnriched
+            self.stopped = stopped
+        }
+    }
+
+    /// Reads a note written by `note` (`ms|r1+2|a3+4|n5+6|m7|d8+9+10|stop`; the `d` part is missing in a stage 2a note), or
+    /// nil.
+    public static func parseNote(_ text: String?) -> Note? {
+        guard let text, !BrainText.isBlank(text) else { return nil }
+        let parts = text.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
+        guard let first = parts.first, let at = Int64(first) else { return nil }
+        func sum(_ prefix: Character) -> Int {
+            for p in parts.dropFirst() where p.first == prefix && p.count > 1 && p.dropFirst().first?.isNumber == true {
+                return p.dropFirst().split(separator: "+").reduce(0) { $0 + (Int($1) ?? 0) }
+            }
+            return 0
+        }
+        let stop = parts.last.flatMap { $0.isEmpty ? nil : $0 } ?? "none"
+        return Note(atMs: at, radios: sum("r"), artists: sum("a"), releases: sum("n"), tracksEnriched: sum("d"), stopped: stop)
     }
 
     /// When the last run that got to ask for something finished, from its note; nil for no note.
@@ -399,7 +522,10 @@ public struct BrainRefresh: Sendable {
         await engine.setStoredValue(Self.keyAttempt, String(clock()))
         // The lists stage 1 left behind become edges, once (3.6); a no-op on every later run.
         await repository.backfillEdgesOnce(nowMs: clock())
-        let report = await BrainRefreshRunner(work: work, allowed: allowed, playing: playing).run()
+        let startedAt = clock()
+        let clock = self.clock
+        let report = await BrainRefreshRunner(work: work, allowed: allowed, playing: playing,
+                                              elapsedMs: { clock() - startedAt }).run()
         let now = clock()
         await repository.pruneEdges(nowMs: now)
         await engine.setStoredValue(Self.keyLast, RefreshSchedule.note(nowMs: now, report))

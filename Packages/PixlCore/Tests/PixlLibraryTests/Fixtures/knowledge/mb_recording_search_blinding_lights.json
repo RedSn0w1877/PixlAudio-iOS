@@ -1,0 +1,83 @@
+{
+ "count": 31,
+ "created": "2026-11-19T04:55:52.161Z",
+ "offset": 0,
+ "recordings": [
+  {
+   "artist-credit": [
+    {
+     "artist": {
+      "disambiguation": "Canadian R&B singer",
+      "id": "c8b03190-306c-4120-bb0b-6f2ebfc06ea9",
+      "name": "The Weeknd",
+      "sort-name": "Weeknd, The"
+     },
+     "name": "The Weeknd"
+    }
+   ],
+   "artist-credit-id": "a429a4ec-9002-312a-b0c2-04d85e54a80c",
+   "disambiguation": "live, 2024-09-07: MorumBIS, São Paulo, Brazil",
+   "id": "1227659f-a933-4549-8fc4-d839b4cd3d45",
+   "isrcs": [
+    "USUMV2403154"
+   ],
+   "score": 100,
+   "tags": [
+    {
+     "count": 1,
+     "name": "soul"
+    }
+   ],
+   "title": "Blinding Lights",
+   "video": true
+  },
+  {
+   "artist-credit": [
+    {
+     "artist": {
+      "disambiguation": "Canadian R&B singer",
+      "id": "c8b03190-306c-4120-bb0b-6f2ebfc06ea9",
+      "name": "The Weeknd",
+      "sort-name": "Weeknd, The"
+     },
+     "name": "The Weeknd"
+    }
+   ],
+   "artist-credit-id": "a429a4ec-9002-312a-b0c2-04d85e54a80c",
+   "disambiguation": "music video",
+   "first-release-date": "2019-11-29",
+   "id": "5bdbfe86-4ad5-4c19-8d29-ee5f30ba628b",
+   "isrcs": [
+    "USUMV1902060"
+   ],
+   "length": 262000,
+   "score": 100,
+   "title": "Blinding Lights",
+   "video": true
+  },
+  {
+   "artist-credit": [
+    {
+     "artist": {
+      "disambiguation": "Canadian R&B singer",
+      "id": "c8b03190-306c-4120-bb0b-6f2ebfc06ea9",
+      "name": "The Weeknd",
+      "sort-name": "Weeknd, The"
+     },
+     "name": "The Weeknd"
+    }
+   ],
+   "artist-credit-id": "a429a4ec-9002-312a-b0c2-04d85e54a80c",
+   "disambiguation": "part of “Barbie: Live from the Barbie Dream House” DJ‐mix",
+   "first-release-date": "2023-07-28",
+   "id": "81932b48-d3c2-46dd-bb6b-98066a7f94e1",
+   "isrcs": [
+    "US23A8017264"
+   ],
+   "length": 90000,
+   "score": 100,
+   "title": "Blinding Lights",
+   "video": null
+  }
+ ]
+}

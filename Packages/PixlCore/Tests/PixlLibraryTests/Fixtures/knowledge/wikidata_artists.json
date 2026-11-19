@@ -1,0 +1,68 @@
+{
+ "head": {
+  "vars": [
+   "mbid",
+   "a",
+   "gmbids",
+   "glabels"
+  ]
+ },
+ "results": {
+  "bindings": [
+   {
+    "a": {
+     "type": "uri",
+     "value": "http://www.wikidata.org/entity/Q1071154"
+    },
+    "glabels": {
+     "type": "literal",
+     "value": "grunge|alternative rock|hard rock|alternative metal|nu metal|post-grunge|funk metal|pop rock|dance-pop|funk rock|dance-punk|post-punk revival|funk"
+    },
+    "gmbids": {
+     "type": "literal",
+     "value": "3f08faa9-6c3e-4b6d-b4b8-08eea45954e2|ceeaa283-5d7b-4202-8d1d-e25d116b2a18|51cb9f91-e6a2-41bf-891f-e78e3f1e52ab|7983ff25-ddf9-411e-a7f9-6cca238bff79|bbad9cda-bde2-448e-821c-7ebf85a54020|bbb1310c-24cb-4fc9-97c4-f93e4549f1e2|0caaa092-27c4-413e-841c-7c4deeec57a7|797e2e85-5ffd-495c-a757-8b4079052f0e|b739a895-85ed-4ad3-8717-4e9ef5387dd8|eca476ac-d63b-431f-9347-c45f530dc15d|509c006f-67c2-4c54-a568-d2b415cb0642|b8495241-e3c7-445b-82db-cea5ebe9ea7a|fe4ba6a1-9873-4fd0-a12b-a70c81818514"
+    },
+    "mbid": {
+     "type": "literal",
+     "value": "0b76f632-25fa-4681-9862-86499c28afd3"
+    }
+   },
+   {
+    "a": {
+     "type": "uri",
+     "value": "http://www.wikidata.org/entity/Q11649"
+    },
+    "glabels": {
+     "type": "literal",
+     "value": "grunge|alternative rock"
+    },
+    "gmbids": {
+     "type": "literal",
+     "value": "3f08faa9-6c3e-4b6d-b4b8-08eea45954e2|ceeaa283-5d7b-4202-8d1d-e25d116b2a18"
+    },
+    "mbid": {
+     "type": "literal",
+     "value": "5b11f4ce-a62d-471e-81fc-a69a8278c7da"
+    }
+   },
+   {
+    "a": {
+     "type": "uri",
+     "value": "http://www.wikidata.org/entity/Q175097"
+    },
+    "glabels": {
+     "type": "literal",
+     "value": "alternative rock|hard rock|post-grunge"
+    },
+    "gmbids": {
+     "type": "literal",
+     "value": "ceeaa283-5d7b-4202-8d1d-e25d116b2a18|51cb9f91-e6a2-41bf-891f-e78e3f1e52ab|bbb1310c-24cb-4fc9-97c4-f93e4549f1e2"
+    },
+    "mbid": {
+     "type": "literal",
+     "value": "2386cd66-e923-4e8e-bf14-2eebe2e9b973"
+    }
+   }
+  ]
+ }
+}

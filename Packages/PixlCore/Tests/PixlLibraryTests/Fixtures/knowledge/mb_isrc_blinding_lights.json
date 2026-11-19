@@ -1,0 +1,28 @@
+{
+ "isrc": "USUG11904206",
+ "recordings": [
+  {
+   "artist-credit": [
+    {
+     "artist": {
+      "country": "CA",
+      "disambiguation": "Canadian R&B singer",
+      "id": "c8b03190-306c-4120-bb0b-6f2ebfc06ea9",
+      "name": "The Weeknd",
+      "sort-name": "Weeknd, The",
+      "type": "Person",
+      "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df"
+     },
+     "joinphrase": "",
+     "name": "The Weeknd"
+    }
+   ],
+   "disambiguation": "",
+   "first-release-date": "2019-11-29",
+   "id": "1a67e215-a19e-40c9-9b12-732de134bf5f",
+   "length": 200046,
+   "title": "Blinding Lights",
+   "video": false
+  }
+ ]
+}

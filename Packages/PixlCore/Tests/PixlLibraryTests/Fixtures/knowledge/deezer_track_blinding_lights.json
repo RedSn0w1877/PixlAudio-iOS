@@ -1,0 +1,32 @@
+{
+ "album": {
+  "id": 137217782,
+  "release_date": "2020-03-20",
+  "title": "After Hours",
+  "type": "album"
+ },
+ "artist": {
+  "id": 4050205,
+  "name": "The Weeknd",
+  "radio": true,
+  "type": "artist"
+ },
+ "bpm": 170.84,
+ "disk_number": 1,
+ "duration": 200,
+ "explicit_content_cover": 0,
+ "explicit_content_lyrics": 0,
+ "explicit_lyrics": false,
+ "gain": -8.8,
+ "id": 908604612,
+ "isrc": "USUG11904206",
+ "rank": 984833,
+ "readable": true,
+ "release_date": "2020-03-20",
+ "title": "Blinding Lights",
+ "title_short": "Blinding Lights",
+ "title_version": "",
+ "track_position": 9,
+ "track_token": "AAAAAWr-i8hq_6UIqGCiVEjtWRvv_PFXB8RFThszIcQUK9x45F_YfwTzLkuBfNL1UrsWlBDWyIhcEfCxJhamEjiquKbb60REvCqtAvpaN_F3hC9dBq85MmOWuNMlG_OuysiJdJxHx9nm44Z5kekgU9OfAXamh4d6lSOZfY0rQmMgO3XvPLXlRdTeOgbC1Vqmo8EZi6j-TsfhpB-eEEljTZC6WcxAedxy3JENh-qs212YnT5TfEmKcIo12ePz-maOhOr2x0LX7-3wZdbrGgtagNUSmwL41CpSFK16sD9AGdUjmrMOuO30MHXrxTJM2Eu3RyBPimuHzUoD_gmnaN_hE3yPP3NfYCGk6RQKw35BfNIk4xdueKiOoercaca78LfIGSt0lJNpp7TYdQN7QpMe5hys0JsMzeGPqAkRzs2WNXidW09D5n8-0AE",
+ "type": "track"
+}

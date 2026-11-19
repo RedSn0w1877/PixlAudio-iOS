@@ -37,4 +37,17 @@ public enum BrainRemoteConfig {
               let enabled = refresh["enabled"] as? Bool else { return true }
         return enabled
     }
+
+    /// False only when `configText` says `{"brain": {"sources": {"<key>": {"enabled": false}}}}` for that source. The
+    /// owner can switch a knowledge source off for every phone before charging anyone (docs/brain-spec.md, 15, question 2).
+    /// A missing file, a missing key or text that is not JSON means "on".
+    public static func sourceAllowed(configText: String?, key: String) -> Bool {
+        guard let configText, !configText.isEmpty,
+              let root = (try? JSONSerialization.jsonObject(with: Data(configText.utf8))) as? [String: Any],
+              let brain = root["brain"] as? [String: Any],
+              let sources = brain["sources"] as? [String: Any],
+              let source = sources[key] as? [String: Any],
+              let enabled = source["enabled"] as? Bool else { return true }
+        return enabled
+    }
 }

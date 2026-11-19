@@ -1,0 +1,357 @@
+{
+ "artist": {
+  "id": 4050205,
+  "name": "The Weeknd",
+  "type": "artist"
+ },
+ "available": true,
+ "duration": 3377,
+ "explicit_content_cover": 0,
+ "explicit_content_lyrics": 3,
+ "explicit_lyrics": false,
+ "fans": 189549,
+ "genre_id": 165,
+ "genres": {
+  "data": [
+   {
+    "id": 165,
+    "name": "R&B",
+    "type": "genre"
+   }
+  ]
+ },
+ "id": 137217782,
+ "label": "Republic Records",
+ "nb_tracks": 14,
+ "record_type": "album",
+ "release_date": "2020-03-20",
+ "title": "After Hours",
+ "tracks": {
+  "data": [
+   {
+    "album": {
+     "id": 137217782,
+     "title": "After Hours",
+     "type": "album"
+    },
+    "artist": {
+     "id": 4050205,
+     "name": "The Weeknd",
+     "type": "artist"
+    },
+    "duration": 252,
+    "explicit_content_cover": 0,
+    "explicit_content_lyrics": 3,
+    "explicit_lyrics": false,
+    "id": 908604532,
+    "rank": 489516,
+    "readable": true,
+    "title": "Alone Again",
+    "title_short": "Alone Again",
+    "title_version": "",
+    "type": "track"
+   },
+   {
+    "album": {
+     "id": 137217782,
+     "title": "After Hours",
+     "type": "album"
+    },
+    "artist": {
+     "id": 4050205,
+     "name": "The Weeknd",
+     "type": "artist"
+    },
+    "duration": 239,
+    "explicit_content_cover": 0,
+    "explicit_content_lyrics": 3,
+    "explicit_lyrics": false,
+    "id": 908604542,
+    "rank": 482094,
+    "readable": true,
+    "title": "Too Late",
+    "title_short": "Too Late",
+    "title_version": "",
+    "type": "track"
+   },
+   {
+    "album": {
+     "id": 137217782,
+     "title": "After Hours",
+     "type": "album"
+    },
+    "artist": {
+     "id": 4050205,
+     "name": "The Weeknd",
+     "type": "artist"
+    },
+    "duration": 211,
+    "explicit_content_cover": 0,
+    "explicit_content_lyrics": 3,
+    "explicit_lyrics": false,
+    "id": 908604552,
+    "rank": 492603,
+    "readable": true,
+    "title": "Hardest To Love",
+    "title_short": "Hardest To Love",
+    "title_version": "",
+    "type": "track"
+   },
+   {
+    "album": {
+     "id": 137217782,
+     "title": "After Hours",
+     "type": "album"
+    },
+    "artist": {
+     "id": 4050205,
+     "name": "The Weeknd",
+     "type": "artist"
+    },
+    "duration": 191,
+    "explicit_content_cover": 0,
+    "explicit_content_lyrics": 3,
+    "explicit_lyrics": false,
+    "id": 908604562,
+    "rank": 666407,
+    "readable": true,
+    "title": "Scared To Live",
+    "title_short": "Scared To Live",
+    "title_version": "",
+    "type": "track"
+   },
+   {
+    "album": {
+     "id": 137217782,
+     "title": "After Hours",
+     "type": "album"
+    },
+    "artist": {
+     "id": 4050205,
+     "name": "The Weeknd",
+     "type": "artist"
+    },
+    "duration": 247,
+    "explicit_content_cover": 0,
+    "explicit_content_lyrics": 3,
+    "explicit_lyrics": false,
+    "id": 908604572,
+    "rank": 437948,
+    "readable": true,
+    "title": "Snowchild",
+    "title_short": "Snowchild",
+    "title_version": "",
+    "type": "track"
+   },
+   {
+    "album": {
+     "id": 137217782,
+     "title": "After Hours",
+     "type": "album"
+    },
+    "artist": {
+     "id": 4050205,
+     "name": "The Weeknd",
+     "type": "artist"
+    },
+    "duration": 355,
+    "explicit_content_cover": 0,
+    "explicit_content_lyrics": 3,
+    "explicit_lyrics": false,
+    "id": 908604582,
+    "rank": 450043,
+    "readable": true,
+    "title": "Escape From LA",
+    "title_short": "Escape From LA",
+    "title_version": "",
+    "type": "track"
+   },
+   {
+    "album": {
+     "id": 137217782,
+     "title": "After Hours",
+     "type": "album"
+    },
+    "artist": {
+     "id": 4050205,
+     "name": "The Weeknd",
+     "type": "artist"
+    },
+    "duration": 200,
+    "explicit_content_cover": 0,
+    "explicit_content_lyrics": 3,
+    "explicit_lyrics": false,
+    "id": 908604592,
+    "rank": 489876,
+    "readable": true,
+    "title": "Heartless",
+    "title_short": "Heartless",
+    "title_version": "",
+    "type": "track"
+   },
+   {
+    "album": {
+     "id": 137217782,
+     "title": "After Hours",
+     "type": "album"
+    },
+    "artist": {
+     "id": 4050205,
+     "name": "The Weeknd",
+     "type": "artist"
+    },
+    "duration": 283,
+    "explicit_content_cover": 0,
+    "explicit_content_lyrics": 3,
+    "explicit_lyrics": false,
+    "id": 908604602,
+    "rank": 476920,
+    "readable": true,
+    "title": "Faith",
+    "title_short": "Faith",
+    "title_version": "",
+    "type": "track"
+   },
+   {
+    "album": {
+     "id": 137217782,
+     "title": "After Hours",
+     "type": "album"
+    },
+    "artist": {
+     "id": 4050205,
+     "name": "The Weeknd",
+     "type": "artist"
+    },
+    "duration": 200,
+    "explicit_content_cover": 0,
+    "explicit_content_lyrics": 0,
+    "explicit_lyrics": false,
+    "id": 908604612,
+    "rank": 984833,
+    "readable": true,
+    "title": "Blinding Lights",
+    "title_short": "Blinding Lights",
+    "title_version": "",
+    "type": "track"
+   },
+   {
+    "album": {
+     "id": 137217782,
+     "title": "After Hours",
+     "type": "album"
+    },
+    "artist": {
+     "id": 4050205,
+     "name": "The Weeknd",
+     "type": "artist"
+    },
+    "duration": 237,
+    "explicit_content_cover": 0,
+    "explicit_content_lyrics": 3,
+    "explicit_lyrics": false,
+    "id": 908604622,
+    "rank": 889321,
+    "readable": true,
+    "title": "In Your Eyes",
+    "title_short": "In Your Eyes",
+    "title_version": "",
+    "type": "track"
+   },
+   {
+    "album": {
+     "id": 137217782,
+     "title": "After Hours",
+     "type": "album"
+    },
+    "artist": {
+     "id": 4050205,
+     "name": "The Weeknd",
+     "type": "artist"
+    },
+    "duration": 215,
+    "explicit_content_cover": 0,
+    "explicit_content_lyrics": 3,
+    "explicit_lyrics": false,
+    "id": 908604632,
+    "rank": 955918,
+    "readable": true,
+    "title": "Save Your Tears",
+    "title_short": "Save Your Tears",
+    "title_version": "",
+    "type": "track"
+   },
+   {
+    "album": {
+     "id": 137217782,
+     "title": "After Hours",
+     "type": "album"
+    },
+    "artist": {
+     "id": 4050205,
+     "name": "The Weeknd",
+     "type": "artist"
+    },
+    "duration": 195,
+    "explicit_content_cover": 0,
+    "explicit_content_lyrics": 3,
+    "explicit_lyrics": false,
+    "id": 908604642,
+    "rank": 411554,
+    "readable": true,
+    "title": "Repeat After Me (Interlude)",
+    "title_short": "Repeat After Me (Interlude)",
+    "title_version": "",
+    "type": "track"
+   },
+   {
+    "album": {
+     "id": 137217782,
+     "title": "After Hours",
+     "type": "album"
+    },
+    "artist": {
+     "id": 4050205,
+     "name": "The Weeknd",
+     "type": "artist"
+    },
+    "duration": 362,
+    "explicit_content_cover": 0,
+    "explicit_content_lyrics": 0,
+    "explicit_lyrics": false,
+    "id": 908604652,
+    "rank": 876706,
+    "readable": true,
+    "title": "After Hours",
+    "title_short": "After Hours",
+    "title_version": "",
+    "type": "track"
+   },
+   {
+    "album": {
+     "id": 137217782,
+     "title": "After Hours",
+     "type": "album"
+    },
+    "artist": {
+     "id": 4050205,
+     "name": "The Weeknd",
+     "type": "artist"
+    },
+    "duration": 190,
+    "explicit_content_cover": 0,
+    "explicit_content_lyrics": 3,
+    "explicit_lyrics": false,
+    "id": 908604662,
+    "rank": 398746,
+    "readable": true,
+    "title": "Until I Bleed Out",
+    "title_short": "Until I Bleed Out",
+    "title_version": "",
+    "type": "track"
+   }
+  ]
+ },
+ "type": "album",
+ "upc": "602508836060"
+}
