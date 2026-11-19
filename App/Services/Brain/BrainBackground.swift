@@ -1,5 +1,6 @@
 import BackgroundTasks
 import Foundation
+import PixlModel
 import PixlLibrary
 
 /// The music brain's one background job (docs/brain-spec.md, 3.7, stage 2a): once a day, when iOS finds the phone idle,
