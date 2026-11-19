@@ -145,9 +145,9 @@ public enum InnerTubeRadio {
             let releases = shelf.items.compactMap(parseTwoRowRelease)
             if !releases.isEmpty && releases.count == shelf.items.count {
                 if NetText.containsIgnoreCase(shelf.header, "single") {
-                    singles.append(contentsOf: releases)
+                    singles.append(contentsOf: releases.map { var r = $0; if r.kind == .unknown { r.kind = .single }; return r })
                 } else {
-                    albums.append(contentsOf: releases)
+                    albums.append(contentsOf: releases.map { var r = $0; if r.kind == .unknown { r.kind = .album }; return r })
                 }
                 continue
             }
@@ -186,28 +186,35 @@ public enum InnerTubeRadio {
         return out
     }
 
-    static func parseListItemRow(_ renderer: JSONObject) -> RadioRow? {
+    static func parseListItemRow(_ renderer: JSONObject) -> RadioRow? { parseListItemRow(renderer, bylineClock: false) }
+
+    static func parseListItemRow(_ renderer: JSONObject, bylineClock: Bool) -> RadioRow? {
         let columns: [JSONObject] = (array(renderer, "flexColumns") ?? []).compactMap {
             obj(obj($0.objectValue, "musicResponsiveListItemFlexColumnRenderer"), "text")
         }
         guard let titleColumn = columns.first else { return nil }
         let watch = findFirst(.object(titleColumn), "watchEndpoint")
-        guard let videoId = string(watch, "videoId"), !videoId.isKotlinBlank else { return nil }
+        var foundId = string(watch, "videoId")
+        if foundId?.isKotlinBlank ?? true { foundId = string(obj(renderer, "playlistItemData"), "videoId") }
+        guard let videoId = foundId, !videoId.isKotlinBlank else { return nil }
         let title = runsText(titleColumn)
         if title.isKotlinBlank { return nil }
 
         // The remaining columns are one byline split across columns.
         var runs: [JSONValue] = []
         var playCount: Int64?
+        var clock = 0
         for i in columns.indices.dropFirst() {
             guard let columnRuns = array(columns[i], "runs") else { continue }
             if !runs.isEmpty { runs.append(separatorRun) }
             for run in columnRuns {
                 let text = (string(run.objectValue, "text") ?? "").kotlinTrimmed()
                 if let plays = parsePlayCount(text) { playCount = plays } else { runs.append(run) }
+                if bylineClock && clock == 0 { clock = parseClock(text) }
             }
         }
         let byline = parseByline(runs)
+        let fixedClock = parseClock(runsText(findFirst(renderer["fixedColumns"], "text")))
         let thumbnails = array(findFirst(renderer["thumbnail"], "thumbnail"), "thumbnails")
             ?? findFirstArray(renderer["thumbnail"], "thumbnails")
         return RadioRow(
@@ -217,7 +224,7 @@ public enum InnerTubeRadio {
             album: byline.album,
             albumBrowseId: byline.albumBrowseId,
             year: byline.year,
-            durationSec: parseClock(runsText(findFirst(renderer["fixedColumns"], "text"))),
+            durationSec: fixedClock > 0 ? fixedClock : clock,
             thumbnailUrl: largestThumbnail(thumbnails),
             explicit: hasExplicitBadge(array(renderer, "badges")),
             kind: MusicVideoKind.from(musicVideoType: findFirstString(watch.map { JSONValue.object($0) }, "musicVideoType")),
@@ -242,12 +249,149 @@ public enum InnerTubeRadio {
             return nil
         }
         var year = 0
+        var kind = ReleaseKind.unknown
         for run in array(obj(renderer, "subtitle"), "runs") ?? [] {
             let text = (string(run.objectValue, "text") ?? "").kotlinTrimmed()
-            if let parsed = parseYear(text) { year = parsed }
+            if let parsed = parseYear(text) {
+                year = parsed
+            } else {
+                switch text.lowercased() {
+                case "album": kind = .album
+                case "single": kind = .single
+                case "ep": kind = .ep
+                default: break
+                }
+            }
         }
-        return ReleaseRef(browseId: browseId, title: runsText(obj(renderer, "title")), year: year)
+        return ReleaseRef(browseId: browseId, title: runsText(obj(renderer, "title")), year: year, kind: kind,
+                          audioPlaylistId: audioPlaylistIn(renderer["menu"]),
+                          thumbnailUrl: largestThumbnail(findFirstArray(renderer["thumbnailRenderer"], "thumbnails")))
     }
+
+    /// The first `OLAK5uy_...` playlist a `watchPlaylistEndpoint` below `root` names; nil when none.
+    static func audioPlaylistIn(_ root: JSONValue?) -> String? {
+        var found: String?
+        collect(root, "watchPlaylistEndpoint") { endpoint in
+            if found == nil, let id = string(endpoint, "playlistId"), id.hasPrefix(audioPlaylistPrefix) { found = id }
+        }
+        return found
+    }
+
+    // MARK: Discography, album audio, playlists, get_queue, search (stage 2a)
+
+    static let audioPlaylistPrefix = "OLAK5uy_"
+
+    /// The whole discography (`browse MPAD<channelId>`, no params): a grid of cards, newest first. Each card is a
+    /// release; its `audioPlaylistId` is read from the "Shuffle play" menu item when the response kept it. Empty (never
+    /// a failure) when the response has no grid.
+    public static func parseDiscography(_ root: JSONValue) -> [ReleaseRef] {
+        guard let grid = findFirst(root, "gridRenderer") else { return [] }
+        return (array(grid, "items") ?? []).compactMap { $0.objectValue.flatMap(parseTwoRowRelease) }
+    }
+
+    public static func parseDiscography(text: String) -> [ReleaseRef]? { OrgJSON.parse(text).map(parseDiscography) }
+
+    /// The `OLAK5uy_...` audio playlist of an album page (`browse MPREb_...`), from
+    /// `microformat.microformatDataRenderer.urlCanonical`; failing that, from the "Shuffle play" button. Nil when the
+    /// page names none.
+    public static func parseAlbumAudioPlaylistId(_ root: JSONValue) -> String? {
+        if let canonical = string(findFirst(root, "microformatDataRenderer"), "urlCanonical"),
+           let id = audioListParam(canonical) { return id }
+        return audioPlaylistIn(root.objectValue?["contents"])
+    }
+
+    public static func parseAlbumAudioPlaylistId(text: String) -> String? {
+        OrgJSON.parse(text).flatMap(parseAlbumAudioPlaylistId)
+    }
+
+    /// `[?&]list=(OLAK5uy_[A-Za-z0-9_-]+)`: the first match in a URL.
+    static func audioListParam(_ url: String) -> String? {
+        let bytes = Array(url.utf8)
+        let needle = Array("list=OLAK5uy_".utf8)
+        guard bytes.count > needle.count else { return nil }
+        var i = 1
+        while i + needle.count <= bytes.count {
+            if (bytes[i - 1] == 0x3F || bytes[i - 1] == 0x26) && Array(bytes[i..<(i + needle.count)]) == needle {
+                var end = i + needle.count
+                while end < bytes.count, isIdByte(bytes[end]) { end += 1 }
+                if end > i + needle.count { return String(decoding: bytes[(i + 5)..<end], as: UTF8.self) }
+            }
+            i += 1
+        }
+        return nil
+    }
+
+    private static func isIdByte(_ b: UInt8) -> Bool {
+        (b >= 0x30 && b <= 0x39) || (b >= 0x41 && b <= 0x5A) || (b >= 0x61 && b <= 0x7A) || b == 0x5F || b == 0x2D
+    }
+
+    /// One page of a playlist (`browse VL<id>`) or of its continuation (`browse {continuation}`). Only the playlist
+    /// shelf is read: an album page's own track list is music videos when anonymous, so the `musicShelfRenderer` of an
+    /// album page is deliberately ignored.
+    ///
+    /// The continuation token is the last `continuationItemRenderer` of the page; the older
+    /// `musicPlaylistShelfContinuation` shape is accepted too.
+    public static func parsePlaylistPage(_ root: JSONValue) -> PlaylistPage {
+        let items: [JSONValue]?
+        var token: String?
+        if let shelf = findFirst(root, "musicPlaylistShelfRenderer") {
+            items = array(shelf, "contents")
+        } else if let appended = findFirst(root, "appendContinuationItemsAction") {
+            items = array(appended, "continuationItems")
+        } else if let legacy = findFirst(root, "musicPlaylistShelfContinuation") {
+            items = array(legacy, "contents")
+            for entry in array(legacy, "continuations") ?? [] {
+                if let t = string(obj(entry.objectValue, "nextContinuationData"), "continuation"), !t.isKotlinBlank { token = t }
+            }
+        } else {
+            return .empty
+        }
+        var rows: [RadioRow] = []
+        rows.reserveCapacity(items?.count ?? 0)
+        for item in items ?? [] {
+            guard let object = item.objectValue else { continue }
+            if let renderer = obj(object, "musicResponsiveListItemRenderer"), let row = parseListItemRow(renderer) {
+                rows.append(row)
+            }
+            if let renderer = obj(object, "continuationItemRenderer"),
+               let t = string(findFirst(.object(renderer), "continuationCommand"), "token"), !t.isKotlinBlank {
+                token = t
+            }
+        }
+        return PlaylistPage(rows: rows, continuation: token)
+    }
+
+    public static func parsePlaylistPage(text: String) -> PlaylistPage? { OrgJSON.parse(text).map(parsePlaylistPage) }
+
+    /// `music/get_queue`: the rows of `queueDatas[].content.playlistPanelVideoRenderer`. Unplayable rows are skipped.
+    public static func parseGetQueue(_ root: JSONValue) -> [RadioRow] {
+        guard let datas = root.objectValue?["queueDatas"]?.arrayValue else { return [] }
+        var rows: [RadioRow] = []
+        rows.reserveCapacity(datas.count)
+        for data in datas {
+            guard let content = obj(data.objectValue, "content") else { continue }
+            let renderer = obj(content, "playlistPanelVideoRenderer")
+                ?? obj(obj(obj(content, "playlistPanelVideoWrapperRenderer"), "primaryRenderer"), "playlistPanelVideoRenderer")
+            if let renderer, let row = parsePanelRow(renderer) { rows.append(row) }
+        }
+        return rows
+    }
+
+    public static func parseGetQueue(text: String) -> [RadioRow]? { OrgJSON.parse(text).map(parseGetQueue) }
+
+    /// A songs search: its rows, with the artist runs' channel ids kept (the first hit's artist carries the `UC...` id an
+    /// artist station needs when nothing in the library names it). The duration is in the byline here ("Song • Artist •
+    /// Album • 3:20"), not in a fixed column.
+    public static func parseSongSearch(_ root: JSONValue) -> [RadioRow] {
+        var rows: [RadioRow] = []
+        rows.reserveCapacity(20)
+        collect(root, "musicResponsiveListItemRenderer") { renderer in
+            if let row = parseListItemRow(renderer, bylineClock: true) { rows.append(row) }
+        }
+        return rows
+    }
+
+    public static func parseSongSearch(text: String) -> [RadioRow]? { OrgJSON.parse(text).map(parseSongSearch) }
 
     // MARK: Bylines
 
@@ -502,6 +646,39 @@ public struct InnerTubeRadioClient: Sendable {
         return await postText("next", body).flatMap(InnerTubeRadio.parseRadio(text:))
     }
 
+    /// The next page of a `browse` list (a playlist, a long top-songs list): the token goes in the body. Answers raw text;
+    /// parse with `InnerTubeRadio.parsePlaylistPage(text:)`.
+    public func browseContinuation(_ continuation: String) async -> String? {
+        var body = await musicBody()
+        body.append("continuation", .string(continuation))
+        return await postText("browse", body)
+    }
+
+    /// `browse` as raw text, for an id the caller parses itself (`MPAD<channel>`, `VL<playlist>`, `MPREb_...`).
+    public func browseText(_ browseId: String) async -> String? { await browse(browseId) }
+
+    /// `music/get_queue`: turns up to 100 video ids into full rows (title, artists, length, kind). One invalid id makes
+    /// the whole batch a 404, which comes back here as nil: the caller bisects.
+    public func getQueueText(_ videoIds: [String]) async -> String? {
+        if videoIds.isEmpty { return nil }
+        var body = await musicBody()
+        body.append("videoIds", .array(videoIds.prefix(InnerTubeRadioClient.maxGetQueueIds).map { JSONValue.string($0) }))
+        return await postText("music/get_queue", body)
+    }
+
+    /// A songs search as raw text, on the same anonymous context as the radios. The first hit's artist run carries the
+    /// artist's `UC...` id. Parse with `InnerTubeRadio.parseSongSearch(text:)`.
+    public func searchSongsText(_ query: String) async -> String? {
+        let trimmed = NetText.trim(query)
+        if trimmed.isEmpty { return nil }
+        var body = await musicBody()
+        body.append("query", .string(trimmed))
+        body.append("params", .string(InnerTubeContexts.songsSearchParams))
+        return await postText("search", body)
+    }
+
+    public static let maxGetQueueIds = 100
+
     /// `browse` for a track's Related tab (`MPTRt_...`).
     public func related(browseId: String) async -> RelatedPage? {
         await browse(browseId).flatMap(InnerTubeRadio.parseRelated(text:))
@@ -535,10 +712,97 @@ public struct InnerTubeRadioClient: Sendable {
 public struct YouTubeRadioSource: RadioSource {
     private let client: InnerTubeRadioClient
     private let budget: HostBudget
+    /// The brain's text folding (`BrainText.fold`, which this module cannot import); the default only lower-cases.
+    private let fold: @Sendable (String) -> String
 
-    public init(client: InnerTubeRadioClient, budget: HostBudget) {
+    public init(client: InnerTubeRadioClient, budget: HostBudget,
+                fold: @escaping @Sendable (String) -> String = { $0.lowercased() }) {
         self.client = client
         self.budget = budget
+        self.fold = fold
+    }
+
+    public static let discographyPrefix = "MPAD"
+    public static let playlistPrefix = "VL"
+    public static let maxPlaylistPages = 3
+    public static let hydrateBatch = 100
+    public static let hydrateBisectRequests = 3
+
+    public func discography(channelId: String) async -> [ReleaseRef]? {
+        guard channelId.hasPrefix("UC") else { return nil }
+        let client = self.client
+        let id = YouTubeRadioSource.discographyPrefix + channelId
+        guard let text = await budget.withPermit({ await client.browseText(id) }) else { return nil }
+        return InnerTubeRadio.parseDiscography(text: text)
+    }
+
+    public func releaseTracks(_ release: ReleaseRef) async -> [RadioRow]? {
+        let client = self.client
+        var playlistId = release.audioPlaylistId
+        if playlistId == nil {
+            guard let album = await budget.withPermit({ await client.browseText(release.browseId) }) else { return nil }
+            playlistId = InnerTubeRadio.parseAlbumAudioPlaylistId(text: album)
+        }
+        guard let playlistId else { return nil }
+        return await playlistRows(playlistId: playlistId, maxPages: 1)
+    }
+
+    public func playlistRows(playlistId: String, maxPages: Int) async -> [RadioRow]? {
+        let client = self.client
+        let id = YouTubeRadioSource.playlistPrefix + playlistId
+        guard let firstText = await budget.withPermit({ await client.browseText(id) }),
+              var page = InnerTubeRadio.parsePlaylistPage(text: firstText) else { return nil }
+        var seen: Set<String> = []
+        var rows: [RadioRow] = []
+        rows.reserveCapacity(page.rows.count)
+        for row in page.rows where seen.insert(row.videoId).inserted { rows.append(row) }
+        var pages = 1
+        while pages < min(max(maxPages, 1), YouTubeRadioSource.maxPlaylistPages) {
+            guard let token = page.continuation,
+                  let text = await budget.withPermit({ await client.browseContinuation(token) }),
+                  let next = InnerTubeRadio.parsePlaylistPage(text: text) else { break }
+            page = next
+            for row in page.rows where seen.insert(row.videoId).inserted { rows.append(row) }
+            pages += 1
+        }
+        return rows
+    }
+
+    public func hydrate(videoIds: [String]) async -> [RadioRow]? {
+        var seen: Set<String> = []
+        var ids: [String] = []
+        for id in videoIds where seen.insert(id).inserted { ids.append(id) }
+        ids = Array(ids.prefix(YouTubeRadioSource.hydrateBatch))
+        if ids.isEmpty { return [] }
+        // One invalid id makes the whole batch a 404: bisect, with a small bound on the extra requests.
+        var spare = YouTubeRadioSource.hydrateBisectRequests
+        return await fetchQueue(ids, spare: &spare)
+    }
+
+    private func fetchQueue(_ part: [String], spare: inout Int) async -> [RadioRow]? {
+        let client = self.client
+        if let text = await budget.withPermit({ await client.getQueueText(part) }) {
+            return InnerTubeRadio.parseGetQueue(text: text)
+        }
+        if part.count <= 1 || spare <= 0 { return nil }
+        spare -= 1
+        let half = part.count / 2
+        let left = await fetchQueue(Array(part[..<half]), spare: &spare)
+        let right = await fetchQueue(Array(part[half...]), spare: &spare)
+        if left == nil && right == nil { return nil }
+        return (left ?? []) + (right ?? [])
+    }
+
+    public func channelId(forArtist artistName: String) async -> String? {
+        let key = fold(artistName)
+        if key.isEmpty { return nil }
+        let client = self.client
+        guard let text = await budget.withPermit({ await client.searchSongsText(artistName) }),
+              let rows = InnerTubeRadio.parseSongSearch(text: text) else { return nil }
+        for row in rows {
+            if let ref = row.artists.first(where: { $0.channelId != nil && fold($0.name) == key }) { return ref.channelId }
+        }
+        return nil
     }
 
     public func songRadio(videoId: String, continuations: Int) async -> FetchedRadio? {

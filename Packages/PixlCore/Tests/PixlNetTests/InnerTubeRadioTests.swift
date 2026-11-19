@@ -254,13 +254,15 @@ struct InnerTubeRadioTests {
         expectRows(expected["topSongs"]?.arrayValue ?? [], page.topSongs, "top songs")
         #expect(page.topSongs.count == 5)
         #expect(page.topSongs.first?.playCount == 3_400_000_000)
-        func releases(_ key: String) -> [ReleaseRef] {
+        struct Card: Equatable { let browseId: String; let title: String; let year: Int }
+        func releases(_ key: String) -> [Card] {
             (expected[key]?.arrayValue ?? []).map {
-                ReleaseRef(browseId: str($0, "browseId") ?? "", title: str($0, "title") ?? "", year: int($0, "year"))
+                Card(browseId: str($0, "browseId") ?? "", title: str($0, "title") ?? "", year: int($0, "year"))
             }
         }
-        #expect(releases("albums") == page.albums)
-        #expect(releases("singles") == page.singles)
+        func cards(_ list: [ReleaseRef]) -> [Card] { list.map { Card(browseId: $0.browseId, title: $0.title, year: $0.year) } }
+        #expect(releases("albums") == cards(page.albums))
+        #expect(releases("singles") == cards(page.singles))
         #expect(page.albums.count == 10)
         #expect(page.singles.count == 10)
         let fans = (expected["fansAlsoLike"]?.arrayValue ?? []).map {

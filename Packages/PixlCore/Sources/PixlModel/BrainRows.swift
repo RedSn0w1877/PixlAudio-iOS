@@ -138,17 +138,44 @@ public struct RadioEndpoint: Sendable, Hashable, Codable {
     }
 }
 
-/// An album, single or EP on an artist page.
+/// What a release is, from the subtitle ("Album", "Single", "EP") of its card.
+public enum ReleaseKind: String, Sendable, Hashable { case album = "ALBUM", single = "SINGLE", ep = "EP", unknown = "UNKNOWN" }
+
+/// An album, single or EP on an artist page or in the discography (`MPAD...`).
+///
+/// `audioPlaylistId` is the `OLAK5uy_...` audio playlist the card's "Shuffle play" menu item names, when the response
+/// kept the menu: the tracks of a release are read through it (spec 3.3, "Album tracks"), never from the album page
+/// itself, whose ids are music videos when anonymous. Nil means "read it from the album page".
 public struct ReleaseRef: Sendable, Hashable {
     public var browseId: String
     public var title: String
     public var year: Int
+    public var kind: ReleaseKind
+    public var audioPlaylistId: String?
+    public var thumbnailUrl: String?
 
-    public init(browseId: String, title: String, year: Int = 0) {
+    public init(browseId: String, title: String, year: Int = 0, kind: ReleaseKind = .unknown,
+                audioPlaylistId: String? = nil, thumbnailUrl: String? = nil) {
         self.browseId = browseId
         self.title = title
         self.year = year
+        self.kind = kind
+        self.audioPlaylistId = audioPlaylistId
+        self.thumbnailUrl = thumbnailUrl
     }
+}
+
+/// A playlist page (`browse VL...`) or one of its continuations: rows plus the token of the next page.
+public struct PlaylistPage: Sendable, Hashable {
+    public var rows: [RadioRow]
+    public var continuation: String?
+
+    public init(rows: [RadioRow], continuation: String?) {
+        self.rows = rows
+        self.continuation = continuation
+    }
+
+    public static let empty = PlaylistPage(rows: [], continuation: nil)
 }
 
 /// An artist's page: top songs, releases, similar artists and the radio button's endpoint.
@@ -436,6 +463,26 @@ public protocol RadioSource: Sendable {
     func artistPage(channelId: String) async -> ArtistPage?
     /// An artist radio, from the endpoint an artist page carried.
     func artistRadio(endpoint: RadioEndpoint) async -> FetchedRadio?
+    /// The whole discography of an artist (`MPAD<channelId>`), newest first. Nil when the source is unavailable or over
+    /// budget; an empty list when the answer had no releases.
+    func discography(channelId: String) async -> [ReleaseRef]?
+    /// The tracks of one release, read through its audio playlist (3.3, "Album tracks"): the playlist id the card
+    /// carried, else one album-page request to read it. Nil when nothing could be read.
+    func releaseTracks(_ release: ReleaseRef) async -> [RadioRow]?
+    /// Up to `maxPages` pages of a playlist (`VL<playlistId>`), rows deduplicated by video id.
+    func playlistRows(playlistId: String, maxPages: Int) async -> [RadioRow]?
+    /// `music/get_queue`: full rows for video ids. An id the source does not know is left out.
+    func hydrate(videoIds: [String]) async -> [RadioRow]?
+    /// The `UC...` channel id of the artist called `artistName`, from a songs search; nil when none matches.
+    func channelId(forArtist artistName: String) async -> String?
+}
+
+public extension RadioSource {
+    func discography(channelId: String) async -> [ReleaseRef]? { nil }
+    func releaseTracks(_ release: ReleaseRef) async -> [RadioRow]? { nil }
+    func playlistRows(playlistId: String, maxPages: Int) async -> [RadioRow]? { nil }
+    func hydrate(videoIds: [String]) async -> [RadioRow]? { nil }
+    func channelId(forArtist artistName: String) async -> String? { nil }
 }
 
 /// One token bucket and one parallelism limit per host (docs/brain-spec.md, 2.1 and 12.1). Stage 1 has a single
