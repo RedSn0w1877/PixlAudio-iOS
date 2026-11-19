@@ -498,3 +498,39 @@ and with VoiceOver; the Swift 6 concurrency of `App/` (CI says).
 6. The queue: swipe an engine pick away, then "Refresh picks".
 7. Recently Played: a track the engine played has "Save".
 8. Settings > Developer mode > Maintenance: "Use my Spotify music to shape picks" off and on.
+
+## Commands and results, milestone 2
+
+```
+gh run list --branch music-brain --workflow ci --limit 3        # at the start: 44429445405 success (milestone 1)
+cmd //c "ci\swiftw.cmd test --package-path Packages\PixlCore --filter BrainMilestone2GoldenTests --filter BrainGoldenTests --filter BrainMixGolden --filter BrainPurity"
+cmd //c "ci\swiftw.cmd test --package-path Packages\PixlCore --filter InnerTubeRadio"
+cmd //c "ci\swiftw.cmd test --package-path Packages\PixlCore --filter BrainStationSourcesTests --filter BrainArtistStationTests --filter BrainNewReleasesTests --filter BrainFeedbackActionsTests --filter BrainFeedbackDecisionTests"
+cmd //c "ci\swiftw.cmd test --package-path Packages\PixlCore"
+bash ci/check-forbidden.sh
+powershell -NoProfile -ExecutionPolicy Bypass -File ci/parse-check.ps1
+```
+
+- Golden: `stage2a.jsonl` matched on the first run (368 lines); every blob id of the fixtures folder equals Android's `music-brain` HEAD.
+- The full PixlCore suite: exit 0, **2,292 tests in 8 bundles, 0 failed** (2,234 after milestone 1). The first full run had two failures, both
+  tests that pinned stage 1 (the Spotify playlist `fields` filter, which now asks for `explicit` and the album's release date as Android's
+  does, and a `new_release` reason that is now a line); fixed in the tests and run again.
+- `check-forbidden.sh`: OK. `parse-check.ps1`: 178 files OK (syntax only).
+- A fresh sweep of the working tree: files I edited with a script on Windows had CRLF line ends, which makes `parse-check.ps1` fail on git's
+  warning text; they were turned back to LF (git's own `eol=lf`). `ci/swiftw.cmd` is the one file that must stay CRLF.
+
+## CI, milestone 2
+
+Pushes of `music-brain` (workflow `ci`):
+
+- `715def9`: **failed** twice over: `core` (the two tests above) and `app` ("failed to produce diagnostic for expression" in
+  `BrainService.init`, which the compiler could not explain).
+- `baedbe3`: the `app` build failed again on the same line: the real error was in the next line of the log,
+  `BrainService.swift:116:76`, `sources?.spotifyShapesPicks ?? { true }` (a nil-coalesced closure literal typed `@Sendable`). Written as an
+  `if let`.
+- `03716e4`: `App/` compiled; the `app` job failed in AppTests only: `WhyFacts.Fact` and `ExcludedPlays` had internal initialisers.
+  Made public.
+- `5d39639`: **green**. `core` passed; `app` executed 663 unit tests, 0 failures. `ipa` is skipped, as on every push. No screenshot run.
+
+Green CI means `App/` compiles and its unit tests pass. No test drives `HomeStore`'s release row, `BrainActions`' new methods, the new
+sheet rows or the queue's "Refresh picks" button, so it says nothing about whether they work on screen.
