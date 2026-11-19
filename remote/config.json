@@ -11,5 +11,9 @@
     "preSignedOrder": ["VISIONOS", "IOS"],
     "cipheredOrder": ["TVHTML5", "WEB", "WEB_REMIX"],
     "hedge": { "enabled": false, "afterSeconds": 1.5, "strategyTimeoutSeconds": 8 }
+  },
+  "brain": {
+    "note": "The music brain's off switches (docs/brain-spec.md, 3.7). refresh: the once-a-day background search for new music. A missing key means on.",
+    "refresh": { "enabled": true }
   }
 }

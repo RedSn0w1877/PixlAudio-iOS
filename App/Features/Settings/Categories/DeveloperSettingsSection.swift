@@ -1,3 +1,4 @@
+import PixlLibrary
 import PixlModel
 import SwiftUI
 
@@ -38,6 +39,15 @@ struct DeveloperSettingsSection: View {
                 }
             }
             SettingsSubsection(title: L10n.settingsMaintenanceSection) {
+                // The music brain (docs/brain-spec.md, 14, stage 2a). Android: Developer mode › Maintenance.
+                SwitchSettingRow(title: BrainStrings.engineTitle, subtitle: BrainStrings.engineSubtitle,
+                                 isOn: Binding(get: { settings.ai.brainEngine == BrainEngineChoice.brain },
+                                               set: { settings.ai.brainEngine = $0 ? BrainEngineChoice.brain : BrainEngineChoice.legacy }),
+                                 systemImage: "wand.and.stars", iconColor: theme.secondary)
+                SwitchSettingRow(title: BrainStrings.refreshTitle, subtitle: BrainStrings.refreshSubtitle,
+                                 isOn: Binding(get: { settings.ai.brainRefreshEnabled },
+                                               set: { settings.ai.brainRefreshEnabled = $0 }),
+                                 systemImage: "flask", iconColor: theme.secondary)
                 ActionSettingRow(title: L10n.settingsForceDailyMixTitle, subtitle: L10n.settingsForceDailyMixSubtitle,
                                  systemImage: "slider.horizontal.3",
                                  primaryLabel: L10n.settingsActionRegenerateDailyMix) { showsDailyMix = true }

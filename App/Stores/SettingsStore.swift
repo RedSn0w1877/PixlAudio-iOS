@@ -184,6 +184,11 @@ nonisolated enum PreferenceKeys {
     /// The music brain (docs/brain-spec.md, 7.1, 12.3): whether YouTube Music may be asked for related music. Off,
     /// Autoplay continues from the library alone. No Settings row yet (Android `brain_youtube_source_enabled`).
     static let brainYouTubeSourceEnabled = "brain_youtube_source_enabled"
+    /// The music brain, stage 2a (Developer mode): which engine ranks Daily Mix and Your Mix (`BrainEngineChoice`: 0
+    /// the old one, 1 the new one, the default), and whether the once-a-day background search for new music runs
+    /// (default on; the remote config can switch it off too). Android `brain_engine` / `brain_refresh_enabled`.
+    static let brainEngine = "brain_engine"
+    static let brainRefreshEnabled = "brain_refresh_enabled"
     /// The music brain (docs/brain-spec.md, 8.3): the station the queue is (one line of text, `Station.encode`) and
     /// the Familiar / Blend / Discover switch (0, 1, 2). Android `brain_station` / `brain_novelty`.
     static let brainStation = "brain_station"
@@ -748,6 +753,15 @@ final class AISettings {
     var brainYouTubeSourceEnabled: Bool {
         didSet { defaults.set(brainYouTubeSourceEnabled, forKey: PreferenceKeys.brainYouTubeSourceEnabled) }
     }
+    /// Which engine ranks Daily Mix and Your Mix: `BrainEngineChoice.brain` (the default) or `.legacy`. A Developer mode
+    /// switch; the listener never sees the choice.
+    var brainEngine: Int {
+        didSet { defaults.set(BrainEngineChoice.clamp(brainEngine), forKey: PreferenceKeys.brainEngine) }
+    }
+    /// Whether the once-a-day background search for new music runs (Developer mode).
+    var brainRefreshEnabled: Bool {
+        didSet { defaults.set(brainRefreshEnabled, forKey: PreferenceKeys.brainRefreshEnabled) }
+    }
     /// 0…0.6 (Android `exploration_fraction`).
     var musicExploration: Double {
         didSet { defaults.set(musicExploration, forKey: PreferenceKeys.musicExplorationFraction) }
@@ -785,6 +799,9 @@ final class AISettings {
         musicLearningEnabled = defaults.bool(PreferenceKeys.musicLearningEnabled, default: true)
         musicDiscoveryEnabled = defaults.bool(PreferenceKeys.musicDiscoveryEnabled, default: true)
         brainYouTubeSourceEnabled = defaults.bool(PreferenceKeys.brainYouTubeSourceEnabled, default: true)
+        brainEngine = defaults.object(forKey: PreferenceKeys.brainEngine) == nil
+            ? BrainEngineChoice.brain : BrainEngineChoice.clamp(defaults.integer(forKey: PreferenceKeys.brainEngine))
+        brainRefreshEnabled = defaults.bool(PreferenceKeys.brainRefreshEnabled, default: true)
         musicExploration = defaults.double(PreferenceKeys.musicExplorationFraction, default: 0.25)
         claudeMonthlyCap = ClaudeBudget.clampCap(defaults.double(PreferenceKeys.aiClaudeMonthlyCap,
                                                                  default: ClaudeBudget.defaultCapDollars))

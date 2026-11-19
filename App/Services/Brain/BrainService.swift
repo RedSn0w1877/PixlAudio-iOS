@@ -46,6 +46,19 @@ final class BrainService {
     let engine: BrainEngine?
     /// Home's "Because you listened to" rows (8.1). Nil in UI tests.
     let homeRows: BrainHomeRows?
+    /// Daily Mix and Your Mix with new music (8.2, stage 2a): built by `configureMixes`, never at launch. Nil in UI tests.
+    private(set) var mixes: BrainMixes?
+    /// The once-a-day background search for new music (3.7, stage 2a). Nil in UI tests.
+    private(set) var refresh: BrainRefresh?
+    private let directory: URL?
+    /// What the refresh asks of the rest of the app (set by `AppEnvironment`).
+    var refreshIsAllowed: () -> Bool = { true }
+    var isMusicPlaying: () -> Bool = { false }
+    /// Created with the first refresh, never at launch (its path monitor starts then).
+    private lazy var networkMonitor = NetworkConditionsMonitor()
+    private var refreshTask: Task<Void, Never>?
+    private var idleCheckTask: Task<Void, Never>?
+    private var sceneActiveAtMs: Int64 = 0
     /// Called on the main actor after each recorded play (Autoplay reacts to skips and likes).
     var onReaction: ((Reaction) -> Void)?
     /// Marks the song that is playing (an `EventFlags` bit): set by `AppEnvironment` to the listening stats.
@@ -91,10 +104,102 @@ final class BrainService {
             let engine = BrainEngine(directory: directory, repository: repository, sources: sources)
             self.engine = engine
             homeRows = BrainHomeRows(directory: directory, repository: repository, engine: engine)
+            self.directory = directory
         } else {
+            directory = nil
             repository = nil
             engine = nil
             homeRows = nil
+        }
+    }
+
+    // MARK: Daily Mix and Your Mix (8.2) and the refresh (3.7)
+
+    /// Builds the objects behind the mixes and the refresh. Reads nothing, fetches nothing: `sources` are closures.
+    func configureMixes(sources: MixSources, budget: HostBudget?) {
+        guard let directory, let repository, let engine else { return }
+        let mixes = BrainMixes(directory: directory, repository: repository, engine: engine, sources: sources)
+        self.mixes = mixes
+        let work = BrainRefreshWork(mixes: mixes, repository: repository, budget: budget,
+                                    matchedVideoId: sources.matchedVideoId)
+        let allowed: @Sendable () async -> Bool = { @MainActor [weak self] in self?.refreshIsAllowed() ?? false }
+        refresh = BrainRefresh(work: work, repository: repository, engine: engine, allowed: allowed)
+    }
+
+    /// The first moments of the process keep the brain's files closed (docs/brain-spec.md, 12.1 "App start"): a mix is
+    /// read and built after this wait, off the main actor.
+    func waitForStartup() async {
+        let wait = BrainStartup.storedTracksWaitMs(sinceLaunchMs: currentTimeMillis() - launchedAtMs)
+        if wait > 0 { try? await Task.sleep(for: .milliseconds(wait)) }
+    }
+
+    /// A mix was built: the one background job is asked for now, and never at app start.
+    func mixWasBuilt() {
+        Task { [weak self] in await self?.scheduleFromLastRun() }
+    }
+
+    /// Puts the system's request in place a day after the last run.
+    func scheduleFromLastRun() async {
+        guard let refresh else { return }
+        let last = await refresh.lastRunMs()
+        BrainBackground.schedule(lastRunMs: last)
+    }
+
+    /// One refresh now (the system gave a processing task, or the app has been quiet in the foreground). Nil when
+    /// something does not allow it: the conditions of 3.7 (unmetered network, not low power) are checked here.
+    @discardableResult
+    func runRefresh() async -> BrainRefreshRunner.Report? {
+        guard let refresh, refreshIsAllowed() else { return nil }
+        if ProcessInfo.processInfo.isLowPowerModeEnabled { return nil }
+        guard await isOnUnmeteredNetwork() else { return nil }
+        let playing: @Sendable () async -> Bool = { @MainActor [weak self] in self?.isMusicPlaying() ?? false }
+        return await refresh.run(playing: playing)
+    }
+
+    /// Wi-Fi or wired, not a hotspot, not Low Data Mode: Android asks WorkManager for an unmetered network, and iOS can
+    /// only say "a network", so the run checks.
+    private func isOnUnmeteredNetwork() async -> Bool {
+        networkMonitor.startIfNeeded()
+        for _ in 0..<10 where networkMonitor.conditions.network == .unknown {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        let conditions = networkMonitor.conditions
+        return (conditions.network == .wifi || conditions.network == .wired) && !conditions.isExpensive && !conditions.isConstrained
+    }
+
+    /// The foreground fallback of the system's task, which iOS runs when it decides to (or never): once the app has been
+    /// in front for `RefreshSchedule.foregroundIdleMs` and a day has gone by, the same work runs at low priority.
+    func sceneBecameActive() {
+        sceneActiveAtMs = currentTimeMillis()
+        idleCheckTask?.cancel()
+        guard refresh != nil else { return }
+        idleCheckTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(RefreshSchedule.foregroundIdleMs))
+            guard !Task.isCancelled else { return }
+            await self?.runRefreshIfDue()
+        }
+    }
+
+    func sceneLeft() {
+        idleCheckTask?.cancel()
+        idleCheckTask = nil
+    }
+
+    private func runRefreshIfDue() async {
+        guard refreshTask == nil, let refresh, let engine else { return }
+        let now = currentTimeMillis()
+        // The brain was used (a play ended or a mix was built): a refresh is never the first thing it does.
+        let loaded = await engine.isLoaded
+        let ranBefore = await engine.storedValue(BrainRefresh.keyLast) != nil
+        let used = loaded || ranBefore
+        let due = RefreshSchedule.foregroundRunDue(
+            nowMs: now, lastRunMs: await refresh.lastRunMs(), lastAttemptMs: await refresh.lastAttemptMs(),
+            idleMs: now - sceneActiveAtMs, brainUsed: used, allowed: refreshIsAllowed())
+        guard due else { return }
+        refreshTask = Task(priority: .utility) { [weak self] in
+            _ = await self?.runRefresh()
+            self?.refreshTask = nil
+            await self?.scheduleFromLastRun()
         }
     }
 

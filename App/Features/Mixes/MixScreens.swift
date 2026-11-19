@@ -1,3 +1,4 @@
+import PixlLibrary
 import PixlModel
 import SwiftUI
 
@@ -6,8 +7,10 @@ struct DailyMixView: View {
     @Environment(AppEnvironment.self) private var env
 
     var body: some View {
+        let details = env.home.brainMixDetails
         MixScreen(title: "Daily Mix", songs: env.home.content.dailyMix, playsFromLibrary: false, screenID: "dailyMix",
-                  titleLeading: 22 + 6, trailingHeaderButton: .ai, topTrailingButton: nil)
+                  titleLeading: 22 + 6, trailingHeaderButton: .ai, topTrailingButton: nil,
+                  brain: details.ownsMixes ? BrainMixRows(details.daily) : nil)
     }
 }
 
@@ -18,8 +21,24 @@ struct YourMixView: View {
 
     var body: some View {
         let content = env.home.content
+        let details = env.home.brainMixDetails
         MixScreen(title: "YOUR MIX", songs: content.yourMix, playsFromLibrary: content.usesFallbackYourMix,
-                  screenID: "yourMix", titleLeading: 28, trailingHeaderButton: nil, topTrailingButton: .regenerate)
+                  screenID: "yourMix", titleLeading: 28, trailingHeaderButton: nil, topTrailingButton: .regenerate,
+                  brain: details.ownsMixes && !content.usesFallbackYourMix ? BrainMixRows(details.your) : nil)
+    }
+}
+
+/// What the brain says about the rows of a mix it built (docs/brain-spec.md, 8.2): the reason under a row, which rows
+/// are music the listener does not have yet (they get Save), and what a play of the mix carries into the queue.
+struct BrainMixRows {
+    var reasons: [String: MixReason]
+    var novelIds: Set<String>
+    var tags: [String: BrainItemTag]
+
+    init(_ part: BrainMixDetails.Part) {
+        reasons = part.reasons
+        novelIds = part.novelIds
+        tags = part.tags
     }
 }
 
@@ -39,6 +58,8 @@ struct MixScreen: View {
     let titleLeading: CGFloat
     let trailingHeaderButton: HeaderButton?
     let topTrailingButton: TopButton?
+    /// Nil while the legacy mixes are showing.
+    var brain: BrainMixRows?
 
     @Environment(AppEnvironment.self) private var env
     @Environment(LibraryStore.self) private var library
@@ -75,15 +96,24 @@ struct MixScreen: View {
                     height: 76, verticalPadding: 8, horizontalPadding: 20, outerRadius: 60,
                     onPlay: { play(from: songs[0]); if playback.isShuffleEnabled { playback.setShuffleEnabled(false) } },
                     onShuffle: {
-                        if playsFromLibrary { playback.play(library.songs.shuffled()) } else { playback.play(songs.shuffled(), source: mixSource) }
+                        if playsFromLibrary {
+                            playback.play(library.songs.shuffled())
+                        } else {
+                            playback.play(songs.shuffled(), source: mixSource, tags: brain?.tags ?? [:])
+                        }
                     })
                 ForEach(songs) { song in
-                    PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
-                        SongCard(song: song, isCurrent: isCurrent, isPlaying: isPlaying,
-                                 onTap: { play(from: song) },
-                                 onMore: { router.present(AppSheet.songInfo(songId: song.id)) })
+                    VStack(spacing: 0) {
+                        PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
+                            SongCard(song: song, isCurrent: isCurrent, isPlaying: isPlaying,
+                                     onTap: { play(from: song) },
+                                     onMore: { router.present(AppSheet.songInfo(songId: song.id)) })
+                        }
+                        .padding(.horizontal, 16)
+                        if let brain {
+                            MixRowNote(song: song, reason: brain.reasons[song.id], isNew: brain.novelIds.contains(song.id))
+                        }
                     }
-                    .padding(.horizontal, 16)
                 }
             }
             .padding(.bottom, 16)
@@ -96,7 +126,9 @@ struct MixScreen: View {
         if playsFromLibrary {
             playback.play(song, in: library.songs)
         } else {
-            playback.play(song, in: songs, source: mixSource)
+            // Every row of a mix the brain built carries its list, its arm and its reason into the queue and the event
+            // log; the legacy mixes carry the surface alone.
+            playback.play(song, in: songs, source: mixSource, tags: brain?.tags ?? [:])
         }
     }
 

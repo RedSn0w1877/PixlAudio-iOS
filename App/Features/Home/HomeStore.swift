@@ -50,6 +50,30 @@ struct HomeBrainRowsSource {
     var refreshIfDue: @MainActor () async -> [BrainHomeRow]?
 }
 
+/// What the brain says about the rows of the mixes it built (docs/brain-spec.md, 8.2, stage 2a): the reason under a row,
+/// which rows are music the listener does not have yet, and what a play of each mix carries into the queue and the
+/// event log. Empty while the legacy mixes are showing.
+struct BrainMixDetails: Equatable {
+    /// What one mix says about its rows.
+    struct Part: Equatable {
+        var reasons: [String: MixReason] = [:]
+        var novelIds: Set<String> = []
+        var tags: [String: BrainItemTag] = [:]
+
+        init() {}
+
+        init(_ view: MixView) {
+            reasons = view.reasons
+            novelIds = view.novelIds
+            tags = view.tags
+        }
+    }
+
+    var ownsMixes = false
+    var daily = Part()
+    var your = Part()
+}
+
 /// The Home tab's state holder. Lives in `AppEnvironment` (process-scoped like Android's `@Singleton` holders),
 /// so Home keeps its snapshot across navigation.
 @Observable
@@ -99,6 +123,24 @@ final class HomeStore {
     @ObservationIgnored private var brainRowsLoaded = false
     @ObservationIgnored private var pendingBrainRows: [BrainHomeShelf]?
     @ObservationIgnored private var brainRowsTask: Task<Void, Never>?
+    /// Daily Mix and Your Mix built by the brain, when it owns them (docs/brain-spec.md, 8.2, stage 2a). They replace the
+    /// legacy mixes in `content` a few seconds after launch (the brain's files stay closed while the app starts), and
+    /// stay in place while the rest of Home is recomputed.
+    private(set) var brainMixDetails = BrainMixDetails()
+    @ObservationIgnored var brainMixes: BrainMixes?
+    /// Waits out the app's first seconds; the brain is touched after it.
+    @ObservationIgnored var brainQuiet: (() async -> Void)?
+    /// Whether the engine switch (Developer mode) is on, read at the moment it matters.
+    @ObservationIgnored var brainEngineIsOn: () -> Bool = { true }
+    /// The tracks from outside the library a mix holds, so the app knows them (Like, "Add to playlist", Recently Played).
+    @ObservationIgnored var onBrainMixTracks: (([EngineTrack]) -> Void)?
+    /// A track from outside the library as the queue shows it: its artist pointed at the library's own artist of the name.
+    @ObservationIgnored var linkBrainSong: ((Song) -> Song)?
+    @ObservationIgnored private var brainDaily: [Song] = []
+    @ObservationIgnored private var brainYour: [Song] = []
+    @ObservationIgnored private var brainMixesTask: Task<Void, Never>?
+    @ObservationIgnored private var pendingBrainRegenerate = false
+    @ObservationIgnored private var regenerateBrainMixesNext = false
     /// Blocked artists: their songs are left out of every mix, shelf and list Home computes.
     @ObservationIgnored private(set) var blockedMatcher: BlockedArtistMatcher = .empty
     @ObservationIgnored private var blockedRevision = 0
@@ -227,14 +269,83 @@ final class HomeStore {
             var content = result.content
             // Today's AI headline, once written, replaces the local one for the rest of the day.
             if let cached = self.cachedAIGreeting(day: day) { content.greeting.headline = cached }
+            // The brain's mixes, when it owns them, stay in place while the rest of Home is recomputed.
+            self.overlayBrainMixes(&content)
             if content != self.content { self.content = content }
             self.requestAIGreeting(day: day)
             if result.generatedMixes { self.saveMixes(result.content, nowMs: now) }
             self.isPreparing = false
             self.isRefreshing = false
+            // Only the Developer mode "Regenerate" draws new brain mixes; the refresh button keeps today's.
+            let regenerate = self.regenerateBrainMixesNext
+            self.regenerateBrainMixesNext = false
+            self.scheduleBrainMixes(regenerate: regenerate)
         }
         computeTask = computation
         await computation.value
+    }
+
+    // MARK: The brain's mixes (docs/brain-spec.md, 8.2)
+
+    private func overlayBrainMixes(_ content: inout HomeContent) {
+        guard brainEngineIsOn(), !brainDaily.isEmpty, !brainYour.isEmpty else { return }
+        content.dailyMix = brainDaily
+        content.curatedYourMix = brainYour
+    }
+
+    /// Asks for today's mixes once the app has settled: the saved ones (a small read, no brain state), or new ones when
+    /// the brain owns the mixes and has played enough. Off the main actor; what comes back is shown at once.
+    private func scheduleBrainMixes(regenerate: Bool) {
+        guard let mixes = brainMixes else { return }
+        if brainMixesTask != nil {
+            if regenerate { pendingBrainRegenerate = true }
+            return
+        }
+        brainMixesTask = Task { [weak self] in
+            await self?.brainQuiet?()
+            let pair = await mixes.publish(regenerate: regenerate)
+            guard let self else { return }
+            self.brainMixesTask = nil
+            self.publishBrainMixes(pair)
+            if self.pendingBrainRegenerate {
+                self.pendingBrainRegenerate = false
+                self.scheduleBrainMixes(regenerate: true)
+            }
+        }
+    }
+
+    private func publishBrainMixes(_ pair: (daily: MixView, your: MixView)?) {
+        guard let pair else {
+            // The legacy engine owns the mixes (the switch is off, or the brain has heard too little): the next
+            // refresh brings them back.
+            if brainMixDetails.ownsMixes {
+                brainDaily = []
+                brainYour = []
+                brainMixDetails = BrainMixDetails()
+                lastKey = nil
+            }
+            return
+        }
+        let link = linkBrainSong ?? { $0 }
+        let daily = pair.daily.songs.map(link)
+        let your = pair.your.songs.map(link)
+        onBrainMixTracks?(pair.daily.engineTracks + pair.your.engineTracks)
+        brainDaily = daily
+        brainYour = your
+        var details = BrainMixDetails(ownsMixes: true)
+        details.daily = BrainMixDetails.Part(pair.daily)
+        details.your = BrainMixDetails.Part(pair.your)
+        if details != brainMixDetails { brainMixDetails = details }
+        var next = content
+        next.dailyMix = daily
+        next.curatedYourMix = your
+        if next != content { content = next }
+        // The legacy keys keep the library songs of the mixes, so a restart shows them before the brain is read.
+        let libraryIds: ([Song], Set<String>) -> [String] = { songs, novel in songs.map(\.id).filter { !novel.contains($0) } }
+        defaults?.set(libraryIds(daily, pair.daily.novelIds), forKey: PreferenceKeys.dailyMixSongIds)
+        defaults?.set(libraryIds(your, pair.your.novelIds), forKey: PreferenceKeys.yourMixSongIds)
+        defaults?.set(Double(history.clock.nowMs()), forKey: PreferenceKeys.lastDailyMixUpdate)
+        isPreparing = false
     }
 
     // MARK: The music brain's rows (docs/brain-spec.md, 8.1)
@@ -340,6 +451,20 @@ final class HomeStore {
 
     /// Android `regenerateYourMix`: a fresh, non-day-seeded draw, so repeated taps give a different mix.
     func regenerateYourMix(snapshot: LibrarySnapshot) async {
+        // The brain draws another list, and the served log counts the one it replaces (8.2).
+        if let mixes = brainMixes, brainEngineIsOn(), let view = await mixes.regenerateYourMix() {
+            onBrainMixTracks?(view.engineTracks)
+            let link = linkBrainSong ?? { $0 }
+            let songs = view.songs.map(link)
+            brainYour = songs
+            var details = brainMixDetails
+            details.ownsMixes = true
+            details.your = BrainMixDetails.Part(view)
+            if details != brainMixDetails { brainMixDetails = details }
+            content.curatedYourMix = songs
+            defaults?.set(songs.map(\.id).filter { !view.novelIds.contains($0) }, forKey: PreferenceKeys.yourMixSongIds)
+            return
+        }
         let snapshot = unblocked(snapshot)
         await history.ensureLoaded()
         await taste?.ensureLoaded()
@@ -373,6 +498,7 @@ final class HomeStore {
         defaults?.removeObject(forKey: PreferenceKeys.dailyMixSongIds)
         defaults?.removeObject(forKey: PreferenceKeys.yourMixSongIds)
         defaults?.removeObject(forKey: PreferenceKeys.lastDailyMixUpdate)
+        regenerateBrainMixesNext = true
         await refresh(snapshot: snapshot, libraryRevision: libraryRevision, force: true)
     }
 

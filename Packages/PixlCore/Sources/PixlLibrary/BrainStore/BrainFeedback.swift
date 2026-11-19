@@ -102,7 +102,7 @@ public enum WhyLineText {
         case becauseListened(String)
         /// "More from X"
         case artistMore(String)
-        /// "On repeat this month"
+        /// "On repeat lately"
         case onRepeat
     }
 

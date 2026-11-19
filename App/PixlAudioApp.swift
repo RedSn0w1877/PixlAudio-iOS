@@ -30,8 +30,12 @@ struct PixlAudioApp: App {
                     // marker follows (docs/handoff/2026-10-10-crash-diagnostics.md).
                     environment.health.scenePhaseChanged(phase)
                     switch phase {
-                    case .active: cloud.resume()
+                    case .active:
+                        cloud.resume()
+                        // The brain's once-a-day search for new music, when iOS has not granted its own task.
+                        environment.brain.sceneBecameActive()
                     case .background:
+                        environment.brain.sceneLeft()
                         cloud.didEnterBackground()
                         environment.home.history.flush()
                         // Partly cached songs keep no file open while the app is away (reopened on the next read).

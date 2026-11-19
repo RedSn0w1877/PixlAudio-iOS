@@ -42,7 +42,7 @@ nonisolated enum BrainStrings {
         case .becauseLiked(let name): String(localized: "Because you liked \(name)")
         case .becauseListened(let name): String(localized: "Because you listened to \(name)")
         case .artistMore(let name): String(localized: "More from \(name)")
-        case .onRepeat: String(localized: "On repeat this month")
+        case .onRepeat: String(localized: "On repeat lately")
         }
     }
 
@@ -78,6 +78,22 @@ nonisolated enum BrainStrings {
     static func homeBecauseListened(_ name: String) -> String { String(localized: "Because you listened to \(name)") }
     static var homeBecauseListenedSubtitle: String { String(localized: "Music you don't have yet") }
 
+    // MARK: Daily Mix and Your Mix (8.2)
+
+    static var mixSave: String { String(localized: "Save") }
+    static var mixSaved: String { String(localized: "Saved") }
+
+    // MARK: Developer mode: the engine that ranks the mixes, and the background search
+
+    static var engineTitle: String { String(localized: "Music engine") }
+    static var engineSubtitle: String {
+        String(localized: "Rank Daily Mix and Your Mix with the new engine. Off uses the old one. Regenerate the daily mix to see the change.")
+    }
+    static var refreshTitle: String { String(localized: "Background music search") }
+    static var refreshSubtitle: String {
+        String(localized: "Looks up music like your favourites once a day on Wi-Fi, so your mixes have new songs in them")
+    }
+
     // MARK: How picks work (8.9)
 
     static var howPicksWork: String { String(localized: "How picks work") }
@@ -86,7 +102,9 @@ nonisolated enum BrainStrings {
     }
     static var promisePaidTitle: String { String(localized: "Nobody can pay to be in your picks") }
     static var promiseRepeatTitle: String { String(localized: "Less repetition") }
-    static var promiseRepeatBody: String { String(localized: "A new song you skipped three times stays away for 60 days.") }
+    static var promiseRepeatBody: String {
+        String(localized: "A song is never in two mixes on the same day, and a new song you skipped three times stays away for 60 days.")
+    }
     static var promiseWhyTitle: String { String(localized: "You can see why, and change it") }
     static var promiseWhyBody: String {
         String(localized: "A pick shows why it is there when there is a reason to give. Changes apply from the next track and can be undone.")

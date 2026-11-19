@@ -98,6 +98,7 @@ targets:
           - io.github.redsn0w1877.pixlaudio.tais-studio
           - io.github.redsn0w1877.pixlaudio.cloud-prepare
           - io.github.redsn0w1877.pixlaudio.cloud-processing
+          - io.github.redsn0w1877.pixlaudio.brain-refresh
         NSLocalNetworkUsageDescription: PixlAudio connects to AI servers you run on your local network.
         # Only NSAllowsArbitraryLoads: iOS ignores it when NSAllowsLocalNetworking is also present
         # (developer.apple.com/documentation/bundleresources/information-property-list/nsapptransportsecurity).

@@ -341,6 +341,66 @@ final class AppEnvironment {
         }
         brainActions = BrainActions(brain: brain, playback: playback, library: library, taste: tasteAdjustments,
                                     playCounts: playCounts, engine: realPlayback?.engine, autoplay: autoplayController)
+        // Daily Mix and Your Mix with new music (docs/brain-spec.md, 8.2, stage 2a) and the once-a-day background search
+        // for new music (3.7). Nothing here reads a file or asks the network: the sources are closures, and a mix is
+        // built after the app has settled, never at launch.
+        if !isUITest {
+            let mixLibrary = library, mixHistory = home.history, mixTaste = musicTaste, mixImported = importedHistory
+            let mixAdjustments = tasteAdjustments, mixBlocked = settings.blocked, mixSettings = settings.ai
+            let mixPersistence = persistence, mixPlayback = playback
+            brain.configureMixes(sources: MixSources(
+                library: { @MainActor in mixLibrary.songs },
+                librarySongs: { @MainActor ids in
+                    var found: [String: Song] = [:]
+                    for id in ids { if let song = mixLibrary.song(id: id) { found[id] = song } }
+                    return found
+                },
+                legacyPicks: { @MainActor library, limit, nowMs, epochDay in
+                    // The existing ranking's best songs, the way Autoplay's library pool asks for them.
+                    await mixHistory.ensureLoaded()
+                    await mixTaste.ensureLoaded()
+                    await mixImported.ensureLoaded()
+                    await mixAdjustments.ensureLoaded()
+                    let events = mixHistory.events, signals = mixTaste.learnedSignals, imported = mixImported.aggregate
+                    let exploration = Float(mixSettings.musicExploration)
+                    let adjustments = mixAdjustments.activeSet(nowMs: nowMs)
+                    return await Task.detached(priority: .utility) {
+                        let inputs = HomeStore.recommendationInputs(songs: library, events: events, signals: signals, imported: imported)
+                        return DailyMix.personalizedPicks(
+                            allSongs: library, favoriteSongIds: Set(library.filter(\.isFavorite).map(\.id)),
+                            engagements: inputs.engagements, storedSignals: inputs.signals, exploration: exploration,
+                            nowMs: nowMs, limit: limit, seed: DailyMix.dailySeed(epochDay: epochDay),
+                            artistAffinity: inputs.artistAffinity, adjustments: adjustments).map(\.song)
+                    }.value
+                },
+                constraints: { @MainActor in
+                    await mixAdjustments.ensureLoaded()
+                    let signature = mixAdjustments.items.map(\.id).joined(separator: ",") + "|\(mixBlocked.count)"
+                    return MixConstraints(blocked: mixBlocked.matcher,
+                                          adjustments: mixAdjustments.activeSet(nowMs: currentTimeMillis()),
+                                          favoriteIds: [], signature: signature)
+                },
+                engine: { @MainActor in mixSettings.brainEngine },
+                noveltyLevel: { @MainActor in brain.stations.novelty },
+                tzOffsetMin: { nowMs in
+                    Int32(clamping: TimeZone.current.secondsFromGMT(for: Date(timeIntervalSince1970: TimeInterval(nowMs) / 1000)) / 60)
+                },
+                song: { BrainService.queueSong(for: $0) },
+                matchedVideoId: { spotifyId in try? await mixPersistence?.matchedVideoId(spotifyId: spotifyId) },
+                mixBuilt: { Task { @MainActor in brain.mixWasBuilt() } },
+                timing: { name, ms in DiagnosticsLog.shared.log("brain", "\(name) \(ms) ms") }),
+                budget: youtube.radioBudget)
+            brain.refreshIsAllowed = { mixSettings.brainRefreshEnabled && BrainRemoteFlags.refreshAllowed() }
+            brain.isMusicPlaying = { mixPlayback.isPlaying }
+            // Home and the two mix screens read the mixes through the brain once the app has settled.
+            home.brainMixes = brain.mixes
+            home.brainQuiet = { [weak brain] in await brain?.waitForStartup() }
+            home.brainEngineIsOn = { mixSettings.brainEngine == BrainEngineChoice.brain }
+            home.onBrainMixTracks = { [weak brain] tracks in brain?.register(tracks) }
+            home.linkBrainSong = { [weak brain] song in brain?.linked(song) ?? song }
+            // The handler is only registered here; no brain code runs until iOS grants a task.
+            BrainBackground.register(for: brain)
+        }
         if let homeRows = brain.homeRows {
             // Home's "Because you listened to" rows (docs/brain-spec.md, 8.1): the saved rows at once; a rebuild only
             // once music has played in this run, off the main actor, with what it reads captured when it is due.

@@ -84,15 +84,16 @@ struct BrainCopyTests {
             "Start station", "Station · \\(title)", "Familiar", "Blend", "Discover", "Not for me",
             "Got it. You won't hear this in mixes again.", "Less from \\(artist)", "Undo",
             "Fans of \\(name) also play this", "Because you liked \\(name)", "Because you listened to \\(name)",
-            "More from \\(name)", "On repeat this month", "Why this song", "How picks work",
+            "More from \\(name)", "On repeat lately", "Why this song", "How picks work",
             "Picks are based on what you play.", "Music you don't have yet",
             "Nobody can pay to be in your picks", "Nothing is slipped into your playlists", "It stays on your phone",
-            // Stage 1 promises only the half of "less repetition" that is true of stage 1 (8.9).
-            "A new song you skipped three times stays away for 60 days.",
+            // Stage 2a keeps the other half: a song is in one mix a day (served log, 6.4), and says so (8.9).
+            "A song is never in two mixes on the same day, and a new song you skipped three times stays away for 60 days.",
+            // Daily Mix and Your Mix (8.2) and the Developer mode rows.
+            "Save", "Saved", "Music engine", "Background music search",
         ] {
             #expect(all.contains(text), "missing: \(text)")
         }
-        #expect(!all.contains { $0.contains("two mixes") })
         let line = try String(contentsOf: appRoot.appendingPathComponent("Features/Queue/AutoplayLine.swift"), encoding: .utf8)
         #expect(Set(literals(line)).isSuperset(of: ["Autoplay", "Taizo picks more after this", "From your library",
                                                     "Skipped three. Changing direction."]))

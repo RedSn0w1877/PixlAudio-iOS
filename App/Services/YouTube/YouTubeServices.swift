@@ -26,6 +26,9 @@ final class YouTubeServices {
     /// YouTube Music radios for the music brain (docs/brain-spec.md, 3.3): anonymous calls on the plain session, under
     /// the YouTube request budget. Nil in UI tests.
     @ObservationIgnored let radioSource: (any RadioSource)?
+    /// The request budget `radioSource` spends (60 a day, 24 at once): the brain's refresh reads what is left of it
+    /// and leaves the foreground its reserve (docs/brain-spec.md, 3.7).
+    @ObservationIgnored let radioBudget: HostBudget?
     @ObservationIgnored private let loader: YouTubeResourceLoader?
     @ObservationIgnored private var prefetcher: YouTubePrefetcher?
     @ObservationIgnored private let accounts: AccountsStore
@@ -46,6 +49,7 @@ final class YouTubeServices {
             searchProvider = nil
             historyClient = nil
             radioSource = nil
+            radioBudget = nil
             loader = nil
             downloads = DownloadManager(service: nil, fetcher: nil)
             return
@@ -64,9 +68,11 @@ final class YouTubeServices {
         self.account = account
         historyClient = YouTubeMusicHistoryClient(http: plain, session: account)
         // No cookie and no sign-in visitor id: only the process-wide anonymous one (nil until it was fetched).
+        let radioBudget = HostBudget()
+        self.radioBudget = radioBudget
         radioSource = YouTubeRadioSource(
             client: InnerTubeRadioClient(http: plain, visitorData: { await account.anonymousVisitorData() }),
-            budget: HostBudget())
+            budget: radioBudget)
         let deviceAuth = GoogleDeviceAuthClient(http: plain, store: account)
         self.deviceAuth = deviceAuth
         let innerTube = GoogleBearerHTTPClient(inner: plain, accessToken: { await deviceAuth.validAccessToken() })
