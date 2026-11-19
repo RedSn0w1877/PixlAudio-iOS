@@ -46,9 +46,13 @@ public protocol RefreshWork: Sendable {
     func releaseTargets() async -> [RefreshTarget]
     /// One artist's releases: the artist page, the discography when a carousel was full, the tracks of what is new.
     func releases(_ target: RefreshTarget) async -> RefreshFetch
+    /// Requests of the day the radios of lane 1 leave for the releases lane, so a day of radios cannot starve it (Android's
+    /// `RELEASES_RESERVE`). The default is none.
+    func releasesReserve() async -> Int
 }
 
 public extension RefreshWork {
+    func releasesReserve() async -> Int { 0 }
     func releaseTargets() async -> [RefreshTarget] { [] }
     func releases(_ target: RefreshTarget) async -> RefreshFetch { .none }
 }
@@ -93,20 +97,28 @@ public struct BrainRefreshRunner: Sendable {
         self.playing = playing
     }
 
-    private func gate() async -> Stop {
+    private func gate(reserve: Int = 0) async -> Stop {
         if Task.isCancelled { return .cancelled }
         if !(await allowed()) { return .off }
         if await playing() { return .playing }
-        if await work.requestsLeft() <= 0 { return .budget }
+        if await work.requestsLeft() - reserve <= 0 { return .budget }
         return .none
     }
 
     public func run() async -> Report {
         var report = Report(stopped: .none, radiosFetched: 0, radiosCached: 0, artistsFetched: 0, artistsCached: 0, missed: 0)
+        var reserveReached = false
         report.stopped = await gate()
         if report.stopped == .none {
+            // Lane 1 stops short of the releases lane's reserve; its own stop is not the run's end.
+            let reserve = await work.releasesReserve()
             for target in await work.radioSeeds() {
-                let stop = await gate()
+                let stop = await gate(reserve: reserve)
+                // Only the reserve is reached: the run goes on to the releases lane, which has the rest of the day.
+                if stop == .budget {
+                    reserveReached = true
+                    break
+                }
                 if stop != .none {
                     report.stopped = stop
                     break
@@ -132,6 +144,11 @@ public struct BrainRefreshRunner: Sendable {
                 case .cached: report.releasesCached += 1
                 case .none: report.missed += 1
                 }
+            }
+            // Lane 1 stopped at the reserve and nothing is left of it either: that is the end of the day's work.
+            if report.stopped == .none, reserveReached {
+                let end = await gate()
+                if end != .none { report.stopped = end }
             }
         }
         if report.stopped == .none {
@@ -165,6 +182,8 @@ public struct BrainRefreshWork: RefreshWork {
     public static let releasesDailyCeiling = 14
     /// Artists looked at per run: the top 20 are all covered within about four days, not daily (Android's deviation 101).
     public static let releaseArtistsPerRun = 6
+    /// What the radios of lane 1 leave of the day for the releases lane (Android: `RELEASES_RESERVE`).
+    public static let releasesReserveRequests = 4
 
     private let budget: HostBudget?
     private let matchedVideoId: @Sendable (String) async -> String?
@@ -207,6 +226,13 @@ public struct BrainRefreshWork: RefreshWork {
     public func artist(_ target: RefreshTarget) async -> RefreshFetch {
         guard let radio = await repository.artistRadio(seed: target.seed, allowNetwork: true) else { return .none }
         return radio.fromCache ? .cached : .network
+    }
+
+    public func releasesReserve() async -> Int {
+        guard let newReleases else { return 0 }
+        let since = clock() - HostBudget.dayMs
+        let left = Self.releasesDailyCeiling - (await newReleases.requestsSince(since))
+        return min(max(left, 0), Self.releasesReserveRequests)
     }
 
     public func releaseTargets() async -> [RefreshTarget] {

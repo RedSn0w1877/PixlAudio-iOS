@@ -1017,6 +1017,38 @@ struct BrainRefreshReleasesLaneTests {
         #expect(report.releasesFetched == 0 && report.releasesCached == 0 && report.stopped == .none)
     }
 
+    @Test func theRadiosLeaveTheReleasesLaneItsReserveOfTheDay() async {
+        final class Spend: RefreshWork, @unchecked Sendable {
+            private let lock = NSLock()
+            private var left = 6
+            private var asked: [String] = []
+            var askedList: [String] { lock.withLock { asked } }
+            private func target(_ name: String) -> RefreshTarget {
+                RefreshTarget(seed: RadioSeed(mediaId: name, videoId: "v" + name, title: name, primaryArtist: name, durationMs: 1),
+                              rid: 1, artistName: name)
+            }
+            func radioSeeds() async -> [RefreshTarget] { (1...8).map { target("r\($0)") } }
+            func artistSeeds() async -> [RefreshTarget] { [] }
+            func requestsLeft() async -> Int { lock.withLock { left } }
+            func releasesReserve() async -> Int { 4 }
+            func radio(_ target: RefreshTarget) async -> RefreshFetch {
+                lock.withLock { left -= 1; asked.append("radio") }
+                return .network
+            }
+            func artist(_ target: RefreshTarget) async -> RefreshFetch { .none }
+            func releaseTargets() async -> [RefreshTarget] { [target("x1"), target("x2")] }
+            func releases(_ target: RefreshTarget) async -> RefreshFetch {
+                lock.withLock { left -= 1; asked.append("releases:\(target.artistName)") }
+                return .network
+            }
+        }
+        let work = Spend()
+        let report = await BrainRefreshRunner(work: work, allowed: { true }, playing: { false }).run()
+        // Six requests left, four kept: two radios, then the releases lane gets the rest.
+        #expect(work.askedList == ["radio", "radio", "releases:x1", "releases:x2"])
+        #expect(report.radiosFetched == 2 && report.releasesFetched == 2)
+    }
+
     @Test func theSwitchStopsTheLaneAtOnce() async {
         let flag = Box(true)
         let work = Work()

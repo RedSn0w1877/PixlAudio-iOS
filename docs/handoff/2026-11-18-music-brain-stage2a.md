@@ -592,6 +592,11 @@ in PixlCore, and one AppTests test for the tracker. Nothing was run on a device.
 103. **The pending BG request is cancelled when the refresh is off**; `runRefresh` is single-flight for both entry points.
 104. **`BrainMixes.minSongs` is 3** (Android's `MIN_SAVED_SONGS`), and `topArtistSeeds` skips "various artists", "unknown artist", "unknown", "va", "<unknown>".
 105. **`KeyedLogStore.remove`** is linear; a large prune is one append.
+106. **Lane 1 of the refresh leaves the releases lane 4 requests of the day** (`RefreshWork.releasesReserve`, Android's `RELEASES_RESERVE`), so a day of radios cannot starve
+    "New from artists you play". Android's persisted `RequestLedger` (every `HostBudget` token, across restarts) is NOT ported: here the worker's day is the
+    radios fetched plus the releases lane's own requests, and `HostBudget`'s bucket bounds the foreground; Autoplay and station requests do not count
+    against the worker's 40. Android's other review changes (a `brain_state_seen` flag, no brain read at launch on a saved-mix day) have no iOS twin
+    needed: Home reads the saved mix without the brain's state already.
 
 ### Not met, said plainly
 
