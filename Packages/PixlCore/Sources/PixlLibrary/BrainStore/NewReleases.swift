@@ -253,6 +253,14 @@ public struct BrainReleaseRow: Sendable, Hashable, Identifiable {
     }
 }
 
+/// The local calendar, for the year rule of 6.3.
+public enum NewReleaseCalendar {
+    public static func localYearAndMonth(_ ms: Int64) -> (year: Int, month: Int) {
+        let parts = Calendar.current.dateComponents([.year, .month], from: Date(timeIntervalSince1970: Double(ms) / 1000.0))
+        return (parts.year ?? 1970, parts.month ?? 1)
+    }
+}
+
 /// New releases by the artists the listener plays.
 public actor NewReleases {
     private static let dayMs: Int64 = 24 * 60 * 60 * 1000
@@ -265,19 +273,23 @@ public actor NewReleases {
     private var memory: NewReleaseFile?
     private var busy = false
 
+    /// The app's: the clock is the wall clock and the year and month are the local ones.
+    public init(store: any ReleaseFileStore, source: (any RadioSource)?, repository: BrainRepository) {
+        self.store = store
+        self.source = source
+        self.repository = repository
+        clock = { currentTimeMillis() }
+        yearAndMonth = { NewReleaseCalendar.localYearAndMonth($0) }
+    }
+
+    /// Tests: the clock and the calendar are given.
     public init(store: any ReleaseFileStore, source: (any RadioSource)?, repository: BrainRepository,
-                clock: @escaping @Sendable () -> Int64 = { currentTimeMillis() },
-                yearAndMonth: @escaping @Sendable (Int64) -> (year: Int, month: Int) = NewReleases.localYearAndMonth) {
+                clock: @escaping @Sendable () -> Int64, yearAndMonth: @escaping @Sendable (Int64) -> (year: Int, month: Int)) {
         self.store = store
         self.source = source
         self.repository = repository
         self.clock = clock
         self.yearAndMonth = yearAndMonth
-    }
-
-    public static func localYearAndMonth(_ ms: Int64) -> (year: Int, month: Int) {
-        let parts = Calendar.current.dateComponents([.year, .month], from: Date(timeIntervalSince1970: Double(ms) / 1000.0))
-        return (parts.year ?? 1970, parts.month ?? 1)
     }
 
     private func state() -> NewReleaseFile {
