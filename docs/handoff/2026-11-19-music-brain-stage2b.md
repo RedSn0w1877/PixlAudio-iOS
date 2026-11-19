@@ -460,3 +460,10 @@ cmd //c "ci\swiftw.cmd test --package-path Packages\PixlCore"                   
 bash ci/check-forbidden.sh                                                              # OK
 powershell -NoProfile -ExecutionPolicy Bypass -File ci/parse-check.ps1                  # 235 files OK
 ```
+
+## CI (review pass)
+
+Run **44517206205** (`012feb0`, workflow `ci`, branch `music-brain`): `core` passed and `app` compiled everything (Swift 6, strict concurrency);
+the first attempt failed one test, `StoreTests.testPlaybackStoreWithDemoEngine` (`store.isPlaying` after a 50 ms sleep on the demo engine, code
+this pass does not touch), and **passed on rerun** (`gh run rerun --failed`): a timing flake, not in the earlier known list. Conclusion: **success**.
+Green CI says nothing about how the new Home looks or behaves on a phone.
