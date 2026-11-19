@@ -291,6 +291,16 @@ public enum Affinity {
         }
     }
 
+    /// The tag part of `applyEvent` (5.2): each of the track's tags gets the play with the weight `q / 255` as its part, in
+    /// the tag vector's order. Called next to `applyEvent` when the track's tags are known; a play that was never
+    /// audible or is excluded from the counters touches nothing, as there.
+    public static func applyTags(_ state: inout State, _ e: PlayEvent, _ g: Reward.Graded, tags: Tags.Vector, tMs: Int64) {
+        if e.has(EventFlags.neverAudible) || e.has(EventFlags.learnExcluded) { return }
+        for t in tags.tags {
+            apply(&state, family: Family.tag, key: Int64(t.atlasId), r: g.r, c: g.cOther, part: Double(t.q) / 255.0, tMs: tMs)
+        }
+    }
+
     /// Takes one event's own contribution back out of the tables (5.2, "Undo (stage 2)"): "Don't count this" removes what
     /// `applyEvent` added, `c * r * part` and `c * (1 - r) * part` decayed to the counter's own time, floored at 0, for
     /// every key the event touched, and its completion. `tMs` is the time the event was applied with (its start, clamped

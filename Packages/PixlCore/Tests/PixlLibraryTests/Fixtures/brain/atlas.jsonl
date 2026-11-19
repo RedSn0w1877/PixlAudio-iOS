@@ -1,0 +1,721 @@
+{"fn":"meta","in":{},"out":{"version":1,"genres":2249,"families":24,"moods":40,"familyNames":["pop","rock","metal","punk","hip hop","r&b and soul","electronic","house and techno","ambient and downtempo","jazz","blues","country","folk","classical","soundtrack","latin","reggae and caribbean","african","east asian pop","south and southeast asian","middle eastern","brazilian","gospel and religious","experimental"],"moodNames":["chill","relaxed","peaceful","dreamy","cozy","sad","melancholic","heartbreak","nostalgic","moody","dark","mysterious","gritty","raw","aggressive","angry","intense","rebellious","energetic","workout","party","festive","playful","happy","bright","uplifting","hopeful","summer","romantic","sensual","groovy","funky","confident","epic","cinematic","lush","focus","sleep","night drive","spiritual"]}}
+{"fn":"name","in":{"text":"zouglou"},"out":{"id":1478}}
+{"fn":"name","in":{"text":"K-BALLAD"},"out":{"id":1341}}
+{"fn":"name","in":{"text":" post-garage "},"out":{"id":1486}}
+{"fn":"name","in":{"text":"bubble-beat"},"out":{"id":1102}}
+{"fn":"name","in":{"text":"korean ost"},"out":{"id":2232}}
+{"fn":"name","in":{"text":"pop country"},"out":{"id":381}}
+{"fn":"name","in":{"text":"DH"},"out":{"id":966}}
+{"fn":"name","in":{"text":" jug band "},"out":{"id":461}}
+{"fn":"name","in":{"text":"karawitan-Jawa"},"out":{"id":543}}
+{"fn":"name","in":{"text":"tallava"},"out":{"id":616}}
+{"fn":"name","in":{"text":"cutting through ego"},"out":{"id":2016}}
+{"fn":"name","in":{"text":"STEEL BAND"},"out":{"id":1394}}
+{"fn":"name","in":{"text":" cape jazz "},"out":{"id":899}}
+{"fn":"name","in":{"text":"protopunk"},"out":{"id":33}}
+{"fn":"name","in":{"text":"russian romance"},"out":{"id":1783}}
+{"fn":"name","in":{"text":"neurohop"},"out":{"id":894}}
+{"fn":"name","in":{"text":"ABSTRACT ELECTRONIC"},"out":{"id":470}}
+{"fn":"name","in":{"text":" English chant "},"out":{"id":353}}
+{"fn":"name","in":{"text":"yakousei"},"out":{"id":1802}}
+{"fn":"name","in":{"text":"zeybek"},"out":{"id":1060}}
+{"fn":"name","in":{"text":"tassa"},"out":{"id":1944}}
+{"fn":"name","in":{"text":"BRITISH GARAGE"},"out":{"id":1312}}
+{"fn":"name","in":{"text":" power doom "},"out":{"id":1162}}
+{"fn":"name","in":{"text":"roots-rock-reggae"},"out":{"id":2107}}
+{"fn":"name","in":{"text":"electronic body music"},"out":{"id":2114}}
+{"fn":"name","in":{"text":"afrobeat"},"out":{"id":2199}}
+{"fn":"name","in":{"text":"BYTEBEAT"},"out":{"id":666}}
+{"fn":"name","in":{"text":" hornpipe "},"out":{"id":1948}}
+{"fn":"name","in":{"text":"The-God-Squad"},"out":{"id":848}}
+{"fn":"name","in":{"text":"NXC"},"out":{"id":659}}
+{"fn":"name","in":{"text":"DOR"},"out":{"id":365}}
+{"fn":"name","in":{"text":"CANTATA"},"out":{"id":1784}}
+{"fn":"name","in":{"text":" electronica "},"out":{"id":707}}
+{"fn":"name","in":{"text":"POI"},"out":{"id":259}}
+{"fn":"name","in":{"text":"mento"},"out":{"id":1782}}
+{"fn":"name","in":{"text":"minimal drum and bass"},"out":{"id":1263}}
+{"fn":"name","in":{"text":"CHILDREN'S MUSIC"},"out":{"id":971}}
+{"fn":"name","in":{"text":" rebop "},"out":{"id":1477}}
+{"fn":"name","in":{"text":"haitian-vodou-drumming"},"out":{"id":1160}}
+{"fn":"name","in":{"text":"concerto for orchestra"},"out":{"id":1347}}
+{"fn":"name","in":{"text":"bbox"},"out":{"id":425}}
+{"fn":"name","in":{"text":"DEATH INDUSTRIAL"},"out":{"id":268}}
+{"fn":"name","in":{"text":" progressive post-hardcore "},"out":{"id":1055}}
+{"fn":"name","in":{"text":"canci\u00f3n-trovadoresca-cubana"},"out":{"id":284}}
+{"fn":"name","in":{"text":"Appalachian traditional music"},"out":{"id":191}}
+{"fn":"name","in":{"text":"eai"},"out":{"id":1434}}
+{"fn":"name","in":{"text":"SAMBA REGGAETON"},"out":{"id":1676}}
+{"fn":"name","in":{"text":" rasqueado cuiabano "},"out":{"id":1125}}
+{"fn":"name","in":{"text":"dutch-house"},"out":{"id":1017}}
+{"fn":"name","in":{"text":"bard song"},"out":{"id":1936}}
+{"fn":"name","in":{"text":"hexd"},"out":{"id":1026}}
+{"fn":"name","in":{"text":"LULLABIES"},"out":{"id":329}}
+{"fn":"name","in":{"text":" al-laywah "},"out":{"id":945}}
+{"fn":"name","in":{"text":"Afrotrap"},"out":{"id":299}}
+{"fn":"name","in":{"text":"spiritual house"},"out":{"id":872}}
+{"fn":"name","in":{"text":"rhumba"},"out":{"id":519}}
+{"fn":"name","in":{"text":"FUNERAL DEATHCORE"},"out":{"id":1822}}
+{"fn":"name","in":{"text":" schotis madrile\u00f1o "},"out":{"id":2070}}
+{"fn":"name","in":{"text":"lounge"},"out":{"id":1929}}
+{"fn":"name","in":{"text":"sevillanas"},"out":{"id":954}}
+{"fn":"name","in":{"text":"jpop"},"out":{"id":2043}}
+{"fn":"name","in":{"text":"ONKYO"},"out":{"id":254}}
+{"fn":"name","in":{"text":" hip coloqaul rap "},"out":{"id":733}}
+{"fn":"name","in":{"text":"weightless-grime"},"out":{"id":225}}
+{"fn":"name","in":{"text":"hardcore (EDM)"},"out":{"id":424}}
+{"fn":"name","in":{"text":"deep techno"},"out":{"id":972}}
+{"fn":"name","in":{"text":"PRANK CALL AUDIO RECORDING"},"out":{"id":1187}}
+{"fn":"name","in":{"text":" lullaby "},"out":{"id":329}}
+{"fn":"name","in":{"text":"m\u00fasica-turra"},"out":{"id":675}}
+{"fn":"name","in":{"text":"disco-rock"},"out":{"id":365}}
+{"fn":"name","in":{"text":"vocal trance"},"out":{"id":2124}}
+{"fn":"name","in":{"text":"ELECTROSONIC"},"out":{"id":1196}}
+{"fn":"name","in":{"text":" samba-can\u00e7\u00e3o "},"out":{"id":1067}}
+{"fn":"name","in":{"text":"rumba-flamenca"},"out":{"id":1239}}
+{"fn":"name","in":{"text":"futuresynth"},"out":{"id":218}}
+{"fn":"name","in":{"text":"nh\u1ea1c cung \u0111\u00ecnh"},"out":{"id":1011}}
+{"fn":"name","in":{"text":"NEWGRASS"},"out":{"id":1557}}
+{"fn":"name","in":{"text":" sh\u014dmy\u014d "},"out":{"id":897}}
+{"fn":"name","in":{"text":"trillwave"},"out":{"id":293}}
+{"fn":"name","in":{"text":"progressive trap"},"out":{"id":1181}}
+{"fn":"name","in":{"text":"lauda"},"out":{"id":861}}
+{"fn":"name","in":{"text":"ZIGLIBITHY"},"out":{"id":136}}
+{"fn":"name","in":{"text":" Western classical opera "},"out":{"id":741}}
+{"fn":"name","in":{"text":"melodic-techno"},"out":{"id":1131}}
+{"fn":"name","in":{"text":"m\u00e0kina"},"out":{"id":1082}}
+{"fn":"name","in":{"text":"broken beat"},"out":{"id":1796}}
+{"fn":"name","in":{"text":"SURF"},"out":{"id":933}}
+{"fn":"name","in":{"text":" balada rockm\u00e1ntica "},"out":{"id":2136}}
+{"fn":"name","in":{"text":"show-band-music"},"out":{"id":1856}}
+{"fn":"name","in":{"text":"neo-perreo"},"out":{"id":583}}
+{"fn":"name","in":{"text":"chilena"},"out":{"id":58}}
+{"fn":"name","in":{"text":"DRUM AND BUGLE CORPS"},"out":{"id":1707}}
+{"fn":"name","in":{"text":" hard house "},"out":{"id":1369}}
+{"fn":"name","in":{"text":"dikir-barat"},"out":{"id":1539}}
+{"fn":"name","in":{"text":"free car music"},"out":{"id":2040}}
+{"fn":"name","in":{"text":"electro latino"},"out":{"id":1267}}
+{"fn":"name","in":{"text":"NEPALI LOK GIT"},"out":{"id":1508}}
+{"fn":"name","in":{"text":" frat rock "},"out":{"id":3}}
+{"fn":"name","in":{"text":"latin-pop"},"out":{"id":356}}
+{"fn":"name","in":{"text":"neoperreo"},"out":{"id":583}}
+{"fn":"name","in":{"text":"future bounce"},"out":{"id":605}}
+{"fn":"name","in":{"text":"AVANT-GARDE PROGRESSIVE ROCK"},"out":{"id":1994}}
+{"fn":"name","in":{"text":" midi-eval music "},"out":{"id":465}}
+{"fn":"name","in":{"text":"euphoric-hardstyle"},"out":{"id":1642}}
+{"fn":"name","in":{"text":"dhaanto"},"out":{"id":2194}}
+{"fn":"name","in":{"text":"rhythm carimbo"},"out":{"id":1970}}
+{"fn":"name","in":{"text":"WYRD FOLK"},"out":{"id":382}}
+{"fn":"name","in":{"text":" dreamwave "},"out":{"id":1000}}
+{"fn":"name","in":{"text":"tumb\u00e9l\u00e9"},"out":{"id":179}}
+{"fn":"name","in":{"text":"tamborz\u00e3o"},"out":{"id":1282}}
+{"fn":"name","in":{"text":"boom bap"},"out":{"id":1862}}
+{"fn":"name","in":{"text":"RAMKBACH"},"out":{"id":1806}}
+{"fn":"name","in":{"text":" mono "},"out":{"id":481}}
+{"fn":"name","in":{"text":"black-ambient"},"out":{"id":2175}}
+{"fn":"name","in":{"text":"fusion gugak"},"out":{"id":1107}}
+{"fn":"name","in":{"text":"melodic metalcore"},"out":{"id":660}}
+{"fn":"name","in":{"text":"PI PHAT"},"out":{"id":1558}}
+{"fn":"name","in":{"text":" famo "},"out":{"id":475}}
+{"fn":"name","in":{"text":"m\u00fasica-caipira"},"out":{"id":1297}}
+{"fn":"name","in":{"text":"dissonant death metal"},"out":{"id":2154}}
+{"fn":"name","in":{"text":"dangak"},"out":{"id":670}}
+{"fn":"name","in":{"text":"BUBBLEGUM"},"out":{"id":1002}}
+{"fn":"name","in":{"text":" raw punk "},"out":{"id":2138}}
+{"fn":"name","in":{"text":"easycore"},"out":{"id":1425}}
+{"fn":"name","in":{"text":"post-classical"},"out":{"id":1164}}
+{"fn":"name","in":{"text":"hip pop"},"out":{"id":1883}}
+{"fn":"name","in":{"text":"CUMBIA"},"out":{"id":1106}}
+{"fn":"name","in":{"text":" reductionism "},"out":{"id":226}}
+{"fn":"name","in":{"text":"filmi"},"out":{"id":1467}}
+{"fn":"name","in":{"text":"tear-out"},"out":{"id":1866}}
+{"fn":"name","in":{"text":"turbofolk"},"out":{"id":1065}}
+{"fn":"name","in":{"text":"BRITISH BRASS"},"out":{"id":423}}
+{"fn":"name","in":{"text":" bugal\u00fa "},"out":{"id":1962}}
+{"fn":"name","in":{"text":"aboio"},"out":{"id":862}}
+{"fn":"name","in":{"text":"tassa"},"out":{"id":1944}}
+{"fn":"name","in":{"text":"neo-rockabilly"},"out":{"id":890}}
+{"fn":"name","in":{"text":"RAGGAJUNGLE"},"out":{"id":1093}}
+{"fn":"name","in":{"text":" ANW "},"out":{"id":1448}}
+{"fn":"name","in":{"text":"hanmai"},"out":{"id":1536}}
+{"fn":"name","in":{"text":"synth wave"},"out":{"id":218}}
+{"fn":"name","in":{"text":"urumee melam"},"out":{"id":205}}
+{"fn":"name","in":{"text":"HYPER RAVE"},"out":{"id":813}}
+{"fn":"name","in":{"text":" semi trot "},"out":{"id":931}}
+{"fn":"name","in":{"text":"laptop-folk"},"out":{"id":2049}}
+{"fn":"name","in":{"text":"alt-pop"},"out":{"id":1829}}
+{"fn":"name","in":{"text":"onkyo-kei"},"out":{"id":254}}
+{"fn":"name","in":{"text":"NU BREAKS"},"out":{"id":702}}
+{"fn":"name","in":{"text":" tango "},"out":{"id":317}}
+{"fn":"name","in":{"text":"Romanian-minimal"},"out":{"id":1854}}
+{"fn":"name","in":{"text":"speedcore"},"out":{"id":20}}
+{"fn":"name","in":{"text":"prank call audio recording"},"out":{"id":1187}}
+{"fn":"name","in":{"text":"BREAKBEAT INDONESIA"},"out":{"id":1928}}
+{"fn":"name","in":{"text":" zoblazo "},"out":{"id":1845}}
+{"fn":"name","in":{"text":"ska-revival"},"out":{"id":203}}
+{"fn":"name","in":{"text":"nocilla pop"},"out":{"id":2132}}
+{"fn":"name","in":{"text":"lite rock"},"out":{"id":1110}}
+{"fn":"name","in":{"text":"\u00d2RAIN LUATHAIDH"},"out":{"id":1138}}
+{"fn":"name","in":{"text":" surf & drag "},"out":{"id":1798}}
+{"fn":"name","in":{"text":"operetta"},"out":{"id":1577}}
+{"fn":"name","in":{"text":"antifolk"},"out":{"id":220}}
+{"fn":"name","in":{"text":"minnesang"},"out":{"id":1358}}
+{"fn":"name","in":{"text":"CARTOON RAVE"},"out":{"id":1534}}
+{"fn":"name","in":{"text":" seto leelo "},"out":{"id":189}}
+{"fn":"name","in":{"text":"cuarteto"},"out":{"id":623}}
+{"fn":"name","in":{"text":"trance"},"out":{"id":351}}
+{"fn":"name","in":{"text":"gamelan selonding"},"out":{"id":1301}}
+{"fn":"name","in":{"text":"TECHNICAL THRASH METAL"},"out":{"id":716}}
+{"fn":"name","in":{"text":" chamber music "},"out":{"id":2247}}
+{"fn":"name","in":{"text":"coimbra-fado"},"out":{"id":15}}
+{"fn":"name","in":{"text":"passion"},"out":{"id":34}}
+{"fn":"name","in":{"text":"punto"},"out":{"id":1811}}
+{"fn":"name","in":{"text":"MEDIEVAL LYRIC POETRY"},"out":{"id":877}}
+{"fn":"name","in":{"text":" latin house "},"out":{"id":171}}
+{"fn":"name","in":{"text":"southern-gospel"},"out":{"id":1870}}
+{"fn":"name","in":{"text":"trap soul"},"out":{"id":1618}}
+{"fn":"name","in":{"text":"freestyle"},"out":{"id":1686}}
+{"fn":"name","in":{"text":"INSTRUMENTAL MUSIC"},"out":{"id":620}}
+{"fn":"name","in":{"text":" electro shaabi "},"out":{"id":114}}
+{"fn":"name","in":{"text":"rap-metal"},"out":{"id":289}}
+{"fn":"name","in":{"text":"skizzo"},"out":{"id":2169}}
+{"fn":"name","in":{"text":"glitch music"},"out":{"id":206}}
+{"fn":"name","in":{"text":"NITZHONOT TRANCE"},"out":{"id":850}}
+{"fn":"name","in":{"text":" ambient dub "},"out":{"id":1365}}
+{"fn":"name","in":{"text":"emo-pop-punk"},"out":{"id":192}}
+{"fn":"name","in":{"text":"salsa rom\u00e1ntica"},"out":{"id":2196}}
+{"fn":"name","in":{"text":"techno bass"},"out":{"id":2159}}
+{"fn":"name","in":{"text":"DITTI"},"out":{"id":1117}}
+{"fn":"name","in":{"text":" krontjong "},"out":{"id":1336}}
+{"fn":"name","in":{"text":"kwasa-kwasa"},"out":{"id":1581}}
+{"fn":"name","in":{"text":"tamborera"},"out":{"id":565}}
+{"fn":"name","in":{"text":"dobrado"},"out":{"id":2031}}
+{"fn":"name","in":{"text":"BUCHIAGE TRANCE"},"out":{"id":295}}
+{"fn":"name","in":{"text":" nepali lok geet "},"out":{"id":1508}}
+{"fn":"name","in":{"text":"cha-cha"},"out":{"id":2020}}
+{"fn":"name","in":{"text":"gamelan jegog"},"out":{"id":735}}
+{"fn":"name","in":{"text":"cape breton fiddling"},"out":{"id":431}}
+{"fn":"name","in":{"text":"ZENONESQUE"},"out":{"id":505}}
+{"fn":"name","in":{"text":" pizzica "},"out":{"id":2205}}
+{"fn":"name","in":{"text":"marching-percussion"},"out":{"id":2003}}
+{"fn":"name","in":{"text":"Lucian kuduro"},"out":{"id":922}}
+{"fn":"name","in":{"text":"son calentano"},"out":{"id":1163}}
+{"fn":"name","in":{"text":"CONGOLESE TRADI-MODERN"},"out":{"id":1088}}
+{"fn":"name","in":{"text":" deep house "},"out":{"id":1129}}
+{"fn":"name","in":{"text":"Chilean-cumbia"},"out":{"id":554}}
+{"fn":"name","in":{"text":"vocal trance"},"out":{"id":2124}}
+{"fn":"name","in":{"text":"technical death metal"},"out":{"id":1898}}
+{"fn":"name","in":{"text":"PHLENG LUK KRUNG"},"out":{"id":1279}}
+{"fn":"name","in":{"text":" waltz music "},"out":{"id":634}}
+{"fn":"name","in":{"text":"dhol-tasha"},"out":{"id":82}}
+{"fn":"name","in":{"text":"audio fairy tale"},"out":{"id":110}}
+{"fn":"name","in":{"text":"jibonmukhi gaan"},"out":{"id":1373}}
+{"fn":"name","in":{"text":"TOCHATA"},"out":{"id":334}}
+{"fn":"name","in":{"text":" powerbounce "},"out":{"id":1666}}
+{"fn":"name","in":{"text":"frevo-de-rua"},"out":{"id":648}}
+{"fn":"name","in":{"text":"fusion"},"out":{"id":294}}
+{"fn":"name","in":{"text":"techno-trance"},"out":{"id":2047}}
+{"fn":"name","in":{"text":"BIGUINE"},"out":{"id":664}}
+{"fn":"name","in":{"text":" reggae drum and bass "},"out":{"id":610}}
+{"fn":"name","in":{"text":"land\u00f3"},"out":{"id":936}}
+{"fn":"name","in":{"text":"human beat box"},"out":{"id":425}}
+{"fn":"name","in":{"text":"underground hip-hop"},"out":{"id":22}}
+{"fn":"name","in":{"text":"RURAL BLUES"},"out":{"id":228}}
+{"fn":"name","in":{"text":" corrido "},"out":{"id":1847}}
+{"fn":"name","in":{"text":"deep-drum-and-bass"},"out":{"id":1926}}
+{"fn":"name","in":{"text":"bytebeat"},"out":{"id":666}}
+{"fn":"name","in":{"text":"parlour song"},"out":{"id":1308}}
+{"fn":"name","in":{"text":"NARODNOZABAVNA GLASBA"},"out":{"id":2076}}
+{"fn":"name","in":{"text":" dutch trancecore "},"out":{"id":1935}}
+{"fn":"name","in":{"text":"colind\u0103"},"out":{"id":2078}}
+{"fn":"name","in":{"text":"stench"},"out":{"id":1916}}
+{"fn":"name","in":{"text":"early reggae"},"out":{"id":1725}}
+{"fn":"name","in":{"text":"FANTEZI"},"out":{"id":2170}}
+{"fn":"name","in":{"text":" dub music "},"out":{"id":1709}}
+{"fn":"name","in":{"text":"new-york-drill"},"out":{"id":1134}}
+{"fn":"name","in":{"text":"fantezi"},"out":{"id":2170}}
+{"fn":"name","in":{"text":"skatecore"},"out":{"id":1599}}
+{"fn":"name","in":{"text":"JOVEM GUARDA"},"out":{"id":89}}
+{"fn":"name","in":{"text":" tropicalia "},"out":{"id":1867}}
+{"fn":"name","in":{"text":"m\u00fasica-popular-brasileira"},"out":{"id":1097}}
+{"fn":"name","in":{"text":"anison"},"out":{"id":2228}}
+{"fn":"name","in":{"text":"toada"},"out":{"id":357}}
+{"fn":"name","in":{"text":"SOFT ROCK"},"out":{"id":1110}}
+{"fn":"name","in":{"text":" melodic techno "},"out":{"id":1131}}
+{"fn":"name","in":{"text":"pumpcore"},"out":{"id":178}}
+{"fn":"name","in":{"text":"jungle juke"},"out":{"id":1432}}
+{"fn":"name","in":{"text":"cumbia tejana"},"out":{"id":1945}}
+{"fn":"name","in":{"text":"INDIAN CLASSICAL MUSIC"},"out":{"id":614}}
+{"fn":"name","in":{"text":" psychedelic "},"out":{"id":1851}}
+{"fn":"name","in":{"text":"dub-music"},"out":{"id":1709}}
+{"fn":"name","in":{"text":"nh\u1ea1c ti\u1ec1n chi\u1ebfn"},"out":{"id":853}}
+{"fn":"name","in":{"text":"Occitan polyphonic chant"},"out":{"id":878}}
+{"fn":"name","in":{"text":"POP-JAZZ"},"out":{"id":1720}}
+{"fn":"name","in":{"text":" pop minangkabau "},"out":{"id":420}}
+{"fn":"name","in":{"text":"son-huasteco"},"out":{"id":1814}}
+{"fn":"name","in":{"text":"synthesizer dance"},"out":{"id":651}}
+{"fn":"name","in":{"text":"flutter house"},"out":{"id":435}}
+{"fn":"name","in":{"text":"K-R&B"},"out":{"id":2233}}
+{"fn":"name","in":{"text":" punto cubano "},"out":{"id":1811}}
+{"fn":"name","in":{"text":"retro-swing"},"out":{"id":843}}
+{"fn":"name","in":{"text":"mantram"},"out":{"id":706}}
+{"fn":"name","in":{"text":"K-Pop"},"out":{"id":1566}}
+{"fn":"name","in":{"text":"k pop"},"out":{"id":1566}}
+{"fn":"name","in":{"text":"V-pop"},"out":{"id":991}}
+{"fn":"name","in":{"text":"Vietnamese Hip Hop"},"out":{"id":2239}}
+{"fn":"name","in":{"text":"vietnamese indie"},"out":{"id":2240}}
+{"fn":"name","in":{"text":"Shoegaze"},"out":{"id":1422}}
+{"fn":"name","in":{"text":"R&B"},"out":{"id":412}}
+{"fn":"name","in":{"text":"Rhythm and Blues"},"out":{"id":412}}
+{"fn":"name","in":{"text":"Hip-Hop/Rap"},"out":{"id":695}}
+{"fn":"name","in":{"text":"rap"},"out":{"id":695}}
+{"fn":"name","in":{"text":"dance pop"},"out":{"id":1562}}
+{"fn":"name","in":{"text":"Lo-Fi Beats"},"out":{"id":888}}
+{"fn":"name","in":{"text":"bossa nova"},"out":{"id":745}}
+{"fn":"name","in":{"text":"Nh\u1ea1c V\u00e0ng"},"out":{"id":1280}}
+{"fn":"name","in":{"text":"nhac vang"},"out":{"id":1280}}
+{"fn":"name","in":{"text":"Trap"},"out":{"id":1348}}
+{"fn":"name","in":{"text":"EDM"},"out":{"id":485}}
+{"fn":"name","in":{"text":"Vinahouse"},"out":{"id":462}}
+{"fn":"name","in":{"text":"singer/songwriter"},"out":{"id":576}}
+{"fn":"name","in":{"text":"city pop"},"out":{"id":827}}
+{"fn":"name","in":{"text":"not a genre at all"},"out":{"id":-1}}
+{"fn":"name","in":{"text":""},"out":{"id":-1}}
+{"fn":"name","in":{"text":"   "},"out":{"id":-1}}
+{"fn":"name","in":{"text":"chill"},"out":{"id":1020}}
+{"fn":"name","in":{"text":"2010s"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"love"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"workout"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"popular"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Bad Habits"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Butt Rock Billionaire"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Ari Abdul"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Ch\u0103m Hoa"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Feel-Good R&B Pop"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"D>E>A>T>H>M>E>T>A>L"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Goo Goo Dolls"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Alka Yagnik"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Be Kind"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Djo"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Abstract Hip-Hop"},"out":{"id":1950}}
+{"fn":"name","in":{"text":"Bag Raiders"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Better Believe"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Alan Walker"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Broken Toy Airplanes"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Easy Going Sertanejo"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Dwight Evans"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Ambient Music Japan"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Crooked Colours"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Ai C\u0169ng Ph\u1ea3i B\u1eaft \u0110\u1ea7u T\u1eeb \u0110\u00e2u \u0110\u00f3"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"tab\u0009separated"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Ch\u1eafc Ai \u0110\u00f3 S\u1ebd V\u1ec1"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Abstract Hip-Hop"},"out":{"id":1950}}
+{"fn":"name","in":{"text":"B Ray"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"2AM"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"A Place In The Sun"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"3two (EP)"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"BASIC INSTINCTS"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Big Sean"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"DT T\u1eadp Rap"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Eminem"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Mot\u00f6rhead"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Mrs. GREEN APPLE"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Fe3O4: BREAK"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Gazpachuelo (VOL.1)"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Th\u1ecbnh Suy"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"070 Shake"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Exitos con banda"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"Glenn Beck"},"out":{"id":-1}}
+{"fn":"name","in":{"text":"BL00MS"},"out":{"id":-1}}
+{"fn":"mbid","in":{"text":"f6fb8e67-cd02-4fb4-b256-2970000dcb46"},"out":{"id":2149}}
+{"fn":"mbid","in":{"text":"01a2c709-21ce-404d-b338-14bc389ac753"},"out":{"id":11}}
+{"fn":"mbid","in":{"text":"cf7c6a4f-9e37-4dac-b0b7-fd70fced51a2"},"out":{"id":1794}}
+{"fn":"mbid","in":{"text":"7204cef3-6608-4696-af7e-bd40db94e569"},"out":{"id":1018}}
+{"fn":"mbid","in":{"text":"9560ece3-b1b8-416f-9cd8-d7d2bf79d725"},"out":{"id":1310}}
+{"fn":"mbid","in":{"text":"3890d16f-1bee-4856-be11-32a40debee17"},"out":{"id":475}}
+{"fn":"mbid","in":{"text":"26685717-e1b6-4b27-991f-8a8f982c19af"},"out":{"id":314}}
+{"fn":"mbid","in":{"text":"6ef74f46-c687-439e-9057-26804ebfe558"},"out":{"id":990}}
+{"fn":"mbid","in":{"text":"c81d4b3d-e4cd-426c-b5c9-b175d81f81aa"},"out":{"id":1717}}
+{"fn":"mbid","in":{"text":"81003386-f8ee-4c22-af5d-ae3514afbc8b"},"out":{"id":1139}}
+{"fn":"mbid","in":{"text":"7c3be1db-8973-46ae-989a-bd2f2d7267d2"},"out":{"id":1103}}
+{"fn":"mbid","in":{"text":"c03e5faa-1ec3-463d-95d5-96a550189510"},"out":{"id":1659}}
+{"fn":"mbid","in":{"text":"d2327987-362f-4d70-8bfd-a8b47c3b0a54"},"out":{"id":1817}}
+{"fn":"mbid","in":{"text":"0255f4d0-a363-4d82-aba1-edbf7545c711"},"out":{"id":17}}
+{"fn":"mbid","in":{"text":"7d22c459-5f2e-4443-b383-518c03aa990c"},"out":{"id":1112}}
+{"fn":"mbid","in":{"text":"1e661112-612a-487a-a3de-180816200eab"},"out":{"id":254}}
+{"fn":"mbid","in":{"text":"ed2e5e6b-2af6-4c7c-a9fb-e2e886bfda38"},"out":{"id":2055}}
+{"fn":"mbid","in":{"text":"d031678a-15f2-4722-ab3a-a3ae297e41e9"},"out":{"id":1801}}
+{"fn":"mbid","in":{"text":"532af7e7-79d1-4bd2-9416-7b7c5860a66e"},"out":{"id":699}}
+{"fn":"mbid","in":{"text":"d024e2e6-842c-43f7-b46e-8d0b87a4cd8e"},"out":{"id":1800}}
+{"fn":"mbid","in":{"text":"94eed6a9-901c-4de7-bd7c-e02dee690330"},"out":{"id":1307}}
+{"fn":"mbid","in":{"text":"92714b3a-a40a-4b75-9d7a-ed0fcd6e326d"},"out":{"id":1280}}
+{"fn":"mbid","in":{"text":"4b30a9db-97ea-4f0b-b3bc-2293994eaafb"},"out":{"id":625}}
+{"fn":"mbid","in":{"text":"5c6ed789-779a-4851-ae85-0f0305084c2b"},"out":{"id":794}}
+{"fn":"mbid","in":{"text":"56c3e042-67ee-47c5-95fe-021b6f89cce4"},"out":{"id":740}}
+{"fn":"mbid","in":{"text":"7fc914c1-a44e-43fd-ace8-63a2c6550057"},"out":{"id":1131}}
+{"fn":"mbid","in":{"text":"2535b30c-b079-4e7d-bd63-c288a479b702"},"out":{"id":308}}
+{"fn":"mbid","in":{"text":"bec0194d-b9ec-4c82-86fd-4a390ec06d61"},"out":{"id":1644}}
+{"fn":"mbid","in":{"text":"1ec74b4b-4f9f-4aa4-9a46-b840382f3a59"},"out":{"id":256}}
+{"fn":"mbid","in":{"text":"948034ab-1e31-4d5b-b447-71eb53c611ca"},"out":{"id":1303}}
+{"fn":"mbid","in":{"text":"0d9335ad-25ed-465e-8321-69e6b96e7cd2"},"out":{"id":118}}
+{"fn":"mbid","in":{"text":"e254f865-58ea-4483-9b2f-1bc65febcd71"},"out":{"id":1967}}
+{"fn":"mbid","in":{"text":"26685717-e1b6-4b27-991f-8a8f982c19af"},"out":{"id":314}}
+{"fn":"mbid","in":{"text":"8a14f570-7297-438d-996d-8797f9b8cfcc"},"out":{"id":1205}}
+{"fn":"mbid","in":{"text":"6e1509e6-4b37-4fee-a8b4-93ccaba6547e"},"out":{"id":978}}
+{"fn":"mbid","in":{"text":"e48771f8-b9e0-4cab-ab31-d636e2a4cb1f"},"out":{"id":1981}}
+{"fn":"mbid","in":{"text":"31e04673-75cd-4ae0-af3c-ad9081e39f5b"},"out":{"id":414}}
+{"fn":"mbid","in":{"text":"b9a125e0-5ce5-40ff-8325-2480cb3c1865"},"out":{"id":1591}}
+{"fn":"mbid","in":{"text":"1f9c8654-33a5-4030-8fb8-f26ad9ad9874"},"out":{"id":263}}
+{"fn":"mbid","in":{"text":"ca06817d-8622-4120-b49d-96921c8bb767"},"out":{"id":1733}}
+{"fn":"mbid","in":{"text":"1f9c4b4a-c43d-40bd-b806-357153641fd0"},"out":{"id":262}}
+{"fn":"mbid","in":{"text":"5054b150-e6b1-4330-aecc-f08f420e4646"},"out":{"id":671}}
+{"fn":"mbid","in":{"text":"50a99000-1e63-444e-8624-7c45fb517d9d"},"out":{"id":674}}
+{"fn":"mbid","in":{"text":"640fb6e1-c2b9-40be-bbd0-4da3c4d4832c"},"out":{"id":872}}
+{"fn":"mbid","in":{"text":"02b2f720-d06e-42ce-85c2-1ecd4191ffcb"},"out":{"id":19}}
+{"fn":"mbid","in":{"text":"bbe70cad-e184-42e5-9b90-e14438ba4363"},"out":{"id":1616}}
+{"fn":"mbid","in":{"text":"6f411023-a59f-4546-b8a3-ae8127911cec"},"out":{"id":994}}
+{"fn":"mbid","in":{"text":"cbea6078-eff4-42e9-ad94-8a1a049ca5c5"},"out":{"id":1750}}
+{"fn":"mbid","in":{"text":"e4581b76-a842-440b-9b0f-1aa7a00a5c57"},"out":{"id":1980}}
+{"fn":"mbid","in":{"text":"8bf3c587-1cde-4d44-91c4-d2d60e17783a"},"out":{"id":1223}}
+{"fn":"mbid","in":{"text":"8e784767-f9f9-4ef5-9849-539033dc1252"},"out":{"id":1254}}
+{"fn":"mbid","in":{"text":"673be496-4e5b-4043-aef8-345030d7ab9b"},"out":{"id":901}}
+{"fn":"mbid","in":{"text":"77f67575-46ed-4447-afc1-ebcd2ab36b66"},"out":{"id":1070}}
+{"fn":"mbid","in":{"text":"b66954d8-1fd8-4338-8de0-4f2a2ac19958"},"out":{"id":1556}}
+{"fn":"mbid","in":{"text":"e427198e-072f-4b2b-8dbf-f89172a82fd7"},"out":{"id":1977}}
+{"fn":"mbid","in":{"text":"34cd43be-4711-4e77-a25c-c6d6a4bf3cb4"},"out":{"id":441}}
+{"fn":"mbid","in":{"text":"fb880da7-5d39-45df-a8ab-eb7f99b223fd"},"out":{"id":2189}}
+{"fn":"mbid","in":{"text":"7e484407-7a78-48a9-bf2d-586bd2705739"},"out":{"id":1119}}
+{"fn":"mbid","in":{"text":"9140a1ef-2a69-4af3-90fa-0ef760e5c887"},"out":{"id":1274}}
+{"fn":"mbid","in":{"text":"e367c884-d94d-4fba-abc4-8ac51d167ccf"},"out":{"id":1975}}
+{"fn":"mbid","in":{"text":"948034ab-1e31-4d5b-b447-71eb53c611ca"},"out":{"id":1303}}
+{"fn":"mbid","in":{"text":"e94c28db-21a2-43de-9e58-8113fba2c732"},"out":{"id":2024}}
+{"fn":"mbid","in":{"text":"ee5490d6-845d-4980-b3d7-cd7efa49ebba"},"out":{"id":2068}}
+{"fn":"mbid","in":{"text":"48095aaf-c31d-4bfc-9578-8755c71d44af"},"out":{"id":591}}
+{"fn":"mbid","in":{"text":"bbad9cda-bde2-448e-821c-7ebf85a54020"},"out":{"id":1611}}
+{"fn":"mbid","in":{"text":"489cf2f9-0edd-4fbc-aa05-ae248706cb3e"},"out":{"id":596}}
+{"fn":"mbid","in":{"text":"daf31859-bf65-495b-a15a-7e522c1f269e"},"out":{"id":1891}}
+{"fn":"mbid","in":{"text":"dfe8e409-3aaf-45ca-a32e-b446d5ca2e4b"},"out":{"id":1947}}
+{"fn":"mbid","in":{"text":"ae406dcd-8da9-4ff5-9ee1-71f4165c3128"},"out":{"id":1491}}
+{"fn":"mbid","in":{"text":"5ac64352-db68-4fc2-9f4a-c434349657d3"},"out":{"id":776}}
+{"fn":"mbid","in":{"text":"a41ccf56-c24c-4fe4-bbe4-22784720646c"},"out":{"id":1424}}
+{"fn":"mbid","in":{"text":"4f2977aa-6943-404a-b8ec-295639ff0adf"},"out":{"id":659}}
+{"fn":"mbid","in":{"text":"7768fdf0-63fa-4bce-ab1f-5b7471ccd971"},"out":{"id":1063}}
+{"fn":"mbid","in":{"text":"01ecf8e4-7f7a-4145-ae97-504d3109633d"},"out":{"id":14}}
+{"fn":"mbid","in":{"text":"dd5ad210-043c-4af3-86bd-91bedd9ca827"},"out":{"id":1925}}
+{"fn":"mbid","in":{"text":"53ab2484-e9f7-4709-9f0e-275446e7ff7c"},"out":{"id":709}}
+{"fn":"mbid","in":{"text":"2c2fe37b-2657-47b5-b3a8-e8a4d7be07d0"},"out":{"id":364}}
+{"fn":"mbid","in":{"text":"7abbbbea-21ea-4167-bcea-48147bf642b8"},"out":{"id":1094}}
+{"fn":"mbid","in":{"text":"9ae35448-af12-4405-9618-18369dff558f"},"out":{"id":1357}}
+{"fn":"mbid","in":{"text":"130790af-ee2d-478f-a02a-f8c1b999e23c"},"out":{"id":156}}
+{"fn":"mbid","in":{"text":"00000000-0000-0000-0000-000000000000"},"out":{"id":-1}}
+{"fn":"source","in":{"source":"deezer","raw":"All"},"out":{"ids":[],"resolved":[]}}
+{"fn":"source","in":{"source":"deezer","raw":"Pop"},"out":{"ids":[1273],"resolved":[1273]}}
+{"fn":"source","in":{"source":"deezer","raw":"Rap/Hip Hop"},"out":{"ids":[695],"resolved":[695]}}
+{"fn":"source","in":{"source":"deezer","raw":"Soul & Funk"},"out":{"ids":[237,2209],"resolved":[237,2209]}}
+{"fn":"source","in":{"source":"deezer","raw":"Films/Games"},"out":{"ids":[2235],"resolved":[2235]}}
+{"fn":"source","in":{"source":"deezer","raw":"Asian Music"},"out":{"ids":[],"resolved":[]}}
+{"fn":"source","in":{"source":"deezer","raw":"Latin Music"},"out":{"ids":[1031],"resolved":[1031]}}
+{"fn":"source","in":{"source":"deezer","raw":"Kids"},"out":{"ids":[],"resolved":[]}}
+{"fn":"source","in":{"source":"deezer","raw":"Cumbia"},"out":{"ids":[1106],"resolved":[1106]}}
+{"fn":"source","in":{"source":"deezer","raw":"rock"},"out":{"ids":[125],"resolved":[125]}}
+{"fn":"source","in":{"source":"itunes","raw":"Hip-Hop/Rap"},"out":{"ids":[695],"resolved":[695]}}
+{"fn":"source","in":{"source":"itunes","raw":"K-Pop"},"out":{"ids":[1566],"resolved":[1566]}}
+{"fn":"source","in":{"source":"itunes","raw":"Cantopop/HK-Pop"},"out":{"ids":[1077],"resolved":[1077]}}
+{"fn":"source","in":{"source":"itunes","raw":"Jungle/Drum'n'bass"},"out":{"ids":[581,2037],"resolved":[581,2037]}}
+{"fn":"source","in":{"source":"itunes","raw":"Death Metal/Black Metal"},"out":{"ids":[2038,148],"resolved":[2038,148]}}
+{"fn":"source","in":{"source":"itunes","raw":"Holiday"},"out":{"ids":[],"resolved":[]}}
+{"fn":"source","in":{"source":"itunes","raw":"Singer/Songwriter"},"out":{"ids":[576],"resolved":[576]}}
+{"fn":"source","in":{"source":"itunes","raw":"Pop Latino"},"out":{"ids":[356],"resolved":[356]}}
+{"fn":"source","in":{"source":"itunes","raw":"R&B/Soul"},"out":{"ids":[412,237],"resolved":[412,237]}}
+{"fn":"source","in":{"source":"itunes","raw":"Bollywood"},"out":{"ids":[1467],"resolved":[1467]}}
+{"fn":"source","in":{"source":"itunes","raw":"Alternative"},"out":{"ids":[1789],"resolved":[1789]}}
+{"fn":"source","in":{"source":"itunes","raw":"Fantasy"},"out":{"ids":null,"resolved":[1317]}}
+{"fn":"source","in":{"source":"chip","raw":"Pop"},"out":{"ids":[1273],"resolved":[1273]}}
+{"fn":"source","in":{"source":"chip","raw":"Hip-Hop"},"out":{"ids":[695],"resolved":[695]}}
+{"fn":"source","in":{"source":"chip","raw":"V-Pop"},"out":{"ids":[991],"resolved":[991]}}
+{"fn":"source","in":{"source":"chip","raw":"Vietnamese Hip Hop"},"out":{"ids":[2239],"resolved":[2239]}}
+{"fn":"source","in":{"source":"chip","raw":"Adult Pop"},"out":{"ids":[2245],"resolved":[2245]}}
+{"fn":"source","in":{"source":"chip","raw":"Romance"},"out":{"ids":null,"resolved":[]}}
+{"fn":"source","in":{"source":"chip","raw":"2010s"},"out":{"ids":null,"resolved":[]}}
+{"fn":"source","in":{"source":"chip","raw":"Popular"},"out":{"ids":null,"resolved":[]}}
+{"fn":"source","in":{"source":"nothing","raw":"Pop"},"out":{"ids":null,"resolved":[1273]}}
+{"fn":"ancestors","in":{"id":393},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":1452},"out":{"ids":[1653,986]}}
+{"fn":"ancestors","in":{"id":115},"out":{"ids":[424,485,1196]}}
+{"fn":"ancestors","in":{"id":745},"out":{"ids":[300]}}
+{"fn":"ancestors","in":{"id":1722},"out":{"ids":[1442]}}
+{"fn":"ancestors","in":{"id":712},"out":{"ids":[45,920]}}
+{"fn":"ancestors","in":{"id":1840},"out":{"ids":[1836,712,1753,45,125,920]}}
+{"fn":"ancestors","in":{"id":1498},"out":{"ids":[125]}}
+{"fn":"ancestors","in":{"id":1711},"out":{"ids":[503,485,1196]}}
+{"fn":"ancestors","in":{"id":2142},"out":{"ids":[40,1634,1231,125]}}
+{"fn":"ancestors","in":{"id":1346},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":110},"out":{"ids":[1712,9]}}
+{"fn":"ancestors","in":{"id":285},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":588},"out":{"ids":[1284,614,986]}}
+{"fn":"ancestors","in":{"id":1778},"out":{"ids":[1355,2223]}}
+{"fn":"ancestors","in":{"id":1766},"out":{"ids":[145]}}
+{"fn":"ancestors","in":{"id":1739},"out":{"ids":[1691,535,210,986]}}
+{"fn":"ancestors","in":{"id":2080},"out":{"ids":[1653,986]}}
+{"fn":"ancestors","in":{"id":1730},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":1395},"out":{"ids":[40,1756,1634,1753,125,1231]}}
+{"fn":"ancestors","in":{"id":1028},"out":{"ids":[1353,986]}}
+{"fn":"ancestors","in":{"id":810},"out":{"ids":[1799,1308]}}
+{"fn":"ancestors","in":{"id":1697},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":523},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":532},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":1055},"out":{"ids":[1500,1231,125]}}
+{"fn":"ancestors","in":{"id":2105},"out":{"ids":[1604]}}
+{"fn":"ancestors","in":{"id":1178},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":1420},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":1824},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":83},"out":{"ids":[1416,485,1196]}}
+{"fn":"ancestors","in":{"id":1796},"out":{"ids":[485,1196]}}
+{"fn":"ancestors","in":{"id":1324},"out":{"ids":[695]}}
+{"fn":"ancestors","in":{"id":1076},"out":{"ids":[485,1196]}}
+{"fn":"ancestors","in":{"id":470},"out":{"ids":[1196]}}
+{"fn":"ancestors","in":{"id":292},"out":{"ids":[1273]}}
+{"fn":"ancestors","in":{"id":1701},"out":{"ids":[1667,1454]}}
+{"fn":"ancestors","in":{"id":1948},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":1600},"out":{"ids":[125]}}
+{"fn":"ancestors","in":{"id":1246},"out":{"ids":[1995]}}
+{"fn":"ancestors","in":{"id":837},"out":{"ids":[695]}}
+{"fn":"ancestors","in":{"id":1969},"out":{"ids":[1442]}}
+{"fn":"ancestors","in":{"id":1880},"out":{"ids":[674,1196]}}
+{"fn":"ancestors","in":{"id":1055},"out":{"ids":[1500,1231,125]}}
+{"fn":"ancestors","in":{"id":150},"out":{"ids":[2207]}}
+{"fn":"ancestors","in":{"id":826},"out":{"ids":[566,125]}}
+{"fn":"ancestors","in":{"id":208},"out":{"ids":[886]}}
+{"fn":"ancestors","in":{"id":1846},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":1541},"out":{"ids":[351,485,1196]}}
+{"fn":"ancestors","in":{"id":404},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":1878},"out":{"ids":[1454]}}
+{"fn":"ancestors","in":{"id":1343},"out":{"ids":[476,1653,986]}}
+{"fn":"ancestors","in":{"id":860},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":1885},"out":{"ids":[1454]}}
+{"fn":"ancestors","in":{"id":802},"out":{"ids":[2200]}}
+{"fn":"ancestors","in":{"id":1604},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":737},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":2241},"out":{"ids":[888,991,1273,1789,125]}}
+{"fn":"ancestors","in":{"id":269},"out":{"ids":[1653,986]}}
+{"fn":"ancestors","in":{"id":622},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":1922},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":177},"out":{"ids":[1712,9]}}
+{"fn":"ancestors","in":{"id":2217},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":1218},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":2171},"out":{"ids":[1917,1196]}}
+{"fn":"ancestors","in":{"id":1076},"out":{"ids":[485,1196]}}
+{"fn":"ancestors","in":{"id":1525},"out":{"ids":[1022,2045]}}
+{"fn":"ancestors","in":{"id":2199},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":1807},"out":{"ids":[1442]}}
+{"fn":"ancestors","in":{"id":1953},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":919},"out":{"ids":[529]}}
+{"fn":"ancestors","in":{"id":39},"out":{"ids":[1883,695]}}
+{"fn":"ancestors","in":{"id":287},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":304},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":373},"out":{"ids":[1196]}}
+{"fn":"ancestors","in":{"id":847},"out":{"ids":[70,2038,40,1753,125,1634,1231]}}
+{"fn":"ancestors","in":{"id":1945},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":942},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":974},"out":{"ids":[74,1416,485,1196]}}
+{"fn":"ancestors","in":{"id":1387},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":1847},"out":{"ids":[1702]}}
+{"fn":"ancestors","in":{"id":1984},"out":{"ids":[424,485,1196]}}
+{"fn":"ancestors","in":{"id":19},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":623},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":1059},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":1544},"out":{"ids":[485,1196]}}
+{"fn":"ancestors","in":{"id":875},"out":{"ids":[2226,125,712,45,920]}}
+{"fn":"ancestors","in":{"id":1964},"out":{"ids":[587,986]}}
+{"fn":"ancestors","in":{"id":1988},"out":{"ids":[2111,652,986]}}
+{"fn":"ancestors","in":{"id":445},"out":{"ids":[1196]}}
+{"fn":"ancestors","in":{"id":371},"out":{"ids":[1540,1634,125,695,1231]}}
+{"fn":"ancestors","in":{"id":1511},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":1432},"out":{"ids":[485,1196]}}
+{"fn":"ancestors","in":{"id":2069},"out":{"ids":[1454]}}
+{"fn":"ancestors","in":{"id":1613},"out":{"ids":[1797,695]}}
+{"fn":"ancestors","in":{"id":1714},"out":{"ids":[2046,576]}}
+{"fn":"ancestors","in":{"id":1214},"out":{"ids":[485,1196]}}
+{"fn":"ancestors","in":{"id":1984},"out":{"ids":[424,485,1196]}}
+{"fn":"ancestors","in":{"id":476},"out":{"ids":[1653,986]}}
+{"fn":"ancestors","in":{"id":1548},"out":{"ids":[1702]}}
+{"fn":"ancestors","in":{"id":1679},"out":{"ids":[40,1634,1231,125]}}
+{"fn":"ancestors","in":{"id":137},"out":{"ids":[674,1196]}}
+{"fn":"ancestors","in":{"id":1061},"out":{"ids":[280,1348,695]}}
+{"fn":"ancestors","in":{"id":1513},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":1131},"out":{"ids":[547,485,1196]}}
+{"fn":"ancestors","in":{"id":1986},"out":{"ids":[604]}}
+{"fn":"ancestors","in":{"id":129},"out":{"ids":[]}}
+{"fn":"ancestors","in":{"id":377},"out":{"ids":[1146,1106]}}
+{"fn":"ancestors","in":{"id":1326},"out":{"ids":[437]}}
+{"fn":"ancestors","in":{"id":1560},"out":{"ids":[1522,1912]}}
+{"fn":"ancestors","in":{"id":283},"out":{"ids":[485,1196]}}
+{"fn":"ancestors","in":{"id":605},"out":{"ids":[1416,485,1196]}}
+{"fn":"ancestors","in":{"id":627},"out":{"ids":[1106]}}
+{"fn":"ancestors","in":{"id":1157},"out":{"ids":[920]}}
+{"fn":"ancestors","in":{"id":1541},"out":{"ids":[351,485,1196]}}
+{"fn":"ancestors","in":{"id":377},"out":{"ids":[1146,1106]}}
+{"fn":"ancestors","in":{"id":2115},"out":{"ids":[1273]}}
+{"fn":"ancestors","in":{"id":902},"out":{"ids":[956]}}
+{"fn":"ancestors","in":{"id":10},"out":{"ids":[645,1454]}}
+{"fn":"ancestors","in":{"id":1108},"out":{"ids":[]}}
+{"fn":"genre","in":{"id":1912},"out":{"family":-1,"depth":1,"eraStart":1900,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":282},"out":{"family":3,"depth":2,"eraStart":1977,"descriptor":{"energy":235,"valence":150,"danceability":120,"acousticness":20,"tempoLo":150,"tempoHi":200,"moods":[15,17,18,13]},"parents":[1634],"related":[40,839,1204,302,456,619]}}
+{"fn":"genre","in":{"id":2013},"out":{"family":6,"depth":2,"eraStart":2001,"descriptor":{"energy":225,"valence":170,"danceability":200,"acousticness":5,"tempoLo":120,"tempoHi":150,"moods":[20,21,18,19]},"parents":[485],"related":[236,503,618,685,1312,1786]}}
+{"fn":"genre","in":{"id":684},"out":{"family":1,"depth":1,"eraStart":1967,"descriptor":{"energy":210,"valence":130,"danceability":110,"acousticness":40,"tempoLo":110,"tempoHi":160,"moods":[18,17,32]},"parents":[125],"related":[100,168,566,725,736,757]}}
+{"fn":"genre","in":{"id":1738},"out":{"family":4,"depth":3,"eraStart":2015,"descriptor":{"energy":195,"valence":55,"danceability":165,"acousticness":10,"tempoLo":135,"tempoHi":145,"moods":[10,12,16]},"parents":[253],"related":[1134,1404,1515,1886,2040]}}
+{"fn":"genre","in":{"id":677},"out":{"family":0,"depth":1,"eraStart":1965,"descriptor":{"energy":205,"valence":200,"danceability":225,"acousticness":30,"tempoLo":115,"tempoHi":140,"moods":[20,23,21]},"parents":[1273],"related":[173,356,381,528,628,1002]}}
+{"fn":"genre","in":{"id":1056},"out":{"family":9,"depth":2,"eraStart":0,"descriptor":{"energy":55,"valence":110,"danceability":60,"acousticness":210,"tempoLo":55,"tempoHi":100,"moods":[28,29,7]},"parents":[611],"related":[1493]}}
+{"fn":"genre","in":{"id":10},"out":{"family":12,"depth":2,"eraStart":0,"descriptor":{"energy":80,"valence":130,"danceability":80,"acousticness":210,"tempoLo":60,"tempoHi":130,"moods":[4,8,2]},"parents":[645],"related":[107,862,1221,1554,1998]}}
+{"fn":"genre","in":{"id":256},"out":{"family":23,"depth":1,"eraStart":0,"descriptor":{"energy":120,"valence":70,"danceability":50,"acousticness":70,"tempoLo":40,"tempoHi":160,"moods":[11,16,36]},"parents":[920],"related":[45,1049,1203,98,226,473]}}
+{"fn":"genre","in":{"id":466},"out":{"family":13,"depth":2,"eraStart":1700,"descriptor":{"energy":60,"valence":110,"danceability":50,"acousticness":230,"tempoLo":50,"tempoHi":140,"moods":[2,36,33]},"parents":[1653],"related":[741,1382,1409,1638,2119,34]}}
+{"fn":"genre","in":{"id":505},"out":{"family":7,"depth":3,"eraStart":1999,"descriptor":{"energy":235,"valence":100,"danceability":160,"acousticness":3,"tempoLo":140,"tempoHi":150,"moods":[16,11,18]},"parents":[37],"related":[]}}
+{"fn":"genre","in":{"id":759},"out":{"family":13,"depth":1,"eraStart":0,"descriptor":{"energy":115,"valence":110,"danceability":35,"acousticness":230,"tempoLo":50,"tempoHi":160,"moods":[33,28,39]},"parents":[741],"related":[232,416,873,1240,1345,1453]}}
+{"fn":"genre","in":{"id":2035},"out":{"family":7,"depth":2,"eraStart":2001,"descriptor":{"energy":235,"valence":110,"danceability":170,"acousticness":8,"tempoLo":165,"tempoHi":180,"moods":[18,16,19]},"parents":[2099],"related":[]}}
+{"fn":"genre","in":{"id":1218},"out":{"family":21,"depth":0,"eraStart":1900,"descriptor":{"energy":180,"valence":190,"danceability":185,"acousticness":170,"tempoLo":100,"tempoHi":150,"moods":[20,21,23]},"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":97},"out":{"family":12,"depth":2,"eraStart":0,"descriptor":{"energy":80,"valence":130,"danceability":80,"acousticness":210,"tempoLo":60,"tempoHi":130,"moods":[4,8,2]},"parents":[2066],"related":[162,1035,1121]}}
+{"fn":"genre","in":{"id":1492},"out":{"family":18,"depth":1,"eraStart":0,"descriptor":{"energy":140,"valence":140,"danceability":130,"acousticness":90,"tempoLo":70,"tempoHi":125,"moods":[28,8,35]},"parents":[1543],"related":[596,1077,539]}}
+{"fn":"genre","in":{"id":1870},"out":{"family":22,"depth":1,"eraStart":1890,"descriptor":{"energy":140,"valence":180,"danceability":130,"acousticness":130,"tempoLo":70,"tempoHi":130,"moods":[39,25,26]},"parents":[62],"related":[1063,865,939,1261,1272,1996]}}
+{"fn":"genre","in":{"id":2131},"out":{"family":2,"depth":1,"eraStart":1991,"descriptor":{"energy":225,"valence":150,"danceability":100,"acousticness":40,"tempoLo":120,"tempoHi":180,"moods":[33,21,22]},"parents":[1753],"related":[148,233,346,796,1084,1435]}}
+{"fn":"genre","in":{"id":861},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":2036},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":1809},"out":{"family":0,"depth":1,"eraStart":1985,"descriptor":{"energy":120,"valence":140,"danceability":140,"acousticness":90,"tempoLo":80,"tempoHi":115,"moods":[28,30,38]},"parents":[1273],"related":[173,356,381,528,628,677]}}
+{"fn":"genre","in":{"id":1492},"out":{"family":18,"depth":1,"eraStart":0,"descriptor":{"energy":140,"valence":140,"danceability":130,"acousticness":90,"tempoLo":70,"tempoHi":125,"moods":[28,8,35]},"parents":[1543],"related":[596,1077,539]}}
+{"fn":"genre","in":{"id":2022},"out":{"family":4,"depth":2,"eraStart":1980,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":478},"out":{"family":4,"depth":1,"eraStart":2012,"descriptor":{"energy":200,"valence":60,"danceability":170,"acousticness":10,"tempoLo":120,"tempoHi":160,"moods":[10,12,16,38]},"parents":[695],"related":[154,169,241,293,831,1094]}}
+{"fn":"genre","in":{"id":1148},"out":{"family":6,"depth":3,"eraStart":1995,"descriptor":{"energy":205,"valence":120,"danceability":180,"acousticness":8,"tempoLo":120,"tempoHi":150,"moods":[18,30,12]},"parents":[503],"related":[244,702,709,1293,1471,1711]}}
+{"fn":"genre","in":{"id":1850},"out":{"family":9,"depth":1,"eraStart":0,"descriptor":null,"parents":[177],"related":[234,496,1013,1046,1311,1887]}}
+{"fn":"genre","in":{"id":1118},"out":{"family":-1,"depth":1,"eraStart":1899,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":1417},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[2011],"related":[]}}
+{"fn":"genre","in":{"id":901},"out":{"family":13,"depth":3,"eraStart":0,"descriptor":{"energy":60,"valence":110,"danceability":50,"acousticness":230,"tempoLo":50,"tempoHi":140,"moods":[2,36,33]},"parents":[1971],"related":[1242,166,190,355,450,560]}}
+{"fn":"genre","in":{"id":1134},"out":{"family":4,"depth":3,"eraStart":0,"descriptor":{"energy":195,"valence":60,"danceability":170,"acousticness":10,"tempoLo":135,"tempoHi":150,"moods":[10,12,16]},"parents":[253],"related":[1738,1404,1515,1886,2040]}}
+{"fn":"genre","in":{"id":1631},"out":{"family":7,"depth":1,"eraStart":0,"descriptor":{"energy":195,"valence":165,"danceability":220,"acousticness":8,"tempoLo":118,"tempoHi":130,"moods":[20,30,25]},"parents":[1416],"related":[38,52,262,462,678,724]}}
+{"fn":"genre","in":{"id":1546},"out":{"family":19,"depth":1,"eraStart":0,"descriptor":{"energy":60,"valence":100,"danceability":30,"acousticness":240,"tempoLo":40,"tempoHi":140,"moods":[39,36,2]},"parents":[1284],"related":[1472,140,588,982,1426,1579]}}
+{"fn":"genre","in":{"id":247},"out":{"family":3,"depth":2,"eraStart":1984,"descriptor":{"energy":215,"valence":80,"danceability":95,"acousticness":25,"tempoLo":110,"tempoHi":180,"moods":[16,7,14]},"parents":[1500,2074],"related":[2074,25,400,1055,1266,1979]}}
+{"fn":"genre","in":{"id":7},"out":{"family":6,"depth":3,"eraStart":0,"descriptor":{"energy":225,"valence":170,"danceability":200,"acousticness":5,"tempoLo":120,"tempoHi":150,"moods":[20,21,18,19]},"parents":[424],"related":[20,115,198,391,511,631]}}
+{"fn":"genre","in":{"id":1840},"out":{"family":2,"depth":2,"eraStart":1995,"descriptor":{"energy":230,"valence":55,"danceability":110,"acousticness":10,"tempoLo":100,"tempoHi":150,"moods":[14,10,16]},"parents":[1836],"related":[]}}
+{"fn":"genre","in":{"id":434},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":1028},"out":{"family":13,"depth":2,"eraStart":0,"descriptor":{"energy":60,"valence":110,"danceability":50,"acousticness":230,"tempoLo":50,"tempoHi":140,"moods":[2,36,33]},"parents":[1353],"related":[57,798,897,984,1609,1654]}}
+{"fn":"genre","in":{"id":1113},"out":{"family":15,"depth":2,"eraStart":0,"descriptor":{"energy":195,"valence":160,"danceability":215,"acousticness":20,"tempoLo":85,"tempoHi":100,"moods":[20,29,32]},"parents":[176],"related":[]}}
+{"fn":"genre","in":{"id":384},"out":{"family":13,"depth":2,"eraStart":0,"descriptor":{"energy":60,"valence":110,"danceability":50,"acousticness":230,"tempoLo":50,"tempoHi":140,"moods":[2,36,33]},"parents":[1653],"related":[741,1382,1409,1638,2119,34]}}
+{"fn":"genre","in":{"id":259},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[1772],"related":[146,1070]}}
+{"fn":"genre","in":{"id":805},"out":{"family":0,"depth":2,"eraStart":0,"descriptor":{"energy":170,"valence":180,"danceability":170,"acousticness":70,"tempoLo":95,"tempoHi":130,"moods":[23,24,20]},"parents":[1733],"related":[1929,211,238]}}
+{"fn":"genre","in":{"id":876},"out":{"family":0,"depth":1,"eraStart":0,"descriptor":{"energy":120,"valence":160,"danceability":130,"acousticness":110,"tempoLo":70,"tempoHi":120,"moods":[28,39,8]},"parents":[237,1273],"related":[335,1408,50,621,763,866]}}
+{"fn":"genre","in":{"id":2217},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":1295},"out":{"family":6,"depth":3,"eraStart":2012,"descriptor":{"energy":225,"valence":170,"danceability":200,"acousticness":5,"tempoLo":120,"tempoHi":150,"moods":[20,21,18,19]},"parents":[1413],"related":[829,1181,1469,1542]}}
+{"fn":"genre","in":{"id":364},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":1805},"out":{"family":17,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":1662},"out":{"family":13,"depth":2,"eraStart":0,"descriptor":{"energy":60,"valence":110,"danceability":50,"acousticness":230,"tempoLo":50,"tempoHi":140,"moods":[2,36,33]},"parents":[1653],"related":[741,1382,1409,1638,2119,34]}}
+{"fn":"genre","in":{"id":1928},"out":{"family":6,"depth":3,"eraStart":2000,"descriptor":{"energy":205,"valence":120,"danceability":180,"acousticness":8,"tempoLo":120,"tempoHi":150,"moods":[18,30,12]},"parents":[503],"related":[244,702,709,1148,1293,1471]}}
+{"fn":"genre","in":{"id":1886},"out":{"family":4,"depth":3,"eraStart":0,"descriptor":{"energy":195,"valence":60,"danceability":170,"acousticness":10,"tempoLo":135,"tempoHi":150,"moods":[10,12,16]},"parents":[253],"related":[1738,1134,1404,1515,2040]}}
+{"fn":"genre","in":{"id":1983},"out":{"family":12,"depth":1,"eraStart":0,"descriptor":{"energy":80,"valence":130,"danceability":80,"acousticness":210,"tempoLo":60,"tempoHi":130,"moods":[4,8,2]},"parents":[1454],"related":[446,2244,6,86,191,312]}}
+{"fn":"genre","in":{"id":1241},"out":{"family":9,"depth":1,"eraStart":1957,"descriptor":{"energy":110,"valence":130,"danceability":110,"acousticness":150,"tempoLo":80,"tempoHi":180,"moods":[1,4,36,29]},"parents":[1442],"related":[48,294,507,591,824,1073]}}
+{"fn":"genre","in":{"id":971},"out":{"family":-1,"depth":1,"eraStart":1900,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":353},"out":{"family":13,"depth":6,"eraStart":0,"descriptor":null,"parents":[2045],"related":[2094,368,1022,1367,1927]}}
+{"fn":"genre","in":{"id":992},"out":{"family":9,"depth":1,"eraStart":0,"descriptor":{"energy":110,"valence":130,"danceability":110,"acousticness":150,"tempoLo":80,"tempoHi":180,"moods":[1,4,36,29]},"parents":[1442],"related":[48,294,507,591,824,1073]}}
+{"fn":"genre","in":{"id":1807},"out":{"family":9,"depth":1,"eraStart":1985,"descriptor":{"energy":110,"valence":130,"danceability":110,"acousticness":150,"tempoLo":80,"tempoHi":180,"moods":[1,4,36,29]},"parents":[1442],"related":[48,294,507,591,824,1073]}}
+{"fn":"genre","in":{"id":176},"out":{"family":15,"depth":1,"eraStart":0,"descriptor":{"energy":195,"valence":160,"danceability":215,"acousticness":20,"tempoLo":85,"tempoHi":100,"moods":[20,29,32]},"parents":[1604],"related":[29,222,583,978,1386,2105]}}
+{"fn":"genre","in":{"id":919},"out":{"family":4,"depth":1,"eraStart":1990,"descriptor":{"energy":225,"valence":200,"danceability":220,"acousticness":80,"tempoLo":150,"tempoHi":190,"moods":[20,21,23]},"parents":[529],"related":[1992,993,1042,2140]}}
+{"fn":"genre","in":{"id":477},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":2002},"out":{"family":10,"depth":1,"eraStart":1948,"descriptor":{"energy":100,"valence":90,"danceability":100,"acousticness":140,"tempoLo":60,"tempoHi":130,"moods":[5,12,9,13]},"parents":[2207],"related":[228,403,934,1145,1509,2098]}}
+{"fn":"genre","in":{"id":323},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":1651},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[1715],"related":[]}}
+{"fn":"genre","in":{"id":2201},"out":{"family":6,"depth":3,"eraStart":1995,"descriptor":{"energy":205,"valence":120,"danceability":180,"acousticness":8,"tempoLo":120,"tempoHi":150,"moods":[18,30,12]},"parents":[503],"related":[244,702,709,1148,1293,1471]}}
+{"fn":"genre","in":{"id":2041},"out":{"family":15,"depth":1,"eraStart":1987,"descriptor":null,"parents":[422],"related":[]}}
+{"fn":"genre","in":{"id":926},"out":{"family":6,"depth":1,"eraStart":2000,"descriptor":null,"parents":[323],"related":[1064,1719]}}
+{"fn":"genre","in":{"id":880},"out":{"family":13,"depth":2,"eraStart":0,"descriptor":{"energy":60,"valence":110,"danceability":50,"acousticness":230,"tempoLo":50,"tempoHi":140,"moods":[2,36,33]},"parents":[516],"related":[411,1212,1300,1476]}}
+{"fn":"genre","in":{"id":1029},"out":{"family":1,"depth":2,"eraStart":0,"descriptor":{"energy":170,"valence":110,"danceability":90,"acousticness":50,"tempoLo":110,"tempoHi":170,"moods":[16,22,36]},"parents":[1439],"related":[]}}
+{"fn":"genre","in":{"id":2244},"out":{"family":12,"depth":1,"eraStart":1900,"descriptor":{"energy":70,"valence":110,"danceability":70,"acousticness":220,"tempoLo":60,"tempoHi":110,"moods":[8,2,4]},"parents":[991,1454],"related":[2237,2238,2239,2240,2241,2242]}}
+{"fn":"genre","in":{"id":2092},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":1040},"out":{"family":6,"depth":4,"eraStart":1992,"descriptor":{"energy":205,"valence":120,"danceability":180,"acousticness":8,"tempoLo":120,"tempoHi":150,"moods":[18,30,12]},"parents":[244],"related":[629,883]}}
+{"fn":"genre","in":{"id":1095},"out":{"family":18,"depth":0,"eraStart":0,"descriptor":{"energy":180,"valence":170,"danceability":165,"acousticness":90,"tempoLo":100,"tempoHi":140,"moods":[8,21,22]},"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":1884},"out":{"family":6,"depth":1,"eraStart":1994,"descriptor":{"energy":190,"valence":130,"danceability":180,"acousticness":10,"tempoLo":100,"tempoHi":150,"moods":[18,36,38]},"parents":[1196],"related":[206,218,485,1020,1167,1256]}}
+{"fn":"genre","in":{"id":1584},"out":{"family":6,"depth":2,"eraStart":0,"descriptor":{"energy":225,"valence":170,"danceability":200,"acousticness":5,"tempoLo":120,"tempoHi":150,"moods":[20,21,18,19]},"parents":[485],"related":[236,503,618,685,1312,1786]}}
+{"fn":"genre","in":{"id":1423},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":1276},"out":{"family":12,"depth":2,"eraStart":0,"descriptor":{"energy":80,"valence":130,"danceability":80,"acousticness":210,"tempoLo":60,"tempoHi":130,"moods":[4,8,2]},"parents":[1667],"related":[458,2024,1475,88,204,220]}}
+{"fn":"genre","in":{"id":1919},"out":{"family":6,"depth":2,"eraStart":2011,"descriptor":{"energy":90,"valence":100,"danceability":110,"acousticness":15,"tempoLo":60,"tempoHi":110,"moods":[8,3,0]},"parents":[2014],"related":[144,451,658,941,1120,1228]}}
+{"fn":"genre","in":{"id":387},"out":{"family":4,"depth":2,"eraStart":2010,"descriptor":{"energy":190,"valence":110,"danceability":185,"acousticness":15,"tempoLo":130,"tempoHi":160,"moods":[32,29,20]},"parents":[1348],"related":[253,272,280,311,524,556]}}
+{"fn":"genre","in":{"id":1561},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":482},"out":{"family":12,"depth":1,"eraStart":0,"descriptor":{"energy":75,"valence":110,"danceability":75,"acousticness":200,"tempoLo":60,"tempoHi":125,"moods":[4,5,2]},"parents":[576],"related":[16,1072,1490,1936,1976,2046]}}
+{"fn":"genre","in":{"id":830},"out":{"family":13,"depth":2,"eraStart":0,"descriptor":{"energy":60,"valence":110,"danceability":50,"acousticness":230,"tempoLo":50,"tempoHi":140,"moods":[2,36,33]},"parents":[1653],"related":[741,1382,1409,1638,2119,34]}}
+{"fn":"genre","in":{"id":1712},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[9],"related":[215,492,1314]}}
+{"fn":"genre","in":{"id":1392},"out":{"family":3,"depth":3,"eraStart":1981,"descriptor":{"energy":250,"valence":90,"danceability":100,"acousticness":10,"tempoLo":170,"tempoHi":240,"moods":[14,15,16,19]},"parents":[40],"related":[864,1679,70,111,483,486]}}
+{"fn":"genre","in":{"id":220},"out":{"family":12,"depth":2,"eraStart":1985,"descriptor":{"energy":80,"valence":130,"danceability":80,"acousticness":210,"tempoLo":60,"tempoHi":130,"moods":[4,8,2]},"parents":[1667],"related":[458,2024,1475,88,204,389]}}
+{"fn":"genre","in":{"id":1609},"out":{"family":13,"depth":2,"eraStart":0,"descriptor":{"energy":60,"valence":110,"danceability":50,"acousticness":230,"tempoLo":50,"tempoHi":140,"moods":[2,36,33]},"parents":[1353],"related":[57,798,897,984,1028,1654]}}
+{"fn":"genre","in":{"id":1392},"out":{"family":3,"depth":3,"eraStart":1981,"descriptor":{"energy":250,"valence":90,"danceability":100,"acousticness":10,"tempoLo":170,"tempoHi":240,"moods":[14,15,16,19]},"parents":[40],"related":[864,1679,70,111,483,486]}}
+{"fn":"genre","in":{"id":581},"out":{"family":7,"depth":0,"eraStart":1992,"descriptor":{"energy":235,"valence":110,"danceability":170,"acousticness":8,"tempoLo":165,"tempoHi":180,"moods":[18,16,19]},"parents":[485],"related":[351,547,1416,236,503,618]}}
+{"fn":"genre","in":{"id":1280},"out":{"family":19,"depth":0,"eraStart":0,"descriptor":{"energy":65,"valence":95,"danceability":60,"acousticness":170,"tempoLo":55,"tempoHi":100,"moods":[8,28,7,6]},"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":75},"out":{"family":2,"depth":2,"eraStart":1994,"descriptor":{"energy":225,"valence":150,"danceability":100,"acousticness":40,"tempoLo":120,"tempoHi":180,"moods":[33,21,22]},"parents":[2131],"related":[2155]}}
+{"fn":"genre","in":{"id":878},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":1058},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":2137},"out":{"family":7,"depth":2,"eraStart":1996,"descriptor":{"energy":235,"valence":100,"danceability":160,"acousticness":3,"tempoLo":140,"tempoHi":150,"moods":[16,11,18]},"parents":[1533],"related":[37,117,1137,1388]}}
+{"fn":"genre","in":{"id":9},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":186},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":1616},"out":{"family":15,"depth":1,"eraStart":1950,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":394},"out":{"family":7,"depth":2,"eraStart":1987,"descriptor":{"energy":195,"valence":165,"danceability":220,"acousticness":8,"tempoLo":118,"tempoHi":130,"moods":[20,30,25]},"parents":[69],"related":[]}}
+{"fn":"genre","in":{"id":1593},"out":{"family":1,"depth":2,"eraStart":1986,"descriptor":{"energy":180,"valence":120,"danceability":115,"acousticness":60,"tempoLo":100,"tempoHi":150,"moods":[9,13,16]},"parents":[1789],"related":[526,854,888,1422,1612,1762]}}
+{"fn":"genre","in":{"id":1874},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":1631},"out":{"family":7,"depth":1,"eraStart":0,"descriptor":{"energy":195,"valence":165,"danceability":220,"acousticness":8,"tempoLo":118,"tempoHi":130,"moods":[20,30,25]},"parents":[1416],"related":[38,52,262,462,678,724]}}
+{"fn":"genre","in":{"id":41},"out":{"family":15,"depth":2,"eraStart":0,"descriptor":null,"parents":[534],"related":[602,1760,1763]}}
+{"fn":"genre","in":{"id":666},"out":{"family":6,"depth":2,"eraStart":0,"descriptor":{"energy":190,"valence":130,"danceability":180,"acousticness":10,"tempoLo":100,"tempoHi":150,"moods":[18,36,38]},"parents":[674],"related":[137,103,1695,1880]}}
+{"fn":"genre","in":{"id":919},"out":{"family":4,"depth":1,"eraStart":1990,"descriptor":{"energy":225,"valence":200,"danceability":220,"acousticness":80,"tempoLo":150,"tempoHi":190,"moods":[20,21,23]},"parents":[529],"related":[1992,993,1042,2140]}}
+{"fn":"genre","in":{"id":504},"out":{"family":1,"depth":2,"eraStart":0,"descriptor":{"energy":165,"valence":120,"danceability":100,"acousticness":60,"tempoLo":90,"tempoHi":140,"moods":[3,11,16]},"parents":[168],"related":[332,700,1074,1366,2073]}}
+{"fn":"genre","in":{"id":960},"out":{"family":13,"depth":2,"eraStart":0,"descriptor":{"energy":60,"valence":110,"danceability":50,"acousticness":230,"tempoLo":50,"tempoHi":140,"moods":[2,36,33]},"parents":[290],"related":[]}}
+{"fn":"genre","in":{"id":446},"out":{"family":12,"depth":1,"eraStart":0,"descriptor":{"energy":120,"valence":150,"danceability":110,"acousticness":210,"tempoLo":70,"tempoHi":170,"moods":[8,21,2]},"parents":[1454],"related":[2244,6,86,191,312,343]}}
+{"fn":"genre","in":{"id":732},"out":{"family":-1,"depth":1,"eraStart":1980,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":1640},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":1153},"out":{"family":7,"depth":2,"eraStart":2009,"descriptor":{"energy":205,"valence":120,"danceability":215,"acousticness":5,"tempoLo":120,"tempoHi":130,"moods":[30,16,38]},"parents":[262],"related":[1854]}}
+{"fn":"genre","in":{"id":789},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":658},"out":{"family":6,"depth":2,"eraStart":2012,"descriptor":{"energy":90,"valence":100,"danceability":110,"acousticness":15,"tempoLo":60,"tempoHi":110,"moods":[8,3,0]},"parents":[2014],"related":[144,451,941,1120,1228,1364]}}
+{"fn":"genre","in":{"id":591},"out":{"family":9,"depth":1,"eraStart":1943,"descriptor":{"energy":165,"valence":170,"danceability":170,"acousticness":150,"tempoLo":100,"tempoHi":190,"moods":[20,30,27]},"parents":[1442],"related":[48,294,507,824,1073,1224]}}
+{"fn":"genre","in":{"id":1719},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[323],"related":[926,1064]}}
+{"fn":"genre","in":{"id":1304},"out":{"family":8,"depth":1,"eraStart":1978,"descriptor":{"energy":40,"valence":100,"danceability":20,"acousticness":60,"tempoLo":40,"tempoHi":100,"moods":[2,37,36,3]},"parents":[833],"related":[14,1210,1744,1839]}}
+{"fn":"genre","in":{"id":1877},"out":{"family":1,"depth":1,"eraStart":1979,"descriptor":{"energy":185,"valence":140,"danceability":120,"acousticness":60,"tempoLo":100,"tempoHi":150,"moods":[18,17,13]},"parents":[125],"related":[100,168,566,684,725,736]}}
+{"fn":"genre","in":{"id":756},"out":{"family":5,"depth":2,"eraStart":1986,"descriptor":{"energy":205,"valence":210,"danceability":230,"acousticness":50,"tempoLo":110,"tempoHi":130,"moods":[20,30,23,21]},"parents":[2145],"related":[1325,123,849]}}
+{"fn":"genre","in":{"id":644},"out":{"family":4,"depth":1,"eraStart":0,"descriptor":{"energy":175,"valence":130,"danceability":185,"acousticness":20,"tempoLo":70,"tempoHi":110,"moods":[32,12,30]},"parents":[695],"related":[154,169,241,293,478,831]}}
+{"fn":"genre","in":{"id":1224},"out":{"family":9,"depth":1,"eraStart":1955,"descriptor":{"energy":155,"valence":140,"danceability":100,"acousticness":190,"tempoLo":110,"tempoHi":220,"moods":[30,16,8]},"parents":[1442],"related":[48,294,507,591,824,1073]}}
+{"fn":"genre","in":{"id":579},"out":{"family":8,"depth":0,"eraStart":1992,"descriptor":{"energy":90,"valence":60,"danceability":100,"acousticness":50,"tempoLo":60,"tempoHi":100,"moods":[9,10,38]},"parents":[1755],"related":[]}}
+{"fn":"genre","in":{"id":1864},"out":{"family":13,"depth":3,"eraStart":0,"descriptor":{"energy":60,"valence":110,"danceability":50,"acousticness":230,"tempoLo":50,"tempoHi":140,"moods":[2,36,33]},"parents":[116],"related":[291,842]}}
+{"fn":"genre","in":{"id":2076},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":792},"out":{"family":7,"depth":1,"eraStart":1997,"descriptor":{"energy":195,"valence":165,"danceability":220,"acousticness":8,"tempoLo":118,"tempoHi":130,"moods":[20,30,25]},"parents":[1416],"related":[38,52,262,462,678,724]}}
+{"fn":"genre","in":{"id":1483},"out":{"family":12,"depth":1,"eraStart":1300,"descriptor":{"energy":80,"valence":130,"danceability":80,"acousticness":210,"tempoLo":60,"tempoHi":130,"moods":[4,8,2]},"parents":[1454],"related":[446,2244,6,86,191,312]}}
+{"fn":"genre","in":{"id":568},"out":{"family":12,"depth":2,"eraStart":0,"descriptor":{"energy":80,"valence":130,"danceability":80,"acousticness":210,"tempoLo":60,"tempoHi":130,"moods":[4,8,2]},"parents":[1667],"related":[458,2024,1475,88,204,220]}}
+{"fn":"genre","in":{"id":882},"out":{"family":4,"depth":2,"eraStart":2018,"descriptor":{"energy":190,"valence":90,"danceability":180,"acousticness":10,"tempoLo":130,"tempoHi":160,"moods":[10,32,16,12]},"parents":[1348],"related":[253,387,272,280,311,524]}}
+{"fn":"genre","in":{"id":1323},"out":{"family":13,"depth":4,"eraStart":0,"descriptor":{"energy":60,"valence":110,"danceability":50,"acousticness":230,"tempoLo":50,"tempoHi":140,"moods":[2,36,33]},"parents":[2094],"related":[314,1014,1226,1507,1614,1706]}}
+{"fn":"genre","in":{"id":1338},"out":{"family":7,"depth":2,"eraStart":2018,"descriptor":{"energy":155,"valence":150,"danceability":205,"acousticness":20,"tempoLo":115,"tempoHi":125,"moods":[30,39,38]},"parents":[52],"related":[]}}
+{"fn":"genre","in":{"id":1472},"out":{"family":19,"depth":0,"eraStart":1450,"descriptor":{"energy":150,"valence":140,"danceability":120,"acousticness":200,"tempoLo":70,"tempoHi":160,"moods":[39,16,33]},"parents":[1284],"related":[140,588,982,1426,1546,1579]}}
+{"fn":"genre","in":{"id":998},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":1607},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[492],"related":[1869]}}
+{"fn":"genre","in":{"id":1163},"out":{"family":-1,"depth":1,"eraStart":1930,"descriptor":null,"parents":[1702],"related":[515,734,1734,1847,58,428]}}
+{"fn":"genre","in":{"id":1507},"out":{"family":13,"depth":4,"eraStart":550,"descriptor":{"energy":60,"valence":110,"danceability":50,"acousticness":230,"tempoLo":50,"tempoHi":140,"moods":[2,36,33]},"parents":[2094],"related":[314,1014,1226,1323,1614,1706]}}
+{"fn":"genre","in":{"id":1472},"out":{"family":19,"depth":0,"eraStart":1450,"descriptor":{"energy":150,"valence":140,"danceability":120,"acousticness":200,"tempoLo":70,"tempoHi":160,"moods":[39,16,33]},"parents":[1284],"related":[140,588,982,1426,1546,1579]}}
+{"fn":"genre","in":{"id":492},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[9],"related":[215,1314,1712]}}
+{"fn":"genre","in":{"id":2104},"out":{"family":13,"depth":2,"eraStart":0,"descriptor":{"energy":60,"valence":110,"danceability":50,"acousticness":230,"tempoLo":50,"tempoHi":140,"moods":[2,36,33]},"parents":[652],"related":[78,96,386,509,1808,2111]}}
+{"fn":"genre","in":{"id":1276},"out":{"family":12,"depth":2,"eraStart":0,"descriptor":{"energy":80,"valence":130,"danceability":80,"acousticness":210,"tempoLo":60,"tempoHi":130,"moods":[4,8,2]},"parents":[1667],"related":[458,2024,1475,88,204,220]}}
+{"fn":"genre","in":{"id":315},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":1560},"out":{"family":16,"depth":1,"eraStart":0,"descriptor":{"energy":215,"valence":205,"danceability":225,"acousticness":40,"tempoLo":120,"tempoHi":170,"moods":[20,21,27]},"parents":[1522,1912],"related":[834,922,1678,1795]}}
+{"fn":"genre","in":{"id":2003},"out":{"family":13,"depth":3,"eraStart":0,"descriptor":null,"parents":[337],"related":[607,636,1227,1707,1856,2081]}}
+{"fn":"genre","in":{"id":792},"out":{"family":7,"depth":1,"eraStart":1997,"descriptor":{"energy":195,"valence":165,"danceability":220,"acousticness":8,"tempoLo":118,"tempoHi":130,"moods":[20,30,25]},"parents":[1416],"related":[38,52,262,462,678,724]}}
+{"fn":"genre","in":{"id":2074},"out":{"family":1,"depth":2,"eraStart":1984,"descriptor":{"energy":185,"valence":80,"danceability":110,"acousticness":50,"tempoLo":110,"tempoHi":170,"moods":[5,7,16,8]},"parents":[1500,1789],"related":[25,247,400,1055,1266,1979]}}
+{"fn":"genre","in":{"id":403},"out":{"family":10,"depth":1,"eraStart":1900,"descriptor":{"energy":185,"valence":190,"danceability":170,"acousticness":180,"tempoLo":120,"tempoHi":200,"moods":[22,20,8]},"parents":[2207],"related":[228,934,1145,1509,2098,757]}}
+{"fn":"genre","in":{"id":2167},"out":{"family":12,"depth":1,"eraStart":0,"descriptor":{"energy":80,"valence":130,"danceability":80,"acousticness":210,"tempoLo":60,"tempoHi":130,"moods":[4,8,2]},"parents":[1454],"related":[446,2244,6,86,191,312]}}
+{"fn":"genre","in":{"id":1368},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":2185},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":1059},"out":{"family":17,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":136},"out":{"family":5,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":1732},"out":{"family":13,"depth":3,"eraStart":0,"descriptor":{"energy":60,"valence":110,"danceability":50,"acousticness":230,"tempoLo":50,"tempoHi":140,"moods":[2,36,33]},"parents":[2111],"related":[175,263,1361,1988,2093,2118]}}
+{"fn":"genre","in":{"id":2239},"out":{"family":4,"depth":1,"eraStart":2000,"descriptor":{"energy":175,"valence":130,"danceability":175,"acousticness":25,"tempoLo":70,"tempoHi":140,"moods":[32,12,30]},"parents":[695,991],"related":[154,169,241,293,478,831]}}
+{"fn":"genre","in":{"id":1885},"out":{"family":12,"depth":1,"eraStart":1975,"descriptor":{"energy":80,"valence":130,"danceability":80,"acousticness":210,"tempoLo":60,"tempoHi":130,"moods":[4,8,2]},"parents":[1454],"related":[446,2244,6,86,191,312]}}
+{"fn":"genre","in":{"id":632},"out":{"family":21,"depth":0,"eraStart":1978,"descriptor":{"energy":145,"valence":180,"danceability":165,"acousticness":150,"tempoLo":90,"tempoHi":130,"moods":[21,23,30]},"parents":[300],"related":[745,65,109,201,341,455]}}
+{"fn":"genre","in":{"id":1796},"out":{"family":6,"depth":2,"eraStart":1993,"descriptor":{"energy":225,"valence":170,"danceability":200,"acousticness":5,"tempoLo":120,"tempoHi":150,"moods":[20,21,18,19]},"parents":[485],"related":[236,503,618,685,1312,1786]}}
+{"fn":"genre","in":{"id":849},"out":{"family":5,"depth":2,"eraStart":1978,"descriptor":{"energy":205,"valence":210,"danceability":230,"acousticness":50,"tempoLo":110,"tempoHi":130,"moods":[20,30,23,21]},"parents":[2145],"related":[1325,123,756]}}
+{"fn":"genre","in":{"id":2118},"out":{"family":13,"depth":3,"eraStart":0,"descriptor":{"energy":60,"valence":110,"danceability":50,"acousticness":230,"tempoLo":50,"tempoHi":140,"moods":[2,36,33]},"parents":[2111],"related":[175,263,1361,1732,1988,2093]}}
+{"fn":"genre","in":{"id":2222},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":723},"out":{"family":6,"depth":3,"eraStart":0,"descriptor":{"energy":225,"valence":130,"danceability":205,"acousticness":5,"tempoLo":126,"tempoHi":132,"moods":[18,16,20]},"parents":[1017,1946],"related":[]}}
+{"fn":"genre","in":{"id":898},"out":{"family":14,"depth":2,"eraStart":1980,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":134},"out":{"family":16,"depth":1,"eraStart":1988,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":966},"out":{"family":3,"depth":1,"eraStart":1992,"descriptor":{"energy":235,"valence":140,"danceability":120,"acousticness":20,"tempoLo":150,"tempoHi":200,"moods":[15,17,13,18]},"parents":[424,1231],"related":[7,20,115,198,391,511]}}
+{"fn":"genre","in":{"id":381},"out":{"family":0,"depth":1,"eraStart":1975,"descriptor":{"energy":150,"valence":180,"danceability":135,"acousticness":100,"tempoLo":90,"tempoHi":140,"moods":[23,27,28]},"parents":[821,1273],"related":[765,823,1410,21,133,318]}}
+{"fn":"genre","in":{"id":1903},"out":{"family":-1,"depth":1,"eraStart":0,"descriptor":null,"parents":[],"related":[]}}
+{"fn":"genre","in":{"id":2155},"out":{"family":2,"depth":2,"eraStart":1995,"descriptor":{"energy":225,"valence":150,"danceability":100,"acousticness":40,"tempoLo":120,"tempoHi":180,"moods":[33,21,22]},"parents":[2131],"related":[75]}}
+{"fn":"genre","in":{"id":1717},"out":{"family":6,"depth":2,"eraStart":1999,"descriptor":{"energy":225,"valence":170,"danceability":200,"acousticness":5,"tempoLo":120,"tempoHi":150,"moods":[20,21,18,19]},"parents":[485],"related":[236,503,618,685,1312,1786]}}

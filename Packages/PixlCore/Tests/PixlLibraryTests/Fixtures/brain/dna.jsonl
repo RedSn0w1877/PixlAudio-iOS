@@ -1,0 +1,466 @@
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":2,"year":1976},{"source":4,"year":1984},{"source":3,"year":1850},{"source":1,"year":1964}]},"out":{"year":1964,"source":1}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":2008},{"source":4,"year":1961},{"source":5,"year":2011},{"source":4,"year":1995}]},"out":{"year":1961,"source":4}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":0},{"source":3,"year":1983},{"source":4,"year":1850},{"source":5,"year":2300}]},"out":{"year":1983,"source":3}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":1850},{"source":5,"year":1986},{"source":2,"year":0}]},"out":{"year":0,"source":0}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":2300},{"source":2,"year":0},{"source":2,"year":1988}]},"out":{"year":1988,"source":2}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":2,"year":1976},{"source":4,"year":2002}]},"out":{"year":1976,"source":2}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":2,"year":2006}]},"out":{"year":2006,"source":2}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":5,"year":2300},{"source":1,"year":2007},{"source":3,"year":0}]},"out":{"year":2007,"source":1}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":1,"year":1987},{"source":3,"year":1989}]},"out":{"year":1987,"source":1}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":1993},{"source":4,"year":2020}]},"out":{"year":1993,"source":3}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":1,"year":2028},{"source":5,"year":2007}]},"out":{"year":0,"source":0}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":1,"year":0},{"source":5,"year":1850},{"source":3,"year":2012},{"source":5,"year":2300}]},"out":{"year":2012,"source":3}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":2,"year":1970}]},"out":{"year":1970,"source":2}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":1,"year":2011},{"source":2,"year":2026}]},"out":{"year":2011,"source":1}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":2,"year":2014},{"source":1,"year":1997}]},"out":{"year":1997,"source":1}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":5,"year":1991},{"source":3,"year":0},{"source":1,"year":2024}]},"out":{"year":1991,"source":5}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":1,"year":0}]},"out":{"year":0,"source":0}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":1995},{"source":4,"year":2029},{"source":1,"year":2006},{"source":5,"year":1850}]},"out":{"year":1995,"source":3}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":2028},{"source":4,"year":2300},{"source":2,"year":2025},{"source":5,"year":1964}]},"out":{"year":1964,"source":5}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":5,"year":2024},{"source":4,"year":1985},{"source":4,"year":1850},{"source":1,"year":1975}]},"out":{"year":1975,"source":1}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":1980}]},"out":{"year":1980,"source":4}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":2,"year":0},{"source":5,"year":1966},{"source":2,"year":2027},{"source":5,"year":2018}]},"out":{"year":1966,"source":5}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":1972},{"source":5,"year":2013},{"source":3,"year":1978}]},"out":{"year":1972,"source":3}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":2300},{"source":5,"year":2003},{"source":2,"year":1995},{"source":3,"year":0}]},"out":{"year":1995,"source":2}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":1982},{"source":5,"year":2016}]},"out":{"year":1982,"source":3}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":1960},{"source":1,"year":1850}]},"out":{"year":1960,"source":3}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":0},{"source":5,"year":2026},{"source":2,"year":1981},{"source":1,"year":1964}]},"out":{"year":1964,"source":1}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":0},{"source":5,"year":1850}]},"out":{"year":0,"source":0}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":1,"year":2300},{"source":5,"year":1850},{"source":4,"year":1975},{"source":5,"year":2300}]},"out":{"year":1975,"source":4}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":1983},{"source":2,"year":0},{"source":3,"year":1996},{"source":1,"year":2005}]},"out":{"year":1983,"source":4}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":2,"year":2013},{"source":1,"year":1965},{"source":4,"year":1850},{"source":2,"year":2018}]},"out":{"year":1965,"source":1}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":0},{"source":5,"year":1967}]},"out":{"year":0,"source":0}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":1978},{"source":2,"year":1997},{"source":3,"year":2300}]},"out":{"year":1978,"source":4}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":1,"year":2025},{"source":4,"year":2300},{"source":1,"year":1994}]},"out":{"year":1994,"source":1}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":1972},{"source":4,"year":1973},{"source":4,"year":1971}]},"out":{"year":1971,"source":4}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":5,"year":1850},{"source":2,"year":0},{"source":5,"year":2300}]},"out":{"year":0,"source":0}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":1,"year":2025},{"source":5,"year":1975}]},"out":{"year":1975,"source":5}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":2018}]},"out":{"year":2018,"source":3}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":5,"year":1980}]},"out":{"year":0,"source":0}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":2005},{"source":5,"year":1999},{"source":2,"year":2300},{"source":2,"year":1850}]},"out":{"year":1999,"source":5}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":2,"year":1963}]},"out":{"year":1963,"source":2}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":2,"year":0}]},"out":{"year":0,"source":0}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":2,"year":1850},{"source":4,"year":2009},{"source":3,"year":1990},{"source":1,"year":1850}]},"out":{"year":1990,"source":3}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":1,"year":2300},{"source":3,"year":2300}]},"out":{"year":0,"source":0}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":2300},{"source":1,"year":0},{"source":5,"year":2009}]},"out":{"year":0,"source":0}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":1850},{"source":1,"year":0},{"source":4,"year":2006},{"source":3,"year":1971}]},"out":{"year":1971,"source":3}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":1965},{"source":2,"year":1992}]},"out":{"year":1965,"source":3}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":2,"year":2005}]},"out":{"year":2005,"source":2}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":5,"year":1963}]},"out":{"year":0,"source":0}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":2,"year":1979},{"source":5,"year":2300},{"source":4,"year":1993},{"source":5,"year":2005}]},"out":{"year":1979,"source":2}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":2022}]},"out":{"year":2022,"source":3}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":1961}]},"out":{"year":1961,"source":3}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":5,"year":2009},{"source":1,"year":1991},{"source":3,"year":2028},{"source":3,"year":0}]},"out":{"year":1991,"source":1}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":2,"year":0}]},"out":{"year":0,"source":0}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":1850}]},"out":{"year":0,"source":0}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":1,"year":1976}]},"out":{"year":1976,"source":1}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":5,"year":1992},{"source":5,"year":0},{"source":1,"year":1963}]},"out":{"year":1963,"source":1}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":1850},{"source":3,"year":1963},{"source":4,"year":1971},{"source":4,"year":2018}]},"out":{"year":1963,"source":3}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":5,"year":1979},{"source":3,"year":2300},{"source":4,"year":2029},{"source":3,"year":2002}]},"out":{"year":1979,"source":5}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":5,"year":2300},{"source":5,"year":1992}]},"out":{"year":0,"source":0}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":5,"year":2007}]},"out":{"year":0,"source":0}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":2013},{"source":5,"year":2300},{"source":4,"year":2300}]},"out":{"year":2013,"source":4}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":2300},{"source":4,"year":1982},{"source":4,"year":2300}]},"out":{"year":1982,"source":4}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":2,"year":0}]},"out":{"year":0,"source":0}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":1997},{"source":1,"year":1995}]},"out":{"year":1995,"source":1}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":2017}]},"out":{"year":2017,"source":4}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":1988},{"source":2,"year":1983},{"source":2,"year":2005},{"source":1,"year":0}]},"out":{"year":1983,"source":2}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":1967}]},"out":{"year":1967,"source":4}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":5,"year":2300},{"source":3,"year":2006},{"source":3,"year":2029}]},"out":{"year":2006,"source":3}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":1,"year":2000}]},"out":{"year":2000,"source":1}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":5,"year":2003}]},"out":{"year":0,"source":0}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":5,"year":1850},{"source":1,"year":1978},{"source":2,"year":1966}]},"out":{"year":1966,"source":2}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":5,"year":2013},{"source":4,"year":1976}]},"out":{"year":1976,"source":4}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":2,"year":2009},{"source":1,"year":1989}]},"out":{"year":1989,"source":1}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":5,"year":0},{"source":5,"year":1990}]},"out":{"year":0,"source":0}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":2006},{"source":2,"year":1979},{"source":5,"year":1850},{"source":3,"year":2003}]},"out":{"year":1979,"source":2}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":0}]},"out":{"year":0,"source":0}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":1,"year":1993}]},"out":{"year":1993,"source":1}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":2007},{"source":3,"year":1978},{"source":1,"year":2011},{"source":5,"year":2008}]},"out":{"year":1978,"source":3}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":5,"year":1850},{"source":2,"year":2300}]},"out":{"year":0,"source":0}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":2029},{"source":2,"year":0},{"source":2,"year":1999}]},"out":{"year":1999,"source":2}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":0},{"source":5,"year":1850},{"source":3,"year":1997}]},"out":{"year":1997,"source":3}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":1966},{"source":3,"year":1850}]},"out":{"year":1966,"source":4}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":2024},{"source":4,"year":2300},{"source":5,"year":2004},{"source":4,"year":2016}]},"out":{"year":2004,"source":5}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":2003},{"source":3,"year":1999}]},"out":{"year":1999,"source":3}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":1994},{"source":2,"year":2013},{"source":1,"year":0},{"source":3,"year":2019}]},"out":{"year":1994,"source":4}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":2,"year":1963},{"source":4,"year":1998},{"source":2,"year":1975}]},"out":{"year":1963,"source":2}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":2300}]},"out":{"year":0,"source":0}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":2,"year":1973},{"source":1,"year":1850},{"source":3,"year":1850},{"source":4,"year":2300}]},"out":{"year":1973,"source":2}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":1,"year":1980},{"source":2,"year":1969},{"source":5,"year":0}]},"out":{"year":1969,"source":2}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":5,"year":2005},{"source":2,"year":0},{"source":5,"year":1968},{"source":4,"year":2023}]},"out":{"year":1968,"source":5}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":1,"year":1961},{"source":1,"year":1979}]},"out":{"year":1961,"source":1}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":1986},{"source":1,"year":0},{"source":2,"year":1971}]},"out":{"year":1971,"source":2}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":1981},{"source":3,"year":1850},{"source":2,"year":1961},{"source":5,"year":2019}]},"out":{"year":1961,"source":2}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":1,"year":1850},{"source":1,"year":0}]},"out":{"year":0,"source":0}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":0},{"source":1,"year":2003},{"source":4,"year":1850}]},"out":{"year":2003,"source":1}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":2,"year":1977},{"source":5,"year":1970},{"source":1,"year":1850}]},"out":{"year":1970,"source":5}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":2,"year":1967},{"source":5,"year":2028},{"source":5,"year":2008}]},"out":{"year":1967,"source":2}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":1,"year":2024}]},"out":{"year":2024,"source":1}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":1,"year":1974}]},"out":{"year":1974,"source":1}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":5,"year":1999},{"source":3,"year":2015},{"source":1,"year":1965}]},"out":{"year":1965,"source":1}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":2015},{"source":3,"year":1850}]},"out":{"year":2015,"source":4}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":2024},{"source":2,"year":2300}]},"out":{"year":2024,"source":4}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":2027},{"source":1,"year":2300},{"source":4,"year":1850}]},"out":{"year":2027,"source":3}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":1,"year":1988},{"source":3,"year":1990},{"source":2,"year":2005},{"source":1,"year":2008}]},"out":{"year":1988,"source":1}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":5,"year":1850},{"source":5,"year":2013}]},"out":{"year":0,"source":0}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":5,"year":1990},{"source":4,"year":2011}]},"out":{"year":1990,"source":5}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":2,"year":2025},{"source":3,"year":1979},{"source":3,"year":2027}]},"out":{"year":1979,"source":3}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":2300},{"source":3,"year":0}]},"out":{"year":0,"source":0}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":4,"year":1971},{"source":5,"year":1972},{"source":4,"year":0},{"source":3,"year":2006}]},"out":{"year":1971,"source":4}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":2,"year":1850},{"source":2,"year":2025},{"source":4,"year":2018},{"source":4,"year":2028}]},"out":{"year":2018,"source":4}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":5,"year":1993},{"source":4,"year":1996},{"source":4,"year":0}]},"out":{"year":1993,"source":5}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":5,"year":2010},{"source":2,"year":1850},{"source":4,"year":2018}]},"out":{"year":2010,"source":5}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":2,"year":1984},{"source":4,"year":0}]},"out":{"year":1984,"source":2}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":2022},{"source":3,"year":2018},{"source":3,"year":0},{"source":4,"year":0}]},"out":{"year":2018,"source":3}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":2,"year":2016},{"source":2,"year":1969},{"source":1,"year":1850},{"source":5,"year":1986}]},"out":{"year":1969,"source":2}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":2,"year":1971},{"source":3,"year":0},{"source":4,"year":1976},{"source":3,"year":0}]},"out":{"year":1971,"source":2}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":3,"year":2008},{"source":3,"year":2000},{"source":1,"year":0},{"source":2,"year":2014}]},"out":{"year":2000,"source":3}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":1,"year":2013},{"source":1,"year":2300},{"source":3,"year":1964}]},"out":{"year":1964,"source":3}}
+{"fn":"mergeYear","in":{"maxYear":2027,"claims":[{"source":5,"year":2003},{"source":3,"year":2017}]},"out":{"year":2003,"source":5}}
+{"fn":"parseYear","in":{"text":"2019"},"out":{"year":2019}}
+{"fn":"parseYear","in":{"text":"2019-03"},"out":{"year":2019}}
+{"fn":"parseYear","in":{"text":"2019-03-29"},"out":{"year":2019}}
+{"fn":"parseYear","in":{"text":"20190329"},"out":{"year":0}}
+{"fn":"parseYear","in":{"text":"1899"},"out":{"year":0}}
+{"fn":"parseYear","in":{"text":"2201"},"out":{"year":0}}
+{"fn":"parseYear","in":{"text":"abcd"},"out":{"year":0}}
+{"fn":"parseYear","in":{"text":""},"out":{"year":0}}
+{"fn":"parseYear","in":{"text":"19"},"out":{"year":0}}
+{"fn":"parseYear","in":{"text":"1994-"},"out":{"year":1994}}
+{"fn":"parseYear","in":{"text":"2022-1"},"out":{"year":2022}}
+{"fn":"popDeezer","in":{"rank":"-5"},"out":{"pop":-1}}
+{"fn":"popDeezer","in":{"rank":"0"},"out":{"pop":-1}}
+{"fn":"popDeezer","in":{"rank":"1"},"out":{"pop":0}}
+{"fn":"popDeezer","in":{"rank":"999"},"out":{"pop":0}}
+{"fn":"popDeezer","in":{"rank":"1000"},"out":{"pop":1}}
+{"fn":"popDeezer","in":{"rank":"541811"},"out":{"pop":541}}
+{"fn":"popDeezer","in":{"rank":"984833"},"out":{"pop":984}}
+{"fn":"popDeezer","in":{"rank":"999999"},"out":{"pop":999}}
+{"fn":"popDeezer","in":{"rank":"5000000"},"out":{"pop":1000}}
+{"fn":"popPlays","in":{"plays":"-1"},"out":{"pop":-1}}
+{"fn":"popListeners","in":{"users":"-1"},"out":{"pop":-1}}
+{"fn":"popPlays","in":{"plays":"0"},"out":{"pop":-1}}
+{"fn":"popListeners","in":{"users":"0"},"out":{"pop":-1}}
+{"fn":"popPlays","in":{"plays":"1"},"out":{"pop":31}}
+{"fn":"popListeners","in":{"users":"1"},"out":{"pop":57}}
+{"fn":"popPlays","in":{"plays":"9"},"out":{"pop":103}}
+{"fn":"popListeners","in":{"users":"9"},"out":{"pop":189}}
+{"fn":"popPlays","in":{"plays":"1000"},"out":{"pop":309}}
+{"fn":"popListeners","in":{"users":"1000"},"out":{"pop":566}}
+{"fn":"popPlays","in":{"plays":"47000000"},"out":{"pop":791}}
+{"fn":"popListeners","in":{"users":"47000000"},"out":{"pop":1000}}
+{"fn":"popPlays","in":{"plays":"1200000000"},"out":{"pop":936}}
+{"fn":"popListeners","in":{"users":"1200000000"},"out":{"pop":1000}}
+{"fn":"popPlays","in":{"plays":"9999999999"},"out":{"pop":1000}}
+{"fn":"popListeners","in":{"users":"9999999999"},"out":{"pop":1000}}
+{"fn":"mergePopularity","in":{"deezer":-1,"youtube":214,"listenbrainz":245},"out":{"pop":214}}
+{"fn":"mergePopularity","in":{"deezer":56,"youtube":-1,"listenbrainz":-1},"out":{"pop":56}}
+{"fn":"mergePopularity","in":{"deezer":862,"youtube":-1,"listenbrainz":-1},"out":{"pop":862}}
+{"fn":"mergePopularity","in":{"deezer":456,"youtube":-1,"listenbrainz":-1},"out":{"pop":456}}
+{"fn":"mergePopularity","in":{"deezer":-1,"youtube":-1,"listenbrainz":-1},"out":{"pop":-1}}
+{"fn":"mergePopularity","in":{"deezer":-1,"youtube":862,"listenbrainz":-1},"out":{"pop":862}}
+{"fn":"mergePopularity","in":{"deezer":-1,"youtube":560,"listenbrainz":-1},"out":{"pop":560}}
+{"fn":"mergePopularity","in":{"deezer":15,"youtube":-1,"listenbrainz":361},"out":{"pop":15}}
+{"fn":"mergePopularity","in":{"deezer":164,"youtube":180,"listenbrainz":-1},"out":{"pop":164}}
+{"fn":"mergePopularity","in":{"deezer":261,"youtube":16,"listenbrainz":292},"out":{"pop":261}}
+{"fn":"mergePopularity","in":{"deezer":705,"youtube":-1,"listenbrainz":852},"out":{"pop":705}}
+{"fn":"mergePopularity","in":{"deezer":295,"youtube":544,"listenbrainz":-1},"out":{"pop":295}}
+{"fn":"mergePopularity","in":{"deezer":969,"youtube":-1,"listenbrainz":951},"out":{"pop":969}}
+{"fn":"mergePopularity","in":{"deezer":-1,"youtube":-1,"listenbrainz":33},"out":{"pop":33}}
+{"fn":"mergePopularity","in":{"deezer":515,"youtube":530,"listenbrainz":-1},"out":{"pop":515}}
+{"fn":"mergePopularity","in":{"deezer":-1,"youtube":-1,"listenbrainz":-1},"out":{"pop":-1}}
+{"fn":"mergePopularity","in":{"deezer":738,"youtube":259,"listenbrainz":-1},"out":{"pop":738}}
+{"fn":"mergePopularity","in":{"deezer":977,"youtube":792,"listenbrainz":-1},"out":{"pop":977}}
+{"fn":"mergePopularity","in":{"deezer":150,"youtube":893,"listenbrainz":-1},"out":{"pop":150}}
+{"fn":"mergePopularity","in":{"deezer":992,"youtube":-1,"listenbrainz":-1},"out":{"pop":992}}
+{"fn":"mergePopularity","in":{"deezer":407,"youtube":-1,"listenbrainz":720},"out":{"pop":407}}
+{"fn":"mergePopularity","in":{"deezer":-1,"youtube":518,"listenbrainz":355},"out":{"pop":518}}
+{"fn":"mergePopularity","in":{"deezer":281,"youtube":271,"listenbrainz":621},"out":{"pop":281}}
+{"fn":"mergePopularity","in":{"deezer":731,"youtube":-1,"listenbrainz":426},"out":{"pop":731}}
+{"fn":"playCount","in":{"text":"47M plays"},"out":{"plays":"47000000"}}
+{"fn":"playCount","in":{"text":"1.2B views"},"out":{"plays":"1200000000"}}
+{"fn":"playCount","in":{"text":"950K plays"},"out":{"plays":"950000"}}
+{"fn":"playCount","in":{"text":"12,345 plays"},"out":{"plays":"12345"}}
+{"fn":"playCount","in":{"text":"3.4K"},"out":{"plays":"3400"}}
+{"fn":"playCount","in":{"text":"1.25M"},"out":{"plays":"1250000"}}
+{"fn":"playCount","in":{"text":"87 plays"},"out":{"plays":"87"}}
+{"fn":"playCount","in":{"text":""},"out":{"plays":"0"}}
+{"fn":"playCount","in":{"text":"plays"},"out":{"plays":"0"}}
+{"fn":"playCount","in":{"text":"0"},"out":{"plays":"0"}}
+{"fn":"playCount","in":{"text":"2.5 million"},"out":{"plays":"2"}}
+{"fn":"playCount","in":{"text":"12.3456K"},"out":{"plays":"12345"}}
+{"fn":"playCount","in":{"text":"1,2M"},"out":{"plays":"12000000"}}
+{"fn":"feel","in":{"tags":["2177:205","1102:97","554:96","1946:40","1106:36","73:24","1601:16","1995:16","547:9","485:6"],"gainDbX10":-70},"out":{"energy":200,"valence":161,"moods":[20,18,23,21]}}
+{"fn":"feel","in":{"tags":["2243:137","591:114","294:91","1238:81","630:68","1084:68","991:51","293:46","1442:42","2088:38","412:25","1273:25"],"gainDbX10":-82},"out":{"energy":149,"valence":132,"moods":[30,28,29,9]}}
+{"fn":"feel","in":{"tags":["953:173","1529:116","1049:93","19:86","1435:47","695:43","920:35","1753:17","125:9"],"gainDbX10":-70},"out":{"energy":152,"valence":123,"moods":[30,32,27,20]}}
+{"fn":"feel","in":{"tags":["1498:139","888:110","241:104","764:82","125:52","1203:52","1467:52","1529:52","1789:43","695:39","2:32","630:29"],"gainDbX10":30},"out":{"energy":181,"valence":129,"moods":[16,9,32,13]}}
+{"fn":"feel","in":{"tags":["757:194","821:115","125:72","2207:72","745:57","300:29","991:6","1273:3"],"gainDbX10":-82},"out":{"energy":144,"valence":133,"moods":[13,12,30,4]}}
+{"fn":"feel","in":{"tags":["387:230","1348:91","827:45","695:34","1273:23"],"gainDbX10":-70},"out":{"energy":194,"valence":120,"moods":[32,20,29,12]}}
+{"fn":"feel","in":{"tags":["1084:198","1147:94","1753:73","1382:55","1196:49","1095:44","125:37","684:37","1653:37","986:14"],"gainDbX10":-32768},"out":{"energy":184,"valence":121,"moods":[16,9,12,36]}}
+{"fn":"feel","in":{"tags":["1734:204","1702:138","236:46","241:37","485:18","695:14","2131:11","1196:7","1753:4","125:2"],"gainDbX10":-82},"out":{"energy":163,"valence":130,"moods":[8,7,28,12]}}
+{"fn":"feel","in":{"tags":[],"gainDbX10":-82},"out":{"energy":-1,"valence":-1,"moods":[]}}
+{"fn":"feel","in":{"tags":["207:185","2010:147","1389:74","1442:54","1196:27"],"gainDbX10":0},"out":{"energy":168,"valence":149,"moods":[8,3,27,36]}}
+{"fn":"feel","in":{"tags":["1325:142","1611:116","346:115","2131:58","2145:56","1422:52","1467:49","1084:46","1543:43","1753:43","125:21","1273:21"],"gainDbX10":-32768},"out":{"energy":196,"valence":131,"moods":[20,35,16,8]}}
+{"fn":"feel","in":{"tags":["381:160","2172:128","1167:64","821:59","1273:59","1867:59","1063:48","1442:48","1562:40","1097:30","62:24","1196:24"],"gainDbX10":-82},"out":{"energy":142,"valence":157,"moods":[8,23,4,28]}}
+{"fn":"feel","in":{"tags":["317:117","596:117","1095:117","1129:79","1031:59","1238:59","1543:59","684:53","991:46","1273:29","1416:29","485:20"],"gainDbX10":30},"out":{"energy":167,"valence":138,"moods":[8,28,29,35]}}
+{"fn":"feel","in":{"tags":["90:218","1799:93","73:61","207:39","805:39","1308:31","547:23","485:15","1389:15","1733:15","1196:6","1273:6"],"gainDbX10":-32768},"out":{"energy":182,"valence":137,"moods":[36,38,10,16]}}
+{"fn":"feel","in":{"tags":["236:206","728:85","485:82","237:68","1273:42","412:34","1196:30","1467:8"],"gainDbX10":-140},"out":{"energy":171,"valence":127,"moods":[20,10,14,16]}}
+{"fn":"feel","in":{"tags":["328:139","2242:139","446:116","125:51","412:51","991:51","618:44","1454:43","1273:26","485:17","293:16","1167:14"],"gainDbX10":-82},"out":{"energy":145,"valence":137,"moods":[8,18,28,17]}}
+{"fn":"feel","in":{"tags":["888:154","2234:122","262:73","2246:73","1789:61","1196:54","125:45","1063:45","1566:45","566:37","1416:27","2024:23"],"gainDbX10":-70},"out":{"energy":163,"valence":125,"moods":[18,36,16,4]}}
+{"fn":"feel","in":{"tags":["1251:164","237:121","1535:104","125:61","412:61","986:52","1031:52"],"gainDbX10":-70},"out":{"energy":166,"valence":127,"moods":[28,13,29,14]}}
+{"fn":"feel","in":{"tags":["1362:172","395:108","101:86","932:86","1011:68","210:43","920:32","1815:27","986:25","38:11","1416:4"],"gainDbX10":-200},"out":{"energy":60,"valence":98,"moods":[36,11,2,33]}}
+{"fn":"feel","in":{"tags":["1775:164","412:96","1015:96","503:82","2115:65","351:48","1073:43","1567:39","485:33","1562:33","1273:24","1442:16"],"gainDbX10":0},"out":{"energy":179,"valence":153,"moods":[4,30,18,3]}}
+{"fn":"feel","in":{"tags":[],"gainDbX10":-32768},"out":{"energy":-1,"valence":-1,"moods":[]}}
+{"fn":"feel","in":{"tags":[],"gainDbX10":-32768},"out":{"energy":-1,"valence":-1,"moods":[]}}
+{"fn":"feel","in":{"tags":["2146:136","1400:106","19:101","1601:72","1995:72","2187:68","412:53","125:50","1564:43","1144:39","1196:27","1416:25"],"gainDbX10":0},"out":{"energy":178,"valence":147,"moods":[30,23,18,20]}}
+{"fn":"feel","in":{"tags":["1929:121","566:120","19:89","2043:89","328:72","1572:72","1733:48","125:45","1203:45","1273:45","412:27","920:22"],"gainDbX10":-200},"out":{"energy":116,"valence":139,"moods":[1,4,28,8]}}
+{"fn":"feel","in":{"tags":["1263:220","581:82","1387:73","485:55","965:33","1266:14","1500:6"],"gainDbX10":-32768},"out":{"energy":231,"valence":114,"moods":[18,19,16,20]}}
+{"fn":"feel","in":{"tags":["1114:208","1601:83","1995:83","1400:61","1341:42","1196:31","412:30","1273:21","764:17","262:7","1416:3","485:2"],"gainDbX10":-200},"out":{"energy":154,"valence":160,"moods":[20,30,18,31]}}
+{"fn":"feel","in":{"tags":["130:172","2005:152","1940:76","485:68","1629:26","1196:25","611:17","424:11"],"gainDbX10":-70},"out":{"energy":221,"valence":164,"moods":[18,19,20,21]}}
+{"fn":"feel","in":{"tags":["1535:228","1031:114"],"gainDbX10":0},"out":{"energy":170,"valence":153,"moods":[29,7,28,20]}}
+{"fn":"feel","in":{"tags":["1400:153","1533:103","1601:103","1995:103","412:76","351:38","1196:38","485:26","2199:15","831:8","695:3"],"gainDbX10":30},"out":{"energy":219,"valence":156,"moods":[18,20,23,30]}}
+{"fn":"feel","in":{"tags":["1273:194","2221:109","458:103","1667:41","1442:40","2239:28","678:23","1454:15","695:10","991:10","1416:9","485:6"],"gainDbX10":-82},"out":{"energy":132,"valence":141,"moods":[20,24,4,23]}}
+{"fn":"feel","in":{"tags":["1251:164","237:121","1535:104","125:61","412:61","986:52","1031:52"],"gainDbX10":-140},"out":{"energy":138,"valence":127,"moods":[28,13,29,14]}}
+{"fn":"feel","in":{"tags":["579:201","1755:101","1826:86","864:52","1196:50","2038:34","40:21","1753:13"],"gainDbX10":0},"out":{"energy":176,"valence":74,"moods":[38,10,14,16]}}
+{"fn":"feel","in":{"tags":["503:139","1312:121","1002:114","1063:82","920:65","485:55","1273:42","62:41","1196:20","351:7"],"gainDbX10":-140},"out":{"energy":147,"valence":149,"moods":[30,18,20,23]}}
+{"fn":"feel","in":{"tags":["1465:124","1929:124","2190:98","1826:82","818:62","864:50","378:49","485:49","1733:49","1245:45","1273:36","2038:33"],"gainDbX10":-96},"out":{"energy":182,"valence":138,"moods":[20,21,23,24]}}
+{"fn":"feel","in":{"tags":["685:158","1311:125","1866:107","177:63","485:63","236:44","1647:37","1712:31","1196:23","298:15","1059:9","1260:5"],"gainDbX10":0},"out":{"energy":232,"valence":109,"moods":[14,16,12,10]}}
+{"fn":"feel","in":{"tags":["1986:152","1940:121","1550:95","509:76","656:76","604:60","413:38","652:30","1192:19","821:14","986:11","1416:7"],"gainDbX10":-90},"out":{"energy":103,"valence":135,"moods":[4,7,8,2]}}
+{"fn":"feel","in":{"tags":["1273:194","2221:109","458:103","1667:41","1442:40","2239:28","678:23","1454:15","695:10","991:10","1416:9","485:6"],"gainDbX10":-70},"out":{"energy":137,"valence":141,"moods":[20,24,4,23]}}
+{"fn":"feel","in":{"tags":["2207:161","787:115","614:78","1862:78","403:62","685:59","351:46","764:40","485:31","695:29","986:29","1196:11"],"gainDbX10":-70},"out":{"energy":144,"valence":123,"moods":[12,36,2,5]}}
+{"fn":"feel","in":{"tags":["685:158","1311:125","1866:107","177:63","485:63","236:44","1647:37","1712:31","1196:23","298:15","1059:9","1260:5"],"gainDbX10":-70},"out":{"energy":220,"valence":109,"moods":[14,16,12,10]}}
+{"fn":"feel","in":{"tags":["685:169","351:124","485:84","986:80","823:67","547:33","1196:31","821:25","734:17","1702:11"],"gainDbX10":-140},"out":{"energy":161,"valence":126,"moods":[18,33,16,12]}}
+{"fn":"feel","in":{"tags":["934:168","1251:134","1574:100","2207:62","125:50","1273:50"],"gainDbX10":-32768},"out":{"energy":172,"valence":123,"moods":[30,13,12,32]}}
+{"fn":"feel","in":{"tags":["857:127","435:100","2140:100","1814:83","588:67","1714:63","2119:63","1934:53","529:50","1702:42","1416:37","696:33"],"gainDbX10":-70},"out":{"energy":140,"valence":142,"moods":[2,20,36,33]}}
+{"fn":"feel","in":{"tags":["446:194","412:120","1634:81","1454:72","1231:30","125:15"],"gainDbX10":-96},"out":{"energy":143,"valence":146,"moods":[2,8,21,13]}}
+{"fn":"feel","in":{"tags":["352:165","1467:165","1273:82","168:56","2037:22","125:21","581:8","485:6"],"gainDbX10":0},"out":{"energy":180,"valence":159,"moods":[20,21,25,26]}}
+{"fn":"feel","in":{"tags":["2037:146","728:108","62:86","2238:73","2241:73","354:54","581:54","1273:54","888:46","485:36","964:36","991:27"],"gainDbX10":-70},"out":{"energy":179,"valence":141,"moods":[18,20,16,21]}}
+{"fn":"feel","in":{"tags":["1986:152","1940:121","1550:95","509:76","656:76","604:60","413:38","652:30","1192:19","821:14","986:11","1416:7"],"gainDbX10":30},"out":{"energy":123,"valence":135,"moods":[4,7,8,2]}}
+{"fn":"feel","in":{"tags":["1409:147","1775:147","294:82","2:61","1653:59","2115:59","352:30","1442:30","2236:30","137:26","986:22","1273:22"],"gainDbX10":0},"out":{"energy":131,"valence":125,"moods":[36,4,3,0]}}
+{"fn":"feel","in":{"tags":["765:219","821:81","1231:76","2209:57","125:38"],"gainDbX10":-200},"out":{"energy":146,"valence":155,"moods":[7,8,21,13]}}
+{"fn":"feel","in":{"tags":["779:233","1416:86","485:58"],"gainDbX10":30},"out":{"energy":220,"valence":166,"moods":[20,25,30,18]}}
+{"fn":"feel","in":{"tags":["277:198","1946:113","1091:82","1601:45","1995:45","423:30","1846:25","1196:17","476:13","1653:5"],"gainDbX10":-32768},"out":{"energy":176,"valence":150,"moods":[18,20,23,36]}}
+{"fn":"feel","in":{"tags":["1224:160","685:134","412:118","1442:59","485:53","2043:25","1196:20","1273:12","632:10","300:5"],"gainDbX10":-90},"out":{"energy":170,"valence":135,"moods":[16,30,8,29]}}
+{"fn":"feel","in":{"tags":["1612:119","1031:112","218:95","233:91","1435:76","2237:76","1144:47","1789:47","194:38","1196:35","1753:34","1412:32"],"gainDbX10":-32768},"out":{"energy":170,"valence":119,"moods":[16,12,14,9]}}
+{"fn":"feel","in":{"tags":["1734:210","1702:142","1203:26","920:13"],"gainDbX10":0},"out":{"energy":160,"valence":125,"moods":[7,8,28,16]}}
+{"fn":"feel","in":{"tags":["1567:167","2242:132","2015:76","933:66","2037:50","125:49","991:49","2074:32","1273:24","581:19","485:13","1500:13"],"gainDbX10":-82},"out":{"energy":191,"valence":141,"moods":[18,8,17,22]}}
+{"fn":"feel","in":{"tags":["724:183","734:108","1702:73","1416:68","173:46","485:46","1009:46","2236:39","137:33","1418:22","2235:20","1273:17"],"gainDbX10":-70},"out":{"energy":185,"valence":148,"moods":[22,30,8,16]}}
+{"fn":"feel","in":{"tags":["2043:228","1273:114"],"gainDbX10":30},"out":{"energy":197,"valence":173,"moods":[24,8,26,20]}}
+{"fn":"feel","in":{"tags":["41:196","1249:136","534:78","2091:43","1966:17","1753:6"],"gainDbX10":-90},"out":{"energy":230,"valence":100,"moods":[10,14,16]}}
+{"fn":"feel","in":{"tags":["1967:145","854:124","2119:116","986:61","485:58","1789:49","620:46","1653:46","1422:26","1196:21","125:18"],"gainDbX10":-82},"out":{"energy":142,"valence":133,"moods":[35,18,2,33]}}
+{"fn":"feel","in":{"tags":["508:128","346:123","1467:119","1475:80","1570:80","1753:46","1667:40","125:30","576:30","1273:30","1454:15"],"gainDbX10":0},"out":{"energy":194,"valence":140,"moods":[20,4,12,29]}}
+{"fn":"feel","in":{"tags":["358:255"],"gainDbX10":-82},"out":{"energy":-1,"valence":-1,"moods":[]}}
+{"fn":"feel","in":{"tags":["1567:228","933:91","351:45","125:34","485:30","1574:21","1196:11","1273:11"],"gainDbX10":-140},"out":{"energy":176,"valence":170,"moods":[18,27,22,13]}}
+{"fn":"feel","in":{"tags":["1031:213","1268:96","2096:90","1789:36","125:35"],"gainDbX10":0},"out":{"energy":199,"valence":159,"moods":[20,27,29,8]}}
+{"fn":"feel","in":{"tags":["2096:196","1522:96","1789:78","1140:59","1442:58","1762:49","125:29","672:25","1334:19","1667:10","1273:7"],"gainDbX10":-140},"out":{"energy":138,"valence":146,"moods":[8,26,32,13]}}
+{"fn":"feel","in":{"tags":["207:202","1564:119","1389:80","1256:53","1196:30"],"gainDbX10":-140},"out":{"energy":106,"valence":120,"moods":[8,3,27,36]}}
+{"fn":"feel","in":{"tags":["335:159","1668:159","649:67","237:59","547:59","485:40","412:29","630:26"],"gainDbX10":-32768},"out":{"energy":148,"valence":128,"moods":[30,29,36,38]}}
+{"fn":"feel","in":{"tags":["736:235","125:87","1286:43","1239:18","207:14","1316:7","1389:6","1196:2"],"gainDbX10":0},"out":{"energy":196,"valence":158,"moods":[8,22,24,18]}}
+{"fn":"feel","in":{"tags":[],"gainDbX10":0},"out":{"energy":-1,"valence":-1,"moods":[]}}
+{"fn":"feel","in":{"tags":["678:148","2247:118","1147:112","2207:88","1416:55","684:44","986:44","485:37","125:16","2241:15","757:9","888:9"],"gainDbX10":-70},"out":{"energy":165,"valence":125,"moods":[20,36,2,32]}}
+{"fn":"feel","in":{"tags":["1868:161","843:133","1521:78","877:69","48:53","492:52","2027:34","1971:33","1902:30","667:28","9:26","1442:20"],"gainDbX10":-70},"out":{"energy":114,"valence":134,"moods":[36,2,33,20]}}
+{"fn":"feel","in":{"tags":["2196:191","1978:143","1015:71","1640:40","313:36"],"gainDbX10":-140},"out":{"energy":185,"valence":190,"moods":[20,21,30]}}
+{"fn":"feel","in":{"tags":["1412:236","1442:87","854:30","566:24","1789:12","125:9"],"gainDbX10":-32768},"out":{"energy":92,"valence":136,"moods":[4,1,29,36]}}
+{"fn":"feel","in":{"tags":["352:165","1467:165","1273:82","168:56","2037:22","125:21","581:8","485:6"],"gainDbX10":-32768},"out":{"energy":160,"valence":159,"moods":[20,21,25,26]}}
+{"fn":"feel","in":{"tags":["1278:231","695:86","1883:50","1203:37","920:18"],"gainDbX10":-96},"out":{"energy":163,"valence":112,"moods":[11,9,22,32]}}
+{"fn":"feel","in":{"tags":["508:128","346:123","1467:119","1475:80","1570:80","1753:46","1667:40","125:30","576:30","1273:30","1454:15"],"gainDbX10":-70},"out":{"energy":182,"valence":140,"moods":[20,4,12,29]}}
+{"fn":"feel","in":{"tags":["1231:126","1734:126","1467:101","1702:85","2230:85","125:63","823:45","695:32","1566:32","821:17","1273:16"],"gainDbX10":-140},"out":{"energy":155,"valence":144,"moods":[18,13,28,17]}}
+{"fn":"feel","in":{"tags":["576:162","846:158","1083:63","1572:63","1077:62","1543:31","125:23","1273:23"],"gainDbX10":-90},"out":{"energy":146,"valence":147,"moods":[18,26,24,2]}}
+{"fn":"feel","in":{"tags":["2241:186","888:117","2131:85","991:69","1789:47","1273:34","1753:31","125:16"],"gainDbX10":30},"out":{"energy":147,"valence":129,"moods":[0,4,36,24]}}
+{"fn":"feel","in":{"tags":["526:165","507:131","2:78","724:66","1789:66","1442:49","352:39","125:24","1416:24","1273:19","485:16","281:8"],"gainDbX10":-32768},"out":{"energy":171,"valence":119,"moods":[13,16,9,12]}}
+{"fn":"feel","in":{"tags":["765:219","821:81","1231:76","2209:57","125:38"],"gainDbX10":-90},"out":{"energy":166,"valence":155,"moods":[7,8,21,13]}}
+{"fn":"feel","in":{"tags":[],"gainDbX10":-32768},"out":{"energy":-1,"valence":-1,"moods":[]}}
+{"fn":"feel","in":{"tags":[],"gainDbX10":0},"out":{"energy":-1,"valence":-1,"moods":[]}}
+{"fn":"feel","in":{"tags":["207:202","1564:119","1389:80","1256:53","1196:30"],"gainDbX10":-140},"out":{"energy":106,"valence":120,"moods":[8,3,27,36]}}
+{"fn":"feel","in":{"tags":["1924:194","1031:105","2115:92","630:77","1273:34","412:29"],"gainDbX10":-32768},"out":{"energy":171,"valence":173,"moods":[20,30,29,32]}}
+{"fn":"feel","in":{"tags":["1618:218","630:87","1348:87","412:32","695:32","1157:22","920:8"],"gainDbX10":-32768},"out":{"energy":147,"valence":127,"moods":[28,29,9,12]}}
+{"fn":"feel","in":{"tags":[],"gainDbX10":0},"out":{"energy":-1,"valence":-1,"moods":[]}}
+{"fn":"feel","in":{"tags":["1162:168","1598:129","820:70","994:70","1092:56","1273:48","2013:41","1282:34","1902:28","2146:28","1204:23","485:16"],"gainDbX10":0},"out":{"energy":199,"valence":116,"moods":[9,10,16,20]}}
+{"fn":"feel","in":{"tags":["1567:167","2242:132","2015:76","933:66","2037:50","125:49","991:49","2074:32","1273:24","581:19","485:13","1500:13"],"gainDbX10":-90},"out":{"energy":188,"valence":141,"moods":[18,8,17,22]}}
+{"fn":"feel","in":{"tags":["636:194","591:135","337:81","1442:50"],"gainDbX10":-32768},"out":{"energy":150,"valence":159,"moods":[20,27,30,1]}}
+{"fn":"feel","in":{"tags":["1567:167","2242:132","2015:76","933:66","2037:50","125:49","991:49","2074:32","1273:24","581:19","485:13","1500:13"],"gainDbX10":-70},"out":{"energy":196,"valence":141,"moods":[18,8,17,22]}}
+{"fn":"feel","in":{"tags":[],"gainDbX10":-90},"out":{"energy":-1,"valence":-1,"moods":[]}}
+{"fn":"feel","in":{"tags":["1567:140","38:111","300:82","1543:82","2207:70","293:55","933:55","168:48","1218:41","1273:41","1416:41","1562:37"],"gainDbX10":-200},"out":{"energy":156,"valence":153,"moods":[20,18,23,16]}}
+{"fn":"feel","in":{"tags":["1462:188","312:113","2129:111","91:48","1454:42","618:20"],"gainDbX10":-70},"out":{"energy":176,"valence":119,"moods":[14,18,19,2]}}
+{"fn":"feel","in":{"tags":["1122:239","1273:89"],"gainDbX10":30},"out":{"energy":190,"valence":180,"moods":[20,23,24]}}
+{"fn":"feel","in":{"tags":["40:147","508:145","2010:125","1634:58","1442:46","886:29","1231:22"],"gainDbX10":-70},"out":{"energy":214,"valence":142,"moods":[15,29,20,14]}}
+{"fn":"feel","in":{"tags":["126:143","131:124","1758:82","776:77","102:61","1196:53","96:52","1762:52","354:36","757:34","566:31","1442:30"],"gainDbX10":-140},"out":{"energy":132,"valence":131,"moods":[36,8,26,4]}}
+{"fn":"feel","in":{"tags":["462:219","1416:81","237:68","485:55","2246:40","412:34","1196:15","515:7","1702:5"],"gainDbX10":0},"out":{"energy":223,"valence":147,"moods":[20,18,21,30]}}
+{"fn":"feel","in":{"tags":["1567:140","38:111","300:82","1543:82","2207:70","293:55","933:55","168:48","1218:41","1273:41","1416:41","1562:37"],"gainDbX10":-70},"out":{"energy":184,"valence":153,"moods":[20,18,23,16]}}
+{"fn":"feel","in":{"tags":["1786:235","485:93","1196:35"],"gainDbX10":-32768},"out":{"energy":205,"valence":147,"moods":[20,27,30,18]}}
+{"fn":"feel","in":{"tags":["40:128","1924:128","2228:102","934:81","964:65","630:51","1634:51","1543:38","2043:38","2235:38","2207:30","1231:24"],"gainDbX10":-82},"out":{"energy":193,"valence":140,"moods":[30,32,15,18]}}
+{"fn":"feel","in":{"tags":[],"gainDbX10":0},"out":{"energy":-1,"valence":-1,"moods":[]}}
+{"fn":"feel","in":{"tags":["137:235","674:93","1196:35"],"gainDbX10":-32768},"out":{"energy":190,"valence":156,"moods":[18,8,22,36]}}
+{"fn":"feel","in":{"tags":["48:232","1442:86","2231:50","1762:31","1566:18","1789:12","1273:9"],"gainDbX10":-140},"out":{"energy":134,"valence":164,"moods":[8,20,22,4]}}
+{"fn":"feel","in":{"tags":["236:169","2010:157","485:67","1442:58","352:50","1196:25","1273:25"],"gainDbX10":-96},"out":{"energy":187,"valence":139,"moods":[21,10,14,16]}}
+{"fn":"feel","in":{"tags":["596:105","1063:105","1789:95","2024:89","547:84","2244:71","485:57","62:53","1543:53","839:50","1667:36","125:35"],"gainDbX10":-96},"out":{"energy":134,"valence":126,"moods":[8,2,9,16]}}
+{"fn":"feel","in":{"tags":["1735:186","854:94","1974:83","70:80","159:56","1789:37","1745:36","40:33","695:21","1463:20","424:15","125:14"],"gainDbX10":-140},"out":{"energy":190,"valence":120,"moods":[19,16,14,15]}}
+{"fn":"feel","in":{"tags":["52:137","1203:126","1408:85","206:80","1611:77","920:63","1416:51","485:34","237:32","1084:30","1196:30","412:16"],"gainDbX10":30},"out":{"energy":203,"valence":115,"moods":[16,30,36,20]}}
+{"fn":"feel","in":{"tags":["1567:140","38:111","300:82","1543:82","2207:70","293:55","933:55","168:48","1218:41","1273:41","1416:41","1562:37"],"gainDbX10":-96},"out":{"energy":173,"valence":153,"moods":[20,18,23,16]}}
+{"fn":"feel","in":{"tags":["1268:204","1344:107","125:76","493:56","1122:42","1416:21","1789:21","1273:16","485:14"],"gainDbX10":-70},"out":{"energy":191,"valence":155,"moods":[20,8,12,32]}}
+{"fn":"feel","in":{"tags":["1535:174","2024:99","745:87","1031:87","367:78","300:44","1667:39","1454:15"],"gainDbX10":-200},"out":{"energy":95,"valence":135,"moods":[28,29,4,7]}}
+{"fn":"feel","in":{"tags":["1400:153","1533:103","1601:103","1995:103","412:76","351:38","1196:38","485:26","2199:15","831:8","695:3"],"gainDbX10":-200},"out":{"energy":179,"valence":156,"moods":[18,20,23,30]}}
+{"fn":"feel","in":{"tags":["358:255"],"gainDbX10":-200},"out":{"energy":-1,"valence":-1,"moods":[]}}
+{"fn":"feel","in":{"tags":["576:162","846:158","1083:63","1572:63","1077:62","1543:31","125:23","1273:23"],"gainDbX10":0},"out":{"energy":166,"valence":147,"moods":[18,26,24,2]}}
+{"fn":"feel","in":{"tags":[],"gainDbX10":-32768},"out":{"energy":-1,"valence":-1,"moods":[]}}
+{"fn":"feel","in":{"tags":["1454:229","854:98","1789:39","1009:31","125:14","1416:11","485:8"],"gainDbX10":-140},"out":{"energy":93,"valence":130,"moods":[2,8,4,35]}}
+{"fn":"feel","in":{"tags":["511:193","1918:128","424:80","808:51","203:32","485:32","1273:19","512:13","886:12"],"gainDbX10":-96},"out":{"energy":200,"valence":176,"moods":[20,18,19,21]}}
+{"fn":"feel","in":{"tags":["40:128","1924:128","2228:102","934:81","964:65","630:51","1634:51","1543:38","2043:38","2235:38","2207:30","1231:24"],"gainDbX10":-140},"out":{"energy":170,"valence":140,"moods":[30,32,15,18]}}
+{"fn":"feel","in":{"tags":["126:143","131:124","1758:82","776:77","102:61","1196:53","96:52","1762:52","354:36","757:34","566:31","1442:30"],"gainDbX10":-200},"out":{"energy":132,"valence":131,"moods":[36,8,26,4]}}
+{"fn":"feel","in":{"tags":["1450:131","1442:121","346:98","1543:91","1789:61","48:55","2237:55","1273:49","1753:36","194:27","125:23","991:20"],"gainDbX10":-140},"out":{"energy":148,"valence":136,"moods":[16,35,22,10]}}
+{"fn":"feel","in":{"tags":["1002:136","2245:136","100:109","412:101","1273:51","125:40","1095:34","1924:17","630:7"],"gainDbX10":-32768},"out":{"energy":151,"valence":154,"moods":[28,23,24,22]}}
+{"fn":"feel","in":{"tags":["1418:180","677:122","169:71","346:61","854:56","1273:45","1231:39","695:26","1753:23","1789:22","125:20"],"gainDbX10":-200},"out":{"energy":157,"valence":160,"moods":[23,21,8,20]}}
+{"fn":"feel","in":{"tags":[],"gainDbX10":-96},"out":{"energy":-1,"valence":-1,"moods":[]}}
+{"fn":"feel","in":{"tags":["1612:223","1789:88","1500:66","125:33","351:29","1231:25","485:19","1475:13","1196:7","1667:7","1273:5","1454:2"],"gainDbX10":-90},"out":{"energy":190,"valence":114,"moods":[16,9,12,13]}}
+{"fn":"feel","in":{"tags":["628:140","765:140","2115:140","821:52","1273:52","2235:32","1809:14"],"gainDbX10":-96},"out":{"energy":150,"valence":167,"moods":[4,7,8,23]}}
+{"fn":"feel","in":{"tags":["2155:229","2131:91","1434:46","1753:34","40:23","932:18","1634:9","920:7","1231:3"],"gainDbX10":-96},"out":{"energy":208,"valence":131,"moods":[21,22,33,16]}}
+{"fn":"feel","in":{"tags":["2131:178","48:149","1753:66","1442:55","1567:47","125:33","933:19"],"gainDbX10":-140},"out":{"energy":173,"valence":155,"moods":[22,21,33,8]}}
+{"fn":"feel","in":{"tags":["507:196","1203:103","1442:73","2088:69","920:51","1049:46","1753:26","724:14","125:13","1416:5","485:3"],"gainDbX10":-140},"out":{"energy":151,"valence":93,"moods":[16,13,11,36]}}
+{"fn":"feel","in":{"tags":["1924:160","346:127","2234:102","630:63","1753:47","125:38","528:38","1509:38","1566:38","412:24","1273:19","2207:14"],"gainDbX10":-82},"out":{"energy":188,"valence":143,"moods":[20,18,32,24]}}
+{"fn":"feel","in":{"tags":["207:202","1564:119","1389:80","1256:53","1196:30"],"gainDbX10":-200},"out":{"energy":106,"valence":120,"moods":[8,3,27,36]}}
+{"fn":"feel","in":{"tags":["503:139","1312:121","1002:114","1063:82","920:65","485:55","1273:42","62:41","1196:20","351:7"],"gainDbX10":0},"out":{"energy":187,"valence":149,"moods":[30,18,20,23]}}
+{"fn":"feel","in":{"tags":["1734:210","1702:142","1203:26","920:13"],"gainDbX10":-200},"out":{"energy":120,"valence":125,"moods":[7,8,28,16]}}
+{"fn":"feel","in":{"tags":["934:148","1084:148","367:65","2242:62","1753:55","2207:55","2:46","1231:46","1288:32","19:27","125:27","352:23"],"gainDbX10":-70},"out":{"energy":174,"valence":115,"moods":[12,9,16,13]}}
+{"fn":"feel","in":{"tags":["1422:155","2087:108","2096:108","1604:64","1789:61","2109:54","1734:49","2115:43","1702:33","576:27","125:23","1555:21"],"gainDbX10":-82},"out":{"energy":151,"valence":127,"moods":[35,32,9,4]}}
+{"fn":"feel","in":{"tags":["1929:150","1467:106","745:88","1564:88","2231:71","1733:59","1762:45","300:44","1015:44","1566:26","1273:22","1789:18"],"gainDbX10":-96},"out":{"energy":123,"valence":149,"moods":[28,4,20,1]}}
+{"fn":"feel","in":{"tags":["511:193","1918:128","424:80","808:51","203:32","485:32","1273:19","512:13","886:12"],"gainDbX10":-200},"out":{"energy":183,"valence":176,"moods":[20,18,19,21]}}
+{"fn":"feel","in":{"tags":["1462:188","312:113","2129:111","91:48","1454:42","618:20"],"gainDbX10":0},"out":{"energy":188,"valence":119,"moods":[14,18,19,2]}}
+{"fn":"feel","in":{"tags":[],"gainDbX10":30},"out":{"energy":-1,"valence":-1,"moods":[]}}
+{"fn":"feel","in":{"tags":["685:169","351:124","485:84","986:80","823:67","547:33","1196:31","821:25","734:17","1702:11"],"gainDbX10":-200},"out":{"energy":161,"valence":126,"moods":[18,33,16,12]}}
+{"fn":"feel","in":{"tags":["1929:149","1570:137","169:118","1733:59","125:51","695:44","1756:39","1273:22","1753:15"],"gainDbX10":0},"out":{"energy":187,"valence":140,"moods":[13,17,18,30]}}
+{"fn":"feel","in":{"tags":["46:215","335:85","1624:85","237:32","695:32","829:32","1143:21","412:16","1413:13","125:8","485:5"],"gainDbX10":-32768},"out":{"energy":167,"valence":118,"moods":[12,32,10,30]}}
+{"fn":"feel","in":{"tags":["1325:172","2015:155","2145:68","2074:64","1500:26","1789:26","1400:25","1809:17","1291:14","1273:6","125:5"],"gainDbX10":-90},"out":{"energy":176,"valence":141,"moods":[8,20,5,38]}}
+{"fn":"scriptLang","in":{"title":"Ch\u00fang Ta C\u1ee7a Hi\u1ec7n T\u1ea1i","country":"CN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"Ditto","country":"KR"},"out":{"lang":2}}
+{"fn":"scriptLang","in":{"title":"\u3072\u307e\u308f\u308a\u306e\u7d04\u675f","country":"US"},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"\uc0ac\ub791\ud574","country":"JP"},"out":{"lang":2}}
+{"fn":"scriptLang","in":{"title":"\u591c\u66f2","country":"KR"},"out":{"lang":4}}
+{"fn":"scriptLang","in":{"title":"\u041c\u043e\u0439 \u0434\u0440\u0443\u0433","country":"CN"},"out":{"lang":6}}
+{"fn":"scriptLang","in":{"title":"\u0e44\u0e21\u0e48\u0e23\u0e39\u0e49","country":""},"out":{"lang":7}}
+{"fn":"scriptLang","in":{"title":"\u0623\u0646\u0627","country":"US"},"out":{"lang":8}}
+{"fn":"scriptLang","in":{"title":"\u0924\u0942","country":"KR"},"out":{"lang":9}}
+{"fn":"scriptLang","in":{"title":"","country":"KR"},"out":{"lang":0}}
+{"fn":"scriptLang","in":{"title":"1234","country":"US"},"out":{"lang":0}}
+{"fn":"scriptLang","in":{"title":"S\u01a1n T\u00f9ng M-TP","country":"US"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"H\u00e0 N\u1ed9i 2020","country":"CN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"\u591c\u306b\u99c6\u3051\u308b","country":""},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"\u767d\u65e5","country":"CN"},"out":{"lang":4}}
+{"fn":"scriptLang","in":{"title":"\u30de\u30ea\u30fc\u30b4\u30fc\u30eb\u30c9","country":""},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"Pretender","country":"KR"},"out":{"lang":2}}
+{"fn":"scriptLang","in":{"title":"\u7d05\u84ee\u83ef","country":""},"out":{"lang":4}}
+{"fn":"scriptLang","in":{"title":"Lemon","country":"CN"},"out":{"lang":4}}
+{"fn":"scriptLang","in":{"title":"\u30a2\u30a4\u30c9\u30eb","country":""},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"\u7fa4\u9752","country":"CN"},"out":{"lang":4}}
+{"fn":"scriptLang","in":{"title":"\u602a\u7269 (Anime Version)","country":"JP"},"out":{"lang":4}}
+{"fn":"scriptLang","in":{"title":"First Love (2022 Remastered)","country":""},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"\u4e38\u306e\u5185\u30b5\u30c7\u30a3\u30b9\u30c6\u30a3\u30c3\u30af (Live)","country":"KR"},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"\u6b8b\u9177\u306a\u5929\u4f7f\u306e\u30c6\u30fc\u30bc (Instrumental)","country":"KR"},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"\u30c9\u30e9\u30a4\u30d5\u30e9\u30ef\u30fc [Acoustic Ver.]","country":"JP"},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"\u5efb\u5efb\u5947\u8b5a - Remix","country":"US"},"out":{"lang":4}}
+{"fn":"scriptLang","in":{"title":"\u708e \uff08\u30ab\u30e9\u30aa\u30b1\uff09","country":"US"},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"\u591c\u306b\u99c6\u3051\u308b\uff08Instrumental\uff09","country":"US"},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"\ubd04\ub0a0","country":""},"out":{"lang":2}}
+{"fn":"scriptLang","in":{"title":"Dynamite (Acoustic Remix)","country":"CN"},"out":{"lang":4}}
+{"fn":"scriptLang","in":{"title":"\ubc24\ud3b8\uc9c0","country":"CN"},"out":{"lang":2}}
+{"fn":"scriptLang","in":{"title":"Ditto","country":"JP"},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"Super Shy","country":"CN"},"out":{"lang":4}}
+{"fn":"scriptLang","in":{"title":"\ub69c\ub450\ub69c\ub450 (DDU-DU DDU-DU)","country":"KR"},"out":{"lang":2}}
+{"fn":"scriptLang","in":{"title":"\uc88b\uc740 \ub0a0","country":"KR"},"out":{"lang":2}}
+{"fn":"scriptLang","in":{"title":"\uc5d0\uc787 (Prod.&Feat. SUGA of BTS)","country":""},"out":{"lang":2}}
+{"fn":"scriptLang","in":{"title":"\uc0ac\uac74\uc758 \uc9c0\ud3c9\uc120","country":"VN"},"out":{"lang":2}}
+{"fn":"scriptLang","in":{"title":"Love Dive (Live)","country":"CN"},"out":{"lang":4}}
+{"fn":"scriptLang","in":{"title":"Hype Boy - Sped Up","country":"VN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"Blue Hour (Japanese Ver.)","country":"JP"},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"Ch\u00fang Ta C\u1ee7a Hi\u1ec7n T\u1ea1i","country":"CN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"H\u00e3y Trao Cho Anh (feat. Snoop Dogg)","country":"CN"},"out":{"lang":4}}
+{"fn":"scriptLang","in":{"title":"N\u01a1i N\u00e0y C\u00f3 Anh","country":"US"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"L\u1ea1c Tr\u00f4i (Triple D Remix)","country":"CN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"See T\u00ecnh","country":"KR"},"out":{"lang":2}}
+{"fn":"scriptLang","in":{"title":"See T\u00ecnh (Speed Up Version)","country":""},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"\u0110\u1ec3 M\u1ecb N\u00f3i Cho M\u00e0 Nghe","country":"JP"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"B\u1eafc Kim Thang","country":"US"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"Em C\u1ee7a Ng\u00e0y H\u00f4m Qua","country":"CN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"C\u00f3 Ch\u1eafc Y\u00eau L\u00e0 \u0110\u00e2y - Live at Sky Tour","country":"CN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"Mang Ti\u1ec1n V\u1ec1 Cho M\u1eb9 (feat. Nguy\u00ean Th\u1ea3o)","country":"VN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"\u0110i V\u1ec1 Nh\u00e0","country":"CN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"N\u00e0ng Th\u01a1","country":""},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"Th\u00edch Em H\u01a1i Nhi\u1ec1u (Acoustic)","country":"CN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"Waiting For You (Karaoke)","country":"VN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"Ng\u00e0y Mai Ng\u01b0\u1eddi Ta L\u1ea5y Ch\u1ed3ng - Lofi Ver.","country":"CN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"B\u00f4ng Hoa \u0110\u1eb9p Nh\u1ea5t (Cover)","country":"CN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"V\u00ec Anh \u0110\u00e2u C\u00f3 Bi\u1ebft (Slowed + Reverb)","country":"VN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"Th\u00e1ng T\u01b0 L\u00e0 L\u1eddi N\u00f3i D\u1ed1i C\u1ee7a Em","country":"VN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"Anh \u0110\u00e3 Quen V\u1edbi C\u00f4 \u0110\u01a1n","country":"US"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"\u0110\u1eebng L\u00e0m Tr\u00e1i Tim Anh \u0110au","country":"KR"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"Ph\u00eda Sau M\u1ed9t C\u00f4 G\u00e1i (Beat)","country":"KR"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"H\u01a1n C\u1ea3 Y\u00eau (Piano Version)","country":"VN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"Dreams (2004 Remaster)","country":"JP"},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"Love Story (Taylor's Version)","country":"KR"},"out":{"lang":2}}
+{"fn":"scriptLang","in":{"title":"All Too Well (10 Minute Version) (Taylor's Version) (From The Vault)","country":"US"},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"Smells Like Teen Spirit - Remastered 2021","country":"JP"},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"Bohemian Rhapsody (Live Aid)","country":"CN"},"out":{"lang":4}}
+{"fn":"scriptLang","in":{"title":"Hotel California - Live On MTV, 1994","country":"US"},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"Blinding Lights (with ROSAL\u00cdA) - Remix","country":""},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"HUMBLE.","country":""},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"Not Like Us","country":"CN"},"out":{"lang":4}}
+{"fn":"scriptLang","in":{"title":"DNA.","country":"CN"},"out":{"lang":4}}
+{"fn":"scriptLang","in":{"title":"m.A.A.d city (feat. MC Eiht)","country":"US"},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"Archangel","country":"US"},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"Espresso","country":"US"},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"Espresso - Double Shot Version","country":"KR"},"out":{"lang":2}}
+{"fn":"scriptLang","in":{"title":"Here With Me","country":"US"},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"Romantic Homicide","country":"KR"},"out":{"lang":2}}
+{"fn":"scriptLang","in":{"title":"Good Luck, Babe!","country":"KR"},"out":{"lang":2}}
+{"fn":"scriptLang","in":{"title":"bad guy (with Justin Bieber)","country":""},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"Get Lucky (Radio Edit) [feat. Pharrell Williams & Nile Rodgers]","country":"JP"},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"Creep (Acoustic)","country":"VN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"Karma Police - Remastered","country":""},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"Hips Don't Lie (feat. Wyclef Jean)","country":"JP"},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"Last Last","country":"CN"},"out":{"lang":4}}
+{"fn":"scriptLang","in":{"title":"Song 2","country":""},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"Part 2 (Interlude)","country":"US"},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"Intro","country":"JP"},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"(Intro)","country":"CN"},"out":{"lang":4}}
+{"fn":"scriptLang","in":{"title":"[Untitled]","country":""},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"Untitled (How Does It Feel)","country":"CN"},"out":{"lang":4}}
+{"fn":"scriptLang","in":{"title":"7 rings","country":""},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"Stay (Instrumental)","country":"VN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"Stay - Karaoke Version","country":"JP"},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"Stay (Originally Performed by The Kid LAROI) [Backing Track]","country":"VN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"Heat Waves (Slowed)","country":"CN"},"out":{"lang":4}}
+{"fn":"scriptLang","in":{"title":"Heat Waves - Sped Up","country":"JP"},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"Somebody That I Used To Know (Tribute Version)","country":"US"},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"Africa (Cover)","country":"VN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"Hurt - Live","country":"CN"},"out":{"lang":4}}
+{"fn":"scriptLang","in":{"title":"Unplugged in New York: About a Girl","country":"VN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"Wonderwall (MTV Unplugged)","country":"VN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"One (Mono)","country":"JP"},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"One - Stereo Mix","country":"JP"},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"Levitating (feat. DaBaby)","country":""},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"Levitating (The Blessed Madonna Remix) [feat. Madonna and Missy Elliott]","country":"US"},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"Mr. Brightside (Jacques Lu Cont's Thin White Duke Mix)","country":"JP"},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"Around the World (Original Mix)","country":""},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"One More Time - Club Mix","country":"KR"},"out":{"lang":2}}
+{"fn":"scriptLang","in":{"title":"Sweet Child O' Mine (Re-Recorded)","country":"US"},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"Rerecorded Hits: Jump","country":"JP"},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"Fearless (John's Version)","country":"CN"},"out":{"lang":4}}
+{"fn":"scriptLang","in":{"title":"Live Forever","country":"US"},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"Alive","country":"CN"},"out":{"lang":4}}
+{"fn":"scriptLang","in":{"title":"Concert for One","country":"VN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"The Remix Song","country":"US"},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"Cover Me Up","country":"VN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"Nightcore - Angel With A Shotgun","country":"JP"},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"Piano Man","country":"VN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"With Or Without You","country":""},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"From The Start","country":"VN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"Feat","country":"VN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"Explicit","country":"JP"},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"Clean","country":"KR"},"out":{"lang":2}}
+{"fn":"scriptLang","in":{"title":"Deluxe","country":"JP"},"out":{"lang":3}}
+{"fn":"scriptLang","in":{"title":"Song (Deluxe Edition)","country":"CN"},"out":{"lang":4}}
+{"fn":"scriptLang","in":{"title":"Song (Bonus Track)","country":""},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"Song (Single Version)","country":"CN"},"out":{"lang":4}}
+{"fn":"scriptLang","in":{"title":"Song (Album Version)","country":"VN"},"out":{"lang":1}}
+{"fn":"scriptLang","in":{"title":"Song (Explicit)","country":"US"},"out":{"lang":5}}
+{"fn":"scriptLang","in":{"title":"Song (Clean)","country":"US"},"out":{"lang":5}}

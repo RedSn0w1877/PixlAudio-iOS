@@ -16,6 +16,13 @@ let modules: [(name: String, dependencies: [String])] = [
     ("PixlBackup", ["PixlFoundation", "PixlModel", "PixlLibrary", "PixlLyrics"]),
 ]
 
+/// Modules a module's TESTS import beyond its own dependencies. PixlBackup depends on PixlLibrary, so PixlLibrary itself
+/// cannot import it, but its tests can: the brain's atlas tests gunzip the shipped asset with PixlBackup's pure-Swift
+/// inflate and check its SHA-256 with PixlBackup's (stage 2b).
+let extraTestDependencies: [String: [String]] = [
+    "PixlLibrary": ["PixlBackup"],
+]
+
 let package = Package(
     name: "PixlCore",
     platforms: [.iOS("26.0"), .macOS("26.0")],
@@ -28,7 +35,8 @@ let package = Package(
             ),
             .testTarget(
                 name: "\(module.name)Tests",
-                dependencies: [Target.Dependency.target(name: module.name)] + module.dependencies.map { Target.Dependency.target(name: $0) },
+                dependencies: [Target.Dependency.target(name: module.name)]
+                    + (module.dependencies + (extraTestDependencies[module.name] ?? [])).map { Target.Dependency.target(name: $0) },
                 resources: [.copy("Fixtures")]
             ),
         ]

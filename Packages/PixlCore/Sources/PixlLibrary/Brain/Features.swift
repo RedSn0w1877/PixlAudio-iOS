@@ -1,7 +1,7 @@
 // The feature vector of docs/brain-spec.md, 5.8 (D = 51). A transliteration of the Android `:brain` module's
 // `Features.kt`. Stage 1 computes features 0, 1, 2, 3, 8, 12-18, 22, 23, 25, 26, 36, 37 and 38; every other entry
 // is exactly 0, because its input does not exist yet or its prior weight is 0. A feature whose input is unknown is
-// exactly 0.
+// exactly 0. Stage 2b adds features 4 and 24 when the candidate carries a tag vector (3.4).
 
 /// One track a list could contain, by id (the core never sees a `Song`).
 public struct Candidate: Sendable {
@@ -22,10 +22,13 @@ public struct Candidate: Sendable {
     public var fromSimilarArtist: Bool
     /// Feature 10, `clip((B + 4) / 6, 0, 1)` of `RepeatActivation`; 0 for a track never played or an unknown history.
     public var actr: Double
+    /// The track's tag vector (3.4); nil or empty when its genres are unknown (features 4 and 24 are then exactly 0).
+    public var tags: Tags.Vector?
 
     public init(rid: Int64, aid: Int64, albumKey: Int64 = 0, inLibrary: Bool = false, liked: Bool = false,
                 fromArtistRadio: Bool = false, boostLn: Double = 0.0, fromSimilarArtist: Bool = false,
-                actr: Double = 0.0) {
+                actr: Double = 0.0, tags: Tags.Vector? = nil) {
+        self.tags = tags
         self.fromSimilarArtist = fromSimilarArtist
         self.actr = actr
         self.rid = rid
@@ -46,6 +49,7 @@ public enum Features {
     public static let trackAff = 1
     public static let artistAff = 2
     public static let artistAffRecent = 3
+    public static let tagAff = 4
     public static let liked = 8
     public static let actr = 10
     public static let actrSq = 11
@@ -54,6 +58,7 @@ public enum Features {
     public static let unheardArtist = 18
     public static let sessPosSim = 22
     public static let sessNegSim = 23
+    public static let sessTagPen = 24
     public static let prevCompleted = 25
     public static let skipRun = 26
     public static let armAff = 36
@@ -102,6 +107,11 @@ public enum Features {
         }
         if c.aid != 0 && !Affinity.isHeard(affinity, family: Family.artist, key: c.aid) { out[unheardArtist] = 1.0 }
 
+        if let tags = c.tags, !tags.isEmpty {
+            out[Features.tagAff] = tagAff(tags, affinity, nowMs: nowMs, p0: p0)
+            out[Features.sessTagPen] = sessTagPen(tags, session)
+        }
+
         out[sessPosSim] = sessPosSim(c, session, graph)
         out[sessNegSim] = sessNegSim(c, session, graph)
         if session.prevCompleted { out[prevCompleted] = 1.0 }
@@ -111,6 +121,26 @@ public enum Features {
         }
         out[Features.retrieval] = retrieval
         if bestRank > 0 { out[radioRank] = 1.0 / BrainMath.log2(2.0 + Double(bestRank)) }
+    }
+
+    /// Feature 4: `sum over tags of (w / 255) * aff(tag) / 3`, summed in the tag vector's order.
+    public static func tagAff(_ tags: Tags.Vector, _ affinity: Affinity.State, nowMs: Int64, p0: Double) -> Double {
+        var sum = 0.0
+        for t in tags.tags {
+            sum += (Double(t.q) / 255.0) * (Affinity.aff(affinity, family: Family.tag, key: Int64(t.atlasId), nowMs: nowMs, p0: p0) / 3.0)
+        }
+        return sum
+    }
+
+    /// Feature 24: `min(1, sum over tags of (w / 255) * tagPen[tag])`.
+    public static func sessTagPen(_ tags: Tags.Vector, _ session: SessionState) -> Double {
+        if session.tagPen.isEmpty { return 0.0 }
+        var sum = 0.0
+        for t in tags.tags {
+            guard let pen = session.tagPen[t.atlasId] else { continue }
+            sum += (Double(t.q) / 255.0) * pen
+        }
+        return BrainMath.min(1.0, sum)
     }
 
     /// Feature 22: `max over j of 0.7^j * sim(i, pos_j)`.

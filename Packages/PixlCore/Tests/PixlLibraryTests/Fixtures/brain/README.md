@@ -68,3 +68,16 @@ How each `fn` is replayed:
   mode with the new `Candidate` fields `fromSimilarArtist` (arm SIM, "Close to X") and `actr` (feature 10;
   feature 11 is its square), `closestOfSeeds` (station mode: nearest of the seeds, not the first; `in.request2.closestOfSeeds`)
   and a session whose seed is an artist station.
+- `atlas.jsonl`, `tags.jsonl`, `dna.jsonl` (stage 2b, milestone 1; new files, nothing before them changed): they need the
+  genre atlas, the bytes of `app/src/main/assets/genre-atlas-v1.json.gz` (SHA-256 in `atlas/genre-atlas-v1.sha256`),
+  gunzipped, as UTF-8 text, then `GenreAtlas.parse`. `meta` is the atlas's counts, family names and mood names. `name` is
+  `idForName(text)`; `mbid` is `idForMbid`; `source` is `idsForSource(source, raw)` (null when the table has no entry)
+  and `resolve(source, raw)`; `ancestors`; `genre` reads family, depth, era start, descriptor, parents and related.
+  `merge` is `Tags.merge(atlas, inputs)` (`conf` is a double bit pattern; `tags` are `"atlasId:q"`; `blob` is
+  `Tags.encode` in hex); `tagdot`; `fromArtist`; `inputs` is `Tags.inputs(atlas, source, table, raws)` then `merge`.
+  `mergeYear(claims, maxYear)`, `parseYear`, `popDeezer`, `popPlays`, `popListeners`, `mergePopularity`, `playCount`
+  (`TrackDna.parsePlayCount`), `feel` is `TrackDna.feel(atlas, tags, gainDbX10)` and `TrackDna.moods`, `scriptLang`.
+- `tagfeatures.jsonl` (stage 2b): `tagAff` runs `Affinity.apply(state, TAG, id, r, c, part, tMs)` for each step on one empty
+  state and reads `Features.tagAff(tags, state, nowMs, p0)` (feature 4). `sessTagPen` runs `Session.applyTags(session,
+  tags, h, completed)` for each step on one fresh `SessionState`; `penalties` are the session's `tagPen` entries in ascending
+  atlas id, `feature` is `Features.sessTagPen(tags, session)` (feature 24).

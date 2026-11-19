@@ -64,6 +64,14 @@ public struct SessionState: Sendable {
     public var likedAid: Int64 = 0
     public var likedWithin: Int32 = 0
 
+    /// `tagPen[atlasId]` (5.5, stage 2b): how much the listener has just skipped each genre. Transient, like the rest
+    /// of the session, and left out of `encode()` (the stage 2a golden files pin that text). Any sum over it goes in
+    /// ascending atlas id.
+    public var tagPen: [Int: Double] = [:]
+
+    /// The heaviest tag of the track skipped last, or -1: a second skip of the same genre in a row counts three times (5.5).
+    public var lastSkippedTopTag = -1
+
     public init(nuStart: Double = Session.nuDefault) {
         self.nuStart = nuStart
         self.nuSession = nuStart
@@ -122,6 +130,30 @@ public enum Session {
     public static let seedAutoplay: Int32 = 1
     public static let seedStationSong: Int32 = 2
     public static let seedStationArtist: Int32 = 3
+
+    /// The most tags a skip penalises (5.5: "the track's top 5 tags").
+    public static let penalisedTags = 5
+
+    /// The tag part of 5.5, called next to `apply` when the track's tags are known: on a skip with strength `h` (> 0)
+    /// each of the track's top 5 tags gains `h * w / 255`, three times that when the previous skipped track had the same
+    /// top tag; on a completion every entry is multiplied by 0.7. Any other play changes nothing.
+    public static func applyTags(_ state: inout SessionState, tags: Tags.Vector, h: Double, completed: Bool) {
+        if completed {
+            for key in Array(state.tagPen.keys) { state.tagPen[key] = (state.tagPen[key] ?? 0.0) * 0.7 }
+            state.lastSkippedTopTag = -1
+            return
+        }
+        if h <= 0.0 || tags.isEmpty { return }
+        let top = tags.top
+        let factor = top == state.lastSkippedTopTag ? 3.0 : 1.0
+        var n = 0
+        for t in tags.tags {
+            if n >= penalisedTags { break }
+            n += 1
+            state.tagPen[t.atlasId] = (state.tagPen[t.atlasId] ?? 0.0) + factor * h * (Double(t.q) / 255.0)
+        }
+        state.lastSkippedTopTag = top
+    }
 
     /// What a play that starts now is stamped with (4.1 `sessionId`, `posInSession`, `passiveRun`).
     public struct Stamp: Sendable {
