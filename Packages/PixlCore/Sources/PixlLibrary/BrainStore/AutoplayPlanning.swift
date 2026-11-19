@@ -58,7 +58,8 @@ public enum AutoplayPlanning {
                               pool: [AutoplayPoolEntry], served: [BrainKey: AutoplayPoolEntry],
                               recentlyPlayed: Set<BrainKey>, seeds: [Retrieval.SeedList], nowMs: Int64,
                               tzOffsetMin: Int32, batch: Int64, station: Station? = nil,
-                              noveltyFactor: Double = 1.0) -> AutoplayPlanContext {
+                              noveltyFactor: Double = 1.0, stationBatches: Int = 1, stationSourceIds: Set<String> = [],
+                              refreshing: Bool = false, stationReseeded: Bool = false) -> AutoplayPlanContext {
         var queuedIds = recentlyPlayed
         var prior: [ListBuilder.Prior] = []
         var excludedRids: Set<Int64> = []
@@ -94,6 +95,14 @@ public enum AutoplayPlanning {
                 candidates.append(candidate)
             }
         }
+        // A station from an album or a playlist does not open with the album's or playlist's own songs (6.2).
+        if station != nil, stationBatches == 0, !stationSourceIds.isEmpty {
+            for entry in pool where stationSourceIds.contains(entry.candidate.mediaId) {
+                if let candidate = entry.brain { excludedRids.insert(candidate.rid) }
+            }
+        }
+        // "Refresh picks": what the tail holds now is not offered again by this plan.
+        if refreshing { for entry in tailEntries { if let candidate = entry.brain { excludedRids.insert(candidate.rid) } } }
         let inputs = AutoplayPlanInputs(
             candidates: candidates,
             prior: prior.count > 50 ? Array(prior.suffix(50)) : prior,
@@ -105,7 +114,9 @@ public enum AutoplayPlanning {
             nowMs: nowMs,
             tzOffsetMin: tzOffsetMin,
             batch: batch,
-            station: station)
+            station: station,
+            closestOfSeeds: station.map { $0.seedMediaIds.count > 1 || stationReseeded } ?? false,
+            replaceAll: refreshing)
         return AutoplayPlanContext(inputs: inputs, entriesByRid: entriesByRid)
     }
 
@@ -118,7 +129,7 @@ public enum AutoplayPlanning {
         var whyName = entry.whyArtist
         var whyKey: String?
         if let pick {
-            if pick.whyKey == WhyLine.radioFans || pick.whyKey == WhyLine.artistMore {
+            if pick.whyKey == WhyLine.radioFans || pick.whyKey == WhyLine.artistMore || pick.whyKey == WhyLine.similarArtist {
                 whyName = artistNames[pick.whyArg] ?? entry.whyArtist
             } else if pick.whyKey == WhyLine.becauseLiked {
                 whyName = likedTitles[pick.whyArg] ?? ""

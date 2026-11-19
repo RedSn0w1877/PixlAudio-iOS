@@ -87,9 +87,16 @@ public struct AutoplayPlanInputs: Sendable {
     public var batch: Int64
     /// The station the plan is for (8.3); nil for plain autoplay.
     public var station: Station?
+    /// An album or playlist station, or one that was re-seeded: a track must be near the closest of its seeds.
+    public var closestOfSeeds: Bool
+    /// The plan replaces a whole tail by other picks ("Refresh picks"): a plan with none must not empty the tail.
+    public var replaceAll: Bool
 
     public init(candidates: [Candidate], prior: [ListBuilder.Prior], excludedRids: Set<Int64>, seeds: [Retrieval.SeedList],
-                nuMultiplier: Double, nowMs: Int64, tzOffsetMin: Int32, batch: Int64, station: Station? = nil) {
+                nuMultiplier: Double, nowMs: Int64, tzOffsetMin: Int32, batch: Int64, station: Station? = nil,
+                closestOfSeeds: Bool = false, replaceAll: Bool = false) {
+        self.closestOfSeeds = closestOfSeeds
+        self.replaceAll = replaceAll
         self.candidates = candidates
         self.prior = prior
         self.excludedRids = excludedRids
@@ -148,11 +155,16 @@ public actor BrainEngine {
         }
     }
 
-    private let log: BrainEventLog
-    private let repository: BrainRepository
-    private let clock: @Sendable () -> Int64
+    let log: BrainEventLog
+    let repository: BrainRepository
+    let clock: @Sendable () -> Int64
+    /// "Don't count this" and the private session's spans are `feedback` rows (3.8).
+    let feedbackStore: FeedbackStore
+    /// Private session (8.5): the spans of this process, memory only.
+    var privateSpans = PrivateSpans()
+    var privateRowId: Int64 = 0
     private let sources: Sources?
-    private var loaded: Loaded?
+    var loaded: Loaded?
     private var rebuildTask: Task<Void, Never>?
     private var recordedDuringRebuild: [PlayEvent]?
     private var recoveredKilledPlay = false
@@ -162,6 +174,7 @@ public actor BrainEngine {
     public init(directory: URL, repository: BrainRepository, sources: Sources?,
                 clock: @escaping @Sendable () -> Int64 = { currentTimeMillis() }) {
         log = BrainEventLog(directory: directory)
+        feedbackStore = FeedbackStore(directory: directory)
         self.repository = repository
         self.sources = sources
         self.clock = clock
@@ -183,7 +196,7 @@ public actor BrainEngine {
 
     /// One graded play into the state and the log: the event and the affinity rows it touched. Nil when the event
     /// was already stored (nothing changes then).
-    private func apply(_ event: PlayEvent, to state: inout Loaded) -> Reward.Graded? {
+    func apply(_ event: PlayEvent, to state: inout Loaded) -> Reward.Graded? {
         if log.hasEvent(event.eventId) { return nil }
         let graded = Brain.onEvent(affinity: &state.affinity, tracker: &state.tracker, session: &state.session,
                                    event: event)
@@ -210,7 +223,7 @@ public actor BrainEngine {
 
     /// Takes the state out of the actor's property for one synchronous step (so its tables are changed in place,
     /// not copied) and puts it back.
-    private func withState<T>(_ body: (inout Loaded) -> T) -> T {
+    func withState<T>(_ body: (inout Loaded) -> T) -> T {
         ensureLoaded()
         var state = loaded!
         loaded = nil
@@ -237,6 +250,10 @@ public actor BrainEngine {
         if context.shuffle { flags |= EventFlags.shuffle }
         if context.repeatOne { flags |= EventFlags.repeatOne }
         if context.offline { flags |= EventFlags.offline }
+        // A play that overlapped a private session counts for nothing in the picks; the log still has it (8.5).
+        if privateSpans.overlaps(startMs: play.startedAtMs, endMs: play.startedAtMs &+ max(play.playedMs, 0)) {
+            flags |= EventFlags.learnExcluded
+        }
 
         // From here on nothing suspends: the state changes in one step.
         return withState { state -> Reaction? in
@@ -368,7 +385,8 @@ public actor BrainEngine {
             mode: inputs.station != nil ? StationPlanner.modeStation : StationPlanner.modeAutoplay, count: count,
             candidates: inputs.candidates, seeds: inputs.seeds,
             prior: inputs.prior, nowMs: inputs.nowMs, tzOffsetMin: inputs.tzOffsetMin, nuMultiplier: inputs.nuMultiplier,
-            tieSeed: tieSeed, excludedRids: inputs.excludedRids, bridge: bridge)
+            tieSeed: tieSeed, excludedRids: inputs.excludedRids, bridge: bridge,
+            closestOfSeeds: inputs.closestOfSeeds)
         let plan: StationPlanner.Plan?
         if let tail {
             plan = Session.patchQueue(session, tail: tail, request: request, affinity: state.affinity, graph: graph)
@@ -617,13 +635,16 @@ public actor BrainEngine {
         }.value
 
         let merges = await repository.trackMerges()
-        let stored = log.allEvents()
+        // The stored events are read as bytes here and decoded off the actor (a long history is tens of thousands of
+        // lines of JSON): a play that ends meanwhile is recorded without waiting for them.
+        let storedPayloads = log.allEventPayloads()
         let plays = imported.plays
         let lengths = durationByRid
         let resolvedImports = importedResolved
         // The fold itself is arithmetic over every play ever recorded or imported: off this actor, so a play that
         // ends meanwhile is recorded without waiting for it.
         let result = await Task.detached(priority: .utility) { () -> ReplayMerger.Result in
+            let stored = BrainEventLog.decodeSorted(storedPayloads)
             let events = ImportedPlayAdapter.events(plays: plays, resolved: resolvedImports,
                                                     durationOfRid: { lengths[$0] ?? 0 })
             return ReplayMerger.rebuild(stored: stored, imported: events, facts: facts, nowMs: nowMs,

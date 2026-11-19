@@ -116,6 +116,54 @@ public final class BrainEventLog {
         return out
     }
 
+    /// The bytes of every stored event, in no particular order: the file is read here and nothing is decoded, so the
+    /// caller can decode them off the actor that owns the log (`decodeSorted`).
+    public func allEventPayloads() -> [[UInt8]] {
+        var out: [[UInt8]] = []
+        eventsOpened = true
+        eventFile.open { _, payload in out.append(Array(payload)) }
+        return out
+    }
+
+    /// The bytes of the events that started at or after `sinceMs` (see `events(startedSince:)`).
+    public func eventPayloads(startedSince sinceMs: Int64) -> [[UInt8]] {
+        openEvents()
+        let floor = sinceMs &<< 16
+        var out: [[UInt8]] = []
+        for key in eventFile.keys {
+            guard let id = Int64(key), id >= floor, let payload = eventFile.payload(for: key) else { continue }
+            out.append(payload)
+        }
+        return out
+    }
+
+    /// The events behind `payloads`, in ascending `eventId` (the order a replay is defined on). Pure: call it anywhere.
+    public static func decodeSorted(_ payloads: [[UInt8]]) -> [PlayEvent] {
+        var out: [PlayEvent] = []
+        out.reserveCapacity(payloads.count)
+        for payload in payloads {
+            if let event = PlayEvent.decode(String(decoding: payload, as: UTF8.self)) { out.append(event) }
+        }
+        out.sort { $0.eventId < $1.eventId }
+        return out
+    }
+
+    /// Sets or clears `flag` on the stored events with these ids, in one write. Returns how many changed.
+    @discardableResult
+    public func setEventFlag(_ eventIds: [Int64], flag: Int32, on: Bool) -> Int {
+        openEvents()
+        var records: [(key: String, payload: [UInt8])] = []
+        for id in eventIds {
+            guard let payload = eventFile.payload(for: String(id)),
+                  var event = PlayEvent.decode(String(decoding: payload, as: UTF8.self)),
+                  event.has(flag) != on else { continue }
+            event.flags = on ? (event.flags | flag) : (event.flags & ~flag)
+            records.append((String(id), Array(event.encode().utf8)))
+        }
+        if records.isEmpty { return 0 }
+        return eventFile.put(records) ? records.count : 0
+    }
+
     public var eventCount: Int {
         openEvents()
         return eventFile.count

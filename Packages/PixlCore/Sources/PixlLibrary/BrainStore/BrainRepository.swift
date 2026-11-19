@@ -58,6 +58,10 @@ public actor BrainRepository {
     public static let deepChip = "+pages"
     /// The `chip` of an artist station's list (the artist page's top songs, then the artist radio).
     public static let artistStationChip = "+artist"
+    /// The `chip` of the top songs of artists close to an artist station's artist (6.2).
+    public static let similarStationChip = "+similar"
+    /// How many similar artists' top songs an artist station reads.
+    public static let similarArtists = 3
 
     static let kinds = [RadioList.kindSong, RadioList.kindRelated, RadioList.kindArtist]
 
@@ -258,7 +262,8 @@ public actor BrainRepository {
 
     /// The `UC...` id of `seed`'s primary artist: from a cached radio row by that artist, else from the seed's own
     /// row of its radio (one `next`).
-    private func channelId(for seed: RadioSeed, seedRid: Int64, radioSource: any RadioSource) async -> String? {
+    private func channelId(for seed: RadioSeed, seedRid: Int64, radioSource: any RadioSource,
+                           allowNetwork: Bool = true) async -> String? {
         let artistKey = BrainText.fold(seed.primaryArtist)
         if artistKey.isEmpty { return nil }
         func channel(in rows: [RadioRow]) -> String? {
@@ -272,6 +277,7 @@ public actor BrainRepository {
             guard let cached = tables.radioFacts(seedRid: seedRid, kind: kind, chip: ""), cached.healthy else { continue }
             if let found = channel(in: tables.radioRows(seedRid: seedRid, kind: kind, chip: "").map(\.row)) { return found }
         }
+        if !allowNetwork { return nil }
         guard let fetched = await radioSource.songRadio(videoId: seed.videoId, continuations: 0) else { return nil }
         if let found = channel(in: fetched.rows) { return found }
         return fetched.rows.first { BrainKey.sameBytes($0.videoId, seed.videoId) }?
@@ -323,7 +329,7 @@ public actor BrainRepository {
                                      healthy: true, rows: stored, chips: chips))
         // An artist station's list is the artist's top songs, not a ranking by closeness to the seed: it is not an
         // edge of the graph. Every other stored radio also becomes edges (3.6).
-        if !BrainKey.sameBytes(chip, Self.artistStationChip) {
+        if !BrainKey.sameBytes(chip, Self.artistStationChip) && !BrainKey.sameBytes(chip, Self.similarStationChip) {
             tables.edges.record(seedRid: seedRid, kind: kind, rids: stored.map(\.rid), nowMs: now)
         }
         return StoredRadio(seedRid: seedRid, kind: kind, rows: stored, fromCache: false)
@@ -360,7 +366,8 @@ public actor BrainRepository {
     public func backfillEdgesOnce(nowMs: Int64? = nil) {
         if tables.edges.isBackfilled { return }
         let now = nowMs ?? clock()
-        for facts in tables.healthyRadioFacts() where !BrainKey.sameBytes(facts.chip, Self.artistStationChip) {
+        for facts in tables.healthyRadioFacts() where !BrainKey.sameBytes(facts.chip, Self.artistStationChip)
+            && !BrainKey.sameBytes(facts.chip, Self.similarStationChip) {
             let rids = tables.radioRows(seedRid: facts.seedRid, kind: facts.kind, chip: facts.chip).map(\.rid)
             tables.edges.record(seedRid: facts.seedRid, kind: facts.kind, rids: rids, nowMs: min(facts.fetchedAt, now))
         }
@@ -372,6 +379,142 @@ public actor BrainRepository {
     public func pruneEdges(nowMs: Int64? = nil) -> Int { tables.edges.prune(nowMs: nowMs ?? clock()) }
 
     public func edgeCount() -> Int { tables.edges.count }
+
+
+    // MARK: Stage 2a, milestone 2: an artist the library has nothing of, similar artists, chips
+
+    /// What an artist station needs to start with an artist the library has nothing of.
+    public struct ArtistStationStart: Sendable {
+        /// The artist page's own radio-button track: the station's first song.
+        public var seedRow: RadioRow
+        public var seedRid: Int64
+        public var channelId: String
+    }
+
+    /// Starts an artist station for an artist with no song in the library (8.3): the artist's channel (one songs
+    /// search), their page, and the radio their own button starts. The first song of that radio is the seed; the page's
+    /// top songs and the radio are stored as the artist list under it, so the station's first pool is answered from the
+    /// cache. Nil when anything is missing or the budget is spent: the caller says so, and nothing starts.
+    public func beginArtistStation(artistName: String) async -> ArtistStationStart? {
+        let name = BrainText.trim(artistName)
+        guard !name.isEmpty, let radioSource else { return nil }
+        let now = clock()
+        if tables.radiosFetchedSince(now - HostBudget.dayMs) >= HostBudget.dailyLimit { return nil }
+        guard let channelId = await radioSource.channelId(forArtist: name),
+              let page = await radioSource.artistPage(channelId: channelId), let endpoint = page.radio else { return nil }
+        let radio = await radioSource.artistRadio(endpoint: endpoint)
+        let radioRows = radio?.rows ?? []
+        let usableRadio = !radioRows.isEmpty
+            && !RadioRules.isJunkRadio(rows: radioRows, seedVideoId: endpoint.videoId, seedArtistIds: [channelId],
+                                       fold: BrainText.fold)
+        var seedRow: RadioRow?
+        if usableRadio {
+            seedRow = radioRows.first { $0.videoId == endpoint.videoId && $0.isOfficialAudio && !$0.artists.isEmpty }
+        }
+        if seedRow == nil { seedRow = page.topSongs.first { $0.isOfficialAudio && !$0.artists.isEmpty } }
+        if seedRow == nil {
+            seedRow = radioRows.first { $0.isOfficialAudio && $0.artists.contains { $0.channelId == channelId } }
+        }
+        guard let seedRow, let primary = seedRow.artists.first else { return nil }
+        let seedRid = tables.resolveTrack(
+            Ids.TrackKeys(videoId: seedRow.videoId, nameKey: Ids.nameKey(primaryArtist: primary.name, rawTitle: seedRow.title)),
+            durationMs: Int32(clamping: seedRow.durationSec * 1000))
+        if seedRid == 0 { return nil }
+        var seen: Set<BrainKey> = []
+        var rows: [RadioRow] = []
+        for row in page.topSongs where seen.insert(BrainKey(row.videoId)).inserted { rows.append(row) }
+        if usableRadio { for row in radioRows where seen.insert(BrainKey(row.videoId)).inserted { rows.append(row) } }
+        if rows.count >= Self.minFallbackRows {
+            let seed = RadioSeed(mediaId: "", videoId: seedRow.videoId, title: seedRow.title, primaryArtist: primary.name,
+                                 durationMs: Int64(seedRow.durationSec) * 1000)
+            _ = store(seedRid: seedRid, kind: RadioList.kindArtist, rows: withoutSeed(rows, seed), chips: [], now: now,
+                      chip: Self.artistStationChip)
+        }
+        return ArtistStationStart(seedRow: seedRow, seedRid: seedRid, channelId: channelId)
+    }
+
+    /// The top songs of up to three artists close to the seed's artist (6.2: "similar artists' top songs" in an artist
+    /// station), from the artist page's "Fans might also like". Cached for two weeks; a fetch costs the artist page and
+    /// at most three more. Empty when the network may not be asked, the budget is spent, or nothing is known.
+    public func similarArtistSongs(seed: RadioSeed, allowNetwork: Bool) async -> [StoredRadioRow] {
+        let seedRid = tables.resolveTrack(
+            Ids.TrackKeys(spotifyId: seed.spotifyId, videoId: seed.videoId,
+                          nameKey: Ids.nameKey(primaryArtist: seed.primaryArtist, rawTitle: seed.title)),
+            durationMs: Int32(clamping: max(seed.durationMs, 0)))
+        if seedRid == 0 { return [] }
+        let slot = ~seedRid ^ 0x5151
+        while let running = inFlight[slot] { _ = await running.value }
+        let task = Task { () -> StoredRadio? in
+            let rows = await self.similarArtistSongsLocked(seed: seed, seedRid: seedRid, allowNetwork: allowNetwork)
+            self.inFlight[slot] = nil
+            return StoredRadio(seedRid: seedRid, kind: RadioList.kindArtist, rows: rows, fromCache: true)
+        }
+        inFlight[slot] = task
+        return await task.value?.rows ?? []
+    }
+
+    private func similarArtistSongsLocked(seed: RadioSeed, seedRid: Int64, allowNetwork: Bool) async -> [StoredRadioRow] {
+        let now = clock()
+        let kind = RadioList.kindArtist
+        let chip = Self.similarStationChip
+        let cached = tables.radioFacts(seedRid: seedRid, kind: kind, chip: chip)
+        func cachedRows() -> [StoredRadioRow] {
+            guard let cached, cached.healthy else { return [] }
+            return tables.radioRows(seedRid: seedRid, kind: kind, chip: chip)
+        }
+        if let cached, now - cached.fetchedAt >= 0, now - cached.fetchedAt < Self.cacheTtlMs { return cachedRows() }
+        guard allowNetwork, let radioSource else { return cachedRows() }
+        if tables.radiosFetchedSince(now - HostBudget.dayMs) >= HostBudget.dailyLimit { return cachedRows() }
+        guard let channelId = await channelId(for: seed, seedRid: seedRid, radioSource: radioSource),
+              let page = await radioSource.artistPage(channelId: channelId) else { return cachedRows() }
+        var seen: Set<BrainKey> = []
+        var rows: [RadioRow] = []
+        for artist in page.fansAlsoLike.filter({ $0.channelId != nil && $0.channelId != channelId }).prefix(Self.similarArtists) {
+            guard let id = artist.channelId, let similar = await radioSource.artistPage(channelId: id) else { continue }
+            for row in similar.topSongs where row.isOfficialAudio && !row.artists.isEmpty
+                && seen.insert(BrainKey(row.videoId)).inserted {
+                rows.append(row)
+            }
+        }
+        if rows.count < Self.minFallbackRows {
+            // Nothing usable: not asked again for a day.
+            tables.upsertRadio(RadioList(seedRid: seedRid, kind: kind, chip: chip, fetchedAt: now, lastUsedAt: now,
+                                         healthy: false, rows: [], chips: []))
+            return []
+        }
+        return store(seedRid: seedRid, kind: kind, rows: withoutSeed(rows, seed), chips: [], now: now, chip: chip).rows
+    }
+
+    /// The `UC...` channel id of `seed`'s primary artist, for the artist page and the discography: from a cached radio
+    /// row by that artist; with `allowNetwork`, else from one `next` for the seed. Nil when unknown.
+    public func artistChannelId(seed: RadioSeed, allowNetwork: Bool) async -> String? {
+        guard let radioSource else { return nil }
+        let seedRid = tables.resolveTrack(
+            Ids.TrackKeys(spotifyId: seed.spotifyId, videoId: seed.videoId,
+                          nameKey: Ids.nameKey(primaryArtist: seed.primaryArtist, rawTitle: seed.title)),
+            durationMs: Int32(clamping: max(seed.durationMs, 0)))
+        if seedRid == 0 { return nil }
+        return await channelId(for: seed, seedRid: seedRid, radioSource: radioSource, allowNetwork: allowNetwork)
+    }
+
+    /// The tuning chips of `seedRid`'s song radio that name a genre, a decade or a mood (3.4, tag source 4), for stage 2b
+    /// to turn into atlas ids. Chips that only steer a radio ("Popular", "Deep cuts") and labels nobody has classified
+    /// are left out: unknown stays unknown. Reads the cache, never the network.
+    public func chipTagsOf(seedRid: Int64) -> [ChipLabels.Chip] {
+        guard let facts = tables.radioFacts(seedRid: seedRid, kind: RadioList.kindSong, chip: ""), facts.healthy else { return [] }
+        var seen: Set<String> = []
+        var out: [ChipLabels.Chip] = []
+        for chip in facts.chips {
+            let classified = ChipLabels.classify(chip.label)
+            switch classified.kind {
+            case .genre, .decade, .mood:
+                if seen.insert(classified.kind.rawValue + ":" + classified.key).inserted { out.append(classified) }
+            case .steer, .unknown:
+                break
+            }
+        }
+        return out
+    }
 
     // MARK: Playable (7.2)
 

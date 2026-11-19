@@ -13,6 +13,10 @@ public enum BrainFeedback {
     // Shown in the Taste changes screen as the reason of the change.
     public static let reasonNotForMe = "Not for me"
     public static let reasonLessFrom = "Less from this artist"
+    public static let reasonMoreLike = "More like this"
+    public static let reasonMuteArtist = "Muted from Less from this artist"
+    /// "More like this" leans the picks for this long.
+    public static let moreLikeDays = 14
 
     /// ONE artist name for a taste change about `song`: its primary credit. A song rebuilt from a queue snapshot
     /// has no credit list, only a display line ("A, B"); its first part is taken. "" when it names nobody.
@@ -41,6 +45,31 @@ public enum BrainFeedback {
                            source: .user)
     }
 
+    /// "More like this" (8.5): the track's primary artist is boosted for two weeks, so the next batch leans that way. It
+    /// is a taste change like any other: it shows in Taste changes and is undone there. Nil when the song names nobody.
+    public static func moreLikeChange(for song: Song) -> TasteChange? {
+        let artist = artistOf(song)
+        let key = TasteKey.of(artist)
+        if key.isEmpty { return nil }
+        return TasteChange(action: .boost, targetType: .artist, key: key, label: artist, reason: reasonMoreLike,
+                           expiresDays: moreLikeDays, source: .user)
+    }
+
+    /// "Mute X": the artist leaves everything the app picks by itself. Nil when the name folds to nothing.
+    public static func muteArtistChange(artistName: String) -> TasteChange? {
+        let key = TasteKey.of(artistName)
+        if key.isEmpty { return nil }
+        return TasteChange(action: .mute, targetType: .artist, key: key, label: artistName, reason: reasonMuteArtist,
+                           source: .user)
+    }
+
+    /// True when `artistName` already has a "less from" on it: a second tap offers to mute them (8.5).
+    public static func isReduced(artistName: String, in adjustments: [TasteAdjustment]) -> Bool {
+        let key = TasteKey.of(artistName)
+        if key.isEmpty { return false }
+        return adjustments.contains { $0.kind == .reduce && $0.targetType == .artist && $0.key == key }
+    }
+
     /// The id of the change an outcome stored (what Undo takes back); nil when nothing was stored.
     public static func adjustmentId(of outcome: TasteChangeOutcome?) -> String? {
         if case .set(let adjustment, _)? = outcome { return adjustment.id }
@@ -52,6 +81,16 @@ public enum BrainFeedback {
 public struct BrainNotice: Sendable, Equatable, Identifiable {
     public enum Kind: Sendable, Equatable {
         case notForMe, notSaved, lessFrom, undone
+        /// "More like this" was stored (a boost for two weeks).
+        case moreLike
+        /// "Don't count this" took plays out of the picks; Undo brings them back.
+        case dontCount
+        /// "Don't count this" found nothing to leave out.
+        case dontCountNothing
+        /// A second "Less from X": the artist already is reduced, and the bar offers to mute them.
+        case alreadyReduced
+        /// "Mute X" was stored.
+        case muted
     }
 
     /// Grows with every notice, so the bar restarts its timer for a new one.
@@ -61,17 +100,22 @@ public struct BrainNotice: Sendable, Equatable, Identifiable {
     public var adjustmentId: String?
     /// ONE artist name, for "Less from ..."; blank when the track names nobody.
     public var artistName: String
+    /// The plays "Don't count this" left out; Undo counts them again.
+    public var excluded: ExcludedPlays?
 
     public var id: Int { serial }
 
-    public init(serial: Int, kind: Kind, adjustmentId: String?, artistName: String) {
+    public init(serial: Int, kind: Kind, adjustmentId: String?, artistName: String, excluded: ExcludedPlays? = nil) {
         self.serial = serial
         self.kind = kind
         self.adjustmentId = adjustmentId
         self.artistName = artistName
+        self.excluded = excluded
     }
 
-    public var canUndo: Bool { adjustmentId != nil }
+    public var canUndo: Bool { adjustmentId != nil || excluded != nil }
+    /// After a "Less from X" (and after a second one) the bar offers the step to "Mute X".
+    public var canMute: Bool { (kind == .lessFrom || kind == .alreadyReduced) && !BrainText.isBlank(artistName) }
     /// After "Not for me" the bar offers the step to "Less from the artist".
     public var canLessFrom: Bool { kind == .notForMe && !BrainText.isBlank(artistName) }
     /// How long the bar stays.
@@ -86,6 +130,29 @@ public struct BrainNotice: Sendable, Equatable, Identifiable {
     public static func afterLessFrom(serial: Int, outcome: TasteChangeOutcome?, artistName: String) -> BrainNotice {
         let id = BrainFeedback.adjustmentId(of: outcome)
         return BrainNotice(serial: serial, kind: id != nil ? .lessFrom : .notSaved, adjustmentId: id, artistName: artistName)
+    }
+
+    /// The notice after "More like this": the boost was stored, or it could not be (too many active changes).
+    public static func afterMoreLike(serial: Int, outcome: TasteChangeOutcome?, artistName: String) -> BrainNotice {
+        let id = BrainFeedback.adjustmentId(of: outcome)
+        return BrainNotice(serial: serial, kind: id != nil ? .moreLike : .notSaved, adjustmentId: id, artistName: artistName)
+    }
+
+    /// The notice after "Mute X".
+    public static func afterMute(serial: Int, outcome: TasteChangeOutcome?, artistName: String) -> BrainNotice {
+        let id = BrainFeedback.adjustmentId(of: outcome)
+        return BrainNotice(serial: serial, kind: id != nil ? .muted : .notSaved, adjustmentId: id, artistName: artistName)
+    }
+
+    /// A second tap on "Less from X": the artist is reduced already, so nothing is stored; the bar offers to mute them.
+    public static func alreadyReduced(serial: Int, artistName: String) -> BrainNotice {
+        BrainNotice(serial: serial, kind: .alreadyReduced, adjustmentId: nil, artistName: artistName)
+    }
+
+    /// The notice after "Don't count this": plays were left out (Undo counts them again), or there were none.
+    public static func afterDontCount(serial: Int, excluded: ExcludedPlays?) -> BrainNotice {
+        BrainNotice(serial: serial, kind: excluded == nil ? .dontCountNothing : .dontCount, adjustmentId: nil,
+                    artistName: "", excluded: excluded)
     }
 }
 
@@ -104,6 +171,10 @@ public enum WhyLineText {
         case artistMore(String)
         /// "On repeat lately"
         case onRepeat
+        /// "Close to X" (a pick from the top songs of an artist close to X, 6.2)
+        case similarArtist(String)
+        /// "New from X" (a release of an artist the listener plays, 6.3)
+        case newRelease(String)
     }
 
     /// The line for a `WhyLine` key and its argument, or nil when there is nothing true to say. The other keys of
@@ -116,6 +187,8 @@ public enum WhyLineText {
         if key == WhyLine.becauseLiked { return .becauseLiked(name) }
         if key == WhyLine.becauseListened { return .becauseListened(name) }
         if key == WhyLine.artistMore { return .artistMore(name) }
+        if key == WhyLine.similarArtist { return .similarArtist(name) }
+        if key == WhyLine.newRelease { return .newRelease(name) }
         return nil
     }
 

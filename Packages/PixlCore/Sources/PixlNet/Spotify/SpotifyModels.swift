@@ -87,18 +87,23 @@ public struct SpotifyAlbumRef: Sendable, Hashable, Codable {
     public var name: String?
     public var images: [SpotifyImage]?
     public var releaseDate: String?
+    /// `year`, `month` or `day`.
+    public var releaseDatePrecision: String?
 
-    public init(id: String?, name: String?, images: [SpotifyImage]? = nil, releaseDate: String? = nil) {
+    public init(id: String?, name: String?, images: [SpotifyImage]? = nil, releaseDate: String? = nil,
+                releaseDatePrecision: String? = nil) {
         self.id = id
         self.name = name
         self.images = images
         self.releaseDate = releaseDate
+        self.releaseDatePrecision = releaseDatePrecision
     }
 
     init?(json: JSONValue) {
         guard let o = json.objectValue else { return nil }
         self.init(id: LenientJSON.string(o["id"]), name: LenientJSON.string(o["name"]), images: SpotifyImage.list(o["images"]),
-                  releaseDate: LenientJSON.string(o["release_date"]))
+                  releaseDate: LenientJSON.string(o["release_date"]),
+                  releaseDatePrecision: LenientJSON.string(o["release_date_precision"]))
     }
 }
 
@@ -111,9 +116,12 @@ public struct SpotifyTrack: Sendable, Hashable, Codable {
     public var isrc: String?
     public var isLocal: Bool?
     public var type: String?
+    public var explicit: Bool?
 
     public init(id: String?, name: String?, durationMs: Int64? = nil, artists: [SpotifyArtistRef]? = nil,
-                album: SpotifyAlbumRef? = nil, isrc: String? = nil, isLocal: Bool? = nil, type: String? = nil) {
+                album: SpotifyAlbumRef? = nil, isrc: String? = nil, isLocal: Bool? = nil, type: String? = nil,
+                explicit: Bool? = nil) {
+        self.explicit = explicit
         self.id = id
         self.name = name
         self.durationMs = durationMs
@@ -130,7 +138,8 @@ public struct SpotifyTrack: Sendable, Hashable, Codable {
                   durationMs: LenientJSON.long(o["duration_ms"]), artists: SpotifyArtistRef.list(o["artists"]),
                   album: o["album"].flatMap(SpotifyAlbumRef.init(json:)),
                   isrc: LenientJSON.string(LenientJSON.object(o["external_ids"])?["isrc"]),
-                  isLocal: LenientJSON.bool(o["is_local"]), type: LenientJSON.string(o["type"]))
+                  isLocal: LenientJSON.bool(o["is_local"]), type: LenientJSON.string(o["type"]),
+                  explicit: LenientJSON.bool(o["explicit"]))
     }
 
     static func list(_ value: JSONValue?) -> [SpotifyTrack]? { LenientJSON.array(value)?.compactMap(SpotifyTrack.init(json:)) }

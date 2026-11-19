@@ -190,7 +190,8 @@ public enum AutoplayPool {
                 for (i, item) in seeds.enumerated() {
                     let continuations = request.deepen && i == 0 ? deepenContinuations : 0
                     let everPlayed = request.everPlayed
-                    let allowNetwork = i == 0
+                    // An album or playlist station has several seeds that all matter (6.2): each may cost a request.
+                    let allowNetwork = i == 0 || request.station != nil
                     let adjustments = request.adjustments
                     group.addTask {
                         guard let radio = await repository.radioFor(seed: item.seed, allowNetwork: allowNetwork,
@@ -221,8 +222,10 @@ public enum AutoplayPool {
                 // from" them; the rest are what their listeners also play.
                 let artistKey = BrainText.fold(first.whyArtist)
                 if let radio = await repository.artistRadio(seed: first.seed, allowNetwork: request.allowNetwork) {
+                    // Songs of artists close to this one (6.2): the top songs of three of the page's "Fans might also like".
+                    let similarRows = await repository.similarArtistSongs(seed: first.seed, allowNetwork: request.allowNetwork)
                     var list: [AutoplayPoolEntry] = []
-                    list.reserveCapacity(radio.rows.count)
+                    list.reserveCapacity(radio.rows.count + similarRows.count)
                     for (rank, stored) in radio.rows.enumerated() {
                         let own = !artistKey.isEmpty
                             && BrainKey.sameBytes(BrainLibraryIndex.artistKey(of: stored.row), artistKey)
@@ -232,7 +235,15 @@ public enum AutoplayPool {
                             list.append(entry)
                         }
                     }
-                    fetched.insert(Fetched(entries: list, seedRid: radio.seedRid, rids: radio.rows.map(\.rid),
+                    for (rank, stored) in similarRows.enumerated() {
+                        if let entry = entry(for: stored, rank: Int32(radio.rows.count + rank + 1), index: index,
+                                             everPlayed: request.everPlayed, anchorArtist: first.whyArtist,
+                                             artistRadio: false, adjustments: request.adjustments, fromSimilar: true) {
+                            list.append(entry)
+                        }
+                    }
+                    fetched.insert(Fetched(entries: list, seedRid: radio.seedRid,
+                                           rids: radio.rows.map(\.rid) + similarRows.map(\.rid),
                                            related: false, artist: first.whyArtist), at: 0)
                 }
             }
@@ -333,7 +344,7 @@ public enum AutoplayPool {
 
     static func entry(for stored: StoredRadioRow, rank: Int32, index: BrainLibraryIndex, everPlayed: Set<String>,
                       anchorArtist: String, artistRadio: Bool,
-                      adjustments: TasteAdjustmentSet = .empty) -> AutoplayPoolEntry? {
+                      adjustments: TasteAdjustmentSet = .empty, fromSimilar: Bool = false) -> AutoplayPoolEntry? {
         let row = stored.row
         if let librarySong = index.match(row) {
             return libraryEntry(librarySong, rid: stored.rid, rank: rank, everPlayed: everPlayed,
@@ -347,11 +358,13 @@ public enum AutoplayPool {
                 mediaId: track.songId, rid: stored.rid, artistKey: BrainLibraryIndex.artistKey(of: row),
                 albumKey: albumKey, durationMs: track.durationMs,
                 versionFlags: BrainText.cleanTitle(row.title).versionFlags, officialAudio: row.isOfficialAudio,
-                inLibrary: false, arm: artistRadio ? Arm.artist : Arm.radio, radioRank: rank),
+                inLibrary: false, arm: fromSimilar ? Arm.sim : (artistRadio ? Arm.artist : Arm.radio), radioRank: rank),
             librarySong: nil, engineTrack: track, whyArtist: anchorArtist,
             primaryArtist: row.artists.first?.name ?? "",
             brain: Candidate(rid: stored.rid, aid: 0, albumKey: albumHash(albumKey), inLibrary: false,
-                             fromArtistRadio: artistRadio, boostLn: adjustments.isEmpty ? 0.0 : boostLn(adjustments, track.song())))
+                             fromArtistRadio: artistRadio && !fromSimilar,
+                             boostLn: adjustments.isEmpty ? 0.0 : boostLn(adjustments, track.song()),
+                             fromSimilarArtist: fromSimilar))
     }
 
     /// A library track as a pool entry: it plays from its library row.

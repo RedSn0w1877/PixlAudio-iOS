@@ -10,7 +10,7 @@ import PixlModel
 public enum SpotifyAPI {
     /// `/items` replaced the retired `/tracks` (Feb/Mar 2026); its row field is `item`, so the filter asks for it.
     public static let playlistTrackFields =
-        "total,next,items(added_at,item(id,name,duration_ms,is_local,type,artists(id,name),album(id,name,images(url,width,height)),external_ids(isrc)))"
+        "total,next,items(added_at,item(id,name,duration_ms,is_local,type,explicit,artists(id,name),album(id,name,release_date,release_date_precision,images(url,width,height)),external_ids(isrc)))"
 
     public static let likedPageSize = 50
     public static let playlistPageSize = 50
@@ -357,10 +357,12 @@ public enum SpotifyLibrary {
     /// `toSpotifySongEntity`: nil for tracks without id, local files and non-track items (podcast episodes). The
     /// first artist with a known genre gives the genre.
     public static func record(for track: SpotifyTrack?, playlistId: String, addedAt: String?,
-                              genreByArtistId: [String: String] = [:], nowMs: Int64) -> SpotifyTrackRecord? {
+                              genreByArtistId: [String: String] = [:], nowMs: Int64,
+                              facts: (any SpotifyFactsSink)? = nil) -> SpotifyTrackRecord? {
         guard let track, let id = track.id else { return nil }
         if track.isLocal == true { return nil }
         if let type = track.type, type != "track" { return nil }
+        facts?.record(factOf(track, id: id))
         let artists = track.artists ?? []
         let artistNames = artists.compactMap { $0.name.flatMap { NetText.isBlank($0) ? nil : $0 } }
         let genre = artists.lazy.compactMap { $0.id.flatMap { genreByArtistId[$0] } }.first
@@ -373,6 +375,16 @@ public enum SpotifyLibrary {
             albumId: track.album?.id, durationMs: track.durationMs ?? 0,
             albumArtUrl: track.album?.images?.first?.url, isrc: track.isrc,
             dateAdded: parseAddedAt(addedAt, nowMs: nowMs), genre: genre)
+    }
+
+    /// What the track carries beyond the library row (13.1): the artists' ids, the album and its date, `explicit`.
+    public static func factOf(_ track: SpotifyTrack, id: String) -> SpotifyFactInput {
+        func filled(_ text: String?) -> String? { text.flatMap { NetText.isBlank($0) ? nil : $0 } }
+        return SpotifyFactInput(
+            spotifyId: id, isrc: filled(track.isrc),
+            artistIds: (track.artists ?? []).compactMap { filled($0.id) },
+            albumId: filled(track.album?.id), releaseDate: filled(track.album?.releaseDate),
+            releasePrecision: filled(track.album?.releaseDatePrecision), explicit: track.explicit)
     }
 
     /// `toYouTubeMusicSongEntity`: a YouTube Music search result stored as an already MATCHED browse row.

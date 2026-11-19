@@ -142,9 +142,13 @@ public actor SpotifyLibrarySync {
     /// Spotify refuses playlist contents for permission reasons (token from before a scope was added).
     public private(set) var playlistAccessDenied = false
 
+    /// What the sync returns beyond the library row (artist ids, release date, explicit): kept for the music brain.
+    private let factsSink: (any SpotifyFactsSink)?
+
     public init(api: SpotifyWebAPI, store: any SpotifyLibraryStore, sha256: @escaping SHA256Function,
                 nowMs: @escaping @Sendable () -> Int64 = { currentTimeMillis() },
-                flush: @escaping @Sendable () async -> Void = {}) {
+                flush: @escaping @Sendable () async -> Void = {}, factsSink: (any SpotifyFactsSink)? = nil) {
+        self.factsSink = factsSink
         self.api = api
         self.store = store
         self.sha256 = sha256
@@ -207,9 +211,10 @@ public actor SpotifyLibrarySync {
         }
         let genres = try await fetchArtistGenres(Self.artistIds(pending))
         let now = nowMs()
+        let facts = factsSink
         let collected = pending.compactMap {
             SpotifyLibrary.record(for: $0.resolvedTrack, playlistId: SpotifyLibrary.likedSongsPlaylistId, addedAt: $0.addedAt,
-                                  genreByArtistId: genres, nowMs: now)
+                                  genreByArtistId: genres, nowMs: now, facts: facts)
         }
         try await store.replaceSongs(playlistId: SpotifyLibrary.likedSongsPlaylistId, with: Self.carryingMatches(collected, matches))
         try await store.upsertPlaylist(SpotifyPlaylistRow(id: SpotifyLibrary.likedSongsPlaylistId, name: "Liked Songs",
@@ -298,8 +303,10 @@ public actor SpotifyLibrarySync {
         }
         let genres = try await fetchArtistGenres(Self.artistIds(pending))
         let now = nowMs()
+        let facts = factsSink
         let collected = pending.compactMap {
-            SpotifyLibrary.record(for: $0.resolvedTrack, playlistId: playlistId, addedAt: $0.addedAt, genreByArtistId: genres, nowMs: now)
+            SpotifyLibrary.record(for: $0.resolvedTrack, playlistId: playlistId, addedAt: $0.addedAt, genreByArtistId: genres,
+                                  nowMs: now, facts: facts)
         }
         try await store.replaceSongs(playlistId: playlistId, with: Self.carryingMatches(collected, matches))
         return collected.count
@@ -471,8 +478,10 @@ public actor SpotifyLibrarySync {
         for track in tracks { for ref in track.artists ?? [] { if let id = ref.id { artistIds.insert(id) } } }
         let genres = try await fetchArtistGenres(artistIds)
         let now = nowMs()
+        let facts = factsSink
         let records = tracks.compactMap {
-            SpotifyLibrary.record(for: $0, playlistId: SpotifyLibrary.browsePlaylistId, addedAt: nil, genreByArtistId: genres, nowMs: now)
+            SpotifyLibrary.record(for: $0, playlistId: SpotifyLibrary.browsePlaylistId, addedAt: nil, genreByArtistId: genres,
+                                  nowMs: now, facts: facts)
         }
         if records.isEmpty { return 0 }
         let alreadyKnown = Set(try await store.allSongs().map(\.spotifyId))

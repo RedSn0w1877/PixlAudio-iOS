@@ -19,10 +19,41 @@ public struct Station: Sendable, Hashable {
     /// ONE artist name: the artist of an artist station, the seed's primary artist of a song station.
     public var artistName: String
     public var startedAtMs: Int64
+    /// What the listener started it from: one of the `source...` constants.
+    public var source: Int
+    /// The media ids of every seed, `seedMediaId` first: one for a song or artist station, up to five for an album or
+    /// playlist station (6.2). They are library tracks; the radios of all of them are merged.
+    public var seedMediaIds: [String]
 
     public var isArtist: Bool { kind == Session.seedStationArtist }
 
     static let separator = "\u{1F}"
+    static let idsSeparator = "\u{1E}"
+
+    public static let sourceSong = 0
+    public static let sourceArtist = 1
+    public static let sourceAlbum = 2
+    public static let sourcePlaylist = 3
+
+    public init(id: String, kind: Int32, seedMediaId: String, title: String, artistName: String, startedAtMs: Int64,
+                source: Int? = nil, seedMediaIds: [String]? = nil) {
+        self.id = id
+        self.kind = kind
+        self.seedMediaId = seedMediaId
+        self.title = title
+        self.artistName = artistName
+        self.startedAtMs = startedAtMs
+        self.source = source ?? (kind == Session.seedStationArtist ? Self.sourceArtist : Self.sourceSong)
+        self.seedMediaIds = seedMediaIds ?? [seedMediaId]
+    }
+
+    /// A station from an album (`sourceAlbum`) or a playlist (`sourcePlaylist`): `seedMediaIds` are its seeds, best first.
+    public static func fromSource(_ source: Int, seedMediaIds: [String], title: String, nowMs: Int64) -> Station {
+        let first = seedMediaIds.first ?? ""
+        return Station(id: idOf(kind: Session.seedStationSong, seedMediaId: first, source: source),
+                       kind: Session.seedStationSong, seedMediaId: first, title: title, artistName: "",
+                       startedAtMs: nowMs, source: source, seedMediaIds: seedMediaIds)
+    }
 
     public static func song(seedMediaId: String, title: String, primaryArtist: String, nowMs: Int64) -> Station {
         Station(id: idOf(kind: Session.seedStationSong, seedMediaId: seedMediaId), kind: Session.seedStationSong,
@@ -35,27 +66,40 @@ public struct Station: Sendable, Hashable {
     }
 
     /// Lower-case hexadecimal of `fnv1a64("station|<kind>|<seedMediaId>")`, as Android writes it.
-    public static func idOf(kind: Int32, seedMediaId: String) -> String {
-        BrainSurfaces.hashedId("station|\(kind)|\(seedMediaId)")
+    public static func idOf(kind: Int32, seedMediaId: String, source: Int = -1) -> String {
+        // A song or artist station's id is what it always was; an album or playlist one adds where it came from.
+        BrainSurfaces.hashedId(source == sourceAlbum || source == sourcePlaylist
+            ? "station|\(kind)|\(seedMediaId)|\(source)" : "station|\(kind)|\(seedMediaId)")
     }
 
-    /// One line of text for the preferences: the five fields, separated by U+001F.
+    /// One line of text for the preferences: seven fields, separated by U+001F (the seeds by U+001E).
     public func encode() -> String {
-        [String(kind), seedMediaId, Self.clean(title), Self.clean(artistName), String(startedAtMs)]
+        [String(kind), seedMediaId, Self.clean(title), Self.clean(artistName), String(startedAtMs), String(source),
+         seedMediaIds.map { Self.clean($0) }.joined(separator: Self.idsSeparator)]
             .joined(separator: Self.separator)
     }
 
     public static func decode(_ text: String?) -> Station? {
         guard let text, !text.isEmpty else { return nil }
         let parts = text.components(separatedBy: separator)
-        guard parts.count == 5, let kind = Int32(parts[0]),
+        // Five parts: a station saved before album and playlist stations existed.
+        guard parts.count == 5 || parts.count == 7, let kind = Int32(parts[0]),
               kind == Session.seedStationSong || kind == Session.seedStationArtist, !parts[1].isEmpty,
               let startedAtMs = Int64(parts[4]) else { return nil }
-        return Station(id: idOf(kind: kind, seedMediaId: parts[1]), kind: kind, seedMediaId: parts[1], title: parts[2],
-                       artistName: parts[3], startedAtMs: startedAtMs)
+        if parts.count == 5 {
+            return Station(id: idOf(kind: kind, seedMediaId: parts[1]), kind: kind, seedMediaId: parts[1], title: parts[2],
+                           artistName: parts[3], startedAtMs: startedAtMs)
+        }
+        guard let source = Int(parts[5]), source >= sourceSong, source <= sourcePlaylist else { return nil }
+        var ids = parts[6].components(separatedBy: idsSeparator).filter { !$0.isEmpty }
+        if ids.isEmpty { ids = [parts[1]] }
+        return Station(id: idOf(kind: kind, seedMediaId: parts[1], source: source), kind: kind, seedMediaId: parts[1],
+                       title: parts[2], artistName: parts[3], startedAtMs: startedAtMs, source: source, seedMediaIds: ids)
     }
 
-    private static func clean(_ text: String) -> String { text.replacingOccurrences(of: separator, with: " ") }
+    private static func clean(_ text: String) -> String {
+        text.replacingOccurrences(of: separator, with: " ").replacingOccurrences(of: idsSeparator, with: " ")
+    }
 
     // MARK: The station's own queue entries
 
@@ -164,5 +208,69 @@ public enum StationRules {
     public static func primaryArtist(of song: Song) -> String {
         let name = BrainLibraryIndex.primaryArtistName(song)
         return BrainText.isBlank(name) || BrainKey.sameBytes(name, EngineTrack.unknownArtist) ? "" : name
+    }
+}
+
+
+/// Which songs seed a station from an album or a playlist (docs/brain-spec.md, 6.2): up to 3 for an album and 5 for a
+/// playlist, "most played, else the first", at most 2 per artist. The first of them plays.
+public enum StationSeeds {
+    public static let albumSeeds = 3
+    public static let playlistSeeds = 5
+    public static let perArtist = 2
+
+    /// `songs` are in the source's own order; `plays` is the play count of each song id the listener has played. Songs
+    /// with plays come first, most played first (ties by the source's order), then the unplayed ones in the source's
+    /// order.
+    public static func pick(songs: [Song], plays: [String: Int], max: Int) -> [Song] {
+        let order = songs.indices.sorted { a, b in
+            let pa = plays[songs[a].id] ?? 0
+            let pb = plays[songs[b].id] ?? 0
+            if (pa > 0) != (pb > 0) { return pa > 0 }
+            if pa != pb { return pa > pb }
+            return a < b
+        }
+        var used: [String: Int] = [:]
+        var out: [Song] = []
+        for i in order {
+            if out.count >= max { break }
+            let song = songs[i]
+            let artist = BrainLibraryIndex.artistKey(of: song)
+            let count = used[artist] ?? 0
+            if !artist.isEmpty && count >= perArtist { continue }
+            used[artist] = count + 1
+            out.append(song)
+        }
+        return out
+    }
+}
+
+/// The rules of a long station (6.2): when it is re-seeded and from what, and what leads its first batch.
+public enum StationReseed {
+    /// A station whose pool runs under this is re-seeded from its best-received track, at most twice.
+    public static let below = 15
+    public static let maxReseeds = 2
+    /// An album or playlist station has up to five seeds, and two re-seeds may join them.
+    public static let maxSeeds = 7
+
+    /// True when the station's pool ran low and `best` (the latest track it finished or the listener liked, never its
+    /// own seed) can join the seeds.
+    public static func shouldReseed(poolFromLibrary: Bool, poolSize: Int, reseedIds: [String], bestMediaId: String?,
+                                    seedMediaIds: [String]) -> Bool {
+        guard let bestMediaId, !poolFromLibrary, poolSize < below, reseedIds.count < maxReseeds else { return false }
+        return !seedMediaIds.contains(bestMediaId) && !reseedIds.contains(bestMediaId)
+    }
+
+    /// The media ids a station's pool is seeded from: its primary seed, the others it was started with, then the
+    /// re-seeds, `maxSeeds` at most, each once.
+    public static func seedIds(primary: String, station: Station, reseedIds: [String]) -> [String] {
+        var out = [primary]
+        for id in station.seedMediaIds + reseedIds where out.count < maxSeeds && !out.contains(id) { out.append(id) }
+        return out
+    }
+
+    /// Whether a station track counts as "the one it did best with": the listener finished it or liked it.
+    public static func isBest(finished: Bool, liked: Bool, mediaId: String, station: Station) -> Bool {
+        (finished || liked) && !BrainKey.sameBytes(mediaId, station.seedMediaId)
     }
 }

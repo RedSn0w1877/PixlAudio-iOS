@@ -570,3 +570,37 @@ public actor HostBudget {
         }
     }
 }
+
+
+/// What the Spotify Web API already returns with a track and the app used to throw away (docs/brain-spec.md, 3.3 B,
+/// 13.1): the artists' Spotify ids, the album and its release date, whether the track is explicit.
+public struct SpotifyFactInput: Sendable, Hashable, Codable {
+    public var spotifyId: String
+    public var isrc: String?
+    /// Spotify artist ids, the primary artist first.
+    public var artistIds: [String]
+    public var albumId: String?
+    /// `YYYY`, `YYYY-MM` or `YYYY-MM-DD`, as Spotify gave it; nil when it gave none.
+    public var releaseDate: String?
+    /// `year`, `month` or `day`.
+    public var releasePrecision: String?
+    /// Nil when Spotify did not say.
+    public var explicit: Bool?
+
+    public init(spotifyId: String, isrc: String? = nil, artistIds: [String] = [], albumId: String? = nil,
+                releaseDate: String? = nil, releasePrecision: String? = nil, explicit: Bool? = nil) {
+        self.spotifyId = spotifyId
+        self.isrc = isrc
+        self.artistIds = artistIds
+        self.albumId = albumId
+        self.releaseDate = releaseDate
+        self.releasePrecision = releasePrecision
+        self.explicit = explicit
+    }
+}
+
+/// Where the Spotify sync hands those facts: called from the one place that maps a Spotify track to a library row, so
+/// a sync pays nothing for it. The implementation queues and writes them a moment later, off the sync's path.
+public protocol SpotifyFactsSink: Sendable {
+    func record(_ fact: SpotifyFactInput)
+}
