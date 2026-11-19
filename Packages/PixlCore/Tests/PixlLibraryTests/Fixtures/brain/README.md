@@ -101,3 +101,20 @@ How each `fn` is replayed:
 - `islandmixes.jsonl`: `Islands.fit(fitTracks)`, then `MixPlanner.plan` on `candidates` with `islands = IslandContext(fit.islands)`,
   `islandIdx`, `tagsByRid` (from the candidates' tags), an empty affinity state, no seeds, `salt` of the case, `nuMultiplier` 1.
 - `homeplan.jsonl`: `plan` is `HomePlanner.plan(shelves)`; `hero` is `HomePlanner.hero(...)` plus `daypart`, `weekday`, `planKey`.
+- `ekf.jsonl`, `listseed.jsonl`, `replay.jsonl`, `learner.jsonl` (stage 3; new files, nothing before them changed).
+- `ekf.jsonl` `ekf`: start from `Ranker.newModel(day0)`; for each step `[eventId, day, bias, r, c, [[index, value]...]]` build `x`
+  (index 0 is 1, the listed indexes take their values, the rest are 0) and call `Ranker.applyEvent(model, x, r, c, bias, day,
+  eventId)`; `status` is each call's result (0 applied, 1 skipped, 2 reset), then the model: `m`, `q`, `anchorDay`, `forgetDone`,
+  `updates`, `lastEventId`, `resets` (`mHash`, `qHash`: FNV-1a 64 over the 8 little-endian bytes of each double). A value past 4
+  or an event id at or below the watermark is skipped. `forget`: start from the model in `in`, call `Ranker.forget(model, day)`
+  for each of `days` in order; `runs` are the results.
+- `listseed.jsonl`: `listSeed` is `Ranker.listSeed(salt, listId, localDay)` (8 little-endian bytes of the salt, 4 little-endian
+  bytes of the UTF-8 length of the id, its UTF-8 bytes, 8 little-endian bytes of the day; FNV-1a 64), `firstGaussian` the first
+  `Rng(seed).gaussian12()`. `control` is `Ranker.isControlSession`. `sample` is `Ranker.sampleWeights(model, Rng(seed))` for the
+  model in `in`.
+- `replay.jsonl` `learnReplay`: `LearnReplay.run(events, LibraryFacts.EMPTY, nowMs, liked, tzNowMin)`; the model, the event count,
+  the watermark, the hash of `Snapshot.encode(state)`, the number of graded plays, the hashes of the two prediction arrays, and
+  `Gate.summarize(predictions, nowMs)` (`plays`, `playsTotal`, `llLearned`, `llPrior`, `accLearned`, `accPrior`, the two `Before`).
+- `learner.jsonl`: `gate` is `Gate.decide(State(useLearned, winStreak, atMs), Summary(plays, ..., llLearned, llPrior), nowMs)`;
+  `logLoss` is `Gate.logLoss` and `Gate.accuracy` (threshold 0.5) over the arrays; `codec` is `LearnerCodec.encode` of the model in
+  `in` (with the gate and summary the case gives) and that it decodes to the same text; `codecBad` texts must not be accepted.

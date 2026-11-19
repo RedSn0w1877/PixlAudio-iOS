@@ -69,6 +69,9 @@ public enum StationPlanner {
         /// First Listen: at most two tracks by one artist, at least 40% from artists never played.
         public var maxPerArtist: Int
         public var minNewArtistShare: Double
+        /// Stage 3: which weights rank this list (5.10, 5.12 point 8). Nil is the prior `M0`, exactly as in stages 1 and 2.
+        /// Build it with `Ranker.WeightSource`; it falls back to the prior by itself when the gate has the prior on.
+        public var ranking: Ranker.WeightSource?
 
         public init(mode: Int32, count: Int, candidates: [Candidate], seeds: [Retrieval.SeedList],
                     prior: [ListBuilder.Prior] = [], nowMs: Int64, tzOffsetMin: Int32 = 0, nuMultiplier: Double = 1.0,
@@ -77,7 +80,8 @@ public enum StationPlanner {
                     servedMax: Double = Repetition.maxPenalty, closestOfSeeds: Bool = false,
                     islands: IslandContext? = nil, calibration: Calibration? = nil,
                     lambda: Double = ListBuilder.lambdaDefault, simSource: (any SimilaritySource)? = nil,
-                    maxPerArtist: Int = 0, minNewArtistShare: Double = 0.0) {
+                    maxPerArtist: Int = 0, minNewArtistShare: Double = 0.0, ranking: Ranker.WeightSource? = nil) {
+            self.ranking = ranking
             self.islands = islands
             self.calibration = calibration
             self.lambda = lambda
@@ -136,7 +140,8 @@ public enum StationPlanner {
     public static func plan(_ request: Request, affinity: Affinity.State, session: SessionState, graph: Graph) -> Plan {
         let nowMs = request.nowMs
         let p0 = Affinity.p0(affinity, nowMs: nowMs)
-        let weights = Ranker.weights(p0: p0)
+        let weights = request.ranking?.weights(p0: p0) ?? Ranker.weights(p0: p0)
+        let precision = request.ranking?.precision()
         let cooc = Retrieval.cooc(request.seeds, affinity: affinity, nowMs: nowMs, p0: p0)
         let homeRow = request.mode == modeHomeRow
         let station = request.mode == modeStation
@@ -235,7 +240,7 @@ public enum StationPlanner {
                 c: c,
                 arm: arms[i],
                 z: z,
-                p: Ranker.p(z, x),
+                p: precision != nil ? Ranker.p(z, x, precision!) : Ranker.p(z, x),
                 novel: !c.inLibrary,
                 bestRank: bestRank,
                 bestSeed: entry?.bestSeed ?? -1,

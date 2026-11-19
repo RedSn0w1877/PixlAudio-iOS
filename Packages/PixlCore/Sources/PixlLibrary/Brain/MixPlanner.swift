@@ -94,6 +94,8 @@ public enum MixPlanner {
         public var embeddings: Embeddings?
         /// Stage 2b: tag vectors by rid, for the diversity term.
         public var tagsByRid: [Int64: Tags.Vector]
+        /// Stage 3: which weights rank the list; nil is the prior `M0` (see `StationPlanner.Request.ranking`).
+        public var ranking: Ranker.WeightSource?
 
         public init(kind: Int32, candidates: [Candidate], seeds: [Retrieval.SeedList], nowMs: Int64, tzOffsetMin: Int32,
                     nuMultiplier: Double = 1.0, salt: Int64 = 0, regenerate: Int32 = 0, excludedRids: Set<Int64> = [],
@@ -213,7 +215,8 @@ public enum MixPlanner {
                 lambda: lambda,
                 simSource: simSource,
                 maxPerArtist: first ? 2 : 0,
-                minNewArtistShare: first ? 0.4 : 0.0
+                minNewArtistShare: first ? 0.4 : 0.0,
+                ranking: request.ranking
             ),
             affinity: affinity,
             session: session,
