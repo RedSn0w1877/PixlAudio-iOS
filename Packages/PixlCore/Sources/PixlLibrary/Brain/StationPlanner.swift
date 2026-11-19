@@ -52,12 +52,16 @@ public enum StationPlanner {
         public var jitter: Double
         /// The penalty at three serves or more (see `Repetition.maxPenalty`).
         public var servedMax: Double
+        /// Station mode only. False (stage 1): a track must be close to the first seed. True (an album or playlist
+        /// station has up to five, 6.2): close to the nearest of them. Off by default so no earlier plan changes.
+        public var closestOfSeeds: Bool
 
         public init(mode: Int32, count: Int, candidates: [Candidate], seeds: [Retrieval.SeedList],
                     prior: [ListBuilder.Prior] = [], nowMs: Int64, tzOffsetMin: Int32 = 0, nuMultiplier: Double = 1.0,
                     tieSeed: Int64 = 0, excludedRids: Set<Int64> = [], bridge: Bool = false, finite: Bool = false,
                     nu: Double = -1.0, servedTimes: [Int64: Int32] = [:], jitter: Double = 0.0,
-                    servedMax: Double = Repetition.maxPenalty) {
+                    servedMax: Double = Repetition.maxPenalty, closestOfSeeds: Bool = false) {
+            self.closestOfSeeds = closestOfSeeds
             self.mode = mode
             self.count = count
             self.candidates = candidates
@@ -140,7 +144,9 @@ public enum StationPlanner {
             if last != 0 && nowMs &- last < fourHoursMs { continue }
             if homeRow && c.inLibrary { continue }
             if let stationSeed, station {
-                let s = Similarity.sim(graph, c.rid, c.aid, stationSeed.seedRid, stationSeed.seedAid)
+                let s = request.closestOfSeeds
+                    ? closestSeed(graph, c, request.seeds)
+                    : Similarity.sim(graph, c.rid, c.aid, stationSeed.seedRid, stationSeed.seedAid)
                 if s < (c.inLibrary ? familiarFloor : stationFloor) { continue }
             } else if c.inLibrary && !mix {
                 var close = 0.0
@@ -153,6 +159,8 @@ public enum StationPlanner {
             let arm: Int32
             if c.inLibrary {
                 arm = (affinity.completions[c.rid] ?? 0) >= 1 ? Arm.fav : Arm.deep
+            } else if c.fromSimilarArtist {
+                arm = Arm.sim
             } else if c.fromArtistRadio {
                 arm = Arm.artist
             } else if c.aid != 0
@@ -181,7 +189,9 @@ public enum StationPlanner {
                              session: session, graph: graph, nowMs: nowMs, p0: p0, allNovel: homeRow, out: &x)
             var z = Ranker.z(weights, x)
             if let stationSeed, station {
-                let s = Similarity.sim(graph, c.rid, c.aid, stationSeed.seedRid, stationSeed.seedAid)
+                let s = request.closestOfSeeds
+                    ? closestSeed(graph, c, request.seeds)
+                    : Similarity.sim(graph, c.rid, c.aid, stationSeed.seedRid, stationSeed.seedAid)
                 let blend = 0.6 * s + 0.4 * x[Features.sessPosSim]
                 z += 1.2 * blend
             }
@@ -285,6 +295,20 @@ public enum StationPlanner {
             ))
         }
         return Plan(picks: picks, usedLiked: usedLiked, usedFamiliarNext: familiarNext && !picks.isEmpty, poolSize: n)
+    }
+
+    /// How close `c` is to the station: the closest of its seeds. A song or artist station has one seed (so this is that
+    /// seed's similarity, as before); an album or playlist station has up to five (6.2), and a track is wanted when it is
+    /// near any of them.
+    private static func closestSeed(_ graph: Graph, _ c: Candidate, _ seeds: [Retrieval.SeedList]) -> Double {
+        var best = 0.0
+        var first = true
+        for seed in seeds {
+            let v = Similarity.sim(graph, c.rid, c.aid, seed.seedRid, seed.seedAid)
+            if first || v > best { best = v }
+            first = false
+        }
+        return best
     }
 
     /// The in-memory graph of 3.6 for one plan: every seed's list, plus one edge from each track to its primary

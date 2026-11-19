@@ -263,6 +263,16 @@ public enum Session {
         if state.posCount < recent { state.posCount += 1 }
     }
 
+    /// The strength of a swipe on an engine row of the queue (8.4): the weakest skip of 5.5.
+    public static let swipeH: Double = 0.2
+
+    /// The listener removed an engine pick from the queue without hearing it (8.4: "swipe removes it, a weak negative,
+    /// `h = 0.2`"). It only pushes the track onto `recentNeg` with that strength, so tracks like it rank lower for the
+    /// rest of the session: no affinity changes, no block, no skip run.
+    public static func weakNegative(_ state: inout SessionState, rid: Int64, aid: Int64) {
+        pushNeg(&state, rid, aid, swipeH)
+    }
+
     private static func pushNeg(_ state: inout SessionState, _ rid: Int64, _ aid: Int64, _ h: Double) {
         if rid == 0 { return }
         var i = state.negCount < recent ? state.negCount : recent - 1

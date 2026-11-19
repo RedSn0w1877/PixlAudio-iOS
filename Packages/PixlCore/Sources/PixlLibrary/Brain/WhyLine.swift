@@ -73,7 +73,8 @@ public enum WhyLine {
             if candidateAid != 0 { return Why(key: artistMore, arg: candidateAid) }
             return Why(key: none, arg: 0)
         }
-        if arm == Arm.sim { return Why(key: similarArtist, arg: candidateAid) }
+        // "Close to X": X is the artist whose list brought the pick in; the pick's own artist when no list did.
+        if arm == Arm.sim { return Why(key: similarArtist, arg: seedAid != 0 ? seedAid : candidateAid) }
         if arm == Arm.new { return Why(key: newRelease, arg: candidateAid) }
         if arm == Arm.back { return Why(key: forgotten, arg: 0) }
         if arm == Arm.edge { return Why(key: adjacentGenre, arg: 0) }

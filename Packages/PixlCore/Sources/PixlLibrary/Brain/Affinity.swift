@@ -291,6 +291,54 @@ public enum Affinity {
         }
     }
 
+    /// Takes one event's own contribution back out of the tables (5.2, "Undo (stage 2)"): "Don't count this" removes what
+    /// `applyEvent` added, `c * r * part` and `c * (1 - r) * part` decayed to the counter's own time, floored at 0, for
+    /// every key the event touched, and its completion. `tMs` is the time the event was applied with (its start, clamped
+    /// to now). It does not look at the event's flags: the caller flags the event, and a rebuild from the log makes the
+    /// tables exact again. `g` is the event's own grade; a grade made without the context of the time can differ from the
+    /// one that was applied, so this is the quick answer, not the exact one.
+    public static func subtract(_ state: inout State, _ e: PlayEvent, _ g: Reward.Graded, tMs: Int64) {
+        if e.has(EventFlags.neverAudible) { return }
+        if e.rid != 0 { remove(&state, family: Family.track, key: e.rid, r: g.r, c: g.c, part: 1.0, tMs: tMs) }
+        if e.primaryAid != 0 {
+            remove(&state, family: Family.artist, key: e.primaryAid, r: g.r, c: g.cOther, part: 1.0, tMs: tMs)
+        }
+        for aid in e.otherAids where aid != 0 && aid != e.primaryAid {
+            remove(&state, family: Family.artist, key: aid, r: g.r, c: g.cOther, part: 0.5, tMs: tMs)
+        }
+        if e.arm != Arm.none {
+            remove(&state, family: Family.arm, key: Int64(e.arm), r: g.r, c: g.cOther, part: 1.0, tMs: tMs)
+        }
+        remove(&state, family: Family.all, key: Family.allKey, r: g.r, c: g.cOther, part: 1.0, tMs: tMs)
+        if g.isCompletion && e.rid != 0 {
+            let count = state.completions[e.rid] ?? 0
+            if count > 0 {
+                state.completions[e.rid] = count - 1
+                state.touched(Family.completions, e.rid)
+            }
+        }
+    }
+
+    private static func remove(_ state: inout State, family: Int32, key: Int64, r: Double, c: Double, part: Double,
+                               tMs: Int64) {
+        guard var counter = state.tables[Int(family)][key] else { return }
+        unbump(&counter, r, c, part, tMs)
+        state.tables[Int(family)][key] = counter
+        unbump(&state.sums[Int(family)], r, c, part, tMs)
+        state.touched(family, key)
+        state.touched(Family.sumBase + family, Family.allKey)
+    }
+
+    private static func unbump(_ k: inout Counter, _ r: Double, _ c: Double, _ part: Double, _ tMs: Int64) {
+        // What the event added is held at the counter's reference time: it decayed from tMs to there.
+        var g = tMs >= k.lastMs ? 1.0 : decay(k.lastMs &- tMs, halfLifeMs)
+        k.posQ = BrainMath.toQ(BrainMath.max(0.0, BrainMath.fromQ(k.posQ) - g * c * r * part))
+        k.negQ = BrainMath.toQ(BrainMath.max(0.0, BrainMath.fromQ(k.negQ) - g * c * (1.0 - r) * part))
+        g = tMs >= k.lastRMs ? 1.0 : decay(k.lastRMs &- tMs, recentHalfLifeMs)
+        k.posRQ = BrainMath.toQ(BrainMath.max(0.0, BrainMath.fromQ(k.posRQ) - g * c * r * part))
+        k.negRQ = BrainMath.toQ(BrainMath.max(0.0, BrainMath.fromQ(k.negRQ) - g * c * (1.0 - r) * part))
+    }
+
     // MARK: Reads (never write)
 
     private static func since(_ nowMs: Int64, _ lastMs: Int64) -> Int64 { nowMs > lastMs ? nowMs &- lastMs : 0 }

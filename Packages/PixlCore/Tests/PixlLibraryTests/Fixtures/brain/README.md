@@ -57,3 +57,14 @@ How each `fn` is replayed:
   completions); `listHealth` is `Eval.listHealth(world, Snapshot.decode(snapshot), days, nowMs,
   tzOffsetMin, salt)` with `HealthWorld(library, novel, seeds, finishRates)`; `finishRates` are
   `[rid, rate]`.
+- `stage2a.jsonl` (stage 2a, milestone 2; a new file, nothing before it changed): `subtract` rebuilds
+  `Replay.rebuild(events, facts, nowMs)`, then for each of `indices` (in order)
+  `Affinity.subtract(state, e, Reward.grade(e, Context(0, 0)), min(e.startedAtMs, nowMs))`; `out.state` is
+  the dump. `repeat` adds `(times[i], weights[i])` to a `RepeatActivation.History` in order and reads
+  `count`, `aggC`, `aggT`, `b(nowMs)` (NaN is the bit pattern 7ff8000000000000) and `feature(nowMs)`.
+  `chip` is `ChipLabels.classify(label)`. `whyFacts` is `WhyFacts.pick(artistPlays, artistFinished,
+  trackFinished, year)`, each fact `[key, a, b]`. `weakNegative` calls `Session.weakNegative(state, rid, aid)` for
+  each pair on a fresh `SessionState` and compares `encode()`. `plan` is `StationPlanner.plan` in station
+  mode with the new `Candidate` fields `fromSimilarArtist` (arm SIM, "Close to X") and `actr` (feature 10;
+  feature 11 is its square), `closestOfSeeds` (station mode: nearest of the seeds, not the first; `in.request2.closestOfSeeds`)
+  and a session whose seed is an artist station.

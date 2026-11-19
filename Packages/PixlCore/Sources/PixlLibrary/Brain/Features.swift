@@ -18,9 +18,16 @@ public struct Candidate: Sendable {
     public var fromArtistRadio: Bool
     /// The listener's boost / reduce adjustments for it (5.11): `ln(product)`, 0 for none.
     public var boostLn: Double
+    /// True when the row came from the top songs of an artist close to the seed's (arm SIM, 6.1).
+    public var fromSimilarArtist: Bool
+    /// Feature 10, `clip((B + 4) / 6, 0, 1)` of `RepeatActivation`; 0 for a track never played or an unknown history.
+    public var actr: Double
 
     public init(rid: Int64, aid: Int64, albumKey: Int64 = 0, inLibrary: Bool = false, liked: Bool = false,
-                fromArtistRadio: Bool = false, boostLn: Double = 0.0) {
+                fromArtistRadio: Bool = false, boostLn: Double = 0.0, fromSimilarArtist: Bool = false,
+                actr: Double = 0.0) {
+        self.fromSimilarArtist = fromSimilarArtist
+        self.actr = actr
         self.rid = rid
         self.aid = aid
         self.albumKey = albumKey
@@ -40,6 +47,8 @@ public enum Features {
     public static let artistAff = 2
     public static let artistAffRecent = 3
     public static let liked = 8
+    public static let actr = 10
+    public static let actrSq = 11
     public static let sinceLast = 12
     public static let unheardTrack = 17
     public static let unheardArtist = 18
@@ -64,6 +73,9 @@ public enum Features {
         if !allNovel {
             out[trackAff] = Affinity.aff(affinity, family: Family.track, key: c.rid, nowMs: nowMs, p0: p0) / 3.0
             if c.liked { out[liked] = 1.0 }
+            // Repeat activation (5.6): where the listener's own point of fatigue sits (features 10 and 11).
+            out[Features.actr] = c.actr
+            out[actrSq] = c.actr * c.actr
         }
         if c.aid != 0 {
             out[artistAff] = Affinity.aff(affinity, family: Family.artist, key: c.aid, nowMs: nowMs, p0: p0) / 3.0
