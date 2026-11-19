@@ -10,6 +10,8 @@ import UIKit
 /// tinted with the genre colour (one glass layer per card).
 struct GenreBrowseView: View {
     let genres: [Genre]
+    /// The catalogue categories shown (docs/brain-spec.md, 8.10: with the brain on, a genre the atlas lacks has no tile).
+    var categories: [SearchCategory] = SearchCategory.defaults
     @Binding var isGridView: Bool
     let onGenre: (Genre) -> Void
     let onCategory: (SearchCategory) -> Void
@@ -31,7 +33,7 @@ struct GenreBrowseView: View {
                     .padding(.top, 6)
                     .padding(.bottom, 10)
                 LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(SearchCategory.defaults) { category in
+                    ForEach(categories) { category in
                         SearchCategoryCard(category: category) { onCategory(category) }
                     }
                 }

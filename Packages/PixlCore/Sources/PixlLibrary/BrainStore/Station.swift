@@ -220,6 +220,8 @@ public enum StationRules {
 public enum StationSeeds {
     public static let albumSeeds = 3
     public static let playlistSeeds = 5
+    /// A genre or mood station: up to five of the listener's own songs under the node (6.2).
+    public static let genreSeeds = 5
     public static let perArtist = 2
 
     /// `songs` are in the source's own order; `plays` is the play count of each song id the listener has played. Songs

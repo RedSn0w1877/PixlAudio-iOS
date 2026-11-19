@@ -1,4 +1,5 @@
 import PixlFoundation
+import PixlLibrary
 import PixlModel
 import SwiftUI
 
@@ -22,6 +23,8 @@ struct SearchView: View {
     @Environment(\.appTheme) private var theme
 
     @State private var model = SearchModel(filter: SearchLaunchOptions.initialFilter)
+    /// The browse tiles the atlas knows (docs/brain-spec.md, 8.10); nil (every tile, as before) with the legacy engine or no atlas.
+    @State private var brainTiles: Set<String>?
 
     var body: some View {
         let showsGenres = router.searchText.isKotlinBlank
@@ -80,9 +83,24 @@ struct SearchView: View {
 
     private var genreBrowse: some View {
         @Bindable var librarySettings = settings.library
-        return GenreBrowseView(genres: model.genres, isGridView: $librarySettings.isGenreGridView,
+        let tiles = brainTiles.map { known in SearchCategory.defaults.filter { known.contains($0.name) } } ?? SearchCategory.defaults
+        return GenreBrowseView(genres: model.genres, categories: tiles, isGridView: $librarySettings.isGenreGridView,
                                onGenre: { genre in router.push(.genreDetail(genreId: genre.id)) },
-                               onCategory: { category in router.push(.spotifyBrowse(query: category.query)) })
+                               onCategory: { category in
+                                   let browse: @MainActor () -> Void = { router.push(.spotifyBrowse(query: category.query)) }
+                                   // With the brain engine on a tile is a station when the atlas knows the genre and the listener
+                                   // has songs under it (8.3); otherwise it is the live search it always was.
+                                   if brainTiles != nil {
+                                       environment.brainActions.startGenreStationByName(category.name, fallback: browse)
+                                   } else {
+                                       browse()
+                                   }
+                               })
+        .task {
+            if settings.ai.brainEngine == BrainEngineChoice.brain {
+                brainTiles = await environment.brainActions.knownGenreTiles(SearchCategory.defaults.map { $0.name })
+            }
+        }
     }
 
     // MARK: Results

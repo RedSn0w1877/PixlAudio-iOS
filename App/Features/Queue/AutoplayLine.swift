@@ -114,6 +114,7 @@ struct AutoplayLine: View {
             switch stationSource {
             case Station.sourceAlbum: return BrainStrings.stationSubtitleAlbum
             case Station.sourcePlaylist: return BrainStrings.stationSubtitlePlaylist
+            case Station.sourceGenre, Station.sourceMood: return BrainStrings.stationSubtitleGenre
             default: return stationIsArtist ? BrainStrings.stationSubtitleArtist : BrainStrings.stationSubtitleSong
             }
         }

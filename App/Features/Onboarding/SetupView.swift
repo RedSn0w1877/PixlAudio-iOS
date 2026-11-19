@@ -1,4 +1,5 @@
 import PixlBackup
+import PixlLibrary
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -20,7 +21,7 @@ import UniformTypeIdentifiers
 /// session). Finishing forgets the page and never shows setup again.
 struct SetupView: View {
     nonisolated enum Page: Int, CaseIterable, Sendable {
-        case welcome, spotify, backupRestore, theme, libraryLayout, finish
+        case welcome, spotify, taste, backupRestore, theme, libraryLayout, finish
     }
 
     @Environment(AppEnvironment.self) private var env
@@ -38,6 +39,8 @@ struct SetupView: View {
     @State private var showsSpotify = false
     @State private var toast: String?
     @State private var started = false
+    /// Familiar / Blend / Discover (docs/brain-spec.md, 8.10): the same switch the queue has.
+    @State private var noveltyLevel = Novelty.blend
 
     /// UserDefaults key for the page to resume at.
     static let resumeKey = "setup_resume_page"
@@ -153,7 +156,7 @@ struct SetupView: View {
             return BottomAction(title: L10n.setupSkipForNow, symbol: nil, kind: .plain)
         case .backupRestore:
             return BottomAction(title: L10n.setupSkipForNow, symbol: nil, kind: .plain, isEnabled: !isBackupBusy)
-        case .theme, .libraryLayout:
+        case .taste, .theme, .libraryLayout:
             return BottomAction(title: L10n.setupContinue, symbol: "arrow.right", kind: .primary)
         case .finish:
             return BottomAction(title: L10n.setupStartListening, symbol: "play.fill", kind: .primary)
@@ -167,6 +170,14 @@ struct SetupView: View {
             SetupWelcomePage()
         case .spotify:
             SetupSpotifyPage(isLoggedIn: isSpotifyLinked, onSignIn: { showsSpotify = true })
+        case .taste:
+            SetupTastePage(level: noveltyLevel, onChange: { level in
+                noveltyLevel = level
+                env.brainActions.setNovelty(level)
+            }, onImportHistory: {
+                // Home opens the existing import once, as soon as it is on screen.
+                UserDefaults.standard.set(true, forKey: PreferenceKeys.pendingHistoryImport)
+            })
         case .backupRestore:
             SetupBackupPage(isInspecting: isInspecting, isRestoring: restoreBackup != nil && env.backup.isBusy,
                             onImport: { showsBackupPicker = true })
@@ -228,6 +239,7 @@ struct SetupView: View {
     private func begin() {
         guard !started else { return }
         started = true
+        noveltyLevel = env.brain.stations.novelty
         if let screen = env.launch.screen {
             page = Self.initialPage(for: screen)
         } else {

@@ -133,7 +133,13 @@ struct MixScreen: View {
     }
 
     /// Where these plays come from, for the event log (docs/brain-spec.md, 4.1 `surface`).
-    private var mixSource: BrainItemTag { screenID == "dailyMix" ? .dailyMix : .yourMix }
+    private var mixSource: BrainItemTag {
+        switch screenID {
+        case "dailyMix": .dailyMix
+        case "yourMix": .yourMix
+        default: .namedMix
+        }
+    }
 
     /// `Brush.verticalGradient(primary 25 %, surface 50 %, surface, endY = 1200 px)`.
     private var background: some View {

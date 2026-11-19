@@ -57,6 +57,12 @@ final class BrainService {
     /// What the brain knows about a song, from the open-data sources (3.3 to 3.5, stage 2b): built by `configureKnowledge`,
     /// read by the refresh's lanes 3 to 5 and the Developer screen, never at launch. Nil in UI tests.
     private(set) var knowledge: BrainKnowledge?
+    /// What the lists of stage 2b need beyond 2a: the islands and their embeddings, genre and mood stations, the artists the
+    /// listener picked, the saved Home plan and Jump back in. Built with the mixes, never at launch. Nil in UI tests.
+    private(set) var stage2b: Stage2bKit?
+    /// Plans Home in the background (8.1) and the first minute of a new listener (8.10). Nil in UI tests.
+    private(set) var planBuilder: HomePlanBuilder?
+    private(set) var coldStart: ColdStart?
     /// New releases by the artists the listener plays (6.3): one small file Home reads without the brain's state. Nil in UI tests.
     let newReleases: NewReleases?
     /// What the Spotify sync receives with a track and used to drop (13.1). Nil in UI tests.
@@ -170,7 +176,11 @@ final class BrainService {
     /// Builds the objects behind the mixes and the refresh. Reads nothing, fetches nothing: `sources` are closures.
     func configureMixes(sources: MixSources, budget: HostBudget?) {
         guard let directory, let repository, let engine else { return }
-        let mixes = BrainMixes(directory: directory, repository: repository, engine: engine, sources: sources)
+        let kit = Stage2bKit.make(directory: directory, engine: engine, repository: repository, sources: sources,
+                                  dna: knowledge?.dna, atlas: knowledge?.atlas ?? CachedAtlasProvider(load: { nil }),
+                                  newReleases: newReleases)
+        stage2b = kit
+        let mixes = BrainMixes(directory: directory, repository: repository, engine: engine, sources: sources, parts: kit.parts)
         self.mixes = mixes
         let library = sources.library
         let work = BrainRefreshWork(mixes: mixes, repository: repository, budget: budget,
@@ -178,6 +188,10 @@ final class BrainService {
                                     librarySongs: { await library() }, dna: knowledge?.lanes)
         let allowed: @Sendable () async -> Bool = { @MainActor [weak self] in self?.refreshIsAllowed() ?? false }
         refresh = BrainRefresh(work: work, repository: repository, engine: engine, allowed: allowed)
+        planBuilder = HomePlanBuilder(mixes: mixes, homeRows: homeRows, genre: kit.genre, store: kit.planStore)
+        // The first minute of a new listener (8.10) is lane 1 of the refresh, run while Home is on screen: the same work under
+        // the same budget and switches, and never a second background job.
+        coldStart = ColdStart(work: work, healthyLists: { await repository.radioListCount() }, allowed: allowed)
     }
 
     /// The first moments of the process keep the brain's files closed (docs/brain-spec.md, 12.1 "App start"): a mix is

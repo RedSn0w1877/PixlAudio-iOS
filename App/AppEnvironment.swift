@@ -28,6 +28,8 @@ final class AppEnvironment {
     let artistImages: ArtistImageService?
     /// Home's state holder: playback history, mixes, recommendations, stats overview (stage 7b).
     let home: HomeStore
+    /// What Home shows when the music brain owns it: the saved plan, Jump back in, the first minute (docs/brain-spec.md, 8.1, 8.10).
+    let homePlan = HomePlanState()
     /// Settings › AI › Music intelligence: what listening teaches the recommendations.
     let musicTaste: MusicTasteStore
     /// Listening history imported from Spotify / YouTube Music (automatic and from data downloads), fed to the
@@ -415,6 +417,26 @@ final class AppEnvironment {
             home.linkBrainSong = { [weak brain] song in brain?.linked(song) ?? song }
             // The handler is only registered here; no brain code runs until iOS grants a task.
             BrainBackground.register(for: brain)
+            // The new Home (8.1): the saved plan, the plan builder, Jump back in and the first minute. Closures and references
+            // only; the plan file is read when Home first appears, never at launch.
+            let plan = homePlan
+            plan.engineIsOn = { mixSettings.brainEngine == BrainEngineChoice.brain }
+            plan.librarySongs = { ids in
+                var found: [String: Song] = [:]
+                for id in ids { if let song = mixLibrary.song(id: id) { found[id] = song } }
+                return found
+            }
+            plan.librarySongCount = { mixLibrary.songs.count }
+            plan.register = { [weak brain] tracks in brain?.register(tracks) }
+            plan.quiet = { [weak brain] in await brain?.waitForStartup() }
+            plan.store = brain.stage2b?.planStore
+            plan.builder = brain.planBuilder
+            plan.mixes = brain.mixes
+            plan.recent = brain.stage2b?.recent
+            plan.coldStart = brain.coldStart
+            plan.picked = brain.stage2b?.picked
+            // A queue started from a made-for-you list is a place to jump back to.
+            mixPlayback.onQueueStarted = { [weak plan] songs, source, tags in plan?.noteQueue(songs: songs, source: source, tags: tags) }
         }
         if let homeRows = brain.homeRows {
             // Home's "Because you listened to" rows (docs/brain-spec.md, 8.1): the saved rows at once; a rebuild only

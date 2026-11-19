@@ -15,10 +15,14 @@ struct HomeView: View {
     @Environment(\.appTheme) private var theme
     /// A reference: writing the flag re-renders only the top bar that reads it, never this body (and its sections).
     @State private var scroll = HomeScrollState()
+    /// Which of the new Home's views the chips pick (docs/brain-spec.md, 8.1).
+    @State private var chip: HomeChip = .forYou
 
     var body: some View {
         let home = env.home
         let content = home.content
+        // The music brain's plan (8.1): read from its file before anything else. `owned` false is the page as it was.
+        let plan = env.homePlan.ui
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 24) {
                 // After an unexpected close: heavy jobs are paused until the person reviews them (once, dismissible).
@@ -38,6 +42,7 @@ struct HomeView: View {
                     .padding(.horizontal, HomeMetrics.greetingInset)
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 }
+                if plan.owned && !plan.dateLine.isEmpty { HomeDateLine(text: plan.dateLine) }
                 HomeGreetingCard(greeting: content.greeting, insight: home.aiInsight ?? content.insight,
                                  isExpanded: home.isInsightExpanded, isLoadingInsight: home.isLoadingInsight,
                                  onToggle: { withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { home.toggleInsight() } })
@@ -48,7 +53,17 @@ struct HomeView: View {
                     onRecentlyPlayed: { router.push(.recentlyPlayed) },
                     onStats: { router.push(.stats) })
 
-                if !content.mixes.isEmpty {
+                // 8.10: while the first radios are fetched Home says so; it never shows a spinner or an empty state for it.
+                if plan.knowingTotal > 0 { HomeKnowingStrip(done: plan.knowingDone, total: plan.knowingTotal) }
+                if plan.offerPicker { HomeArtistPickerCard(onPick: { router.push(.artistPicker) }) }
+                if plan.owned {
+                    HomeChipsRow(selected: chip, onSelect: { picked in
+                        if picked == .spatial { router.push(.cloudProcessing) } else { chip = picked }
+                    })
+                }
+                if plan.owned || !plan.tiles.isEmpty { planItems(plan) }
+
+                if !plan.owned, !content.mixes.isEmpty {
                     HomeDiscoveryMixes(mixes: content.mixes, isRefreshing: home.isRefreshing,
                                        onRefresh: {
                                            Task {
@@ -59,18 +74,20 @@ struct HomeView: View {
                                        onPlay: { section, song in playback.play(song, in: section.songs, source: .homeShelf) })
                 }
 
-                yourMix(content: content, isPreparing: home.isPreparing)
+                // The plan's "Made for you" shelf holds Your Mix: the legacy block, its placeholders included, is not drawn.
+                if !plan.owned { yourMix(content: content, isPreparing: home.isPreparing) }
 
                 // The music brain's "Because you listened to X" rows (docs/brain-spec.md, 8.1): music the listener does
-                // not have yet, in front of the legacy shelves. A card plays with the row as the queue.
-                ForEach(home.brainShelves) { shelf in
+                // not have yet, in front of the legacy shelves. A card plays with the row as the queue. The plan carries
+                // these rows itself when it owns Home.
+                ForEach(plan.owned ? [] : home.brainShelves) { shelf in
                     CurrentSongState { currentSongId in
                         HomeDiscoveryShelf(section: shelf.section, currentSongId: currentSongId,
                                            onPlay: { song in env.brainActions.play(shelf, startingAt: song) })
                     }
                 }
 
-                ForEach(content.shelves) { section in
+                ForEach(plan.owned ? [] : content.shelves) { section in
                     CurrentSongState { currentSongId in
                         HomeDiscoveryShelf(section: section, currentSongId: currentSongId,
                                            onPlay: { song in playback.play(song, in: section.songs, source: .homeShelf) })
@@ -124,7 +141,20 @@ struct HomeView: View {
         }
         // Rows the music brain rebuilt while Home was away are shown when Home is back on screen, never under the thumb.
         .onChange(of: router.selection) { _, tab in
-            if tab == .home { home.showPendingBrainRows() }
+            if tab == .home {
+                home.showPendingBrainRows()
+                env.homePlan.onHomeShown()
+            }
+        }
+        // The first appearance reads the saved plan, then plans again when the day, the daypart or the taste moved.
+        .task { env.homePlan.onHomeShown() }
+        .onChange(of: env.tasteAdjustments.revision) { _, _ in env.homePlan.invalidate() }
+        // "Import your listening history" from the setup page: the existing import opens once, as soon as Home is here.
+        .task {
+            if UserDefaults.standard.bool(forKey: PreferenceKeys.pendingHistoryImport) {
+                UserDefaults.standard.removeObject(forKey: PreferenceKeys.pendingHistoryImport)
+                router.push(.listeningHistory)
+            }
         }
         // Cloud Studio's stored jobs (read once, off the main actor): its work may have moved on while the app was closed,
         // and the jobs button should show it.
@@ -177,6 +207,78 @@ struct HomeView: View {
                     onCheckOut: { router.push(.yourMix) })
             }
         }
+    }
+
+    // MARK: The brain's plan (docs/brain-spec.md, 8.1)
+
+    /// The new Home's rows: the hero, Jump back in, then the shelves of the plan in the plan's order; the chips pick what
+    /// shows. Without a plan only Jump back in is drawn, and the library rows below it carry the page.
+    @ViewBuilder
+    private func planItems(_ plan: HomePlanUi) -> some View {
+        if !plan.owned {
+            HomeJumpBackIn(tiles: plan.tiles, onTile: openTile)
+        } else {
+            switch chip {
+            case .mixes:
+                HomeAllMixes(cards: plan.allMixes, onOpen: openMix)
+            case .new:
+                planShelves(plan.newShelves)
+            default:
+                if let hero = plan.hero { HomeHeroCard(hero: hero, onTap: { openHero(hero) }) }
+                HomeJumpBackIn(tiles: plan.tiles, onTile: openTile)
+                planShelves(plan.shelves)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func planShelves(_ shelves: [HomeShelfUi]) -> some View {
+        ForEach(shelves) { shelf in
+            switch shelf {
+            case .tracks(let tracks):
+                CurrentSongState { currentSongId in
+                    HomeDiscoveryShelf(section: tracks.section, currentSongId: currentSongId,
+                                       onPlay: { song in env.brainActions.play(tracks, startingAt: song) })
+                }
+            case .mixes(_, let title, let subtitle, let cards):
+                HomeMixShelf(title: title, subtitle: subtitle, cards: cards, onOpen: openMix)
+            case .stations(_, let title, let subtitle, let cards):
+                HomeStationShelf(title: title, subtitle: subtitle, cards: cards, onStart: { card in
+                    env.brainActions.startGenreStation(kind: card.kind, atlasId: card.atlasId, name: card.name)
+                })
+            }
+        }
+    }
+
+    /// A card of "Made for you" was tapped (8.2): Daily Mix 1 and Your Mix have their own screens, the others open the list.
+    private func openMix(_ card: MixCardUi) { openMix(id: card.mixId, isFirstDaily: card.kind == MixKinds.daily && card.number == 1) }
+
+    private func openMix(id: String, isFirstDaily: Bool = false) {
+        if id.isEmpty { return }
+        if id == "your" {
+            router.push(.yourMix)
+        } else if id == "daily" || isFirstDaily {
+            router.push(.dailyMix)
+        } else {
+            router.push(.mixDetail(mixId: id))
+        }
+    }
+
+    private func openHero(_ hero: HeroUi) {
+        if let release = hero.release, let song = release.section.songs.first {
+            env.brainActions.play(release, startingAt: song)
+        } else {
+            openMix(id: hero.mixId)
+        }
+    }
+
+    private func openTile(_ tile: TileUi) {
+        if !tile.mixId.isEmpty {
+            openMix(id: tile.mixId)
+            return
+        }
+        let songs = tile.songIds.compactMap { library.song(id: $0) }
+        if let first = songs.first { playback.play(first, in: songs, source: .homeShelf) }
     }
 
     /// Android `shuffleAllSongs(queueName = "Shuffle All")`.

@@ -14,6 +14,8 @@ struct RouteDestination: View {
         case .playlistEditor(let playlistId): PlaylistEditorView(playlistId: playlistId)
         case .dailyMix: DailyMixView()
         case .yourMix: YourMixView()
+        case .mixDetail(let mixId): MixDetailView(mixId: mixId)
+        case .artistPicker: ArtistPickerView()
         case .recentlyPlayed: RecentlyPlayedView()
         case .stats: StatsView()
         case .settings: SettingsView()

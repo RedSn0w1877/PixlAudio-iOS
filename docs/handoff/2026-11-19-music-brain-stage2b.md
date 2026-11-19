@@ -247,3 +247,114 @@ concurrency) and ran 664 unit tests with 1 failure, `testPlaybackStoreWithDemoEn
 this work. Run **44488832203** (`751e6d4`, the same code plus the lazy `URLSession`) is **green**: `core` and `app` passed, 664 app
 unit tests, 0 failures; `ipa` skipped as on every push. So the one failure was a flake of that test. As before, green CI says
 nothing about whether the new screen and the lanes work on a phone.
+
+---
+
+# Milestone 2 of 2b (iOS): "it knows your music"
+
+The port of Android's milestone 2 (its commits `85efa6e`, `4a01e6b`, `8450d76`, its handoff part "Milestone 2 of 2b"). Read the text
+above first. This part continues the iOS numbering at **120**; Android's 152 to 168 hold here unless a line below says otherwise.
+**Nothing here has run on a phone.** Only `Packages/PixlCore` compiles on the Windows machine; `App/` is compiled by GitHub CI alone.
+"Works" means: unit tests pass, the golden files match Android's bit for bit, and the code paths were read end to end.
+
+## What is done (per task)
+
+1. **The pure core, bit for bit.** `PixlLibrary/Brain/`: `Embeddings.swift` (`Embeddings`, `FastRp`), `Ppr.swift`, `Islands.swift`
+   (`Islands`, `TagProjection`, `IslandNames`), `ArmRules.swift`, `ListMixes.swift`, `Calibration.swift` (`Calibration`,
+   `SimilarityIndex`), `HomePlanner.swift`, and the changes to `Features` (the new `Candidate` fields, `IslandContext`, features 5, 6,
+   19, 20 and 39), `StationPlanner` (`modeFirstListen`, the arm flags, islands, calibration), `MixPlanner` (`kindFirstListen`, a Daily
+   Mix of one island, Your Mix across islands), `ListBuilder` (calibration gain, the similarity source, the cap per artist, the
+   new-artist share), `Repetition` (`takenOnDay` with an id), `Graph` (`nodeIds`, `weightedDegree`, `SimilaritySource`).
+   Android's eight new golden files (`fastrp` 30 cases, `ppr` 12, `islands` 71, `arms` 77, `listmixes` 10, `islandfeatures` 22,
+   `islandmixes` 12, `homeplan` 84), `README.md` and `MANIFEST.sha256` are copied unchanged (git blob ids equal Android's);
+   `BrainStage2bM2GoldenTests` replays every case byte for byte and **every one was green on the first run**. The older golden
+   files and `recommendationMatchesAndroid` are untouched and green.
+2. **The record files** (`BrainStore/IslandStore.swift`, `HomePlan.swift`, `PickedArtists.swift`), all versioned, all tolerating a
+   stage 1 or 2a install that has none: `node_embedding.bin` (magic `PEMB`, format 1, ids ascending, 64 bytes a node), `island.pbl`
+   (one record per island, centroid as 96 big-endian doubles), `island_member.pbl` (one record), `brain_state` values
+   `island_last_id`, `island_tag_shares`, `emb_count`, `island_fit_at`, `picked_artists`; `home_plan.json` (at most 50 KB,
+   tested), `recent_contexts.json`. A file this code cannot read is no islands, never an error.
+3. **The lists** (`BrainMixes` + `BrainStore/MadeForYou.swift`): `MixSpec`/`MixKinds` (`daily`, `daily:<islandId>`, `your`, `first`,
+   `dropped`, `repeat`, `rediscover`), the saved-mix format with the new optional fields (`mixId`, `islandId`, `number`, `subtitle`;
+   a 2a record still reads), Daily Mix 1..K (one per island, at most six, numbered by ascending stable id, "Soft pop & R&B · Artist,
+   Artist" subtitles from real atlas genres and artists), Your Mix across islands, First Listen (weekly, fixed from Monday 04:00,
+   held against every other list all week), Just Dropped, On Repeat, Rediscover; stable for the day, no track in two lists of a day.
+   `IslandBuilder` fits weekly or after 200 qualified plays, inside the one refresh (`RefreshWork.fitIslands`) and from the Home plan.
+4. **The new Home.** `HomePlanBuilder` (PixlCore, the shelves in the fixed order of 8.1, then `HomePlanner`'s page rules, the hero)
+   saves `home_plan.json`; `App/Features/Home/HomePlanState.swift` reads it when Home first appears (one small file, never at
+   launch), shows it, plans again when the day (04:00), the daypart or the taste changed, and shows the new plan the next time Home
+   appears; `HomePlanSections.swift` draws the date line, chips (For you, Mixes, Spatial, New), hero, Jump back in, the mix shelf, the
+   station shelf, the track shelves (the existing `HomeDiscoveryShelf`, played through the existing `BrainActions.play`). No spinner and
+   no empty state: without a plan Home shows Jump back in and the library rows. The legacy whole-library ranking still runs for the
+   legacy page; while the plan owns Home its mixes, Your Mix block and shelves are not drawn.
+5. **Stations, Search tiles, the cold start, the picker, the setup page.** `GenreStations` (cards, songs under a node, `idForName`,
+   `knownNames`), `BrainActions.startGenreStation`/`startGenreStationByName`/`knownGenreTiles`, `Station.sourceGenre`/`sourceMood`,
+   the Search tiles (a genre the atlas lacks has no tile; a tile with songs under it starts a station; otherwise the live search it
+   always was), `ColdStart` (8 radios, two at a time, "Getting to know your music · 3 of 8"), `PickedArtists` + `ArtistPickerView`
+   (search-based), the setup page "How much new music?" (Familiar / Blend / Discover after Spotify, with the history-import link).
+6. **The Muselle 2 gate.** iOS Home never had one: `Muselle`/`Muselle2` live only in `Recommendation.swift` (the pure port of the
+   legacy engine, untouched), and nothing in the brain's features or in `App/` asks for a Plus tier. Nothing to remove; nothing in the
+   brain is behind Plus.
+7. **The eval tests** (`BrainStage2bM2EvalTests`): Android's `Stage2bM2Test` with the same planted listeners (the same random
+   draws) and the same expected numbers (purity at least 0.95 for 3, 4, 5 and 6 clusters, ids kept and a new island getting a new
+   one, KL under 0.15, the Home rules on 400 random pages), 22 tests, green. `BrainStage2bM2Tests` (14) covers the files, the fit,
+   every list end to end over real record files, the plan size, Jump back in and the cold start.
+
+## Deviations (120 and on)
+
+120. **Embeddings are one binary table** (`node_embedding.bin`), not per-node records: the fit rewrites the whole table, a lookup is
+     a sorted-array search, and it is read once, off the main actor, on first use.
+121. **Islands are one record per island plus one members record** (`island_member.pbl`, key `all`); the quantised `weightQ` is
+     stored as Android does, so a reread island equals the fitted one.
+122. **`Candidate.point` is computed on demand** (a Swift struct cannot cache a lazy value); `Calibration` is a `final class`
+     (`@unchecked Sendable`), because the list builder adds each pick to it.
+123. **`ServedListStore.put` stamps a list a millisecond later when another list of the same surface has the same `recId`**. Android's
+     `recId` is `(builtAt << 8) | surface`, so two Daily Mixes built in one millisecond would overwrite each other. A test found it.
+124. **Jump back in holds made-for-you lists only.** An iOS queue has no name (`PlaybackStore.play` takes songs and a source tag), so
+     the new `PlaybackStore.onQueueStarted` hook records a queue when its tag says Daily Mix, Your Mix or a named list. Playlists,
+     albums and stations are not recorded (Android records them from its dispatch path by queue name). Cut, said here.
+125. **The Muselle 2 gate** (task 6): see above, nothing to remove on iOS.
+126. **The Spatial chip opens Cloud processing** (Android 161).
+127. **The island refit also runs from the Home plan** (Android 168), through `IslandBuilder.ensure()`.
+128. **The setup page sits at raw value 2** of `SetupView.Page` (after Spotify, as on Android). A setup that was closed mid-way before
+     this build resumes one page later than it was; `BackupServiceTests` now expects 7 pages and the new resume indexes.
+129. **A Daily Mix of an island has no "Regenerate" button**, as on Android (only Your Mix has one); the new `MixDetailView` reuses
+     `MixScreen` with the list's own tags.
+130. **Genre and mood stations are seeded by five songs** (`StationSeeds.genreSeeds`); their queue line says "Music like your songs in
+     this genre, picked as you listen".
+131. **The artist picker's search** is `InnerTubeClient.searchSongs` (20 results, the first artist of each credit), as on Android.
+132. **SIM and BACK are in the core and the planner, and nothing sets them yet** (Android 160); EDGE offers library songs only.
+133. **`RefreshWork.fitIslands()`** is a protocol method with a default no-op, so a work without islands runs as it did.
+
+## Cut or deferred
+
+The same as Android's list: "Popular where you are" and the picker's chart grid (no chart call), assistant-written island names,
+seeding radios from each island's medoid, co-play and same-playlist graph edges, islands inside `Eval`, a Developer screen section
+for islands, feeding SIM and BACK. Also on iOS: Jump back in for playlists, albums and stations (124).
+
+## Not verified on a device
+
+Everything in `App/` (CI compiles it; nothing runs it). In particular: how the new Home looks and that nothing jumps; that a plan
+built while Home is open waits for the next appearance; the 04:00 and daypart rollover; island fit time on a real library (timed into
+the diagnostics log as `brain_island_fit`) and whether real islands read as sides of someone's taste (only planted ones are proven);
+the first-minute strip and the picker's search (they call YouTube Music); the genre station start and the Search tiles; the setup page
+and the history-import link; the Swift 6 concurrency of the new `App/` lines; that the refresh still shows ONE background task.
+
+## How to test on a phone
+
+Developer mode on, Spotify connected.
+1. Play ten different songs, leave Home open a few seconds, leave and come back: date line ("Friday night"), chips, hero, Jump back in,
+   "Made for you". Kill and reopen: it paints from `home_plan.json` with no wait.
+2. After the first refresh (or 90 s idle in front), Daily Mix 1..K appear with subtitles; tap Daily Mix 2: the list opens.
+3. "Stations for you": tap a genre card, the queue line says "Station · <genre>". Search with the brain on: Pop starts a station.
+4. A new install with Spotify connected: the strip counts to 8 and goes. Under 30 songs: "Pick three artists you love".
+5. Setup: the new page after Spotify; "Import your listening history" opens the import when Home first appears.
+
+## Commands and results
+
+```
+cmd //c "ci\swiftw.cmd test --package-path Packages\PixlCore"          # 2,445 tests in 8 bundles, 0 failed (2,400 before: +9 golden, +22 eval, +14 lists)
+cmd //c "ci\swiftw.cmd test --package-path Packages\PixlCore --filter BrainStage2bM2"   # golden 9, eval 22, lists 14: all green
+bash ci/check-forbidden.sh                                              # OK
+powershell -NoProfile -ExecutionPolicy Bypass -File ci/parse-check.ps1  # 232 files OK
+```

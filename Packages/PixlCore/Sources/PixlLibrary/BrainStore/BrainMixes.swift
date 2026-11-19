@@ -40,13 +40,17 @@ public actor BrainMixes {
     private var slice: [LibraryTrack] = []
 
     public init(directory: URL, repository: BrainRepository, engine: BrainEngine, sources: MixSources,
-                clock: @escaping @Sendable () -> Int64 = { currentTimeMillis() }) {
+                parts: Stage2bParts? = nil, clock: @escaping @Sendable () -> Int64 = { currentTimeMillis() }) {
+        self.parts = parts
         served = ServedListStore(directory: directory)
         self.repository = repository
         self.engine = engine
         self.sources = sources
         self.clock = clock
     }
+
+    /// What the taste adjustments and blocked artists look like now: a plan made under another one is made again.
+    public func tasteSignature() async -> String { await sources.constraints().signature }
 
     /// Turns on the lists of stage 2b. Reads nothing: the parts open their files on first use.
     public func configureStage2b(_ parts: Stage2bParts) { self.parts = parts }

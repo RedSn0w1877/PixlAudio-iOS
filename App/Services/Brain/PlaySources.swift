@@ -10,6 +10,7 @@ nonisolated extension BrainItemTag {
     static let search = BrainSurfaces.tag(Surface.search)
     static let dailyMix = BrainSurfaces.tag(Surface.dailyMix)
     static let yourMix = BrainSurfaces.tag(Surface.yourMix)
+    static let namedMix = BrainSurfaces.tag(Surface.namedMix)
     static let homeShelf = BrainSurfaces.tag(Surface.homeShelf)
     static let assistant = BrainSurfaces.tag(Surface.assistant)
 

@@ -91,6 +91,50 @@ final class BrainActions {
         startStation(from: songs, name: name, source: Station.sourcePlaylist, maxSeeds: StationSeeds.playlistSeeds)
     }
 
+    /// A station from a genre or a mood of the atlas (8.3, stage 2b): the listener's most played songs under the node seed it.
+    /// With none of their songs under it nothing starts, a notice says so, and `onNothing` runs (a Search tile then falls back
+    /// to its live search).
+    func startGenreStation(kind: Int, atlasId: Int, name: String, onNothing: @escaping @MainActor () -> Void = {}) {
+        guard !name.trimmingCharacters(in: .whitespaces).isEmpty, let genre = brain.stage2b?.genre else {
+            onNothing()
+            return
+        }
+        Task { [weak self] in
+            let songs = await genre.songsFor(kind: kind, atlasId: atlasId, nowMs: currentTimeMillis())
+            guard let self else { return }
+            if songs.isEmpty {
+                self.playback.notices.show(BrainStrings.stationGenreNothing(name))
+                onNothing()
+                return
+            }
+            let source = kind == StationCard.kindMood ? Station.sourceMood : Station.sourceGenre
+            self.startStation(from: songs, name: name, source: source, maxSeeds: StationSeeds.genreSeeds)
+        }
+    }
+
+    /// A Search tile: a station when the atlas knows the genre and the listener has songs under it, else `fallback`.
+    func startGenreStationByName(_ name: String, fallback: @escaping @MainActor () -> Void) {
+        guard let genre = brain.stage2b?.genre else {
+            fallback()
+            return
+        }
+        Task { [weak self] in
+            let id = await genre.idForName(name)
+            guard let self else { return }
+            if id == GenreAtlas.none {
+                fallback()
+            } else {
+                self.startGenreStation(kind: StationCard.kindGenre, atlasId: id, name: name, onNothing: fallback)
+            }
+        }
+    }
+
+    /// The Search tiles the atlas knows (8.10): a genre the atlas lacks gets no tile. Nil while it is not known yet.
+    func knownGenreTiles(_ names: [String]) async -> Set<String>? {
+        guard let genre = brain.stage2b?.genre else { return nil }
+        return await genre.knownNames(names)
+    }
+
     private func startStation(from songs: [Song], name: String, source: Int, maxSeeds: Int) {
         guard !songs.isEmpty, !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         var counts: [String: Int] = [:]

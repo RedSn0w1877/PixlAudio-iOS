@@ -119,6 +119,10 @@ nonisolated enum AppRoute: Hashable, Sendable {
     // Home
     case dailyMix
     case yourMix
+    /// A made-for-you list other than Daily Mix 1 and Your Mix (docs/brain-spec.md, 8.2): the id is `MixSpec.surfaceId`.
+    case mixDetail(mixId: String)
+    /// "Pick three artists you love" (8.10): the way in for a thin or empty library.
+    case artistPicker
     case recentlyPlayed
     case stats
 
@@ -175,6 +179,8 @@ nonisolated enum AppRoute: Hashable, Sendable {
         case .playlistEditor: "playlistEditor"
         case .dailyMix: "dailyMix"
         case .yourMix: "yourMix"
+        case .mixDetail: "mixDetail"
+        case .artistPicker: "artistPicker"
         case .recentlyPlayed: "recentlyPlayed"
         case .stats: "stats"
         case .settings: "settings"

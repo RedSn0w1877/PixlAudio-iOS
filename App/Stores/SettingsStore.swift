@@ -86,6 +86,8 @@ nonisolated enum PreferenceKeys {
     static let homeGreetingDate = "home_greeting_date"
     /// The local day (epoch day) on which the listener refined Daily Mix with AI: the brain keeps its hands off that day's Daily Mix.
     static let aiDailyMixEpochDay = "home_ai_daily_mix_epoch_day"
+    /// The setup page's "Import your listening history" was tapped: Home opens the import once (docs/brain-spec.md, 8.10).
+    static let pendingHistoryImport = "home_pending_history_import"
     // Lyrics
     static let automaticLyrics = "automatic_lyrics"
     static let lyricsSourcePreference = "lyrics_source_preference"

@@ -202,3 +202,62 @@ extension BrainMixes {
                          mixId: spec.surfaceId)
     }
 }
+
+// MARK: - The kit the app builds once
+
+/// Everything of stage 2b that has no dependency on the mixes themselves, built in one call so the app's side stays thin.
+/// Reads nothing and fetches nothing: every file opens on first use, off the main actor.
+public struct Stage2bKit: Sendable {
+    public let parts: Stage2bParts
+    /// Nil when the knowledge layer (the DNA files) is not there: no genre or mood stations then.
+    public let genre: GenreStations?
+    public let picked: PickedArtists
+    public let planStore: HomePlanStore
+    public let recent: RecentContexts
+
+    public static func make(directory: URL, engine: BrainEngine, repository: BrainRepository, sources: MixSources,
+                            dna: DnaRepository?, atlas: any AtlasProvider, newReleases: NewReleases?) -> Stage2bKit {
+        let state = StateValues.of(engine)
+        let islands = IslandStore(directory: directory, state: state)
+        let libraryRids = LibraryRids(sources: sources, repository: repository)
+        let inputs = IslandInputs.live(engine: engine, repository: repository, library: libraryRids, dna: dna, timing: sources.timing)
+        let picked = PickedArtists(state: state, repository: repository)
+        let parts = Stage2bParts(islands: islands, builder: IslandBuilder(store: islands, inputs: inputs, state: state),
+                                 candidateDna: CandidateDna(store: islands, dna: dna), libraryRids: libraryRids, atlas: atlas,
+                                 newReleases: newReleases, dna: dna, picked: picked)
+        let genre = dna.map { GenreStations(library: libraryRids, dna: $0, atlas: atlas, engine: engine, islands: islands) }
+        return Stage2bKit(parts: parts, genre: genre, picked: picked, planStore: HomePlanStore(directory: directory),
+                          recent: RecentContexts(directory: directory))
+    }
+}
+
+public extension IslandInputs {
+    /// The fit's inputs as the app has them: the library by id, the stored graph, the affinity tables, the event log and the DNA.
+    static func live(engine: BrainEngine, repository: BrainRepository, library: LibraryRids, dna: DnaRepository?,
+                     timing: @escaping @Sendable (String, Int64) -> Void) -> IslandInputs {
+        IslandInputs(
+            library: { now in await library.all(nowMs: now) },
+            edges: { await repository.allEdges() },
+            hasState: { await engine.hasState() },
+            weights: { rids, now in
+                await engine.readAffinity { st in
+                    var out: [Int64: [Double]] = [:]
+                    for rid in rids {
+                        let k = st.counter(Family.track, rid)
+                        let prior = st.prior(Family.track, rid)
+                        let pos = (k.map { Affinity.pos($0, nowMs: now) } ?? 0.0) + (prior.map { BrainMath.fromQ($0.posQ) } ?? 0.0)
+                        if pos <= 0.0 { continue }
+                        out[rid] = [pos, k.map { Affinity.posRecent($0, nowMs: now) } ?? 0.0]
+                    }
+                    return out
+                }
+            },
+            qualifiedPlaysSince: { since in BrainEventQueries.qualifiedPlays(await engine.recentEvents(sinceMs: since), sinceMs: since) },
+            tags: { rids in
+                var out: [Int64: Tags.Vector] = [:]
+                if let dna { for row in await dna.tracks(rids) where !row.tagVector.isEmpty { out[row.rid] = row.tagVector } }
+                return out
+            },
+            timing: timing)
+    }
+}

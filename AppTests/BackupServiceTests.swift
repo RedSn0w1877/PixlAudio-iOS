@@ -181,14 +181,14 @@ final class BackupServiceTests: XCTestCase {
         XCTAssertEqual(SetupView.initialPage(for: .setupBackup), .backupRestore)
         XCTAssertEqual(SetupView.initialPage(for: .setupFinish), .finish)
         XCTAssertEqual(SetupView.initialPage(for: .setupSpotify), .spotify)
-        // Welcome, Spotify, Backup, Theme, Library layout, Finish: no media-permission or music-folder page.
-        XCTAssertEqual(SetupView.Page.allCases.count, 6)
+        // Welcome, Spotify, How much new music, Backup, Theme, Library layout, Finish: no media-permission or music-folder page.
+        XCTAssertEqual(SetupView.Page.allCases.count, 7)
     }
 
     func testSetupResumesWhereItWasClosed() {
         XCTAssertEqual(SetupView.resumePage(storedIndex: 0), .welcome)
-        XCTAssertEqual(SetupView.resumePage(storedIndex: 3), .theme)
-        XCTAssertEqual(SetupView.resumePage(storedIndex: 5), .finish)
+        XCTAssertEqual(SetupView.resumePage(storedIndex: 4), .theme)
+        XCTAssertEqual(SetupView.resumePage(storedIndex: 6), .finish)
         // A stale or corrupt value starts over instead of crashing.
         XCTAssertEqual(SetupView.resumePage(storedIndex: 99), .welcome)
         XCTAssertEqual(SetupView.resumePage(storedIndex: -1), .welcome)

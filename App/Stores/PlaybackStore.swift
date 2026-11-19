@@ -65,6 +65,9 @@ final class PlaybackStore {
 
     // MARK: Commands
 
+    /// A queue was started by the listener (docs/brain-spec.md, 8.1 "Jump back in"): the songs and where they came from.
+    @ObservationIgnored var onQueueStarted: (([Song], BrainItemTag?, [String: BrainItemTag]) -> Void)?
+
     /// Plays `songs` from `startIndex` (Android `showAndPlaySong` / `playSongs`).
     ///
     /// Blocked artists: a list that would start on a blocked song starts on the nearest song that is not blocked
@@ -95,6 +98,7 @@ final class PlaybackStore {
         syncCurrent()
         engine.setQueueSource(source)
         engine.setQueueTags(tags)
+        onQueueStarted?(songs, source, tags)
         if let remote {
             // The new queue plays on the remote device; the engine only holds it.
             engine.setQueue(songs, startIndex: currentIndex ?? 0, startPositionMs: startPositionMs, playWhenReady: false)

@@ -1,3 +1,4 @@
+import PixlLibrary
 import SwiftUI
 
 // The setup's pages. Each one is a `SetupPageScroll` (so it scrolls on small phones and at big text sizes) of a hero,
@@ -700,5 +701,83 @@ private struct SetupSuccessMark: View {
                 withAnimation(.easeInOut(duration: 0.9)) { drawn = true }
             }
         }
+    }
+}
+
+// MARK: - How much new music (docs/brain-spec.md, 8.10)
+
+/// Familiar / Blend / Discover: how much of what the picks hold should be new to the listener. The same switch the queue has;
+/// there are no questions to answer. "Import your listening history" opens the existing import once, when Home is first shown.
+struct SetupTastePage: View {
+    let level: Int
+    let onChange: (Int) -> Void
+    let onImportHistory: () -> Void
+    @Environment(\.appTheme) private var theme
+    @Namespace private var pick
+
+    var body: some View {
+        SetupPageScroll { compact in
+            VStack(spacing: compact ? 14 : 20) {
+                SetupPageHeader(title: BrainStrings.setupTasteTitle, subtitle: BrainStrings.setupTasteSubtitle)
+                    .setupReveal(0)
+                picker
+                    .setupReveal(1)
+                Text(verbatim: BrainStrings.tasteHint(level))
+                    .pixlFont(.bodyMedium)
+                    .foregroundStyle(theme.onSurfaceVariant)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .contentTransition(.opacity)
+                    .animation(PixlMotion.state, value: level)
+                    .setupReveal(2)
+                Button(action: onImportHistory) {
+                    Text(verbatim: BrainStrings.setupTasteImportHistory)
+                        .pixlFont(.labelLarge)
+                        .foregroundStyle(theme.primary)
+                        .padding(.horizontal, 16)
+                        .frame(height: 44)
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(PressScaleButtonStyle())
+                .accessibilityIdentifier("setup.taste.importHistory")
+                .setupReveal(3)
+                SetupFootnote(text: BrainStrings.setupTasteFooter)
+                    .setupReveal(4)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 12)
+            .pixlHaptic(.selection, trigger: level)
+        }
+    }
+
+    private var picker: some View {
+        HStack(spacing: 4) {
+            option(BrainStrings.noveltyFamiliar, value: Novelty.familiar)
+            option(BrainStrings.noveltyBlend, value: Novelty.blend)
+            option(BrainStrings.noveltyDiscover, value: Novelty.discover)
+        }
+        .padding(4)
+        .pixlGlass(in: Capsule(), tint: theme.surfaceContainer.opacity(SettingsTint.row))
+    }
+
+    private func option(_ title: String, value: Int) -> some View {
+        let isSelected = level == value
+        return Button { onChange(value) } label: {
+            Text(verbatim: title)
+                .pixlFont(.labelLarge)
+                .lineLimit(1)
+                .foregroundStyle(isSelected ? theme.onPrimary : theme.onSurface)
+                .frame(maxWidth: .infinity, minHeight: 46)
+                .contentShape(Capsule())
+                .background {
+                    if isSelected {
+                        Capsule().fill(theme.primary).matchedGeometryEffect(id: "selection", in: pick)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .animation(PixlMotion.selection, value: isSelected)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier("setup.taste.\(value)")
     }
 }
