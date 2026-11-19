@@ -314,8 +314,25 @@ bash ci/check-forbidden.sh
 powershell -NoProfile -ExecutionPolicy Bypass -File ci/parse-check.ps1
 ```
 
-The full PixlCore suite: exit 0, **2,234 tests in 8 bundles, 0 failed** (79 more than the review-fix round's 2,155: 9 in
-`BrainMixGoldenTests` and `BrainGoldenTests`' new manifest count, 18 `BrainMixPlannerTests`, 10 `BrainEvalTests`, 14
-`BrainMixesTests`, 29 in `BrainStage2aTests`, one `SpotifyConnectIdTests`, and the rest). `check-forbidden.sh`: OK.
-`parse-check.ps1`: 162 files OK (syntax only: nothing under `App/` is type-checked on this machine). In a debug build the
-three list-health tests take about 80 to 90 s each, in parallel; a release build is far faster.
+The full PixlCore suite: exit 0, **2,234 tests in 8 bundles, 0 failed** (79 more than the review-fix round's 2,155; the new
+suites are `BrainMixGoldenTests` 7, `BrainMixPlannerTests` 18, `BrainEvalTests` 10, `BrainMixesTests` 14, `BrainStage2aTests`
+29 in three suites, `SpotifyConnectIdTests` 1). `check-forbidden.sh`: OK. `parse-check.ps1`: 162 files OK (syntax only: nothing
+under `App/` is type-checked on this machine). In a debug build the three list-health tests take about 80 to 90 s each, in parallel; a release build is far faster.
+
+## CI
+
+Run `44429445405` (workflow `ci`, branch `music-brain`, last code commit `eaa0f93`) finished **green on its third attempt**.
+
+- Attempt 1 (commit `db8e57c`): `core` (Linux) passed; the app **did not build**: `BrainBackground.swift` used
+  `currentTimeMillis()` without `import PixlModel` ("cannot find 'currentTimeMillis' in scope"). Fixed in `eaa0f93`.
+- With `eaa0f93`: the app BUILT on its first try with no other compile error, so everything else under `App/` that this
+  milestone touched type-checks (Swift 6 concurrency included). `core` (Linux): the eight PixlCore bundles passed, so the
+  golden files hold on Linux too.
+  - attempt 1: 657 unit tests, the only failure `SpotifyMatchCoordinatorTests.testConcurrentMatchesOfOneSongRunTheSearchOnce`
+    (known flaky);
+  - attempt 2: the only failure `SpatialPlaybackTests.testTheRenditionSwitchFadesForAQuarterSecondAndKeepsTheTwentySecondRule`
+    (known flaky);
+  - attempt 3: all 657 passed.
+- `ipa` was skipped, as on every push. No screenshot (`[shots]`) run was made. CI green means `App/` compiles and its unit
+  tests pass; no test drives the new `HomeStore` path, `BrainService.runRefresh`, `BrainBackground` or the mix rows, so it says
+  nothing about whether they work.
