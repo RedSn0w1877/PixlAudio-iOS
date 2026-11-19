@@ -116,6 +116,11 @@ public struct ExcludedPlays: Sendable, Equatable {
     public var feedbackId: Int64
     public var eventIds: [Int64]
     public var count: Int { eventIds.count }
+
+    public init(feedbackId: Int64, eventIds: [Int64]) {
+        self.feedbackId = feedbackId
+        self.eventIds = eventIds
+    }
 }
 
 extension BrainEngine {

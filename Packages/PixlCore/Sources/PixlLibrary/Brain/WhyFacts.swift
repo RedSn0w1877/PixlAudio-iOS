@@ -29,6 +29,12 @@ public enum WhyFacts {
         public let key: String
         public let a: Int
         public let b: Int
+
+        public init(key: String, a: Int, b: Int) {
+            self.key = key
+            self.a = a
+            self.b = b
+        }
     }
 
     /// `artistPlays` is how many of the listener's last plays by the artist were looked at (at most 10),
