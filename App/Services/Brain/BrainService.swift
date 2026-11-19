@@ -20,6 +20,8 @@ final class AutoplayState {
     /// The queue is a station (8.3): what it is named after, a song's title or an artist's name. Nil for none.
     var stationTitle: String?
     var stationIsArtist = false
+    /// What the station was started from (`Station.sourceSong`, `.sourceArtist`, `.sourceAlbum`, `.sourcePlaylist`).
+    var stationSource = Station.sourceSong
     /// The Familiar / Blend / Discover switch (`Novelty.familiar`, `.blend`, `.discover`).
     var novelty = Novelty.blend
     /// The reason line of every queue entry that has one, by song id (8.8).
@@ -50,6 +52,10 @@ final class BrainService {
     private(set) var mixes: BrainMixes?
     /// The once-a-day background search for new music (3.7, stage 2a). Nil in UI tests.
     private(set) var refresh: BrainRefresh?
+    /// New releases by the artists the listener plays (6.3): one small file Home reads without the brain's state. Nil in UI tests.
+    let newReleases: NewReleases?
+    /// What the Spotify sync receives with a track and used to drop (13.1). Nil in UI tests.
+    let spotifyFacts: SpotifyFactStore?
     private let directory: URL?
     /// What the refresh asks of the rest of the app (set by `AppEnvironment`).
     var refreshIsAllowed: () -> Bool = { true }
@@ -105,7 +111,15 @@ final class BrainService {
             self.engine = engine
             homeRows = BrainHomeRows(directory: directory, repository: repository, engine: engine)
             self.directory = directory
+            newReleases = NewReleases(store: AtomicReleaseFileStore(directory: directory), source: radioSource,
+                                      repository: repository)
+            let shapes: @Sendable () -> Bool = sources?.spotifyShapesPicks ?? { true }
+            let facts = SpotifyFactStore(directory: directory, enabled: shapes)
+            spotifyFacts = facts
+            SpotifyFactsRelay.shared.set(facts)
         } else {
+            newReleases = nil
+            spotifyFacts = nil
             directory = nil
             repository = nil
             engine = nil
@@ -120,8 +134,10 @@ final class BrainService {
         guard let directory, let repository, let engine else { return }
         let mixes = BrainMixes(directory: directory, repository: repository, engine: engine, sources: sources)
         self.mixes = mixes
+        let library = sources.library
         let work = BrainRefreshWork(mixes: mixes, repository: repository, budget: budget,
-                                    matchedVideoId: sources.matchedVideoId)
+                                    matchedVideoId: sources.matchedVideoId, newReleases: newReleases,
+                                    librarySongs: { await library() })
         let allowed: @Sendable () async -> Bool = { @MainActor [weak self] in self?.refreshIsAllowed() ?? false }
         refresh = BrainRefresh(work: work, repository: repository, engine: engine, allowed: allowed)
     }
@@ -201,6 +217,54 @@ final class BrainService {
             self?.refreshTask = nil
             await self?.scheduleFromLastRun()
         }
+    }
+
+    // MARK: New releases (6.3) and the facts under a reason (8.8)
+
+    /// The "New from artists you play" row, from the saved file only: no network, no brain state. Nil under six cards.
+    func releaseRow(blocked: BlockedArtistMatcher, adjustments: TasteAdjustmentSet) async -> BrainReleaseRow? {
+        await newReleases?.row(blocked: blocked, adjustments: adjustments)
+    }
+
+    /// The supporting facts of `song` (8.8): up to two true statements from the listener's own plays and the song itself.
+    /// Resolves the song's ids, then reads the log off the engine's actor; nothing when the brain is off.
+    func whyFacts(for song: Song) async -> [WhyFacts.Fact] {
+        guard let repository, let engine, let facts = TrackCatalog.facts(of: song) else { return [] }
+        let names = [facts.primaryArtist] + facts.otherArtists.prefix(PlayEvent.maxOtherAids)
+        let ids = await repository.resolve(keys: facts.keys, durationMs: Int32(clamping: max(song.duration, 0)),
+                                           artistNames: names)
+        return await engine.whyFacts(rid: ids.rid, aid: ids.aids.first ?? 0, year: song.year)
+    }
+
+    // MARK: Don't count this (8.5) and Private session
+
+    /// "Don't count this" on one song: the plays of its recording leave the picks at once and a rebuild makes the tables
+    /// exact. The play in flight is flagged too, so it is logged as left out when it ends.
+    func excludeSong(_ song: Song) async -> ExcludedPlays? {
+        guard let repository, let engine, let facts = TrackCatalog.facts(of: song) else { return nil }
+        markPlaying?(song.id, EventFlags.learnExcluded)
+        let rid = await repository.resolveTracks([TrackRequest(keys: facts.keys,
+                                                               durationMs: Int32(clamping: max(song.duration, 0)))])[0]
+        if rid == 0 { return nil }
+        return await engine.excludeRecordings(rids: [rid], targetKind: FeedbackKinds.targetSong, targetId: rid)
+    }
+
+    /// "Don't count the last hour": every live play of the last hour leaves the picks.
+    func excludeLastHour(playingSongId: String?) async -> ExcludedPlays? {
+        guard let engine else { return nil }
+        if let playingSongId { markPlaying?(playingSongId, EventFlags.learnExcluded) }
+        return await engine.excludeLastHour()
+    }
+
+    func undoExclusion(_ excluded: ExcludedPlays) async { await engine?.undoExclusion(excluded) }
+
+    /// The private session (8.5): off at every app start (the engine holds it in memory only).
+    func setPrivate(_ on: Bool) { Task { [engine] in await engine?.setPrivate(on) } }
+
+    /// The Spotify switch went off: what the sync kept goes now, and the next rebuild leaves the rest out.
+    func spotifyShapesTurnedOff() {
+        spotifyFacts?.clear()
+        Task { [engine] in await engine?.requestRebuild(force: true) }
     }
 
     // MARK: The event log (docs/brain-spec.md, 4.2)

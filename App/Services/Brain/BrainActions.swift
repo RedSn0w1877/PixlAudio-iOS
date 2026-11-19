@@ -13,6 +13,8 @@ import PixlModel
 final class BrainActions {
     /// The bar that follows "Not for me" and "Less from X" (Undo, and the step to the artist); nil when there is none.
     private(set) var notice: BrainNotice?
+    /// Private session (8.5): plays are not counted in the picks while it is on. Off at every app start.
+    private(set) var isPrivate = false
 
     private let brain: BrainService
     private let playback: PlaybackStore
@@ -61,16 +63,56 @@ final class BrainActions {
                 StationRules.artistSeed(artistName: name, songs: songs, playCount: { plays[$0] ?? 0 })
             }.value
             guard let self, !Task.isCancelled else { return }
-            guard let seed else {
-                self.playback.notices.show(BrainStrings.stationNothingToStart(name))
+            if let seed {
+                self.start(Station.artist(seedMediaId: seed.id, artistName: name, nowMs: currentTimeMillis()), seed: seed)
                 return
             }
-            self.start(Station.artist(seedMediaId: seed.id, artistName: name, nowMs: currentTimeMillis()), seed: seed)
+            // An artist with no song in the library: the artist page's own radio button starts it (8.3). One search, one
+            // page and one radio before sound, off the main actor, under the YouTube budget.
+            guard let started = await self.brain.repository?.beginArtistStation(artistName: name), !Task.isCancelled else {
+                self.playback.notices.show(BrainStrings.stationNothingFound(name))
+                return
+            }
+            let track = EngineTrack(row: started.seedRow, rid: started.seedRid)
+            // The track must be known to the app BEFORE its queue item reaches the player (7.2).
+            self.brain.register([track])
+            let song = self.brain.linked(BrainService.queueSong(for: track))
+            self.start(Station.artist(seedMediaId: song.id, artistName: name, nowMs: currentTimeMillis()), seed: song)
         }
     }
 
-    private func start(_ station: Station, seed: Song) {
-        brain.stations.start(station)
+    /// A station from an album: three of its songs seed it, and none of its own songs lead (6.2).
+    func startAlbumStation(name: String, songs: [Song]) {
+        startStation(from: songs, name: name, source: Station.sourceAlbum, maxSeeds: StationSeeds.albumSeeds)
+    }
+
+    /// A station from a playlist: five of its songs seed it (6.2).
+    func startPlaylistStation(name: String, songs: [Song]) {
+        startStation(from: songs, name: name, source: Station.sourcePlaylist, maxSeeds: StationSeeds.playlistSeeds)
+    }
+
+    private func startStation(from songs: [Song], name: String, source: Int, maxSeeds: Int) {
+        guard !songs.isEmpty, !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        var counts: [String: Int] = [:]
+        for entry in playCounts.entries ?? [] where counts[entry.songId] == nil { counts[entry.songId] = entry.stats.playCount }
+        let plays = counts
+        seedTask?.cancel()
+        seedTask = Task { [weak self] in
+            let seeds = await Task.detached(priority: .userInitiated) {
+                StationSeeds.pick(songs: songs, plays: plays, max: maxSeeds)
+            }.value
+            guard let self, !Task.isCancelled else { return }
+            guard let first = seeds.first else {
+                self.playback.notices.show(BrainStrings.stationNothingFound(name))
+                return
+            }
+            let station = Station.fromSource(source, seedMediaIds: seeds.map(\.id), title: name, nowMs: currentTimeMillis())
+            self.start(station, seed: first, sourceIds: Set(songs.map(\.id)))
+        }
+    }
+
+    private func start(_ station: Station, seed: Song, sourceIds: Set<String> = []) {
+        brain.stations.start(station, sourceIds: sourceIds)
         // The seed is already sounding: it keeps playing, and what was queued behind it goes.
         let inPlace = playback.currentSongId == seed.id && (engine?.startStationInPlace(tag: station.seedTag) ?? false)
         if !inPlace {
@@ -84,6 +126,7 @@ final class BrainActions {
         let state = brain.autoplay
         if state.stationTitle != station.title { state.stationTitle = station.title }
         if state.stationIsArtist != station.isArtist { state.stationIsArtist = station.isArtist }
+        if state.stationSource != station.source { state.stationSource = station.source }
         autoplay?.stationChanged()
     }
 
@@ -93,7 +136,7 @@ final class BrainActions {
     /// outside the library: they are made known first (so they can be shown and saved later), and each carries its
     /// pick into the queue and the event log.
     func play(_ shelf: BrainHomeShelf, startingAt song: Song) {
-        brain.register(shelf.row.items.map(\.track))
+        brain.register(shelf.tracks)
         // The cards were built off the main actor; here each is pointed at the library's own artist, when it has one.
         let songs = shelf.section.songs.map { brain.linked($0) }
         playback.play(songs.first { $0.id == song.id } ?? song, in: songs, tags: shelf.tags)
@@ -116,12 +159,78 @@ final class BrainActions {
         }
     }
 
-    /// Undo on the bar: takes the change it names back.
+    /// Undo on the bar: takes the change it names back, or counts the plays "Don't count this" left out again.
     func undo() {
+        if let excluded = notice?.excluded {
+            Task { [weak self] in
+                guard let self else { return }
+                await self.brain.undoExclusion(excluded)
+                self.serial += 1
+                self.show(BrainNotice(serial: self.serial, kind: .undone, adjustmentId: nil, artistName: ""))
+            }
+            return
+        }
         guard let id = notice?.adjustmentId else { return }
         taste.remove(id: id)
         serial += 1
         show(BrainNotice(serial: serial, kind: .undone, adjustmentId: nil, artistName: ""))
+    }
+
+    /// "More like this" (8.5): the track's artist is boosted for two weeks, so the next batch leans that way. It shows
+    /// in Taste changes and is undone there or from the bar.
+    func moreLike(_ song: Song) {
+        guard let change = BrainFeedback.moreLikeChange(for: song) else { return }
+        let artist = BrainFeedback.artistOf(song)
+        Task { [weak self] in
+            guard let self else { return }
+            let outcomes = await self.taste.apply([change])
+            self.serial += 1
+            self.show(BrainNotice.afterMoreLike(serial: self.serial, outcome: outcomes.first, artistName: artist))
+        }
+    }
+
+    /// "Don't count this" (8.5): the song's plays leave what the picks are based on, now; the bar offers Undo.
+    func dontCount(_ song: Song) {
+        Task { [weak self] in
+            guard let self else { return }
+            let excluded = await self.brain.excludeSong(song)
+            self.serial += 1
+            self.show(BrainNotice.afterDontCount(serial: self.serial, excluded: excluded))
+        }
+    }
+
+    /// "Don't count the last hour" (8.5).
+    func dontCountLastHour() {
+        let playing = playback.currentSongId
+        Task { [weak self] in
+            guard let self else { return }
+            let excluded = await self.brain.excludeLastHour(playingSongId: playing)
+            self.serial += 1
+            self.show(BrainNotice.afterDontCount(serial: self.serial, excluded: excluded))
+        }
+    }
+
+    /// Private session on or off (8.5). Off at every app start; the "Private" pill shows while it is on.
+    func setPrivate(_ on: Bool) {
+        guard on != isPrivate else { return }
+        isPrivate = on
+        brain.setPrivate(on)
+        if on { PixlAccessibility.announce(BrainStrings.privatePillDescription) }
+    }
+
+    /// "Refresh picks" on the Autoplay line (8.4): the engine's upcoming picks are replaced by the next best ones.
+    func refreshPicks() { autoplay?.refreshPicks() }
+
+    /// "Mute X" on the bar after a "Less from X" (and after a second one): the artist leaves the picks.
+    func muteNoticeArtist() {
+        guard let notice, notice.canMute, let change = BrainFeedback.muteArtistChange(artistName: notice.artistName) else { return }
+        let artist = notice.artistName
+        Task { [weak self] in
+            guard let self else { return }
+            let outcomes = await self.taste.apply([change])
+            self.serial += 1
+            self.show(BrainNotice.afterMute(serial: self.serial, outcome: outcomes.first, artistName: artist))
+        }
     }
 
     /// "Less from X" on the bar after "Not for me".
@@ -135,6 +244,13 @@ final class BrainActions {
         guard let change = BrainFeedback.lessFromChange(artistName: artistName) else { return }
         Task { [weak self] in
             guard let self else { return }
+            // A second tap: the artist already is reduced, so nothing is stored and the bar offers to mute them.
+            await self.taste.ensureLoaded()
+            if BrainFeedback.isReduced(artistName: artistName, in: self.taste.activeAdjustments(nowMs: currentTimeMillis())) {
+                self.serial += 1
+                self.show(BrainNotice.alreadyReduced(serial: self.serial, artistName: artistName))
+                return
+            }
             let outcomes = await self.taste.apply([change])
             self.serial += 1
             self.show(BrainNotice.afterLessFrom(serial: self.serial, outcome: outcomes.first, artistName: artistName))
@@ -172,11 +288,26 @@ final class BrainActions {
 /// One "Because you listened to X" row as Home draws it: the row, its cards as songs, and what each card carries
 /// into the queue.
 nonisolated struct BrainHomeShelf: Sendable, Equatable, Identifiable {
-    let row: BrainHomeRow
+    let id: String
+    /// The cards' tracks, in order: made known to the app before a play (`BrainService.register`).
+    let tracks: [EngineTrack]
     let section: HomeMusicSection
     let tags: [String: BrainItemTag]
 
-    var id: String { row.id }
+    /// "New from artists you play" (6.3): up to twelve fresh releases, each card with "New from <artist>" under it.
+    static func make(release row: BrainReleaseRow, nowMs: Int64) -> BrainHomeShelf {
+        var songs: [Song] = []
+        var reasons: [(String, String)] = []
+        songs.reserveCapacity(row.items.count)
+        for item in row.items {
+            let song = BrainService.queueSong(for: item.track, nowMs: nowMs)
+            songs.append(song)
+            if let line = row.cardReason(item) { reasons.append((song.id, BrainStrings.whyLine(line))) }
+        }
+        let section = HomeMusicSection(id: row.id, title: BrainStrings.homeNewReleases,
+                                       subtitle: BrainStrings.homeNewReleasesSubtitle, songs: songs, reasons: reasons)
+        return BrainHomeShelf(id: row.id, tracks: row.items.map(\.track), section: section, tags: row.tags())
+    }
 
     /// Built off the main actor: twelve songs and their reason lines per row.
     static func make(_ rows: [BrainHomeRow], nowMs: Int64) -> [BrainHomeShelf] {
@@ -192,7 +323,7 @@ nonisolated struct BrainHomeShelf: Sendable, Equatable, Identifiable {
             let section = HomeMusicSection(id: row.id, title: BrainStrings.homeBecauseListened(row.anchor.title),
                                            subtitle: BrainStrings.homeBecauseListenedSubtitle, songs: songs,
                                            reasons: reasons)
-            return BrainHomeShelf(row: row, section: section, tags: row.tags())
+            return BrainHomeShelf(id: row.id, tracks: row.items.map(\.track), section: section, tags: row.tags())
         }
     }
 }

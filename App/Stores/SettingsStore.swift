@@ -189,6 +189,8 @@ nonisolated enum PreferenceKeys {
     /// (default on; the remote config can switch it off too). Android `brain_engine` / `brain_refresh_enabled`.
     static let brainEngine = "brain_engine"
     static let brainRefreshEnabled = "brain_refresh_enabled"
+    /// "Use my Spotify music to shape picks" (docs/brain-spec.md, 13.1), default on. Android `brain_spotify_shapes_picks`.
+    static let brainSpotifyShapesPicks = "brain_spotify_shapes_picks"
     /// The music brain (docs/brain-spec.md, 8.3): the station the queue is (one line of text, `Station.encode`) and
     /// the Familiar / Blend / Discover switch (0, 1, 2). Android `brain_station` / `brain_novelty`.
     static let brainStation = "brain_station"
@@ -762,6 +764,16 @@ final class AISettings {
     var brainRefreshEnabled: Bool {
         didSet { defaults.set(brainRefreshEnabled, forKey: PreferenceKeys.brainRefreshEnabled) }
     }
+    /// Whether the listener's Spotify likes, top lists and history count towards the picks (Developer mode, default on).
+    /// Off, the next rebuild leaves them out and what the sync kept is cleared.
+    var brainSpotifyShapesPicks: Bool {
+        didSet {
+            defaults.set(brainSpotifyShapesPicks, forKey: PreferenceKeys.brainSpotifyShapesPicks)
+            if !brainSpotifyShapesPicks { onBrainSpotifyShapesOff?() }
+        }
+    }
+    /// Set by `AppEnvironment`: clears what the Spotify sync kept for the brain.
+    @ObservationIgnored var onBrainSpotifyShapesOff: (() -> Void)?
     /// 0…0.6 (Android `exploration_fraction`).
     var musicExploration: Double {
         didSet { defaults.set(musicExploration, forKey: PreferenceKeys.musicExplorationFraction) }
@@ -802,6 +814,7 @@ final class AISettings {
         brainEngine = defaults.object(forKey: PreferenceKeys.brainEngine) == nil
             ? BrainEngineChoice.brain : BrainEngineChoice.clamp(defaults.integer(forKey: PreferenceKeys.brainEngine))
         brainRefreshEnabled = defaults.bool(PreferenceKeys.brainRefreshEnabled, default: true)
+        brainSpotifyShapesPicks = defaults.bool(PreferenceKeys.brainSpotifyShapesPicks, default: true)
         musicExploration = defaults.double(PreferenceKeys.musicExplorationFraction, default: 0.25)
         claudeMonthlyCap = ClaudeBudget.clampCap(defaults.double(PreferenceKeys.aiClaudeMonthlyCap,
                                                                  default: ClaudeBudget.defaultCapDollars))

@@ -46,6 +46,8 @@ struct HomeBrainRowsSource {
     var isEnabled: @MainActor () -> Bool
     /// The saved rows: one small file, never the brain's own state.
     var cached: @MainActor () async -> [BrainHomeRow]
+    /// "New from artists you play" (6.3), from its saved file; nil under six cards. Never the network.
+    var releaseRow: @MainActor () async -> BrainReleaseRow?
     /// Rebuilds the rows when they are due; nil when nothing was rebuilt (always, until music played in this run).
     var refreshIfDue: @MainActor () async -> [BrainHomeRow]?
 }
@@ -364,15 +366,28 @@ final class HomeStore {
         let loaded = brainRowsLoaded
         brainRowsLoaded = true
         brainRowsTask = Task { [weak self] in
+            // The release row comes from its own small file and follows the "Because you listened to" rows.
+            let release = await source.releaseRow()
             if !loaded {
-                let shelves = await HomeStore.shelves(of: await source.cached())
+                let shelves = await HomeStore.shelves(of: await source.cached(), release: release)
                 if let self, self.brainShelves != shelves { self.brainShelves = shelves }
             }
             var shelves: [BrainHomeShelf]?
-            if let rebuilt = await source.refreshIfDue() { shelves = await HomeStore.shelves(of: rebuilt) }
+            if let rebuilt = await source.refreshIfDue() { shelves = await HomeStore.shelves(of: rebuilt, release: release) }
             guard let self else { return }
             self.brainRowsTask = nil
-            guard let shelves else { return }
+            guard let shelves else {
+                // Nothing was rebuilt, but a release found since is shown with the rows already there.
+                if loaded, let release {
+                    let withRelease = await HomeStore.shelves(of: [], release: release)
+                    let kept = self.brainShelves.filter { $0.id != BrainReleaseRow.id }
+                    let next = kept + withRelease
+                    if next != self.brainShelves { self.pendingBrainRows = next }
+                } else if loaded, release == nil, self.brainShelves.contains(where: { $0.id == BrainReleaseRow.id }) {
+                    self.pendingBrainRows = self.brainShelves.filter { $0.id != BrainReleaseRow.id }
+                }
+                return
+            }
             if self.brainShelves.isEmpty {
                 self.brainShelves = shelves
             } else if self.brainShelves != shelves {
@@ -393,8 +408,11 @@ final class HomeStore {
 
     /// The rows as Home draws them (songs and reason lines), built off the main actor.
     @concurrent
-    private nonisolated static func shelves(of rows: [BrainHomeRow]) async -> [BrainHomeShelf] {
-        BrainHomeShelf.make(rows, nowMs: currentTimeMillis())
+    private nonisolated static func shelves(of rows: [BrainHomeRow], release: BrainReleaseRow?) async -> [BrainHomeShelf] {
+        let now = currentTimeMillis()
+        var out = BrainHomeShelf.make(rows, nowMs: now)
+        if let release { out.append(BrainHomeShelf.make(release: release, nowMs: now)) }
+        return out
     }
 
     /// Expands the card and asks for the AI insight (Android `expandInsight`: on demand, not cached), or collapses

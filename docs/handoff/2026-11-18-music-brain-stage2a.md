@@ -11,8 +11,8 @@ otherwise.
 GitHub CI alone. "Works" means: unit tests pass and the code paths were read end to end. Every section ends with what is
 still unverified.
 
-This is milestone 1 of 2a ("the mixes get new music"), the port of Android's milestone 1. The second milestone of 2a
-(Private session, "Don't learn from this", New releases) is not started.
+This file holds both milestones of 2a: milestone 1 ("the mixes get new music", the port of Android's milestone 1) and, after
+the line "Milestone 2" below, milestone 2 ("more ways in, more control": the port of Android's milestone 2).
 
 ---
 
@@ -336,3 +336,165 @@ Run `44429445405` (workflow `ci`, branch `music-brain`, last code commit `eaa0f9
 - `ipa` was skipped, as on every push. No screenshot (`[shots]`) run was made. CI green means `App/` compiles and its unit
   tests pass; no test drives the new `HomeStore` path, `BrainService.runRefresh`, `BrainBackground` or the mix rows, so it says
   nothing about whether they work.
+
+
+---
+
+# Milestone 2 of 2a (iOS): "more ways in, more control"
+
+The reference is Android's `handoff/2026-11-18-music-brain-stage2a.md` (milestone 2, its commits `3b43df6` to `39c58a8`; deviations
+101 to 121). iOS deviations continue here at **80**. **Nothing below has been run on a phone.** Only `Packages/PixlCore` compiles on the
+Windows machine; `App/` is compiled by GitHub CI alone.
+
+## What the listener gets (once checked on a phone)
+
+- Home: "New from artists you play" (up to 12 cards, 2 per artist, hidden under 6), each card with "New from <artist>" and the row
+  as the queue. Found by the refresh, read from one small file.
+- Stations from an album (the radio button at the top right of the album page) and from a playlist (its options menu: "Start
+  station from this playlist"): 3 or 5 songs of it seed the station, at most 2 per artist, the most played first; none of its own
+  songs lead the first batch. "Start artist station" in any song's sheet, for an artist the library has nothing of (one songs search,
+  the artist page and the radio its button starts before sound). An artist station also carries the top songs of up to three similar
+  artists ("Close to X"). A station whose pool runs under 15 is re-seeded from the track it did best with (at most twice).
+- Song sheet and "Why this song": "More like this" (a two-week boost on the artist, in Taste changes), "Don't count this" (the song's
+  plays leave the picks at once, Undo on the bar). The Why sheet shows up to two true facts under the reason ("You finished 9 of your
+  last 10 plays by this artist", "You've finished this 3 times", "Out in 2024").
+- "How picks work": Private session (a "Private" pill shows at the top while it is on, off at every app start) and "Don't count the last
+  hour". A second tap on "Less from X" says so and offers "Mute X"; the bar after a first one offers it too.
+- The queue: "Refresh picks" on the Autoplay line; swiping an engine pick away is a weak negative for the session.
+- Recently Played: Save on a track the engine played that the library does not have (the full list).
+- Developer mode: "Use my Spotify music to shape picks" (default on).
+
+## Task 1: InnerTube additions (spec 3.3)
+
+`InnerTubeRadio` (PixlNet/YouTube) gained `parseDiscography`, `parseAlbumAudioPlaylistId`, `parsePlaylistPage` (a `browse VL<id>` page
+and both continuation shapes; an album page's own track list is deliberately not read), `parseGetQueue`, `parseSongSearch`;
+`parseListItemRow` falls back to `playlistItemData.videoId` and reads the length from the byline for a songs search. `ReleaseRef` carries
+`kind`, `audioPlaylistId`, `thumbnailUrl`. `InnerTubeRadioClient` gained `browseContinuation`, `browseText`, `getQueueText`,
+`searchSongsText`. `YouTubeRadioSource` (the `RadioSource` protocol, with default bodies so every earlier fake still compiles) gained
+`discography`, `releaseTracks` (the card's playlist id, else one album-page request), `playlistRows` (up to 3 pages),
+`hydrate` (one batch, bisected on a 404) and `channelId(forArtist:)`. The seven fixtures and their `.expected.json` are Android's files
+(`Tests/PixlNetTests/Fixtures/innertube`, same bytes); `InnerTubeRadio2aTests` reads them. All requests go through `HostBudget`.
+
+## Task 2: New releases (6.3)
+
+`NewReleases.swift` (PixlLibrary/BrainStore): `NewReleaseRules` (pure: the baseline, a re-release by folded title, the year rule with
+January, 2 per check, 12 cards / 2 per artist / 3 per release / fresh for 28 days), `NewReleaseFile` (`brain_new_releases_v1.json`,
+one small atomic file; a field a later version adds reads with a default), `NewReleases` (an actor: `check`, `checkOrder`, `channelOf`,
+`isFresh`, `requestsSince`, `row`) and `BrainReleaseRow` (the tags: surface `homeShelf`, id `brain_new_releases`, arm NEW, reason
+"New from X"). The refresh (`BrainRefreshRunner`) has a lane between the radios and the artist lists: `releaseTargets` (the 6 artists
+checked longest ago, inside its own 14 requests a day) and `releases`; the report and the note gained `n<fetched>+<cached>`. Home reads
+the row from the file at every refresh of its brain rows (`HomeBrainRowsSource.releaseRow`), after the "Because you listened to" rows.
+
+## Task 3: stations
+
+- `Station` has `source` and `seedMediaIds` (the saved text has 7 fields; a 5-field one from stage 1 still reads, and a song or artist
+  station's id is what it always was). `StationSeeds.pick`, `StationReseed` (below 15, twice at most, `maxSeeds` 7, the best-received
+  track = the latest one finished or liked), `AutoplayPlanning.inputs` (`stationBatches`, `stationSourceIds`, `refreshing`,
+  `stationReseeded`) and `AutoplayPlanInputs.closestOfSeeds` / `replaceAll`.
+- `BrainRepository`: `beginArtistStation`, `similarArtistSongs` (cached 14 days under chip `+similar`, not an edge of the graph),
+  `artistChannelId`, `chipTagsOf`. `AutoplayPool` gives rows of similar artists the SIM arm and, for a station, lets every seed ask for
+  its radio. `StationStore.sourceIds` is memory only.
+- **Stage 1 leftover: a deepen no longer fetches page one again.** `FetchedRadio` and `RadioList` carry the token of the next page
+  (`continuation`; absent in a stage 1 record), `RadioSource.songRadioContinuation(token:pages:)` fetches only the new pages and
+  `BrainRepository` merges them with the stored first-page list. A list without a token takes the old path.
+- App: `AutoplayController` reads the station's seeds (`StationReseed.seedIds`), re-seeds after an append (`maybeReseedStation`),
+  `refreshPicks()`, `engineRowRemoved(songId:)`; `BrainActions.startAlbumStation / startPlaylistStation / startArtistStation` (falls
+  back to `beginArtistStation` for an artist with nothing in the library).
+
+## Task 4: the controls
+
+- `FeedbackKinds`, `PrivateSpans`, `ExcludedPlays` and the `BrainEngine` methods in `BrainFeedbackActions.swift`:
+  `excludeRecordings`, `excludeLastHour`, `undoExclusion` (flag the events `learnExcluded`, `Affinity.subtract` at once, upsert the rows,
+  a `feedback` record, a full rebuild; Undo clears the flags and asks for a rebuild), `setPrivate` / `isPrivate` (each switch is a
+  `feedback` record, a play that overlaps a span is logged `learnExcluded`), `weakNegative`, `whyFacts`, `activation`.
+- `BrainFeedback.moreLikeChange` (boost, 14 days), `muteArtistChange`, `isReduced`; `BrainNotice` kinds `moreLike`, `dontCount`,
+  `dontCountNothing`, `alreadyReduced`, `muted`, with `canMute` and `excluded`.
+- `FeedbackStore` is now written (Android 95 no longer holds here).
+- App: `BrainActions` (`moreLike`, `dontCount`, `dontCountLastHour`, `setPrivate`, `refreshPicks`, `muteNoticeArtist`, the second tap
+  in `lessFrom`), `BrainNoticeBar` (a "Mute X" button), `PrivatePill`, `BrainSongActions` (rows), `WhyThisSongSheet` (tiles, facts),
+  `HowPicksWorkSheet` (Private session, last hour), `AutoplayLine` ("Refresh picks", the source line), `QueueSheet` (a removal calls
+  `engineRowRemoved`), `RecentlyPlayedView` (Save through `MixRowNote`).
+
+## Task 5 and the pure core: proven against Android
+
+`Affinity.subtract`, `RepeatActivation`, `ChipLabels`, `WhyFacts`, `Session.weakNegative` / `swipeH`, `Candidate.fromSimilarArtist` / `actr`
+(features 10 and 11), `StationPlanner.Request.closestOfSeeds` and the SIM reason argument are transliterations. `stage2a.jsonl` (368
+lines, README and MANIFEST updated, 17 entries) replays bit for bit on the first run (`BrainMilestone2GoldenTests`); blob ids equal
+Android's `music-brain` HEAD for every file of the folder; no earlier golden file changed. `ActivationFeatures` reads the last 90 days
+of a recording's plays off the engine's actor and feeds the mixes' library shortlist (`LibraryTrack.actr`); autoplay and stations
+still carry `actr = 0` (as Android 119).
+
+## Task 6: Spotify facts and chips
+
+`SpotifyFactInput` / `SpotifyFactsSink` (PixlModel), `SpotifyTrack.explicit` and the album's `release_date_precision` (the playlist
+fields filter asks for them), `SpotifyLibrary.record(for:facts:)` calls the sink, `SpotifyLibrarySync(factsSink:)`.
+`SpotifyFactStore` (`spotify_fact.pbl`, queued, written 2 s later in batches of 200, `clear()`); `SpotifyFactsRelay` (App) is what the
+sync holds before the brain exists. The switch is `SettingsStore.ai.brainSpotifyShapesPicks` (Developer mode, default on):
+off, the store clears and drops what is queued, and the rebuild leaves out the Spotify imports and the top lists and follows
+(`BrainEngine.Sources.spotifyShapesPicks`, `keySpotifyShapes`; flipping it asks for a rebuild). Chips are classified by `ChipLabels` and
+read back by `chipTagsOf`; the radio list already kept the labels.
+
+## Task 7: why facts
+
+`WhyFactsInputs` (artist stats from the log, the finish rule), `BrainEngine.whyFacts`, `BrainService.whyFacts(for:)`; the Why sheet
+loads them when it opens. A genre or mood fact needs the 2b atlas.
+
+## Task 8: the stage 1 review leftovers
+
+- The rebuild read and decoded every stored event on the engine's actor: it now reads the bytes there and decodes (and sorts) off it
+  (`BrainEventLog.allEventPayloads` / `decodeSorted`); the same for the 90-day reads.
+- `AutoplayControllerDecisionTests` (AppTests): the controller over an idle engine. It can hold the station line, the kept source ids,
+  a station not yet on the queue, and a swipe or "Refresh picks" with nothing to act on. It cannot reach a queue's items or a pick.
+
+## Deviations 80 and on
+
+80. **`in.request2.closestOfSeeds`** in Android's README is `in.closestOfSeeds` in the file (a sibling of `request`); the test reads the file.
+81. **Chips** are kept as the radio's own chips (as before) and mapped on read (`chipTagsOf`), as Android 121; no atlas ids.
+82. **`hydrate`'s bound**: Android's comment says three extra requests, its code splits three times (two requests a split). Ported as
+    it is; the budget bounds it either way, and the test allows up to 7 requests.
+83. **A station's seeds all may ask for a radio** (Android's behaviour). Stage 1 let only the newest anchor spend a request.
+84. **A deepen starts from a stored token** (new on both sides of the data: `continuation` on `RadioList`, `FetchedRadio`); Android's
+    stage 1 leftover list names it, Android had not done it, so there is no twin.
+85. **No legacy releases shelf on iOS**, so the row replaces nothing.
+86. **A release's artist channel** comes from the file, else a cached radio row, else one `next` for the seed (outside the lane's count,
+    as Android 106).
+87. **The swipe** reaches the controller from the queue's removal (`QueueSheet.remove`), so a removal the listener undoes still counts as
+    the weak negative; the song's rid is known only for a pick this process queued.
+88. **Private session** is switched through an unstructured task; a play that ends in the same millisecond as the switch can be logged
+    either way. The pill is `BrainActions.isPrivate`; the engine holds the spans.
+89. **"Don't count" scopes in the UI**: song and the last hour (as Android 112). `excludeRecordings` takes any set of recordings; no
+    album or playlist screen offers it.
+90. **Words for the iOS-only wording**: "Start station from this album / playlist" and the album's radio icon; Android has the same
+    strings. "Couldn't find music for X right now. Try again in a moment." replaces "Nothing to start from yet" for an artist the
+    brain cannot find.
+91. **Repeat activation is in the mixes only** (as Android 119); stations and autoplay carry `actr = 0`.
+92. **The golden manifest test now expects 17 entries.**
+
+## Cut or deferred
+
+- "Don't count" for an album or a playlist has no screen (data layer only), as Android.
+- Save on Recently Played is on the full list only, not Home's pills (as Android 118).
+- A genre or mood fact, tag-based "More like this": the atlas (2b).
+- No real-data eval number; the iOS twin of `BrainEvalTest` for a real export is still not written.
+- `getArtistTopTracks` has no iOS twin (iOS never called the removed endpoint).
+
+## Not verified on a device
+
+Everything on a phone. In particular: the album and playlist station feel (and that the first batch leaves the source's songs out);
+an artist station for an artist the library lacks (time before sound: up to 3 requests); a re-seed on a long station; "More like
+this" visibly changing the next batch; "Don't count" and Undo (the plays count again after the rebuild); the Private pill over every
+screen and a private play leaving the picks alone; "Refresh picks"; the swipe; Save on Recently Played; a real new release found and
+played after a day on Wi-Fi; the Spotify switch; `explicit` / `release_date_precision` in the playlist `fields` filter (the Web API
+may refuse a field it does not know: the sync's fallback asks again without a filter); the layout of the new rows at large text sizes
+and with VoiceOver; the Swift 6 concurrency of `App/` (CI says).
+
+## How to test on a phone, milestone 2
+
+1. Developer mode on. Play ten songs through. Wait a day on Wi-Fi (or let Home sit for two minutes in the foreground).
+2. Home: "New from artists you play" once an artist you play has a release of this year the file had not seen.
+3. A song's sheet: "Start artist station" on a song of an artist you never played; watch for sound within a few seconds.
+4. An album's page: the radio icon at the top right; a playlist's ⋯ menu. Skip around, let the station run long.
+5. A song's sheet: "More like this", "Don't count this" (then Undo). "How picks work": Private session on, play, off; the pill.
+6. The queue: swipe an engine pick away, then "Refresh picks".
+7. Recently Played: a track the engine played has "Save".
+8. Settings > Developer mode > Maintenance: "Use my Spotify music to shape picks" off and on.

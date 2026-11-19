@@ -27,6 +27,7 @@ private struct AlbumDetailContent: View {
     @Environment(PlaybackStore.self) private var playback
     @Environment(BlockedArtistsStore.self) private var blocked
     @Environment(Router.self) private var router
+    @Environment(AppEnvironment.self) private var env
     @Environment(\.appTheme) private var theme
     @State private var scroll = HeaderScrollState()
     /// The album's songs in play order, derived in `body` once per library revision: the push's first frame has them
@@ -51,7 +52,17 @@ private struct AlbumDetailContent: View {
                                             artwork: ArtworkSource(uriString: album.albumArtUriString), scroll: scroll,
                                             metrics: metrics, safeTop: safeTop,
                                             onBack: { router.pop() },
-                                            onShuffle: shuffle) { EmptyView() }
+                                            onShuffle: shuffle) {
+                        // A station from the album (docs/brain-spec.md, 6.2): three of its songs seed it, and none of its
+                        // own songs lead.
+                        GlassCircleButton(systemImage: "dot.radiowaves.left.and.right",
+                                          accessibilityLabel: LocalizedStringKey(BrainStrings.startStationFromAlbum),
+                                          tint: theme.surfaceContainerLow.opacity(GlassTint.container),
+                                          foreground: theme.onSurface) {
+                            env.brainActions.startAlbumStation(name: album.title, songs: songs)
+                        }
+                        .accessibilityIdentifier("album.startStation")
+                    }
                         .ignoresSafeArea(edges: .top)
                 } else {
                     LibraryEmptyState(systemImage: "opticaldisc", title: "Album not found", subtitle: "")

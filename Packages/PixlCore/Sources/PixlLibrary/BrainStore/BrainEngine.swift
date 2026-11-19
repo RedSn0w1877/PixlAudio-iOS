@@ -52,9 +52,13 @@ public struct Reaction: Sendable {
     public let artistKey: String
     /// That artist is not to be queued for now (a hard skip): their picks leave the engine's tail.
     public let artistBlocked: Bool
+    /// The track that played, as a radio request needs it: what a station re-seeds from (6.2).
+    public let played: AnchorInfo?
 
     public init(event: PlayEvent, graded: Reward.Graded, title: String, changedDirection: Bool, anchors: [AnchorInfo],
-                turn: Int = 0, turnAnchors: [AnchorInfo] = [], artistKey: String = "", artistBlocked: Bool = false) {
+                turn: Int = 0, turnAnchors: [AnchorInfo] = [], artistKey: String = "", artistBlocked: Bool = false,
+                played: AnchorInfo? = nil) {
+        self.played = played
         self.event = event
         self.graded = graded
         self.title = title
@@ -339,7 +343,9 @@ public actor BrainEngine {
             turn: turn,
             turnAnchors: turn == 0 ? [] : state.direction.follow(anchorRids).compactMap { known[$0] },
             artistKey: BrainText.fold(facts.primaryArtist),
-            artistBlocked: session.isBlocked(event.primaryAid)
+            artistBlocked: session.isBlocked(event.primaryAid),
+            played: AnchorInfo(rid: rid, mediaId: play.songId, title: facts.title, primaryArtist: facts.primaryArtist,
+                               spotifyId: facts.spotifyId, videoId: facts.videoId, durationMs: facts.durationMs)
         )
         }
     }

@@ -88,6 +88,10 @@ struct RecentlyPlayedView: View {
                                          onMore: { router.present(AppSheet.songInfo(songId: item.song.id)) })
                             }
                             .padding(.horizontal, 16)
+                            // A track the engine played that is not in the library can be saved from here (8.2, stage 2a).
+                            if item.song.id.hasPrefix(EngineTrack.songIdPrefix), library.song(id: item.song.id) == nil {
+                                MixRowNote(song: item.song, reason: nil, isNew: true)
+                            }
                         }
                     }
                 }

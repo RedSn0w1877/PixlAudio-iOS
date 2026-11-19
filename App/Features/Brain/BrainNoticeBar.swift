@@ -8,6 +8,7 @@ struct BrainNoticeBar: View {
     let notice: BrainNotice
     let onUndo: () -> Void
     let onLessFrom: () -> Void
+    var onMute: () -> Void = {}
 
     @Environment(\.appTheme) private var theme
 
@@ -19,12 +20,15 @@ struct BrainNoticeBar: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.trailing, 12)
-                .padding(.bottom, notice.canUndo || notice.canLessFrom ? 4 : 12)
-            if notice.canUndo || notice.canLessFrom {
+                .padding(.bottom, notice.canUndo || notice.canLessFrom || notice.canMute ? 4 : 12)
+            if notice.canUndo || notice.canLessFrom || notice.canMute {
                 HStack(spacing: 4) {
                     Spacer(minLength: 0)
                     if notice.canLessFrom {
                         action(BrainStrings.lessFrom(notice.artistName), identifier: "brain.notice.lessFrom", onLessFrom)
+                    }
+                    if notice.canMute {
+                        action(BrainStrings.muteArtist(notice.artistName), identifier: "brain.notice.mute", onMute)
                     }
                     if notice.canUndo {
                         action(BrainStrings.undo, identifier: "brain.notice.undo", onUndo)
@@ -67,7 +71,8 @@ struct BrainNoticeOverlay: ViewModifier {
         let actions = env.brainActions
         content.overlay(alignment: .bottom) {
             if let notice = actions.notice {
-                BrainNoticeBar(notice: notice, onUndo: { actions.undo() }, onLessFrom: { actions.lessFromNoticeArtist() })
+                BrainNoticeBar(notice: notice, onUndo: { actions.undo() }, onLessFrom: { actions.lessFromNoticeArtist() },
+                               onMute: { actions.muteNoticeArtist() })
                     .padding(.horizontal, 16)
                     .padding(.bottom, bottomPadding)
                     .transition(.move(edge: .bottom).combined(with: .opacity))

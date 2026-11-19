@@ -12,6 +12,9 @@ final class StationStore {
     private var isLoaded = false
     private var station: Station?
     private var level = Novelty.blend
+    /// The media ids of the album or playlist an album or playlist station came from, for its first batch (6.2: none of
+    /// the source's own songs lead). Memory only: after a restart the first batch is long served.
+    private(set) var sourceIds: Set<String> = []
 
     init(defaults: UserDefaults?) {
         self.defaults = defaults
@@ -39,8 +42,9 @@ final class StationStore {
         return level
     }
 
-    func start(_ station: Station) {
+    func start(_ station: Station, sourceIds: Set<String> = []) {
         ensureLoaded()
+        self.sourceIds = sourceIds
         self.station = station
         defaults?.set(station.encode(), forKey: PreferenceKeys.brainStation)
     }
@@ -49,6 +53,7 @@ final class StationStore {
     func clear() {
         ensureLoaded()
         guard station != nil else { return }
+        sourceIds = []
         station = nil
         defaults?.removeObject(forKey: PreferenceKeys.brainStation)
     }

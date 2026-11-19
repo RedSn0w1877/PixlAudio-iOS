@@ -283,8 +283,11 @@ final class AppEnvironment {
             adjustments: { @MainActor in
                 await brainTaste.ensureLoaded()
                 return brainTaste.activeAdjustments(nowMs: currentTimeMillis())
-            }))
+            },
+            spotifyShapesPicks: { UserDefaults.standard.object(forKey: PreferenceKeys.brainSpotifyShapesPicks) as? Bool ?? true }))
         self.brain = brain
+        // "Use my Spotify music to shape picks" went off: what the sync kept goes and the next rebuild leaves the rest out.
+        settings.ai.onBrainSpotifyShapesOff = { [weak brain] in brain?.spotifyShapesTurnedOff() }
         BrainService.shared = brain
         home.engineSongs = { await brain.engineSongsForHome() }
         // The stored tracks are read a moment after launch; Home then resolves the rest of its history.
@@ -406,9 +409,16 @@ final class AppEnvironment {
             // once music has played in this run, off the main actor, with what it reads captured when it is due.
             let rowsLibrary = library, rowsBlocked = settings.blocked, rowsSettings = settings.ai
             let rowsTaste = tasteAdjustments, rowsAutoplay = autoplayController, rowsPersistence = persistence
+            let rowsBrain = brain
             home.brainRows = HomeBrainRowsSource(
                 isEnabled: { rowsSettings.musicDiscoveryEnabled },
                 cached: { await homeRows.cached() },
+                releaseRow: {
+                    // The saved file only, never the network (6.3): the refresh found these.
+                    await rowsTaste.ensureLoaded()
+                    return await rowsBrain.releaseRow(blocked: rowsBlocked.matcher,
+                                                      adjustments: rowsTaste.activeSet(nowMs: currentTimeMillis()))
+                },
                 refreshIfDue: {
                     await rowsTaste.ensureLoaded()
                     // What the rows depend on besides their anchors: the taste changes in force and the blocked artists.

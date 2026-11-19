@@ -93,6 +93,8 @@ final class AutoplayController {
     /// Engine items this process put in a queue that a re-score may still need to know.
     private static let servedLimit = 400
     private static let directionNote: Duration = .seconds(12)
+    /// "Refresh picks" needs this many other tracks in the pool to choose from; with fewer a deeper pool is built first.
+    static let refreshMinPool = 10
 
     private let engine: DualDeckEngine
     private let brain: BrainService
@@ -152,6 +154,12 @@ final class AutoplayController {
     private var station: Station?
     /// Batches appended for the current `station`: its first one is the long one (6.2).
     private var stationBatches = 0
+    /// The track the station did best with so far (one the listener finished or liked), and the tracks the station was
+    /// re-seeded from when its pool ran low (6.2): their radios join the seeds.
+    private var stationBest: AnchorInfo?
+    private var stationReseeds: [AnchorInfo] = []
+    /// The next re-score replaces the whole engine tail with the next best picks ("Refresh picks", 8.4).
+    private var refreshNext = false
     private var stationRecheck: Task<Void, Never>?
     /// What the Familiar / Blend / Discover switch multiplies the novelty share by.
     private var noveltyFactor = 1.0
@@ -330,6 +338,13 @@ final class AutoplayController {
             likedTitles[reaction.event.rid] = reaction.title
         }
         refreshStation()
+        // The station's best-received track: what its radio is asked for when the pool runs low (6.2).
+        if let station, let played = reaction.played, reaction.event.surface == Surface.station,
+           reaction.event.surfaceId == station.id,
+           StationReseed.isBest(finished: reaction.graded.isCompletion && reaction.graded.c > 0.0, liked: reaction.liked,
+                                mediaId: played.mediaId, station: station) {
+            stationBest = played
+        }
         // A station stays on its seed: three skips there thin out what was skipped (the session's blocks), they do
         // not turn the station into another one.
         if reaction.changedDirection, station == nil { showDirectionNote() }
@@ -384,7 +399,9 @@ final class AutoplayController {
         let tailRids = tailEntries.compactMap { $0.brain?.rid }
         guard tailRids.count == tailEntries.count else { return false }
         let tailIds = queue[start...].map(\.mediaId)
-        let context = planContext(queue: queue, tailStart: start, tailEntries: tailEntries)
+        let refreshing = refreshNext
+        refreshNext = false
+        let context = planContext(queue: queue, tailStart: start, tailEntries: tailEntries, refreshing: refreshing)
         let key = poolKey
         rescoreTask = Task { [weak self] in
             let plan = await brainEngine.plan(context.inputs, count: tailRids.count, bridge: false, tail: tailRids)
@@ -414,6 +431,8 @@ final class AutoplayController {
     private func applyRescore(_ plan: StationPlanner.Plan?, context: AutoplayPlanContext, start: Int, tailIds: [String],
                               tailEntries: [AutoplayPoolEntry], key: String) {
         guard let plan, key == poolKey, isActive else { return }
+        // "Refresh picks" with nothing else to offer leaves the tail as it is.
+        if context.inputs.replaceAll, plan.picks.isEmpty { return }
         // The queue may have moved on while the plan was made: only an unchanged tail is replaced.
         let entries = engine.queue.entries
         let protectedUntil = (engine.queue.currentIndex ?? -1) + 1
@@ -519,6 +538,13 @@ final class AutoplayController {
         appendFromPool { [weak self] appended in
             guard let self else { return }
             if appended {
+                if self.maybeReseedStation() {
+                    // The station's pool ran low: the radio of the track it did best with joins its seeds.
+                    let next = self.currentSeeding()
+                    self.adoptPool(for: next)
+                    self.startFill(next, settle: true, deepen: false, purpose: .refill)
+                    return
+                }
                 if self.pool.count < AutoplayPolicy.poolRefillBelow, !self.poolFromLibrary, !self.poolDeepened {
                     self.startFill(seeding, settle: true, deepen: true, purpose: .refill)
                 }
@@ -529,6 +555,41 @@ final class AutoplayController {
             if !self.pool.isEmpty, self.poolDeepened { return }
             self.startFill(seeding, settle: settle, deepen: !self.pool.isEmpty, purpose: .topUp)
         }
+    }
+
+    /// 6.2: when a station's pool runs under 15 it is re-seeded from the best-received station track's radio. True when
+    /// a seed was added (at most `StationReseed.maxReseeds` per station): the pool is built again from the new seeds.
+    private func maybeReseedStation() -> Bool {
+        guard let station, StationReseed.shouldReseed(poolFromLibrary: poolFromLibrary, poolSize: pool.count,
+                                                      reseedIds: stationReseeds.map(\.mediaId),
+                                                      bestMediaId: stationBest?.mediaId,
+                                                      seedMediaIds: station.seedMediaIds),
+              let best = stationBest else { return false }
+        stationReseeds.append(best)
+        return true
+    }
+
+    /// "Refresh picks" (8.4): the engine's upcoming picks are replaced by the next best ones, in one queue edit, never
+    /// touching the track that is starting or one the prefetcher has warmed. With too little left in memory to choose
+    /// from, a deeper pool is built first and the swap happens when it is ready.
+    func refreshPicks() {
+        guard isActive, remoteRule().rescore, !isRestoringQueue else { return }
+        let seeding = currentSeeding()
+        guard !seeding.anchors.isEmpty else { return }
+        adoptPool(for: seeding)
+        refreshNext = true
+        if pool.count >= Self.refreshMinPool, !poolFromLibrary, rescoreTail() { return }
+        poolDeepened = false
+        startFill(seeding, settle: false, deepen: true, purpose: .turn)
+    }
+
+    /// The listener swiped an engine pick out of the queue without hearing it (8.4): a weak negative for the session
+    /// (`Session.weakNegative`), no event and no block. Only picks this process queued are known.
+    func engineRowRemoved(songId: String) {
+        guard let brainEngine = brain.engine, let candidate = served[BrainKey(songId)]?.brain, candidate.rid != 0 else { return }
+        let rid = candidate.rid
+        let aid = candidate.aid
+        Task { await brainEngine.weakNegative(rid: rid, aid: aid) }
     }
 
     /// A pool that is being built only because the queue ran low is not needed once it no longer is.
@@ -590,7 +651,22 @@ final class AutoplayController {
         let entries = engine.queue.entries
         // A station has one anchor for as long as it lasts: its seed (8.3).
         if let station {
-            return Seeding(anchors: entries.first { station.isSeed(mediaId: $0.song.id, tag: $0.brain) }.map { [$0.song] } ?? [])
+            guard let seed = entries.first(where: { station.isSeed(mediaId: $0.song.id, tag: $0.brain) })?.song else {
+                return Seeding(anchors: [])
+            }
+            // An album or playlist station has up to five seeds (6.2), and a station whose pool ran low was re-seeded
+            // from tracks the listener took to: all their radios are merged.
+            var anchors = [seed]
+            let ids = StationReseed.seedIds(primary: seed.id, station: station, reseedIds: stationReseeds.map(\.mediaId))
+            for id in ids.dropFirst() {
+                if let info = stationReseeds.first(where: { $0.mediaId == id }) {
+                    if let song = anchorSong(for: info, in: entries) { anchors.append(song) }
+                } else if let song = sources.librarySong(id) ?? entries.first(where: { $0.song.id == id })?.song
+                            ?? brain.song(id: id) {
+                    anchors.append(song)
+                }
+            }
+            return Seeding(anchors: anchors)
         }
         let age = now() - sessionAnchorsAtMs
         let fresh = sessionAnchorsAtMs != 0 && age >= 0 && age < Session.gapMs
@@ -655,13 +731,16 @@ final class AutoplayController {
     }
 
     /// Everything a plan reads, taken from the queue and the pool on the main actor.
-    private func planContext(queue: [AutoplayQueueItem], tailStart: Int, tailEntries: [AutoplayPoolEntry]) -> AutoplayPlanContext {
+    private func planContext(queue: [AutoplayQueueItem], tailStart: Int, tailEntries: [AutoplayPoolEntry],
+                             refreshing: Bool = false) -> AutoplayPlanContext {
         let nowMs = now()
         batchSeq = (batchSeq + 1) & 0xff
         return AutoplayPlanning.inputs(queue: queue, tailStart: tailStart, tailEntries: tailEntries, pool: pool,
                                        served: served, recentlyPlayed: recentlyPlayed(nowMs: nowMs), seeds: poolSeeds,
                                        nowMs: nowMs, tzOffsetMin: Int32(clamping: TimeZone.current.secondsFromGMT() / 60),
-                                       batch: batchSeq, station: station, noveltyFactor: noveltyFactor)
+                                       batch: batchSeq, station: station, noveltyFactor: noveltyFactor,
+                                       stationBatches: stationBatches, stationSourceIds: brain.stations.sourceIds,
+                                       refreshing: refreshing, stationReseeded: !stationReseeds.isEmpty)
     }
 
     /// Appends one batch from the in-memory pool and tells `onDone` whether one went in. No network. The plan
@@ -1080,8 +1159,12 @@ final class AutoplayController {
         if next != station {
             station = next
             stationBatches = 0
+            stationBest = nil
+            stationReseeds.removeAll()
         }
         let state = brain.autoplay
+        let source = next?.source ?? Station.sourceSong
+        if state.stationSource != source { state.stationSource = source }
         if state.stationTitle != next?.title { state.stationTitle = next?.title }
         let isArtist = next?.isArtist ?? false
         if state.stationIsArtist != isArtist { state.stationIsArtist = isArtist }

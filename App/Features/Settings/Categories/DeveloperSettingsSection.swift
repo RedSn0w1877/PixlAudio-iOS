@@ -48,6 +48,10 @@ struct DeveloperSettingsSection: View {
                                  isOn: Binding(get: { settings.ai.brainRefreshEnabled },
                                                set: { settings.ai.brainRefreshEnabled = $0 }),
                                  systemImage: "flask", iconColor: theme.secondary)
+                SwitchSettingRow(title: BrainStrings.spotifyShapesTitle, subtitle: BrainStrings.spotifyShapesSubtitle,
+                                 isOn: Binding(get: { settings.ai.brainSpotifyShapesPicks },
+                                               set: { settings.ai.brainSpotifyShapesPicks = $0 }),
+                                 systemImage: "music.note.list", iconColor: theme.secondary)
                 ActionSettingRow(title: L10n.settingsForceDailyMixTitle, subtitle: L10n.settingsForceDailyMixSubtitle,
                                  systemImage: "slider.horizontal.3",
                                  primaryLabel: L10n.settingsActionRegenerateDailyMix) { showsDailyMix = true }

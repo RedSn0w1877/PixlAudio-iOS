@@ -19,10 +19,14 @@ struct AutoplayLine: View {
     /// The queue is a station: what it is named after (a song's title, an artist's name). Nil for plain autoplay.
     var stationTitle: String?
     var stationIsArtist = false
+    /// What the station was started from (`Station.sourceSong`, `.sourceArtist`, `.sourceAlbum`, `.sourcePlaylist`).
+    var stationSource = Station.sourceSong
     /// `Novelty.familiar`, `.blend` or `.discover`.
     var novelty = Novelty.blend
     let onToggle: (Bool) -> Void
     var onNovelty: ((Int) -> Void)?
+    /// "Refresh picks" (8.4): the upcoming picks are replaced by the next best ones.
+    var onRefresh: (() -> Void)?
     var onHowPicksWork: (() -> Void)?
 
     @Environment(\.appTheme) private var theme
@@ -71,6 +75,20 @@ struct AutoplayLine: View {
                     .padding(.top, 8)
                     .padding(.bottom, 4)
             }
+            if let onRefresh, isStation || isOn, !fromLibrary, !finding {
+                Button(action: onRefresh) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.triangle.2.circlepath").font(.system(size: 14, weight: .semibold))
+                        Text(BrainStrings.refreshPicks).pixlFont(.labelLarge)
+                    }
+                    .foregroundStyle(theme.primary)
+                    .padding(.horizontal, 4)
+                    .frame(minHeight: 40)
+                    .contentShape(.rect)
+                }
+                .buttonStyle(PressScaleButtonStyle())
+                .accessibilityIdentifier("queue.refreshPicks")
+            }
         }
         .padding(.leading, 20)
         .padding(.trailing, 16)
@@ -89,7 +107,13 @@ struct AutoplayLine: View {
         if finding { return String(localized: "Finding more like this") }
         if changedDirection { return String(localized: "Skipped three. Changing direction.") }
         if fromLibrary { return String(localized: "From your library") }
-        if isStation { return stationIsArtist ? BrainStrings.stationSubtitleArtist : BrainStrings.stationSubtitleSong }
+        if isStation {
+            switch stationSource {
+            case Station.sourceAlbum: return BrainStrings.stationSubtitleAlbum
+            case Station.sourcePlaylist: return BrainStrings.stationSubtitlePlaylist
+            default: return stationIsArtist ? BrainStrings.stationSubtitleArtist : BrainStrings.stationSubtitleSong
+            }
+        }
         return String(localized: "Taizo picks more after this")
     }
 }

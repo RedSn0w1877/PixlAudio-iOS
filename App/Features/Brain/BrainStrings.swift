@@ -14,6 +14,14 @@ nonisolated enum BrainStrings {
     static func stationTitle(_ title: String) -> String { String(localized: "Station · \(title)") }
     static var stationSubtitleSong: String { String(localized: "Music like this song, picked as you listen") }
     static var stationSubtitleArtist: String { String(localized: "This artist and music close to them") }
+    static var stationSubtitleAlbum: String { String(localized: "Music like this album, picked as you listen") }
+    static var stationSubtitlePlaylist: String { String(localized: "Music like this playlist, picked as you listen") }
+    static var startArtistStation: String { String(localized: "Start artist station") }
+    static var startStationFromAlbum: String { String(localized: "Start station from this album") }
+    static var startStationFromPlaylist: String { String(localized: "Start station from this playlist") }
+    static func stationNothingFound(_ name: String) -> String {
+        String(localized: "Couldn't find music for \(name) right now. Try again in a moment.")
+    }
     static func stationNothingToStart(_ artist: String) -> String {
         String(localized: "Nothing to start from yet. Add a song by \(artist) first.")
     }
@@ -43,6 +51,18 @@ nonisolated enum BrainStrings {
         case .becauseListened(let name): String(localized: "Because you listened to \(name)")
         case .artistMore(let name): String(localized: "More from \(name)")
         case .onRepeat: String(localized: "On repeat lately")
+        case .similarArtist(let name): String(localized: "Close to \(name)")
+        case .newRelease(let name): String(localized: "New from \(name)")
+        }
+    }
+
+    /// A supporting fact under the reason (8.8): a true statement from the listener's own plays, or the song's year.
+    static func whyFact(_ fact: WhyFacts.Fact) -> String {
+        switch fact.key {
+        case WhyFacts.keyArtistFinished:
+            String(localized: "You finished \(fact.a) of your last \(fact.b) plays by this artist")
+        case WhyFacts.keyTrackFinished: String(localized: "You've finished this \(fact.a) times")
+        default: String(localized: "Out in \(String(fact.a))")
         }
     }
 
@@ -58,6 +78,30 @@ nonisolated enum BrainStrings {
     static var notForMeFailed: String { String(localized: "Couldn't save that. Remove a few taste changes first.") }
     static func lessFrom(_ artist: String) -> String { String(localized: "Less from \(artist)") }
     static func lessFromDone(_ artist: String) -> String { String(localized: "You'll hear less from \(artist).") }
+    static var moreLikeThis: String { String(localized: "More like this") }
+    static var moreLikeThisSupporting: String { String(localized: "Leans your picks that way for two weeks") }
+    static func moreLikeDone(_ artist: String) -> String { String(localized: "Got it. More like \(artist) for a while.") }
+    static var dontCount: String { String(localized: "Don't count this") }
+    static var dontCountSupporting: String { String(localized: "Keeps this song out of what your picks are based on") }
+    static var dontCountDone: String { String(localized: "This won't shape your picks.") }
+    static var dontCountHour: String { String(localized: "Don't count the last hour") }
+    static var dontCountHourSupporting: String {
+        String(localized: "Leaves everything you played in the last hour out of your picks")
+    }
+    static var dontCountNothing: String { String(localized: "There was nothing to leave out.") }
+    static func muteArtist(_ artist: String) -> String { String(localized: "Mute \(artist)") }
+    static func muteArtistOffer(_ artist: String) -> String {
+        String(localized: "You already hear less from \(artist). Mute them?")
+    }
+    static func muteArtistDone(_ artist: String) -> String { String(localized: "You won't hear \(artist) in your picks.") }
+    static var privateSession: String { String(localized: "Private session") }
+    static var privateSessionBody: String {
+        String(localized: "Plays aren't counted in your picks until you switch this off. It switches off when the app restarts.")
+    }
+    static var privatePill: String { String(localized: "Private") }
+    static var privatePillDescription: String { String(localized: "Private session is on. Tap to end it.") }
+    static var refreshPicks: String { String(localized: "Refresh picks") }
+    static var recentSave: String { String(localized: "Save") }
     static var undo: String { String(localized: "Undo") }
     static var undone: String { String(localized: "Undone") }
     static var like: String { String(localized: "Like") }
@@ -70,6 +114,11 @@ nonisolated enum BrainStrings {
         case .notSaved: notForMeFailed
         case .lessFrom: lessFromDone(notice.artistName)
         case .undone: undone
+        case .moreLike: moreLikeDone(notice.artistName)
+        case .dontCount: dontCountDone
+        case .dontCountNothing: dontCountNothing
+        case .alreadyReduced: muteArtistOffer(notice.artistName)
+        case .muted: muteArtistDone(notice.artistName)
         }
     }
 
@@ -77,6 +126,8 @@ nonisolated enum BrainStrings {
 
     static func homeBecauseListened(_ name: String) -> String { String(localized: "Because you listened to \(name)") }
     static var homeBecauseListenedSubtitle: String { String(localized: "Music you don't have yet") }
+    static var homeNewReleases: String { String(localized: "New from artists you play") }
+    static var homeNewReleasesSubtitle: String { String(localized: "Fresh releases from music in your library") }
 
     // MARK: Daily Mix and Your Mix (8.2)
 
@@ -88,6 +139,10 @@ nonisolated enum BrainStrings {
     static var engineTitle: String { String(localized: "Music engine") }
     static var engineSubtitle: String {
         String(localized: "Rank Daily Mix and Your Mix with the new engine. Off uses the old one. Regenerate the daily mix to see the change.")
+    }
+    static var spotifyShapesTitle: String { String(localized: "Use my Spotify music to shape picks") }
+    static var spotifyShapesSubtitle: String {
+        String(localized: "Your Spotify likes, top lists and listening history count towards your picks. Off takes them out at the next rebuild.")
     }
     static var refreshTitle: String { String(localized: "Background music search") }
     static var refreshSubtitle: String {

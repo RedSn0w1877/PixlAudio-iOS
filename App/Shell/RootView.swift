@@ -65,6 +65,8 @@ struct RootView: View {
         // "Not for me" and "Less from ..." answer with a bar that offers Undo (docs/brain-spec.md, 8.5), over the tabs
         // and the full player.
         .brainNoticeBar(bottomPadding: Tokens.Shell.miniPlayerHeight + 96)
+        // The "Private" pill (8.5): shown while a private session is on, so it is clear what is not being counted.
+        .brainPrivatePill()
         // The Connect device's volume pop-up (the volume buttons), over the tabs and the full player; sheets and covers
         // show their own copy.
         .spotifyConnectVolumeHUD(followsPresentations: true)

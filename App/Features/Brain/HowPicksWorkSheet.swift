@@ -108,6 +108,59 @@ struct HowPicksWorkSheet: View {
                 .pixlGlass(in: RoundedRectangle(cornerRadius: 6, style: .continuous),
                            tint: theme.surfaceContainerHigh.opacity(GlassTint.surface))
 
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(BrainStrings.privateSession)
+                            .pixlFont(.titleMedium)
+                            .foregroundStyle(theme.onSurface)
+                        Text(BrainStrings.privateSessionBody)
+                            .pixlFont(.bodyMedium)
+                            .foregroundStyle(theme.onSurfaceVariant)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Toggle(BrainStrings.privateSession, isOn: Binding(get: { env.brainActions.isPrivate },
+                                                                     set: { env.brainActions.setPrivate($0) }))
+                        .labelsHidden()
+                        .tint(theme.primary)
+                        .accessibilityIdentifier("howPicksWork.private")
+                }
+                .padding(.leading, 16)
+                .padding(.trailing, 12)
+                .padding(.vertical, 12)
+                .pixlGlass(in: RoundedRectangle(cornerRadius: 6, style: .continuous),
+                           tint: theme.surfaceContainerHigh.opacity(GlassTint.surface))
+
+                Button {
+                    env.brainActions.dontCountLastHour()
+                    dismiss()
+                } label: {
+                    HStack(spacing: 16) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(theme.primary)
+                            .frame(width: 24)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(BrainStrings.dontCountHour)
+                                .pixlFont(.titleMedium)
+                                .foregroundStyle(theme.onSurface)
+                            Text(BrainStrings.dontCountHourSupporting)
+                                .pixlFont(.bodyMedium)
+                                .foregroundStyle(theme.onSurfaceVariant)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(.leading, 16)
+                    .padding(.trailing, 12)
+                    .padding(.vertical, 12)
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .pixlGlass(in: RoundedRectangle(cornerRadius: 6, style: .continuous),
+                           tint: theme.surfaceContainerHigh.opacity(GlassTint.surface), interactive: true)
+                .accessibilityIdentifier("howPicksWork.dontCountHour")
+
                 Button(action: openTasteChanges) {
                     HStack(spacing: 16) {
                         Image(systemName: "slider.horizontal.3")

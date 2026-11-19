@@ -14,6 +14,8 @@ struct WhyThisSongSheet: View {
     @Environment(\.appTheme) private var theme
     @Environment(\.dismiss) private var dismiss
     @State private var showsHowPicksWork = false
+    /// Up to two true facts under the reason, read from the listener's own plays when the sheet opens (8.8).
+    @State private var facts: [WhyFacts.Fact] = []
 
     var body: some View {
         let reason = why.line.map(BrainStrings.whyLine)
@@ -53,6 +55,16 @@ struct WhyThisSongSheet: View {
                         .foregroundStyle(theme.onSurfaceVariant)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                if !facts.isEmpty {
+                    Spacer().frame(height: 10)
+                    ForEach(facts, id: \.key) { fact in
+                        Text(BrainStrings.whyFact(fact))
+                            .pixlFont(.bodyMedium)
+                            .foregroundStyle(theme.onSurfaceVariant)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
                 Spacer().frame(height: 20)
                 HStack(spacing: 8) {
                     ActionTile(title: isFavorite ? BrainStrings.liked : BrainStrings.like,
@@ -67,6 +79,21 @@ struct WhyThisSongSheet: View {
                         dismiss()
                     }
                     .accessibilityIdentifier("whyThisSong.notForMe")
+                }
+                Spacer().frame(height: 8)
+                HStack(spacing: 8) {
+                    ActionTile(title: BrainStrings.moreLikeThis, systemImage: "hand.thumbsup",
+                               tint: theme.surfaceContainerHigh, foreground: theme.onSurface, minHeight: 52) {
+                        env.brainActions.moreLike(song)
+                        dismiss()
+                    }
+                    .accessibilityIdentifier("whyThisSong.moreLike")
+                    ActionTile(title: BrainStrings.dontCount, systemImage: "eye.slash",
+                               tint: theme.surfaceContainerHigh, foreground: theme.onSurface, minHeight: 52) {
+                        env.brainActions.dontCount(song)
+                        dismiss()
+                    }
+                    .accessibilityIdentifier("whyThisSong.dontCount")
                 }
                 if !artist.isEmpty {
                     Spacer().frame(height: 8)
@@ -99,6 +126,7 @@ struct WhyThisSongSheet: View {
             .padding(.bottom, 16)
         }
         .scrollIndicators(.hidden)
+        .task(id: song.id) { facts = await env.brain.whyFacts(for: song) }
         .sheet(isPresented: $showsHowPicksWork) {
             HowPicksWorkSheet().pixlSheet()
         }

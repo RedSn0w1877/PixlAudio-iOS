@@ -1,3 +1,4 @@
+import PixlLibrary
 import PixlModel
 import SwiftUI
 
@@ -20,9 +21,26 @@ struct BrainSongActions: View {
                     env.brainActions.startSongStation(song)
                     onDone()
                 }
+                if !StationRules.primaryArtist(of: song).isEmpty {
+                    row(BrainStrings.startArtistStation, BrainStrings.startStationArtistSupporting,
+                        systemImage: "person.wave.2", identifier: "songInfo.startArtistStation") {
+                        env.brainActions.startArtistStation(name: StationRules.primaryArtist(of: song))
+                        onDone()
+                    }
+                }
+                row(BrainStrings.moreLikeThis, BrainStrings.moreLikeThisSupporting, systemImage: "hand.thumbsup",
+                    identifier: "songInfo.moreLikeThis") {
+                    env.brainActions.moreLike(song)
+                    onDone()
+                }
                 row(BrainStrings.notForMe, BrainStrings.notForMeSupporting, systemImage: "hand.thumbsdown",
                     identifier: "songInfo.notForMe") {
                     env.brainActions.notForMe(song)
+                    onDone()
+                }
+                row(BrainStrings.dontCount, BrainStrings.dontCountSupporting, systemImage: "eye.slash",
+                    identifier: "songInfo.dontCount") {
+                    env.brainActions.dontCount(song)
                     onDone()
                 }
             }

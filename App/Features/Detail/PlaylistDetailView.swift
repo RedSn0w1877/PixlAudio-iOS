@@ -556,6 +556,13 @@ private struct PlaylistDetailContent: View {
         Section {
             Button("Find in playlist", systemImage: "magnifyingglass") { withAnimation(PixlMotion.state) { find.open() } }
             Button("Edit playlist", systemImage: "pencil") { router.push(.playlistEditor(playlistId: playlistId)) }
+            // A station from the playlist (docs/brain-spec.md, 6.2): five of its songs seed it.
+            if let playlist, !songs.isEmpty {
+                Button(BrainStrings.startStationFromPlaylist, systemImage: "dot.radiowaves.left.and.right") {
+                    env.brainActions.startPlaylistStation(name: playlist.name, songs: songs)
+                }
+                .accessibilityIdentifier("playlist.startStation")
+            }
             Button("Set default transition", systemImage: "point.topleft.down.to.point.bottomright.curvepath") {
                 router.push(.editTransition(playlistId: playlistId))
             }

@@ -200,12 +200,13 @@ struct QueueSheet: View {
         let actions = env.brainActions
         return AutoplayLine(isOn: ai.musicDiscoveryEnabled, finding: state.finding, fromLibrary: state.fromLibrary,
                             changedDirection: state.changedDirection, stationTitle: state.stationTitle,
-                            stationIsArtist: state.stationIsArtist, novelty: state.novelty,
+                            stationIsArtist: state.stationIsArtist, stationSource: state.stationSource, novelty: state.novelty,
                             onToggle: { isOn in
                                 ai.musicDiscoveryEnabled = isOn
                                 autoplayController?.settingChanged()
                             },
                             onNovelty: { level in actions.setNovelty(level) },
+                            onRefresh: { actions.refreshPicks() },
                             onHowPicksWork: { showsHowPicksWork = true })
     }
 
@@ -439,6 +440,8 @@ struct QueueSheet: View {
     // MARK: Removing, undo, clearing
 
     private func remove(_ song: Song, at queueIndex: Int) {
+        // A pick the engine queued, swiped away unheard, is a weak negative for the session (8.4).
+        env.autoplayController?.engineRowRemoved(songId: song.id)
         playback.removeQueueItem(at: queueIndex)
         let entry = QueueUndo(song: song, index: queueIndex)
         undo = entry

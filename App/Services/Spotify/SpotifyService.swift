@@ -102,7 +102,7 @@ final class SpotifyService {
             sync = SpotifyLibrarySync(api: api, store: persistence, sha256: SpotifyPlatform.sha256, flush: {
                 try? await persistence.rebuildSpotifyUnifiedLibrary()
                 await reload()
-            })
+            }, factsSink: SpotifyFactsRelay.shared)
         }
         if let demo { applyDemo(demo) }
     }
