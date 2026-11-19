@@ -39,6 +39,8 @@ struct HomeDateLine: View {
 
 struct HomeChipsRow: View {
     let selected: HomeChip
+    /// The chips offered: one with nothing behind it (no mixes, nothing new) is not here, so no chip leads to a blank page.
+    var chips: [HomeChip] = HomeChip.allCases
     let onSelect: (HomeChip) -> Void
     @Environment(\.appTheme) private var theme
 
@@ -46,7 +48,7 @@ struct HomeChipsRow: View {
         ScrollView(.horizontal) {
             GlassEffectContainer(spacing: 6) {
                 HStack(spacing: 8) {
-                    ForEach(HomeChip.allCases, id: \.rawValue) { chip in
+                    ForEach(chips, id: \.rawValue) { chip in
                         let isSelected = chip == selected
                         Button { onSelect(chip) } label: {
                             Text(verbatim: chip.title)

@@ -422,8 +422,16 @@ final class AppEnvironment {
             let plan = homePlan
             plan.engineIsOn = { mixSettings.brainEngine == BrainEngineChoice.brain }
             plan.librarySongs = { ids in
+                // What the shelves of a saved plan draw is the library as it is now: a song since removed from it, or muted,
+                // blocked or sent away with "Not for me" is not drawn, whatever the plan (up to a day old) says.
+                let blocked = mixBlocked.matcher
+                let taste = mixAdjustments.activeSet(nowMs: currentTimeMillis())
                 var found: [String: Song] = [:]
-                for id in ids { if let song = mixLibrary.song(id: id) { found[id] = song } }
+                for id in ids {
+                    guard let song = mixLibrary.song(id: id), !blocked.isBlocked(song), !taste.isExcluded(song), !taste.isBlocked(song)
+                    else { continue }
+                    found[id] = song
+                }
                 return found
             }
             plan.librarySongCount = { mixLibrary.songs.count }

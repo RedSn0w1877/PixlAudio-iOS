@@ -712,6 +712,8 @@ struct SetupTastePage: View {
     let level: Int
     let onChange: (Int) -> Void
     let onImportHistory: () -> Void
+    /// The import was asked for: the button says when it opens (the setup is still over Home).
+    var importQueued = false
     @Environment(\.appTheme) private var theme
     @Namespace private var pick
 
@@ -731,7 +733,7 @@ struct SetupTastePage: View {
                     .animation(PixlMotion.state, value: level)
                     .setupReveal(2)
                 Button(action: onImportHistory) {
-                    Text(verbatim: BrainStrings.setupTasteImportHistory)
+                    Text(verbatim: importQueued ? BrainStrings.setupTasteImportQueued : BrainStrings.setupTasteImportHistory)
                         .pixlFont(.labelLarge)
                         .foregroundStyle(theme.primary)
                         .padding(.horizontal, 16)

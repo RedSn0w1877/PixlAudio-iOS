@@ -113,7 +113,9 @@ nonisolated final class BrainKnowledge: Sendable {
         self.atlas = atlas
         self.ledger = ledger
         lanes = DnaLanes(targets: DnaTargets(sources: sources, repository: repository, engine: engine, store: dna),
-                         enricher: DnaEnricher(http: http, store: dna, atlas: atlas, timing: timing))
+                         enricher: DnaEnricher(http: http, store: dna, atlas: atlas, timing: timing),
+                         purge: SpotifyDnaPurge(shapesPicks: sources.spotifyShapesPicks, store: dna, atlas: atlas,
+                                                state: StateValues.of(engine)))
         reader = BrainDataReader(
             dna: dna, ledger: ledger, atlas: atlas,
             localEnabled: { BrainSourceSwitch.localEnabled($0) }, remoteAllowed: { BrainRemoteFlags.sourceAllowed($0.key) },

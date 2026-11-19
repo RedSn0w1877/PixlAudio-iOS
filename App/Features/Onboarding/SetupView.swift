@@ -41,6 +41,8 @@ struct SetupView: View {
     @State private var started = false
     /// Familiar / Blend / Discover (docs/brain-spec.md, 8.10): the same switch the queue has.
     @State private var noveltyLevel = Novelty.blend
+    /// "Import your listening history" was tapped: it opens when the setup closes.
+    @State private var importQueued = false
 
     /// UserDefaults key for the page to resume at.
     static let resumeKey = "setup_resume_page"
@@ -175,9 +177,10 @@ struct SetupView: View {
                 noveltyLevel = level
                 env.brainActions.setNovelty(level)
             }, onImportHistory: {
-                // Home opens the existing import once, as soon as it is on screen.
+                // Home is already mounted behind this cover: it opens the existing import once the cover closes.
                 UserDefaults.standard.set(true, forKey: PreferenceKeys.pendingHistoryImport)
-            })
+                importQueued = true
+            }, importQueued: importQueued)
         case .backupRestore:
             SetupBackupPage(isInspecting: isInspecting, isRestoring: restoreBackup != nil && env.backup.isBusy,
                             onImport: { showsBackupPicker = true })

@@ -83,6 +83,7 @@ nonisolated extension BrainStrings {
     static var setupTasteBlendHint: String { String(localized: "A mix of your music and new music") }
     static var setupTasteDiscoverHint: String { String(localized: "As much new music as it can find") }
     static var setupTasteImportHistory: String { String(localized: "Import your listening history") }
+    static var setupTasteImportQueued: String { String(localized: "It opens when you finish setup") }
     static var setupTasteFooter: String { String(localized: "There are no questions to answer. Picks follow what you play from here.") }
 
     static func daypart(_ code: Int32) -> String {

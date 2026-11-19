@@ -92,19 +92,18 @@ final class BrainActions {
     }
 
     /// A station from a genre or a mood of the atlas (8.3, stage 2b): the listener's most played songs under the node seed it.
-    /// With none of their songs under it nothing starts, a notice says so, and `onNothing` runs (a Search tile then falls back
-    /// to its live search).
-    func startGenreStation(kind: Int, atlasId: Int, name: String, onNothing: @escaping @MainActor () -> Void = {}) {
+    /// With none of their songs under it nothing starts. A card says so in a notice; a Search tile has `onNothing` instead (its live
+    /// search), and says nothing, so the person is not told "nothing started" and shown a new screen at the same time.
+    func startGenreStation(kind: Int, atlasId: Int, name: String, onNothing: (@MainActor () -> Void)? = nil) {
         guard !name.trimmingCharacters(in: .whitespaces).isEmpty, let genre = brain.stage2b?.genre else {
-            onNothing()
+            onNothing?()
             return
         }
         Task { [weak self] in
             let songs = await genre.songsFor(kind: kind, atlasId: atlasId, nowMs: currentTimeMillis())
             guard let self else { return }
             if songs.isEmpty {
-                self.playback.notices.show(BrainStrings.stationGenreNothing(name))
-                onNothing()
+                if let onNothing { onNothing() } else { self.playback.notices.show(BrainStrings.stationGenreNothing(name)) }
                 return
             }
             let source = kind == StationCard.kindMood ? Station.sourceMood : Station.sourceGenre

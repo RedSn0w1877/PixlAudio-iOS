@@ -122,7 +122,7 @@ User-Agent below, and stay at or under one request per second per host (the real
 | ListenBrainz | recording and artist genre tags (MusicBrainz votes), listener count | derived from MusicBrainz, **CC BY-NC-SA votes** | as MusicBrainz, switch off `listenbrainz` |
 | Wikidata | artist genres, Wikidata id | CC0 | none |
 | iTunes Search | a song's genre and release date, by name | the Search API's terms | review them, or switch off `itunes` |
-| Spotify | what the sync already returns (ids, release date, explicit, the top artists' genres) | Spotify terms: **never used to train a model**; nothing here trains anything | the existing "Use my Spotify music to shape picks" switch |
+| Spotify | what the sync already returns (ids, release date, explicit, the top artists' genres) | Spotify terms: **never used to train a model**. Since the review pass no genre or year Spotify gave is a feature of the island fit (see "After the independent review"); Spotify likes and history still weigh the listener's own tracks as pseudo-counts (owner question 1, default) | the existing "Use my Spotify music to shape picks" switch |
 
 Without Deezer, MusicBrainz and ListenBrainz the engine keeps iTunes, Wikidata, Spotify genres, the radio chips and the atlas.
 **User-Agent**: `PixlAudio/<version> ( https://github.com/RedSn0w1877/PixlAudio-iOS )`, this repository, which is public
@@ -365,3 +365,98 @@ Run **44508593496** (`8b263f7`, workflow `ci`, branch `music-brain`) is **green 
 everything (Swift 6, strict concurrency) and ran 664 unit tests with 0 failures, `ipa` skipped as on every push. The CI run that
 followed milestone 1 (44488832203) was green too, so nothing from it needed fixing. Green CI says nothing about how the new Home
 looks or behaves on a phone.
+
+
+# After the independent review (iOS)
+
+An independent reviewer read the whole iOS stage 2b diff and gave 17 findings. Each was checked against the code. Android's own
+review pass (`9f29a21`) changed no `:brain` file, so **no golden file moved** (the blob ids of `MANIFEST.sha256`, `islands`,
+`homeplan`, `eval` and `islandmixes` were compared and are equal); its app-layer rules were copied by hand where they applied.
+
+## Findings, one by one
+
+| # | Finding | Result |
+|---|---------|--------|
+| 1 | Island save was remove-all then put-one-by-one | Fixed. `IslandStore.save` stamps `island_last_id` first, then writes every island AND the member record in ONE append (`island.pbl`; the member record is last and names the islands of its fit in `ids`), then removes the keys that are gone. A reader takes the islands the member record names and no others, and a first fit with no member record is no set. The separate `island_member.pbl` is gone (nothing had run on a phone). A fit is also due again when `node_embedding.bin` holds another number of rows than `emb_count` says (Android's rule). Tests: kill before the member record leaves the previous fit; unfinished first fit is no islands; stale islands are removed. |
+| 2 | Setup's "Import your listening history" set a flag Home had already stopped reading | Fixed. Home reads the flag in its `.task` AND when the setup cover closes (`router.cover == nil`), never under a cover; the page's button now says "It opens when you finish setup" after a tap. |
+| 3 | Spotify off left stored Spotify genre claims | Fixed. `DnaTarget.spotifyOff`; `assemble` drops provider-3 claims from the track and the artist row, the Spotify year and the "asked Spotify" bit, and re-merges tags, moods and the year. `SpotifyDnaPurge` (new, run by the one refresh before the island fit, Android's design) rewrites every row that still carries them once and marks the islands due; switching the switch on clears the mark. Spotify track ids and ISRCs stay on the rows (identifiers the library already holds). Tests: assemble with the switch off, other sources keep their genres, the purge runs once and resets. |
+| 4 | Spotify genres fed the island fit | Fixed in the stricter direction. The island fit reads each row's tags with the Spotify claims taken out (`DnaAssembler.tagVectorWithoutSpotify`); with no readable atlas it reads no tags. **This differs from Android, which still fits on the stored vector; Android should do the same** (one line in `IslandInputs.live`). What stays: the listener's own play history and Spotify likes weigh the tracks (pseudo-counts, owner question 1 default, removed with the same switch at the next rebuild); the clustering itself is k-means over that and over the YouTube Music graph, not a trained model. Test: `theIslandFitReadsNoGenreOnlySpotifyGave`. |
+| 5 | A saved plan with no shelves hid the legacy rows | Fixed. `HomePlan.hasContent` (hero, a mix card or a shelf); Home is owned only when what is drawn has a hero or a shelf, else Jump back in and the library rows carry the page. |
+| 6 | A shelf under 6 could show after songs were removed | Fixed. A library shelf with fewer than `HomePlanner.minTracks` songs left is hidden; the songs a plan draws come through the library minus blocked, muted and "Not for me" songs (`AppEnvironment`). |
+| 7 | The hero release was also in "New from artists you love" | Fixed. The hero is chosen before the shelves and its recording is taken out of the shelf. |
+| 8 | Daily Mix numbers from the island set at build time | Fixed. The number is read from today's islands when a list is read back (`BrainMixes.liveNumber`); an island that is not one of today's six has no list (not shown, not built); the plan records `islandFitAtMs` and is due when the islands were fitted again. Cards still open by the number-1 route, now consistent with the plan. |
+| 9 | An empty fit overwrote good islands and retried at every plan | Fixed. A fit that places nothing keeps the stored islands, stamps `island_empty_fit_at`, and waits a day. |
+| 10 | Genre index cached on library size only | Fixed. The key holds the DNA row count and a write counter (`DnaRepository.revision`). Cards are also ranked by what the listener plays (decayed play weight), then by song count (Android's rule). |
+| 11 | Engine switched to legacy left brain bits on screen | Fixed. Home's state resets to the legacy page, whole. |
+| 12 | A failed atlas load was retried by every caller | Fixed. A failure is remembered for ten minutes. |
+| 13 | Track and artist DNA rows written separately | Fixed. The artist row goes first, so a kill never leaves "MusicBrainz done" on a track with its artist lost. |
+| 14 | A plan over 50 KB was not saved, silently | Fixed. Retried with 10, 8 and 6 songs a shelf and two covers a card; a plan that still does not fit logs `brain_home_plan_not_saved`. |
+| 15 | The date line was the saved plan's | Fixed. Weekday and daypart come from the clock when Home draws. |
+| 16 | A Search tile with no songs toasted and opened browse | Fixed. A tile with a fallback says nothing; a Home card (no fallback) still says so. |
+| 17 | Atlas families wrong for two Vietnamese genres | Deferred. The atlas is one shared CC0 file pinned by SHA on both apps; changing `nhac tien chien` (853) and `nhac do` (231) to a south and southeast asian family has to land on Android and iOS together. Nothing user-visible depends on `family` yet. |
+
+Also copied from Android's review pass: tracks are deduplicated by recording id before the graph and the fit; the graph is capped at
+30,000 nodes (library edges first, then the heaviest of the rest); an island gets a genre name only when 40% of its tracks carry a genre
+and the genre is among its top tags; genre names with a banned word (substring, so "atmospheric ..." is hidden) are never shown on a card, a
+Search tile, an island name or "A step sideways"; On Repeat is built first; `takenOnDay` reads the newest build of each list only; the "New"
+and "Mixes" chips are offered only with something behind them; Home draws nothing below the top bar until the saved plan has been looked
+for (120 ms fade). Not needed on iOS: the served-log cache (the iOS log is an in-memory index), the ISRC in the exported log (the
+knowledge transport logs no URL).
+
+## Deviations 134 and on
+
+134. **`island_member.pbl` is gone**: the member record is the key `members` in `island.pbl`, written last in the same append (Android: one Room transaction).
+135. **`SpotifyDnaPurge` and `DnaTarget.spotifyOff`** (Android 170/171); `RefreshWork.purgeSpotify()` has a default no-op.
+136. **The island fit excludes Spotify-sourced tags** (stricter than Android; see finding 4). The same input switch exists nowhere else.
+137. **`HomePlan.islandFitAtMs`** (optional field, 0 when absent) and `HomePlan.hasContent` / `shrunk(maxItems:)`.
+138. **`CachedAtlasProvider.init(load:clock:)`**: the clock is the second parameter so a trailing closure still means `load`.
+139. **The setup page's import button changes its words after a tap** (new string "It opens when you finish setup").
+
+## Cut or deferred (this pass)
+
+- The 30-day, 60%-distinct simulation with islands in `Eval` (as on Android: needs islands plus novel candidates with embeddings inside `Eval`).
+- The atlas family fix (finding 17).
+- The song count on a mix card stays the plan's until the next plan (as on Android); the plan is now due again when the islands were refitted.
+- Android's `brain.db` migration and instrumented tests have no iOS twin (record files).
+
+## How to test on a phone (stage 2b, whole)
+
+Developer mode on, Spotify connected. Use a build installed over one that has stage 2a files if you have it.
+1. **Update over an old build.** The app opens, nothing is lost: Brain data still counts the same plays.
+2. **Home from the file.** Play ten different songs, leave Home open a few seconds, go away and come back: date line (it follows the clock),
+   chips, hero, Jump back in, "Made for you". Kill and reopen: Home fades in already showing the plan; the old rows are never drawn first.
+3. **Chips.** "New" and "Mixes" are only there with something behind them; a remembered chip with nothing falls back to "For you".
+4. **No blank Home.** With few songs and picked artists but no network: Jump back in and the library rows are there, never just the chips.
+5. **Mixes named from real genres.** After one refresh (or 90 s idle in front) the Daily Mixes appear numbered 1..K; a name appears only when
+   many of that island's songs have a genre; a thin corner shows only artists. No card says "atmospheric ...".
+6. **A song is in one mix a day.** Open Daily Mix 1, 2, 3, Your Mix, On Repeat, Rediscover and the hero release: look for a song twice (none
+   expected). Over a week the Daily Mixes should mostly differ (no automated evidence for islands: write down what you see).
+7. **Genre stations.** Tap a card under "Stations for you": the queue line says "Station · <genre>". A Search tile for a genre you have no songs in
+   opens the search without a message.
+8. **Spotify switch.** Settings > Developer mode > Brain: "Use my Spotify music to shape picks" off, then after the next refresh Brain data shows
+   fewer genres and the Daily Mix names may go to artists alone; on again, they return after a refresh.
+9. **Knowledge sources.** Brain data lists Deezer, MusicBrainz, ListenBrainz, Wikidata and iTunes with their terms, each with its own switch;
+   Deezer off stops its counter. (Non-commercial sources: switch each off before charging anyone.)
+10. **One background job.** The Developer screen / Console shows one `brain refresh` task; while music plays no enrichment runs.
+11. **Cold start.** Fresh install with Spotify: "Getting to know your music" counts to 8 and goes. Under 30 songs: "Pick three artists you love";
+    after three, Your Mix and a Daily Mix exist.
+12. **Setup.** The new page after Spotify; tap "Import your listening history": the button says it opens when you finish; on Finish the import opens.
+13. **Kill during a refresh.** Start a refresh, kill the app, reopen: Daily Mixes keep their numbers (the fit lands whole or not at all).
+
+## What nobody has verified on a device (stage 2b, whole)
+
+Everything in `App/` (CI compiles it, nothing runs it): the look of the new Home, the fade-in and that nothing jumps when a plan arrives; the
+chips; the setup page and the import hand-over; the picker and the first-minute strip (they call YouTube Music); genre station starts and Search
+tiles; the 04:00 and daypart rollover; island fit time and memory on a real 3,000 to 20,000 song library (timed as `brain_island_fit`) and whether
+real islands read as sides of someone's taste and whether the 40% naming rule leaves too many unnamed; the purge on a real library; the transaction
+behaviour when iOS ends the background task mid-fit (the tests prove a half-written fit is never read, not what iOS does to the process); the
+30-day distinct share of island Daily Mixes; the Swift 6 concurrency of the new `App/` lines beyond what CI compiles; that the refresh is still one task.
+
+## Commands and results (review pass)
+
+```
+cmd //c "ci\swiftw.cmd test --package-path Packages\PixlCore --filter BrainStage2b"   # 71 tests, 5 suites, 0 failed
+cmd //c "ci\swiftw.cmd test --package-path Packages\PixlCore"                         # 2,461 tests in 8 bundles, 0 failed
+bash ci/check-forbidden.sh                                                              # OK
+powershell -NoProfile -ExecutionPolicy Bypass -File ci/parse-check.ps1                  # 235 files OK
+```

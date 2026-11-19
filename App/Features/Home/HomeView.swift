@@ -57,7 +57,7 @@ struct HomeView: View {
                 if plan.knowingTotal > 0 { HomeKnowingStrip(done: plan.knowingDone, total: plan.knowingTotal) }
                 if plan.offerPicker { HomeArtistPickerCard(onPick: { router.push(.artistPicker) }) }
                 if plan.owned {
-                    HomeChipsRow(selected: chip, onSelect: { picked in
+                    HomeChipsRow(selected: activeChip(plan), chips: offeredChips(plan), onSelect: { picked in
                         if picked == .spatial { router.push(.cloudProcessing) } else { chip = picked }
                     })
                 }
@@ -113,6 +113,10 @@ struct HomeView: View {
                 }
             }
             .padding(.bottom, 38)
+            // Nothing is drawn below the top bar until the saved plan has been looked for (a frame or two): the old rows are
+            // never painted and then swapped out for the plan, and the plan fades in. UI tests draw at once.
+            .opacity(plan.resolved || env.launch.isUITest ? 1 : 0)
+            .animation(.easeOut(duration: 0.12), value: plan.resolved)
         }
         .scrollIndicators(.hidden)
         // Only the scroll view carries the screen id. Applied after the top-bar inset below, it overwrote the
@@ -149,16 +153,22 @@ struct HomeView: View {
         // The first appearance reads the saved plan, then plans again when the day, the daypart or the taste moved.
         .task { env.homePlan.onHomeShown() }
         .onChange(of: env.tasteAdjustments.revision) { _, _ in env.homePlan.invalidate() }
-        // "Import your listening history" from the setup page: the existing import opens once, as soon as Home is here.
-        .task {
-            if UserDefaults.standard.bool(forKey: PreferenceKeys.pendingHistoryImport) {
-                UserDefaults.standard.removeObject(forKey: PreferenceKeys.pendingHistoryImport)
-                router.push(.listeningHistory)
-            }
+        // "Import your listening history" from the setup page: the existing import opens once, when Home is on screen with no
+        // cover over it. Home is already mounted behind the setup, so this also watches the cover close.
+        .task { openPendingHistoryImport() }
+        .onChange(of: router.cover == nil) { _, closed in
+            if closed { openPendingHistoryImport() }
         }
         // Cloud Studio's stored jobs (read once, off the main actor): its work may have moved on while the app was closed,
         // and the jobs button should show it.
         .task { await env.cloud.loadForDisplay() }
+    }
+
+    /// The import the setup page asked for opens once; never under a cover (the setup itself), where it would be pushed unseen.
+    private func openPendingHistoryImport() {
+        guard router.cover == nil, UserDefaults.standard.bool(forKey: PreferenceKeys.pendingHistoryImport) else { return }
+        UserDefaults.standard.removeObject(forKey: PreferenceKeys.pendingHistoryImport)
+        router.push(.listeningHistory)
     }
 
     /// Not in UI tests (screenshots stay as they were), and only once there is a library to make mixes from.
@@ -218,7 +228,7 @@ struct HomeView: View {
         if !plan.owned {
             HomeJumpBackIn(tiles: plan.tiles, onTile: openTile)
         } else {
-            switch chip {
+            switch activeChip(plan) {
             case .mixes:
                 HomeAllMixes(cards: plan.allMixes, onOpen: openMix)
             case .new:
@@ -230,6 +240,20 @@ struct HomeView: View {
             }
         }
     }
+
+    /// "Mixes" and "New" are offered only when there is something behind them.
+    private func offeredChips(_ plan: HomePlanUi) -> [HomeChip] {
+        HomeChip.allCases.filter { chip in
+            switch chip {
+            case .mixes: !plan.allMixes.isEmpty
+            case .new: !plan.newShelves.isEmpty
+            default: true
+            }
+        }
+    }
+
+    /// The chip the page shows: a remembered chip whose content has gone falls back to "For you".
+    private func activeChip(_ plan: HomePlanUi) -> HomeChip { offeredChips(plan).contains(chip) ? chip : .forYou }
 
     @ViewBuilder
     private func planShelves(_ shelves: [HomeShelfUi]) -> some View {

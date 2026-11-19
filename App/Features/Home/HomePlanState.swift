@@ -70,6 +70,9 @@ nonisolated struct TileUi: Identifiable, Equatable, Sendable {
 /// What Home shows. `owned` is false until a plan is read or built; Home never shows a spinner or an empty state for it: without
 /// a plan it shows Jump back in and the library rows (8.1, 8.10).
 nonisolated struct HomePlanUi: Equatable, Sendable {
+    /// True once the saved plan has been looked for (or it is known there will be none). Until then Home draws nothing below the
+    /// top bar, so the old rows are never painted for a frame and then swapped out for the plan.
+    var resolved = false
     var owned = false
     var dateLine = ""
     var hero: HeroUi?
@@ -123,17 +126,24 @@ final class HomePlanState {
             readOnce = true
             current = await store.read()
         }
-        return current != nil
+        return current?.hasContent ?? false
     }
 
     /// Home appeared. Reads the saved plan the first time (one small file) and shows it; on a later appearance shows the plan that
     /// was built meanwhile. Then, once the first seconds have passed, plans again if the day, the daypart or the taste changed.
     func onHomeShown() {
-        guard let store else { return }
+        guard let store else {
+            if !ui.resolved { ui.resolved = true }
+            return
+        }
         Task { [weak self] in
             guard let self else { return }
             guard self.engineIsOn() else {
-                if self.ui.owned { self.ui.owned = false }
+                // The legacy page, whole: nothing of the brain's Home (its tiles, the first-minute strip, the picker, the date
+                // line) stays on screen after the engine is switched off in this process.
+                var legacy = HomePlanUi()
+                legacy.resolved = true
+                if self.ui != legacy { self.ui = legacy }
                 return
             }
             if !self.readOnce {
@@ -237,9 +247,11 @@ final class HomePlanState {
 
     private func publish(_ plan: HomePlan?) async {
         let tiles = await tiles()
-        guard let plan else {
-            // Without a plan: Jump back in and the library rows. The brain owns Home only once there is one.
+        guard let plan, plan.hasContent else {
+            // Without a plan (or with a plan that has nothing to show): Jump back in and the library rows. The brain owns Home
+            // only once a plan has a hero, a made-for-you card or a shelf; an empty one would leave the page nearly blank.
             var next = ui
+            next.resolved = true
             next.owned = false
             next.tiles = tiles
             if next != ui { ui = next }
@@ -252,7 +264,9 @@ final class HomePlanState {
         let now = currentTimeMillis()
         let rendered = await Self.render(plan, tiles: tiles, library: songs, nowMs: now)
         var next = ui
-        next.owned = true
+        next.resolved = true
+        // What survived the library as it is now: a plan whose every shelf was dropped is not a page.
+        next.owned = rendered.hero != nil || !rendered.shelves.isEmpty
         next.dateLine = rendered.dateLine
         next.hero = rendered.hero
         next.shelves = rendered.shelves
@@ -316,7 +330,9 @@ final class HomePlanState {
                     if let line = reason(item) { reasons.append((song.id, line)) }
                     tags[song.id] = tag(shelf, item)
                 }
-                if songs.isEmpty { continue }
+                // A shelf of the library the listener has since thinned out (songs removed, unfavourited, blocked) is hidden when
+                // fewer than the planner's minimum are left, like a shelf the planner never chose.
+                if songs.count < (shelf.items.contains { $0.songId != nil } ? HomePlanner.minTracks : 1) { continue }
                 let section = HomeMusicSection(id: shelf.id, title: text(shelf.titleKey, shelf.titleArg),
                                                subtitle: text(shelf.subtitleKey, shelf.titleArg), songs: songs, reasons: reasons)
                 shelves.append(.tracks(BrainHomeShelf(id: shelf.id, tracks: tracks, section: section, tags: tags)))
@@ -334,13 +350,16 @@ final class HomePlanState {
             case .stations: return nil
             }
         }
-        return Rendered(dateLine: dateLine(plan), hero: hero, shelves: shelves, tiles: tiles, allMixes: cards, newShelves: newShelves)
+        return Rendered(dateLine: dateLine(nowMs: nowMs), hero: hero, shelves: shelves, tiles: tiles, allMixes: cards, newShelves: newShelves)
     }
 
-    nonisolated static func dateLine(_ plan: HomePlan) -> String {
+    /// The weekday and daypart of the clock now, not of the day the saved plan was made on: Home opened on Saturday morning
+    /// with Friday evening's plan still says Saturday morning.
+    nonisolated static func dateLine(nowMs: Int64) -> String {
+        let tz = Int32(clamping: TimeZone.current.secondsFromGMT(for: Date(timeIntervalSince1970: TimeInterval(nowMs) / 1000)) / 60)
         let symbols = Calendar.current.weekdaySymbols
-        let day = symbols[(Int(plan.weekday) + 1) % 7]
-        return "\(day) \(BrainStrings.daypart(plan.daypart))"
+        let day = symbols[(Int(HomePlanner.weekday(nowMs: nowMs, tzOffsetMin: tz)) + 1) % 7]
+        return "\(day) \(BrainStrings.daypart(HomePlanner.daypart(nowMs: nowMs, tzOffsetMin: tz)))"
     }
 
     nonisolated private static func hero(_ h: PlanHero, plan: HomePlan, library: [String: Song], nowMs: Int64) -> HeroUi? {
