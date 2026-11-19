@@ -65,65 +65,82 @@ nonisolated final class AtomicDouble: @unchecked Sendable {
 
 // MARK: - Global effects (one instance, shared by every tap)
 
-/// The effects every item runs: the equalizer chain (10 peaking bands + bass-boost shelf, pre-gain, stereo width,
-/// limiter flag, from PixlAudioCore's `EqualizerDesigner`), the mid/side instrumental fallback and the ReplayGain
-/// boost policy. Coefficients are designed on the main actor at the device's nominal rate and redesigned by each tap
-/// for its own sample rate only when that differs (`coefficients(for:)`, off the render thread in `prepare`).
-nonisolated final class AudioEffectsParameters: @unchecked Sendable {
-    /// Biquad sections in the chain (`EqualizerChainParameters.sectionCount` = 11).
-    static let sectionCount = EqualizerChainParameters.sectionCount
-    /// Doubles per published block: 5 per section + pre-gain, width, limiter flag, bypass flag.
-    static let blockSize = sectionCount * 5 + 4
-    private static let slotCount = 8
-
+/// Coefficients for one prepared tap at its actual input rate. The settings writer and render reader each own a
+/// block. They exchange ownership of the third block atomically, so repeated edits cannot overwrite a block that
+/// vDSP is reading. Preparation and publication may allocate; taking the latest block at a buffer boundary cannot.
+nonisolated final class TapEqualizerCoefficients: @unchecked Sendable {
+    let sampleRate: Double
     private let blocks: UnsafeMutablePointer<Double>
-    private let published = Atomic<Int>(0)
-    /// The settings the latest block was designed from (main actor only; taps redesign for other sample rates).
-    private let settingsLock = Mutex<EqualizerSettings>(EqualizerSettings())
+    private static let pending = 4
+    private let middle = Atomic<Int>(1)
+    private var front = 0   // reader only
+    private var back = 2    // writer only
+
+    init(sampleRate: Double) {
+        self.sampleRate = sampleRate
+        blocks = .allocate(capacity: 3 * AudioEffectsParameters.blockSize)
+        blocks.initialize(repeating: 0, count: 3 * AudioEffectsParameters.blockSize)
+    }
+
+    deinit { blocks.deallocate() }
+
+    func publish(_ settings: EqualizerSettings) {
+        let parameters = EqualizerDesigner.design(settings, sampleRate: sampleRate)
+        AudioEffectsParameters.write(parameters, into: blocks + back * AudioEffectsParameters.blockSize)
+        back = middle.exchange(back | Self.pending, ordering: .acquiringAndReleasing) & ~Self.pending
+    }
+
+    /// The pointer remains exclusively the reader's until its next successful exchange.
+    @inline(__always)
+    func takeUpdate() -> UnsafePointer<Double>? {
+        guard middle.load(ordering: .acquiring) & Self.pending != 0 else { return nil }
+        front = middle.exchange(front, ordering: .acquiringAndReleasing) & ~Self.pending
+        return UnsafePointer(blocks + front * AudioEffectsParameters.blockSize)
+    }
+}
+
+/// Global effect preferences and the active taps, including both decks during a crossfade.
+nonisolated final class AudioEffectsParameters: @unchecked Sendable {
+    static let sectionCount = EqualizerChainParameters.sectionCount
+    static let blockSize = sectionCount * 5 + 4
+
+    private struct TapReference: Sendable {
+        weak var coefficients: TapEqualizerCoefficients?
+    }
+
+    private struct State: Sendable {
+        var settings = EqualizerSettings()
+        var taps: [TapReference] = []
+    }
+
+    private let state = Mutex(State())
     /// Mid/side vocal attenuation 0…1 (0 = off).
     let midSideAttenuation = AtomicFloat(0)
     /// Allow ReplayGain gains above unity (+6 dB max) through the soft limiter. Android caps at 1 (parity: false).
     let allowReplayGainBoost = Atomic<Bool>(false)
-    /// The rate the published coefficients were designed for.
-    let designSampleRate = AtomicDouble(44_100)
     /// Music Haptics: the shared signal the taps publish onsets and the bass level to (inactive unless switched on).
     let haptics = HapticSignalBus()
     /// Spatial audio's on-device stage: the profile every tap plays (or none) and the shared coefficients.
     let spatial = SpatialTapShared()
 
-    init() {
-        blocks = .allocate(capacity: Self.blockSize * Self.slotCount)
-        blocks.initialize(repeating: 0, count: Self.blockSize * Self.slotCount)
-        for slot in 0..<Self.slotCount { Self.write(.bypass, into: blocks + slot * Self.blockSize) }
+    /// Register with the current settings atomically so a racing edit reaches even a newly prepared tap.
+    func coefficients(for sampleRate: Double) -> TapEqualizerCoefficients {
+        let coefficients = TapEqualizerCoefficients(sampleRate: sampleRate)
+        state.withLock { state in
+            state.taps.removeAll { $0.coefficients == nil }
+            coefficients.publish(state.settings)
+            state.taps.append(TapReference(coefficients: coefficients))
+        }
+        return coefficients
     }
 
-    deinit { blocks.deallocate() }
-
-    /// The current equalizer settings (for taps that need coefficients at another sample rate).
-    var settings: EqualizerSettings { settingsLock.withLock { $0 } }
-
-    /// Publishes new equalizer settings (main actor). Taps pick them up on their next buffer.
-    func setEqualizer(_ settings: EqualizerSettings, sampleRate: Double = 44_100) {
-        settingsLock.withLock { $0 = settings }
-        designSampleRate.store(sampleRate)
-        publish(EqualizerDesigner.design(settings, sampleRate: sampleRate))
-    }
-
-    private func publish(_ parameters: EqualizerChainParameters) {
-        let next = published.load(ordering: .relaxed) &+ 1
-        Self.write(parameters, into: blocks + (next % Self.slotCount) * Self.blockSize)
-        published.store(next, ordering: .releasing)
-    }
-
-    /// The generation of the latest block.
-    @inline(__always) var generation: Int { published.load(ordering: .acquiring) }
-
-    /// The latest block (render thread): 5 doubles per section (b0 b1 b2 a1 a2), then pre-gain, width, limiter
-    /// flag (0/1) and bypass flag (0/1).
-    @inline(__always)
-    func latestBlock() -> (generation: Int, block: UnsafePointer<Double>) {
-        let g = published.load(ordering: .acquiring)
-        return (g, UnsafePointer(blocks + (g % Self.slotCount) * Self.blockSize))
+    func setEqualizer(_ settings: EqualizerSettings) {
+        state.withLock { state in
+            guard settings != state.settings else { return }
+            state.settings = settings
+            state.taps.removeAll { $0.coefficients == nil }
+            for tap in state.taps { tap.coefficients?.publish(settings) }
+        }
     }
 
     /// Lays out `parameters` as a block.

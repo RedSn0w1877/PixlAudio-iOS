@@ -52,7 +52,16 @@ final class LyricsDriver: NSObject {
     /// Frame-accurate player position (main thread, cheap).
     var positionProvider: () -> Int64 = { 0 }
     /// The additive lyric sync offset.
-    var offsetMs: Int64 = 0 { didSet { if offsetMs != oldValue { wake() } } }
+    var offsetMs: Int64 = 0 {
+        didSet {
+            guard offsetMs != oldValue else { return }
+            // A deliberate nudge can move the lyrics backward. Accept it on the next frame,
+            // even if the new position would otherwise be held by the playback jitter guard.
+            engine.clock.reset()
+            engine.clock.markSeek()
+            wake()
+        }
+    }
     /// UI tests: the song position the lyrics are frozen at (`-lyricsFreezeMs`).
     var frozenPositionMs: Int64?
 
@@ -150,8 +159,7 @@ final class LyricsDriver: NSObject {
     }
 
     private func rawLyricsTime() -> Int64 {
-        if let frozenPositionMs { return frozenPositionMs }
-        return positionProvider() &+ offsetMs
+        (frozenPositionMs ?? positionProvider()) &+ offsetMs
     }
 
     @objc private func tick(_ link: CADisplayLink) {

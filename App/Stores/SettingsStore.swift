@@ -642,6 +642,31 @@ final class EqualizerPreferences {
     var viewMode: String { didSet { defaults.set(viewMode, forKey: PreferenceKeys.equalizerViewMode) } }
     /// Android `custom_presets_json` (a JSON list of `EqualizerPreset`), kept raw; the equalizer screen decodes it.
     var customPresetsJSON: String? { didSet { defaults.set(customPresetsJSON, forKey: PreferenceKeys.customPresets) } }
+    @ObservationIgnored private var decodedPresetsJSON: String?
+    @ObservationIgnored private var decodedPresets: [EqualizerPreset] = []
+
+    /// Decode only after a restore or a save. Dragging a band reads the same array on the UI and engine paths.
+    var savedPresets: [EqualizerPreset] {
+        guard let json = customPresetsJSON else { return [] }
+        if decodedPresetsJSON != json {
+            let presets = (try? JSONDecoder().decode([EqualizerPreset].self, from: Data(json.utf8))) ?? []
+            var names = Set(EqualizerPreset.allPresets.map(\.name) + ["custom"])
+            decodedPresets = presets.map { preset in
+                var saved = preset
+                // Older builds allowed repeated names and names shared with built-ins. Preserve each curve.
+                while !names.insert(saved.name).inserted {
+                    saved.name += " (saved)"
+                    saved.displayName = saved.name
+                }
+                saved.isCustom = true
+                saved.bandLevels = Self.normalizedBands(saved.bandLevels)
+                return saved
+            }
+            decodedPresetsJSON = json
+        }
+        return decodedPresets
+    }
+
     /// Android `pinned_presets_json` (a JSON list of preset names); nil = every built-in preset.
     var pinnedPresetsJSON: String? { didSet { defaults.set(pinnedPresetsJSON, forKey: PreferenceKeys.pinnedPresets) } }
 
@@ -659,20 +684,9 @@ final class EqualizerPreferences {
         isEnabled = defaults.bool(PreferenceKeys.equalizerEnabled, default: false)
         presetName = defaults.string(PreferenceKeys.equalizerPreset, default: "flat")
         bassBoostEnabled = defaults.bool(PreferenceKeys.bassBoostEnabled, default: false)
-        bassBoostStrength = defaults.int(PreferenceKeys.bassBoostStrength, default: 0)
+        bassBoostStrength = min(max(defaults.int(PreferenceKeys.bassBoostStrength, default: 0), 0), 1000)
         virtualizerEnabled = defaults.bool(PreferenceKeys.virtualizerEnabled, default: false)
-        virtualizerStrength = defaults.int(PreferenceKeys.virtualizerStrength, default: 0)
-        lockOffWhileBroken()
-    }
-
-    /// Locked while the equalizer is marked broken (owner, 2026-10-26): every effect is stored off, whatever an old
-    /// build or a restored backup left behind (the strengths and presets are kept for the fix).
-    private func lockOffWhileBroken() {
-        guard BrokenFeature.equalizer.isLocked else { return }
-        if isEnabled { isEnabled = false }
-        if bassBoostEnabled { bassBoostEnabled = false }
-        if virtualizerEnabled { virtualizerEnabled = false }
-        if loudnessEnhancerEnabled { loudnessEnhancerEnabled = false }
+        virtualizerStrength = min(max(defaults.int(PreferenceKeys.virtualizerStrength, default: 0), 0), 1000)
     }
 }
 
@@ -680,17 +694,19 @@ final class EqualizerPreferences {
 
 extension EqualizerPreferences {
     /// Android `setEqualizerCustomBands` normalises to 10 levels clamped to −15…15.
+    nonisolated static func normalizedBands(_ bands: [Int]) -> [Int] {
+        EqualizerPreset.bandFrequencies.indices.map { i in
+            i < bands.count ? min(max(bands[i], EqualizerPreset.minLevel), EqualizerPreset.maxLevel) : 0
+        }
+    }
+
     nonisolated static func encodeInts(_ bands: [Int]) -> String {
-        let normalized = (0..<10).map { i in i < bands.count ? min(max(bands[i], -15), 15) : 0 }
-        return "[" + normalized.map(String.init).joined(separator: ",") + "]"
+        "[" + normalizedBands(bands).map(String.init).joined(separator: ",") + "]"
     }
 
     nonisolated static func decodeInts(_ json: String?) -> [Int] {
-        guard let json, let data = json.data(using: .utf8),
-              let decoded = try? JSONDecoder().decode([Int].self, from: data), decoded.count == 10 else {
-            return Array(repeating: 0, count: 10)
-        }
-        return decoded
+        let bands = json.flatMap { try? JSONDecoder().decode([Int].self, from: Data($0.utf8)) }
+        return normalizedBands(bands ?? [])
     }
 }
 

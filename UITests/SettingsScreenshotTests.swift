@@ -203,7 +203,10 @@ final class SettingsScreenshotTests: XCTestCase {
     /// The equalizer in its other view modes and the brick game in play.
     func testEqualizerGraphModeLight() throws {
         try capture("equalizer", "light") { app in
-            app.descendants(matching: .any)["eq.viewMode"].firstMatch.tap()
+            let graph = app.segmentedControls["eq.viewMode"].buttons["Graph"]
+            XCTAssertTrue(graph.waitForExistence(timeout: 5))
+            graph.tap()
+            XCTAssertTrue(graph.isSelected)
         }
     }
 

@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import MediaPlayer
 import Observation
@@ -153,21 +154,26 @@ final class NowPlayingController {
             return
         }
         let song = entry.song
-        var durationMs = engine.currentDurationMs()
-        var positionMs = engine.currentPositionMs()
-        var rate = engine.playWhenReady ? Double(engine.rate) : 0.0
+        // A queue edit or skip publishes the new entry before the old item has been replaced. Publish one
+        // entry's clock and title together. Loading or stalled decks have no moving clock to extrapolate.
+        let matches = engine.activeItem?.entry.id == entry.id
+        var durationMs = matches ? engine.currentDurationMs() : song.duration
+        var positionMs = matches ? engine.currentPositionMs() : 0
+        var rate = matches && engine.playWhenReady && engine.active.player.timeControlStatus == .playing
+            ? Double(engine.active.player.rate) : 0.0
         if let remote {
             let remoteDuration = remote.remoteDurationMs()
             durationMs = remoteDuration > 0 ? remoteDuration : song.duration
             positionMs = remote.remotePositionMs()
             rate = remote.remoteIsPlaying ? 1.0 : 0.0
         }
+        let elapsedMs = durationMs > 0 ? min(positionMs, durationMs) : positionMs
         var info: [String: Any] = [
             MPMediaItemPropertyTitle: song.title,
             MPMediaItemPropertyArtist: song.displayArtist,
             MPMediaItemPropertyAlbumTitle: song.album,
-            MPMediaItemPropertyPlaybackDuration: Double(durationMs) / 1000,
-            MPNowPlayingInfoPropertyElapsedPlaybackTime: Double(positionMs) / 1000,
+            MPMediaItemPropertyPlaybackDuration: Double(max(0, durationMs)) / 1000,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: Double(max(0, elapsedMs)) / 1000,
             MPNowPlayingInfoPropertyPlaybackRate: rate,
             MPNowPlayingInfoPropertyDefaultPlaybackRate: 1.0,
             MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.audio.rawValue,

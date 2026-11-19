@@ -2,6 +2,7 @@ import AVFoundation
 import CoreMedia
 import Foundation
 import PixlAudioCore
+import PixlFoundation
 import PixlModel
 
 /// One playable queue entry on a deck: the `AVPlayerItem` with its processing tap and the tap's parameters.
@@ -11,8 +12,10 @@ final class DeckItem {
     let playerItem: AVPlayerItem
     let asset: AVURLAsset
     let tap: TapItemParameters
-    /// From the asset (falls back to the song's stored duration while unknown).
+    /// The playable portion of this rendition, also used by the transition scheduler and Now Playing.
     let durationSeconds: Double
+    /// Untrimmed length for checking whether two renditions of the song line up.
+    let assetDurationSeconds: Double
     /// True for local files (ReplayGain tags can be read).
     let isLocalFile: Bool
     /// What the item plays as Spatial audio sees it: the song's own audio (and of which video), a spatial render, or
@@ -24,6 +27,8 @@ final class DeckItem {
     var pendingSeekSeconds: Double?
     /// The target of a seek still in flight (the timebase only moves once it completes).
     var seekTargetSeconds: Double?
+    /// A completed accurate seek can leave the presentation clock briefly behind its destination while audio prerolls.
+    private var completedSeekFloor: Double?
     /// Distinguishes seeks so an older completion never clears a newer target.
     var seekGeneration = 0
 
@@ -35,21 +40,56 @@ final class DeckItem {
         self.playerItem = playerItem
         self.asset = asset
         self.tap = tap
-        self.durationSeconds = durationSeconds
         self.isLocalFile = isLocalFile
         self.audio = audio
+        let hintMs = entry.song.duration
+        assetDurationSeconds = durationSeconds > 0 ? durationSeconds : Double(max(hintMs, 0)) / 1000
+        // A matched stream can report twice the catalog song's length, even after it is cached as a file.
+        // Use the scrubber's duration for both the scheduled join and AVFoundation's natural end notification.
+        // Imported files keep their actual duration, even when their library metadata is stale.
+        let isCatalogSong = SpotifyUnifiedLibrary.isSpotifySongId(entry.song.id)
+            || YouTubeSongIdentity.videoId(for: entry.song) != nil
+        let reportedMs = Int64((max(durationSeconds, 0) * 1000).rounded())
+        let endMs = PlaybackProgress.displayDuration(reportedMs: reportedMs, hintMs: hintMs)
+        if isCatalogSong, endMs > 0, reportedMs == 0 || endMs < reportedMs {
+            self.durationSeconds = Double(endMs) / 1000
+            playerItem.forwardPlaybackEndTime = CMTime(value: endMs, timescale: 1000)
+        } else {
+            self.durationSeconds = assetDurationSeconds
+        }
+        tap.mediaDuration.store(self.durationSeconds)
     }
 
     /// Position from the item's timebase (cheap; no observation).
     var positionSeconds: Double {
         if let pendingSeekSeconds { return pendingSeekSeconds }
         if let seekTargetSeconds { return seekTargetSeconds }
-        if let timebase = playerItem.timebase {
-            let t = CMTimebaseGetTime(timebase)
-            if t.isValid && t.isNumeric { return max(t.seconds, 0) }
+        let timebaseTime = playerItem.timebase.map { CMTimebaseGetTime($0) } ?? .invalid
+        let time = timebaseTime.isNumeric ? timebaseTime : playerItem.currentTime()
+        let seconds = time.isNumeric ? max(0, time.seconds) : 0
+        if let floor = completedSeekFloor {
+            if seconds < floor { return floor }
+            completedSeekFloor = nil
         }
-        let t = playerItem.currentTime()
-        return t.isValid && t.isNumeric ? max(t.seconds, 0) : 0
+        return seconds
+    }
+
+    func seekTarget(_ seconds: Double) -> Double {
+        max(0, durationSeconds > 0 ? min(seconds, durationSeconds) : seconds)
+    }
+
+    func completeSeek(generation: Int, finished: Bool) {
+        guard generation == seekGeneration else { return }
+        completedSeekFloor = finished ? seekTargetSeconds : nil
+        seekTargetSeconds = nil
+    }
+
+    func clearSeekForScheduledStart() {
+        // A host-clock start supplies its own position, independently of the earlier preroll seek.
+        seekGeneration += 1
+        pendingSeekSeconds = nil
+        seekTargetSeconds = nil
+        completedSeekFloor = nil
     }
 }
 
@@ -151,13 +191,11 @@ final class DeckItemFactory {
         }
         if let timing { PlaybackStartTimings.shared.tracksLoaded(timing) }
         let duration = try? await asset.load(.duration)
-        var seconds = duration.map { $0.isValid && $0.isNumeric ? $0.seconds : 0 } ?? 0
-        if seconds <= 0 { seconds = Double(entry.song.duration) / 1000 }
+        let seconds = duration.map { $0.isValid && $0.isNumeric ? $0.seconds : 0 } ?? 0
         let audio = Self.audio(of: activeURL, isOverride: overrideURL != nil)
         // The song's own audio may run the on-device stage: its tap needs the tables (loaded once, at launch).
         if case .own = audio { await spatial?.tablesReady() }
         let parameters = TapItemParameters(logCapacity: tapLogCapacity)
-        parameters.mediaDuration.store(seconds)
         Self.configureSpatial(parameters, for: audio)
         let item = AVPlayerItem(asset: asset)
         // Pitch-preserving rate changes (sync editor speeds 0.75 / 0.5).
@@ -179,9 +217,7 @@ final class DeckItemFactory {
         let duration = try? await asset.load(.duration)
         var seconds = duration.map { $0.isValid && $0.isNumeric ? $0.seconds : 0 } ?? 0
         if seconds <= 0, let milliseconds = render.durationMs { seconds = Double(milliseconds) / 1000 }
-        if seconds <= 0 { seconds = Double(entry.song.duration) / 1000 }
         let parameters = TapItemParameters(logCapacity: tapLogCapacity)
-        parameters.mediaDuration.store(seconds)
         parameters.spatialRole.store(SpatialItemRole.render, ordering: .relaxed)
         parameters.spatialHeadroomDb.store(render.headroomDb)
         let item = AVPlayerItem(asset: asset)
@@ -249,7 +285,6 @@ final class DeckItemFactory {
         if CMTimeCompare(songEnd, clipEnd) > 0 { track.insertEmptyTimeRange(CMTimeRange(start: clipEnd, end: songEnd)) }
         seconds = max(seconds, clipEnd.seconds)
         let parameters = TapItemParameters(logCapacity: tapLogCapacity)
-        parameters.mediaDuration.store(seconds)
         let item = AVPlayerItem(asset: composition)
         item.audioTimePitchAlgorithm = .spectral
         item.audioMix = ProcessingTap.makeAudioMix(for: track, effects: effects, item: parameters)
@@ -326,7 +361,7 @@ final class Deck {
         observe(item)
         player.insert(item.playerItem, after: nil)
         if seconds > 0 {
-            if item.playerItem.status == .readyToPlay { seek(to: seconds) } else { item.pendingSeekSeconds = seconds }
+            if item.playerItem.status == .readyToPlay { seek(to: seconds) } else { item.pendingSeekSeconds = item.seekTarget(seconds) }
         }
     }
 
@@ -389,6 +424,7 @@ final class Deck {
 
     /// Starts the current item from its beginning at `hostTime` (host clock). Precise starts need stall waiting off.
     func start(rate: Float, atHostTime hostTime: CMTime) {
+        currentItem?.clearSeekForScheduledStart()
         player.automaticallyWaitsToMinimizeStalling = false
         player.defaultRate = rate
         player.setRate(rate, time: .zero, atHostTime: hostTime)
@@ -397,6 +433,7 @@ final class Deck {
     /// Starts the current item at `itemSeconds` (item time) at `hostTime` — stage 14's in-sync switch between a song
     /// and its instrumental. Call after `preroll`.
     func start(rate: Float, at itemSeconds: Double, atHostTime hostTime: CMTime) {
+        currentItem?.clearSeekForScheduledStart()
         player.automaticallyWaitsToMinimizeStalling = false
         player.defaultRate = rate
         player.setRate(rate, time: CMTime(seconds: itemSeconds, preferredTimescale: 1_000_000_000), atHostTime: hostTime)
@@ -414,6 +451,7 @@ final class Deck {
 
     /// Accurate seek on the current item (deferred until it is ready to play).
     func seek(to seconds: Double) {
+        let seconds = currentItem?.seekTarget(seconds) ?? max(0, seconds)
         if let item = currentItem, item.playerItem.status != .readyToPlay {
             item.pendingSeekSeconds = seconds
             return
@@ -426,11 +464,10 @@ final class Deck {
         item.seekGeneration += 1
         let generation = item.seekGeneration
         item.seekTargetSeconds = max(seconds, 0)
-        player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { @Sendable [weak item] _ in
+        player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { @Sendable [weak item] finished in
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
-                    guard let item, item.seekGeneration == generation else { return }
-                    item.seekTargetSeconds = nil
+                    item?.completeSeek(generation: generation, finished: finished)
                 }
             }
         }
