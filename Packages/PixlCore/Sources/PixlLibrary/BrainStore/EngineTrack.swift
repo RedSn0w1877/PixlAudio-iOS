@@ -72,6 +72,12 @@ public struct EngineTrack: Sendable, Hashable {
 
     public static func songId(videoId: String) -> String { songIdPrefix + videoId }
 
+    /// The parsed row this track came from, rebuilt for a saved plan (it carries what a card and the player need).
+    public func toRadioRow() -> RadioRow {
+        RadioRow(videoId: videoId, title: title, artists: artists, album: album, durationSec: Int(durationMs / 1000),
+                 thumbnailUrl: artUrl, kind: .atv)
+    }
+
     public var artistDisplay: String {
         let joined = artists.map(\.name).joined(separator: ", ")
         return BrainText.isBlank(joined) ? Self.unknownArtist : joined

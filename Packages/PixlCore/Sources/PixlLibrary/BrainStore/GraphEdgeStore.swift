@@ -195,6 +195,16 @@ public final class GraphEdgeStore {
         return out
     }
 
+    /// Every stored edge, in a fixed order (the island fit's graph, 5.3).
+    public func allEdges() -> [MixPlanner.Edge] {
+        load()
+        var out: [MixPlanner.Edge] = []
+        out.reserveCapacity(edges.count)
+        for edge in edges.values { out.append(MixPlanner.Edge(a: edge.src, b: edge.dst, weight: Double(edge.record.w) / Self.weightUnit)) }
+        out.sort { x, y in x.a != y.a ? x.a < y.a : (x.b != y.b ? x.b < y.b : x.weight < y.weight) }
+        return out
+    }
+
     public var count: Int {
         load()
         return edges.count

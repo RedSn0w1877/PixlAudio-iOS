@@ -373,6 +373,9 @@ public actor BrainRepository {
     /// The stored edges that touch any of `nodes` (3.6).
     public func edgesFor(_ nodes: [Int64]) -> [MixPlanner.Edge] { tables.edges.edgesFor(nodes) }
 
+    /// Every stored graph edge: the embeddings are fitted over all of them (5.3).
+    public func allEdges() -> [MixPlanner.Edge] { tables.edges.allEdges() }
+
     /// Converts every healthy list in the cache into edges, once. Safe to call again: it does nothing after the first
     /// run. The conversion keeps the age of the list it came from, so its edges expire with it.
     public func backfillEdgesOnce(nowMs: Int64? = nil) {

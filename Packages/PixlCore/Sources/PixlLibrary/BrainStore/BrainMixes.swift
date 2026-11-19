@@ -24,11 +24,13 @@ public actor BrainMixes {
     /// Folded credits that name nobody: never a top-artist seed.
     static let noArtistNames = ["various artists", "unknown artist", "unknown", "va", "<unknown>"]
 
-    private let engine: BrainEngine
-    private let repository: BrainRepository
-    private let served: ServedListStore
-    private let sources: MixSources
-    private let clock: @Sendable () -> Int64
+    let engine: BrainEngine
+    let repository: BrainRepository
+    let served: ServedListStore
+    let sources: MixSources
+    let clock: @Sendable () -> Int64
+    /// Stage 2b: the islands, the DNA and the whole library by id (docs/brain-spec.md, 5.4, 6.2, 8.2). Nil: the lists of stage 2a.
+    var parts: Stage2bParts?
 
     // One build at a time: a mutex that survives the awaits inside it (an actor alone does not).
     private var busy = false
@@ -46,6 +48,9 @@ public actor BrainMixes {
         self.clock = clock
     }
 
+    /// Turns on the lists of stage 2b. Reads nothing: the parts open their files on first use.
+    public func configureStage2b(_ parts: Stage2bParts) { self.parts = parts }
+
     private func lock() async {
         if busy {
             await withCheckedContinuation { waiters.append($0) }
@@ -60,8 +65,16 @@ public actor BrainMixes {
 
     public static func surfaceIdOf(kind: Int32) -> String { kind == MixPlanner.kindYour ? "your" : "daily" }
 
-    static func nuQ(of mix: StoredMix) -> Int32 {
-        Int32(truncatingIfNeeded: BrainMath.floorToLong(MixPlanner.nuOf(mix.kind, multiplier: Novelty.factor(mix.novelty)) * 1000.0))
+    static func nuQ(of mix: StoredMix, spec: MixSpec) -> Int32 {
+        Int32(truncatingIfNeeded: BrainMath.floorToLong(Self.nuOf(spec, multiplier: Novelty.factor(mix.novelty)) * 1000.0))
+    }
+
+    /// The novelty share each list is planned with.
+    static func nuOf(_ spec: MixSpec, multiplier: Double) -> Double {
+        if spec.kind == MixKinds.daily && spec.islandId > 0 { return MixPlanner.nuOfIsland(multiplier: multiplier) }
+        if spec.kind == MixKinds.daily || spec.kind == MixKinds.your { return MixPlanner.nuOf(spec.kind, multiplier: multiplier) }
+        if spec.kind == MixKinds.onRepeat || spec.kind == MixKinds.rediscover { return 0.0 }
+        return 1.0
     }
 
     // MARK: Who owns the mixes
@@ -69,11 +82,15 @@ public actor BrainMixes {
     /// True when the brain scorer builds the mixes: switched on, and there is state to rank by. Loads the state.
     public func ownsMixes() async -> Bool {
         if BrainEngineChoice.clamp(await sources.engine()) != BrainEngineChoice.brain { return false }
-        return await engine.hasState()
+        return await hasState()
     }
 
-    /// True when the brain has played tracks to rank by. Loads the state on first use.
-    public func hasState() async -> Bool { await engine.hasState() }
+    /// True when the brain has played tracks to rank by, or the listener picked artists to start from (8.10). Loads the
+    /// state on first use.
+    public func hasState() async -> Bool {
+        if await engine.hasState() { return true }
+        return await parts?.picked?.hasPicks() ?? false
+    }
 
     // MARK: What the screens ask for
 
@@ -86,7 +103,7 @@ public actor BrainMixes {
         var daily = regenerate ? nil : await saved(kind: MixPlanner.kindDaily)
         var your = regenerate ? nil : await saved(kind: MixPlanner.kindYour)
         if daily == nil || your == nil {
-            if !(await engine.hasState()) { return nil }
+            if !(await hasState()) { return nil }
             if daily == nil { daily = await today(kind: MixPlanner.kindDaily, regenerate: regenerate) }
             if your == nil { your = await today(kind: MixPlanner.kindYour, regenerate: regenerate) }
         }
@@ -106,86 +123,129 @@ public actor BrainMixes {
     /// Today's saved mix of `kind`, read back without building anything and without loading the brain's state: one
     /// small read of the served log. Nil when there is none, when it is too empty to show, or when it was built without
     /// new music and radios are cached now (see `isStale`).
-    public func saved(kind: Int32) async -> MixView? {
+    public func saved(kind: Int32) async -> MixView? { await savedOf(await specFor(kind: kind)) }
+
+    /// The list a caller that knows only "the Daily Mix" means (the legacy screens, the widgets): with several islands it is
+    /// Daily Mix 1, the island of the lowest id among the biggest six; without, the one list of stage 2a.
+    public func specFor(kind: Int32) async -> MixSpec {
+        if kind != MixKinds.daily { return MixSpec(kind: kind) }
+        if let islands = await parts?.islands.current(), islands.hasMany, let first = islands.dailyIslands().first {
+            return MixSpec(kind: kind, islandId: first.id)
+        }
+        return MixSpec(kind: kind)
+    }
+
+    public func savedOf(_ spec: MixSpec) async -> MixView? {
         await lock()
         defer { unlock() }
         let now = clock()
         let tz = sources.tzOffsetMin(now)
-        guard let stored = served.todays(surface: MixPlanner.surfaceOf(kind), nowMs: now, tzOffsetMin: tz) else { return nil }
+        guard let stored = served.todays(surface: spec.surface, nowMs: now, tzOffsetMin: tz, surfaceId: spec.surfaceId,
+                                         weekly: spec.kind == MixKinds.firstListen) else { return nil }
         if await isStale(stored, now: now, tz: tz) { return nil }
         return await materialize(stored, now: now)
     }
 
     /// The listener removed a song from today's mix: it stays out when the mix is read back.
-    public func removeItem(kind: Int32, songId: String) async {
+    public func removeItem(kind: Int32, songId: String) async { await removeItemOf(await specFor(kind: kind), songId: songId) }
+
+    public func removeItemOf(_ spec: MixSpec, songId: String) async {
         await lock()
         defer { unlock() }
         let now = clock()
-        let surface = MixPlanner.surfaceOf(kind)
-        guard var stored = served.todays(surface: surface, nowMs: now, tzOffsetMin: sources.tzOffsetMin(now)) else { return }
+        let surface = spec.surface
+        guard var stored = served.todays(surface: surface, nowMs: now, tzOffsetMin: sources.tzOffsetMin(now),
+                                         surfaceId: spec.surfaceId) else { return }
         let before = stored.items.count
         stored.items.removeAll { item in
             if let id = item.songId { return BrainKey.sameBytes(id, songId) }
             return item.row.map { BrainKey.sameBytes(EngineTrack(row: $0.row, rid: $0.rid).songId, songId) } ?? false
         }
         if stored.items.count == before { return }
-        served.put(surface: surface, surfaceId: Self.surfaceIdOf(kind: kind), mix: stored, nuQ: Self.nuQ(of: stored), nowMs: now)
+        served.put(surface: surface, surfaceId: spec.surfaceId, mix: stored, nuQ: Self.nuQ(of: stored, spec: spec), nowMs: now)
     }
 
     /// Today's mix of `kind`: the saved one when there is one for today's local day, otherwise a new one (which is then
     /// saved). With `regenerate` a new list is drawn whatever is saved. Nil when there is nothing to build a mix from
     /// (an empty library and no cached radios).
     public func today(kind: Int32, regenerate: Bool = false) async -> MixView? {
+        await todayOf(await specFor(kind: kind), regenerate: regenerate)
+    }
+
+    public func todayOf(_ spec: MixSpec, regenerate: Bool = false) async -> MixView? {
         await lock()
         defer { unlock() }
         let now = clock()
         let tz = sources.tzOffsetMin(now)
-        let surface = MixPlanner.surfaceOf(kind)
-        if !regenerate, let saved = served.todays(surface: surface, nowMs: now, tzOffsetMin: tz) {
+        let surface = spec.surface
+        let weekly = spec.kind == MixKinds.firstListen
+        if !regenerate, let saved = served.todays(surface: surface, nowMs: now, tzOffsetMin: tz, surfaceId: spec.surfaceId, weekly: weekly) {
             let stale = await isStale(saved, now: now, tz: tz)
             if !stale, let view = await materialize(saved, now: now) { return view }
         }
-        let drawn: Int32 = regenerate ? served.buildsToday(surface: surface, nowMs: now, tzOffsetMin: tz) : 0
+        let drawn: Int32 = regenerate ? served.buildsToday(surface: surface, nowMs: now, tzOffsetMin: tz, surfaceId: spec.surfaceId) : 0
         let started = clock()
-        guard let stored = await build(kind: kind, now: now, tz: tz, regenerate: drawn) else { return nil }
+        guard let stored = await build(spec: spec, now: now, tz: tz, regenerate: drawn) else { return nil }
         sources.timing("brain_mix_build", max(clock() - started, 0))
         // The brain has been used: now (and not at app start) the one background job is scheduled.
         sources.mixBuilt()
-        let recId = served.put(surface: surface, surfaceId: Self.surfaceIdOf(kind: kind), mix: stored,
-                               nuQ: Self.nuQ(of: stored), nowMs: now)
+        let recId = served.put(surface: surface, surfaceId: spec.surfaceId, mix: stored,
+                               nuQ: Self.nuQ(of: stored, spec: spec), nowMs: now)
         return await materialize(stored, now: now, recIdKnown: recId)
     }
 
     /// A mix built when no radio was cached holds no new music. Once lists are in the cache it is built again, once:
     /// the listener should not wait a day for the first new music. A mix with new music is the day's mix and stays.
     private func isStale(_ saved: StoredMix, now: Int64, tz: Int32) async -> Bool {
+        // Only the lists that take new music from cached radios can be waiting for one; On Repeat and Rediscover never are.
+        if !MixKinds.usesPlanner(saved.kind) || saved.kind == MixKinds.firstListen { return false }
         if saved.seedLists > 0 || saved.novelCount > 0 { return false }
         if now - saved.builtAtMs < Self.rebuildMinAgeMs { return false }
         // "Once": the rebuild is itself a build of the day. When the day already has two, the mix stays even if it again
         // holds no new music (none of today's seeds has a cached radio): it would otherwise be drawn again every ten minutes,
         // each draw raising the served penalty (deviation 94).
-        if served.buildsToday(surface: MixPlanner.surfaceOf(saved.kind), nowMs: now, tzOffsetMin: tz) >= 2 { return false }
+        let spec = MixSpec(kind: saved.kind, islandId: saved.islandId)
+        if served.buildsToday(surface: spec.surface, nowMs: now, tzOffsetMin: tz, surfaceId: spec.surfaceId) >= 2 { return false }
         return await repository.radiosFetchedSince(0) > 0
     }
 
     // MARK: Building
 
-    private func build(kind: Int32, now: Int64, tz: Int32, regenerate: Int32) async -> StoredMix? {
+    private func build(spec: MixSpec, now: Int64, tz: Int32, regenerate: Int32) async -> StoredMix? {
         await repository.backfillEdgesOnce(nowMs: now)
-        let surface = MixPlanner.surfaceOf(kind)
+        if !MixKinds.usesPlanner(spec.kind) { return await buildSimple(spec, now: now, tz: tz, regenerate: regenerate) }
+        let kind = spec.kind
+        let surface = spec.surface
         let taste = await sources.constraints()
         let level = Novelty.clamp(await sources.noveltyLevel())
         let salt = await engine.salt()
         let all = await sources.library()
-        let library = await shortlist(all, now: now, tz: tz, salt: salt, taste: taste)
+        let shortlisted = await shortlist(all, now: now, tz: tz, salt: salt, taste: taste)
+        // Stage 2b: with islands the pool is the whole library (the planner keeps what is close to the island); First Listen's
+        // library part is only unplayed tracks in adjacent genres (arm EDGE, 6.1).
+        var islandSet: IslandSet?
+        if let found = await parts?.islands.current(), !found.isEmpty { islandSet = found }
+        let edgeTracks: [LibraryTrack] = kind == MixKinds.firstListen ? await edgeLibrary(now) : []
+        var edgeRids: Set<Int64> = []
+        for t in edgeTracks { edgeRids.insert(t.rid) }
+        let library: [LibraryTrack]
+        if kind == MixKinds.firstListen {
+            library = edgeTracks
+        } else if islandSet != nil, let parts {
+            library = mergedLibrary(shortlisted, await parts.libraryRids.all(nowMs: now))
+        } else {
+            library = shortlisted
+        }
         let ignored = await engine.ignoredRids(nowMs: now)
         let log = served.recent(nowMs: now)
-        let taken = Repetition.takenOnDay(log, nowMs: now, tzOffsetMin: tz, exceptSurface: surface)
+        var taken = Repetition.takenOnDay(log, nowMs: now, tzOffsetMin: tz, exceptSurface: surface, exceptId: spec.surfaceId)
+        // This week's First Listen is held all week (8.2): no other list repeats it.
+        if kind != MixKinds.firstListen { taken.formUnion(firstListenRids(now: now, tz: tz)) }
         let times = Repetition.timesServed(log, nowMs: now)
 
         var byRid: [Int64: LibraryTrack] = [:]
-        byRid.reserveCapacity(library.count * 2)
-        for track in library where byRid[track.rid] == nil { byRid[track.rid] = track }
+        byRid.reserveCapacity(shortlisted.count * 2)
+        for track in shortlisted where byRid[track.rid] == nil { byRid[track.rid] = track }
         let picked = await pickSeeds(now: now, tz: tz, salt: salt, byRid: byRid, taste: taste)
         var seeds: [MixSeed] = []
         seeds.reserveCapacity(picked.count)
@@ -220,10 +280,34 @@ public actor BrainMixes {
         var edgeNodes = seeds.map(\.rid)
         edgeNodes.append(contentsOf: pool.novel.keys.sorted())
         let edges = await repository.edgesFor(edgeNodes)
+        var candidates = pool.candidates
+        var known = CandidateDna.Known(tags: [:], embeddings: nil)
+        if let dna = parts?.candidateDna {
+            let enriched = await dna.enrich(candidates)
+            candidates = enriched.candidates
+            known = enriched.known
+        }
+        let context = islandSet.map { IslandContext($0.islands) }
+        var islandIdx = -1
+        if kind == MixKinds.daily, spec.islandId > 0, let islandSet { islandIdx = islandSet.indexOfId(spec.islandId) }
+        // A Daily Mix of an island that is gone is the plain Daily Mix: no island to be close to.
+        let useIslands = context != nil && !(kind == MixKinds.daily && spec.islandId > 0 && islandIdx < 0)
+        if kind == MixKinds.firstListen {
+            // First Listen: which tracks are adjacent-genre ones, and which artists the listener never played (6.2).
+            let beforeFlags = candidates
+            let isEdge = edgeRids
+            candidates = await engine.readAffinity { st in
+                beforeFlags.map { c in
+                    c.withFlags(edge: isEdge.contains(c.rid),
+                                artistNew: c.aid != 0 && !Affinity.isHeard(st, family: Family.artist, key: c.aid))
+                }
+            }
+        }
         let request = MixPlanner.Request(
-            kind: kind, candidates: pool.candidates, seeds: pool.seedLists, nowMs: now, tzOffsetMin: tz,
+            kind: kind, candidates: candidates, seeds: pool.seedLists, nowMs: now, tzOffsetMin: tz,
             nuMultiplier: Novelty.factor(level), salt: salt, regenerate: regenerate,
-            excludedRids: taken.union(ignored), servedTimes: times, edges: edges)
+            excludedRids: taken.union(ignored), servedTimes: times, edges: edges,
+            islands: useIslands ? context : nil, islandIdx: islandIdx, embeddings: known.embeddings, tagsByRid: known.tags)
         let plan = await engine.planMix(request)
         if plan.picks.isEmpty { return nil }
 
@@ -243,9 +327,16 @@ public actor BrainMixes {
             }
         }
         if items.isEmpty { return nil }
+        var number = 0
+        var subtitle = ""
+        if useIslands, islandIdx >= 0, let islandSet {
+            number = (islandSet.dailyIslands().firstIndex { $0.id == spec.islandId } ?? -1) + 1
+            subtitle = await islandSubtitle(islandSet.islands[islandIdx], nowMs: now)
+        }
         return StoredMix(kind: kind, builtAtMs: now, seed: MixPlanner.tieSeedOf(request), regenerate: regenerate,
                          novelty: level, tasteSignature: taste.signature,
-                         seedLists: seeds.filter { $0.list != nil }.count, items: items)
+                         seedLists: seeds.filter { $0.list != nil }.count, items: items, mixId: spec.surfaceId,
+                         islandId: useIslands && islandIdx >= 0 ? spec.islandId : 0, number: number, subtitle: subtitle)
     }
 
     /// The name a reason is about, or "" when the sentence would have none (it is then not shown).
@@ -259,7 +350,7 @@ public actor BrainMixes {
     /// About 500 library tracks the mixes may pick: the legacy ranking's best 300 (it knows the library's own
     /// engagement counters), the favourites, and a day-seeded handful of the rest so deep cuts get a chance. Each gets
     /// its recording id; the whole library is not resolved.
-    private func shortlist(_ all: [Song], now: Int64, tz: Int32, salt: Int64, taste: MixConstraints) async -> [LibraryTrack] {
+    func shortlist(_ all: [Song], now: Int64, tz: Int32, salt: Int64, taste: MixConstraints) async -> [LibraryTrack] {
         let day = Repetition.mixDay(now, tzOffsetMin: tz)
         // The favourites are part of the key: a song liked since is a "liked" row at once, not tomorrow.
         var favouriteHash: UInt64 = 0
@@ -378,8 +469,8 @@ public actor BrainMixes {
     }
 
     /// The day's seeds (3.6): the four groups, at most 24, two per artist, the listener's own choices only.
-    private func pickSeeds(now: Int64, tz: Int32, salt: Int64, byRid: [Int64: LibraryTrack],
-                           taste: MixConstraints) async -> [PickedSeed] {
+    func pickSeeds(now: Int64, tz: Int32, salt: Int64, byRid: [Int64: LibraryTrack],
+                   taste: MixConstraints) async -> [PickedSeed] {
         let events = await engine.recentEvents(sinceMs: now - Seeds.savedWindowMs)
         let recent = SeedQueries.recentChosen(events, sinceMs: now - Seeds.recentWindowMs, limit: 40)
         let saved = SeedQueries.recentlySaved(events, sinceMs: now - Seeds.savedWindowMs, limit: 20)
@@ -436,7 +527,7 @@ public actor BrainMixes {
                 if let track = knownPlayables[rid] { return taste.allows(track.song()) }
                 return false
             })
-        return Seeds.select(groups).map { s in
+        let selected: [PickedSeed] = Seeds.select(groups).map { s in
             if let track = byRid[s.rid] {
                 return PickedSeed(rid: s.rid, aid: s.aid, title: track.song.title,
                                   artist: BrainLibraryIndex.primaryArtistName(track.song), song: track.song)
@@ -445,6 +536,16 @@ public actor BrainMixes {
             return PickedSeed(rid: s.rid, aid: s.aid, title: row?.title ?? "", artist: row?.artists.first?.name ?? "",
                               playable: row)
         }
+        // The artists the listener picked at the start (8.10) come after the day's seeds, each once.
+        guard let picked = await parts?.picked else { return selected }
+        var have = Set(selected.map(\.rid))
+        var out = selected
+        for p in await picked.all() where have.insert(p.seed.rid).inserted {
+            let track = EngineTrack(row: p.seed.row, rid: p.seed.rid)
+            let aid = await repository.resolveArtistNames([p.name]).first ?? 0
+            out.append(PickedSeed(rid: p.seed.rid, aid: aid, title: p.seed.row.title, artist: p.name, playable: track))
+        }
+        return out
     }
 
     // MARK: Reading a saved mix back
@@ -456,8 +557,11 @@ public actor BrainMixes {
         let taste = await sources.constraints()
         let libraryIds = stored.items.compactMap(\.songId)
         let library = libraryIds.isEmpty ? [:] : await sources.librarySongs(libraryIds)
-        let surface = MixPlanner.surfaceOf(stored.kind)
+        let spec = MixSpec(kind: stored.kind, islandId: stored.islandId)
+        let surface = spec.surface
         let recId = recIdKnown != 0 ? recIdKnown : ServedListStore.recIdOf(builtAtMs: stored.builtAtMs, surface: surface)
+        var ridBySong: [String: Int64] = [:]
+        ridBySong.reserveCapacity(stored.items.count * 2)
         var songs: [Song] = []
         songs.reserveCapacity(stored.items.count)
         var tracks: [EngineTrack] = []
@@ -483,12 +587,13 @@ public actor BrainMixes {
                 novel.insert(song.id)
             }
             songs.append(song)
+            ridBySong[song.id] = item.rid
             let keyName = WhyLine.nameOf(item.whyKey)
             if item.whyKey != WhyLine.none && (item.whyKey == WhyLine.onRepeat || !item.whyName.isEmpty) {
                 reasons[song.id] = MixReason(key: keyName, arg: item.whyName)
             }
             tags[song.id] = BrainItemTag(
-                surface: Surface.nameOf(surface), surfaceId: Self.surfaceIdOf(kind: stored.kind), recId: recId,
+                surface: Surface.nameOf(surface), surfaceId: spec.surfaceId, recId: recId,
                 slot: item.slot, arm: Arm.nameOf(item.arm), whyArg: item.whyName.isEmpty ? nil : item.whyName,
                 radioRank: item.radioRank, retrQ: item.retrQ, whyKey: item.whyKey != WhyLine.none ? keyName : nil,
                 primaryArtist: BrainLibraryIndex.primaryArtistName(song),
@@ -498,6 +603,7 @@ public actor BrainMixes {
         if songs.count < Self.minSongs { return nil }
         if !tracks.isEmpty { await repository.registerPlayable(tracks, nowMs: now) }
         return MixView(kind: stored.kind, builtAtMs: stored.builtAtMs, recId: recId, songs: songs, reasons: reasons,
-                       tags: tags, novelIds: novel, engineTracks: tracks, seedLists: stored.seedLists)
+                       tags: tags, novelIds: novel, engineTracks: tracks, seedLists: stored.seedLists, spec: spec,
+                       number: stored.number, subtitle: stored.subtitle, rids: ridBySong)
     }
 }

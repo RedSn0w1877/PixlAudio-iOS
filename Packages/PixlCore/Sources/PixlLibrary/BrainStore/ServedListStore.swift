@@ -24,6 +24,7 @@ public final class ServedListStore {
         var surface: Int32
         var builtAtMs: Int64
         var rids: [Int64]
+        var surfaceId: String = ""
     }
 
     /// What is stored; `mix` is skipped when only the header is wanted.
@@ -56,7 +57,7 @@ public final class ServedListStore {
             guard let record = try? JSONDecoder().decode(Record.self, from: Data(payload)),
                   record.v >= 1, record.v <= Self.formatVersion else { return }
             self.headers[record.recId] = Header(recId: record.recId, surface: record.surface, builtAtMs: record.builtAt,
-                                                rids: record.rids)
+                                                rids: record.rids, surfaceId: record.surfaceId)
         }
     }
 
@@ -67,6 +68,12 @@ public final class ServedListStore {
         Repetition.mixDay(nowMs, tzOffsetMin: tzOffsetMin) &* Repetition.dayMs &- Int64(tzOffsetMin) &* 60_000 &+ 14_400_000
     }
 
+    /// The start of the week (Monday 04:00 local) `nowMs` is in: First Listen is built then and fixed all week (8.2).
+    public static func weekStart(nowMs: Int64, tzOffsetMin: Int32) -> Int64 {
+        let weekday = Int64(HomePlanner.weekday(nowMs: nowMs &- 14_400_000, tzOffsetMin: tzOffsetMin))
+        return dayStart(nowMs: nowMs, tzOffsetMin: tzOffsetMin) &- weekday &* Repetition.dayMs
+    }
+
     /// `(builtAtMs << 8) | (0xA0 + surface)`: unique per build, time-ordered, like an event id.
     public static func recIdOf(builtAtMs: Int64, surface: Int32) -> Int64 {
         (builtAtMs &<< 8) | Int64(0xA0 + surface)
@@ -75,11 +82,13 @@ public final class ServedListStore {
     // MARK: Read
 
     /// The mix of `surface` built on the local day of `nowMs`, newest build, or nil.
-    public func todays(surface: Int32, nowMs: Int64, tzOffsetMin: Int32) -> StoredMix? {
+    public func todays(surface: Int32, nowMs: Int64, tzOffsetMin: Int32, surfaceId: String? = nil, weekly: Bool = false) -> StoredMix? {
         load()
-        let since = Self.dayStart(nowMs: nowMs, tzOffsetMin: tzOffsetMin)
+        let since = weekly ? Self.weekStart(nowMs: nowMs, tzOffsetMin: tzOffsetMin)
+                           : Self.dayStart(nowMs: nowMs, tzOffsetMin: tzOffsetMin)
         var best: Header?
-        for header in headers.values where header.surface == surface && header.builtAtMs >= since {
+        for header in headers.values where header.surface == surface && header.builtAtMs >= since
+            && (surfaceId == nil || BrainKey.sameBytes(header.surfaceId, surfaceId!)) {
             if best == nil || header.builtAtMs > best!.builtAtMs { best = header }
         }
         // A list built on today's day by a clock that was later set back is not today's.
@@ -92,11 +101,12 @@ public final class ServedListStore {
     }
 
     /// How many lists `surface` already got today: the draw number of the next "Regenerate".
-    public func buildsToday(surface: Int32, nowMs: Int64, tzOffsetMin: Int32) -> Int32 {
+    public func buildsToday(surface: Int32, nowMs: Int64, tzOffsetMin: Int32, surfaceId: String? = nil) -> Int32 {
         load()
         let since = Self.dayStart(nowMs: nowMs, tzOffsetMin: tzOffsetMin)
         var count: Int32 = 0
-        for header in headers.values where header.surface == surface && header.builtAtMs >= since { count += 1 }
+        for header in headers.values where header.surface == surface && header.builtAtMs >= since
+            && (surfaceId == nil || BrainKey.sameBytes(header.surfaceId, surfaceId!)) { count += 1 }
         return count
     }
 
@@ -106,7 +116,7 @@ public final class ServedListStore {
         let after = Repetition.keepAfter(nowMs)
         return headers.values.filter { $0.builtAtMs >= after }
             .sorted { $0.builtAtMs != $1.builtAtMs ? $0.builtAtMs < $1.builtAtMs : $0.recId < $1.recId }
-            .map { Repetition.Served(surface: $0.surface, builtAtMs: $0.builtAtMs, rids: $0.rids) }
+            .map { Repetition.Served(surface: $0.surface, builtAtMs: $0.builtAtMs, rids: $0.rids, surfaceId: $0.surfaceId) }
     }
 
     public var count: Int {
@@ -119,17 +129,24 @@ public final class ServedListStore {
     /// Stores `mix` under `surface` and forgets what is older than the retention. Returns its `recId`; 0 when the
     /// file could not be written.
     @discardableResult
-    public func put(surface: Int32, surfaceId: String, mix: StoredMix, nuQ: Int32, nowMs: Int64,
+    public func put(surface: Int32, surfaceId: String, mix original: StoredMix, nuQ: Int32, nowMs: Int64,
                     modelVersion: Int32 = Brain.specVersion) -> Int64 {
         load()
-        let recId = Self.recIdOf(builtAtMs: mix.builtAtMs, surface: surface)
+        // Several lists of one surface (the Daily Mixes of the islands) built in one millisecond would share an id: the later
+        // one is stamped a millisecond on, so every list keeps its own record.
+        var mix = original
+        var recId = Self.recIdOf(builtAtMs: mix.builtAtMs, surface: surface)
+        while let existing = headers[recId], !BrainKey.sameBytes(existing.surfaceId, surfaceId) {
+            mix.builtAtMs += 1
+            recId = Self.recIdOf(builtAtMs: mix.builtAtMs, surface: surface)
+        }
         let rids = mix.items.map(\.rid)
         let record = Record(v: Self.formatVersion, recId: recId, surface: surface, surfaceId: surfaceId,
                             builtAt: mix.builtAtMs, seed: mix.seed, modelVersion: modelVersion, nuQ: nuQ, rids: rids, mix: mix)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         guard let data = try? encoder.encode(record), file.put(String(recId), [UInt8](data)) else { return 0 }
-        headers[recId] = Header(recId: recId, surface: surface, builtAtMs: mix.builtAtMs, rids: rids)
+        headers[recId] = Header(recId: recId, surface: surface, builtAtMs: mix.builtAtMs, rids: rids, surfaceId: surfaceId)
         prune(nowMs: nowMs)
         return recId
     }

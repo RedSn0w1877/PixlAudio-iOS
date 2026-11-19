@@ -9,7 +9,7 @@ import Testing
 /// budget, the switch, the legacy fallback, and what the refresh seeds from. A port of Android's `BrainMixesTest`.
 @Suite("Brain mixes")
 struct BrainMixesTests {
-    private final class Source: RadioSource, @unchecked Sendable {
+    final class Source: RadioSource, @unchecked Sendable {
         private let lock = NSLock()
         private var radios: [String: FetchedRadio] = [:]
         private var asked: [String] = []
@@ -21,17 +21,17 @@ struct BrainMixesTests {
         func artistRadio(endpoint: RadioEndpoint) async -> FetchedRadio? { nil }
     }
 
-    private final class Box<T: Sendable>: @unchecked Sendable {
+    final class Box<T: Sendable>: @unchecked Sendable {
         private let lock = NSLock()
         private var stored: T
         init(_ value: T) { stored = value }
         var value: T { get { lock.withLock { stored } } set { lock.withLock { stored = newValue } } }
     }
 
-    private static let start: Int64 = 1_736_514_000_000 // 2025-01-10 14:00 local at UTC+1
+    static let start: Int64 = 1_736_514_000_000 // 2025-01-10 14:00 local at UTC+1
 
     /// The day the listener lives in: 60 library songs by 12 artists, thirty of them played through twice.
-    private struct World {
+    struct World {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("brain-mixes-\(UUID().uuidString)", isDirectory: true)
         let clock = Box<Int64>(BrainMixesTests.start)
         let source = Source()

@@ -466,6 +466,20 @@ public actor NewReleases {
         old.filter { now - $0 >= 0 && now - $0 < Self.dayMs } + [Int64](repeating: now, count: spent)
     }
 
+    /// The cards of "New from artists you play" with their releases, from the saved file only (stage 2b: Just Dropped and the
+    /// Home shelf read the same cards). Muted, blocked and already-owned music is left out.
+    public func cards(blocked: BlockedArtistMatcher, adjustments: TasteAdjustmentSet,
+                      library: BrainLibraryIndex? = nil) -> [NewReleaseRules.Card] {
+        let now = clock()
+        let file = state()
+        if file.found.isEmpty { return [] }
+        return NewReleaseRules.cards(found: file.found, nowMs: now) { stored in
+            let song = EngineTrack(row: stored.row, rid: stored.rid).song()
+            return !blocked.isBlocked(song) && !adjustments.isExcluded(song) && !adjustments.isBlocked(song)
+                && (library == nil || library!.match(stored.row) == nil)
+        }
+    }
+
     /// The row for Home, from the saved file only. Cards the listener has since muted or blocked are left out; nil
     /// when fewer than `NewReleaseRules.minCards` are left.
     public func row(blocked: BlockedArtistMatcher, adjustments: TasteAdjustmentSet) -> BrainReleaseRow? {

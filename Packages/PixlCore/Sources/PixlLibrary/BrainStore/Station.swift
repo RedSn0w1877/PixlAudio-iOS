@@ -34,6 +34,9 @@ public struct Station: Sendable, Hashable {
     public static let sourceArtist = 1
     public static let sourceAlbum = 2
     public static let sourcePlaylist = 3
+    /// A station from a genre or a mood of the atlas (8.3, stage 2b): the listener's own songs under the node seed it.
+    public static let sourceGenre = 4
+    public static let sourceMood = 5
 
     public init(id: String, kind: Int32, seedMediaId: String, title: String, artistName: String, startedAtMs: Int64,
                 source: Int? = nil, seedMediaIds: [String]? = nil) {
@@ -68,7 +71,7 @@ public struct Station: Sendable, Hashable {
     /// Lower-case hexadecimal of `fnv1a64("station|<kind>|<seedMediaId>")`, as Android writes it.
     public static func idOf(kind: Int32, seedMediaId: String, source: Int = -1) -> String {
         // A song or artist station's id is what it always was; an album or playlist one adds where it came from.
-        BrainSurfaces.hashedId(source == sourceAlbum || source == sourcePlaylist
+        BrainSurfaces.hashedId(source >= sourceAlbum
             ? "station|\(kind)|\(seedMediaId)|\(source)" : "station|\(kind)|\(seedMediaId)")
     }
 
@@ -90,7 +93,7 @@ public struct Station: Sendable, Hashable {
             return Station(id: idOf(kind: kind, seedMediaId: parts[1]), kind: kind, seedMediaId: parts[1], title: parts[2],
                            artistName: parts[3], startedAtMs: startedAtMs)
         }
-        guard let source = Int(parts[5]), source >= sourceSong, source <= sourcePlaylist else { return nil }
+        guard let source = Int(parts[5]), source >= sourceSong, source <= sourceMood else { return nil }
         var ids = parts[6].components(separatedBy: idsSeparator).filter { !$0.isEmpty }
         if ids.isEmpty { ids = [parts[1]] }
         return Station(id: idOf(kind: kind, seedMediaId: parts[1], source: source), kind: kind, seedMediaId: parts[1],
