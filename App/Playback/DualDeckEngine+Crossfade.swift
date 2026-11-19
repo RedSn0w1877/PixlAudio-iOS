@@ -250,11 +250,11 @@ extension DualDeckEngine {
         }
         guard let incoming = preparedIncoming else { return }
         let deck = idle
-        _ = await deck.preroll(rate: rate)
+        let prerolled = await deck.preroll(rate: rate)
         guard !Task.isCancelled, plannedTransition?.id == plan.id, activeItem === outgoing,
               preparedIncoming === incoming, playWhenReady else { return }
         let remaining = remainingSeconds()
-        guard remaining > 0.02 else {
+        guard prerolled, remaining > 0.02 else {
             cancelCrossfadePlan()
             return
         }

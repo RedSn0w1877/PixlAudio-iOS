@@ -101,22 +101,32 @@ final class LyricsScreenshotTests: XCTestCase {
         }
     }
 
-    /// The More sheet after the 2026-10-26 clean-up: "Adjust sync" is locked while it is broken (the row stays, greyed
-    /// out and marked "Broken, fix soon"), and "Show as plain text" and "Translate on device" are gone.
-    func testAdjustSyncIsLockedAndPlainTextIsGone() throws {
-        try capture("lyricsAdjustSyncLocked", demo: "words", freezeMs: 42_300, tap: "Lyrics options", settle: 1.5) { app in
+    func testAdjustSyncShowsUsableTimingControls() throws {
+        try capture("lyricsAdjustSync", demo: "words", freezeMs: 42_300, tap: "Lyrics options", settle: 1.5) { app in
             let sheet = app.descendants(matching: .any)["screen.lyricsOptions"].firstMatch
             XCTAssertTrue(sheet.waitForExistence(timeout: 10), "the More sheet did not open")
-            let adjustSync = sheet.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Adjust sync")).firstMatch
-            XCTAssertTrue(adjustSync.waitForExistence(timeout: 10), "Adjust sync should stay in the sheet, locked")
-            XCTAssertFalse(adjustSync.isEnabled, "Adjust sync is locked while it is broken")
-            XCTAssertTrue(adjustSync.label.contains("Broken, fix soon"), "the locked row should say it is broken")
+            let adjustSync = sheet.buttons["lyricsMore.adjustSync"].firstMatch
+            XCTAssertTrue(adjustSync.waitForExistence(timeout: 10))
             for gone in ["Show as plain text", "Translate on device"] {
                 let row = sheet.descendants(matching: .any)
                     .matching(NSPredicate(format: "label CONTAINS %@", gone)).firstMatch
                 XCTAssertFalse(row.exists, "\(gone) should be gone from the More sheet")
             }
-            Thread.sleep(forTimeInterval: 1.0)
+            self.reveal(adjustSync, in: sheet, app: app, clearOfBottom: 12)
+            adjustSync.tap()
+            let reset = app.buttons["lyrics.offset.reset"].firstMatch
+            XCTAssertTrue(reset.waitForExistence(timeout: 5))
+            if reset.isEnabled { reset.tap() }
+            for (step, expected) in [(500, "+0.5 s"), (-100, "+0.4 s"), (-500, "-0.1 s"), (100, "0 s")] {
+                let button = app.buttons["lyrics.offset.\(step)"].firstMatch
+                XCTAssertTrue(button.isHittable)
+                XCTAssertGreaterThanOrEqual(button.frame.width, 44)
+                button.tap()
+                XCTAssertEqual(reset.value as? String, expected)
+            }
+            app.buttons["lyrics.offset.100"].firstMatch.tap()
+            reset.tap()
+            XCTAssertEqual(reset.value as? String, "0 s")
         }
     }
 

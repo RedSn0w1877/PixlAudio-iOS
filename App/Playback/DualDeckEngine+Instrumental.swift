@@ -180,7 +180,7 @@ extension DualDeckEngine {
         }
         if playheadMoved() { return leave(.abortedBySeek, incoming) }
         if requireAligned,
-           abs(incoming.durationSeconds - outgoing.durationSeconds) > Self.instrumentalAlignmentToleranceSeconds {
+           abs(incoming.assetDurationSeconds - outgoing.assetDurationSeconds) > Self.instrumentalAlignmentToleranceSeconds {
             return leave(.misaligned, incoming)
         }
         prepareReplayGain(incoming)

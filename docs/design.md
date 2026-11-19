@@ -693,9 +693,9 @@ purpose and is listed in `docs/parity.md` row 25.
   instead of the album container at about 34 %, which read as dark plastic; Increase Contrast keeps the container,
   and bright art keeps the 35 % black. Play/pause, the active segment and the discs stay at `GlassTint.prominent`,
   as strong as the full player's transport and active toggles. Play/pause, the seek bar, the toolbar and the sync
-  row share **one** `GlassEffectContainer(spacing: 3)` (below the smallest gap, 6 pt), so they sample the artwork
-  together. The sync-offset row is five clear interactive capsules (Android: filled pills in one capsule, which
-  would be glass on glass) that materialise (`glassEffectTransition(.materialize)`, toggled in `withAnimation`).
+  row share **one** `GlassEffectContainer(spacing: 3)` so they sample the artwork together.
+  The sync-offset row uses one clear glass capsule with five filled buttons. Each label has its own full-height
+  tap target. The centre button displays and resets the per-song offset. Controls stay visible while adjusting.
   "Add lyrics and sync them" got its own clear glass capsule. The fetch dialog's card is tinted 45 % (was 62 %) over
   a 35 % dim (was 45 %).
 - **"0 liquid glass", the More sheet:** it opens at half height (`[.medium, .tallGlass]`), where iOS draws a sheet as

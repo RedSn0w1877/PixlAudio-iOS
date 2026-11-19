@@ -191,9 +191,10 @@ struct PlayingBarsIcon: View {
 /// The control cluster (Android `LyricsControlCluster`, Material mode): play/pause, the seek bar, then the toolbar
 /// (back · Translate · Sing · more), optionally the sync-offset row above — each a glass shape over the soft scrim.
 /// All of them share ONE `GlassEffectContainer` (spacing 3 pt, below the smallest gap: 6 pt between the sync buttons),
-/// so they sample the artwork together and the sync row materialises instead of popping (WWDC25-323: "glass can not
+/// so they sample the artwork together (WWDC25-323: "glass can not
 /// sample other glass"; one container per cluster).
 struct LyricsControlCluster: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let chrome: LyricsChromeColors
     let brightArt: Bool
     let isPlaying: Bool
@@ -222,7 +223,6 @@ struct LyricsControlCluster: View {
                 if showSyncControls {
                     LyricsSyncControls(offsetMs: offsetMs, chrome: chrome, brightArt: brightArt, onChange: onOffsetChange)
                         .padding(.bottom, 8)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
                 HStack(spacing: 12) {
                     LyricsPlayPauseButton(isPlaying: isPlaying, chrome: chrome, action: onPlayPause)
@@ -237,7 +237,7 @@ struct LyricsControlCluster: View {
                               onBack: onBack, onMore: onMore)
             }
         }
-        .animation(.spring(response: 0.35, dampingFraction: 0.9), value: showSyncControls)
+        .animation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.9), value: showSyncControls)
     }
 }
 
@@ -701,10 +701,7 @@ private struct LyricsSegmentGlass: ViewModifier {
     }
 }
 
-/// The sync-offset row (Android `LyricsSyncControls`): −.5 −.1 [offset / reset] +.1 +.5. Android puts filled pills in
-/// one capsule; iOS can't stack glass on glass, so each is its own clear interactive capsule in the cluster's
-/// container (owner, 2026-10-07: "0 liquid glass"), materialising when the row shows. The offset chip turns the sync
-/// accent while an offset is set.
+/// The five timing controls share one glass surface. Each label gets an equal column and a full-height tap target.
 private struct LyricsSyncControls: View {
     let offsetMs: Int
     let chrome: LyricsChromeColors
@@ -712,37 +709,42 @@ private struct LyricsSyncControls: View {
     let onChange: (Int) -> Void
 
     var body: some View {
-        HStack(spacing: 6) {
-            button("−.5", weight: 1) { onChange(offsetMs - 500) }
-            button("−.1", weight: 1) { onChange(offsetMs - 100) }
-            button(offsetMs == 0 ? "0s" : String(format: "%+.1fs", Double(offsetMs) / 1000), weight: 1.3,
-                   filled: offsetMs != 0, size: 12) { onChange(0) }
+        HStack(spacing: 2) {
+            step("−0.5", by: -500, label: "Decrease offset by half a second")
+            step("−0.1", by: -100, label: "Decrease offset by a tenth of a second")
+            let value = offsetMs == 0 ? "0 s" : String(format: "%+.1f s", Double(offsetMs) / 1000)
+            button(value, highlighted: offsetMs != 0) { onChange(0) }
+                .accessibilityLabel("Reset lyric timing")
+                .accessibilityValue(Text(verbatim: value))
+                .accessibilityIdentifier("lyrics.offset.reset")
                 .disabled(offsetMs == 0)
-            button("+.1", weight: 1) { onChange(offsetMs + 100) }
-            button("+.5", weight: 1) { onChange(offsetMs + 500) }
+            step("+0.1", by: 100, label: "Increase offset by a tenth of a second")
+            step("+0.5", by: 500, label: "Increase offset by half a second")
         }
         .padding(4)
-        .frame(height: 52)
+        .glassEffect(chrome.panelGlass(brightArt: brightArt), in: Capsule())
     }
 
-    private func button(_ title: String, weight: CGFloat, filled: Bool = false, size: CGFloat = 11,
+    private func step(_ title: String, by delta: Int, label: LocalizedStringKey) -> some View {
+        button(title) { onChange(offsetMs + delta) }
+            .accessibilityLabel(Text(label))
+            .accessibilityIdentifier("lyrics.offset.\(delta)")
+    }
+
+    private func button(_ title: String, highlighted: Bool = false,
                         action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(verbatim: title)
-                .pixlFont(.custom(size: size, weight: .bold))
+                .pixlFont(.labelLarge, weight: .semibold)
+                .monospacedDigit()
                 .lineLimit(1)
-                .foregroundStyle(filled ? chrome.onSyncAccent : chrome.content)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .minimumScaleFactor(0.75)
+                .foregroundStyle(highlighted ? chrome.onSyncAccent : chrome.content)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(highlighted ? chrome.syncAccent : chrome.content.opacity(0.09), in: Capsule())
                 .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
-        .glassEffect(Glass.clear
-                        .tint(filled ? chrome.syncAccent.opacity(GlassTint.prominent) : chrome.panelColor(brightArt: brightArt))
-                        .interactive(),
-                     in: Capsule())
-        .glassEffectTransition(.materialize)
-        .frame(maxWidth: .infinity)
-        .layoutPriority(weight)
+        .buttonStyle(PressScaleButtonStyle(pressedScale: 0.96))
     }
 }
 
