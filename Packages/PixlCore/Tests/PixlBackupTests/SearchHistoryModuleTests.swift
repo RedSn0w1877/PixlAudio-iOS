@@ -18,12 +18,48 @@ struct SearchHistoryModuleTests {
 
     @Test func anOldPayloadRestoresWithDefaultsAndRecomputedKeys() throws {
         let items = try SearchHistoryModule.restore(payload: oldPayload)
-        #expect(items.map(\.query) == ["Beyonce", "BEYONCÉ", "Sơn Tùng"])
-        #expect(items.map(\.key) == ["beyonce", "beyonce", "son tung"])
-        #expect(items.allSatisfy { $0.count == 1 && $0.kind == nil && $0.targetId == nil && $0.imageUrl == nil })
-        // The store merges them by key (the two spellings are one row).
+        // The two spellings of Beyonce are one row inside the payload, and they add up (two uses): Android's `mergeRestore` does the same.
+        #expect(items.map(\.query) == ["BEYONCÉ", "Sơn Tùng"])
+        #expect(items.map(\.key) == ["beyonce", "son tung"])
+        #expect(items.map(\.count) == [2, 1])
+        #expect(items.allSatisfy { $0.kind == nil && $0.targetId == nil && $0.imageUrl == nil })
         let merged = SearchHistoryRules.merged([], with: items, counts: .max)
         #expect(merged.map(\.query) == ["Sơn Tùng", "BEYONCÉ"])
+        #expect(merged.first { $0.key == "beyonce" }?.count == 2)
+    }
+
+    @Test func spellingsOfOneKeyInsideAPayloadAddUpWhateverTheirOrder() throws {
+        let payload = """
+        [{"id":1,"query":"Sơn Tùng","timestamp":20},{"id":2,"query":"son tung","timestamp":10}]
+        """
+        let items = try SearchHistoryModule.restore(payload: payload)
+        #expect(items.count == 1 && items[0].count == 2 && items[0].query == "Sơn Tùng" && items[0].timestamp == 20)
+    }
+
+    @Test func rowsUnderTwoCharactersAreDroppedAsAndroidDoes() throws {
+        let payload = #"[{"id":1,"query":"a","timestamp":1},{"id":2,"query":"  b ","timestamp":2},{"id":3,"query":"ab","timestamp":3},{"id":4,"query":"!!","timestamp":4}]"#
+        #expect(try SearchHistoryModule.restore(payload: payload).map(\.query) == ["ab"])
+    }
+
+    @Test func aTargetNeedsAKnownKindAndATargetId() throws {
+        let payload = """
+        [{"id":1,"query":"aa","kind":"song","targetId":"  ","targetTitle":"T","imageUrl":"u","timestamp":1},
+         {"id":2,"query":"bb","kind":"query","targetId":"9","targetTitle":"T","imageUrl":"u","timestamp":2},
+         {"id":3,"query":"cc","kind":"artist","targetId":"9","targetTitle":"T","imageUrl":"u","timestamp":3}]
+        """
+        let items = try SearchHistoryModule.restore(payload: payload)
+        let byQuery = Dictionary(uniqueKeysWithValues: items.map { ($0.query, $0) })
+        #expect(byQuery["aa"]?.kind == nil && byQuery["aa"]?.targetId == nil && byQuery["aa"]?.targetTitle == nil && byQuery["aa"]?.imageUrl == nil)
+        #expect(byQuery["bb"]?.kind == nil && byQuery["bb"]?.targetId == nil)
+        #expect(byQuery["cc"]?.kind == .artist && byQuery["cc"]?.targetId == "9" && byQuery["cc"]?.targetTitle == "T")
+    }
+
+    @Test func aLongTargetTitleIsCutTo200UnitsAndACountIsHeld() throws {
+        let long = String(repeating: "t", count: 300)
+        let payload = #"[{"id":1,"query":"abc","kind":"album","targetId":"3","targetTitle":"\#(long)","timestamp":1,"count":5000000}]"#
+        let item = try #require(try SearchHistoryModule.restore(payload: payload).first)
+        #expect(item.targetTitle?.utf16.count == SearchHistoryRules.maxTargetTitleLength)
+        #expect(item.count == SearchHistoryRules.maxRestoredCount)
     }
 
     @Test func anOldPayloadRoundTripsWithoutGainingFields() throws {
@@ -40,7 +76,8 @@ struct SearchHistoryModuleTests {
             SearchHistoryItem(query: "night drive", timestamp: 20, key: "night drive", count: 2),
         ]
         let restored = try SearchHistoryModule.restore(payload: SearchHistoryModule.export(rows))
-        #expect(restored == rows)
+        // Oldest first (the order the in-payload merge walks); the store orders them by time.
+        #expect(restored == rows.reversed())
     }
 
     @Test func aKeyInThePayloadIsRecomputedNotTrusted() throws {
@@ -69,6 +106,7 @@ struct SearchHistoryModuleTests {
         let backup = try SearchHistoryModule.restore(payload: oldPayload)
         let merged = SearchHistoryRules.merged(local, with: backup, counts: .max)
         #expect(merged.map(\.key) == ["local only", "son tung", "beyonce"])
+        #expect(merged.first { $0.key == "beyonce" }?.count == 2)
         #expect(merged[0].count == 5)
     }
 }

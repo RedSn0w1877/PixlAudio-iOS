@@ -31,6 +31,21 @@ public enum SearchHistoryCountMerge: Sendable {
     case max
 }
 
+extension SearchHistoryItem {
+    /// The kind a row opens, or nil for a plain typed search: a kind other than `query` with a target id that is not
+    /// blank (Android `SearchHistoryItem.openKind`).
+    public var openKind: SearchHistoryKind? {
+        guard let kind, kind != .query, let targetId, !BrainText.trim(targetId).isEmpty else { return nil }
+        return kind
+    }
+
+    /// What the row opens (`artist:42`), nil for a plain search: rows with the same one are the same thing.
+    public var targetKey: String? {
+        guard let kind = openKind, let targetId else { return nil }
+        return "\(kind.rawValue):\(targetId)"
+    }
+}
+
 public enum SearchHistoryRules {
     /// Shorter queries are not stored (the same two-character rule as the remote searches).
     public static let minQueryLength = 2
@@ -42,6 +57,10 @@ public enum SearchHistoryRules {
     public static let suggestionLimit = 5
     /// Tiles in the strip above the genre grid.
     public static let stripLimit = 10
+    /// The name of an opened result is cut to this many UTF-16 units (Android `MAX_TARGET_TITLE_LENGTH`).
+    public static let maxTargetTitleLength = 200
+    /// A count read from a backup is held to this (a guard against a hand-edited file).
+    public static let maxRestoredCount = 1_000_000
 
     /// The stored form of a typed text: trimmed, cut to `maxQueryLength`, and its folded key. nil when the text is too
     /// short to store (under `minQueryLength` after trimming) or folds to nothing (only punctuation).
@@ -56,12 +75,21 @@ public enum SearchHistoryRules {
     static func display(_ raw: String) -> String? {
         var text = BrainText.trim(raw)
         if text.isEmpty { return nil }
-        if text.utf16.count > maxQueryLength {
-            var units = Array(text.utf16.prefix(maxQueryLength))
-            if let last = units.last, last >= 0xD800, last <= 0xDBFF { units.removeLast() }
-            text = BrainText.trim(String(decoding: units, as: UTF16.self))
-        }
+        if text.utf16.count > maxQueryLength { text = BrainText.trim(cutUnits(text, maxQueryLength)) }
         return text.isEmpty ? nil : text
+    }
+
+    /// `text` cut to `max` UTF-16 units, never in the middle of a surrogate pair (Android `cutUnits`).
+    static func cutUnits(_ text: String, _ max: Int) -> String {
+        guard text.utf16.count > max else { return text }
+        var units = Array(text.utf16.prefix(max))
+        if let last = units.last, last >= 0xD800, last <= 0xDBFF { units.removeLast() }
+        return String(decoding: units, as: UTF16.self)
+    }
+
+    /// What an opened result keeps of its name: trimmed and cut to `maxTargetTitleLength`.
+    static func title(_ raw: String?) -> String? {
+        raw.map { cutUnits(BrainText.trim($0), maxTargetTitleLength) }
     }
 
     /// The row with its key computed and its text normalised, or nil when it cannot be keyed. The minimum length is
@@ -74,6 +102,16 @@ public enum SearchHistoryRules {
         out.query = query
         out.key = key
         out.count = Swift.max(1, item.count)
+        // A target only counts with a known kind and a target id (Android `toEntityOrNull`): anything else is a plain search.
+        if let opened = item.openKind {
+            out.kind = opened
+            out.targetTitle = title(item.targetTitle)
+        } else {
+            out.kind = nil
+            out.targetId = nil
+            out.targetTitle = nil
+            out.imageUrl = nil
+        }
         return out
     }
 
@@ -100,12 +138,15 @@ public enum SearchHistoryRules {
         var row = updated ?? SearchHistoryItem(query: stored.query, timestamp: now, key: stored.key, count: 0)
         row.query = stored.query
         row.key = stored.key
-        row.timestamp = now
+        row.timestamp = Swift.max(row.timestamp, now)
         row.count = Swift.max(0, row.count) + 1
-        if input.kind != nil {
-            row.kind = input.kind
+        // Only a real target replaces the one already there; a plain submit (or a `query` kind) keeps it.
+        let opened = SearchHistoryItem(query: stored.query, timestamp: now, kind: input.kind, targetId: input.targetId,
+                                       targetTitle: input.targetTitle, imageUrl: input.imageUrl)
+        if let kind = opened.openKind {
+            row.kind = kind
             row.targetId = input.targetId
-            row.targetTitle = input.targetTitle
+            row.targetTitle = title(input.targetTitle)
             row.imageUrl = input.imageUrl
         }
         return capped([row] + rows)
@@ -141,6 +182,49 @@ public enum SearchHistoryRules {
             return a.offset < b.offset
         }
         return Array(ordered.prefix(limit).map(\.element))
+    }
+
+    /// One row per thing opened (the strip and the list): the same artist reached from two typed searches is one tile,
+    /// the newest of them. Rows that open nothing are all kept; the order is kept (Android `collapseByTarget`).
+    public static func collapseByTarget(_ entries: [SearchHistoryItem]) -> [SearchHistoryItem] {
+        var seen = Set<String>()
+        return entries.filter { row in
+            guard let target = row.targetKey else { return true }
+            return seen.insert(target).inserted
+        }
+    }
+
+    /// The rows of a backup as they will be merged (Android `toEntityOrNull` + the in-payload part of `mergeRestore`):
+    /// a row without a storable text (under two characters, or only punctuation) is dropped, the key is recomputed, a
+    /// target needs a known kind and a target id, the count is held to 1...1,000,000. Spellings of one key inside the
+    /// payload add up, oldest first (they were separate uses): the newest text wins, the target of the newest row that
+    /// has one, the latest time. Merging with the stored rows is `merged(_:with:counts:)`.
+    public static func restoredRows(_ incoming: [SearchHistoryItem]) -> [SearchHistoryItem] {
+        let ordered = incoming.enumerated().sorted { a, b in
+            a.element.timestamp != b.element.timestamp ? a.element.timestamp < b.element.timestamp : a.offset < b.offset
+        }
+        var order: [String] = []
+        var byKey: [String: SearchHistoryItem] = [:]
+        for (_, raw) in ordered {
+            guard normalize(raw.query) != nil, var row = sanitized(raw) else { continue }
+            row.count = Swift.min(Swift.max(1, raw.count), maxRestoredCount)
+            guard var before = byKey[row.key] else {
+                order.append(row.key)
+                byKey[row.key] = row
+                continue
+            }
+            before.query = row.query
+            before.timestamp = Swift.max(before.timestamp, row.timestamp)
+            before.count += row.count
+            if row.kind != nil {
+                before.kind = row.kind
+                before.targetId = row.targetId
+                before.targetTitle = row.targetTitle
+                before.imageUrl = row.imageUrl
+            }
+            byKey[row.key] = before
+        }
+        return order.compactMap { byKey[$0] }
     }
 
     /// The first `limit` rows, newest first (the strip, the recent list).

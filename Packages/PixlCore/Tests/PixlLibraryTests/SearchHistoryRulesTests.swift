@@ -236,4 +236,61 @@ struct SearchHistoryRulesTests {
         #expect(SearchHistoryRules.sanitized(lying)?.key == "beyonce")
         #expect(SearchHistoryRules.merged([], with: [lying], counts: .max).first?.key == "beyonce")
     }
+
+    // MARK: Android parity (the review's cases)
+
+    @Test func collapseByTargetShowsOneRowPerOpenedThing() {
+        let rows = [
+            SearchHistoryItem(query: "beyonce", timestamp: 5, key: "beyonce", kind: .artist, targetId: "7", targetTitle: "Beyoncé"),
+            SearchHistoryItem(query: "night", timestamp: 4, key: "night"),
+            SearchHistoryItem(query: "bey", timestamp: 3, key: "bey", kind: .artist, targetId: "7", targetTitle: "Beyoncé"),
+            SearchHistoryItem(query: "bey album", timestamp: 2, key: "bey album", kind: .album, targetId: "7"),
+            SearchHistoryItem(query: "again", timestamp: 1, key: "again"),
+        ]
+        // The newest row of an artist stands for it; a plain search is never collapsed; the same id of another kind is another thing.
+        #expect(SearchHistoryRules.collapseByTarget(rows).map(\.query) == ["beyonce", "night", "bey album", "again"])
+        #expect(rows[0].targetKey == "artist:7" && rows[1].targetKey == nil)
+    }
+
+    @Test func aQueryKindOrABlankTargetIdOpensNothing() {
+        #expect(SearchHistoryItem(query: "ab", timestamp: 1, kind: .query, targetId: "5").openKind == nil)
+        #expect(SearchHistoryItem(query: "ab", timestamp: 1, kind: .song, targetId: " ").openKind == nil)
+        #expect(SearchHistoryItem(query: "ab", timestamp: 1, kind: .song, targetId: nil).openKind == nil)
+        #expect(SearchHistoryItem(query: "ab", timestamp: 1, kind: .song, targetId: "5").openKind == .song)
+    }
+
+    @Test func aPlainSubmitOrAQueryKindKeepsTheTargetAlreadyThere() {
+        var rows = SearchHistoryRules.record(into: [], SearchHistoryInput(query: "taylor", kind: .artist, targetId: "9", targetTitle: "Taylor Swift"),
+                                             isPrivate: false, now: Self.t0)
+        rows = SearchHistoryRules.record(into: rows, SearchHistoryInput(query: "Taylor", kind: .query, targetId: "1", targetTitle: "x"),
+                                         isPrivate: false, now: Self.t0 + 1)
+        rows = SearchHistoryRules.record(into: rows, SearchHistoryInput(query: "taylor", kind: .song, targetId: "", targetTitle: "y"),
+                                         isPrivate: false, now: Self.t0 + 2)
+        #expect(rows.count == 1 && rows[0].count == 3)
+        #expect(rows[0].kind == .artist && rows[0].targetId == "9" && rows[0].targetTitle == "Taylor Swift")
+    }
+
+    @Test func aNewRowWithAQueryKindHasNoTarget() {
+        let rows = SearchHistoryRules.record(into: [], SearchHistoryInput(query: "abc", kind: .query, targetId: "1", targetTitle: "t", imageUrl: "u"),
+                                             isPrivate: false, now: Self.t0)
+        #expect(rows[0].kind == nil && rows[0].targetId == nil && rows[0].targetTitle == nil && rows[0].imageUrl == nil)
+    }
+
+    @Test func aTargetTitleIsTrimmedAndCutTo200Units() {
+        let long = "  " + String(repeating: "t", count: 260) + "  "
+        let rows = SearchHistoryRules.record(into: [], SearchHistoryInput(query: "abc", kind: .album, targetId: "1", targetTitle: long),
+                                             isPrivate: false, now: Self.t0)
+        #expect(rows[0].targetTitle == String(repeating: "t", count: SearchHistoryRules.maxTargetTitleLength))
+        #expect(SearchHistoryRules.maxTargetTitleLength == 200)
+    }
+
+    @Test func restoredRowsSumSpellingsInsideOnePayload() {
+        let payload = [SearchHistoryItem(query: "Sơn Tùng", timestamp: 2), SearchHistoryItem(query: "son tung", timestamp: 1),
+                       SearchHistoryItem(query: "x", timestamp: 9)]
+        let rows = SearchHistoryRules.restoredRows(payload)
+        #expect(rows.count == 1 && rows[0].count == 2 && rows[0].query == "Sơn Tùng")
+        // Against the stored rows the larger count wins (restoring twice does not double).
+        let stored = [SearchHistoryItem(query: "son tung", timestamp: 1, key: "son tung", count: 5)]
+        #expect(SearchHistoryRules.merged(stored, with: rows, counts: .max).first?.count == 5)
+    }
 }
