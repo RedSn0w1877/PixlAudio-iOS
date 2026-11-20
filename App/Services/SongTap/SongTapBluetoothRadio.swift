@@ -510,7 +510,7 @@ nonisolated final class SongTapBluetoothProxy: NSObject, CBCentralManagerDelegat
 
     func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
         nonisolated(unsafe) let p = peripheral
-        let uuid = characteristic.uuid
+        nonisolated(unsafe) let uuid = characteristic.uuid
         let on = characteristic.isNotifying
         let failed = error != nil
         MainActor.assumeIsolated { radio.notificationStateChanged(p, characteristic: uuid, on: on, failed: failed) }
@@ -518,7 +518,7 @@ nonisolated final class SongTapBluetoothProxy: NSObject, CBCentralManagerDelegat
 
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         nonisolated(unsafe) let p = peripheral
-        let uuid = characteristic.uuid
+        nonisolated(unsafe) let uuid = characteristic.uuid
         let value = characteristic.value.map { Array($0) }
         let failed = error != nil
         MainActor.assumeIsolated { radio.valueUpdated(p, characteristic: uuid, value: value, failed: failed) }
