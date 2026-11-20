@@ -292,3 +292,137 @@ Windows, from the iOS checkout root (Git Bash):
 ## CI
 
 - Round 1 (`3ed5f90`): `core` green; `app` (build and unit tests, Xcode 27) green; `ipa` skipped as before. No flaky test seen.
+
+# Review pass (iOS): the independent reviewer's findings, verified and fixed
+
+An independent reviewer read the whole stage 4 diff and sent 21 findings (2 blockers, 10 majors, 9 minors; its summary says 20). Each was checked against the code
+before anything was changed. All 21 were real; none is closed as "not real". The cause of most of them: Android's own review fix commit `f4d4b5e`
+(app side, after `e31f835`) had not been ported. It is ported now where it applies, and a few fixes go a step further than Android (said below).
+Android's `music-brain` HEAD is `48cc163`; its golden files did not change after `e31f835` (every `.jsonl` of the folder has Android's blob id).
+
+## What changed
+
+- **Grounding** (`TaizoGrounding`, PixlLibrary): `check` now passes `scanUnmarked: true`, so a name written with no mark and no quote is checked
+  too; the app's own words (`TaizoGrounding.appNames`: Your Mix, First Listen, Made for you, Your sound, Familiar, Blend, Discover, Taste changes)
+  are always known; refs seen in any tool result (similar artists, new releases, an older chat's history) are known refs; `lookup_genre`'s ids
+  are kept (genres and moods apart) and `recommend`, `build_mix` and `steer_session` refuse an id no lookup returned in this chat (`ids_ignored`).
+  New: `shown` (a final reply; when every sentence is left out it says "I cannot say that from what PixlAudio has recorded." and never the raw
+  text), `streaming` and `holdBack` (what a reply may show while it is still written), `introLine`, `libraryNames`.
+- **The chat** (`TaisChatModel`): the streamed text is checked on every 50 ms flush, with an unclosed mark or quote, the word being typed and a
+  trailing run of capitalised words held back; the stop path and the dropped-connection path show only the finished part, checked; the phone
+  model's answer and the plain provider's answer are checked against the listener's own words and the library (names only), and an intro line
+  that names something nobody gave is dropped.
+- **Play and Save after a restart** (`TaizoToolbox`): the four id-taking tools prepare the music engine first, so an engine ref of a reopened chat
+  still resolves; a ref plays only when a tool of this chat returned it (history included); a mix that the app no longer holds says so
+  (`mix_note`: build it again) instead of "not found".
+- **The engine and the card**: a seed that could not be used (no radio on the phone, none fetched, or the song could not be placed) comes back as
+  `seeds_not_used` with a note, and the card says so (`taizoMixSeedNotUsed`); Play and Save use exactly the picks the card shows; a chip's new mix
+  takes the old one's place in the record (16 kept, not 12); the "Slower" and "Lower energy" chips are not offered when no track of the pool has a
+  tempo or an energy (`chipUnsupported`); the top artist of a mix is the credited primary artist ("Tyler, The Creator" is one artist, so "Less
+  Tyler" can no longer be written); `similar_artists` gives a rank, not a percentage, and the artist's own name from the artist table.
+- **`explain_track`**: genres the batch job wrote say they are a suggestion (`genres_note`); factors are returned only when they can be read (a
+  pick the learned weights ranked, after the gate switched them off, has none) and say they are read "as the engine ranks today"; a ref from
+  nowhere is refused.
+- **Stations**: a station from a sentence does not touch the Familiar / Blend / Discover switch; `start_station` with mode blend leaves it, with
+  familiar or discover sets it and says so in the result (`note`). The library-artist test runs off the main actor on `BrainLibraryIndex`.
+- **`resolve_tracks`**: a search without a known length needs a score of 0.62 when an artist is given (Android's bar), and a search that could not
+  be made is reported as that (`failed`), not as "no such song".
+- **Confirmations** (`TaizoAssistant.confirmationQuestion`): a mix counts as its songs (so "Replace your queue (8 songs) with 30 songs?" and a
+  playlist of two mixes asks), and a lasting steer names the artist or the genre, never a raw ref or id.
+- **Set notes** (`SetNoteLines`, `SetNoteHistory`): a note says "your side" only for a song with a recorded play, "something new" only for an
+  engine song with none, and a library song nobody played is neither (a First Listen queue gets no note); notes are keyed by the position in the
+  queue, and the plays are read off the main thread when the window of the queue changes. In the queue the note is part of its row, so it moves with
+  the row when it is dragged.
+- **Weekly note** (`WeeklyNoteService`): one cloud call per calendar week (not per list build); the new-music share is out of the evidence hash and
+  checked on its own (3 points); a call cut short by leaving the list does not spend the week; and a second look refuses a note that names a
+  capitalised artist the evidence rows did not hold.
+- **Batch jobs**: a failed tagging call marks the week and is not repeated on every daily run; the Settings copy no longer says the whole job runs
+  weekly; turning the switch off takes the written genres back out at once (`BrainAssist.switchedOff`), not at the next refresh.
+
+## The findings
+
+| # | Severity | Finding | Verdict |
+| - | - | - | - |
+| 1 | blocker | Unmarked names never checked (`scanUnmarked` off), also in `WeeklyNote.check` | Fixed: on in `TaizoGrounding.check`; the weekly note gets the same scan in the service (`namesAreMarkedOrGrounded`), not in the golden-tested core |
+| 2 | blocker | A reply whose every sentence is dropped shows the raw text | Fixed: `shown` returns the fixed sentence |
+| 3 | major | Streaming text, the phone model and the plain provider are unchecked | Fixed (streaming, stop, drop, phone model, intro lines); the phone-model check is names only (see 193) |
+| 4 | major | After a restart Play and "play it" find nothing | Fixed: engine prepared first, refs come back from the history, a mix that is gone says so. A mix is still not saved across a restart (build it again) |
+| 5 | major | A seed with no radio silently becomes the day's list | Fixed: `seeds_not_used` + note + a line on the card. The list still falls back to the day's seeds (as Android), but it is said |
+| 6 | major | Genre and mood ids are not checked against `lookup_genre` | Fixed, `steer_session` genres included |
+| 7 | major | Refs of `similar_artists` and `new_releases` rejected; refs of other chats accepted for playing | Fixed both ways |
+| 8 | major | Play and Save use every planned song, the card shows only the picks with a ref | Fixed; the replaced mix leaves the record |
+| 9 | major | `start_station` and the offline sentence overwrite the Familiar / Blend / Discover switch | Fixed (195). The "untrusted content" confirmation is still missing (deviation 176, unchanged) |
+| 10 | major | The confirmation counts a mix as one song | Fixed |
+| 11 | major | `firstArtist` splits "Tyler, The Creator" | Fixed in the card, in `explain_track` and in `similar_artists` |
+| 12 | major | Set notes say untrue things and are keyed by song id | Fixed |
+| 13 | minor | `resolve_tracks` bar and network failure read as "not found" | Fixed |
+| 14 | minor | Assistant genres presented as facts; tags stay after the switch goes off | Fixed (`genres_note`; take-back on the switch). Cut: `explain_taste`'s genres from Your sound do not carry the mark |
+| 15 | minor | `similar_artists` score is a share of the closest | Fixed: rank |
+| 16 | minor | "One call a week" is one per list build; a cancelled view burns the week | Fixed |
+| 17 | minor | Copy says "Once a week"; tagging runs daily and retries a failure daily | Fixed (copy as Android's; failure marked for the week) |
+| 18 | minor | Set-note labels break the drag arithmetic | Mostly fixed (202) |
+| 19 | minor | `explain_track` factors use today's learned model | Fixed for the case that misleads (gate off); the weights are today's and the tool says so |
+| 20 | minor | "Slower" chip with no tempo data | Fixed |
+| 21 | minor | The offline station test folds every library artist on the main actor | Fixed |
+
+## Deviations 191 and on
+
+191. **`TaizoGrounding` seeds the app's own words** (`appNames`). Android has no such list; with `scanUnmarked` on, "Your Mix" or "First Listen" would
+     otherwise be flagged. The list is words of this app only, never a song, album or artist.
+192. **The weekly note's unmarked-name scan is in the service**, not in `WeeklyNote.check` (the pure function stays as Android has it, golden-tested).
+     A note that names an artist unmarked now falls back to the template; Android's check does not look for those.
+193. **The phone model's answer is checked for names only**: the model reads the library through its own lookup tool, so its numbers cannot be seen
+     here. A name passes when the listener said it or it is a title, album or credited artist of the library. A plain-provider answer is checked the
+     same way. An intro line is dropped when it names anything else.
+194. **The streamed text also holds back a trailing run of capitalised words** (Android holds the word being typed and an unclosed mark). Without it
+     "Sabrina" shows as an unchecked name for the instant before "Carpenter" arrives.
+195. **`start_station` mode: blend leaves the switch as the listener has it**; familiar and discover set it and the result says so. Android sets the
+     switch for every mode. The schema is the same (mode stays required).
+196. **`similar_artists` names the artist from the artist table** (the first credited artist id), as `explain_track` does, because the display line is
+     comma-joined and cannot say where one name ends.
+197. **Factors of a pick the learned weights ranked are not shown once the gate has switched them off** (Android shows the prior's factors under the
+     same heading). The "Why this song" sheet then shows no factor lines for that pick.
+198. **`SetNoteHistory` resolves the window's recording ids with `resolveTracks`** (up to 40 requests when the window changes). It can mint an id for a
+     queue song the engine has not met; the library shortlist does the same for every library song, so nothing new is stored in kind.
+199. **Tagging marks a failed week with an `ask` entry of kind `tagfail`** in `AssistCache` (as Android). Not ported: Android's "artists the listener
+     really plays are never suggested" (only the island artists are excluded here).
+200. **A queue row and its note are one view**; the drag pitch is measured on the row, not on the note. A note is about one line (20 points) and there
+     is at most one per five rows, so a drag across several notes can still end a row early or late after about eleven rows. Not closed.
+201. **`DemoAiClient.chatReply` no longer names artists** (the scripted answer is checked like any other, and `AITests` compare it for equality).
+
+## Cut or deferred
+
+- The "untrusted content" confirmation for `start_station` after web text (176 and finding 9).
+- A mix is not kept across a restart (finding 4): the card is gone with the chat; the model is told to build it again.
+- `explain_taste`'s genres do not say when one came from the assistant's batch job (finding 14).
+- Android's "played artists are known" part of the suggestion job (199).
+- A test of the factor gate (197) over a real `BrainEngine`: it is traced and not unit-tested.
+
+## What nobody has verified on a device (added by this pass)
+
+- The streaming text on a phone: whether holding back the end of the reply makes it read as stuttering, and whether a proper name that the model
+  does not mark is replaced too often (the check can only see capitals).
+- The phone model's answers with the library check: how often a real library name is flagged anyway.
+- Play from a card after a restart, a reopened chat's refs, the "mix is gone" message.
+- The queue: the note moving with its row, the drag landing on the right row, the player line.
+- That the history read for set notes is fast on a real library (up to 40 recording lookups when the queue window changes), and that a First
+  Listen queue shows no note until something was played.
+- The Settings switch taking the genres back at once.
+- That `App/` compiles: only CI checks it (see the CI section).
+
+## How to test on a phone (for Hoa)
+
+1. Ask Taizo (cloud): "recommend me something like Radiohead". Every artist and album in the answer is one you saw a card or a result for. If
+   the model names someone it did not look up, the answer reads "(a name I could not check)" for it.
+2. Ask something the model can only answer with a number you never told it ("how many plays does my favourite song have"): if it cannot, it says
+   "I cannot say that from what PixlAudio has recorded." and never the number.
+3. Watch an answer stream: a name appears only once it is whole; no brackets show.
+4. Build a mix, close the app, reopen Ask Taizo (it restores the chat), say "play it": it tells you the mix has to be built again; ask for a song
+   by name from that chat and play it: that works.
+5. Switch Spotify's radios off (airplane mode) and ask for "a mix like Espresso": the card says it could not load songs like that.
+6. A mix by Tyler, The Creator: the chip says "Less Tyler, The Creator". On a library with no tempo data there is no "Slower" chip.
+7. Set Discover in the player, then say "start a station from Radiohead": the switch is still on Discover. Say "start a mostly familiar station
+   from Radiohead": the reply says the switch is now on Familiar.
+8. First Listen on a fresh library: no line in the queue about "your side". After a few days of listening, one appears.
+9. Settings: turn "Let Taizo help the engine" on, let a refresh run, then turn it off: the genres it wrote are gone at once.
+10. Drag a song 10 rows down a queue that has a note in it: it lands one row from where you aimed at most.
