@@ -180,3 +180,125 @@ The full run had exactly one failure, `BrainGoldenTests.theManifestListsEveryFil
 Run **44627072802** (`1e9fa56`, workflow `ci`, branch `music-brain`): `core` (PixlCore `swift test` on macOS) **passed**, `app` (build and unit tests,
 Xcode 27, Swift 6 strict concurrency, which is the only compiler for `App/`) **passed**, `ipa` skipped as for any branch push. Conclusion: **success**, on the first
 attempt, with no rerun and no known flake hit. Green CI says nothing about how the two new screens look or behave on a phone.
+
+---
+
+# Stage 3 completion (iOS, second pass)
+
+This pass ports Android's second pass (its commits `aedd3cc`, `053340a`, `52c9439` and `c3a6f14`, and the section "Stage 3 completion" of its
+`handoff/2026-11-20-music-brain-stage3.md`, deviations 189 to 201, which hold here unless a line below says otherwise). It built what the first pass
+cut: control sessions measured on what was ranked, the arm bandit, the novelty appetite, context and the daypart mix, impressions and the shelf bandit,
+Your sound's Lately, genre tree and island sheet, the genre page's own sections, the music picks backup module and the test 6 command.
+
+**Still true: nothing below has run on a phone, every number is from synthetic listeners, there is no real-data number for the learner anywhere
+(code, copy, docs), and the legacy engine is NOT deleted.** `Brain.specVersion` is still 2; no earlier golden file moved.
+
+## What was built (files)
+
+Pure core, `Packages/PixlCore/Sources/PixlLibrary/Brain/` (same names as `:brain`; Android's five NEW golden files `bandit`, `novelty`, `context`,
+`shelfbandit`, `posteriors` are matched bit for bit; `MANIFEST.sha256` and `README.md` copied, 38 files now):
+`ArmBandit.swift` (+ `ArmPicker`, `ClosureArmPicker`, `Sampler`), `NoveltyAppetite.swift`, `Posteriors.swift` (+ `PosteriorUpdate`, `PosteriorCodec`),
+`ContextLift.swift`, `ShelfBandit.swift` (+ `ShelfBanditCodec`); changes to `ListBuilder` (`armPicker`, `Pick.explore`), `StationPlanner` (`armPicker`,
+`Pick.explore`, `Plan.control` / `modelVersion`), `MixPlanner` (`armPicker`, `nuBase`, `nuOverride`, `nuOf(appetite:)`), `HomePlanner` (`daypartMix`,
+`reorder`), `LearnReplay` (`Result.posteriors`, `applyLive(posteriors:)`), `Replay.applyFacts` (a TAG adjustment), `YourSound` (`lately`, `genreTree`,
+`genreHistory`).
+
+Engine and stores, `PixlLibrary/BrainStore/`: `BrainEngine` (`RankingChoice`, `Loaded.rankingChoice` / `armPicker` / `sessionNu`, `Learner.posteriors`,
+the live update of both, `posteriors_v1`, reset, rebuild, `usesLearned`, `configureAtlas`, `backupState` / `restoreBackupState`), `ShelfStore.swift`
+(`ShelfStore`, `Impression`, `ImpressionFile`), `ContextStore.swift`, `BrainMixes` / `MixModel` (the daypart kind, `explore`, `control`, `model`),
+`BrainHomeRows`, `HomePlan` (`PlanItem.explore`, `PlanShelf.control` / `model`), `HomePlanBuilder` (the daypart shelf after "Because you listened to",
+the bandit's order), `BrainRefresh` (`settleShelves`), `AutoplayPlanning` (the tag reads the plan's choice), `YourSoundReader` (Lately, the tree,
+island names, `genreExtras`), `BrainFeedback.genreChange`, `BrainMigration` (`LibraryFactsBuilder`: a genre change is a TAG pseudo-count),
+`DnaStore` (`artistsWithTags`), `FeedbackStore` (`all`, `replaceAll`). Model: `BrainItemTag` and the saved queue item gained `control`, `modelVersion`,
+`explore` (`brainControl`, `brainModel`, `brainExplore`, the same names as Android). Backup: `PixlBackup/Modules/BrainModule.swift`
+(`BrainBackupModule`), `BackupSection.brain` (key `brain`, `sinceVersion` 4, label "Music picks"), its validator and importer.
+
+App (thin): `BrainService` (builds `ShelfStore` and `ContextStore`, hands them to the plan builder, the refresh and Your sound; `backupBrain`,
+`restoreBrain`), `HomePlanState` (the page shown, seen and started signals), `HomeView` (a one-second dwell per shelf, a started shelf),
+`BrainStringsHome` / `BrainStringsSound` (every new word, the same sentences as Android), `YourSoundView` (Lately, the tree, the island sheet),
+`GenrePageView` (More / Less, key artists, From your library, You and this genre), `BrainActions.adjustGenre`, `TasteAdjustmentStore`
+(`backupText`, `restoreFromBackup`), `BackupService` (the `.brain` export and restore), `AppEnvironment` (wiring), `BackupSettingsSection`.
+
+Tests: `BrainStage3bGoldenTests` (6), `BrainStage3bTests` (33), `BrainStage3bEngineTests` (15), `BrainBackupTests` (6), `BrainRealExportTest6` (1,
+skipped without a file); `BrainLearnerEngineTests`' control case now passes the choice in the tag; `AndroidPortTests` counts 13 sections;
+`BrainGoldenTests` counts 38 fixture files.
+
+## Deviations (iOS numbering continues at 149)
+
+149. **The ranking record travels on the plan.** Android sets `inputs.choice` on the mutable autoplay inputs. Here the engine puts `control` and
+     `modelVersion` on the `StationPlanner.Plan` it returns (autoplay, station, Home row, mix), and `AutoplayPlanning.items` and `tag` read them, so
+     `AutoplayController` needed no change. A pick taken in pool order has no plan: the prior, no control (Android 189).
+150. **Impressions are two record files owned by `ShelfStore`**, not rows in `BrainEventLog`: `impression.pbl` (`visitId|position` -> `[v, visitId,
+     position, shelf, daypart, shownAtMs, seen, activatedAtMs, settled]`, `v` = 1; a record of another version is ignored; a stage 1 to 3 install has
+     no file) and `shelf_bandit.pbl` (the posteriors, `ShelfBanditCodec`). At most 200 visits and 90 days, pruned when a visit is added. Android keeps
+     the posteriors in `brain_state`; they were kept apart here because the event log's files belong to the engine actor. A missing or unreadable
+     posterior state starts from the priors (Android 196: the rows hold no reward, so they cannot make it again).
+151. **`ContextStore` reads the whole log** (the file's bytes on the engine, decoded and counted in a detached task), cached for 30 minutes, not paged
+     as on Android. Same trade as Your sound (deviation 145): never measured on 100,000 plays.
+152. **`ShelfStore` is an actor; every call from the page is a detached `.utility` task**; nothing runs on the main actor, and the settle also runs at the
+     end of the refresh (`RefreshWork.settleShelves`) and at the next page show, as on Android.
+153. **A shelf is "seen" after a one-second dwell** of a SwiftUI `task(id:)` that starts when the shelf appears and is cancelled when it goes. Whether a
+     shelf in a `LazyVStack` counts the way a listener would is unverified.
+154. **Genre changes reach the tag only when the engine has the atlas**: `BrainEngine.configureAtlas` is called with the atlas provider when the
+     mixes are configured. Without it a genre change is the ranking-time boost alone, as before.
+155. **Backup.** `BackupSection.brain` is listed for developer mode only (`isTechnical`), so the everyday list keeps its seven sections; it is in every
+     backup by default. Salt and exclusions cross platforms unchanged. The taste changes travel as the exporting app's own text: this app writes its
+     JSON, and text from the other platform is not read (the changes here are left alone, never failed). The event log is not in the module (the
+     playback history and imported history modules cover plays, as on Android 200). **Platform backup**: nothing under `Application Support/Brain/` is
+     marked excluded from the device backup, so the whole folder (the event log is the truth, the rest small caches) is carried by iCloud / iTunes backup;
+     Android excludes only its saved plans. No code was added for this.
+156. **Test 6 on a real export** (`BrainRealExportTest6`): iOS has no "Export play events" action (stage 2a, deviation noted there), so the test also
+     reads a copy of `play_event.pbl` (records are the same lines). Command:
+     `PIXLAUDIO_EVAL_EXPORT=<play-events.jsonl or play_event.pbl> cmd //c "ci\swiftw.cmd test --package-path Packages\PixlCore --filter BrainRealExportTest6"`;
+     the report is printed and written to `PIXLAUDIO_EVAL_REPORT`, else `Packages/PixlCore/.build/reports/brain-test6.txt`. It was run once on a
+     synthetic file made from a golden file, to see that it works; **it was not run on a real export** and its numbers are not recorded here.
+157. **Saved shapes that gained fields** (`StoredHomeItem`, `StoredHomeRow`, `PlanItem`, `PlanShelf`) got explicit decoders: a synthesized `Codable` would
+     have refused every file a stage 2 install wrote. Tested with the old JSON.
+158. **The island's detail is a sheet**, not an alert (a list with buttons), and a genre family opens in place. "Play station" is the existing
+     `startGenreStation`, so with nothing of the listener's under the genre the existing notice says so (as deviation 148).
+159. **Daypart titles** say "Your weekday mornings" ... "Your weekend nights" (Android 195): the shelf's bucket is weekday or weekend, never one weekday.
+
+Android 189 to 201 hold, in particular: the arm bandit runs only while the learned weights are in use and the session is not a control (190), a
+taste adjustment on a genre does not move tracks with no genre (199), the shelf order is used only with the learned weights on and after 20 shelf
+updates (196).
+
+## Cut or deferred (as on Android, nothing more)
+
+Feature 29 `ctx_lift` is not fed into scoring; Your sound's energy and mood sections, the artwork-tinted hero and an entry from Home's avatar (Settings
+only); a station from an island with no nameable genre; the `M0` refit on pooled exports and test 6 on real data; deleting the legacy engine.
+
+## How to test on a phone (additions)
+
+1. **Control flag**: play autoplay in a few sessions; about one session in ten has `controlSession` on its engine picks in the event log, and `modelVersion`
+   is 0 on them and on every pick while the gate is off.
+2. **Nothing changes until the gate is on.** After two weekly rebuilds in which the learned weights won, novel slots carry the exploration flag and the
+   novelty share follows what you finish; Your sound's novelty line moves with it.
+3. **Daypart shelf**: needs islands and 50 plays in one bucket of the week; then "Your weekday nights" (or the bucket you are in) appears after "Because you
+   listened to". Absent otherwise.
+4. **Shelf order**: with the gate on and 20 shelf updates the order can differ between dayparts, never within one. `impression.pbl` stays small (at most 200
+   visits).
+5. **Your sound**: Lately after a few days of moved plays; tap a family to open its genres, tap an island for its artists and songs, Play station, More of this,
+   Less of this. A genre page: More / Less, Key artists, From your library, You and this genre (absent for a genre never played).
+6. **Backup**: Settings › Developer mode lists "Music picks"; export, change a taste change, restore: the change comes back, the salt and exclusions too.
+7. **Test 6** on your own export: deviation 156.
+
+## What nobody has verified on a device
+
+Everything above, and in particular: that the control flag and the model version reach events from every surface (read in code, tested at the recorder);
+the arm bandit's exploration slots and whether the audit ever fires; what the learned appetite does to a mix over weeks; the context table on a real log
+(time over 100,000 events) and the daypart shelf's content; the one-second dwell and the started-shelf signal in a real page; the settling and the frozen
+order; the size of `impression.pbl` over months; Lately (two passes over a large log: time not measured); the island sheet and the tree; the genre page on
+real atlas coverage; a backup export and restore of the music picks and the platform backup behaviour; that `App/` compiles (CI alone says so, below).
+**There is still no real-data number for the learner.**
+
+## Commands and results
+
+```
+cmd //c "ci\swiftw.cmd test --package-path Packages\PixlCore --filter BrainStage3b"   # 54 tests in 3 suites, 0 failed (golden 6, pure 33, engine 15)
+cmd //c "ci\swiftw.cmd test --package-path Packages\PixlCore --filter BrainBackupTests"   # 6 tests, 0 failed
+cmd //c "ci\swiftw.cmd test --package-path Packages\PixlCore --filter AndroidPortTests"   # 66 tests, 0 failed
+cmd //c "ci\swiftw.cmd test --package-path Packages\PixlCore --filter BrainLearnerEngineTests"   # 6 tests, 0 failed
+bash ci/check-forbidden.sh                                                                  # OK
+powershell -NoProfile -ExecutionPolicy Bypass -File ci/parse-check.ps1 -All               # 1,075 files OK
+cmd //c "ci\swiftw.cmd test --package-path Packages\PixlCore"                              # 8 bundles, 2,577 tests, 0 failed
+```
