@@ -110,16 +110,31 @@ public enum AndroidBackup {
 
     // MARK: search history
 
-    /// `SearchHistoryEntity`.
+    /// `SearchHistoryEntity`. The fields after `timestamp` came with the search history screen: a payload from before it
+    /// has none (they stay nil and are not written back, so an old payload round-trips byte for byte), and an older app
+    /// reading a new payload ignores them. Gson's field names.
     public struct SearchHistoryEntity: GsonRecord {
         public var id: Int64
         public var query: String?
         public var timestamp: Int64
+        public var key: String?
+        public var kind: String?
+        public var targetId: String?
+        public var targetTitle: String?
+        public var imageUrl: String?
+        public var count: Int32?
 
-        public init(id: Int64 = 0, query: String?, timestamp: Int64) {
+        public init(id: Int64 = 0, query: String?, timestamp: Int64, key: String? = nil, kind: String? = nil,
+                    targetId: String? = nil, targetTitle: String? = nil, imageUrl: String? = nil, count: Int32? = nil) {
             self.id = id
             self.query = query
             self.timestamp = timestamp
+            self.key = key
+            self.kind = kind
+            self.targetId = targetId
+            self.targetTitle = targetTitle
+            self.imageUrl = imageUrl
+            self.count = count
         }
 
         public static func gsonDecode(_ value: JSONValue) throws(GsonError) -> SearchHistoryEntity? {
@@ -130,6 +145,12 @@ public enum AndroidBackup {
                 case "id": if let v = try GsonRead.long(m.value) { r.id = v }
                 case "query": r.query = try GsonRead.string(m.value)
                 case "timestamp": if let v = try GsonRead.long(m.value) { r.timestamp = v }
+                case "key": r.key = try GsonRead.string(m.value)
+                case "kind": r.kind = try GsonRead.string(m.value)
+                case "targetId": r.targetId = try GsonRead.string(m.value)
+                case "targetTitle": r.targetTitle = try GsonRead.string(m.value)
+                case "imageUrl": r.imageUrl = try GsonRead.string(m.value)
+                case "count": r.count = try GsonRead.int(m.value)
                 default: break
                 }
             }
@@ -137,8 +158,15 @@ public enum AndroidBackup {
         }
 
         public var gsonTree: JSONValue {
-            GsonValue.object([("id", GsonValue.long(id)), ("query", GsonValue.string(query)),
-                              ("timestamp", GsonValue.long(timestamp))])
+            var members: [(String, JSONValue)] = [("id", GsonValue.long(id)), ("query", GsonValue.string(query)),
+                                                  ("timestamp", GsonValue.long(timestamp))]
+            if let key { members.append(("key", GsonValue.string(key))) }
+            if let kind { members.append(("kind", GsonValue.string(kind))) }
+            if let targetId { members.append(("targetId", GsonValue.string(targetId))) }
+            if let targetTitle { members.append(("targetTitle", GsonValue.string(targetTitle))) }
+            if let imageUrl { members.append(("imageUrl", GsonValue.string(imageUrl))) }
+            if let count { members.append(("count", GsonValue.int(count))) }
+            return GsonValue.object(members)
         }
     }
 

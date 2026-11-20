@@ -202,18 +202,29 @@ extension AndroidBackup.LyricsEntity {
 // MARK: - Search history
 
 public enum SearchHistoryModule {
+    /// The rows of a payload, each with its key recomputed from its text (a key in the payload is never trusted) and
+    /// its fields defaulted when the payload predates them. Rows are not merged here: that is the store's job
+    /// (`SearchHistoryRules.merged`).
     public static func restore(payload: String) throws(BackupError) -> [SearchHistoryItem] {
         var out: [SearchHistoryItem] = []
         for (record, _) in try decodeRequiredList(payload, AndroidBackup.SearchHistoryEntity.self, module: .searchHistory) {
             guard let query = record.query else { throw BackupError("Search History payload has an entry without a query.") }
-            out.append(SearchHistoryItem(id: record.id == 0 ? nil : record.id, query: query, timestamp: record.timestamp))
+            let item = SearchHistoryItem(id: record.id == 0 ? nil : record.id, query: query, timestamp: record.timestamp,
+                                         kind: record.kind.flatMap(SearchHistoryKind.init(rawValue:)),
+                                         targetId: record.targetId, targetTitle: record.targetTitle,
+                                         imageUrl: record.imageUrl, count: Int(max(1, record.count ?? 1)))
+            // A row that cannot be keyed (only punctuation) keeps an empty key; the merge drops it.
+            out.append(SearchHistoryRules.sanitized(item) ?? item)
         }
         return out
     }
 
     public static func export(_ items: [SearchHistoryItem]) -> String {
         AndroidBackup.SearchHistoryEntity.encodeList(items.map {
-            AndroidBackup.SearchHistoryEntity(id: $0.id ?? 0, query: $0.query, timestamp: $0.timestamp)
+            AndroidBackup.SearchHistoryEntity(id: $0.id ?? 0, query: $0.query, timestamp: $0.timestamp,
+                                              key: $0.key.isEmpty ? nil : $0.key, kind: $0.kind?.rawValue,
+                                              targetId: $0.targetId, targetTitle: $0.targetTitle, imageUrl: $0.imageUrl,
+                                              count: Int32(clamping: $0.count))
         })
     }
 }

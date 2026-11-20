@@ -4,17 +4,61 @@
 import Foundation
 import PixlFoundation
 
-/// A past search (`SearchHistoryItem`).
+/// What a history row stands for (`SearchHistoryKind`): `query` is a typed search, the rest is a result the listener
+/// opened from that search. A row with no kind at all is a submitted search too (the IME key, the voice result).
+public enum SearchHistoryKind: String, Sendable, Hashable, Codable, CaseIterable {
+    case query
+    case song
+    case album
+    case artist
+    case playlist
+}
+
+/// A past search (`SearchHistoryItem`). The fields after `timestamp` came with the search history screen: old backups
+/// and old rows have none of them, so they default (the key is computed by `SearchHistoryRules`, never trusted).
 public struct SearchHistoryItem: Sendable, Hashable, Codable {
     public var id: Int64?
+    /// As typed (trimmed, at most `SearchHistoryRules.maxQueryLength` characters): what the row shows.
     public var query: String
-    /// Milliseconds since 1970.
+    /// Milliseconds since 1970 of the last use.
     public var timestamp: Int64
+    /// The folded `query` (`BrainText.fold`): what rows are de-duplicated and matched by. Empty until computed.
+    public var key: String
+    public var kind: SearchHistoryKind?
+    public var targetId: String?
+    public var targetTitle: String?
+    public var imageUrl: String?
+    /// How many times the row was used (at least 1).
+    public var count: Int
 
-    public init(id: Int64? = nil, query: String, timestamp: Int64) {
+    public init(id: Int64? = nil, query: String, timestamp: Int64, key: String = "", kind: SearchHistoryKind? = nil,
+                targetId: String? = nil, targetTitle: String? = nil, imageUrl: String? = nil, count: Int = 1) {
         self.id = id
         self.query = query
         self.timestamp = timestamp
+        self.key = key
+        self.kind = kind
+        self.targetId = targetId
+        self.targetTitle = targetTitle
+        self.imageUrl = imageUrl
+        self.count = count
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, query, timestamp, key, kind, targetId, targetTitle, imageUrl, count
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(Int64.self, forKey: .id)
+        query = try c.decode(String.self, forKey: .query)
+        timestamp = try c.decode(Int64.self, forKey: .timestamp)
+        key = try c.decodeIfPresent(String.self, forKey: .key) ?? ""
+        kind = (try c.decodeIfPresent(String.self, forKey: .kind)).flatMap(SearchHistoryKind.init(rawValue:))
+        targetId = try c.decodeIfPresent(String.self, forKey: .targetId)
+        targetTitle = try c.decodeIfPresent(String.self, forKey: .targetTitle)
+        imageUrl = try c.decodeIfPresent(String.self, forKey: .imageUrl)
+        count = max(1, try c.decodeIfPresent(Int.self, forKey: .count) ?? 1)
     }
 }
 
