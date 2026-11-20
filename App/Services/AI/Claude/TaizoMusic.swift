@@ -22,7 +22,7 @@ final class TaizoMusic {
     nonisolated init() {}
 
     /// The runner and the playable side, made on first use from the brain's stores; nil while the brain is off (UI tests) or not ready.
-    func prepare(_ environment: @MainActor @Sendable () -> AppEnvironment?) -> Prepared? {
+    func prepare(_ environment: @escaping @MainActor @Sendable () -> AppEnvironment?) -> Prepared? {
         if let prepared { return prepared }
         guard let env = environment(), let engine = env.brain.engine, let repository = env.brain.repository,
               let mixes = env.brain.mixes else { return nil }
