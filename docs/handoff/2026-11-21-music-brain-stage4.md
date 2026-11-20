@@ -286,8 +286,8 @@ Windows, from the iOS checkout root (Git Bash):
   timing test, not touched).
 - `bash ci/check-forbidden.sh`: OK. `ci/parse-check.ps1`: 313 files OK.
 - Golden files: `assistant.jsonl`, `assistantcards.jsonl`, `MANIFEST.sha256` and `README.md` re-copied from Android's `music-brain` (`e31f835`);
-  every file of the folder now has the same blob id as Android's committed one except the three binary or line-ending cases that were never
-  copied (`fold-v1.tsv`, `genre-atlas-v1.json.gz`, `radio_song.expected.json`, `title-rules-v1.tsv` live elsewhere on iOS).
+  every file of the folder now has the same blob id as Android's committed one, except four files that are not in Android's golden folder at all
+  (`fold-v1.tsv`, `genre-atlas-v1.json.gz`, `radio_song.expected.json`, `title-rules-v1.tsv`; iOS-only copies of other Android resources).
 
 ## CI
 
