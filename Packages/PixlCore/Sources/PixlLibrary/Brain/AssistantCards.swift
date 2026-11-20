@@ -84,35 +84,71 @@ public enum AssistantCards {
         }
     }
 
-    /// Which of `named` the listener asked about in `userText` ("Why do I keep getting trap?" names trap): the longest of them that is a
-    /// whole-word run of what they wrote, ties to the earlier one. nil when none is, and then no chip is offered: a "Less X" for a thing the
-    /// listener did not ask about would be a guess. Names shorter than two characters never match (a one-letter name is in every sentence).
+    /// Words that, just before a name, say the listener likes it: no "Less X" is offered for a name they praised.
+    private static let liking: Set<String> = ["love", "loves", "like", "likes", "enjoy", "enjoys", "adore", "favourite", "favorite", "into", "want"]
+
+    /// How many words before a name are read for a liking word.
+    private static let likingWindow = 3
+
+    /// Which of `named` the listener asked about in `userText` ("Why do I keep getting trap?" names trap). Exactly one name must be a
+    /// whole-word run of what they wrote (a name inside a longer one that also matches, "rock" in "indie rock", does not count), and no
+    /// liking word may stand in the three words before it ("I love rock though"): a listener who names two things, or praises the thing they
+    /// named, gets no chip, because a "Less X" for the wrong one would be a guess. Names shorter than two characters never match.
     public static func lessTarget(userText: String, named: [Named]) -> Named? {
         let text = Array((" " + BrainText.trim(BrainText.fold(userText)) + " ").utf16)
-        var best: Named?
-        var bestLen = 0
+        struct Hit { let named: Named; let at: Int; let end: Int }
+        var hits: [Hit] = []
         for n in named {
             let f = Array(BrainText.trim(BrainText.fold(n.name)).utf16)
             if f.count < 2 { continue }
-            if containsWords(text, f) && f.count > bestLen {
-                best = n
-                bestLen = f.count
+            var from = 0
+            while true {
+                let at = indexOfWords(text, f, from)
+                if at < 0 { break }
+                hits.append(Hit(named: n, at: at, end: at + f.count))
+                from = at + 1
             }
         }
-        return best
+        // A hit inside a longer hit is the same mention.
+        var outer: [Hit] = []
+        for (hi, h) in hits.enumerated() {
+            var inside = false
+            for (oi, o) in hits.enumerated() where oi != hi && o.at <= h.at && o.end >= h.end && (o.end - o.at) > (h.end - h.at) {
+                inside = true
+                break
+            }
+            if !inside { outer.append(h) }
+        }
+        var liked = Set<String>()
+        var wantedKeys: [String] = []
+        var wanted: [String: Named] = [:]
+        for h in outer {
+            let key = String(h.named.kind) + ":" + BrainText.fold(h.named.name)
+            let words = BrainText.trim(String(decoding: text[0..<h.at], as: UTF16.self)).split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+            let before = words.suffix(likingWindow)
+            if before.contains(where: { liking.contains($0) }) {
+                liked.insert(key)
+            } else if wanted[key] == nil {
+                wanted[key] = h.named
+                wantedKeys.append(key)
+            }
+        }
+        for k in liked { wanted[k] = nil }
+        wantedKeys.removeAll { liked.contains($0) }
+        return wantedKeys.count == 1 ? wanted[wantedKeys[0]] : nil
     }
 
-    /// True when `needle` occurs in `haystack` with no word character on either side.
-    private static func containsWords(_ haystack: [UInt16], _ needle: [UInt16]) -> Bool {
-        var from = 0
+    /// The index of `needle` in `haystack` with no word character on either side, from `from`; -1 when there is none.
+    private static func indexOfWords(_ haystack: [UInt16], _ needle: [UInt16], _ from: Int) -> Int {
+        var start = from
         while true {
-            let at = Grounding.indexOf(haystack, needle, from)
-            if at < 0 { return false }
+            let at = Grounding.indexOf(haystack, needle, start)
+            if at < 0 { return -1 }
             let before: UInt16 = at > 0 ? haystack[at - 1] : 0x20
             let afterIndex = at + needle.count
             let after: UInt16 = afterIndex < haystack.count ? haystack[afterIndex] : 0x20
-            if !isWordChar(before) && !isWordChar(after) { return true }
-            from = at + 1
+            if !isWordChar(before) && !isWordChar(after) { return at }
+            start = at + 1
         }
     }
 

@@ -494,6 +494,19 @@ public enum AssistantRules {
         return n
     }()
 
+    /// The words of an affinity feature (1, 2, 3, 4, 36) when its value is NEGATIVE: the listener skips this artist, they do not play it. An
+    /// affinity runs from -3 to 3, so a negative one needs its own sentence; a feature with no entry here has no negative form and a negative
+    /// value is read as its ordinary name (only the affinities can be negative).
+    public static let negativeNames: [String?] = {
+        var n = [String?](repeating: nil, count: Ranker.d)
+        n[1] = "you have skipped this track before"
+        n[2] = "you often skip this artist"
+        n[3] = "you have been skipping this artist lately"
+        n[4] = "its genres match what you skip"
+        n[36] = "this kind of pick has not worked for you"
+        return n
+    }()
+
     /// A factor is reported when its contribution is at least this far from 0.
     public static let factorMin = 0.05
 
@@ -507,6 +520,9 @@ public enum AssistantRules {
         for i in 1..<Ranker.d {
             if factorNames[i] == nil { continue }
             let c = w[i] * x[i]
+            // A negative affinity with a positive weight is a reason it was held back, said as a skip. With a negative weight the product is
+            // positive and "you skip this artist" would read as a reason in its favour: such a factor is not reported.
+            if negativeNames[i] != nil && x[i] < 0.0 && c > 0.0 { continue }
             contrib[i] = c
             let a = c < 0.0 ? -c : c
             if a >= factorMin { idx.append(i) }
@@ -527,7 +543,8 @@ public enum AssistantRules {
             }
             if best < 0 { break }
             taken[best] = true
-            out.append(Factor(name: factorNames[best]!, up: contrib[best] > 0.0))
+            let negative = negativeNames[best] != nil && x[best] < 0.0
+            out.append(Factor(name: negative ? negativeNames[best]! : factorNames[best]!, up: contrib[best] > 0.0))
         }
         return out
     }

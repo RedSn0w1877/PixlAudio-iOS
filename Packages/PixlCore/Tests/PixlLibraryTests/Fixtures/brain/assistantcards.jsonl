@@ -143,3 +143,6 @@
 {"fn":"lessTarget","in":{"user":"Why is so much V-pop in my mixes","named":[[0,"V-pop"],[0,"Pop"]]},"out":{"target":"V-pop","label":"Less V-pop"}}
 {"fn":"lessTarget","in":{"user":"t\u1ea1i sao S\u01a1n T\u00f9ng M-TP","named":[[1,"S\u01a1n T\u00f9ng M-TP"]]},"out":{"target":"S\u01a1n T\u00f9ng M-TP","label":"Less S\u01a1n T\u00f9ng M-TP"}}
 {"fn":"lessTarget","in":{"user":"a b c","named":[[0,"A"],[0,""]]},"out":{"target":null,"label":""}}
+{"fn":"lessTarget","in":{"user":"why do I keep getting pop? I love rock though","named":[[0,"Pop"],[0,"Rock"]]},"out":{"target":"Pop","label":"Less Pop"}}
+{"fn":"lessTarget","in":{"user":"why do I keep getting pop and rock","named":[[0,"Pop"],[0,"Rock"]]},"out":{"target":null,"label":""}}
+{"fn":"lessTarget","in":{"user":"i love trap, why so much trap","named":[[0,"Trap"]]},"out":{"target":null,"label":""}}

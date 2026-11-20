@@ -53,7 +53,7 @@ struct BrainStage4M2GoldenTests {
         report.verify(atLeast: 140)
         #expect(counts["allChips"] == 40)
         #expect(counts["chipLabel"] == 96)
-        #expect(counts["lessTarget"] == 9)
+        #expect(counts["lessTarget"] == 12)
     }
 
     // MARK: setnotes.jsonl

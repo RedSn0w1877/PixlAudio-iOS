@@ -209,12 +209,12 @@ struct BrainStage4GoldenTests {
                     for f in out { $0.beginArray(); $0.stringItem(f.name); $0.intItem(f.up ? 1 : 0); $0.endArray() }
                     $0.endArray()
                 })
-            case "grounding":
+            case "grounding", "grounding2":
                 var reg = Grounding.Registry()
                 for n in Self.strings(i, "names") { reg.addName(n) }
                 for t in Self.strings(i, "texts") { reg.addText(t) }
                 let v = Grounding.check(G.string(i, "reply"), reg, userText: G.string(i, "user"), placeholder: "(unverified)",
-                                        dropUngroundedNumbers: G.bool(i, "drop"))
+                                        dropUngroundedNumbers: G.bool(i, "drop"), scanUnmarked: c.fn == "grounding2")
                 report.record(c, c.matches {
                     $0.string("cleaned", v.cleaned)
                     Self.writeStrings(&$0, "ungroundedNames", v.ungroundedNames)
@@ -236,6 +236,7 @@ struct BrainStage4GoldenTests {
         #expect(counts["chips"] == 10)
         #expect(counts["topFactors"] == 8)
         #expect(counts["grounding"] == 8)
+        #expect(counts["grounding2"] == 3)
         #expect(counts["numbers"] == 3)
     }
 

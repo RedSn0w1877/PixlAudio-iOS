@@ -63,18 +63,29 @@ public enum Grounding {
         /// Free text the model may quote from, or numbers it may read: a tool result as text, lyrics, what the user said.
         public mutating func addText(_ raw: String?) {
             guard let raw, !raw.utf16.isEmpty else { return }
-            corpus.append(Grounding.units(BrainText.fold(raw)))
+            // Padded with a space on both sides, so a lookup is a whole-word match ("sia" is not inside "asia").
+            corpus.append([0x20] + Grounding.units(BrainText.fold(raw)) + [0x20])
             for n in Grounding.numbersIn(raw) { numbers.insert(n) }
         }
 
         /// True when `folded` is a name a tool returned.
         public func hasName(_ folded: String) -> Bool { names.contains(KotlinKey(folded)) }
 
-        /// True when `folded` is a part of some registered free text.
+        /// True when `folded` is a run of whole words of some registered free text.
         public func inText(_ folded: String) -> Bool {
             let f = Grounding.units(folded)
             if f.isEmpty { return false }
-            for t in corpus where Grounding.contains(t, f) { return true }
+            let needle: [UInt16] = [0x20] + f + [0x20]
+            for t in corpus where Grounding.contains(t, needle) { return true }
+            return false
+        }
+
+        /// True when `folded` is a run of whole words of some name a tool returned ("Good Luck" of "Good Luck, Babe!"). Only the unmarked scan uses it.
+        public func inName(_ folded: String) -> Bool {
+            let f = Grounding.units(folded)
+            if f.isEmpty { return false }
+            let needle: [UInt16] = [0x20] + f + [0x20]
+            for n in names where Grounding.contains([0x20] + Grounding.units(n.value) + [0x20], needle) { return true }
             return false
         }
 
@@ -91,6 +102,16 @@ public enum Grounding {
         public let end: Int
         public let inner: String
         public let marked: Bool
+        /// Found by the unmarked scan and not grounded: it is replaced whatever the registry holds.
+        public let bad: Bool
+
+        public init(start: Int, end: Int, inner: String, marked: Bool, bad: Bool = false) {
+            self.start = start
+            self.end = end
+            self.inner = inner
+            self.marked = marked
+            self.bad = bad
+        }
     }
 
     /// The `[[...]]` marks of `text`, in order (an unclosed mark, an empty one and a long one are not spans).
@@ -122,13 +143,51 @@ public enum Grounding {
         return out
     }
 
-    private static let leftQuote: UInt16 = 0x201C
-    private static let rightQuote: UInt16 = 0x201D
+    private static let noClose: UInt16 = 0
 
-    private static func isOpenQuote(_ c: UInt16) -> Bool { c == 0x22 || c == leftQuote }
-    private static func isCloseQuote(_ c: UInt16, _ open: UInt16) -> Bool { open == 0x22 ? c == 0x22 : c == rightQuote }
+    /// True for a Unicode letter or digit among the UTF-16 units (Kotlin `Char.isLetterOrDigit`): a surrogate half is neither.
+    static func isLetterOrDigit(_ c: UInt16) -> Bool {
+        guard let scalar = Unicode.Scalar(UInt32(c)) else { return false }
+        switch scalar.properties.generalCategory {
+        case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .modifierLetter, .otherLetter, .decimalNumber: return true
+        default: return false
+        }
+    }
 
-    /// Double-quoted phrases of `text` that are not inside a `[[...]]` mark: a title the model quoted without marking it.
+    /// True for an upper-case unit (Kotlin `Char.isUpperCase`).
+    static func isUpperCase(_ c: UInt16) -> Bool {
+        guard let scalar = Unicode.Scalar(UInt32(c)) else { return false }
+        return scalar.properties.isUppercase
+    }
+
+    /// The unit that closes a quote opened at `i` of `t`, or `noClose` when `i` does not open one. Double quotes (straight and curly),
+    /// guillemets and curly single quotes always open one; a straight single quote opens one only at a word start followed by a letter or
+    /// digit (an apostrophe in "don't" is not a quote).
+    private static func closeFor(_ t: Units, _ i: Int) -> UInt16 {
+        let c = t[i]
+        switch c {
+        case 0x22: return 0x22
+        case 0x201C: return 0x201D
+        case 0x00AB: return 0x00BB
+        case 0x2018: return 0x2019
+        case 0x27:
+            let before: UInt16 = i == 0 ? 0x20 : t[i - 1]
+            let startsWord = before == 0x20 || before == 0x28 || before == 0x5B || before == 0x0A || before == 0x09
+            if startsWord && i + 1 < t.count && isLetterOrDigit(t[i + 1]) { return 0x27 }
+            return noClose
+        default: return noClose
+        }
+    }
+
+    /// True when the unit at `j` closes a quote that `close` ends (a single quote only when no letter follows it: "Rock'n'roll" stays whole).
+    private static func closesAt(_ t: Units, _ j: Int, _ close: UInt16) -> Bool {
+        if t[j] != close { return false }
+        if close == 0x27 || close == 0x2019 { return j + 1 >= t.count || !isLetterOrDigit(t[j + 1]) }
+        return true
+    }
+
+    /// Quoted phrases of `text` that are not inside a `[[...]]` mark: a title the model quoted without marking it. Double quotes, curly single
+    /// quotes, straight single quotes at a word start, and guillemets.
     public static func quotedSpans(_ text: String, _ marked: [Span]) -> [Span] {
         quotedSpans(units(text), marked)
     }
@@ -139,13 +198,13 @@ public enum Grounding {
         while i < t.count {
             var inMark = false
             for m in marked where i >= m.start && i < m.end { inMark = true; break }
-            if !inMark && isOpenQuote(t[i]) {
-                let open = t[i]
+            let close: UInt16 = inMark ? noClose : closeFor(t, i)
+            if close != noClose {
                 var j = i + 1
                 var closed = -1
                 while j < t.count && j - i <= maxQuoted + 1 {
                     if t[j] == 0x0A { break }
-                    if isCloseQuote(t[j], open) { closed = j; break }
+                    if closesAt(t, j, close) { closed = j; break }
                     j += 1
                 }
                 if closed > 0 {
@@ -180,7 +239,10 @@ public enum Grounding {
         let foldedUnits = units(folded)
         if !marked {
             if registry.inText(folded) { return true }
-            if !userText.utf16.isEmpty && contains(units(BrainText.fold(userText)), foldedUnits) { return true }
+            if !userText.utf16.isEmpty {
+                let hay: Units = [0x20] + units(BrainText.fold(userText)) + [0x20]
+                if contains(hay, [0x20] + foldedUnits + [0x20]) { return true }
+            }
         } else if !userText.utf16.isEmpty && foldedUnits.count >= minUserName {
             // A name the listener typed is theirs: the assistant may say it back ("Espresso is a good place to start"). Whole words only.
             let hay: Units = [0x20] + units(BrainText.fold(userText)) + [0x20]
@@ -229,6 +291,165 @@ public enum Grounding {
             if !registry.hasName(t) { return false }
         }
         return true
+    }
+
+    // MARK: Names the model wrote with no mark (the second pass)
+
+    /// Words that start with a capital but are not names: the pronoun, the app's own words, the days and the months. A reply may use them
+    /// anywhere (folded). A name-like word in this list is never flagged; it is also never a name the model may claim.
+    private static let notNames: Set<String> = [
+        "i", "im", "ill", "ive", "id", "ai", "dj", "ep", "lp", "url", "ui", "tv", "usb", "wifi", "bluetooth", "flac", "mp3",
+        "taizo", "pixlaudio", "pixl", "spotify", "youtube", "music", "home", "settings", "android", "google", "premium", "plus",
+        "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+        "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december",
+    ]
+
+    /// Lower-case words that may sit inside a name between two capitalised words ("Kind of Blue", "Tyler the Creator").
+    private static let nameConnectors: Set<String> = ["of", "the", "and", "de", "la", "le", "da", "van", "von", "x"]
+
+    private struct Word {
+        let start: Int
+        let end: Int
+        let cap: Bool
+        let connector: Bool
+    }
+
+    private static func withoutSpaces(_ s: String) -> String {
+        var out = String.UnicodeScalarView()
+        for u in s.unicodeScalars where u != " " { out.append(u) }
+        return String(out)
+    }
+
+    /// The words of `t` in `from..<to` (letters and digits, with an apostrophe, hyphen or point between two of them, and `&`).
+    private static func wordsOf(_ t: Units, _ from: Int, _ to: Int, _ out: inout [Word]) {
+        var i = from
+        while i < to {
+            let c = t[i]
+            if c == 0x26 {
+                out.append(Word(start: i, end: i + 1, cap: false, connector: true))
+                i += 1
+            } else if isLetterOrDigit(c) {
+                var j = i + 1
+                while j < to {
+                    let d = t[j]
+                    if isLetterOrDigit(d) {
+                        j += 1
+                    } else if (d == 0x27 || d == 0x2019 || d == 0x2D || d == 0x2E) && j + 1 < to && isLetterOrDigit(t[j + 1])
+                                && (d != 0x2E || isUpperCase(t[j - 1])) {
+                        j += 1
+                    } else {
+                        break
+                    }
+                }
+                var end = j
+                // A possessive is not part of the name.
+                if end - i > 2 && (t[end - 2] == 0x27 || t[end - 2] == 0x2019) && (t[end - 1] == 0x73 || t[end - 1] == 0x53) { end -= 2 }
+                let folded = BrainText.fold(string(t[i..<end]))
+                out.append(Word(start: i, end: end, cap: isUpperCase(c) && !notNames.contains(withoutSpaces(folded)),
+                                connector: nameConnectors.contains(folded)))
+                i = j
+            } else {
+                i += 1
+            }
+        }
+    }
+
+    /// True when the word at `at` starts a sentence or a line (or a list item): its capital is grammar, not a name.
+    private static func startsSentence(_ t: Units, _ at: Int) -> Bool {
+        var k = at - 1
+        while k >= 0 {
+            let c = t[k]
+            if c == 0x20 || c == 0x2A || c == 0x5F || c == 0x28 || c == 0x22 || c == 0x2D || c == 0x2022 || c == 0x3E || c == 0x23 || c == 0x201C {
+                k -= 1
+                continue
+            }
+            if c >= 0x30 && c <= 0x39 {
+                k -= 1
+                continue
+            }
+            return c == 0x2E || c == 0x21 || c == 0x3F || c == 0x0A
+        }
+        return true
+    }
+
+    private static func runGrounded(_ run: String, _ registry: Registry, _ userText: String) -> Bool {
+        isGrounded(run, registry, marked: false, userText: userText) || registry.inName(BrainText.trim(BrainText.fold(run)))
+    }
+
+    /// True when only spaces lie between two words (no punctuation, no line break).
+    private static func adjacent(_ t: Units, _ a: Word, _ b: Word) -> Bool {
+        var k = a.end
+        while k < b.start {
+            if t[k] != 0x20 { return false }
+            k += 1
+        }
+        return true
+    }
+
+    /// Runs of capitalised words that lie outside every span of `taken`: a name written with no mark and no quote ("You might also try
+    /// Radiohead or OK Computer"). A run that is not grounded (`isGrounded`) comes back as a bad span. A single capitalised word that starts
+    /// a sentence is skipped (a sentence opener is not a name); a run of two or more that starts a sentence is checked whole and then without
+    /// its first word ("Try Radiohead"). Lower-case names are not found: the check can only see what capitals show.
+    public static func unmarkedNames(_ text: String, _ taken: [Span], _ registry: Registry, userText: String) -> [Span] {
+        unmarkedNames(units(text), taken, registry, userText)
+    }
+
+    static func unmarkedNames(_ t: Units, _ taken: [Span], _ registry: Registry, _ userText: String) -> [Span] {
+        var out: [Span] = []
+        let sorted = taken.sorted { $0.start < $1.start }
+        var words: [Word] = []
+        var at = 0
+        for s in sorted {
+            if s.start > at { wordsOf(t, at, s.start, &words) }
+            // A mark or a quote is a hard break between words.
+            words.append(Word(start: s.start, end: s.start, cap: false, connector: false))
+            if s.end > at { at = s.end }
+        }
+        if at < t.count { wordsOf(t, at, t.count, &words) }
+        var i = 0
+        while i < words.count {
+            if !words[i].cap {
+                i += 1
+                continue
+            }
+            var j = i
+            while true {
+                if j + 1 < words.count && words[j + 1].cap && adjacent(t, words[j], words[j + 1]) {
+                    j += 1
+                    continue
+                }
+                if j + 2 < words.count && words[j + 1].connector && words[j + 2].cap && adjacent(t, words[j], words[j + 1])
+                    && adjacent(t, words[j + 1], words[j + 2]) {
+                    j += 2
+                    continue
+                }
+                break
+            }
+            let initial = startsSentence(t, words[i].start)
+            if !(initial && j == i) {
+                let full = string(t[words[i].start..<words[j].end])
+                if !runGrounded(full, registry, userText) {
+                    var from = i
+                    if initial && j > i {
+                        // "Try Radiohead": the first word may be grammar.
+                        var k = i + 1
+                        if words[k].connector { k += 1 }
+                        if k <= j {
+                            let rest = string(t[words[k].start..<words[j].end])
+                            if runGrounded(rest, registry, userText) {
+                                i = j + 1
+                                continue
+                            }
+                            from = k
+                        }
+                    }
+                    let inner = string(t[words[from].start..<words[j].end])
+                    out.append(Span(start: words[from].start, end: words[j].end, inner: inner, marked: false, bad: true))
+                }
+            }
+            i = j + 1
+        }
+        return out
     }
 
     // MARK: Numbers
@@ -361,11 +582,13 @@ public enum Grounding {
     /// dropped (when `dropUngroundedNumbers`); marks around grounded names are removed. `userText` is what the user wrote in this
     /// conversation (a number or a quoted phrase the user said first is theirs).
     public static func check(_ text: String, _ registry: Registry, userText: String, placeholder: String,
-                             dropUngroundedNumbers: Bool) -> Verdict {
+                             dropUngroundedNumbers: Bool, scanUnmarked: Bool = false) -> Verdict {
         let t = units(text)
         let marked = markedSpans(t)
         let quoted = quotedSpans(t, marked)
         var all = marked + quoted
+        // A name the model wrote with no mark and no quote: found as a run of capitalised words outside every span.
+        if scanUnmarked { all.append(contentsOf: unmarkedNames(t, all, registry, userText)) }
         all.sort { $0.start < $1.start }
         var badNames: [String] = []
         var sb: Units = []
@@ -373,7 +596,7 @@ public enum Grounding {
         var at = 0
         for s in all {
             sb.append(contentsOf: t[at..<s.start])
-            if isGrounded(s.inner, registry, marked: s.marked, userText: userText) {
+            if !s.bad && isGrounded(s.inner, registry, marked: s.marked, userText: userText) {
                 // A mark is only a mark: the name stays, the brackets go. A quote stays as written.
                 if s.marked { sb.append(contentsOf: units(s.inner)) } else { sb.append(contentsOf: t[s.start..<s.end]) }
             } else {

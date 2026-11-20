@@ -156,11 +156,14 @@ How each `fn` is replayed:
   `topFactors`: `AssistantRules.topFactors(x, Ranker.weights(p0))`, each factor `[name, 1 up | 0 down]`.
   `grounding`: a `Grounding.Registry` with `addName` for each of `names` and `addText` for each of `texts`, then `Grounding.check(reply,
   registry, user, "(unverified)", drop)`. `numbers`: `Grounding.numbersIn(text)` and the tokens of `Grounding.listenerNumbers(text)`.
+  `grounding2` is the same call with the fifth argument `scanUnmarked = true` (the second pass of the review): runs of capitalised words outside every
+  mark and quote are checked too (`Grounding.unmarkedNames`), quotes include single quotes at a word start and guillemets, and a registered free text
+  matches whole words only. A skipped sentence opener, `NOT_NAMES` and `NAME_CONNECTORS` are in `Grounding.kt`.
   A marked name that is a whole-word run of the user's own words (two letters or more) is grounded too. No regular expressions anywhere: a Swift port scans UTF-16 units, as the Kotlin does.
 - `assistantcards.jsonl` (stage 4, milestone 2): `AssistantCards`. `allChips`: `AssistantRules.Query` from the fields of `in` (the
   genre ids are `genreIds`, no moods, no years, no excluded genres), then `allChips(q, topArtistRef, topGenreId, unsupported)` is
   `chips` (`[kind, ref, genreId]` each). `chipLabel`: `chipLabel(Chip(kind, "yt:aaaaaaaaaaa", 5), artist, genre)`. `lessTarget`:
-  `lessTarget(user, [Named(kind, name)])`, then `lessLabel(target.name)`. Names are compared folded, whole words, two characters or more.
+  `lessTarget(user, [Named(kind, name)])`, then `lessLabel(target.name)`. Names are compared folded, whole words, two characters or more; exactly one name may remain (a name inside a longer matching name is the same mention; a name with `love`, `like`, `enjoy`, `adore`, `favourite`, `into` or `want` in the three words before it is dropped).
 - `setnotes.jsonl`: `SetNotes.notes(slots)` for `slots` = `[artist, genre, known 1|0]`, each note `[index, kind, count, genre,
   artist, newArtist, text]` with `text = SetNotes.text(note)`. `firstGenre`: `SetNotes.firstGenre(raw)`.
 - `weeklynote.jsonl`: `WeeklyNote.Evidence(tracks, newSongs, artists, genre, island, newSharePct)` (-1 and "" are unknown).
