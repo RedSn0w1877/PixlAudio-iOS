@@ -8,11 +8,13 @@ import UIKit
 /// catalogue categories that open the catalogue browser — then "Browse by genre" with the grid/list toggle and the
 /// library's genres. 18 pt side padding, 12 pt gaps, the top corners clipped at 24 pt. Material cards become glass
 /// tinted with the genre colour (one glass layer per card).
-struct GenreBrowseView: View {
+struct GenreBrowseView<Header: View>: View {
     let genres: [Genre]
     /// The catalogue categories shown (docs/brain-spec.md, 8.10: with the brain on, a genre the atlas lacks has no tile).
     var categories: [SearchCategory] = SearchCategory.defaults
     @Binding var isGridView: Bool
+    /// Above "Browse categories": the Recent strip (or the private session's line); empty when there is none.
+    let header: Header
     let onGenre: (Genre) -> Void
     let onCategory: (SearchCategory) -> Void
 
@@ -25,6 +27,7 @@ struct GenreBrowseView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 12) {
+                header
                 Text("Browse categories")
                     .pixlFont(.titleLarge, weight: .semibold)
                     .foregroundStyle(theme.onSurface)

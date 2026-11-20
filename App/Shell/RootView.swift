@@ -99,6 +99,9 @@ struct RootView: View {
             // The field leaves with the Search tab (the bar flips back to the tab segments).
             if tab != .search, isSearchFieldFocused { isSearchFieldFocused = false }
         }
+        // Search's recent searches follow the field's focus (the field itself is the bar's capsule).
+        .onChange(of: isSearchFieldFocused) { _, focused in router.setSearchFieldFocused(focused) }
+        .onChange(of: router.searchBlurRequests) { _, _ in isSearchFieldFocused = false }
         .task { await prebuildHiddenTabs() }
         // Blocked artists: a tap on a blocked song asks first (it is never played by itself).
         .confirmationDialog("Blocked artist", isPresented: Binding(get: { settings.blocked.pendingPlay != nil },

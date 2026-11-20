@@ -211,7 +211,7 @@ Proven on the `xcode-27` lane by the stage-4 build (fallback lane: its next week
 | API | Min iOS | Docs | Used in | Notes |
 |---|---|---|---|---|
 | `VersionedSchema` (`versionIdentifier`, `models`), `Schema.Version`, `Schema(versionedSchema:)` | 17 | /documentation/swiftdata/versionedschema | `SchemaV1` | Store-only models, string ids. |
-| `SchemaMigrationPlan` (`schemas`, `stages`), `MigrationStage` | 17 | /documentation/swiftdata/schemamigrationplan | `PixlMigrationPlan` | Empty until v2. |
+| `SchemaMigrationPlan` (`schemas`, `stages`), `MigrationStage` | 17 | /documentation/swiftdata/schemamigrationplan | `PixlMigrationPlan` | v1 to v2 (search history grew). |
 | `@Model`, `@Attribute(.unique)` | 17 | /documentation/swiftdata/model() | `SchemaV1` | Models are `nonisolated` (SE-0449) so the model actor can use them under default MainActor isolation. |
 | `#Index<T>(_:)` | 18 | /documentation/swiftdata/index(_:)-74ia2 | hot fields (title, albumId, playlistId, …) | |
 | `ModelContainer(for:migrationPlan:configurations:)` | 17 | /documentation/swiftdata/modelcontainer | `PersistenceActor.makeContainer` | |
@@ -1065,3 +1065,12 @@ Launch, library, artwork, player and Spotify-matcher speed-ups (docs/performance
 | `View.onScrollGeometryChange(for:of:action:)` with an `Equatable` enum | 18 | /documentation/swiftui/view/onscrollgeometrychange(for:of:action:) | `PlaylistDetailView` | Already in the ledger with `CGFloat`; here the transform returns PixlFoundation `PullToFind.Zone`, so the action (open / put away Find in playlist) runs only when the page crosses a threshold, never per frame. |
 | `ForEach` inside the branches of a `LazyVStack` | 13 | /documentation/swiftui/lazyvstack | `PlaylistDetailView` | The hero, the card's top, each song row and the card's bottom are separate items of the page's one lazy stack, so a long playlist still lays out only the rows near the screen; the card is plain `surfaceContainerHigh` fills behind each row that tile into one shape. |
 | `View.padding(_:_:)` with a negative length inside `background(alignment:content:)` | 13 | /documentation/swiftui/view/padding(_:_:) | `PlaylistDetailView` (Find field) | Extends the page-coloured fade 16 pt below the pinned Find field so rows pass under it softly. |
+
+## Search history (2026-11-20, branch `brain-search-history`)
+| API | Min OS | Doc | Used in | Notes |
+|---|---|---|---|---|
+| `MigrationStage.lightweight(fromVersion:toVersion:)` | 17 | /documentation/swiftdata/migrationstage/lightweight(fromversion:toversion:) | `PixlMigrationPlan` | v1 to v2: new properties all have defaults, so nothing runs at launch; the keys are filled on the first history read. |
+| `ModelConfiguration(_:schema:url:allowsSave:cloudKitDatabase:)` | 17 | /documentation/swiftdata/modelconfiguration/init(_:schema:url:allowsave:cloudkitdatabase:) | `PersistenceActor.makeContainer(storeURL:)`, `SearchHistoryTests` | An on-disk store at a given file, so a test can create a version-1 store and open it with the plan. |
+| `#Index<Model>([\.a], [\.b])` with two single-key indexes | 18 | /documentation/swiftdata/index | `SchemaV2.SearchHistoryRecord` | Already used on `ArtworkThemeRecord`. |
+| `GlassEffectContainer`-free single `glassEffect` shape under a `LazyVStack` of plain rows | 26 | /documentation/swiftui/view/glasseffect(_:in:) | `HistoryRowsContainer` | One glass layer for a whole list of rows; only the small X is its own glass circle. |
+| `View.scrollDismissesKeyboard(_:)` with `.never` | 16 | /documentation/swiftui/view/scrolldismisseskeyboard(_:) | `SearchRecentList` | Scrolling the recent list keeps the keyboard (the list is shown while the field is focused). |

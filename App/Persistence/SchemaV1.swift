@@ -5,7 +5,7 @@ import SwiftData
 // relationships, string ids; the app works from the in-memory `LibrarySnapshot` value types. Field names follow
 // the Room entities (`data/database/*Entity.kt`) so backup/restore and ports map 1:1.
 //
-// Rules: never change a model of a shipped version — add `SchemaV2` and a stage in `PixlMigrationPlan`. Models are
+// Rules: never change a model of a shipped version — add the next schema and a stage in `PixlMigrationPlan`. Models are
 // `nonisolated` so `PersistenceActor` (a `@ModelActor`) can use them off the main actor.
 
 nonisolated enum SchemaV1: VersionedSchema {
@@ -14,7 +14,7 @@ nonisolated enum SchemaV1: VersionedSchema {
     static var models: [any PersistentModel.Type] {
         [SongRecord.self, AlbumRecord.self, ArtistRecord.self, SongArtistLinkRecord.self, FavoriteRecord.self,
          UserPlaylistRecord.self, PlaylistEntryRecord.self, LyricsRecord.self, EngagementRecord.self,
-         TransitionRuleRecord.self, SearchHistoryRecord.self, ArtworkThemeRecord.self, SpotifySongRecord.self,
+         TransitionRuleRecord.self, SchemaV1.SearchHistoryRecord.self, ArtworkThemeRecord.self, SpotifySongRecord.self,
          SpotifyPlaylistRecord.self, AICacheRecord.self, AIUsageRecord.self, StreamCacheRecord.self,
          TagOverrideRecord.self, FolderSourceRecord.self]
     }
@@ -460,7 +460,6 @@ typealias PlaylistEntryRecord = SchemaV1.PlaylistEntryRecord
 typealias LyricsRecord = SchemaV1.LyricsRecord
 typealias EngagementRecord = SchemaV1.EngagementRecord
 typealias TransitionRuleRecord = SchemaV1.TransitionRuleRecord
-typealias SearchHistoryRecord = SchemaV1.SearchHistoryRecord
 typealias ArtworkThemeRecord = SchemaV1.ArtworkThemeRecord
 typealias SpotifySongRecord = SchemaV1.SpotifySongRecord
 typealias SpotifyPlaylistRecord = SchemaV1.SpotifyPlaylistRecord
@@ -470,8 +469,13 @@ typealias StreamCacheRecord = SchemaV1.StreamCacheRecord
 typealias TagOverrideRecord = SchemaV1.TagOverrideRecord
 typealias FolderSourceRecord = SchemaV1.FolderSourceRecord
 
-/// The migration plan (only v1 so far). Add a stage with every new schema version.
+/// The migration plan. Add a stage with every new schema version.
 nonisolated enum PixlMigrationPlan: SchemaMigrationPlan {
-    static var schemas: [any VersionedSchema.Type] { [SchemaV1.self] }
-    static var stages: [MigrationStage] { [] }
+    static var schemas: [any VersionedSchema.Type] { [SchemaV1.self, SchemaV2.self] }
+    static var stages: [MigrationStage] { [migrateV1toV2] }
+
+    /// v1 to v2: search history rows gain a key, a kind, a target, an image and a count. Every new property has a
+    /// default, so the store migrates by itself (lightweight) and every row survives; the keys are filled in the
+    /// first time the history is read (`PersistenceActor.searchHistory`), not here, so nothing runs at launch.
+    static let migrateV1toV2 = MigrationStage.lightweight(fromVersion: SchemaV1.self, toVersion: SchemaV2.self)
 }
