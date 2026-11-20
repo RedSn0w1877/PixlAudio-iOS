@@ -9,6 +9,10 @@ final class FakeMusicBackend: MusicBackend, @unchecked Sendable {
     var mixTracks: [AssistantTrack] = []
     var unsupported: [String] = []
     var coldStart = false
+    /// Seeds the backend could not use (no radio to be had): reported on every list it builds.
+    var notUsed: [String] = []
+    /// Titles whose search "could not be made" (the lookup fails, it is not "not found").
+    var failedTitles: Set<String> = []
     var explanation: AssistantTrackExplanation?
     var taste = AssistantTasteExplanation(scope: "summary", lines: [], unknown: [])
     var genre = AssistantGenreLookup()
@@ -40,6 +44,7 @@ final class FakeMusicBackend: MusicBackend, @unchecked Sendable {
         return items.map { item in
             defer { looked += 1 }
             if looked >= skipAfter { return AssistantLookup(track: nil, skipped: true) }
+            if failedTitles.contains(item.title) { return AssistantLookup(track: nil, failed: true) }
             return AssistantLookup(track: catalog[key(item.title, item.artist)])
         }
     }
@@ -48,7 +53,7 @@ final class FakeMusicBackend: MusicBackend, @unchecked Sendable {
         recommendQueries.append(query)
         return AssistantRecommendation(
             picks: mixTracks.prefix(query.count).map { AssistantPick(track: $0, whyKey: "radio_fans", whyArgs: ["Sabrina Carpenter"]) },
-            unsupportedFilters: unsupported, coldStart: coldStart)
+            unsupportedFilters: unsupported, coldStart: coldStart, seedsNotUsed: notUsed)
     }
 
     func buildMix(_ query: AssistantRules.Query) async -> AssistantMix? {
@@ -57,7 +62,7 @@ final class FakeMusicBackend: MusicBackend, @unchecked Sendable {
         if mixTracks.isEmpty { return nil }
         return AssistantMix(mixId: "m1", title: query.title.isEmpty ? "Made for you" : query.title,
                             tracks: mixTracks.prefix(query.count).map { AssistantPick(track: $0, whyKey: "asked") },
-                            unsupportedFilters: unsupported, query: query)
+                            unsupportedFilters: unsupported, query: query, seedsNotUsed: notUsed)
     }
 
     var builtQueries: [String: AssistantRules.Query] = [:]
@@ -68,10 +73,10 @@ final class FakeMusicBackend: MusicBackend, @unchecked Sendable {
         guard let stored = builtQueries[mixId] else { return nil }
         let next = AssistantRules.applyChip(stored, chip)
         adjustCalls.append(mixId)
-        let id = "m(adjustCalls.count + 1)"
+        let id = "m\(adjustCalls.count + 1)"
         builtQueries[id] = next
         return AssistantMix(mixId: id, title: next.title, tracks: mixTracks.prefix(next.count).map { AssistantPick(track: $0, whyKey: "asked") },
-                            unsupportedFilters: unsupported, query: next)
+                            unsupportedFilters: unsupported, query: next, seedsNotUsed: notUsed)
     }
 
     func startStation(seedRef: String, seedKind: String, mode: String) async -> AssistantStationOutcome {

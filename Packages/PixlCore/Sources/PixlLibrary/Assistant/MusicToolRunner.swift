@@ -40,7 +40,7 @@ public actor MusicToolRunner {
     // MARK: Cards under the answer (docs/brain-spec.md, 9.3 "What the listener gets"): no model call behind any of these
 
     /// Mixes kept so their cards can still play, save and change.
-    public static let maxMixes = 8
+    public static let maxMixes = 16
 
     private var builtMixes: [String: AssistantMix] = [:]
     private var mixOrder: [String] = []
@@ -79,6 +79,9 @@ public actor MusicToolRunner {
         guard let next = await backend.adjustMix(mixId: mixId, chip: chip) else { return nil }
         for p in next.tracks { notePick(p) }
         grounding.noteName(next.title)
+        // The card takes the new list in place of the old one: the old record goes, so chips never push another card out.
+        builtMixes[mixId] = nil
+        mixOrder.removeAll { $0 == mixId }
         remember(next)
         return MixCard.of(next)
     }
@@ -149,7 +152,9 @@ public actor MusicToolRunner {
                 members += Self.trackMembers(track)
             } else {
                 members.append(("not_found", .bool(true)))
-                if lookup.skipped {
+                if lookup.failed {
+                    members.append(("reason", .string("the search could not be made (no connection or a failed request): this does not mean the song does not exist")))
+                } else if lookup.skipped {
                     budgetSpentThisTurn = true
                     members.append(("reason", .string("not looked up: PixlAudio's lookups for this chat or this day are used up")))
                 }
@@ -168,9 +173,10 @@ public actor MusicToolRunner {
 
     private func recommend(_ input: JSONObject) async -> JSONValue {
         var unknown: [String] = []
+        var unknownIds: [String] = []
         let seeds = grounding.known(Self.strings(input, "seed_refs"), &unknown)
         let query = AssistantRules.normalize(
-            title: "", seedRefs: seeds, genreIds: Self.ints(input, "genre_ids"), moodIds: [],
+            title: "", seedRefs: seeds, genreIds: grounding.knownGenreIds(Self.ints(input, "genre_ids"), &unknownIds), moodIds: [],
             yearFrom: Self.int(input, "year_from"), yearTo: Self.int(input, "year_to"), energy: Self.str(input, "energy"), tempo: nil,
             novelty: Self.str(input, "novelty"), noveltySharePct: -1, count: Self.int(input, "count"), excludeArtistRefs: [],
             minCount: 1, maxCount: AssistantRules.maxRecommend, defaultCount: AssistantRules.defaultResults)
@@ -180,19 +186,23 @@ public actor MusicToolRunner {
         grounding.noteCount(picks.count)
         var out: [(String, JSONValue)] = [("picks", .array(picks.map(Self.pickJson))), ("count", .integer(picks.count))]
         out += Self.filterMembers(rec.unsupportedFilters)
+        out += Self.seedsNotUsedMembers(rec.seedsNotUsed)
         if rec.coldStart {
             out.append(("note", .string("PixlAudio has little of the listener's history yet; these follow the radios' own order, not their taste.")))
         }
         out += Self.unknownRefMembers(unknown)
+        out += Self.unknownIdMembers(unknownIds)
         return Self.obj(out)
     }
 
     private func buildMix(_ input: JSONObject) async -> JSONValue {
         var unknown: [String] = []
+        var unknownIds: [String] = []
         let seeds = grounding.known(Self.strings(input, "seed_refs"), &unknown)
         let excluded = grounding.known(Self.strings(input, "exclude_artist_refs"), &unknown)
         let query = AssistantRules.normalize(
-            title: Self.str(input, "title"), seedRefs: seeds, genreIds: Self.ints(input, "genre_ids"), moodIds: Self.ints(input, "mood_ids"),
+            title: Self.str(input, "title"), seedRefs: seeds, genreIds: grounding.knownGenreIds(Self.ints(input, "genre_ids"), &unknownIds),
+            moodIds: grounding.knownMoodIds(Self.ints(input, "mood_ids"), &unknownIds),
             yearFrom: Self.int(input, "year_from"), yearTo: Self.int(input, "year_to"), energy: Self.str(input, "energy"),
             tempo: Self.str(input, "tempo"), novelty: nil, noveltySharePct: Self.intOr(input, "novelty_share_pct", -1),
             count: Self.intOr(input, "length", AssistantRules.defaultMix), excludeArtistRefs: excluded, minCount: AssistantRules.minMix,
@@ -203,12 +213,14 @@ public actor MusicToolRunner {
                 ("note", .string("PixlAudio has nothing to build this from yet (no songs and no cached radios). Say so; do not make a list yourself.")),
             ]
             out += Self.unknownRefMembers(unknown)
+            out += Self.unknownIdMembers(unknownIds)
             return Self.obj(out)
         }
         remember(mix)
         newCardIds.append(mix.mixId)
         var out = mixMembers(mix)
         out += Self.unknownRefMembers(unknown)
+        out += Self.unknownIdMembers(unknownIds)
         return Self.obj(out)
     }
 
@@ -222,6 +234,7 @@ public actor MusicToolRunner {
             ("total", .integer(mix.tracks.count)), ("tracks", .array(shown.map(Self.pickJson))),
         ]
         out += Self.filterMembers(mix.unsupportedFilters)
+        out += Self.seedsNotUsedMembers(mix.seedsNotUsed)
         out.append(("note", .string("The app shows this mix as a card with Play and Save. To play it from chat, call play_songs with song_ids [\"mix:\(mix.mixId)\"].")))
         return out
     }
@@ -245,12 +258,25 @@ public actor MusicToolRunner {
             out.append(("first_track", Self.obj(Self.trackMembers(first))))
         }
         if !outcome.started && !outcome.reason.isEmpty { out.append(("reason", .string(outcome.reason))) }
+        if !outcome.note.isEmpty { out.append(("note", .string(outcome.note))) }
         return Self.obj(out)
     }
 
     private func steer(_ input: JSONObject) async -> JSONValue {
-        let outcome = await backend.steer(change: Self.str(input, "change") ?? "", target: BrainText.trim(Self.str(input, "target") ?? ""),
-                                          scope: Self.str(input, "scope") ?? "")
+        let change = Self.str(input, "change") ?? ""
+        let target = BrainText.trim(Self.str(input, "target") ?? "")
+        if AssistantRules.parseRef(target) != nil && !grounding.isKnownRef(target) {
+            return Self.obj([("applied", .bool(false)), ("tail_changed", .integer(0)),
+                             ("note", .string("That ref was not returned by a tool in this chat. Call resolve_tracks first."))])
+        }
+        if change.hasSuffix("_genre") {
+            // A genre is changed by an id lookup_genre returned in this chat, never by one written from memory.
+            guard let id = Int(target), id > 0, grounding.genreName(id) != nil else {
+                return Self.obj([("applied", .bool(false)), ("tail_changed", .integer(0)),
+                                 ("note", .string("That is not a genre id lookup_genre returned in this chat, so nothing was changed. Call lookup_genre first."))])
+            }
+        }
+        let outcome = await backend.steer(change: change, target: target, scope: Self.str(input, "scope") ?? "")
         grounding.noteCount(outcome.tailChanged)
         var out: [(String, JSONValue)] = [("applied", .bool(outcome.applied)), ("tail_changed", .integer(outcome.tailChanged))]
         if !outcome.note.isEmpty { out.append(("note", .string(outcome.note))) }
@@ -261,6 +287,10 @@ public actor MusicToolRunner {
 
     private func explainTrack(_ input: JSONObject) async -> JSONValue {
         let ref = BrainText.trim(Self.str(input, "ref") ?? "")
+        if AssistantRules.parseRef(ref) != nil && !grounding.isKnownRef(ref) {
+            return Self.obj([("found", .bool(false)),
+                             ("note", .string("That ref was not returned by a tool in this chat. Call resolve_tracks first; do not guess why."))])
+        }
         guard let e = await backend.explainTrack(ref: ref) else {
             return Self.obj([("found", .bool(false)),
                              ("note", .string("PixlAudio has nothing recorded about that track. Say you can't tell why; do not guess."))])
@@ -268,7 +298,8 @@ public actor MusicToolRunner {
         grounding.noteName(e.title)
         grounding.noteArtists(e.artist)
         for a in e.whyArgs { grounding.noteName(a) }
-        noteNamed(AssistantCards.namedArtist, e.artist.components(separatedBy: ", ").first ?? e.artist)
+        // The credited primary artist, not a comma split of the display line ("Tyler, The Creator" is one artist).
+        noteNamed(AssistantCards.namedArtist, BrainText.isBlank(e.primaryArtist) ? (TaizoGrounding.splitCredits(e.artist).first ?? e.artist) : e.primaryArtist)
         for g in e.genres ?? [] { noteNamed(AssistantCards.namedGenre, g) }
         var unknown: [String] = []
         var out: [(String, JSONValue)] = [
@@ -283,6 +314,7 @@ public actor MusicToolRunner {
         }
         if let factors = e.factors, !factors.isEmpty {
             out.append(("top_factors", .array(factors.map { Self.obj([("name", .string($0.name)), ("direction", .string($0.up ? "up" : "down"))]) })))
+            out.append(("factors_note", .string("Read the way the engine ranks today, from the vector the pick was served with; say it is \"as the engine ranks today\".")))
         } else {
             unknown.append("top_factors")
         }
@@ -290,6 +322,9 @@ public actor MusicToolRunner {
         if let genres = e.genres {
             for g in genres { grounding.noteName(g) }
             facts.append(("genres", .array(genres.map { .string($0) })))
+            if e.genresSuggested {
+                facts.append(("genres_note", .string("These genres were suggested by the assistant for a song no source knew; say they are a suggestion, not a fact.")))
+            }
         } else {
             unknown.append("genres")
         }
@@ -369,10 +404,11 @@ public actor MusicToolRunner {
         let artists = Array(r.artists.prefix(count))
         for a in artists { grounding.noteName(a.name) }
         grounding.noteCount(artists.count)
-        let rows: [JSONValue] = artists.map { a in
+        let rows: [JSONValue] = artists.enumerated().map { index, a in
             var m: [(String, JSONValue)] = [("name", .string(a.name))]
             if !a.ref.isEmpty { m.append(("ref", .string(a.ref))) }
-            m.append(("score", .integer(AssistantRules.clampInt(Int(a.score * 100.0 + 0.5), 0, 100))))
+            // A position, not a percentage: the closest one found is always first, and its edge may be a weak one.
+            m.append(("rank", .integer(index + 1)))
             m.append(("sources", .array(a.sources.map { .string($0) })))
             return Self.obj(m)
         }
@@ -431,6 +467,18 @@ public actor MusicToolRunner {
         if unsupported.isEmpty { return [] }
         return [("filters_not_applied", .array(unsupported.map { .string($0) })),
                 ("filters_note", .string("PixlAudio has no data for these filters yet, so they were not applied. Tell the user."))]
+    }
+
+    nonisolated static func seedsNotUsedMembers(_ refs: [String]) -> [(String, JSONValue)] {
+        if refs.isEmpty { return [] }
+        return [("seeds_not_used", .array(refs.map { .string($0) })),
+                ("seeds_note", .string("PixlAudio could not get songs similar to these seeds right now (offline, or today's lookups are used up), so the picks do not follow them. Tell the user; do not say the list is like them."))]
+    }
+
+    nonisolated static func unknownIdMembers(_ unknown: [String]) -> [(String, JSONValue)] {
+        if unknown.isEmpty { return [] }
+        return [("ids_ignored", .array(unknown.map { .string($0) })),
+                ("ids_note", .string("These genre or mood ids were not returned by lookup_genre in this chat, so they were left out. Call lookup_genre for the id first."))]
     }
 
     nonisolated static func unknownRefMembers(_ unknown: [String]) -> [(String, JSONValue)] {

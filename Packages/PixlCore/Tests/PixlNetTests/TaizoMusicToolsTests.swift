@@ -137,6 +137,30 @@ struct TaizoMusicToolsTests {
         #expect(other == nil)
     }
 
+    @Test func aMixIsCountedBySongsNotAsOneIdAndASteerNamesWhatItChanges() throws {
+        func question(_ tool: TaizoTool, _ text: String, queue: Int = 0, mixes: [String: Int] = [:],
+                      nameOf: (String) -> String? = { _ in nil }) throws -> String? {
+            let input = try #require(try parse(text).objectValue)
+            return TaizoAssistant.confirmationQuestion(tool: tool.rawValue, input: input, currentQueueCount: queue, mixCounts: mixes, nameOf: nameOf)
+        }
+        // A 30-song mix is not "1 song".
+        let play = try question(.playSongs, #"{"song_ids":["mix:ab12"],"queries":[],"start_index":0}"#, queue: 8, mixes: ["ab12": 30])
+        #expect(play == "Replace your queue (8 songs) with 30 songs?")
+        // A playlist of two mixes passes the 50-song line, though the call holds two ids.
+        let big = try question(.createPlaylist, #"{"name":"Road","song_ids":["mix:a","mix:b"],"queries":[]}"#, mixes: ["a": 30, "b": 30])
+        #expect(big == "Create \u{201C}Road\u{201D} with 60 songs?")
+        let small = try question(.createPlaylist, #"{"name":"Road","song_ids":["mix:a"],"queries":[]}"#, mixes: ["a": 30])
+        #expect(small == nil)
+        // A lasting steer says the artist or genre, never the raw ref or id.
+        let nameOf: (String) -> String? = { $0 == "12" ? "Bedroom pop" : ($0 == "yt:abcdefghijk" ? "Mono" : nil) }
+        let genre = try question(.steerSession, #"{"change":"less_genre","target":"12","scope":"always"}"#, nameOf: nameOf)
+        #expect(genre == "Keep this for good: play less of Bedroom pop? You can undo it in Settings.")
+        let artist = try question(.steerSession, #"{"change":"more_artist","target":"yt:abcdefghijk","scope":"always"}"#, nameOf: nameOf)
+        #expect(artist?.contains("play more of Mono") == true)
+        let unknown = try question(.steerSession, #"{"change":"more_artist","target":"yt:zzzzzzzzzzz","scope":"always"}"#, nameOf: nameOf)
+        #expect(unknown?.contains("yt:") == false)
+    }
+
     // MARK: The prompt
 
     @Test func theMusicRulesComeAfterTheExistingGuidanceAndSayWhatTheSpecSays() {

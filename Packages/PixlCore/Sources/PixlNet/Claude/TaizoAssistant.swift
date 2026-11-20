@@ -88,9 +88,16 @@ public enum TaizoAssistant {
     /// The question to confirm before a tool call runs, or nil to run it at once: creating a playlist with more than
     /// 50 songs, replacing a queue that holds more than the song playing, and taste changes that block something,
     /// touch more than 5 targets, or clear them all (`adjustmentCount` = how many are in force).
+    ///
+    /// `mixCounts` is how many songs each `mix:<id>` this chat built holds (a mix is one id in the call but many songs in the queue), and
+    /// `nameOf` is what the listener calls a steer target (the artist of a ref, the name of a genre id): a raw ref or id is never shown.
     public static func confirmationQuestion(tool: String, input: JSONObject, currentQueueCount: Int,
-                                            adjustmentCount: Int = 0) -> String? {
-        let count = (input["song_ids"]?.arrayValue?.count ?? 0) + (input["queries"]?.arrayValue?.count ?? 0)
+                                            adjustmentCount: Int = 0, mixCounts: [String: Int] = [:],
+                                            nameOf: (String) -> String? = { _ in nil }) -> String? {
+        var count = input["queries"]?.arrayValue?.count ?? 0
+        for id in (input["song_ids"]?.arrayValue ?? []).compactMap(\.stringValue) {
+            if id.hasPrefix("mix:") { count += mixCounts[id] ?? mixCounts[String(id.dropFirst(4))] ?? 0 } else { count += 1 }
+        }
         switch tool {
         case TaizoTool.adjustTaste.rawValue:
             return tasteChangeQuestion(input)
@@ -104,20 +111,22 @@ public enum TaizoAssistant {
         case TaizoTool.startStation.rawValue where currentQueueCount > 1:
             return "Replace your queue (\(currentQueueCount) songs) with a station?"
         case TaizoTool.steerSession.rawValue where input["scope"]?.stringValue == "always":
-            return "Keep this for good: \(describeSteer(change: input["change"]?.stringValue ?? "", target: input["target"]?.stringValue ?? ""))? You can undo it in Settings."
+            return "Keep this for good: \(describeSteer(change: input["change"]?.stringValue ?? "", target: input["target"]?.stringValue ?? "", nameOf: nameOf))? You can undo it in Settings."
         default:
             return nil
         }
     }
 
     /// What a `steer_session` change says, for the question that asks before a lasting one (mirrors Android's wording).
-    public static func describeSteer(change: String, target: String) -> String {
-        let name = target.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "this" : target
+    public static func describeSteer(change: String, target: String, nameOf: (String) -> String? = { _ in nil }) -> String {
+        let t = target.trimmingCharacters(in: .whitespacesAndNewlines)
+        let isRef = t.hasPrefix("yt:") || t.hasPrefix("sp:")
+        let name = t.isEmpty ? "this" : (nameOf(t) ?? (isRef ? "this artist" : t))
         switch change {
         case "more_artist": return "play more of \(name)"
         case "less_artist": return "play less of \(name)"
-        case "more_genre": return "play more of genre \(name)"
-        case "less_genre": return "play less of genre \(name)"
+        case "more_genre": return "play more of \(name)"
+        case "less_genre": return "play less of \(name)"
         case "energy_up": return "turn the energy up"
         case "energy_down": return "turn the energy down"
         case "more_familiar": return "play more of what you know"

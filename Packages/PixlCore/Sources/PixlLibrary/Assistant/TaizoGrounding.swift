@@ -8,6 +8,7 @@
 
 import Foundation
 import PixlFoundation
+import PixlModel
 
 /// The conversation's record of what was returned and said.
 public final class TaizoGrounding: @unchecked Sendable {
@@ -18,11 +19,30 @@ public final class TaizoGrounding: @unchecked Sendable {
     private let lock = NSLock()
     private var registry = Grounding.Registry()
     private var refs: [String: AssistantTrack] = [:]
+    /// Refs a tool result of this conversation held (an older chat's history too) whose track was not kept: a similar artist's or a new
+    /// release's ref, a ref of a chat that was opened again. Usable as a seed, never invented.
+    private var seenRefs = Set<String>()
+    /// The genre and mood ids `lookup_genre` returned (id to name): an id the model writes from memory is not one of them.
+    private var genreNames: [Int: String] = [:]
+    private var moodNames: [Int: String] = [:]
     private var seeded = false
     private var userLog: [UInt16] = []
     private var seenContexts = Set<UInt64>()
 
-    public init() {}
+    /// The app's own words (what a reply may call its screens and switches): never an artist, album or track, so never a name to check.
+    public static let appNames = ["Your Mix", "First Listen", "Made for you", "Your sound", "Familiar", "Blend", "Discover", "Taste changes"]
+
+    /// What a reply says in place of a name no tool returned.
+    public static let unverifiedName = "(a name I could not check)"
+
+    /// What the listener reads when every sentence of a reply was left out by the check (the raw text is never shown in its place).
+    public static let unverifiedReply = "I cannot say that from what PixlAudio has recorded."
+
+    public init() { noteAppNames() }
+
+    private func noteAppNames() {
+        lock.withLock { for n in Self.appNames { registry.addName(n) } }
+    }
 
     /// True once `noteHistory` ran for this conversation (or it was started here).
     public var isSeeded: Bool { lock.withLock { seeded } }
@@ -35,10 +55,14 @@ public final class TaizoGrounding: @unchecked Sendable {
         lock.withLock {
             registry = Grounding.Registry()
             refs = [:]
+            seenRefs = []
+            genreNames = [:]
+            moodNames = [:]
             seeded = false
             userLog = []
             seenContexts = []
         }
+        noteAppNames()
     }
 
     // MARK: What tools return
@@ -145,14 +169,40 @@ public final class TaizoGrounding: @unchecked Sendable {
 
     public func trackOf(_ ref: String) -> AssistantTrack? { lock.withLock { refs[ref] } }
 
-    public func isKnownRef(_ ref: String) -> Bool { lock.withLock { refs[ref] != nil } }
+    public func isKnownRef(_ ref: String) -> Bool { lock.withLock { refs[ref] != nil || seenRefs.contains(ref) } }
+
+    /// The name of a genre id `lookup_genre` returned in this conversation, or nil.
+    public func genreName(_ id: Int) -> String? { lock.withLock { genreNames[id] } }
 
     /// The refs of `list` that were issued in this conversation, in order; the others are added to `unknown`.
     public func known(_ list: [String], _ unknown: inout [String]) -> [String] {
         var out: [String] = []
         lock.withLock {
             for ref in list {
-                if refs[ref] != nil { out.append(ref) } else { unknown.append(ref) }
+                if refs[ref] != nil || seenRefs.contains(ref) { out.append(ref) } else { unknown.append(ref) }
+            }
+        }
+        return out
+    }
+
+    /// The genre ids of `list` that `lookup_genre` returned in this conversation, in order; the others are added to `unknown` as "genre 12".
+    /// An id of zero or less is the sentinel for "none" and passes.
+    public func knownGenreIds(_ list: [Int], _ unknown: inout [String]) -> [Int] {
+        var out: [Int] = []
+        lock.withLock {
+            for id in list {
+                if id <= 0 || genreNames[id] != nil { out.append(id) } else { unknown.append("genre \(id)") }
+            }
+        }
+        return out
+    }
+
+    /// Same for mood ids (a mood and a genre share numbers: an id of one list is not an id of the other).
+    public func knownMoodIds(_ list: [Int], _ unknown: inout [String]) -> [Int] {
+        var out: [Int] = []
+        lock.withLock {
+            for id in list {
+                if id <= 0 || moodNames[id] != nil { out.append(id) } else { unknown.append("mood \(id)") }
             }
         }
         return out
@@ -161,9 +211,100 @@ public final class TaizoGrounding: @unchecked Sendable {
     // MARK: The reply
 
     /// Checks `reply` against what this conversation held; everything the listener wrote in it counts as theirs.
+    /// A name written with no mark and no quote is checked too (`scanUnmarked`): the guarantee does not rest on the model marking names.
     public func check(_ reply: String, placeholder: String) -> Grounding.Verdict {
-        let (reg, user) = lock.withLock { (registry, String(decoding: userLog, as: UTF16.self)) }
-        return Grounding.check(reply, reg, userText: user, placeholder: placeholder, dropUngroundedNumbers: true)
+        check(reply, placeholder: placeholder, extraNames: [])
+    }
+
+    private func check(_ reply: String, placeholder: String, extraNames: [String], numbers: Bool = true) -> Grounding.Verdict {
+        var (reg, user) = lock.withLock { (registry, String(decoding: userLog, as: UTF16.self)) }
+        for n in extraNames { reg.addName(n) }
+        return Grounding.check(reply, reg, userText: user, placeholder: placeholder, dropUngroundedNumbers: numbers, scanUnmarked: true)
+    }
+
+    /// A final reply as the listener reads it: a name no tool returned (and the listener did not say) is replaced, a sentence with a number
+    /// about the listener no tool returned is left out, the marks are taken off. When nothing is left, a fixed sentence says so: the raw text
+    /// is never shown in its place. `alsoKnown` is asked once with the names that failed, and returns those that are still real (the
+    /// listener's own library, for an answer from the phone's model, which looks the library up itself); they pass for this reply only.
+    /// `numbers` false checks names only: an answer whose numbers the app cannot see (the phone model's own lookups) is not cut by them.
+    public func shown(_ raw: String, numbers: Bool = true, alsoKnown: (([String]) -> [String])? = nil) -> String {
+        let text = BrainText.trim(raw)
+        if text.isEmpty { return text }
+        var verdict = check(text, placeholder: Self.unverifiedName, extraNames: [], numbers: numbers)
+        if !verdict.ungroundedNames.isEmpty, let alsoKnown {
+            let extra = alsoKnown(verdict.ungroundedNames)
+            if !extra.isEmpty { verdict = check(text, placeholder: Self.unverifiedName, extraNames: extra, numbers: numbers) }
+        }
+        let cleaned = BrainText.trim(verdict.cleaned)
+        return cleaned.isEmpty ? Self.unverifiedReply : cleaned
+    }
+
+    /// An intro line for a result card: the line itself, or nil when it names anything no tool or the listener gave (the card keeps its plain
+    /// words). Names only: its numbers are the result count the app itself stated.
+    public func introLine(_ raw: String) -> String? {
+        let text = BrainText.trim(raw)
+        if text.isEmpty { return nil }
+        let verdict = check(text, placeholder: Self.unverifiedName, extraNames: [], numbers: false)
+        return verdict.ungroundedNames.isEmpty ? text : nil
+    }
+
+    /// A reply that is still being written, as it may be shown: an unclosed mark or quote, the word being typed and a run of capitalised
+    /// words at the end (a half-written name cannot be judged) are held back; the rest is checked like a final reply. Empty while nothing
+    /// can be judged yet.
+    public func streaming(_ raw: String) -> String {
+        let held = Self.holdBack(raw)
+        if BrainText.isBlank(held) { return "" }
+        return check(held, placeholder: Self.unverifiedName).cleaned
+    }
+
+    private static let heldConnectors: Set<String> = ["of", "the", "and", "de", "la", "le", "da", "van", "von", "x", "&"]
+
+    /// `raw` without its unfinished end (see `streaming`).
+    public static func holdBack(_ raw: String) -> String {
+        var s = raw
+        if let open = s.range(of: "[[", options: .backwards), s.range(of: "]]", range: open.upperBound..<s.endIndex) == nil {
+            s = String(s[..<open.lowerBound])
+        }
+        if s.reduce(0, { $1 == "\"" ? $0 + 1 : $0 }) % 2 == 1, let q = s.lastIndex(of: "\"") { s = String(s[..<q]) }
+        if let o = s.lastIndex(of: "\u{201C}"), s[o...].firstIndex(of: "\u{201D}") == nil { s = String(s[..<o]) }
+        // The word being typed.
+        guard let lastBreak = s.lastIndex(where: { $0.isWhitespace }) else { return "" }
+        s = String(s[...lastBreak])
+        // A run of capitalised words (and the little words inside a name) at the end: the next word may belong to it.
+        var end = s.endIndex
+        while true {
+            var j = end
+            while j > s.startIndex, s[s.index(before: j)].isWhitespace { j = s.index(before: j) }
+            var k = j
+            while k > s.startIndex, !s[s.index(before: k)].isWhitespace { k = s.index(before: k) }
+            if k == j { break }
+            let word = s[k..<j]
+            let letters = word.lowercased().filter { $0.isLetter || $0 == "&" }
+            if (word.first?.isUppercase ?? false) || heldConnectors.contains(letters) { end = k } else { break }
+        }
+        return String(s[..<end])
+    }
+
+    /// Of `names`, those that are a title, an album or a credited artist of `songs`: the names a phone-model answer may say, because the
+    /// model looks the library up itself (the same words, folded). One pass over the library; call it only when something failed the check.
+    public static func libraryNames(among names: [String], in songs: [Song]) -> [String] {
+        var wanted: [String: [String]] = [:]
+        for n in names { wanted[BrainText.fold(n), default: []].append(n) }
+        if wanted.isEmpty { return [] }
+        let distinct = Set(names).count
+        var found = Set<String>()
+        func test(_ value: String) {
+            if value.isEmpty { return }
+            if let originals = wanted[BrainText.fold(value)] { for o in originals { found.insert(o) } }
+        }
+        for song in songs {
+            if found.count == distinct { break }
+            test(song.title)
+            test(song.album)
+            for part in splitCredits(song.artist) { test(part) }
+            for a in song.artists { test(a.name) }
+        }
+        return names.filter { found.contains($0) }
     }
 
     // MARK: Helpers
@@ -175,8 +316,19 @@ public final class TaizoGrounding: @unchecked Sendable {
             lock.withLock { registry.addNumber(items.count) }
             for item in items { walk(item) }
         case .object(let o):
+            noteObject(o)
             for member in o { walk(member.value) }
         default: break
+        }
+    }
+
+    /// The refs and the genre or mood ids an object of a tool result carries (a similar artist's ref, a lookup's id with its name).
+    private func noteObject(_ o: JSONObject) {
+        lock.withLock {
+            if let ref = o["ref"]?.stringValue, AssistantRules.parseRef(ref) != nil { seenRefs.insert(ref) }
+            if let id = o["id"]?.int64Value, id > 0, id <= Int64(Int32.max), let name = o["name"]?.stringValue, !BrainText.isBlank(name) {
+                if o["kind"]?.stringValue == "mood" { moodNames[Int(id)] = name } else { genreNames[Int(id)] = name }
+            }
         }
     }
 

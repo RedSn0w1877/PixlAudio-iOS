@@ -118,6 +118,19 @@ struct AssistantHelpTests {
         #expect(stored.tagRids == [1])
     }
 
+    @Test func aFailedTaggingCallIsNotRepeatedOnEveryRunButWaitsForTheNextWeek() async throws {
+        let r = try await rig(answer: { _ in nil })
+        defer { try? FileManager.default.removeItem(at: r.directory) }
+        await r.dna.upsert(track: untaggedRow(1), artist: nil)
+        _ = await r.help.run(playing: { false })
+        let first = r.asked.all.filter { $0.system == AssistantHelp.tagSystem }.count
+        #expect(first == 1)
+        // The next daily run asks nothing: the failure is marked for the week.
+        _ = await r.help.run(playing: { false })
+        _ = await r.help.run(playing: { false })
+        #expect(r.asked.all.filter { $0.system == AssistantHelp.tagSystem }.count == 1)
+    }
+
     @Test func anAnswerThatIsNotJsonIsStoredAsAskedWithNothingUsable() async throws {
         let r = try await rig(answer: { _ in "I could not do that." })
         defer { try? FileManager.default.removeItem(at: r.directory) }

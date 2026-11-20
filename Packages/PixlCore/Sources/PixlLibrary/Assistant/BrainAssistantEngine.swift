@@ -17,6 +17,8 @@ public enum AssistantSearch: Sendable {
     case notFound
     /// The day's requests were used up before it could be asked.
     case skipped
+    /// The search itself failed (no connection, a failed request): the song may well exist.
+    case failed
 }
 
 /// What the app target does for the engine: the network search and the parts that touch the player.
@@ -37,7 +39,7 @@ public protocol AssistantHost: Sendable {
 
 public actor BrainAssistantEngine: MusicBackend, AssistantPlayable {
     static let maxIssued = 4_000
-    static let maxMixes = 12
+    static let maxMixes = 16
     static let nearestGenres = 5
     static let recTag: Int64 = 0x4B
     static let steerCount = 5
@@ -65,6 +67,8 @@ public actor BrainAssistantEngine: MusicBackend, AssistantPlayable {
     private let host: any AssistantHost
     private let library: @Sendable () async -> [Song]
     private let clock: @Sendable () -> Int64
+    /// True for a recording whose genres the optional batch job wrote (the assistant's suggestion, not a source's fact).
+    private let assisted: (@Sendable (Int64) async -> Bool)?
 
     private var issued: [String: Issued] = [:]
     private var tagBySongId: [String: BrainItemTag] = [:]
@@ -73,7 +77,9 @@ public actor BrainAssistantEngine: MusicBackend, AssistantPlayable {
 
     public init(mixes: BrainMixes, engine: BrainEngine, repository: BrainRepository, parts: Stage2bParts?, yourSound: YourSoundReader?,
                 host: any AssistantHost, library: @escaping @Sendable () async -> [Song],
+                assisted: (@Sendable (Int64) async -> Bool)? = nil,
                 clock: @escaping @Sendable () -> Int64 = { currentTimeMillis() }) {
+        self.assisted = assisted
         self.mixes = mixes
         self.engine = engine
         self.repository = repository
@@ -130,7 +136,8 @@ public actor BrainAssistantEngine: MusicBackend, AssistantPlayable {
                       inLibrary: Bool) -> AssistantTrack {
         let rawAlbum = song?.album ?? track?.album ?? ""
         let album = rawAlbum.lowercased() == EngineTrack.unknownAlbum.lowercased() ? "" : rawAlbum
-        return AssistantTrack(ref: ref, title: title, artist: artist, year: year, inLibrary: inLibrary, album: album)
+        let primary = song.map { BrainLibraryIndex.primaryArtistName($0) } ?? track?.artists.first?.name ?? ""
+        return AssistantTrack(ref: ref, title: title, artist: artist, year: year, inLibrary: inLibrary, album: album, primaryArtist: primary)
     }
 
     private func infoOfSong(_ song: Song, track: EngineTrack?, rid: Int64, tag: BrainItemTag?, servedX: [UInt8]?,
@@ -194,6 +201,8 @@ public actor BrainAssistantEngine: MusicBackend, AssistantPlayable {
         switch await host.searchSong(title: title, artist: artist) {
         case .skipped:
             return AssistantLookup(track: nil, skipped: true)
+        case .failed:
+            return AssistantLookup(track: nil, failed: true)
         case .notFound:
             return AssistantLookup(track: nil)
         case .found(let row):
@@ -251,7 +260,10 @@ public actor BrainAssistantEngine: MusicBackend, AssistantPlayable {
 
     private func planFor(_ query: AssistantRules.Query, bump: Int) async -> AssistantPlan? {
         var seeds: [AssistantSeed] = []
-        for ref in query.seedRefs { if let s = await material(of: ref) { seeds.append(s) } }
+        var unmaterialised: [String] = []
+        for ref in query.seedRefs {
+            if let s = await material(of: ref) { seeds.append(s) } else { unmaterialised.append(ref) }
+        }
         var excluded: [String] = []
         for ref in query.excludeArtistRefs {
             var name: String?
@@ -262,14 +274,20 @@ public actor BrainAssistantEngine: MusicBackend, AssistantPlayable {
             }
             if let name, !BrainText.isBlank(name) { excluded.append(BrainText.fold(name)) }
         }
-        return await mixes.assistantPlan(query, seeds: seeds, excludedArtists: excluded,
-                                         regen: BrainMixes.assistantRegen(of: query, bump: bump))
+        guard var plan = await mixes.assistantPlan(query, seeds: seeds, excludedArtists: excluded,
+                                                   regen: BrainMixes.assistantRegen(of: query, bump: bump)) else { return nil }
+        // A seed whose song could not be placed is said, like one with no radio: the list does not follow it.
+        plan.seedsNotUsed = unmaterialised + plan.seedsNotUsed
+        return plan
     }
 
-    private func picksOf(_ plan: AssistantPlan, surfaceId: String, now: Int64) async -> [AssistantPick] {
+    /// The picks with a ref (a pick the engine cannot name is in neither list), and the songs of exactly those picks: what Play and Save use.
+    private func picksOf(_ plan: AssistantPlan, surfaceId: String, now: Int64) async -> (picks: [AssistantPick], songs: [Song]) {
         let recId = (now << 8) | Self.recTag
         var out: [AssistantPick] = []
+        var songs: [Song] = []
         out.reserveCapacity(plan.picks.count)
+        songs.reserveCapacity(plan.picks.count)
         for (slot, p) in plan.picks.enumerated() {
             let primary = BrainLibraryIndex.primaryArtistName(p.song)
             let hasWhy = p.whyKey != WhyLine.none && !p.whyName.isEmpty
@@ -282,16 +300,18 @@ public actor BrainAssistantEngine: MusicBackend, AssistantPlayable {
                 servedX: p.servedX.map(ServedVector.toHex))
             guard let info = await infoOfSong(p.song, track: p.track, rid: p.rid, tag: tag, servedX: p.servedX, year: p.year) else { continue }
             out.append(AssistantPick(track: info, whyKey: whyKey ?? "", whyArgs: p.whyName.isEmpty ? [] : [p.whyName]))
+            songs.append(p.song)
         }
-        return out
+        return (out, songs)
     }
 
     public func recommend(_ query: AssistantRules.Query) async -> AssistantRecommendation {
         guard let plan = await planFor(query, bump: 0) else {
             return AssistantRecommendation(picks: [], unsupportedFilters: [], coldStart: !(await mixes.hasState()))
         }
-        let picks = await picksOf(plan, surfaceId: "assistant", now: clock())
-        return AssistantRecommendation(picks: Array(picks.prefix(query.count)), unsupportedFilters: plan.unsupported, coldStart: plan.coldStart)
+        let made = await picksOf(plan, surfaceId: "assistant", now: clock())
+        return AssistantRecommendation(picks: Array(made.picks.prefix(query.count)), unsupportedFilters: plan.unsupported, coldStart: plan.coldStart,
+                                       seedsNotUsed: plan.seedsNotUsed)
     }
 
     public func buildMix(_ query: AssistantRules.Query) async -> AssistantMix? {
@@ -303,32 +323,40 @@ public actor BrainAssistantEngine: MusicBackend, AssistantPlayable {
         guard let record = builtMixes[mixId] else { return nil }
         let next = AssistantRules.applyChip(record.query, chip)
         guard let plan = await planFor(next, bump: 1), !plan.picks.isEmpty else { return nil }
-        return await finish(next, plan)
+        // The card now shows the new list: it takes the old one's place, so a card never loses its record to the chips of another.
+        return await finish(next, plan, replacing: mixId)
     }
 
-    private func finish(_ query: AssistantRules.Query, _ plan: AssistantPlan) async -> AssistantMix? {
+    private func finish(_ query: AssistantRules.Query, _ plan: AssistantPlan, replacing old: String? = nil) async -> AssistantMix? {
         let now = clock()
         let seed = BrainHash.fnv1a64("assistant|\(query.title)|\(now)|\(plan.picks.first?.rid ?? 0)")
         let mixId = String(seed, radix: 16)
-        let picks = await picksOf(plan, surfaceId: mixId, now: now)
+        let made = await picksOf(plan, surfaceId: mixId, now: now)
+        let picks = made.picks
         if picks.isEmpty { return nil }
         // Tracks from outside the library go into `playable` now, so Play and Save work from the card.
         let engineTracks = plan.picks.compactMap(\.track)
         await register(engineTracks)
-        builtMixes[mixId] = BuiltRecord(query: query, songs: plan.picks.map(\.song))
+        if let old, old != mixId {
+            builtMixes[old] = nil
+            builtOrder.removeAll { $0 == old }
+        }
+        // The songs Play and Save use are exactly the picks the card shows.
+        builtMixes[mixId] = BuiltRecord(query: query, songs: made.songs)
         builtOrder.removeAll { $0 == mixId }
         builtOrder.append(mixId)
         while builtOrder.count > Self.maxMixes { builtMixes[builtOrder.removeFirst()] = nil }
         return await built(mixId, query, plan, picks)
     }
 
-    private func firstArtist(_ display: String) -> String { display.components(separatedBy: ", ").first ?? display }
+    /// The artist a pick counts for: its credited primary artist ("Tyler, The Creator" is one), else the first credit of the line.
+    private func artistOf(_ track: AssistantTrack) -> String { track.chipArtist }
 
     private func built(_ mixId: String, _ query: AssistantRules.Query, _ plan: AssistantPlan, _ picks: [AssistantPick]) async -> AssistantMix {
         var counts: [String: Int] = [:]
         var order: [String] = []
         for p in picks {
-            let name = firstArtist(p.track.artist)
+            let name = artistOf(p.track)
             if counts[name] == nil { order.append(name) }
             counts[name, default: 0] += 1
         }
@@ -337,16 +365,20 @@ public actor BrainAssistantEngine: MusicBackend, AssistantPlayable {
             let ca = counts[a] ?? 0, cb = counts[b] ?? 0
             return ca != cb ? ca < cb : a.utf16.count > b.utf16.count
         } ?? ""
-        let topRef = picks.first { firstArtist($0.track.artist) == topName }?.track.ref ?? ""
+        let topRef = picks.first { artistOf($0.track) == topName }?.track.ref ?? ""
         var byGenre: [Int: Int] = [:]
         for p in plan.picks { for g in p.genreIds { byGenre[g, default: 0] += 1 } }
         let atlas = await parts?.atlas.loadedOrNil()
         // A genre with some depth (a root family is too broad to be a chip); ties go to the lower id.
         let topGenre = byGenre.filter { (atlas?.depth($0.key) ?? 0) >= 1 }
             .sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.first?.key ?? 0
+        var chipUnsupported = plan.unsupported
+        if !plan.tempoKnown, !chipUnsupported.contains(AssistantRules.filterTempo) { chipUnsupported.append(AssistantRules.filterTempo) }
+        if !plan.energyKnown, !chipUnsupported.contains(AssistantRules.filterEnergy) { chipUnsupported.append(AssistantRules.filterEnergy) }
         return AssistantMix(mixId: mixId, title: query.title.isEmpty ? "Made for you" : query.title, tracks: picks,
                             unsupportedFilters: plan.unsupported, query: query, topArtistRef: topRef, topArtistName: topName,
-                            topGenreId: topGenre, topGenreName: atlas?.genre(topGenre)?.name ?? "")
+                            topGenreId: topGenre, topGenreName: atlas?.genre(topGenre)?.name ?? "",
+                            seedsNotUsed: plan.seedsNotUsed, chipUnsupported: chipUnsupported)
     }
 
     // MARK: start_station / steer_session
@@ -418,8 +450,8 @@ public actor BrainAssistantEngine: MusicBackend, AssistantPlayable {
         if (change == "energy_up" || change == "energy_down") && plan.unsupported.contains(where: { KotlinText.equals($0, AssistantRules.filterEnergy) }) {
             return AssistantSteerOutcome(applied: false, note: "PixlAudio does not know how energetic these songs are yet, so it cannot change the energy of this queue. Nothing was changed.")
         }
-        let picks = await picksOf(plan, surfaceId: "assistant", now: clock())
-        let songs = plan.picks.prefix(picks.count).map(\.song)
+        let made = await picksOf(plan, surfaceId: "assistant", now: clock())
+        let songs = made.songs
         let engineTracks = plan.picks.compactMap(\.track)
         await register(engineTracks)
         let queued = await host.queueNext(Array(songs), tags: await tags(for: Array(songs)))
@@ -458,13 +490,17 @@ public actor BrainAssistantEngine: MusicBackend, AssistantPlayable {
             factors = await engine.servedFactors(x, modelVersion: model, nowMs: clock())
         }
         var genres: [String]?
+        var genresSuggested = false
         var year = song.year
         if let row = await parts?.dna?.track(rid) {
             if row.firstYear > 0 { year = row.firstYear }
             let tags = row.tagVector
             if !tags.isEmpty, let atlas = await parts?.atlas.atlas() {
                 let names = tags.tags.compactMap { atlas.genre($0.atlasId)?.name }
-                if !names.isEmpty { genres = names }
+                if !names.isEmpty {
+                    genres = names
+                    genresSuggested = await assisted?(rid) ?? false
+                }
             }
         }
         let plays = events.filter { $0.playedMs > 0 || $0.endReason == EndReason.trackDone }.count
@@ -473,7 +509,8 @@ public actor BrainAssistantEngine: MusicBackend, AssistantPlayable {
             ref: key, title: song.title, artist: song.artist, arm: arm, whyKey: known?.tag?.whyKey,
             whyArgs: known?.tag?.whyArg.map { [$0] } ?? [], factors: factors, genres: genres, year: year,
             plays: events.isEmpty ? nil : plays,
-            completionRate: plays >= AssistantTrackExplanation.minPlaysForRate ? Double(finished) / Double(plays) : nil)
+            completionRate: plays >= AssistantTrackExplanation.minPlaysForRate ? Double(finished) / Double(plays) : nil,
+            genresSuggested: genresSuggested, primaryArtist: primary)
     }
 
     // MARK: explain_taste
@@ -611,8 +648,14 @@ public actor BrainAssistantEngine: MusicBackend, AssistantPlayable {
         }
         struct Row { var name: String; var score: Double; var ref: String }
         var byArtist: [String: Row] = [:]
-        for row in await dna.tracks(Array(weight.keys)) {
-            let name = firstArtist(row.artistDisplay)
+        let rows = await dna.tracks(Array(weight.keys))
+        // The credited artist's own name ("Tyler, The Creator" is one artist; the comma-joined display line cannot say so).
+        var nameOfAid: [Int64: String] = [:]
+        let firstAids = Set(rows.compactMap { $0.artistIds.split(separator: ",").first.flatMap { Int64($0) } })
+        if !firstAids.isEmpty { for a in await dna.artists(Array(firstAids)) { nameOfAid[a.aid] = a.name } }
+        for row in rows {
+            let aid = row.artistIds.split(separator: ",").first.flatMap { Int64($0) } ?? 0
+            let name = nameOfAid[aid].flatMap { BrainText.isBlank($0) ? nil : $0 } ?? row.artistDisplay.components(separatedBy: ", ").first ?? row.artistDisplay
             let folded = BrainText.fold(name)
             if folded.isEmpty || folded == key { continue }
             var ref = ""

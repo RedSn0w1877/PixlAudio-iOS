@@ -7,13 +7,16 @@ import Foundation
 import PixlModel
 
 extension BrainEngine {
-    /// The factors of `x` (a dequantised served vector). `modelVersion` is what ranked the pick (`modelLearned`, or 0 for the prior): the
-    /// learned weights are used only for a pick they ranked, and only while the gate still has them on.
-    public func servedFactors(_ x: [Double], modelVersion: Int32, nowMs: Int64) -> [AssistantRules.Factor] {
+    /// The factors of `x` (a dequantised served vector). `modelVersion` is what ranked the pick (`modelLearned`, or 0 for the prior). A pick
+    /// the learned weights ranked is read with the weights the engine holds NOW (they move with every play, so this is "under the current
+    /// weights", and the tool says so); when the gate has switched the learned weights off since, there is nothing true to say and the
+    /// answer is nil (never the prior's factors for a list the prior did not rank).
+    public func servedFactors(_ x: [Double], modelVersion: Int32, nowMs: Int64) -> [AssistantRules.Factor]? {
         withState { st in
+            let rankedByLearned = modelVersion == BrainEngine.modelLearned
+            if rankedByLearned && !st.learner.useLearned { return nil }
             let p0 = Affinity.p0(st.affinity, nowMs: nowMs)
-            let learned = modelVersion == BrainEngine.modelLearned && st.learner.useLearned
-            return AssistantRules.topFactors(x, Ranker.weightsFor(st.learner.model, learned: learned, p0: p0, seed: nil))
+            return AssistantRules.topFactors(x, Ranker.weightsFor(st.learner.model, learned: rankedByLearned, p0: p0, seed: nil))
         }
     }
 

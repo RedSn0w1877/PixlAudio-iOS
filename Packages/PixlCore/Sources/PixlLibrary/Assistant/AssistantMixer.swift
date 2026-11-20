@@ -58,6 +58,11 @@ public struct AssistantPlan: Sendable {
     public var control: Bool
     public var modelVersion: Int
     public var seedListCount: Int
+    /// False when no candidate of the pool has a tempo (or an energy) on record: a chip for that filter changes nothing and is not offered.
+    public var tempoKnown: Bool = true
+    public var energyKnown: Bool = true
+    /// The refs of the seeds the request named that the plan could not use (no radio on the phone and none could be fetched).
+    public var seedsNotUsed: [String] = []
 }
 
 extension BrainMixes {
@@ -91,11 +96,16 @@ extension BrainMixes {
 
         // The seeds the request named; none named means the day's own seeds (the ones a Your Mix uses), from the cache only.
         var mixSeeds: [MixSeed] = []
+        var notUsed: [String] = []
         for s in seeds {
             var list = await repository.cachedRadio(seedRid: s.rid)
             if list == nil, let radioSeed = s.radioSeed { list = await repository.radioFor(seed: radioSeed, allowNetwork: true) }
             let artistRows = await repository.cachedArtistRadio(seedRid: s.rid)
-            if list == nil && artistRows.isEmpty { continue }
+            if list == nil && artistRows.isEmpty {
+                // Nothing similar to this seed can be had right now (offline, the day's lookups spent, a failed fetch): said, never hidden.
+                notUsed.append(s.ref)
+                continue
+            }
             mixSeeds.append(MixSeed(rid: s.rid, aid: s.aid, title: s.title, artistName: s.primaryArtist, list: list, artistRows: artistRows))
         }
         if mixSeeds.isEmpty {
@@ -182,8 +192,10 @@ extension BrainMixes {
         for c in pool.candidates { if let f = facts[c.rid], AssistantRules.passes(query, f, ctx) { kept.append(c) } }
         let unsupported = AssistantRules.unsupportedFilters(query, ctx)
         if kept.isEmpty {
-            return AssistantPlan(picks: [], unsupported: unsupported, coldStart: cold, control: false, modelVersion: 0,
-                                 seedListCount: mixSeeds.filter { $0.list != nil }.count)
+            var empty = AssistantPlan(picks: [], unsupported: unsupported, coldStart: cold, control: false, modelVersion: 0,
+                                      seedListCount: mixSeeds.filter { $0.list != nil }.count)
+            empty.seedsNotUsed = notUsed
+            return empty
         }
 
         var edgeNodes = mixSeeds.map(\.rid)
@@ -223,8 +235,12 @@ extension BrainMixes {
                 radioRank: (novel?.radioRank ?? 0) > 0 ? Int32(novel!.radioRank) : pick.radioRank, explore: pick.explore,
                 servedX: pick.servedX, year: facts[pick.rid]?.year ?? 0, genreIds: genresOf[pick.rid] ?? []))
         }
-        return AssistantPlan(picks: out, unsupported: unsupported, coldStart: cold, control: plan.control,
-                             modelVersion: Int(plan.modelVersion), seedListCount: mixSeeds.filter { $0.list != nil }.count)
+        var result = AssistantPlan(picks: out, unsupported: unsupported, coldStart: cold, control: plan.control,
+                                   modelVersion: Int(plan.modelVersion), seedListCount: mixSeeds.filter { $0.list != nil }.count)
+        result.tempoKnown = ctx.tempoKnown
+        result.energyKnown = ctx.energyKnown
+        result.seedsNotUsed = notUsed
+        return result
     }
 
     /// The atlas ids of a track's genres, ancestors included, or none when the DNA has no tags. Unknown stays unknown.

@@ -168,6 +168,9 @@ public actor AssistantHelp {
     }
 
     private func tagTracks(_ atlas: GenreAtlas) async -> (calls: Int, done: Int) {
+        // A call that failed is not repeated on every run: tagging waits for the next week.
+        let failKey = await cache.keyOf("tagfail", "week=\(clock() / Self.weekMs)")
+        if await cache.read().ask[failKey] != nil { return (0, 0) }
         let listenerGenres = await host.listenerGenres()
         var calls = 0
         var tagged = 0
@@ -207,7 +210,10 @@ public actor AssistantHelp {
                 prompt += t.shortlist.map { "\($0) \(atlas.genre($0)?.name ?? "")" }.joined(separator: ", ") + "\n"
             }
             calls += 1
-            guard let text = await host.ask(Self.tagSystem, prompt, Self.maxTokensTags) else { continue }
+            guard let text = await host.ask(Self.tagSystem, prompt, Self.maxTokensTags) else {
+                await cache.update { $0.ask[failKey] = [] }
+                break
+            }
             var answers: [AssistBatch.TagOut] = []
             for el in Self.objectsOf(text, "tracks") {
                 guard let i = Self.intValue(el["i"]) else { continue }

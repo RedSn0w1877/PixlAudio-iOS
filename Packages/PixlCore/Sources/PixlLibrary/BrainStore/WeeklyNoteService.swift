@@ -27,20 +27,30 @@ public actor WeeklyNoteService {
 
     /// What is kept between opens of the list.
     public struct Stored: Codable, Sendable, Equatable {
-        /// The week's list (its `builtAtMs`): a new list is a new week.
+        /// The calendar week (`weekOf`) the note belongs to: a rebuilt list inside the same week is not a new week.
         public var week: Int64 = 0
         /// The cloud call of this week was made (or tried): no second one.
         public var asked = false
         public var cloudHash: Int64 = 0
         public var cloudText = ""
+        /// The new-music share the cloud text was written with (-1 unknown): the text is dropped when the share has moved on.
+        public var cloudShare = -1
 
-        public init(week: Int64 = 0, asked: Bool = false, cloudHash: Int64 = 0, cloudText: String = "") {
+        public init(week: Int64 = 0, asked: Bool = false, cloudHash: Int64 = 0, cloudText: String = "", cloudShare: Int = -1) {
             self.week = week
             self.asked = asked
             self.cloudHash = cloudHash
             self.cloudText = cloudText
+            self.cloudShare = cloudShare
         }
     }
+
+    public static let weekMs: Int64 = 7 * 24 * 60 * 60 * 1000
+    /// How far (in points) today's new-music share may move from the one the cloud text was written with before the text is dropped.
+    public static let shareTolerance = 3
+
+    /// The week a moment belongs to: one cloud call a week, however often the list is rebuilt.
+    public static func weekOf(_ nowMs: Int64) -> Int64 { nowMs / weekMs }
 
     private let file: URL?
     private let mayAsk: @Sendable () async -> Bool
@@ -58,25 +68,52 @@ public actor WeeklyNoteService {
     public func note(for evidence: WeeklyNote.Evidence, week: Int64) async -> String? {
         let template = WeeklyNote.template(evidence)
         if template.isEmpty { return nil }
-        let hash = WeeklyNote.evidenceHash(evidence)
+        // The share of new music moves every day: it is left out of the hash (the list's own facts decide whether the text still fits) and
+        // checked on its own against the figure the text was written with.
+        let hash = WeeklyNote.evidenceHash(Self.stable(evidence))
         var stored = read().flatMap { $0.week == week ? $0 : nil } ?? Stored(week: week)
-        if !stored.cloudText.isEmpty && stored.cloudHash == hash { return stored.cloudText }
+        if !stored.cloudText.isEmpty && stored.cloudHash == hash && Self.shareStillFits(stored.cloudShare, evidence.newSharePct) {
+            return stored.cloudText
+        }
         if !stored.asked, await mayAsk() {
             // Counted before the call: a crash or a double tap cannot make a second one this week.
+            let before = stored
             stored = Stored(week: week, asked: true)
             write(stored)
             if let text = await cloud(evidence) {
-                stored = Stored(week: week, asked: true, cloudHash: hash, cloudText: text)
+                stored = Stored(week: week, asked: true, cloudHash: hash, cloudText: text, cloudShare: evidence.newSharePct)
                 write(stored)
                 return text
             }
+            // The listener left the list before the call could answer: the week is not spent, the next open asks.
+            if Task.isCancelled { write(before) }
         }
         return template
     }
 
+    /// The evidence without the rolling figure: what stays the same while the same list is shown.
+    static func stable(_ e: WeeklyNote.Evidence) -> WeeklyNote.Evidence {
+        WeeklyNote.Evidence(tracks: e.tracks, newSongs: e.newSongs, artists: e.artists, genre: e.genre, island: e.island, newSharePct: -1)
+    }
+
+    /// True while the text's figure is still near today's (a few points), or when neither is known.
+    static func shareStillFits(_ written: Int, _ now: Int) -> Bool {
+        written < 0 || now < 0 ? written == now : abs(written - now) <= shareTolerance
+    }
+
     private func cloud(_ evidence: WeeklyNote.Evidence) async -> String? {
         guard let answer = await ask(Self.system, WeeklyNote.evidenceLines(evidence), Self.maxTokens) else { return nil }
-        return WeeklyNote.check(answer, evidence)
+        guard let checked = WeeklyNote.check(answer, evidence), Self.namesAreMarkedOrGrounded(answer, evidence) else { return nil }
+        return checked
+    }
+
+    /// The second look at a cloud note: a capitalised name written with no mark must be one of the evidence rows too (or one of the app's own
+    /// words), so the note cannot name an artist the evidence did not hold. Stricter than `WeeklyNote.check` (which sees only marked names).
+    static func namesAreMarkedOrGrounded(_ cloud: String, _ e: WeeklyNote.Evidence) -> Bool {
+        var registry = WeeklyNote.registry(e)
+        for n in TaizoGrounding.appNames { registry.addName(n) }
+        return Grounding.check(WeeklyNote.oneLine(cloud), registry, userText: "", placeholder: "\u{0}", dropUngroundedNumbers: false,
+                               scanUnmarked: true).ok
     }
 
     private func read() -> Stored? {
@@ -147,7 +184,7 @@ public struct FirstListenNote: Sendable {
         if let novelty = await yourSound?.load().novelty { share = (novelty.permille + 5) / 10 }
         let genre = await adjacentGenre(of: view)
         guard let evidence = WeeklyNoteEvidence.of(view, genre: genre, newSharePct: share) else { return nil }
-        return await service.note(for: evidence, week: view.builtAtMs)
+        return await service.note(for: evidence, week: WeeklyNoteService.weekOf(currentTimeMillis()))
     }
 
     /// The genre most of the list's adjacent-genre picks are tagged with, or "" when none is: nothing is guessed.

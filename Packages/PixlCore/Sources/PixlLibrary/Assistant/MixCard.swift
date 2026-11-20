@@ -37,10 +37,14 @@ public struct MixCard: Sendable, Equatable {
     public let preview: [MixCardTrack]
     /// Filters the request asked for that the data could not answer ("tempo"), so the card can say they were not applied.
     public let notApplied: [String]
+    /// How many of the songs the mix was asked to follow could not be used (nothing similar to them could be had right now).
+    public let seedsNotUsed: Int
 
     public static let previewTracks = 4
 
-    public init(mixId: String, title: String, total: Int, chips: [MixCardChip], preview: [MixCardTrack], notApplied: [String]) {
+    public init(mixId: String, title: String, total: Int, chips: [MixCardChip], preview: [MixCardTrack], notApplied: [String],
+                seedsNotUsed: Int = 0) {
+        self.seedsNotUsed = seedsNotUsed
         self.mixId = mixId
         self.title = title
         self.total = total
@@ -52,13 +56,13 @@ public struct MixCard: Sendable, Equatable {
     /// The card of `mix`: only chips that have words (a chip about a name nobody has is not offered).
     public static func of(_ mix: AssistantMix) -> MixCard {
         let chips = AssistantCards.allChips(mix.query, topArtistRef: mix.topArtistRef, topGenreId: mix.topGenreId,
-                                            unsupported: mix.unsupportedFilters).compactMap { chip -> MixCardChip? in
+                                            unsupported: mix.chipUnsupported).compactMap { chip -> MixCardChip? in
             let label = AssistantCards.chipLabel(chip, artistName: mix.topArtistName, genreName: mix.topGenreName)
             return label.isEmpty ? nil : MixCardChip(chip: chip, label: label)
         }
         return MixCard(mixId: mix.mixId, title: mix.title, total: mix.tracks.count, chips: chips,
                        preview: mix.tracks.prefix(previewTracks).map { MixCardTrack(title: $0.track.title, artist: $0.track.artist) },
-                       notApplied: mix.unsupportedFilters)
+                       notApplied: mix.unsupportedFilters, seedsNotUsed: mix.seedsNotUsed.count)
     }
 }
 

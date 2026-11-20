@@ -42,10 +42,13 @@ public protocol MusicBackend: Sendable {
 public struct AssistantLookup: Sendable {
     public var track: AssistantTrack?
     public var skipped: Bool
+    /// The search could not be made (no connection, a failed request): not the same as "no such song".
+    public var failed: Bool
 
-    public init(track: AssistantTrack?, skipped: Bool = false) {
+    public init(track: AssistantTrack?, skipped: Bool = false, failed: Bool = false) {
         self.track = track
         self.skipped = skipped
+        self.failed = failed
     }
 }
 
@@ -57,14 +60,23 @@ public struct AssistantTrack: Sendable, Hashable {
     public var year: Int
     public var inLibrary: Bool
     public var album: String
+    /// The one credited primary artist ("Tyler, The Creator" is one artist, not "Tyler"); "" when the engine did not say.
+    public var primaryArtist: String
 
-    public init(ref: String, title: String, artist: String, year: Int = 0, inLibrary: Bool, album: String = "") {
+    public init(ref: String, title: String, artist: String, year: Int = 0, inLibrary: Bool, album: String = "", primaryArtist: String = "") {
         self.ref = ref
         self.title = title
         self.artist = artist
         self.year = year
         self.inLibrary = inLibrary
         self.album = album
+        self.primaryArtist = primaryArtist
+    }
+
+    /// The artist a "Less X" chip or an explanation is about: the credited primary artist, else the first credit of the display line.
+    public var chipArtist: String {
+        if !BrainText.isBlank(primaryArtist) { return primaryArtist }
+        return TaizoGrounding.splitCredits(artist).first ?? artist
     }
 }
 
@@ -88,11 +100,14 @@ public struct AssistantRecommendation: Sendable {
     public var unsupportedFilters: [String]
     /// True when the engine had nothing of the listener's to rank (a thin history): the picks are the radios' own order.
     public var coldStart: Bool
+    /// Refs of the seeds the request named that no similar tracks could be had for: the picks do not follow them.
+    public var seedsNotUsed: [String]
 
-    public init(picks: [AssistantPick], unsupportedFilters: [String] = [], coldStart: Bool = false) {
+    public init(picks: [AssistantPick], unsupportedFilters: [String] = [], coldStart: Bool = false, seedsNotUsed: [String] = []) {
         self.picks = picks
         self.unsupportedFilters = unsupportedFilters
         self.coldStart = coldStart
+        self.seedsNotUsed = seedsNotUsed
     }
 }
 
@@ -108,9 +123,14 @@ public struct AssistantMix: Sendable {
     public var topArtistName: String
     public var topGenreId: Int
     public var topGenreName: String
+    /// Refs of the seeds the request named that no similar tracks could be had for: the mix does not follow them.
+    public var seedsNotUsed: [String]
+    /// The filters whose chips are not offered: the ones the request set that no data answers, and the tempo or energy no track of the pool has.
+    public var chipUnsupported: [String]
 
     public init(mixId: String, title: String, tracks: [AssistantPick], unsupportedFilters: [String] = [], query: AssistantRules.Query,
-                topArtistRef: String = "", topArtistName: String = "", topGenreId: Int = 0, topGenreName: String = "") {
+                topArtistRef: String = "", topArtistName: String = "", topGenreId: Int = 0, topGenreName: String = "",
+                seedsNotUsed: [String] = [], chipUnsupported: [String]? = nil) {
         self.mixId = mixId
         self.title = title
         self.tracks = tracks
@@ -120,6 +140,8 @@ public struct AssistantMix: Sendable {
         self.topArtistName = topArtistName
         self.topGenreId = topGenreId
         self.topGenreName = topGenreName
+        self.seedsNotUsed = seedsNotUsed
+        self.chipUnsupported = chipUnsupported ?? unsupportedFilters
     }
 }
 
@@ -127,11 +149,14 @@ public struct AssistantStationOutcome: Sendable {
     public var started: Bool
     public var firstTrack: AssistantTrack?
     public var reason: String
+    /// Something the listener should hear about what the start did besides playing (a setting it changed).
+    public var note: String
 
-    public init(started: Bool, firstTrack: AssistantTrack? = nil, reason: String = "") {
+    public init(started: Bool, firstTrack: AssistantTrack? = nil, reason: String = "", note: String = "") {
         self.started = started
         self.firstTrack = firstTrack
         self.reason = reason
+        self.note = note
     }
 }
 
@@ -167,10 +192,16 @@ public struct AssistantTrackExplanation: Sendable {
     public var plays: Int?
     /// Share of those plays that were finished, 0.0 to 1.0; nil with fewer than `minPlaysForRate`.
     public var completionRate: Double?
+    /// True when the genres come from the assistant's own batch job (a guess checked against the atlas), not from a source.
+    public var genresSuggested: Bool
+    /// The track's primary credited artist (one name), for the one-tap "Less X".
+    public var primaryArtist: String
 
     public init(ref: String, title: String, artist: String, arm: String? = nil, whyKey: String? = nil, whyArgs: [String] = [],
                 factors: [AssistantRules.Factor]? = nil, genres: [String]? = nil, year: Int = 0, plays: Int? = nil,
-                completionRate: Double? = nil) {
+                completionRate: Double? = nil, genresSuggested: Bool = false, primaryArtist: String = "") {
+        self.genresSuggested = genresSuggested
+        self.primaryArtist = primaryArtist
         self.ref = ref
         self.title = title
         self.artist = artist

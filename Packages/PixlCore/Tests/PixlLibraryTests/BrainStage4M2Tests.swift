@@ -15,6 +15,23 @@ struct BrainStage4M2Tests {
                              tempo: tempo, novelty: "any", noveltySharePct: share, count: count, excludeArtistRefs: [])
     }
 
+    @Test func aPaceChipIsNotOfferedWhenNoTrackOfThePoolHasATempoAndTheCardCountsWhatItShows() {
+        let tracks = (1...5).map { n in
+            AssistantPick(track: AssistantTrack(ref: "yt:abcdefghi0\(n)", title: "S\(n)", artist: "A", inLibrary: false), whyKey: "asked")
+        }
+        // The request set no tempo, so nothing was "not applied" - but no track of the pool has a tempo, so "Slower" would change nothing.
+        let mix = AssistantMix(mixId: "m1", title: "Late drive", tracks: tracks, unsupportedFilters: [], query: query(),
+                               seedsNotUsed: ["yt:aaaaaaaaaaa"], chipUnsupported: ["tempo"])
+        let card = MixCard.of(mix)
+        #expect(!card.chips.contains { $0.chip.kind == AssistantRules.chipSlower })
+        #expect(card.notApplied.isEmpty)
+        #expect(card.seedsNotUsed == 1)
+        #expect(card.total == 5 && card.preview.count == MixCard.previewTracks)
+        // With the tempo known the chip is back.
+        let known = MixCard.of(AssistantMix(mixId: "m2", title: "x", tracks: tracks, query: query()))
+        #expect(known.chips.contains { $0.chip.kind == AssistantRules.chipSlower })
+    }
+
     @Test func chipsAreAtMostSixAndOnlyForWhatCanChangeTheRequest() {
         let chips = AssistantCards.allChips(query(), topArtistRef: "yt:aaaaaaaaaaa", topGenreId: 4, unsupported: [])
         #expect(chips.count <= AssistantCards.maxChips)
@@ -250,7 +267,8 @@ struct BrainStage4M2Tests {
     }
 }
 
-/// Set notes over a queue of songs (Android `SetNoteLinesTest`).
+/// Set notes over a queue of songs (Android `SetNoteLinesTest`): "your side" is a song with a recorded play, "something new" is a song from
+/// outside the library with none, and a library song nobody has played is neither.
 @Suite("Set notes on the queue")
 struct SetNoteLinesTests {
     private func song(_ id: String, _ artist: String, _ genre: String?) -> Song {
@@ -261,27 +279,54 @@ struct SetNoteLinesTests {
 
     private func library(_ id: String, _ artist: String, _ genre: String) -> Song { song(id, artist, genre) }
 
-    private func outside(_ id: String, _ artist: String) -> Song { song(id, artist, nil) }
-
-    private func known(_ s: Song) -> Bool { !s.id.hasPrefix("yt") }
+    private func outside(_ id: String, _ artist: String) -> Song { song("yt:" + id, artist, nil) }
 
     @Test func threeSongsOfOneGenreAndThenANewOneReadAsOneNoteOnTheFirstOfTheThree() {
         let queue = [library("1", "Hoang Dung", "V-pop, ballad"), library("2", "Mono", "V-pop"), library("3", "Orange", "v-pop"),
-                     outside("yt4", "HIEUTHUHAI"), library("5", "Clairo", "bedroom pop")]
-        let notes = SetNoteLines.forQueue(queue, currentIndex: 0, isKnown: known)
+                     outside("aaaaaaaaaa4", "HIEUTHUHAI"), library("5", "Clairo", "bedroom pop")]
+        let notes = SetNoteLines.forQueue(queue, currentIndex: 0, heard: ["1", "2", "3"])
         let text = "Three from your V-pop side, then something new from HIEUTHUHAI."
-        #expect(notes.bySongId == ["1": text])
+        #expect(notes.byIndex == [0: text])
         #expect(notes.current == text)
     }
 
     @Test func theNoteIsMadeFromWhatIsStillToPlaySoItMovesWithTheCurrentSong() {
-        let queue = [library("1", "A", "pop"), library("2", "B", "pop"), library("3", "C", "pop"), outside("yt4", "D")]
-        let notes = SetNoteLines.forQueue(queue, currentIndex: 1, isKnown: known)
-        #expect(notes.bySongId == ["2": "Two from your pop side, then something new from D."])
+        let queue = [library("1", "A", "pop"), library("2", "B", "pop"), library("3", "C", "pop"), outside("aaaaaaaaaa4", "D")]
+        let heard: Set<String> = ["1", "2", "3"]
+        let notes = SetNoteLines.forQueue(queue, currentIndex: 1, heard: heard)
+        #expect(notes.byIndex == [1: "Two from your pop side, then something new from D."])
         #expect(notes.current == "Two from your pop side, then something new from D.")
-        #expect(SetNoteLines.forQueue(queue, currentIndex: -1, isKnown: known).bySongId.isEmpty)
-        #expect(SetNoteLines.forQueue([], currentIndex: 0, isKnown: known).current == nil)
-        #expect(SetNoteLines.forQueue(queue, currentIndex: 3, isKnown: known).current == nil)
+        #expect(SetNoteLines.forQueue(queue, currentIndex: -1, heard: heard).byIndex.isEmpty)
+        #expect(SetNoteLines.forQueue([], currentIndex: 0, heard: heard).current == nil)
+        #expect(SetNoteLines.forQueue(queue, currentIndex: 3, heard: heard).current == nil)
+    }
+
+    @Test func songsTheListenerNeverPlayedAreNotTheirSideAndAPlayedEngineTrackIsNotNew() {
+        let queue = [library("1", "A", "trap"), library("2", "B", "trap"), library("3", "C", "trap"), outside("aaaaaaaaaa4", "D")]
+        // Nothing played (a First Listen queue is made of library songs nobody has played): no note at all. While the history is still
+        // loading there is none either.
+        #expect(SetNoteLines.forQueue(queue, currentIndex: 0, heard: []).byIndex.isEmpty)
+        #expect(SetNoteLines.forQueue(queue, currentIndex: 0, heard: nil).byIndex.isEmpty)
+        // The engine track has been played through a radio: it is not "something new".
+        let played = SetNoteLines.forQueue(queue, currentIndex: 0, heard: ["1", "2", "3", "yt:aaaaaaaaaa4"])
+        #expect(played.current == nil)
+    }
+
+    @Test func aSongTwiceInTheQueueGetsItsNoteOnOneRowOnly() {
+        let queue = [library("1", "A", "pop"), library("1", "A", "pop"), library("2", "B", "pop"), outside("aaaaaaaaaa4", "D")]
+        let notes = SetNoteLines.forQueue(queue, currentIndex: 0, heard: ["1", "2"])
+        #expect(Set(notes.byIndex.keys) == [0])
+    }
+
+    @Test func theHistoryIsReadFromTheRecordingsTheAliasTableKnowsAndNeverMakesAnotherSongHeard() async {
+        let queue = [library("1", "A", "pop"), library("2", "B", "pop"), outside("aaaaaaaaaa4", "D")]
+        // The first two get recordings 11 and 12, the engine track none; only 12 was heard.
+        let heard = await SetNoteHistory.heardSongIds(queue, ridsOf: { requests in
+            requests.indices.map { $0 < 2 ? Int64(11 + $0) : 0 }
+        }, heard: { rids in rids.intersection([12]) })
+        #expect(heard == ["2"])
+        let none = await SetNoteHistory.heardSongIds([], ridsOf: { _ in [] }, heard: { _ in [] })
+        #expect(none.isEmpty)
     }
 }
 
@@ -361,6 +406,53 @@ struct WeeklyNoteServiceTests {
         #expect(calls.asks == 1)
         #expect(await service(calls, file: file).note(for: evidence, week: 8) != WeeklyNote.template(evidence))
         #expect(calls.asks == 2)
+    }
+
+    // MARK: The review (stage 4 milestone 2)
+
+    @Test func aNameWrittenWithNoMarkThatTheEvidenceDidNotHoldMakesTheNoteTheTemplate() async {
+        let calls = Calls()
+        // The unmarked "Radiohead" is no evidence row, however true the numbers are.
+        calls.answer = "This week\u{2019}s list has 25 songs, and 18 of them are new to your library. It opens with Radiohead and [[Mono]]."
+        let s = service(calls, file: tempFile())
+        #expect(await s.note(for: evidence, week: 7) == WeeklyNote.template(evidence))
+        // The same words with the name taken from the evidence pass, marked or not.
+        let ok = WeeklyNoteService.namesAreMarkedOrGrounded("This week\u{2019}s list has 25 songs. It opens with Mono and [[HIEUTHUHAI]].", evidence)
+        #expect(ok)
+        #expect(!WeeklyNoteService.namesAreMarkedOrGrounded("It opens with Radiohead.", evidence))
+    }
+
+    @Test func aRebuiltListInTheSameCalendarWeekIsNotANewWeekAndTheShareMayMoveAFewPoints() async {
+        let calls = Calls()
+        calls.answer = good
+        let s = service(calls, file: tempFile())
+        let week = WeeklyNoteService.weekOf(1_800_000_000_000)
+        #expect(WeeklyNoteService.weekOf(1_800_000_000_000 + 3 * 86_400_000) == week || WeeklyNoteService.weekOf(1_800_000_000_000 + 3 * 86_400_000) == week + 1)
+        let first = await s.note(for: evidence, week: week)
+        // The new-music share moved from 22 to 24 (inside the tolerance): the same text, no second call.
+        let moved = WeeklyNote.Evidence(tracks: 25, newSongs: 18, artists: ["Mono", "HIEUTHUHAI"], genre: "Bedroom pop", island: "", newSharePct: 24)
+        #expect(await s.note(for: moved, week: week) == first)
+        #expect(calls.asks == 1)
+        // Moved a long way: the text is not true of today any more, so the template stands in for it (the week stays counted).
+        let far = WeeklyNote.Evidence(tracks: 25, newSongs: 18, artists: ["Mono", "HIEUTHUHAI"], genre: "Bedroom pop", island: "", newSharePct: 40)
+        #expect(await s.note(for: far, week: week) == WeeklyNote.template(far))
+        #expect(calls.asks == 1)
+    }
+
+    @Test func aCancelledCallDoesNotSpendTheWeek() async {
+        let file = tempFile()
+        let calls = Calls()
+        calls.answer = nil
+        let task = Task { () -> String? in
+            // Cancelled before the call can answer: the listener left the list.
+            withUnsafeCurrentTask { $0?.cancel() }
+            return await service(calls, file: file).note(for: evidence, week: 7)
+        }
+        _ = await task.value
+        #expect(calls.asks == 1)
+        calls.answer = good
+        #expect(await service(calls, file: file).note(for: evidence, week: 7) != WeeklyNote.template(evidence))
+        #expect(calls.asks == 2, "the next open asked again")
     }
 
     @Test func nothingToSayMeansNoNoteAndNoCall() async {

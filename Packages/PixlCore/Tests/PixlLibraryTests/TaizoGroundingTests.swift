@@ -1,5 +1,6 @@
 import Foundation
 import PixlFoundation
+import PixlModel
 import Testing
 @testable import PixlLibrary
 
@@ -78,11 +79,102 @@ struct TaizoGroundingTests {
     }
 
     @Test func aNameThatIsTooLongToBeANameIsNotRegistered() {
+        // The app's own words are always known; nothing else is yet.
+        let own = g.knownNames
+        #expect(own == TaizoGrounding.appNames.count)
         g.noteName(String(repeating: "x", count: 500))
-        #expect(g.knownNames == 0)
+        #expect(g.knownNames == own)
         g.noteName("   ")
         g.noteName(nil)
-        #expect(g.knownNames == 0)
+        #expect(g.knownNames == own)
+    }
+
+    // MARK: The review (stage 4 milestone 2): the guarantee does not rest on the model marking names
+
+    @Test func aNameWrittenWithNoMarkAndNoQuoteIsCheckedToo() {
+        g.noteTrack(AssistantTrack(ref: "yt:abcdefghijk", title: "Espresso", artist: "Sabrina Carpenter", year: 2024, inLibrary: false))
+        let v = g.check("You might also try Radiohead or OK Computer. Espresso by Sabrina Carpenter is a good start.", placeholder: placeholder)
+        #expect(!v.ok)
+        #expect(v.ungroundedNames.contains("Radiohead"))
+        #expect(!v.cleaned.contains("Radiohead"))
+        #expect(v.cleaned.contains("Sabrina Carpenter"))
+        // The app's own words are not names to check.
+        #expect(g.check("Your Mix and First Listen both lean on your sound.", placeholder: placeholder).ok)
+    }
+
+    @Test func aReplyWhoseEverySentenceIsLeftOutIsNeverShownRaw() {
+        g.noteUser("what did I play lately")
+        let raw = "You have played it 500 times."
+        let shown = g.shown(raw)
+        #expect(shown == TaizoGrounding.unverifiedReply)
+        #expect(!shown.contains("500"))
+        // An invented name AND a number in one reply: nothing of the raw text is in what is shown.
+        let both = g.shown("[[Fake Band]] has 500 plays.")
+        #expect(!both.contains("Fake Band") && !both.contains("500"))
+        #expect(g.shown("") == "")
+    }
+
+    @Test func aReplyThatStillStreamsHoldsBackWhatItCannotJudgeYet() {
+        #expect(TaizoGrounding.holdBack("Try [[Fake Ba") == "")
+        #expect(TaizoGrounding.holdBack("Also try [[Fake Ba") == "Also try ")
+        #expect(TaizoGrounding.holdBack("He said \"Fake") == "He said ")
+        #expect(TaizoGrounding.holdBack("It is nice and Radiohe") == "It is nice ")
+        // A run of capitalised words at the end may still grow: the next word can belong to it.
+        #expect(TaizoGrounding.holdBack("You might like Sabrina ") == "You might like ")
+        #expect(TaizoGrounding.holdBack("Nothing yet") == "")
+        #expect(TaizoGrounding.holdBack("It is nothing yet") == "It is nothing ")
+        #expect(TaizoGrounding.holdBack("one") == "")
+        g.noteTrack(AssistantTrack(ref: "yt:abcdefghijk", title: "Espresso", artist: "Sabrina Carpenter", year: 2024, inLibrary: false))
+        // The invented name never shows, not even for the moment it streams; the real one does once it is whole.
+        #expect(!g.streaming("Try [[Fake Band]] and also [[Sabrina").contains("Fake Band"))
+        #expect(g.streaming("Try [[Fake Band]] and also ").contains("(a name I could not check)"))
+        #expect(g.streaming("Try [[Sabrina Carpenter]] now ").contains("Sabrina Carpenter"))
+        #expect(g.streaming("") == "")
+    }
+
+    @Test func aPhoneModelsAnswerMayNameWhatIsInTheListenersLibraryAndNothingElse() {
+        let song = Song(id: "1", title: "Harbor Lights", artist: "Luma Vale, Orla", artistId: 1,
+                        artists: [ArtistRef(id: 1, name: "Luma Vale", isPrimary: true), ArtistRef(id: 2, name: "Orla", isPrimary: false)],
+                        album: "Night Swim", albumId: 1, path: "", contentUriString: "", albumArtUriString: nil, duration: 1_000, genre: "Indie",
+                        mimeType: nil, bitrate: nil, sampleRate: nil)
+        let known: ([String]) -> [String] = { TaizoGrounding.libraryNames(among: $0, in: [song]) }
+        let text = "Try Luma Vale, or Radiohead if you like, and the album Night Swim."
+        let shown = g.shown(text, numbers: false, alsoKnown: known)
+        #expect(shown.contains("Luma Vale") && shown.contains("Night Swim"))
+        #expect(!shown.contains("Radiohead"))
+        #expect(TaizoGrounding.libraryNames(among: ["luma vale", "Nobody"], in: [song]) == ["luma vale"])
+        // Names only: a count the app cannot see does not cut the answer.
+        #expect(g.shown("You have 12 songs in your library.", numbers: false) == "You have 12 songs in your library.")
+        #expect(g.shown("You have 12 songs in your library.") == TaizoGrounding.unverifiedReply)
+    }
+
+    @Test func anIntroLineThatNamesWhatNoToolReturnedIsDropped() {
+        #expect(g.introLine("Here are 2 songs.") == "Here are 2 songs.")
+        #expect(g.introLine("Some Radiohead warmth for you.") == nil)
+        g.noteUser("play some radiohead")
+        #expect(g.introLine("Some Radiohead warmth for you.") != nil)
+    }
+
+    @Test func refsAndIdsOfTheToolResultsOfThisChatAreTheOnlyOnesTheNextCallMayUse() {
+        // A similar artist's ref and a lookup's id are in tool results: the next call may use them though no track was noted.
+        g.noteToolResult(#"{"artists":[{"name":"Mono","ref":"yt:abcdefghijk","rank":1}]}"#)
+        #expect(g.isKnownRef("yt:abcdefghijk"))
+        #expect(!g.isKnownRef("yt:zzzzzzzzzzz"))
+        g.noteToolResult(#"{"found":true,"kind":"genre","id":12,"name":"Bedroom pop"}"#)
+        g.noteToolResult(#"{"found":true,"kind":"mood","id":3,"name":"Calm"}"#)
+        var unknown: [String] = []
+        #expect(g.knownGenreIds([12, 99, 0], &unknown) == [12, 0])
+        #expect(unknown == ["genre 99"])
+        unknown = []
+        // A mood and a genre share numbers: mood 12 is not a mood, genre 3 is not a genre.
+        #expect(g.knownMoodIds([3, 12], &unknown) == [3])
+        #expect(unknown == ["mood 12"])
+        #expect(g.genreName(12) == "Bedroom pop")
+        #expect(g.genreName(3) == nil)
+        // An older chat's history brings its refs back, and a new chat forgets them.
+        g.reset()
+        #expect(!g.isKnownRef("yt:abcdefghijk"))
+        #expect(g.genreName(12) == nil)
     }
 
     @Test func creditsSplitOnTheJoinersListenersWrite() {
