@@ -76,9 +76,11 @@ public struct SongTapSessionState: Sendable, Equatable {
     /// The number `SongTapSigning.senderKey` gave the sender of the offer on the table, 0 when unknown.
     public var senderKey: Int32
     public var limits: SongTapRateLimits
+    /// Beams saved without asking since the listener last said yes; at `SongTapSession.askAgainAfter` the next one asks again.
+    public var autoSaves: Int
 
     public init(phase: SongTapPhase, role: SongTapRole, peer: Int, videoId: String, fail: SongTapFailReason?, askFirst: Bool, alreadyHad: Bool,
-                senderKey: Int32, limits: SongTapRateLimits) {
+                senderKey: Int32, limits: SongTapRateLimits, autoSaves: Int = 0) {
         self.phase = phase
         self.role = role
         self.peer = peer
@@ -88,6 +90,7 @@ public struct SongTapSessionState: Sendable, Equatable {
         self.alreadyHad = alreadyHad
         self.senderKey = senderKey
         self.limits = limits
+        self.autoSaves = autoSaves
     }
 
     public func describe() -> String {
@@ -209,10 +212,15 @@ public struct SongTapReduction: Sendable, Equatable {
 }
 
 public enum SongTapSession {
-    public static let ackTimeoutMs: Int64 = 15_000
+    /// How long a sender waits to hear back. The receiver may first ask its listener (up to `consentTimeoutMs`) and then
+    /// save (up to `saveTimeoutMs`) before it answers, so this is longer than both together.
+    public static let ackTimeoutMs: Int64 = 45_000
     public static let readTimeoutMs: Int64 = 8_000
     public static let consentTimeoutMs: Int64 = 20_000
-    public static let saveTimeoutMs: Int64 = 30_000
+    public static let saveTimeoutMs: Int64 = 20_000
+
+    /// After this many beams saved without asking, the next one asks (Add / Not now) again.
+    public static let askAgainAfter = 5
 
     /// How long the saved card offers Undo.
     public static let undoWindowMs: Int64 = 6_000
@@ -291,13 +299,12 @@ public enum SongTapSession {
         return SongTapReduction(state: n, effects: [.startTransport(role)])
     }
 
-    /// What to undo when a session is torn down in the middle of something.
+    /// What to stop when a session is torn down in the middle of something. A save that is still running is not undone
+    /// here: its outcome is not known yet, and a song the listener already had must never be removed. The controller
+    /// takes back a save that finishes after the session is gone, and only when that save really added the song.
     private static func teardown(_ s: SongTapSessionState) -> [SongTapSessionEffect] {
-        var out: [SongTapSessionEffect] = []
         let inFlight = s.phase == .offered || s.phase == .transferring
-        if inFlight && s.peer != 0 { out.append(.abortTransfer(peer: s.peer)) }
-        if s.role == .receive && s.phase == .transferring && !s.videoId.isEmpty { out.append(.undoSave(videoId: s.videoId)) }
-        return out
+        return inFlight && s.peer != 0 ? [.abortTransfer(peer: s.peer)] : []
     }
 
     private static func disarm(_ s: SongTapSessionState) -> SongTapReduction {
@@ -335,6 +342,13 @@ public enum SongTapSession {
             n.peer = 0
             return SongTapReduction(state: n, effects: [])
         case .offered, .transferring:
+            // A receiver that holds a checked offer does not need the sender any more: pulling the phones apart after a
+            // tap is normal, and Add / save must still work. Only a beam still being read is lost.
+            if s.role == .receive && !s.videoId.isEmpty {
+                var n = s
+                n.peer = 0
+                return SongTapReduction(state: n, effects: [])
+            }
             return SongTapReduction(state: failed(s, .peerLost), effects: teardown(s) + [.haptic(.warn)])
         default:
             return stay(s)
@@ -452,10 +466,11 @@ public enum SongTapSession {
         return SongTapReduction(state: known, effects: saveEffects(peer: peer, videoId: videoId, nowMs: nowMs))
     }
 
-    /// Saving starts, and either the sender is told (Bluetooth) or the beam starts at once (QR, no peer).
+    /// Saving starts. Over Bluetooth the sender is told only when the save is done (`saveResult`), so it never celebrates a
+    /// beam that did not land; without a peer (a QR code, or the phones already apart) the beam starts at once.
     private static func saveEffects(peer: Int, videoId: String, nowMs: Int64) -> [SongTapSessionEffect] {
         var out: [SongTapSessionEffect] = [.saveSong(videoId: videoId), .scheduleTimeout(.save, afterMs: saveTimeoutMs)]
-        out.append(peer != 0 ? .sendAck(peer: peer) : .startBeam(role: .receive, startMs: nowMs))
+        if peer == 0 { out.append(.startBeam(role: .receive, startMs: nowMs)) }
         return out
     }
 
@@ -497,6 +512,7 @@ public enum SongTapSession {
         var n = s
         n.phase = .transferring
         n.askFirst = false
+        n.autoSaves = 0
         return SongTapReduction(state: n, effects: saveEffects(peer: s.peer, videoId: s.videoId, nowMs: nowMs))
     }
 
@@ -509,25 +525,35 @@ public enum SongTapSession {
 
     private static func saveResult(_ s: SongTapSessionState, outcome: SongTapSaveOutcome, nowMs: Int64) -> SongTapReduction {
         if s.role != .receive || s.phase != .transferring || s.videoId.isEmpty { return stay(s) }
+        let linked = s.peer != 0
+        let ack: [SongTapSessionEffect] = linked ? [.sendAck(peer: s.peer)] : []
+        let decline: [SongTapSessionEffect] = linked ? [.sendDecline(peer: s.peer)] : []
         switch outcome {
         case .saved:
+            // Every `askAgainAfter`-th beam saved without asking makes the next one ask: consent is not for ever.
+            let auto = s.autoSaves + 1
+            let ask = auto >= askAgainAfter
             var n = s
             n.phase = .saved
-            n.askFirst = false
+            n.askFirst = ask
             n.alreadyHad = false
+            n.autoSaves = ask ? 0 : auto
             n.limits = s.limits.accepted(nowMs: nowMs, videoId: s.videoId)
-            return SongTapReduction(state: n, effects: [.haptic(.success)])
+            return SongTapReduction(state: n, effects: ack + [.haptic(.success)])
         case .alreadyHad:
             var n = s
             n.phase = .saved
-            n.askFirst = false
             n.alreadyHad = true
             n.limits = s.limits.accepted(nowMs: nowMs, videoId: s.videoId)
-            return SongTapReduction(state: n, effects: [.haptic(.tick)])
+            return SongTapReduction(state: n, effects: ack + [.haptic(.tick)])
         case .notFound:
-            return SongTapReduction(state: failed(s, .notFound), effects: [.notice(.notFound), .haptic(.warn)])
+            var n = failed(s, .notFound)
+            n.limits = s.limits.attempted(nowMs: nowMs)
+            return SongTapReduction(state: n, effects: decline + [.notice(.notFound), .haptic(.warn)])
         case .failed:
-            return SongTapReduction(state: failed(s, .saveFailed), effects: [.notice(.saveFailed), .haptic(.warn)])
+            var n = failed(s, .saveFailed)
+            n.limits = s.limits.attempted(nowMs: nowMs)
+            return SongTapReduction(state: n, effects: decline + [.notice(.saveFailed), .haptic(.warn)])
         }
     }
 

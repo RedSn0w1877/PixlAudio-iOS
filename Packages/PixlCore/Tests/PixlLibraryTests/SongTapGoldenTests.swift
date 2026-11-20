@@ -357,6 +357,8 @@ struct SongTapGoldenTests {
                     verdicts.append(limits.admit(nowMs: Int64(p[1]) ?? 0, videoId: p[2], senderKey: Int32(p[3]) ?? 0).code)
                 case "accepted":
                     limits = limits.accepted(nowMs: Int64(p[1]) ?? 0, videoId: p[2]); verdicts.append("-")
+                case "attempted":
+                    limits = limits.attempted(nowMs: Int64(p[1]) ?? 0); verdicts.append("-")
                 default:
                     limits = limits.undone(nowMs: Int64(p[1]) ?? 0, senderKey: Int32(p[2]) ?? 0); verdicts.append("-")
                 }

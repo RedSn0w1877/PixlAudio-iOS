@@ -30,6 +30,15 @@ public enum SongTapTuning {
     /// Without a jerk, the jump must hold this long (a gentle tap).
     public static let dwellMs: Int64 = 400
 
+    /// ...and the smoothed signal must also be at least this strong. A slow approach, or a phone that raises its transmit
+    /// power, can make a 15 dB jump at arm's length; only a phone that is right there reads this strong. A jump that is
+    /// not this strong still fires with a jerk (the loose near floor above). Calibrate on the real phones.
+    public static let dwellMinDbm = -58
+
+    /// A jump that has held this long without firing is the new normal level, not a tap: the baseline catches up to it
+    /// (otherwise a phone parked at a new distance would keep the baseline frozen for good).
+    public static let freezeMaxMs: Int64 = 2_000
+
     /// A jerk counts when it was within this long of the moment the jump has been held.
     public static let impulseWindowMs: Int64 = 400
 
@@ -119,7 +128,7 @@ public enum SongTapDetector {
         }
         let fastQ = s.fastQ + ((sampleQ - s.fastQ) >> SongTapTuning.fastShift)
         let deltaQ = fastQ - s.baselineQ
-        let baselineQ: Int
+        var baselineQ: Int
         if deltaQ < SongTapTuning.freezeDb * songTapRssiScale {
             baselineQ = s.baselineQ + ((sampleQ - s.baselineQ) >> SongTapTuning.baselineShift)
         } else {
@@ -142,13 +151,19 @@ public enum SongTapDetector {
             let jerkNear = impulseMs >= 0 && absDiff(sample.tMs, impulseMs) <= SongTapTuning.impulseWindowMs
             if heldFor >= SongTapTuning.holdMs && jerkNear {
                 fire = .impulse
-            } else if heldFor >= SongTapTuning.dwellMs {
+            } else if heldFor >= SongTapTuning.dwellMs && fastDbm >= SongTapTuning.dwellMinDbm {
                 fire = .dwell
             }
         }
         if fire != .none {
             lastFire = sample.tMs
             held = -1
+            // The phones stay together after a tap: the signal stays high, so the baseline must catch up or the same
+            // contact would fire again as soon as the cooldown ends.
+            baselineQ = fastQ
+        } else if held >= 0 && sample.tMs - held >= SongTapTuning.freezeMaxMs {
+            held = -1
+            baselineQ = fastQ
         }
         let next = SongTapDetectorState(started: true, lastMs: sample.tMs, baselineQ: baselineQ, fastQ: fastQ, near: near, heldSinceMs: held,
                                  lastFireMs: lastFire)

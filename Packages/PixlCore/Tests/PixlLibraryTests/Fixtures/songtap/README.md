@@ -27,7 +27,7 @@ exactly `out`. Signatures are never part of a golden, only the bytes that are si
 - detector.jsonl: `detector`: samples `"t,rssi,impulseMs"` from `DetectorState.INITIAL`; each step is
   `"fire,glow,baselineQ,fastQ,near"`. Also `glow` and `floorDiv`.
 - impulse.jsonl: `impulse`: samples `"t,x,y,z"` from `ImpulseState.INITIAL`; out `hits` 0/1.
-- ratelimit.jsonl: `limits`: ops `admit,now,videoId,key`, `accepted,now,videoId`, `undone,now,key`
+- ratelimit.jsonl: `limits`: ops `admit,now,videoId,key`, `accepted,now,videoId`, `attempted,now`, `undone,now,key`
   from an empty `RateLimits`; out `verdicts` (`-` for the two that return no verdict).
 - timeline.jsonl: `ease`, `frame` (role, t, reduced), `total`.
 - wire.jsonl: the Bluetooth wire format (`SongTapWire`): `constants` (the UUIDs), `infoEncode`, `infoDecode`,

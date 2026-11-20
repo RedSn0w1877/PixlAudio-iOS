@@ -322,11 +322,73 @@ struct SongTapCoreTests {
         #expect(steps[3].state == steps[2].state)
     }
 
-    @Test func cancelWhileSavingTakesTheSaveBack() {
+    @Test func cancelWhileSavingOnlyStopsTheTransferAndNeverUndoesASong() {
         let steps = Self.run(false, [.arm(role: .receive, askFirst: false), .peerFound(1), .peerNear(1), .tapDetected(peer: 1, videoId: ""),
                                      .offerReceived(peer: 1, videoId: Self.v1, senderKey: 7, nowMs: 1000), .cancel, .saveResult(.saved, nowMs: 1100)])
-        #expect(steps[5].effects == [.abortTransfer(peer: 1), .undoSave(videoId: Self.v1)])
+        #expect(steps[5].effects == [.abortTransfer(peer: 1)])
         #expect(steps[6].state.phase == .cancelled, "a result after a cancel changes nothing")
+        #expect(steps[6].effects.isEmpty)
+    }
+
+    @Test func aTeardownNeverEmitsAnUndoOfASongTheListenerMayHave() {
+        let disarm = Self.run(false, [.arm(role: .receive, askFirst: false), .peerFound(1), .peerNear(1), .tapDetected(peer: 1, videoId: ""),
+                                      .offerReceived(peer: 1, videoId: Self.v1, senderKey: 7, nowMs: 1000), .disarm])
+        #expect(disarm.last?.effects == [.abortTransfer(peer: 1), .stopTransport])
+        let timeout = Self.run(false, [.arm(role: .receive, askFirst: false), .offerReceived(peer: 0, videoId: Self.v1, senderKey: 0, nowMs: 1000),
+                                       .timeout(.save)])
+        #expect(!timeout.last!.effects.contains(.undoSave(videoId: Self.v1)))
+    }
+
+    @Test func aReceiverThatHoldsACheckedOfferKeepsSavingWhenThePhonesComeApart() {
+        let steps = Self.run(false, [.arm(role: .receive, askFirst: false), .peerFound(1), .peerNear(1), .tapDetected(peer: 1, videoId: ""),
+                                     .offerReceived(peer: 1, videoId: Self.v1, senderKey: 7, nowMs: 1000), .peerLost(1),
+                                     .saveResult(.saved, nowMs: 1500)])
+        #expect(steps[5].state.phase == .transferring && steps[5].state.peer == 0)
+        #expect(steps[5].effects.isEmpty)
+        #expect(steps[6].state.phase == .saved)
+        #expect(steps[6].effects == [.haptic(.success)], "no one to answer, so nobody is acknowledged")
+    }
+
+    @Test func theFirstBeamsAddStillWorksAfterThePhonesComeApart() {
+        let steps = Self.run(true, [.arm(role: .receive, askFirst: true), .peerFound(1), .peerNear(1), .tapDetected(peer: 1, videoId: ""),
+                                    .offerReceived(peer: 1, videoId: Self.v1, senderKey: 7, nowMs: 1000), .peerLost(1),
+                                    .accept(nowMs: 9_000), .saveResult(.saved, nowMs: 9_200)])
+        #expect(steps[5].state.phase == .offered && steps[5].state.videoId == Self.v1)
+        #expect(steps[5].effects.isEmpty)
+        #expect(steps[6].effects == [.saveSong(videoId: Self.v1), .scheduleTimeout(.save, afterMs: SongTapSession.saveTimeoutMs),
+                                     .startBeam(role: .receive, startMs: 9_000)])
+        #expect(steps[7].state.phase == .saved)
+    }
+
+    @Test func aBeamStillBeingReadIsLostWhenThePhonesComeApart() {
+        let steps = Self.run(false, [.arm(role: .receive, askFirst: false), .peerFound(1), .peerNear(1), .tapDetected(peer: 1, videoId: ""),
+                                     .peerLost(1)])
+        #expect(steps[4].state.fail == .peerLost)
+        #expect(steps[4].effects == [.abortTransfer(peer: 1), .haptic(.warn)])
+    }
+
+    @Test func theSenderIsToldOnlyOnceTheSaveIsDone() {
+        let steps = Self.run(false, [.arm(role: .receive, askFirst: false), .peerFound(1), .peerNear(1), .tapDetected(peer: 1, videoId: ""),
+                                     .offerReceived(peer: 1, videoId: Self.v1, senderKey: 7, nowMs: 10_000),
+                                     .saveResult(.notFound, nowMs: 10_100), .dismiss, .tapDetected(peer: 1, videoId: ""),
+                                     .offerReceived(peer: 1, videoId: Self.v2, senderKey: 7, nowMs: 11_000)])
+        #expect(steps[4].effects == [.saveSong(videoId: Self.v1), .scheduleTimeout(.save, afterMs: 20_000)])
+        #expect(steps[5].effects == [.sendDecline(peer: 1), .notice(.notFound), .haptic(.warn)])
+        #expect(steps[8].state.fail == .tooSoon, "a failed offer counts towards the gap")
+    }
+
+    @Test func everyFifthBeamSavedWithoutAskingMakesTheNextOneAsk() {
+        var events: [SongTapSessionEvent] = [.arm(role: .receive, askFirst: false)]
+        var at: Int64 = 10_000
+        for v in [Self.v1, Self.v2, "bbbbbbbbbbb", "ccccccccccc", "ddddddddddd"] {
+            events += [.offerReceived(peer: 0, videoId: v, senderKey: 0, nowMs: at), .saveResult(.saved, nowMs: at + 100), .dismiss]
+            at += 10_000
+        }
+        let steps = Self.run(false, events)
+        #expect(steps[3 * 4].state.askFirst == false)
+        #expect(steps.last?.state.askFirst == true)
+        let next = SongTapSession.reduce(steps.last!.state, .offerReceived(peer: 0, videoId: "zzzzzzzzzzz", senderKey: 0, nowMs: at))
+        #expect(next.state.phase == .offered)
     }
 
     @Test func rateLimitsAreHonouredThroughTheSession() {
@@ -444,6 +506,32 @@ struct SongTapCoreTests {
         #expect(fires.count == 1)
         #expect(fires.first?.fire == .dwell)
         #expect(fires.first.map { $0.t >= 2_000 + SongTapTuning.dwellMs } == true)
+    }
+
+    @Test func phonesThatStayTogetherFireOnceAndNotAgainEveryCooldown() {
+        #expect(Self.series([(20, -62), (80, -42)], impulseAt: 2_050).filter { $0.fire != .none }.count == 1)
+        #expect(Self.series([(20, -62), (80, -42)]).filter { $0.fire != .none }.count == 1)
+    }
+
+    @Test func aSlowApproachThatStopsShortOfContactDoesNotFire() {
+        let ramp = (0..<30).map { (count: 1, rssi: -90 + $0) }
+        #expect(Self.series(ramp + [(40, -61)]).filter { $0.fire != .none }.isEmpty)
+    }
+
+    @Test func aJumpThatHoldsForGoodIsTakenAsTheNewLevelAfterAWhile() {
+        var state = SongTapDetectorState.initial
+        for i in 0..<20 { state = SongTapDetector.step(state, SongTapRssiSample(tMs: Int64(i) * 100, rssi: -90), impulseMs: -1).state }
+        for i in 20..<60 { state = SongTapDetector.step(state, SongTapRssiSample(tMs: Int64(i) * 100, rssi: -70), impulseMs: -1).state }
+        #expect(state.heldSinceMs < 0)
+        #expect(state.baselineQ > -75 * songTapRssiScale)
+    }
+
+    @Test func anOfferThatEndedInNoSongStillCountsTowardsTheGapAndTheMinute() {
+        var l = SongTapRateLimits()
+        for i in 0..<10 { l = l.attempted(nowMs: Int64(i) * 5_000) }
+        #expect(SongTapRateLimits().attempted(nowMs: 0).admit(nowMs: 2_999, videoId: "x", senderKey: 1) == .tooSoon)
+        #expect(l.admit(nowMs: 55_000, videoId: "x", senderKey: 1) == .minuteLimit)
+        #expect(SongTapRateLimits().attempted(nowMs: 0).admit(nowMs: 3_000, videoId: "a", senderKey: 1) == .allowed)
     }
 
     @Test func aShortSpikeDoesNotFire() {

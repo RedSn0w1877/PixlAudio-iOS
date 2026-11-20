@@ -72,6 +72,19 @@ public struct SongTapRateLimits: Sendable, Equatable {
         return next
     }
 
+    /// An offer was let in but did not end in a saved song (nothing found, the save failed). It still cost a network
+    /// search, so it counts towards the gap, the minute and the hour like an accepted beam; the song itself is not
+    /// remembered, so the same song can be tried again once the gap has passed.
+    public func attempted(nowMs: Int64) -> SongTapRateLimits {
+        var next = self
+        var times = acceptedAt.filter { nowMs - $0 < Self.hourMs }
+        times.append(nowMs)
+        if times.count > Self.perHour { times.removeFirst(times.count - Self.perHour) }
+        next.acceptedAt = times
+        next.mutedUntil = mutedUntil.filter { $0.until > nowMs }
+        return next
+    }
+
     /// The listener undid a beam from `senderKey`; the second undo mutes that sender for an hour. Key 0 means the
     /// sender is not known (a QR code carries no key), and not knowing who it was, nobody is muted for it: the rate
     /// limits above still apply.

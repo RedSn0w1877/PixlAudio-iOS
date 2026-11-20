@@ -2,5 +2,5 @@
 // describe; bump it with Android's `GoldenGenerator.SPEC_VERSION` when the pure logic changes on purpose.
 
 public enum SongTapSpec {
-    public static let version = 2
+    public static let version = 3
 }
