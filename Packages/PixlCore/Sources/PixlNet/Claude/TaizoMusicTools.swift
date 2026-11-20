@@ -161,3 +161,30 @@ extension TaizoTool.Schema {
                            ("description", .string(description))])
     }
 }
+
+/// What the listener reads about the music tools: the line under the chat while one runs, and what stands where a name could not be
+/// checked. The wording is Android's (`taizo_activity_*`, `taizo_unverified_name`); none of it names the vendor or the model.
+public enum TaizoMusicStrings {
+    public static let unverifiedName = "(a name I could not check)"
+
+    /// "Finding those songs…" for `resolve_tracks`, and so on; nil for a tool that is not a music tool.
+    public static func activity(for tool: TaizoTool) -> String? {
+        switch tool {
+        case .resolveTracks: "Finding those songs…"
+        case .recommend: "Picking songs for you…"
+        case .buildMix: "Building your mix…"
+        case .startStation: "Starting your station…"
+        case .steerSession: "Changing your queue…"
+        case .explainTrack, .explainTaste: "Looking at why…"
+        case .lookupGenre: "Checking the genre atlas…"
+        case .similarArtists: "Looking for similar artists…"
+        case .newReleases: "Checking new releases…"
+        default: nil
+        }
+    }
+
+    /// Takes the `[[ ]]` marks the model puts around names off a text (a text that is still streaming included).
+    public static func withoutMarks(_ text: String) -> String {
+        text.replacingOccurrences(of: "[[", with: "").replacingOccurrences(of: "]]", with: "")
+    }
+}

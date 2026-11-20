@@ -66,6 +66,16 @@ struct TaizoGroundingTests {
         #expect(!g.check("[[Julien Baker]]", placeholder: placeholder).ok)
     }
 
+    @Test func whatAWebPageReturnedIsHeldButTheModelsOwnTextNeverIs() throws {
+        let messages: [JSONValue] = [
+            try JSONParser().parse(#"{"role":"assistant","content":[{"type":"web_search_tool_result","tool_use_id":"s1","content":[{"type":"web_search_result","title":"Boygenius tour dates","page_content":"Lucy Dacus, Julien Baker and Phoebe Bridgers play 12 shows"}]},{"type":"text","text":"[[Taylor Swift]] is great."}]}"#),
+        ]
+        g.noteServerResults(messages)
+        #expect(g.check("[[Julien Baker]] and [[Phoebe Bridgers]] play 12 shows.", placeholder: placeholder).ok)
+        // The reply's own words are not held: a name only the model said stays unchecked and is replaced.
+        #expect(!g.check("[[Taylor Swift]]", placeholder: placeholder).ok)
+    }
+
     @Test func aNameThatIsTooLongToBeANameIsNotRegistered() {
         g.noteName(String(repeating: "x", count: 500))
         #expect(g.knownNames == 0)

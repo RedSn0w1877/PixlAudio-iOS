@@ -158,9 +158,17 @@ struct TaizoMusicToolsTests {
         for name in ["resolve_tracks", "recommend", "build_mix", "lookup_genre", "explain_track", "explain_taste"] { #expect(names.contains(name)) }
     }
 
+    @Test func everyMusicToolHasALineForTheListenerAndNoOtherToolDoes() {
+        for tool in TaizoTool.music { #expect(TaizoMusicStrings.activity(for: tool)?.isEmpty == false, "\(tool.rawValue)") }
+        for tool in TaizoTool.legacy { #expect(TaizoMusicStrings.activity(for: tool) == nil) }
+        #expect(TaizoMusicStrings.withoutMarks("[[Espresso]] by [[Sabrina Carpenter]]") == "Espresso by Sabrina Carpenter")
+        #expect(TaizoMusicStrings.withoutMarks("[[Esp") == "Esp")
+    }
+
     @Test func theAssistantsWordsNeverNameTheVendorOrTheModelOrTheForbiddenFeatureWords() {
         let forbidden = ["lossless", "hi-res", "dolby", "atmos", "360 reality", "claude", "anthropic", "binilyrics", "enhanced"]
-        var texts = [TaizoAssistant.musicRules]
+        var texts = [TaizoAssistant.musicRules, TaizoMusicStrings.unverifiedName]
+        texts += TaizoTool.music.compactMap(TaizoMusicStrings.activity(for:))
         for tool in TaizoTool.music {
             texts.append(tool.definition.description)
             texts.append(JSONWriter.write(tool.definition.inputSchema))

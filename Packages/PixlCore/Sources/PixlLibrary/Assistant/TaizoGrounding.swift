@@ -124,6 +124,17 @@ public final class TaizoGrounding: @unchecked Sendable {
         }
     }
 
+    /// What a web search or fetch returned in this turn (the loop's `web_search_tool_result` and `web_fetch_tool_result` blocks): names and
+    /// numbers the model READ there are not names it invented (deviation 219). Only those blocks count; the model's own text never does.
+    public func noteServerResults(_ messages: [JSONValue]) {
+        for message in messages {
+            for block in message["content"]?.arrayValue ?? [] {
+                guard let type = block["type"]?.stringValue, type.hasSuffix("_tool_result"), type != "tool_result" else { continue }
+                noteContext(JSONWriter.write(block))
+            }
+        }
+    }
+
     private static func withoutMarks(_ text: String) -> String {
         text.replacingOccurrences(of: "[[", with: "").replacingOccurrences(of: "]]", with: "")
     }

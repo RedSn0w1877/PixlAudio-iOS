@@ -18,6 +18,8 @@ nonisolated struct TaizoToolbox: ClaudeToolExecuting {
     let seen = TaizoCatalogCache()
     /// The user's own message for the turn that is running: the only thing that may justify a taste change.
     let turn = TaizoTurnState()
+    /// The ten music tools and what this conversation's tools returned (`TaizoMusic`).
+    let music = TaizoMusic()
 
     var definitions: [ClaudeToolDefinition] { TaizoTool.definitions }
 
@@ -33,7 +35,18 @@ nonisolated struct TaizoToolbox: ClaudeToolExecuting {
 
     func run(_ call: ClaudeToolUse) async -> ClaudeToolOutput {
         guard let tool = TaizoTool(rawValue: call.name) else { return .error("Unknown tool \(call.name).") }
-        return await TaizoToolRunner.run(tool, input: call.input, environment: environment, catalog: catalog, seen: seen, turn: turn)
+        if tool.isMusicTool {
+            // The runner notes every name and number it returns in the conversation's grounding record itself.
+            guard let prepared = await music.prepare(environment) else {
+                return .error("PixlAudio's music engine isn't ready yet. Try again in a moment.")
+            }
+            seen.setPlayable(prepared.playable)
+            return ClaudeToolOutput(content: await prepared.runner.run(call.name, call.input))
+        }
+        let output = await TaizoToolRunner.run(tool, input: call.input, environment: environment, catalog: catalog, seen: seen, turn: turn)
+        // What any older tool returned may be said too (docs/brain-spec.md, 9.4).
+        music.grounding.noteToolResult(output.content)
+        return output
     }
 }
 
@@ -50,6 +63,13 @@ nonisolated final class TaizoCatalogCache: Sendable {
     }
 
     func track(_ id: String) -> CatalogTrack? { tracks.withLock { $0[id] } }
+
+    /// The engine's refs (`yt:`, `sp:`) and mixes (`mix:`) a music tool returned, once one ran in this conversation.
+    private let playableBox = Mutex<(any AssistantPlayable)?>(nil)
+
+    func setPlayable(_ value: any AssistantPlayable) { playableBox.withLock { $0 = value } }
+
+    var playable: (any AssistantPlayable)? { playableBox.withLock { $0 } }
 }
 
 /// What the running turn is about: the user's own message. Set by the chat before the loop starts, read by the
@@ -91,6 +111,10 @@ enum TaizoToolRunner {
         case .adjustTaste: return await adjustTaste(env, input, turn: turn)
         case .listTasteAdjustments: return listTasteAdjustments(env)
         case .removeTasteAdjustment: return removeTasteAdjustment(env, input, turn: turn)
+        case .resolveTracks, .recommend, .buildMix, .startStation, .steerSession, .explainTrack, .explainTaste, .lookupGenre,
+             .similarArtists, .newReleases:
+            // The music tools run on `MusicToolRunner` (see `TaizoToolbox.run`); they never come here.
+            return .error("Unknown tool \(tool.rawValue).")
         }
     }
 
@@ -199,6 +223,16 @@ enum TaizoToolRunner {
             return bySpotify?[spotifyId]
         }
         for id in ids.prefix(maxSongsPerCall) {
+            if id.hasPrefix("mix:"), let playable = seen.playable {
+                // A mix built in this chat (build_mix): its songs, in order.
+                if let mix = await playable.songsForMix(String(id.dropFirst(4))), !mix.isEmpty { songs += mix } else { missing.append(id) }
+                continue
+            }
+            if AssistantRules.parseRef(id) != nil {
+                // An engine ref (resolve_tracks, recommend, build_mix, ...): played through `playable`, never imported into the library.
+                if let song = await seen.playable?.songForRef(id) { songs.append(song) } else { missing.append(id) }
+                continue
+            }
             if let song = env.library.song(id: id) {
                 songs.append(song)
             } else if id.hasPrefix("spotify:track:") {
@@ -285,7 +319,9 @@ enum TaizoToolRunner {
         let (songs, blocked) = withoutBlocked(env, resolved)
         guard !songs.isEmpty else { return .error(allBlockedMessage) }
         let start = min(clamp(input["start_index"], default: 0, range: 0...Int.max), songs.count - 1)
-        env.playback.play(songs, startIndex: start, source: .assistant)
+        // The picks carry the surface, the arm and the vector they were served with into the event log.
+        let tags = await seen.playable?.tags(for: songs) ?? [:]
+        env.playback.play(songs, startIndex: start, source: .assistant, tags: tags)
         var members: [(String, JSONValue)] = [
             ("now_playing", .string("\(songs[start].title) — \(songs[start].displayArtist)")),
             ("queue_length", .integer(songs.count)), ("not_found", .array(missing.map(JSONValue.string))),
@@ -302,7 +338,8 @@ enum TaizoToolRunner {
         guard !songs.isEmpty else { return .error(allBlockedMessage) }
         let next = input["play_next"]?.boolValue ?? false
         if !env.playback.hasItem {
-            env.playback.play(songs, startIndex: 0, source: .assistant)
+            let tags = await seen.playable?.tags(for: songs) ?? [:]
+            env.playback.play(songs, startIndex: 0, source: .assistant, tags: tags)
         } else if next {
             env.playback.playNext(songs)
         } else {

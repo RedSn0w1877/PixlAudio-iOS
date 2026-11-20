@@ -221,6 +221,14 @@ final class TaisChatModel {
         // The user's own words for this turn: the only thing that may justify a taste change (`TasteChangeGuard`).
         tools.turn.begin(userMessage: pending.prompt)
         defer { tools.turn.end() }
+        // The grounding rule (docs/brain-spec.md, 1 principle 9, 9.4): what the model is shown, what earlier turns of this chat returned and
+        // what the listener says are things the reply may say back; a name or a number about the listener nothing returned is not.
+        let grounding = tools.music.grounding
+        if !grounding.isSeeded { grounding.noteHistory(record.messages) }
+        grounding.noteContext(record.context)
+        grounding.noteContext(now.context.render())
+        grounding.noteUser(pending.prompt)
+        await tools.music.beginTurn()
         let progress = ClaudeTurnProgress()
         let loop = ClaudeToolLoop(
             client: client, system: record.system, tools: tools, serverTools: TaizoAssistant.serverTools,
@@ -240,7 +248,9 @@ final class TaisChatModel {
                 record.transcript.append(TaizoTranscriptEntry(role: .user, text: pending.prompt))
                 record.transcript.append(TaizoTranscriptEntry(role: .assistant, text: text))
             case .finished, .truncated, .stepLimit:
-                var text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                // What a web search or fetch returned in this turn is something the model read, not something it invented.
+                grounding.noteServerResults(result.appended)
+                var text = Self.groundedReply(result.text.trimmingCharacters(in: .whitespacesAndNewlines), grounding)
                 if text.isEmpty {
                     text = result.outcome == .finished ? "Done." : "That got too long for one answer — try asking for less at once."
                 }
@@ -256,7 +266,8 @@ final class TaisChatModel {
             return true
         } catch is CancellationError {
             flushPendingText()
-            setAssistant(replyId, text: progress.text.isEmpty ? "Stopped." : progress.text, sources: [], streaming: false)
+            setAssistant(replyId, text: progress.text.isEmpty ? "Stopped." : Self.groundedReply(progress.text, tools.music.grounding), sources: [],
+                         streaming: false)
             return true
         } catch {
             flushPendingText()
@@ -264,7 +275,8 @@ final class TaisChatModel {
             await assistant.onFallback("assistant: \(error)")
             if progress.ranTool || !progress.text.isEmpty {
                 // Something already happened (text shown, a tool ran): keep it rather than answer twice.
-                setAssistant(replyId, text: progress.text.isEmpty ? "Done so far." : progress.text, sources: [], streaming: false)
+                setAssistant(replyId, text: progress.text.isEmpty ? "Done so far." : Self.groundedReply(progress.text, tools.music.grounding),
+                             sources: [], streaming: false)
                 insert(.note(id: makeId(), text: "The connection dropped, so that answer may be incomplete."), after: replyId)
                 return true
             }
@@ -285,7 +297,7 @@ final class TaisChatModel {
         case .turnDiscarded:
             pendingText[replyId] = nil
             progress.text = progress.turnStart
-            setAssistant(replyId, text: progress.text, sources: [], streaming: true)
+            setAssistant(replyId, text: TaizoMusicStrings.withoutMarks(progress.text), sources: [], streaming: true)
         case .stream(.text(let piece)):
             progress.text += piece
             pendingText[replyId, default: ""] += piece
@@ -322,8 +334,23 @@ final class TaisChatModel {
         case .adjustTaste?: return "Updating your taste…"
         case .listTasteAdjustments?: return "Checking your taste changes…"
         case .removeTasteAdjustment?: return "Undoing a taste change…"
+        case .resolveTracks?, .recommend?, .buildMix?, .startStation?, .steerSession?, .explainTrack?, .explainTaste?, .lookupGenre?,
+             .similarArtists?, .newReleases?:
+            return TaizoMusicStrings.activity(for: TaizoTool(rawValue: tool) ?? .recommend) ?? "Working on it…"
         case nil: return "Working on it…"
         }
+    }
+
+    // MARK: The grounding rule
+
+    /// The reply as the listener reads it (docs/brain-spec.md, 1 principle 9, 9.4): a track, album or artist that no tool returned in this
+    /// chat (and the listener did not say) is replaced, a sentence with a number about the listener that no tool returned is left out, and
+    /// the marks the model put around names are taken off. The saved history keeps what the model wrote; only what is shown is cleaned.
+    nonisolated static func groundedReply(_ raw: String, _ grounding: TaizoGrounding) -> String {
+        if raw.isEmpty { return raw }
+        let verdict = grounding.check(raw, placeholder: TaizoMusicStrings.unverifiedName)
+        let cleaned = verdict.cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty ? TaizoMusicStrings.withoutMarks(raw) : cleaned
     }
 
     // MARK: Streaming display
@@ -343,7 +370,8 @@ final class TaisChatModel {
             guard let index = messages.firstIndex(where: { $0.id == id }),
                   case .assistant(_, let text, let sources, _, let streaming) = messages[index] else { continue }
             // Text arriving clears the activity line: the answer is being written.
-            messages[index] = .assistant(id: id, text: text + piece, sources: sources, activity: nil, isStreaming: streaming)
+            // The `[[ ]]` marks the model puts around names are not shown while it streams.
+            messages[index] = .assistant(id: id, text: TaizoMusicStrings.withoutMarks(text + piece), sources: sources, activity: nil, isStreaming: streaming)
         }
         pendingText.removeAll()
     }

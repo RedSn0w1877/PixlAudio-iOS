@@ -25,9 +25,14 @@ public protocol AssistantHost: Sendable {
     func searchSong(title: String, artist: String) async -> AssistantSearch
     /// Starts a station and plays it. `song` is the resolved seed for `song` stations.
     func startStation(seedRef: String, seedKind: String, mode: String, song: Song?) async -> AssistantStationOutcome
-    func steer(change: String, target: String, scope: String) async -> AssistantSteerOutcome
+    /// A lasting change (`scope` always): `target` is an artist name or a genre id; `song` is the track a ref named, when it did.
+    func steer(change: String, target: String, scope: String, song: Song?) async -> AssistantSteerOutcome
     /// The song that is playing, if any.
     func nowPlaying() async -> Song?
+    /// Makes tracks from outside the library known to the app, so their queue items can play (docs/brain-spec.md, 7.2).
+    func register(_ tracks: [EngineTrack]) async
+    /// Puts `songs` next in the queue, in order, after the song playing; returns how many were queued.
+    func queueNext(_ songs: [Song], tags: [String: BrainItemTag]) async -> Int
 }
 
 public actor BrainAssistantEngine: MusicBackend, AssistantPlayable {
@@ -35,6 +40,7 @@ public actor BrainAssistantEngine: MusicBackend, AssistantPlayable {
     static let maxMixes = 12
     static let nearestGenres = 5
     static let recTag: Int64 = 0x4B
+    static let steerCount = 5
 
     private struct Issued {
         var ref: String
@@ -79,6 +85,12 @@ public actor BrainAssistantEngine: MusicBackend, AssistantPlayable {
     }
 
     // MARK: What this process issued
+
+    private func register(_ tracks: [EngineTrack]) async {
+        if tracks.isEmpty { return }
+        await repository.registerPlayable(tracks, nowMs: clock())
+        await host.register(tracks)
+    }
 
     private func remember(_ entry: Issued) {
         if issued.count > Self.maxIssued {
@@ -191,7 +203,7 @@ public actor BrainAssistantEngine: MusicBackend, AssistantPlayable {
             let rid = await repository.resolveTrack(keys, durationMs: Int32(clamping: max(row.durationSec, 0) * 1000))
             let track = EngineTrack(row: row, rid: rid)
             // In `playable` BEFORE a media item can reach the player (7.2).
-            await repository.registerPlayable([track], nowMs: clock())
+            await register([track])
             let song = mixes.sources.song(track)
             guard let found = await infoOfSong(song, track: track, rid: rid, tag: nil, servedX: nil, year: row.year) else {
                 return AssistantLookup(track: nil)
@@ -302,7 +314,7 @@ public actor BrainAssistantEngine: MusicBackend, AssistantPlayable {
         if picks.isEmpty { return nil }
         // Tracks from outside the library go into `playable` now, so Play and Save work from the card.
         let engineTracks = plan.picks.compactMap(\.track)
-        if !engineTracks.isEmpty { await repository.registerPlayable(engineTracks, nowMs: now) }
+        await register(engineTracks)
         builtMixes[mixId] = BuiltRecord(query: query, songs: plan.picks.map(\.song))
         builtOrder.removeAll { $0 == mixId }
         builtOrder.append(mixId)
@@ -350,8 +362,64 @@ public actor BrainAssistantEngine: MusicBackend, AssistantPlayable {
         return await host.startStation(seedRef: seedRef, seedKind: seedKind, mode: mode, song: song)
     }
 
+    /// `session`: five songs built for the change go next in the queue and the rest of the queue follows unchanged (deviation 216: a real
+    /// rewrite of the tail needs a player API that does not exist). `always`: a lasting change of what the app recommends, which is the
+    /// app's own taste store (`AssistantHost.steer`).
     public func steer(change: String, target: String, scope: String) async -> AssistantSteerOutcome {
-        await host.steer(change: change, target: target, scope: scope)
+        if scope != "session" {
+            var song: Song?
+            var name = target
+            if AssistantRules.parseRef(target) != nil {
+                song = await songForRef(target)
+                if let s = song { name = BrainLibraryIndex.primaryArtistName(s) }
+            }
+            return await host.steer(change: change, target: name, scope: scope, song: song)
+        }
+        var query = AssistantRules.Query(
+            title: "", seedRefs: [], genreIds: [], moodIds: [], yearFrom: 0, yearTo: 0, energy: AssistantRules.anyWord,
+            tempo: AssistantRules.anyWord, novelty: AssistantRules.anyWord, noveltySharePct: AssistantRules.shareUnset, count: Self.steerCount,
+            excludeArtistRefs: [])
+        if let current = await host.nowPlaying(), let ref = await refFor(current, EngineTrack(queueSong: current)) {
+            if issued[ref] == nil {
+                remember(Issued(ref: ref, song: current, rid: 0, track: nil, primaryArtist: BrainLibraryIndex.primaryArtistName(current),
+                                tag: nil, servedX: nil))
+            }
+            query.seedRefs = [ref]
+        }
+        switch change {
+        case "energy_down": query.energy = AssistantRules.lower
+        case "energy_up": query.energy = AssistantRules.higher
+        case "more_familiar": query.novelty = AssistantRules.familiar
+        case "more_new": query.novelty = AssistantRules.new
+        case "more_genre":
+            guard let id = Int(BrainText.trim(target)), id > 0 else { return AssistantSteerOutcome(applied: false, note: "The genre is not known: use an id from lookup_genre.") }
+            query.genreIds = [id]
+        case "less_genre":
+            guard let id = Int(BrainText.trim(target)), id > 0 else { return AssistantSteerOutcome(applied: false, note: "The genre is not known: use an id from lookup_genre.") }
+            query.excludeGenreIds = [id]
+        case "more_artist":
+            guard let ref = AssistantRules.parseRef(target)?.text, issued[ref] != nil else {
+                return AssistantSteerOutcome(applied: false, note: "Give the artist as the ref of one of their tracks that a tool returned.")
+            }
+            query.seedRefs = [ref]
+        case "less_artist":
+            guard let ref = AssistantRules.parseRef(target)?.text, issued[ref] != nil else {
+                return AssistantSteerOutcome(applied: false, note: "Give the artist as the ref of one of their tracks that a tool returned.")
+            }
+            query.excludeArtistRefs = [ref]
+        default:
+            return AssistantSteerOutcome(applied: false, note: "That change is not one PixlAudio knows.")
+        }
+        guard let plan = await planFor(query, bump: 2), !plan.picks.isEmpty else {
+            return AssistantSteerOutcome(applied: false, note: "PixlAudio could not find songs for that change.")
+        }
+        let picks = await picksOf(plan, surfaceId: "assistant", now: clock())
+        let songs = plan.picks.prefix(picks.count).map(\.song)
+        let engineTracks = plan.picks.compactMap(\.track)
+        await register(engineTracks)
+        let queued = await host.queueNext(Array(songs), tags: await tags(for: Array(songs)))
+        return AssistantSteerOutcome(applied: queued > 0, tailChanged: queued,
+                                     note: queued > 0 ? "Put \(queued) songs next in the queue; the rest of the queue follows unchanged." : "The queue could not take them.")
     }
 
     // MARK: explain_track
