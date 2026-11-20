@@ -131,6 +131,9 @@ public enum StationPlanner {
         public let novel: Bool
         /// The slot was an exploration slot: the arm was drawn by the bandit (5.10), and the play is logged with `EventFlags.exploreSlot`.
         public var explore: Bool = false
+        /// The feature vector the pick was scored with, quantised (`ServedVector`), kept with the play so the learner trains on what the
+        /// ranker saw (stage 4). Nil when the plan was built without it; it never changes which picks are made.
+        public var servedX: [UInt8]?
     }
 
     public struct Plan: Sendable {
@@ -260,7 +263,8 @@ public enum StationPlanner {
                 servedPen: mix ? Repetition.servedPenalty(request.servedTimes[c.rid] ?? 0, max: request.servedMax) : 0.0,
                 noise: (mix && request.jitter > 0.0)
                     ? request.jitter * (BrainHash.unit(BrainHash.splitmix64(UInt64(bitPattern: c.rid ^ request.tieSeed))) - 0.5)
-                    : 0.0
+                    : 0.0,
+                idx: i
             ))
         }
 
@@ -320,6 +324,14 @@ public enum StationPlanner {
             let b = built[i]
             let s = b.scored
             if b.kind == ListBuilder.slotLiked { usedLiked = true }
+            // The vector this pick was scored with, read again from the same state (a plan changes neither the tables nor the session).
+            var servedX: [UInt8]?
+            if s.idx >= 0 && s.idx < n {
+                Features.compute(kept[s.idx], arm: arms[s.idx], retrieval: pct[s.idx], bestRank: s.bestRank, affinity: affinity,
+                                 session: session, graph: graph, nowMs: nowMs, p0: p0, allNovel: homeRow || firstListen,
+                                 out: &x, islands: request.islands)
+                servedX = ServedVector.quantize(x)
+            }
             let seedAid: Int64 = (s.bestSeed >= 0 && Int(s.bestSeed) < request.seeds.count)
                 ? request.seeds[Int(s.bestSeed)].seedAid : 0
             let why = WhyLine.pick(
@@ -347,7 +359,8 @@ public enum StationPlanner {
                 key: b.key,
                 pQ: Int32(truncatingIfNeeded: BrainMath.floorToLong(s.p * 10000.0 + 0.5)),
                 novel: s.novel,
-                explore: b.explore
+                explore: b.explore,
+                servedX: servedX
             ))
         }
         return Plan(picks: picks, usedLiked: usedLiked, usedFamiliarNext: familiarNext && !picks.isEmpty, poolSize: n)

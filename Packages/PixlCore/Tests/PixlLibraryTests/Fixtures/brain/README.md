@@ -136,3 +136,24 @@ How each `fn` is replayed:
   the impression rows reproduces the posteriors; `text` is `ShelfBanditCodec.encode`.
 - `posteriors.jsonl` `posteriors`: `LearnReplay.run` of the events (as in `replay.jsonl`), `PosteriorCodec.encode` of its `posteriors`;
   `posteriorsBad` texts must not be accepted.
+- `servedvec.jsonl`, `gate2.jsonl`, `assistant.jsonl` (stage 4, milestone 1; new files, nothing before them changed).
+- `servedvec.jsonl` `quantize`: `ServedVector.quantize(x)` is `hex` (51 little-endian signed 16-bit integers, each `floor(x * 4096 + 0.5)`
+  clipped to +-32767, as lower-case hex: 204 characters); `back` is `ServedVector.dequantize` of it (`q / 4096`). `hexBad`: `fromHex` of
+  the text must not be accepted (wrong length, upper case, a character that is not hex). `servedReplay`: `LearnReplay.run(events,
+  LibraryFacts.EMPTY, nowMs, no favourites, tz 0)` over events whose `servedX` is the hex in the line (an event without it uses the
+  reduced vector); `m`, `q`, `updates`, the number of graded plays and the hashes of the two prediction arrays; `learnedHashWithout`
+  is the learned prediction hash of the same events with `servedX` removed (it must differ from `learnedHash`).
+- `gate2.jsonl` `gate2`: `Gate.decide(State(useLearned, winStreak, atMs), Summary(plays, playsTotal, llLearned, llPrior, ...), nowMs,
+  intervalAboveZero)`; `clearlyBetter` is `Summary.learnedClearlyBetter` (better by at least 1%). A week that is better but not by 1%, or
+  from 2,000 graded plays without an interval above zero, is not a win.
+- `assistant.jsonl` (stage 4, milestone 1): the pure rules of Ask Taizo's tools, `AssistantRules` and `Grounding`.
+  `parseRef`: `AssistantRules.parseRef` (kind 0 `sp:` with 22 letters or digits, 1 `yt:` with 11 letters, digits, `_` or `-`; else null).
+  `normalize`: `AssistantRules.normalize(title, seeds, genres, moods, from, to, energy, tempo, novelty, share, count, exclude, min, max,
+  def)` is the `Query` in `out` (a null list is empty; `share` below 0 is -1, unset). `passes`: `AssistantRules.passes(Query, Facts(year,
+  have, novel, bpm, artist, energy, moodHave), FilterContext(tempoKnown, energyKnown, moodKnown, energyRef, excluded))`,
+  `noveltyShare(Query, base)` and `unsupportedFilters(Query, FilterContext)`. `chips`: start from the
+  `Query` in `in`, `applyChip(q, Chip(kind, ref, genreId))` for each step, then `chipsFor(q, "yt:aaaaaaaaaaa", 5)` is `offered`.
+  `topFactors`: `AssistantRules.topFactors(x, Ranker.weights(p0))`, each factor `[name, 1 up | 0 down]`.
+  `grounding`: a `Grounding.Registry` with `addName` for each of `names` and `addText` for each of `texts`, then `Grounding.check(reply,
+  registry, user, "(unverified)", drop)`. `numbers`: `Grounding.numbersIn(text)` and the tokens of `Grounding.listenerNumbers(text)`.
+  A marked name that is a whole-word run of the user's own words (two letters or more) is grounded too. No regular expressions anywhere: a Swift port scans UTF-16 units, as the Kotlin does.

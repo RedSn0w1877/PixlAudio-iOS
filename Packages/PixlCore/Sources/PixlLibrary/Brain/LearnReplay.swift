@@ -12,8 +12,9 @@
 // and `radioRank` the event carried since stage 1; the origin one-hot (48-50) is switched on for imported and migrated
 // rows in training only and is 0 in every prediction, as it is when serving.
 //
-// The LIVE path (the app's recorder) computes the same vector with `featuresOf` from the state before the play is applied,
-// so a live update and a replay of the same play agree up to the session's expiry rule.
+// The LIVE path (the app's recorder) computes the same vector with `vectorOf` from the state before the play is applied,
+// so a live update and a replay of the same play agree up to the session's expiry rule. Since stage 4 a play served by the
+// scorer carries the vector it was served with (`PlayEvent.servedX`), and `vectorOf` prefers it to the reduced rebuild above.
 
 /// Replaying the log into the learner.
 public enum LearnReplay {
@@ -42,6 +43,20 @@ public enum LearnReplay {
                          graph: Graph.empty, nowMs: nowMs, p0: p0, allNovel: false, out: &out)
     }
 
+    /// The feature vector the learner and the gate see for play `e`: the vector it was SERVED with when the row carries one
+    /// (`PlayEvent.servedX`, stage 4), else the reduced vector `featuresOf` rebuilds from the log. Live and replay call this one
+    /// function, so they agree. Fills `out` (length `Ranker.d`); returns true when the served vector was used.
+    @discardableResult
+    public static func vectorOf(_ e: PlayEvent, liked: Bool, affinity: Affinity.State, session: SessionState, nowMs: Int64,
+                                p0: Double, out: inout [Double]) -> Bool {
+        if let served = ServedVector.dequantize(e.servedX) {
+            for i in 0..<Ranker.d { out[i] = served[i] }
+            return true
+        }
+        featuresOf(e, liked: liked, affinity: affinity, session: session, nowMs: nowMs, p0: p0, out: &out)
+        return false
+    }
+
     /// True for a play that can be graded for the gate and the accuracy: it counted, was heard, and is a clear finish or a clear skip.
     public static func isGradedLabel(_ e: PlayEvent, _ g: Reward.Graded) -> Bool {
         g.c > 0.0 && !e.has(EventFlags.neverAudible) && (g.r >= 1.0 || g.r <= skippedMax)
@@ -57,7 +72,7 @@ public enum LearnReplay {
         let t = e.startedAtMs > nowMs ? nowMs : e.startedAtMs
         var x = [Double](repeating: 0.0, count: Ranker.d)
         let p0 = Affinity.p0(affinity, nowMs: t)
-        featuresOf(e, liked: liked, affinity: affinity, session: session, nowMs: t, p0: p0, out: &x)
+        vectorOf(e, liked: liked, affinity: affinity, session: session, nowMs: t, p0: p0, out: &x)
         let originIndex = originIndexOf(e.origin)
         if originIndex >= 0 { x[originIndex] = 1.0 }
         return Ranker.applyEvent(&model, x, r: g.r, c: g.c, bias: Ranker.biasOf(p0), day: dayOf(e, t),
@@ -147,7 +162,7 @@ public enum LearnReplay {
                 model = fresh
             }
             let p0 = Affinity.p0(affinity, nowMs: t)
-            featuresOf(e, liked: likedRids.contains(e.rid), affinity: affinity, session: session, nowMs: t, p0: p0, out: &x)
+            vectorOf(e, liked: likedRids.contains(e.rid), affinity: affinity, session: session, nowMs: t, p0: p0, out: &x)
             let bias = Ranker.biasOf(p0)
             Ranker.forget(&model!, today: day)
             if isGradedLabel(e, g) {

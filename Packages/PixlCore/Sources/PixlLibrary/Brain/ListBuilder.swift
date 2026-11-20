@@ -47,9 +47,12 @@ public enum ListBuilder {
         public var servedPen: Double
         /// A per-list jitter in the value (a mix draws one per list so "Regenerate" gives another list); 0 for none.
         public var noise: Double
+        /// Index into the planner's kept candidates (stage 4: the planner re-reads this candidate's features for the served vector); -1 for none.
+        public var idx: Int
 
         public init(c: Candidate, arm: Int32, z: Double, p: Double, novel: Bool, bestRank: Int32, bestSeed: Int32,
-                    newestSeedRank: Int32, lastMs: Int64, retrQ: Int32, servedPen: Double = 0.0, noise: Double = 0.0) {
+                    newestSeedRank: Int32, lastMs: Int64, retrQ: Int32, servedPen: Double = 0.0, noise: Double = 0.0,
+                    idx: Int = -1) {
             self.c = c
             self.arm = arm
             self.z = z
@@ -62,6 +65,7 @@ public enum ListBuilder {
             self.retrQ = retrQ
             self.servedPen = servedPen
             self.noise = noise
+            self.idx = idx
         }
     }
 

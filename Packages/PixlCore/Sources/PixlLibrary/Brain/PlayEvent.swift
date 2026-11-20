@@ -128,6 +128,10 @@ public struct PlayEvent: Sendable {
     public var radioRank: Int32
     public var pServedQ: Int32
     public var modelVersion: Int32
+    /// The feature vector the pick was served with, quantised (`ServedVector`): 102 bytes, or nil for a play that was not served by the
+    /// scorer (a track the listener chose, an import, a row written before stage 4). The learner and the gate use it instead of the
+    /// reduced vector a replay can rebuild from the log. Additive: a row without it reads as nil and the line omits the key.
+    public var servedX: [UInt8]?
     public var schema: Int32
 
     public init(eventId: Int64, origin: Int32, rid: Int64, primaryAid: Int64, otherAids: [Int64] = [],
@@ -136,7 +140,8 @@ public struct PlayEvent: Sendable {
                 flags: Int32 = 0, surface: Int32 = Surface.unknown, surfaceId: String = "", recId: Int64 = 0,
                 slot: Int32 = -1, arm: Int32 = Arm.none, sessionId: Int64 = 0, posInSession: Int32 = 0,
                 passiveRun: Int32 = 0, route: Int32 = Route.unknown, retrQ: Int32 = -1, radioRank: Int32 = -1,
-                pServedQ: Int32 = 0, modelVersion: Int32 = 0, schema: Int32 = PlayEvent.schemaVersion) {
+                pServedQ: Int32 = 0, modelVersion: Int32 = 0, servedX: [UInt8]? = nil,
+                schema: Int32 = PlayEvent.schemaVersion) {
         self.eventId = eventId
         self.origin = origin
         self.rid = rid
@@ -163,6 +168,7 @@ public struct PlayEvent: Sendable {
         self.radioRank = radioRank
         self.pServedQ = pServedQ
         self.modelVersion = modelVersion
+        self.servedX = servedX
         self.schema = schema
     }
 
@@ -202,6 +208,7 @@ public struct PlayEvent: Sendable {
         w.int("radioRank", radioRank)
         w.int("pServedQ", pServedQ)
         w.int("modelVersion", modelVersion)
+        if let servedX, servedX.count == ServedVector.bytes { w.string("servedX", ServedVector.toHex(servedX)) }
         w.endObject()
         return w.text
     }
@@ -250,6 +257,7 @@ public struct PlayEvent: Sendable {
             radioRank: int("radioRank", -1),
             pServedQ: int("pServedQ"),
             modelVersion: int("modelVersion"),
+            servedX: ServedVector.fromHex(m["servedX"]?.stringValue),
             schema: int("schema", schemaVersion)
         )
     }
