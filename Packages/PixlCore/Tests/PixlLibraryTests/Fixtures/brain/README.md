@@ -157,3 +157,15 @@ How each `fn` is replayed:
   `grounding`: a `Grounding.Registry` with `addName` for each of `names` and `addText` for each of `texts`, then `Grounding.check(reply,
   registry, user, "(unverified)", drop)`. `numbers`: `Grounding.numbersIn(text)` and the tokens of `Grounding.listenerNumbers(text)`.
   A marked name that is a whole-word run of the user's own words (two letters or more) is grounded too. No regular expressions anywhere: a Swift port scans UTF-16 units, as the Kotlin does.
+- `assistantcards.jsonl` (stage 4, milestone 2): `AssistantCards`. `allChips`: `AssistantRules.Query` from the fields of `in` (the
+  genre ids are `genreIds`, no moods, no years, no excluded genres), then `allChips(q, topArtistRef, topGenreId, unsupported)` is
+  `chips` (`[kind, ref, genreId]` each). `chipLabel`: `chipLabel(Chip(kind, "yt:aaaaaaaaaaa", 5), artist, genre)`. `lessTarget`:
+  `lessTarget(user, [Named(kind, name)])`, then `lessLabel(target.name)`. Names are compared folded, whole words, two characters or more.
+- `setnotes.jsonl`: `SetNotes.notes(slots)` for `slots` = `[artist, genre, known 1|0]`, each note `[index, kind, count, genre,
+  artist, newArtist, text]` with `text = SetNotes.text(note)`. `firstGenre`: `SetNotes.firstGenre(raw)`.
+- `weeklynote.jsonl`: `WeeklyNote.Evidence(tracks, newSongs, artists, genre, island, newSharePct)` (-1 and "" are unknown).
+  `template`: `template(e)`, `evidenceLines(e)` and `evidenceHash(e)`. `check`: `check(cloud, e)` is `text` (null: the template is
+  shown instead) and `sentenceCount(oneLine(cloud))` is `sentences`.
+- `assistbatch.jsonl`: `cacheKey(model, kind, input)`; `islandNames`: `validateIslandNames(ins, outs)` (a row of `ins` is `[id,
+  genres joined by |, artists joined by |]`); `tags`: `validateTags(shortlists, outs)`; `artistNames`: `validateArtistNames(raw,
+  known)`. No regular expressions anywhere, as in the other files.

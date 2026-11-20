@@ -1,0 +1,145 @@
+{"fn":"allChips","in":{"title":"Late drive","energy":"higher","tempo":"fast","novelty":"new","share":-1,"count":51,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[4],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":4,"unsupported":["tempo","energy"]},"out":{"chips":[[0,"yt:aaaaaaaaaaa",0],[3,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"any","tempo":"mid","novelty":"familiar","share":-1,"count":31,"excludeArtistRefs":["yt:aaaaaaaaaaa"],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[4],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":5,"unsupported":["tempo"]},"out":{"chips":[[1,"",5],[3,"",0],[9,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"higher","tempo":"any","novelty":"any","share":87,"count":16,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":6,"unsupported":["tempo","energy"]},"out":{"chips":[[0,"yt:aaaaaaaaaaa",0],[1,"",6],[3,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"lower","tempo":"any","novelty":"any","share":-1,"count":30,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":8,"unsupported":[]},"out":{"chips":[[0,"yt:aaaaaaaaaaa",0],[1,"",8],[3,"",0],[7,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"any","tempo":"mid","novelty":"any","share":16,"count":38,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[4],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":0,"unsupported":[]},"out":{"chips":[[0,"yt:aaaaaaaaaaa",0],[3,"",0],[7,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"lower","tempo":"slow","novelty":"familiar","share":-1,"count":56,"excludeArtistRefs":["yt:aaaaaaaaaaa"],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[4],"topArtistRef":"","topGenreId":0,"unsupported":[]},"out":{"chips":[[3,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"any","tempo":"fast","novelty":"new","share":80,"count":14,"excludeArtistRefs":["yt:aaaaaaaaaaa"],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":5,"unsupported":["tempo"]},"out":{"chips":[[1,"",5],[3,"",0],[9,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"any","tempo":"fast","novelty":"new","share":28,"count":17,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[4],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":0,"unsupported":[]},"out":{"chips":[[0,"yt:aaaaaaaaaaa",0],[3,"",0],[7,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"any","tempo":"slow","novelty":"new","share":15,"count":37,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[4],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":0,"unsupported":["tempo","energy"]},"out":{"chips":[[0,"yt:aaaaaaaaaaa",0],[3,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"higher","tempo":"fast","novelty":"new","share":40,"count":59,"excludeArtistRefs":["yt:aaaaaaaaaaa"],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":2,"unsupported":[]},"out":{"chips":[[1,"",2],[3,"",0],[7,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"lower","tempo":"mid","novelty":"familiar","share":70,"count":35,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[4],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":3,"unsupported":["energy"]},"out":{"chips":[[0,"yt:aaaaaaaaaaa",0],[1,"",3],[3,"",0],[7,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"higher","tempo":"mid","novelty":"familiar","share":79,"count":21,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[],"topArtistRef":"","topGenreId":5,"unsupported":["tempo"]},"out":{"chips":[[1,"",5],[3,"",0],[9,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"lower","tempo":"fast","novelty":"any","share":-1,"count":57,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[4],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":0,"unsupported":["energy"]},"out":{"chips":[[0,"yt:aaaaaaaaaaa",0],[3,"",0],[7,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"lower","tempo":"any","novelty":"new","share":24,"count":37,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[],"topArtistRef":"","topGenreId":7,"unsupported":[]},"out":{"chips":[[1,"",7],[3,"",0],[7,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"lower","tempo":"any","novelty":"new","share":54,"count":17,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[4],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":1,"unsupported":["tempo"]},"out":{"chips":[[0,"yt:aaaaaaaaaaa",0],[1,"",1],[3,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"any","tempo":"slow","novelty":"any","share":-1,"count":50,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":0,"unsupported":[]},"out":{"chips":[[0,"yt:aaaaaaaaaaa",0],[3,"",0],[9,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"lower","tempo":"fast","novelty":"any","share":-1,"count":27,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[4],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":6,"unsupported":[]},"out":{"chips":[[0,"yt:aaaaaaaaaaa",0],[1,"",6],[3,"",0],[7,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"any","tempo":"any","novelty":"new","share":-1,"count":15,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[4],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":3,"unsupported":["energy"]},"out":{"chips":[[0,"yt:aaaaaaaaaaa",0],[1,"",3],[3,"",0],[7,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"any","tempo":"mid","novelty":"new","share":8,"count":32,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":0,"unsupported":["energy"]},"out":{"chips":[[0,"yt:aaaaaaaaaaa",0],[3,"",0],[7,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"higher","tempo":"slow","novelty":"familiar","share":99,"count":23,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[4],"topArtistRef":"","topGenreId":0,"unsupported":[]},"out":{"chips":[[3,"",0],[9,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"any","tempo":"slow","novelty":"new","share":46,"count":43,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[4],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":1,"unsupported":["energy"]},"out":{"chips":[[0,"yt:aaaaaaaaaaa",0],[1,"",1],[3,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"any","tempo":"mid","novelty":"familiar","share":-1,"count":15,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[4],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":4,"unsupported":["tempo"]},"out":{"chips":[[0,"yt:aaaaaaaaaaa",0],[3,"",0],[9,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"any","tempo":"fast","novelty":"familiar","share":25,"count":23,"excludeArtistRefs":["yt:aaaaaaaaaaa"],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":0,"unsupported":["tempo","energy"]},"out":{"chips":[[3,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"higher","tempo":"slow","novelty":"new","share":-1,"count":21,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[],"topArtistRef":"","topGenreId":0,"unsupported":[]},"out":{"chips":[[3,"",0],[9,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"higher","tempo":"mid","novelty":"new","share":-1,"count":34,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":5,"unsupported":[]},"out":{"chips":[[0,"yt:aaaaaaaaaaa",0],[1,"",5],[3,"",0],[7,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"higher","tempo":"any","novelty":"new","share":14,"count":57,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[4],"topArtistRef":"","topGenreId":5,"unsupported":["tempo"]},"out":{"chips":[[1,"",5],[3,"",0],[9,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"lower","tempo":"mid","novelty":"new","share":-1,"count":40,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[],"topArtistRef":"","topGenreId":0,"unsupported":[]},"out":{"chips":[[3,"",0],[7,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"lower","tempo":"slow","novelty":"any","share":95,"count":52,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[4],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":0,"unsupported":["energy"]},"out":{"chips":[[0,"yt:aaaaaaaaaaa",0],[3,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"lower","tempo":"mid","novelty":"new","share":67,"count":51,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[4],"topArtistRef":"","topGenreId":2,"unsupported":[]},"out":{"chips":[[1,"",2],[3,"",0],[7,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"lower","tempo":"fast","novelty":"new","share":-1,"count":23,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":0,"unsupported":[]},"out":{"chips":[[0,"yt:aaaaaaaaaaa",0],[3,"",0],[7,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"lower","tempo":"fast","novelty":"familiar","share":-1,"count":17,"excludeArtistRefs":["yt:aaaaaaaaaaa"],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":4,"unsupported":[]},"out":{"chips":[[1,"",4],[3,"",0],[7,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"lower","tempo":"any","novelty":"new","share":-1,"count":42,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[],"topArtistRef":"","topGenreId":5,"unsupported":["energy"]},"out":{"chips":[[1,"",5],[3,"",0],[7,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"lower","tempo":"mid","novelty":"familiar","share":-1,"count":42,"excludeArtistRefs":["yt:aaaaaaaaaaa"],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[4],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":7,"unsupported":["energy"]},"out":{"chips":[[1,"",7],[3,"",0],[7,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"lower","tempo":"slow","novelty":"any","share":47,"count":45,"excludeArtistRefs":["yt:aaaaaaaaaaa"],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[4],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":8,"unsupported":["tempo","energy"]},"out":{"chips":[[1,"",8],[3,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"any","tempo":"slow","novelty":"familiar","share":31,"count":10,"excludeArtistRefs":["yt:aaaaaaaaaaa"],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[4],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":6,"unsupported":[]},"out":{"chips":[[1,"",6],[4,"",0],[9,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"lower","tempo":"fast","novelty":"any","share":70,"count":47,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":1,"unsupported":["energy"]},"out":{"chips":[[0,"yt:aaaaaaaaaaa",0],[1,"",1],[3,"",0],[7,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"higher","tempo":"any","novelty":"new","share":37,"count":45,"excludeArtistRefs":["yt:aaaaaaaaaaa"],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[4],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":0,"unsupported":["tempo"]},"out":{"chips":[[3,"",0],[9,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"higher","tempo":"any","novelty":"familiar","share":-1,"count":30,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[4],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":4,"unsupported":["energy"]},"out":{"chips":[[0,"yt:aaaaaaaaaaa",0],[3,"",0],[7,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"lower","tempo":"fast","novelty":"new","share":-1,"count":30,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":1,"unsupported":[]},"out":{"chips":[[0,"yt:aaaaaaaaaaa",0],[1,"",1],[3,"",0],[7,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"allChips","in":{"title":"Late drive","energy":"any","tempo":"slow","novelty":"new","share":33,"count":13,"excludeArtistRefs":[],"seedRefs":["yt:aaaaaaaaaaa"],"genreIds":[4],"topArtistRef":"yt:aaaaaaaaaaa","topGenreId":0,"unsupported":["energy"]},"out":{"chips":[[0,"yt:aaaaaaaaaaa",0],[3,"",0],[5,"",0],[6,"",0]]}}
+{"fn":"chipLabel","in":{"kind":0,"artist":"Sabrina Carpenter","genre":"Sabrina Carpenter"},"out":{"label":"Less Sabrina Carpenter"}}
+{"fn":"chipLabel","in":{"kind":0,"artist":"R&B","genre":"R&B"},"out":{"label":"Less R&B"}}
+{"fn":"chipLabel","in":{"kind":0,"artist":"Hip Hop","genre":"Hip Hop"},"out":{"label":"Less Hip Hop"}}
+{"fn":"chipLabel","in":{"kind":0,"artist":"A","genre":"A"},"out":{"label":"Less A"}}
+{"fn":"chipLabel","in":{"kind":0,"artist":"","genre":""},"out":{"label":""}}
+{"fn":"chipLabel","in":{"kind":0,"artist":"  Chappell   Roan ","genre":"  Chappell   Roan "},"out":{"label":"Less Chappell Roan"}}
+{"fn":"chipLabel","in":{"kind":0,"artist":"The Hierophant Green Guardians of Everything","genre":"The Hierophant Green Guardians of Everything"},"out":{"label":"Less The Hierophant Green\u2026"}}
+{"fn":"chipLabel","in":{"kind":0,"artist":"S\u01a1n T\u00f9ng M-TP","genre":"S\u01a1n T\u00f9ng M-TP"},"out":{"label":"Less S\u01a1n T\u00f9ng M-TP"}}
+{"fn":"chipLabel","in":{"kind":1,"artist":"Sabrina Carpenter","genre":"Sabrina Carpenter"},"out":{"label":"More Sabrina Carpenter"}}
+{"fn":"chipLabel","in":{"kind":1,"artist":"R&B","genre":"R&B"},"out":{"label":"More R&B"}}
+{"fn":"chipLabel","in":{"kind":1,"artist":"Hip Hop","genre":"Hip Hop"},"out":{"label":"More Hip Hop"}}
+{"fn":"chipLabel","in":{"kind":1,"artist":"A","genre":"A"},"out":{"label":"More A"}}
+{"fn":"chipLabel","in":{"kind":1,"artist":"","genre":""},"out":{"label":""}}
+{"fn":"chipLabel","in":{"kind":1,"artist":"  Chappell   Roan ","genre":"  Chappell   Roan "},"out":{"label":"More Chappell Roan"}}
+{"fn":"chipLabel","in":{"kind":1,"artist":"The Hierophant Green Guardians of Everything","genre":"The Hierophant Green Guardians of Everything"},"out":{"label":"More The Hierophant Green\u2026"}}
+{"fn":"chipLabel","in":{"kind":1,"artist":"S\u01a1n T\u00f9ng M-TP","genre":"S\u01a1n T\u00f9ng M-TP"},"out":{"label":"More S\u01a1n T\u00f9ng M-TP"}}
+{"fn":"chipLabel","in":{"kind":2,"artist":"Sabrina Carpenter","genre":"Sabrina Carpenter"},"out":{"label":"Less Sabrina Carpenter"}}
+{"fn":"chipLabel","in":{"kind":2,"artist":"R&B","genre":"R&B"},"out":{"label":"Less R&B"}}
+{"fn":"chipLabel","in":{"kind":2,"artist":"Hip Hop","genre":"Hip Hop"},"out":{"label":"Less Hip Hop"}}
+{"fn":"chipLabel","in":{"kind":2,"artist":"A","genre":"A"},"out":{"label":"Less A"}}
+{"fn":"chipLabel","in":{"kind":2,"artist":"","genre":""},"out":{"label":""}}
+{"fn":"chipLabel","in":{"kind":2,"artist":"  Chappell   Roan ","genre":"  Chappell   Roan "},"out":{"label":"Less Chappell Roan"}}
+{"fn":"chipLabel","in":{"kind":2,"artist":"The Hierophant Green Guardians of Everything","genre":"The Hierophant Green Guardians of Everything"},"out":{"label":"Less The Hierophant Green\u2026"}}
+{"fn":"chipLabel","in":{"kind":2,"artist":"S\u01a1n T\u00f9ng M-TP","genre":"S\u01a1n T\u00f9ng M-TP"},"out":{"label":"Less S\u01a1n T\u00f9ng M-TP"}}
+{"fn":"chipLabel","in":{"kind":3,"artist":"Sabrina Carpenter","genre":"Sabrina Carpenter"},"out":{"label":"Shorter"}}
+{"fn":"chipLabel","in":{"kind":3,"artist":"R&B","genre":"R&B"},"out":{"label":"Shorter"}}
+{"fn":"chipLabel","in":{"kind":3,"artist":"Hip Hop","genre":"Hip Hop"},"out":{"label":"Shorter"}}
+{"fn":"chipLabel","in":{"kind":3,"artist":"A","genre":"A"},"out":{"label":"Shorter"}}
+{"fn":"chipLabel","in":{"kind":3,"artist":"","genre":""},"out":{"label":"Shorter"}}
+{"fn":"chipLabel","in":{"kind":3,"artist":"  Chappell   Roan ","genre":"  Chappell   Roan "},"out":{"label":"Shorter"}}
+{"fn":"chipLabel","in":{"kind":3,"artist":"The Hierophant Green Guardians of Everything","genre":"The Hierophant Green Guardians of Everything"},"out":{"label":"Shorter"}}
+{"fn":"chipLabel","in":{"kind":3,"artist":"S\u01a1n T\u00f9ng M-TP","genre":"S\u01a1n T\u00f9ng M-TP"},"out":{"label":"Shorter"}}
+{"fn":"chipLabel","in":{"kind":4,"artist":"Sabrina Carpenter","genre":"Sabrina Carpenter"},"out":{"label":"Longer"}}
+{"fn":"chipLabel","in":{"kind":4,"artist":"R&B","genre":"R&B"},"out":{"label":"Longer"}}
+{"fn":"chipLabel","in":{"kind":4,"artist":"Hip Hop","genre":"Hip Hop"},"out":{"label":"Longer"}}
+{"fn":"chipLabel","in":{"kind":4,"artist":"A","genre":"A"},"out":{"label":"Longer"}}
+{"fn":"chipLabel","in":{"kind":4,"artist":"","genre":""},"out":{"label":"Longer"}}
+{"fn":"chipLabel","in":{"kind":4,"artist":"  Chappell   Roan ","genre":"  Chappell   Roan "},"out":{"label":"Longer"}}
+{"fn":"chipLabel","in":{"kind":4,"artist":"The Hierophant Green Guardians of Everything","genre":"The Hierophant Green Guardians of Everything"},"out":{"label":"Longer"}}
+{"fn":"chipLabel","in":{"kind":4,"artist":"S\u01a1n T\u00f9ng M-TP","genre":"S\u01a1n T\u00f9ng M-TP"},"out":{"label":"Longer"}}
+{"fn":"chipLabel","in":{"kind":5,"artist":"Sabrina Carpenter","genre":"Sabrina Carpenter"},"out":{"label":"More new"}}
+{"fn":"chipLabel","in":{"kind":5,"artist":"R&B","genre":"R&B"},"out":{"label":"More new"}}
+{"fn":"chipLabel","in":{"kind":5,"artist":"Hip Hop","genre":"Hip Hop"},"out":{"label":"More new"}}
+{"fn":"chipLabel","in":{"kind":5,"artist":"A","genre":"A"},"out":{"label":"More new"}}
+{"fn":"chipLabel","in":{"kind":5,"artist":"","genre":""},"out":{"label":"More new"}}
+{"fn":"chipLabel","in":{"kind":5,"artist":"  Chappell   Roan ","genre":"  Chappell   Roan "},"out":{"label":"More new"}}
+{"fn":"chipLabel","in":{"kind":5,"artist":"The Hierophant Green Guardians of Everything","genre":"The Hierophant Green Guardians of Everything"},"out":{"label":"More new"}}
+{"fn":"chipLabel","in":{"kind":5,"artist":"S\u01a1n T\u00f9ng M-TP","genre":"S\u01a1n T\u00f9ng M-TP"},"out":{"label":"More new"}}
+{"fn":"chipLabel","in":{"kind":6,"artist":"Sabrina Carpenter","genre":"Sabrina Carpenter"},"out":{"label":"More familiar"}}
+{"fn":"chipLabel","in":{"kind":6,"artist":"R&B","genre":"R&B"},"out":{"label":"More familiar"}}
+{"fn":"chipLabel","in":{"kind":6,"artist":"Hip Hop","genre":"Hip Hop"},"out":{"label":"More familiar"}}
+{"fn":"chipLabel","in":{"kind":6,"artist":"A","genre":"A"},"out":{"label":"More familiar"}}
+{"fn":"chipLabel","in":{"kind":6,"artist":"","genre":""},"out":{"label":"More familiar"}}
+{"fn":"chipLabel","in":{"kind":6,"artist":"  Chappell   Roan ","genre":"  Chappell   Roan "},"out":{"label":"More familiar"}}
+{"fn":"chipLabel","in":{"kind":6,"artist":"The Hierophant Green Guardians of Everything","genre":"The Hierophant Green Guardians of Everything"},"out":{"label":"More familiar"}}
+{"fn":"chipLabel","in":{"kind":6,"artist":"S\u01a1n T\u00f9ng M-TP","genre":"S\u01a1n T\u00f9ng M-TP"},"out":{"label":"More familiar"}}
+{"fn":"chipLabel","in":{"kind":7,"artist":"Sabrina Carpenter","genre":"Sabrina Carpenter"},"out":{"label":"Slower"}}
+{"fn":"chipLabel","in":{"kind":7,"artist":"R&B","genre":"R&B"},"out":{"label":"Slower"}}
+{"fn":"chipLabel","in":{"kind":7,"artist":"Hip Hop","genre":"Hip Hop"},"out":{"label":"Slower"}}
+{"fn":"chipLabel","in":{"kind":7,"artist":"A","genre":"A"},"out":{"label":"Slower"}}
+{"fn":"chipLabel","in":{"kind":7,"artist":"","genre":""},"out":{"label":"Slower"}}
+{"fn":"chipLabel","in":{"kind":7,"artist":"  Chappell   Roan ","genre":"  Chappell   Roan "},"out":{"label":"Slower"}}
+{"fn":"chipLabel","in":{"kind":7,"artist":"The Hierophant Green Guardians of Everything","genre":"The Hierophant Green Guardians of Everything"},"out":{"label":"Slower"}}
+{"fn":"chipLabel","in":{"kind":7,"artist":"S\u01a1n T\u00f9ng M-TP","genre":"S\u01a1n T\u00f9ng M-TP"},"out":{"label":"Slower"}}
+{"fn":"chipLabel","in":{"kind":8,"artist":"Sabrina Carpenter","genre":"Sabrina Carpenter"},"out":{"label":"Faster"}}
+{"fn":"chipLabel","in":{"kind":8,"artist":"R&B","genre":"R&B"},"out":{"label":"Faster"}}
+{"fn":"chipLabel","in":{"kind":8,"artist":"Hip Hop","genre":"Hip Hop"},"out":{"label":"Faster"}}
+{"fn":"chipLabel","in":{"kind":8,"artist":"A","genre":"A"},"out":{"label":"Faster"}}
+{"fn":"chipLabel","in":{"kind":8,"artist":"","genre":""},"out":{"label":"Faster"}}
+{"fn":"chipLabel","in":{"kind":8,"artist":"  Chappell   Roan ","genre":"  Chappell   Roan "},"out":{"label":"Faster"}}
+{"fn":"chipLabel","in":{"kind":8,"artist":"The Hierophant Green Guardians of Everything","genre":"The Hierophant Green Guardians of Everything"},"out":{"label":"Faster"}}
+{"fn":"chipLabel","in":{"kind":8,"artist":"S\u01a1n T\u00f9ng M-TP","genre":"S\u01a1n T\u00f9ng M-TP"},"out":{"label":"Faster"}}
+{"fn":"chipLabel","in":{"kind":9,"artist":"Sabrina Carpenter","genre":"Sabrina Carpenter"},"out":{"label":"Calmer"}}
+{"fn":"chipLabel","in":{"kind":9,"artist":"R&B","genre":"R&B"},"out":{"label":"Calmer"}}
+{"fn":"chipLabel","in":{"kind":9,"artist":"Hip Hop","genre":"Hip Hop"},"out":{"label":"Calmer"}}
+{"fn":"chipLabel","in":{"kind":9,"artist":"A","genre":"A"},"out":{"label":"Calmer"}}
+{"fn":"chipLabel","in":{"kind":9,"artist":"","genre":""},"out":{"label":"Calmer"}}
+{"fn":"chipLabel","in":{"kind":9,"artist":"  Chappell   Roan ","genre":"  Chappell   Roan "},"out":{"label":"Calmer"}}
+{"fn":"chipLabel","in":{"kind":9,"artist":"The Hierophant Green Guardians of Everything","genre":"The Hierophant Green Guardians of Everything"},"out":{"label":"Calmer"}}
+{"fn":"chipLabel","in":{"kind":9,"artist":"S\u01a1n T\u00f9ng M-TP","genre":"S\u01a1n T\u00f9ng M-TP"},"out":{"label":"Calmer"}}
+{"fn":"chipLabel","in":{"kind":10,"artist":"Sabrina Carpenter","genre":"Sabrina Carpenter"},"out":{"label":"Livelier"}}
+{"fn":"chipLabel","in":{"kind":10,"artist":"R&B","genre":"R&B"},"out":{"label":"Livelier"}}
+{"fn":"chipLabel","in":{"kind":10,"artist":"Hip Hop","genre":"Hip Hop"},"out":{"label":"Livelier"}}
+{"fn":"chipLabel","in":{"kind":10,"artist":"A","genre":"A"},"out":{"label":"Livelier"}}
+{"fn":"chipLabel","in":{"kind":10,"artist":"","genre":""},"out":{"label":"Livelier"}}
+{"fn":"chipLabel","in":{"kind":10,"artist":"  Chappell   Roan ","genre":"  Chappell   Roan "},"out":{"label":"Livelier"}}
+{"fn":"chipLabel","in":{"kind":10,"artist":"The Hierophant Green Guardians of Everything","genre":"The Hierophant Green Guardians of Everything"},"out":{"label":"Livelier"}}
+{"fn":"chipLabel","in":{"kind":10,"artist":"S\u01a1n T\u00f9ng M-TP","genre":"S\u01a1n T\u00f9ng M-TP"},"out":{"label":"Livelier"}}
+{"fn":"chipLabel","in":{"kind":11,"artist":"Sabrina Carpenter","genre":"Sabrina Carpenter"},"out":{"label":""}}
+{"fn":"chipLabel","in":{"kind":11,"artist":"R&B","genre":"R&B"},"out":{"label":""}}
+{"fn":"chipLabel","in":{"kind":11,"artist":"Hip Hop","genre":"Hip Hop"},"out":{"label":""}}
+{"fn":"chipLabel","in":{"kind":11,"artist":"A","genre":"A"},"out":{"label":""}}
+{"fn":"chipLabel","in":{"kind":11,"artist":"","genre":""},"out":{"label":""}}
+{"fn":"chipLabel","in":{"kind":11,"artist":"  Chappell   Roan ","genre":"  Chappell   Roan "},"out":{"label":""}}
+{"fn":"chipLabel","in":{"kind":11,"artist":"The Hierophant Green Guardians of Everything","genre":"The Hierophant Green Guardians of Everything"},"out":{"label":""}}
+{"fn":"chipLabel","in":{"kind":11,"artist":"S\u01a1n T\u00f9ng M-TP","genre":"S\u01a1n T\u00f9ng M-TP"},"out":{"label":""}}
+{"fn":"lessTarget","in":{"user":"Why do I keep getting trap?","named":[[0,"Trap"],[0,"Pop"],[1,"Drake"]]},"out":{"target":"Trap","label":"Less Trap"}}
+{"fn":"lessTarget","in":{"user":"why do i keep getting trap music","named":[[0,"Trap"],[0,"Latin Trap"]]},"out":{"target":"Trap","label":"Less Trap"}}
+{"fn":"lessTarget","in":{"user":"why do i keep getting latin trap","named":[[0,"Trap"],[0,"Latin Trap"]]},"out":{"target":"Latin Trap","label":"Less Latin Trap"}}
+{"fn":"lessTarget","in":{"user":"why so much entrapment","named":[[0,"Trap"]]},"out":{"target":null,"label":""}}
+{"fn":"lessTarget","in":{"user":"Why is Drake everywhere?","named":[[0,"Hip Hop"],[1,"Drake"]]},"out":{"target":"Drake","label":"Less Drake"}}
+{"fn":"lessTarget","in":{"user":"why so much of it","named":[[0,"Pop"]]},"out":{"target":null,"label":""}}
+{"fn":"lessTarget","in":{"user":"Why is so much V-pop in my mixes","named":[[0,"V-pop"],[0,"Pop"]]},"out":{"target":"V-pop","label":"Less V-pop"}}
+{"fn":"lessTarget","in":{"user":"t\u1ea1i sao S\u01a1n T\u00f9ng M-TP","named":[[1,"S\u01a1n T\u00f9ng M-TP"]]},"out":{"target":"S\u01a1n T\u00f9ng M-TP","label":"Less S\u01a1n T\u00f9ng M-TP"}}
+{"fn":"lessTarget","in":{"user":"a b c","named":[[0,"A"],[0,""]]},"out":{"target":null,"label":""}}
