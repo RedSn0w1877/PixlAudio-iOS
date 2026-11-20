@@ -360,11 +360,13 @@ public actor BrainMixes {
             if let novel = pool.novel[pick.rid] {
                 items.append(StoredMixItem(rid: pick.rid, row: novel.stored, arm: pick.arm, slot: items.count,
                                            whyKey: whyKey, whyArg: pick.whyArg, whyName: whyName, retrQ: Int(pick.retrQ),
-                                           radioRank: novel.radioRank > 0 ? novel.radioRank : -1, explore: pick.explore))
+                                           radioRank: novel.radioRank > 0 ? novel.radioRank : -1, explore: pick.explore,
+                                           sx: pick.servedX.map(ServedVector.toHex) ?? ""))
             } else if let track = pool.library[pick.rid] {
                 items.append(StoredMixItem(rid: pick.rid, songId: track.song.id, arm: pick.arm, slot: items.count,
                                            whyKey: whyKey, whyArg: pick.whyArg, whyName: whyName, retrQ: Int(pick.retrQ),
-                                           radioRank: Int(pick.radioRank), explore: pick.explore))
+                                           radioRank: Int(pick.radioRank), explore: pick.explore,
+                                           sx: pick.servedX.map(ServedVector.toHex) ?? ""))
             }
         }
         if items.isEmpty { return nil }
@@ -640,7 +642,8 @@ public actor BrainMixes {
                 radioRank: item.radioRank, retrQ: item.retrQ, whyKey: item.whyKey != WhyLine.none ? keyName : nil,
                 primaryArtist: BrainLibraryIndex.primaryArtistName(song),
                 // The listener chose to play the mix: its tracks are theirs, like a playlist's.
-                chosen: true, control: stored.control, modelVersion: stored.model, explore: item.explore)
+                chosen: true, control: stored.control, modelVersion: stored.model, explore: item.explore,
+                servedX: item.sx.isEmpty ? nil : item.sx)
         }
         if songs.count < Self.minSongs { return nil }
         if !tracks.isEmpty { await repository.registerPlayable(tracks, nowMs: now) }

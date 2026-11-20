@@ -460,7 +460,8 @@ public actor BrainEngine {
             route: context.route,
             retrQ: Int32(clamping: tag?.retrQ ?? -1),
             radioRank: Int32(clamping: tag?.radioRank ?? -1),
-            modelVersion: (tag?.modelVersion ?? -1) >= 0 ? Int32(clamping: tag?.modelVersion ?? 0) : 0
+            modelVersion: (tag?.modelVersion ?? -1) >= 0 ? Int32(clamping: tag?.modelVersion ?? 0) : 0,
+            servedX: ServedVector.fromHex(tag?.servedX)
         )
         guard let graded = apply(event, to: &state) else { return nil }
         // A play a Home row may be built around is written down beside the event (8.1): the event itself holds
@@ -1178,6 +1179,7 @@ enum OpenPlayCodec {
         w.int("retrQ", c.tag?.retrQ ?? -1); w.int("radioRank", c.tag?.radioRank ?? -1)
         w.string("primaryArtist", c.tag?.primaryArtist ?? "")
         w.bool("control", c.tag?.control ?? false); w.int("model", c.tag?.modelVersion ?? -1); w.bool("explore", c.tag?.explore ?? false)
+        if let sx = c.tag?.servedX { w.string("sx", sx) }
         w.bool("shuffle", c.shuffle); w.bool("repeatOne", c.repeatOne); w.int("route", c.route)
         w.endObject()
         return w.text
@@ -1195,7 +1197,7 @@ enum OpenPlayCodec {
                                slot: Int(int("slot", -1)), arm: optional("arm"), radioRank: Int(int("radioRank", -1)),
                                retrQ: Int(int("retrQ", -1)), primaryArtist: optional("primaryArtist"),
                                control: m["control"]?.boolValue ?? false, modelVersion: Int(int("model", -1)),
-                               explore: m["explore"]?.boolValue ?? false)
+                               explore: m["explore"]?.boolValue ?? false, servedX: optional("sx"))
         let hasTag = !tag.isEmpty || tag.primaryArtist != nil
         let context = PlayContext(
             title: str("title"), artistDisplay: str("artist"),

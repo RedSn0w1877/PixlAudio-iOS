@@ -27,11 +27,14 @@ public struct StoredMixItem: Sendable, Hashable, Codable {
     public var radioRank: Int
     /// The slot was an exploration slot: the arm bandit drew its arm (5.10).
     public var explore: Bool
+    /// The feature vector the pick was served with (hex, stage 4); empty for none (a mix saved before stage 4).
+    public var sx: String
 
     public init(rid: Int64, songId: String? = nil, row: StoredRadioRow? = nil, arm: Int32 = Arm.none, slot: Int = -1,
                 whyKey: Int32 = WhyLine.none, whyArg: Int64 = 0, whyName: String = "", retrQ: Int = -1,
-                radioRank: Int = -1, explore: Bool = false) {
+                radioRank: Int = -1, explore: Bool = false, sx: String = "") {
         self.explore = explore
+        self.sx = sx
         self.rid = rid
         self.songId = songId
         self.row = row
@@ -47,7 +50,7 @@ public struct StoredMixItem: Sendable, Hashable, Codable {
     public var isOutsideLibrary: Bool { songId == nil }
 
     private enum CodingKeys: String, CodingKey {
-        case rid, songId, row, arm, slot, whyKey, whyArg, whyName, retrQ, radioRank, explore
+        case rid, songId, row, arm, slot, whyKey, whyArg, whyName, retrQ, radioRank, explore, sx
     }
 
     public init(from decoder: any Decoder) throws {
@@ -63,6 +66,7 @@ public struct StoredMixItem: Sendable, Hashable, Codable {
         retrQ = try c.decodeIfPresent(Int.self, forKey: .retrQ) ?? -1
         radioRank = try c.decodeIfPresent(Int.self, forKey: .radioRank) ?? -1
         explore = try c.decodeIfPresent(Bool.self, forKey: .explore) ?? false
+        sx = try c.decodeIfPresent(String.self, forKey: .sx) ?? ""
     }
 }
 

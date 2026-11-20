@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import PixlFoundation
+import PixlModel
 @testable import PixlNet
 
 // Claude over raw HTTPS (spec A3): request bodies, SSE assembly, retries, the tool loop, the router, the budget, the
@@ -102,12 +103,15 @@ private struct FixtureStreamer: ClaudeLineStreaming {
         // Tools: the client tools (strict, eager), then web search and fetch with max_uses 10.
         let tools = try #require(body["tools"]?.arrayValue)
         let clientCount = TaizoTool.allCases.count
-        #expect(clientCount == 16)
+        #expect(clientCount == 26)
         #expect(tools.count == clientCount + 2)
         #expect(tools.prefix(clientCount).map { $0["name"]?.stringValue ?? "" } == TaizoTool.allCases.map(\.rawValue))
         for tool in tools.prefix(clientCount) {
-            // search_library opts out of strict (its 12 optional filters would break the API's budget of 24).
-            #expect((tool["strict"]?.boolValue == true) == (tool["name"]?.stringValue != "search_library"))
+            // search_library opts out of strict (its 12 optional filters would break the API's budget of 24), and so do the five small
+            // read-only music tools (a request holds at most 20 strict tools: deviation 222).
+            let name = tool["name"]?.stringValue ?? ""
+            let optedOut = name == "search_library" || AssistantVocabulary.nonStrictMusicTools.contains(name)
+            #expect((tool["strict"]?.boolValue == true) == !optedOut)
             #expect(tool["eager_input_streaming"]?.boolValue == true)
             #expect(tool["input_schema"]?["additionalProperties"]?.boolValue == false)
         }
@@ -579,7 +583,8 @@ private struct FixtureStreamer: ClaudeLineStreaming {
         }
         for tool in TaizoTool.allCases {
             check(tool.definition.inputSchema)
-            #expect(tool.definition.description.contains("Call this"), "\(tool.rawValue) says when to call it")
+            // The 16 older tools say when to call them; the ten music tools carry Android's wording, which says it in its own way.
+            if !tool.isMusicTool { #expect(tool.definition.description.contains("Call this"), "\(tool.rawValue) says when to call it") }
         }
     }
 }

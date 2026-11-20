@@ -7,6 +7,8 @@
 // function of its inputs (no I/O, no clock, no regular expressions), so the port reproduces `assistant.jsonl` bit for bit. Strings are
 // scanned as UTF-16 code units, as the Kotlin does.
 
+import PixlModel
+
 /// The rules of the assistant's tools.
 public enum AssistantRules {
 
@@ -54,7 +56,7 @@ public enum AssistantRules {
 
     // MARK: Sentinels and enums (9.3: every parameter is required, "no value" is explicit)
 
-    public static let anyWord = "any"
+    public static let anyWord = AssistantVocabulary.anyWord
     public static let lower = "lower"
     public static let higher = "higher"
     public static let familiar = "familiar"
@@ -63,31 +65,29 @@ public enum AssistantRules {
     public static let mid = "mid"
     public static let fast = "fast"
 
-    public static let energy: [String] = [anyWord, lower, higher]
-    public static let novelty: [String] = [anyWord, familiar, new]
-    public static let tempo: [String] = [anyWord, slow, mid, fast]
-    public static let seedKinds: [String] = ["song", "artist", "album", "playlist", "genre"]
-    public static let stationModes: [String] = ["familiar", "blend", "discover"]
-    public static let steerChanges: [String] = [
-        "more_artist", "less_artist", "more_genre", "less_genre", "energy_up", "energy_down", "more_familiar", "more_new",
-    ]
-    public static let steerScopes: [String] = ["session", "always"]
-    public static let explainScopes: [String] = ["summary", "islands", "genres", "dayparts", "recent_moves", "model"]
-    public static let releaseScopes: [String] = ["my_artists", "adjacent", "country"]
+    public static let energy: [String] = AssistantVocabulary.energy
+    public static let novelty: [String] = AssistantVocabulary.novelty
+    public static let tempo: [String] = AssistantVocabulary.tempo
+    public static let seedKinds: [String] = AssistantVocabulary.seedKinds
+    public static let stationModes: [String] = AssistantVocabulary.stationModes
+    public static let steerChanges: [String] = AssistantVocabulary.steerChanges
+    public static let steerScopes: [String] = AssistantVocabulary.steerScopes
+    public static let explainScopes: [String] = AssistantVocabulary.explainScopes
+    public static let releaseScopes: [String] = AssistantVocabulary.releaseScopes
 
     /// `novelty_share_pct` when the sentence said nothing about it (0 is a real answer: no new music).
-    public static let shareUnset = -1
+    public static let shareUnset = AssistantVocabulary.shareUnset
 
-    public static let defaultResults = 25
-    public static let maxRecommend = 50
-    public static let minMix = 10
-    public static let maxMix = 60
-    public static let defaultMix = 30
-    public static let maxResolveItems = 25
-    public static let maxSeedRefs = 5
+    public static let defaultResults = AssistantVocabulary.defaultResults
+    public static let maxRecommend = AssistantVocabulary.maxRecommend
+    public static let minMix = AssistantVocabulary.minMix
+    public static let maxMix = AssistantVocabulary.maxMix
+    public static let defaultMix = AssistantVocabulary.defaultMix
+    public static let maxResolveItems = AssistantVocabulary.maxResolveItems
+    public static let maxSeedRefs = AssistantVocabulary.maxSeedRefs
     public static let maxGenres = 8
     public static let maxExcludedArtists = 25
-    public static let maxTitle = 60
+    public static let maxTitle = AssistantVocabulary.maxTitle
 
     public static func clampInt(_ v: Int, _ lo: Int, _ hi: Int) -> Int { v < lo ? lo : (v > hi ? hi : v) }
 

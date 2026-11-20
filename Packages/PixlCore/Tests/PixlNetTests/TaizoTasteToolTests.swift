@@ -22,8 +22,9 @@ import PixlFoundation
 
     @Test func theNewToolsAreRegisteredAfterTheOldOnesInAFixedOrder() {
         let names = TaizoTool.allCases.map(\.rawValue)
-        #expect(names.suffix(5) == ["get_taste_profile", "get_library_overview", "adjust_taste", "list_taste_adjustments",
-                                    "remove_taste_adjustment"])
+        // The 16 tools of the earlier stages keep their place; the ten music tools of stage 4 come after them.
+        #expect(names.prefix(16).suffix(5) == ["get_taste_profile", "get_library_overview", "adjust_taste", "list_taste_adjustments",
+                                               "remove_taste_adjustment"])
         #expect(names.prefix(11).last == "like_song", "the earlier tools keep their place in the cached prefix")
         #expect(Set(names).count == names.count)
     }

@@ -413,11 +413,14 @@ public struct BrainItemTag: Sendable, Hashable {
     public var modelVersion: Int
     /// The pick filled a novel slot the arm bandit drew (5.10): an exploration slot, logged with `EventFlags.exploreSlot`.
     public var explore: Bool
+    /// The feature vector the pick was served with (`ServedVector`, 204 lower-case hex characters); nil for a track the scorer did not
+    /// serve. It rides with the queue entry and goes into the play event, so the learner trains on what the ranker saw (stage 4).
+    public var servedX: String?
 
     public init(surface: String? = nil, surfaceId: String? = nil, recId: Int64 = 0, slot: Int = -1, arm: String? = nil,
                 whyArg: String? = nil, radioRank: Int = -1, retrQ: Int = -1, whyKey: String? = nil,
                 primaryArtist: String? = nil, chosen: Bool = false, control: Bool = false, modelVersion: Int = -1,
-                explore: Bool = false) {
+                explore: Bool = false, servedX: String? = nil) {
         self.surface = surface
         self.surfaceId = surfaceId.map { String($0.unicodeScalars.prefix(Self.maxSurfaceIdLength)) }
         self.recId = recId
@@ -432,12 +435,14 @@ public struct BrainItemTag: Sendable, Hashable {
         self.control = control
         self.modelVersion = modelVersion
         self.explore = explore
+        self.servedX = servedX.flatMap { $0.utf16.count == 204 ? $0 : nil }
     }
 
     /// True when nothing is set: such a tag is not saved with the queue.
     public var isEmpty: Bool {
         surface == nil && surfaceId == nil && recId == 0 && slot < 0 && arm == nil && whyKey == nil && whyArg == nil
             && primaryArtist == nil && !chosen && retrQ < 0 && radioRank < 0 && !control && modelVersion < 0 && !explore
+            && servedX == nil
     }
 }
 
@@ -448,7 +453,7 @@ extension PlaybackQueueItemSnapshot {
                                slot: brainSlot ?? -1, arm: brainArm, whyArg: brainWhyArg,
                                radioRank: brainRadioRank ?? -1, retrQ: brainRetrQ ?? -1, whyKey: brainWhyKey,
                                primaryArtist: brainPrimaryArtist, chosen: brainChosen == true, control: brainControl == true,
-                               modelVersion: brainModel ?? -1, explore: brainExplore == true)
+                               modelVersion: brainModel ?? -1, explore: brainExplore == true, servedX: brainServedX)
         return tag.isEmpty ? nil : tag
     }
 
@@ -470,6 +475,7 @@ extension PlaybackQueueItemSnapshot {
         copy.brainControl = tag.control ? true : nil
         copy.brainModel = tag.modelVersion >= 0 ? tag.modelVersion : nil
         copy.brainExplore = tag.explore ? true : nil
+        copy.brainServedX = tag.servedX
         return copy
     }
 }

@@ -107,6 +107,30 @@ struct BrainEventRecorderTests {
         #expect(e?.primaryAid != 0)
     }
 
+    @Test func theServedVectorOfTheTagIsStoredWithTheEventAndTheLearnerTrainsOnIt() async throws {
+        var x = [Double](repeating: 0.0, count: Ranker.d)
+        x[0] = 1.0
+        x[1] = 0.5
+        x[17] = 1.0
+        let served = ServedVector.quantize(x)
+        let h = Harness()
+        defer { h.cleanUp() }
+        let tag = BrainItemTag(surface: "autoplay", surfaceId: "a", recId: 9, slot: 0, arm: "RADIO", servedX: ServedVector.toHex(served))
+        let ctx = context("Edge of Seventeen", "Stevie Nicks", videoId: "abc123XYZ_0", inLibrary: false,
+                          start: StartReason.autoplay, tag: tag)
+        _ = await h.engine.record(play("yt:abc123XYZ_0", ctx, at: Harness.t0, played: 200_000))
+        let e = try #require(await h.engine.events().first)
+        #expect(e.servedX == served)
+        // A play with no vector in its tag stores none: the reduced vector is used for it, as for every older row.
+        _ = await h.engine.record(play("s1", context("Dreams", "Fleetwood Mac"), at: Harness.t0 + 400_000, played: 200_000))
+        let all = await h.engine.events()
+        #expect(all.count == 2)
+        #expect(all.last?.servedX == nil)
+        // A second process reads the same file, vector included.
+        let again = Harness(directory: h.directory)
+        #expect(await again.engine.events().first?.servedX == served)
+    }
+
     @Test func theEventAndTheAffinityRowsItTouchedAreWrittenAndReadBack() async {
         let h = Harness()
         defer { h.cleanUp() }

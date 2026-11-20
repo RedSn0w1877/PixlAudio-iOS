@@ -110,8 +110,11 @@ public struct StoredHomeItem: Sendable, Hashable, Codable {
     public var radioRank: Int
     /// The slot was an exploration slot (5.10): carried into the play's tag. A row saved before stage 3 says false.
     public var explore: Bool
+    /// The feature vector the pick was served with (hex, stage 4); empty for none. A row saved before stage 4 says empty.
+    public var sx: String
 
-    public init(stored: StoredRadioRow, arm: Int32, slot: Int, retrQ: Int, radioRank: Int, explore: Bool = false) {
+    public init(stored: StoredRadioRow, arm: Int32, slot: Int, retrQ: Int, radioRank: Int, explore: Bool = false, sx: String = "") {
+        self.sx = sx
         self.stored = stored
         self.arm = arm
         self.slot = slot
@@ -120,7 +123,7 @@ public struct StoredHomeItem: Sendable, Hashable, Codable {
         self.explore = explore
     }
 
-    private enum CodingKeys: String, CodingKey { case stored, arm, slot, retrQ, radioRank, explore }
+    private enum CodingKeys: String, CodingKey { case stored, arm, slot, retrQ, radioRank, explore, sx }
 
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -130,6 +133,7 @@ public struct StoredHomeItem: Sendable, Hashable, Codable {
         retrQ = try c.decode(Int.self, forKey: .retrQ)
         radioRank = try c.decode(Int.self, forKey: .radioRank)
         explore = try c.decodeIfPresent(Bool.self, forKey: .explore) ?? false
+        sx = try c.decodeIfPresent(String.self, forKey: .sx) ?? ""
     }
 }
 
@@ -183,6 +187,8 @@ public struct BrainHomeItem: Sendable, Hashable {
     public var retrQ: Int
     public var radioRank: Int
     public var explore: Bool = false
+    /// The feature vector the pick was served with (hex, stage 4); nil for none.
+    public var servedX: String?
 }
 
 /// A "Because you listened to X" row.
@@ -213,7 +219,8 @@ public struct BrainHomeRow: Sendable, Hashable, Identifiable {
                 whyKey: WhyLine.nameOf(WhyLine.becauseListened),
                 primaryArtist: artist.flatMap { BrainText.isBlank($0) ? nil : $0 },
                 // The listener chose to play the row: its tracks are theirs, like a playlist's.
-                chosen: true, control: control, modelVersion: model, explore: item.explore)
+                chosen: true, control: control, modelVersion: model, explore: item.explore,
+                servedX: item.servedX)
         }
         return out
     }
@@ -401,7 +408,8 @@ public actor BrainHomeRows {
             for pick in plan.picks {
                 guard let i = byRid[pick.rid] else { continue }
                 items.append(StoredHomeItem(stored: rows[i], arm: pick.arm, slot: items.count, retrQ: Int(pick.retrQ),
-                                            radioRank: ranks[i], explore: pick.explore))
+                                            radioRank: ranks[i], explore: pick.explore,
+                                            sx: pick.servedX.map(ServedVector.toHex) ?? ""))
                 usedRids.insert(pick.rid)
             }
             out.append(StoredHomeRow(anchor: anchor, recId: (nowMs << 8) | (Self.homeRecTag + Int64(rowIndex)), items: items,
@@ -426,7 +434,8 @@ public actor BrainHomeRows {
             if age < 0 || age >= HomeAnchors.maxAgeMs || row.items.count < minCards { continue }
             let items = row.items.map { item in
                 BrainHomeItem(track: EngineTrack(row: item.stored.row, rid: item.stored.rid), arm: item.arm,
-                              slot: item.slot, retrQ: item.retrQ, radioRank: item.radioRank, explore: item.explore)
+                              slot: item.slot, retrQ: item.retrQ, radioRank: item.radioRank, explore: item.explore,
+                              servedX: item.sx.isEmpty ? nil : item.sx)
             }
             out.append(BrainHomeRow(id: BrainHomeRow.idOf(anchorRid: row.anchor.rid), anchor: row.anchor,
                                     recId: row.recId, items: items, control: row.control, model: row.model))

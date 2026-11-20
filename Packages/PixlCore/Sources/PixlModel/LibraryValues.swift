@@ -96,6 +96,8 @@ public struct PlaybackQueueItemSnapshot: Sendable, Hashable, Codable {
     public var brainControl: Bool?
     public var brainModel: Int?
     public var brainExplore: Bool?
+    /// The feature vector the pick was served with, as hex (stage 4); nil for a track the scorer did not serve.
+    public var brainServedX: String?
 
     public init(mediaId: String, uri: String, title: String? = nil, artist: String? = nil, albumTitle: String? = nil,
                 artworkUri: String? = nil, durationMs: Int64? = nil, brainSurface: String? = nil,

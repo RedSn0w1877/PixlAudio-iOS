@@ -176,7 +176,7 @@ public actor HomePlanBuilder {
                                     row: StoredRadioRow(row: item.track.toRadioRow(), rid: item.track.rid), arm: item.arm,
                                     whyKey: artistMore ? WhyLine.artistMore : WhyLine.radioFans,
                                     whyName: artistMore ? (artist ?? "") : row.anchor.primaryArtist, slot: slot,
-                                    explore: item.explore)
+                                    explore: item.explore, sx: item.servedX ?? "")
                 }
                 addShelf(PlanShelf(type: HomePlanner.becauseListened, id: row.id, titleKey: "because_listened",
                                    titleArg: row.anchor.title, subtitleKey: "because_listened_subtitle", items: items, recId: row.recId,
@@ -276,7 +276,8 @@ public actor HomePlanBuilder {
             guard let rid = view.rids[song.id], let stored = byRid[rid] else { continue }
             let row = view.novelIds.contains(song.id) ? stored.row : nil
             items.append(PlanItem(rid: rid, aid: nameHash(row != nil ? row?.row.artists.first?.name : BrainLibraryIndex.primaryArtistName(song)),
-                                  songId: row == nil ? song.id : nil, row: row, arm: stored.arm, slot: items.count, explore: stored.explore))
+                                  songId: row == nil ? song.id : nil, row: row, arm: stored.arm, slot: items.count, explore: stored.explore,
+                                  sx: stored.sx))
         }
         if items.count < HomePlanner.minTracks { return nil }
         return PlanShelf(type: HomePlanner.daypartMix, id: "daypart:\(bucket)", titleKey: "your_daypart", titleArg: String(bucket),

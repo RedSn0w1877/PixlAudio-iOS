@@ -7,8 +7,25 @@ import Foundation
 import PixlFoundation
 
 public enum TaizoAssistant {
+    /// Stage 4 (docs/brain-spec.md, 9.4): appended after the existing tool guidance; the wording is Android's. The last bullet is what the
+    /// grounding check needs (deviation 208): code cannot tell a title from other words, so the model marks every name it says.
+    public static let musicRules = """
+        Music picks come from the listener's own engine, not from memory.
+        - Never name a track, album or artist as a recommendation unless a tool returned it in this conversation.
+          If you think of a song yourself, pass it to resolve_tracks first and drop anything not found.
+        - To recommend, call recommend or build_mix with structured filters. Do not rank or reorder what they return.
+        - Genre and mood filters are ids. Get them from lookup_genre; do not guess ids.
+        - To explain a pick or the listener's taste, call explain_track or explain_taste and report only what they return.
+          If a field is listed as unknown, say it is unknown.
+        - Numbers about the listener come only from tool results.
+        - Put [[double square brackets]] around every track, album and artist you name, spelled as a tool returned it. The app takes the brackets off.
+        """
+
     /// The stable instruction block (first system block).
-    public static let instructions = """
+    public static let instructions = baseInstructions + "\n\n" + musicRules
+
+    /// The instructions of the stages before 4.
+    static let baseInstructions = """
         Your name is Taizo and you are PixlAudio's built-in assistant. Never say which AI model, company or service is behind you; if asked, say you are Taizo, PixlAudio's assistant.
 
         You are Taizo, PixlAudio's music assistant, inside the PixlAudio music player on the user's phone. You help \
@@ -84,8 +101,28 @@ public enum TaizoAssistant {
             return "Create “\(name)” with \(count) songs?"
         case TaizoTool.playSongs.rawValue where currentQueueCount > 1:
             return "Replace your queue (\(currentQueueCount) songs) with \(count == 1 ? "1 song" : "\(count) songs")?"
+        case TaizoTool.startStation.rawValue where currentQueueCount > 1:
+            return "Replace your queue (\(currentQueueCount) songs) with a station?"
+        case TaizoTool.steerSession.rawValue where input["scope"]?.stringValue == "always":
+            return "Keep this for good: \(describeSteer(change: input["change"]?.stringValue ?? "", target: input["target"]?.stringValue ?? ""))? You can undo it in Settings."
         default:
             return nil
+        }
+    }
+
+    /// What a `steer_session` change says, for the question that asks before a lasting one (mirrors Android's wording).
+    public static func describeSteer(change: String, target: String) -> String {
+        let name = target.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "this" : target
+        switch change {
+        case "more_artist": return "play more of \(name)"
+        case "less_artist": return "play less of \(name)"
+        case "more_genre": return "play more of genre \(name)"
+        case "less_genre": return "play less of genre \(name)"
+        case "energy_up": return "turn the energy up"
+        case "energy_down": return "turn the energy down"
+        case "more_familiar": return "play more of what you know"
+        case "more_new": return "play more new music"
+        default: return change
         }
     }
 
@@ -389,6 +426,17 @@ public enum TaizoTool: String, Sendable, Hashable, CaseIterable {
     case adjustTaste = "adjust_taste"
     case listTasteAdjustments = "list_taste_adjustments"
     case removeTasteAdjustment = "remove_taste_adjustment"
+    // Stage 4 (docs/brain-spec.md, 9.3): the music tools, appended after the 16 older ones in this order, never reordered.
+    case resolveTracks = "resolve_tracks"
+    case recommend = "recommend"
+    case buildMix = "build_mix"
+    case startStation = "start_station"
+    case steerSession = "steer_session"
+    case explainTrack = "explain_track"
+    case explainTaste = "explain_taste"
+    case lookupGenre = "lookup_genre"
+    case similarArtists = "similar_artists"
+    case newReleases = "new_releases"
 
     /// The tools the on-device model can use offline (no catalogue, no web). It can read the taste but not change it.
     public static let offline: [TaizoTool] = [.searchLibrary, .playSongs, .addToQueue, .playbackControl, .createPlaylist,
@@ -399,9 +447,11 @@ public enum TaizoTool: String, Sendable, Hashable, CaseIterable {
     public var isReadOnly: Bool {
         switch self {
         case .searchLibrary, .searchSpotifyCatalog, .getListeningInsights, .getLyrics, .getTasteProfile,
-             .getLibraryOverview, .listTasteAdjustments: true
+             .getLibraryOverview, .listTasteAdjustments,
+             .resolveTracks, .recommend, .buildMix, .explainTrack, .explainTaste, .lookupGenre, .similarArtists,
+             .newReleases: true
         case .playSongs, .addToQueue, .playbackControl, .createPlaylist, .addToPlaylist, .startSing, .likeSong,
-             .adjustTaste, .removeTasteAdjustment: false
+             .adjustTaste, .removeTasteAdjustment, .startStation, .steerSession: false
         }
     }
 
@@ -411,10 +461,16 @@ public enum TaizoTool: String, Sendable, Hashable, CaseIterable {
     public static let tastePeriods = ["month", "six_months", "year", "all_time"]
     public static let searchSorts = ["relevance", "most_played", "recently_played", "recently_added", "random", "title"]
 
+    /// The 16 tools of the stages before 4: a cached prompt prefix mirrored on Android. Their order is part of the contract.
+    public static var legacy: [TaizoTool] { allCases.filter { !$0.isMusicTool } }
+
     public static var definitions: [ClaudeToolDefinition] { allCases.map(\.definition) }
 
     public var definition: ClaudeToolDefinition {
         switch self {
+        case .resolveTracks, .recommend, .buildMix, .startStation, .steerSession, .explainTrack, .explainTaste, .lookupGenre,
+             .similarArtists, .newReleases:
+            return musicDefinition
         case .searchLibrary:
             return ClaudeToolDefinition(
                 name: rawValue,

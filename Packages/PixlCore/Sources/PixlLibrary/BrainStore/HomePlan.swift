@@ -19,10 +19,13 @@ public struct PlanItem: Codable, Sendable, Equatable {
     public var slot: Int
     /// The slot was an exploration slot (5.10): carried into the play's tag.
     public var explore: Bool
+    /// The feature vector the pick was served with (hex, stage 4); empty for none.
+    public var sx: String
 
     public init(rid: Int64, aid: Int64 = 0, songId: String? = nil, row: StoredRadioRow? = nil, arm: Int32 = Arm.none,
-                whyKey: Int32 = WhyLine.none, whyName: String = "", slot: Int = -1, explore: Bool = false) {
+                whyKey: Int32 = WhyLine.none, whyName: String = "", slot: Int = -1, explore: Bool = false, sx: String = "") {
         self.explore = explore
+        self.sx = sx
         self.rid = rid
         self.aid = aid
         self.songId = songId
@@ -33,7 +36,7 @@ public struct PlanItem: Codable, Sendable, Equatable {
         self.slot = slot
     }
 
-    private enum CodingKeys: String, CodingKey { case rid, aid, songId, row, arm, whyKey, whyName, slot, explore }
+    private enum CodingKeys: String, CodingKey { case rid, aid, songId, row, arm, whyKey, whyName, slot, explore, sx }
 
     // A plan saved by an earlier stage has no `explore`: it is read as false.
     public init(from decoder: any Decoder) throws {
@@ -47,6 +50,7 @@ public struct PlanItem: Codable, Sendable, Equatable {
         whyName = try c.decode(String.self, forKey: .whyName)
         slot = try c.decode(Int.self, forKey: .slot)
         explore = try c.decodeIfPresent(Bool.self, forKey: .explore) ?? false
+        sx = try c.decodeIfPresent(String.self, forKey: .sx) ?? ""
     }
 }
 
@@ -374,6 +378,7 @@ public extension BrainItemTag {
                      whyKey: item.whyKey != WhyLine.none ? WhyLine.nameOf(item.whyKey) : nil,
                      primaryArtist: item.row?.row.artists.first?.name,
                      // The listener chose to play the shelf: its tracks are theirs, like a playlist's.
-                     chosen: true, control: shelf.control, modelVersion: shelf.model, explore: item.explore)
+                     chosen: true, control: shelf.control, modelVersion: shelf.model, explore: item.explore,
+                     servedX: item.sx.isEmpty ? nil : item.sx)
     }
 }

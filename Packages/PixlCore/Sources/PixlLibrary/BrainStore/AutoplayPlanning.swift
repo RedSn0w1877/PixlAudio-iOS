@@ -151,7 +151,8 @@ public enum AutoplayPlanning {
                             primaryArtist: BrainText.isBlank(entry.primaryArtist) ? nil : entry.primaryArtist,
                             // How the list was ranked, fixed when it was built (5.12 point 8); a pick taken in pool order was
                             // ranked by nothing: the prior, no control. A novel slot the arm bandit drew is an exploration slot (5.10).
-                            control: control, modelVersion: Int(modelVersion), explore: pick?.explore == true)
+                            control: control, modelVersion: Int(modelVersion), explore: pick?.explore == true,
+                            servedX: pick?.servedX.map(ServedVector.toHex))
     }
 
     /// `items` without what the queue already holds. A plan is made off the main actor; meanwhile another edit (a
