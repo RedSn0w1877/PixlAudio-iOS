@@ -34,6 +34,9 @@ public actor BrainMixes {
     let clock: @Sendable () -> Int64
     /// Stage 2b: the islands, the DNA and the whole library by id (docs/brain-spec.md, 5.4, 6.2, 8.2). Nil: the lists of stage 2a.
     var parts: Stage2bParts?
+    /// "Let Taizo help the engine": songs the assistant suggested by artists the listener likely does not know (nil: none). An assistant mix may
+    /// draw from them as an artist list, so they are candidates like any other (arm ASK).
+    var assistSuggestions: (@Sendable () async -> [StoredRadioRow])?
 
     // One build at a time: a mutex that survives the awaits inside it (an actor alone does not).
     private var busy = false

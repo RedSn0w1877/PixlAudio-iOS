@@ -189,11 +189,14 @@ public struct AssistantTasteLine: Sendable {
     public var name: String
     public var value: String
     public var detail: String
+    /// The line is about a genre (its `name`): a one-tap "Less X" may be offered for it when the listener asked about it.
+    public var isGenre: Bool
 
-    public init(name: String, value: String, detail: String = "") {
+    public init(name: String, value: String, detail: String = "", isGenre: Bool = false) {
         self.name = name
         self.value = value
         self.detail = detail
+        self.isGenre = isGenre
     }
 }
 

@@ -66,9 +66,14 @@ public protocol RefreshWork: Sendable {
     /// Stage 3 (5.9, 5.12): the replay that trains the learner and decides the gate, and the weekly refresh of the facts, when they
     /// are due. It runs here and not at first use, so a play or Home never waits for it. A no-op by default.
     func rebuildBrain() async
+    /// Stage 4 (docs/brain-spec.md, 9.4): the optional batch jobs of "Let Taizo help the engine" (island names, genres for tracks no source
+    /// knows, artists the listener may not know). Off by default behind its own switch, inside the assistant's monthly budget; runs here and
+    /// nowhere else, after the brain is rebuilt. A no-op by default.
+    func assistantHelp(playing: @Sendable () async -> Bool) async
 }
 
 public extension RefreshWork {
+    func assistantHelp(playing: @Sendable () async -> Bool) async {}
     func settleShelves() async {}
     func rebuildBrain() async {}
     func fitIslands() async {}
@@ -256,6 +261,8 @@ public struct BrainRefreshRunner: Sendable {
             await work.fitIslands()
             await work.settleShelves()
             await work.rebuildBrain()
+            // The optional assistant jobs (off unless "Let Taizo help the engine" is on): after everything the brain needs, so they never delay it.
+            if await allowed(), !(await playing()) { await work.assistantHelp(playing: playing) }
         }
         return report
     }
@@ -282,6 +289,8 @@ public struct BrainRefreshWork: RefreshWork {
     private let shelves: ShelfStore?
     /// Lanes 3 to 5 (stage 2b): the open-data sources. Nil runs the refresh as stage 2a did.
     private let dna: DnaLanes?
+    /// Stage 4: the optional batch jobs, run at the end of a refresh. Nil leaves the refresh as stage 3 made it.
+    private let assist: AssistantHelp?
     private let matchedVideoId: @Sendable (String) async -> String?
     private let clock: @Sendable () -> Int64
     private let newReleases: NewReleases?
@@ -291,7 +300,9 @@ public struct BrainRefreshWork: RefreshWork {
     public init(mixes: BrainMixes, repository: BrainRepository, budget: HostBudget?,
                 matchedVideoId: @escaping @Sendable (String) async -> String?,
                 newReleases: NewReleases? = nil, librarySongs: @escaping @Sendable () async -> [Song] = { [] },
-                dna: DnaLanes? = nil, shelves: ShelfStore? = nil, clock: @escaping @Sendable () -> Int64 = { currentTimeMillis() }) {
+                dna: DnaLanes? = nil, shelves: ShelfStore? = nil, assist: AssistantHelp? = nil,
+                clock: @escaping @Sendable () -> Int64 = { currentTimeMillis() }) {
+        self.assist = assist
         self.shelves = shelves
         self.dna = dna
         self.newReleases = newReleases
@@ -331,6 +342,12 @@ public struct BrainRefreshWork: RefreshWork {
     public func settleShelves() async { await shelves?.settle() }
 
     public func rebuildBrain() async { await mixes.engine.rebuildIfDue() }
+
+    public func assistantHelp(playing: @Sendable () async -> Bool) async {
+        guard let assist else { return }
+        let work = self
+        _ = await assist.run(playing: playing, requestsLeft: { await work.requestsLeft() })
+    }
 
     public func radioSeeds() async -> [RefreshTarget] { await targets(of: await mixes.seedsForRefresh()) }
 

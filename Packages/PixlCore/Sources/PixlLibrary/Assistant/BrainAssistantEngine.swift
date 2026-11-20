@@ -413,6 +413,11 @@ public actor BrainAssistantEngine: MusicBackend, AssistantPlayable {
         guard let plan = await planFor(query, bump: 2), !plan.picks.isEmpty else {
             return AssistantSteerOutcome(applied: false, note: "PixlAudio could not find songs for that change.")
         }
+        // An energy change the data cannot answer (no energy known for the pool) would only add songs that are not any calmer or livelier:
+        // it is not applied, and the model is told, instead of reporting a change that did not happen (Android milestone 2).
+        if (change == "energy_up" || change == "energy_down") && plan.unsupported.contains(where: { KotlinText.equals($0, AssistantRules.filterEnergy) }) {
+            return AssistantSteerOutcome(applied: false, note: "PixlAudio does not know how energetic these songs are yet, so it cannot change the energy of this queue. Nothing was changed.")
+        }
         let picks = await picksOf(plan, surfaceId: "assistant", now: clock())
         let songs = plan.picks.prefix(picks.count).map(\.song)
         let engineTracks = plan.picks.compactMap(\.track)
@@ -448,9 +453,9 @@ public actor BrainAssistantEngine: MusicBackend, AssistantPlayable {
         let servedX = known?.servedX ?? newest?.servedX
         var factors: [AssistantRules.Factor]?
         if let x = ServedVector.dequantize(servedX) {
-            let now = clock()
-            let p0 = await engine.readAffinity { Affinity.p0($0, nowMs: now) }
-            factors = AssistantRules.topFactors(x, Ranker.weights(p0: p0))
+            // The weights the pick was ranked with (the learned ones only for a pick they ranked, and only while the gate has them on).
+            let model: Int32 = known?.servedX != nil ? Int32(clamping: known?.tag?.modelVersion ?? 0) : (newest?.modelVersion ?? 0)
+            factors = await engine.servedFactors(x, modelVersion: model, nowMs: clock())
         }
         var genres: [String]?
         var year = song.year
@@ -496,7 +501,7 @@ public actor BrainAssistantEngine: MusicBackend, AssistantPlayable {
             }
             if lines.isEmpty { unknown.append("Taste islands need about 20 plays in the last 28 days.") }
         case "genres":
-            for g in st.genres.prefix(10) { lines.append(AssistantTasteLine(name: g.name, value: pct(g.permille))) }
+            for g in st.genres.prefix(10) { lines.append(AssistantTasteLine(name: g.name, value: pct(g.permille), isGenre: true)) }
             if lines.isEmpty { unknown.append("Genres are known only for tracks whose tags have been fetched. None are yet.") }
         case "dayparts":
             for d in st.dayparts where d.plays > 0 {
@@ -529,7 +534,7 @@ public actor BrainAssistantEngine: MusicBackend, AssistantPlayable {
         default:
             lines.append(AssistantTasteLine(name: "Plays counted", value: "\(st.plays)"))
             for i in st.islands.prefix(3) { if let name = i.name { lines.append(AssistantTasteLine(name: name, value: pct(i.permille))) } }
-            for g in st.genres.prefix(3) { lines.append(AssistantTasteLine(name: g.name, value: pct(g.permille))) }
+            for g in st.genres.prefix(3) { lines.append(AssistantTasteLine(name: g.name, value: pct(g.permille), isGenre: true)) }
         }
         return AssistantTasteExplanation(scope: scope, lines: lines, unknown: unknown)
     }

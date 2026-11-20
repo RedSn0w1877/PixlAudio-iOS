@@ -158,6 +158,8 @@ public actor YourSoundReader {
     private var extrasCache: [Int: (atMs: Int64, value: GenreExtras)] = [:]
     /// The island names of one `compute` pass.
     private var nameCache: [Int: String?] = [:]
+    /// "Let Taizo help the engine": a validated assistant-written island name, used only while that switch is on (nil: the atlas names).
+    private var assistedIslandName: (@Sendable (_ islandId: Int, _ genreNames: [String]) async -> String?)?
 
     public init(engine: BrainEngine, mixes: BrainMixes, parts: Stage2bParts, genre: GenreStations? = nil, shelves: ShelfStore? = nil,
                 homeRows: BrainHomeRows? = nil, homePlans: HomePlanStore? = nil,
@@ -468,13 +470,32 @@ public actor YourSoundReader {
         return out
     }
 
+    public func setAssistedIslandName(_ lookup: (@Sendable (_ islandId: Int, _ genreNames: [String]) async -> String?)?) {
+        assistedIslandName = lookup
+        nameCache.removeAll()
+    }
+
     /// An island's name, the same words the Daily Mixes carry (an island is named only when enough of it has a genre).
     private func nameOf(_ id: Int, _ set: IslandSet?, _ now: Int64) async -> String? {
         if let known = nameCache[id] { return known }
         var found: String?
         if let island = set?.islands.first(where: { $0.id == id }) {
-            let text = await mixes.islandSubtitle(island, nowMs: now)
-            found = BrainText.isBlank(text) ? nil : text
+            // A validated assistant-written name, only while the switch is on and only while the island still holds the genres it was written
+            // for. Otherwise (and always without the switch) the atlas name below.
+            var assisted: String?
+            if let lookup = assistedIslandName, let atlas = await parts.atlas.atlas() {
+                var names: [String] = []
+                for tag in island.topTags {
+                    if let n = AtlasNames.genreName(atlas, tag), !names.contains(where: { KotlinText.equals($0, n) }) { names.append(n) }
+                }
+                assisted = await lookup(island.id, Array(names.prefix(5)))
+            }
+            if let assisted {
+                found = assisted
+            } else {
+                let text = await mixes.islandSubtitle(island, nowMs: now)
+                found = BrainText.isBlank(text) ? nil : text
+            }
         }
         nameCache[id] = .some(found)
         return found

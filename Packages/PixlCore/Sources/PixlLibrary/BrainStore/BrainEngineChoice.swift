@@ -38,6 +38,17 @@ public enum BrainRemoteConfig {
         return enabled
     }
 
+    /// False only when `configText` says `{"brain": {"assist": {"enabled": false}}}`: the owner can switch the batch jobs of "Let Taizo help the
+    /// engine" off for every phone. A missing file, a missing key or text that is not JSON means "on" (the local switch is off by default).
+    public static func assistAllowed(configText: String?) -> Bool {
+        guard let configText, !configText.isEmpty,
+              let root = (try? JSONSerialization.jsonObject(with: Data(configText.utf8))) as? [String: Any],
+              let brain = root["brain"] as? [String: Any],
+              let assist = brain["assist"] as? [String: Any],
+              let enabled = assist["enabled"] as? Bool else { return true }
+        return enabled
+    }
+
     /// False only when `configText` says `{"brain": {"sources": {"<key>": {"enabled": false}}}}` for that source. The
     /// owner can switch a knowledge source off for every phone before charging anyone (docs/brain-spec.md, 15, question 2).
     /// A missing file, a missing key or text that is not JSON means "on".

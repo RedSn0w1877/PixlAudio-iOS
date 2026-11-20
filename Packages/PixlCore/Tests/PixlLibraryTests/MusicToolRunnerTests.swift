@@ -245,6 +245,58 @@ struct MusicToolRunnerTests {
         #expect(backend.steerCalls.first == ["energy_down", "", "session"])
     }
 
+    // MARK: Cards under the answer (stage 4 milestone 2)
+
+    private let mixInput = #"{"title":"Late drive","seed_refs":[],"genre_ids":[],"mood_ids":[],"year_from":0,"year_to":0,"energy":"any","tempo":"any","novelty_share_pct":-1,"length":30,"exclude_artist_refs":[]}"#
+
+    @Test func aBuiltMixGivesOneCardThatIsTakenOnceAndKeptForItsButtons() async throws {
+        backend.mixTracks = (1...12).map { backend.add(yt($0), "Song \($0)", "Mono") }
+        _ = try await run("build_mix", mixInput)
+        let cards = await runner.takeNewMixCards()
+        #expect(cards.count == 1 && cards[0].mixId == "m1" && cards[0].title == "Late drive" && cards[0].total == 12)
+        #expect(await runner.takeNewMixCards().isEmpty, "a card is shown once")
+        #expect(await runner.mixCard("m1")?.total == 12, "its buttons find it again")
+        #expect(await runner.mixTitle("m1") == "Late drive")
+        #expect(await runner.mixTitle("nope") == "Made for you")
+    }
+
+    @Test func aChipChangesTheStoredRequestOnTheDeviceAndTheNewTracksMayBeNamed() async throws {
+        backend.mixTracks = (1...40).map { backend.add(yt($0), "Song \($0)", "Mono") }
+        _ = try await run("build_mix", mixInput)
+        let shorter = AssistantRules.Chip(kind: AssistantRules.chipShorter)
+        let next = try #require(await runner.adjustMix(mixId: "m1", chip: shorter))
+        #expect(next.total == 20, "Shorter takes ten off")
+        #expect(backend.adjustCalls == ["m1"])
+        #expect(backend.mixQueries.count == 1, "no second build_mix call: a chip is not a tool call")
+        #expect(grounding.check("[[Song 7]]", placeholder: "(?)").ok)
+        // A card of a mix this chat never built has no chip to apply.
+        #expect(await runner.adjustMix(mixId: "zzz", chip: shorter) == nil)
+    }
+
+    @Test func onlyTheEightNewestMixesKeepTheirCards() async throws {
+        backend.mixTracks = [backend.add(yt(1), "Song 1", "Mono")]
+        for _ in 0..<10 { _ = try await run("build_mix", mixInput) }
+        // The fake reuses one id, so one card is held; the limit itself is the constant.
+        #expect(MusicToolRunner.maxMixes == 8)
+        #expect(await runner.mixCard("m1") != nil)
+    }
+
+    @Test func theExplainToolsNameOnlyWhatTheyReturnedForLessX() async throws {
+        backend.explanation = AssistantTrackExplanation(ref: yt(1), title: "Song", artist: "Mono, Clairo", genres: ["Trap", "Pop"])
+        _ = try await run("explain_track", "{\"ref\":\"\(yt(1))\"}")
+        backend.taste = AssistantTasteExplanation(scope: "genres", lines: [AssistantTasteLine(name: "Hip Hop", value: "30% of plays", isGenre: true),
+                                                                          AssistantTasteLine(name: "Late night", value: "x")], unknown: [])
+        _ = try await run("explain_taste", #"{"scope":"genres"}"#)
+        let named = await runner.namedThisTurn()
+        #expect(named.contains(AssistantCards.Named(kind: AssistantCards.namedArtist, name: "Mono")))
+        #expect(!named.contains { $0.name == "Clairo" }, "only the primary artist")
+        #expect(named.contains(AssistantCards.Named(kind: AssistantCards.namedGenre, name: "Trap")))
+        #expect(named.contains(AssistantCards.Named(kind: AssistantCards.namedGenre, name: "Hip Hop")))
+        #expect(!named.contains { $0.name == "Late night" }, "a line that is not a genre is not offered")
+        await runner.beginTurn()
+        #expect(await runner.namedThisTurn().isEmpty, "a new turn starts empty")
+    }
+
     @Test func anUnknownToolNameIsAnErrorNotACrash() async throws {
         let out = try await run("nope", "{}")
         #expect(out["error"] != nil)

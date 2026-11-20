@@ -278,6 +278,20 @@ public actor DnaRepository {
         return true
     }
 
+    /// Rows no source could tag (stage 4, the optional tagging job): no tags, and Deezer, MusicBrainz and iTunes have all answered. After `after`,
+    /// in recording order, at most `limit`. A row the assistant could not tag either is skipped by the job's own cache, not here.
+    public func untagged(after: Int64, limit: Int) -> [TrackDnaRow] {
+        load()
+        let answered = DnaSource.deezer | DnaSource.musicbrainz | DnaSource.itunes
+        var out: [TrackDnaRow] = []
+        for rid in tracks.keys.sorted() where rid > after {
+            guard let row = tracks[rid], row.tags.isEmpty, row.fetchedMask & answered == answered else { continue }
+            out.append(row)
+            if out.count >= limit { break }
+        }
+        return out
+    }
+
     /// Writes one artist row alone (the Spotify purge of artists no track row led to).
     @discardableResult
     public func upsert(artist: ArtistDnaRow) -> Bool {

@@ -53,13 +53,26 @@ final class FakeMusicBackend: MusicBackend, @unchecked Sendable {
 
     func buildMix(_ query: AssistantRules.Query) async -> AssistantMix? {
         mixQueries.append(query)
+        builtQueries["m1"] = query
         if mixTracks.isEmpty { return nil }
         return AssistantMix(mixId: "m1", title: query.title.isEmpty ? "Made for you" : query.title,
                             tracks: mixTracks.prefix(query.count).map { AssistantPick(track: $0, whyKey: "asked") },
                             unsupportedFilters: unsupported, query: query)
     }
 
-    func adjustMix(mixId: String, chip: AssistantRules.Chip) async -> AssistantMix? { nil }
+    var builtQueries: [String: AssistantRules.Query] = [:]
+    var adjustCalls: [String] = []
+
+    /// A chip is a delta on the stored request: the same list source, the new request, a new id.
+    func adjustMix(mixId: String, chip: AssistantRules.Chip) async -> AssistantMix? {
+        guard let stored = builtQueries[mixId] else { return nil }
+        let next = AssistantRules.applyChip(stored, chip)
+        adjustCalls.append(mixId)
+        let id = "m(adjustCalls.count + 1)"
+        builtQueries[id] = next
+        return AssistantMix(mixId: id, title: next.title, tracks: mixTracks.prefix(next.count).map { AssistantPick(track: $0, whyKey: "asked") },
+                            unsupportedFilters: unsupported, query: next)
+    }
 
     func startStation(seedRef: String, seedKind: String, mode: String) async -> AssistantStationOutcome {
         stationCalls.append([seedRef, seedKind, mode])

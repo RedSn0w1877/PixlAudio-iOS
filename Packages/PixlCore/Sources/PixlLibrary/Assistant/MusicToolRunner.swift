@@ -33,6 +33,63 @@ public actor MusicToolRunner {
     public func beginTurn() {
         lookedUpThisTurn = 0
         budgetSpentThisTurn = false
+        named.removeAll()
+        newCardIds.removeAll()
+    }
+
+    // MARK: Cards under the answer (docs/brain-spec.md, 9.3 "What the listener gets"): no model call behind any of these
+
+    /// Mixes kept so their cards can still play, save and change.
+    public static let maxMixes = 8
+
+    private var builtMixes: [String: AssistantMix] = [:]
+    private var mixOrder: [String] = []
+    /// Mixes `build_mix` made in this turn whose card has not been taken yet.
+    private var newCardIds: [String] = []
+    /// The genres and artists the explain tools of this turn returned (for the one-tap "Less X").
+    private var named: [AssistantCards.Named] = []
+
+    private func remember(_ mix: AssistantMix) {
+        builtMixes[mix.mixId] = mix
+        mixOrder.removeAll { $0 == mix.mixId }
+        mixOrder.append(mix.mixId)
+        while mixOrder.count > Self.maxMixes { builtMixes[mixOrder.removeFirst()] = nil }
+    }
+
+    /// The cards of the mixes `build_mix` made since the last call, in order (the chat shows them under the answer).
+    public func takeNewMixCards() -> [MixCard] {
+        let ids = newCardIds
+        newCardIds.removeAll()
+        return ids.compactMap { builtMixes[$0] }.map(MixCard.of)
+    }
+
+    /// The card of a mix this chat built, or nil.
+    public func mixCard(_ mixId: String) -> MixCard? { builtMixes[mixId].map(MixCard.of) }
+
+    /// The title of a mix this chat built ("Made for you" for any other id): the name a saved playlist gets.
+    public func mixTitle(_ mixId: String) -> String {
+        let t = builtMixes[mixId]?.title ?? ""
+        return BrainText.isBlank(t) ? "Made for you" : t
+    }
+
+    /// A chip tapped under a card: the stored request with that delta, built again by the engine. No model call, no tool call of the
+    /// conversation: the tracks it returns are noted as held, so a reply that names one is not an invented name. Nil when the engine had
+    /// nothing to build or the mix is not this chat's.
+    public func adjustMix(mixId: String, chip: AssistantRules.Chip) async -> MixCard? {
+        guard let next = await backend.adjustMix(mixId: mixId, chip: chip) else { return nil }
+        for p in next.tracks { notePick(p) }
+        grounding.noteName(next.title)
+        remember(next)
+        return MixCard.of(next)
+    }
+
+    /// The genres and artists the explain tools of this turn returned; the chat offers "Less X" only for one of these that the listener asked about.
+    public func namedThisTurn() -> [AssistantCards.Named] { named }
+
+    private func noteNamed(_ kind: Int, _ raw: String) {
+        let n = BrainText.trim(raw)
+        if n.isEmpty { return }
+        if !named.contains(where: { $0.kind == kind && $0.name == n }) { named.append(AssistantCards.Named(kind: kind, name: n)) }
     }
 
     /// True for the ten music tools.
@@ -148,6 +205,8 @@ public actor MusicToolRunner {
             out += Self.unknownRefMembers(unknown)
             return Self.obj(out)
         }
+        remember(mix)
+        newCardIds.append(mix.mixId)
         var out = mixMembers(mix)
         out += Self.unknownRefMembers(unknown)
         return Self.obj(out)
@@ -209,6 +268,8 @@ public actor MusicToolRunner {
         grounding.noteName(e.title)
         grounding.noteArtists(e.artist)
         for a in e.whyArgs { grounding.noteName(a) }
+        noteNamed(AssistantCards.namedArtist, e.artist.components(separatedBy: ", ").first ?? e.artist)
+        for g in e.genres ?? [] { noteNamed(AssistantCards.namedGenre, g) }
         var unknown: [String] = []
         var out: [(String, JSONValue)] = [
             ("found", .bool(true)), ("ref", .string(e.ref)), ("title", .string(e.title)), ("artist", .string(e.artist)),
@@ -257,6 +318,8 @@ public actor MusicToolRunner {
             grounding.noteName(line.name)
             grounding.noteName(line.value)
             if !line.detail.isEmpty { grounding.noteName(line.detail) }
+            // A genre the answer states is something "Less X" can be about.
+            if line.isGenre { noteNamed(AssistantCards.namedGenre, line.name) }
         }
         let facts: [JSONValue] = t.lines.map { l in
             var m: [(String, JSONValue)] = [("name", .string(l.name)), ("value", .string(l.value))]

@@ -215,10 +215,15 @@ public enum WhyLineText {
 public struct QueueWhy: Sendable, Hashable {
     public var key: String
     public var arg: String
+    /// The vector the pick was served with (`BrainItemTag.servedX`, hex) and the model that ranked it: "What helped" on the sheet reads them.
+    public var servedX: String?
+    public var model: Int
 
-    public init(key: String, arg: String) {
+    public init(key: String, arg: String, servedX: String? = nil, model: Int = -1) {
         self.key = key
         self.arg = arg
+        self.servedX = servedX
+        self.model = model
     }
 
     public var line: WhyLineText.Line? { WhyLineText.line(keyName: key, arg: arg) }
@@ -228,7 +233,7 @@ public struct QueueWhy: Sendable, Hashable {
         var out: [String: QueueWhy] = [:]
         for entry in entries {
             guard let key = entry.tag?.whyKey, !key.isEmpty else { continue }
-            let why = QueueWhy(key: key, arg: entry.tag?.whyArg ?? "")
+            let why = QueueWhy(key: key, arg: entry.tag?.whyArg ?? "", servedX: entry.tag?.servedX, model: entry.tag?.modelVersion ?? -1)
             if why.line != nil { out[entry.mediaId] = why }
         }
         return out

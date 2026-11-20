@@ -268,4 +268,17 @@ public enum ClaudeCompletion {
         if result.outcome == .refused { throw Refused() }
         return result.text
     }
+
+    /// One short, low-effort answer under a small `max_tokens` (the weekly note and the optional batch jobs: docs/brain-spec.md, 9.4). No
+    /// tools, no streaming. The text of a refused or cut-off answer is not returned: nil. The usage is charged as soon as it arrives.
+    public static func short(client: any ClaudeMessaging, system: String, prompt: String, maxTokens: Int,
+                             onUsage: @escaping @Sendable (ClaudeUsage) async -> Void = { _ in }) async throws -> String? {
+        let request = ClaudeRequest(system: [ClaudeSystemBlock(system)], messages: [ClaudeJSON.userText(prompt)], effort: .low,
+                                    maxTokens: maxTokens, stream: false)
+        let message = try await client.send(request, onUpdate: { _ in })
+        await onUsage(message.usage)
+        if message.stopReason == "refusal" || message.stopReason == "max_tokens" { return nil }
+        let text = message.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
+    }
 }

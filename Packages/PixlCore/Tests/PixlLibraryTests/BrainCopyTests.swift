@@ -123,6 +123,29 @@ struct BrainCopyTests {
                                                     "Skipped three. Changing direction."]))
     }
 
+    /// Stage 4 milestone 2: the words under Ask Taizo's answers, the factors of a pick, the weekly note and the switch of the optional jobs
+    /// are Android's sentences (`strings_brain.xml`), and none of them says "learn" (the stage 3 allowance names four other strings).
+    @Test func theWordsOfStageFourMilestoneTwoAreAndroidsAndSayNoLearn() throws {
+        let strings = try String(contentsOf: appRoot.appendingPathComponent("Features/Brain/BrainStringsTaizo.swift"), encoding: .utf8)
+        let all = literals(strings)
+        for text in [
+            "1 song", "\\(count) songs", "Play", "Save", "Saved", "Updating", "Could not change that mix. Try again.",
+            "Some of what you asked for could not be applied, because PixlAudio has no data on it yet.",
+            "Done. You will get less \\(name).", "Undo", "Could not change that.",
+            "What helped: \\(names)", "What held it back: \\(names)", "This week", "Let Taizo help the engine",
+            "Once a week Taizo can name your taste islands, suggest artists you may not know and add genres to songs that no source knows. It sends genre names, artist names and song titles to the cloud assistant, never play counts or dates, and it counts against your monthly allowance. Off unless you turn it on.",
+            "Started a station from \\(name).",
+            "I could not find \\(name) in your library or your genres, so I did not start a station.",
+        ] {
+            #expect(all.contains(text), "missing: \(text)")
+        }
+        for literal in all {
+            let lower = literal.lowercased()
+            #expect(!lower.contains("learn"), "says learn: \(literal)")
+            for word in forbidden { #expect(!lower.contains(word), "says \(word): \(literal)") }
+        }
+    }
+
     @Test func theScanReadsLiteralsAndSkipsComments() {
         let found = literals("let a = \"One \\(x) two\" // \"not this\"\n/* \"nor this\" */ let b = \"Three\"")
         #expect(found == ["One \\(x) two", "Three"])

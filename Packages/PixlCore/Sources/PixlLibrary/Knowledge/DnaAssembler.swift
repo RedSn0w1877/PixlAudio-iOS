@@ -101,6 +101,9 @@ public enum DnaAssembler {
     public static let pDeezerAlbum = 8
     public static let pLbArtist = 12
     public static let pWdArtist = 13
+    /// The optional assistant tagging job (tag source 10, stage 4): constrained to a shortlist of atlas ids, trust 0.25, used only when the
+    /// other sources are weak. Android `P_ASSISTANT`.
+    public static let pAssistant = 10
 
     public static func sourceOf(_ provider: Int) -> Int {
         switch provider {
@@ -110,6 +113,7 @@ public enum DnaAssembler {
         case pChip: return Tags.srcChip
         case pITunes: return Tags.srcITunes
         case pDeezerAlbum: return Tags.srcDeezerAlbum
+        case pAssistant: return Tags.srcAssistant
         default: return 0
         }
     }
@@ -427,5 +431,30 @@ public enum DnaAssembler {
                 tagInputs: Data(encodeClaims(artistClaims)))
         }
         return Result(track: track, artist: artist)
+    }
+}
+
+extension DnaAssembler {
+    /// `row` with its assistant claims replaced by `claims` (none removes them): the stored claims of every other source are kept and the
+    /// tags are merged again, so the weakest source speaks only while the others are weak (3.4) and takes nothing away when they are not.
+    /// Used by the optional tagging job (`AssistantHelp`) and by its undo when the switch is turned off. A port of Android's
+    /// `DnaAssembler.withAssistantClaims`.
+    public static func withAssistantClaims(_ row: TrackDnaRow, claims: [Claim], atlas: GenreAtlas, atlasVersion: Int, nowMs: Int64) -> TrackDnaRow {
+        let prior = row.atlasVersion == atlasVersion ? decodeClaims([UInt8](row.tagInputs)) : []
+        let all = prior.filter { $0.provider != pAssistant } + claims.filter { $0.provider == pAssistant }
+        let tags = merged(atlas, all, artistLevelOnly: false)
+        let feel = TrackDna.feel(atlas, tags, gainDbX10: row.gainDbX10)
+        let moods = TrackDna.moods(atlas, tags)
+        let sources = Set(all.map { sourceOf($0.provider) }.filter { $0 != 0 }).count
+        var out = row
+        out.tags = Data(Tags.encode(tags))
+        out.moods = Data(moods.map { UInt8(truncatingIfNeeded: $0) })
+        out.energy = feel.energy
+        out.valence = feel.valence
+        out.confidence = tags.isEmpty ? 0 : min(255, sources * 64)
+        out.updatedAtMs = nowMs
+        out.atlasVersion = atlasVersion
+        out.tagInputs = Data(encodeClaims(all))
+        return out
     }
 }

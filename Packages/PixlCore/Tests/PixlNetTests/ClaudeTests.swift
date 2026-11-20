@@ -450,6 +450,31 @@ private struct FixtureStreamer: ClaudeLineStreaming {
             _ = try await ClaudeCompletion.text(client: client, system: [], prompt: "x", effort: .low)
         }
     }
+
+    @Test func shortCompletionIsOneSmallRequestAndChargesItsUsage() async throws {
+        let client = ScriptedClaude([message([textBlock("  Two songs.  ")], stop: "end_turn", usage: ClaudeUsage(outputTokens: 7))])
+        let charged = UsageBox()
+        let text = try await ClaudeCompletion.short(client: client, system: "Say it.", prompt: "rows", maxTokens: 320) { await charged.add($0) }
+        #expect(text == "Two songs.")
+        let request = try #require(client.recorded.first)
+        #expect(client.recorded.count == 1)
+        #expect(request.maxTokens == 320 && !request.stream && request.tools.isEmpty && request.effort == .low)
+        #expect(await charged.total == 7)
+    }
+
+    @Test func shortCompletionReturnsNilForARefusalACutOffAnswerAndNoText() async throws {
+        for stop in ["refusal", "max_tokens"] {
+            let client = ScriptedClaude([message([textBlock("partial")], stop: stop)])
+            #expect(try await ClaudeCompletion.short(client: client, system: "s", prompt: "p", maxTokens: 50) == nil)
+        }
+        let empty = ScriptedClaude([message([textBlock("  ")], stop: "end_turn")])
+        #expect(try await ClaudeCompletion.short(client: empty, system: "s", prompt: "p", maxTokens: 50) == nil)
+    }
+}
+
+private actor UsageBox {
+    private(set) var total: Int64 = 0
+    func add(_ usage: ClaudeUsage) { total += usage.outputTokens }
 }
 
 @Suite struct ClaudeConversationTests {

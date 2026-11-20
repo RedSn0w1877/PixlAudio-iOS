@@ -73,6 +73,8 @@ extension BrainMixes {
         return Int32(truncatingIfNeeded: 1000 + Int(BrainHash.fnv1a64(text) >> 40) + bump)
     }
 
+    public func setAssistSuggestions(_ rows: (@Sendable () async -> [StoredRadioRow])?) { assistSuggestions = rows }
+
     /// Plans `query`. Nil when there is nothing to build from (no library and no cached radio).
     public func assistantPlan(_ query: AssistantRules.Query, seeds: [AssistantSeed], excludedArtists: [String],
                               regen: Int32) async -> AssistantPlan? {
@@ -103,6 +105,13 @@ extension BrainMixes {
                 if list == nil && artistRows.isEmpty { continue }
                 mixSeeds.append(MixSeed(rid: p.rid, aid: p.aid, title: p.title, artistName: p.artist, list: list, artistRows: artistRows))
             }
+        }
+        // "Let Taizo help the engine" (off by default): songs the assistant suggested by artists the listener likely does not know join the pool
+        // as an artist list, so they are candidates like any other (arm ASK, scored by the same ranker); a request for familiar music or for no
+        // new music leaves them out.
+        if query.novelty != AssistantRules.familiar && query.noveltySharePct != 0, let suggestions = assistSuggestions {
+            let rows = await suggestions()
+            if !rows.isEmpty { mixSeeds.append(MixSeed(rid: 0, aid: 0, title: "", artistName: "", list: nil, artistRows: rows)) }
         }
         let cold = !(await hasState())
         if library.isEmpty && mixSeeds.isEmpty { return nil }
