@@ -143,7 +143,7 @@ instead of Material. Notes: `docs/handoff/2026-11-11-ios-spatial-ui.md`.
 | Player file-info chip (developer mode) | ends with "• Spatial Studio on phone" / "• Spatial Studio cloud render" | same |
 
 
-## Song Tap (2026-11-20, branch `song-tap`, milestone 1)
+## Song Tap (2026-11-20, branch `song-tap`, milestones 1 and 2)
 
 Send the song that is playing to another phone with PixlAudio and add it to that phone's library, in the end with a
 Bluetooth tap and one beam animation on both phones; milestone 1 is the code route (a QR code), the core, the receiver
@@ -161,6 +161,12 @@ Material. Notes: `docs/handoff/2026-11-20-song-tap.md`.
 | Transport | `SongTapTransport` + `SongTapQrTransport`; camera `SongTapCamera` (AVFoundation QR detector, 6 reads a second, started and stopped on its own queue), code `SongTapQrImage` (CoreImage, level L) | `SongTapTransport` + `QrTransport`; CameraX + zxing |
 | Settings | `SongTapSettings` (UserDefaults: `allow_song_tap` off by default, `song_tap_first_beam_accepted`); Settings › Song Tap (switch + "Open Song Tap") after Sing | `SongTapSettings` (DataStore `song_tap`); Settings › Song Tap after Sing |
 | Player entry | the ⋯ menu's second group, after Share: "Song Tap" with On / Off, opening the cover | the player menu's Listen group, third row |
-| Surface | `AppCover.songTap` (`SongTapView`): turn-on card, Send / Receive, code or camera, result card (Add / Not now the first time, then Undo for 6 s) | `Screen.SongTap` |
-| Permissions | camera asked when the listener first picks Receive and taps Allow camera; Bluetooth string in the plist for milestone 2, not asked yet | camera the same; Bluetooth permission milestone 2 |
-| Not yet (milestone 2) | Bluetooth tap, the beam animation (the timeline is in the core), Reduce Motion in the UI, Developer mode "Song Tap diagnostics" | same |
+| Surface | `AppCover.songTap` (`SongTapView`): turn-on card, Send / Receive, the song's large artwork with the status line, code (one tap away) or camera, result card (Add / Not now the first time), the beam | `Screen.SongTap` |
+| Permissions | Bluetooth asked by the system the first time the screen arms the radio, i.e. right after "Turn on Song Tap"; camera when the listener first picks "Scan a code instead" and taps Allow camera | Bluetooth asked by the "Turn on Song Tap" button; camera the same |
+| Bluetooth wire (milestone 2) | `SongTapWire` (PixlCore): the same two service UUIDs, four characteristics and message bytes as Android's `SongTapWire`; `wire.jsonl` replayed bit for bit | `SongTapWire` (`:songtap`, spec version 2) |
+| Bluetooth route | `SongTapBleRoute` (PixlCore, a port of `BleTransport` over `SongTapBleRadio` / `SongTapImpulseSource` / `SongTapClock` / `SongTapBleScheduler`; 33 tests over fakes) | `BleTransport` + `BleRadio` |
+| Radio | `SongTapBluetoothRadio` (app): `CBPeripheralManager` (advertise one service UUID, the sender's GATT server, long reads signed once) and `CBCentralManager` (scan both UUIDs with duplicates, one connection to the sender, one operation at a time); main queue; made only while armed | `AndroidBleRadio` |
+| Tap sensor | `SongTapMotionSource` (CoreMotion accelerometer, 50 Hz, only while armed) feeding the core's `SongTapImpulse`; the detector is the core's, fed with the scan's RSSI | `SensorImpulseSource` |
+| Beam | `SongTapBeam.swift`: `TimelineView` (paused unless a beam plays) over the core's `SongTapTimeline`; sender artwork lifts, shrinks and flies off the top; receiver card in one `GlassEffectContainer` with the Undo chip (`glassEffectID`, matched geometry); top-edge glow (one radial gradient); Reduce Motion = 150 ms cross-fade, haptics stay | `SongTapBeam.kt` (graphicsLayer, one `Animatable`) |
+| Diagnostics | Settings › Song Tap › Song Tap diagnostics (Developer mode): `SongTapDiagnosticsView` + `SongTapDiagnostics` (PixlCore): live signal, baseline, jump, jerk, detector state, last 20 events, Mark buttons, Copy log | `SongTapDiagnosticsScreen` |
+| Not built | Nearby Interaction / UWB (a later stage; the transport interface is ready) | same |

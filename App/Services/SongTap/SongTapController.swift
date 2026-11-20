@@ -3,6 +3,7 @@ import Observation
 import PixlFoundation
 import PixlLibrary
 import PixlModel
+import UIKit
 
 /// Song Tap's controller (the Android `SongTapStateHolder`, a process-wide state holder): the decisions are in
 /// `SongTapEngine` (PixlCore, tested without a phone); this class is its coroutines: it gives the engine a clock, timers,
@@ -26,12 +27,18 @@ final class SongTapController: SongTapPort {
     @ObservationIgnored private let sender: SongTapSender
     @ObservationIgnored private let playback: PlaybackStore
     @ObservationIgnored private let qr: SongTapQrTransport
-    @ObservationIgnored private var transport: any SongTapTransport
+    /// The Bluetooth route (PixlCore): it makes no manager, scans nothing and listens to no sensor until the screen arms it.
+    @ObservationIgnored let ble: SongTapBleRoute
+    /// The numbers behind the tap detector, for Developer mode's Song Tap diagnostics.
+    @ObservationIgnored let diagnostics = SongTapDiagnostics()
+    /// The approach glow (0...500 permille), in a small model of its own so a signal reading redraws only the glow.
+    let glow = SongTapGlowModel()
     @ObservationIgnored private var timeouts: [SongTapTimeoutTag: Task<Void, Never>] = [:]
     @ObservationIgnored private var dismissTask: Task<Void, Never>?
     @ObservationIgnored private var noticeTask: Task<Void, Never>?
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private var nowPlayingTask: Task<Void, Never>?
+    @ObservationIgnored private var beamTask: Task<Void, Never>?
 
     init(settings: SongTapSettings, receiver: SongTapReceiver, sender: SongTapSender, playback: PlaybackStore) {
         self.settings = settings
@@ -40,11 +47,23 @@ final class SongTapController: SongTapPort {
         self.playback = playback
         let qr = SongTapQrTransport()
         self.qr = qr
-        transport = qr
+        ble = SongTapBleRoute(
+            radio: SongTapBluetoothRadio(), impulses: SongTapMotionSource(), clock: SongTapSystemClock(), diag: diagnostics,
+            scheduler: SongTapTaskScheduler(), newSigner: { SongTapSigner() }, verifier: SongTapVerifier(),
+            random: { count in
+                var generator = SystemRandomNumberGenerator()
+                return (0..<count).map { _ in UInt8.random(in: 0...255, using: &generator) }
+            })
         engine.port = self
         qr.onEvent = { [weak self] event in self?.engine.handle(event) }
+        ble.onEvent = { [weak self] event in self?.engine.handle(event) }
+        ble.onStatusChange = { [weak self] status in self?.engine.setBluetooth(status) }
+        ble.onGlowChange = { [weak self] value in self?.glow.value = value }
         engine.setAllowed(settings.allowed)
     }
+
+    /// A code has no peer (0); a phone found over Bluetooth has a number.
+    private func transport(for peer: Int) -> any SongTapTransport { peer == 0 ? qr : ble }
 
     // MARK: What the listener does
 
@@ -111,15 +130,67 @@ final class SongTapController: SongTapPort {
 
     func nowMs() -> Int64 { currentTimeMillis() }
 
-    func startTransport(_ role: SongTapRole) { transport.start(role: role) }
-    func stopTransport() { transport.stop() }
-    func publishOffer(peer: Int, payload: [UInt8]) { transport.publishOffer(peer: peer, payload: payload) }
-    func withdrawOffer() { transport.withdrawOffer() }
-    func readOffer(peer: Int) { transport.readOffer(peer: peer) }
-    func sendAck(peer: Int) { transport.sendAck(peer: peer) }
-    func sendGo(peer: Int, startMs: Int64) { transport.sendGo(peer: peer, startMs: startMs) }
-    func sendDecline(peer: Int) { transport.sendDecline(peer: peer) }
-    func abortTransfer(peer: Int) { transport.abort(peer: peer) }
+    func startTransport(_ role: SongTapRole) {
+        qr.start(role: role)
+        ble.start(role: role)
+    }
+
+    func stopTransport() {
+        qr.stop()
+        ble.stop()
+    }
+
+    func publishOffer(peer: Int, payload: [UInt8]) { transport(for: peer).publishOffer(peer: peer, payload: payload) }
+
+    func withdrawOffer() {
+        qr.withdrawOffer()
+        ble.withdrawOffer()
+    }
+
+    func readOffer(peer: Int) { transport(for: peer).readOffer(peer: peer) }
+    func sendAck(peer: Int) { transport(for: peer).sendAck(peer: peer) }
+    func sendGo(peer: Int, startMs: Int64) { transport(for: peer).sendGo(peer: peer, startMs: startMs) }
+    func sendDecline(peer: Int) { transport(for: peer).sendDecline(peer: peer) }
+    func abortTransfer(peer: Int) { transport(for: peer).abort(peer: peer) }
+
+    func resync() { ble.resync() }
+
+    func reducedMotion() -> Bool { UIAccessibility.isReduceMotionEnabled }
+
+    /// The phones touched and this one sends: the song that plays now is what goes.
+    func requestTapPayload(peer: Int) {
+        let song = playback.current
+        Task { [sender] in
+            let payload: SongTapPayload?
+            if let song { payload = await sender.payload(for: song, nowMs: currentTimeMillis()) } else { payload = nil }
+            engine.tap(peer: peer, payload: payload)
+        }
+    }
+
+    func scheduleBeamEnd(afterMs: Int64?) {
+        beamTask?.cancel()
+        beamTask = nil
+        guard let afterMs else { return }
+        beamTask = Task {
+            try? await Task.sleep(for: .milliseconds(afterMs))
+            guard !Task.isCancelled else { return }
+            engine.beamTimerFired()
+        }
+    }
+
+    /// The beam's own vibrations, on the beam's clock; the screen runs this for as long as a beam plays.
+    func playBeamCues(role: SongTapRole, startMs: Int64, reduced: Bool) async {
+        for timed in SongTapHaptics.cues(role: role, reducedMotion: reduced) {
+            let wait = startMs + timed.tMs - currentTimeMillis()
+            if wait < -120 { continue }
+            if wait > 0 { try? await Task.sleep(for: .milliseconds(wait)) }
+            if Task.isCancelled { return }
+            haptic(timed.cue)
+        }
+    }
+
+    /// Developer mode diagnostics: write the current signal into the log under `label` ("touching", "1 cm"...).
+    func mark(_ label: String) { ble.mark(label) }
 
     func save(_ payload: SongTapPayload) {
         // The import is not interrupted half way: whatever happens to the session meanwhile, the engine is told how it ended
@@ -228,4 +299,12 @@ enum SongTapHub {
 extension AppEnvironment {
     /// Song Tap's controller, made on first use.
     var songTap: SongTapController { SongTapHub.controller(for: self) }
+}
+
+/// The approach glow's strength, 0...500 permille, from the smoothed signal of the phone coming closer. Its own small model, so
+/// the screen's body does not re-run for every signal reading.
+@MainActor
+@Observable
+final class SongTapGlowModel {
+    var value = 0
 }

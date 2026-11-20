@@ -164,6 +164,8 @@ nonisolated enum AppRoute: Hashable, Sendable {
     /// Cloud Studio (iOS-first, design §7.2): Settings › Sing › Cloud processing, and its queue.
     case cloudProcessing
     case cloudQueue
+    /// Song Tap diagnostics (Developer mode, Settings › Song Tap): the live numbers behind the tap detector.
+    case songTapDiagnostics
 
     // Accounts
     case accounts
@@ -214,6 +216,7 @@ nonisolated enum AppRoute: Hashable, Sendable {
         case .genrePage: "genrePage"
         case .cloudProcessing: "cloudProcessing"
         case .cloudQueue: "cloudQueue"
+        case .songTapDiagnostics: "songTapDiagnostics"
         case .accounts: "accounts"
         case .spotifyDashboard: "spotifyDashboard"
         case .spotifyBrowse: "spotifyBrowse"

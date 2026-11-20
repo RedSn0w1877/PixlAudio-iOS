@@ -68,6 +68,41 @@ nonisolated enum SongTapStrings {
     static var declined: String { String(localized: "Not added") }
     static var cancelled: String { String(localized: "Cancelled") }
 
+    // MARK: Status while two phones find each other
+
+    static var statusLooking: String { String(localized: "Looking for the other phone") }
+    static var statusFound: String { String(localized: "Phone nearby. Hold the backs together.") }
+    static var statusNear: String { String(localized: "Almost there. Touch the phones together.") }
+    static var statusSent: String { String(localized: "Sent") }
+    static var sendHint: String { String(localized: "Touch the backs of the two phones together.") }
+    static var receiveHint: String { String(localized: "Touch the back of your phone to the one playing the song.") }
+    static var useCode: String { String(localized: "Use a code instead") }
+    static var scanCode: String { String(localized: "Scan a code instead") }
+    static var backToTap: String { String(localized: "Back to touching phones") }
+
+    // MARK: Bluetooth
+
+    static var btPermission: String { String(localized: "Song Tap needs Bluetooth to find the other phone.") }
+    static var btOff: String { String(localized: "Bluetooth is off. Turn it on to find the other phone.") }
+    static var btUnsupported: String { String(localized: "This phone can't use Bluetooth for Song Tap. A code still works.") }
+    static var beamArtwork: String { String(localized: "Artwork of the song being sent") }
+
+    // MARK: Developer mode: Song Tap diagnostics
+
+    static var diagTitle: String { String(localized: "Song Tap diagnostics") }
+    static var diagSettingsSubtitle: String { String(localized: "Live signal, baseline and jerk, to tune the tap on real phones") }
+    static var diagNeedOn: String { String(localized: "Turn on Song Tap to see live numbers.") }
+    static var diagSignal: String { String(localized: "Signal") }
+    static var diagMotion: String { String(localized: "Motion") }
+    static var diagDetector: String { String(localized: "Detector") }
+    static var diagMarks: String { String(localized: "Mark the signal") }
+    static var diagMarksHint: String { String(localized: "Hold the phones at a distance, then press the matching button. The numbers go into the log.") }
+    static var diagEvents: String { String(localized: "Last 20 events") }
+    static var diagCopy: String { String(localized: "Copy log") }
+    static var diagCopied: String { String(localized: "Copied") }
+    static var diagClear: String { String(localized: "Clear") }
+    static var diagTuning: String { String(localized: "Thresholds") }
+
     // MARK: Things that did not work
 
     static func notice(_ notice: SongTapNotice) -> String {
