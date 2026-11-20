@@ -142,4 +142,18 @@ conversation, as the older tools' were. Nothing in the brain is behind Plus.
 
 ## Commands and results
 
-See the end of this file (filled in as the runs finish).
+Windows, from the iOS checkout root (Git Bash):
+
+- `cmd //c "ci\swiftw.cmd test --package-path Packages\PixlCore"` (the whole PixlCore suite): **all green, 0 failed** (PixlLibrary 905 tests in
+  98 suites, PixlNet 340, PixlBackup 157, and the other targets; the one failure on the way was my own web-result test, fixed). The new
+  suites: `BrainStage4GoldenTests` (5), `BrainStage4Tests` (3), `MusicToolRunnerTests` (17), `TaizoGroundingTests` (9),
+  `TaizoMusicToolsTests` (10), one more case in `BrainEventRecorderTests`, and the changed `ClaudeTests` / `TaizoTasteToolTests`.
+- `bash ci/check-forbidden.sh`: OK. `ci/parse-check.ps1`: 291 files OK.
+- The golden files compared by git blob id with Android's committed ones: only `MANIFEST.sha256`, `README.md`, `assistant.jsonl`,
+  `gate2.jsonl` and `servedvec.jsonl` differed, and they were copied; every older file is identical.
+
+## CI
+
+- Round 1 (`522876b`): `core` green, `app` failed: `cannot find type 'TaizoGrounding' in scope` (`TaisChatModel` did not import PixlLibrary).
+  I re-read every `App/` diff for Swift 6 concurrency and found one more: `TaizoMusic.prepare` took a non-escaping closure it stores.
+- Round 2 (`849997d`): `core` and `app` (build and unit tests) green; `ipa` skipped as before. Nothing flaky was seen.
