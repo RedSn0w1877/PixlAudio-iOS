@@ -130,7 +130,9 @@ public final class TaizoGrounding: @unchecked Sendable {
         for message in messages {
             for block in message["content"]?.arrayValue ?? [] {
                 guard let type = block["type"]?.stringValue, type.hasSuffix("_tool_result"), type != "tool_result" else { continue }
-                noteContext(JSONWriter.write(block))
+                // Its short strings (titles, names) count as names and its text as quotable words and numbers; a name that is only
+                // somewhere inside a long page is not a registered name, so a pick must still come from `recommend` or `build_mix`.
+                noteToolResult(JSONWriter.write(block))
             }
         }
     }
