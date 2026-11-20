@@ -302,3 +302,9 @@ bash ci/check-forbidden.sh                                                      
 powershell -NoProfile -ExecutionPolicy Bypass -File ci/parse-check.ps1 -All               # 1,075 files OK
 cmd //c "ci\swiftw.cmd test --package-path Packages\PixlCore"                              # 8 bundles, 2,577 tests, 0 failed
 ```
+
+## CI (second pass)
+
+Run **44655280700** (`18d828d`) and run **44657236353** (`da17f07`, the last code commit), workflow `ci`, branch `music-brain`: `core` (PixlCore `swift test`
+on macOS) **passed**, `app` (build and unit tests, Xcode 27, Swift 6 strict concurrency, the only compiler for `App/`) **passed**, `ipa` skipped as for any
+branch push. Both on the first attempt, no rerun, no known flake hit. Green CI says nothing about how the new sections look or behave on a phone.
