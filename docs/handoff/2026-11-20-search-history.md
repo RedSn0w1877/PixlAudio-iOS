@@ -92,3 +92,9 @@ Run 44736583747 on 3dbb592 (`ci` workflow): `core` (PixlCore swift test) success
 failures, `ipa` skipped (the workflow skips it off the release branches). The log prints suite totals only, so the individual
 `SearchHistoryTests` names are not in it; they compile into the same test target and the total has no failure. UI tests and the phone are
 still to do.
+
+### After the review pass
+
+Run 44742639890 on ff6de1d (`ci` workflow): `core` (PixlCore swift test) success, `app` (build + unit tests) success with 680 app tests and 0
+failures (675 before, plus the new `SearchHistoryTests` cases), `ipa` skipped. PixlCore also passed locally on Windows (all targets, the
+search history suites included). UI tests and the phone are still to do.
