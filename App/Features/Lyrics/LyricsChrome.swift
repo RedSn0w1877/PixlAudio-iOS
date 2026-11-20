@@ -190,9 +190,9 @@ struct PlayingBarsIcon: View {
 
 /// The control cluster (Android `LyricsControlCluster`, Material mode): play/pause, the seek bar, then the toolbar
 /// (back · Translate · Sing · more), optionally the sync-offset row above — each a glass shape over the soft scrim.
-/// All of them share ONE `GlassEffectContainer` (spacing 3 pt, below the smallest gap: 6 pt between the sync buttons),
-/// so they sample the artwork together (WWDC25-323: "glass can not
-/// sample other glass"; one container per cluster).
+/// All of them share ONE `GlassEffectContainer` (spacing 3 pt, below the smallest gap: the 8 pt between the sync row
+/// and the seek row), so they sample the artwork together (WWDC25-323: "glass can not sample other glass"; one
+/// container per cluster).
 struct LyricsControlCluster: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let chrome: LyricsChromeColors
@@ -701,15 +701,22 @@ private struct LyricsSegmentGlass: ViewModifier {
     }
 }
 
-/// The five timing controls share one glass surface. Each label gets an equal column and a full-height tap target.
+/// The five timing controls, built like the toolbar below them (new UI, 2026-11-16, `PlayerActionPills`' metrics): one
+/// big clear-glass capsule (`Tokens.PlayerPills`: 64 pt, 5 pt inset, 4 pt between segments) with a segment per control,
+/// each an equal column and the toolbar segments' 54 pt tall tap target, set in the segments' type (SF Pro bold, 14 pt).
+/// Inactive segments have nothing of their own; the centre one is a tonal capsule of the sync accent while an offset is
+/// set. It renders in the cluster's `GlassEffectContainer` with the pills.
 private struct LyricsSyncControls: View {
     let offsetMs: Int
     let chrome: LyricsChromeColors
     let brightArt: Bool
     let onChange: (Int) -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        HStack(spacing: 2) {
+        let p = Tokens.PlayerPills.self
+        HStack(spacing: p.segmentSpacing) {
             step("−0.5", by: -500, label: "Decrease offset by half a second")
             step("−0.1", by: -100, label: "Decrease offset by a tenth of a second")
             let value = offsetMs == 0 ? "0 s" : String(format: "%+.1f s", Double(offsetMs) / 1000)
@@ -721,8 +728,11 @@ private struct LyricsSyncControls: View {
             step("+0.1", by: 100, label: "Increase offset by a tenth of a second")
             step("+0.5", by: 500, label: "Increase offset by half a second")
         }
-        .padding(4)
-        .glassEffect(chrome.panelGlass(brightArt: brightArt), in: Capsule())
+        .padding(p.padding)
+        .frame(maxWidth: .infinity)
+        .frame(height: p.height)
+        .glassEffect(chrome.panelGlass(brightArt: brightArt, interactive: true), in: Capsule())
+        .glassEffectTransition(reduceMotion ? .identity : .materialize)
     }
 
     private func step(_ title: String, by delta: Int, label: LocalizedStringKey) -> some View {
@@ -735,16 +745,17 @@ private struct LyricsSyncControls: View {
                         action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(verbatim: title)
-                .pixlFont(.labelLarge, weight: .semibold)
+                .pixlFont(.bodyMedium, weight: .bold)
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
                 .foregroundStyle(highlighted ? chrome.onSyncAccent : chrome.content)
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .background(highlighted ? chrome.syncAccent : chrome.content.opacity(0.09), in: Capsule())
+                .frame(maxWidth: .infinity)
+                .frame(height: LyricsChromeMetrics.toggleHeight)
+                .background(highlighted ? chrome.syncAccent : Color.clear, in: Capsule())
                 .contentShape(Capsule())
         }
-        .buttonStyle(PressScaleButtonStyle(pressedScale: 0.96))
+        .buttonStyle(PressScaleButtonStyle(pressedScale: 0.94))
     }
 }
 
