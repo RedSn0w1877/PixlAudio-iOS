@@ -68,7 +68,7 @@ Android's `music-brain` at `670e957`). `Brain.specVersion` stays 2: no earlier o
 4. **No second background job; per-play update and rebuild off the main thread**: done. The update runs under the engine actor (a copy of 51
    doubles, one feature vector); the replay and the gate's evaluation run inside the existing rebuild, in its detached task; nothing runs at
    app start (the engine loads the saved learner with the first play or plan, as it loads the affinity rows).
-5. **Genre pages from atlas facts only**: done (`GenrePage`, `YourSoundReader.facts`).
+5. **Genre pages from atlas facts only**: done for the facts and links (`GenrePage`, `YourSoundReader.facts`); the completion added the page's own sections of spec 8.7 (see the review pass, "done-means 5").
 6. **Legacy engine, Muselle and the recommendation golden files still present, with a written deletion plan**: nothing was deleted
    (`Recommendation.swift` and `recommendationMatchesAndroid` are untouched). The plan is Android's, with step 4 "the same on iOS after
    Android": remove `BrainEngineChoice.legacy` and its switch row, delete `Recommendation.swift` and its golden test once nothing reads
@@ -259,8 +259,8 @@ skipped without a file); `BrainLearnerEngineTests`' control case now passes the 
 159. **Daypart titles** say "Your weekday mornings" ... "Your weekend nights" (Android 195): the shelf's bucket is weekday or weekend, never one weekday.
 
 Android 189 to 201 hold, in particular: the arm bandit runs only while the learned weights are in use and the session is not a control (190), a
-taste adjustment on a genre does not move tracks with no genre (199), the shelf order is used only with the learned weights on and after 20 shelf
-updates (196).
+taste adjustment on a genre does not move tracks with no genre (199), the shelf order is used only with the learned weights on and after 100 shelf
+updates (196, raised from 20 by Android's review pass).
 
 ## Cut or deferred (as on Android, nothing more)
 
@@ -275,7 +275,7 @@ only); a station from an island with no nameable genre; the `M0` refit on pooled
    novelty share follows what you finish; Your sound's novelty line moves with it.
 3. **Daypart shelf**: needs islands and 50 plays in one bucket of the week; then "Your weekday nights" (or the bucket you are in) appears after "Because you
    listened to". Absent otherwise.
-4. **Shelf order**: with the gate on and 20 shelf updates the order can differ between dayparts, never within one. `impression.pbl` stays small (at most 200
+4. **Shelf order**: with the gate on and 100 shelf updates the order can differ between dayparts, never within one. `impression.pbl` stays small (at most 200
    visits).
 5. **Your sound**: Lately after a few days of moved plays; tap a family to open its genres, tap an island for its artists and songs, Play station, More of this,
    Less of this. A genre page: More / Less, Key artists, From your library, You and this genre (absent for a genre never played).
@@ -308,3 +308,112 @@ cmd //c "ci\swiftw.cmd test --package-path Packages\PixlCore"                   
 Run **44655280700** (`18d828d`) and run **44657236353** (`da17f07`, the last code commit), workflow `ci`, branch `music-brain`: `core` (PixlCore `swift test`
 on macOS) **passed**, `app` (build and unit tests, Xcode 27, Swift 6 strict concurrency, the only compiler for `App/`) **passed**, `ipa` skipped as for any
 branch push. Both on the first attempt, no rerun, no known flake hit. Green CI says nothing about how the new sections look or behave on a phone.
+
+# Review pass (iOS): two independent reviews of stage 3, and Android's review fixes
+
+Two reviews read this branch (REVIEW 1: `ed220b8..cc9f251`, REVIEW 2: `cc9f251..HEAD`), and Android fixed its own findings in `2e9348a`, `04bdade`, `47c5dcb`.
+This pass checks every finding against the code here, fixes the real ones, and brings over what Android changed. **Nothing here has run on a phone, and there
+is still no real-data number for the learner anywhere (code, copy, tests, this file).**
+
+## Android's golden files changed: copied again
+
+`novelty.jsonl`, `posteriors.jsonl`, `shelfbandit.jsonl` and `MANIFEST.sha256` were copied from Android's committed `music-brain` (`brain/src/test/resources/brain-golden/`);
+every blob id of the other 38 files is equal to Android's. Three things were ported with them (all green against the new files, bit for bit):
+the appetite's discount anchor moves with each play (`NoveltyAppetite.onPlay`); a live play is applied under `LearnReplay.liveId` (the next id after the watermark
+when its clock-derived id is not above it; the replay still uses real ids); the shelf bandit's forced exposure also covers a type never seen, is spent only by a
+`visit` that shows it, and `ShelfBandit.minUpdates` is 100. Also from Android: the `YourSound` section minimums (constants and parameters, defaults 0).
+`Brain.specVersion` is still 2 and `LearnReplay.version` still 1 (no replay is forced by this pass).
+
+## Finding by finding
+
+REVIEW 1 (first pass of stage 3):
+
+| # | Finding | Verdict |
+|---|---|---|
+| 1 (major) | The learner is trained and gated on vectors without graph, islands, tags, actr, pop and fresh features (`featuresOf` passes `Graph.empty`); the gate says nothing about the vectors served | **Real, not fixed (deferred).** Fixing it means holding the served `x` (or the serve-time score) with the queue entry and the event, a schema change on both platforms that cannot be checked without a phone. Same on Android (its R1-5). What was done: the accuracy lines say "On plays I could check" and the standard recipe's "of the same plays" (Android's wording); the lines are shown only when the learned figure is not below the standard recipe's (`ModelVoice.State.showsAccuracy`); deviation 160 below says it plainly. The gate is therefore a check on a reduced feature space and is documented as one; it does not validate serving. |
+| 2 (major) | Control line false when the gate was never on; "the rest" is only `modelVersion == 1` plays | **Fixed.** The line shows only while the learned weights are in use (`ModelVoice.learning`); the two rates cover the same weeks (from the first learned play) and show only when BOTH sides have 300 plays there, else the sentence says "once each side has 300 plays over the same weeks"; "of the picks made with the weights in use" replaces "the rest" (`YourSoundReader.control`, tested). |
+| 3 (major) | Control and "served learned" decided at play end from the current session and gate | **Fixed in two steps.** Stage 3 completion (`18d828d`) already stamped both on the queue entry when the list is built. This pass closes what was left: the draw for a list built before a session exists (id 0 after launch, or an expired one) is taken on one key per gap (`Loaded.controlKey`) instead of on id 0, which is never a control; and a control is drawn only while the gate has the learned weights on (so a control never exists in an era when everything is the prior). A control session also starts with the standard share of new music. Tested. |
+| 4 (major) | Gate turns on for any improvement, no 1% margin or noise guard | **Fixed.** A week counts as a win only when the learned log-loss is lower by at least 1% (`Gate.minImprovement`); from 2,000 graded plays the bootstrap interval of test 6 must also be above zero (`intervalAboveZero`, computed once per rebuild by `LearnReplay.test6`). A better-but-not-clearly-better week ends a streak that has not switched the weights on and leaves one that has alone (no flapping); worse is still off at once. Forced rebuilds still count as an evaluation, but the 6-day rule means at most one counted evaluation per six days (deviation 161). Tested. |
+| 5 (major) | "New and familiar" and the other sections count only the app's own log; imported history makes "new to you" wrong | **Fixed.** Your sound reads the same merged stream a rebuild reads (`BrainEngine.mergedPlays`: stored log + imported plays, duplicates dropped, merged recordings mapped, "Don't count this" applied, the Spotify switch honoured; `ReplayMerger.merged` is the part of `rebuild` it shares). Plays with no timezone are read in the device's offset. Tested with five imported plays of one track (one first play). |
+| 6 (minor) | Island shares are shares of island-assigned plays only; no minimums; truncated percent | **Fixed.** Android's minimums (islands 20 plays and 50% placed, genres 50 and 60%, eras 50, dayparts 10, months 5, novelty 20); percentages are rounded, a real share under half a percent reads "<1%". Deviation 162: the minimums are invented, as on Android. |
+| 7 (minor) | Reset leaves the stored Home plan and today's mixes ranked with the learned weights | **Fixed.** `resetLearned` (reader) clears the plan file and drops saved Home rows ranked with the learned weights (`BrainHomeRows.dropLearned`); a saved mix the learned weights ranked and built at or before the reset moment is stale (`BrainMixes.isStale` reads `BrainEngine.learnResetAtMs`). Tested. |
+| 8 (minor) | Cached Your sound can contradict the live model; an in-flight compute can overwrite a reset | **Fixed.** `BrainEngine.learnerGeneration` changes when a rebuild adopts a learner or the listener resets; a cached figure from another generation is not served, and one worked out across a change is shown once and not kept. Reader generation counter for resets. |
+| 9 (minor) | "Learning" copy with a prior-equivalent model, or with lower accuracy; no plurals | **Fixed.** `updates == 0` is the standard recipe; accuracy lines hidden when below the standard recipe's; "1 play" / "N plays" (two literals, both allowed by the copy test). |
+| 10 (minor) | Favourites cut to the smallest 20,000 ids; the learner file rewritten (and compacted with 180 KB) on every play | **Fixed.** The favourites have their own file (`learner_liked.pbl`, read from the old `brain_state` value when absent), cap 50,000 by id. Per-play writes no longer compact a file holding them. Tested. |
+| 11 (minor) | Catch-up after a rebuild learns plays with an empty session and a stale clock | **Fixed.** The catch-up builds a session from the plays (`Session.begin` / `apply`) and uses the clock at adoption. |
+| 12 (minor) | Genre page has no empty or error state | **Fixed.** "Nothing to show for this genre." once loaded with no facts; the facts show before the extras are ready. |
+| 13 (minor) | Batch-refit test one-sided; no tests for control / gate paths | **Gate and control tests added** (`BrainStage3ReviewTests`, 18 tests). The batch-refit bound is unchanged: it is a synthetic check and says so; no real-data bound can be written. |
+
+REVIEW 2 (the completion):
+
+| # | Finding | Verdict |
+|---|---|---|
+| 1 (major) | Home shelf plays lose the control, model-version and exploration flags (`HomePlanState.tag`) | **Real, fixed.** The tag is built by `BrainItemTag.homeShelf(shelf, item)` in PixlLibrary (`control`, `modelVersion` from the shelf, `explore` from the item), the App calls it; tested on a `PlanShelf`. The other builders (mixes, Home rows, new releases, stations) were checked: mixes and Home rows carry the choice already. |
+| 2 (major) | A visit is settled by age, so a play still running gets reward 0 | **Real, fixed.** A visit is over when nothing has happened on it for 30 minutes (shown, a tap, or the page's last signal); a tap keeps it open that long. The play window is 10 minutes (Android's). Private, silent and auto-advanced plays are skipped and a play rewards one shelf. Tested. |
+| 3 (major) | Actor re-entrancy in `settleLocked`: a stale copy of the bandit overwrites a Reset or a frozen order | **Real, fixed.** All awaits (reading the plays) happen first; the state is read and written with no suspension after; a reset bumps an epoch and a settle that started before it writes nothing; a visit another settle already gave is skipped; the posteriors are saved before the visits are marked. `onPlanShown` puts the new visit in place before it awaits. Tested (reset with visits waiting). The interleaving itself was reasoned, not provoked, in a test. |
+| 4 (major) | Control from the session at build time, flagged while the gate is off | **Fixed** (see R1-3): per-gap key, control only while the gate is on. The comparison is over the same weeks by construction. |
+| 5 (major) | `usesLearned()` calls `ensureLoaded()`: the Home plan build loads the state and arms a rebuild | **Not real as worded, related defect fixed.** The plan build already loads the engine before it reaches `ShelfStore.order` (`readAffinity`, `planMix`, `salt` since stage 2), so this adds nothing; and the Home plan is not app start. What was real: the first use started a FULL rebuild (replay, gate, weekly facts). First use now starts only an urgent one (`requestRebuild(urgentOnly: true)`: tables missing or built by other logic, import or Spotify switch changed); the replay that trains the learner, the gate evaluation and the weekly facts run in the refresh worker (`RefreshWork.rebuildBrain` → `BrainEngine.rebuildIfDue`), inside the one job. The context table's read of the log is off every actor and cached 30 minutes; unchanged. |
+| 6 (minor) | Lately with no baseline; control line mislabels | **Fixed:** Lately needs 50 plays from before the 14-day mark; the control line as in R1-2. |
+| 7 (minor) | Island sheet More / Less gives no visible feedback | **Fixed:** the sheet closes first (so the toast under it is seen and a second tap cannot add the change twice). |
+| 8 (minor) | Share truncated, not rounded | **Fixed** (R1-6). |
+| 9 (minor) | Genre page extras re-read the whole log and scan every artist on the reader actor | **Fixed.** Cached per genre for 5 minutes; the artist scan is a detached task with each tag's ancestry worked out once; "You and this genre" reads the merged stream detached. Key artists need Deezer, MusicBrainz and ListenBrainz all switched on (Android's R2-10, deviation 164). |
+| 10 (minor) | Brain backup restore replaces exclusion rows but not the event flags | **Fixed differently:** a restore merges (the restored records replace the ones with the same id, records made since stay), so an exclusion made after the backup is not removed while its plays keep the flag. `FeedbackStore.replaceAll` now inserts before it deletes. Tested. |
+| 11 (minor) | Forced exposure never applies to a never-seen type and is spent when drawn | **Fixed** (golden-covered core change, above). |
+| 12 (minor) | Arm "none" novel candidates are starved while the arm bandit is on | **Not changed (by design, not real harm).** A candidate with no arm has no posterior to credit; with the bandit on they are not picked while an armed candidate exists and fill the slot when none does. Changing `ListBuilder` would also leave Android's behaviour behind; the golden files do not cover it. Recorded here so a later owner can decide. |
+| done-means 1 | decoder accepts any `anchorDay`, `today - anchorDay` could trap | **Fixed:** both discounts use wrapping subtraction. |
+| done-means 5 | Genre pages "atlas facts only" | **Spec 8.7 wins** (key artists, library artists, "You and this genre" are in the spec's page); the handoff's earlier "atlas facts only" line is corrected: the extras use stored tag votes (switch-gated, above), the library and the listener's plays. Facts and links are the atlas's. |
+| done-means 8 | "Got it. You will hear less X." is an effect claim | **Left.** The adjustment is applied at the next replay as a pseudo-count; the sentence is the spec's wording and the copy test allows it. Not changed. |
+
+## Deviations (continuing at 160)
+
+160. **The learner and the gate see a reduced feature vector** (R1-1). Training, the live update and the gate's two predictions use `featuresOf` with an empty graph, no
+     islands, no tags, `actr` 0, no popularity or freshness, while the planner serves with all of them. The weights of the omitted features stay at the prior in
+     training, so serving applies them on top of a model trained without them. The gate's verdict is about the reduced space and does not validate serving.
+     Fix (not done): store the served `x`, or the serve-time score, with the event. Android has the same limit.
+161. **Gate margin and interval are iOS-only for now.** Android's `Gate.decide` has no 1% margin or interval (Android is not touched here); this port's
+     `decide(_:_:nowMs:intervalAboveZero:)` has both, with the old behaviour as the default of the new parameter. The golden files do not exercise the gate, so
+     parity is not broken, but the two apps will gate differently until Android is brought along. **Android should follow.**
+162. **Section minimums are invented** (no number in the spec): the constants of `YourSound`, copied from Android.
+163. **Control exists only while the gate is on** (Android flags control while it is off too). A control draw is made only when the learned weights would
+     otherwise rank the list. **Android should follow** (its comparison mixes eras).
+164. **Key artists need three sources on** (Deezer, MusicBrainz, ListenBrainz: local and remote switch), as on Android 206; the section vanishes if any one is off.
+165. **A visit's life is "30 minutes without a signal"**, tracked in memory (`lastTouchMs`) and from the rows' `shownAtMs` / `activatedAtMs`; a process death forgets
+     the in-memory touch and the visit is then judged by its rows alone.
+166. **First use no longer starts the learner's replay** (as Android 204): a listener whose refresh worker never runs does not train the learner. The worker runs
+     `rebuildBrain` after the lanes, only when the refresh is allowed and nothing is playing.
+167. **The imported plays are resolved again when Your sound opens** (`mergedPlays` calls the same resolution a rebuild does, one lookup per distinct track, in
+     batches); cached five minutes with the figures. Time on a large import was not measured.
+168. **Brain backup restore merges** exclusions (deviation 155 said "come back"; they still do, and nothing made since is removed).
+
+## Cut or deferred
+
+Unchanged from the second pass, plus: serve-time features with the event (deviation 160); matching a tap to the shelf's own list (shelf ids and list ids do not
+match yet: the reward goes to the first heard play after the tap, as on Android); live favourites updates and mapping favourites through `track_merge` (healed at
+the next rebuild); an arm for "none" candidates (above).
+
+## How to test on a phone (review pass)
+
+1. **Reset reaches the lists.** With the learned weights on (or not, the lists still rebuild): Your sound › Reset what I've learned (the row is hidden until a
+   play has moved the weights) › Home: the learned rows are rebuilt, today's mixes come back as new lists, "Back to the standard recipe." shows. Plays and
+   exclusions stay.
+2. **Your sound with an import.** Import a Spotify export: Right now / Genres / Over months fill with it on day one; "New and familiar" does not say 100% new for songs
+   you have heard in the import. A listener with only an import sees the page, not "Play some music".
+3. **The control line** appears only under "Learning from N plays." and only with two rates once each side has 300 plays over the same weeks; before that it says
+   so. With the standard recipe nothing is said about a check.
+4. **Accuracy lines** say "On plays I could check"; they are absent when the learned figure is lower than the standard recipe's.
+5. **Home shelf plays**: play a card from "Because you listened to" with the gate on; Settings › Developer mode › event export (or the log) shows `modelVersion`
+   1 or `controlSession` on the event, and `exploreSlot` on an exploration card.
+6. **Shelf settling**: tap a shelf song and leave the page open; after 30 minutes without a signal the visit is given to the bandit with the reward (a song played
+   for 30 s or more); the order does not change inside a daypart; shelf order needs 100 shelf updates.
+7. **Island sheet**: More of this / Less of this closes the sheet and shows the confirmation on the page.
+8. **Genre page**: a blank atlas shows "Nothing to show for this genre."; key artists vanish when one of Deezer, MusicBrainz, ListenBrainz is switched off.
+9. **Refresh worker**: with the app idle and the refresh allowed, the learner's replay and the gate evaluation happen in it (check `Brain data` for the last run),
+   never when Home first appears.
+10. **Percentages**: a genre with a tiny share reads "<1%"; shares are rounded, not cut.
+
+## What nobody has verified on a device (review pass)
+
+Everything above. In particular: the shelf settling over real use and what 30 minutes without a signal means for a page left open; that the plan, mixes and rows
+really rebuild after a reset; the cost of `mergedPlays` (the log plus the imported plays and their key resolution) on 100,000 plays; whether the refresh worker runs
+often enough for the gate's two-week rule; the control draw's share on a real queue; the margin of the gate on a real listener (the 1% and the interval are
+unvalidated defaults); the favourites file on a large library. **That `App/` compiles is shown by CI only.**
