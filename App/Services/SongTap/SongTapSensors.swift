@@ -1,6 +1,6 @@
 import CoreMotion
 import Foundation
-import PixlFoundation
+import PixlModel
 import PixlLibrary
 
 /// The two clocks Song Tap uses: a monotonic one for signal and motion timing (the system's uptime, the same clock CoreMotion
