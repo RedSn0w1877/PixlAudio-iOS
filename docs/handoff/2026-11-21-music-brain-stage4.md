@@ -157,3 +157,120 @@ Windows, from the iOS checkout root (Git Bash):
 - Round 1 (`522876b`): `core` green, `app` failed: `cannot find type 'TaizoGrounding' in scope` (`TaisChatModel` did not import PixlLibrary).
   I re-read every `App/` diff for Swift 6 concurrency and found one more: `TaizoMusic.prepare` took a non-escaping closure it stores.
 - Round 2 (`849997d`): `core` and `app` (build and unit tests) green; `ipa` skipped as before. Nothing flaky was seen.
+
+---
+
+# Milestone 2 (iOS): what the listener sees
+
+Branch `music-brain`, same rule as above: **nothing here ran on a phone**, `App/` is compiled by CI alone, and there is still **no real-data
+number anywhere**. This is the port of Android's milestone 2 (`9c38a15`, `d4acabc`, `5e65370`) and of its later review commit `e31f835`
+(pure core). Android's deviations 223 to 233 hold here unless a line below says otherwise; this file continues the iOS numbering at **183**.
+
+An earlier attempt at this milestone was cut off when the session ended. It had committed the pure core (`4a4daaa`) and left about 36 files
+uncommitted (the services, the chat cards, the queue and player notes). They were read, kept where right, finished and committed in pieces.
+
+## What was built (per task)
+
+1. **A mix from a sentence, as a card.** `TaisChatMessage.mix` in Ask Taizo (`App/Features/AI/TaizoViews.swift`, `TaizoMixCard`): "Late drive -
+   30 songs", the first four songs, Play, Save, and the chips. `MixCard.of(AssistantMix)` (PixlLibrary) builds it from the engine's own answer; the
+   model's text is never read. Play = `TaizoToolbox.playMix` (the same `play_songs` path with `mix:<id>`, so surface assistant, arm ASK and the
+   served vector reach the event log). Save = the `create_playlist` path with the mix's songs (engine tracks are saved first). **A chip is a delta on
+   the stored request applied on the phone with no model call**: `AssistantCards.allChips` / `chipLabel` (golden `assistantcards.jsonl`) and
+   `BrainAssistantEngine.adjustMix`; a tap replaces the card in place (`TaisChatModel.applyChip`).
+2. **Explanations.** `explain_taste` / `explain_track` record the genres and artists they returned (`MusicToolRunner.namedThisTurn`); after the
+   answer `LessOffer.offer(userText:named:)` offers "Less trap" only when exactly one returned name is a whole-word run of what the listener wrote
+   and they did not praise it (the review rule, below). The tap writes the existing taste change (`BrainActions.lessLikeThis`) and shows "Done.
+   You will get less trap." with Undo. "Why this song" shows "What helped: ..." / "What held it back: ..." (`ServedFactors`, `BrainService.whyFactors`):
+   from the vector the queue item carries, else the newest play of the song that stored one, else nothing. `explain_track` now uses the weights the
+   pick was ranked with (this supersedes deviation 178).
+3. **Steering.** `steer_session`'s description gained "\"Slow it down\" is energy_down, \"pick it up\" energy_up" (a cached-prefix change, as on
+   Android), and an energy change with no energy data now answers `applied: false` and says why. `scope always` still goes through the confirm card.
+4. **Set notes.** `SetNotes` (golden `setnotes.jsonl`) over `SetNoteLines.forQueue`: at most one note per five tracks, from templates over the queue
+   itself, true or absent. Drawn above the first row of a group in the queue (`SetNoteRowLabel`, `QueueSheet`) and under the artist line of the player
+   (`PlayerSetNoteLine`, `NowPlayingView`). `SetNoteMemo` (a class held in `@State`) makes them again only when the queue window, the current song or
+   the library revision changes, so a drag or a progress tick walks nothing.
+5. **Weekly note.** `WeeklyNote` (golden `weeklynote.jsonl`) and `WeeklyNoteService` (PixlLibrary), shown on First Listen (`MixDetailView` ->
+   `MixScreen.note`, a "This week" block between the header and Play). **One cloud call a week**, marked as asked in `weekly_note.json` before the
+   call; offline it is not attempted and not counted; a cloud answer is used only if every name and number in it is in the evidence rows
+   (`WeeklyNote.check`), otherwise the template shows. Made when the list is opened, never at app start.
+6. **Batch jobs.** `AssistantHelp` (PixlLibrary) is the last step of the one refresh (`RefreshWork.assistantHelp`, after `rebuildBrain`), behind
+   Settings > AI features > "Let Taizo help the engine" (`brain_assist_help_enabled`, **off by default**, plus the remote `brain.assist.enabled`).
+   Island names, genres for tracks no source knows (tag source 10, `DnaAssembler.withAssistantClaims`), and artist suggestions (looked up like
+   `resolve_tracks`). Answers go through `AssistBatch` (golden `assistbatch.jsonl`) and are cached forever by model id, prompt version and input hash
+   (`AssistCache`, `assist_cache.json`). The tags the job wrote are taken back out when the switch is off. An assistant island name is read only while
+   the switch is on and only for the genres it was written for (`YourSoundReader.setAssistedIslandName`); the suggestions feed assistant mixes only
+   (`BrainMixes.setAssistSuggestions`, arm ASK).
+7. **No network.** `StationSentence.parse` reads "start a station from X" by rules, in `TaisDjEngine.respond` before the media route, so it needs no
+   model and no connection; `TaisChatModel` tries X as an artist of the library, a genre of the atlas, a playlist and an album, through the same host
+   call the chat's `start_station` makes. iOS has no on-device model path that names a seed, so nothing is asked of it.
+8. **Copy.** The new sentences are `App/Features/Brain/BrainStringsTaizo.swift` (Android's `strings_brain.xml`, word for word). `BrainCopyTests`
+   scans that file with the rest of `App/Features/Brain` (no forbidden word, no "learn"; the stage 3 allowance still names exactly four strings) and
+   a new test pins the sentences to Android's. The templates written in PixlLibrary (chip labels, set notes, the weekly template and evidence,
+   the factor names, the negative factor names) are scanned by `BrainStage4M2Tests`; the instructions of the weekly note and the batch jobs by
+   `AssistantHelpTests`.
+
+### The review commit `e31f835`, ported
+
+Android's reviewer changed three pure functions after milestone 2 and regenerated two golden files. They are ported and `assistant.jsonl`,
+`assistantcards.jsonl`, `MANIFEST.sha256` and `README.md` are copied from Android's committed ones (the blob ids match):
+
+- `Grounding`: a second pass `unmarkedNames` (runs of capitalised words outside every mark and quote), single quotes at a word start and
+  guillemets as quotes, and whole-word text lookups (`Registry.addText` pads, `inText`, `inName`); `Grounding.check` gained `scanUnmarked` (default
+  false). New golden `grounding2` (3 cases).
+- `AssistantRules.topFactors`: `negativeNames` ("you often skip this artist") for a negative affinity; a negative affinity under a negative weight is
+  not reported.
+- `AssistantCards.lessTarget`: exactly one name may remain; a name inside a longer matching name is the same mention; a liking word in the three
+  words before a name drops it.
+
+## Deviations 183 and on
+
+183. **The cloud door for the weekly note and the jobs is `ClaudeCompletion.short`** (PixlNet, new, two tests): one non-streamed request at
+     effort low under a small `max_tokens` (320 for the note, 900 / 2500 / 1800 for the jobs), the usage charged through `AIService.recordClaudeUsage`
+     (the monthly budget and the usage list). Android calls `ClaudeService.complete`. The door is `ClaudeCloud.shared.route() == .claude`: the
+     automatic route, a connection and budget left; an own-key override or a $0 cap closes it.
+184. **`BrainAssist` (App) holds the second engine the jobs need.** The artist suggestions are looked up with `BrainAssistantEngine.resolve`; the app
+     makes one lazily (same host, same library) instead of reaching into the chat's. It exists only once a job has songs to look up.
+185. **Save is a playlist, cards are not saved with the chat, a chip makes a new mix id, "Less X" is for genres and artists only**: Android 223 to
+     226 unchanged.
+186. **Set notes: "known" is a library row** (`library.song(id:) != nil`), the iOS reading of Android's `EngineTrack.isEngineOnly` (228). The genre is
+     `Song.genre`'s first value (`SetNotes.firstGenre`). On a library whose genre column is empty only the artist and "you know" forms appear.
+187. **The offline station tries four kinds in Android's order** (artist, genre, playlist, album). The artist test is "the library has a song by that
+     primary artist" (iOS has no artist table of the engine's to ask), the genre test is `GenreAtlas.idForName`.
+188. **`scanUnmarked` is not switched on in the chat.** The pure function and its golden are ported; Android's committed app does not pass it either
+     (its HEAD predates any caller). Turned on, a reply that says "Your Mix" or "First Listen" unmarked would be flagged unless the registry held those
+     words, so the app's own names need adding first. Left for the owner's decision; nothing else depends on it.
+189. **The settings row is shown only when the build has the built-in key** (it is the cloud door that the jobs use), under "Use cloud AI".
+190. **`AssistCache` and `weekly_note.json` use `Codable`** with Android's field names; they are per-device files, not meant to be moved between the
+     two apps.
+
+## Cut or deferred
+
+- The mix card is not shown from the on-device chat path (as on Android); an unmatched sentence there goes the old way.
+- `scanUnmarked` in the chat (188).
+- Batch-job cost is not measured. No prompt-injection pass on the jobs' inputs beyond the validators (the inputs are the app's own genre and
+  artist names).
+- Nothing was cut from the task list.
+
+## What nobody has verified on a device
+
+- Every screen: the card (busy, failed, Save, Play), the chips, "Less X" and Undo, the factors in "Why this song", the set note in the queue and
+  under the player title (and whether a line there shifts the hero layout), the weekly note block on First Listen, the Settings row.
+- That a chip really rebuilds a different list through `adjustMix` over the real tables, and that Play from a card reaches the event log with surface
+  assistant, arm ASK and the vector (traced and tested over a fake backend only).
+- The weekly note's cloud call: how often the model marks names with `[[ ]]` and how often `WeeklyNote.check` rejects its answer.
+- The batch jobs, none has run: how often the model's island names pass `AssistBatch`, how many tracks no source knows on a real library, what a
+  week costs (no figure is claimed), and whether a source-10 claim ever tips a track's merged tags (it is the weakest source: a test shows the claim is
+  kept and taken back out, and `Tags.merge` decides the rest).
+- That an offline artist station starts quickly and that `startStation` for a name that is not in the library fails fast.
+- That `App/` compiles: only CI checks it.
+
+## How to test on a phone (for Hoa)
+
+1. Ask Taizo: "make me something like Espresso but slower for a late drive". A card "Late drive - 30 songs", four rows, Play, Save, chips. Tap
+   "Shorter": 20 songs, no chat message. Play: the queue becomes the mix. Save: a playlist appears.
+2. "Why do I keep getting trap?" (a genre you play): a "Less trap" chip; tap it, then Undo. Name two genres in the question: no chip.
+3. "Why this song" on an engine pick in the queue: "What helped" and "What held it back" lines.
+4. Queue three songs of one genre from the library, then an engine pick: a line above the first of them and the same under the player title.
+5. First Listen: a "This week" block; airplane mode shows the template; open it again and nothing is asked.
+6. Settings > AI features: "Let Taizo help the engine" is off. Turn it on and let the refresh run; turn it off and the atlas names come back.
+7. Airplane mode: "start a station from Radiohead" (an artist in the library) starts one.
