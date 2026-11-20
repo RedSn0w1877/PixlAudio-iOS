@@ -55,6 +55,10 @@ public struct SongTapUiState: Sendable, Equatable {
     /// When the animation of the current beam starts on this phone's clock, and which side it plays.
     public var beamStartMs: Int64 = 0
     public var beamRole: SongTapRole?
+    /// The current beam plays the short cross-fade (Reduce Motion is on), not the flight.
+    public var beamReduced = false
+    /// Whether Bluetooth is running, and if not why. The code route works either way.
+    public var bluetooth: SongTapBleStatus = .idle
 
     public init() {}
 
@@ -71,6 +75,8 @@ public enum SongTapTransportEvent: Sendable, Equatable {
     case peerNear(Int)
     case peerFar(Int)
     case peerRole(peer: Int, role: SongTapRole)
+    /// The two phones touched: the detector fired.
+    case tap(peer: Int)
     /// An offer arrived from `peer` (0 for a QR code): the payload bytes and the number of the key that signed it (0 when unsigned).
     case offer(peer: Int, payload: [UInt8], senderKey: Int32)
     /// Something arrived that is not an offer this phone can use.
@@ -111,6 +117,14 @@ public protocol SongTapPort: AnyObject {
     func cancelTimers()
     func markFirstBeamAccepted()
     func uiChanged(_ ui: SongTapUiState)
+    /// Sender: the phones touched; build the payload of the song that plays now and answer with `SongTapEngine.tap(peer:payload:)`.
+    func requestTapPayload(peer: Int)
+    /// True when Reduce Motion is on: the beam then cross-fades instead of flying.
+    func reducedMotion() -> Bool
+    /// Calls `SongTapEngine.beamTimerFired()` after `afterMs`; nil cancels the timer.
+    func scheduleBeamEnd(afterMs: Int64?)
+    /// The session is back to waiting: tell the Bluetooth route to announce the phone that is close again.
+    func resync()
 }
 
 @MainActor
@@ -137,6 +151,8 @@ public final class SongTapEngine {
     private var dismissPending = false
     /// The video the last save put in the library (a song that came without one was matched to a video first).
     private var savedVideoId: String?
+    private var dispatching = false
+    private var queued: [SongTapSessionEvent] = []
 
     public init() {}
 
@@ -150,6 +166,24 @@ public final class SongTapEngine {
     }
 
     public func setNowPlaying(_ nowPlaying: SongTapNowPlaying?) { ui.nowPlaying = nowPlaying }
+
+    public func setBluetooth(_ status: SongTapBleStatus) { ui.bluetooth = status }
+
+    /// The beam's own timer ran out: the sender's beam is the whole send, so the session is done; the receiver's card is over
+    /// when the Undo window is, which is also when the saved result is put away.
+    public func beamTimerFired() {
+        guard let role = ui.beamRole else { return }
+        if role == .send { dispatch(.beamFinished) } else { dispatch(.dismiss) }
+        clearBeam()
+    }
+
+    private func clearBeam() {
+        if ui.beamRole != nil {
+            port?.scheduleBeamEnd(afterMs: nil)
+            ui.beamRole = nil
+            ui.beamStartMs = 0
+        }
+    }
 
     public func arm(_ role: SongTapRole, askFirst: Bool) {
         guard ui.allowed else { return }
@@ -233,6 +267,13 @@ public final class SongTapEngine {
         case .peerNear(let p): dispatch(.peerNear(p))
         case .peerFar(let p): dispatch(.peerFar(p))
         case .peerRole(let p, let role): dispatch(.peerRole(peer: p, role: role))
+        case .tap(let p):
+            if session.role == .receive {
+                // The receiver sends nothing: the tap only means "read the offer now".
+                dispatch(.tapDetected(peer: p, videoId: ""))
+            } else {
+                port?.requestTapPayload(peer: p)
+            }
         case .offer(let peer, let bytes, let senderKey):
             let window = peer == 0 ? SongTapSigning.qrWindowMs : SongTapSigning.offerWindowMs
             if case .ok(let payload) = SongTapPayloads.decode(bytes),
@@ -273,7 +314,18 @@ public final class SongTapEngine {
 
     // MARK: The session
 
+    /// Run to completion: an event raised while another is being handled (a transport answers the call the engine just made)
+    /// waits its turn, so the state machine never sees two events at once.
     private func dispatch(_ event: SongTapSessionEvent) {
+        queued.append(event)
+        if dispatching { return }
+        dispatching = true
+        while !queued.isEmpty { step(queued.removeFirst()) }
+        dispatching = false
+    }
+
+    private func step(_ event: SongTapSessionEvent) {
+        let before = session.phase
         let r = SongTapSession.reduce(session, event)
         session = r.state
         updateUi(after: event)
@@ -283,6 +335,8 @@ public final class SongTapEngine {
             port?.withdrawOffer()
             if ui.code != nil { ui.code = nil }
         }
+        // Back to waiting after a result: the phone that is close has to be announced again to be tappable.
+        if before != .armed && before != .idle && session.phase == .armed { port?.resync() }
         watchTerminal()
     }
 
@@ -291,10 +345,15 @@ public final class SongTapEngine {
         next.session = session
         if session.phase == .armed || session.phase == .idle { next.card = nil }
         switch event {
-        case .dismiss, .arm, .disarm: next.notice = nil
-        default: break
+        case .dismiss, .arm, .disarm:
+            next.notice = nil
+        default:
+            // A failure the session reports without a notice of its own (a lost peer, a timeout) is worded from its reason.
+            if session.phase == .failed, let fail = session.fail { next.notice = SongTapNotice.of(fail) }
         }
         ui = next
+        // A beam belongs to a session that is sending or saving; anything else (a failure, a cancel, Undo) ends it at once.
+        if session.phase != .transferring && session.phase != .saved { clearBeam() }
     }
 
     private static func card(of p: SongTapPayload) -> SongTapCard {
@@ -320,8 +379,12 @@ public final class SongTapEngine {
         case .sendDecline(let peer): port.sendDecline(peer: peer)
         case .abortTransfer(let peer): port.abortTransfer(peer: peer)
         case .startBeam(let role, let startMs):
+            let reduced = port.reducedMotion()
             ui.beamStartMs = startMs
             ui.beamRole = role
+            ui.beamReduced = reduced
+            let end = startMs + SongTapTimeline.totalMs(role: role, reducedMotion: reduced) - now()
+            port.scheduleBeamEnd(afterMs: max(0, end))
         case .saveSong:
             savedVideoId = nil
             if let payload = incoming { port.save(payload) }
@@ -329,7 +392,10 @@ public final class SongTapEngine {
             port.cancelSave()
             let videoId = savedVideoId ?? ui.card.map(\.videoId).flatMap { $0.isEmpty ? nil : $0 } ?? incoming?.ytVideoId ?? songKey
             port.undoSave(videoId: videoId)
-        case .haptic(let cue): port.haptic(cue)
+        case .haptic(let cue):
+            // A beam (playing, or about to: any phone found over Bluetooth) does its own vibrating from the timeline's cue
+            // list; the session's "success" would buzz twice.
+            if !(cue == .success && (ui.beamRole != nil || session.peer != 0)) { port.haptic(cue) }
         case .scheduleTimeout(let tag, let afterMs): port.schedule(tag, afterMs: afterMs)
         case .notice(let reason): ui.notice = SongTapNotice.of(reason)
         case .noticeInvalidCode:
@@ -348,6 +414,8 @@ public final class SongTapEngine {
             return
         }
         if dismissPending { return }
+        // A saved card that came with a beam is put away by the beam's own end (its Undo chip lives inside it).
+        if phase == .saved && ui.beamRole == .receive { return }
         dismissPending = true
         port?.scheduleDismiss(afterMs: phase == .saved ? SongTapSession.undoWindowMs : Self.resultMs)
     }

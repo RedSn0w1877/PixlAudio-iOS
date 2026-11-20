@@ -429,11 +429,69 @@ struct SongTapGoldenTests {
         report.verify(atLeast: 20)
     }
 
+    // MARK: wire.jsonl
+
+    @Test func bluetoothWireFormat() throws {
+        var report = Report(file: "wire.jsonl")
+        for c in try Self.cases("wire.jsonl") {
+            let hex = Self.string(c.input, "hex")
+            switch c.fn {
+            case "constants":
+                report.record(c, c.matches {
+                    $0.string("sendService", SongTapWire.serviceSend); $0.string("receiveService", SongTapWire.serviceReceive)
+                    $0.string("info", SongTapWire.charInfo); $0.string("offer", SongTapWire.charOffer)
+                    $0.string("control", SongTapWire.charControl); $0.string("event", SongTapWire.charEvent)
+                    $0.int("notReady", SongTapWire.errorNotReady); $0.int("mtu", SongTapWire.wantedMtu)
+                })
+            case "infoEncode":
+                let out = SongTapWire.encodeInfo(ageMs: Self.long(c.input, "age"))
+                report.record(c, c.matches { Self.writeHex(&$0, "hex", out) })
+            case "infoDecode":
+                let age = SongTapWire.decodeInfo(Self.bytes(hex))
+                report.record(c, c.matches { if let age { $0.bool("ok", true); $0.long("age", age) } else { $0.bool("ok", false) } })
+            case "helloEncode":
+                let out = SongTapWire.encodeHello(challenge: Self.bytes(Self.string(c.input, "challenge")))
+                report.record(c, c.matches { Self.writeHex(&$0, "hex", out) })
+            case "ackEncode":
+                report.record(c, c.matches { Self.writeHex(&$0, "hex", SongTapWire.encodeAck()) })
+            case "declineEncode":
+                report.record(c, c.matches { Self.writeHex(&$0, "hex", SongTapWire.encodeDecline()) })
+            case "goEncode":
+                report.record(c, c.matches { Self.writeHex(&$0, "hex", SongTapWire.encodeGo()) })
+            case "tapEncode":
+                let out = SongTapWire.encodeTap(ageMs: Self.long(c.input, "age"))
+                report.record(c, c.matches { Self.writeHex(&$0, "hex", out) })
+            case "controlDecode":
+                let message = SongTapWire.decodeControl(Self.bytes(hex))
+                report.record(c, c.matches {
+                    switch message {
+                    case nil: $0.string("kind", "none")
+                    case .hello(let challenge)?: $0.string("kind", "hello"); Self.writeHex(&$0, "challenge", challenge)
+                    case .ack?: $0.string("kind", "ack")
+                    case .decline?: $0.string("kind", "decline")
+                    case .tap(let age)?: $0.string("kind", "tap"); $0.long("age", age)
+                    }
+                })
+            case "isGo":
+                let go = SongTapWire.isGo(Self.bytes(hex))
+                report.record(c, c.matches { $0.bool("go", go) })
+            case "roleOfService":
+                let role = SongTapWire.roleOfService(Self.string(c.input, "uuid"))
+                report.record(c, c.matches { Self.writeOptional(&$0, "role", role?.rawValue) })
+            default:
+                report.record(c, false)
+            }
+        }
+        #expect(report.counts["infoEncode"] ?? 0 >= 8)
+        #expect(report.counts["controlDecode"] ?? 0 >= 17)
+        report.verify(atLeast: 50)
+    }
+
     // MARK: The folder itself
 
     @Test func theManifestListsEveryFileWithItsHash() throws {
         let manifest = try Self.lines("MANIFEST.sha256")
-        #expect(manifest.count == 11)
+        #expect(manifest.count == 12)
         var names: [String] = []
         for entry in manifest {
             let hash = String(entry.prefix(64))
@@ -443,7 +501,7 @@ struct SongTapGoldenTests {
             #expect(digest == hash, "\(name) is not the file Android generated (was it edited, or re-encoded with CRLF?)")
         }
         #expect(Set(names) == ["payload.jsonl", "link.jsonl", "signing.jsonl", "session.jsonl", "detector.jsonl", "impulse.jsonl",
-                               "ratelimit.jsonl", "timeline.jsonl", "haptics.jsonl", "handshake.jsonl", "README.md"])
+                               "ratelimit.jsonl", "timeline.jsonl", "haptics.jsonl", "handshake.jsonl", "wire.jsonl", "README.md"])
     }
 
     @Test func theSpecVersionFileIsTheCodesVersion() throws {

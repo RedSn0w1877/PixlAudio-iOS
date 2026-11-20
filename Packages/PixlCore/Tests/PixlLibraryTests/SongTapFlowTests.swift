@@ -184,6 +184,10 @@ struct SongTapFlowTests {
         func cancelTimers() { log.append("cancelTimers") }
         func markFirstBeamAccepted() { firstBeamAccepted = true }
         func uiChanged(_ ui: SongTapUiState) { uis.append(ui) }
+        func requestTapPayload(peer: Int) { log.append("tapPayload:\(peer)") }
+        func reducedMotion() -> Bool { false }
+        func scheduleBeamEnd(afterMs: Int64?) { log.append("beamEnd:\(afterMs.map(String.init) ?? "cancel")") }
+        func resync() { log.append("resync") }
     }
 
     @MainActor
@@ -223,7 +227,10 @@ struct SongTapFlowTests {
         #expect(engine.session.phase == .transferring)
         engine.saveFinished(.saved(SongTapCard(videoId: "dQw4w9WgXcQ", songId: "id", title: "t", artist: "a", artUrl: nil)), for: port.saved[0])
         #expect(engine.session.phase == .saved)
-        #expect(port.log.contains("dismissIn:6000"))
+        // The card came with a beam (a code plays the receiver beam too): the beam's own end puts it away, 6 s of Undo inside it.
+        #expect(engine.ui.beamRole == .receive)
+        #expect(port.log.contains { $0.hasPrefix("beamEnd:") })
+        #expect(!port.log.contains("dismissIn:6000"))
         engine.undo()
         #expect(port.log.contains("undo:dQw4w9WgXcQ"))
         #expect(engine.session.phase == .armed)

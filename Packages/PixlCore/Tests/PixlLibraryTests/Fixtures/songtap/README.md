@@ -30,4 +30,7 @@ exactly `out`. Signatures are never part of a golden, only the bytes that are si
 - ratelimit.jsonl: `limits`: ops `admit,now,videoId,key`, `accepted,now,videoId`, `undone,now,key`
   from an empty `RateLimits`; out `verdicts` (`-` for the two that return no verdict).
 - timeline.jsonl: `ease`, `frame` (role, t, reduced), `total`.
+- wire.jsonl: the Bluetooth wire format (`SongTapWire`): `constants` (the UUIDs), `infoEncode`, `infoDecode`,
+  `helloEncode`, `ackEncode`, `declineEncode`, `goEncode`, `tapEncode`, `controlDecode` (`kind` hello, ack, decline,
+  tap or none), `isGo`, `roleOfService` (case sensitive).
 - haptics.jsonl: `cues`. handshake.jsonl: `senderStart`, `receiverStart`, `impulseAge`, `peerImpulse`.

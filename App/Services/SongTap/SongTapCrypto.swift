@@ -9,7 +9,7 @@ import PixlLibrary
 /// A `SongTapSigner` is made per session and thrown away: no key outlives it, so nothing stable identifies a phone from one
 /// beam to the next. What a signature proves is that the payload was not changed and was made for this receiver's challenge;
 /// it does not prove the sender is honest (see `SongTapSigning`).
-nonisolated struct SongTapSigner {
+nonisolated struct SongTapSigner: SongTapSignerPort {
     private let key = P256.Signing.PrivateKey()
 
     /// The uncompressed point, 65 bytes.
