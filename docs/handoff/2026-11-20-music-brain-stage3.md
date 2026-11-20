@@ -417,3 +417,20 @@ Everything above. In particular: the shelf settling over real use and what 30 mi
 really rebuild after a reset; the cost of `mergedPlays` (the log plus the imported plays and their key resolution) on 100,000 plays; whether the refresh worker runs
 often enough for the gate's two-week rule; the control draw's share on a real queue; the margin of the gate on a real listener (the 1% and the interval are
 unvalidated defaults); the favourites file on a large library. **That `App/` compiles is shown by CI only.**
+
+## Commands and results (review pass)
+
+```
+cmd //c "ci\swiftw.cmd test --package-path Packages\PixlCore --filter BrainStage3Review"   # 18 tests in 1 suite, 0 failed
+cmd //c "ci\swiftw.cmd test --package-path Packages\PixlCore"                              # 8 bundles, 2,602 tests, 0 failed (the last run)
+bash ci/check-forbidden.sh                                                                  # OK
+powershell -NoProfile -File ci/parse-check.ps1 -All                                         # 1,078 files OK
+```
+
+One full run had a single failure, `theColdStartFetchesEightRadiosAtMostTwoAtATimeAndSaysHowFarItIs` (a timing-sensitive progress callback in
+`BrainStage2bM2Tests`, nothing this pass touches); it passed alone three times and in the next two full runs.
+
+## CI (review pass)
+
+Run **44663889853** (`643e8d9`, the last code commit), workflow `ci`, branch `music-brain`: `core` **passed**, `app` (Xcode 27, Swift 6 strict concurrency, the only
+compiler for `App/`) **passed**, `ipa` skipped as for any branch push. First attempt, no rerun. Green CI says nothing about how any of this looks or behaves on a phone.
