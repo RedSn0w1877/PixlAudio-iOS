@@ -108,12 +108,16 @@ public enum ListBuilder {
         public var maxPerArtist: Int
         /// At least this share of the picks from artists the listener never played (First Listen: 0.4); 0 for none.
         public var minNewArtistShare: Double
+        /// Stage 3 (5.10): the arm bandit. A novel slot goes to the arm with the largest draw among the arms that still have a
+        /// candidate, and the pick is flagged `Pick.explore`. Nil keeps stage 2's choice (the best-valued novel candidate), exactly.
+        public var armPicker: (any ArmPicker)?
 
         public init(count: Int, prior: [Prior], nu: Double, tieSeed: Int64, nowMs: Int64, tzOffsetMin: Int32,
                     firstSlotAids: [Int64]? = nil, likedAid: Int64 = 0, likedRid: Int64 = 0, finite: Bool = false,
                     thinAid: Int64 = 0, lambda: Double = ListBuilder.lambdaDefault,
                     calibration: Calibration? = nil, kappa: Double = Calibration.kappa,
-                    simSource: (any SimilaritySource)? = nil, maxPerArtist: Int = 0, minNewArtistShare: Double = 0.0) {
+                    simSource: (any SimilaritySource)? = nil, maxPerArtist: Int = 0, minNewArtistShare: Double = 0.0,
+                    armPicker: (any ArmPicker)? = nil) {
             self.count = count
             self.prior = prior
             self.nu = nu
@@ -131,6 +135,7 @@ public enum ListBuilder {
             self.simSource = simSource
             self.maxPerArtist = maxPerArtist
             self.minNewArtistShare = minNewArtistShare
+            self.armPicker = armPicker
         }
     }
 
@@ -139,6 +144,15 @@ public enum ListBuilder {
         public let kind: Int32
         /// The quantised key it won its slot with.
         public let key: Int64
+        /// The novel slot was filled from the arm the bandit drew (an exploration slot, logged with `EventFlags.exploreSlot`).
+        public let explore: Bool
+
+        public init(scored: Scored, kind: Int32, key: Int64, explore: Bool = false) {
+            self.scored = scored
+            self.kind = kind
+            self.key = key
+            self.explore = explore
+        }
     }
 
     public static func build(_ request: Request, scored: [Scored], graph: Graph) -> [Pick] {
@@ -182,6 +196,7 @@ public enum ListBuilder {
             }
             var chosen: Scored?
             var chosenKey: Int64 = 0
+            var explore = false
 
             if kind == slotBridge {
                 let aids = request.firstSlotAids!
@@ -293,15 +308,30 @@ public enum ListBuilder {
                 while pass < 2 && chosen == nil {
                     var restrict = needNewArtist
                     while chosen == nil {
+                        // 5.10: a novel slot goes to the arm with the largest draw among the arms that still have a candidate.
+                        var drawnArm: Int32 = -1
+                        if wantNovel, let picker = request.armPicker {
+                            var eligible = [Bool](repeating: false, count: ArmBandit.arms)
+                            var hasAny = false
+                            for s in scored {
+                                if !s.novel || used.contains(s.c.rid) || s.arm < 0 || Int(s.arm) >= ArmBandit.arms || !okSlot(s.c) { continue }
+                                if restrict && !s.c.artistNew { continue }
+                                eligible[Int(s.arm)] = true
+                                hasAny = true
+                            }
+                            if hasAny { drawnArm = picker.pick(eligible) }
+                        }
                         for s in scored {
                             if s.novel != wantNovel || used.contains(s.c.rid) || !okSlot(s.c) {
                                 continue
                             }
                             if restrict && !s.c.artistNew { continue }
+                            if drawnArm >= 0 && s.arm != drawnArm { continue }
                             let key = BrainMath.orderKey(value(s, list, graph, request))
                             if chosen == nil || better(key, s.c.rid, chosenKey, chosen!.c.rid, request.tieSeed) {
                                 chosen = s
                                 chosenKey = key
+                                explore = drawnArm >= 0
                             }
                         }
                         if chosen == nil && restrict { restrict = false } else { break }
@@ -313,7 +343,7 @@ public enum ListBuilder {
             }
 
             guard let pick = chosen else { break }
-            picks.append(Pick(scored: pick, kind: kind, key: chosenKey))
+            picks.append(Pick(scored: pick, kind: kind, key: chosenKey, explore: explore && pick.novel))
             used.insert(pick.c.rid)
             if pick.novel { novelSoFar += 1 }
             if pick.c.artistNew { newArtistSoFar += 1 }

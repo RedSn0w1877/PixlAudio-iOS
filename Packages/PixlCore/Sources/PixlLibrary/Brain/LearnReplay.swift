@@ -63,6 +63,16 @@ public enum LearnReplay {
         return Ranker.applyEvent(&model, x, r: g.r, c: g.c, bias: Ranker.biasOf(p0), day: dayOf(e, t), eventId: e.eventId)
     }
 
+    /// As `applyLive`, and the arm bandit and the novelty appetite (5.10) take the same play first: their update reads the
+    /// tables as they are before the play (`novel` is the first play of the track).
+    @discardableResult
+    public static func applyLive(_ model: inout RankerModel, posteriors: inout Posteriors, _ e: PlayEvent, _ g: Reward.Graded,
+                                 liked: Bool, affinity: Affinity.State, session: SessionState, nowMs: Int64) -> Int {
+        let t = e.startedAtMs > nowMs ? nowMs : e.startedAtMs
+        PosteriorUpdate.onPlay(&posteriors, e, g, novel: !Affinity.isHeard(affinity, family: Family.track, key: e.rid), nowMs: t)
+        return applyLive(&model, e, g, liked: liked, affinity: affinity, session: session, nowMs: nowMs)
+    }
+
     private static func originIndexOf(_ origin: Int32) -> Int {
         if origin == Origin.importSpotify { return originBase }
         if origin == Origin.importYtm { return originBase + 1 }
@@ -79,6 +89,8 @@ public enum LearnReplay {
         public let events: Int
         /// The id of the newest event replayed: the watermark the live path catches up from.
         public let lastEventId: Int64
+        /// The arm bandit and the novelty appetite, built by the same pass (plays after "Reset what I've learned" only).
+        public let posteriors: Posteriors
     }
 
     /// Replays `events` (ascending `eventId`, rids already mapped through `track_merge`, as `Replay.rebuild` needs them).
@@ -94,6 +106,7 @@ public enum LearnReplay {
         var tracker = GradeTracker()
         var session = SessionState()
         var model: RankerModel?
+        var posteriors: Posteriors?
         var x = [Double](repeating: 0.0, count: Ranker.d)
         var times: [Int64] = []
         var sessions: [Int64] = []
@@ -139,6 +152,12 @@ public enum LearnReplay {
             if originIndex >= 0 { x[originIndex] = 1.0 }
             Ranker.applyEvent(&model!, x, r: g.r, c: g.c, bias: bias, day: day, eventId: e.eventId)
             let novel = !Affinity.isHeard(affinity, family: Family.track, key: e.rid)
+            if posteriors == nil {
+                var fresh = Posteriors.newState(today: day)
+                fresh.lastEventId = learnAfterEventId == Int64.min ? Int64.min : learnAfterEventId
+                posteriors = fresh
+            }
+            PosteriorUpdate.onPlay(&posteriors!, e, g, novel: novel, nowMs: nowMs)
             Affinity.applyEvent(&affinity, e, g, tMs: t)
             Session.apply(&session, e, g, novel: novel)
             count += 1
@@ -152,7 +171,14 @@ public enum LearnReplay {
         }()
         Ranker.forget(&finalModel, today: BrainMath.localDay(nowMs, tzOffsetMin: tzNowMin))
         let pred = Gate.Predictions(times: times, sessions: sessions, finished: finished, learned: pl, prior: pp, threshold: thr)
-        return Result(state: affinity, model: finalModel, predictions: pred, events: count, lastEventId: lastId)
+        var finalPosteriors = posteriors ?? {
+            var fresh = Posteriors.newState(today: BrainMath.localDay(nowMs, tzOffsetMin: tzNowMin))
+            fresh.lastEventId = learnAfterEventId
+            return fresh
+        }()
+        PosteriorUpdate.advanceTo(&finalPosteriors, today: BrainMath.localDay(nowMs, tzOffsetMin: tzNowMin))
+        return Result(state: affinity, model: finalModel, predictions: pred, events: count, lastEventId: lastId,
+                      posteriors: finalPosteriors)
     }
 
     // MARK: Test 6 (11): learned weights against the frozen prior

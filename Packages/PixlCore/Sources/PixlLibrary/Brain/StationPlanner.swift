@@ -72,6 +72,8 @@ public enum StationPlanner {
         /// Stage 3: which weights rank this list (5.10, 5.12 point 8). Nil is the prior `M0`, exactly as in stages 1 and 2.
         /// Build it with `Ranker.WeightSource`; it falls back to the prior by itself when the gate has the prior on.
         public var ranking: Ranker.WeightSource?
+        /// Stage 3: the arm bandit of 5.10 (nil keeps stage 2's choice of the novel candidate, byte for byte).
+        public var armPicker: (any ArmPicker)?
 
         public init(mode: Int32, count: Int, candidates: [Candidate], seeds: [Retrieval.SeedList],
                     prior: [ListBuilder.Prior] = [], nowMs: Int64, tzOffsetMin: Int32 = 0, nuMultiplier: Double = 1.0,
@@ -80,8 +82,10 @@ public enum StationPlanner {
                     servedMax: Double = Repetition.maxPenalty, closestOfSeeds: Bool = false,
                     islands: IslandContext? = nil, calibration: Calibration? = nil,
                     lambda: Double = ListBuilder.lambdaDefault, simSource: (any SimilaritySource)? = nil,
-                    maxPerArtist: Int = 0, minNewArtistShare: Double = 0.0, ranking: Ranker.WeightSource? = nil) {
+                    maxPerArtist: Int = 0, minNewArtistShare: Double = 0.0, ranking: Ranker.WeightSource? = nil,
+                    armPicker: (any ArmPicker)? = nil) {
             self.ranking = ranking
+            self.armPicker = armPicker
             self.islands = islands
             self.calibration = calibration
             self.lambda = lambda
@@ -125,6 +129,8 @@ public enum StationPlanner {
         /// `p` x 10,000.
         public let pQ: Int32
         public let novel: Bool
+        /// The slot was an exploration slot: the arm was drawn by the bandit (5.10), and the play is logged with `EventFlags.exploreSlot`.
+        public var explore: Bool = false
     }
 
     public struct Plan: Sendable {
@@ -296,7 +302,8 @@ public enum StationPlanner {
                 calibration: request.calibration,
                 simSource: request.simSource,
                 maxPerArtist: request.maxPerArtist,
-                minNewArtistShare: request.minNewArtistShare
+                minNewArtistShare: request.minNewArtistShare,
+                armPicker: request.armPicker
             ),
             scored: scored,
             graph: graph
@@ -335,7 +342,8 @@ public enum StationPlanner {
                 radioRank: s.bestRank > 0 ? s.bestRank : -1,
                 key: b.key,
                 pQ: Int32(truncatingIfNeeded: BrainMath.floorToLong(s.p * 10000.0 + 0.5)),
-                novel: s.novel
+                novel: s.novel,
+                explore: b.explore
             ))
         }
         return Plan(picks: picks, usedLiked: usedLiked, usedFamiliarNext: familiarNext && !picks.isEmpty, poolSize: n)

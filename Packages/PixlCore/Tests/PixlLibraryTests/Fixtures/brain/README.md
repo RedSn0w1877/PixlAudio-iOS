@@ -118,3 +118,21 @@ How each `fn` is replayed:
 - `learner.jsonl`: `gate` is `Gate.decide(State(useLearned, winStreak, atMs), Summary(plays, ..., llLearned, llPrior), nowMs)`;
   `logLoss` is `Gate.logLoss` and `Gate.accuracy` (threshold 0.5) over the arrays; `codec` is `LearnerCodec.encode` of the model in
   `in` (with the gate and summary the case gives) and that it decodes to the same text; `codecBad` texts must not be accepted.
+- `bandit.jsonl`, `novelty.jsonl`, `context.jsonl`, `shelfbandit.jsonl`, `posteriors.jsonl` (the completion of stage 3; new files, nothing before them changed).
+- `bandit.jsonl` `armBandit`: start from `ArmBandit.newState(day0)`; each step `[family, arm, r, c, explore, day]` is `ArmBandit.update`;
+  `moved` is its result. Then the hashes (FNV-1a 64 over the 8 little-endian bytes of each double) of `alpha`, `beta`, `auditAlpha`,
+  `auditBeta`, the anchor day and update count; `picks[k]` is `ArmBandit.pickArm(state, k mod 3, eligible, Rng(fnv1a64("golden:armdraw:<c>:<k>")))`
+  with `eligible[a] = (a + k + c) mod 3 != 0`; `theta[a]` is `ArmBandit.draw(state, MIX, a, Rng(fnv1a64("golden:armtheta:<c>:<a>")))`; `mean[a]` is
+  `ArmBandit.mean(state, MIX, a)`. `armDiscount`: start from a state with the given `alphaHash` and `anchorDay` (the file does not
+  hold the state: a port builds the same one from its own `update`), call `ArmBandit.discount(state, day)` for each of `days`.
+- `novelty.jsonl` `novelty`: start from `NoveltyAppetite.newState(day0)`; each play `[startedAtMs, day, finished, novel, recommender, flags]` becomes
+  the event of `Stage3bGolden.event` (a live autoplay play of arm RADIO, 200 s long, finished or skipped after 3 s) and is given to
+  `NoveltyAppetite.onPlay`; after the last, `advance(state, lastDay + 1)`; the figures are read at `nowMs`.
+- `context.jsonl` `bucket`: `ContextLift.daypart` and `bucket` of a time and an offset. `context`: add every play
+  `[island, startedAtMs, tzOffsetMin, c, r]` to `ContextLift.Builder(nowMs)`; `plays` per bucket, `lift[island * 8 + bucket]` for islands 0..2,
+  and `leader[bucket]` of `table.leader(bucket, [(0, 1.0), (1, 2.0), (2, 0.5)])`.
+- `shelfbandit.jsonl` `shelfBandit`: from `ShelfBandit.newState()` each visit `[daypart, lastSeen, used, day, moved, [types]]` is
+  `ShelfBandit.visit`; then `order(state, 700 + c, c mod 4, [0..9], 123 + c, lastDay + 20)`; `rebuiltEqual` says `ShelfBandit.rebuild` of
+  the impression rows reproduces the posteriors; `text` is `ShelfBanditCodec.encode`.
+- `posteriors.jsonl` `posteriors`: `LearnReplay.run` of the events (as in `replay.jsonl`), `PosteriorCodec.encode` of its `posteriors`;
+  `posteriorsBad` texts must not be accepted.

@@ -187,7 +187,7 @@ public enum Replay {
             state.addPrior(Family.artist, aid, posQ: BrainMath.toQ(2.0), negQ: 0)
         }
         for a in facts.adjustments {
-            if a.key == 0 || (a.family != Family.track && a.family != Family.artist) { continue }
+            if a.key == 0 || (a.family != Family.track && a.family != Family.artist && a.family != Family.tag) { continue }
             let scale: Double = a.strength >= 3 ? 2.0 : (a.strength == 2 ? 1.5 : 1.0)
             let q = BrainMath.toQ(6.0 * scale)
             if a.more {

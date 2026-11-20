@@ -96,6 +96,13 @@ public enum MixPlanner {
         public var tagsByRid: [Int64: Tags.Vector]
         /// Stage 3: which weights rank the list; nil is the prior `M0` (see `StationPlanner.Request.ranking`).
         public var ranking: Ranker.WeightSource?
+        /// Stage 3: the arm bandit of 5.10; nil keeps stage 2's choice (see `StationPlanner.Request.armPicker`).
+        public var armPicker: (any ArmPicker)?
+        /// Stage 3: the novelty appetite the mixes start from (`NoveltyAppetite.nu`); `nu0` is stage 2's constant, kept while
+        /// the gate has the prior on.
+        public var nuBase: Double = MixPlanner.nu0
+        /// A list with its own novelty share (the daypart mix: 0.15, 6.2); negative for the share of its kind.
+        public var nuOverride: Double = -1.0
 
         public init(kind: Int32, candidates: [Candidate], seeds: [Retrieval.SeedList], nowMs: Int64, tzOffsetMin: Int32,
                     nuMultiplier: Double = 1.0, salt: Int64 = 0, regenerate: Int32 = 0, excludedRids: Set<Int64> = [],
@@ -127,14 +134,14 @@ public enum MixPlanner {
     public static func countOf(_ kind: Int32) -> Int { kind == kindYour ? yourCount : dailyCount }
 
     /// The share of the slots given to music the listener does not have (8.2, 5.10).
-    public static func nuOf(_ kind: Int32, multiplier: Double) -> Double {
-        let base = kind == kindYour ? nu0 * yourFactor : nu0
+    public static func nuOf(_ kind: Int32, multiplier: Double, appetite: Double = nu0) -> Double {
+        let base = kind == kindYour ? appetite * yourFactor : appetite
         return BrainMath.clip(base * multiplier, 0.0, nuMax)
     }
 
     /// The novelty share of one island's Daily Mix.
-    public static func nuOfIsland(multiplier: Double) -> Double {
-        BrainMath.clip(nu0 * multiplier, islandNuMin, islandNuMax)
+    public static func nuOfIsland(multiplier: Double, base: Double = nu0) -> Double {
+        BrainMath.clip(base * multiplier, islandNuMin, islandNuMax)
     }
 
     /// The surface a kind of mix is logged under.
@@ -166,7 +173,7 @@ public enum MixPlanner {
         var candidates = request.candidates
         var calibration: Calibration?
         var lambda = ListBuilder.lambdaDefault
-        var nu = nuOf(kind, multiplier: request.nuMultiplier)
+        var nu = nuOf(kind, multiplier: request.nuMultiplier, appetite: request.nuBase)
         if let islands, !islands.islands.isEmpty {
             if request.islandIdx >= 0 && request.islandIdx < islands.islands.count {
                 // A Daily Mix of one island: every track must be close to it (6.2).
@@ -178,7 +185,7 @@ public enum MixPlanner {
                     if Islands.similarity(island, p) >= islandFloor { kept.append(c) }
                 }
                 candidates = kept
-                nu = nuOfIsland(multiplier: request.nuMultiplier)
+                nu = nuOfIsland(multiplier: request.nuMultiplier, base: request.nuBase)
             } else if kind == kindYour && islands.islands.count > 1 {
                 // Your Mix: every island, kept in the listener's proportions (6.5).
                 calibration = Calibration(islands.islands.map { $0.weight })
@@ -189,6 +196,7 @@ public enum MixPlanner {
                 candidates = placed
             }
         }
+        if request.nuOverride >= 0.0 { nu = BrainMath.clip(request.nuOverride, 0.0, nuMax) }
         var simSource: (any SimilaritySource)?
         if islands != nil && (request.embeddings != nil || !request.tagsByRid.isEmpty) {
             simSource = SimilarityIndex(graph, request.embeddings, request.tagsByRid)
@@ -216,7 +224,8 @@ public enum MixPlanner {
                 simSource: simSource,
                 maxPerArtist: first ? 2 : 0,
                 minNewArtistShare: first ? 0.4 : 0.0,
-                ranking: request.ranking
+                ranking: request.ranking,
+                armPicker: request.armPicker
             ),
             affinity: affinity,
             session: session,

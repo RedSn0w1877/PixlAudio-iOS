@@ -12,7 +12,7 @@
 //  - a shelf with too few playable items is hidden, not padded;
 //  - at most seven shelves.
 //
-// The order of the shelves is fixed in stage 2; the bandit that would reorder them is stage 3.
+// The order of the shelves is fixed in stage 2; in stage 3 the shelf bandit (`ShelfBandit`) may reorder them through `reorder`.
 
 public enum HomePlanner {
     // Shelf types, in the fixed order of the table in 8.1.
@@ -25,6 +25,9 @@ public enum HomePlanner {
     public static let stepSideways: Int32 = 6
     public static let moreLikeAlbum: Int32 = 7
     public static let popular: Int32 = 8
+
+    /// Stage 3: the daypart mix shelf (6.2, 8.1). Not in stage 2's table; the builder puts it right after "Because you listened to".
+    public static let daypartMix: Int32 = 9
 
     public static let maxShelves = 7
     public static let itemsPerShelf = 12
@@ -131,6 +134,22 @@ public enum HomePlanner {
             rounds += 1
         }
         return result
+    }
+
+    /// Puts `shelves` (in the fixed order of stage 2) in the order of `typeOrder`, the shelf types the shelf bandit drew (5.10):
+    /// by the place of each shelf's type in `typeOrder`, shelves of one type keeping their own order; a type `typeOrder` does
+    /// not hold goes after the others, in its fixed order. The page rules of `plan` then apply to this order as before.
+    public static func reorder(_ shelves: [ShelfIn], typeOrder: [Int32]) -> [ShelfIn] {
+        func place(_ type: Int32) -> Int {
+            for i in typeOrder.indices where typeOrder[i] == type { return i }
+            return typeOrder.count
+        }
+        let idx = shelves.indices.sorted { a, b in
+            let pa = place(shelves[a].type)
+            let pb = place(shelves[b].type)
+            return pa != pb ? pa < pb : a < b
+        }
+        return idx.map { shelves[$0] }
     }
 
     private static func filterItems(_ shelf: ShelfIn, _ pageRids: Set<Int64>, _ pageArtists: [Int64: Int]) -> [Item] {

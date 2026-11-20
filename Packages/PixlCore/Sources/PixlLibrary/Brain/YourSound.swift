@@ -225,6 +225,127 @@ public enum YourSound {
         }
         return byCountDesc(counts).prefix(top).map { GenreShare(atlasId: $0, permille: permille(counts[$0] ?? 0, known)) }
     }
+
+    // MARK: Lately (8.6 point 8)
+
+    /// "Lately" looks this far back.
+    public static let latelyDays = 14
+
+    /// The most moves "Lately" shows.
+    public static let latelyTop = 5
+
+    /// A key needs this much decayed weight (about three plays) in the newer or the older state to count as a move.
+    public static let latelyMinWeight = 3.0
+
+    /// A move smaller than this in `aff` (which runs -3..3) is noise.
+    public static let latelyMinDelta = 0.25
+
+    /// One affinity move: `family` is `Family.artist` or `Family.tag`; `delta` is `aff` now minus `aff` `latelyDays` days ago.
+    public struct Move: Sendable, Equatable {
+        public let family: Int32
+        public let key: Int64
+        public let delta: Double
+
+        public init(family: Int32, key: Int64, delta: Double) {
+            self.family = family
+            self.key = key
+            self.delta = delta
+        }
+    }
+
+    /// The largest affinity moves between `before` (the tables as they stood at `beforeMs`) and `after` (as they stand at
+    /// `nowMs`), over artists and tags: `aff(after, nowMs) - aff(before, beforeMs)`, each read with that state's own base
+    /// rate. Only keys with at least `latelyMinWeight` of weight in one of the two and a move of at least `latelyMinDelta`;
+    /// largest absolute move first, ties by family then key; at most `top`.
+    public static func lately(before: Affinity.State, after: Affinity.State, beforeMs: Int64, nowMs: Int64, top: Int = latelyTop) -> [Move] {
+        let p0Before = Affinity.p0(before, nowMs: beforeMs)
+        let p0After = Affinity.p0(after, nowMs: nowMs)
+        var moves: [Move] = []
+        for family in [Family.artist, Family.tag] {
+            var keys = Set<Int64>()
+            for k in before.sortedKeys(family) { keys.insert(k) }
+            for k in after.sortedKeys(family) { keys.insert(k) }
+            for key in keys.sorted() {
+                let wBefore = Affinity.weight(before, family: family, key: key, nowMs: beforeMs)
+                let wAfter = Affinity.weight(after, family: family, key: key, nowMs: nowMs)
+                if wBefore < latelyMinWeight && wAfter < latelyMinWeight { continue }
+                let delta = Affinity.aff(after, family: family, key: key, nowMs: nowMs, p0: p0After)
+                    - Affinity.aff(before, family: family, key: key, nowMs: beforeMs, p0: p0Before)
+                if BrainMath.abs(delta) < latelyMinDelta { continue }
+                moves.append(Move(family: family, key: key, delta: delta))
+            }
+        }
+        moves.sort { a, b in
+            let ka = BrainMath.orderKey(BrainMath.abs(a.delta))
+            let kb = BrainMath.orderKey(BrainMath.abs(b.delta))
+            if ka != kb { return ka > kb }
+            if a.family != b.family { return a.family < b.family }
+            return a.key < b.key
+        }
+        return moves.count > top ? Array(moves[0..<top]) : moves
+    }
+
+    // MARK: The genre tree (8.6 point 2)
+
+    /// A family of the atlas (a root) with the share of the plays under it and the genres played inside it.
+    public struct GenreFamily: Sendable, Equatable {
+        public let rootId: Int
+        public let permille: Int
+        /// The genres played inside it: atlas id and permille of the plays whose genre is known, heaviest first.
+        public let children: [GenreShare]
+    }
+
+    /// The plays' genres rolled up along the atlas tree: each play with a known top tag adds one count to its genre and to that
+    /// genre's root (`rootOf` gives the root family of a genre, the genre itself for a root). Families heaviest first (ties:
+    /// smaller id), each with its genres heaviest first. Shares are permille of the plays whose genre is known. Unknown genres
+    /// are absent.
+    public static func genreTree(_ plays: [Play], top: Int = 8, topTagOf: (Int64) -> Int, rootOf: (Int) -> Int) -> [GenreFamily] {
+        var perRoot: [Int: Int] = [:]
+        var under: [Int: [Int: Int]] = [:]
+        var known = 0
+        for p in plays {
+            let t = topTagOf(p.rid)
+            if t == GenreAtlas.none { continue }
+            let root = rootOf(t)
+            known += 1
+            perRoot[root, default: 0] += 1
+            under[root, default: [:]][t, default: 0] += 1
+        }
+        return byCountDesc(perRoot).prefix(top).map { root in
+            let m = under[root] ?? [:]
+            return GenreFamily(rootId: root, permille: permille(perRoot[root] ?? 0, known),
+                               children: byCountDesc(m).map { GenreShare(atlasId: $0, permille: permille(m[$0] ?? 0, known)) })
+        }
+    }
+
+    // MARK: "You and this genre" (8.7)
+
+    /// What the listener's own plays say about one genre: when they first played it, how much of their listening it is, their
+    /// favourite tracks in it.
+    public struct GenreHistory: Sendable, Equatable {
+        public let firstPlayedMs: Int64
+        public let permille: Int
+        public let plays: Int
+        public let topRids: [Int64]
+    }
+
+    /// `belongs` says whether a recording is under the genre (its tag vector holds the genre or one of its descendants). Nil
+    /// when the listener never played anything under it: the section is hidden then. `top` tracks by plays, ties by the
+    /// smaller id.
+    public static func genreHistory(_ plays: [Play], top: Int = 5, belongs: (Int64) -> Bool) -> GenreHistory? {
+        var first = Int64.max
+        var n = 0
+        var perTrack: [Int64: Int] = [:]
+        for p in plays {
+            if !belongs(p.rid) { continue }
+            n += 1
+            if p.startedAtMs < first { first = p.startedAtMs }
+            perTrack[p.rid, default: 0] += 1
+        }
+        if n == 0 { return nil }
+        return GenreHistory(firstPlayedMs: first, permille: permille(n, plays.count), plays: n,
+                            topRids: Array(byCountDesc(perTrack).prefix(top)))
+    }
 }
 
 /// What "Your sound" may say about the model, a function of the model's real state and nothing else (honesty rule of stage 3).
