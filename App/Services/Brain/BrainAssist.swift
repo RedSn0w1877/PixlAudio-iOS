@@ -82,6 +82,12 @@ final class BrainAssist {
         }
     }
 
+    /// "Let Taizo help the engine" was turned off: the genres its job wrote are taken back out now (the refresh would do it at its next run).
+    func switchedOff() {
+        guard let help else { return }
+        Task { _ = await help.run(playing: { false }) }
+    }
+
     // MARK: The one cloud call
 
     /// One short answer from the cloud assistant under the monthly budget, or nil (not on the automatic route, a failure, a refusal).

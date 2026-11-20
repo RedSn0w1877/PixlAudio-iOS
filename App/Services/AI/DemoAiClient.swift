@@ -6,8 +6,10 @@ import PixlNet
 /// fixed sentences, lyric translations echo each line with a bracketed translation.
 nonisolated struct DemoAiClient: AiClient {
     static let introLine = "Here's some indie warmth straight from your library."
-    static let chatReply = "Daft Punk produced Random Access Memories themselves, recording with session legends like "
-        + "Nile Rodgers and Giorgio Moroder. Want me to queue something with that disco-funk feel?"
+    /// Names no one: a chat answer is checked against what the conversation held (docs/brain-spec.md, 1 principle 9), so a scripted answer that
+    /// named artists would be shown with them replaced.
+    static let chatReply = "That one came out in 2013 and leans on live session players more than on samples. "
+        + "Want me to queue something with that disco-funk feel?"
 
     /// A prompt containing this fails like a provider rejecting the key (the AI sheet's error state).
     static let errorTrigger = "#demo-error"

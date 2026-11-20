@@ -35,6 +35,8 @@ struct QueueSheet: View {
     @State private var whyRef: QueueWhyRef?
     /// The notes of the queue (docs/brain-spec.md, 9.3): made again only when the queue, the current song or the library change.
     @State private var setNoteMemo = SetNoteMemo()
+    /// The songs of the next few rows that the listener has a recorded play of; nil until read (a note is true or absent).
+    @State private var heardIds: Set<String>?
     @State private var showsHowPicksWork = false
     /// The drag's state lives in its own observable model: a drag event re-runs the visible rows' offset modifiers,
     /// not this sheet's body.
@@ -215,7 +217,9 @@ struct QueueSheet: View {
     private func list(queue: [Song], count: Int, offset: Int, currentDisplay: Int, autoplayLine: Int?) -> some View {
         // The reason line of every pick that has one, by song id (kept in step with the queue by Autoplay).
         let whyLines = env.brain.autoplay.why
-        let setNotes = setNoteMemo.notes(queue: queue, currentIndex: playback.currentIndex ?? -1, library: env.library).bySongId
+        let currentIndex = playback.currentIndex ?? -1
+        // By the position of the row in the queue: a song queued twice has its note on one row only.
+        let setNotes = setNoteMemo.notes(queue: queue, currentIndex: currentIndex, heard: heardIds).byIndex
         return ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 8) {
@@ -226,9 +230,13 @@ struct QueueSheet: View {
                         let song = queue[index + offset]
                         let canReorder = index > currentDisplay
                         let isCurrent = index == currentDisplay
-                        if let note = setNotes[song.id], canReorder || isCurrent { SetNoteRowLabel(text: note) }
+                        let note = canReorder || isCurrent ? setNotes[index + offset] : nil
                         let why = whyLines.isEmpty ? nil : whyLines[song.id]
-                        QueueSongRow(song: song, isCurrent: isCurrent,
+                        // The note is part of its row: it moves with the row when it is dragged, and the row's own height is what sets the
+                        // drag's pitch (measured on the row, below, not on the note).
+                        VStack(spacing: 8) {
+                            if let note { SetNoteRowLabel(text: note) }
+                            QueueSongRow(song: song, isCurrent: isCurrent,
                                      isPlaying: isCurrent && playback.isPlaying, canReorder: canReorder,
                                      isDragging: reorder.draggingIndex == index,
                                      why: why?.line.map(BrainStrings.whyLine),
@@ -243,12 +251,13 @@ struct QueueSheet: View {
                                      },
                                      handle: handleGesture(index: index, minIndex: currentDisplay + 1,
                                                            maxIndex: count - 1, offset: offset))
-                            .modifier(QueueRowReorderOffset(reorder: reorder, index: index, pitch: rowPitch))
-                            .zIndex(reorder.draggingIndex == index ? 1 : 0)
                             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
                                 if index == 0 { rowPitch = height + 8 }
                             }
-                            .id(index)
+                        }
+                        .modifier(QueueRowReorderOffset(reorder: reorder, index: index, pitch: rowPitch))
+                        .zIndex(reorder.draggingIndex == index ? 1 : 0)
+                        .id(index)
                     }
                     // No pick of Autoplay's is waiting: the line closes the queue, so its switch is always in reach.
                     if autoplayLine == nil { autoplayLineView }
@@ -266,6 +275,11 @@ struct QueueSheet: View {
             }
             .scrollEdgeEffectStyle(.soft, for: .top)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
+            // The plays behind the notes are read when the window of the queue changes, on the brain's own actors (never on the main thread).
+            .task(id: setNoteMemo.key(queue: queue, currentIndex: currentIndex)) {
+                heardIds = await SetNoteHistoryLoader.heard(SetNoteLines.window(queue, currentIndex: currentIndex),
+                                                            repository: env.brain.repository, engine: env.brain.engine)
+            }
             .onChange(of: locateRequest) { _, _ in
                 guard currentDisplay >= 0 else { return }
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.9)) {

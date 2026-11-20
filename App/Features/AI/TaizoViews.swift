@@ -990,6 +990,12 @@ struct TaizoMixCard: View {
                     .foregroundStyle(theme.onSurfaceVariant)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            if card.seedsNotUsed > 0 {
+                Text(BrainStrings.taizoMixSeedNotUsed)
+                    .pixlFont(.bodySmall)
+                    .foregroundStyle(theme.onSurfaceVariant)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if state.failed {
                 Text(BrainStrings.taizoMixFailed)
                     .pixlFont(.bodySmall)

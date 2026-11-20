@@ -83,7 +83,11 @@ struct AISettingsSection: View {
     /// "Let Taizo help the engine" (docs/brain-spec.md, 9.4): the optional weekly jobs, off unless turned on, inside the monthly limit.
     private var assistHelpSwitch: some View {
         SwitchSettingRow(title: BrainStrings.assistTitle, subtitle: BrainStrings.assistBody,
-                         isOn: Binding(get: { settings.ai.brainAssistHelp }, set: { settings.ai.brainAssistHelp = $0 }),
+                         isOn: Binding(get: { settings.ai.brainAssistHelp }, set: { isOn in
+                             settings.ai.brainAssistHelp = isOn
+                             // Off: the genres its job wrote leave the song data now, not at the next daily refresh.
+                             if !isOn { environment.brain.assist?.switchedOff() }
+                         }),
                          systemImage: "sparkles", iconColor: theme.secondary)
             .accessibilityIdentifier("settings.ai.assistHelp")
     }

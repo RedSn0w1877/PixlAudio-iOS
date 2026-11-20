@@ -84,6 +84,11 @@ final class TaisChatModel {
     /// The turn in flight. One at a time: two turns would share the toolbox (and its taste-change guard) and the
     /// conversation record, and drive playback against each other. "New chat" and opening another chat cancel it.
     @ObservationIgnored private var turnTask: Task<Void, Never>?
+    /// The Claude reply that is streaming right now: its full raw text so far and the conversation's record of what tools returned, so what the
+    /// listener reads while it streams is checked like the final reply (a name no tool returned is never shown, even for a moment).
+    @ObservationIgnored private var streamingReply: (id: Int, progress: ClaudeTurnProgress, grounding: TaizoGrounding)?
+    /// What an on-device or plain-provider chat knows (the listener's own words), when there is no cloud toolbox.
+    @ObservationIgnored private let deviceGrounding = TaizoGrounding()
 
     /// Android `TAIZO_SUGGESTIONS` (sent as "Play some <x> songs"; the chips are `TaizoSuggestion.moods`).
     static let suggestions = ["Chill acoustic", "Energetic rock", "Sad indie", "Party anthems", "Focus beats", "Feel-good pop"]
@@ -152,8 +157,12 @@ final class TaisChatModel {
     // MARK: On the device (TAIS Engine 3)
 
     private func respondOnDevice(to pending: (prompt: String, thinkingId: Int)) async {
-        let turn = await engine.respond(pending.prompt)
+        let rawTurn = await engine.respond(pending.prompt)
         // The chat was cleared or switched meanwhile: this answer belongs to a conversation that is gone.
+        guard !Task.isCancelled else { return }
+        let grounding = toolbox?.music.grounding ?? deviceGrounding
+        grounding.noteUser(pending.prompt)
+        let turn = await checked(rawTurn, grounding: grounding)
         guard !Task.isCancelled else { return }
         // "Start a station from X" is read by rules, so it works with no connection and no model: X is looked up in the library and the atlas.
         if case .station(let name) = turn {
@@ -168,11 +177,30 @@ final class TaisChatModel {
         let replyId = finish(thinkingId: pending.thinkingId, prompt: pending.prompt, turn: turn)
         // On-device, the card is already up; its intro line follows when the model has written it.
         var intro: String?
-        if case .media(_, let result, nil) = turn, let deferred = await engine.deferredIntro(prompt: pending.prompt, result: result) {
-            setIntro(id: replyId, text: deferred)
-            intro = deferred
+        if case .media(_, let result, nil) = turn, let deferred = await engine.deferredIntro(prompt: pending.prompt, result: result),
+           let line = grounding.introLine(deferred) {
+            setIntro(id: replyId, text: line)
+            intro = line
         }
         await rememberOnDeviceTurn(prompt: pending.prompt, turn: turn, intro: intro)
+    }
+
+    /// An answer from the phone's model or a plain provider, checked like a Claude reply (docs/brain-spec.md, 1 principle 9): a name that is
+    /// not the listener's own words and not a title, album or artist of their library is replaced, and an intro line that names one is
+    /// dropped. Names only: the numbers the phone model read through its own library lookup are not visible here.
+    private func checked(_ turn: TaizoTurn, grounding: TaizoGrounding) async -> TaizoTurn {
+        switch turn {
+        case .conversation(let text):
+            let library = engine.router.songs()
+            let shown = await Task.detached(priority: .userInitiated) {
+                grounding.shown(text, numbers: false) { names in TaizoGrounding.libraryNames(among: names, in: library) }
+            }.value
+            return .conversation(shown)
+        case .media(let intent, let result, let intro):
+            return .media(intent, result, aiIntro: intro.flatMap { grounding.introLine($0) })
+        case .error, .station:
+            return turn
+        }
     }
 
     /// A station from a sentence (`StationSentence`): false when there is no music engine to ask or the name is none of the listener's.
@@ -256,6 +284,8 @@ final class TaisChatModel {
         grounding.noteUser(pending.prompt)
         await tools.music.beginTurn()
         let progress = ClaudeTurnProgress()
+        streamingReply = (replyId, progress, grounding)
+        defer { streamingReply = nil }
         let loop = ClaudeToolLoop(
             client: client, system: record.system, tools: tools, serverTools: TaizoAssistant.serverTools,
             effort: .medium, stream: true,
@@ -293,8 +323,7 @@ final class TaisChatModel {
             return true
         } catch is CancellationError {
             flushPendingText()
-            setAssistant(replyId, text: progress.text.isEmpty ? "Stopped." : Self.groundedReply(progress.text, tools.music.grounding), sources: [],
-                         streaming: false)
+            setAssistant(replyId, text: Self.groundedPartial(progress.text, tools.music.grounding) ?? "Stopped.", sources: [], streaming: false)
             return true
         } catch {
             flushPendingText()
@@ -302,8 +331,7 @@ final class TaisChatModel {
             await assistant.onFallback("assistant: \(error)")
             if progress.ranTool || !progress.text.isEmpty {
                 // Something already happened (text shown, a tool ran): keep it rather than answer twice.
-                setAssistant(replyId, text: progress.text.isEmpty ? "Done so far." : Self.groundedReply(progress.text, tools.music.grounding),
-                             sources: [], streaming: false)
+                setAssistant(replyId, text: Self.groundedPartial(progress.text, tools.music.grounding) ?? "Done so far.", sources: [], streaming: false)
                 insert(.note(id: makeId(), text: "The connection dropped, so that answer may be incomplete."), after: replyId)
                 return true
             }
@@ -324,7 +352,8 @@ final class TaisChatModel {
         case .turnDiscarded:
             pendingText[replyId] = nil
             progress.text = progress.turnStart
-            setAssistant(replyId, text: TaizoMusicStrings.withoutMarks(progress.text), sources: [], streaming: true)
+            setAssistant(replyId, text: streamingReply?.grounding.streaming(progress.text) ?? TaizoMusicStrings.withoutMarks(progress.text), sources: [],
+                         streaming: true)
         case .stream(.text(let piece)):
             progress.text += piece
             pendingText[replyId, default: ""] += piece
@@ -375,9 +404,15 @@ final class TaisChatModel {
     /// the marks the model put around names are taken off. The saved history keeps what the model wrote; only what is shown is cleaned.
     nonisolated static func groundedReply(_ raw: String, _ grounding: TaizoGrounding) -> String {
         if raw.isEmpty { return raw }
-        let verdict = grounding.check(raw, placeholder: TaizoMusicStrings.unverifiedName)
-        let cleaned = verdict.cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
-        return cleaned.isEmpty ? TaizoMusicStrings.withoutMarks(raw) : cleaned
+        // When every sentence is left out a fixed sentence says so: the raw text is never shown in its place.
+        return grounding.shown(raw)
+    }
+
+    /// The text of a reply that was cut short (stopped, or the connection dropped): its finished part, checked, or nil when there is none.
+    nonisolated static func groundedPartial(_ raw: String, _ grounding: TaizoGrounding) -> String? {
+        let finished = TaizoGrounding.holdBack(raw)
+        if finished.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return nil }
+        return grounding.shown(finished)
     }
 
     // MARK: Streaming display
@@ -396,9 +431,15 @@ final class TaisChatModel {
         for (id, piece) in pendingText where !piece.isEmpty {
             guard let index = messages.firstIndex(where: { $0.id == id }),
                   case .assistant(_, let text, let sources, _, let streaming) = messages[index] else { continue }
-            // Text arriving clears the activity line: the answer is being written.
-            // The `[[ ]]` marks the model puts around names are not shown while it streams.
-            messages[index] = .assistant(id: id, text: TaizoMusicStrings.withoutMarks(text + piece), sources: sources, activity: nil, isStreaming: streaming)
+            // Text arriving clears the activity line: the answer is being written. What is shown is checked like the final reply (an unclosed
+            // mark, the word being typed and a trailing run of capitalised words are held back; the marks are never shown).
+            let shown: String
+            if let live = streamingReply, live.id == id {
+                shown = live.grounding.streaming(live.progress.text)
+            } else {
+                shown = TaizoMusicStrings.withoutMarks(text + piece)
+            }
+            messages[index] = .assistant(id: id, text: shown, sources: sources, activity: nil, isStreaming: streaming)
         }
         pendingText.removeAll()
     }
@@ -562,6 +603,7 @@ final class TaisChatModel {
         messages.removeAll()
         conversation = nil
         toolbox = nil
+        deviceGrounding.reset()
         inputText = ""
     }
 
@@ -577,6 +619,7 @@ final class TaisChatModel {
     private func show(_ record: TaizoConversationRecord) {
         conversation = record
         toolbox = nil
+        deviceGrounding.reset()
         messages = record.transcript.map { entry in
             let id = makeId()
             switch entry.role {

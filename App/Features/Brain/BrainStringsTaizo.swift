@@ -12,7 +12,10 @@ nonisolated extension BrainStrings {
     static var taizoMixSave: String { String(localized: "Save") }
     static var taizoMixSaved: String { String(localized: "Saved") }
     static var taizoMixUpdating: String { String(localized: "Updating") }
-    static var taizoMixFailed: String { String(localized: "Could not change that mix. Try again.") }
+    static var taizoMixFailed: String { String(localized: "That did not work. Try again.") }
+    static var taizoMixSeedNotUsed: String {
+        String(localized: "I could not load songs like what you started from just now, so this mix may not follow it.")
+    }
     static var taizoMixNotApplied: String {
         String(localized: "Some of what you asked for could not be applied, because PixlAudio has no data on it yet.")
     }
@@ -33,13 +36,13 @@ nonisolated extension BrainStrings {
     static var weeklyNoteTitle: String { String(localized: "This week") }
     static var assistTitle: String { String(localized: "Let Taizo help the engine") }
     static var assistBody: String {
-        String(localized: "Once a week Taizo can name your taste islands, suggest artists you may not know and add genres to songs that no source knows. It sends genre names, artist names and song titles to the cloud assistant, never play counts or dates, and it counts against your monthly allowance. Off unless you turn it on.")
+        String(localized: "Taizo can name your taste islands, suggest artists you may not know once a week, and add genres to songs that no source knows, a batch at a time. It sends genre names, artist names and song titles to the cloud assistant, never play counts or dates, and it counts against your monthly allowance. Off unless you turn it on.")
     }
 
     // MARK: A station from a sentence
 
     static func taizoStationStarted(_ name: String) -> String { String(localized: "Started a station from \(name).") }
     static func taizoStationNotFound(_ name: String) -> String {
-        String(localized: "I could not find \(name) in your library or your genres, so I did not start a station.")
+        String(localized: "I could not find \(name) in your library, your genres or your playlists, so I did not start a station.")
     }
 }

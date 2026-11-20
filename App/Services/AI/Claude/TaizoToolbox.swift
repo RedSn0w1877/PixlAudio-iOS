@@ -29,8 +29,19 @@ nonisolated struct TaizoToolbox: ClaudeToolExecuting {
         let store = await MainActor.run { environment()?.tasteAdjustments }
         await store?.ensureLoaded()
         let counts = await MainActor.run { (queue: environment()?.playback.queue.count ?? 0, taste: store?.count ?? 0) }
-        return TaizoAssistant.confirmationQuestion(tool: call.name, input: call.input, currentQueueCount: counts.queue,
-                                                   adjustmentCount: counts.taste)
+        // A mix is one id in the call and many songs in the queue: the question counts the songs, and a steer names the thing it changes.
+        var mixCounts: [String: Int] = [:]
+        let mixIds = (call.input["song_ids"]?.arrayValue ?? []).compactMap(\.stringValue).filter { $0.hasPrefix("mix:") }
+        if !mixIds.isEmpty, let prepared = await music.prepare(environment) {
+            for id in mixIds { mixCounts[id] = await prepared.playable.songsForMix(String(id.dropFirst(4)))?.count ?? 0 }
+        }
+        let grounding = music.grounding
+        return TaizoAssistant.confirmationQuestion(
+            tool: call.name, input: call.input, currentQueueCount: counts.queue, adjustmentCount: counts.taste, mixCounts: mixCounts,
+            nameOf: { target in
+                if let id = Int(target), let name = grounding.genreName(id) { return name }
+                return grounding.trackOf(target)?.chipArtist
+            })
     }
 
     func run(_ call: ClaudeToolUse) async -> ClaudeToolOutput {
@@ -40,8 +51,15 @@ nonisolated struct TaizoToolbox: ClaudeToolExecuting {
             guard let prepared = await music.prepare(environment) else {
                 return .error("PixlAudio's music engine isn't ready yet. Try again in a moment.")
             }
-            seen.setPlayable(prepared.playable)
+            seen.setPlayable(prepared.playable, grounding: music.grounding)
             return ClaudeToolOutput(content: await prepared.runner.run(call.name, call.input))
+        }
+        // The tools that take ids may be given an engine ref or a mix from this chat: the engine is ready before they look (a chat that was
+        // reopened after a restart has not run a music tool yet, and its refs still have to play).
+        switch tool {
+        case .playSongs, .addToQueue, .createPlaylist, .addToPlaylist:
+            if let prepared = await music.prepare(environment) { seen.setPlayable(prepared.playable, grounding: music.grounding) }
+        default: break
         }
         let output = await TaizoToolRunner.run(tool, input: call.input, environment: environment, catalog: catalog, seen: seen, turn: turn)
         // What any older tool returned may be said too (docs/brain-spec.md, 9.4).
@@ -54,7 +72,7 @@ nonisolated struct TaizoToolbox: ClaudeToolExecuting {
     /// Play on a mix card: the queue becomes the mix, each pick announced with its tags (surface assistant, arm, served vector).
     func playMix(_ mixId: String) async -> Bool {
         guard let prepared = await music.prepare(environment) else { return false }
-        seen.setPlayable(prepared.playable)
+        seen.setPlayable(prepared.playable, grounding: music.grounding)
         let input = JSONObject([(key: "song_ids", value: .array([.string("mix:" + mixId)]))])
         let output = await TaizoToolRunner.run(.playSongs, input: input, environment: environment, catalog: catalog, seen: seen, turn: turn)
         return !output.isError
@@ -63,7 +81,7 @@ nonisolated struct TaizoToolbox: ClaudeToolExecuting {
     /// Save on a mix card: the mix becomes a playlist of the listener's, named as the card is.
     func saveMix(_ mixId: String) async -> Bool {
         guard let prepared = await music.prepare(environment) else { return false }
-        seen.setPlayable(prepared.playable)
+        seen.setPlayable(prepared.playable, grounding: music.grounding)
         let title = await music.mixTitle(mixId)
         let input = JSONObject([(key: "name", value: .string(title)), (key: "song_ids", value: .array([.string("mix:" + mixId)]))])
         let output = await TaizoToolRunner.run(.createPlaylist, input: input, environment: environment, catalog: catalog, seen: seen, turn: turn)
@@ -100,9 +118,17 @@ nonisolated final class TaizoCatalogCache: Sendable {
     /// The engine's refs (`yt:`, `sp:`) and mixes (`mix:`) a music tool returned, once one ran in this conversation.
     private let playableBox = Mutex<(any AssistantPlayable)?>(nil)
 
-    func setPlayable(_ value: any AssistantPlayable) { playableBox.withLock { $0 = value } }
+    private let groundingBox = Mutex<TaizoGrounding?>(nil)
+
+    func setPlayable(_ value: any AssistantPlayable, grounding: TaizoGrounding) {
+        playableBox.withLock { $0 = value }
+        groundingBox.withLock { $0 = grounding }
+    }
 
     var playable: (any AssistantPlayable)? { playableBox.withLock { $0 } }
+
+    /// Whether a ref was returned by a tool of this conversation (an older chat's history included): a ref written from memory never plays.
+    func isKnownRef(_ ref: String) -> Bool { groundingBox.withLock { $0?.isKnownRef(ref) ?? false } }
 }
 
 /// What the running turn is about: the user's own message. Set by the chat before the loop starts, read by the
@@ -262,8 +288,9 @@ enum TaizoToolRunner {
                 continue
             }
             if AssistantRules.parseRef(id) != nil {
-                // An engine ref (resolve_tracks, recommend, build_mix, ...): played through `playable`, never imported into the library.
-                if let song = await seen.playable?.songForRef(id) { songs.append(song) } else { missing.append(id) }
+                // An engine ref (resolve_tracks, recommend, build_mix, ...): played through `playable`, never imported into the library. Only
+                // a ref a tool returned in this chat counts; one written from memory is not found.
+                if seen.isKnownRef(id), let song = await seen.playable?.songForRef(id) { songs.append(song) } else { missing.append(id) }
                 continue
             }
             if let song = env.library.song(id: id) {
@@ -341,6 +368,18 @@ enum TaizoToolRunner {
                 ("blocked_note", .string("These are blocked in the user's taste changes and were left out. Tell them; they can unblock with adjust_taste if they ask."))]
     }
 
+    /// A mix is kept only while the app stays open (and is not saved with the chat): said, so the model builds it again instead of retrying.
+    private static let mixGoneNote = "A mix built earlier is kept only while PixlAudio stays open. Build it again with build_mix, then play that one."
+
+    private static func mixNote(_ missing: [String]) -> [(String, JSONValue)] {
+        missing.contains { $0.hasPrefix("mix:") } ? [("mix_note", .string(mixGoneNote))] : []
+    }
+
+    private static func noneFound(_ missing: [String]) -> String {
+        let base = "None of those songs could be found. Search first and use the ids returned."
+        return missing.contains { $0.hasPrefix("mix:") } ? base + " " + mixGoneNote : base
+    }
+
     private static let allBlockedMessage = "Every one of those songs is blocked in the user's taste changes, so nothing was done. Tell them, and offer to unblock if they want."
 
     // MARK: Playback
@@ -348,7 +387,7 @@ enum TaizoToolRunner {
     private static func playSongs(_ env: AppEnvironment, _ input: JSONObject, catalog: (any SearchProviding)?,
                                   seen: TaizoCatalogCache) async -> ClaudeToolOutput {
         let (resolved, missing) = await resolve(env, input, catalog: catalog, seen: seen)
-        guard !resolved.isEmpty else { return .error("None of those songs could be found. Search first and use the ids returned.") }
+        guard !resolved.isEmpty else { return .error(noneFound(missing)) }
         let (songs, blocked) = withoutBlocked(env, resolved)
         guard !songs.isEmpty else { return .error(allBlockedMessage) }
         let start = min(clamp(input["start_index"], default: 0, range: 0...Int.max), songs.count - 1)
@@ -359,6 +398,7 @@ enum TaizoToolRunner {
             ("now_playing", .string("\(songs[start].title) — \(songs[start].displayArtist)")),
             ("queue_length", .integer(songs.count)), ("not_found", .array(missing.map(JSONValue.string))),
         ]
+        members += mixNote(missing)
         members += blockedMember(blocked)
         return .json(ClaudeJSON.object(members))
     }
@@ -366,7 +406,7 @@ enum TaizoToolRunner {
     private static func addToQueue(_ env: AppEnvironment, _ input: JSONObject, catalog: (any SearchProviding)?,
                                    seen: TaizoCatalogCache) async -> ClaudeToolOutput {
         let (resolved, missing) = await resolve(env, input, catalog: catalog, seen: seen)
-        guard !resolved.isEmpty else { return .error("None of those songs could be found. Search first and use the ids returned.") }
+        guard !resolved.isEmpty else { return .error(noneFound(missing)) }
         let (songs, blocked) = withoutBlocked(env, resolved)
         guard !songs.isEmpty else { return .error(allBlockedMessage) }
         let next = input["play_next"]?.boolValue ?? false
@@ -382,6 +422,7 @@ enum TaizoToolRunner {
             ("added", .integer(songs.count)), ("position", .string(next ? "next" : "end of queue")),
             ("not_found", .array(missing.map(JSONValue.string))),
         ]
+        members += mixNote(missing)
         members += blockedMember(blocked)
         return .json(ClaudeJSON.object(members))
     }
@@ -415,7 +456,7 @@ enum TaizoToolRunner {
         let name = (input["name"]?.stringValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return .error("The playlist needs a name.") }
         let (resolved, missing) = await resolve(env, input, catalog: catalog, seen: seen)
-        guard !resolved.isEmpty else { return .error("None of those songs could be found. Search first and use the ids returned.") }
+        guard !resolved.isEmpty else { return .error(noneFound(missing)) }
         let (songs, blocked) = withoutBlocked(env, resolved)
         guard !songs.isEmpty else { return .error(allBlockedMessage) }
         let playlist = env.libraryEditor.createPlaylist(name: name, songIds: songs.map(\.id), isAiGenerated: true)
@@ -423,6 +464,7 @@ enum TaizoToolRunner {
             ("created", .string(playlist.name)), ("playlist_id", .string(playlist.id)),
             ("songs", .integer(playlist.songIds.count)), ("not_found", .array(missing.map(JSONValue.string))),
         ]
+        members += mixNote(missing)
         members += blockedMember(blocked)
         return .json(ClaudeJSON.object(members))
     }
@@ -457,7 +499,7 @@ enum TaizoToolRunner {
         } else {
             return .error("Nothing is playing; say which songs to add.")
         }
-        guard !songs.isEmpty else { return .error("None of those songs could be found.") }
+        guard !songs.isEmpty else { return .error(noneFound(missing)) }
         let before = Set(playlist.songIds)
         env.libraryEditor.addSongs(songs.map(\.id), toPlaylist: playlist.id)
         let added = songs.filter { !before.contains($0.id) }.count
@@ -465,6 +507,7 @@ enum TaizoToolRunner {
             ("playlist", .string(playlist.name)), ("added", .integer(added)),
             ("already_there", .integer(songs.count - added)), ("not_found", .array(missing.map(JSONValue.string))),
         ]
+        members += mixNote(missing)
         members += blockedMember(blocked)
         return .json(ClaudeJSON.object(members))
     }
