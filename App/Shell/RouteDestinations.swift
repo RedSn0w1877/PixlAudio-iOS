@@ -97,6 +97,7 @@ struct CoverDestination: View {
             case .aiPlaylistLab: AiPlaylistLabView()
             case .backupImport: BackupImportCover()
             case .backupExport: BackupExportCover()
+            case .songTap: SongTapView()
             }
         }
         // The Connect volume pop-up over the lyrics screen and the other covers.

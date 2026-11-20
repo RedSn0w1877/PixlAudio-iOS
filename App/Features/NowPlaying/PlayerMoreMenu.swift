@@ -67,6 +67,10 @@ struct PlayerMoreMenu<MenuShape: Shape>: View {
                 if let shareURL {
                     ShareLink(item: shareURL) { Label("Share", systemImage: "square.and.arrow.up") }
                 }
+                Button { router.present(AppCover.songTap) } label: {
+                    Label(SongTapStrings.title, systemImage: "iphone.radiowaves.left.and.right")
+                    Text(UserDefaults.standard.bool(forKey: SongTapSettings.Keys.allow) ? SongTapStrings.menuOn : SongTapStrings.menuOff)
+                }
             }
             Section {
                 Button("Sleep timer", systemImage: "moon.zzz") { router.present(AppSheet.sleepTimer) }

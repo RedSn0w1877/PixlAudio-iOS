@@ -21,6 +21,10 @@ allowed_imports=(
   AuthenticationServices SafariServices WebKit JavaScriptCore Network BackgroundTasks AppIntents
   Compression CoreHaptics CallKit CoreTransferable LinkPresentation PhotosUI Photos StoreKit TipKit
   SystemConfiguration UserNotifications ActivityKit CoreSpotlight MobileCoreServices GameController MetricKit
+  # Song Tap (2026-11-20): CoreBluetooth finds a phone nearby, CoreMotion sees the knock of a tap. Neither needs an entitlement
+  # (CoreBluetooth only an Info.plist string), so both work with a free Apple ID. CoreImage (QR code) and AVFoundation (camera)
+  # were already allowed. NearbyInteraction (UWB) stays out: a later stage, and only if it works on a free account.
+  CoreBluetooth CoreMotion
 )
 
 swift_dirs=()

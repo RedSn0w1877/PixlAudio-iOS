@@ -141,3 +141,26 @@ instead of Material. Notes: `docs/handoff/2026-11-11-ios-spatial-ui.md`.
 | Settings › Playback › Sound | Spatial audio (opens the sheet), Cloud renders, "Cloud processing is off" (leads to the master), Prepare ahead (needs cloud renders), "Songs ready: N · X GB on this phone" + Remove downloaded renders (confirm) | same rows |
 | Settings › Playback › Advanced | route, monthly limit ($5 … $200, No limit), storage (14 stops, 256 MB … 64 GB), songs a day ahead (1 … 100), this song's diagnostics | same rows |
 | Player file-info chip (developer mode) | ends with "• Spatial Studio on phone" / "• Spatial Studio cloud render" | same |
+
+
+## Song Tap (2026-11-20, branch `song-tap`, milestone 1)
+
+Send the song that is playing to another phone with PixlAudio and add it to that phone's library, in the end with a
+Bluetooth tap and one beam animation on both phones; milestone 1 is the code route (a QR code), the core, the receiver
+and the settings. The Android side is `RedSn0w1877/PixlAudio` branch `song-tap` (`:songtap`, `data/songtap/*`,
+`presentation/songtap/*`, `strings_songtap.xml`). Same places, order, words and rules; Liquid Glass instead of
+Material. Notes: `docs/handoff/2026-11-20-song-tap.md`.
+
+| Part | iOS | Android |
+|---|---|---|
+| Pure core | `Packages/PixlCore/Sources/PixlLibrary/SongTap/` (9 files, the names of `:songtap`'s), standard library only, integers only; Android's 13 golden files in `Fixtures/songtap` replayed bit for bit | `:songtap` (new JVM module) |
+| Controller | `SongTapEngine` (PixlCore, decisions, tested over a fake port) + `SongTapController` (app, timers, haptics, library, transports, `@Observable`) made on first use | `SongTapStateHolder` (Hilt singleton) |
+| Receiver save | `SongTapReceiver` (PixlCore, over `SongTapLibrary`) through `AppSongTapLibrary`: `YouTubeLibraryImporter.importTrack` (the importer Search's Save uses), a Spotify-only song through `TrackMatcher.findMatchFanOut`; Undo `LibraryEditor.removeSongs` | `SongTapReceiver` over `SpotifySongTapLibrary`: `importYouTubeMusicTracks`, `removeFromExploredCatalog` |
+| Sender | `SongTapSender` (PixlCore) + `AppSongTapSongIds`: a YouTube song's own video, a Spotify song's matched video, the real Spotify id and recording code; no account, device or name | `SongTapSender` |
+| Signing | `SongTapSigner` / `SongTapVerifier` (CryptoKit P-256, x9.63 key, raw r\|\|s signature), per-session ephemeral key | `SongTapSigner` / `SongTapVerifier` (java.security), same forms |
+| Transport | `SongTapTransport` + `SongTapQrTransport`; camera `SongTapCamera` (AVFoundation QR detector, 6 reads a second, started and stopped on its own queue), code `SongTapQrImage` (CoreImage, level L) | `SongTapTransport` + `QrTransport`; CameraX + zxing |
+| Settings | `SongTapSettings` (UserDefaults: `allow_song_tap` off by default, `song_tap_first_beam_accepted`); Settings › Song Tap (switch + "Open Song Tap") after Sing | `SongTapSettings` (DataStore `song_tap`); Settings › Song Tap after Sing |
+| Player entry | the ⋯ menu's second group, after Share: "Song Tap" with On / Off, opening the cover | the player menu's Listen group, third row |
+| Surface | `AppCover.songTap` (`SongTapView`): turn-on card, Send / Receive, code or camera, result card (Add / Not now the first time, then Undo for 6 s) | `Screen.SongTap` |
+| Permissions | camera asked when the listener first picks Receive and taps Allow camera; Bluetooth string in the plist for milestone 2, not asked yet | camera the same; Bluetooth permission milestone 2 |
+| Not yet (milestone 2) | Bluetooth tap, the beam animation (the timeline is in the core), Reduce Motion in the UI, Developer mode "Song Tap diagnostics" | same |

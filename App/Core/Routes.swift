@@ -59,6 +59,8 @@ nonisolated enum SettingsCategory: String, Hashable, Sendable, CaseIterable, Ide
     /// Lyrics and Sing (2026-10-22 settings reorganisation): categories of their own, on Android too.
     case lyrics = "lyrics"
     case sing = "sing"
+    /// Song Tap (2026-11-20): send the song that is playing to a phone nearby; its own category, after Sing, on Android too.
+    case songTap = "song_tap"
     case behavior = "behavior"
     case ai = "ai"
     case backupRestore = "backup_restore"
@@ -78,6 +80,7 @@ nonisolated enum SettingsCategory: String, Hashable, Sendable, CaseIterable, Ide
         case .equalizer: "Equalizer"
         case .lyrics: "Lyrics"
         case .sing: "Sing"
+        case .songTap: "Song Tap"
         case .behavior: "Gestures & haptics"
         case .ai: "AI features"
         case .backupRestore: "Backup & Restore"
@@ -96,6 +99,7 @@ nonisolated enum SettingsCategory: String, Hashable, Sendable, CaseIterable, Ide
         case .equalizer: "waveform"
         case .lyrics: "quote.bubble"
         case .sing: "music.mic"
+        case .songTap: "iphone.radiowaves.left.and.right"
         case .behavior: "hand.tap"
         case .ai: "sparkles"
         case .backupRestore: "externaldrive"
@@ -285,6 +289,8 @@ nonisolated enum AppCover: Hashable, Sendable, Identifiable {
     /// Stage 15: the restore and export flows of Settings › Backup & Restore, presented from the root.
     case backupImport
     case backupExport
+    /// Song Tap (2026-11-20, Android `Screen.SongTap`): send the song that is playing to a phone nearby, or take one.
+    case songTap
 
     var id: String {
         switch self {
@@ -296,6 +302,7 @@ nonisolated enum AppCover: Hashable, Sendable, Identifiable {
         case .aiPlaylistLab: "aiPlaylistLab"
         case .backupImport: "backupImport"
         case .backupExport: "backupExport"
+        case .songTap: "songTap"
         }
     }
 }
