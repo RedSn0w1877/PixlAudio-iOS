@@ -436,7 +436,7 @@ private extension View {
     func shelfSeen(_ id: String, _ plan: HomePlanState) -> some View {
         task(id: id) {
             try? await Task.sleep(for: .seconds(1))
-            if !Task.isCancelled { plan.shelfSeen(id) }
+            if !Task.isCancelled { await MainActor.run { plan.shelfSeen(id) } }
         }
     }
 }
