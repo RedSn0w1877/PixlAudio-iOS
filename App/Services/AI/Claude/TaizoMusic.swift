@@ -164,7 +164,7 @@ nonisolated struct TaizoAssistantHost: AssistantHost {
             let actions = env.brainActions
             var note = ""
             /// Applies the mode just before a start that will happen, and says what changed.
-            func applyMode() {
+            @MainActor func applyMode() {
                 guard let wanted, wanted != env.brain.stations.novelty else { return }
                 actions.setNovelty(wanted)
                 note = "The Familiar / Blend / Discover switch is now on \(wanted == Novelty.familiar ? "Familiar" : "Discover"). Tell the user."
