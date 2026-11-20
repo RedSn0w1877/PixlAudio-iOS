@@ -424,15 +424,45 @@ struct BrainStage3bTests {
         var s = ShelfBandit.newState()
         let types: [Int32] = [HomePlanner.madeForYou, HomePlanner.becauseListened, HomePlanner.onRepeat, HomePlanner.rediscover]
         ShelfBandit.visit(&s, daypart: 0, shown: [HomePlanner.rediscover], lastSeen: 0, used: -1, today: day0)
-        for k in 0..<30 {
+        for k in 0..<40 {
             ShelfBandit.visit(&s, daypart: 0, shown: Array(types[0..<3]), lastSeen: 2, used: 0, today: day0 + 1 + Int64(k) / 10)
         }
         let today = day0 + 20
         let order = ShelfBandit.order(&s, planKey: 5, daypart: 0, types: types, seed: 1, today: today)!
         #expect(order[0] == HomePlanner.rediscover)
+        // The exposure is spent when a visit shows the shelf, not when the order is drawn: a plan that leaves it out forces it again.
+        #expect(s.lastSeenDay[Int(HomePlanner.rediscover)] == day0)
+        #expect(ShelfBandit.order(&s, planKey: 6, daypart: 0, types: types, seed: 1, today: today)![0] == HomePlanner.rediscover)
+        ShelfBandit.visit(&s, daypart: 0, shown: order, lastSeen: 0, used: -1, today: today)
         #expect(s.lastSeenDay[Int(HomePlanner.rediscover)] == today)
-        let later = ShelfBandit.order(&s, planKey: 6, daypart: 0, types: types, seed: 1, today: today + 3)!
+        let later = ShelfBandit.order(&s, planKey: 7, daypart: 0, types: types, seed: 1, today: today + 3)!
         #expect(later.contains(HomePlanner.rediscover))
+    }
+
+    @Test func aShelfTypeThatWasNeverOnScreenIsForcedToTheTopOnceThereIsData() {
+        var s = ShelfBandit.newState()
+        let types: [Int32] = [HomePlanner.madeForYou, HomePlanner.becauseListened, HomePlanner.onRepeat]
+        for _ in 0..<60 { ShelfBandit.visit(&s, daypart: 0, shown: Array(types[0..<2]), lastSeen: 1, used: 0, today: day0) }
+        #expect(s.lastSeenDay[Int(HomePlanner.onRepeat)] == Int64.min)
+        #expect(ShelfBandit.order(&s, planKey: 1, daypart: 0, types: types, seed: 1, today: day0)![0] == HomePlanner.onRepeat)
+    }
+
+    @Test func theAppetitesDiscountKeepsRunningAfterTheFirstLongGapAndALateStampedPlayDoesNotStallTheLearner() {
+        var s = NoveltyAppetite.newState(today: day0)
+        func play(_ id: Int64) -> PlayEvent { event(id, day0 * BrainMath.dayMs) }
+        let finished = graded(play(1))
+        for k in 0..<40 { NoveltyAppetite.onPlay(&s, play(100 + Int64(k)), finished, novel: true, recommender: true, day: day0) }
+        let excess0 = s.nAlpha - NoveltyAppetite.prior
+        #expect(excess0 > 10.0)
+        NoveltyAppetite.onPlay(&s, play(900), finished, novel: true, recommender: false, day: day0 + 60)
+        let capped = Foundation.pow(NoveltyAppetite.dailyDiscount, Double(NoveltyAppetite.maxForgetRuns))
+        #expect(abs((s.nAlpha - NoveltyAppetite.prior) - excess0 * capped) < 1e-9)
+        NoveltyAppetite.onPlay(&s, play(901), finished, novel: true, recommender: false, day: day0 + 120)
+        #expect(abs((s.nAlpha - NoveltyAppetite.prior) - excess0 * capped * capped) < 1e-9, "the second gap is discounted as well")
+        // The live id: below the watermark the play goes under the next id; in order the real one is used.
+        #expect(LearnReplay.liveId(10, watermark: 5) == 10)
+        #expect(LearnReplay.liveId(3, watermark: 5) == 6)
+        #expect(LearnReplay.liveId(3, watermark: Int64.max) == Int64.max)
     }
 
     @Test func thePosteriorsCanBeMadeAgainFromTheImpressionsAndTheCodecIsStrict() {

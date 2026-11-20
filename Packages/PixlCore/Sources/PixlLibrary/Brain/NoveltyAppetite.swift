@@ -91,7 +91,7 @@ public enum NoveltyAppetite {
             state.forgetDone = 0
             return 0
         }
-        let gap = today - state.anchorDay
+        let gap = today &- state.anchorDay
         let total = gap > Int64(maxForgetRuns) ? maxForgetRuns : Int(gap)
         let runs = total - state.forgetDone
         if runs <= 0 { return 0 }
@@ -171,6 +171,10 @@ public enum NoveltyAppetite {
     public static func onPlay(_ state: inout State, _ e: PlayEvent, _ g: Reward.Graded, novel: Bool, recommender: Bool,
                               day: Int64) -> Bool {
         advance(&state, today: day)
+        // The discount counts from the last day a play was applied, as `ArmBandit.update` does. Without moving the anchor, a gap of
+        // 30 days or more spends all 30 runs once and F and N are never discounted again.
+        state.anchorDay = day
+        state.forgetDone = 0
         if !(g.c > 0.0) || e.has(EventFlags.learnExcluded) || e.has(EventFlags.neverAudible) { return false }
         var counts = state.days[day] ?? [0, 0]
         counts[0] += 1

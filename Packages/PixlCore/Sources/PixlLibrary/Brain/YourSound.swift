@@ -15,6 +15,20 @@ public enum YourSound {
     /// The eras section needs a year for at least this share of the plays (permille).
     public static let erasMinCoveragePermille = 600
 
+    /// What a section needs before it says anything (a section is shown only when its data exist; a share of one play is not
+    /// data). The app passes these to the functions below; the functions themselves default to no minimum.
+    public static let islandsMinPlays = 20
+    public static let islandsMinCoveragePermille = 500
+    public static let genresMinPlays = 50
+    public static let genresMinCoveragePermille = 600
+    public static let erasMinPlays = 50
+    public static let daypartMinPlays = 10
+    public static let monthMinPlays = 5
+    public static let noveltyMinPlays = 20
+
+    /// "Lately" compares with two weeks ago: it needs this many plays from before then, or "up" has no baseline.
+    public static let latelyMinBaselinePlays = 50
+
     /// One counted play. `first` is true for the listener's first play of that recording (computed by `withFirsts`).
     public struct Play: Sendable {
         public let rid: Int64
@@ -109,14 +123,17 @@ public enum YourSound {
     }
 
     /// The islands of the plays that started within `rightNowDays` days before `nowMs`, largest first (ties: smaller id).
-    public static func islands(_ plays: [Play], islandOf: (Int64) -> Int, nowMs: Int64, top: Int = 3) -> [IslandShare] {
+    public static func islands(_ plays: [Play], islandOf: (Int64) -> Int, nowMs: Int64, top: Int = 3, minPlays: Int = 0,
+                               minCoveragePermille: Int = 0) -> [IslandShare] {
         let from = nowMs &- Int64(rightNowDays) &* BrainMath.dayMs
         var counts: [Int: Int] = [:]
         var byArtist: [Int: [Int64: Int]] = [:]
         var byTrack: [Int: [Int64: Int]] = [:]
         var total = 0
+        var inWindow = 0
         for p in plays {
             if p.startedAtMs < from || p.startedAtMs > nowMs { continue }
+            inWindow += 1
             let id = islandOf(p.rid)
             if id < 0 { continue }
             total += 1
@@ -124,6 +141,9 @@ public enum YourSound {
             if p.aid != 0 { byArtist[id, default: [:]][p.aid, default: 0] += 1 }
             byTrack[id, default: [:]][p.rid, default: 0] += 1
         }
+        // Shares are over the plays an island could be found for: too few of them, or too small a part of the plays, and there is
+        // nothing to say.
+        if total == 0 || total < minPlays || permille(total, inWindow) < minCoveragePermille { return [] }
         return byCountDesc(counts).map { id in
             let n = counts[id] ?? 0
             return IslandShare(islandId: id, permille: permille(n, total), plays: n, topAids: topKeys(byArtist[id], top),
@@ -137,7 +157,7 @@ public enum YourSound {
     }
 
     /// For each of the four dayparts: how many plays, and the island that led it (-1 when none of its plays belong to an island).
-    public static func dayparts(_ plays: [Play], islandOf: (Int64) -> Int) -> [Daypart] {
+    public static func dayparts(_ plays: [Play], minPlays: Int = 0, islandOf: (Int64) -> Int) -> [Daypart] {
         var counts = [Int](repeating: 0, count: 4)
         var perIsland = [[Int: Int]](repeating: [:], count: 4)
         for p in plays {
@@ -147,7 +167,8 @@ public enum YourSound {
             let id = islandOf(p.rid)
             if id >= 0 { perIsland[d][id, default: 0] += 1 }
         }
-        return (0..<4).map { d in Daypart(daypart: d, plays: counts[d], leadingIslandId: byCountDesc(perIsland[d]).first ?? -1) }
+        return (0..<4).map { d in Daypart(daypart: d, plays: counts[d], leadingIslandId: counts[d] < minPlays ? -1 : (byCountDesc(perIsland[d]).first ?? -1))
+        }
     }
 
     /// `year * 12 + month0` of a UTC day, by integer arithmetic (the proleptic Gregorian calendar).
@@ -165,7 +186,7 @@ public enum YourSound {
     }
 
     /// The last `maxMonths` months with plays, oldest first: each month's island shares (permille), largest first.
-    public static func months(_ plays: [Play], islandOf: (Int64) -> Int) -> [Month] {
+    public static func months(_ plays: [Play], minPlays: Int = 0, islandOf: (Int64) -> Int) -> [Month] {
         var perMonth: [Int: [Int: Int]] = [:]
         var totals: [Int: Int] = [:]
         for p in plays {
@@ -175,7 +196,7 @@ public enum YourSound {
             let id = islandOf(p.rid)
             if id >= 0 { perMonth[month, default: [:]][id, default: 0] += 1 }
         }
-        let all = totals.keys.sorted()
+        let all = totals.keys.filter { (totals[$0] ?? 0) >= minPlays }.sorted()
         let kept = all.count > maxMonths ? Array(all[(all.count - maxMonths)...]) : all
         return kept.map { month in
             let m = perMonth[month] ?? [:]
@@ -200,7 +221,7 @@ public enum YourSound {
 
     /// The decades of the plays whose year is known (`yearOf` gives 0 for unknown), by decade. Empty until a year is
     /// known for `erasMinCoveragePermille` of the plays.
-    public static func decades(_ plays: [Play], yearOf: (Int64) -> Int) -> [Decade] {
+    public static func decades(_ plays: [Play], minPlays: Int = 0, yearOf: (Int64) -> Int) -> [Decade] {
         var counts: [Int: Int] = [:]
         var known = 0
         for p in plays {
@@ -209,12 +230,13 @@ public enum YourSound {
             known += 1
             counts[(y / 10) * 10, default: 0] += 1
         }
-        if plays.isEmpty || permille(known, plays.count) < erasMinCoveragePermille { return [] }
+        if plays.isEmpty || known < minPlays || permille(known, plays.count) < erasMinCoveragePermille { return [] }
         return counts.keys.sorted().map { Decade(decade: $0, permille: permille(counts[$0] ?? 0, known)) }
     }
 
     /// The genres of the plays, heaviest first: each play gives its track's top tag one count (unknown genres are absent).
-    public static func genres(_ plays: [Play], top: Int = 8, topTagOf: (Int64) -> Int) -> [GenreShare] {
+    public static func genres(_ plays: [Play], top: Int = 8, minPlays: Int = 0, minCoveragePermille: Int = 0,
+                              topTagOf: (Int64) -> Int) -> [GenreShare] {
         var counts: [Int: Int] = [:]
         var known = 0
         for p in plays {
@@ -223,6 +245,7 @@ public enum YourSound {
             known += 1
             counts[t, default: 0] += 1
         }
+        if known == 0 || known < minPlays || permille(known, plays.count) < minCoveragePermille { return [] }
         return byCountDesc(counts).prefix(top).map { GenreShare(atlasId: $0, permille: permille(counts[$0] ?? 0, known)) }
     }
 
@@ -299,7 +322,8 @@ public enum YourSound {
     /// genre's root (`rootOf` gives the root family of a genre, the genre itself for a root). Families heaviest first (ties:
     /// smaller id), each with its genres heaviest first. Shares are permille of the plays whose genre is known. Unknown genres
     /// are absent.
-    public static func genreTree(_ plays: [Play], top: Int = 8, topTagOf: (Int64) -> Int, rootOf: (Int) -> Int) -> [GenreFamily] {
+    public static func genreTree(_ plays: [Play], top: Int = 8, topTagOf: (Int64) -> Int, rootOf: (Int) -> Int, minPlays: Int = 0,
+                                 minCoveragePermille: Int = 0) -> [GenreFamily] {
         var perRoot: [Int: Int] = [:]
         var under: [Int: [Int: Int]] = [:]
         var known = 0
@@ -311,6 +335,7 @@ public enum YourSound {
             perRoot[root, default: 0] += 1
             under[root, default: [:]][t, default: 0] += 1
         }
+        if known == 0 || known < minPlays || permille(known, plays.count) < minCoveragePermille { return [] }
         return byCountDesc(perRoot).prefix(top).map { root in
             let m = under[root] ?? [:]
             return GenreFamily(rootId: root, permille: permille(perRoot[root] ?? 0, known),
@@ -371,6 +396,14 @@ public enum ModelVoice {
         public let accNowPercent: Int?
         public let accBeforePercent: Int?
         public let accPriorPercent: Int?
+
+        /// The two accuracy lines are shown only when the learned weights' figure is not below the standard recipe's. The gate decides on
+        /// log-loss, so the weights can be in use while the share called right is a point or two lower: the screen then says nothing
+        /// that reads as a claim of being better.
+        public var showsAccuracy: Bool {
+            guard kind == ModelVoice.learning, let now = accNowPercent, let prior = accPriorPercent else { return false }
+            return now >= prior
+        }
     }
 
     private static func percent(_ share: Double) -> Int { Int(BrainMath.floorToLong(share * 100.0 + 0.5)) }
@@ -381,7 +414,9 @@ public enum ModelVoice {
             return State(kind: gettingToKnow, gradedPlays: graded, learnedFrom: 0, accNowPercent: nil, accBeforePercent: nil,
                          accPriorPercent: nil)
         }
-        if !useLearned {
+        // The weights went back to the prior (a value that was not finite, or a reset) and no play has moved them since: that is the
+        // standard recipe, whatever the gate still holds from the last replay.
+        if !useLearned || modelUpdates <= 0 {
             return State(kind: standardRecipe, gradedPlays: graded, learnedFrom: 0, accNowPercent: nil, accBeforePercent: nil,
                          accPriorPercent: percent(summary.accPrior))
         }

@@ -60,7 +60,17 @@ public enum LearnReplay {
         featuresOf(e, liked: liked, affinity: affinity, session: session, nowMs: t, p0: p0, out: &x)
         let originIndex = originIndexOf(e.origin)
         if originIndex >= 0 { x[originIndex] = 1.0 }
-        return Ranker.applyEvent(&model, x, r: g.r, c: g.c, bias: Ranker.biasOf(p0), day: dayOf(e, t), eventId: e.eventId)
+        return Ranker.applyEvent(&model, x, r: g.r, c: g.c, bias: Ranker.biasOf(p0), day: dayOf(e, t),
+                                 eventId: liveId(e.eventId, watermark: model.lastEventId))
+    }
+
+    /// The id a LIVE play is applied under. An event id carries the phone's clock (`startedAtMs << 16`), so one play written while
+    /// the clock was a day ahead would leave a watermark that every later, correctly stamped play sits below, and the learner
+    /// would skip them all until real time caught up. A live play is new by construction (the recorder stores it once, and a
+    /// rebuild's catch-up skips what the replay read), so when its id is not above the watermark it is applied under the next id
+    /// after the watermark: the watermark only moves forward, by one. A replay walks the log in id order and uses the real ids.
+    public static func liveId(_ eventId: Int64, watermark: Int64) -> Int64 {
+        eventId > watermark ? eventId : (watermark == Int64.max ? watermark : watermark + 1)
     }
 
     /// As `applyLive`, and the arm bandit and the novelty appetite (5.10) take the same play first: their update reads the
@@ -69,7 +79,8 @@ public enum LearnReplay {
     public static func applyLive(_ model: inout RankerModel, posteriors: inout Posteriors, _ e: PlayEvent, _ g: Reward.Graded,
                                  liked: Bool, affinity: Affinity.State, session: SessionState, nowMs: Int64) -> Int {
         let t = e.startedAtMs > nowMs ? nowMs : e.startedAtMs
-        PosteriorUpdate.onPlay(&posteriors, e, g, novel: !Affinity.isHeard(affinity, family: Family.track, key: e.rid), nowMs: t)
+        PosteriorUpdate.onPlay(&posteriors, e, g, novel: !Affinity.isHeard(affinity, family: Family.track, key: e.rid), nowMs: t,
+                                eventId: liveId(e.eventId, watermark: posteriors.lastEventId))
         return applyLive(&model, e, g, liked: liked, affinity: affinity, session: session, nowMs: nowMs)
     }
 

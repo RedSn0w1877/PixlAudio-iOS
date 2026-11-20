@@ -31,10 +31,66 @@ struct BrainYourSoundReaderTests {
         let pass = YourSoundReader.pass(events)
         // The 3 s skips are not listens; the excluded and the silent ones are not counted at all.
         #expect(pass.rids.count == 3 + 4 + 1)
-        #expect(pass.controlPlays == 4)
-        #expect(pass.controlFinished == 3)
-        #expect(pass.learnedPlays == 5)
-        #expect(pass.learnedFinished == 4)
+        #expect(pass.controlStarts.count == 4)
+        #expect(pass.controlFinished.filter { $0 }.count == 3)
+        #expect(pass.learnedStarts.count == 5)
+        #expect(pass.learnedFinished.filter { $0 }.count == 4)
+    }
+
+    /// 300 control plays and 300 learned plays, both after `first`; `extra` more control plays came before the learned ones began.
+    private func twoSides(controlAfter: Int, learnedCount: Int, controlBefore: Int = 0) -> [PlayEvent] {
+        var events: [PlayEvent] = []
+        var i = 1
+        for _ in 0..<controlBefore {
+            events.append(event(i, flags: EventFlags.controlSession)); i += 1
+        }
+        for k in 0..<learnedCount {
+            events.append(event(i, played: k % 4 == 0 ? 3_000 : 200_000, end: k % 4 == 0 ? EndReason.next : EndReason.trackDone,
+                                model: BrainEngine.modelLearned)); i += 1
+        }
+        for _ in 0..<controlAfter {
+            events.append(event(i, flags: EventFlags.controlSession)); i += 1
+        }
+        return events
+    }
+
+    @Test func theTwoRatesComeFromTheSameWeeksAndShowOnlyWhenBothSidesHaveThreeHundredPlays() {
+        // Control plays from before the learned weights were ever in use are not part of the comparison.
+        let early = YourSoundReader.control(YourSoundReader.pass(twoSides(controlAfter: 100, learnedCount: 300, controlBefore: 400)))
+        #expect(early?.controlPlays == 100)
+        #expect(early?.controlPermille == nil && early?.learnedPermille == nil, "100 control plays over the same weeks are not enough")
+        let enough = YourSoundReader.control(YourSoundReader.pass(twoSides(controlAfter: 300, learnedCount: 300, controlBefore: 50)))
+        #expect(enough?.controlPlays == 300 && enough?.learnedPlays == 300)
+        #expect(enough?.controlPermille == 1000)
+        #expect(enough?.learnedPermille == 750)
+        // No learned play yet: nothing is compared, whatever the control flags say.
+        let none = YourSoundReader.control(YourSoundReader.pass(twoSides(controlAfter: 0, learnedCount: 0, controlBefore: 500)))
+        #expect(none?.controlPlays == 0 && none?.controlPermille == nil)
+        #expect(YourSoundReader.control(YourSoundReader.pass([])) == nil)
+    }
+
+    @Test func aPlayWithNoTimezoneIsReadInTheDevicesOffset() {
+        var e = event(1)
+        e.tzOffsetMin = PlayEvent.tzUnknown
+        let pass = YourSoundReader.pass([e], deviceOffsetMin: { _ in 120 })
+        #expect(pass.tzs == [120])
+        #expect(YourSoundReader.pass([e]).tzs == [0])
+    }
+
+    @Test func latelyNeedsABaselineOfPlaysFromBeforeTheCutoff() {
+        let now: Int64 = 1_760_000_000_000 + 400 * 300_000
+        // 60 plays from the last four days only: nothing from before the 14-day mark.
+        var recent: [PlayEvent] = []
+        for i in 0..<60 {
+            var e = event(i + 1, rid: Int64(i % 5 + 1))
+            e.startedAtMs = now - Int64(i) * 3_600_000
+            recent.append(e)
+        }
+        recent.sort { $0.startedAtMs < $1.startedAtMs }
+        #expect(YourSoundReader.pass(recent, lately: now).beforeCutoffPlays == 0)
+        var old = event(900, rid: 7)
+        old.startedAtMs = now - 20 * BrainMath.dayMs
+        #expect(YourSoundReader.pass([old] + recent, lately: now).beforeCutoffPlays == 1)
     }
 
     @Test func aRateIsShownOnlyFromThreeHundredPlays() {

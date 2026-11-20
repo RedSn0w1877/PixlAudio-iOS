@@ -205,7 +205,16 @@ final class BrainService {
         refresh = BrainRefresh(work: work, repository: repository, engine: engine, allowed: allowed)
         planBuilder = HomePlanBuilder(mixes: mixes, homeRows: homeRows, genre: kit.genre, store: kit.planStore, context: context,
                                       shelfStore: shelves)
-        yourSound = YourSoundReader(engine: engine, mixes: mixes, parts: kit.parts, genre: kit.genre, shelves: shelves)
+        // Key artists on a genre page come from tag votes of Deezer, MusicBrainz and ListenBrainz: all three must be on (local switch and
+        // the remote one), or the section is left out.
+        let tagVotesAllowed: @Sendable () async -> Bool = {
+            let gate = BrainSourceSwitch()
+            if !(await gate.sourceAllowed(.deezer)) { return false }
+            if !(await gate.sourceAllowed(.musicbrainz)) { return false }
+            return await gate.sourceAllowed(.listenbrainz)
+        }
+        yourSound = YourSoundReader(engine: engine, mixes: mixes, parts: kit.parts, genre: kit.genre, shelves: shelves,
+                                    homeRows: homeRows, homePlans: kit.planStore, tagVotesAllowed: tagVotesAllowed)
         // The first minute of a new listener (8.10) is lane 1 of the refresh, run while Home is on screen: the same work under
         // the same budget and switches, and never a second background job.
         coldStart = ColdStart(work: work, healthyLists: { await repository.radioListCount() }, allowed: allowed)

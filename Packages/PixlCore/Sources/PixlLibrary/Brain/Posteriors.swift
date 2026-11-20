@@ -28,8 +28,10 @@ public enum PosteriorUpdate {
     /// appetite. `novel` is true when it was the first play of the track (computed from the tables BEFORE the play is
     /// applied). An event at or below the watermark changes nothing. Returns true when the event was applied.
     @discardableResult
-    public static func onPlay(_ p: inout Posteriors, _ e: PlayEvent, _ g: Reward.Graded, novel: Bool, nowMs: Int64) -> Bool {
-        if e.eventId <= p.lastEventId { return false }
+    public static func onPlay(_ p: inout Posteriors, _ e: PlayEvent, _ g: Reward.Graded, novel: Bool, nowMs: Int64,
+                       eventId: Int64? = nil) -> Bool {
+        let id = eventId ?? e.eventId
+        if id <= p.lastEventId { return false }
         let t = e.startedAtMs > nowMs ? nowMs : e.startedAtMs
         let day = LearnReplay.dayOf(e, t)
         let family = ArmBandit.familyOf(e.surface)
@@ -43,7 +45,7 @@ public enum PosteriorUpdate {
             p.arms.forgetDone = 0
         }
         NoveltyAppetite.onPlay(&p.appetite, e, g, novel: novel, recommender: recommender, day: day)
-        p.lastEventId = e.eventId
+        p.lastEventId = id
         return true
     }
 

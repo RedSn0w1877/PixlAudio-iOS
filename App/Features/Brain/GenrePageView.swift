@@ -55,11 +55,16 @@ struct GenrePageView: View {
                 family(YourSoundStrings.genreShapedBy, facts.influences)
             } else if !loaded {
                 ProgressView().frame(maxWidth: .infinity).padding(.vertical, 40)
+            } else {
+                // The atlas could not be read, or does not hold this genre: one plain sentence instead of a blank screen.
+                Text(YourSoundStrings.genreUnavailable).pixlFont(.bodyMedium).foregroundStyle(theme.onSurfaceVariant)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 4)
             }
         }
         .task {
             if let reader = env.brain.yourSound {
                 facts = await reader.genrePage(atlasId)
+                loaded = true
                 extras = await reader.genreExtras(atlasId)
             }
             loaded = true
@@ -98,7 +103,7 @@ struct GenrePageView: View {
                 Text(YourSoundStrings.genreYouFirst(Date(timeIntervalSince1970: TimeInterval(you.firstPlayedMs) / 1000)
                     .formatted(.dateTime.day().month(.abbreviated).year())))
                     .pixlFont(.bodyMedium).foregroundStyle(theme.onSurface)
-                Text(YourSoundStrings.genreYouShare(you.permille / 10, you.plays))
+                Text(YourSoundStrings.genreYouShare(YourSoundStrings.sharePermille(you.permille), you.plays))
                     .pixlFont(.bodyMedium).foregroundStyle(theme.onSurface)
                 if !you.topSongs.isEmpty {
                     Text(YourSoundStrings.genreYouTop).pixlFont(.labelLarge).foregroundStyle(theme.onSurfaceVariant)

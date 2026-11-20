@@ -87,15 +87,22 @@ public final class FeedbackStore {
         return records.values.sorted { $0.createdAtMs != $1.createdAtMs ? $0.createdAtMs < $1.createdAtMs : $0.id < $1.id }
     }
 
-    /// Puts a whole set of records in place (a restored backup): what was there and is not in `list` goes.
+    /// Puts a whole set of records in place: what was there and is not in `list` goes. The new records are written first and the old ones
+    /// removed after, so a stop in between loses nothing.
     public func replaceAll(_ list: [Record]) {
         load()
+        for record in list { insert(record) }
         let keep = Set(list.map(\.id))
         let doomed = records.keys.filter { !keep.contains($0) }
         if !doomed.isEmpty {
             file.remove(doomed.map { String($0) })
             for id in doomed { records[id] = nil }
         }
+    }
+
+    /// A restored backup: every record of `list` is written (replacing the one with the same id); records made since stay.
+    public func merge(_ list: [Record]) {
+        load()
         for record in list { insert(record) }
     }
 

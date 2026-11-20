@@ -109,6 +109,8 @@ public actor YourSoundReader {
         public let novelty: YourSound.Novelty?
         public let model: ModelVoice.State
         public let control: Control?
+        /// Plays that moved the weights since they were last at the prior; "Reset what I've learned" is offered only above 0.
+        public let modelUpdates: Int64
         public let computedAtMs: Int64
 
         public var isEmpty: Bool { plays == 0 }
@@ -135,6 +137,8 @@ public actor YourSoundReader {
     static let cacheMs: Int64 = 5 * 60_000
     static let listenMs: Int32 = 30_000
     static let dnaChunk = 800
+    /// A genre page's extras are worked out once and kept this long.
+    static let extrasCacheMs: Int64 = 5 * 60_000
 
     private let engine: BrainEngine
     private let mixes: BrainMixes
@@ -142,93 +146,135 @@ public actor YourSoundReader {
     /// Stage 3: the genre stations (a genre page's "From your library") and the shelf bandit (cleared by a reset). Nil leaves them out.
     private let genre: GenreStations?
     private let shelves: ShelfStore?
+    /// The saved Home rows and the Home plan: lists the learned weights ranked go with a reset (they are built again at the next visit).
+    private let homeRows: BrainHomeRows?
+    private let homePlans: HomePlanStore?
+    /// Deezer, MusicBrainz and ListenBrainz all switched on: only then does a genre page name key artists (their tag votes).
+    private let tagVotesAllowed: @Sendable () async -> Bool
     private let clock: @Sendable () -> Int64
     private var cached: State?
+    /// Bumped by a reset: a figure that was being worked out before it is not kept (it would still show the old weights).
+    private var generation = 0
+    private var extrasCache: [Int: (atMs: Int64, value: GenreExtras)] = [:]
     /// The island names of one `compute` pass.
     private var nameCache: [Int: String?] = [:]
 
     public init(engine: BrainEngine, mixes: BrainMixes, parts: Stage2bParts, genre: GenreStations? = nil, shelves: ShelfStore? = nil,
+                homeRows: BrainHomeRows? = nil, homePlans: HomePlanStore? = nil,
+                tagVotesAllowed: @escaping @Sendable () async -> Bool = { true },
                 clock: @escaping @Sendable () -> Int64 = { currentTimeMillis() }) {
         self.genre = genre
         self.shelves = shelves
+        self.homeRows = homeRows
+        self.homePlans = homePlans
+        self.tagVotesAllowed = tagVotesAllowed
         self.engine = engine
         self.mixes = mixes
         self.parts = parts
         self.clock = clock
     }
 
-    /// The figures, from the cache when they are under `cacheMs` old.
+    /// The figures, from the cache when they are under `cacheMs` old and no learner changed since.
     public func load(force: Bool = false) async -> State {
         let now = clock()
-        if !force, let cached, now - cached.computedAtMs >= 0, now - cached.computedAtMs < Self.cacheMs { return cached }
+        let learnerNow = await engine.learnerGeneration()
+        if !force, let cached, now - cached.computedAtMs >= 0, now - cached.computedAtMs < Self.cacheMs,
+           cachedLearnerGeneration == learnerNow { return cached }
+        let before = generation
+        let beforeLearner = learnerNow
         let state = await compute(now)
-        cached = state
+        // A figure worked out while the weights were reset or a new learner was adopted still describes the old ones: it is shown once
+        // and not kept.
+        if before == generation, await engine.learnerGeneration() == beforeLearner {
+            cached = state
+            cachedLearnerGeneration = beforeLearner
+        }
         return state
     }
 
-    /// "Reset what I've learned": the weights go back to the prior; the log, the taste changes and the exclusions stay (8.6).
+    private var cachedLearnerGeneration = 0
+
+    /// "Reset what I've learned": the weights go back to the prior; the log, the taste changes and the exclusions stay (8.6). The lists
+    /// the learned weights ranked go with them: the saved Home rows and the Home plan are built again with the standard recipe (a saved
+    /// mix notices by itself, see `BrainMixes`).
     public func resetLearned() async {
+        generation += 1
         await engine.resetLearned()
         await shelves?.reset()
+        await homeRows?.dropLearned()
+        await homePlans?.clear()
+        generation += 1
         cached = nil
+        extrasCache = [:]
     }
 
-    /// What one pass over the log gives: the counted plays and the control-session completion counts.
+    /// What one pass over the plays gives: the counted plays and the finish rates of the two kinds of picks.
     struct LogPass: Sendable {
         var rids: [Int64] = []
         var aids: [Int64] = []
         var starts: [Int64] = []
         var tzs: [Int32] = []
-        var controlPlays = 0
-        var controlFinished = 0
-        var learnedPlays = 0
-        var learnedFinished = 0
-        /// "Lately" (8.6 point 8): the tables as they are now and as they stood 14 days ago, both made from the log in order, and the
+        /// The finish of each engine pick, by time, so the control and the learned picks are compared over the same weeks (5.12 point 8).
+        var controlStarts: [Int64] = []
+        var controlFinished: [Bool] = []
+        var learnedStarts: [Int64] = []
+        var learnedFinished: [Bool] = []
+        /// "Lately" (8.6 point 8): the tables as they are now and as they stood 14 days ago, both made from the plays in order, and the
         /// plays that tags are added from once the track facts are read. Empty unless `pass` was given `lately`.
         var nowTables = Affinity.State()
         var earlierTables = Affinity.State()
+        /// Plays from before the 14-day mark: "up" needs something to be up from.
+        var beforeCutoffPlays = 0
         var tagRids: [Int64] = []
         var tagTimes: [Int64] = []
         var tagR: [Double] = []
         var tagC: [Double] = []
     }
 
-    /// A counted play is a real listen (not excluded, not silent, and heard to the end or for 30 s). Pure; run off the actor.
-    static func pass(_ events: [PlayEvent], lately nowMs: Int64? = nil) -> LogPass {
+    /// A counted play is a real listen (not excluded, not silent, and heard to the end or for 30 s). Pure; run off the actor. `events` is
+    /// the log and the imported history as one stream in event order (`BrainEngine.mergedPlays`). A play with no timezone (an imported
+    /// one, or a live one from before the offset was recorded) is read in the device's offset then (`deviceOffsetMin`), as the spec says
+    /// for dayparts and months.
+    static func pass(_ events: [PlayEvent], lately nowMs: Int64? = nil,
+                     deviceOffsetMin: @Sendable (Int64) -> Int32 = { _ in 0 }) -> LogPass {
         var out = LogPass()
         var tracker = GradeTracker()
         let cutoff = (nowMs ?? 0) - Int64(YourSound.latelyDays) * BrainMath.dayMs
         for e in events {
+            let excluded = e.has(EventFlags.learnExcluded) || e.has(EventFlags.neverAudible)
             if let nowMs {
                 let t = e.startedAtMs > nowMs ? nowMs : e.startedAtMs
                 let graded = tracker.grade(e, completions: out.nowTables.completions)
-                if !e.has(EventFlags.learnExcluded) && !e.has(EventFlags.neverAudible) {
+                if !excluded {
                     Affinity.applyEvent(&out.nowTables, e, graded, tMs: t)
-                    if t <= cutoff { Affinity.applyEvent(&out.earlierTables, e, graded, tMs: t) }
+                    if t <= cutoff {
+                        Affinity.applyEvent(&out.earlierTables, e, graded, tMs: t)
+                        out.beforeCutoffPlays += 1
+                    }
                     out.tagRids.append(e.rid)
                     out.tagTimes.append(t)
                     out.tagR.append(graded.r)
                     out.tagC.append(graded.cOther)
                 }
             }
-            if e.has(EventFlags.learnExcluded) || e.has(EventFlags.neverAudible) { continue }
+            if excluded { continue }
             let listened = e.endReason == EndReason.trackDone || e.playedMs < 0 || e.playedMs >= listenMs
             if listened {
                 out.rids.append(e.rid)
                 out.aids.append(e.primaryAid)
                 out.starts.append(e.startedAtMs)
-                out.tzs.append(e.tzOffsetMin == PlayEvent.tzUnknown ? 0 : e.tzOffsetMin)
+                out.tzs.append(e.tzOffsetMin == PlayEvent.tzUnknown ? deviceOffsetMin(e.startedAtMs) : e.tzOffsetMin)
             }
             if Reward.isEngineSurface(e.surface) && e.origin == Origin.live {
                 let g = Reward.grade(e, Reward.Context())
                 if g.c > 0.0 {
                     let finished = g.r >= Reward.completionR
                     if e.has(EventFlags.controlSession) {
-                        out.controlPlays += 1
-                        if finished { out.controlFinished += 1 }
+                        out.controlStarts.append(e.startedAtMs)
+                        out.controlFinished.append(finished)
                     } else if e.modelVersion == BrainEngine.modelLearned {
-                        out.learnedPlays += 1
-                        if finished { out.learnedFinished += 1 }
+                        out.learnedStarts.append(e.startedAtMs)
+                        out.learnedFinished.append(finished)
                     }
                 }
             }
@@ -236,21 +282,48 @@ public actor YourSoundReader {
         return out
     }
 
+    /// The two finish rates, compared over the same weeks: from the first play ranked with the learned weights (those exist only while
+    /// the gate has them on), and only when BOTH sides have at least `Gate.controlMinPlays` plays in that span. Otherwise no rate is
+    /// shown. Nil when neither side has a play.
+    static func control(_ log: LogPass) -> Control? {
+        if log.controlStarts.isEmpty && log.learnedStarts.isEmpty { return nil }
+        let since = log.learnedStarts.min() ?? Int64.max
+        var controlPlays = 0
+        var controlFinished = 0
+        for i in log.controlStarts.indices where log.controlStarts[i] >= since {
+            controlPlays += 1
+            if log.controlFinished[i] { controlFinished += 1 }
+        }
+        let learnedPlays = log.learnedStarts.count
+        let learnedFinished = log.learnedFinished.filter { $0 }.count
+        let enough = controlPlays >= Gate.controlMinPlays && learnedPlays >= Gate.controlMinPlays
+        return Control(controlPlays: controlPlays,
+                       controlPermille: enough ? Int(Double(controlFinished) / Double(controlPlays) * 1000.0 + 0.5) : nil,
+                       learnedPlays: learnedPlays,
+                       learnedPermille: enough ? Int(Double(learnedFinished) / Double(learnedPlays) * 1000.0 + 0.5) : nil)
+    }
+
+    private nonisolated static func deviceOffset(_ atMs: Int64) -> Int32 {
+        Int32(TimeZone.current.secondsFromGMT(for: Date(timeIntervalSince1970: TimeInterval(atMs) / 1000)) / 60)
+    }
+
     private func compute(_ now: Int64) async -> State {
         // The model's own figures first: they come from the replay's graded plays, not from this screen's counting.
         let figures = await engine.learnerFigures()
         let model = ModelVoice.of(figures.summary, useLearned: figures.useLearned, modelUpdates: figures.updates)
 
-        // The log, in order. The file is read here and decoded and counted off this actor.
-        let payloads = await engine.eventPayloads()
-        let log = await Task.detached(priority: .utility) { Self.pass(BrainEventLog.decodeSorted(payloads), lately: now) }.value
+        // The log and the imported history as one stream, in order, with merged recordings mapped to their survivor (as a rebuild reads
+        // them). The merge and the counting run off every actor.
+        let events = await engine.mergedPlays()
+        let log = await Task.detached(priority: .utility) { Self.pass(events, lately: now, deviceOffsetMin: Self.deviceOffset) }.value
         let plays = YourSound.withFirsts(rids: log.rids, aids: log.aids, startedAtMs: log.starts, tzOffsetMin: log.tzs)
         let set = await parts.islands.current()
         let memberOf = set?.memberOf ?? [:]
         let islandOf: (Int64) -> Int = { memberOf[$0] ?? -1 }
         let atlas = await parts.atlas.atlas()
 
-        // Island names: the same words the Daily Mixes carry (an island is named only when enough of it has a genre).
+        // Island names: the same words the Daily Mixes carry (an island is named only when enough of it has a genre). Each island is
+        // named once (a nil answer is remembered too: naming walks the library).
         nameCache = [:]
 
         // The track facts of every recording played: tags (genres), years, titles. Unknown stays unknown.
@@ -278,7 +351,8 @@ public actor YourSoundReader {
             }
         }
 
-        let islandShares = YourSound.islands(plays, islandOf: islandOf, nowMs: now)
+        let islandShares = YourSound.islands(plays, islandOf: islandOf, nowMs: now, minPlays: YourSound.islandsMinPlays,
+                                             minCoveragePermille: YourSound.islandsMinCoveragePermille)
         // Artist names, for the islands' top artists and for "Lately": the names the brain knows (an unknown one is left out).
         var artistNames: [Int64: String] = [:]
         var wanted: [Int64] = []
@@ -298,12 +372,12 @@ public actor YourSoundReader {
                 genreId: genreId, genreName: genreId >= 0 ? atlas.flatMap { AtlasNames.genreName($0, genreId) } : nil))
         }
         var dayparts: [DaypartRow] = []
-        for d in YourSound.dayparts(plays, islandOf: islandOf) {
+        for d in YourSound.dayparts(plays, minPlays: YourSound.daypartMinPlays, islandOf: islandOf) {
             dayparts.append(DaypartRow(daypart: d.daypart, plays: d.plays,
                                        leadingIsland: d.leadingIslandId >= 0 ? await nameOf(d.leadingIslandId, set, now) : nil))
         }
         var months: [MonthRow] = []
-        for m in YourSound.months(plays, islandOf: islandOf) {
+        for m in YourSound.months(plays, minPlays: YourSound.monthMinPlays, islandOf: islandOf) {
             var shares: [MonthIsland] = []
             for s in m.islandPermille.prefix(3) { shares.append(MonthIsland(name: await nameOf(s.islandId, set, now), permille: s.permille)) }
             months.append(MonthRow(month: m.month, plays: m.plays, islands: shares))
@@ -312,7 +386,8 @@ public actor YourSoundReader {
         var genreRows: [GenreRow] = []
         var genreTree: [GenreFamilyRow] = []
         if let atlas {
-            for g in YourSound.genres(plays, topTagOf: { topTag[$0] ?? GenreAtlas.none }) {
+            for g in YourSound.genres(plays, minPlays: YourSound.genresMinPlays, minCoveragePermille: YourSound.genresMinCoveragePermille,
+                                      topTagOf: { topTag[$0] ?? GenreAtlas.none }) {
                 if let name = AtlasNames.genreName(atlas, g.atlasId) {
                     genreRows.append(GenreRow(atlasId: g.atlasId, name: name, permille: g.permille))
                 }
@@ -329,7 +404,9 @@ public actor YourSoundReader {
                 rootCache[id] = best
                 return best
             }
-            for family in YourSound.genreTree(plays, top: 8, topTagOf: { topTag[$0] ?? GenreAtlas.none }, rootOf: rootOf) {
+            for family in YourSound.genreTree(plays, top: 8, topTagOf: { topTag[$0] ?? GenreAtlas.none }, rootOf: rootOf,
+                                              minPlays: YourSound.genresMinPlays,
+                                              minCoveragePermille: YourSound.genresMinCoveragePermille) {
                 guard let name = AtlasNames.genreName(atlas, family.rootId) else { continue }
                 let children = family.children.compactMap { child in
                     AtlasNames.genreName(atlas, child.atlasId).map { GenreRow(atlasId: child.atlasId, name: $0, permille: child.permille) }
@@ -337,15 +414,17 @@ public actor YourSoundReader {
                 genreTree.append(GenreFamilyRow(rootId: family.rootId, name: name, permille: family.permille, children: children))
             }
         }
-        let decades = YourSound.decades(plays, yearOf: { year[$0] ?? 0 })
-        let novelty = YourSound.novelty(plays, nowMs: now)
+        let decades = YourSound.decades(plays, minPlays: YourSound.erasMinPlays, yearOf: { year[$0] ?? 0 })
+        let rawNovelty = YourSound.novelty(plays, nowMs: now)
+        let novelty: YourSound.Novelty? = rawNovelty.plays >= YourSound.noveltyMinPlays ? rawNovelty : nil
 
-        // "Lately": add the tags to the two sets of tables, then read the largest moves.
+        // "Lately": add the tags to the two sets of tables, then read the largest moves. "Up" needs something to be up from: with fewer
+        // than `latelyMinBaselinePlays` plays from before the cutoff there is no baseline, and nothing is said.
         var nowTables = log.nowTables
         var earlierTables = log.earlierTables
         let cutoff = now - Int64(YourSound.latelyDays) * BrainMath.dayMs
         var lately = Lately.none
-        if let atlas {
+        if let atlas, log.beforeCutoffPlays >= YourSound.latelyMinBaselinePlays {
             for i in log.tagRids.indices {
                 guard let v = tagVectors[log.tagRids[i]] else { continue }
                 let t = log.tagTimes[i]
@@ -369,19 +448,9 @@ public actor YourSoundReader {
             lately = Lately(up: up, down: down)
         }
 
-        var control: Control?
-        if log.controlPlays + log.learnedPlays > 0 {
-            control = Control(
-                controlPlays: log.controlPlays,
-                controlPermille: Gate.shownRate(finished: log.controlFinished, total: log.controlPlays).map { Int($0 * 1000.0 + 0.5) },
-                learnedPlays: log.learnedPlays,
-                // The learned rate is shown only next to a control rate that has enough plays.
-                learnedPermille: log.controlPlays >= Gate.controlMinPlays && log.learnedPlays > 0
-                    ? Int(Double(log.learnedFinished) / Double(log.learnedPlays) * 1000.0 + 0.5) : nil)
-        }
         return State(plays: plays.count, islands: islandRows, genres: genreRows, genreTree: genreTree, lately: lately,
-                     decades: decades, dayparts: dayparts, months: months, novelty: novelty.plays > 0 ? novelty : nil, model: model,
-                     control: control, computedAtMs: now)
+                     decades: decades, dayparts: dayparts, months: months, novelty: novelty, model: model,
+                     control: Self.control(log), modelUpdates: figures.updates, computedAtMs: now)
     }
 
     /// The names the brain knows for `aids`: an artist it holds no row for, or whose name the app does not say, is absent.
@@ -421,12 +490,19 @@ public actor YourSoundReader {
     }
 
     /// What a genre page says beyond the atlas's own facts (8.7), all of it from the listener's own data: the artists the brain
-    /// knows with the most of this genre in them, the artists of the listener's library under it, and "You and this genre". Nothing is
-    /// guessed: an artist with no known genre is absent, and the "you" part does not exist for a genre the listener never played.
+    /// knows with the most of this genre in them (only while the three open-data sources that vote on tags are on), the artists of the
+    /// listener's library under it, and "You and this genre". Nothing is guessed: an artist with no known genre is absent, and the "you"
+    /// part does not exist for a genre the listener never played. Worked out once per genre and kept for a few minutes; the scans run
+    /// off every actor.
     public func genreExtras(_ id: Int) async -> GenreExtras {
+        let now = clock()
+        if let hit = extrasCache[id], now - hit.atMs >= 0, now - hit.atMs < Self.extrasCacheMs { return hit.value }
         guard let atlas = await parts.atlas.atlas() else { return .none }
-        return GenreExtras(keyArtists: await keyArtists(atlas, id), libraryArtists: await libraryArtists(id),
-                           you: await youAndGenre(atlas, id))
+        let before = generation
+        let keys = await tagVotesAllowed() ? await keyArtists(atlas, id) : []
+        let extras = GenreExtras(keyArtists: keys, libraryArtists: await libraryArtists(id), you: await youAndGenre(atlas, id))
+        if before == generation { extrasCache[id] = (now, extras) }
+        return extras
     }
 
     static let keyArtistCount = 8
@@ -434,19 +510,31 @@ public actor YourSoundReader {
     /// Whether a tag is the genre or one of its descendants.
     static func under(_ atlas: GenreAtlas, _ tag: Int, _ id: Int) -> Bool { tag == id || atlas.ancestors(tag).contains(id) }
 
-    /// The artists the brain holds a genre vector for, the largest weight under `id` first (ties: the smaller id).
+    /// The artists the brain holds a genre vector for, the largest weight under `id` first (ties: the smaller id). The ancestors of each
+    /// tag are worked out once, and the pass over every artist runs off the actor.
     private func keyArtists(_ atlas: GenreAtlas, _ id: Int) async -> [String] {
         guard let dna = parts.dna else { return [] }
-        var scored: [(aid: Int64, best: Int, name: String)] = []
-        for row in await dna.artistsWithTags() {
-            let v = Tags.decode(Array(row.tags))
-            var best = 0
-            for t in v.tags where Int(t.q) > best && Self.under(atlas, t.atlasId, id) { best = Int(t.q) }
-            if best <= 0 || !AtlasNames.isShown(row.name) { continue }
-            scored.append((row.aid, best, row.name))
-        }
-        scored.sort { $0.best != $1.best ? $0.best > $1.best : $0.aid < $1.aid }
-        return scored.prefix(Self.keyArtistCount).map(\.name)
+        let rows = await dna.artistsWithTags()
+        return await Task.detached(priority: .utility) { () -> [String] in
+            var underCache: [Int: Bool] = [:]
+            var scored: [(aid: Int64, best: Int, name: String)] = []
+            for row in rows {
+                let v = Tags.decode(Array(row.tags))
+                var best = 0
+                for t in v.tags where Int(t.q) > best {
+                    let inside: Bool
+                    if let known = underCache[t.atlasId] { inside = known } else {
+                        inside = Self.under(atlas, t.atlasId, id)
+                        underCache[t.atlasId] = inside
+                    }
+                    if inside { best = Int(t.q) }
+                }
+                if best <= 0 || !AtlasNames.isShown(row.name) { continue }
+                scored.append((row.aid, best, row.name))
+            }
+            scored.sort { $0.best != $1.best ? $0.best > $1.best : $0.aid < $1.aid }
+            return scored.prefix(Self.keyArtistCount).map(\.name)
+        }.value
     }
 
     /// The artists of the listener's own songs under the genre, the one with the most of them first.
@@ -468,8 +556,8 @@ public actor YourSoundReader {
 
     private func youAndGenre(_ atlas: GenreAtlas, _ id: Int) async -> You? {
         guard let dna = parts.dna else { return nil }
-        let payloads = await engine.eventPayloads()
-        let log = await Task.detached(priority: .utility) { Self.pass(BrainEventLog.decodeSorted(payloads)) }.value
+        let events = await engine.mergedPlays()
+        let log = await Task.detached(priority: .utility) { Self.pass(events, deviceOffsetMin: Self.deviceOffset) }.value
         if log.rids.isEmpty { return nil }
         var belongs = Set<Int64>()
         var title: [Int64: String] = [:]

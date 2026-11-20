@@ -223,6 +223,10 @@ public actor BrainMixes {
     /// A mix built when no radio was cached holds no new music. Once lists are in the cache it is built again, once:
     /// the listener should not wait a day for the first new music. A mix with new music is the day's mix and stays.
     private func isStale(_ saved: StoredMix, now: Int64, tz: Int32) async -> Bool {
+        // "Reset what I've learned": a list the learned weights ranked, built before the reset, is not the day's list any more.
+        if saved.model == Int(BrainEngine.modelLearned), let resetAt = await engine.learnResetAtMs(), saved.builtAtMs <= resetAt {
+            return true
+        }
         // Only the lists that take new music from cached radios can be waiting for one; On Repeat and Rediscover never are.
         if !MixKinds.usesPlanner(saved.kind) || saved.kind == MixKinds.firstListen { return false }
         if saved.seedLists > 0 || saved.novelCount > 0 { return false }

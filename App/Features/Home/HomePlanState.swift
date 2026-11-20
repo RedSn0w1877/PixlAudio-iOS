@@ -484,12 +484,5 @@ final class HomePlanState {
         }
     }
 
-    nonisolated private static func tag(_ shelf: PlanShelf, _ item: PlanItem) -> BrainItemTag {
-        BrainItemTag(surface: Surface.nameOf(Surface.homeShelf), surfaceId: shelf.id, recId: shelf.recId, slot: item.slot,
-                     arm: Arm.nameOf(item.arm), whyArg: item.whyName.isEmpty ? nil : item.whyName,
-                     whyKey: item.whyKey != WhyLine.none ? WhyLine.nameOf(item.whyKey) : nil,
-                     primaryArtist: item.row?.row.artists.first?.name,
-                     // The listener chose to play the shelf: its tracks are theirs, like a playlist's.
-                     chosen: true)
-    }
+    nonisolated private static func tag(_ shelf: PlanShelf, _ item: PlanItem) -> BrainItemTag { BrainItemTag.homeShelf(shelf, item) }
 }

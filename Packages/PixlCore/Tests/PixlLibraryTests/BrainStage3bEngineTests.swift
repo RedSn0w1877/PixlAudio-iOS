@@ -328,11 +328,59 @@ struct BrainStage3bEngineTests {
         #expect((await h.shelves().snapshot()).updates == 0)
     }
 
-    @Test func theRewardNeedsAPlayOfThirtySecondsOrToTheEndStartedWithinTwoMinutes() {
-        func play(_ start: Int64, played: Int32, end: Int32 = EndReason.next) -> PlayEvent {
+    @Test func aVisitIsOverOnlyAfterHalfAnHourWithoutASignalSoAPlayThatIsStillRunningIsNotGradedAsNoReward() async throws {
+        let h = Harness3b()
+        defer { h.cleanUp() }
+        let store = h.shelves()
+        let ids = ["0:a", "1:b"]
+        let types: [Int32] = [HomePlanner.madeForYou, HomePlanner.becauseListened]
+        await store.onPlanShown(ids: ids, types: types, daypart: 2)
+        // The page stays open for an hour, then the listener taps a shelf: the song is playing and not yet in the log.
+        h.clock.advance(60 * 60_000)
+        await store.onShelfActivated(ids[1])
+        let tapped = h.clock.now
+        // Two minutes later another page is shown and the refresh settles: the visit has a tap from two minutes ago, so it is not over.
+        h.clock.advance(2 * 60_000)
+        await store.onPlanShown(ids: ["0:other"], types: [HomePlanner.madeForYou], daypart: 2)
+        await store.settle()
+        #expect((await store.snapshot()).updates == 0, "a tap two minutes ago keeps its visit open")
+        // The song ends and is written; half an hour after the tap the visit is given to the bandit with its reward.
+        let play = PlayEvent(eventId: ((tapped + 1_000) << 16) | 1, origin: Origin.live, rid: 1, primaryAid: 1, startedAtMs: tapped + 1_000,
+                             tzOffsetMin: 0, playedMs: 200_000, durationMs: 200_000, startReason: StartReason.tap,
+                             endReason: EndReason.trackDone, surface: Surface.homeShelf)
+        BrainEventLog(directory: h.directory).insert([play])
+        h.clock.advance(ShelfStore.sameVisitMs)
+        await store.settle()
+        let state = await store.snapshot()
+        #expect(state.alpha[Int(HomePlanner.becauseListened) * 4 + 2] == ShelfBandit.priorAlpha(HomePlanner.becauseListened) + 1.0)
+    }
+
+    @Test func aResetWhileVisitsAreWaitingLeavesNothingToComeBack() async throws {
+        let h = Harness3b()
+        defer { h.cleanUp() }
+        let store = h.shelves()
+        await store.onPlanShown(ids: ["0:a"], types: [HomePlanner.madeForYou], daypart: 0)
+        await store.reset()
+        h.clock.advance(ShelfStore.sameVisitMs + 1_000)
+        await store.settle()
+        #expect((await store.snapshot()).updates == 0)
+        #expect(await store.impressionCount() == 0)
+    }
+
+    @Test func theRewardNeedsAPlayOfThirtySecondsOrToTheEndStartedWithinTenMinutes() {
+        func play(_ start: Int64, played: Int32, end: Int32 = EndReason.next, reason: Int32 = StartReason.tap,
+                  flags: Int32 = 0) -> PlayEvent {
             PlayEvent(eventId: start << 16, origin: Origin.live, rid: 1, primaryAid: 1, startedAtMs: start, tzOffsetMin: 0, playedMs: played,
-                      durationMs: 200_000, endReason: end)
+                      durationMs: 200_000, startReason: reason, endReason: end, flags: flags)
         }
+        // A private or silent play, and one the queue moved on to by itself, is not what the tap started; a play rewards one shelf.
+        #expect(ShelfStore.reward(events: [play(1_200, played: 3_000, flags: EventFlags.learnExcluded), play(1_500, played: 40_000)],
+                                  activatedAtMs: 1_000))
+        #expect(!ShelfStore.reward(events: [play(1_200, played: 90_000, reason: StartReason.autoAdvance)], activatedAtMs: 1_000))
+        var claimed = Set<Int64>()
+        let rewarded = [play(1_500, played: 60_000)]
+        #expect(ShelfStore.reward(events: rewarded, activatedAtMs: 1_000, claimed: &claimed))
+        #expect(!ShelfStore.reward(events: rewarded, activatedAtMs: 1_000, claimed: &claimed), "the same play is not given to a second shelf")
         #expect(ShelfStore.reward(events: [play(1_500, played: 31_000)], activatedAtMs: 1_000))
         #expect(!ShelfStore.reward(events: [play(1_500, played: 29_000)], activatedAtMs: 1_000))
         #expect(ShelfStore.reward(events: [play(1_500, played: 10_000, end: EndReason.trackDone)], activatedAtMs: 1_000))
@@ -433,7 +481,8 @@ struct BrainStage3bEngineTests {
         await other.engine.restoreBackupState(salt: state.salt, feedback: state.feedback)
         let restored = await other.engine.backupState()
         #expect(restored.salt == salt)
-        #expect(restored.feedback.map(\.id) == [16])
+        // Merged in, not swapped: the exclusion made on this install since the backup keeps its record (its plays are flagged in the log).
+        #expect(restored.feedback.map(\.id).sorted() == [16, 24])
         #expect(await other.engine.salt() == salt)
     }
 

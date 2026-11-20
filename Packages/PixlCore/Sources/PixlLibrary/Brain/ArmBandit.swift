@@ -121,7 +121,7 @@ public enum ArmBandit {
             state.forgetDone = 0
             return 0
         }
-        let gap = today - state.anchorDay
+        let gap = today &- state.anchorDay
         let total = gap > Int64(maxForgetRuns) ? maxForgetRuns : Int(gap)
         let runs = total - state.forgetDone
         if runs <= 0 { return 0 }

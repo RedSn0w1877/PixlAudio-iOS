@@ -63,10 +63,14 @@ public protocol RefreshWork: Sendable {
     func purgeSpotify() async
     /// Gives the finished Home visits to the shelf bandit (stage 3, 5.10). Reads and writes its own small files only. A no-op by default.
     func settleShelves() async
+    /// Stage 3 (5.9, 5.12): the replay that trains the learner and decides the gate, and the weekly refresh of the facts, when they
+    /// are due. It runs here and not at first use, so a play or Home never waits for it. A no-op by default.
+    func rebuildBrain() async
 }
 
 public extension RefreshWork {
     func settleShelves() async {}
+    func rebuildBrain() async {}
     func fitIslands() async {}
     func purgeSpotify() async {}
     func dnaTargets(lane: Int, limit: Int) async -> [DnaTarget] { [] }
@@ -251,6 +255,7 @@ public struct BrainRefreshRunner: Sendable {
             await work.purgeSpotify()
             await work.fitIslands()
             await work.settleShelves()
+            await work.rebuildBrain()
         }
         return report
     }
@@ -324,6 +329,8 @@ public struct BrainRefreshWork: RefreshWork {
     }
 
     public func settleShelves() async { await shelves?.settle() }
+
+    public func rebuildBrain() async { await mixes.engine.rebuildIfDue() }
 
     public func radioSeeds() async -> [RefreshTarget] { await targets(of: await mixes.seedsForRefresh()) }
 

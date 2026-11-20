@@ -124,7 +124,7 @@ struct YourSoundView: View {
         }
         if let novelty = state.novelty {
             section(YourSoundStrings.newAndFamiliar) {
-                line(YourSoundStrings.novelty(novelty.permille / 10))
+                line(YourSoundStrings.novelty(YourSoundStrings.percentOf(permille: novelty.permille)))
             }
         }
         section(YourSoundStrings.model) { modelLines(state) }
@@ -176,7 +176,10 @@ struct YourSoundView: View {
         .presentationDetents([.medium, .large])
     }
 
+    /// One tap, one change: the sheet closes first, so the confirmation (which lives on the screen under it) is seen, and a second tap
+    /// cannot add the same change twice.
     private func adjust(_ genre: String, more: Bool) {
+        openIsland = nil
         Task {
             let ok = await env.brainActions.adjustGenre(genre, more: more)
             toast = ok ? (more ? YourSoundStrings.genreMoreDone(genre) : YourSoundStrings.genreLessDone(genre))
@@ -197,13 +200,19 @@ struct YourSoundView: View {
             if let p = m.accPriorPercent { line(YourSoundStrings.modelStandardAccuracy(p), dim: true) }
         default:
             line(YourSoundStrings.modelLearning(Int(m.learnedFrom)))
-            if let p = m.accNowPercent { line(YourSoundStrings.modelAccuracy(p)) }
-            if let p = m.accBeforePercent { line(YourSoundStrings.modelAccuracyBefore(p), dim: true) }
-            if let p = m.accPriorPercent { line(YourSoundStrings.modelAccuracyPrior(p), dim: true) }
+            // The share called right is shown only when it is not below the standard recipe's: the gate decides on log-loss, and a
+            // line that reads as "better" under a lower figure would claim more than the plays show.
+            if m.showsAccuracy {
+                if let p = m.accNowPercent { line(YourSoundStrings.modelAccuracy(p)) }
+                if let p = m.accBeforePercent { line(YourSoundStrings.modelAccuracyBefore(p), dim: true) }
+                if let p = m.accPriorPercent { line(YourSoundStrings.modelAccuracyPrior(p), dim: true) }
+            }
         }
-        if let control = state.control, m.kind != ModelVoice.gettingToKnow {
+        // The check exists only while the learned weights are in use (a control session is ranked with the standard recipe to compare
+        // with them); on the standard recipe everywhere there is nothing to compare, so nothing is said.
+        if m.kind == ModelVoice.learning, let control = state.control {
             if let a = control.controlPermille, let b = control.learnedPermille {
-                line(YourSoundStrings.control(a / 10, b / 10), dim: true)
+                line(YourSoundStrings.control(YourSoundStrings.percentOf(permille: a), YourSoundStrings.percentOf(permille: b)), dim: true)
             } else {
                 line(YourSoundStrings.controlWaiting(Gate.controlMinPlays), dim: true)
             }
@@ -212,6 +221,8 @@ struct YourSoundView: View {
 
     private var controls: some View {
         section(YourSoundStrings.controls) {
+            // "Reset what I've learned" is offered only once something has been learned (a play moved the weights).
+            if (model.state?.modelUpdates ?? 0) > 0 {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(YourSoundStrings.reset).pixlFont(.titleSmall).foregroundStyle(theme.onSurface)
@@ -222,6 +233,7 @@ struct YourSoundView: View {
                 Button(YourSoundStrings.resetConfirm) { confirmsReset = true }
                     .buttonStyle(.bordered)
                     .accessibilityIdentifier("yourSound.reset")
+            }
             }
             Button { router.push(.tasteChanges) } label: {
                 Text(YourSoundStrings.tasteChanges).pixlFont(.bodyMedium).foregroundStyle(theme.primary)
@@ -258,7 +270,7 @@ struct YourSoundView: View {
             HStack {
                 Text(label).pixlFont(.bodyMedium).foregroundStyle(theme.onSurface).lineLimit(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Text(YourSoundStrings.share(permille / 10)).pixlFont(.labelMedium).foregroundStyle(theme.onSurfaceVariant)
+                Text(YourSoundStrings.sharePermille(permille)).pixlFont(.labelMedium).foregroundStyle(theme.onSurfaceVariant)
             }
             ProgressView(value: min(max(Double(permille) / 1000.0, 0.0), 1.0)).tint(theme.primary)
         }

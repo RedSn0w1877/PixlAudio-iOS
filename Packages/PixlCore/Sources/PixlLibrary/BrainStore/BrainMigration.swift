@@ -140,15 +140,20 @@ public enum ReplayMerger {
         public let learned: LearnReplay.Result?
     }
 
-    /// `stored` in ascending event id; `imported` in any order. `survivorOf` maps a merged recording to the one it
-    /// was merged into. An imported play whose end is within `duplicateWindowMs` of a stored play of the same
-    /// recording is the same listen seen twice and is dropped.
-    /// `excluded` maps a surviving recording to the time a "Don't count this" was made on it: every play of it that
-    /// started at or before then, imported ones included (the log holds none of those), replays as `learnExcluded`.
-    public static func rebuild(stored: [PlayEvent], imported: [PlayEvent], facts: LibraryFacts, nowMs: Int64,
-                               excluded: [Int64: Int64] = [:], learn: Bool = false, likedRids: Set<Int64> = [],
-                               learnAfterEventId: Int64 = Int64.min, tzNowMin: Int32 = 0,
-                               survivorOf: (Int64) -> Int64) -> Result {
+    public struct Merged: Sendable {
+        public let events: [PlayEvent]
+        public let recentEventIds: Set<Int64>
+        public let used: Int
+        public let dropped: Int
+    }
+
+    /// The merge of the stored log and the imported plays, in ascending event id, as `rebuild` replays it. `stored` in ascending event
+    /// id; `imported` in any order. `survivorOf` maps a merged recording to the one it was merged into. An imported play whose end is
+    /// within `duplicateWindowMs` of a stored play of the same recording is the same listen seen twice and is dropped. `excluded` maps a
+    /// surviving recording to the time a "Don't count this" was made on it: every play of it that started at or before then, imported
+    /// ones included (the log holds none of those), is flagged `learnExcluded`.
+    public static func merged(stored: [PlayEvent], imported: [PlayEvent], nowMs: Int64, excluded: [Int64: Int64] = [:],
+                              survivorOf: (Int64) -> Int64) -> Merged {
         // Pass 1 over the log: when each recording's stored plays ended.
         var endsByRid: [Int64: [Int64]] = [:]
         for e in stored { endsByRid[survivorOf(e.rid), default: []].append(e.endedAtMs) }
@@ -194,15 +199,28 @@ public enum ReplayMerger {
             }
             merged.append(next)
         }
+        return Merged(events: merged, recentEventIds: recent, used: kept.count, dropped: dropped)
+    }
+
+    /// `stored` in ascending event id; `imported` in any order (see `merged`); the merged stream is replayed.
+    public static func rebuild(stored: [PlayEvent], imported: [PlayEvent], facts: LibraryFacts, nowMs: Int64,
+                               excluded: [Int64: Int64] = [:], learn: Bool = false, likedRids: Set<Int64> = [],
+                               learnAfterEventId: Int64 = Int64.min, tzNowMin: Int32 = 0,
+                               survivorOf: (Int64) -> Int64) -> Result {
+        let m = merged(stored: stored, imported: imported, nowMs: nowMs, excluded: excluded, survivorOf: survivorOf)
+        let stream = m.events
+        let recent = m.recentEventIds
+        let kept = m.used
+        let dropped = m.dropped
         // Stage 3: the same pass trains the ranker (5.9).
         if learn {
-            let learned = LearnReplay.run(merged, facts: facts, nowMs: nowMs, likedRids: likedRids, tzNowMin: tzNowMin,
+            let learned = LearnReplay.run(stream, facts: facts, nowMs: nowMs, likedRids: likedRids, tzNowMin: tzNowMin,
                                           learnAfterEventId: learnAfterEventId)
-            return Result(state: learned.state, recentEventIds: recent, importedUsed: kept.count, importedDropped: dropped,
+            return Result(state: learned.state, recentEventIds: recent, importedUsed: kept, importedDropped: dropped,
                           learned: learned)
         }
-        return Result(state: Replay.rebuild(merged, facts: facts, nowMs: nowMs), recentEventIds: recent,
-                      importedUsed: kept.count, importedDropped: dropped, learned: nil)
+        return Result(state: Replay.rebuild(stream, facts: facts, nowMs: nowMs), recentEventIds: recent,
+                      importedUsed: kept, importedDropped: dropped, learned: nil)
     }
 }
 

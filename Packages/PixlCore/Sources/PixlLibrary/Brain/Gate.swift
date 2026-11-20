@@ -24,6 +24,10 @@ public enum Gate {
     /// Two evaluations closer than this count as one week.
     public static let weekMs: Int64 = 6 * 86_400_000
 
+    /// The relative gain in log-loss a week must show to count as a win (the stage 3 "done means": 1%). Below it the learned weights are
+    /// not better than the prior in any way worth a decision, and a coin-flip week on a few hundred plays must not switch them on.
+    public static let minImprovement = 0.01
+
     /// A month, for "up from ... a month ago".
     public static let monthMs: Int64 = 30 * 86_400_000
 
@@ -102,6 +106,9 @@ public enum Gate {
         }
 
         public var learnedBetter: Bool { plays >= Gate.minPlays && logLossLearned < logLossPrior }
+
+        /// Better by at least `Gate.minImprovement`: what a week must show to be counted towards switching the learned weights on.
+        public var learnedClearlyBetter: Bool { learnedBetter && improvement >= Gate.minImprovement }
     }
 
     private static func clipP(_ p: Double) -> Double { BrainMath.clip(p, pEdge, 1.0 - pEdge) }
@@ -147,12 +154,16 @@ public enum Gate {
                 ? accuracy(pred.prior, pred.threshold, pred.finished, from: fromBefore, to: endBefore) : nil)
     }
 
-    /// The gate's decision after one evaluation (5.12 point 8). Off at once when the learned weights are not better (or
-    /// there are too few graded plays); on only after `winsNeeded` counted weeks of winning in a row; once on, it stays
-    /// on while it keeps winning. An evaluation less than `weekMs` after the last counted one changes the streak only
-    /// downward, never upward.
-    public static func decide(_ prev: State, _ summary: Summary, nowMs: Int64) -> State {
+    /// The gate's decision after one evaluation (5.12 point 8). Off at once when the learned weights are not better (or there are too
+    /// few graded plays); on only after `winsNeeded` counted weeks of winning in a row, each by at least `minImprovement` (and, from
+    /// `LearnReplay.test6MinPlays` graded plays, with the bootstrap interval of test 6 above zero: `intervalAboveZero`); once on, it
+    /// stays on while it is still better. An evaluation less than `weekMs` after the last counted one changes the streak only
+    /// downward, never upward. A week that is better but not clearly better is not a win: it ends a streak that has not switched the
+    /// learned weights on, and leaves one that has alone (no flapping on noise).
+    public static func decide(_ prev: State, _ summary: Summary, nowMs: Int64, intervalAboveZero: Bool = true) -> State {
         if !summary.learnedBetter { return State(useLearned: false, winStreak: 0, atMs: nowMs) }
+        let clear = summary.learnedClearlyBetter && (summary.playsTotal < LearnReplay.test6MinPlays || intervalAboveZero)
+        if !clear { return prev.useLearned ? prev : State(useLearned: false, winStreak: 0, atMs: prev.atMs) }
         let newWeek = prev.atMs == 0 || nowMs &- prev.atMs >= weekMs || nowMs < prev.atMs
         if !newWeek { return prev }
         let streak = prev.winStreak >= winsNeeded ? prev.winStreak : prev.winStreak + 1

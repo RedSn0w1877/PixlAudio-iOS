@@ -434,6 +434,16 @@ public actor BrainHomeRows {
         return out
     }
 
+    /// "Reset what I've learned": rows the learned weights ranked are not shown again. They are built again, with the standard recipe,
+    /// at the next visit (the saved file goes with them).
+    public func dropLearned() {
+        let current = stored()
+        guard current.rows.contains(where: { $0.model == Int(BrainEngine.modelLearned) }) else { return }
+        memory = StoredHomeRows()
+        try? FileManager.default.removeItem(at: file)
+        lastFailedSignature = ""
+    }
+
     private func readFile() -> StoredHomeRows {
         guard let data = try? Data(contentsOf: file), !data.isEmpty, data.count <= Self.maxFileBytes,
               let rows = try? JSONDecoder().decode(StoredHomeRows.self, from: data) else { return StoredHomeRows() }

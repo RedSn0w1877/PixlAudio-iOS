@@ -119,8 +119,8 @@ public actor ShelfStore {
     /// A page left alone this long is a finished visit; the same page shown again within it is the same visit.
     public static let sameVisitMs: Int64 = 30 * 60_000
 
-    /// A play that starts within this long of a tap is the one the tap started.
-    public static let playWindowMs: Int64 = 2 * 60_000
+    /// A play the listener starts within this long of a tap is the one the tap started (a card opens a page first, then play is pressed).
+    public static let playWindowMs: Int64 = 10 * 60_000
     static let firstEvents = 8
 
     private let file: ImpressionFile
@@ -135,6 +135,10 @@ public actor ShelfStore {
     private var visitShelves: [String] = []
     private var seenDepth = -1
     private var activated = Set<Int>()
+    /// When the page last reported anything. A visit is over after `sameVisitMs` without a signal, not that long after it began.
+    private var lastTouchMs: Int64 = 0
+    /// Bumped by a reset: a settle that was working while it happened writes nothing.
+    private var epoch = 0
 
     public init(directory: URL, engine: BrainEngine, tzOffsetMin: @escaping @Sendable (Int64) -> Int32,
                 clock: @escaping @Sendable () -> Int64 = { currentTimeMillis() }) {
@@ -173,18 +177,23 @@ public actor ShelfStore {
     }
 
     /// The page was shown with `types` (the shelf type of each shelf, in page order) whose ids are `ids`. The same page shown again
-    /// within `sameVisitMs` is the same visit. Gives earlier visits to the bandit first.
+    /// within `sameVisitMs` of the last signal is the same visit. Gives earlier visits to the bandit afterwards.
     public func onPlanShown(ids: [String], types: [Int32], daypart: Int) async {
         if ids.isEmpty || ids.count != types.count { return }
         let now = clock()
-        if visitId != 0 && now - visitId >= 0 && now - visitId < Self.sameVisitMs && visitShelves == ids { return }
-        await settleLocked(now)
+        if visitId != 0 && now - lastTouchMs >= 0 && now - lastTouchMs < Self.sameVisitMs && visitShelves == ids {
+            lastTouchMs = now
+            return
+        }
+        // The new visit is in place before anything is awaited: a second page shown meanwhile sees it, not a half-made one.
         visitId = now
+        lastTouchMs = now
         visitShelves = ids
         seenDepth = -1
         activated.removeAll()
         update(ids.indices.map { Impression(visitId: now, position: $0, shelf: Int(types[$0]), daypart: daypart, shownAtMs: now) })
         prune(now)
+        await settleLocked(now)
     }
 
     /// At most `keepVisits` visits and `keepDays` days.
@@ -208,6 +217,7 @@ public actor ShelfStore {
     public func onShelfSeen(_ shelfId: String) {
         guard let position = visitShelves.firstIndex(of: shelfId), visitId != 0, position > seenDepth else { return }
         seenDepth = position
+        lastTouchMs = clock()
         markSeenThrough(position)
     }
 
@@ -224,8 +234,9 @@ public actor ShelfStore {
     /// has one.
     public func onShelfActivated(_ shelfId: String) {
         guard visitId != 0, let position = visitShelves.firstIndex(of: shelfId), activated.insert(position).inserted else { return }
+        lastTouchMs = clock()
         if var row = loadedRows().first(where: { $0.visitId == visitId && $0.position == position }), row.activatedAtMs == 0 {
-            row.activatedAtMs = clock()
+            row.activatedAtMs = lastTouchMs
             update([row])
         }
         if position > seenDepth {
@@ -237,55 +248,94 @@ public actor ShelfStore {
     /// Gives every finished visit to the bandit. Safe to call any time (the refresh worker calls it).
     public func settle(nowMs: Int64? = nil) async { await settleLocked(nowMs ?? clock()) }
 
-    private func settleLocked(_ nowMs: Int64) async {
-        // A visit is over once the page has been left alone for a while; the one on screen now is not.
-        let pending = loadedRows().filter { !$0.settled && $0.visitId < nowMs - Self.sameVisitMs }
-        if pending.isEmpty { return }
-        var s = loadedState()
-        var moved = false
-        var settled: [Impression] = []
+    /// The unsettled visits that are over, each one's rows in page order. A visit is over once nothing has happened on it for
+    /// `sameVisitMs`: it was shown, a shelf was started from it, or (for the page on screen now) the page reported anything. A tap
+    /// keeps the visit open for that long too, so a song started from a shelf has been heard, and its play recorded, before the visit is
+    /// given to the bandit.
+    private func finishedVisits(_ nowMs: Int64) -> [[Impression]] {
+        let pending = loadedRows().filter { !$0.settled }
+        var out: [[Impression]] = []
         var i = 0
         while i < pending.count {
             var j = i
             while j < pending.count && pending[j].visitId == pending[i].visitId { j += 1 }
             let group = Array(pending[i..<j])
-            let shown = group.map { Int32($0.shelf) }
+            i = j
+            var activity = group.map { max($0.shownAtMs, $0.activatedAtMs) }.max() ?? group[0].visitId
+            if group[0].visitId == visitId { activity = max(activity, lastTouchMs) }
+            if nowMs - activity >= Self.sameVisitMs { out.append(group) }
+        }
+        return out
+    }
+
+    private func settleLocked(_ nowMs: Int64) async {
+        let finished = finishedVisits(nowMs)
+        if finished.isEmpty { return }
+        let epochAtStart = epoch
+        // First everything that needs a wait (the plays a tap started are read from the log); nothing of the bandit's state is held
+        // across it, so a reset or an order drawn meanwhile is not overwritten by an older copy.
+        var claimed = Set<Int64>()
+        var results: [(group: [Impression], lastSeen: Int, used: Int)] = []
+        for group in finished {
             var lastSeen = -1
             var used = -1
             for k in group.indices {
                 if group[k].seen { lastSeen = k }
-                if group[k].activatedAtMs > 0 && used < 0, await wasPlayedThirtySeconds(group[k].activatedAtMs) { used = k }
+                if group[k].activatedAtMs > 0 && used < 0, await wasPlayedThirtySeconds(group[k].activatedAtMs, claimed: &claimed) { used = k }
                 // Started but not played for 30 seconds: the listener looked at it, no reward.
                 if group[k].activatedAtMs > 0 && k > lastSeen { lastSeen = k }
             }
-            let at = group[0].shownAtMs
+            results.append((group, lastSeen, used))
+        }
+        // From here to the end nothing suspends.
+        if epoch != epochAtStart { return }
+        let stillOpen = Set(loadedRows().filter { !$0.settled }.map(\.visitId))
+        var s = loadedState()
+        var moved = false
+        var settled: [Impression] = []
+        for r in results where stillOpen.contains(r.group[0].visitId) {
+            let at = r.group[0].shownAtMs
             let today = BrainMath.localDay(at, tzOffsetMin: tzOffsetMin(at))
-            if ShelfBandit.visit(&s, daypart: group[0].daypart, shown: shown, lastSeen: lastSeen, used: used, today: today) > 0 { moved = true }
-            settled.append(contentsOf: group.map { row -> Impression in
-                var r = row
-                r.settled = true
-                return r
+            if ShelfBandit.visit(&s, daypart: r.group[0].daypart, shown: r.group.map { Int32($0.shelf) }, lastSeen: r.lastSeen,
+                                 used: r.used, today: today) > 0 { moved = true }
+            settled.append(contentsOf: r.group.map { row -> Impression in
+                var copy = row
+                copy.settled = true
+                return copy
             })
-            i = j
         }
         state = s
-        update(settled)
+        // The posteriors are saved BEFORE the visits are marked as given: a stop between the two counts a visit twice at worst, never
+        // loses one for good.
         if moved { save(s) }
+        update(settled)
     }
 
-    /// True when the first play that started within two minutes of `activatedAtMs` was heard for at least 30 seconds (or to its end).
-    private func wasPlayedThirtySeconds(_ activatedAtMs: Int64) async -> Bool {
-        Self.reward(events: await engine.recentEvents(sinceMs: activatedAtMs), activatedAtMs: activatedAtMs)
+    /// True when the first play the listener's tap started within `playWindowMs` of `activatedAtMs` was heard for at least 30 seconds
+    /// (or to its end).
+    private func wasPlayedThirtySeconds(_ activatedAtMs: Int64, claimed: inout Set<Int64>) async -> Bool {
+        Self.reward(events: await engine.recentEvents(sinceMs: activatedAtMs), activatedAtMs: activatedAtMs, claimed: &claimed)
     }
 
-    /// The rule of the reward, on the plays that started at or after the tap, oldest first (pure, tested).
-    static func reward(events: [PlayEvent], activatedAtMs: Int64) -> Bool {
+    /// The rule of the reward, on the plays that started at or after the tap, oldest first (pure, tested). Plays that count for nothing
+    /// (private, silent) are skipped, and so are the ones the queue moved on to by itself (auto advance, autoplay, a restored queue):
+    /// they are not what the tap started. A play rewards one shelf only (`claimed`). The play is not matched to the shelf's own list: the
+    /// event carries a surface and a list id, but a shelf and a list do not share ids yet.
+    static func reward(events: [PlayEvent], activatedAtMs: Int64, claimed: inout Set<Int64>) -> Bool {
         for e in events.prefix(firstEvents) {
             if e.startedAtMs < activatedAtMs { continue }
             if e.startedAtMs > activatedAtMs + playWindowMs { return false }
+            if e.has(EventFlags.learnExcluded) || e.has(EventFlags.neverAudible) { continue }
+            if e.startReason == StartReason.autoAdvance || e.startReason == StartReason.autoplay || e.startReason == StartReason.restore { continue }
+            if !claimed.insert(e.eventId).inserted { continue }
             return e.endReason == EndReason.trackDone || Int64(e.playedMs) >= ShelfBandit.rewardPlayMs
         }
         return false
+    }
+
+    static func reward(events: [PlayEvent], activatedAtMs: Int64) -> Bool {
+        var claimed = Set<Int64>()
+        return reward(events: events, activatedAtMs: activatedAtMs, claimed: &claimed)
     }
 
     /// The shelf types `types` (in stage 2's fixed order) in the order the bandit draws for this daypart, or nil to keep the fixed
@@ -304,11 +354,13 @@ public actor ShelfStore {
 
     /// "Reset what I've learned": the posteriors go back to their priors and the impressions are forgotten.
     public func reset() {
+        epoch += 1
         file.remove(loadedRows())
         rows = []
         state = ShelfBandit.newState()
         file.writeBandit(nil)
         visitId = 0
+        lastTouchMs = 0
         visitShelves = []
         seenDepth = -1
         activated.removeAll()

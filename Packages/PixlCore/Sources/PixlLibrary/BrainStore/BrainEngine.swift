@@ -199,13 +199,16 @@ public actor BrainEngine {
 
         /// Which weights rank a list for the session `sessionId`: nil (the prior `M0`) while the gate has the prior on, and
         /// for one session in ten (the control sessions, 5.12 point 8). With `seed` the list gets one posterior sample (5.10).
-        func ranking(sessionId: Int64, seed: Int64? = nil) -> Ranker.WeightSource? { rankingChoice(sessionId: sessionId, seed: seed).source }
+        mutating func ranking(sessionId: Int64, seed: Int64? = nil, nowMs: Int64 = currentTimeMillis()) -> Ranker.WeightSource? {
+            rankingChoice(sessionId: sessionId, seed: seed, nowMs: nowMs).source
+        }
 
         /// `ranking` together with what the plays of the list must say about it (5.12 point 8): decided ONCE, when the list is
         /// built, and carried with each queue entry, so the control completion rate is measured on what was really ranked with
-        /// the prior.
-        func rankingChoice(sessionId: Int64, seed: Int64? = nil) -> RankingChoice {
-            let control = Ranker.isControlSession(sessionId)
+        /// the prior. A control exists only while the gate has the learned weights on (before that EVERY list is ranked with the prior,
+        /// so there is nothing to compare it with, and a control flag would only mix eras in the comparison).
+        mutating func rankingChoice(sessionId: Int64, seed: Int64? = nil, nowMs: Int64 = currentTimeMillis()) -> RankingChoice {
+            let control = learner.useLearned && Ranker.isControlSession(controlKey(sessionId, nowMs: nowMs))
             if !learner.useLearned || control { return RankingChoice(source: nil, control: control, modelVersion: 0) }
             return RankingChoice(source: Ranker.WeightSource(model: learner.model, learned: true, seed: seed), control: false,
                                  modelVersion: BrainEngine.modelLearned)
@@ -213,9 +216,26 @@ public actor BrainEngine {
 
         /// The arm bandit of a list (5.10), seeded by `seed`: nil while the gate has the prior on and in a control session, so
         /// a listener on the standard recipe keeps stage 2's choice of the novel candidate exactly.
-        func armPicker(sessionId: Int64, family: Int, seed: Int64) -> (any ArmPicker)? {
-            if !learner.useLearned || Ranker.isControlSession(sessionId) { return nil }
+        mutating func armPicker(sessionId: Int64, family: Int, seed: Int64, nowMs: Int64 = currentTimeMillis()) -> (any ArmPicker)? {
+            if !learner.useLearned || Ranker.isControlSession(controlKey(sessionId, nowMs: nowMs)) { return nil }
             return ArmBandit.Sampler(learner.posteriors.arms, family: family, seed: seed)
+        }
+
+        private var pendingKey: Int64 = 0
+        private var pendingFor: Int64 = -1
+
+        /// The id a list's control draw is taken on. A session's id is the start time of its first play, so before that play (right after
+        /// the process starts, or after the session has expired and before the next play) there is no live id: the stored one is 0 or
+        /// the old session's. Drawing on it would make every list built then the same kind for good (id 0 is never a control). Those
+        /// lists are drawn on one key per gap instead (the time the gap was first seen), so about one in ten of them is a control too.
+        mutating func controlKey(_ sessionId: Int64, nowMs: Int64) -> Int64 {
+            let stale = sessionId == 0 || (sessionId == session.sessionId && Session.isExpired(session, startedAtMs: nowMs))
+            if !stale { return sessionId }
+            if pendingFor != sessionId {
+                pendingFor = sessionId
+                pendingKey = nowMs
+            }
+            return pendingKey
         }
 
         /// The novelty share a new session starts at (5.5): the learned appetite while the gate has the learned weights on, else
@@ -231,7 +251,11 @@ public actor BrainEngine {
         /// Starts a new session: the old one's lists, blocks, anchors and direction are gone.
         mutating func newSession(nowMs: Int64 = currentTimeMillis()) {
             session = SessionState()
-            session.nuSession = sessionNu(nowMs: nowMs)
+            // A new gap before the next play: its lists are drawn on a fresh key (`controlKey`), and a control draw keeps the standard
+            // share of new music.
+            pendingFor = -1
+            session.nuSession = learner.useLearned && Ranker.isControlSession(controlKey(0, nowMs: nowMs))
+                ? Session.nuDefault : sessionNu(nowMs: nowMs)
             anchors.removeAll()
             direction = Direction()
         }
@@ -251,6 +275,7 @@ public actor BrainEngine {
     /// genre adjustments to the ranking-time boost alone).
     private var atlasProvider: (any AtlasProvider)?
     private var rebuildTask: Task<Void, Never>?
+    private var learnGeneration = 0
     /// A forced rebuild asked for while another ran: the running one read the log before the change, so one more follows.
     private var rebuildAgain = false
     private var recordedDuringRebuild: [PlayEvent]?
@@ -293,7 +318,10 @@ public actor BrainEngine {
         var fresh = Loaded(affinity: state)
         if let storedLearner { fresh.learner = storedLearner }
         loaded = fresh
-        requestRebuild(force: false)
+        // First use reads the cache; a rebuild runs now only when the tables themselves are missing or stale (`urgentOnly`). The replay
+        // that trains the learner, the gate and the weekly refresh of the facts run in the refresh worker (`rebuildIfDue`), so a play
+        // or a Home plan never starts them (5.9: no second job).
+        requestRebuild(force: false, urgentOnly: true)
     }
 
     /// One graded play into the state and the log: the event and the affinity rows it touched. Nil when the event
@@ -384,12 +412,18 @@ public actor BrainEngine {
         // From here on nothing suspends: the state changes in one step.
         return withState { state -> Reaction? in
         let firstSession = state.session.sessionId == 0
+        var newSession = false
         if state.session.sessionId != 0 && Session.isExpired(state.session, startedAtMs: play.startedAtMs) {
             state.newSession(nowMs: play.startedAtMs)
+            newSession = true
         }
         let stamp = Session.begin(&state.session, startedAtMs: play.startedAtMs, startReason: context.startReason)
         // A session starts at the novelty share of the moment (5.5): the learned appetite while the gate has the learned weights on.
-        if firstSession { state.session.nuSession = state.sessionNu(nowMs: play.startedAtMs) }
+        // A control session (5.12 point 8) is ranked with the standard recipe, and that includes its share of new music.
+        if firstSession || newSession {
+            state.session.nuSession = state.learner.useLearned && Ranker.isControlSession(stamp.sessionId)
+                ? Session.nuDefault : state.sessionNu(nowMs: play.startedAtMs)
+        }
         // One session in ten is ranked with the prior and flagged (5.12 point 8). Which weights ranked a list, and whether it was a
         // control, was decided when the list was BUILT and travels with the queue entry (`BrainItemTag.control`, `modelVersion`):
         // it is read here, never worked out at the end of the play. An entry that carries nothing (a track the listener chose, a
@@ -520,7 +554,7 @@ public actor BrainEngine {
         }
         let session = state.session
         // Decided once, here, when the list is built; each queue entry carries it (5.12 point 8).
-        let choice = state.rankingChoice(sessionId: state.session.sessionId)
+        let choice = state.rankingChoice(sessionId: state.session.sessionId, nowMs: clock())
         let graph = StationPlanner.buildGraph(seeds: inputs.seeds, candidates: inputs.candidates, session: session)
         // 6.2: a station's ties break by its seed and the day; autoplay's by the session.
         let tieSeed = stationSeed.map {
@@ -536,7 +570,8 @@ public actor BrainEngine {
             ranking: choice.source,
             // 5.10: a novel slot goes to the arm the bandit draws, while the learned weights are on (nil: stage 2's choice, exactly).
             armPicker: state.armPicker(sessionId: state.session.sessionId, family: ArmBandit.station,
-                                       seed: Int64(bitPattern: BrainHash.splitmix64(UInt64(bitPattern: state.session.sessionId ^ (inputs.batch << 8) ^ Self.armSeedTag)))))
+                                       seed: Int64(bitPattern: BrainHash.splitmix64(UInt64(bitPattern: state.session.sessionId ^ (inputs.batch << 8) ^ Self.armSeedTag))),
+                                       nowMs: clock()))
         var plan: StationPlanner.Plan?
         if let tail {
             plan = Session.patchQueue(session, tail: tail, request: request, affinity: state.affinity, graph: graph)
@@ -573,13 +608,14 @@ public actor BrainEngine {
                             excludedRids: Set<Int64>) -> StationPlanner.Plan {
         withState { state in
             let session = SessionState()
-            let choice = state.rankingChoice(sessionId: state.session.sessionId)
+            let choice = state.rankingChoice(sessionId: state.session.sessionId, nowMs: nowMs)
             let graph = StationPlanner.buildGraph(seeds: [seed], candidates: candidates, session: session)
             let tie = seed.seedRid ^ BrainMath.localDay(nowMs, tzOffsetMin: tzOffsetMin)
             let request = StationPlanner.Request(
                 mode: StationPlanner.modeHomeRow, count: count, candidates: candidates, seeds: [seed], nowMs: nowMs,
                 tzOffsetMin: tzOffsetMin, tieSeed: tie, excludedRids: excludedRids, ranking: choice.source,
-                armPicker: state.armPicker(sessionId: state.session.sessionId, family: ArmBandit.home, seed: tie ^ Self.armSeedTag))
+                armPicker: state.armPicker(sessionId: state.session.sessionId, family: ArmBandit.home, seed: tie ^ Self.armSeedTag,
+                                           nowMs: nowMs))
             var plan = StationPlanner.plan(request, affinity: state.affinity, session: session, graph: graph)
             plan.control = choice.control
             plan.modelVersion = choice.modelVersion
@@ -641,10 +677,11 @@ public actor BrainEngine {
         let seed = Ranker.listSeed(salt: request.salt, listId: "mix:\(request.kind):\(request.islandIdx):\(request.regenerate)",
                                    localDay: Repetition.mixDay(request.nowMs, tzOffsetMin: request.tzOffsetMin))
         // How it was ranked is decided here, once, and saved with the list: its plays carry it (5.12 point 8).
-        let choice = loaded!.rankingChoice(sessionId: loaded!.session.sessionId, seed: seed)
+        let choice = loaded!.rankingChoice(sessionId: loaded!.session.sessionId, seed: seed, nowMs: request.nowMs)
         request.ranking = choice.source
         // 5.10: the arm bandit and the learned appetite, while the learned weights rank this list; stage 2's values otherwise.
-        request.armPicker = loaded!.armPicker(sessionId: loaded!.session.sessionId, family: ArmBandit.mix, seed: seed ^ Self.armSeedTag)
+        request.armPicker = loaded!.armPicker(sessionId: loaded!.session.sessionId, family: ArmBandit.mix, seed: seed ^ Self.armSeedTag,
+                                              nowMs: request.nowMs)
         request.nuBase = choice.modelVersion == Self.modelLearned
             ? NoveltyAppetite.nu(loaded!.learner.posteriors.appetite, nowMs: request.nowMs) : MixPlanner.nu0
         var plan = MixPlanner.plan(request, affinity: loaded!.affinity)
@@ -669,7 +706,7 @@ public actor BrainEngine {
     // MARK: Rebuild (4.4)
 
     /// Asks for a rebuild in the background. Without `force` it only runs when one is needed.
-    public func requestRebuild(force: Bool) {
+    public func requestRebuild(force: Bool, urgentOnly: Bool = false, delayed: Bool = true) {
         guard sources != nil else { return }
         if rebuildTask != nil {
             // Not dropped: an exclusion, its Undo or the Spotify switch changed what the running rebuild reads.
@@ -680,10 +717,10 @@ public actor BrainEngine {
             return
         }
         rebuildDelayCut = false
-        let delay = force ? 0 : rebuildDelayMs
+        let delay = force || !delayed ? 0 : rebuildDelayMs
         rebuildTask = Task { [weak self] in
             await self?.waitBeforeRebuild(delay)
-            await self?.runRebuild(force: force)
+            await self?.runRebuild(force: force, urgentOnly: urgentOnly)
             await self?.finishRebuilds()
         }
     }
@@ -709,14 +746,27 @@ public actor BrainEngine {
         await rebuildTask?.value
     }
 
-    private func isRebuildNeeded(importSignature: String, nowMs: Int64) -> Bool {
+    /// The refresh worker's part (5.9, "no second job"): the replay that trains the learner and decides the gate, and the weekly refresh
+    /// of the facts, when they are due. Waits for the rebuild it started, so the work stays inside the worker's run.
+    public func rebuildIfDue() async {
+        ensureLoaded()
+        for _ in 0..<2 {
+            requestRebuild(force: false, urgentOnly: false, delayed: false)
+            await awaitRebuild()
+        }
+    }
+
+    /// `urgentOnly`: only what cannot wait for the refresh worker (the tables are missing or were built by other logic, or the import or
+    /// the Spotify switch changed). The learner's replay and the weekly refresh of the facts are not urgent.
+    private func isRebuildNeeded(importSignature: String, nowMs: Int64, urgentOnly: Bool = false) -> Bool {
         if log.value(BrainEventLog.keyHistoryMigrated) == nil { return true }
         if log.value(BrainEventLog.keySpecVersion) != String(Brain.specVersion) { return true }
         if log.value(BrainEventLog.keyImportCount) != importSignature { return true }
-        // The learner (stage 3) is missing, or was built by other logic: replay it.
-        if log.value(BrainEventLog.keyLearnVersion) != String(LearnReplay.version) { return true }
         // "Use my Spotify music to shape picks" was flipped since the last rebuild: the tables change with it.
         if (log.value(BrainEventLog.keySpotifyShapes) ?? "true") != String(sources?.spotifyShapesPicks() ?? true) { return true }
+        if urgentOnly { return false }
+        // The learner (stage 3) is missing, or was built by other logic: replay it.
+        if log.value(BrainEventLog.keyLearnVersion) != String(LearnReplay.version) { return true }
         // The facts (likes, top lists, follows, taste changes) are folded in at a rebuild; a weekly one keeps them
         // current without a background job.
         let rebuiltAt = log.value(BrainEventLog.keyRebuiltAtMs).flatMap { Int64($0) } ?? 0
@@ -724,11 +774,11 @@ public actor BrainEngine {
         return age < 0 || age > Self.factsRefreshMs
     }
 
-    private func runRebuild(force: Bool) async {
+    private func runRebuild(force: Bool, urgentOnly: Bool = false) async {
         guard let sources else { return }
         let nowMs = clock()
         let importSignature = await sources.importSignature()
-        if !force && !isRebuildNeeded(importSignature: importSignature, nowMs: nowMs) { return }
+        if !force && !isRebuildNeeded(importSignature: importSignature, nowMs: nowMs, urgentOnly: urgentOnly) { return }
         recordedDuringRebuild = []
         let epochAtStart = loaded?.learnEpoch ?? 0
 
@@ -795,41 +845,7 @@ public actor BrainEngine {
         var imported = await sources.imported()
         // Off: Spotify's own history and its lists are left out of the picks (owner question 1); the app's own plays stay.
         if !shapes { imported = (imported.plays.filter { !$0.source.isSpotify }, ExternalTasteSnapshot()) }
-        var importedResolved: [BrainKey: ResolvedTrack] = [:]
-        // One key per imported play (50,000 and more of them, each a fold and a title clean): off this actor too.
-        let importedPlays = imported.plays
-        let pending = await Task.detached(priority: .utility) {
-            () -> (keys: [BrainKey], requests: [TrackRequest], artists: [String], keyTexts: [String]) in
-            var keys: [BrainKey] = []
-            var requests: [TrackRequest] = []
-            var artists: [String] = []
-            var keyTexts: [String] = []
-            var seen: Set<BrainKey> = []
-            for play in importedPlays {
-                let cacheKey = BrainKey(ImportedPlayAdapter.cacheKey(play))
-                guard seen.insert(cacheKey).inserted, let found = ImportedPlayAdapter.keys(play) else { continue }
-                keys.append(cacheKey)
-                requests.append(TrackRequest(keys: found.keys, durationMs: 0))
-                artists.append(play.artist)
-                keyTexts.append(found.key)
-            }
-            return (keys, requests, artists, keyTexts)
-        }.value
-        let pendingKeys = pending.keys
-        let pendingRequests = pending.requests
-        let pendingArtists = pending.artists
-        let pendingKeyTexts = pending.keyTexts
-        from = 0
-        while from < pendingRequests.count {
-            let to = min(from + Self.resolveBatch, pendingRequests.count)
-            let rids = await repository.resolveTracks(Array(pendingRequests[from..<to]))
-            let aids = await repository.resolveArtistNames(Array(pendingArtists[from..<to]))
-            for i in from..<to where rids[i - from] != 0 {
-                importedResolved[pendingKeys[i]] = ResolvedTrack(rid: rids[i - from], primaryAid: aids[i - from],
-                                                                 key: pendingKeyTexts[i])
-            }
-            from = to
-        }
+        let importedResolved = await resolveImported(imported.plays)
 
         // Step 4: facts that are not events.
         let adjustments = await sources.adjustments()
@@ -857,12 +873,7 @@ public actor BrainEngine {
         }.value
 
         let merges = await repository.trackMerges()
-        // "Don't count this" on a song reaches its imported plays too: the log holds only the plays made here.
-        var excludedAt: [Int64: Int64] = [:]
-        for row in feedbackStore.active() where row.kind == FeedbackKinds.dontCount && row.targetKind == FeedbackKinds.targetSong {
-            let survivor = merges[row.targetId] ?? row.targetId
-            excludedAt[survivor] = max(excludedAt[survivor] ?? 0, row.createdAtMs)
-        }
+        let excludedAt = songExclusions(merges)
         let excludedMap = excludedAt
         // The stored events are read as bytes here and decoded off the actor (a long history is tens of thousands of
         // lines of JSON): a play that ends meanwhile is recorded without waiting for them.
@@ -894,7 +905,9 @@ public actor BrainEngine {
         if let replayed = result.learned, (loaded?.learnEpoch ?? 0) == epochAtStart {
             let summary = Gate.summarize(replayed.predictions, nowMs: nowMs)
             var learner = Learner(model: replayed.model)
-            learner.gate = Gate.decide(loaded?.learner.gate ?? Gate.State(), summary, nowMs: nowMs)
+            // From 2,000 graded plays a week counts only when the bootstrap interval of test 6 is above zero too (the gain is not noise).
+            let above = summary.playsTotal < LearnReplay.test6MinPlays || LearnReplay.test6(replayed.predictions).gainLow > 0.0
+            learner.gate = Gate.decide(loaded?.learner.gate ?? Gate.State(), summary, nowMs: nowMs, intervalAboveZero: above)
             learner.summary = summary
             learner.learnVersion = LearnReplay.version
             learner.rebuiltAtMs = nowMs
@@ -902,17 +915,25 @@ public actor BrainEngine {
             learner.posteriors = replayed.posteriors
             adopted = learner
         }
-        let catchUpSession = SessionState()
+        // The session features of these plays come from a session built from them, as the replay builds it (not an empty one), and the
+        // clock is the one now: a play that started after the rebuild began keeps its own day.
+        var catchUpSession = SessionState()
+        let catchUpNow = max(clock(), nowMs)
         for event in recordedDuringRebuild ?? [] where !result.recentEventIds.contains(event.eventId) {
+            let novelBefore = !Affinity.isHeard(state, family: Family.track, key: event.rid)
             let graded = tracker.grade(event, completions: state.completions)
+            if Session.isExpired(catchUpSession, startedAtMs: event.startedAtMs) { catchUpSession = SessionState() }
+            _ = Session.begin(&catchUpSession, startedAtMs: event.startedAtMs, startReason: event.startReason)
             if adopted != nil {
                 var learner = adopted!
                 adopted = nil
                 LearnReplay.applyLive(&learner.model, posteriors: &learner.posteriors, event, graded,
-                                      liked: learner.liked.contains(event.rid), affinity: state, session: catchUpSession, nowMs: nowMs)
+                                      liked: learner.liked.contains(event.rid), affinity: state, session: catchUpSession,
+                                      nowMs: catchUpNow)
                 adopted = learner
             }
             Affinity.applyEvent(&state, event, graded, tMs: event.startedAtMs)
+            Session.apply(&catchUpSession, event, graded, novel: novelBefore)
         }
         _ = state.drainTouched()
         recordedDuringRebuild = nil
@@ -920,7 +941,7 @@ public actor BrainEngine {
         if let adopted {
             log.setValue(BrainEventLog.keyLearner, LearnerCodec.encode(adopted.saved))
             log.setValue(BrainEventLog.keyPosteriors, PosteriorCodec.encode(adopted.posteriors))
-            log.setValue(BrainEventLog.keyLearnerLiked, Self.encodeLiked(adopted.liked))
+            log.setLikedText(Self.encodeLiked(adopted.liked))
             log.setValue(BrainEventLog.keyLearnVersion, String(LearnReplay.version))
         }
         log.setValue(BrainEventLog.keySpecVersion, String(Brain.specVersion))
@@ -930,8 +951,78 @@ public actor BrainEngine {
         if loaded != nil {
             loaded!.affinity = state
             loaded!.tracker = tracker
-            if let adopted { loaded!.learner = adopted }
+            if let adopted {
+                loaded!.learner = adopted
+                learnGeneration += 1
+            }
         }
+    }
+
+    /// One resolution per distinct imported track: the recording and artist ids a play of the imported history stands for.
+    private func resolveImported(_ importedPlays: [ImportedPlay]) async -> [BrainKey: ResolvedTrack] {
+        var importedResolved: [BrainKey: ResolvedTrack] = [:]
+        // One key per imported play (50,000 and more of them, each a fold and a title clean): off this actor too.
+        let pending = await Task.detached(priority: .utility) {
+            () -> (keys: [BrainKey], requests: [TrackRequest], artists: [String], keyTexts: [String]) in
+            var keys: [BrainKey] = []
+            var requests: [TrackRequest] = []
+            var artists: [String] = []
+            var keyTexts: [String] = []
+            var seen: Set<BrainKey> = []
+            for play in importedPlays {
+                let cacheKey = BrainKey(ImportedPlayAdapter.cacheKey(play))
+                guard seen.insert(cacheKey).inserted, let found = ImportedPlayAdapter.keys(play) else { continue }
+                keys.append(cacheKey)
+                requests.append(TrackRequest(keys: found.keys, durationMs: 0))
+                artists.append(play.artist)
+                keyTexts.append(found.key)
+            }
+            return (keys, requests, artists, keyTexts)
+        }.value
+        var from = 0
+        while from < pending.requests.count {
+            let to = min(from + Self.resolveBatch, pending.requests.count)
+            let rids = await repository.resolveTracks(Array(pending.requests[from..<to]))
+            let aids = await repository.resolveArtistNames(Array(pending.artists[from..<to]))
+            for i in from..<to where rids[i - from] != 0 {
+                importedResolved[pending.keys[i]] = ResolvedTrack(rid: rids[i - from], primaryAid: aids[i - from],
+                                                                  key: pending.keyTexts[i])
+            }
+            from = to
+        }
+        return importedResolved
+    }
+
+    /// "Don't count this" on a song reaches its imported plays too (the log holds only the plays made here): surviving recording -> when
+    /// it was said.
+    private func songExclusions(_ merges: [Int64: Int64]) -> [Int64: Int64] {
+        var excludedAt: [Int64: Int64] = [:]
+        for row in feedbackStore.active() where row.kind == FeedbackKinds.dontCount && row.targetKind == FeedbackKinds.targetSong {
+            let survivor = merges[row.targetId] ?? row.targetId
+            excludedAt[survivor] = max(excludedAt[survivor] ?? 0, row.createdAtMs)
+        }
+        return excludedAt
+    }
+
+    /// The stored log and the imported history as ONE stream in event order, as a rebuild reads them (duplicates dropped, merged
+    /// recordings mapped to their survivor, "Don't count this" applied): what Your sound counts, so a listener with years of imported
+    /// history sees them too. Off the engine's own work: the bytes are read here, decoding and merging run detached.
+    public func mergedPlays() async -> [PlayEvent] {
+        let nowMs = clock()
+        let storedPayloads = log.allEventPayloads()
+        guard let sources else { return await Task.detached(priority: .utility) { BrainEventLog.decodeSorted(storedPayloads) }.value }
+        var imported = await sources.imported().plays
+        if !sources.spotifyShapesPicks() { imported = imported.filter { !$0.source.isSpotify } }
+        let resolved = await resolveImported(imported)
+        let merges = await repository.trackMerges()
+        let excluded = songExclusions(merges)
+        let plays = imported
+        return await Task.detached(priority: .utility) {
+            let stored = BrainEventLog.decodeSorted(storedPayloads)
+            let events = ImportedPlayAdapter.events(plays: plays, resolved: resolved, durationOfRid: { _ in 0 })
+            return ReplayMerger.merged(stored: stored, imported: events, nowMs: nowMs, excluded: excluded,
+                                       survivorOf: { merges[$0] ?? $0 }).events
+        }.value
     }
 
     // MARK: The learner (5.9, 5.12)
@@ -939,7 +1030,8 @@ public actor BrainEngine {
     /// `play_event.modelVersion` of a pick that was ranked with the learned weights (0: the prior).
     public static let modelLearned: Int32 = 1
 
-    private static let maxLiked = 20_000
+    /// The favourites kept for the live learner (feature 8). They have their own file, so a large set costs nothing per play.
+    private static let maxLiked = 50_000
 
     static func encodeLiked(_ liked: Set<Int64>) -> String {
         liked.sorted().prefix(maxLiked).map { String($0, radix: 36) }.joined(separator: ",")
@@ -959,7 +1051,7 @@ public actor BrainEngine {
         learner.summary = saved.summary
         learner.learnVersion = saved.learnVersion
         learner.rebuiltAtMs = saved.rebuiltAtMs
-        learner.liked = Self.decodeLiked(log.value(BrainEventLog.keyLearnerLiked))
+        learner.liked = Self.decodeLiked(log.likedText())
         if let text = log.value(BrainEventLog.keyPosteriors), let posteriors = PosteriorCodec.decode(text) {
             learner.posteriors = posteriors
         } else {
@@ -991,6 +1083,7 @@ public actor BrainEngine {
             state.learner = learner
             state.learnEpoch += 1
         }
+        learnGeneration += 1
         log.setValue(BrainEventLog.keyLearnAfter, String(after))
         if let saved = loaded?.learner.saved {
             log.setValue(BrainEventLog.keyLearner, LearnerCodec.encode(saved))
@@ -1005,7 +1098,16 @@ public actor BrainEngine {
         public let summary: Gate.Summary?
         public let useLearned: Bool
         public let updates: Int64
+        /// Changes whenever a rebuild adopts a new learner or the listener resets what was learned: a figure worked out under another
+        /// generation is out of date (Your sound drops it).
+        public let generation: Int
     }
+
+    /// See `LearnerFigures.generation`.
+    public func learnerGeneration() -> Int { learnGeneration }
+
+    /// When "Reset what I've learned" last happened (ms), or nil for never: a list the learned weights ranked before it is not shown again.
+    public func learnResetAtMs() -> Int64? { log.value(BrainEventLog.keyLearnAfter).flatMap { Int64($0) }.map { $0 >> 16 } }
 
     /// True while the gate has the learned weights on (the shelf bandit's order and the arm bandit are used only then).
     public func usesLearned() -> Bool {
@@ -1016,7 +1118,7 @@ public actor BrainEngine {
     public func learnerFigures() -> LearnerFigures {
         ensureLoaded()
         let l = loaded!.learner
-        return LearnerFigures(summary: l.summary, useLearned: l.useLearned, updates: l.model.updates)
+        return LearnerFigures(summary: l.summary, useLearned: l.useLearned, updates: l.model.updates, generation: learnGeneration)
     }
 
     /// The bytes of every stored event, for a reader that decodes them off the actor (Your sound).
@@ -1034,7 +1136,9 @@ public actor BrainEngine {
     /// learned weights) again from the log. Nothing here runs at app start.
     public func restoreBackupState(salt: Int64?, feedback: [FeedbackStore.Record]) {
         if let salt { log.setValue(Self.saltKey, String(salt)) }
-        feedbackStore.replaceAll(feedback)
+        // Merged in, not swapped: an exclusion made here since the backup keeps its record, so nothing that already counts for nothing in
+        // the log becomes impossible to undo. The restored records replace the ones with the same id.
+        feedbackStore.merge(feedback)
         requestRebuild(force: true)
     }
 

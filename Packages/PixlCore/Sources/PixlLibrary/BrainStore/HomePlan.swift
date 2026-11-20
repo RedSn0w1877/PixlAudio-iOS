@@ -363,3 +363,17 @@ public actor RecentContexts {
         return HomePlanner.distinctContexts(list.map(\.key), count: count).map { list[$0] }
     }
 }
+
+public extension BrainItemTag {
+    /// The tag of a card of a Home shelf the listener plays (8.1): where it came from, and how its list was ranked. The choice of
+    /// weights (`control`, `modelVersion`) was decided when the shelf's list was built and is carried on the shelf, and the
+    /// exploration flag on the item: a play from the page is recorded with what really ranked it (5.12 point 8).
+    static func homeShelf(_ shelf: PlanShelf, _ item: PlanItem) -> BrainItemTag {
+        BrainItemTag(surface: Surface.nameOf(Surface.homeShelf), surfaceId: shelf.id, recId: shelf.recId, slot: item.slot,
+                     arm: Arm.nameOf(item.arm), whyArg: item.whyName.isEmpty ? nil : item.whyName,
+                     whyKey: item.whyKey != WhyLine.none ? WhyLine.nameOf(item.whyKey) : nil,
+                     primaryArtist: item.row?.row.artists.first?.name,
+                     // The listener chose to play the shelf: its tracks are theirs, like a playlist's.
+                     chosen: true, control: shelf.control, modelVersion: shelf.model, explore: item.explore)
+    }
+}

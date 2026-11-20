@@ -12,9 +12,10 @@ struct BrainCopyTests {
 
     /// Decision D15, as stage 3 relaxes it: "learn" may appear only in the strings the spec names for Your sound (8.6), each of
     /// which the screen shows only when it is true of the model at that moment (`ModelVoice`): the one line that says the
-    /// model is learning, and the reset button and its question. Every other string still fails on it. The text is the
+    /// model is learning (once for one play, once for the rest), and the reset button and its question. Every other string still fails on it. The text is the
     /// literal as written in the source, interpolation included.
-    private let learnAllowed: Set<String> = ["Learning from \\(count) plays.", "Reset what I've learned", "Reset what I've learned?"]
+    private let learnAllowed: Set<String> = ["Learning from \\(count) play.", "Learning from \\(count) plays.", "Reset what I've learned",
+                                             "Reset what I've learned?"]
 
     private var appRoot: URL {
         URL(fileURLWithPath: #filePath)
@@ -87,7 +88,7 @@ struct BrainCopyTests {
     @Test func theWordLearnIsOnlyWhereTheSpecNamesIt() throws {
         let strings = try String(contentsOf: appRoot.appendingPathComponent("Features/Brain/BrainStringsSound.swift"), encoding: .utf8)
         let all = literals(strings)
-        // The allowance is not a loophole: the three strings are really there, each exactly once, and they are the only
+        // The allowance is not a loophole: the four strings are really there, each exactly once, and they are the only
         // literals of the brain's screens that say "learn".
         for text in learnAllowed { #expect(all.filter { $0 == text }.count == 1, "missing: \(text)") }
         var said: [String] = []
@@ -95,7 +96,7 @@ struct BrainCopyTests {
             for literal in literals(file.text) where literal.lowercased().contains("learn") { said.append(literal) }
         }
         #expect(Set(said) == learnAllowed, "the strings that say learn: \(said)")
-        // A sentence that says it fails the test unless it is one of the three.
+        // A sentence that says it fails the test unless it is one of the four.
         #expect(!learnAllowed.contains("The app learns what you like."))
         #expect(!learnAllowed.contains("Learning your taste"))
     }

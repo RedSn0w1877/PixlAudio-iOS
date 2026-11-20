@@ -25,7 +25,7 @@ public enum ShelfBandit {
     public static let forceDays = 14
 
     /// Below this many shelf updates (all types and dayparts together) the stage 2 order stays.
-    public static let minUpdates = 20
+    public static let minUpdates = 100
 
     /// A play counts as the shelf's reward from this long.
     public static let rewardPlayMs: Int64 = 30_000
@@ -136,8 +136,9 @@ public enum ShelfBandit {
     /// The order of the shelf types `types` (given in stage 2's fixed order) for the page of `planKey`: drawn once per daypart
     /// and then frozen in `state`, so a shelf does not move while the listener is on it. Nil while there is no data (`hasData`),
     /// meaning "keep the fixed order". A type in `types` the frozen order does not know goes where it stands in the fixed
-    /// order; one it holds that is not in `types` is dropped. A type last seen `forceDays` or more days ago (and seen at some
-    /// time) is moved to the top once, and counted as seen from `today` so it is not forced again for another `forceDays` days.
+    /// order; one it holds that is not in `types` is dropped. A type last seen `forceDays` or more days ago, or never seen, is moved
+    /// to the top (the one unseen the longest, never seen first). It counts as seen only when a visit shows it (`visit`), so a
+    /// shelf the planner left out of the page is not spent: it is forced again at the next plan.
     public static func order(_ state: inout State, planKey: Int64, daypart: Int, types shelfTypes: [Int32], seed: Int64,
                              today: Int64) -> [Int32]? {
         if !hasData(state) { return nil }
@@ -152,13 +153,13 @@ public enum ShelfBandit {
                 return a < b
             }
             var drawn: [Int32] = idx.map { shelfTypes[$0] }
-            // One forced exposure: the type unseen the longest (and seen once), if it is 14 days or more.
+            // One forced exposure: the type unseen the longest (a type never seen is the longest), if it is 14 days or more.
             var forced: Int32 = -1
             var oldest = Int64.max
             for t in shelfTypes {
                 if t < 0 || Int(t) >= types { continue }
                 let seen = state.lastSeenDay[Int(t)]
-                if seen == Int64.min || today - seen < Int64(forceDays) { continue }
+                if seen != Int64.min && today - seen < Int64(forceDays) { continue }
                 if seen < oldest {
                     oldest = seen
                     forced = t
@@ -167,7 +168,6 @@ public enum ShelfBandit {
             if forced >= 0 {
                 if let at = drawn.firstIndex(of: forced) { drawn.remove(at: at) }
                 drawn.insert(forced, at: 0)
-                state.lastSeenDay[Int(forced)] = today
             }
             state.frozenKey = planKey
             state.frozenOrder = drawn

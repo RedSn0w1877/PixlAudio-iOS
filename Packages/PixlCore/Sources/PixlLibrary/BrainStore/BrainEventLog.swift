@@ -5,6 +5,8 @@
 //   affinity.pbl      storedFamily|key -> [posQ,negQ,lastMs,posRQ,negRQ,lastRMs]          cache of the log
 //   brain_state.pbl   name -> text                                                        small values
 //   engine_plays.pbl  rid -> [longAtMs,shortAtMs...]                                      cache of the log (6.1)
+//   learner_liked.pbl "liked" -> the favourites the last replay used, one value (stage 3 review: its own file, so the learner's
+//                     per-play writes never make the file that holds it compact)
 //
 // Read on first use, never at app start. Not thread-safe: `BrainEngine` (an actor) owns it. The iOS twin of
 // Android's `play_event`, `affinity` and `brain_state` tables and its `BrainStore.kt`.
@@ -42,6 +44,7 @@ public final class BrainEventLog {
     private let affinityFile: KeyedLogStore
     private let stateFile: KeyedLogStore
     private let ignoreFile: KeyedLogStore
+    private let likedFile: KeyedLogStore
 
     private var stateLoaded = false
     private var state: [BrainKey: String] = [:]
@@ -55,6 +58,7 @@ public final class BrainEventLog {
         affinityFile = file("affinity.pbl")
         stateFile = file("brain_state.pbl")
         ignoreFile = file("engine_plays.pbl")
+        likedFile = file("learner_liked.pbl")
     }
 
     private var eventsOpened = false
@@ -300,6 +304,24 @@ public final class BrainEventLog {
     public var affinityRowCount: Int {
         openAffinity()
         return affinityFile.count
+    }
+
+    // MARK: The favourites the learner was trained with
+
+    private static let likedKey = "liked"
+
+    /// The favourites the last replay used (base 36, comma separated): from their own file, else from the `brain_state` value an
+    /// earlier build wrote.
+    public func likedText() -> String? {
+        likedFile.open()
+        if let payload = likedFile.payload(for: Self.likedKey) { return String(decoding: payload, as: UTF8.self) }
+        return value(Self.keyLearnerLiked)
+    }
+
+    public func setLikedText(_ text: String) {
+        likedFile.open()
+        likedFile.put(Self.likedKey, Array(text.utf8))
+        setValue(Self.keyLearnerLiked, nil)
     }
 
     // MARK: Named values
