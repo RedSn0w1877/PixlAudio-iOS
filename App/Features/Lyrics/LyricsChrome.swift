@@ -1,4 +1,5 @@
 import PixlFoundation
+import PixlLyrics
 import PixlModel
 import SwiftUI
 
@@ -77,6 +78,10 @@ enum LyricsChromeMetrics {
     static let playingCorner: CGFloat = 18
     static let pausedCorner: CGFloat = Tokens.PlayerPills.height / 2
     static let seekBarHeight: CGFloat = Tokens.PlayerPills.height
+    /// Between the timing row and the seek row: Android's `LyricsPillGap` (10 pt, the nav pills' gap too). It was 8 pt
+    /// from the old 52 pt row; with two 64 pt bands it takes the Android gap, and stays under the 16 pt between the
+    /// seek row and the toolbar so the open cluster grows by 10 pt, not 16.
+    static let syncRowGap: CGFloat = Tokens.Shell.navPillSpacing
     /// A toolbar segment inside the big capsule (`Tokens.PlayerPills`: 64 pt capsule, 5 pt inset).
     static let toggleHeight: CGFloat = Tokens.PlayerPills.height - 2 * Tokens.PlayerPills.padding
 }
@@ -190,7 +195,7 @@ struct PlayingBarsIcon: View {
 
 /// The control cluster (Android `LyricsControlCluster`, Material mode): play/pause, the seek bar, then the toolbar
 /// (back · Translate · Sing · more), optionally the sync-offset row above — each a glass shape over the soft scrim.
-/// All of them share ONE `GlassEffectContainer` (spacing 3 pt, below the smallest gap: the 8 pt between the sync row
+/// All of them share ONE `GlassEffectContainer` (spacing 3 pt, below the smallest gap: the 10 pt between the sync row
 /// and the seek row), so they sample the artwork together (WWDC25-323: "glass can not sample other glass"; one
 /// container per cluster).
 struct LyricsControlCluster: View {
@@ -222,7 +227,7 @@ struct LyricsControlCluster: View {
             VStack(spacing: 0) {
                 if showSyncControls {
                     LyricsSyncControls(offsetMs: offsetMs, chrome: chrome, brightArt: brightArt, onChange: onOffsetChange)
-                        .padding(.bottom, 8)
+                        .padding(.bottom, LyricsChromeMetrics.syncRowGap)
                 }
                 HStack(spacing: 12) {
                     LyricsPlayPauseButton(isPlaying: isPlaying, chrome: chrome, action: onPlayPause)
@@ -714,12 +719,14 @@ private struct LyricsSyncControls: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    private let minus = LyricsOffsetFormat.minus
+
     var body: some View {
         let p = Tokens.PlayerPills.self
         HStack(spacing: p.segmentSpacing) {
-            step("−0.5", by: -500, label: "Decrease offset by half a second")
-            step("−0.1", by: -100, label: "Decrease offset by a tenth of a second")
-            let value = offsetMs == 0 ? "0 s" : String(format: "%+.1f s", Double(offsetMs) / 1000)
+            step("\(minus)0.5", by: -500, label: "Decrease offset by half a second")
+            step("\(minus)0.1", by: -100, label: "Decrease offset by a tenth of a second")
+            let value = LyricsOffsetFormat.text(offsetMs: offsetMs)
             button(value, highlighted: offsetMs != 0) { onChange(0) }
                 .accessibilityLabel("Reset lyric timing")
                 .accessibilityValue(Text(verbatim: value))
@@ -752,7 +759,13 @@ private struct LyricsSyncControls: View {
                 .foregroundStyle(highlighted ? chrome.onSyncAccent : chrome.content)
                 .frame(maxWidth: .infinity)
                 .frame(height: LyricsChromeMetrics.toggleHeight)
-                .background(highlighted ? chrome.syncAccent : Color.clear, in: Capsule())
+                .background {
+                    // Always mounted, like the toolbar segments' capsule: setting an offset fades and swells it in.
+                    Capsule()
+                        .fill(chrome.syncAccent.opacity(highlighted ? GlassTint.prominent : 0))
+                        .scaleEffect(highlighted || reduceMotion ? 1 : 0.86)
+                }
+                .animation(.spring(response: 0.5, dampingFraction: 0.8), value: highlighted)
                 .contentShape(Capsule())
         }
         .buttonStyle(PressScaleButtonStyle(pressedScale: 0.94))

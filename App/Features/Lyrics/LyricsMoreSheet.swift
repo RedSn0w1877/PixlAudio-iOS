@@ -16,7 +16,7 @@ struct LyricsMoreActions {
 }
 
 /// The lyrics More sheet (Android `LyricsMoreBottomSheet`): Lyrics actions, Appearance (alignment), Controls
-/// (Adjust sync, locked as broken for now; romanisation, translations, immersive once) and the shuffle / repeat /
+/// (Adjust sync, romanisation, translations, immersive once) and the shuffle / repeat /
 /// favourite row. "Translate on device" and "Show as plain text" are gone (owner, 2026-10-26). The lyrics screen
 /// presents it at half height, where iOS draws the sheet as floating Liquid Glass (owner,
 /// 2026-10-07: "0 liquid glass"); its rows stay soft fills on that glass (no glass on glass), while the alignment

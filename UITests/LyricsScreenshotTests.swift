@@ -114,17 +114,25 @@ final class LyricsScreenshotTests: XCTestCase {
             }
             self.reveal(adjustSync, in: sheet, app: app, clearOfBottom: 12)
             adjustSync.tap()
-            let reset = app.buttons["lyrics.offset.reset"].firstMatch
+            // By label: identifiers don't survive the glass capsule (the toolbar tests find their segments the same way).
+            func control(_ label: String) -> XCUIElement {
+                app.buttons.matching(NSPredicate(format: "label == %@", label)).firstMatch
+            }
+            let steps: [Int: String] = [
+                -500: "Decrease offset by half a second", -100: "Decrease offset by a tenth of a second",
+                100: "Increase offset by a tenth of a second", 500: "Increase offset by half a second",
+            ]
+            let reset = control("Reset lyric timing")
             XCTAssertTrue(reset.waitForExistence(timeout: 5))
             if reset.isEnabled { reset.tap() }
-            for (step, expected) in [(500, "+0.5 s"), (-100, "+0.4 s"), (-500, "-0.1 s"), (100, "0 s")] {
-                let button = app.buttons["lyrics.offset.\(step)"].firstMatch
+            for (step, expected) in [(500, "+0.5 s"), (-100, "+0.4 s"), (-500, "\u{2212}0.1 s"), (100, "0 s")] {
+                let button = control(steps[step]!)
                 XCTAssertTrue(button.isHittable)
                 XCTAssertGreaterThanOrEqual(button.frame.width, 44)
                 button.tap()
                 XCTAssertEqual(reset.value as? String, expected)
             }
-            app.buttons["lyrics.offset.100"].firstMatch.tap()
+            control(steps[100]!).tap()
             reset.tap()
             XCTAssertEqual(reset.value as? String, "0 s")
         }
