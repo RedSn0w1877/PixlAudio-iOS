@@ -42,7 +42,7 @@ tested by GitHub CI alone.
    text that already has an opened result keeps it.
 2. **No `@Attribute(.unique)` on `key`.** A lightweight migration cannot give old rows distinct keys, so uniqueness is kept by the write path
    (`SearchHistoryRules.record` and the diff in `PersistenceActor.write`). `key` and `timestamp` are indexed.
-3. **Keys are filled on the first history read, not at launch.** The v1 to v2 stage is lightweight (every new property has a default). The
+3. **Keys are filled on the first history read, which now happens when the Search tab is selected, not at launch and not when the hidden tab is prebuilt.** The v1 to v2 stage is lightweight (every new property has a default). The
    first `searchHistory()` after the update folds the old rows, merges the ones that fold alike (counts added) and trims to 50. Rows that
    fold to nothing (only punctuation) are dropped; one-letter old rows survive.
 4. **`kind` is nil for a submitted search** (the IME key, the voice result); `query` is a legal kind in the type and in payloads but the app
@@ -56,12 +56,23 @@ tested by GitHub CI alone.
 7. **Row tap in the focused list:** an artist, album or playlist that is still in the library opens its page; anything else (a song, a text,
    something deleted) runs its text as the search. Song rows do not start playback by themselves.
 8. **Catalogue and YouTube Music rows** record their imported song when Play succeeds (kind `song`).
-9. **The X is a `GlassCircleButton`** (32 pt) on the list's one glass shape, as the requirement says; this is glass on glass inside one
+9. **The X is a `GlassCircleButton`** (32 pt) on the list's one glass shape, as the requirement says (a review asked for a plain fill; kept, the
+   requirement names the glass button); this is glass on glass inside one
    element, the exception AGENTS.md otherwise forbids. Only visible rows exist (lazy stack). Drop it for a fill if it costs frames.
 10. **The Undo bar is local to Search** (`SearchUndoBar`): `LibraryToast` has no action button.
 11. The minimum length (2 UTF-16 units) is applied when writing, not to rows that already exist. A query of two or more units that folds to
     nothing (`!!`) is not stored.
-12. No Settings toggle ("Save search history") was added; the requirement list does not ask for one.
+12. **The review pass (2026-11-20)** changed these: history is read when the Search tab is selected and after a backup restore (a notification
+    `searchHistoryRestored` posted from `BackupService.onRestored`), never at launch; the model's writes run in order on one chain (`settled()` awaits
+    them in tests) and only the newest answer is shown; Clear all asks the store for the rows it removes, so Undo brings back what the store held, not what
+    the list showed; a second removal adds to the open Undo; the strip and the list show one row per opened thing (`collapseByTarget`, as Android);
+    restore follows Android's `toEntityOrNull` + `mergeRestore` (under two characters dropped, a target needs a known kind and an id, title cut to 200,
+    count held to 1,000,000, spellings inside one payload add up); a write in the same millisecond as another row gets the next millisecond (no tied
+    order on read back); Search's results area is one scroll view so the matching rows stay put while loading, empty and results swap; the atlas query
+    for the browse tiles runs once per engine choice, not per grid rebuild; VoiceOver hears the Undo offer and tiles have a Remove action.
+13. **Not changed from Android:** a one-letter row already stored survives the first read (Android's migration drops it); a matching row whose key
+    equals the typed text is still shown above the results (Android shows it too).
+14. No Settings toggle ("Save search history") was added; the requirement list does not ask for one.
 
 ## Unverified (needs CI, then the phone)
 
@@ -72,6 +83,8 @@ tested by GitHub CI alone.
   both versions (only `SearchHistoryRecord` is a second class); if SwiftData objects to that, give `SchemaV2` its own copies.
 - Glass cost of the list with the X buttons, and whether the one-glass-shape container looks right over a tall list.
 - The twin's field names (decision 5).
+- The genre grid is rebuilt on a focus toggle and loses its scroll offset (Android keeps it with a remembered grid state); cosmetic, needs the phone.
+- The single results scroll view (decision 12): the empty / loading states now sit inside a scroll view (`scrollBounceBehavior(.basedOnSize)`); the UI tests' ids are unchanged (`search.results` while a list shows, `search.state` otherwise).
 
 ## CI result
 

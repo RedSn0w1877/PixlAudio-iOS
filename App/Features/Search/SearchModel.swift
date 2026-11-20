@@ -120,13 +120,16 @@ final class SearchModel {
     private(set) var history: [SearchHistoryItem] = []
     /// The rows that match what is typed (at most 5), refreshed when the query or the history changes.
     private(set) var suggestions: [SearchHistoryItem] = []
-    /// The first rows of `history` for the strip above the genre grid.
+    /// `history` with one row per thing opened (the Recent searches list).
+    private(set) var shownHistory: [SearchHistoryItem] = []
+    /// The first rows of `shownHistory` for the strip above the genre grid.
     private(set) var strip: [SearchHistoryItem] = []
     /// The last removal or Clear all, offered for Undo until it times out.
     private(set) var undo: SearchHistoryUndo?
     @ObservationIgnored private var undoTask: Task<Void, Never>?
     @ObservationIgnored private var isPrivate: @MainActor () -> Bool = { false }
-    @ObservationIgnored private var hasLoadedHistory = false
+    @ObservationIgnored private var historyReads = 0
+    @ObservationIgnored private var writeChain: Task<Void, Never>?
 
     init(filter: SearchFilterType = .all) {
         self.filter = filter
@@ -345,11 +348,12 @@ final class SearchModel {
 
     // MARK: History (Android `onSearchQuerySubmitted`)
 
-    /// Reads the history (once when Search appears; the writes below keep it current without another read).
-    func loadHistory() async {
-        guard !hasLoadedHistory, let persistence else { return }
-        hasLoadedHistory = true
-        if let rows = try? await persistence.searchHistory() { setHistory(rows) }
+    /// Reads the history from the store. Search calls it when its tab is selected and after a backup restore (a read
+    /// of at most 50 rows, never per keystroke); a failed read keeps what is shown and is simply tried again next time.
+    func refreshHistory() async {
+        guard let persistence else { return }
+        let seq = nextHistoryRead()
+        if let rows = try? await persistence.searchHistory() { applyFromStore(rows, issued: seq) }
     }
 
     /// Records a submitted search (`kind` nil) or an opened result. Does nothing during a private session (not even a
@@ -359,10 +363,10 @@ final class SearchModel {
         guard SearchHistoryRules.shouldRecord(isPrivate: isPrivate()), let persistence else { return }
         let input = SearchHistoryInput(query: query, kind: kind, targetId: targetId, targetTitle: targetTitle,
                                        imageUrl: imageUrl)
-        Task { [weak self] in
+        enqueue { [weak self] in
+            let seq = self?.nextHistoryRead() ?? 0
             guard let rows = try? await persistence.recordSearchHistory(input, isPrivate: false) else { return }
-            self?.hasLoadedHistory = true
-            self?.setHistory(rows)
+            self?.applyFromStore(rows, issued: seq)
         }
     }
 
@@ -374,30 +378,38 @@ final class SearchModel {
     /// Removes one row (the X, or long-press › Remove); Undo puts it back.
     func remove(_ item: SearchHistoryItem) {
         guard let persistence else { return }
-        offerUndo(SearchHistoryUndo(message: SearchHistoryStrings.removed, items: [item]))
+        offerUndo(SearchHistoryStrings.removed, items: [item])
         setHistory(history.filter { $0.key != item.key })
-        Task { [weak self] in
-            if let rows = try? await persistence.removeSearchHistory(key: item.key) { self?.setHistory(rows) }
+        _ = nextHistoryRead()
+        enqueue { [weak self] in
+            let seq = self?.nextHistoryRead() ?? 0
+            if let rows = try? await persistence.removeSearchHistory(key: item.key) { self?.applyFromStore(rows, issued: seq) }
         }
     }
 
-    /// Clear all, with no confirmation: the snackbar's Undo is the way back.
+    /// Clear all, with no confirmation: the snackbar's Undo is the way back. What Undo restores is what the store held
+    /// at that moment (not the list on screen), so rows a restore or a write brought in since are not lost.
     func clearAll() {
         guard let persistence, !history.isEmpty else { return }
-        offerUndo(SearchHistoryUndo(message: SearchHistoryStrings.cleared, items: history))
         setHistory([])
-        Task { try? await persistence.clearSearchHistory() }
+        _ = nextHistoryRead()
+        enqueue { [weak self] in
+            guard let removed = try? await persistence.clearSearchHistory(), !removed.isEmpty else { return }
+            self?.offerUndo(SearchHistoryStrings.cleared, items: removed)
+        }
     }
 
-    /// Undo of the last removal or Clear all.
+    /// Undo of the last removals or Clear all.
     func performUndo() {
         guard let undo, let persistence else { return }
         self.undo = nil
         undoTask?.cancel()
         // Back in the list at once (merged the way the store will merge them), the store catches up behind it.
         setHistory(SearchHistoryRules.merged(history, with: undo.items, counts: .max))
-        Task { [weak self] in
-            if let rows = try? await persistence.restoreSearchHistory(undo.items) { self?.setHistory(rows) }
+        _ = nextHistoryRead()
+        enqueue { [weak self] in
+            let seq = self?.nextHistoryRead() ?? 0
+            if let rows = try? await persistence.restoreSearchHistory(undo.items) { self?.applyFromStore(rows, issued: seq) }
         }
     }
 
@@ -406,9 +418,42 @@ final class SearchModel {
         if undo != nil { undo = nil }
     }
 
-    private func offerUndo(_ offer: SearchHistoryUndo) {
+    /// Waits until every write the model started has finished (tests; the screen never needs it).
+    func settled() async {
+        await writeChain?.value
+    }
+
+    /// Writes run one after the other in the order they were asked for, so a remove, an Undo and a Clear all in quick
+    /// succession reach the store in that order.
+    private func enqueue(_ work: @escaping @MainActor () async -> Void) {
+        let previous = writeChain
+        writeChain = Task {
+            await previous?.value
+            await work()
+        }
+    }
+
+    /// Every read or write that returns the history takes a number first; only the newest answer is shown, so a slow
+    /// older read cannot put an old list back.
+    private func nextHistoryRead() -> Int {
+        historyReads &+= 1
+        return historyReads
+    }
+
+    private func applyFromStore(_ rows: [SearchHistoryItem], issued seq: Int) {
+        guard seq == historyReads else { return }
+        setHistory(rows)
+    }
+
+    /// An offer for Undo. While one is still showing, a new removal adds to it (the bar's Undo brings everything back)
+    /// and the five seconds start again; a Clear all keeps its wording.
+    private func offerUndo(_ message: String, items: [SearchHistoryItem]) {
         undoTask?.cancel()
-        undo = offer
+        var all = undo?.items ?? []
+        let known = Set(all.map(\.key))
+        all += items.filter { !known.contains($0.key) }
+        let wording = undo?.message == SearchHistoryStrings.cleared ? SearchHistoryStrings.cleared : message
+        undo = SearchHistoryUndo(message: wording, items: all)
         undoTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(5))
             guard !Task.isCancelled else { return }
@@ -419,7 +464,10 @@ final class SearchModel {
     private func setHistory(_ rows: [SearchHistoryItem]) {
         if history != rows {
             history = rows
-            strip = Array(rows.prefix(SearchHistoryRules.stripLimit))
+            // One tile or row per thing opened (the newest of them), as on Android.
+            let shown = SearchHistoryRules.collapseByTarget(rows)
+            if shown != shownHistory { shownHistory = shown }
+            strip = Array(shown.prefix(SearchHistoryRules.stripLimit))
         }
         refreshSuggestions()
     }
@@ -437,4 +485,9 @@ final class SearchModel {
 nonisolated struct SearchHistoryUndo: Sendable, Equatable {
     let message: String
     let items: [SearchHistoryItem]
+}
+
+extension Notification.Name {
+    /// Posted after a backup restore wrote search history rows: a built Search page reads its list again.
+    nonisolated static let searchHistoryRestored = Notification.Name("PixlAudio.searchHistoryRestored")
 }

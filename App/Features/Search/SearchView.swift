@@ -1,3 +1,4 @@
+import Combine
 import PixlFoundation
 import PixlLibrary
 import PixlModel
@@ -78,10 +79,27 @@ struct SearchView: View {
             prepare()
             model.performSearch(query)
         }
-        // The history is read once, when the page appears; writes keep the model's copy current.
-        .task {
+        // The history is read when the Search tab is selected (not when its page is built behind the scenes at launch) and
+        // after a backup restore; writes keep the model's copy current in between. At most 50 rows, never per keystroke.
+        .onChange(of: router.selection == .search, initial: true) { _, isSelected in
+            guard isSelected else { return }
             prepare()
-            await model.loadHistory()
+            Task { await model.refreshHistory() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .searchHistoryRestored)) { _ in
+            Task { await model.refreshHistory() }
+        }
+        // The browse tiles the atlas knows are asked once, not each time the grid is rebuilt by a focus change.
+        .task(id: settings.ai.brainEngine) {
+            if settings.ai.brainEngine == BrainEngineChoice.brain {
+                brainTiles = await environment.brainActions.knownGenreTiles(SearchCategory.defaults.map { $0.name })
+            } else {
+                brainTiles = nil
+            }
+        }
+        // VoiceOver: the Undo bar appears without moving focus, so say it.
+        .onChange(of: model.undo) { _, undo in
+            if let undo { AccessibilityNotification.Announcement(SearchHistoryStrings.undoAnnouncement(undo.message)).post() }
         }
         // The bar's field was submitted (Android `onSearch`: the query goes into the history).
         .onChange(of: router.searchSubmission) { _, _ in model.submit(router.searchText) }
@@ -131,11 +149,6 @@ struct SearchView: View {
                                        browse()
                                    }
                                })
-        .task {
-            if settings.ai.brainEngine == BrainEngineChoice.brain {
-                brainTiles = await environment.brainActions.knownGenreTiles(SearchCategory.defaults.map { $0.name })
-            }
-        }
     }
 
     /// Above the grid: the "Recent" strip when there is history, or the private session's one line.
@@ -151,7 +164,7 @@ struct SearchView: View {
     // MARK: Recent searches (the field is focused and blank)
 
     private var recentList: some View {
-        SearchRecentList(items: model.history, onOpen: openRecent, onFill: fillField,
+        SearchRecentList(items: model.shownHistory, onOpen: openRecent, onFill: fillField,
                          onRemove: { model.remove($0) }, onClearAll: { model.clearAll() })
     }
 
@@ -190,44 +203,56 @@ struct SearchView: View {
 
     // MARK: Results
 
+    /// What the results area shows under the matching history rows.
+    private enum ResultsState: Equatable {
+        case unavailable, empty, loading, list
+    }
+
+    private var resultsState: ResultsState {
+        if model.showsEmptyState { return model.remoteFailed.contains(.spotify) ? .unavailable : .empty }
+        return model.showsLoadingState ? .loading : .list
+    }
+
     private func results(hidesHistory: Bool) -> some View {
         @Bindable var model = model
+        let state = resultsState
         return VStack(spacing: 0) {
             SearchFilterChips(selection: $model.filter)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 8)
-            ZStack(alignment: .top) {
-                if model.showsEmptyState, model.remoteFailed.contains(.spotify) {
-                    // Spotify didn't answer (offline, signed out on its side, rate limited): not "no results".
-                    withSuggestions(hidesHistory: hidesHistory) { SearchUnavailableView { model.performSearch(router.searchText) } }
-                        .transition(.opacity)
-                } else if model.showsEmptyState {
-                    withSuggestions(hidesHistory: hidesHistory) { EmptySearchResultsView(query: router.searchText) }
-                        .transition(.opacity)
-                } else if model.showsLoadingState {
-                    withSuggestions(hidesHistory: hidesHistory) { SearchingResultsView() }
-                        .transition(.opacity)
-                } else {
-                    resultsList(hidesHistory: hidesHistory)
-                        .transition(.opacity)
+            // One scroll view for every state: the matching history rows sit at its top and stay put while the loading,
+            // empty and results states swap underneath them (they used to be rebuilt, and faded, with each swap).
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    if !hidesHistory {
+                        SearchSuggestionList(items: model.suggestions, onOpen: openSuggestion, onFill: fillField)
+                    }
+                    switch state {
+                    case .unavailable:
+                        SearchUnavailableView { model.performSearch(router.searchText) }
+                            .transition(.opacity)
+                    case .empty:
+                        EmptySearchResultsView(query: router.searchText)
+                            .transition(.opacity)
+                    case .loading:
+                        SearchingResultsView()
+                            .transition(.opacity)
+                    case .list:
+                        resultSections
+                            .transition(.opacity)
+                    }
                 }
+                .padding(.top, 8)
+                .padding(.bottom, 24)
+                .animation(.easeInOut(duration: 0.19), value: state)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .animation(.easeInOut(duration: 0.19), value: model.showsEmptyState)
-            .animation(.easeInOut(duration: 0.19), value: model.showsLoadingState)
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
+            .minimizesTabBarOnScroll()
+            .clipShape(TopRoundedClip(radius: 28))
+            .accessibilityIdentifier(state == .list ? "search.results" : "search.state")
         }
         .padding(.horizontal, 16)
-    }
-
-    /// The history rows that match the typed text, then `content` (the empty and loading states).
-    private func withSuggestions<Content: View>(hidesHistory: Bool, @ViewBuilder _ content: () -> Content) -> some View {
-        VStack(spacing: 0) {
-            if !hidesHistory {
-                SearchSuggestionList(items: model.suggestions, onOpen: openSuggestion, onFill: fillField)
-                    .padding(.top, 8)
-            }
-            content()
-        }
     }
 
     /// A tap on a matching row: its text goes into the field and the search runs (the row moves to the top again).
@@ -237,27 +262,16 @@ struct SearchView: View {
         router.requestSearchBlur()
     }
 
-    private func resultsList(hidesHistory: Bool) -> some View {
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                if !hidesHistory {
-                    SearchSuggestionList(items: model.suggestions, onOpen: openSuggestion, onFill: fillField)
-                }
-                ForEach(model.sections) { section in
-                    SearchResultSectionHeader(title: section.title)
-                    ForEach(section.rows) { row in
-                        resultRow(row.item)
-                            .padding(.bottom, SearchMetrics.rowSpacing)
-                    }
+    private var resultSections: some View {
+        Group {
+            ForEach(model.sections) { section in
+                SearchResultSectionHeader(title: section.title)
+                ForEach(section.rows) { row in
+                    resultRow(row.item)
+                        .padding(.bottom, SearchMetrics.rowSpacing)
                 }
             }
-            .padding(.top, 8)
-            .padding(.bottom, 24)
         }
-        .scrollIndicators(.hidden)
-        .minimizesTabBarOnScroll()
-        .clipShape(TopRoundedClip(radius: 28))
-        .accessibilityIdentifier("search.results")
     }
 
     @ViewBuilder

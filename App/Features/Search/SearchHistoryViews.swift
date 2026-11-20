@@ -23,6 +23,8 @@ nonisolated enum SearchHistoryStrings {
     static var removed: String { String(localized: "Removed from recent searches") }
     static var cleared: String { String(localized: "Recent searches cleared") }
     static var privateHint: String { String(localized: "Private session: searches aren't saved.") }
+    static var recentSearchTrait: String { String(localized: "Recent search") }
+    static func undoAnnouncement(_ message: String) -> String { String(localized: "\(message). Undo is available.") }
     static func fill(_ query: String) -> String { String(localized: "Use \(query) in the search field") }
     static func removeLabel(_ query: String) -> String { String(localized: "Remove \(query) from recent searches") }
 
@@ -40,15 +42,12 @@ nonisolated enum SearchHistoryStrings {
 extension SearchHistoryItem {
     /// What a row calls itself: the opened result's name, or the typed text.
     var shownTitle: String {
-        guard kind != nil, kind != .query, let title = targetTitle, !title.isEmpty else { return query }
+        guard openKind != nil, let title = targetTitle, !title.isEmpty else { return query }
         return title
     }
 
     /// True for a row that stands for an opened result (artwork and a subtitle), not just a typed search.
-    var isResult: Bool {
-        guard let kind else { return false }
-        return kind != .query
-    }
+    var isResult: Bool { openKind != nil }
 }
 
 // MARK: - Leading art
@@ -274,7 +273,7 @@ struct SearchRecentStrip: View {
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: 12) {
                     ForEach(items, id: \.key) { item in
-                        SearchRecentTile(item: item, onOpen: { onOpen(item) })
+                        SearchRecentTile(item: item, onOpen: { onOpen(item) }, onRemove: { onRemove(item) })
                             .contextMenu {
                                 Button(role: .destructive) { onRemove(item) } label: {
                                     Label(SearchHistoryStrings.remove, systemImage: "xmark")
@@ -294,6 +293,7 @@ struct SearchRecentStrip: View {
 private struct SearchRecentTile: View {
     let item: SearchHistoryItem
     let onOpen: () -> Void
+    let onRemove: () -> Void
     @Environment(\.appTheme) private var theme
 
     private static let artSize: CGFloat = 64
@@ -329,7 +329,10 @@ private struct SearchRecentTile: View {
         }
         .buttonStyle(PressScaleButtonStyle(pressedScale: 0.94))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel([item.shownTitle, SearchHistoryStrings.kind(item.kind)].compactMap { $0 }.joined(separator: ", "))
+        .accessibilityLabel([item.shownTitle, SearchHistoryStrings.kind(item.kind), SearchHistoryStrings.recentSearchTrait]
+            .compactMap { $0 }.joined(separator: ", "))
+        // The long-press menu is not reachable with VoiceOver: removal is also an action on the tile.
+        .accessibilityAction(named: Text(SearchHistoryStrings.remove), onRemove)
         .accessibilityIdentifier("search.recentTile")
     }
 }

@@ -85,7 +85,11 @@ extension PersistenceActor {
         }
         try fillSearchHistoryKeys()
         let existing = try records()
-        let next = SearchHistoryRules.record(into: existing.map(Self.item), input, isPrivate: false, now: now)
+        // Two writes in the same millisecond must not tie: a tie has no defined order when the rows are read back.
+        let used = Set(existing.map(\.timestamp))
+        var stamp = now
+        while used.contains(stamp) { stamp &+= 1 }
+        let next = SearchHistoryRules.record(into: existing.map(Self.item), input, isPrivate: false, now: stamp)
         try write(next, over: existing)
         return next
     }
@@ -100,11 +104,15 @@ extension PersistenceActor {
         return SearchHistoryRules.capped(next)
     }
 
-    /// Android `clearSearchHistory`.
-    func clearSearchHistory() throws {
+    /// Android `clearSearchHistory`. Returns the rows it removed (what Undo of a Clear all puts back).
+    @discardableResult
+    func clearSearchHistory() throws -> [SearchHistoryItem] {
+        try? fillSearchHistoryKeys()
+        let removed = SearchHistoryRules.capped(try records().map(Self.item))
         try modelContext.delete(model: SearchHistoryRecord.self)
         try modelContext.save()
         searchHistoryKeysFilled = true
+        return removed
     }
 
     /// Puts rows back (Undo of a remove or Clear all) or restores a backup: merged into what is there by key, never

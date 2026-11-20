@@ -19,12 +19,6 @@ final class SearchHistoryTests: XCTestCase {
         return model
     }
 
-    /// Fire-and-forget writes of the model finish on their own: wait for the condition.
-    private func waitUntil(_ condition: () -> Bool) async throws {
-        for _ in 0..<200 where !condition() { try await Task.sleep(for: .milliseconds(10)) }
-        XCTAssertTrue(condition())
-    }
-
     // MARK: Store
 
     func testRecordKeepsOneRowPerFoldedQueryNewestFirst() async throws {
@@ -159,11 +153,11 @@ final class SearchHistoryTests: XCTestCase {
         var isPrivate = false
         let model = makeModel(persistence: persistence, isPrivate: { isPrivate })
         model.record("Beyonce")
-        try await waitUntil { model.history.count == 1 }
         model.record("beyonce knowles")
-        try await waitUntil { model.history.count == 2 }
         model.record("night")
-        try await waitUntil { model.history.count == 3 }
+        // The model runs its writes in order and `settled()` waits for all of them: no sleeping, no polling.
+        await model.settled()
+        XCTAssertEqual(model.history.count, 3)
         model.performSearch("BEY")
         XCTAssertEqual(model.suggestions.map(\.query), ["beyonce knowles", "Beyonce"])
         model.performSearch("zzz")
@@ -172,7 +166,8 @@ final class SearchHistoryTests: XCTestCase {
         isPrivate = true
         model.record("secret")
         model.record("night")
-        try await Task.sleep(for: .milliseconds(200))
+        // Nothing was queued at all, so there is nothing to wait for: the store still has what it had.
+        await model.settled()
         let stored = try await persistence.searchHistory()
         XCTAssertEqual(stored.count, 3)
         XCTAssertEqual(stored.first { $0.key == "night" }?.count, 1)
@@ -181,10 +176,9 @@ final class SearchHistoryTests: XCTestCase {
     func testModelRemoveClearAllAndUndo() async throws {
         let persistence = try makePersistence()
         let model = makeModel(persistence: persistence)
-        for q in ["alpha", "bravo"] {
-            model.record(q)
-            try await waitUntil { model.history.contains { $0.query == q } }
-        }
+        model.record("alpha")
+        model.record("bravo")
+        await model.settled()
         let bravo = try XCTUnwrap(model.history.first { $0.query == "bravo" })
         model.remove(bravo)
         XCTAssertEqual(model.history.map(\.query), ["alpha"])
@@ -194,21 +188,89 @@ final class SearchHistoryTests: XCTestCase {
         XCTAssertNil(model.undo)
         model.clearAll()
         XCTAssertTrue(model.history.isEmpty)
-        XCTAssertNotNil(model.undo)
+        await model.settled()
+        XCTAssertEqual(model.undo?.items.count, 2)
         model.performUndo()
         XCTAssertEqual(model.history.count, 2)
-        try await waitUntil { model.history.count == 2 }
+        await model.settled()
         let stored = try await persistence.searchHistory()
         XCTAssertEqual(stored.count, 2)
+    }
+
+    func testASecondRemovalAddsToTheUndoInsteadOfReplacingIt() async throws {
+        let persistence = try makePersistence()
+        let model = makeModel(persistence: persistence)
+        for q in ["alpha", "bravo", "charlie"] { model.record(q) }
+        await model.settled()
+        model.remove(try XCTUnwrap(model.history.first { $0.query == "alpha" }))
+        model.remove(try XCTUnwrap(model.history.first { $0.query == "bravo" }))
+        XCTAssertEqual(Set(model.undo?.items.map(\.query) ?? []), ["alpha", "bravo"])
+        model.performUndo()
+        await model.settled()
+        let stored = try await persistence.searchHistory()
+        XCTAssertEqual(Set(stored.map(\.query)), ["alpha", "bravo", "charlie"])
+    }
+
+    func testRowsRestoredBehindTheModelsBackShowAfterARefresh() async throws {
+        let persistence = try makePersistence()
+        let model = makeModel(persistence: persistence)
+        await model.refreshHistory()
+        XCTAssertTrue(model.history.isEmpty)
+        // A backup restore writes through the store, not through the model.
+        try await persistence.restoreSearchHistory([SearchHistoryItem(query: "restored", timestamp: 5)])
+        XCTAssertTrue(model.history.isEmpty)
+        await model.refreshHistory()
+        XCTAssertEqual(model.history.map(\.query), ["restored"])
+    }
+
+    func testClearAllThenUndoKeepsRowsTheModelHadNotSeenYet() async throws {
+        let persistence = try makePersistence()
+        let model = makeModel(persistence: persistence)
+        model.record("alpha")
+        await model.settled()
+        // A restore brings in a row while the model still shows only alpha.
+        try await persistence.restoreSearchHistory([SearchHistoryItem(query: "restored", timestamp: 5)])
+        XCTAssertEqual(model.history.map(\.query), ["alpha"])
+        model.clearAll()
+        await model.settled()
+        XCTAssertEqual(Set(model.undo?.items.map(\.query) ?? []), ["alpha", "restored"])
+        model.performUndo()
+        await model.settled()
+        let stored = try await persistence.searchHistory()
+        XCTAssertEqual(Set(stored.map(\.query)), ["alpha", "restored"])
+    }
+
+    func testTheStripAndTheListShowOneRowPerOpenedThing() async throws {
+        let persistence = try makePersistence()
+        let model = makeModel(persistence: persistence)
+        model.record("bey", kind: .artist, targetId: "7", targetTitle: "Beyoncé")
+        model.record("night")
+        model.record("beyonce", kind: .artist, targetId: "7", targetTitle: "Beyoncé")
+        await model.settled()
+        XCTAssertEqual(model.history.count, 3)
+        XCTAssertEqual(model.shownHistory.map(\.query), ["beyonce", "night"])
+        XCTAssertEqual(model.strip.map(\.query), ["beyonce", "night"])
+    }
+
+    func testAPlainSubmitKeepsTheOpenedResultOfTheSameQuery() async throws {
+        let persistence = try makePersistence()
+        let model = makeModel(persistence: persistence)
+        model.record("taylor", kind: .artist, targetId: "9", targetTitle: "Taylor Swift")
+        model.record("Taylor")
+        model.record("taylor", kind: .query, targetId: "1")
+        await model.settled()
+        XCTAssertEqual(model.history.count, 1)
+        XCTAssertEqual(model.history.first?.count, 3)
+        XCTAssertEqual(model.history.first?.kind, .artist)
+        XCTAssertEqual(model.history.first?.targetId, "9")
     }
 
     func testTheStripHoldsTheNewestTen() async throws {
         let persistence = try makePersistence()
         let model = makeModel(persistence: persistence)
-        for i in 0..<12 {
-            model.record("query \(i)")
-            try await waitUntil { model.history.count == i + 1 }
-        }
+        for i in 0..<12 { model.record("query \(i)") }
+        await model.settled()
+        XCTAssertEqual(model.history.count, 12)
         XCTAssertEqual(model.strip.count, 10)
         XCTAssertEqual(model.strip.first?.query, "query 11")
     }

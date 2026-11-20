@@ -663,6 +663,8 @@ final class AppEnvironment {
         autoPrepare?.start()
         backup.onRestored = { [weak self] in
             reloadPlayCounts()
+            // The restored search history rows: a built Search page reads its list again.
+            NotificationCenter.default.post(name: .searchHistoryRestored, object: nil)
             // A restore may write AI keys and base URLs (it dropped the cached answer): re-check off the main actor.
             // It may also bring back GEMINI without a key (an Android backup): move that to the on-device model again.
             guard let self else { return }
