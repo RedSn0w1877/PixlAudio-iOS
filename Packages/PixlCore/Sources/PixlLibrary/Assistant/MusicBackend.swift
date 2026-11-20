@@ -321,6 +321,6 @@ public protocol AssistantPlayable: Sendable {
     /// The songs of a mix this chat built, in order, ready to play; nil for an unknown id.
     func songsForMix(_ mixId: String) async -> [Song]?
 
-    /// Announces the tags (surface assistant, the pick's arm and served vector) the next play of `songs` carries.
-    func expectTags(songs: [Song]) async
+    /// The tags (surface assistant, the pick's arm and served vector) a play of `songs` carries into the event log, by song id.
+    func tags(for songs: [Song]) async -> [String: BrainItemTag]
 }
