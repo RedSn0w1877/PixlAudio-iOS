@@ -42,10 +42,15 @@ import Testing
         #expect(BackupSection.defaultSelection == Set(BackupSection.allCases))
     }
 
-    @Test func allTwelveSupportedBackupSectionsArePresent() {
-        #expect(BackupSection.allCases.count == 12)
+    @Test func allThirteenSupportedBackupSectionsArePresent() {
+        #expect(BackupSection.allCases.count == 13)
         #expect(BackupSection.fromKey("ai_usage_logs") == .aiUsageLogs)
         #expect(BackupSection.aiUsageLogs.sinceVersion == 4)
+        // Stage 3 completion: the brain's module, the same key and version as Android's `BackupSection.BRAIN`.
+        #expect(BackupSection.fromKey("brain") == .brain)
+        #expect(BackupSection.brain.sinceVersion == 4)
+        #expect(BackupSection.brain.kotlinName == "BRAIN")
+        #expect(BackupSection.brain.label == "Music picks")
     }
 
     @Test func newSectionsHaveSinceVersion3() {

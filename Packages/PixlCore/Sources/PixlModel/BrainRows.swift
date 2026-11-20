@@ -405,10 +405,19 @@ public struct BrainItemTag: Sendable, Hashable {
     /// The listener put this pick in the queue themselves (they played a Home row): it has an `arm`, because it
     /// was a recommendation, but it is theirs like a playlist's track, not the engine's tail.
     public var chosen: Bool
+    /// The list this pick came from was ranked with the prior because its session is a control session (5.12 point 8).
+    /// Decided when the list was built and carried with the queue entry, never worked out when the play ends.
+    public var control: Bool
+    /// `play_event.modelVersion` the list was ranked with (1: the learned weights, 0: the prior); -1 when not recorded
+    /// (an old queue entry).
+    public var modelVersion: Int
+    /// The pick filled a novel slot the arm bandit drew (5.10): an exploration slot, logged with `EventFlags.exploreSlot`.
+    public var explore: Bool
 
     public init(surface: String? = nil, surfaceId: String? = nil, recId: Int64 = 0, slot: Int = -1, arm: String? = nil,
                 whyArg: String? = nil, radioRank: Int = -1, retrQ: Int = -1, whyKey: String? = nil,
-                primaryArtist: String? = nil, chosen: Bool = false) {
+                primaryArtist: String? = nil, chosen: Bool = false, control: Bool = false, modelVersion: Int = -1,
+                explore: Bool = false) {
         self.surface = surface
         self.surfaceId = surfaceId.map { String($0.unicodeScalars.prefix(Self.maxSurfaceIdLength)) }
         self.recId = recId
@@ -420,12 +429,15 @@ public struct BrainItemTag: Sendable, Hashable {
         self.whyKey = whyKey
         self.primaryArtist = primaryArtist
         self.chosen = chosen
+        self.control = control
+        self.modelVersion = modelVersion
+        self.explore = explore
     }
 
     /// True when nothing is set: such a tag is not saved with the queue.
     public var isEmpty: Bool {
         surface == nil && surfaceId == nil && recId == 0 && slot < 0 && arm == nil && whyKey == nil && whyArg == nil
-            && primaryArtist == nil && !chosen && retrQ < 0 && radioRank < 0
+            && primaryArtist == nil && !chosen && retrQ < 0 && radioRank < 0 && !control && modelVersion < 0 && !explore
     }
 }
 
@@ -435,7 +447,8 @@ extension PlaybackQueueItemSnapshot {
         let tag = BrainItemTag(surface: brainSurface, surfaceId: brainSurfaceId, recId: brainRecId ?? 0,
                                slot: brainSlot ?? -1, arm: brainArm, whyArg: brainWhyArg,
                                radioRank: brainRadioRank ?? -1, retrQ: brainRetrQ ?? -1, whyKey: brainWhyKey,
-                               primaryArtist: brainPrimaryArtist, chosen: brainChosen == true)
+                               primaryArtist: brainPrimaryArtist, chosen: brainChosen == true, control: brainControl == true,
+                               modelVersion: brainModel ?? -1, explore: brainExplore == true)
         return tag.isEmpty ? nil : tag
     }
 
@@ -454,6 +467,9 @@ extension PlaybackQueueItemSnapshot {
         copy.brainChosen = tag.chosen ? true : nil
         copy.brainRetrQ = tag.retrQ >= 0 ? tag.retrQ : nil
         copy.brainRadioRank = tag.radioRank >= 0 ? tag.radioRank : nil
+        copy.brainControl = tag.control ? true : nil
+        copy.brainModel = tag.modelVersion >= 0 ? tag.modelVersion : nil
+        copy.brainExplore = tag.explore ? true : nil
         return copy
     }
 }

@@ -94,6 +94,30 @@ final class TasteAdjustmentStore {
     /// The changes in force, one by one (the music brain turns boosts and reductions into prior counts).
     func activeAdjustments(nowMs: Int64) -> [TasteAdjustment] { list.active(nowMs: nowMs) }
 
+    // MARK: Backup (the brain's module, stage 3 completion)
+
+    /// The changes as one text for the backup's brain module; "" for none.
+    func backupText() async -> String {
+        await ensureLoaded()
+        return list.items.isEmpty ? "" : String(decoding: list.encoded(), as: UTF8.self)
+    }
+
+    /// A restored backup's taste changes: "" clears them; a text this app reads replaces them; any other text (the other platform's,
+    /// or a damaged one) leaves the changes as they are. Returns how many changes are in force afterwards.
+    func restoreFromBackup(_ text: String) async -> Int {
+        await ensureLoaded()
+        if text.isEmpty {
+            removeAll()
+        } else {
+            let restored = TasteAdjustmentList.decode(Data(text.utf8))
+            if !restored.items.isEmpty {
+                list = restored
+                changed()
+            }
+        }
+        return list.items.count
+    }
+
     // MARK: Changing
 
     /// Applies the changes in order and returns what each did. One save and one revision bump for the whole call.

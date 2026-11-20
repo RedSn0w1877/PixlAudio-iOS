@@ -141,6 +141,10 @@ public enum StationPlanner {
         public let usedFamiliarNext: Bool
         /// How many candidates survived the filters.
         public let poolSize: Int
+        /// Stage 3 (5.12 point 8): how the engine ranked this list, set by whoever ran the planner on the engine's state
+        /// (`BrainEngine`); the pure planner leaves the defaults (the prior, no control). Every pick of the list carries it.
+        public var control: Bool = false
+        public var modelVersion: Int32 = 0
     }
 
     public static func plan(_ request: Request, affinity: Affinity.State, session: SessionState, graph: Graph) -> Plan {

@@ -81,6 +81,24 @@ public final class FeedbackStore {
             .sorted { $0.createdAtMs != $1.createdAtMs ? $0.createdAtMs < $1.createdAtMs : $0.id < $1.id }
     }
 
+    /// Every record, undone ones too, oldest first (the backup holds them all).
+    public func all() -> [Record] {
+        load()
+        return records.values.sorted { $0.createdAtMs != $1.createdAtMs ? $0.createdAtMs < $1.createdAtMs : $0.id < $1.id }
+    }
+
+    /// Puts a whole set of records in place (a restored backup): what was there and is not in `list` goes.
+    public func replaceAll(_ list: [Record]) {
+        load()
+        let keep = Set(list.map(\.id))
+        let doomed = records.keys.filter { !keep.contains($0) }
+        if !doomed.isEmpty {
+            file.remove(doomed.map { String($0) })
+            for id in doomed { records[id] = nil }
+        }
+        for record in list { insert(record) }
+    }
+
     public var count: Int {
         load()
         return records.count

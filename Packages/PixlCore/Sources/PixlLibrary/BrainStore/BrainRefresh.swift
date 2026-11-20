@@ -61,9 +61,12 @@ public protocol RefreshWork: Sendable {
     /// Before the islands are fitted: takes Spotify's stored genres and years out of the DNA when the Spotify switch is off.
     /// A no-op by default.
     func purgeSpotify() async
+    /// Gives the finished Home visits to the shelf bandit (stage 3, 5.10). Reads and writes its own small files only. A no-op by default.
+    func settleShelves() async
 }
 
 public extension RefreshWork {
+    func settleShelves() async {}
     func fitIslands() async {}
     func purgeSpotify() async {}
     func dnaTargets(lane: Int, limit: Int) async -> [DnaTarget] { [] }
@@ -247,6 +250,7 @@ public struct BrainRefreshRunner: Sendable {
            report.stopped != .cancelled {
             await work.purgeSpotify()
             await work.fitIslands()
+            await work.settleShelves()
         }
         return report
     }
@@ -269,6 +273,8 @@ public struct BrainRefreshWork: RefreshWork {
     public static let releasesReserveRequests = 4
 
     private let budget: HostBudget?
+    /// Stage 3: the shelf bandit's store, settled at the end of a run. Nil leaves the refresh as stage 2 made it.
+    private let shelves: ShelfStore?
     /// Lanes 3 to 5 (stage 2b): the open-data sources. Nil runs the refresh as stage 2a did.
     private let dna: DnaLanes?
     private let matchedVideoId: @Sendable (String) async -> String?
@@ -280,7 +286,8 @@ public struct BrainRefreshWork: RefreshWork {
     public init(mixes: BrainMixes, repository: BrainRepository, budget: HostBudget?,
                 matchedVideoId: @escaping @Sendable (String) async -> String?,
                 newReleases: NewReleases? = nil, librarySongs: @escaping @Sendable () async -> [Song] = { [] },
-                dna: DnaLanes? = nil, clock: @escaping @Sendable () -> Int64 = { currentTimeMillis() }) {
+                dna: DnaLanes? = nil, shelves: ShelfStore? = nil, clock: @escaping @Sendable () -> Int64 = { currentTimeMillis() }) {
+        self.shelves = shelves
         self.dna = dna
         self.newReleases = newReleases
         self.librarySongs = librarySongs
@@ -315,6 +322,8 @@ public struct BrainRefreshWork: RefreshWork {
     public func fitIslands() async {
         if let builder = await mixes.parts?.builder { _ = await builder.ensure() }
     }
+
+    public func settleShelves() async { await shelves?.settle() }
 
     public func radioSeeds() async -> [RefreshTarget] { await targets(of: await mixes.seedsForRefresh()) }
 

@@ -48,6 +48,7 @@ public struct BackupContents: Sendable {
     public var playbackHistory: [PlaybackEvent]?
     public var artistImages: [ArtistImageRestore]?
     public var aiUsage: [AiUsageRecord]?
+    public var brain: BrainBackupPayload?
     public var report: BackupImportReport
 }
 
@@ -176,6 +177,8 @@ public enum BackupImporter {
                     contents.artistImages = try ArtistImagesModule.restore(payload: payload)
                 case .aiUsageLogs:
                     contents.aiUsage = try AiUsageModule.restore(payload: payload)
+                case .brain:
+                    contents.brain = try BrainBackupModule.restore(payload: payload)
                 }
             } catch {
                 contents.report.failed[section] = backupErrorMessage(error)

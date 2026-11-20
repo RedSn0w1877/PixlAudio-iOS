@@ -16,6 +16,9 @@ struct YourSoundView: View {
     @State private var model = YourSoundModel()
     @State private var confirmsReset = false
     @State private var toast: String?
+    /// The island whose sheet is open (8.6 point 1), and the families of the genre tree that are open (8.6 point 2).
+    @State private var openIsland: YourSoundReader.IslandRow?
+    @State private var openFamilies: Set<Int> = []
 
     var body: some View {
         SettingsScaffold(title: YourSoundStrings.title, screenID: "yourSound", spacing: 12, contentToast: $toast) {
@@ -52,6 +55,9 @@ struct YourSoundView: View {
         } message: {
             Text(YourSoundStrings.resetBody)
         }
+        .sheet(item: $openIsland) { island in
+            islandSheet(island)
+        }
     }
 
     // MARK: Sections
@@ -61,16 +67,31 @@ struct YourSoundView: View {
         if !state.islands.isEmpty {
             section(YourSoundStrings.now, hint: YourSoundStrings.nowHint) {
                 ForEach(Array(state.islands.prefix(6)), id: \.id) { row in
-                    bar(row.name ?? YourSoundStrings.islandUnnamed, row.permille)
+                    Button { openIsland = row } label: { bar(row.name ?? YourSoundStrings.islandUnnamed, row.permille) }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("yourSound.island.\(row.id)")
                 }
             }
         }
         if !state.genres.isEmpty {
             section(YourSoundStrings.genres) {
-                ForEach(state.genres, id: \.atlasId) { row in
-                    Button { router.push(.genrePage(atlasId: row.atlasId)) } label: { bar(row.name, row.permille) }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("yourSound.genre.\(row.atlasId)")
+                if state.genreTree.isEmpty {
+                    ForEach(state.genres, id: \.atlasId) { row in genreButton(row) }
+                } else {
+                    // The atlas tree: a family opens to the genres played inside it; a genre opens its page.
+                    ForEach(state.genreTree, id: \.rootId) { family in
+                        let open = openFamilies.contains(family.rootId)
+                        Button {
+                            if open { openFamilies.remove(family.rootId) } else { openFamilies.insert(family.rootId) }
+                        } label: { bar(family.name, family.permille) }
+                            .buttonStyle(.plain)
+                            .accessibilityHint(YourSoundStrings.familyOpen)
+                            .accessibilityValue(open ? "expanded" : "collapsed")
+                            .accessibilityIdentifier("yourSound.family.\(family.rootId)")
+                        if open {
+                            ForEach(family.children, id: \.atlasId) { row in genreButton(row).padding(.leading, 16) }
+                        }
+                    }
                 }
             }
         }
@@ -95,12 +116,72 @@ struct YourSoundView: View {
                 }
             }
         }
+        if !state.lately.isEmpty {
+            section(YourSoundStrings.lately) {
+                if !state.lately.up.isEmpty { line(YourSoundStrings.latelyUp(state.lately.up.joined(separator: ", "))) }
+                if !state.lately.down.isEmpty { line(YourSoundStrings.latelyDown(state.lately.down.joined(separator: ", "))) }
+            }
+        }
         if let novelty = state.novelty {
             section(YourSoundStrings.newAndFamiliar) {
                 line(YourSoundStrings.novelty(novelty.permille / 10))
             }
         }
         section(YourSoundStrings.model) { modelLines(state) }
+    }
+
+    private func genreButton(_ row: YourSoundReader.GenreRow) -> some View {
+        Button { router.push(.genrePage(atlasId: row.atlasId)) } label: { bar(row.name, row.permille) }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("yourSound.genre.\(row.atlasId)")
+    }
+
+    /// What tapping an island shows (8.6 point 1): its top artists and songs by name, and, when the island has a genre the app may
+    /// name, Play station and More of this / Less of this on that genre. Names the brain does not know are not here.
+    private func islandSheet(_ island: YourSoundReader.IslandRow) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(island.name ?? YourSoundStrings.islandUnnamed)
+                    .pixlFont(.headlineSmall, weight: .bold).foregroundStyle(theme.onSurface)
+                    .accessibilityAddTraits(.isHeader)
+                if !island.topArtists.isEmpty {
+                    Text(YourSoundStrings.islandArtists).pixlFont(.titleSmall).foregroundStyle(theme.primary)
+                    ForEach(island.topArtists, id: \.self) { name in line(name) }
+                }
+                if !island.topSongs.isEmpty {
+                    Text(YourSoundStrings.islandSongs).pixlFont(.titleSmall).foregroundStyle(theme.primary)
+                    ForEach(island.topSongs, id: \.self) { name in line(name) }
+                }
+                if let genre = island.genreName {
+                    HStack(spacing: 8) {
+                        Button(YourSoundStrings.islandMore) { adjust(genre, more: true) }.buttonStyle(.bordered)
+                        Button(YourSoundStrings.islandLess) { adjust(genre, more: false) }.buttonStyle(.bordered)
+                    }
+                    Button {
+                        let id = island.genreId
+                        openIsland = nil
+                        env.brainActions.startGenreStation(kind: StationCard.kindGenre, atlasId: id, name: genre)
+                    } label: {
+                        Text(YourSoundStrings.islandPlayStation).pixlFont(.labelLarge).frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("yourSound.island.playStation")
+                }
+                Button(YourSoundStrings.islandClose) { openIsland = nil }
+                    .buttonStyle(.plain).foregroundStyle(theme.primary)
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func adjust(_ genre: String, more: Bool) {
+        Task {
+            let ok = await env.brainActions.adjustGenre(genre, more: more)
+            toast = ok ? (more ? YourSoundStrings.genreMoreDone(genre) : YourSoundStrings.genreLessDone(genre))
+                : YourSoundStrings.genreAdjustFailed
+        }
     }
 
     /// The model's lines: only what is true of its state right now (`ModelVoice`); a figure only when it was computed from graded plays.

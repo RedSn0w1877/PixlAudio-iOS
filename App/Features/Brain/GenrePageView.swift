@@ -11,12 +11,14 @@ struct GenrePageView: View {
     @Environment(Router.self) private var router
     @Environment(\.appTheme) private var theme
     @State private var facts: YourSoundReader.GenreFacts?
+    @State private var extras = YourSoundReader.GenreExtras.none
     @State private var loaded = false
+    @State private var toast: String?
 
     private static let maxLinks = 30
 
     var body: some View {
-        SettingsScaffold(title: facts?.name ?? "", screenID: "genrePage", spacing: 12) {
+        SettingsScaffold(title: facts?.name ?? "", screenID: "genrePage", spacing: 12, contentToast: $toast) {
             if let facts {
                 VStack(alignment: .leading, spacing: 8) {
                     if let origin = facts.origin {
@@ -36,6 +38,17 @@ struct GenrePageView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .accessibilityIdentifier("genrePage.playStation")
+                HStack(spacing: 8) {
+                    Button(YourSoundStrings.genreMore) { adjust(facts.name, more: true) }.buttonStyle(.bordered)
+                        .accessibilityIdentifier("genrePage.more")
+                    Button(YourSoundStrings.genreLess) { adjust(facts.name, more: false) }.buttonStyle(.bordered)
+                        .accessibilityIdentifier("genrePage.less")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 4)
+                names(YourSoundStrings.genreKeyArtists, extras.keyArtists)
+                names(YourSoundStrings.genreFromLibrary, extras.libraryArtists)
+                you(extras.you)
                 family(YourSoundStrings.genreComesFrom, facts.parents)
                 family(YourSoundStrings.genreBranches, facts.children)
                 family(YourSoundStrings.genreCloseTo, facts.related)
@@ -45,8 +58,57 @@ struct GenrePageView: View {
             }
         }
         .task {
-            if let reader = env.brain.yourSound { facts = await reader.genrePage(atlasId) }
+            if let reader = env.brain.yourSound {
+                facts = await reader.genrePage(atlasId)
+                extras = await reader.genreExtras(atlasId)
+            }
             loaded = true
+        }
+    }
+
+    private func adjust(_ name: String, more: Bool) {
+        Task {
+            let ok = await env.brainActions.adjustGenre(name, more: more)
+            toast = ok ? (more ? YourSoundStrings.genreMoreDone(name) : YourSoundStrings.genreLessDone(name))
+                : YourSoundStrings.genreAdjustFailed
+        }
+    }
+
+    /// A list of names the brain knows; absent when there is none.
+    @ViewBuilder
+    private func names(_ title: String, _ list: [String]) -> some View {
+        if !list.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).pixlFont(.titleSmall).foregroundStyle(theme.primary).accessibilityAddTraits(.isHeader)
+                ForEach(list, id: \.self) { name in
+                    Text(name).pixlFont(.bodyMedium).foregroundStyle(theme.onSurface)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 4)
+        }
+    }
+
+    /// "You and this genre" (8.7): first play, share and the tracks played most; absent for a genre never played.
+    @ViewBuilder
+    private func you(_ you: YourSoundReader.You?) -> some View {
+        if let you {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(YourSoundStrings.genreYou).pixlFont(.titleSmall).foregroundStyle(theme.primary).accessibilityAddTraits(.isHeader)
+                Text(YourSoundStrings.genreYouFirst(Date(timeIntervalSince1970: TimeInterval(you.firstPlayedMs) / 1000)
+                    .formatted(.dateTime.day().month(.abbreviated).year())))
+                    .pixlFont(.bodyMedium).foregroundStyle(theme.onSurface)
+                Text(YourSoundStrings.genreYouShare(you.permille / 10, you.plays))
+                    .pixlFont(.bodyMedium).foregroundStyle(theme.onSurface)
+                if !you.topSongs.isEmpty {
+                    Text(YourSoundStrings.genreYouTop).pixlFont(.labelLarge).foregroundStyle(theme.onSurfaceVariant)
+                    ForEach(you.topSongs, id: \.self) { name in
+                        Text(name).pixlFont(.bodyMedium).foregroundStyle(theme.onSurface).lineLimit(2)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 4)
         }
     }
 

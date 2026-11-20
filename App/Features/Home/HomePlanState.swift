@@ -107,6 +107,8 @@ final class HomePlanState {
     @ObservationIgnored var recent: RecentContexts?
     @ObservationIgnored var coldStart: ColdStart?
     @ObservationIgnored var picked: PickedArtists?
+    /// The shelf bandit's store (5.10): told what the page showed and what was started from it. Its work is off the main actor.
+    @ObservationIgnored var shelfStore: ShelfStore?
 
     @ObservationIgnored private var current: HomePlan?
     @ObservationIgnored private var pending: HomePlan?
@@ -280,6 +282,26 @@ final class HomePlanState {
         }.flatMap { $0 }
         if !outside.isEmpty { register(outside) }
         if let release = rendered.hero?.release { register(release.tracks) }
+        // The page was shown: its shelves are one visit for the shelf bandit (5.10). Off the main actor, never waited for.
+        if next.owned, !next.shelves.isEmpty, let shelfStore {
+            var typeOf: [String: Int32] = [:]
+            for shelf in plan.shelves { typeOf[shelf.id] = shelf.type }
+            let ids = next.shelves.map(\.id).filter { typeOf[$0] != nil }
+            let types = ids.compactMap { typeOf[$0] }
+            let daypart = Int(plan.daypart)
+            Task.detached(priority: .utility) { await shelfStore.onPlanShown(ids: ids, types: types, daypart: daypart) }
+        }
+    }
+
+    /// A shelf was on screen for a second; something was started from a shelf (the shelf bandit, 5.10).
+    func shelfSeen(_ shelfId: String) {
+        guard let shelfStore else { return }
+        Task.detached(priority: .utility) { await shelfStore.onShelfSeen(shelfId) }
+    }
+
+    func shelfActivated(_ shelfId: String) {
+        guard let shelfStore else { return }
+        Task.detached(priority: .utility) { await shelfStore.onShelfActivated(shelfId) }
     }
 
     private func tiles() async -> [TileUi] {
@@ -445,6 +467,8 @@ final class HomePlanState {
         case "step_sideways_subtitle": BrainStrings.homeStepSidewaysSubtitle(arg)
         case "more_like_album": BrainStrings.homeMoreLikeAlbum(arg)
         case "more_like_album_subtitle": BrainStrings.homeMoreLikeAlbumSubtitle
+        case "your_daypart": BrainStrings.homeDaypart(Int(arg) ?? 0)
+        case "your_daypart_subtitle": BrainStrings.homeDaypartSubtitle
         default: ""
         }
     }

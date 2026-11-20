@@ -55,6 +55,19 @@ public enum BrainFeedback {
                            expiresDays: moreLikeDays, source: .user)
     }
 
+    public static let reasonMoreGenre = "More of this genre"
+    public static let reasonLessGenre = "Less of this genre"
+
+    /// "More of this" / "Less of this" on a genre (8.7): the existing boost or reduce on a genre at the default strength, with no
+    /// end date. It also writes the pseudo-count of 4.4 on the genre's tag at the next replay (the engine asks for one). `name` is
+    /// the genre as the atlas spells it. Nil when the name folds to nothing.
+    public static func genreChange(name: String, more: Bool) -> TasteChange? {
+        let key = TasteKey.of(name)
+        if key.isEmpty { return nil }
+        return TasteChange(action: more ? .boost : .reduce, targetType: .genre, key: key, label: name,
+                           reason: more ? reasonMoreGenre : reasonLessGenre, source: .user)
+    }
+
     /// "Mute X": the artist leaves everything the app picks by itself. Nil when the name folds to nothing.
     public static func muteArtistChange(artistName: String) -> TasteChange? {
         let key = TasteKey.of(artistName)

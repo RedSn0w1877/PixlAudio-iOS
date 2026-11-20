@@ -20,6 +20,7 @@ public enum BackupSection: String, Sendable, Hashable, CaseIterable, Codable {
     case artistImages = "artist_images"
     case equalizer = "equalizer"
     case aiUsageLogs = "ai_usage_logs"
+    case brain = "brain"
 
     public var key: String { rawValue }
 
@@ -38,6 +39,7 @@ public enum BackupSection: String, Sendable, Hashable, CaseIterable, Codable {
         case .artistImages: "ARTIST_IMAGES"
         case .equalizer: "EQUALIZER"
         case .aiUsageLogs: "AI_USAGE_LOGS"
+        case .brain: "BRAIN"
         }
     }
 
@@ -56,6 +58,7 @@ public enum BackupSection: String, Sendable, Hashable, CaseIterable, Codable {
         case .artistImages: "Artist Images"
         case .equalizer: "Equalizer"
         case .aiUsageLogs: "AI Activity Logs"
+        case .brain: "Music picks"
         }
     }
 
@@ -73,6 +76,7 @@ public enum BackupSection: String, Sendable, Hashable, CaseIterable, Codable {
         case .artistImages: "Cached artist image URLs from Deezer."
         case .equalizer: "Your custom equalizer presets and audio profiles."
         case .aiUsageLogs: "History of AI requests and token consumption."
+        case .brain: "Your taste changes, what you asked not to count, and the seed of your picks."
         }
     }
 
@@ -91,6 +95,7 @@ public enum BackupSection: String, Sendable, Hashable, CaseIterable, Codable {
         case .artistImages: "person.crop.circle"
         case .equalizer: "slider.vertical.3"
         case .aiUsageLogs: "chart.bar.doc.horizontal"
+        case .brain: "wand.and.stars"
         }
     }
 
@@ -98,7 +103,7 @@ public enum BackupSection: String, Sendable, Hashable, CaseIterable, Codable {
     public var sinceVersion: Int {
         switch self {
         case .quickFill, .artistImages, .equalizer: 3
-        case .aiUsageLogs: 4
+        case .aiUsageLogs, .brain: 4
         default: 1
         }
     }

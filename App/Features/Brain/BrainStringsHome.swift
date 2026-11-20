@@ -20,6 +20,22 @@ nonisolated extension BrainStrings {
     }
     static func homeMoreLikeAlbum(_ album: String) -> String { String(localized: "More like \(album)") }
     static var homeMoreLikeAlbumSubtitle: String { String(localized: "Music close to an album you just finished") }
+
+    // Stage 3 completion: the daypart mix shelf (8.1). `bucket` is `ContextLift.bucket`: 0..3 weekday morning to night, 4..7 weekend.
+    // The buckets are weekday and weekend, so the titles say so and never name one weekday the data does not make a claim about.
+    static func homeDaypart(_ bucket: Int) -> String {
+        switch bucket {
+        case 0: String(localized: "Your weekday mornings")
+        case 1: String(localized: "Your weekday afternoons")
+        case 2: String(localized: "Your weekday evenings")
+        case 3: String(localized: "Your weeknights")
+        case 4: String(localized: "Your weekend mornings")
+        case 5: String(localized: "Your weekend afternoons")
+        case 6: String(localized: "Your weekend evenings")
+        default: String(localized: "Your weekend nights")
+        }
+    }
+    static var homeDaypartSubtitle: String { String(localized: "Music from the side of your taste you play at this time of the week") }
     static var homeCouldNotPlay: String { String(localized: "Could not play that right now. Try again in a moment.") }
     static var whyAdjacentGenre: String { String(localized: "A genre next to what you play") }
 

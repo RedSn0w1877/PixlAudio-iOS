@@ -73,6 +73,30 @@ nonisolated enum YourSoundStrings {
     static var genreShapedBy: String { String(localized: "Shaped by") }
     static var genrePlayStation: String { String(localized: "Play station") }
 
+    // MARK: Stage 3 completion: Lately, the genre tree, the island sheet, the genre page's own sections (8.6, 8.7)
+
+    static var lately: String { String(localized: "Lately") }
+    static func latelyUp(_ names: String) -> String { String(localized: "Up: \(names)") }
+    static func latelyDown(_ names: String) -> String { String(localized: "Down: \(names)") }
+    static var islandArtists: String { String(localized: "Top artists") }
+    static var islandSongs: String { String(localized: "Top songs") }
+    static var islandPlayStation: String { String(localized: "Play station") }
+    static var islandMore: String { String(localized: "More of this") }
+    static var islandLess: String { String(localized: "Less of this") }
+    static var islandClose: String { String(localized: "Close") }
+    static var familyOpen: String { String(localized: "Show the genres inside") }
+    static var genreKeyArtists: String { String(localized: "Key artists") }
+    static var genreFromLibrary: String { String(localized: "From your library") }
+    static var genreYou: String { String(localized: "You and this genre") }
+    static func genreYouFirst(_ date: String) -> String { String(localized: "First played \(date)") }
+    static func genreYouShare(_ percent: Int, _ plays: Int) -> String { String(localized: "\(percent)% of your listening, \(plays) plays") }
+    static var genreYouTop: String { String(localized: "Played most") }
+    static var genreMore: String { String(localized: "More of this") }
+    static var genreLess: String { String(localized: "Less of this") }
+    static func genreMoreDone(_ name: String) -> String { String(localized: "Got it. You will hear more \(name).") }
+    static func genreLessDone(_ name: String) -> String { String(localized: "Got it. You will hear less \(name).") }
+    static var genreAdjustFailed: String { String(localized: "That change could not be saved.") }
+
     static func daypartName(_ daypart: Int) -> String {
         switch Int32(daypart) {
         case HomePlanner.daypartMorning: morning

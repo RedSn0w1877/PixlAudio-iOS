@@ -25,10 +25,13 @@ public struct StoredMixItem: Sendable, Hashable, Codable {
     public var whyName: String
     public var retrQ: Int
     public var radioRank: Int
+    /// The slot was an exploration slot: the arm bandit drew its arm (5.10).
+    public var explore: Bool
 
     public init(rid: Int64, songId: String? = nil, row: StoredRadioRow? = nil, arm: Int32 = Arm.none, slot: Int = -1,
                 whyKey: Int32 = WhyLine.none, whyArg: Int64 = 0, whyName: String = "", retrQ: Int = -1,
-                radioRank: Int = -1) {
+                radioRank: Int = -1, explore: Bool = false) {
+        self.explore = explore
         self.rid = rid
         self.songId = songId
         self.row = row
@@ -44,7 +47,7 @@ public struct StoredMixItem: Sendable, Hashable, Codable {
     public var isOutsideLibrary: Bool { songId == nil }
 
     private enum CodingKeys: String, CodingKey {
-        case rid, songId, row, arm, slot, whyKey, whyArg, whyName, retrQ, radioRank
+        case rid, songId, row, arm, slot, whyKey, whyArg, whyName, retrQ, radioRank, explore
     }
 
     public init(from decoder: any Decoder) throws {
@@ -59,6 +62,7 @@ public struct StoredMixItem: Sendable, Hashable, Codable {
         whyName = try c.decodeIfPresent(String.self, forKey: .whyName) ?? ""
         retrQ = try c.decodeIfPresent(Int.self, forKey: .retrQ) ?? -1
         radioRank = try c.decodeIfPresent(Int.self, forKey: .radioRank) ?? -1
+        explore = try c.decodeIfPresent(Bool.self, forKey: .explore) ?? false
     }
 }
 
@@ -88,10 +92,16 @@ public struct StoredMix: Sendable, Hashable, Codable {
     public var number: Int
     /// "Soft pop & R&B · Sabrina Carpenter, Chappell Roan": real genres and artists, never invented; empty when nothing is known.
     public var subtitle: String
+    /// The list was ranked with the prior as a control (5.12 point 8), decided when it was built.
+    public var control: Bool
+    /// 1 when the learned weights ranked the list, 0 for the prior (decided when it was built).
+    public var model: Int
 
     public init(kind: Int32, builtAtMs: Int64, seed: Int64, regenerate: Int32 = 0, novelty: Int = Novelty.blend,
                 tasteSignature: String = "", seedLists: Int = 0, items: [StoredMixItem], mixId: String = "",
-                islandId: Int = 0, number: Int = 0, subtitle: String = "") {
+                islandId: Int = 0, number: Int = 0, subtitle: String = "", control: Bool = false, model: Int = 0) {
+        self.control = control
+        self.model = model
         self.mixId = mixId
         self.islandId = islandId
         self.number = number
@@ -110,7 +120,7 @@ public struct StoredMix: Sendable, Hashable, Codable {
     public var novelCount: Int { items.filter(\.isOutsideLibrary).count }
 
     private enum CodingKeys: String, CodingKey {
-        case v, kind, builtAtMs, seed, regenerate, novelty, tasteSignature, seedLists, items, mixId, islandId, number, subtitle
+        case v, kind, builtAtMs, seed, regenerate, novelty, tasteSignature, seedLists, items, mixId, islandId, number, subtitle, control, model
     }
 
     public init(from decoder: any Decoder) throws {
@@ -128,6 +138,8 @@ public struct StoredMix: Sendable, Hashable, Codable {
         islandId = try c.decodeIfPresent(Int.self, forKey: .islandId) ?? 0
         number = try c.decodeIfPresent(Int.self, forKey: .number) ?? 0
         subtitle = try c.decodeIfPresent(String.self, forKey: .subtitle) ?? ""
+        control = try c.decodeIfPresent(Bool.self, forKey: .control) ?? false
+        model = try c.decodeIfPresent(Int.self, forKey: .model) ?? 0
     }
 }
 
@@ -164,12 +176,21 @@ public struct MixView: Sendable {
     public var subtitle: String
     /// By song id: the recording id of each row (the Home page rules and the plan read it).
     public var rids: [String: Int64]
+    /// The list as it was saved (its rows outside the library are what a shelf of it needs to play them).
+    public var storedItems: [StoredMixItem]
+    /// How the list was ranked, decided when it was built (5.12 point 8).
+    public var control: Bool
+    public var model: Int
 
     public var isEmpty: Bool { songs.isEmpty }
 
     public init(kind: Int32, builtAtMs: Int64, recId: Int64, songs: [Song], reasons: [String: MixReason],
                 tags: [String: BrainItemTag], novelIds: Set<String>, engineTracks: [EngineTrack], seedLists: Int,
-                spec: MixSpec? = nil, number: Int = 0, subtitle: String = "", rids: [String: Int64] = [:]) {
+                spec: MixSpec? = nil, number: Int = 0, subtitle: String = "", rids: [String: Int64] = [:],
+                storedItems: [StoredMixItem] = [], control: Bool = false, model: Int = 0) {
+        self.storedItems = storedItems
+        self.control = control
+        self.model = model
         self.spec = spec ?? MixSpec(kind: kind)
         self.number = number
         self.subtitle = subtitle
@@ -194,19 +215,25 @@ public enum MixKinds {
     public static let justDropped: Int32 = 3
     public static let onRepeat: Int32 = 4
     public static let rediscover: Int32 = 5
+    /// "Your weekday nights" (stage 3, 6.2): the island that fits this bucket of the week, 25 tracks, 15% new. Planned like a Daily
+    /// Mix of an island.
+    public static let daypart: Int32 = 6
 
     /// Planned by `StationPlanner`; the others are `ListMixes`.
-    public static func usesPlanner(_ kind: Int32) -> Bool { kind == daily || kind == your || kind == firstListen }
+    public static func usesPlanner(_ kind: Int32) -> Bool { kind == daily || kind == your || kind == firstListen || kind == daypart }
 }
 
 /// One list to build or read: its kind and, for a Daily Mix of an island, which island.
 public struct MixSpec: Sendable, Hashable {
     public var kind: Int32
     public var islandId: Int
+    /// For `MixKinds.daypart`: the bucket of the week (0..7, `ContextLift.bucket`).
+    public var part: Int
 
-    public init(kind: Int32, islandId: Int = 0) {
+    public init(kind: Int32, islandId: Int = 0, part: Int = 0) {
         self.kind = kind
         self.islandId = islandId
+        self.part = part
     }
 
     /// The `served_list.surfaceId`; "daily" and "your" are what stage 2a wrote.
@@ -215,6 +242,7 @@ public struct MixSpec: Sendable, Hashable {
         case MixKinds.daily: return islandId > 0 ? "daily:\(islandId)" : "daily"
         case MixKinds.your: return "your"
         case MixKinds.firstListen: return "first"
+        case MixKinds.daypart: return "daypart:\(part):\(islandId)"
         case MixKinds.justDropped: return "dropped"
         case MixKinds.onRepeat: return "repeat"
         default: return "rediscover"
@@ -234,6 +262,11 @@ public struct MixSpec: Sendable, Hashable {
     public static func of(surfaceId: String) -> MixSpec? {
         if surfaceId == "daily" { return MixSpec(kind: MixKinds.daily) }
         if surfaceId.hasPrefix("daily:") { return Int(surfaceId.dropFirst(6)).map { MixSpec(kind: MixKinds.daily, islandId: $0) } }
+        if surfaceId.hasPrefix("daypart:") {
+            let p = surfaceId.split(separator: ":", omittingEmptySubsequences: false)
+            if p.count == 3, let part = Int(p[1]), let island = Int(p[2]) { return MixSpec(kind: MixKinds.daypart, islandId: island, part: part) }
+            return nil
+        }
         switch surfaceId {
         case "your": return MixSpec(kind: MixKinds.your)
         case "first": return MixSpec(kind: MixKinds.firstListen)

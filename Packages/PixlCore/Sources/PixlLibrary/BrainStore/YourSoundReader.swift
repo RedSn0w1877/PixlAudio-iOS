@@ -10,10 +10,60 @@ import PixlModel
 
 /// Reads Your sound and the genre pages.
 public actor YourSoundReader {
-    public struct IslandRow: Sendable, Equatable {
+    /// One island of "Right now": its share, and what tapping it shows (8.6 point 1): its top artists and songs by name (a name the brain
+    /// does not know is left out), and the genre More / Less and "Play station" act on (`genreId` is -1 when the island has no genre
+    /// the app may name).
+    public struct IslandRow: Sendable, Equatable, Identifiable {
         public let id: Int
         public let name: String?
         public let permille: Int
+        public let topArtists: [String]
+        public let topSongs: [String]
+        public let genreId: Int
+        public let genreName: String?
+
+        public init(id: Int, name: String?, permille: Int, topArtists: [String] = [], topSongs: [String] = [], genreId: Int = -1,
+                    genreName: String? = nil) {
+            self.id = id
+            self.name = name
+            self.permille = permille
+            self.topArtists = topArtists
+            self.topSongs = topSongs
+            self.genreId = genreId
+            self.genreName = genreName
+        }
+    }
+
+    /// A family of the genre tree with the genres played inside it (8.6 point 2).
+    public struct GenreFamilyRow: Sendable, Equatable {
+        public let rootId: Int
+        public let name: String
+        public let permille: Int
+        public let children: [GenreRow]
+    }
+
+    /// "Lately" (8.6 point 8): the names whose affinity moved most in 14 days.
+    public struct Lately: Sendable, Equatable {
+        public let up: [String]
+        public let down: [String]
+        public var isEmpty: Bool { up.isEmpty && down.isEmpty }
+        public static let none = Lately(up: [], down: [])
+    }
+
+    /// "You and this genre" (8.7): when it was first played, how much of the listening it is, the tracks played most.
+    public struct You: Sendable, Equatable {
+        public let firstPlayedMs: Int64
+        public let permille: Int
+        public let plays: Int
+        public let topSongs: [String]
+    }
+
+    /// What a genre page says beyond the atlas's own facts, all of it from the listener's own data (8.7).
+    public struct GenreExtras: Sendable, Equatable {
+        public let keyArtists: [String]
+        public let libraryArtists: [String]
+        public let you: You?
+        public static let none = GenreExtras(keyArtists: [], libraryArtists: [], you: nil)
     }
 
     public struct GenreRow: Sendable, Equatable {
@@ -51,6 +101,8 @@ public actor YourSoundReader {
         public let plays: Int
         public let islands: [IslandRow]
         public let genres: [GenreRow]
+        public let genreTree: [GenreFamilyRow]
+        public let lately: Lately
         public let decades: [YourSound.Decade]
         public let dayparts: [DaypartRow]
         public let months: [MonthRow]
@@ -87,13 +139,18 @@ public actor YourSoundReader {
     private let engine: BrainEngine
     private let mixes: BrainMixes
     private let parts: Stage2bParts
+    /// Stage 3: the genre stations (a genre page's "From your library") and the shelf bandit (cleared by a reset). Nil leaves them out.
+    private let genre: GenreStations?
+    private let shelves: ShelfStore?
     private let clock: @Sendable () -> Int64
     private var cached: State?
     /// The island names of one `compute` pass.
     private var nameCache: [Int: String?] = [:]
 
-    public init(engine: BrainEngine, mixes: BrainMixes, parts: Stage2bParts,
+    public init(engine: BrainEngine, mixes: BrainMixes, parts: Stage2bParts, genre: GenreStations? = nil, shelves: ShelfStore? = nil,
                 clock: @escaping @Sendable () -> Int64 = { currentTimeMillis() }) {
+        self.genre = genre
+        self.shelves = shelves
         self.engine = engine
         self.mixes = mixes
         self.parts = parts
@@ -112,6 +169,7 @@ public actor YourSoundReader {
     /// "Reset what I've learned": the weights go back to the prior; the log, the taste changes and the exclusions stay (8.6).
     public func resetLearned() async {
         await engine.resetLearned()
+        await shelves?.reset()
         cached = nil
     }
 
@@ -125,12 +183,34 @@ public actor YourSoundReader {
         var controlFinished = 0
         var learnedPlays = 0
         var learnedFinished = 0
+        /// "Lately" (8.6 point 8): the tables as they are now and as they stood 14 days ago, both made from the log in order, and the
+        /// plays that tags are added from once the track facts are read. Empty unless `pass` was given `lately`.
+        var nowTables = Affinity.State()
+        var earlierTables = Affinity.State()
+        var tagRids: [Int64] = []
+        var tagTimes: [Int64] = []
+        var tagR: [Double] = []
+        var tagC: [Double] = []
     }
 
     /// A counted play is a real listen (not excluded, not silent, and heard to the end or for 30 s). Pure; run off the actor.
-    static func pass(_ events: [PlayEvent]) -> LogPass {
+    static func pass(_ events: [PlayEvent], lately nowMs: Int64? = nil) -> LogPass {
         var out = LogPass()
+        var tracker = GradeTracker()
+        let cutoff = (nowMs ?? 0) - Int64(YourSound.latelyDays) * BrainMath.dayMs
         for e in events {
+            if let nowMs {
+                let t = e.startedAtMs > nowMs ? nowMs : e.startedAtMs
+                let graded = tracker.grade(e, completions: out.nowTables.completions)
+                if !e.has(EventFlags.learnExcluded) && !e.has(EventFlags.neverAudible) {
+                    Affinity.applyEvent(&out.nowTables, e, graded, tMs: t)
+                    if t <= cutoff { Affinity.applyEvent(&out.earlierTables, e, graded, tMs: t) }
+                    out.tagRids.append(e.rid)
+                    out.tagTimes.append(t)
+                    out.tagR.append(graded.r)
+                    out.tagC.append(graded.cOther)
+                }
+            }
             if e.has(EventFlags.learnExcluded) || e.has(EventFlags.neverAudible) { continue }
             let listened = e.endReason == EndReason.trackDone || e.playedMs < 0 || e.playedMs >= listenMs
             if listened {
@@ -163,7 +243,7 @@ public actor YourSoundReader {
 
         // The log, in order. The file is read here and decoded and counted off this actor.
         let payloads = await engine.eventPayloads()
-        let log = await Task.detached(priority: .utility) { Self.pass(BrainEventLog.decodeSorted(payloads)) }.value
+        let log = await Task.detached(priority: .utility) { Self.pass(BrainEventLog.decodeSorted(payloads), lately: now) }.value
         let plays = YourSound.withFirsts(rids: log.rids, aids: log.aids, startedAtMs: log.starts, tzOffsetMin: log.tzs)
         let set = await parts.islands.current()
         let memberOf = set?.memberOf ?? [:]
@@ -173,9 +253,49 @@ public actor YourSoundReader {
         // Island names: the same words the Daily Mixes carry (an island is named only when enough of it has a genre).
         nameCache = [:]
 
+        // The track facts of every recording played: tags (genres), years, titles. Unknown stays unknown.
+        var topTag: [Int64: Int] = [:]
+        var tagVectors: [Int64: Tags.Vector] = [:]
+        var year: [Int64: Int] = [:]
+        var title: [Int64: String] = [:]
+        if let dna = parts.dna {
+            let distinct = Array(Set(log.rids).union(log.tagRids)).sorted()
+            var from = 0
+            while from < distinct.count {
+                let to = min(from + Self.dnaChunk, distinct.count)
+                for row in await dna.tracks(Array(distinct[from..<to])) {
+                    let v = Tags.decode(Array(row.tags))
+                    if !v.isEmpty {
+                        topTag[row.rid] = v.top
+                        tagVectors[row.rid] = v
+                    }
+                    if row.firstYear > 0 { year[row.rid] = row.firstYear }
+                    if !BrainText.isBlank(row.title) {
+                        title[row.rid] = BrainText.isBlank(row.artistDisplay) ? row.title : "\(row.title) · \(row.artistDisplay)"
+                    }
+                }
+                from = to
+            }
+        }
+
+        let islandShares = YourSound.islands(plays, islandOf: islandOf, nowMs: now)
+        // Artist names, for the islands' top artists and for "Lately": the names the brain knows (an unknown one is left out).
+        var artistNames: [Int64: String] = [:]
+        var wanted: [Int64] = []
+        for share in islandShares { for aid in share.topAids where !wanted.contains(aid) { wanted.append(aid) } }
+        artistNames.merge(await namesOf(artists: wanted)) { _, new in new }
+
         var islandRows: [IslandRow] = []
-        for share in YourSound.islands(plays, islandOf: islandOf, nowMs: now) {
-            islandRows.append(IslandRow(id: share.islandId, name: await nameOf(share.islandId, set, now), permille: share.permille))
+        for share in islandShares {
+            let island = set?.islands.first { $0.id == share.islandId }
+            var genreId = -1
+            if let island, let atlas {
+                genreId = island.topTags.first { AtlasNames.genreName(atlas, $0) != nil } ?? -1
+            }
+            islandRows.append(IslandRow(
+                id: share.islandId, name: await nameOf(share.islandId, set, now), permille: share.permille,
+                topArtists: share.topAids.compactMap { artistNames[$0] }, topSongs: share.topRids.compactMap { title[$0] },
+                genreId: genreId, genreName: genreId >= 0 ? atlas.flatMap { AtlasNames.genreName($0, genreId) } : nil))
         }
         var dayparts: [DaypartRow] = []
         for d in YourSound.dayparts(plays, islandOf: islandOf) {
@@ -189,32 +309,65 @@ public actor YourSoundReader {
             months.append(MonthRow(month: m.month, plays: m.plays, islands: shares))
         }
 
-        // Genres and years: what the track facts hold for the recordings played; unknown stays unknown.
-        var topTag: [Int64: Int] = [:]
-        var year: [Int64: Int] = [:]
-        if let dna = parts.dna {
-            let distinct = Array(Set(log.rids)).sorted()
-            var from = 0
-            while from < distinct.count {
-                let to = min(from + Self.dnaChunk, distinct.count)
-                for row in await dna.tracks(Array(distinct[from..<to])) {
-                    let v = Tags.decode(Array(row.tags))
-                    if !v.isEmpty { topTag[row.rid] = v.top }
-                    if row.firstYear > 0 { year[row.rid] = row.firstYear }
-                }
-                from = to
-            }
-        }
         var genreRows: [GenreRow] = []
+        var genreTree: [GenreFamilyRow] = []
         if let atlas {
             for g in YourSound.genres(plays, topTagOf: { topTag[$0] ?? GenreAtlas.none }) {
                 if let name = AtlasNames.genreName(atlas, g.atlasId) {
                     genreRows.append(GenreRow(atlasId: g.atlasId, name: name, permille: g.permille))
                 }
             }
+            // The atlas tree: families (roots) with the genres played inside them. A family or genre the app does not name is absent.
+            var rootCache: [Int: Int] = [:]
+            let rootOf: (Int) -> Int = { id in
+                if let known = rootCache[id] { return known }
+                var best = id
+                for ancestor in atlas.ancestors(id) where (atlas.genre(ancestor)?.depth ?? 1) == 0 {
+                    best = ancestor
+                    break
+                }
+                rootCache[id] = best
+                return best
+            }
+            for family in YourSound.genreTree(plays, top: 8, topTagOf: { topTag[$0] ?? GenreAtlas.none }, rootOf: rootOf) {
+                guard let name = AtlasNames.genreName(atlas, family.rootId) else { continue }
+                let children = family.children.compactMap { child in
+                    AtlasNames.genreName(atlas, child.atlasId).map { GenreRow(atlasId: child.atlasId, name: $0, permille: child.permille) }
+                }
+                genreTree.append(GenreFamilyRow(rootId: family.rootId, name: name, permille: family.permille, children: children))
+            }
         }
         let decades = YourSound.decades(plays, yearOf: { year[$0] ?? 0 })
         let novelty = YourSound.novelty(plays, nowMs: now)
+
+        // "Lately": add the tags to the two sets of tables, then read the largest moves.
+        var nowTables = log.nowTables
+        var earlierTables = log.earlierTables
+        let cutoff = now - Int64(YourSound.latelyDays) * BrainMath.dayMs
+        var lately = Lately.none
+        if let atlas {
+            for i in log.tagRids.indices {
+                guard let v = tagVectors[log.tagRids[i]] else { continue }
+                let t = log.tagTimes[i]
+                for tg in v.tags {
+                    let part = Double(tg.q) / 255.0
+                    Affinity.apply(&nowTables, family: Family.tag, key: Int64(tg.atlasId), r: log.tagR[i], c: log.tagC[i], part: part, tMs: t)
+                    if t <= cutoff {
+                        Affinity.apply(&earlierTables, family: Family.tag, key: Int64(tg.atlasId), r: log.tagR[i], c: log.tagC[i], part: part, tMs: t)
+                    }
+                }
+            }
+            let moves = YourSound.lately(before: earlierTables, after: nowTables, beforeMs: cutoff, nowMs: now)
+            artistNames.merge(await namesOf(artists: moves.filter { $0.family == Family.artist }.map(\.key))) { _, new in new }
+            var up: [String] = []
+            var down: [String] = []
+            for m in moves {
+                let name = m.family == Family.artist ? artistNames[m.key] : AtlasNames.genreName(atlas, Int(m.key))
+                guard let name else { continue }
+                if m.delta > 0.0 { up.append(name) } else { down.append(name) }
+            }
+            lately = Lately(up: up, down: down)
+        }
 
         var control: Control?
         if log.controlPlays + log.learnedPlays > 0 {
@@ -226,8 +379,24 @@ public actor YourSoundReader {
                 learnedPermille: log.controlPlays >= Gate.controlMinPlays && log.learnedPlays > 0
                     ? Int(Double(log.learnedFinished) / Double(log.learnedPlays) * 1000.0 + 0.5) : nil)
         }
-        return State(plays: plays.count, islands: islandRows, genres: genreRows, decades: decades, dayparts: dayparts,
-                     months: months, novelty: novelty.plays > 0 ? novelty : nil, model: model, control: control, computedAtMs: now)
+        return State(plays: plays.count, islands: islandRows, genres: genreRows, genreTree: genreTree, lately: lately,
+                     decades: decades, dayparts: dayparts, months: months, novelty: novelty.plays > 0 ? novelty : nil, model: model,
+                     control: control, computedAtMs: now)
+    }
+
+    /// The names the brain knows for `aids`: an artist it holds no row for, or whose name the app does not say, is absent.
+    private func namesOf(artists aids: [Int64]) async -> [Int64: String] {
+        guard let dna = parts.dna else { return [:] }
+        var out: [Int64: String] = [:]
+        var from = 0
+        while from < aids.count {
+            let to = min(from + Self.dnaChunk, aids.count)
+            for row in await dna.artists(Array(aids[from..<to])) where !BrainText.isBlank(row.name) && AtlasNames.isShown(row.name) {
+                out[row.aid] = row.name
+            }
+            from = to
+        }
+        return out
     }
 
     /// An island's name, the same words the Daily Mixes carry (an island is named only when enough of it has a genre).
@@ -249,6 +418,79 @@ public actor YourSoundReader {
     public func genrePage(_ id: Int) async -> GenreFacts? {
         guard let atlas = await parts.atlas.atlas() else { return nil }
         return Self.facts(atlas, id)
+    }
+
+    /// What a genre page says beyond the atlas's own facts (8.7), all of it from the listener's own data: the artists the brain
+    /// knows with the most of this genre in them, the artists of the listener's library under it, and "You and this genre". Nothing is
+    /// guessed: an artist with no known genre is absent, and the "you" part does not exist for a genre the listener never played.
+    public func genreExtras(_ id: Int) async -> GenreExtras {
+        guard let atlas = await parts.atlas.atlas() else { return .none }
+        return GenreExtras(keyArtists: await keyArtists(atlas, id), libraryArtists: await libraryArtists(id),
+                           you: await youAndGenre(atlas, id))
+    }
+
+    static let keyArtistCount = 8
+
+    /// Whether a tag is the genre or one of its descendants.
+    static func under(_ atlas: GenreAtlas, _ tag: Int, _ id: Int) -> Bool { tag == id || atlas.ancestors(tag).contains(id) }
+
+    /// The artists the brain holds a genre vector for, the largest weight under `id` first (ties: the smaller id).
+    private func keyArtists(_ atlas: GenreAtlas, _ id: Int) async -> [String] {
+        guard let dna = parts.dna else { return [] }
+        var scored: [(aid: Int64, best: Int, name: String)] = []
+        for row in await dna.artistsWithTags() {
+            let v = Tags.decode(Array(row.tags))
+            var best = 0
+            for t in v.tags where Int(t.q) > best && Self.under(atlas, t.atlasId, id) { best = Int(t.q) }
+            if best <= 0 || !AtlasNames.isShown(row.name) { continue }
+            scored.append((row.aid, best, row.name))
+        }
+        scored.sort { $0.best != $1.best ? $0.best > $1.best : $0.aid < $1.aid }
+        return scored.prefix(Self.keyArtistCount).map(\.name)
+    }
+
+    /// The artists of the listener's own songs under the genre, the one with the most of them first.
+    private func libraryArtists(_ id: Int) async -> [String] {
+        guard let genre else { return [] }
+        let songs = await genre.songsFor(kind: StationCard.kindGenre, atlasId: id, nowMs: clock())
+        var counts: [BrainKey: Int] = [:]
+        var order: [String] = []
+        for song in songs {
+            let name = BrainFeedback.artistOf(song)
+            if BrainText.isBlank(name) || !AtlasNames.isShown(name) { continue }
+            if counts[BrainKey(name)] == nil { order.append(name) }
+            counts[BrainKey(name), default: 0] += 1
+        }
+        let indexed = order.enumerated().map { (index: $0.offset, name: $0.element, count: counts[BrainKey($0.element)] ?? 0) }
+        return indexed.sorted { $0.count != $1.count ? $0.count > $1.count : $0.index < $1.index }
+            .prefix(Self.keyArtistCount).map(\.name)
+    }
+
+    private func youAndGenre(_ atlas: GenreAtlas, _ id: Int) async -> You? {
+        guard let dna = parts.dna else { return nil }
+        let payloads = await engine.eventPayloads()
+        let log = await Task.detached(priority: .utility) { Self.pass(BrainEventLog.decodeSorted(payloads)) }.value
+        if log.rids.isEmpty { return nil }
+        var belongs = Set<Int64>()
+        var title: [Int64: String] = [:]
+        let distinct = Array(Set(log.rids)).sorted()
+        var from = 0
+        while from < distinct.count {
+            let to = min(from + Self.dnaChunk, distinct.count)
+            for row in await dna.tracks(Array(distinct[from..<to])) {
+                let v = Tags.decode(Array(row.tags))
+                if v.tags.contains(where: { Self.under(atlas, $0.atlasId, id) }) {
+                    belongs.insert(row.rid)
+                    if !BrainText.isBlank(row.title) {
+                        title[row.rid] = BrainText.isBlank(row.artistDisplay) ? row.title : "\(row.title) · \(row.artistDisplay)"
+                    }
+                }
+            }
+            from = to
+        }
+        let plays = YourSound.withFirsts(rids: log.rids, aids: log.aids, startedAtMs: log.starts, tzOffsetMin: log.tzs)
+        guard let h = YourSound.genreHistory(plays, top: 5, belongs: { belongs.contains($0) }) else { return nil }
+        return You(firstPlayedMs: h.firstPlayedMs, permille: h.permille, plays: h.plays, topSongs: h.topRids.compactMap { title[$0] })
     }
 
     static func facts(_ atlas: GenreAtlas, _ id: Int) -> GenreFacts? {

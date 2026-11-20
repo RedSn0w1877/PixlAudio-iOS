@@ -232,6 +232,16 @@ final class BrainActions {
         }
     }
 
+    /// "More of this" / "Less of this" on a genre (8.7): the boost or reduce on the genre (no end date), and one replay is asked for so
+    /// the pseudo-count on the genre's tag reaches the picks soon. False when the change could not be stored.
+    func adjustGenre(_ name: String, more: Bool) async -> Bool {
+        guard let change = BrainFeedback.genreChange(name: name, more: more) else { return false }
+        let outcomes = await taste.apply([change])
+        guard BrainFeedback.adjustmentId(of: outcomes.first) != nil else { return false }
+        await brain.engine?.requestRebuild(force: true)
+        return true
+    }
+
     /// "Don't count this" (8.5): the song's plays leave what the picks are based on, now; the bar offers Undo.
     func dontCount(_ song: Song) {
         Task { [weak self] in

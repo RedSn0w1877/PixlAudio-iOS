@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import PixlLibrary
+import PixlBackup
 import PixlModel
 import PixlNet
 
@@ -66,6 +67,9 @@ final class BrainService {
     /// Reads Your sound and the genre pages (8.6, 8.7, stage 3) and resets what was learned. Built with the mixes, never at launch;
     /// nothing is computed until a screen asks. Nil in UI tests.
     private(set) var yourSound: YourSoundReader?
+    /// The Home shelf bandit's store (5.10, stage 3): the page reports what happened on it, off the main actor. Built with the mixes,
+    /// never at launch. Nil in UI tests.
+    private(set) var shelfStore: ShelfStore?
     /// New releases by the artists the listener plays (6.3): one small file Home reads without the brain's state. Nil in UI tests.
     let newReleases: NewReleases?
     /// What the Spotify sync receives with a track and used to drop (13.1). Nil in UI tests.
@@ -186,13 +190,22 @@ final class BrainService {
         let mixes = BrainMixes(directory: directory, repository: repository, engine: engine, sources: sources, parts: kit.parts)
         self.mixes = mixes
         let library = sources.library
+        // Stage 3: the shelf bandit's impressions and the context table behind the daypart shelf. Files are read on first use.
+        let tz = sources.tzOffsetMin
+        let shelves = ShelfStore(directory: directory, engine: engine, tzOffsetMin: tz)
+        shelfStore = shelves
+        let context = ContextStore(engine: engine, islands: kit.parts.islands, tzOffsetMin: tz)
+        // A genre the listener asked for more or less of reaches the picks as a pseudo-count on its tag at the next replay.
+        let atlas = kit.parts.atlas
+        Task { await engine.configureAtlas(atlas) }
         let work = BrainRefreshWork(mixes: mixes, repository: repository, budget: budget,
                                     matchedVideoId: sources.matchedVideoId, newReleases: newReleases,
-                                    librarySongs: { await library() }, dna: knowledge?.lanes)
+                                    librarySongs: { await library() }, dna: knowledge?.lanes, shelves: shelves)
         let allowed: @Sendable () async -> Bool = { @MainActor [weak self] in self?.refreshIsAllowed() ?? false }
         refresh = BrainRefresh(work: work, repository: repository, engine: engine, allowed: allowed)
-        planBuilder = HomePlanBuilder(mixes: mixes, homeRows: homeRows, genre: kit.genre, store: kit.planStore)
-        yourSound = YourSoundReader(engine: engine, mixes: mixes, parts: kit.parts)
+        planBuilder = HomePlanBuilder(mixes: mixes, homeRows: homeRows, genre: kit.genre, store: kit.planStore, context: context,
+                                      shelfStore: shelves)
+        yourSound = YourSoundReader(engine: engine, mixes: mixes, parts: kit.parts, genre: kit.genre, shelves: shelves)
         // The first minute of a new listener (8.10) is lane 1 of the refresh, run while Home is on screen: the same work under
         // the same budget and switches, and never a second background job.
         coldStart = ColdStart(work: work, healthyLists: { await repository.radioListCount() }, allowed: allowed)
@@ -299,6 +312,33 @@ final class BrainService {
         let ids = await repository.resolve(keys: facts.keys, durationMs: Int32(clamping: max(song.duration, 0)),
                                            artistNames: names)
         return await engine.whyFacts(rid: ids.rid, aid: ids.aids.first ?? 0, year: song.year)
+    }
+
+    // MARK: Backup (docs/brain-spec.md, 12.2, 13.2)
+
+    /// The brain's backup module: the salt, the exclusions and the taste changes. Nil when the brain is off.
+    func backupBrain(taste: TasteAdjustmentStore) async -> String? {
+        guard let engine else { return nil }
+        let adjustments = await taste.backupText()
+        let state = await engine.backupState()
+        let rows = state.feedback.map {
+            BrainBackupFeedbackRow(id: $0.id, kind: $0.kind, targetKind: $0.targetKind, targetId: $0.targetId,
+                                   createdAtMs: $0.createdAtMs, undoneAtMs: $0.undoneAtMs)
+        }
+        return BrainBackupModule.export(BrainBackupPayload(salt: state.salt.map(String.init), adjustments: adjustments, feedback: rows))
+    }
+
+    /// A restore: the salt and the exclusions go back, the taste changes are replaced when this app can read them, and one replay in
+    /// the background makes the caches again from the event log. Returns how many entries came back.
+    func restoreBrain(_ payload: BrainBackupPayload, taste: TasteAdjustmentStore) async -> Int {
+        guard let engine else { return 0 }
+        let rows = payload.feedback.map {
+            FeedbackStore.Record(id: $0.id, kind: $0.kind, targetKind: $0.targetKind, targetId: $0.targetId,
+                                 createdAtMs: $0.createdAtMs, undoneAtMs: $0.undoneAtMs)
+        }
+        await engine.restoreBackupState(salt: payload.salt.flatMap { Int64($0) }, feedback: rows)
+        let changes = await taste.restoreFromBackup(payload.adjustments)
+        return rows.count + changes
     }
 
     // MARK: Don't count this (8.5) and Private session

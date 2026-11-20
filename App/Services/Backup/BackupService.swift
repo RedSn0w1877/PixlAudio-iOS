@@ -38,6 +38,10 @@ final class BackupService {
     @ObservationIgnored var importStart: BackupImportFlowView.Start = .pick
     /// A restore finished (whatever it restored): `AppEnvironment` re-reads caches the restored tables feed.
     @ObservationIgnored var onRestored: (() -> Void)?
+    /// The brain's side of the backup (stage 3 completion), set by `AppEnvironment` once the brain exists: its module text, and a
+    /// restore that returns how many entries came back. Nil in UI tests: the module is then an empty one.
+    @ObservationIgnored var brainExport: (@MainActor () async -> String?)?
+    @ObservationIgnored var brainRestore: (@MainActor (BrainBackupPayload) async -> Int)?
 
     @ObservationIgnored private let persistence: PersistenceActor?
     @ObservationIgnored private let library: LibraryStore
@@ -124,6 +128,7 @@ final class BackupService {
         await history.ensureLoaded()
         let events = sections.contains(.playbackHistory) ? history.events : []
         let persistence = self.persistence
+        let brainPayload: String? = sections.contains(.brain) ? await brainExport?() : nil
 
         return try await Task.detached(priority: .userInitiated) { () async throws -> [BackupSection: String] in
             var payloads: [BackupSection: String] = [:]
@@ -185,6 +190,8 @@ final class BackupService {
                     })
                 case .aiUsageLogs:
                     payloads[.aiUsageLogs] = AiUsageModule.export(try await persistence?.backupAIUsage() ?? [])
+                case .brain:
+                    payloads[.brain] = brainPayload ?? BrainBackupModule.export(BrainBackupPayload(salt: nil, adjustments: "", feedback: []))
                 }
             }
             return payloads
@@ -398,6 +405,10 @@ final class BackupService {
             let records = contents.aiUsage ?? []
             try await persistence?.restoreAIUsage(records)
             return records.count
+
+        case .brain:
+            guard let payload = contents.brain else { return 0 }
+            return await brainRestore?(payload) ?? 0
         }
     }
 

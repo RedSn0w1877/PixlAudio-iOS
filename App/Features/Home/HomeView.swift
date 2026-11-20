@@ -262,14 +262,24 @@ struct HomeView: View {
             case .tracks(let tracks):
                 CurrentSongState { currentSongId in
                     HomeDiscoveryShelf(section: tracks.section, currentSongId: currentSongId,
-                                       onPlay: { song in env.brainActions.play(tracks, startingAt: song) })
+                                       onPlay: { song in
+                                           env.homePlan.shelfActivated(tracks.id)
+                                           env.brainActions.play(tracks, startingAt: song)
+                                       })
                 }
-            case .mixes(_, let title, let subtitle, let cards):
-                HomeMixShelf(title: title, subtitle: subtitle, cards: cards, onOpen: openMix)
-            case .stations(_, let title, let subtitle, let cards):
+                .shelfSeen(shelf.id, env.homePlan)
+            case .mixes(let id, let title, let subtitle, let cards):
+                HomeMixShelf(title: title, subtitle: subtitle, cards: cards, onOpen: { card in
+                    env.homePlan.shelfActivated(id)
+                    openMix(card)
+                })
+                .shelfSeen(shelf.id, env.homePlan)
+            case .stations(let id, let title, let subtitle, let cards):
                 HomeStationShelf(title: title, subtitle: subtitle, cards: cards, onStart: { card in
+                    env.homePlan.shelfActivated(id)
                     env.brainActions.startGenreStation(kind: card.kind, atlasId: card.atlasId, name: card.name)
                 })
+                .shelfSeen(shelf.id, env.homePlan)
             }
         }
     }
@@ -416,6 +426,17 @@ private struct HomeTopBar: View {
                 .opacity(scroll.isScrolled ? 1 : 0)
                 .animation(.easeInOut(duration: 0.3), value: scroll.isScrolled)
                 .allowsHitTesting(false)
+        }
+    }
+}
+
+private extension View {
+    /// The shelf was on screen for a second (the shelf bandit, 5.10): a task that starts when the shelf appears and is cancelled when it
+    /// goes, so a shelf scrolled past counts for nothing. One sleep and one call, off the main actor; nothing per frame.
+    func shelfSeen(_ id: String, _ plan: HomePlanState) -> some View {
+        task(id: id) {
+            try? await Task.sleep(for: .seconds(1))
+            if !Task.isCancelled { plan.shelfSeen(id) }
         }
     }
 }

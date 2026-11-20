@@ -108,12 +108,58 @@ public struct StoredHomeItem: Sendable, Hashable, Codable {
     public var slot: Int
     public var retrQ: Int
     public var radioRank: Int
+    /// The slot was an exploration slot (5.10): carried into the play's tag. A row saved before stage 3 says false.
+    public var explore: Bool
+
+    public init(stored: StoredRadioRow, arm: Int32, slot: Int, retrQ: Int, radioRank: Int, explore: Bool = false) {
+        self.stored = stored
+        self.arm = arm
+        self.slot = slot
+        self.retrQ = retrQ
+        self.radioRank = radioRank
+        self.explore = explore
+    }
+
+    private enum CodingKeys: String, CodingKey { case stored, arm, slot, retrQ, radioRank, explore }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        stored = try c.decode(StoredRadioRow.self, forKey: .stored)
+        arm = try c.decode(Int32.self, forKey: .arm)
+        slot = try c.decode(Int.self, forKey: .slot)
+        retrQ = try c.decode(Int.self, forKey: .retrQ)
+        radioRank = try c.decode(Int.self, forKey: .radioRank)
+        explore = try c.decodeIfPresent(Bool.self, forKey: .explore) ?? false
+    }
 }
 
 public struct StoredHomeRow: Sendable, Hashable, Codable {
     public var anchor: HomeAnchor
     public var recId: Int64
     public var items: [StoredHomeItem]
+    /// The row was ranked with the prior as a control (5.12 point 8), decided when it was built.
+    public var control: Bool
+    /// 1 when the learned weights ranked the row, 0 for the prior. A row saved before stage 3 says 0.
+    public var model: Int
+
+    public init(anchor: HomeAnchor, recId: Int64, items: [StoredHomeItem], control: Bool = false, model: Int = 0) {
+        self.anchor = anchor
+        self.recId = recId
+        self.items = items
+        self.control = control
+        self.model = model
+    }
+
+    private enum CodingKeys: String, CodingKey { case anchor, recId, items, control, model }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        anchor = try c.decode(HomeAnchor.self, forKey: .anchor)
+        recId = try c.decode(Int64.self, forKey: .recId)
+        items = try c.decode([StoredHomeItem].self, forKey: .items)
+        control = try c.decodeIfPresent(Bool.self, forKey: .control) ?? false
+        model = try c.decodeIfPresent(Int.self, forKey: .model) ?? 0
+    }
 }
 
 public struct StoredHomeRows: Sendable, Hashable, Codable {
@@ -136,6 +182,7 @@ public struct BrainHomeItem: Sendable, Hashable {
     public var slot: Int
     public var retrQ: Int
     public var radioRank: Int
+    public var explore: Bool = false
 }
 
 /// A "Because you listened to X" row.
@@ -147,6 +194,9 @@ public struct BrainHomeRow: Sendable, Hashable, Identifiable {
     public var anchor: HomeAnchor
     public var recId: Int64
     public var items: [BrainHomeItem]
+    /// How the row was ranked, decided when it was built and carried by every card played from it (5.12 point 8).
+    public var control: Bool = false
+    public var model: Int = 0
 
     /// `because_` and the anchor's recording id in lower-case hexadecimal (Java `Long.toHexString`).
     public static func idOf(anchorRid: Int64) -> String { idPrefix + String(UInt64(bitPattern: anchorRid), radix: 16) }
@@ -163,7 +213,7 @@ public struct BrainHomeRow: Sendable, Hashable, Identifiable {
                 whyKey: WhyLine.nameOf(WhyLine.becauseListened),
                 primaryArtist: artist.flatMap { BrainText.isBlank($0) ? nil : $0 },
                 // The listener chose to play the row: its tracks are theirs, like a playlist's.
-                chosen: true)
+                chosen: true, control: control, modelVersion: model, explore: item.explore)
         }
         return out
     }
@@ -344,16 +394,18 @@ public actor BrainHomeRows {
             let plan = await engine.planHomeRow(candidates: candidates, seed: seedList, count: Self.cards, nowMs: nowMs,
                                                 tzOffsetMin: inputs.tzOffsetMin, excludedRids: usedRids)
             if plan.picks.count < Self.minCards { continue }
+            // How the row was ranked is read off its plan: decided once, when it was built (5.12 point 8).
             var byRid: [Int64: Int] = [:]
             for i in rows.indices { byRid[rows[i].rid] = i }
             var items: [StoredHomeItem] = []
             for pick in plan.picks {
                 guard let i = byRid[pick.rid] else { continue }
                 items.append(StoredHomeItem(stored: rows[i], arm: pick.arm, slot: items.count, retrQ: Int(pick.retrQ),
-                                            radioRank: ranks[i]))
+                                            radioRank: ranks[i], explore: pick.explore))
                 usedRids.insert(pick.rid)
             }
-            out.append(StoredHomeRow(anchor: anchor, recId: (nowMs << 8) | (Self.homeRecTag + Int64(rowIndex)), items: items))
+            out.append(StoredHomeRow(anchor: anchor, recId: (nowMs << 8) | (Self.homeRecTag + Int64(rowIndex)), items: items,
+                                     control: plan.control, model: Int(plan.modelVersion)))
         }
         return out
     }
@@ -374,10 +426,10 @@ public actor BrainHomeRows {
             if age < 0 || age >= HomeAnchors.maxAgeMs || row.items.count < minCards { continue }
             let items = row.items.map { item in
                 BrainHomeItem(track: EngineTrack(row: item.stored.row, rid: item.stored.rid), arm: item.arm,
-                              slot: item.slot, retrQ: item.retrQ, radioRank: item.radioRank)
+                              slot: item.slot, retrQ: item.retrQ, radioRank: item.radioRank, explore: item.explore)
             }
             out.append(BrainHomeRow(id: BrainHomeRow.idOf(anchorRid: row.anchor.rid), anchor: row.anchor,
-                                    recId: row.recId, items: items))
+                                    recId: row.recId, items: items, control: row.control, model: row.model))
         }
         return out
     }

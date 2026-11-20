@@ -17,9 +17,12 @@ public struct PlanItem: Codable, Sendable, Equatable {
     public var whyKey: Int32
     public var whyName: String
     public var slot: Int
+    /// The slot was an exploration slot (5.10): carried into the play's tag.
+    public var explore: Bool
 
     public init(rid: Int64, aid: Int64 = 0, songId: String? = nil, row: StoredRadioRow? = nil, arm: Int32 = Arm.none,
-                whyKey: Int32 = WhyLine.none, whyName: String = "", slot: Int = -1) {
+                whyKey: Int32 = WhyLine.none, whyName: String = "", slot: Int = -1, explore: Bool = false) {
+        self.explore = explore
         self.rid = rid
         self.aid = aid
         self.songId = songId
@@ -28,6 +31,22 @@ public struct PlanItem: Codable, Sendable, Equatable {
         self.whyKey = whyKey
         self.whyName = whyName
         self.slot = slot
+    }
+
+    private enum CodingKeys: String, CodingKey { case rid, aid, songId, row, arm, whyKey, whyName, slot, explore }
+
+    // A plan saved by an earlier stage has no `explore`: it is read as false.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        rid = try c.decode(Int64.self, forKey: .rid)
+        aid = try c.decode(Int64.self, forKey: .aid)
+        songId = try c.decodeIfPresent(String.self, forKey: .songId)
+        row = try c.decodeIfPresent(StoredRadioRow.self, forKey: .row)
+        arm = try c.decode(Int32.self, forKey: .arm)
+        whyKey = try c.decode(Int32.self, forKey: .whyKey)
+        whyName = try c.decode(String.self, forKey: .whyName)
+        slot = try c.decode(Int.self, forKey: .slot)
+        explore = try c.decodeIfPresent(Bool.self, forKey: .explore) ?? false
     }
 }
 
@@ -84,9 +103,15 @@ public struct PlanShelf: Codable, Sendable, Equatable {
     public var mixes: [PlanMix]
     public var stations: [PlanStation]
     public var recId: Int64
+    /// The shelf was ranked with the prior as a control (5.12 point 8), decided when its list was built.
+    public var control: Bool
+    /// 1 when the learned weights ranked it, 0 for the prior and for a shelf nothing ranked.
+    public var model: Int
 
     public init(type: Int32, id: String, titleKey: String, titleArg: String = "", subtitleKey: String = "", items: [PlanItem] = [],
-                mixes: [PlanMix] = [], stations: [PlanStation] = [], recId: Int64 = 0) {
+                mixes: [PlanMix] = [], stations: [PlanStation] = [], recId: Int64 = 0, control: Bool = false, model: Int = 0) {
+        self.control = control
+        self.model = model
         self.type = type
         self.id = id
         self.titleKey = titleKey
@@ -96,6 +121,26 @@ public struct PlanShelf: Codable, Sendable, Equatable {
         self.mixes = mixes
         self.stations = stations
         self.recId = recId
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case type, id, titleKey, titleArg, subtitleKey, items, mixes, stations, recId, control, model
+    }
+
+    // A plan saved by an earlier stage has no `control` and no `model`: it is read as the prior, not a control.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        type = try c.decode(Int32.self, forKey: .type)
+        id = try c.decode(String.self, forKey: .id)
+        titleKey = try c.decode(String.self, forKey: .titleKey)
+        titleArg = try c.decode(String.self, forKey: .titleArg)
+        subtitleKey = try c.decode(String.self, forKey: .subtitleKey)
+        items = try c.decode([PlanItem].self, forKey: .items)
+        mixes = try c.decode([PlanMix].self, forKey: .mixes)
+        stations = try c.decode([PlanStation].self, forKey: .stations)
+        recId = try c.decode(Int64.self, forKey: .recId)
+        control = try c.decodeIfPresent(Bool.self, forKey: .control) ?? false
+        model = try c.decodeIfPresent(Int.self, forKey: .model) ?? 0
     }
 }
 

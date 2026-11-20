@@ -247,11 +247,12 @@ public enum LibraryFactsBuilder {
     }
 
     /// `ridBySongId`: the library by recording; `aidByName`: the ids of `names(...).artists`; `topTrackRids`: the
-    /// ids of `names(...).topTracks`, in order. Only in-app favourites count as liked; genre and album adjustments
-    /// give no pseudo-counts (they need the ids of stage 2); mute and block are hard exclusions (5.11), not counts.
+    /// ids of `names(...).topTracks`, in order. Only in-app favourites count as liked; a genre adjustment is a pseudo-count on
+    /// the genre's TAG when `genreIdByName` knows its name (stage 3: a name the atlas does not know is absent, never guessed);
+    /// album adjustments give none; mute and block are hard exclusions (5.11), not counts.
     public static func build(library: [Song], ridBySongId: [BrainKey: Int64], taste: ExternalTasteSnapshot,
                              adjustments: [TasteAdjustment], aidByName: [BrainKey: Int64],
-                             topTrackRids: [Int64]) -> LibraryFacts {
+                             topTrackRids: [Int64], genreIdByName: [BrainKey: Int] = [:]) -> LibraryFacts {
         func aid(_ name: String) -> Int64 { aidByName[BrainKey(name)] ?? 0 }
         var liked: [LibraryFacts.TrackFact] = []
         for song in library where song.isFavorite {
@@ -296,6 +297,11 @@ public enum LibraryFactsBuilder {
                       let rid = ridBySongId[BrainKey(song.id)] else { continue }
                 out.append(LibraryFacts.Adjustment(family: Family.track, key: rid, more: more,
                                                    strength: Int32(clamping: adjustment.strength)))
+            case .genre:
+                if let id = genreIdByName[BrainKey(adjustment.label)], id != GenreAtlas.none {
+                    out.append(LibraryFacts.Adjustment(family: Family.tag, key: Int64(id), more: more,
+                                                       strength: Int32(clamping: adjustment.strength)))
+                }
             default:
                 continue
             }

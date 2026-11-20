@@ -227,7 +227,7 @@ public enum ModuleSchemaValidator {
             try validatePlaylistsModule(element, &errors)
             return .from(errors)
         }
-        if section != .quickFill && section != .equalizer {
+        if section != .quickFill && section != .equalizer && section != .brain {
             guard case .array(let array) = element else {
                 return .invalid([ValidationError(code: "NOT_ARRAY", message: "Module '\(section.key)' should be a JSON array.",
                                                  module: section.key)])
@@ -250,6 +250,7 @@ public enum ModuleSchemaValidator {
         case .transitions: try validateTransitions(element, &errors)
         case .globalSettings, .quickFill, .equalizer: try validatePreferenceEntries(element, section.key, &errors)
         case .aiUsageLogs: break
+        case .brain: validateBrain(element, &errors)
         }
         return .from(errors)
     }
@@ -382,6 +383,13 @@ public enum ModuleSchemaValidator {
                 errors.append(ValidationError(code: "NEGATIVE_DURATION", message: "PlaybackHistory[\(i)]: negative duration",
                                               module: "playback_history", severity: .warning))
             }
+        }
+    }
+
+    /// The brain module is one object (see `BrainBackupModule`); anything else is refused.
+    static func validateBrain(_ element: JSONValue, _ errors: inout [ValidationError]) {
+        if BrainBackupModule.decode(GsonWriter.plain(element)) == nil {
+            errors.append(ValidationError(code: "INVALID_BRAIN_PAYLOAD", message: "Module 'brain' is not a music picks backup.", module: "brain"))
         }
     }
 

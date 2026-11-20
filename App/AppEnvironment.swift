@@ -443,6 +443,7 @@ final class AppEnvironment {
             plan.recent = brain.stage2b?.recent
             plan.coldStart = brain.coldStart
             plan.picked = brain.stage2b?.picked
+            plan.shelfStore = brain.shelfStore
             // A queue started from a made-for-you list is a place to jump back to.
             mixPlayback.onQueueStarted = { [weak plan] songs, source, tags in plan?.noteQueue(songs: songs, source: source, tags: tags) }
         }
@@ -487,8 +488,15 @@ final class AppEnvironment {
                                                 isEnabled: !isUITest)
 
         let settingsDefaults = isUITest ? (UserDefaults(suiteName: "pixlaudio.uitest") ?? .standard) : .standard
-        backup = BackupService(persistence: persistence, library: library, settings: settings, defaults: settingsDefaults,
-                               history: home.history, playbackServices: playbackServices, isUITest: isUITest)
+        let backupService = BackupService(persistence: persistence, library: library, settings: settings, defaults: settingsDefaults,
+                                          history: home.history, playbackServices: playbackServices, isUITest: isUITest)
+        backup = backupService
+        // The music picks module (docs/brain-spec.md, 12.2): the salt, the exclusions and the taste changes.
+        if !isUITest {
+            let backupTaste = tasteAdjustments
+            backupService.brainExport = { [weak brain] in await brain?.backupBrain(taste: backupTaste) }
+            backupService.brainRestore = { [weak brain] payload in await brain?.restoreBrain(payload, taste: backupTaste) ?? 0 }
+        }
         updates = UpdateNotifier(isEnabled: !isUITest)
         let cloud = CloudStudio.make(launch: launch, defaults: settingsDefaults, library: library, playback: playback,
                                      tais: tais, lyricsService: lyricsController.lyricsService,

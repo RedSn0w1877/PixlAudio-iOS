@@ -35,6 +35,8 @@ public final class BrainEventLog {
     public static let keyLearnerLiked = "learner_liked_v1"
     /// The event id at or below which plays are not learned from (set by "Reset what I've learned").
     public static let keyLearnAfter = "learn_after_event_id"
+    /// The arm bandit and the novelty appetite (`PosteriorCodec`); a value of `brain_state`, no file changed (stage 3 completion).
+    public static let keyPosteriors = "posteriors_v1"
 
     private let eventFile: KeyedLogStore
     private let affinityFile: KeyedLogStore

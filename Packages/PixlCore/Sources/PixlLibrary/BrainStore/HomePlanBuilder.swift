@@ -19,11 +19,17 @@ public actor HomePlanBuilder {
     private let genre: GenreStations?
     private let store: HomePlanStore
     private let clock: @Sendable () -> Int64
+    /// Stage 3: the context table (the daypart shelf) and the shelf bandit (the order of the page). Nil leaves the page as stage 2 made it.
+    private let context: ContextStore?
+    private let shelfStore: ShelfStore?
     private var busy = false
     private var waiters: [CheckedContinuation<Void, Never>] = []
 
     public init(mixes: BrainMixes, homeRows: BrainHomeRows?, genre: GenreStations?, store: HomePlanStore,
+                context: ContextStore? = nil, shelfStore: ShelfStore? = nil,
                 clock: @escaping @Sendable () -> Int64 = { currentTimeMillis() }) {
+        self.context = context
+        self.shelfStore = shelfStore
         self.mixes = mixes
         self.homeRows = homeRows
         self.genre = genre
@@ -169,12 +175,16 @@ public actor HomePlanBuilder {
                     return PlanItem(rid: item.track.rid, aid: nameHash(artist),
                                     row: StoredRadioRow(row: item.track.toRadioRow(), rid: item.track.rid), arm: item.arm,
                                     whyKey: artistMore ? WhyLine.artistMore : WhyLine.radioFans,
-                                    whyName: artistMore ? (artist ?? "") : row.anchor.primaryArtist, slot: slot)
+                                    whyName: artistMore ? (artist ?? "") : row.anchor.primaryArtist, slot: slot,
+                                    explore: item.explore)
                 }
                 addShelf(PlanShelf(type: HomePlanner.becauseListened, id: row.id, titleKey: "because_listened",
-                                   titleArg: row.anchor.title, subtitleKey: "because_listened_subtitle", items: items, recId: row.recId))
+                                   titleArg: row.anchor.title, subtitleKey: "because_listened_subtitle", items: items, recId: row.recId,
+                                   control: row.control, model: row.model))
             }
         }
+        // Your weekday nights (stage 3): the island that fits this time of the week, only once the bucket has 50 plays (5.10).
+        if let shelf = await daypartShelf(now, tz: tz, islands: islands) { addShelf(shelf) }
         // New from artists you love: the saved releases (not the one the hero plays).
         let shelfCards = releaseCards.filter { $0.stored.rid != heroRid }
         if !shelfCards.isEmpty {
@@ -206,8 +216,19 @@ public actor HomePlanBuilder {
         if let shelf = await stepSideways(now, adjacent: adjacent) { addShelf(shelf) }
         if let shelf = await moreLikeAlbum(now, allSongs: allSongs, constraints: constraints) { addShelf(shelf) }
 
+        // The shelf bandit's order (5.10), drawn once per daypart; with no data, or while the gate has the prior on, stage 2's fixed
+        // order stays.
+        var ordered = inputs
+        if let shelfStore {
+            var fixedTypes: [Int32] = []
+            for input in inputs where !fixedTypes.contains(input.type) { fixedTypes.append(input.type) }
+            if let drawn = await shelfStore.order(types: fixedTypes, planKey: HomePlanner.planKey(nowMs: now, tzOffsetMin: tz),
+                                               daypart: Int(HomePlanner.daypart(nowMs: now, tzOffsetMin: tz)), salt: salt, nowMs: now) {
+                ordered = HomePlanner.reorder(inputs, typeOrder: drawn)
+            }
+        }
         // The page rules.
-        let chosen = HomePlanner.plan(inputs)
+        let chosen = HomePlanner.plan(ordered)
         var out: [PlanShelf] = []
         out.reserveCapacity(chosen.count)
         for s in chosen {
@@ -235,6 +256,31 @@ public actor HomePlanBuilder {
         return HomePlan(generatedAtMs: now, planKey: HomePlanner.planKey(nowMs: now, tzOffsetMin: tz), taste: taste,
                         daypart: HomePlanner.daypart(nowMs: now, tzOffsetMin: tz), weekday: HomePlanner.weekday(nowMs: now, tzOffsetMin: tz),
                         hero: planHero, mixes: cards, shelves: out, islandFitAtMs: islands?.fitAtMs ?? 0)
+    }
+
+    /// "Your weekday nights": the daypart mix of the island that leads this bucket of the week. Absent until the bucket has
+    /// `ContextLift.minPlays` plays with an island, and while the listener has one island only (nothing leads).
+    private func daypartShelf(_ now: Int64, tz: Int32, islands: IslandSet?) async -> PlanShelf? {
+        guard let context, let islands, islands.hasMany, let table = await context.table(nowMs: now) else { return nil }
+        let bucket = ContextLift.bucket(now, tzOffsetMin: tz)
+        if !table.hasLift(bucket) { return nil }
+        let leader = table.leader(bucket, islands.dailyIslands().map { (id: $0.id, weight: $0.weight) })
+        if leader < 0 { return nil }
+        guard let view = await mixes.todayOf(MixSpec(kind: MixKinds.daypart, islandId: leader, part: bucket)) else { return nil }
+        var byRid: [Int64: StoredMixItem] = [:]
+        byRid.reserveCapacity(view.storedItems.count * 2)
+        for item in view.storedItems { byRid[item.rid] = item }
+        var items: [PlanItem] = []
+        items.reserveCapacity(view.songs.count)
+        for song in view.songs {
+            guard let rid = view.rids[song.id], let stored = byRid[rid] else { continue }
+            let row = view.novelIds.contains(song.id) ? stored.row : nil
+            items.append(PlanItem(rid: rid, aid: nameHash(row != nil ? row?.row.artists.first?.name : BrainLibraryIndex.primaryArtistName(song)),
+                                  songId: row == nil ? song.id : nil, row: row, arm: stored.arm, slot: items.count, explore: stored.explore))
+        }
+        if items.count < HomePlanner.minTracks { return nil }
+        return PlanShelf(type: HomePlanner.daypartMix, id: "daypart:\(bucket)", titleKey: "your_daypart", titleArg: String(bucket),
+                         subtitleKey: "your_daypart_subtitle", items: items, recId: view.recId, control: view.control, model: view.model)
     }
 
     /// A release by one of the listener's five most played artists, or nil.

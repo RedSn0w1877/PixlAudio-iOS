@@ -54,10 +54,11 @@ struct BackupSettingsSection: View {
 
 extension BackupSection {
     /// Sections only developer mode lists, in the export picker and the restore list (their selection stays as it is,
-    /// default included): transition rules, engagement stats, QuickFill genres, artist images, AI activity logs.
+    /// default included): transition rules, engagement stats, QuickFill genres, artist images, AI activity logs, and the music picks
+    /// module (it is in every backup by default; Android lists it for everyone, here it stays out of the everyday list).
     var isTechnical: Bool {
         switch self {
-        case .transitions, .engagementStats, .quickFill, .artistImages, .aiUsageLogs: true
+        case .transitions, .engagementStats, .quickFill, .artistImages, .aiUsageLogs, .brain: true
         default: false
         }
     }

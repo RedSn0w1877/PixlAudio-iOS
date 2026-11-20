@@ -305,6 +305,12 @@ public actor DnaRepository {
         return aids.compactMap { artists[$0] }
     }
 
+    /// Every artist row that holds a genre vector, by id (a genre page's key artists, stage 3). Reads nothing but the rows in memory.
+    public func artistsWithTags() -> [ArtistDnaRow] {
+        load()
+        return artists.values.filter { !$0.tags.isEmpty }.sorted { $0.aid < $1.aid }
+    }
+
     /// Spotify ids that already have a row, so the library scan can leave them alone.
     public func knownSpotifyIds(_ ids: [String]) -> Set<String> {
         load()

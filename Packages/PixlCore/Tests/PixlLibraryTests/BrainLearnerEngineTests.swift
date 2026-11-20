@@ -209,21 +209,29 @@ struct BrainLearnerEngineTests {
         let saved = LearnerCodec.Saved(model: model, gate: Gate.State(useLearned: true, winStreak: 2, atMs: 1),
                                        learnVersion: LearnReplay.version, summary: nil, rebuiltAtMs: 1)
         BrainEventLog(directory: h.directory).setValue(BrainEventLog.keyLearner, LearnerCodec.encode(saved))
-        let tag = BrainItemTag(surface: "autoplay", surfaceId: "yt:seed", recId: 7_700, slot: 3, arm: "RADIO", radioRank: 4,
-                               retrQ: 812, primaryArtist: "Fleetwood Mac")
-        // The session id is the start time of its first play: pick one start in a control session and one outside.
-        var controlStart = LearnerHarness.t0
-        while !Ranker.isControlSession(controlStart) { controlStart += 1 }
-        var normalStart = LearnerHarness.t0 + 10 * 3_600_000
-        while Ranker.isControlSession(normalStart) { normalStart += 1 }
-        let control = try #require(await h.engine.record(livePlay(at: controlStart, id: "c", tag: tag, start: StartReason.autoplay)))
+        // Which weights ranked a list and whether it was a control is decided when the list is built and carried with each entry
+        // (5.12 point 8): the recorder reads it, it does not work it out at the end of the play.
+        let controlTag = BrainItemTag(surface: "autoplay", surfaceId: "yt:seed", recId: 7_700, slot: 3, arm: "RADIO", radioRank: 4,
+                                      retrQ: 812, primaryArtist: "Fleetwood Mac", control: true, modelVersion: 0)
+        let learnedTag = BrainItemTag(surface: "autoplay", surfaceId: "yt:seed", recId: 7_701, slot: 3, arm: "RADIO", radioRank: 4,
+                                      retrQ: 812, primaryArtist: "Fleetwood Mac", control: false, modelVersion: 1, explore: true)
+        let control = try #require(await h.engine.record(livePlay(at: LearnerHarness.t0, id: "c", tag: controlTag, start: StartReason.autoplay)))
         #expect(control.event.has(EventFlags.controlSession))
         #expect(control.event.modelVersion == 0)
-        let learned = try #require(await h.engine.record(livePlay(at: normalStart, id: "n", tag: tag, start: StartReason.autoplay)))
+        #expect(!control.event.has(EventFlags.exploreSlot))
+        let learned = try #require(await h.engine.record(livePlay(at: LearnerHarness.t0 + 10 * 3_600_000, id: "n", tag: learnedTag,
+                                                                 start: StartReason.autoplay)))
         #expect(!learned.event.has(EventFlags.controlSession))
         #expect(learned.event.modelVersion == BrainEngine.modelLearned)
+        #expect(learned.event.has(EventFlags.exploreSlot))
+        // A queue entry from before this build carries nothing about it: the prior, and not a control.
+        let oldTag = BrainItemTag(surface: "autoplay", surfaceId: "yt:seed", recId: 7_702, slot: 3, arm: "RADIO")
+        let old = try #require(await h.engine.record(livePlay(at: LearnerHarness.t0 + 20 * 3_600_000, id: "o", tag: oldTag,
+                                                              start: StartReason.autoplay)))
+        #expect(!old.event.has(EventFlags.controlSession))
+        #expect(old.event.modelVersion == 0)
         // A pick the listener chose is neither flagged nor counted as served by the model.
-        let chosen = try #require(await h.engine.record(livePlay(at: normalStart + 2 * 3_600_000, id: "m")))
+        let chosen = try #require(await h.engine.record(livePlay(at: LearnerHarness.t0 + 30 * 3_600_000, id: "m")))
         #expect(!chosen.event.has(EventFlags.controlSession))
         #expect(chosen.event.modelVersion == 0)
     }

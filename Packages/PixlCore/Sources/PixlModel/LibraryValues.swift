@@ -91,6 +91,11 @@ public struct PlaybackQueueItemSnapshot: Sendable, Hashable, Codable {
     public var brainChosen: Bool?
     public var brainRetrQ: Int?
     public var brainRadioRank: Int?
+    // How the list was ranked, fixed when it was built (docs/brain-spec.md, 5.12 point 8; Android's three fields): the control
+    // flag, the model version and the exploration flag. Optional, so an older queue decodes unchanged.
+    public var brainControl: Bool?
+    public var brainModel: Int?
+    public var brainExplore: Bool?
 
     public init(mediaId: String, uri: String, title: String? = nil, artist: String? = nil, albumTitle: String? = nil,
                 artworkUri: String? = nil, durationMs: Int64? = nil, brainSurface: String? = nil,

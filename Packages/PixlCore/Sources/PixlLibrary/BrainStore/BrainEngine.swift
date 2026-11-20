@@ -31,6 +31,24 @@ public struct AnchorInfo: Sendable, Equatable {
     }
 }
 
+/// How one list was ranked, fixed when it was built (5.12 point 8): `source` is nil for the prior; `control` is true when the list
+/// was ranked with the prior because its session is one of the one in ten; `modelVersion` is 1 when the learned weights ranked it,
+/// else 0.
+public struct RankingChoice: Sendable {
+    public let source: Ranker.WeightSource?
+    public let control: Bool
+    public let modelVersion: Int32
+
+    public init(source: Ranker.WeightSource?, control: Bool, modelVersion: Int32) {
+        self.source = source
+        self.control = control
+        self.modelVersion = modelVersion
+    }
+
+    /// A list nothing ranked: the prior, no control.
+    public static let none = RankingChoice(source: nil, control: false, modelVersion: 0)
+}
+
 /// What a finished play did to the session, for whoever reacts at once (the autoplay tail).
 public struct Reaction: Sendable {
     public let event: PlayEvent
@@ -158,6 +176,8 @@ public actor BrainEngine {
         var rebuiltAtMs: Int64 = 0
         /// Favourites at the last rebuild (feature 8 of a live play).
         var liked: Set<Int64> = []
+        /// The arm bandit and the novelty appetite (5.10), learned from the same plays as `model`.
+        var posteriors = Posteriors.newState(today: 0)
 
         init(model: RankerModel) { self.model = model }
 
@@ -179,9 +199,29 @@ public actor BrainEngine {
 
         /// Which weights rank a list for the session `sessionId`: nil (the prior `M0`) while the gate has the prior on, and
         /// for one session in ten (the control sessions, 5.12 point 8). With `seed` the list gets one posterior sample (5.10).
-        func ranking(sessionId: Int64, seed: Int64? = nil) -> Ranker.WeightSource? {
+        func ranking(sessionId: Int64, seed: Int64? = nil) -> Ranker.WeightSource? { rankingChoice(sessionId: sessionId, seed: seed).source }
+
+        /// `ranking` together with what the plays of the list must say about it (5.12 point 8): decided ONCE, when the list is
+        /// built, and carried with each queue entry, so the control completion rate is measured on what was really ranked with
+        /// the prior.
+        func rankingChoice(sessionId: Int64, seed: Int64? = nil) -> RankingChoice {
+            let control = Ranker.isControlSession(sessionId)
+            if !learner.useLearned || control { return RankingChoice(source: nil, control: control, modelVersion: 0) }
+            return RankingChoice(source: Ranker.WeightSource(model: learner.model, learned: true, seed: seed), control: false,
+                                 modelVersion: BrainEngine.modelLearned)
+        }
+
+        /// The arm bandit of a list (5.10), seeded by `seed`: nil while the gate has the prior on and in a control session, so
+        /// a listener on the standard recipe keeps stage 2's choice of the novel candidate exactly.
+        func armPicker(sessionId: Int64, family: Int, seed: Int64) -> (any ArmPicker)? {
             if !learner.useLearned || Ranker.isControlSession(sessionId) { return nil }
-            return Ranker.WeightSource(model: learner.model, learned: true, seed: seed)
+            return ArmBandit.Sampler(learner.posteriors.arms, family: family, seed: seed)
+        }
+
+        /// The novelty share a new session starts at (5.5): the learned appetite while the gate has the learned weights on, else
+        /// stage 2's constant.
+        func sessionNu(nowMs: Int64) -> Double {
+            learner.useLearned ? NoveltyAppetite.nu(learner.posteriors.appetite, nowMs: nowMs) : Session.nuDefault
         }
         /// What a radio request needs for each of the session's anchors, by rid.
         var anchors: [Int64: AnchorInfo] = [:]
@@ -189,8 +229,9 @@ public actor BrainEngine {
         var direction = Direction()
 
         /// Starts a new session: the old one's lists, blocks, anchors and direction are gone.
-        mutating func newSession() {
+        mutating func newSession(nowMs: Int64 = currentTimeMillis()) {
             session = SessionState()
+            session.nuSession = sessionNu(nowMs: nowMs)
             anchors.removeAll()
             direction = Direction()
         }
@@ -206,6 +247,9 @@ public actor BrainEngine {
     var privateRowId: Int64 = 0
     let sources: Sources?
     var loaded: Loaded?
+    /// The genre atlas, for the pseudo-counts of a genre the listener asked for more or less of (set by `configureAtlas`; nil leaves
+    /// genre adjustments to the ranking-time boost alone).
+    private var atlasProvider: (any AtlasProvider)?
     private var rebuildTask: Task<Void, Never>?
     /// A forced rebuild asked for while another ran: the running one read the log before the change, so one more follows.
     private var rebuildAgain = false
@@ -229,6 +273,9 @@ public actor BrainEngine {
         self.sources = sources
         self.clock = clock
     }
+
+    /// Hands the engine the atlas a rebuild reads genre names with. Reads nothing.
+    public func configureAtlas(_ provider: any AtlasProvider) { atlasProvider = provider }
 
     // MARK: State
 
@@ -256,6 +303,7 @@ public actor BrainEngine {
         // The learner reads the state as it was before the play is applied (5.9): its step runs in the hook, on a copy
         // of the model that is put back afterwards.
         var model = state.learner.model
+        var posteriors = state.learner.posteriors
         var learnStatus = Ranker.updateSkipped
         let learnerReady = state.learner.learnVersion == LearnReplay.version
         let liked = state.learner.liked.contains(event.rid)
@@ -263,10 +311,14 @@ public actor BrainEngine {
         let graded = Brain.onEvent(affinity: &state.affinity, tracker: &state.tracker, session: &state.session,
                                    event: event) { e, g, affinity, session in
             if learnerReady {
-                learnStatus = LearnReplay.applyLive(&model, e, g, liked: liked, affinity: affinity, session: session, nowMs: nowMs)
+                learnStatus = LearnReplay.applyLive(&model, posteriors: &posteriors, e, g, liked: liked, affinity: affinity,
+                                                    session: session, nowMs: nowMs)
             }
         }
-        if learnerReady { state.learner.model = model }
+        if learnerReady {
+            state.learner.model = model
+            state.learner.posteriors = posteriors
+        }
         var rows: [Affinity.Row] = []
         var seen: Set<Affinity.RowRef> = []
         for ref in state.affinity.drainTouched() where seen.insert(ref).inserted {
@@ -284,7 +336,10 @@ public actor BrainEngine {
         log.upsertAffinity(rows)
         // The learner is saved right after the play it learned from: a crash between the two loses one step and never
         // applies one twice (the watermark). The files are separate here, so this is not one transaction as on Android.
-        if learnerReady { log.setValue(BrainEventLog.keyLearner, LearnerCodec.encode(state.learner.saved)) }
+        if learnerReady {
+            log.setValue(BrainEventLog.keyLearner, LearnerCodec.encode(state.learner.saved))
+            log.setValue(BrainEventLog.keyPosteriors, PosteriorCodec.encode(state.learner.posteriors))
+        }
         if countsForTally, let row = ignoreTally?.note(event) { log.putIgnoreRow(rid: event.rid, row) }
         recordedDuringRebuild?.append(event)
         // A value that was not finite sent the model back to its prior: replay it from the log (5.12 point 2).
@@ -328,16 +383,21 @@ public actor BrainEngine {
 
         // From here on nothing suspends: the state changes in one step.
         return withState { state -> Reaction? in
+        let firstSession = state.session.sessionId == 0
         if state.session.sessionId != 0 && Session.isExpired(state.session, startedAtMs: play.startedAtMs) {
-            state.newSession()
+            state.newSession(nowMs: play.startedAtMs)
         }
         let stamp = Session.begin(&state.session, startedAtMs: play.startedAtMs, startReason: context.startReason)
-        // One session in ten is ranked with the prior and flagged (5.12 point 8); a pick served while the learned weights
-        // were on says so in `modelVersion`, so Your sound can set the two completion rates side by side.
-        let control = context.isEngineOwned && Ranker.isControlSession(stamp.sessionId)
+        // A session starts at the novelty share of the moment (5.5): the learned appetite while the gate has the learned weights on.
+        if firstSession { state.session.nuSession = state.sessionNu(nowMs: play.startedAtMs) }
+        // One session in ten is ranked with the prior and flagged (5.12 point 8). Which weights ranked a list, and whether it was a
+        // control, was decided when the list was BUILT and travels with the queue entry (`BrainItemTag.control`, `modelVersion`):
+        // it is read here, never worked out at the end of the play. An entry that carries nothing (a track the listener chose, a
+        // queue saved by an older build) is the prior and not a control.
         var eventFlags = flags
-        if control { eventFlags |= EventFlags.controlSession }
-        let servedLearned = context.isEngineOwned && !control && state.learner.useLearned
+        if tag?.control == true { eventFlags |= EventFlags.controlSession }
+        // A novel slot the arm bandit drew is an exploration slot: logged, and weighted 1.5 by the grade (5.12 point 3).
+        if tag?.explore == true { eventFlags |= EventFlags.exploreSlot }
         let surfaceId = String((tag?.surfaceId ?? "").unicodeScalars.prefix(PlayEvent.maxSurfaceIdLength))
         let log = self.log
         let event = PlayEvent(
@@ -366,7 +426,7 @@ public actor BrainEngine {
             route: context.route,
             retrQ: Int32(clamping: tag?.retrQ ?? -1),
             radioRank: Int32(clamping: tag?.radioRank ?? -1),
-            modelVersion: servedLearned ? Self.modelLearned : 0
+            modelVersion: (tag?.modelVersion ?? -1) >= 0 ? Int32(clamping: tag?.modelVersion ?? 0) : 0
         )
         guard let graded = apply(event, to: &state) else { return nil }
         // A play a Home row may be built around is written down beside the event (8.1): the event itself holds
@@ -459,6 +519,8 @@ public actor BrainEngine {
             state.session.seedKind = Session.seedNone
         }
         let session = state.session
+        // Decided once, here, when the list is built; each queue entry carries it (5.12 point 8).
+        let choice = state.rankingChoice(sessionId: state.session.sessionId)
         let graph = StationPlanner.buildGraph(seeds: inputs.seeds, candidates: inputs.candidates, session: session)
         // 6.2: a station's ties break by its seed and the day; autoplay's by the session.
         let tieSeed = stationSeed.map {
@@ -471,17 +533,28 @@ public actor BrainEngine {
             tieSeed: tieSeed, excludedRids: inputs.excludedRids, bridge: bridge,
             closestOfSeeds: inputs.closestOfSeeds,
             // Stage 3: the learned weights, unless the gate has the prior on or this is a control session (5.12 point 8).
-            ranking: state.ranking(sessionId: state.session.sessionId))
-        let plan: StationPlanner.Plan?
+            ranking: choice.source,
+            // 5.10: a novel slot goes to the arm the bandit draws, while the learned weights are on (nil: stage 2's choice, exactly).
+            armPicker: state.armPicker(sessionId: state.session.sessionId, family: ArmBandit.station,
+                                       seed: Int64(bitPattern: BrainHash.splitmix64(UInt64(bitPattern: state.session.sessionId ^ (inputs.batch << 8) ^ Self.armSeedTag)))))
+        var plan: StationPlanner.Plan?
         if let tail {
             plan = Session.patchQueue(session, tail: tail, request: request, affinity: state.affinity, graph: graph)
         } else {
             plan = StationPlanner.plan(request, affinity: state.affinity, session: session, graph: graph)
         }
-        if let plan { StationPlanner.consume(&state.session, plan) }
+        if var made = plan {
+            StationPlanner.consume(&state.session, made)
+            made.control = choice.control
+            made.modelVersion = choice.modelVersion
+            plan = made
+        }
         return plan
         }
     }
+
+    /// Mixed into the seed of a batch's arm draws, so they do not repeat the tie-break's random stream.
+    static let armSeedTag: Int64 = 0x41524D53
 
     // MARK: Home rows (8.1) and what the engine keeps out (6.1)
 
@@ -500,12 +573,17 @@ public actor BrainEngine {
                             excludedRids: Set<Int64>) -> StationPlanner.Plan {
         withState { state in
             let session = SessionState()
+            let choice = state.rankingChoice(sessionId: state.session.sessionId)
             let graph = StationPlanner.buildGraph(seeds: [seed], candidates: candidates, session: session)
+            let tie = seed.seedRid ^ BrainMath.localDay(nowMs, tzOffsetMin: tzOffsetMin)
             let request = StationPlanner.Request(
                 mode: StationPlanner.modeHomeRow, count: count, candidates: candidates, seeds: [seed], nowMs: nowMs,
-                tzOffsetMin: tzOffsetMin, tieSeed: seed.seedRid ^ BrainMath.localDay(nowMs, tzOffsetMin: tzOffsetMin),
-                excludedRids: excludedRids, ranking: state.ranking(sessionId: state.session.sessionId))
-            return StationPlanner.plan(request, affinity: state.affinity, session: session, graph: graph)
+                tzOffsetMin: tzOffsetMin, tieSeed: tie, excludedRids: excludedRids, ranking: choice.source,
+                armPicker: state.armPicker(sessionId: state.session.sessionId, family: ArmBandit.home, seed: tie ^ Self.armSeedTag))
+            var plan = StationPlanner.plan(request, affinity: state.affinity, session: session, graph: graph)
+            plan.control = choice.control
+            plan.modelVersion = choice.modelVersion
+            return plan
         }
     }
 
@@ -562,8 +640,17 @@ public actor BrainEngine {
         var request = request
         let seed = Ranker.listSeed(salt: request.salt, listId: "mix:\(request.kind):\(request.islandIdx):\(request.regenerate)",
                                    localDay: Repetition.mixDay(request.nowMs, tzOffsetMin: request.tzOffsetMin))
-        request.ranking = loaded!.ranking(sessionId: loaded!.session.sessionId, seed: seed)
-        return MixPlanner.plan(request, affinity: loaded!.affinity)
+        // How it was ranked is decided here, once, and saved with the list: its plays carry it (5.12 point 8).
+        let choice = loaded!.rankingChoice(sessionId: loaded!.session.sessionId, seed: seed)
+        request.ranking = choice.source
+        // 5.10: the arm bandit and the learned appetite, while the learned weights rank this list; stage 2's values otherwise.
+        request.armPicker = loaded!.armPicker(sessionId: loaded!.session.sessionId, family: ArmBandit.mix, seed: seed ^ Self.armSeedTag)
+        request.nuBase = choice.modelVersion == Self.modelLearned
+            ? NoveltyAppetite.nu(loaded!.learner.posteriors.appetite, nowMs: request.nowMs) : MixPlanner.nu0
+        var plan = MixPlanner.plan(request, affinity: loaded!.affinity)
+        plan.control = choice.control
+        plan.modelVersion = choice.modelVersion
+        return plan
     }
 
     /// The events that started at or after `sinceMs`, oldest first (the seeds of the refresh read the last weeks).
@@ -754,9 +841,19 @@ public actor BrainEngine {
         let taste = imported.taste
         let ridsBySong = ridBySongId
         let aidsByName = aidByName
+        // A genre the listener asked for more or less of (8.7) becomes a pseudo-count on its tag: only a name the atlas knows.
+        var genreIds: [BrainKey: Int] = [:]
+        let genreLabels = adjustments.filter { $0.targetType == .genre && $0.kind.isWeight }.map(\.label)
+        if !genreLabels.isEmpty, let atlas = await atlasProvider?.atlas() {
+            for label in genreLabels {
+                let id = atlas.idForName(label)
+                if id != GenreAtlas.none { genreIds[BrainKey(label)] = id }
+            }
+        }
+        let genreIdByName = genreIds
         let facts = await Task.detached(priority: .utility) {
             LibraryFactsBuilder.build(library: library, ridBySongId: ridsBySong, taste: taste, adjustments: adjustments,
-                                      aidByName: aidsByName, topTrackRids: topTrackRids)
+                                      aidByName: aidsByName, topTrackRids: topTrackRids, genreIdByName: genreIdByName)
         }.value
 
         let merges = await repository.trackMerges()
@@ -802,14 +899,18 @@ public actor BrainEngine {
             learner.learnVersion = LearnReplay.version
             learner.rebuiltAtMs = nowMs
             learner.liked = likedRids
+            learner.posteriors = replayed.posteriors
             adopted = learner
         }
         let catchUpSession = SessionState()
         for event in recordedDuringRebuild ?? [] where !result.recentEventIds.contains(event.eventId) {
             let graded = tracker.grade(event, completions: state.completions)
             if adopted != nil {
-                LearnReplay.applyLive(&adopted!.model, event, graded, liked: adopted!.liked.contains(event.rid), affinity: state,
-                                      session: catchUpSession, nowMs: nowMs)
+                var learner = adopted!
+                adopted = nil
+                LearnReplay.applyLive(&learner.model, posteriors: &learner.posteriors, event, graded,
+                                      liked: learner.liked.contains(event.rid), affinity: state, session: catchUpSession, nowMs: nowMs)
+                adopted = learner
             }
             Affinity.applyEvent(&state, event, graded, tMs: event.startedAtMs)
         }
@@ -818,6 +919,7 @@ public actor BrainEngine {
         log.replaceAffinity(state.rows())
         if let adopted {
             log.setValue(BrainEventLog.keyLearner, LearnerCodec.encode(adopted.saved))
+            log.setValue(BrainEventLog.keyPosteriors, PosteriorCodec.encode(adopted.posteriors))
             log.setValue(BrainEventLog.keyLearnerLiked, Self.encodeLiked(adopted.liked))
             log.setValue(BrainEventLog.keyLearnVersion, String(LearnReplay.version))
         }
@@ -858,6 +960,14 @@ public actor BrainEngine {
         learner.learnVersion = saved.learnVersion
         learner.rebuiltAtMs = saved.rebuiltAtMs
         learner.liked = Self.decodeLiked(log.value(BrainEventLog.keyLearnerLiked))
+        if let text = log.value(BrainEventLog.keyPosteriors), let posteriors = PosteriorCodec.decode(text) {
+            learner.posteriors = posteriors
+        } else {
+            // A learner saved before the arm bandit and the novelty appetite existed, or a posterior state that cannot be read:
+            // the replay is due again (it makes both from the log), and until then they start from their priors.
+            learner.posteriors = Posteriors.newState(today: saved.model.anchorDay)
+            if log.value(BrainEventLog.keyLearnVersion) != nil { log.setValue(BrainEventLog.keyLearnVersion, nil) }
+        }
         return learner
     }
 
@@ -875,11 +985,17 @@ public actor BrainEngine {
             learner.learnVersion = LearnReplay.version
             learner.rebuiltAtMs = nowMs
             learner.liked = state.learner.liked
+            var fresh = Posteriors.newState(today: BrainMath.localDay(nowMs, tzOffsetMin: 0))
+            fresh.lastEventId = after
+            learner.posteriors = fresh
             state.learner = learner
             state.learnEpoch += 1
         }
         log.setValue(BrainEventLog.keyLearnAfter, String(after))
-        if let saved = loaded?.learner.saved { log.setValue(BrainEventLog.keyLearner, LearnerCodec.encode(saved)) }
+        if let saved = loaded?.learner.saved {
+            log.setValue(BrainEventLog.keyLearner, LearnerCodec.encode(saved))
+            if let posteriors = loaded?.learner.posteriors { log.setValue(BrainEventLog.keyPosteriors, PosteriorCodec.encode(posteriors)) }
+        }
         requestRebuild(force: true)
     }
 
@@ -891,6 +1007,12 @@ public actor BrainEngine {
         public let updates: Int64
     }
 
+    /// True while the gate has the learned weights on (the shelf bandit's order and the arm bandit are used only then).
+    public func usesLearned() -> Bool {
+        ensureLoaded()
+        return loaded!.learner.useLearned
+    }
+
     public func learnerFigures() -> LearnerFigures {
         ensureLoaded()
         let l = loaded!.learner
@@ -899,6 +1021,22 @@ public actor BrainEngine {
 
     /// The bytes of every stored event, for a reader that decodes them off the actor (Your sound).
     public func eventPayloads() -> [[UInt8]] { log.allEventPayloads() }
+
+    // MARK: Backup (stage 3 completion; docs/brain-spec.md, 12.2, 13.2)
+
+    /// What the brain's backup module holds besides the taste changes (which the app keeps): the install's salt, if it has one, and
+    /// every recorded exclusion.
+    public func backupState() -> (salt: Int64?, feedback: [FeedbackStore.Record]) {
+        (log.value(Self.saltKey).flatMap { Int64($0) }, feedbackStore.all())
+    }
+
+    /// A restore: the salt and the exclusions go back, and one replay in the background makes the caches (affinities, islands, the
+    /// learned weights) again from the log. Nothing here runs at app start.
+    public func restoreBackupState(salt: Int64?, feedback: [FeedbackStore.Record]) {
+        if let salt { log.setValue(Self.saltKey, String(salt)) }
+        feedbackStore.replaceAll(feedback)
+        requestRebuild(force: true)
+    }
 
     // MARK: Tests and diagnostics
 
@@ -935,6 +1073,7 @@ enum OpenPlayCodec {
         w.long("recId", c.tag?.recId ?? 0); w.int("slot", c.tag?.slot ?? -1); w.string("arm", c.tag?.arm ?? "")
         w.int("retrQ", c.tag?.retrQ ?? -1); w.int("radioRank", c.tag?.radioRank ?? -1)
         w.string("primaryArtist", c.tag?.primaryArtist ?? "")
+        w.bool("control", c.tag?.control ?? false); w.int("model", c.tag?.modelVersion ?? -1); w.bool("explore", c.tag?.explore ?? false)
         w.bool("shuffle", c.shuffle); w.bool("repeatOne", c.repeatOne); w.int("route", c.route)
         w.endObject()
         return w.text
@@ -950,7 +1089,9 @@ enum OpenPlayCodec {
         if BrainText.isBlank(songId) { return nil }
         let tag = BrainItemTag(surface: optional("surface"), surfaceId: optional("surfaceId"), recId: long("recId"),
                                slot: Int(int("slot", -1)), arm: optional("arm"), radioRank: Int(int("radioRank", -1)),
-                               retrQ: Int(int("retrQ", -1)), primaryArtist: optional("primaryArtist"))
+                               retrQ: Int(int("retrQ", -1)), primaryArtist: optional("primaryArtist"),
+                               control: m["control"]?.boolValue ?? false, modelVersion: Int(int("model", -1)),
+                               explore: m["explore"]?.boolValue ?? false)
         let hasTag = !tag.isEmpty || tag.primaryArtist != nil
         let context = PlayContext(
             title: str("title"), artistDisplay: str("artist"),

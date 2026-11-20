@@ -21,6 +21,9 @@ public actor BrainMixes {
     public static let minSongs = 3
     public static let topArtists = 20
     static let rebuildMinAgeMs: Int64 = 10 * 60 * 1000
+    /// The share of new music in a daypart mix, and its length (6.2).
+    public static let daypartNu = 0.15
+    public static let daypartCount = 25
     /// Folded credits that name nobody: never a top-artist seed.
     static let noArtistNames = ["various artists", "unknown artist", "unknown", "va", "<unknown>"]
 
@@ -77,6 +80,7 @@ public actor BrainMixes {
     static func nuOf(_ spec: MixSpec, multiplier: Double) -> Double {
         if spec.kind == MixKinds.daily && spec.islandId > 0 { return MixPlanner.nuOfIsland(multiplier: multiplier) }
         if spec.kind == MixKinds.daily || spec.kind == MixKinds.your { return MixPlanner.nuOf(spec.kind, multiplier: multiplier) }
+        if spec.kind == MixKinds.daypart { return daypartNu }
         if spec.kind == MixKinds.onRepeat || spec.kind == MixKinds.rediscover { return 0.0 }
         return 1.0
     }
@@ -226,9 +230,15 @@ public actor BrainMixes {
         // "Once": the rebuild is itself a build of the day. When the day already has two, the mix stays even if it again
         // holds no new music (none of today's seeds has a cached radio): it would otherwise be drawn again every ten minutes,
         // each draw raising the served penalty (deviation 94).
-        let spec = MixSpec(kind: saved.kind, islandId: saved.islandId)
+        let spec = Self.specOf(saved)
         if served.buildsToday(surface: spec.surface, nowMs: now, tzOffsetMin: tz, surfaceId: spec.surfaceId) >= 2 { return false }
         return await repository.radiosFetchedSince(0) > 0
+    }
+
+    /// The list a saved record is: its own id when it has one the code knows (a daypart mix needs its bucket), else its kind and island.
+    static func specOf(_ stored: StoredMix) -> MixSpec {
+        if stored.kind == MixKinds.daypart, let spec = MixSpec.of(surfaceId: stored.mixId) { return spec }
+        return MixSpec(kind: stored.kind, islandId: stored.islandId)
     }
 
     // MARK: Building
@@ -311,9 +321,11 @@ public actor BrainMixes {
         }
         let context = islandSet.map { IslandContext($0.islands) }
         var islandIdx = -1
-        if kind == MixKinds.daily, spec.islandId > 0, let islandSet { islandIdx = islandSet.indexOfId(spec.islandId) }
+        let daypartMix = kind == MixKinds.daypart
+        let ofIsland = kind == MixKinds.daily || daypartMix
+        if ofIsland, spec.islandId > 0, let islandSet { islandIdx = islandSet.indexOfId(spec.islandId) }
         // A Daily Mix of an island that is gone is the plain Daily Mix: no island to be close to.
-        let useIslands = context != nil && !(kind == MixKinds.daily && spec.islandId > 0 && islandIdx < 0)
+        let useIslands = context != nil && !(ofIsland && spec.islandId > 0 && islandIdx < 0)
         if kind == MixKinds.firstListen {
             // First Listen: which tracks are adjacent-genre ones, and which artists the listener never played (6.2).
             let beforeFlags = candidates
@@ -325,11 +337,14 @@ public actor BrainMixes {
                 }
             }
         }
-        let request = MixPlanner.Request(
-            kind: kind, candidates: candidates, seeds: pool.seedLists, nowMs: now, tzOffsetMin: tz,
-            nuMultiplier: Novelty.factor(level), salt: salt, regenerate: regenerate,
-            excludedRids: taken.union(ignored), servedTimes: times, edges: edges,
+        // A daypart mix is planned like a Daily Mix of one island, with its own size and share of new music; its seed differs from
+        // its island's Daily Mix by the bucket it is for.
+        var request = MixPlanner.Request(
+            kind: daypartMix ? MixKinds.daily : kind, candidates: candidates, seeds: pool.seedLists, nowMs: now, tzOffsetMin: tz,
+            nuMultiplier: Novelty.factor(level), salt: salt, regenerate: daypartMix ? Int32(1 + spec.part) : regenerate,
+            excludedRids: taken.union(ignored), servedTimes: times, edges: edges, count: daypartMix ? Self.daypartCount : 0,
             islands: useIslands ? context : nil, islandIdx: islandIdx, embeddings: known.embeddings, tagsByRid: known.tags)
+        if daypartMix { request.nuOverride = Self.daypartNu }
         let plan = await engine.planMix(request)
         if plan.picks.isEmpty { return nil }
 
@@ -341,11 +356,11 @@ public actor BrainMixes {
             if let novel = pool.novel[pick.rid] {
                 items.append(StoredMixItem(rid: pick.rid, row: novel.stored, arm: pick.arm, slot: items.count,
                                            whyKey: whyKey, whyArg: pick.whyArg, whyName: whyName, retrQ: Int(pick.retrQ),
-                                           radioRank: novel.radioRank > 0 ? novel.radioRank : -1))
+                                           radioRank: novel.radioRank > 0 ? novel.radioRank : -1, explore: pick.explore))
             } else if let track = pool.library[pick.rid] {
                 items.append(StoredMixItem(rid: pick.rid, songId: track.song.id, arm: pick.arm, slot: items.count,
                                            whyKey: whyKey, whyArg: pick.whyArg, whyName: whyName, retrQ: Int(pick.retrQ),
-                                           radioRank: Int(pick.radioRank)))
+                                           radioRank: Int(pick.radioRank), explore: pick.explore))
             }
         }
         if items.isEmpty { return nil }
@@ -358,7 +373,8 @@ public actor BrainMixes {
         return StoredMix(kind: kind, builtAtMs: now, seed: MixPlanner.tieSeedOf(request), regenerate: regenerate,
                          novelty: level, tasteSignature: taste.signature,
                          seedLists: seeds.filter { $0.list != nil }.count, items: items, mixId: spec.surfaceId,
-                         islandId: useIslands && islandIdx >= 0 ? spec.islandId : 0, number: number, subtitle: subtitle)
+                         islandId: useIslands && islandIdx >= 0 ? spec.islandId : 0, number: number, subtitle: subtitle,
+                         control: plan.control, model: Int(plan.modelVersion))
     }
 
     /// The name a reason is about, or "" when the sentence would have none (it is then not shown).
@@ -579,7 +595,7 @@ public actor BrainMixes {
         let taste = await sources.constraints()
         let libraryIds = stored.items.compactMap(\.songId)
         let library = libraryIds.isEmpty ? [:] : await sources.librarySongs(libraryIds)
-        let spec = MixSpec(kind: stored.kind, islandId: stored.islandId)
+        let spec = Self.specOf(stored)
         let surface = spec.surface
         let recId = recIdKnown != 0 ? recIdKnown : ServedListStore.recIdOf(builtAtMs: stored.builtAtMs, surface: surface)
         var ridBySong: [String: Int64] = [:]
@@ -620,12 +636,13 @@ public actor BrainMixes {
                 radioRank: item.radioRank, retrQ: item.retrQ, whyKey: item.whyKey != WhyLine.none ? keyName : nil,
                 primaryArtist: BrainLibraryIndex.primaryArtistName(song),
                 // The listener chose to play the mix: its tracks are theirs, like a playlist's.
-                chosen: true)
+                chosen: true, control: stored.control, modelVersion: stored.model, explore: item.explore)
         }
         if songs.count < Self.minSongs { return nil }
         if !tracks.isEmpty { await repository.registerPlayable(tracks, nowMs: now) }
         return MixView(kind: stored.kind, builtAtMs: stored.builtAtMs, recId: recId, songs: songs, reasons: reasons,
                        tags: tags, novelIds: novel, engineTracks: tracks, seedLists: stored.seedLists, spec: spec,
-                       number: await liveNumber(of: spec) ?? stored.number, subtitle: stored.subtitle, rids: ridBySong)
+                       number: await liveNumber(of: spec) ?? stored.number, subtitle: stored.subtitle, rids: ridBySong,
+                       storedItems: stored.items, control: stored.control, model: stored.model)
     }
 }

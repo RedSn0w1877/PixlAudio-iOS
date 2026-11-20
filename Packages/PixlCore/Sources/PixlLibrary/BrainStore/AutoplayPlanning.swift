@@ -124,7 +124,7 @@ public enum AutoplayPlanning {
     /// picks are logged under the station (`surface = station`, its hashed id), everything else under autoplay.
     public static func tag(entry: AutoplayPoolEntry, pick: StationPlanner.Pick?, recId: Int64, slot: Int, surfaceId: String,
                            artistNames: [Int64: String], likedTitles: [Int64: String],
-                           station: Station? = nil) -> BrainItemTag {
+                           station: Station? = nil, control: Bool = false, modelVersion: Int32 = 0) -> BrainItemTag {
         // The reason line (8.8): a key from the pure core and the name its argument stands for.
         var whyName = entry.whyArtist
         var whyKey: String?
@@ -148,7 +148,10 @@ public enum AutoplayPlanning {
                             arm: Arm.nameOf(pick?.arm ?? entry.candidate.arm),
                             whyArg: BrainText.isBlank(whyName) ? nil : whyName, radioRank: rank,
                             retrQ: pick.map { Int($0.retrQ) } ?? -1, whyKey: whyKey,
-                            primaryArtist: BrainText.isBlank(entry.primaryArtist) ? nil : entry.primaryArtist)
+                            primaryArtist: BrainText.isBlank(entry.primaryArtist) ? nil : entry.primaryArtist,
+                            // How the list was ranked, fixed when it was built (5.12 point 8); a pick taken in pool order was
+                            // ranked by nothing: the prior, no control. A novel slot the arm bandit drew is an exploration slot (5.10).
+                            control: control, modelVersion: Int(modelVersion), explore: pick?.explore == true)
     }
 
     /// `items` without what the queue already holds. A plan is made off the main actor; meanwhile another edit (a
@@ -170,7 +173,8 @@ public enum AutoplayPlanning {
             out.append(AutoplayPlannedItem(entry: entry, tag: tag(entry: entry, pick: pick, recId: recId,
                                                                   slot: Int(pick.slot), surfaceId: surfaceId,
                                                                   artistNames: artistNames, likedTitles: likedTitles,
-                                                                  station: station)))
+                                                                  station: station, control: plan.control,
+                                                                  modelVersion: plan.modelVersion)))
         }
         return out
     }
@@ -190,8 +194,11 @@ extension AutoplayPlanning {
             guard let entry = context.entriesByRid[pick.rid] else { return false }
             return kept.contains(BrainKey(entry.candidate.mediaId))
         }
-        return StationPlanner.Plan(picks: picks, usedLiked: plan.usedLiked && !picks.isEmpty,
-                                   usedFamiliarNext: plan.usedFamiliarNext && !picks.isEmpty, poolSize: plan.poolSize)
+        var narrowedPlan = StationPlanner.Plan(picks: picks, usedLiked: plan.usedLiked && !picks.isEmpty,
+                                               usedFamiliarNext: plan.usedFamiliarNext && !picks.isEmpty, poolSize: plan.poolSize)
+        narrowedPlan.control = plan.control
+        narrowedPlan.modelVersion = plan.modelVersion
+        return narrowedPlan
     }
 }
 
