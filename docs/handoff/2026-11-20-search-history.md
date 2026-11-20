@@ -68,7 +68,14 @@ tested by GitHub CI alone.
 - Everything under `App/`: compile, Swift 6 strict concurrency, layout, the swap animation, the keyboard behaviour (the list while focused,
   the keyboard dropping on a tap, the strip's long-press menu), Dynamic Type, VoiceOver.
 - The lightweight migration on a real store: `SearchHistoryTests.testRowsOfSchemaV1SurviveTheMigrationAndGetKeys` creates a version-1 store on
-  disk and opens it through the plan; it has run only if the CI result below says so. The classes of the 18 unchanged models are shared by
+  disk and opens it through the plan; CI ran it with the rest (see the CI result at the end). The classes of the 18 unchanged models are shared by
   both versions (only `SearchHistoryRecord` is a second class); if SwiftData objects to that, give `SchemaV2` its own copies.
 - Glass cost of the list with the X buttons, and whether the one-glass-shape container looks right over a tall list.
 - The twin's field names (decision 5).
+
+## CI result
+
+Run 44736583747 on 3dbb592 (`ci` workflow): `core` (PixlCore swift test) success, `app` (build + unit tests) success with 675 app tests and 0
+failures, `ipa` skipped (the workflow skips it off the release branches). The log prints suite totals only, so the individual
+`SearchHistoryTests` names are not in it; they compile into the same test target and the total has no failure. UI tests and the phone are
+still to do.
