@@ -274,3 +274,21 @@ Android's reviewer changed three pure functions after milestone 2 and regenerate
 5. First Listen: a "This week" block; airplane mode shows the template; open it again and nothing is asked.
 6. Settings > AI features: "Let Taizo help the engine" is off. Turn it on and let the refresh run; turn it off and the atlas names come back.
 7. Airplane mode: "start a station from Radiohead" (an artist in the library) starts one.
+
+## What was run, and what it said (milestone 2)
+
+Windows, from the iOS checkout root (Git Bash):
+
+- `cmd //c "ci\swiftw.cmd test --package-path Packages\PixlCore"` (the whole suite): **all green, 0 failed** (PixlLibrary 949 tests in 103 suites,
+  PixlNet 340, PixlBackup 157, PixlLyrics 202, PixlFoundation 160 and the other targets). On the way: my own `AssistantHelpTests` failed twice
+  (they asserted that a source-10 claim shows in the merged tags; the claim is kept and taken back out, whether it tips the merge is `Tags.merge`'s
+  rule), and `theColdStartFetchesEightRadiosAtMostTwoAtATimeAndSaysHowFarItIs` failed once while another build ran and passed on the next run (a
+  timing test, not touched).
+- `bash ci/check-forbidden.sh`: OK. `ci/parse-check.ps1`: 313 files OK.
+- Golden files: `assistant.jsonl`, `assistantcards.jsonl`, `MANIFEST.sha256` and `README.md` re-copied from Android's `music-brain` (`e31f835`);
+  every file of the folder now has the same blob id as Android's committed one except the three binary or line-ending cases that were never
+  copied (`fold-v1.tsv`, `genre-atlas-v1.json.gz`, `radio_song.expected.json`, `title-rules-v1.tsv` live elsewhere on iOS).
+
+## CI
+
+- Round 1 (`3ed5f90`): `core` green; `app` (build and unit tests, Xcode 27) green; `ipa` skipped as before. No flaky test seen.
