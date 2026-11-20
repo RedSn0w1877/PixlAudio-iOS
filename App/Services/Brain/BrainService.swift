@@ -67,6 +67,9 @@ final class BrainService {
     /// Reads Your sound and the genre pages (8.6, 8.7, stage 3) and resets what was learned. Built with the mixes, never at launch;
     /// nothing is computed until a screen asks. Nil in UI tests.
     private(set) var yourSound: YourSoundReader?
+    /// The optional weekly jobs of "Let Taizo help the engine" and the weekly note on First Listen (stage 4, docs/brain-spec.md, 9.3, 9.4).
+    /// Built with the mixes, never at launch; nothing is read or asked until the refresh or First Listen needs it. Nil in UI tests.
+    private(set) var assist: BrainAssist?
     /// The Home shelf bandit's store (5.10, stage 3): the page reports what happened on it, off the main actor. Built with the mixes,
     /// never at launch. Nil in UI tests.
     private(set) var shelfStore: ShelfStore?
@@ -198,13 +201,6 @@ final class BrainService {
         // A genre the listener asked for more or less of reaches the picks as a pseudo-count on its tag at the next replay.
         let atlas = kit.parts.atlas
         Task { await engine.configureAtlas(atlas) }
-        let work = BrainRefreshWork(mixes: mixes, repository: repository, budget: budget,
-                                    matchedVideoId: sources.matchedVideoId, newReleases: newReleases,
-                                    librarySongs: { await library() }, dna: knowledge?.lanes, shelves: shelves)
-        let allowed: @Sendable () async -> Bool = { @MainActor [weak self] in self?.refreshIsAllowed() ?? false }
-        refresh = BrainRefresh(work: work, repository: repository, engine: engine, allowed: allowed)
-        planBuilder = HomePlanBuilder(mixes: mixes, homeRows: homeRows, genre: kit.genre, store: kit.planStore, context: context,
-                                      shelfStore: shelves)
         // Key artists on a genre page come from tag votes of Deezer, MusicBrainz and ListenBrainz: all three must be on (local switch and
         // the remote one), or the section is left out.
         let tagVotesAllowed: @Sendable () async -> Bool = {
@@ -213,8 +209,22 @@ final class BrainService {
             if !(await gate.sourceAllowed(.musicbrainz)) { return false }
             return await gate.sourceAllowed(.listenbrainz)
         }
-        yourSound = YourSoundReader(engine: engine, mixes: mixes, parts: kit.parts, genre: kit.genre, shelves: shelves,
+        let sound = YourSoundReader(engine: engine, mixes: mixes, parts: kit.parts, genre: kit.genre, shelves: shelves,
                                     homeRows: homeRows, homePlans: kit.planStore, tagVotesAllowed: tagVotesAllowed)
+        yourSound = sound
+        // Stage 4: the optional weekly jobs ("Let Taizo help the engine", off by default) run as the last step of the one refresh; the weekly
+        // note on First Listen asks through the same cloud door. Nothing is read or asked here.
+        let helper = BrainAssist(directory: directory, brain: self, mixes: mixes, engine: engine, repository: repository, parts: kit.parts,
+                                 yourSound: sound)
+        assist = helper
+        helper.connect()
+        let work = BrainRefreshWork(mixes: mixes, repository: repository, budget: budget,
+                                    matchedVideoId: sources.matchedVideoId, newReleases: newReleases,
+                                    librarySongs: { await library() }, dna: knowledge?.lanes, shelves: shelves, assist: helper.help)
+        let allowed: @Sendable () async -> Bool = { @MainActor [weak self] in self?.refreshIsAllowed() ?? false }
+        refresh = BrainRefresh(work: work, repository: repository, engine: engine, allowed: allowed)
+        planBuilder = HomePlanBuilder(mixes: mixes, homeRows: homeRows, genre: kit.genre, store: kit.planStore, context: context,
+                                      shelfStore: shelves)
         // The first minute of a new listener (8.10) is lane 1 of the refresh, run while Home is on screen: the same work under
         // the same budget and switches, and never a second background job.
         coldStart = ColdStart(work: work, healthyLists: { await repository.radioListCount() }, allowed: allowed)
@@ -321,6 +331,19 @@ final class BrainService {
         let ids = await repository.resolve(keys: facts.keys, durationMs: Int32(clamping: max(song.duration, 0)),
                                            artistNames: names)
         return await engine.whyFacts(rid: ids.rid, aid: ids.aids.first ?? 0, year: song.year)
+    }
+
+    /// What moved a pick's score the most (docs/brain-spec.md, 9.3, 8.8): the fixed names of `AssistantRules.factorNames`, from the vector the
+    /// pick was served with (the queue carries it), else from the newest play of the song that stored one. Empty when there is none: nothing
+    /// is guessed. Off the main actor, never throws.
+    func whyFactors(for song: Song, why: QueueWhy) async -> [AssistantRules.Factor] {
+        guard let engine else { return [] }
+        let now = currentTimeMillis()
+        if let found = await engine.servedFactors(hex: why.servedX, modelVersion: why.model, nowMs: now) { return found }
+        guard let repository, let facts = TrackCatalog.facts(of: song) else { return [] }
+        let names = [facts.primaryArtist] + facts.otherArtists.prefix(PlayEvent.maxOtherAids)
+        let ids = await repository.resolve(keys: facts.keys, durationMs: Int32(clamping: max(song.duration, 0)), artistNames: names)
+        return await engine.servedFactors(rid: ids.rid, nowMs: now) ?? []
     }
 
     // MARK: Backup (docs/brain-spec.md, 12.2, 13.2)

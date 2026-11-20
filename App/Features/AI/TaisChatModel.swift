@@ -23,11 +23,16 @@ nonisolated enum TaisChatMessage: Identifiable, Sendable, Equatable {
     case confirm(id: Int, question: String, state: TaizoConfirmState)
     /// A one-line note (offline, the month's cloud limit, a lost connection).
     case note(id: Int, text: String)
+    /// A mix `build_mix` made (docs/brain-spec.md, 9.3): "Late drive · 30 songs", Play, Save and the chips under it. A chip is a delta on the
+    /// stored request applied on the phone, with no model call. Not saved with the chat.
+    case mix(id: Int, card: MixCard, state: MixCardState)
+    /// The one-tap "Less trap" that ends an explanation of the listener's taste or of one pick.
+    case less(id: Int, offer: LessOffer)
 
     var id: Int {
         switch self {
         case .user(let id, _), .thinking(let id, _), .djReply(let id, _, _, _), .textReply(let id, _, _),
-             .assistant(let id, _, _, _, _), .confirm(let id, _, _), .note(let id, _): id
+             .assistant(let id, _, _, _, _), .confirm(let id, _, _), .note(let id, _), .mix(let id, _, _), .less(let id, _): id
         }
     }
 }
@@ -150,6 +155,16 @@ final class TaisChatModel {
         let turn = await engine.respond(pending.prompt)
         // The chat was cleared or switched meanwhile: this answer belongs to a conversation that is gone.
         guard !Task.isCancelled else { return }
+        // "Start a station from X" is read by rules, so it works with no connection and no model: X is looked up in the library and the atlas.
+        if case .station(let name) = turn {
+            let started = await startStation(named: name)
+            guard !Task.isCancelled else { return }
+            let text = started ? BrainStrings.taizoStationStarted(name) : BrainStrings.taizoStationNotFound(name)
+            let resolved: TaizoTurn = started ? .conversation(text) : .error(text)
+            finish(thinkingId: pending.thinkingId, prompt: pending.prompt, turn: resolved)
+            await rememberOnDeviceTurn(prompt: pending.prompt, turn: resolved, intro: nil)
+            return
+        }
         let replyId = finish(thinkingId: pending.thinkingId, prompt: pending.prompt, turn: turn)
         // On-device, the card is already up; its intro line follows when the model has written it.
         var intro: String?
@@ -158,6 +173,14 @@ final class TaisChatModel {
             intro = deferred
         }
         await rememberOnDeviceTurn(prompt: pending.prompt, turn: turn, intro: intro)
+    }
+
+    /// A station from a sentence (`StationSentence`): false when there is no music engine to ask or the name is none of the listener's.
+    private func startStation(named name: String) async -> Bool {
+        guard let assistant else { return false }
+        let tools = toolbox ?? assistant.toolbox()
+        toolbox = tools
+        return await tools.music.startStation(named: name, environment: tools.environment)
     }
 
     /// Replaces the thinking row with Taizo's turn; returns the reply's id.
@@ -169,6 +192,7 @@ final class TaisChatModel {
         case .media(_, let result, let intro): reply = .djReply(id: id, prompt: prompt, result: result, aiIntro: intro)
         case .conversation(let text): reply = .textReply(id: id, text: text, isError: false)
         case .error(let message): reply = .textReply(id: id, text: message, isError: true)
+        case .station(let name): reply = .textReply(id: id, text: BrainStrings.taizoStationStarted(name), isError: false)
         }
         replace(thinkingId, with: reply)
         return id
@@ -189,6 +213,7 @@ final class TaisChatModel {
         case .media(_, let result, _): reply = (intro.map { $0 + " " } ?? "") + "(Found \(result.count) songs on this iPhone.)"
         case .conversation(let text): reply = text
         case .error(let message): reply = message
+        case .station(let name): reply = BrainStrings.taizoStationStarted(name)
         }
         record.messages = ClaudeConversation.appendingUserText(record.messages, prompt)
         record.messages.append(ClaudeJSON.assistant([ClaudeJSON.object([("type", .string("text")), ("text", .string(reply))])]))
@@ -256,6 +281,7 @@ final class TaisChatModel {
                     text = result.outcome == .finished ? "Done." : "That got too long for one answer — try asking for less at once."
                 }
                 setAssistant(replyId, text: text, sources: result.sources, streaming: false)
+                await showCards(after: replyId, prompt: pending.prompt, tools: tools)
                 record.messages = history + result.appended
                 record.lyricsSongKey = now.lyricsSongKey
                 record.transcript.append(TaizoTranscriptEntry(role: .user, text: pending.prompt))
@@ -387,6 +413,103 @@ final class TaisChatModel {
         guard let index = messages.firstIndex(where: { $0.id == id }),
               case .assistant(_, let text, let sources, let current, let streaming) = messages[index], current != activity else { return }
         messages[index] = .assistant(id: id, text: text, sources: sources, activity: activity, isStreaming: streaming)
+    }
+
+    // MARK: Cards under the answer (docs/brain-spec.md, 9.3): nothing below calls a model
+
+    /// The mixes `build_mix` made in this turn get their card under the answer (read from what the engine kept, never from the model's text),
+    /// and an explanation of the listener's taste gets its one-tap "Less X" when the listener's own words named it.
+    private func showCards(after replyId: Int, prompt: String, tools: TaizoToolbox) async {
+        var anchor = replyId
+        for card in await tools.music.takeNewMixCards() {
+            let id = makeId()
+            insert(.mix(id: id, card: card, state: MixCardState()), after: anchor)
+            anchor = id
+        }
+        if let offer = LessOffer.offer(userText: prompt, named: await tools.music.namedThisTurn()) {
+            insert(.less(id: makeId(), offer: offer), after: anchor)
+        }
+    }
+
+    private func mixCard(_ id: Int) -> (card: MixCard, state: MixCardState)? {
+        guard let message = messages.first(where: { $0.id == id }), case .mix(_, let card, let state) = message else { return nil }
+        return (card, state)
+    }
+
+    private func setMix(_ id: Int, card: MixCard? = nil, state: MixCardState) {
+        guard let index = messages.firstIndex(where: { $0.id == id }), case .mix(_, let current, _) = messages[index] else { return }
+        messages[index] = .mix(id: id, card: card ?? current, state: state)
+    }
+
+    /// Play on a mix card: the queue becomes the mix.
+    func playMix(id: Int) {
+        guard let (card, state) = mixCard(id), !state.busy, let tools = toolbox else { return }
+        Task { [weak self] in
+            let ok = await tools.playMix(card.mixId)
+            guard let self, let now = self.mixCard(id) else { return }
+            self.setMix(id, state: now.state.afterPlay(succeeded: ok))
+        }
+    }
+
+    /// Save on a mix card: a playlist of the listener's with the mix's songs.
+    func saveMix(id: Int) {
+        guard let (card, state) = mixCard(id), !state.busy, !state.saved, let tools = toolbox else { return }
+        var working = state
+        working.busy = true
+        working.failed = false
+        setMix(id, state: working)
+        Task { [weak self] in
+            let ok = await tools.saveMix(card.mixId)
+            guard let self, let now = self.mixCard(id) else { return }
+            self.setMix(id, state: now.state.afterSave(succeeded: ok))
+        }
+    }
+
+    /// A chip under a mix card: the stored request with that delta, built again by the engine on the phone.
+    func applyChip(id: Int, chip: MixCardChip) {
+        guard let (card, state) = mixCard(id), !state.busy, let tools = toolbox else { return }
+        var working = state
+        working.busy = true
+        working.failed = false
+        setMix(id, state: working)
+        Task { [weak self] in
+            let next = await tools.music.adjustMix(card.mixId, chip: chip.chip)
+            guard let self, let now = self.mixCard(id) else { return }
+            if let next {
+                self.setMix(id, card: next, state: now.state.afterChip(succeeded: true))
+            } else {
+                self.setMix(id, state: now.state.afterChip(succeeded: false))
+            }
+        }
+    }
+
+    private func lessOffer(_ id: Int) -> LessOffer? {
+        guard let message = messages.first(where: { $0.id == id }), case .less(_, let offer) = message else { return nil }
+        return offer
+    }
+
+    private func setLess(_ id: Int, _ offer: LessOffer) {
+        guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
+        messages[index] = .less(id: id, offer: offer)
+    }
+
+    /// "Less trap": the existing taste change (undone with Undo here, or in Taste changes).
+    func tapLess(id: Int) {
+        guard let offer = lessOffer(id), offer.phase != .done, let tools = toolbox else { return }
+        Task { [weak self] in
+            let adjustment = await tools.lessLike(kind: offer.kind, name: offer.name)
+            guard let self, let current = self.lessOffer(id) else { return }
+            self.setLess(id, current.tapped(adjustmentId: adjustment))
+        }
+    }
+
+    func undoLess(id: Int) {
+        guard let offer = lessOffer(id), let adjustment = offer.adjustmentId, let tools = toolbox else { return }
+        Task { [weak self] in
+            await tools.undoLess(id: adjustment)
+            guard let self, let current = self.lessOffer(id) else { return }
+            self.setLess(id, current.undone())
+        }
     }
 
     // MARK: Confirmations

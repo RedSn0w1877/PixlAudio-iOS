@@ -60,6 +60,8 @@ struct MixScreen: View {
     let topTrailingButton: TopButton?
     /// Nil while the legacy mixes are showing.
     var brain: BrainMixRows?
+    /// The weekly note of First Listen: two or three sentences from the list itself (docs/brain-spec.md, 9.3). Nil for every other list.
+    var note: String? = nil
 
     @Environment(AppEnvironment.self) private var env
     @Environment(LibraryStore.self) private var library
@@ -91,6 +93,9 @@ struct MixScreen: View {
             LazyVStack(spacing: 8) {
                 MixHeader(title: title, songs: songs, titleLeading: titleLeading,
                           showsAIButton: trailingHeaderButton == .ai)
+                if let note {
+                    MixWeeklyNote(text: note)
+                }
                 MixPlayShuffleRow(
                     playTitle: "Play it",
                     height: 76, verticalPadding: 8, horizontalPadding: 20, outerRadius: 60,
@@ -331,5 +336,31 @@ struct MixPlayShuffleRow: View {
         }
         .buttonStyle(.plain)
         .glassEffect(Glass.regular.tint(tint).interactive(), in: shape)
+    }
+}
+
+/// First Listen's note for the week (Android `MixDetailScreen`'s "This week" block): a small label and two or three sentences. The text is the
+/// template over the list, or the cloud assistant's answer when it passed the evidence check (`WeeklyNote.check`); either way it is true of
+/// the list shown.
+private struct MixWeeklyNote: View {
+    let text: String
+
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(BrainStrings.weeklyNoteTitle)
+                .pixlFont(.labelLarge)
+                .foregroundStyle(theme.primary)
+            Text(text)
+                .pixlFont(.bodyLarge)
+                .foregroundStyle(theme.onSurface)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("mixDetail.weeklyNote")
     }
 }

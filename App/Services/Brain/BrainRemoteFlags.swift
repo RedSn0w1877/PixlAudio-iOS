@@ -18,6 +18,11 @@ nonisolated enum BrainRemoteFlags {
         BrainRemoteConfig.sourceAllowed(configText: savedText(), key: key)
     }
 
+    /// False only when the saved remote config switches the optional assistant jobs off (`brain.assist.enabled`).
+    static func assistAllowed() -> Bool {
+        BrainRemoteConfig.assistAllowed(configText: savedText())
+    }
+
     private static func savedText() -> String? {
         let file = YouTubeNetwork.supportDirectory().appendingPathComponent("remote-config.json")
         guard let data = try? Data(contentsOf: file), data.count < maxBytes else { return nil }

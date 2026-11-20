@@ -242,6 +242,24 @@ final class BrainActions {
         return true
     }
 
+    /// The one tap "Less trap" under an Ask Taizo explanation (docs/brain-spec.md, 9.3): the existing reduce on a genre or an artist, no bar
+    /// and no model call. The taste change's id when it was stored (Undo takes it back with `undoTasteChange`), else nil.
+    func lessLikeThis(kind: Int, name: String) async -> String? {
+        let isGenre = kind == AssistantCards.namedGenre
+        guard let change = isGenre ? BrainFeedback.genreChange(name: name, more: false) : BrainFeedback.lessFromChange(artistName: name) else {
+            return nil
+        }
+        let outcomes = await taste.apply([change])
+        guard let id = BrainFeedback.adjustmentId(of: outcomes.first) else { return nil }
+        if isGenre { await brain.engine?.requestRebuild(force: true) }
+        return id
+    }
+
+    /// Undo for `lessLikeThis`.
+    func undoTasteChange(id: String) {
+        taste.remove(id: id)
+    }
+
     /// "Don't count this" (8.5): the song's plays leave what the picks are based on, now; the bar offers Undo.
     func dontCount(_ song: Song) {
         Task { [weak self] in

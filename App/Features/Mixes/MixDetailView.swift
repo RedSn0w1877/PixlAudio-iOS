@@ -13,13 +13,15 @@ struct MixDetailView: View {
     @Environment(\.appTheme) private var theme
     @State private var view: MixView?
     @State private var loaded = false
+    /// The weekly note of First Listen (docs/brain-spec.md, 9.3): from the list itself, made when the list is opened, never at app start.
+    @State private var note: String?
 
     var body: some View {
         Group {
             if let view, !view.songs.isEmpty {
                 MixScreen(title: LocalizedStringKey(Self.title(view)), songs: view.songs, playsFromLibrary: false,
                           screenID: "mixDetail", titleLeading: 28, trailingHeaderButton: nil, topTrailingButton: nil,
-                          brain: BrainMixRows(BrainMixDetails.Part(view)))
+                          brain: BrainMixRows(BrainMixDetails.Part(view)), note: note)
             } else {
                 ZStack {
                     theme.surface.ignoresSafeArea()
@@ -64,6 +66,10 @@ struct MixDetailView: View {
             env.brain.register(found.engineTracks)
             found.songs = found.songs.map { env.brain.linked($0) }
             view = found
+            let current = found
+            if current.kind == MixKinds.firstListen {
+                note = await env.brain.assist?.firstListen.note(for: current)
+            }
         }
         loaded = true
     }

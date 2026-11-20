@@ -48,6 +48,39 @@ nonisolated struct TaizoToolbox: ClaudeToolExecuting {
         music.grounding.noteToolResult(output.content)
         return output
     }
+
+    // MARK: The buttons of a mix card (docs/brain-spec.md, 9.3): the same code paths as `play_songs` and `create_playlist`, no model call
+
+    /// Play on a mix card: the queue becomes the mix, each pick announced with its tags (surface assistant, arm, served vector).
+    func playMix(_ mixId: String) async -> Bool {
+        guard let prepared = await music.prepare(environment) else { return false }
+        seen.setPlayable(prepared.playable)
+        let input = JSONObject([(key: "song_ids", value: .array([.string("mix:" + mixId)]))])
+        let output = await TaizoToolRunner.run(.playSongs, input: input, environment: environment, catalog: catalog, seen: seen, turn: turn)
+        return !output.isError
+    }
+
+    /// Save on a mix card: the mix becomes a playlist of the listener's, named as the card is.
+    func saveMix(_ mixId: String) async -> Bool {
+        guard let prepared = await music.prepare(environment) else { return false }
+        seen.setPlayable(prepared.playable)
+        let title = await music.mixTitle(mixId)
+        let input = JSONObject([(key: "name", value: .string(title)), (key: "song_ids", value: .array([.string("mix:" + mixId)]))])
+        let output = await TaizoToolRunner.run(.createPlaylist, input: input, environment: environment, catalog: catalog, seen: seen, turn: turn)
+        return !output.isError
+    }
+
+    /// The one tap "Less trap" under an explanation: the existing taste change, with its id for Undo (nil when it could not be stored).
+    func lessLike(kind: Int, name: String) async -> String? {
+        let environment = self.environment
+        let actions = await MainActor.run { environment()?.brainActions }
+        return await actions?.lessLikeThis(kind: kind, name: name)
+    }
+
+    func undoLess(id: String) async {
+        let environment = self.environment
+        await MainActor.run { environment()?.brainActions.undoTasteChange(id: id) }
+    }
 }
 
 /// Catalogue results by id, shared by the calls of one conversation.

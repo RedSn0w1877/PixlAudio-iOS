@@ -371,6 +371,7 @@ private struct PlayerMetadataRow: View {
                     .onLongPressGesture(minimumDuration: 0.5) { navigateToArtist(song.primaryArtist.id) }
                     .accessibilityAddTraits(.isButton)
                     .accessibilityHint("Opens the artist")
+                PlayerSetNoteLine(color: theme.onPrimaryContainer.opacity(0.7))
             }
             .padding(.vertical, 4)
             .frame(maxWidth: .infinity, alignment: .leading)

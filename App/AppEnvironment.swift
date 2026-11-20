@@ -621,6 +621,8 @@ final class AppEnvironment {
         // First run: PixlAudio's setup (Android shows `SetupScreen` until `initial_setup_done`).
         if !settings.behavior.initialSetupDone, router.cover == nil { router.present(AppCover.setup) }
         playbackServices?.start()
+        // The optional weekly jobs and the weekly note reach the cloud assistant through the app (nothing runs until one is due).
+        brain.assist?.environment = { [weak self] in self }
         youtube.start()
         activeJobs.start()
         musicHaptics.start()

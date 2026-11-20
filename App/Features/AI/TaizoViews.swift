@@ -257,6 +257,12 @@ struct TaisChatMessageRow: View {
     let onResolve: ([SearchResultItem], SearchSource, Bool) -> Void
     /// A confirmation card's Confirm (true) / Cancel (false).
     var onConfirm: (Int, Bool) -> Void = { _, _ in }
+    /// A mix card's Play and Save, and a chip under it; the "Less X" tap and its Undo (stage 4 milestone 2). The row's id goes with each.
+    var onMixPlay: (Int) -> Void = { _ in }
+    var onMixSave: (Int) -> Void = { _ in }
+    var onMixChip: (Int, MixCardChip) -> Void = { _, _ in }
+    var onLessTap: (Int) -> Void = { _ in }
+    var onLessUndo: (Int) -> Void = { _ in }
 
     @Environment(\.appTheme) private var theme
 
@@ -330,6 +336,14 @@ struct TaisChatMessageRow: View {
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, 24)
                 .accessibilityIdentifier("ai.taizo.note")
+        case .mix(let id, let card, let state):
+            taizoTurn {
+                TaizoMixCard(card: card, state: state, onPlay: { onMixPlay(id) }, onSave: { onMixSave(id) }, onChip: { onMixChip(id, $0) })
+            }
+        case .less(let id, let offer):
+            taizoTurn {
+                TaizoLessRow(offer: offer, onTap: { onLessTap(id) }, onUndo: { onLessUndo(id) })
+            }
         }
     }
 
@@ -873,5 +887,174 @@ nonisolated struct AIFlowLayout: Layout {
         }
         if !current.indices.isEmpty { rows.append(current) }
         return rows
+    }
+}
+
+// MARK: - Cards under an answer (docs/brain-spec.md, 9.3 "What the listener gets", stage 4 milestone 2)
+
+/// A mix `build_mix` made: its title and size, the first four songs, Play and Save, and the chips under them. Every control works on the
+/// phone with no model call (Android `MixCardBubble`). The words are `BrainStrings`'.
+struct TaizoMixCard: View {
+    let card: MixCard
+    let state: MixCardState
+    let onPlay: () -> Void
+    let onSave: () -> Void
+    let onChip: (MixCardChip) -> Void
+
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(card.title)
+                    .pixlFont(.titleMedium, weight: .bold)
+                    .foregroundStyle(theme.onSurface)
+                    .lineLimit(2)
+                Text(state.busy ? BrainStrings.taizoMixUpdating : BrainStrings.taizoMixSongs(card.total))
+                    .pixlFont(.bodySmall, weight: .semibold)
+                    .foregroundStyle(theme.primary)
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(Array(card.preview.enumerated()), id: \.offset) { _, track in
+                    HStack(spacing: 6) {
+                        Text(track.title)
+                            .pixlFont(.bodyMedium, weight: .semibold)
+                            .foregroundStyle(theme.onSurface)
+                            .lineLimit(1)
+                        Text(track.artist)
+                            .pixlFont(.bodySmall)
+                            .foregroundStyle(theme.onSurfaceVariant)
+                            .lineLimit(1)
+                    }
+                }
+            }
+            .accessibilityElement(children: .combine)
+            HStack(spacing: 8) {
+                Button(action: onPlay) {
+                    HStack(spacing: 6) {
+                        Image(systemName: state.playing ? "checkmark" : "play.fill").font(.system(size: 15, weight: .bold))
+                        Text(BrainStrings.taizoMixPlay).pixlFont(.labelLarge, weight: .semibold).lineLimit(1)
+                    }
+                    .foregroundStyle(theme.onPrimary)
+                    .padding(.horizontal, 22)
+                    .frame(minHeight: 44)
+                    .background(theme.primary, in: Capsule())
+                    .contentShape(.capsule)
+                }
+                .buttonStyle(PressScaleButtonStyle(pressedScale: 0.95))
+                .accessibilityIdentifier("ai.taizo.mix.play")
+                Button(action: onSave) {
+                    HStack(spacing: 6) {
+                        Image(systemName: state.saved ? "checkmark" : "plus").font(.system(size: 15, weight: .semibold))
+                        Text(state.saved ? BrainStrings.taizoMixSaved : BrainStrings.taizoMixSave)
+                            .pixlFont(.labelLarge, weight: .semibold)
+                            .lineLimit(1)
+                    }
+                    .foregroundStyle(theme.onSecondaryContainer)
+                    .padding(.horizontal, 18)
+                    .frame(minHeight: 44)
+                    .background(theme.secondaryContainer, in: Capsule())
+                    .contentShape(.capsule)
+                }
+                .buttonStyle(PressScaleButtonStyle(pressedScale: 0.95))
+                .disabled(state.saved)
+                .accessibilityIdentifier("ai.taizo.mix.save")
+            }
+            .disabled(state.busy)
+            .opacity(state.busy ? 0.6 : 1)
+            if !card.chips.isEmpty {
+                GlassEffectContainer(spacing: 4) {
+                    AIFlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
+                        ForEach(card.chips) { chip in
+                            Button { onChip(chip) } label: {
+                                Text(chip.label)
+                                    .pixlFont(.labelLarge)
+                                    .foregroundStyle(theme.onSurface)
+                                    .lineLimit(1)
+                                    .padding(.horizontal, 14)
+                                    .frame(minHeight: 36)
+                                    .contentShape(.capsule)
+                            }
+                            .buttonStyle(.plain)
+                            .pixlGlass(in: Capsule(), tint: theme.primary.opacity(theme.isDark ? 0.16 : 0.1), interactive: true)
+                            .accessibilityLabel(chip.label)
+                        }
+                    }
+                }
+                .disabled(state.busy)
+                .opacity(state.busy ? 0.6 : 1)
+            }
+            if !card.notApplied.isEmpty {
+                Text(BrainStrings.taizoMixNotApplied)
+                    .pixlFont(.bodySmall)
+                    .foregroundStyle(theme.onSurfaceVariant)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if state.failed {
+                Text(BrainStrings.taizoMixFailed)
+                    .pixlFont(.bodySmall)
+                    .foregroundStyle(theme.onErrorContainer)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(14)
+        .pixlGlass(in: TaisChatMessageRow.taizoShape, tint: theme.surfaceContainerHigh.opacity(GlassTint.surface))
+        .accessibilityIdentifier("ai.taizo.mix")
+    }
+}
+
+/// The one-tap "Less trap" that ends an explanation: a glass chip; after the tap, "Done. You will get less trap." with Undo.
+struct TaizoLessRow: View {
+    let offer: LessOffer
+    let onTap: () -> Void
+    let onUndo: () -> Void
+
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        switch offer.phase {
+        case .idle:
+            chip(text: offer.label, action: onTap)
+        case .failed:
+            VStack(alignment: .leading, spacing: 8) {
+                Text(BrainStrings.taizoLessFailed)
+                    .pixlFont(.bodySmall)
+                    .foregroundStyle(theme.onErrorContainer)
+                chip(text: offer.label, action: onTap)
+            }
+        case .done:
+            HStack(spacing: 10) {
+                Text(BrainStrings.taizoLessDone(offer.name))
+                    .pixlFont(.bodyMedium)
+                    .foregroundStyle(theme.onSurface)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button(action: onUndo) {
+                    Text(BrainStrings.taizoLessUndo)
+                        .pixlFont(.labelLarge, weight: .semibold)
+                        .foregroundStyle(theme.primary)
+                        .padding(.horizontal, 10)
+                        .frame(minHeight: 36)
+                        .contentShape(.capsule)
+                }
+                .buttonStyle(PressScaleButtonStyle(pressedScale: 0.95))
+                .accessibilityIdentifier("ai.taizo.less.undo")
+            }
+        }
+    }
+
+    private func chip(text: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(text)
+                .pixlFont(.labelLarge)
+                .foregroundStyle(theme.onSurface)
+                .lineLimit(1)
+                .padding(.horizontal, 16)
+                .frame(minHeight: 40)
+                .contentShape(.capsule)
+        }
+        .buttonStyle(.plain)
+        .pixlGlass(in: Capsule(), tint: theme.primary.opacity(theme.isDark ? 0.16 : 0.1), interactive: true)
+        .accessibilityLabel(text)
+        .accessibilityIdentifier("ai.taizo.less")
     }
 }

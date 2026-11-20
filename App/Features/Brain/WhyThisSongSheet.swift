@@ -16,6 +16,8 @@ struct WhyThisSongSheet: View {
     @State private var showsHowPicksWork = false
     /// Up to two true facts under the reason, read from the listener's own plays when the sheet opens (8.8).
     @State private var facts: [WhyFacts.Fact] = []
+    /// What moved this pick's score the most, by fixed names, from the vector it was served with (docs/brain-spec.md, 9.3); empty when none.
+    @State private var factors: [AssistantRules.Factor] = []
 
     var body: some View {
         let reason = why.line.map(BrainStrings.whyLine)
@@ -64,6 +66,24 @@ struct WhyThisSongSheet: View {
                             .fixedSize(horizontal: false, vertical: true)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                }
+                let helped = ServedFactorLines.helped(factors)
+                let held = ServedFactorLines.held(factors)
+                if !helped.isEmpty {
+                    Spacer().frame(height: 4)
+                    Text(BrainStrings.whyFactorsUp(helped))
+                        .pixlFont(.bodyMedium)
+                        .foregroundStyle(theme.onSurfaceVariant)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if !held.isEmpty {
+                    Spacer().frame(height: 4)
+                    Text(BrainStrings.whyFactorsDown(held))
+                        .pixlFont(.bodyMedium)
+                        .foregroundStyle(theme.onSurfaceVariant)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 Spacer().frame(height: 20)
                 HStack(spacing: 8) {
@@ -126,7 +146,10 @@ struct WhyThisSongSheet: View {
             .padding(.bottom, 16)
         }
         .scrollIndicators(.hidden)
-        .task(id: song.id) { facts = await env.brain.whyFacts(for: song) }
+        .task(id: song.id) {
+            facts = await env.brain.whyFacts(for: song)
+            factors = await env.brain.whyFactors(for: song, why: why)
+        }
         .sheet(isPresented: $showsHowPicksWork) {
             HowPicksWorkSheet().pixlSheet()
         }

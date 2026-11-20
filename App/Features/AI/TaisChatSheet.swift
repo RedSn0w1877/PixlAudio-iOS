@@ -180,7 +180,12 @@ struct TaisChatSheet: View {
                                            onResolve: { items, source, play in
                                                model.resolveOnlineTracks(items, source: source, thenPlay: play) { dismiss() }
                                            },
-                                           onConfirm: { id, approved in model.resolveConfirmation(id: id, approved: approved) })
+                                           onConfirm: { id, approved in model.resolveConfirmation(id: id, approved: approved) },
+                                           onMixPlay: { model.playMix(id: $0) },
+                                           onMixSave: { model.saveMix(id: $0) },
+                                           onMixChip: { model.applyChip(id: $0, chip: $1) },
+                                           onLessTap: { model.tapLess(id: $0) },
+                                           onLessUndo: { model.undoLess(id: $0) })
                             .id(message.id)
                             .transition(message.insertionTransition)
                     }

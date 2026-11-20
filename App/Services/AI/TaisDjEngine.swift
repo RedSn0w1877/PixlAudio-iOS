@@ -26,6 +26,9 @@ nonisolated enum TaizoTurn: Sendable, Equatable {
     case media(DjIntent, DjRouteResult, aiIntro: String?)
     case conversation(String)
     case error(String)
+    /// "Start a station from [name]": read by rules (`StationSentence`), so it works with no connection and no model (docs/brain-spec.md, 14
+    /// stage 4). The chat starts it.
+    case station(String)
 }
 
 /// TAIS Engine 3 (Android `TaisDjEngine`): a play/queue/find prompt (`TaisIntentParser.isMediaRequest`) goes
@@ -48,6 +51,8 @@ nonisolated struct TaisDjEngine: Sendable {
     var onDevice: (any TaizoOnDevice)? = nil
 
     func respond(_ prompt: String) async -> TaizoTurn {
+        // A station from a sentence needs no model and no network: the name is looked up in the library and the genre atlas on the phone.
+        if let name = StationSentence.parse(prompt) { return .station(name) }
         let local = await usesOnDevice()
         if TaisIntentParser.isMediaRequest(prompt) {
             let intent = TaisIntentParser.parse(prompt)

@@ -33,6 +33,8 @@ struct QueueSheet: View {
     @State private var songInfo: QueueSongRef?
     /// "Why this song" for the row whose reason line was tapped (docs/brain-spec.md, 8.8).
     @State private var whyRef: QueueWhyRef?
+    /// The notes of the queue (docs/brain-spec.md, 9.3): made again only when the queue, the current song or the library change.
+    @State private var setNoteMemo = SetNoteMemo()
     @State private var showsHowPicksWork = false
     /// The drag's state lives in its own observable model: a drag event re-runs the visible rows' offset modifiers,
     /// not this sheet's body.
@@ -213,6 +215,7 @@ struct QueueSheet: View {
     private func list(queue: [Song], count: Int, offset: Int, currentDisplay: Int, autoplayLine: Int?) -> some View {
         // The reason line of every pick that has one, by song id (kept in step with the queue by Autoplay).
         let whyLines = env.brain.autoplay.why
+        let setNotes = setNoteMemo.notes(queue: queue, currentIndex: playback.currentIndex ?? -1, library: env.library).bySongId
         return ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 8) {
@@ -223,6 +226,7 @@ struct QueueSheet: View {
                         let song = queue[index + offset]
                         let canReorder = index > currentDisplay
                         let isCurrent = index == currentDisplay
+                        if let note = setNotes[song.id], canReorder || isCurrent { SetNoteRowLabel(text: note) }
                         let why = whyLines.isEmpty ? nil : whyLines[song.id]
                         QueueSongRow(song: song, isCurrent: isCurrent,
                                      isPlaying: isCurrent && playback.isPlaying, canReorder: canReorder,

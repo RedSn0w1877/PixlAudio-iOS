@@ -47,6 +47,7 @@ struct AISettingsSection: View {
                 .accessibilityIdentifier("ai.taizo.settings")
                 if hasBuiltInClaude {
                     claudeCloudSwitch
+                    assistHelpSwitch
                 }
             }
             Spacer().frame(height: 20)
@@ -78,6 +79,14 @@ struct AISettingsSection: View {
 
     /// Whether this build carries the built-in Claude key (UI tests show the normal state).
     private var hasBuiltInClaude: Bool { environment.launch.isUITest || ClaudeCloud.shared.hasKey }
+
+    /// "Let Taizo help the engine" (docs/brain-spec.md, 9.4): the optional weekly jobs, off unless turned on, inside the monthly limit.
+    private var assistHelpSwitch: some View {
+        SwitchSettingRow(title: BrainStrings.assistTitle, subtitle: BrainStrings.assistBody,
+                         isOn: Binding(get: { settings.ai.brainAssistHelp }, set: { settings.ai.brainAssistHelp = $0 }),
+                         systemImage: "sparkles", iconColor: theme.secondary)
+            .accessibilityIdentifier("settings.ai.assistHelp")
+    }
 
     /// For everyone: what goes to the cloud, and a way to stop it. Off is the $0 monthly limit (everything then runs on
     /// this iPhone); on restores the default limit.

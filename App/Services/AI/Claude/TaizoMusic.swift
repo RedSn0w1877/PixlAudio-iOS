@@ -39,6 +39,43 @@ final class TaizoMusic {
     func beginTurn() async {
         await prepared?.runner.beginTurn()
     }
+
+    // MARK: Cards under the answer (docs/brain-spec.md, 9.3): nothing below calls a model
+
+    /// The cards of the mixes `build_mix` made since the last call.
+    func takeNewMixCards() async -> [MixCard] { await prepared?.runner.takeNewMixCards() ?? [] }
+
+    /// What the explain tools returned this turn that a "Less X" could be about.
+    func namedThisTurn() async -> [AssistantCards.Named] { await prepared?.runner.namedThisTurn() ?? [] }
+
+    /// A chip under a card: the stored request with that delta, built again by the engine on the phone.
+    func adjustMix(_ mixId: String, chip: AssistantRules.Chip) async -> MixCard? {
+        await prepared?.runner.adjustMix(mixId: mixId, chip: chip)
+    }
+
+    func mixTitle(_ mixId: String) async -> String { await prepared?.runner.mixTitle(mixId) ?? "Made for you" }
+
+    /// "Start a station from X" with no network and no model (docs/brain-spec.md, 14 stage 4): X is tried as an artist of the library, a
+    /// genre of the atlas, a playlist and an album of the listener's, in that order, through the same host call the chat's `start_station`
+    /// makes. False when X is none of them: nothing is started and nothing is guessed.
+    func startStation(named name: String, environment: @escaping @MainActor @Sendable () -> AppEnvironment?) async -> Bool {
+        guard let env = environment() else { return false }
+        let host = TaizoAssistantHost(environment: environment)
+        let key = BrainText.fold(name)
+        var kinds: [(kind: String, ref: String)] = []
+        if env.library.songs.contains(where: { BrainText.fold(BrainLibraryIndex.primaryArtistName($0)) == key }) { kinds.append(("artist", name)) }
+        if let atlas = await env.brain.stage2b?.parts.atlas.atlas() {
+            let id = atlas.idForName(name)
+            if id != GenreAtlas.none { kinds.append(("genre", String(id))) }
+        }
+        kinds.append(("playlist", name))
+        kinds.append(("album", name))
+        for candidate in kinds {
+            let outcome = await host.startStation(seedRef: candidate.ref, seedKind: candidate.kind, mode: "blend", song: nil)
+            if outcome.started { return true }
+        }
+        return false
+    }
 }
 
 /// What the engine asks of the app: the YouTube Music search, stations, lasting taste changes and the queue.
