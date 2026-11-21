@@ -1082,3 +1082,15 @@ Android has no tests for a RunPod/R2 pipeline; everything here is new.
 | `data/service/player/HostDuckTest` | 10 | `HostDuckTests` (ramp down and up, the quick way back, an abort gives the level back at once and says why, never held twice) + `ProcessingTapTests.testTheHostDuckScalesTheSignalAndKeepsReplayGain` | AppTests | ported | Android tests the volume writes; here the duck is a gain in the tap, measured offline through the real tap. CI only. |
 | `data/preferences/EndlessSettingsPreferenceTest` | 2 | none | - | not ported | The switch is one `UserDefaults` key read in `EndlessState` (default false); no store to test. |
 | `presentation/components/BrainCopyTest` (reads all of `strings_endless.xml`) | 1 | `BrainCopyTests.theWordsOfEndlessListeningAreAndroidsAndNameNothingElse` (the new strings added; `HostVoiceController`, `HostSpeaker` and `HostDuck` read as text too) | PixlLibrary | ported | |
+
+## Endless Listening, review fixes (2026-11-21, branch `endless-listening`; Android head `382241a`)
+
+| Android test | Tests | iOS test | Target | Status | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `:brain` `EndlessTest` (+5: sideways text, cadence across windows, `tracksSinceNote`, walking the queue, names are not copy) + golden `endless.jsonl` (regenerated: +30 `notes_since`, +20 `since_note`, +7 `note_names`) | 5 + 57 lines | `BrainEndlessTests` (`goldenMatchesAndroid` counts the three new functions; the five unit cases) | PixlLibrary | ported | The golden file, README and MANIFEST re-copied byte for byte. |
+| `:brain` `HostVoiceTest` (+1: `line(noteChecked)`) | 1 | `BrainHostVoiceTests` (a checked note is not re-scanned for names) | PixlLibrary | ported | |
+| `presentation/components/SetNoteLinesHostTest` (+4: heard rules, one note in five while moving on, sideways, notes off) | 4 | `Host notes on the queue` (+5: the same four, and card = rows = voice with one memory; the memory itself) | PixlLibrary | ported | `HostNoteMemory` is in PixlLibrary here. |
+| `data/brain/BrainMixesTest` (+2: no seed before a play, only played songs) | 2 | `Endless Listening seeds` (+2) | PixlLibrary | ported | |
+| `data/brain/StationAndPlayTagsTest` (host novelty and put-back) | 2 | `Ask the host: chips apply to this listening only` (4: put-back once, back to familiar never Discover, the listener's own switch, the real count) | PixlLibrary | ported | `HostNoveltyHold` and `HostSteerReply` are pure here; `StationStore` is `App/`. |
+| `presentation/components/BrainCopyTest` (+plural replies) | 1 | `BrainCopyTests.theWordsOfEndlessListeningAreAndroidsAndNameNothingElse` (the new reply words and the "already playing" notice) | PixlLibrary | ported | |
+| (Android keeps its plan at version 1) | 0 | `BrainStage2bReviewFixesTests.aPlanSavedBeforeTheEndlessCardIsStillReadAndIsDueAtOnce` | PixlLibrary | added | iOS only: plan version 2. |

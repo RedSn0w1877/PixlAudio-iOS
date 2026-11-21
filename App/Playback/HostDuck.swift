@@ -11,6 +11,11 @@ import PixlLibrary
 /// The ramp numbers are `HostVoice.ramp` (the same rule as on Android, from `hostvoice.jsonl`): down to 0.35 over 250 ms, up over 400 ms
 /// (120 ms when a line was cut short). The main actor writes a step every 24 ms and the tap smooths each step across its buffer, so no zipper
 /// noise. `abort` gives the level back at once: a crossfade, a rebuilt deck, an interruption and the end of the app's session call it first.
+///
+/// Timing, honestly: the ramp is wall-clock, and the tap runs AHEAD of the speaker (it processes a buffer before it is heard; the crossfade
+/// curve is evaluated from media time for the same reason). So what the listener hears lags what this class writes by the tap's lead, which
+/// is not measured: the music may still be coming down when the voice starts, and "back at once" is back within the ramp plus that lead.
+/// The numbers are for a phone to calibrate with the Host voice log; nothing here promises more than the writes it makes.
 @MainActor
 final class HostDuck {
     private let effects: AudioEffectsParameters

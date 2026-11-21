@@ -162,7 +162,7 @@ player and the queue; Test the voice with music playing; the battery of an armed
 
 Settings › Endless Listening: switch Spoken host notes on, tap Test the voice with a song playing (the song dips, the sample is heard, the song returns at the
 same loudness). Start Endless Listening from the Home card; a card appears when a song has a note and the voice says the same words 1.5 s into that song.
-Skip while it talks (stops at once, music back in about a tenth of a second); pause; unplug headphones; take a call; play with crossfade on. Developer mode ›
+Skip while it talks (the line stops at once and the music starts coming back over 120 ms; what you hear lags that by the tap's lead, which is unmeasured); pause; unplug headphones; take a call; play with crossfade on. Developer mode ›
 Endless Listening › Host voice log shows each decision and why (`too_soon`, `transition`, `short_left`, `route_changed`, ...): use it to calibrate the numbers
 in `HostVoice`.
 
@@ -171,3 +171,71 @@ in `HostVoice`.
 - Round 1, run 44863345792 (on `683b05d`): core and app both green on the first try (`App/` compiled, `HostDuckTests` and the new tap test passed on CI).
 - Locally: the whole `Packages/PixlCore` suite passed except one stage 3 test, `BrainLearnerEngineTests.theLearnedWeightsRankOnlyWhileTheGateHasThemOnAndNeverInAControlSession`,
   which timed out under the full run's load (13 s) and passes alone and in a second run of the whole `PixlLibraryTests` target (1021 tests). Not touched by this milestone.
+
+---
+
+# Review fixes (iOS, after the two independent reviews)
+
+Ported from Android's "Review fixes" (`endless-listening` head `382241a`) plus the iOS review's own findings. **Android's golden `endless.jsonl` changed
+(and `MANIFEST.sha256`, `README.md`); all three were copied byte for byte and `BrainEndlessTests.goldenMatchesAndroid` passes bit for bit** (the file now has
+60 `seeds`, 70 `notes`, 9 `fact`, 8 `speakable`, 30 `notes_since`, 20 `since_note`, 7 `note_names` lines). `hostvoice.jsonl` did not change.
+
+## What changed, by finding (A = Android review, I = iOS review)
+
+- **A2 / I1 one note per five tracks across windows**: pure core `HostNotes.notes(sinceLast:)` and `HostNotes.tracksSinceNote`; `HostNoteMemory` (PixlLibrary, a
+  small locked set of the song ids whose note was shown or spoken) rides in `SetNoteLines.HostFacts.memory`. `EndlessState` owns the one memory and gives it to
+  every `hostFacts` it builds, so the player card, the queue rows and the spoken line (all three call `SetNoteLines.forQueue`) agree. `forQueue` marks the current
+  track when it has a note.
+- **A4 sideways**: the note is `A step sideways: <genre>.`, only for the genre the engine flagged `adjacent_genre`; the "from A to B" claim and `genreBefore` are gone.
+- **A9 forbidden words**: `HostNotes.isClean` (whole words, folded) / `isShort` / `isSpeakable` (both); the banned words are looked for in the template and the atlas
+  sentence, not in a name (Claude Debussy, Atmosphere keep their notes). `HostVoice.line(_:noteChecked:)`; the voice controller passes `true` for the app's own notes.
+- **I2 / A8 heard rule**: "New from X, an artist you play" only when `!heard.contains(song.id)`; the island note only for a song with a recorded play.
+- **A7 Host notes off**: `SetNoteLines.forQueue(notesOff:)` gives nothing at all (set notes included) while Endless Listening is the queue and the switch is off
+  (`EndlessState.hostNotesOff`; the memo's key carries it, so flipping the switch redraws at once).
+- **A6 seeds with real plays**: `endlessSeeds` only considers library tracks with a play weight above zero; the card needs at least two such seeds, and
+  "Play a few songs first" can fire.
+- **A1 dead Home card**: `BrainActions.startEndless` resumes only when the live queue holds the station's seed entry (`station.isSeed(mediaId:tag:)`, the same test
+  `AutoplayController.refreshStation` keeps a station alive with; with no engine, the seed ids in `PlaybackStore.queue`), otherwise it starts fresh. **iOS only:**
+  tapped while it already plays, it says "Endless Listening is already playing." (I9; Android just resumes).
+- **A5 / I3 chip replies**: `HostSteerReply.of(applied:tailChanged:note:)` (pure, tested); `EndlessStrings.replyUpbeat(_:)` etc. say the real count, with "One ... song"
+  for 1.
+- **A12 / I4 chips and the app-wide switch**: `HostNoveltyHold` (pure, tested) keeps the saved level; `StationStore.setNoveltyForHost` applies a level without saving
+  it, and `start` (another station) and `clear` (the station ended) put it back; the listener's own switch (`setNovelty`) cancels the put-back and, unlike Android,
+  still saves a level the listener picks that equals the held one. "Back to familiar" goes to `levelBeforeHost` (Blend when that was Discover or unknown), never
+  to Familiar. The replies say "until this station ends" / "Back to your usual mix".
+- **I5 `CXCallObserver`**: now made with a no-op delegate (`HostCallWatcher`) the first time the host is armed, before a call can come. Whether `calls` is
+  reliable without it was not provable here; with it, the documented way is used. The audio interruption notification stays the main call guard.
+- **I6 synthesizer creation**: `HostSpeaker.decisionVoiceState` is `voicePending` until `ensure()` ran; `HostVoice.decide` reaches `voice_pending` only after every
+  other rule (off, repeat, too soon, call, paused, route, window, transition, too early, short left) allows the line, and only then the controller calls
+  `speaker.ensure()` and decides again. The voices are listed for a line that will almost certainly be said; `cant_duck` (the one rule after it) can still skip.
+- **I7 switch off mid-line**: `speakNow` hands the synthesizer back at its end when the host is no longer armed.
+- **I8 duck timing**: the code was not changed (no number can be calibrated without a phone); `HostDuck`'s header and the how-to-test text below now say that the duck
+  is wall-clock while the tap runs ahead of the speaker, so what is heard lags the writes by the tap's lead.
+- **I9 card colour and menu**: the Endless card has its own tint (tertiary) and the other cards keep the colour they had; the context menu is attached only to the
+  Endless card (`EndlessCardMenu`).
+- **I10 plan saved before the card**: `HomePlan.version` is 2; `HomePlanStore.read` still reads version 1, and `HomePlanBuilder.isDue` is true for a plan below
+  the current version, so the card appears at the next Home without waiting for the next daypart. iOS only (Android's plan stays at 1). A plan with no card because
+  there are fewer than two seeds is saved at version 2 and is not rebuilt for that reason.
+
+Not changed: **A10** (engine picks carry no genre or year: a data limit, not a defect), **A15** (one `hostFacts` shared by three callers: a refactor, risky without a
+phone), **A3, A11, A13, A14** (Android only: TTS package visibility, the intro's disposal flag, the init callback, the coroutine guard; iOS has no equivalents).
+
+## Deviations from Android in this round
+
+1. The memory is `HostNoteMemory` in PixlLibrary (testable); Android's lives in `data/brain`.
+2. The put-back state is `HostNoveltyHold` (PixlLibrary); `StationStore` is a thin wrapper.
+3. iOS feedback when the card is tapped while it plays; plan version 2; the Endless card's own tint; the synthesizer is created at the `voice_pending` gate.
+
+## New tests
+
+`BrainEndlessTests`: golden (+57 lines), the cadence across windows, `tracksSinceNote`, walking the queue one track at a time, names are not copy; `Host notes on the
+queue`: heard rules, one note in five while moving on, card = rows = voice, sideways text, Host notes off, the memory; `Endless Listening seeds`: no seed before a
+play, only played songs; `Ask the host: chips apply to this listening only` (put-back, back to familiar, the listener's own switch, the real count);
+`BrainHostVoiceTests` (a checked note is not re-scanned for names); `BrainStage2bReviewFixesTests` (a version 1 plan is read and due; a newer one is refused);
+`BrainCopyTests` (the new reply words, "Endless Listening is already playing.").
+
+## Not verified on a phone
+
+Everything about sound (the voice, the duck against a crossfade, the tap's lead and so the real lag of the duck, whether `CXCallObserver` sees a call on another
+route), the Home card after Stop and the "already playing" notice, the card's tint and long-press menu, the chips' real counts on a thin pool, that the
+version 2 plan rebuilds once on the first Home after the update, and the look of the host cards. `App/` changes compile only on CI.

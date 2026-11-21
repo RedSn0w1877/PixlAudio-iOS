@@ -177,7 +177,10 @@ struct HomeMixShelf: View {
             ScrollView(.horizontal) {
                 GlassEffectContainer(spacing: 4) {
                     HStack(spacing: 12) {
-                        ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in cardView(card, index: index) }
+                        ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
+                            // The Endless Listening card has a colour of its own, so the mixes keep the colours they had before it joined the shelf.
+                            cardView(card, index: card.kind == MixKinds.endless ? 2 : cards.prefix(index).filter { $0.kind != MixKinds.endless }.count)
+                        }
                     }
                     .padding(.horizontal, 16)
                 }
@@ -229,11 +232,23 @@ struct HomeMixShelf: View {
         .accessibilityLabel(Text(verbatim: card.title))
         .accessibilityIdentifier("home.mix.\(card.mixId)")
         // The menu of the Endless Listening card: "How it works" replays the introduction. The long press is the card's own, so the
-        // menu is a context menu and no second control sits over the glass.
-        .contextMenu {
-            if card.kind == MixKinds.endless, let onEndlessHowItWorks {
-                Button(EndlessStrings.howItWorks, systemImage: "questionmark.circle", action: onEndlessHowItWorks)
+        // menu is a context menu and no second control sits over the glass. Only that card gets one: a menu with nothing in it on every
+        // other card might still take the long press.
+        .modifier(EndlessCardMenu(howItWorks: card.kind == MixKinds.endless ? onEndlessHowItWorks : nil))
+    }
+}
+
+/// The context menu of the Endless Listening card, or nothing at all when there is no action.
+private struct EndlessCardMenu: ViewModifier {
+    let howItWorks: (() -> Void)?
+
+    func body(content: Content) -> some View {
+        if let howItWorks {
+            content.contextMenu {
+                Button(EndlessStrings.howItWorks, systemImage: "questionmark.circle", action: howItWorks)
             }
+        } else {
+            content
         }
     }
 }
