@@ -290,6 +290,54 @@ struct SongTapTwoPhonesTests {
         #expect(p.a.ui.notice == .peerLost)
     }
 
+    @Test func aSlowFirstBeamConsentDoesNotTimeTheSenderOut() async {
+        // The listener reads the card for 18 seconds: the sender used to give up at 15.
+        let p = Self.pair(firstBeamAsks: true)
+        p.settle()
+        p.touch()
+        await p.pass(1_000)
+        for _ in 0..<170 { // the phones stay together, so both keep hearing each other
+            p.step(-40)
+            p.a.scheduler.pump()
+            p.b.scheduler.pump()
+        }
+        #expect(p.b.phase == .offered)
+        #expect(p.a.phase == .offered)
+        p.b.engine.accept()
+        await p.pass(600)
+        #expect(p.b.library.videos == ["dQw4w9WgXcQ"])
+        #expect(p.a.ui.beamRole == .send, "the sender hears back after the save and beams")
+        #expect(p.b.ui.beamRole == .receive)
+    }
+
+    @Test func theFirstBeamsAddStillSavesTheSongAfterThePhonesCameApart() async {
+        let p = Self.pair(firstBeamAsks: true)
+        p.settle()
+        p.touch()
+        await p.pass(1_000)
+        #expect(p.b.phase == .offered)
+        p.a.radio.drop() // pulling the phones apart after a tap is normal
+        await p.pass(100)
+        #expect(p.b.phase == .offered, "the card is still there")
+        p.b.engine.accept()
+        await p.pass(1_000)
+        #expect(p.b.library.videos == ["dQw4w9WgXcQ"])
+        #expect(p.b.phase == .saved)
+        #expect(p.b.library.removed.isEmpty)
+    }
+
+    @Test func aSongTheListenerAlreadyHadIsNeverTakenBackWhenTheBeamIsCancelledMidSave() async {
+        let p = Self.pair()
+        p.b.library.videos = ["dQw4w9WgXcQ"] // already in the library
+        p.settle()
+        p.touch()
+        await p.pass(300)
+        p.b.engine.cancel()
+        await p.pass(2_000)
+        #expect(p.b.library.removed.isEmpty)
+        #expect(p.b.library.videos == ["dQw4w9WgXcQ"])
+    }
+
     @Test func cancellingOnTheSenderAfterTheOfferIsUpClosesItAndTheReceiverGivesUp() async {
         let p = Self.pair(firstBeamAsks: true)
         p.settle()
