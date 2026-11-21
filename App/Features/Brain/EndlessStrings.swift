@@ -73,11 +73,27 @@ nonisolated enum EndlessStrings {
     // MARK: Settings
 
     static var settingsTitle: String { String(localized: "Endless Listening") }
-    static var settingsSubtitle: String { String(localized: "Host notes and how it works") }
+    static var settingsSubtitle: String { String(localized: "Host notes, spoken notes and how it works") }
     static var settingsHostNotes: String { String(localized: "Host notes") }
     static var settingsHostNotesSummary: String { String(localized: "Short notes about the songs coming up in Endless Listening") }
     static var settingsHow: String { String(localized: "How it works") }
     static var settingsHowSummary: String { String(localized: "Replay the introduction") }
+    static var settingsSpoken: String { String(localized: "Spoken host notes") }
+    static var settingsSpokenSummary: String {
+        String(localized: "The host says a note out loud now and then, with the music turned down. Uses the voice on this phone.")
+    }
+    static var settingsVoiceTest: String { String(localized: "Test the voice") }
+    static var settingsVoiceTestSummary: String { String(localized: "Hear how the host sounds") }
+    static var settingsVoiceTestRunning: String { String(localized: "Starting the voice") }
+    static var voiceTestLine: String { String(localized: "This is how the host sounds.") }
+    static var voiceTestNone: String { String(localized: "This phone has no English voice that works without the internet.") }
+    static var voiceTestBusy: String { String(localized: "The host is talking right now.") }
+    static var voiceTestCall: String { String(localized: "Not during a call.") }
+    static var voiceTestError: String { String(localized: "The voice did not start. Try again.") }
+    static var settingsVoiceLog: String { String(localized: "Host voice log") }
+    static var settingsVoiceLogSummary: String { String(localized: "The last 20 notes: said or skipped, and why") }
+    static var voiceLogEmpty: String { String(localized: "Nothing yet.") }
+    static var voiceLogClose: String { String(localized: "Close") }
 
     /// The three pages of the introduction, in order.
     static var introPages: [(title: String, body: String)] {

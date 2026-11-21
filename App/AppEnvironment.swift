@@ -352,7 +352,12 @@ final class AppEnvironment {
         }
         brainActions = BrainActions(brain: brain, playback: playback, library: library, taste: tasteAdjustments,
                                     playCounts: playCounts, engine: realPlayback?.engine, autoplay: autoplayController)
-        endless = EndlessState(defaults: isUITest ? nil : UserDefaults.standard, brain: brain)
+        let endlessState = EndlessState(defaults: isUITest ? nil : UserDefaults.standard, brain: brain)
+        endless = endlessState
+        // The spoken host (Endless Listening, milestone E2): created here, watches nothing until its switch is on (`start()` below).
+        if let realPlayback {
+            endlessState.voice = HostVoiceController(endless: endlessState, brain: brain, playback: playback, engine: realPlayback.engine)
+        }
         // Daily Mix and Your Mix with new music (docs/brain-spec.md, 8.2, stage 2a) and the once-a-day background search
         // for new music (3.7). Nothing here reads a file or asks the network: the sources are closures, and a mix is
         // built after the app has settled, never at launch.
@@ -630,6 +635,7 @@ final class AppEnvironment {
         youtube.start()
         activeJobs.start()
         musicHaptics.start()
+        endless.voice?.switchChanged()
         tais.start()
         automaticStudio.start()
         spatial.start()
