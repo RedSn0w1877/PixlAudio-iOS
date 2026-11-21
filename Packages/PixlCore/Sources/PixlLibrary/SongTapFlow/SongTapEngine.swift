@@ -59,6 +59,16 @@ public struct SongTapUiState: Sendable, Equatable {
     public var beamReduced = false
     /// Whether Bluetooth is running, and if not why. The code route works either way.
     public var bluetooth: SongTapBleStatus = .idle
+    /// Song Drop (sender): phones advertising as receivers inside the list gate, strongest first, from advertisements only.
+    public var nearby: [SongTapNearbyEntry] = []
+    /// Song Drop (sender): the phone inside the near gate to ask "Song drop to X?" about, or nil.
+    public var prompt: SongTapNearbyEntry?
+    /// The other phone's name for the cards: the sender on a receiver, the target on a sender; nil when unknown.
+    public var peerName: String?
+    /// True while the song being offered is a Song Drop song picked from a song's options (not just the one that plays).
+    public var dropMode = false
+    /// How sensitive the tap is (Settings > Song Tap), applied live.
+    public var sensitivity = SongTapSensitivity.default
 
     public init() {}
 
@@ -75,15 +85,22 @@ public enum SongTapTransportEvent: Sendable, Equatable {
     case peerNear(Int)
     case peerFar(Int)
     case peerRole(peer: Int, role: SongTapRole)
-    /// The two phones touched: the detector fired.
+    /// The other phone's name (its full name once connected): a label for the cards, never an identity.
+    case peerName(peer: Int, name: String)
+    /// The commit: this phone's detector fired for `peer`, or the other phone's tap message was accepted by `SongTapPeerTap.judge`.
     case tap(peer: Int)
-    /// An offer arrived from `peer` (0 for a QR code): the payload bytes and the number of the key that signed it (0 when unsigned).
-    case offer(peer: Int, payload: [UInt8], senderKey: Int32)
+    /// An offer arrived from `peer` (0 for a QR code): the payload bytes and the number of the key that signed it (0 when unsigned); `name` is the sender's name.
+    case offer(peer: Int, payload: [UInt8], senderKey: Int32, name: String? = nil)
+    /// Receiver: a checked offer was fetched from `peer` before any tap and is now in hand (spec 5 prefetch).
+    case offerPrefetched(peer: Int, payload: [UInt8], senderKey: Int32, name: String? = nil)
+    /// Receiver: the offer fetched ahead is no good any more (the sender withdrew it, or the connection closed).
+    case offerGone(peer: Int)
+    /// Sender: the phone the listener said yes to has read the offer, or went away before the beam.
+    case offerRead(peer: Int)
+    case offerReadLost(peer: Int)
     /// Something arrived that is not an offer this phone can use.
     case offerInvalid
     case ack(peer: Int)
-    /// The sender said go (receiver side); `rttMs` is the receiver's measured round trip of its acknowledgement.
-    case go(peer: Int, rttMs: Int64)
     case declined(peer: Int)
 }
 
@@ -94,10 +111,11 @@ public protocol SongTapPort: AnyObject {
     func startTransport(_ role: SongTapRole)
     func stopTransport()
     func publishOffer(peer: Int, payload: [UInt8])
-    func withdrawOffer()
+    /// Takes the offer off the table. A sender keeps its Bluetooth offer through the beam (`keepBluetooth`), because the receiver's
+    /// answer still has to be matched to the phone that read it.
+    func withdrawOffer(keepBluetooth: Bool)
     func readOffer(peer: Int)
     func sendAck(peer: Int)
-    func sendGo(peer: Int, startMs: Int64)
     func sendDecline(peer: Int)
     func abortTransfer(peer: Int)
     /// Starts saving `payload`; the app reports back with `SongTapEngine.saveFinished`.
@@ -117,8 +135,6 @@ public protocol SongTapPort: AnyObject {
     func cancelTimers()
     func markFirstBeamAccepted()
     func uiChanged(_ ui: SongTapUiState)
-    /// Sender: the phones touched; build the payload of the song that plays now and answer with `SongTapEngine.tap(peer:payload:)`.
-    func requestTapPayload(peer: Int)
     /// True when Reduce Motion is on: the beam then cross-fades instead of flying.
     func reducedMotion() -> Bool
     /// Calls `SongTapEngine.beamTimerFired()` after `afterMs`; nil cancels the timer.
@@ -136,8 +152,9 @@ public final class SongTapEngine {
     public static let qrRefreshMs: Int64 = 240_000
     /// The same code seen again within this long is the same beam.
     public static let sameScanMs: Int64 = 10_000
-    /// After a save over Bluetooth, how long to wait for the sender's go before the Undo window starts without a beam.
-    public static let goGraceMs: Int64 = 3_000
+    /// A sender armed to a phone makes its offer again this often (the offer carries a time), and a receiver accepts one this old.
+    public static let targetRefreshMs: Int64 = 20_000
+    public static let prefetchPayloadWindowMs: Int64 = 120_000
 
     public weak var port: (any SongTapPort)?
 
@@ -147,6 +164,8 @@ public final class SongTapEngine {
     }
 
     private var pendingOffer: SongTapPayload?
+    /// Receiver (spec 5): the checked offer fetched ahead of the tap, kept until the session commits to it or lets it go.
+    private var prefetched: SongTapPayload?
     /// The offer the session accepted and is acting on (set only when the session took it, never by a mere arrival).
     private var incoming: SongTapPayload?
     /// An offer that has arrived and is being put to the session: it becomes `incoming` only if the session takes it.
@@ -174,7 +193,24 @@ public final class SongTapEngine {
 
     public func setNowPlaying(_ nowPlaying: SongTapNowPlaying?) { ui.nowPlaying = nowPlaying }
 
-    public func setBluetooth(_ status: SongTapBleStatus) { ui.bluetooth = status }
+    public func setBluetooth(_ status: SongTapBleStatus) {
+        ui.bluetooth = status
+        // Bluetooth went away under a sender that was armed to a phone: the offer is gone with it.
+        if status != .active && status != .idle && session.phase == .offered && session.target != 0 {
+            dispatch(.cancel)
+            dispatch(.dismiss)
+        }
+    }
+
+    public func setNearby(_ list: [SongTapNearbyEntry], prompt: SongTapNearbyEntry?) {
+        ui.nearby = list
+        ui.prompt = prompt
+    }
+
+    public func setSensitivity(_ value: SongTapSensitivity) { ui.sensitivity = value }
+
+    /// A song picked from a song's options is being offered instead of the one that plays (Song Drop).
+    public func setDropMode(_ on: Bool) { ui.dropMode = on }
 
     /// The beam's own timer ran out: the sender's beam is the whole send, so the session is done; the receiver's card is over
     /// when the Undo window is, which is also when the saved result is put away.
@@ -250,10 +286,25 @@ public final class SongTapEngine {
     public func cancel() { dispatch(.cancel) }
     public func dismiss() { dispatch(.dismiss) }
 
-    /// A Bluetooth tap: the detector fired for `peer`; `payload` is the song that plays now, if it can be named.
-    public func tap(peer: Int, payload: SongTapPayload?) {
+    /// Sender: "Song drop to X?" was answered yes for `peer` (a number from `ui.nearby` or `ui.prompt`): the offer for `payload` is
+    /// published for that phone only, and the beam starts when the two phones touch. A nil payload (the song cannot be named) says so.
+    public func approve(peer: Int, name: String?, payload: SongTapPayload?) {
         pendingOffer = payload
-        dispatch(.tapDetected(peer: peer, videoId: payload?.songKey ?? ""))
+        ui.peerName = name
+        dispatch(.approve(peer: peer, videoId: payload?.songKey ?? ""))
+    }
+
+    /// Sender: the offer's payload is made again (it carries a time, and the song may have changed): the target reads it anew.
+    public func republish(_ fresh: SongTapPayload?) {
+        guard session.phase == .offered, session.target != 0, let fresh else { return }
+        pendingOffer = fresh
+        dispatch(.republish(videoId: fresh.songKey))
+    }
+
+    /// Stop being armed to the phone that was said yes to.
+    public func cancelDrop() {
+        dispatch(.cancel)
+        dispatch(.dismiss)
     }
 
     public func timeout(_ tag: SongTapTimeoutTag) { dispatch(.timeout(tag)) }
@@ -274,27 +325,36 @@ public final class SongTapEngine {
         case .peerNear(let p): dispatch(.peerNear(p))
         case .peerFar(let p): dispatch(.peerFar(p))
         case .peerRole(let p, let role): dispatch(.peerRole(peer: p, role: role))
+        case .peerName(let p, let name):
+            if p == session.peer && session.role == .receive { ui.peerName = name }
         case .tap(let p):
-            if session.role == .receive {
-                // The receiver sends nothing: the tap only means "read the offer now".
-                dispatch(.tapDetected(peer: p, videoId: ""))
-            } else {
-                port?.requestTapPayload(peer: p)
+            // The commit: nothing is made and nothing is waited for, so the haptic and the beam start at the moment of the tap. The
+            // sender's song was made at "Yes", the receiver's offer is already in hand (prefetched).
+            dispatch(.tapDetected(peer: p, videoId: session.role == .receive ? "" : pendingOffer?.songKey ?? "", nowMs: now()))
+        case .offerPrefetched(let peer, let bytes, let senderKey, let name):
+            if case .ok(let payload) = SongTapPayloads.decode(bytes),
+               SongTapSigning.isFresh(tsMs: payload.ts, nowMs: now(), windowMs: Self.prefetchPayloadWindowMs) {
+                prefetched = payload
+                if let name { ui.peerName = name }
+                dispatch(.offerPrefetched(peer: peer, videoId: payload.songKey, senderKey: senderKey))
             }
-        case .offer(let peer, let bytes, let senderKey):
-            let window = peer == 0 ? SongTapSigning.qrWindowMs : SongTapSigning.offerWindowMs
+        case .offerGone(let p): dispatch(.offerGone(peer: p))
+        case .offerRead(let p): dispatch(.offerRead(peer: p, nowMs: now()))
+        case .offerReadLost(let p): dispatch(.offerReadLost(peer: p))
+        case .offer(let peer, let bytes, let senderKey, let name):
+            let window = peer == 0 ? SongTapSigning.qrWindowMs : Self.prefetchPayloadWindowMs
             if case .ok(let payload) = SongTapPayloads.decode(bytes),
                SongTapSigning.isFresh(tsMs: payload.ts, nowMs: now(), windowMs: window) {
                 // Written down only once the session has taken it (see `step`): an offer it ignored (one already being asked
                 // about, or being saved) must not replace the card or the song that Undo would remove.
                 candidate = payload
+                if let name { ui.peerName = name }
                 dispatch(.offerReceived(peer: peer, videoId: payload.songKey, senderKey: senderKey, nowMs: now()))
             } else {
                 dispatch(.offerRejected)
             }
         case .offerInvalid: dispatch(.offerRejected)
         case .ack: dispatch(.ackReceived(nowMs: now(), rttMs: 0))
-        case .go(_, let rtt): dispatch(.goReceived(nowMs: now(), rttMs: rtt))
         case .declined(let p): dispatch(.peerDeclined(p))
         }
     }
@@ -338,6 +398,13 @@ public final class SongTapEngine {
         let previous = session
         let r = SongTapSession.reduce(session, event)
         session = r.state
+        // A tap that committed to an offer that was fetched ahead: that offer is now the one on the table.
+        if case .tapDetected = event, previous.pre, !session.pre, session.phase == .offered || session.phase == .transferring,
+           let held = prefetched, held.songKey == session.videoId {
+            incoming = held
+            ui.card = Self.card(of: held)
+        }
+        if !session.pre { prefetched = nil }
         if case .offerReceived(_, let videoId, _, _) = event {
             let offered = candidate
             candidate = nil
@@ -349,9 +416,10 @@ public final class SongTapEngine {
         }
         updateUi(after: event)
         for effect in r.effects { perform(effect) }
-        // A code is up only while an offer is on the table.
+        // A code is up, and an offer readable over Bluetooth, only while an offer is on the table. A sender keeps its Bluetooth offer
+        // through the beam (the receiver's answer still has to be matched to the phone that read it).
         if session.phase != .offered {
-            port?.withdrawOffer()
+            port?.withdrawOffer(keepBluetooth: session.role == .send && session.phase == .transferring)
             if ui.code != nil { ui.code = nil }
         }
         // Back to waiting after a result: the phone that is close has to be announced again to be tappable.
@@ -362,7 +430,10 @@ public final class SongTapEngine {
     private func updateUi(after event: SongTapSessionEvent) {
         var next = ui
         next.session = session
-        if session.phase == .armed || session.phase == .idle { next.card = nil }
+        if session.phase == .armed || session.phase == .idle {
+            next.card = nil
+            next.peerName = nil
+        }
         switch event {
         case .dismiss, .arm, .disarm:
             next.notice = nil
@@ -394,7 +465,6 @@ public final class SongTapEngine {
             if let p = pendingOffer { publish(peer: peer, payload: p) }
         case .readOffer(let peer): port.readOffer(peer: peer)
         case .sendAck(let peer): port.sendAck(peer: peer)
-        case .sendGo(let peer, let startMs): port.sendGo(peer: peer, startMs: startMs)
         case .sendDecline(let peer): port.sendDecline(peer: peer)
         case .abortTransfer(let peer): port.abortTransfer(peer: peer)
         case .startBeam(let role, let startMs):
@@ -441,11 +511,9 @@ public final class SongTapEngine {
         // A saved card that came with a beam is put away by the beam's own end (its Undo chip lives inside it).
         if phase == .saved && ui.beamRole == .receive { return }
         dismissPending = true
-        // Over Bluetooth the receiver saves first and the sender's go (which starts the beam) arrives a moment later: the Undo
-        // window must not begin before the beam does, or the card would be taken away in the middle of it.
-        let waitForBeam = phase == .saved && session.role == .receive && session.peer != 0
+        // The beam starts with the save (spec 5), so the Undo window starts at the save as well: nothing waits for the other phone.
         let stay = phase == .saved ? SongTapSession.undoWindowMs : Self.resultMs
-        port?.scheduleDismiss(afterMs: waitForBeam ? Self.goGraceMs + stay : stay)
+        port?.scheduleDismiss(afterMs: stay)
     }
 
     private func cancelJobs() {

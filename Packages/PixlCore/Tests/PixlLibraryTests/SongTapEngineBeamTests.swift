@@ -16,46 +16,67 @@ struct SongTapEngineBeamTests {
         return (engine, port)
     }
 
-    /// A sender with a phone near: found, near, tapped, the receiver's ack arrives.
-    static func senderBeaming() -> (SongTapEngine, Port) {
+    /// A sender whose listener said yes to the phone near: found, near, yes, the phone read the offer, the two touch.
+    static func senderCommitted() -> (SongTapEngine, Port) {
         let (engine, port) = armed(.send)
         engine.handle(.peerFound(3))
         engine.handle(.peerNear(3))
         engine.handle(.peerRole(peer: 3, role: .receive))
-        engine.tap(peer: 3, payload: SongTapFlowTests.offerPayload(at: port.now))
+        engine.approve(peer: 3, name: "Ann", payload: SongTapFlowTests.offerPayload(at: port.now))
+        engine.handle(.offerRead(peer: 3))
+        engine.handle(.tap(peer: 3))
+        return (engine, port)
+    }
+
+    /// ... and the receiver's acknowledgement arrives.
+    static func senderBeaming() -> (SongTapEngine, Port) {
+        let (engine, port) = senderCommitted()
         engine.handle(.ack(peer: 3))
         return (engine, port)
     }
 
-    @Test func aTapOnTheSendingSideAsksTheAppForThePayloadAReceiverJustReads() {
+    @Test func aTapCommitsAtOnceOnBothSidesAndANonPrefetchedReceiverJustReads() {
         let (sender, senderPort) = Self.armed(.send)
         sender.handle(.peerFound(3))
-        sender.handle(.peerRole(peer: 3, role: .receive))
+        sender.handle(.peerNear(3))
+        sender.approve(peer: 3, name: "Ann", payload: SongTapFlowTests.offerPayload(at: senderPort.now))
+        sender.handle(.offerRead(peer: 3))
+        senderPort.log.removeAll()
         sender.handle(.tap(peer: 3))
-        #expect(senderPort.log.contains("tapPayload:3"))
+        // No payload is asked for and nothing waits: the haptic and the beam start with the tap.
+        #expect(senderPort.log.contains("haptic:tick") && senderPort.log.contains("schedule:ack:45000"))
+        #expect(sender.ui.beamRole == .send)
+        #expect(sender.session.phase == .transferring)
 
         let (receiver, receiverPort) = Self.armed(.receive)
         receiver.handle(.peerFound(4))
         receiver.handle(.peerRole(peer: 4, role: .send))
         receiver.handle(.tap(peer: 4))
-        #expect(!receiverPort.log.contains("tapPayload:4"))
         #expect(receiverPort.log.contains("read:4"))
     }
 
     @Test func theSendersBeamIsTheWholeSendAndEndsTheSession() {
         let (engine, port) = Self.senderBeaming()
-        #expect(engine.session.phase == .transferring || engine.session.phase == .saved || engine.ui.beamRole == .send)
-        #expect(port.log.contains { $0.hasPrefix("go:3") })
         #expect(engine.ui.beamRole == .send)
         #expect(engine.ui.beamReduced == false)
         #expect(port.log.contains { $0.hasPrefix("beamEnd:") && $0 != "beamEnd:cancel" })
         engine.beamTimerFired()
         #expect(engine.ui.beamRole == nil)
-        #expect(engine.session.phase != .transferring)
+        #expect(engine.session.phase == .saved)
+    }
+
+    @Test func aSendersBluetoothOfferIsKeptThroughTheBeamAndLetGoAfterIt() {
+        let (engine, port) = Self.senderCommitted()
+        #expect(engine.session.phase == .transferring)
+        #expect(port.log.last { $0.hasPrefix("withdraw") } == "withdraw:keep", "the receiver's answer still has to be matched to the phone that read it")
+        engine.handle(.ack(peer: 3))
+        engine.beamTimerFired()
+        #expect(engine.session.phase == .saved)
+        #expect(port.log.last { $0.hasPrefix("withdraw") } == "withdraw")
     }
 
     @Test func aBeamEndsAtOnceWhenTheSessionFails() {
-        let (engine, port) = Self.senderBeaming()
+        let (engine, port) = Self.senderCommitted()
         #expect(engine.ui.beamRole == .send)
         engine.handle(.peerLost(3))
         #expect(engine.ui.beamRole == nil)
@@ -64,10 +85,7 @@ struct SongTapEngineBeamTests {
     }
 
     @Test func aFailureWithoutANoticeOfItsOwnIsWordedFromItsReason() {
-        let (engine, _) = Self.armed(.send)
-        engine.handle(.peerFound(3))
-        engine.handle(.peerRole(peer: 3, role: .receive))
-        engine.tap(peer: 3, payload: SongTapFlowTests.offerPayload(at: 1))
+        let (engine, _) = Self.senderCommitted()
         engine.handle(.peerLost(3))
         #expect(engine.session.phase == .failed)
         #expect(engine.ui.notice == .peerLost)
@@ -80,6 +98,17 @@ struct SongTapEngineBeamTests {
         #expect(engine.ui.bluetooth == .noPermission)
         engine.setBluetooth(.active)
         #expect(engine.ui.bluetooth == .active)
+    }
+
+    @Test func bluetoothGoingAwayUnderASenderArmedToAPhoneCancelsTheOffer() {
+        let (engine, _) = Self.armed(.send)
+        engine.handle(.peerFound(3))
+        engine.handle(.peerNear(3))
+        engine.approve(peer: 3, name: "Ann", payload: SongTapFlowTests.offerPayload(at: 1_763_600_000_000))
+        #expect(engine.session.phase == .offered && engine.session.target == 3)
+        engine.setBluetooth(.bluetoothOff)
+        #expect(engine.session.phase == .armed, "cancelled, then dismissed")
+        #expect(engine.ui.bluetooth == .bluetoothOff)
     }
 
     @Test func backToWaitingAfterAResultAsksTheRouteToAnnounceThePhoneThatIsClose() {

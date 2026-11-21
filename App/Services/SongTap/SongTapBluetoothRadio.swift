@@ -7,10 +7,16 @@ import PixlLibrary
 /// turns CoreBluetooth callbacks into `SongTapBleRadioListener` calls and back, and keeps the GATT client's one-operation-at-a-time
 /// rule. The wire (the UUIDs, the characteristics and what they hold) is `SongTapWire`, the same on a Pixel.
 ///
-/// Nothing is created until `start`: no manager, no permission prompt, no scan. The advertisement is the service UUID alone (an
-/// iPhone can advertise nothing else while PixlAudio is in the foreground): no local name, no data, and the address iOS gives an
-/// advertiser is a private one that changes every few minutes. Both managers run on the main queue, so every callback arrives on
-/// the main thread and is handed to the main actor from there.
+/// Nothing is created until `start`: no manager, no permission prompt, no scan. The advertisement is the service UUID and the short
+/// name as the local name (an iPhone can advertise nothing else while PixlAudio is in the foreground; never the system device name,
+/// iOS may shorten the name further), and the address iOS gives an advertiser is a private one that changes every few minutes. A
+/// scan result's name is read from an Android phone's manufacturer block (company id 0xFFFF in its scan response) or, from an
+/// iPhone, its local name, both through `SongTapWire.advertisedName`. Both managers run on the main queue, so every callback
+/// arrives on the main thread and is handed to the main actor from there.
+///
+/// An iPhone cannot choose its advertising power (Android advertises at LOW): the near gate in the core is the only thing that keeps
+/// a far phone from being connected to, and the signal readings of the two phones differ, which is why the readings are on the
+/// iPhone's own scale as they are.
 ///
 /// iOS cannot do two things Android does, both harmless here: it has no API to disconnect a central from the server side
 /// (`dropClient` does nothing; the receiver closes its own connection when the session ends), and an iOS peripheral cannot
@@ -38,8 +44,10 @@ final class SongTapBluetoothRadio: SongTapBleRadio {
     private var controlCharacteristic: CBMutableCharacteristic?
     private var eventCharacteristic: CBMutableCharacteristic?
     private var serverClients: [String: CBCentral] = [:]
+    private var nameCharacteristic: CBMutableCharacteristic?
     private var offerCache: [String: [UInt8]] = [:]
-    private var pendingGo: [String] = []
+    private var pendingNotifications: [(client: String, value: [UInt8])] = []
+    private var shortName = SongTapNames.fallback
 
     private static let sendService = CBUUID(string: SongTapWire.serviceSend)
     private static let receiveService = CBUUID(string: SongTapWire.serviceReceive)
@@ -47,9 +55,11 @@ final class SongTapBluetoothRadio: SongTapBleRadio {
     private static let offer = CBUUID(string: SongTapWire.charOffer)
     private static let control = CBUUID(string: SongTapWire.charControl)
     private static let event = CBUUID(string: SongTapWire.charEvent)
+    private static let name = CBUUID(string: SongTapWire.charName)
 
     private enum Op {
         case readInfo
+        case readName
         case readOffer
         case write([UInt8])
     }
@@ -59,6 +69,7 @@ final class SongTapBluetoothRadio: SongTapBleRadio {
         var ready = false
         var busy = false
         var info: CBCharacteristic?
+        var name: CBCharacteristic?
         var offer: CBCharacteristic?
         var control: CBCharacteristic?
         var event: CBCharacteristic?
@@ -69,10 +80,11 @@ final class SongTapBluetoothRadio: SongTapBleRadio {
 
     // MARK: Start and stop
 
-    func start(role: SongTapRole, listener: any SongTapBleRadioListener) -> SongTapBleStatus {
+    func start(role: SongTapRole, listener: any SongTapBleRadioListener, name: String) -> SongTapBleStatus {
         stopRadios()
         self.listener = listener
         self.role = role
+        shortName = SongTapNames.advertName(SongTapNames.orFallback(name))
         switch CBManager.authorization {
         case .denied, .restricted: return .noPermission
         default: break
@@ -108,8 +120,9 @@ final class SongTapBluetoothRadio: SongTapBleRadio {
         seen.removeAll()
         serverClients.removeAll()
         offerCache.removeAll()
-        pendingGo.removeAll()
+        pendingNotifications.removeAll()
         infoCharacteristic = nil
+        nameCharacteristic = nil
         offerCharacteristic = nil
         controlCharacteristic = nil
         eventCharacteristic = nil
@@ -164,8 +177,9 @@ final class SongTapBluetoothRadio: SongTapBleRadio {
         seen.removeAll()
         serverClients.removeAll()
         offerCache.removeAll()
-        pendingGo.removeAll()
+        pendingNotifications.removeAll()
         infoCharacteristic = nil
+        nameCharacteristic = nil
         offerCharacteristic = nil
         controlCharacteristic = nil
         eventCharacteristic = nil
@@ -184,7 +198,8 @@ final class SongTapBluetoothRadio: SongTapBleRadio {
     private func startAdvertising(_ service: CBUUID) {
         guard let advertiser, !advertising else { return }
         advertising = true
-        advertiser.startAdvertising([CBAdvertisementDataServiceUUIDsKey: [service]])
+        // The service UUID says the role; the local name is the short name (spec 5), cut to 24 bytes. Never the system device name.
+        advertiser.startAdvertising([CBAdvertisementDataServiceUUIDsKey: [service], CBAdvertisementDataLocalNameKey: shortName])
     }
 
     fileprivate func discovered(_ peripheral: CBPeripheral, advertisement: [String: Any], rssi: Int) {
@@ -198,7 +213,11 @@ final class SongTapBluetoothRadio: SongTapBleRadio {
         guard let peerRole else { return }
         let address = peripheral.identifier.uuidString
         seen[address] = peripheral
-        listener?.onSeen(address: address, role: peerRole, rssi: rssi)
+        // The name: an Android phone's Song Tap manufacturer block (company id little endian first), else the local name.
+        let manufacturer = (advertisement[CBAdvertisementDataManufacturerDataKey] as? Data).map { Array($0) }
+        let localName = advertisement[CBAdvertisementDataLocalNameKey] as? String
+        listener?.onSeen(address: address, role: peerRole, rssi: rssi,
+                         name: SongTapWire.advertisedName(manufacturerData: manufacturer, localName: localName))
     }
 
     // MARK: The sender's GATT server
@@ -206,15 +225,17 @@ final class SongTapBluetoothRadio: SongTapBleRadio {
     private func openServer() {
         guard let advertiser, infoCharacteristic == nil else { return }
         let info = CBMutableCharacteristic(type: Self.info, properties: [.read], value: nil, permissions: [.readable])
+        let name = CBMutableCharacteristic(type: Self.name, properties: [.read], value: nil, permissions: [.readable])
         let offer = CBMutableCharacteristic(type: Self.offer, properties: [.read], value: nil, permissions: [.readable])
         let control = CBMutableCharacteristic(type: Self.control, properties: [.write], value: nil, permissions: [.writeable])
         let event = CBMutableCharacteristic(type: Self.event, properties: [.notify], value: nil, permissions: [.readable])
         infoCharacteristic = info
+        nameCharacteristic = name
         offerCharacteristic = offer
         controlCharacteristic = control
         eventCharacteristic = event
         let service = CBMutableService(type: Self.sendService, primary: true)
-        service.characteristics = [info, offer, control, event]
+        service.characteristics = [info, name, offer, control, event]
         advertiser.add(service)
     }
 
@@ -244,6 +265,8 @@ final class SongTapBluetoothRadio: SongTapBleRadio {
         switch request.characteristic.uuid {
         case Self.info:
             full = listener?.serverInfo()
+        case Self.name:
+            full = listener?.serverName()
         case Self.offer:
             // A long read comes as several requests with growing offsets: sign once, on the first.
             if request.offset == 0 {
@@ -289,20 +312,22 @@ final class SongTapBluetoothRadio: SongTapBleRadio {
         let address = central.identifier.uuidString
         serverClients[address] = nil
         offerCache[address] = nil
-        pendingGo.removeAll { $0 == address }
+        pendingNotifications.removeAll { $0.client == address }
         listener?.serverClientGone(client: address)
     }
 
     fileprivate func readyToNotify() {
-        let waiting = pendingGo
-        pendingGo.removeAll()
-        for address in waiting { notifyGo(client: address) }
+        let waiting = pendingNotifications
+        pendingNotifications.removeAll()
+        for item in waiting { notify(client: item.client, value: item.value) }
     }
 
-    func notifyGo(client: String) {
+    /// Sends `value` as a notification of Event to one subscribed phone (offer ready, offer withdrawn, tap). One that does not fit the
+    /// queue goes out when CoreBluetooth says it is ready again.
+    func notify(client: String, value: [UInt8]) {
         guard let advertiser, let event = eventCharacteristic, let target = serverClients[client] else { return }
-        let sent = advertiser.updateValue(Data(SongTapWire.encodeGo()), for: event, onSubscribedCentrals: [target])
-        if !sent { pendingGo.append(client) }
+        let sent = advertiser.updateValue(Data(value), for: event, onSubscribedCentrals: [target])
+        if !sent { pendingNotifications.append((client, value)) }
     }
 
     func dropClient(client: String) {
@@ -330,6 +355,7 @@ final class SongTapBluetoothRadio: SongTapBleRadio {
     }
 
     func readInfo(address: String) { enqueue(address, .readInfo) }
+    func readName(address: String) { enqueue(address, .readName) }
     func readOffer(address: String) { enqueue(address, .readOffer) }
     func writeControl(address: String, value: [UInt8]) { enqueue(address, .write(value)) }
 
@@ -338,6 +364,7 @@ final class SongTapBluetoothRadio: SongTapBleRadio {
             failLater(address) { listener in
                 switch op {
                 case .readInfo: listener.onInfoRead(address: address, value: nil)
+                case .readName: listener.onNameRead(address: address, value: nil)
                 case .readOffer: listener.onOfferRead(address: address, value: nil)
                 case .write: listener.onControlWritten(address: address, ok: false)
                 }
@@ -356,6 +383,11 @@ final class SongTapBluetoothRadio: SongTapBleRadio {
         switch op {
         case .readInfo:
             guard let c = client.info else { return failLater(address) { $0.onInfoRead(address: address, value: nil) } }
+            client.busy = true
+            peripheral.readValue(for: c)
+        case .readName:
+            // An older sender may not have the Name characteristic: that read just fails.
+            guard let c = client.name else { return failLater(address) { $0.onNameRead(address: address, value: nil) } }
             client.busy = true
             peripheral.readValue(for: c)
         case .readOffer:
@@ -398,13 +430,14 @@ final class SongTapBluetoothRadio: SongTapBleRadio {
             central?.cancelPeripheralConnection(peripheral)
             return
         }
-        peripheral.discoverCharacteristics([Self.info, Self.offer, Self.control, Self.event], for: service)
+        peripheral.discoverCharacteristics([Self.info, Self.name, Self.offer, Self.control, Self.event], for: service)
     }
 
     fileprivate func didDiscoverCharacteristics(_ peripheral: CBPeripheral, failed: Bool) {
         guard let client = clients[key(of: peripheral)] else { return }
         let characteristics = peripheral.services?.first(where: { $0.uuid == Self.sendService })?.characteristics ?? []
         client.info = characteristics.first { $0.uuid == Self.info }
+        client.name = characteristics.first { $0.uuid == Self.name }
         client.offer = characteristics.first { $0.uuid == Self.offer }
         client.control = characteristics.first { $0.uuid == Self.control }
         client.event = characteristics.first { $0.uuid == Self.event }
@@ -439,6 +472,10 @@ final class SongTapBluetoothRadio: SongTapBleRadio {
         case Self.info:
             client.busy = false
             listener?.onInfoRead(address: address, value: failed ? nil : value)
+            if let still = clients[address] { pump(address, still) }
+        case Self.name:
+            client.busy = false
+            listener?.onNameRead(address: address, value: failed ? nil : value)
             if let still = clients[address] { pump(address, still) }
         case Self.offer:
             client.busy = false

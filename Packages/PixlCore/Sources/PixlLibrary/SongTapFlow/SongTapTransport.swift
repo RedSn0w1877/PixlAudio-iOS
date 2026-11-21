@@ -16,7 +16,6 @@ public protocol SongTapTransport: AnyObject {
     /// Receiver: read the offer of `peer` now.
     func readOffer(peer: Int)
     func sendAck(peer: Int)
-    func sendGo(peer: Int, startMs: Int64)
     func sendDecline(peer: Int)
     func abort(peer: Int)
 }

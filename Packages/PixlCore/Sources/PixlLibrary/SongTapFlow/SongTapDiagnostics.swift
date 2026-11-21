@@ -25,7 +25,13 @@ public struct SongTapDiagSnapshot: Sendable, Equatable {
     public var rssi = 0
     public var smoothed = 0
     public var baseline = 0
-    /// Smoothed minus baseline, whole dB: a tap is a jump of at least `SongTapTuning.jumpDb`.
+    /// The shift added to every raw reading before the core sees it (spec 6): always 0 on an iPhone, which IS the reference scale
+    /// (Android adds -15 on a Pixel). `normalised` is the reading the core worked with, so equal to `rssi` here.
+    public var offsetDb = 0
+    public var normalised = 0
+    /// The sensitivity profile in use (`normal` or `high`).
+    public var profile = SongTapSensitivity.default.code
+    /// Smoothed minus baseline, whole dB: a tap is a jump of at least the profile's `jumpDb`.
     public var jump = 0
     /// How long the jump has held, ms; -1 when there is none.
     public var heldMs: Int64 = -1
@@ -37,6 +43,16 @@ public struct SongTapDiagSnapshot: Sendable, Equatable {
     public var detector = "idle"
     public var lastFire = "-"
     public var samples = 0
+    /// Which gate the followed phone is in: "tap near" (may connect and beam), "list only" (shown in the picker, nothing else), "outside" or "none".
+    public var gate = "none"
+    public var mayConnect = false
+    public var listed = false
+    /// Receiver: a checked offer fetched ahead of the tap is in hand.
+    public var offerInHand = false
+    /// The short name the followed phone advertised and the full name it gave once connected, "short / full".
+    public var names = ""
+    /// What the one-sided tap did last: the other phone's tap message and the verdict (`SongTapPeerTapVerdict.code`), or "-".
+    public var peerTap = "-"
 
     public init() {}
 }
@@ -124,10 +140,16 @@ public final class SongTapDiagnostics {
         out += "device: \(device)\n"
         let s = snapshot
         out += "status \(s.status.rawValue), role \(s.role), peers \(s.peersSeen)\n"
-        out += "tuning: baselineShift=\(SongTapTuning.baselineShift) fastShift=\(SongTapTuning.fastShift) jumpDb=\(SongTapTuning.jumpDb)"
-        out += " freezeDb=\(SongTapTuning.freezeDb) holdMs=\(SongTapTuning.holdMs) dwellMs=\(SongTapTuning.dwellMs)"
-        out += " impulseWindowMs=\(SongTapTuning.impulseWindowMs) cooldownMs=\(SongTapTuning.cooldownMs)"
-        out += " nearEnter=\(SongTapTuning.nearEnterDbm) nearExit=\(SongTapTuning.nearExitDbm) jerkMilliG=\(SongTapTuning.jerkMilliG)\n"
+        let p = SongTapSensitivity.fromCode(s.profile)
+        out += "profile: \(s.profile)  signal offset: \(s.offsetDb) dB (an iPhone is the reference scale: its readings go to the core as they are)\n"
+        out += "tuning: baselineShift=\(p.baselineShift) fastShift=\(p.fastShift) jumpDb=\(p.jumpDb) freezeDb=\(p.freezeDb)"
+        out += " holdMs=\(p.holdMs) dwellMs=\(p.dwellMs) impulseWindowMs=\(p.impulseWindowMs) cooldownMs=\(p.cooldownMs) jerkMilliG=\(p.jerkMilliG)\n"
+        out += "gates: nearEnter=\(SongTapTuning.nearEnterDbm) nearExit=\(SongTapTuning.nearExitDbm)"
+        out += " listEnter=\(SongTapTuning.listEnterDbm) listExit=\(SongTapTuning.listExitDbm)"
+        out += " closeHold=\(SongTapTuning.closeHoldDbm) dBm for \(SongTapTuning.closeHoldMs) ms, released below \(SongTapTuning.closeReleaseDbm)"
+        out += " dwellMin=\(SongTapTuning.dwellMinDbm)\n"
+        out += "followed: gate \(s.gate), may connect and beam \(s.mayConnect ? "yes" : "no"), listed \(s.listed ? "yes" : "no"),"
+        out += " offer in hand \(s.offerInHand ? "yes" : "no"), names \(s.names.isEmpty ? "-" : s.names), peer tap \(s.peerTap)\n"
         out += "last events (ms since boot, oldest first):\n"
         for e in events { out += "  \(e.tMs)  \(e.text)\n" }
         out += "recent signal (t, rssi, smoothed, baseline), oldest first:\n"

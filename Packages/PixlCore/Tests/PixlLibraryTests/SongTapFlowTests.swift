@@ -167,10 +167,9 @@ struct SongTapFlowTests {
         func startTransport(_ role: SongTapRole) { log.append("start:\(role.code)") }
         func stopTransport() { log.append("stop") }
         func publishOffer(peer: Int, payload: [UInt8]) { log.append("publish:\(peer)"); offers.append(payload) }
-        func withdrawOffer() { log.append("withdraw") }
+        func withdrawOffer(keepBluetooth: Bool) { log.append(keepBluetooth ? "withdraw:keep" : "withdraw") }
         func readOffer(peer: Int) { log.append("read:\(peer)") }
         func sendAck(peer: Int) { log.append("ack:\(peer)") }
-        func sendGo(peer: Int, startMs: Int64) { log.append("go:\(peer):\(startMs)") }
         func sendDecline(peer: Int) { log.append("decline:\(peer)") }
         func abortTransfer(peer: Int) { log.append("abort:\(peer)") }
         func save(_ payload: SongTapPayload) { log.append("save:\(payload.songKey)"); saved.append(payload) }
@@ -184,7 +183,6 @@ struct SongTapFlowTests {
         func cancelTimers() { log.append("cancelTimers") }
         func markFirstBeamAccepted() { firstBeamAccepted = true }
         func uiChanged(_ ui: SongTapUiState) { uis.append(ui) }
-        func requestTapPayload(peer: Int) { log.append("tapPayload:\(peer)") }
         func reducedMotion() -> Bool { false }
         func scheduleBeamEnd(afterMs: Int64?) { log.append("beamEnd:\(afterMs.map(String.init) ?? "cancel")") }
         func resync() { log.append("resync") }
@@ -318,22 +316,21 @@ struct SongTapFlowTests {
         #expect(port.log.filter { $0.hasPrefix("undo:") } == ["undo:dQw4w9WgXcQ"])
     }
 
-    @MainActor @Test func overBluetoothTheSenderIsToldAfterTheSaveAndTheUndoWindowWaitsForTheBeam() {
+    @MainActor @Test func overBluetoothTheBeamStartsWithTheSaveAndTheSenderIsToldWhenItIsDone() {
         let port = FakePort()
         let engine = Self.engine(port)
         engine.arm(.receive, askFirst: false)
         engine.handle(.peerFound(1))
         engine.handle(.peerNear(1))
         engine.handle(.tap(peer: 1))
-        engine.handle(.offer(peer: 1, payload: SongTapPayloads.encode(Self.offerPayload(at: port.now))!, senderKey: 7))
+        engine.handle(.offer(peer: 1, payload: SongTapPayloads.encode(Self.offerPayload(at: port.now))!, senderKey: 7, name: "Hoa's Pixel"))
         #expect(engine.session.phase == .transferring)
+        #expect(engine.ui.peerName == "Hoa's Pixel")
+        #expect(engine.ui.beamRole == .receive, "the beam starts with the save, nothing waits for the sender")
         #expect(!port.log.contains("ack:1"), "not before the save is done")
         engine.saveFinished(.saved(SongTapCard(videoId: "dQw4w9WgXcQ", songId: "id", title: "t", artist: "a", artUrl: nil)), for: port.saved[0])
         #expect(port.log.contains("ack:1"))
-        #expect(port.log.contains("dismissIn:\(SongTapEngine.goGraceMs + SongTapSession.undoWindowMs)"))
-        engine.handle(.go(peer: 1, rttMs: 40))
-        #expect(engine.ui.beamRole == .receive)
-        #expect(port.log.last { $0 == "cancelDismiss" || $0.hasPrefix("dismissIn:") } == "cancelDismiss", "the beam owns the end now")
+        #expect(!port.log.contains { $0.hasPrefix("dismissIn:") }, "the beam owns the end of the card")
     }
 
     @MainActor @Test func theSenderShowsACodeAndTakesItDownWhenDone() throws {

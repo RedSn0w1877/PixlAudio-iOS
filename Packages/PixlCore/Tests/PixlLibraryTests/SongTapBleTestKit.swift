@@ -20,8 +20,11 @@ final class FakeImpulses: SongTapImpulseSource {
     var running = false
     private var callback: (@MainActor (Int64) -> Void)?
 
+    var profile = SongTapSensitivity.default
+
     func start(onImpulse: @escaping @MainActor (Int64) -> Void) { running = true; callback = onImpulse }
     func stop() { running = false; callback = nil }
+    func setSensitivity(_ profile: SongTapSensitivity) { self.profile = profile }
     func jerk(atMs: Int64) { callback?(atMs) }
 }
 
@@ -104,12 +107,14 @@ final class FakeRadio: SongTapBleRadio {
     var role = SongTapRole.send
     var calls: [String] = []
     var controlWrites: [[UInt8]] = []
-    var goNotifications: [String] = []
+    var notifications: [(client: String, value: [UInt8])] = []
     var dropped: [String] = []
+    var advertisedName = ""
 
-    func start(role: SongTapRole, listener: any SongTapBleRadioListener) -> SongTapBleStatus {
+    func start(role: SongTapRole, listener: any SongTapBleRadioListener, name: String) -> SongTapBleStatus {
         self.listener = listener
         self.role = role
+        self.advertisedName = name
         calls.append("start:\(role.code)")
         running = startStatus == .active
         return startStatus
@@ -119,9 +124,10 @@ final class FakeRadio: SongTapBleRadio {
     func connect(address: String) { calls.append("connect:\(address)") }
     func disconnect(address: String) { calls.append("disconnect:\(address)") }
     func readInfo(address: String) { calls.append("readInfo:\(address)") }
+    func readName(address: String) { calls.append("readName:\(address)") }
     func readOffer(address: String) { calls.append("readOffer:\(address)") }
     func writeControl(address: String, value: [UInt8]) { calls.append("write:\(address)"); controlWrites.append(value) }
-    func notifyGo(client: String) { calls.append("go:\(client)"); goNotifications.append(client) }
+    func notify(client: String, value: [UInt8]) { calls.append("notify:\(client)"); notifications.append((client, value)) }
     func dropClient(client: String) { calls.append("drop:\(client)"); dropped.append(client) }
     func forget(address: String) { calls.append("forget:\(address)") }
 
@@ -192,18 +198,25 @@ final class BleRig {
     var listener: any SongTapBleRadioListener { radio.listener! }
 
     /// One scan result, `stepMs` after the last.
-    func see(_ address: String, _ role: SongTapRole, _ rssi: Int, stepMs: Int64 = 100) {
+    func see(_ address: String, _ role: SongTapRole, _ rssi: Int, stepMs: Int64 = 100, name: String? = nil) {
         clock.advance(stepMs)
-        listener.onSeen(address: address, role: role, rssi: rssi)
+        listener.onSeen(address: address, role: role, rssi: rssi, name: name)
     }
 
-    /// A phone sits near at `rssi`, long enough for the detector to settle.
-    func settle(_ address: String, _ role: SongTapRole, rssi: Int = -62, samples: Int = 8) {
-        for _ in 0..<samples { see(address, role, rssi) }
+    /// Resting 20 to 30 cm apart: about -60 on the reference scale, inside the near gate (-70) and well below the hold level (-45).
+    static let nearDbm = -60
+    /// Touching: about -33.
+    static let touchDbm = -33
+    /// Inside the broad list gate (-85) and outside the near gate (-70).
+    static let listOnlyDbm = -80
+
+    /// A phone sits near at `rssi`, long enough for the detector to settle. The first reading is the baseline, so there is no jump.
+    func settle(_ address: String, _ role: SongTapRole, rssi: Int = BleRig.nearDbm, samples: Int = 8, name: String? = nil) {
+        for _ in 0..<samples { see(address, role, rssi, name: name) }
     }
 
-    /// The signal jumps and stays: a tap that is held.
-    func touch(_ address: String, _ role: SongTapRole, rssi: Int = -40, samples: Int = 8) {
+    /// The signal jumps 27 dB and stays: a tap that is held.
+    func touch(_ address: String, _ role: SongTapRole, rssi: Int = BleRig.touchDbm, samples: Int = 8) {
         for _ in 0..<samples { see(address, role, rssi) }
     }
 
@@ -217,10 +230,16 @@ final class BleRig {
     var declines: [Int] { events.compactMap { if case .declined(let p) = $0 { p } else { nil } } }
     var roles: [SongTapRole] { events.compactMap { if case .peerRole(_, let r) = $0 { r } else { nil } } }
     var invalids: Int { events.filter { $0 == .offerInvalid }.count }
-    var gos: [(peer: Int, rttMs: Int64)] { events.compactMap { if case .go(let p, let r) = $0 { (p, r) } else { nil } } }
-    var offers: [(peer: Int, payload: [UInt8], senderKey: Int32)] {
-        events.compactMap { if case .offer(let p, let b, let k) = $0 { (p, b, k) } else { nil } }
+    var offers: [(peer: Int, payload: [UInt8], senderKey: Int32, name: String?)] {
+        events.compactMap { if case .offer(let p, let b, let k, let n) = $0 { (p, b, k, n) } else { nil } }
     }
+    var prefetched: [(peer: Int, payload: [UInt8], senderKey: Int32, name: String?)] {
+        events.compactMap { if case .offerPrefetched(let p, let b, let k, let n) = $0 { (p, b, k, n) } else { nil } }
+    }
+    var gones: [Int] { events.compactMap { if case .offerGone(let p) = $0 { p } else { nil } } }
+    var reads: [Int] { events.compactMap { if case .offerRead(let p) = $0 { p } else { nil } } }
+    var readsLost: [Int] { events.compactMap { if case .offerReadLost(let p) = $0 { p } else { nil } } }
+    var names: [(peer: Int, name: String)] { events.compactMap { if case .peerName(let p, let n) = $0 { (p, n) } else { nil } } }
 
     var controlsDecoded: [SongTapControlMessage?] { radio.controlWrites.map { SongTapWire.decodeControl($0) } }
     var hellos: [[UInt8]] { controlsDecoded.compactMap { if case .hello(let c)? = $0 { c } else { nil } } }

@@ -23,13 +23,17 @@ public enum SongTapBleStatus: String, Sendable, CaseIterable {
 /// handle of the radio's own object for the length of one session.
 @MainActor
 public protocol SongTapBleRadioListener: AnyObject {
-    /// A scan result: a phone advertising `role`'s service, with its signal strength in dBm.
-    func onSeen(address: String, role: SongTapRole, rssi: Int)
+    /// A scan result: a phone advertising `role`'s service, with its signal strength in dBm and the short name it advertised
+    /// (`name`, already clean through `SongTapWire.advertisedName`, nil when it advertised none). On iOS the signal is the reference
+    /// scale as it is: there is no offset to add.
+    func onSeen(address: String, role: SongTapRole, rssi: Int, name: String?)
     /// Our connection to a sender's server is ready (service found, notifications on), or failed.
     func onConnected(address: String, ok: Bool)
     func onDisconnected(address: String)
     /// The answer to `SongTapBleRadio.readInfo`; nil when the read failed.
     func onInfoRead(address: String, value: [UInt8]?)
+    /// The answer to `SongTapBleRadio.readName`; nil when the read failed.
+    func onNameRead(address: String, value: [UInt8]?)
     /// The answer to `SongTapBleRadio.readOffer`; nil when the read failed or the sender had nothing to give yet.
     func onOfferRead(address: String, value: [UInt8]?)
     /// The answer to `SongTapBleRadio.writeControl`, in the order the writes were asked for.
@@ -42,6 +46,8 @@ public protocol SongTapBleRadioListener: AnyObject {
 
     /// A client read Info.
     func serverInfo() -> [UInt8]
+    /// A client read Name: the value of `SongTapWire.encodeName` for this phone's name.
+    func serverName() -> [UInt8]
     /// A client read Offer. Nil answers with the "not ready" error (`SongTapWire.errorNotReady`).
     func serverOffer(client: String) -> [UInt8]?
     /// A client wrote Control; false answers the write with an error.
@@ -52,21 +58,23 @@ public protocol SongTapBleRadioListener: AnyObject {
 /// The thin layer over the platform's Bluetooth LE. Calls return at once; results come back through the listener.
 @MainActor
 public protocol SongTapBleRadio: AnyObject {
-    /// Starts advertising `role`'s service (the sender also opens its GATT server) and scanning for both services.
-    /// Returns `.active`, or the reason it could not start (then nothing is running). A radio that learns its state
+    /// Starts advertising `role`'s service (the sender also opens its GATT server) with `name` as the short name (the local name in
+    /// the advertisement; an iPhone cannot choose its advertising power, which is why the near gate is the only thing that keeps a
+    /// far phone from being connected to) and scanning for both services. Returns `.active`, or the reason it could not start (then nothing is running). A radio that learns its state
     /// later (iOS asks for permission, and tells the state a moment after it is made) answers `.active` now and reports
     /// the truth through `onStatus`.
-    func start(role: SongTapRole, listener: any SongTapBleRadioListener) -> SongTapBleStatus
+    func start(role: SongTapRole, listener: any SongTapBleRadioListener, name: String) -> SongTapBleStatus
     /// Stops advertising, scanning, the server and every connection.
     func stop()
     /// Client: connect to the sender seen at `address`, find the service and subscribe to Event.
     func connect(address: String)
     func disconnect(address: String)
     func readInfo(address: String)
+    func readName(address: String)
     func readOffer(address: String)
     func writeControl(address: String, value: [UInt8])
-    /// Server: tell the connected client the beam starts.
-    func notifyGo(client: String)
+    /// Server: send `value` as a notification of the Event characteristic to the connected `client`.
+    func notify(client: String, value: [UInt8])
     /// Server: drop a client.
     func dropClient(client: String)
     /// The route no longer tracks the phone at `address`: let go of whatever the radio keeps for it (a scan result is an
@@ -90,6 +98,12 @@ public protocol SongTapClock: AnyObject {
 public protocol SongTapImpulseSource: AnyObject {
     func start(onImpulse: @escaping @MainActor (Int64) -> Void)
     func stop()
+    /// The sensitivity profile whose jerk threshold decides what counts as a jerk (spec 6); may change while running.
+    func setSensitivity(_ profile: SongTapSensitivity)
+}
+
+public extension SongTapImpulseSource {
+    func setSensitivity(_ profile: SongTapSensitivity) {}
 }
 
 /// Timers for the route. The app implements them with tasks; a test moves them by hand.
