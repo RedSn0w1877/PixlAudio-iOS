@@ -177,3 +177,7 @@ How each `fn` is replayed:
   `HostNotes.notes(slots, taken)` for `slots` = `[artist, genre, genreFact, year, island, newFromPlayedArtist 1|0, sideways 1|0]` and
   `taken` = `[index, span]` (the set notes already in the queue), each note `[index, kind, a, b, text]` with `text = HostNotes.text(note)`.
   `fact`: `HostNotes.factOf(raw)`. `speakable`: `HostNotes.isSpeakable(text)`. Word and sentence counting splits on a space and on `.`, `!`, `?`; no regular expressions.
+- `hostvoice.jsonl` (the spoken host): `decide`: `HostVoice.decide(Inputs)` for the fields in `in` (booleans are 1/0) gives `action`
+  (0 speak, 1 wait, 2 skip), `reason` and `waitMs`. `cancel`: `HostVoice.cancelReason(Running)`. `ramp`: `HostVoice.ramp(from, to, elapsedMs, rampMs)` in
+  thousandths. `line`: `HostVoice.line(text)` (Unicode characters are compared as UTF-16 units; a space-only difference is not allowed).
+  `estimate`: `HostVoice.estimateMs(line)`.
