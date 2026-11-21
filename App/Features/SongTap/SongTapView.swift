@@ -84,7 +84,8 @@ struct SongTapView: View {
         }
         // The moment of contact: the glow flares once.
         .onChange(of: ui.phase) { _, phase in
-            if (phase == .offered || phase == .transferring), ui.session.peer != 0, !ui.beamReduced { pulseAt = Date() }
+            // Reduce Motion is read now, not from the last beam: the flag on the state is only set when a beam starts.
+            if (phase == .offered || phase == .transferring), ui.session.peer != 0, !controller.reducedMotion() { pulseAt = Date() }
         }
         .task(id: pulseAt) {
             guard pulseAt != nil else { return }

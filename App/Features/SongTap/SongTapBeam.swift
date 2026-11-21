@@ -27,6 +27,10 @@ struct SongTapGlowLayer: View {
     /// When the moment of contact happened, for the one-off pulse.
     let pulseAt: Date?
     @Environment(\.appTheme) private var theme
+    /// True only while the beam's own glow is moving: after that the glow is a still frame, so the layer stops drawing every
+    /// frame (the receiver's card rests for six seconds after the beam's light is gone).
+    @State private var beamGlowMoving = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let pulseSeconds = 0.6
 
@@ -44,7 +48,7 @@ struct SongTapGlowLayer: View {
 
     var body: some View {
         let approach = model.value
-        let running = beamRole != nil || pulseAt != nil
+        let running = beamGlowMoving || pulseAt != nil
         GeometryReader { geo in
             TimelineView(.animation(paused: !running)) { context in
                 let strength = Self.strength(approach: approach, beamRole: beamRole, beamStartMs: beamStartMs, reduced: reduced,
@@ -54,7 +58,14 @@ struct SongTapGlowLayer: View {
                     .opacity(strength)
             }
         }
-        .animation(.linear(duration: 0.12), value: approach)
+        .animation(reduceMotion ? nil : .linear(duration: 0.12), value: approach)
+        .task(id: beamStartMs) {
+            guard beamRole != nil else { beamGlowMoving = false; return }
+            beamGlowMoving = true
+            let left = SongTapTimeline.glowFallEndMs + 100 - beamMs(Date(), startMs: beamStartMs)
+            if left > 0 { try? await Task.sleep(for: .milliseconds(left)) }
+            if !Task.isCancelled { beamGlowMoving = false }
+        }
         .ignoresSafeArea()
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -76,13 +87,16 @@ struct SongTapBeamArtwork: View {
 
     var body: some View {
         let playing = beamRole == .send
+        // Built once per update of this view, not once per frame; the frames below only move, scale and fade it. The shadow keeps
+        // one radius for the whole flight (only its strength follows the lift), so it is not re-rendered at a new size every frame.
+        let art = ArtworkView(source: ArtworkSource(uriString: artUrl), size: size, cornerRadius: 28)
         TimelineView(.animation(paused: !playing)) { context in
             let frame = playing
                 ? SongTapTimeline.frame(role: .send, tMs: beamMs(context.date, startMs: beamStartMs), reducedMotion: reduced)
                 : SongTapBeamFrame(0, 1000, 0, 1000, 0, 0, 0, 0)
             let lift = Double(frame.shadow) / 1000
-            ArtworkView(source: ArtworkSource(uriString: artUrl), size: size, cornerRadius: 28)
-                .shadow(color: .black.opacity(0.32 * lift), radius: 24 * lift, y: 10 * lift)
+            art
+                .shadow(color: .black.opacity(0.32 * lift), radius: 16, y: 8)
                 .scaleEffect(CGFloat(frame.scale) / 1000)
                 .offset(y: CGFloat(frame.translateY) / 1000 * rootHeight)
                 .opacity(Double(frame.alpha) / 1000)
@@ -108,17 +122,21 @@ struct SongTapReceiveBeamCard: View {
     let onUndo: () -> Void
     @Environment(\.appTheme) private var theme
     @Namespace private var glassNamespace
+    /// The card is a still picture between the moment its Undo chip has come in and the start of its slide away: the clock stops
+    /// then, and nothing is rebuilt per frame for those five seconds.
+    @State private var resting = false
 
     private static let cardShape = RoundedRectangle(cornerRadius: 32, style: .continuous)
 
     var body: some View {
         let canUndo = phase == .saved && !alreadyHad
-        TimelineView(.animation) { context in
+        let art = ArtworkView(source: ArtworkSource(uriString: card.artUrl), size: 132, cornerRadius: 22)
+        TimelineView(.animation(paused: resting)) { context in
             let frame = SongTapTimeline.frame(role: .receive, tMs: beamMs(context.date, startMs: beamStartMs), reducedMotion: reduced)
             let showChip = canUndo && frame.undoAlpha > 0
             GlassEffectContainer(spacing: 24) {
                 VStack(spacing: 14) {
-                    cardBody(frame)
+                    cardBody(frame, art: art)
                     if showChip {
                         undoChip(frame)
                     }
@@ -130,13 +148,28 @@ struct SongTapReceiveBeamCard: View {
             .opacity(Double(frame.alpha) / 1000)
         }
         .frame(maxWidth: 320)
+        .task(id: beamStartMs) { await restWhileStill() }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("songTap.beamCard")
     }
 
-    private func cardBody(_ frame: SongTapBeamFrame) -> some View {
+    /// Stops the clock while the card is still and starts it again for the slide away.
+    private func restWhileStill() async {
+        resting = false
+        let stillAt = reduced ? SongTapTimeline.reducedFadeMs + 100 : SongTapTimeline.receiveUndoStartMs + 300
+        let endAt = reduced ? SongTapTimeline.reducedFadeMs + SongTapTimeline.cardRestMs : SongTapTimeline.receiveRestEndMs
+        let toStill = stillAt - beamMs(Date(), startMs: beamStartMs)
+        if toStill > 0 { try? await Task.sleep(for: .milliseconds(toStill)) }
+        guard !Task.isCancelled else { return }
+        resting = true
+        let toEnd = endAt - beamMs(Date(), startMs: beamStartMs)
+        if toEnd > 0 { try? await Task.sleep(for: .milliseconds(toEnd)) }
+        if !Task.isCancelled { resting = false }
+    }
+
+    private func cardBody(_ frame: SongTapBeamFrame, art: ArtworkView) -> some View {
         VStack(spacing: 6) {
-            ArtworkView(source: ArtworkSource(uriString: card.artUrl), size: 132, cornerRadius: 22)
+            art
             VStack(spacing: 2) {
                 Text(card.title)
                     .pixlFont(.titleMedium)

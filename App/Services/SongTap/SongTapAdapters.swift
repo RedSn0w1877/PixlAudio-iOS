@@ -16,8 +16,9 @@ final class AppSongTapLibrary: SongTapLibrary {
     private let editor: () -> LibraryEditor
     private let search: any YouTubeMusicSearching
 
-    /// How long a song without a video waits for its match (the same limit as a catalogue tap).
-    static let matchTimeoutSeconds: Double = 25
+    /// How long a song without a video waits for its match: under the session's own save limit (20 s), so a search that finds
+    /// nothing ends as "couldn't find" and not as a timeout.
+    static let matchTimeoutSeconds: Double = 15
 
     init(library: LibraryStore, persistence: PersistenceActor?, importer: YouTubeLibraryImporter,
          editor: @escaping () -> LibraryEditor, search: any YouTubeMusicSearching) {
@@ -27,6 +28,10 @@ final class AppSongTapLibrary: SongTapLibrary {
         self.editor = editor
         self.search = search
     }
+
+    /// The rows this phone's Song Tap added, by video, with the `dateAdded` the import gave them. Undo takes back only these,
+    /// and only while the row is still the one the beam made.
+    private var added: [String: Int64] = [:]
 
     private func rowId(_ videoId: String) -> String { "yt:\(videoId)" }
 
@@ -53,16 +58,20 @@ final class AppSongTapLibrary: SongTapLibrary {
         let existed = library.song(id: rowId(videoId)) != nil
         let track = YouTubeMusicTrack(videoId: videoId, title: title, artist: artist, album: nil, thumbnailUrl: artUrl,
                                       durationMs: durationMs)
-        guard await importer.importTrack(track, favorite: false) != nil else { throw SongTapLibraryError.notImported }
+        guard let song = await importer.importTrack(track, favorite: false) else { throw SongTapLibraryError.notImported }
+        if !existed { added[videoId] = song.dateAdded }
         return !existed
     }
 
-    /// Takes the song back out (`LibraryEditor.removeSongs`: the row, its links, favourite and playlist entries). It is the
-    /// song Song Tap added a few seconds ago, so a song the listener has since put in a playlist loses that entry too.
+    /// Takes the song back out, but only a row Song Tap itself added in this session and that the listener has not touched since:
+    /// still the row the beam made (same `dateAdded`), not a favourite, in no playlist. A song the listener already owned is
+    /// never removed, and the id is not added to `HiddenSongs` (it must stay free to be saved again).
     func remove(videoId: String) async throws -> Bool {
         let id = rowId(videoId)
-        guard library.song(id: id) != nil else { return false }
-        editor().removeSongs([id])
+        guard let stamp = added[videoId], let row = library.song(id: id), row.dateAdded == stamp, !row.isFavorite else { return false }
+        if library.snapshot.playlists.contains(where: { $0.songIds.contains(id) }) { return false }
+        added[videoId] = nil
+        editor().removeSongs([id], remember: false)
         return true
     }
 

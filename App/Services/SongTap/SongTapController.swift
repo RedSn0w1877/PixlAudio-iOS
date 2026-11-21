@@ -39,6 +39,7 @@ final class SongTapController: SongTapPort {
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private var nowPlayingTask: Task<Void, Never>?
     @ObservationIgnored private var beamTask: Task<Void, Never>?
+    @ObservationIgnored private var showCodeTask: Task<Void, Never>?
 
     init(settings: SongTapSettings, receiver: SongTapReceiver, sender: SongTapSender, playback: PlaybackStore) {
         self.settings = settings
@@ -81,11 +82,14 @@ final class SongTapController: SongTapPort {
 
     func disarm() {
         engine.disarm()
+        showCodeTask?.cancel()
+        showCodeTask = nil
         nowPlayingTask?.cancel()
     }
 
     func switchRole(_ role: SongTapRole) {
         refreshTask?.cancel()
+        showCodeTask?.cancel()
         engine.switchRole(role)
     }
 
@@ -93,6 +97,11 @@ final class SongTapController: SongTapPort {
     func nowPlayingChanged(_ song: Song?) {
         nowPlayingTask?.cancel()
         guard let song else { engine.setNowPlaying(nil); return }
+        // A code that is up is for the song that plays: when the track changes, the code changes with it.
+        if ui.session.role == .send, ui.session.phase == .offered, ui.session.peer == 0, ui.code != nil {
+            hideCode()
+            showCode()
+        }
         nowPlayingTask = Task { [sender] in
             let payload = await sender.payload(for: song, nowMs: currentTimeMillis())
             guard !Task.isCancelled else { return }
@@ -104,16 +113,22 @@ final class SongTapController: SongTapPort {
     /// Sender: put the song that is playing up as a code.
     func showCode() {
         let song = playback.current
-        Task { [sender] in
+        showCodeTask?.cancel()
+        showCodeTask = Task { [sender] in
             let payload: SongTapPayload?
             if let song { payload = await sender.payload(for: song, nowMs: currentTimeMillis()) } else { payload = nil }
+            // Hiding the code (or leaving Send) while the payload was being made cancels this: the session must not be put
+            // into "offered" with nothing on screen to answer it.
+            guard !Task.isCancelled else { return }
             engine.showCode(payload)
-            if payload != nil, let song { startRefresh(song) }
+            if payload != nil { startRefresh() }
         }
     }
 
     func hideCode() {
         refreshTask?.cancel()
+        showCodeTask?.cancel()
+        showCodeTask = nil
         engine.hideCode()
     }
 
@@ -262,12 +277,13 @@ final class SongTapController: SongTapPort {
     // MARK: The code's refresh
 
     /// A code expires after five minutes; while it is up, make a fresh one every four.
-    private func startRefresh(_ song: Song) {
+    private func startRefresh() {
         refreshTask?.cancel()
-        refreshTask = Task { [sender] in
+        refreshTask = Task { [sender, playback] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(SongTapEngine.qrRefreshMs))
-                guard !Task.isCancelled, ui.session.phase == .offered else { return }
+                // The song that plays at that moment, not the one the code was first made for.
+                guard !Task.isCancelled, ui.session.phase == .offered, let song = playback.current else { return }
                 let fresh = await sender.payload(for: song, nowMs: currentTimeMillis())
                 guard !Task.isCancelled else { return }
                 engine.refreshCode(fresh)
