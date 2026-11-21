@@ -276,6 +276,14 @@ public final class SongTapEngine {
         }
     }
 
+    /// The song a ring code named (the receiver looked its video id up): it goes through the session exactly like an offer read off a QR
+    /// code, so the same consent, rate limits, save and Undo apply. The code carries no signature or name, only a video id and a tag, so
+    /// the tag's freshness and replay rules have already been checked (`RingReceiveFlow`).
+    public func ringOffer(_ payload: SongTapPayload) {
+        candidate = payload
+        dispatch(.offerReceived(peer: 0, videoId: payload.songKey, senderKey: 0, nowMs: now()))
+    }
+
     public func accept() {
         port?.markFirstBeamAccepted()
         dispatch(.accept(nowMs: now()))
