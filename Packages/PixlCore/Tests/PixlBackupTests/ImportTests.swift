@@ -127,7 +127,7 @@ import Testing
         #expect(playlists.playlistsSortOption == "playlist_name_za")
         #expect(playlists.playlistSongOrderModes == ["legacy-1": "manual"])
         #expect(value("app_theme_mode", in: contents.globalSettings) == .string("light"))
-        #expect(contents.searchHistory == [SearchHistoryItem(id: 9, query: "old query", timestamp: 1_710_000_000_000)])
+        #expect(contents.searchHistory == [SearchHistoryItem(id: 9, query: "old query", timestamp: 1_710_000_000_000, key: "old query")])
         #expect(contents.report.unresolvedSongs[.favorites] == 1)
         #expect(contents.report.unresolvedSongs[.engagementStats] == 1)
         #expect(contents.report.unresolvedSongs[.playbackHistory] == 1)

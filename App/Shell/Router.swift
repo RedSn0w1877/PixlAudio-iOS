@@ -16,6 +16,12 @@ final class Router {
     /// Counts the search field's submits (the keyboard's search key). The field lives in the bottom bar (split pill,
     /// 2026-11-16) and the Search page records the query in its history when this changes.
     private(set) var searchSubmission = 0
+    /// The bar's search field has the keyboard (set by the shell from its focus state). Search swaps the genre grid for
+    /// the recent searches while this is on and the field is blank.
+    private(set) var isSearchFieldFocused = false
+    /// Counts the times a screen asked the field to give up the keyboard (a tap on a recent search); the shell owns the
+    /// focus state and drops it when this changes.
+    private(set) var searchBlurRequests = 0
     /// The tab bar is minimized because a tab root scrolled down (`MinimizesTabBarOnScroll`). It stays minimized across
     /// tab switches and pushes; scrolling up, or tapping the selected tab, clears it.
     private(set) var isTabBarMinimized = false
@@ -87,6 +93,15 @@ final class Router {
 
     /// The bar's search field was submitted (see `searchSubmission`).
     func submitSearch() { searchSubmission &+= 1 }
+
+    /// Writes `isSearchFieldFocused` only on a change (each write re-runs the Search page).
+    func setSearchFieldFocused(_ focused: Bool) {
+        guard focused != isSearchFieldFocused else { return }
+        isSearchFieldFocused = focused
+    }
+
+    /// Asks the bar's field to give up the keyboard (see `searchBlurRequests`).
+    func requestSearchBlur() { searchBlurRequests &+= 1 }
 
     func present(_ sheet: AppSheet) { self.sheet = sheet }
     func present(_ cover: AppCover) { self.cover = cover }

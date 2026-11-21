@@ -40,8 +40,7 @@ extension PersistenceActor {
     }
 
     func backupSearchHistory() throws -> [SearchHistoryItem] {
-        try modelContext.fetch(FetchDescriptor<SearchHistoryRecord>(sortBy: [SortDescriptor(\.timestamp, order: .reverse)]))
-            .map { SearchHistoryItem(id: nil, query: $0.query, timestamp: $0.timestamp) }
+        try searchHistory()
     }
 
     func backupAIUsage() throws -> [AiUsageRecord] {
@@ -117,15 +116,6 @@ extension PersistenceActor {
         for row in rows.reversed() where seen.insert(row.songId).inserted {
             modelContext.insert(LyricsRecord(songId: row.songId, docJSON: row.content, isSynced: row.isSynced,
                                              source: row.source, updatedAt: updatedAt))
-        }
-        try modelContext.save()
-    }
-
-    func restoreSearchHistory(_ items: [SearchHistoryItem]) throws {
-        try modelContext.delete(model: SearchHistoryRecord.self)
-        var seen = Set<String>()
-        for item in items.sorted(by: { $0.timestamp > $1.timestamp }) where seen.insert(item.query).inserted {
-            modelContext.insert(SearchHistoryRecord(query: item.query, timestamp: item.timestamp))
         }
         try modelContext.save()
     }

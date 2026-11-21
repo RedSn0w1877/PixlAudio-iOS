@@ -12,11 +12,16 @@ actor PersistenceActor {
     static let batchSize = 500
 
     /// The app's container: on disk normally, in memory for UI tests and previews.
-    static func makeContainer(inMemory: Bool) throws -> ModelContainer {
-        let schema = Schema(versionedSchema: SchemaV1.self)
+    static func makeContainer(inMemory: Bool, storeURL: URL? = nil) throws -> ModelContainer {
+        let schema = Schema(versionedSchema: SchemaV2.self)
         // No App Group, no CloudKit (free signing, decision 4).
-        let configuration = ModelConfiguration("PixlAudio", schema: schema, isStoredInMemoryOnly: inMemory,
+        let configuration: ModelConfiguration
+        if let storeURL {
+            configuration = ModelConfiguration(schema: schema, url: storeURL, allowsSave: true, cloudKitDatabase: .none)
+        } else {
+            configuration = ModelConfiguration("PixlAudio", schema: schema, isStoredInMemoryOnly: inMemory,
                                                groupContainer: .none, cloudKitDatabase: .none)
+        }
         return try ModelContainer(for: schema, migrationPlan: PixlMigrationPlan.self, configurations: [configuration])
     }
 
@@ -25,6 +30,8 @@ actor PersistenceActor {
     /// How many times the whole song table was read (a snapshot, a scan's diff). Tests assert that a rescan with
     /// nothing to do reads it zero times.
     var fullLibraryReads = 0
+    /// The search history's keys were filled in (rows saved before schema version 2 have none; see `fillSearchHistoryKeys`).
+    var searchHistoryKeysFilled = false
     /// The pending coalesced save of album-art themes (`saveArtworkTheme`).
     private var themeSave: Task<Void, Never>?
 

@@ -4,7 +4,7 @@ import XCTest
 @testable import PixlAudio
 
 /// Stage 7c: Search's library provider, state holder, result grouping, genre list, genre colours and icons,
-/// title typography and search history.
+/// title typography (search history has its own file).
 @MainActor
 final class SearchTests: XCTestCase {
     // MARK: Genres (Android MusicRepositoryImpl.getGenres / buildGenre, GenreThemeUtils, GenreIconProvider)
@@ -177,26 +177,7 @@ final class SearchTests: XCTestCase {
         XCTAssertTrue(model.showsEmptyState)
     }
 
-    // MARK: History (Android SearchHistoryDao)
-
-    func testSearchHistoryKeepsOneRowPerQueryNewestFirst() async throws {
-        let container = try PersistenceActor.makeContainer(inMemory: true)
-        let persistence = PersistenceActor(modelContainer: container)
-        try await persistence.addSearchHistoryItem("luma", timestamp: 1)
-        try await persistence.addSearchHistoryItem("night", timestamp: 2)
-        try await persistence.addSearchHistoryItem("luma", timestamp: 3)
-        var recent = try await persistence.recentSearchHistory()
-        XCTAssertEqual(recent.map(\.query), ["luma", "night"])
-        XCTAssertEqual(recent.first?.timestamp, 3)
-        recent = try await persistence.recentSearchHistory(limit: 1)
-        XCTAssertEqual(recent.map(\.query), ["luma"])
-        try await persistence.deleteSearchHistoryItem(query: "luma")
-        recent = try await persistence.recentSearchHistory()
-        XCTAssertEqual(recent.map(\.query), ["night"])
-        try await persistence.clearSearchHistory()
-        recent = try await persistence.recentSearchHistory()
-        XCTAssertTrue(recent.isEmpty)
-    }
+    // History: see SearchHistoryTests.
 
     func testSearchLaunchOptionsDefaultToAll() {
         XCTAssertEqual(SearchLaunchOptions.initialFilter, .all)
