@@ -1,15 +1,4 @@
-{"fn":"senderStart","in":{"now":"0"},"out":{"ms":"150"}}
-{"fn":"senderStart","in":{"now":"1000"},"out":{"ms":"1150"}}
-{"fn":"senderStart","in":{"now":"1763600000000"},"out":{"ms":"1763600000150"}}
-{"fn":"receiverStart","in":{"receipt":"10000","rtt":"-5"},"out":{"ms":"10150"}}
-{"fn":"receiverStart","in":{"receipt":"10000","rtt":"0"},"out":{"ms":"10150"}}
-{"fn":"receiverStart","in":{"receipt":"10000","rtt":"1"},"out":{"ms":"10150"}}
-{"fn":"receiverStart","in":{"receipt":"10000","rtt":"40"},"out":{"ms":"10130"}}
-{"fn":"receiverStart","in":{"receipt":"10000","rtt":"81"},"out":{"ms":"10110"}}
-{"fn":"receiverStart","in":{"receipt":"10000","rtt":"999"},"out":{"ms":"9651"}}
-{"fn":"receiverStart","in":{"receipt":"10000","rtt":"1000"},"out":{"ms":"9650"}}
-{"fn":"receiverStart","in":{"receipt":"10000","rtt":"1001"},"out":{"ms":"9650"}}
-{"fn":"receiverStart","in":{"receipt":"10000","rtt":"50000"},"out":{"ms":"9650"}}
+{"fn":"constants","in":{},"out":{"goDelay":"0","maxRtt":"1000"}}
 {"fn":"impulseAge","in":{"now":"1000","impulse":"900"},"out":{"ms":"100"}}
 {"fn":"impulseAge","in":{"now":"1000","impulse":"1000"},"out":{"ms":"0"}}
 {"fn":"impulseAge","in":{"now":"1000","impulse":"1001"},"out":{"ms":"-1"}}

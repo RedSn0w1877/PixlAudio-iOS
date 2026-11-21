@@ -1,23 +1,16 @@
-// The clock that lines the two animations up (Song Tap). The receiver acknowledges the offer, the sender answers with
-// `go` carrying a start time a little ahead on the sender's clock, and the receiver starts at its own receipt time plus
-// the same delay minus half the measured round trip. An error of a few tens of milliseconds is invisible because the
-// motion is symmetric and eased. A transliteration of `SongTapHandshake.kt`.
+// What is left of the clock alignment (Song Tap). Spec 4 had the sender wait for the receiver's acknowledgement, answer with
+// `go` and start both animations `goDelayMs` later, which made a tap feel late. From spec 5 the data is fetched before the
+// tap, so each phone starts its own beam at its own commit (the first haptic) and nothing waits for the other: there is no
+// `go` and no start delay (`goDelayMs` is 0 and kept only so the ports have the same name). The two animations differ by
+// the difference of the two commit times (tens of ms, rarely over 150); the motion is symmetric and eased and the phones
+// are touching, so it is not visible and not corrected. A transliteration of `SongTapHandshake.kt`.
 
 public enum SongTapHandshake {
-    /// How far ahead of the `go` message both animations start.
-    public static let goDelayMs: Int64 = 150
+    /// No wait: both animations start at the moment each phone commits.
+    public static let goDelayMs: Int64 = 0
 
     /// A round trip longer than this is not trusted for the correction.
     public static let maxRttMs: Int64 = 1_000
-
-    /// The sender's animation start, on the sender's clock.
-    public static func senderStartMs(_ nowMs: Int64) -> Int64 { nowMs + goDelayMs }
-
-    /// The receiver's animation start, on the receiver's clock; `rttMs` is the receiver's measured round trip of its ack.
-    public static func receiverStartMs(receiptMs: Int64, rttMs: Int64) -> Int64 {
-        let rtt = rttMs < 0 ? 0 : (rttMs > maxRttMs ? maxRttMs : rttMs)
-        return receiptMs + goDelayMs - rtt / 2
-    }
 
     /// How long ago, on a phone's own clock, its last impulse was, so the other phone can place it on its clock.
     public static func impulseAgeMs(nowMs: Int64, impulseMs: Int64) -> Int64 {

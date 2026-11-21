@@ -2,16 +2,24 @@
 // `SongTapWire.kt`; every constant is the same string and the same number.
 //
 // Each phone, while Song Tap is armed on screen, advertises exactly one 128-bit service UUID and scans for both. The UUID
-// says which side it is on: `serviceSend` (this phone offers the song that is playing) or `serviceReceive` (this phone
-// waits for one). A phone that is sending also runs a GATT server with the four characteristics below; the receiving
-// phone connects to it as the client and never serves anything, so a beam always travels over one connection in one
-// direction. Nothing sits in the advertisement but the UUID (an iPhone can advertise nothing else), no device name, no
-// identifier.
+// says which side it is on: `serviceSend` (this phone offers a song) or `serviceReceive` (this phone waits for one). A
+// phone that is sending also runs a GATT server with the five characteristics below; the receiving phone connects to it as
+// the client and never serves anything, so a beam always travels over one connection in one direction. Spec 5 adds a short
+// name next to the UUID (see `SongTapNames`): an iPhone advertises it as its local name, an Android phone in a manufacturer
+// block (company id `advertCompanyId`) of its scan response; no identifier.
 //
 //   info     read    `encodeInfo`: version and how long ago the sender's last jerk was
 //   offer    read    the signed frame (`SongTapSigning.encodeFrame`); an application error until an offer exists
 //   control  write   a `SongTapControlMessage` from the receiver: hello (challenge), tap, ack, decline
-//   event    notify  `eventGo` once, when the sender starts the beam
+//   name     read    `encodeName`: the sender's full name (spec 5)
+//   event    notify  `eventOfferReady` when the sender has an offer to read, `eventOfferWithdrawn` when it has none any more,
+//                    `eventTap` when the sender's detector fired (spec 6); `eventGo` is reserved and never sent
+//
+// The flow (spec 5, "prefetch"): the receiver connects while the sender is inside the near gate, writes Hello with a fresh 16
+// byte challenge, subscribes to event, reads Name, and as soon as the sender has an offer for it (the sender's listener said
+// yes; the sender says so with `eventOfferReady`) reads Offer: the sender signs payload, challenge and time with its
+// per-session key on that read, and the receiver checks the signature and holds the result. Nothing slow is left for the
+// tap: when a phone's detector fires the data is in hand, so both phones start the beam at once.
 //
 // The signature itself is ECDSA P-256 over SHA-256, written as the raw 64 bytes r then s (not DER); the public key is the
 // 65 byte x9.63 point. That is CryptoKit's `rawRepresentation` / `x963Representation`, and Android's own encoding.
@@ -33,6 +41,12 @@ public enum SongTapWire {
     public static let charOffer = "b7f3a1c0-5d2e-4c9a-8e61-3f4d7a2b9c12"
     public static let charControl = "b7f3a1c0-5d2e-4c9a-8e61-3f4d7a2b9c13"
     public static let charEvent = "b7f3a1c0-5d2e-4c9a-8e61-3f4d7a2b9c14"
+    public static let charName = "b7f3a1c0-5d2e-4c9a-8e61-3f4d7a2b9c15"
+
+    /// The company id of the manufacturer-specific block that carries the short name in an Android phone's scan response
+    /// (0xFFFF: no company, as the Bluetooth spec reserves it for tests and internal use).
+    public static let advertCompanyId = 0xFFFF
+    public static let advertVersion = 1
 
     /// The ATT application error a sender answers an Offer read with while it has nothing (yet) to give.
     public static let errorNotReady = 0x80
@@ -45,8 +59,20 @@ public enum SongTapWire {
     public static let opDecline = 0x03
     public static let opTap = 0x04
 
-    /// The one thing `charEvent` says.
+    /// Reserved: spec 4 sent it to start the animations. No phone sends it any more and every phone ignores it.
     public static let eventGo = 0x01
+
+    /// The sender has an offer (a new one) for the connected receiver to read.
+    public static let eventOfferReady = 0x02
+
+    /// The sender no longer offers anything (its listener cancelled, the time ran out, the beam is over): a receiver that
+    /// holds an offer fetched ahead lets it go.
+    public static let eventOfferWithdrawn = 0x03
+
+    /// The sender's detector fired (spec 6, the one-sided tap): a one byte notification on Event, `04`, sent at once to the
+    /// central that read the offer. The receiver commits only if `SongTapPeerTap.judge` accepts it. (The receiver's own tap
+    /// message is the Control write `opTap`; the two share the number 4 on different characteristics.)
+    public static let eventTap = 0x04
 
     /// "No jerk to report" in an age field.
     public static let noAge: Int64 = 0xFFFF_FFFF
@@ -119,6 +145,59 @@ public enum SongTapWire {
     public static func isGo(_ bytes: [UInt8]) -> Bool { bytes.count == 1 && Int(bytes[0]) == eventGo }
 
     public static func encodeGo() -> [UInt8] { [UInt8(eventGo)] }
+
+    public static func isOfferReady(_ bytes: [UInt8]) -> Bool { bytes.count == 1 && Int(bytes[0]) == eventOfferReady }
+
+    public static func encodeOfferReady() -> [UInt8] { [UInt8(eventOfferReady)] }
+
+    public static func isOfferWithdrawn(_ bytes: [UInt8]) -> Bool { bytes.count == 1 && Int(bytes[0]) == eventOfferWithdrawn }
+
+    public static func encodeOfferWithdrawn() -> [UInt8] { [UInt8(eventOfferWithdrawn)] }
+
+    public static func isTapEvent(_ bytes: [UInt8]) -> Bool { bytes.count == 1 && Int(bytes[0]) == eventTap }
+
+    public static func encodeTapEvent() -> [UInt8] { [UInt8(eventTap)] }
+
+    // MARK: Names
+
+    /// `charName`: the version byte, then the clean name in UTF-8 (at most `SongTapNames.maxNameBytes` bytes).
+    public static func encodeName(_ name: String) -> [UInt8] {
+        [UInt8(version)] + SongTapText.encodeUtf8(SongTapText.toCodePoints(SongTapNames.orFallback(name)))
+    }
+
+    /// The clean name in a Name value; nil for a wrong version, bad UTF-8, too long or nothing usable.
+    public static func decodeName(_ bytes: [UInt8]) -> String? {
+        if bytes.count < 2 || bytes.count > 1 + SongTapNames.maxNameBytes || Int(bytes[0]) != version { return nil }
+        guard let cps = SongTapText.decodeUtf8(bytes, from: 1, to: bytes.count) else { return nil }
+        return SongTapNames.fromAdvert(SongTapText.fromCodePoints(cps))
+    }
+
+    /// The data of the manufacturer block (`advertCompanyId`) of an Android phone's scan response: `advertVersion`, then the
+    /// short name in UTF-8. An iPhone never writes one (it advertises its local name); this is for the port's tests and for
+    /// parity with Android.
+    public static func encodeAdvertName(_ name: String) -> [UInt8] {
+        [UInt8(advertVersion)] + SongTapText.encodeUtf8(SongTapText.toCodePoints(SongTapNames.advertName(SongTapNames.orFallback(name))))
+    }
+
+    /// The clean short name in a manufacturer block's data; nil for a wrong version, bad UTF-8, too long or nothing usable.
+    public static func decodeAdvertName(_ bytes: [UInt8]) -> String? {
+        if bytes.count < 2 || bytes.count > 1 + SongTapNames.advertNameMaxBytes || Int(bytes[0]) != advertVersion { return nil }
+        guard let cps = SongTapText.decodeUtf8(bytes, from: 1, to: bytes.count) else { return nil }
+        return SongTapNames.fromAdvert(SongTapText.fromCodePoints(cps))
+    }
+
+    /// The short name of a phone from what its advertisement carried (both platforms read it the same way): the Song Tap
+    /// manufacturer block when there is one, else the local name, each through `SongTapNames.fromAdvert`. `manufacturerData` is
+    /// CoreBluetooth's `CBAdvertisementDataManufacturerDataKey`: the company id first, two bytes little endian, then the data.
+    public static func advertisedName(manufacturerData: [UInt8]?, localName: String?) -> String? {
+        if let m = manufacturerData, m.count >= 3,
+           Int(m[0]) | (Int(m[1]) << 8) == advertCompanyId,
+           let name = decodeAdvertName(Array(m[2...])) {
+            return name
+        }
+        guard let localName else { return nil }
+        return SongTapNames.fromAdvert(localName)
+    }
 
     // MARK: Bytes
 

@@ -1,7 +1,7 @@
 // One Song Tap session as a pure `reduce(state, event) -> (state, effects)`: no clock, no radio, no storage. A
 // transport (QR now, Bluetooth next) turns what it sees into `SongTapSessionEvent`s, the controller performs the
 // `SongTapSessionEffect`s, and both platforms are proven to agree by golden event traces. A transliteration of
-// `SongTapSession.kt`.
+// `SongTapSession.kt` (spec 6).
 //
 // Phases: idle (Song Tap is off), armed (on, nobody around), found (a peer is in range), near (a peer is close),
 // offered (a real offer exists and waits for a decision: the sender for an acknowledgement, the receiver for
@@ -50,7 +50,7 @@ public enum SongTapSaveOutcome: String, Sendable, CaseIterable {
 }
 
 public enum SongTapTimeoutTag: String, Sendable, CaseIterable {
-    case ack, read, consent, save
+    case ack, read, consent, save, target
 
     public var code: String { rawValue }
 }
@@ -78,9 +78,22 @@ public struct SongTapSessionState: Sendable, Equatable {
     public var limits: SongTapRateLimits
     /// Beams saved without asking since the listener last said yes; at `SongTapSession.askAgainAfter` the next one asks again.
     public var autoSaves: Int
+    /// Sender: the peer the listener said "Song drop to X?" yes to (spec 5); 0 when none. The offer is published for that phone only.
+    public var target: Int
+    /// Sender: the target has read the offer (so the data is already in hand over there).
+    public var offerRead: Bool
+    /// Sender: a tap came before the target had read the offer; the beam starts when the read arrives.
+    public var tapSeen: Bool
+    /// Sender: the receiver acknowledged (it saved).
+    public var acked: Bool
+    /// Sender: the beam has played out; the session ends when the acknowledgement is also in.
+    public var beamDone: Bool
+    /// Receiver: a checked offer from `peer` is in hand (`videoId`, `senderKey`) and waits for the tap (spec 5 prefetch).
+    public var pre: Bool
 
     public init(phase: SongTapPhase, role: SongTapRole, peer: Int, videoId: String, fail: SongTapFailReason?, askFirst: Bool, alreadyHad: Bool,
-                senderKey: Int32, limits: SongTapRateLimits, autoSaves: Int = 0) {
+                senderKey: Int32, limits: SongTapRateLimits, autoSaves: Int = 0, target: Int = 0, offerRead: Bool = false,
+                tapSeen: Bool = false, acked: Bool = false, beamDone: Bool = false, pre: Bool = false) {
         self.phase = phase
         self.role = role
         self.peer = peer
@@ -91,11 +104,23 @@ public struct SongTapSessionState: Sendable, Equatable {
         self.senderKey = senderKey
         self.limits = limits
         self.autoSaves = autoSaves
+        self.target = target
+        self.offerRead = offerRead
+        self.tapSeen = tapSeen
+        self.acked = acked
+        self.beamDone = beamDone
+        self.pre = pre
     }
 
     public func describe() -> String {
         "\(phase.code) role=\(role.code) peer=\(peer) vid=\(videoId.isEmpty ? "-" : videoId) fail=\(fail?.code ?? "-") " +
-            "ask=\(askFirst ? 1 : 0) had=\(alreadyHad ? 1 : 0) key=\(senderKey)"
+            "ask=\(askFirst ? 1 : 0) had=\(alreadyHad ? 1 : 0) key=\(senderKey)" +
+            (target != 0 ? " tgt=\(target)" : "") +
+            (offerRead ? " read=1" : "") +
+            (tapSeen ? " tapseen=1" : "") +
+            (acked ? " acked=1" : "") +
+            (beamDone ? " beamdone=1" : "") +
+            (pre ? " pre=1" : "")
     }
 
     public static func initial(askFirst: Bool = true) -> SongTapSessionState {
@@ -114,8 +139,21 @@ public enum SongTapSessionEvent: Sendable, Equatable {
     case peerFar(Int)
     case peerRole(peer: Int, role: SongTapRole)
     case peerDeclined(Int)
-    /// The detector fired for `peer`; `videoId` is what plays now on this phone (empty when nothing does).
-    case tapDetected(peer: Int, videoId: String)
+    /// The detector fired for `peer` (or, for a sender, the receiver told it so); `videoId` is what plays now on this phone
+    /// (empty when nothing does), `nowMs` this phone's clock: it is the moment of the commit.
+    case tapDetected(peer: Int, videoId: String, nowMs: Int64)
+    /// Sender: the listener said yes to "Song drop to X?" for `peer`; the offer for `videoId` is published for that phone only.
+    case approve(peer: Int, videoId: String)
+    /// Sender: the song changed, or the offer is being refreshed: publish `videoId` again for the target (a new read is needed).
+    case republish(videoId: String)
+    /// Sender: the target phone has read the offer.
+    case offerRead(peer: Int, nowMs: Int64)
+    /// Sender: the phone that read the offer went away (before the beam).
+    case offerReadLost(peer: Int)
+    /// Receiver: a valid, checked offer from `peer` was fetched before any tap and is now in hand (spec 5 prefetch).
+    case offerPrefetched(peer: Int, videoId: String, senderKey: Int32)
+    /// Receiver: the offer in hand is no longer valid (the sender withdrew it or changed it).
+    case offerGone(peer: Int)
     /// The sender put its QR code up for `videoId`.
     case qrShown(videoId: String)
     /// A valid offer arrived (checked by the transport): from `peer` (0 for a QR code), made by `senderKey`.
@@ -123,7 +161,6 @@ public enum SongTapSessionEvent: Sendable, Equatable {
     /// Something arrived that is not a valid offer (a stranger's QR code, a bad signature, a stale frame).
     case offerRejected
     case ackReceived(nowMs: Int64, rttMs: Int64)
-    case goReceived(nowMs: Int64, rttMs: Int64)
     case beamFinished
     case accept(nowMs: Int64)
     case decline
@@ -145,12 +182,17 @@ public enum SongTapSessionEvent: Sendable, Equatable {
         case .peerFar(let p): "peerFar(\(p))"
         case .peerRole(let p, let role): "peerRole(\(p),\(role.code))"
         case .peerDeclined(let p): "peerDeclined(\(p))"
-        case .tapDetected(let p, let v): "tap(\(p),\(v.isEmpty ? "-" : v))"
+        case .tapDetected(let p, let v, let now): "tap(\(p),\(v.isEmpty ? "-" : v),\(now))"
+        case .approve(let p, let v): "approve(\(p),\(v.isEmpty ? "-" : v))"
+        case .republish(let v): "republish(\(v.isEmpty ? "-" : v))"
+        case .offerRead(let p, let now): "offerRead(\(p),\(now))"
+        case .offerReadLost(let p): "offerReadLost(\(p))"
+        case .offerPrefetched(let p, let v, let k): "offerPrefetched(\(p),\(v),\(k))"
+        case .offerGone(let p): "offerGone(\(p))"
         case .qrShown(let v): "qrShown(\(v))"
         case .offerReceived(let p, let v, let k, let now): "offer(\(p),\(v),\(k),\(now))"
         case .offerRejected: "offerRejected"
         case .ackReceived(let now, let rtt): "ack(\(now),\(rtt))"
-        case .goReceived(let now, let rtt): "go(\(now),\(rtt))"
         case .beamFinished: "beamFinished"
         case .accept(let now): "accept(\(now))"
         case .decline: "decline"
@@ -169,7 +211,6 @@ public enum SongTapSessionEffect: Sendable, Equatable {
     case publishOffer(peer: Int, videoId: String)
     case readOffer(peer: Int)
     case sendAck(peer: Int)
-    case sendGo(peer: Int, startMs: Int64)
     case sendDecline(peer: Int)
     case startBeam(role: SongTapRole, startMs: Int64)
     case saveSong(videoId: String)
@@ -187,7 +228,6 @@ public enum SongTapSessionEffect: Sendable, Equatable {
         case .publishOffer(let p, let v): "publishOffer(\(p),\(v))"
         case .readOffer(let p): "readOffer(\(p))"
         case .sendAck(let p): "sendAck(\(p))"
-        case .sendGo(let p, let start): "sendGo(\(p),\(start))"
         case .sendDecline(let p): "sendDecline(\(p))"
         case .startBeam(let role, let start): "startBeam(\(role.code),\(start))"
         case .saveSong(let v): "saveSong(\(v))"
@@ -219,6 +259,9 @@ public enum SongTapSession {
     public static let consentTimeoutMs: Int64 = 20_000
     public static let saveTimeoutMs: Int64 = 20_000
 
+    /// How long a sender stays armed to a phone it said yes to, waiting for the tap.
+    public static let targetTimeoutMs: Int64 = 60_000
+
     /// After this many beams saved without asking, the next one asks (Add / Not now) again.
     public static let askAgainAfter = 5
 
@@ -238,13 +281,18 @@ public enum SongTapSession {
         case .peerFar(let peer): return peerFar(s, peer)
         case .peerRole(let peer, let role): return peerRole(s, peer: peer, role: role)
         case .peerDeclined(let peer): return peerDeclined(s, peer)
-        case .tapDetected(let peer, let videoId): return tap(s, peer: peer, videoId: videoId)
+        case .tapDetected(let peer, let videoId, let nowMs): return tap(s, peer: peer, videoId: videoId, nowMs: nowMs)
+        case .approve(let peer, let videoId): return approve(s, peer: peer, videoId: videoId)
+        case .republish(let videoId): return republish(s, videoId)
+        case .offerRead(let peer, let nowMs): return offerRead(s, peer: peer, nowMs: nowMs)
+        case .offerReadLost(let peer): return offerReadLost(s, peer)
+        case .offerPrefetched(let peer, let videoId, let senderKey): return offerPrefetched(s, peer: peer, videoId: videoId, senderKey: senderKey)
+        case .offerGone(let peer): return offerGone(s, peer)
         case .qrShown(let videoId): return qrShown(s, videoId)
         case .offerReceived(let peer, let videoId, let senderKey, let nowMs):
             return offerReceived(s, peer: peer, videoId: videoId, senderKey: senderKey, nowMs: nowMs)
         case .offerRejected: return offerRejected(s)
         case .ackReceived(let nowMs, _): return ackReceived(s, nowMs: nowMs)
-        case .goReceived(let nowMs, let rttMs): return goReceived(s, nowMs: nowMs, rttMs: rttMs)
         case .beamFinished: return beamFinished(s)
         case .accept(let nowMs): return accept(s, nowMs: nowMs)
         case .decline: return decline(s)
@@ -282,6 +330,12 @@ public enum SongTapSession {
         n.fail = nil
         n.alreadyHad = false
         n.senderKey = 0
+        n.target = 0
+        n.offerRead = false
+        n.tapSeen = false
+        n.acked = false
+        n.beamDone = false
+        n.pre = false
         return n
     }
 
@@ -340,10 +394,33 @@ public enum SongTapSession {
             var n = s
             n.phase = .armed
             n.peer = 0
+            n.pre = false
+            n.videoId = ""
+            n.senderKey = 0
             return SongTapReduction(state: n, effects: [])
+        case .offered:
+            // A sender armed to a phone it said yes to keeps waiting for the tap when that phone's link drops or it is out of
+            // sight for a moment: only the read is lost. The listener cancels, or the target timeout does.
+            if s.role == .send && s.target != 0 {
+                var n = s
+                n.offerRead = false
+                return SongTapReduction(state: n, effects: [])
+            }
+            return peerLostMidBeam(s)
+        case .transferring:
+            return peerLostMidBeam(s)
+        default:
+            return stay(s)
+        }
+    }
+
+    private static func peerLostMidBeam(_ s: SongTapSessionState) -> SongTapReduction {
+        // After the receiver's acknowledgement the sender has nothing left to lose.
+        if s.role == .send && s.acked { return stay(s) }
+        switch s.phase {
         case .offered, .transferring:
-            // A receiver that holds a checked offer does not need the sender any more: pulling the phones apart after a
-            // tap is normal, and Add / save must still work. Only a beam still being read is lost.
+            // A receiver that holds a checked offer does not need the sender any more: pulling the phones apart after a tap is
+            // normal, and Add / save must still work. Only a beam still being read is lost.
             if s.role == .receive && !s.videoId.isEmpty {
                 var n = s
                 n.peer = 0
@@ -392,29 +469,101 @@ public enum SongTapSession {
         return stay(s)
     }
 
-    private static func tap(_ s: SongTapSessionState, peer: Int, videoId: String) -> SongTapReduction {
-        if (s.phase != .found && s.phase != .near) || s.peer != peer { return stay(s) }
+    private static func tap(_ s: SongTapSessionState, peer: Int, videoId: String, nowMs: Int64) -> SongTapReduction {
         if s.role == .send {
-            if videoId.isEmpty {
-                return SongTapReduction(state: failed(s, .nothingToSend), effects: [.notice(.nothingToSend), .haptic(.warn)])
-            }
+            // A sender beams only to the phone its listener said yes to; a tap with anybody else changes nothing.
+            if s.phase != .offered || s.target == 0 || s.peer != peer { return stay(s) }
+            // The target already holds the offer: the tap is the commit. If it has not read it yet, the beam starts when it does.
+            if s.offerRead { return commitSend(s, nowMs: nowMs) }
             var n = s
-            n.phase = .offered
-            n.videoId = videoId
-            return SongTapReduction(state: n, effects: [
-                .publishOffer(peer: peer, videoId: videoId),
-                .haptic(.tick),
-                .scheduleTimeout(.ack, afterMs: ackTimeoutMs),
-            ])
+            n.tapSeen = true
+            return stay(n)
+        }
+        if (s.phase != .found && s.phase != .near) || s.peer != peer { return stay(s) }
+        // The offer was fetched before the tap: the tap is the commit, with nothing slow left to do.
+        if s.pre {
+            var n = s
+            n.pre = false
+            return admitOffer(n, peer: peer, videoId: s.videoId, senderKey: s.senderKey, nowMs: nowMs, withTick: true)
         }
         var n = s
         n.phase = .transferring
         n.videoId = ""
         return SongTapReduction(state: n, effects: [
             .readOffer(peer: peer),
-            .haptic(.tick),
             .scheduleTimeout(.read, afterMs: readTimeoutMs),
         ])
+    }
+
+    /// The sender's commit: the first haptic, the beam, and the wait for the receiver's answer.
+    private static func commitSend(_ s: SongTapSessionState, nowMs: Int64) -> SongTapReduction {
+        var n = s
+        n.phase = .transferring
+        n.tapSeen = false
+        return SongTapReduction(state: n, effects: [
+            .haptic(.tick),
+            .startBeam(role: .send, startMs: nowMs),
+            .scheduleTimeout(.ack, afterMs: ackTimeoutMs),
+        ])
+    }
+
+    private static func approve(_ s: SongTapSessionState, peer: Int, videoId: String) -> SongTapReduction {
+        if s.role != .send || peer <= 0 { return stay(s) }
+        if s.phase != .armed && s.phase != .found && s.phase != .near { return stay(s) }
+        if videoId.isEmpty {
+            return SongTapReduction(state: failed(s, .nothingToSend), effects: [.notice(.nothingToSend), .haptic(.warn)])
+        }
+        var n = s
+        n.phase = .offered
+        n.peer = peer
+        n.videoId = videoId
+        n.target = peer
+        n.offerRead = false
+        n.tapSeen = false
+        return SongTapReduction(state: n, effects: [.publishOffer(peer: peer, videoId: videoId),
+                                                    .scheduleTimeout(.target, afterMs: targetTimeoutMs)])
+    }
+
+    private static func republish(_ s: SongTapSessionState, _ videoId: String) -> SongTapReduction {
+        if s.role != .send || s.phase != .offered || s.target == 0 || videoId.isEmpty { return stay(s) }
+        var n = s
+        n.videoId = videoId
+        n.offerRead = false
+        return SongTapReduction(state: n, effects: [.publishOffer(peer: s.target, videoId: videoId)])
+    }
+
+    private static func offerRead(_ s: SongTapSessionState, peer: Int, nowMs: Int64) -> SongTapReduction {
+        if s.role != .send || s.phase != .offered || s.target == 0 || s.target != peer { return stay(s) }
+        var n = s
+        n.offerRead = true
+        // A tap that came first starts the beam now that the offer is in hand.
+        return s.tapSeen ? commitSend(n, nowMs: nowMs) : stay(n)
+    }
+
+    private static func offerReadLost(_ s: SongTapSessionState, _ peer: Int) -> SongTapReduction {
+        if s.role != .send || s.phase != .offered || s.target == 0 || s.target != peer { return stay(s) }
+        var n = s
+        n.offerRead = false
+        return stay(n)
+    }
+
+    private static func offerPrefetched(_ s: SongTapSessionState, peer: Int, videoId: String, senderKey: Int32) -> SongTapReduction {
+        if s.role != .receive || peer == 0 || s.peer != peer { return stay(s) }
+        if s.phase != .found && s.phase != .near { return stay(s) }
+        var n = s
+        n.pre = true
+        n.videoId = videoId
+        n.senderKey = senderKey
+        return stay(n)
+    }
+
+    private static func offerGone(_ s: SongTapSessionState, _ peer: Int) -> SongTapReduction {
+        if s.role != .receive || !s.pre || s.peer != peer { return stay(s) }
+        var n = s
+        n.pre = false
+        n.videoId = ""
+        n.senderKey = 0
+        return stay(n)
     }
 
     private static func qrShown(_ s: SongTapSessionState, _ videoId: String) -> SongTapReduction {
@@ -447,31 +596,41 @@ public enum SongTapSession {
             return active ? SongTapReduction(state: failed(s, .bothSending), effects: teardown(s) + [.notice(.bothSending)]) : stay(s)
         }
         if !waiting { return stay(s) }
+        // A beam fetched after the tap (no prefetch) commits when it arrives: that is when the haptic belongs.
+        var n = s
+        n.pre = false
+        return admitOffer(n, peer: peer, videoId: videoId, senderKey: senderKey, nowMs: nowMs, withTick: peer != 0)
+    }
+
+    /// The receiver has a checked offer in hand and the tap (or a code) says take it: limits, then ask or save and beam.
+    private static func admitOffer(_ s: SongTapSessionState, peer: Int, videoId: String, senderKey: Int32, nowMs: Int64,
+                                   withTick: Bool) -> SongTapReduction {
         let verdict = s.limits.admit(nowMs: nowMs, videoId: videoId, senderKey: senderKey)
         if verdict != .allowed {
             let reason = verdictReason(verdict)
             var withPeer = s
             withPeer.peer = peer
-            return SongTapReduction(state: failed(withPeer, reason), effects: [.notice(reason), .haptic(.warn)])
+            // The sender has already started its beam (spec 5): it is told this one will not be taken.
+            return SongTapReduction(state: failed(withPeer, reason),
+                                    effects: (peer != 0 ? [.sendDecline(peer: peer)] : []) + [.notice(reason), .haptic(.warn)])
         }
         var known = s
         known.peer = peer
         known.videoId = videoId
         known.senderKey = senderKey
+        let tick: [SongTapSessionEffect] = withTick ? [.haptic(.tick)] : []
         if s.askFirst {
             known.phase = .offered
-            return SongTapReduction(state: known, effects: [.scheduleTimeout(.consent, afterMs: consentTimeoutMs)])
+            return SongTapReduction(state: known, effects: tick + [.scheduleTimeout(.consent, afterMs: consentTimeoutMs)])
         }
         known.phase = .transferring
-        return SongTapReduction(state: known, effects: saveEffects(peer: peer, videoId: videoId, nowMs: nowMs))
+        return SongTapReduction(state: known, effects: tick + saveEffects(videoId: videoId, nowMs: nowMs))
     }
 
-    /// Saving starts. Over Bluetooth the sender is told only when the save is done (`saveResult`), so it never celebrates a
-    /// beam that did not land; without a peer (a QR code, or the phones already apart) the beam starts at once.
-    private static func saveEffects(peer: Int, videoId: String, nowMs: Int64) -> [SongTapSessionEffect] {
-        var out: [SongTapSessionEffect] = [.saveSong(videoId: videoId), .scheduleTimeout(.save, afterMs: saveTimeoutMs)]
-        if peer == 0 { out.append(.startBeam(role: .receive, startMs: nowMs)) }
-        return out
+    /// Saving starts and the beam starts with it, on every route: the beam does not wait for the save, the sender or a `go`
+    /// (spec 5). The receiver's card says "Adding" until the save result arrives; a save that fails ends the beam.
+    private static func saveEffects(videoId: String, nowMs: Int64) -> [SongTapSessionEffect] {
+        [.saveSong(videoId: videoId), .scheduleTimeout(.save, afterMs: saveTimeoutMs), .startBeam(role: .receive, startMs: nowMs)]
     }
 
     private static func offerRejected(_ s: SongTapSessionState) -> SongTapReduction {
@@ -484,36 +643,42 @@ public enum SongTapSession {
     }
 
     private static func ackReceived(_ s: SongTapSessionState, nowMs: Int64) -> SongTapReduction {
-        if s.role != .send || s.phase != .offered || s.peer == 0 { return stay(s) }
-        let start = SongTapHandshake.senderStartMs(nowMs)
-        var n = s
-        n.phase = .transferring
-        return SongTapReduction(state: n, effects: [.sendGo(peer: s.peer, startMs: start), .startBeam(role: .send, startMs: start)])
-    }
-
-    private static func goReceived(_ s: SongTapSessionState, nowMs: Int64, rttMs: Int64) -> SongTapReduction {
-        if s.role != .receive || s.peer == 0 || s.videoId.isEmpty { return stay(s) }
-        if s.phase != .transferring && s.phase != .saved { return stay(s) }
-        return SongTapReduction(state: s, effects: [.startBeam(role: .receive, startMs: SongTapHandshake.receiverStartMs(receiptMs: nowMs, rttMs: rttMs))])
-    }
-
-    private static func beamFinished(_ s: SongTapSessionState) -> SongTapReduction {
-        if s.role == .send && s.phase == .transferring {
+        if s.role != .send || s.peer == 0 { return stay(s) }
+        if s.phase == .offered {
+            // The receiver committed and saved before this phone noticed the tap: the beam starts now.
             var n = s
+            n.acked = true
+            return commitSend(n, nowMs: nowMs)
+        }
+        if s.phase != .transferring || s.acked { return stay(s) }
+        var n = s
+        n.acked = true
+        if s.beamDone {
             n.phase = .saved
             return SongTapReduction(state: n, effects: [.haptic(.success)])
         }
-        return stay(s)
+        return stay(n)
+    }
+
+    private static func beamFinished(_ s: SongTapSessionState) -> SongTapReduction {
+        if s.role != .send || s.phase != .transferring { return stay(s) }
+        var n = s
+        n.beamDone = true
+        // The session ends when the beam has played and the receiver has said it saved (a QR beam has no peer to wait for).
+        if s.acked || s.peer == 0 {
+            n.phase = .saved
+            return SongTapReduction(state: n, effects: [.haptic(.success)])
+        }
+        return stay(n)
     }
 
     private static func accept(_ s: SongTapSessionState, nowMs: Int64) -> SongTapReduction {
         if s.role != .receive || s.phase != .offered || s.videoId.isEmpty { return stay(s) }
-        // The beam of a Bluetooth offer starts when the sender answers, a QR beam now.
         var n = s
         n.phase = .transferring
         n.askFirst = false
         n.autoSaves = 0
-        return SongTapReduction(state: n, effects: saveEffects(peer: s.peer, videoId: s.videoId, nowMs: nowMs))
+        return SongTapReduction(state: n, effects: saveEffects(videoId: s.videoId, nowMs: nowMs))
     }
 
     private static func decline(_ s: SongTapSessionState) -> SongTapReduction {
@@ -580,8 +745,13 @@ public enum SongTapSession {
     }
 
     private static func timeout(_ s: SongTapSessionState, _ tag: SongTapTimeoutTag) -> SongTapReduction {
-        if tag == .ack && s.role == .send && s.phase == .offered && s.peer != 0 {
+        if tag == .ack && s.role == .send && s.phase == .transferring && !s.acked && s.peer != 0 {
             return SongTapReduction(state: failed(s, .timeout), effects: teardown(s) + [.haptic(.warn)])
+        }
+        if tag == .target && s.role == .send && s.phase == .offered && s.target != 0 {
+            var n = s
+            n.phase = .cancelled
+            return SongTapReduction(state: n, effects: teardown(s))
         }
         if tag == .read && s.role == .receive && s.phase == .transferring && s.videoId.isEmpty {
             return SongTapReduction(state: failed(s, .timeout), effects: teardown(s) + [.haptic(.warn)])

@@ -1,0 +1,130 @@
+{"fn":"clean","in":{"name":"Pixel 10 Pro"},"out":{"name":"Pixel 10 Pro"}}
+{"fn":"orFallback","in":{"name":"Pixel 10 Pro"},"out":{"name":"Pixel 10 Pro"}}
+{"fn":"advertName","in":{"name":"Pixel 10 Pro"},"out":{"name":"Pixel 10 Pro"}}
+{"fn":"isValid","in":{"name":"Pixel 10 Pro"},"out":{"valid":true}}
+{"fn":"fromAdvert","in":{"name":"Pixel 10 Pro"},"out":{"name":"Pixel 10 Pro"}}
+{"fn":"clean","in":{"name":"  Hoa's   Pixel  "},"out":{"name":"Hoa's Pixel"}}
+{"fn":"orFallback","in":{"name":"  Hoa's   Pixel  "},"out":{"name":"Hoa's Pixel"}}
+{"fn":"advertName","in":{"name":"  Hoa's   Pixel  "},"out":{"name":"Hoa's Pixel"}}
+{"fn":"isValid","in":{"name":"  Hoa's   Pixel  "},"out":{"valid":false}}
+{"fn":"fromAdvert","in":{"name":"  Hoa's   Pixel  "},"out":{"name":"Hoa's Pixel"}}
+{"fn":"clean","in":{"name":""},"out":{"name":""}}
+{"fn":"orFallback","in":{"name":""},"out":{"name":"Phone"}}
+{"fn":"advertName","in":{"name":""},"out":{"name":""}}
+{"fn":"isValid","in":{"name":""},"out":{"valid":false}}
+{"fn":"fromAdvert","in":{"name":""},"out":{"name":null}}
+{"fn":"clean","in":{"name":"   "},"out":{"name":""}}
+{"fn":"orFallback","in":{"name":"   "},"out":{"name":"Phone"}}
+{"fn":"advertName","in":{"name":"   "},"out":{"name":""}}
+{"fn":"isValid","in":{"name":"   "},"out":{"valid":false}}
+{"fn":"fromAdvert","in":{"name":"   "},"out":{"name":null}}
+{"fn":"clean","in":{"name":"Ab"},"out":{"name":"Ab"}}
+{"fn":"orFallback","in":{"name":"Ab"},"out":{"name":"Ab"}}
+{"fn":"advertName","in":{"name":"Ab"},"out":{"name":"Ab"}}
+{"fn":"isValid","in":{"name":"Ab"},"out":{"valid":true}}
+{"fn":"fromAdvert","in":{"name":"Ab"},"out":{"name":"Ab"}}
+{"fn":"clean","in":{"name":"AAAAAAAAAAAAAAAAAAAA"},"out":{"name":"AAAAAAAAAAAAAAAAAAAA"}}
+{"fn":"orFallback","in":{"name":"AAAAAAAAAAAAAAAAAAAA"},"out":{"name":"AAAAAAAAAAAAAAAAAAAA"}}
+{"fn":"advertName","in":{"name":"AAAAAAAAAAAAAAAAAAAA"},"out":{"name":"AAAAAAAAAAAAAAAAAAAA"}}
+{"fn":"isValid","in":{"name":"AAAAAAAAAAAAAAAAAAAA"},"out":{"valid":true}}
+{"fn":"fromAdvert","in":{"name":"AAAAAAAAAAAAAAAAAAAA"},"out":{"name":"AAAAAAAAAAAAAAAAAAAA"}}
+{"fn":"clean","in":{"name":"AAAAAAAAAAAAAAAAAAAAA"},"out":{"name":"AAAAAAAAAAAAAAAAAAAA"}}
+{"fn":"orFallback","in":{"name":"AAAAAAAAAAAAAAAAAAAAA"},"out":{"name":"AAAAAAAAAAAAAAAAAAAA"}}
+{"fn":"advertName","in":{"name":"AAAAAAAAAAAAAAAAAAAAA"},"out":{"name":"AAAAAAAAAAAAAAAAAAAA"}}
+{"fn":"isValid","in":{"name":"AAAAAAAAAAAAAAAAAAAAA"},"out":{"valid":false}}
+{"fn":"fromAdvert","in":{"name":"AAAAAAAAAAAAAAAAAAAAA"},"out":{"name":"AAAAAAAAAAAAAAAAAAAA"}}
+{"fn":"clean","in":{"name":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},"out":{"name":"AAAAAAAAAAAAAAAAAAAA"}}
+{"fn":"orFallback","in":{"name":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},"out":{"name":"AAAAAAAAAAAAAAAAAAAA"}}
+{"fn":"advertName","in":{"name":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},"out":{"name":"AAAAAAAAAAAAAAAAAAAA"}}
+{"fn":"isValid","in":{"name":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},"out":{"valid":false}}
+{"fn":"fromAdvert","in":{"name":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},"out":{"name":"AAAAAAAAAAAAAAAAAAAA"}}
+{"fn":"clean","in":{"name":"Zo\u00eb's phone"},"out":{"name":"Zo\u00eb's phone"}}
+{"fn":"orFallback","in":{"name":"Zo\u00eb's phone"},"out":{"name":"Zo\u00eb's phone"}}
+{"fn":"advertName","in":{"name":"Zo\u00eb's phone"},"out":{"name":"Zo\u00eb's phone"}}
+{"fn":"isValid","in":{"name":"Zo\u00eb's phone"},"out":{"valid":true}}
+{"fn":"fromAdvert","in":{"name":"Zo\u00eb's phone"},"out":{"name":"Zo\u00eb's phone"}}
+{"fn":"clean","in":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9"},"out":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9"}}
+{"fn":"orFallback","in":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9"},"out":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9"}}
+{"fn":"advertName","in":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9"},"out":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9"}}
+{"fn":"isValid","in":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9"},"out":{"valid":true}}
+{"fn":"fromAdvert","in":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9"},"out":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9"}}
+{"fn":"clean","in":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9"},"out":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9"}}
+{"fn":"orFallback","in":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9"},"out":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9"}}
+{"fn":"advertName","in":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9"},"out":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9"}}
+{"fn":"isValid","in":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9"},"out":{"valid":false}}
+{"fn":"fromAdvert","in":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9"},"out":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9"}}
+{"fn":"clean","in":{"name":"\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c"},"out":{"name":"\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c"}}
+{"fn":"orFallback","in":{"name":"\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c"},"out":{"name":"\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c"}}
+{"fn":"advertName","in":{"name":"\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c"},"out":{"name":"\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c"}}
+{"fn":"isValid","in":{"name":"\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c"},"out":{"valid":true}}
+{"fn":"fromAdvert","in":{"name":"\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c"},"out":{"name":"\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c\u4f60\u597d\u4e16\u754c"}}
+{"fn":"clean","in":{"name":"tab\u0009here"},"out":{"name":"tab here"}}
+{"fn":"orFallback","in":{"name":"tab\u0009here"},"out":{"name":"tab here"}}
+{"fn":"advertName","in":{"name":"tab\u0009here"},"out":{"name":"tab here"}}
+{"fn":"isValid","in":{"name":"tab\u0009here"},"out":{"valid":false}}
+{"fn":"fromAdvert","in":{"name":"tab\u0009here"},"out":{"name":"tab here"}}
+{"fn":"clean","in":{"name":"line\u000abreak"},"out":{"name":"line break"}}
+{"fn":"orFallback","in":{"name":"line\u000abreak"},"out":{"name":"line break"}}
+{"fn":"advertName","in":{"name":"line\u000abreak"},"out":{"name":"line break"}}
+{"fn":"isValid","in":{"name":"line\u000abreak"},"out":{"valid":false}}
+{"fn":"fromAdvert","in":{"name":"line\u000abreak"},"out":{"name":"line break"}}
+{"fn":"clean","in":{"name":"bell\u0007x"},"out":{"name":"bellx"}}
+{"fn":"orFallback","in":{"name":"bell\u0007x"},"out":{"name":"bellx"}}
+{"fn":"advertName","in":{"name":"bell\u0007x"},"out":{"name":"bellx"}}
+{"fn":"isValid","in":{"name":"bell\u0007x"},"out":{"valid":false}}
+{"fn":"fromAdvert","in":{"name":"bell\u0007x"},"out":{"name":"bellx"}}
+{"fn":"clean","in":{"name":"\u202eevil\u202c"},"out":{"name":"evil"}}
+{"fn":"orFallback","in":{"name":"\u202eevil\u202c"},"out":{"name":"evil"}}
+{"fn":"advertName","in":{"name":"\u202eevil\u202c"},"out":{"name":"evil"}}
+{"fn":"isValid","in":{"name":"\u202eevil\u202c"},"out":{"valid":false}}
+{"fn":"fromAdvert","in":{"name":"\u202eevil\u202c"},"out":{"name":"evil"}}
+{"fn":"clean","in":{"name":"zero\u200bwidth"},"out":{"name":"zerowidth"}}
+{"fn":"orFallback","in":{"name":"zero\u200bwidth"},"out":{"name":"zerowidth"}}
+{"fn":"advertName","in":{"name":"zero\u200bwidth"},"out":{"name":"zerowidth"}}
+{"fn":"isValid","in":{"name":"zero\u200bwidth"},"out":{"valid":false}}
+{"fn":"fromAdvert","in":{"name":"zero\u200bwidth"},"out":{"name":"zerowidth"}}
+{"fn":"clean","in":{"name":"\ud83c\udf8a party"},"out":{"name":"\ud83c\udf8a party"}}
+{"fn":"orFallback","in":{"name":"\ud83c\udf8a party"},"out":{"name":"\ud83c\udf8a party"}}
+{"fn":"advertName","in":{"name":"\ud83c\udf8a party"},"out":{"name":"\ud83c\udf8a party"}}
+{"fn":"isValid","in":{"name":"\ud83c\udf8a party"},"out":{"valid":true}}
+{"fn":"fromAdvert","in":{"name":"\ud83c\udf8a party"},"out":{"name":"\ud83c\udf8a party"}}
+{"fn":"clean","in":{"name":"\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a"},"out":{"name":"\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a"}}
+{"fn":"orFallback","in":{"name":"\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a"},"out":{"name":"\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a"}}
+{"fn":"advertName","in":{"name":"\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a"},"out":{"name":"\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a"}}
+{"fn":"isValid","in":{"name":"\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a"},"out":{"valid":true}}
+{"fn":"fromAdvert","in":{"name":"\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a"},"out":{"name":"\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a\ud83c\udf8a"}}
+{"fn":"clean","in":{"name":"\ufeffbom"},"out":{"name":"bom"}}
+{"fn":"orFallback","in":{"name":"\ufeffbom"},"out":{"name":"bom"}}
+{"fn":"advertName","in":{"name":"\ufeffbom"},"out":{"name":"bom"}}
+{"fn":"isValid","in":{"name":"\ufeffbom"},"out":{"valid":false}}
+{"fn":"fromAdvert","in":{"name":"\ufeffbom"},"out":{"name":"bom"}}
+{"fn":"clean","in":{"name":"caf\u00e9 "},"out":{"name":"caf\u00e9"}}
+{"fn":"orFallback","in":{"name":"caf\u00e9 "},"out":{"name":"caf\u00e9"}}
+{"fn":"advertName","in":{"name":"caf\u00e9 "},"out":{"name":"caf\u00e9"}}
+{"fn":"isValid","in":{"name":"caf\u00e9 "},"out":{"valid":false}}
+{"fn":"fromAdvert","in":{"name":"caf\u00e9 "},"out":{"name":"caf\u00e9"}}
+{"fn":"clean","in":{"name":"a b"},"out":{"name":"a b"}}
+{"fn":"orFallback","in":{"name":"a b"},"out":{"name":"a b"}}
+{"fn":"advertName","in":{"name":"a b"},"out":{"name":"a b"}}
+{"fn":"isValid","in":{"name":"a b"},"out":{"valid":true}}
+{"fn":"fromAdvert","in":{"name":"a b"},"out":{"name":"a b"}}
+{"fn":"clean","in":{"name":"\ud800 lone"},"out":{"name":"\ufffd lone"}}
+{"fn":"orFallback","in":{"name":"\ud800 lone"},"out":{"name":"\ufffd lone"}}
+{"fn":"advertName","in":{"name":"\ud800 lone"},"out":{"name":"\ufffd lone"}}
+{"fn":"isValid","in":{"name":"\ud800 lone"},"out":{"valid":false}}
+{"fn":"fromAdvert","in":{"name":"\ud800 lone"},"out":{"name":"\ufffd lone"}}
+{"fn":"clean","in":{"name":"xxxxxxxxxxxxxxxxxxx y"},"out":{"name":"xxxxxxxxxxxxxxxxxxx"}}
+{"fn":"orFallback","in":{"name":"xxxxxxxxxxxxxxxxxxx y"},"out":{"name":"xxxxxxxxxxxxxxxxxxx"}}
+{"fn":"advertName","in":{"name":"xxxxxxxxxxxxxxxxxxx y"},"out":{"name":"xxxxxxxxxxxxxxxxxxx"}}
+{"fn":"isValid","in":{"name":"xxxxxxxxxxxxxxxxxxx y"},"out":{"valid":false}}
+{"fn":"fromAdvert","in":{"name":"xxxxxxxxxxxxxxxxxxx y"},"out":{"name":"xxxxxxxxxxxxxxxxxxx"}}
+{"fn":"clean","in":{"name":"xxxxxxxxxxxxxxxxxxx\ud83c\udf8a"},"out":{"name":"xxxxxxxxxxxxxxxxxxx\ud83c\udf8a"}}
+{"fn":"orFallback","in":{"name":"xxxxxxxxxxxxxxxxxxx\ud83c\udf8a"},"out":{"name":"xxxxxxxxxxxxxxxxxxx\ud83c\udf8a"}}
+{"fn":"advertName","in":{"name":"xxxxxxxxxxxxxxxxxxx\ud83c\udf8a"},"out":{"name":"xxxxxxxxxxxxxxxxxxx\ud83c\udf8a"}}
+{"fn":"isValid","in":{"name":"xxxxxxxxxxxxxxxxxxx\ud83c\udf8a"},"out":{"valid":true}}
+{"fn":"fromAdvert","in":{"name":"xxxxxxxxxxxxxxxxxxx\ud83c\udf8a"},"out":{"name":"xxxxxxxxxxxxxxxxxxx\ud83c\udf8a"}}
+{"fn":"clean","in":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9a"},"out":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9a"}}
+{"fn":"orFallback","in":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9a"},"out":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9a"}}
+{"fn":"advertName","in":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9a"},"out":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9a"}}
+{"fn":"isValid","in":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9a"},"out":{"valid":true}}
+{"fn":"fromAdvert","in":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9a"},"out":{"name":"\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9a"}}

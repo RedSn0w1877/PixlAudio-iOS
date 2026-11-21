@@ -244,11 +244,16 @@ struct SongTapGoldenTests {
         case "peerFar": return .peerFar(n(0))
         case "peerRole": return .peerRole(peer: n(0), role: SongTapRole(rawValue: a[1]) ?? .send)
         case "peerDeclined": return .peerDeclined(n(0))
-        case "tap": return .tapDetected(peer: n(0), videoId: vid(1))
+        case "tap": return .tapDetected(peer: n(0), videoId: vid(1), nowMs: l(2))
+        case "approve": return .approve(peer: n(0), videoId: vid(1))
+        case "republish": return .republish(videoId: vid(0))
+        case "offerRead": return .offerRead(peer: n(0), nowMs: l(1))
+        case "offerReadLost": return .offerReadLost(peer: n(0))
+        case "offerPrefetched": return .offerPrefetched(peer: n(0), videoId: a[1], senderKey: Int32(a[2]) ?? 0)
+        case "offerGone": return .offerGone(peer: n(0))
         case "qrShown": return .qrShown(videoId: inner)
         case "offer": return .offerReceived(peer: n(0), videoId: a[1], senderKey: Int32(a[2]) ?? 0, nowMs: l(3))
         case "ack": return .ackReceived(nowMs: l(0), rttMs: l(1))
-        case "go": return .goReceived(nowMs: l(0), rttMs: l(1))
         case "accept": return .accept(nowMs: l(0))
         case "saveResult": return .saveResult(SongTapSaveOutcome(rawValue: a[0]) ?? .failed, nowMs: l(1))
         case "undo": return .undo(nowMs: l(0))
@@ -288,21 +293,24 @@ struct SongTapGoldenTests {
                 seen.insert(String(text.prefix { $0 != "(" }))
             }
         }
-        #expect(seen.count >= 22, "the traces should use every event kind, saw \(seen.sorted())")
+        #expect(seen.count >= 28, "the traces should use every event kind, saw \(seen.sorted())")
     }
 
     // MARK: detector.jsonl, impulse.jsonl, ratelimit.jsonl
+
+    static func profile(_ v: Value) -> SongTapSensitivity { SongTapSensitivity.fromCode(optionalString(v, "profile")) }
 
     @Test func detectorTraces() throws {
         var report = Report(file: "detector.jsonl")
         for c in try Self.cases("detector.jsonl") {
             switch c.fn {
             case "detector":
+                let profile = Self.profile(c.input)
                 var state = SongTapDetectorState.initial
                 var steps: [String] = []
                 for sample in Self.strings(c.input, "samples") {
                     let p = sample.split(separator: ",").map { Int64($0) ?? 0 }
-                    let step = SongTapDetector.step(state, SongTapRssiSample(tMs: p[0], rssi: Int(p[1])), impulseMs: p[2])
+                    let step = SongTapDetector.step(state, SongTapRssiSample(tMs: p[0], rssi: Int(p[1])), impulseMs: p[2], profile: profile)
                     state = step.state
                     steps.append("\(step.fire.code),\(step.glowPermille),\(state.baselineQ),\(state.fastQ),\(state.near ? 1 : 0)")
                 }
@@ -310,6 +318,22 @@ struct SongTapGoldenTests {
                     w.beginArray("steps")
                     for s in steps { w.stringItem(s) }
                     w.endArray()
+                })
+            case "tuning":
+                let p = Self.profile(c.input)
+                report.record(c, c.matches {
+                    $0.int("baselineShift", p.baselineShift); $0.int("fastShift", p.fastShift); $0.int("jumpDb", p.jumpDb)
+                    $0.int("freezeDb", p.freezeDb); $0.long("holdMs", p.holdMs); $0.long("dwellMs", p.dwellMs)
+                    $0.long("impulseWindowMs", p.impulseWindowMs); $0.int("jerkMilliG", p.jerkMilliG); $0.long("cooldownMs", p.cooldownMs)
+                })
+            case "gates":
+                report.record(c, c.matches {
+                    $0.int("nearEnter", SongTapTuning.nearEnterDbm); $0.int("nearExit", SongTapTuning.nearExitDbm)
+                    $0.int("listEnter", SongTapTuning.listEnterDbm); $0.int("listExit", SongTapTuning.listExitDbm)
+                    $0.int("closeHoldDbm", SongTapTuning.closeHoldDbm); $0.long("closeHoldMs", SongTapTuning.closeHoldMs)
+                    $0.int("closeReleaseDbm", SongTapTuning.closeReleaseDbm); $0.int("dwellMinDbm", SongTapTuning.dwellMinDbm)
+                    $0.long("freezeMaxMs", SongTapTuning.freezeMaxMs); $0.long("gapResetMs", SongTapTuning.gapResetMs)
+                    $0.long("jerkDebounceMs", SongTapTuning.jerkDebounceMs)
                 })
             case "glow":
                 let permille = SongTapDetector.glowPermille(Self.int(c.input, "fastQ"))
@@ -321,18 +345,21 @@ struct SongTapGoldenTests {
                 report.record(c, false)
             }
         }
-        #expect(report.counts["detector"] ?? 0 >= 70)
-        report.verify(atLeast: 80)
+        #expect(report.counts["detector"] ?? 0 >= 170)
+        #expect(report.counts["tuning"] == 2)
+        #expect(report.counts["gates"] == 1)
+        report.verify(atLeast: 180)
     }
 
     @Test func impulseTraces() throws {
         var report = Report(file: "impulse.jsonl")
         for c in try Self.cases("impulse.jsonl") {
+            let profile = Self.profile(c.input)
             var state = SongTapImpulseState.initial
             var hits: [Int] = []
             for sample in Self.strings(c.input, "samples") {
                 let p = sample.split(separator: ",").map { Int64($0) ?? 0 }
-                let step = SongTapImpulse.step(state, SongTapAccelSample(tMs: p[0], xMg: Int(p[1]), yMg: Int(p[2]), zMg: Int(p[3])))
+                let step = SongTapImpulse.step(state, SongTapAccelSample(tMs: p[0], xMg: Int(p[1]), yMg: Int(p[2]), zMg: Int(p[3])), profile: profile)
                 state = step.state
                 hits.append(step.impulse ? 1 : 0)
             }
@@ -342,8 +369,86 @@ struct SongTapGoldenTests {
                 w.endArray()
             })
         }
-        report.verify(atLeast: 45)
+        report.verify(atLeast: 90)
     }
+
+    /// peertap.jsonl (spec 6): the verdict of one tap message from the other phone.
+    @Test func peerTapVerdicts() throws {
+        var report = Report(file: "peertap.jsonl")
+        for c in try Self.cases("peertap.jsonl") {
+            switch c.fn {
+            case "constants":
+                report.record(c, c.matches { $0.int("minDbm", SongTapTuning.nearEnterDbm); $0.long("minGapMs", SongTapPeerTap.minGapMs) })
+            case "peerTap":
+                let verdict = SongTapPeerTap.judge(ownFastDbm: Self.int(c.input, "dbm"), followed: Self.bool(c.input, "followed"),
+                                                   saidYes: Self.bool(c.input, "yes"), nowMs: Self.long(c.input, "now"),
+                                                   lastTapMs: Self.long(c.input, "last"))
+                report.record(c, c.matches { $0.string("verdict", verdict.code) })
+            default:
+                report.record(c, false)
+            }
+        }
+        #expect(report.counts["peerTap"] == 128)
+        report.verify(atLeast: 129)
+    }
+
+    // MARK: names.jsonl, nearby.jsonl (spec 5)
+
+    @Test func nameRules() throws {
+        var report = Report(file: "names.jsonl")
+        for c in try Self.cases("names.jsonl") {
+            let name = Self.string(c.input, "name")
+            switch c.fn {
+            case "clean": report.record(c, c.matches { $0.string("name", SongTapNames.clean(name)) })
+            case "orFallback": report.record(c, c.matches { $0.string("name", SongTapNames.orFallback(name)) })
+            case "advertName": report.record(c, c.matches { $0.string("name", SongTapNames.advertName(name)) })
+            case "isValid":
+                // A Swift String cannot hold a lone surrogate: the parser turns it into U+FFFD, which is itself a clean character, so
+                // the name reads as valid here. Android sees the raw lone surrogate, which `clean` replaces, so it says false.
+                let loneSurrogate = c.line.range(of: #"\\ud[89ab][0-9a-f]{2}(?!\\ud[c-f][0-9a-f]{2})|(?<!\\ud[89ab][0-9a-f]{2})\\ud[c-f][0-9a-f]{2}"#,
+                                                 options: .regularExpression) != nil
+                let valid = loneSurrogate ? false : SongTapNames.isValid(name)
+                report.record(c, c.matches { $0.bool("valid", valid) })
+            case "fromAdvert": report.record(c, c.matches { Self.writeOptional(&$0, "name", SongTapNames.fromAdvert(name)) })
+            default: report.record(c, false)
+            }
+        }
+        report.verify(atLeast: 130)
+    }
+
+    @Test func nearbyBookScripts() throws {
+        var report = Report(file: "nearby.jsonl")
+        for c in try Self.cases("nearby.jsonl") {
+            var book = SongTapNearbyBook()
+            var results: [String] = []
+            func roleOf(_ x: String) -> SongTapRole { x == "send" ? .send : .receive }
+            for op in Self.strings(c.input, "ops") {
+                let f = op.split(separator: ",", omittingEmptySubsequences: false).map(String.init)
+                switch f[0] {
+                case "u":
+                    book.update(id: Int(f[1]) ?? 0, name: f[2], role: roleOf(f[3]), fastQ: Int(f[4]) ?? 0, near: f[5] == "1", nowMs: Int64(f[6]) ?? 0)
+                    results.append("-")
+                case "r": book.remove(Int(f[1]) ?? 0); results.append("-")
+                case "c": book.clear(); results.append("-")
+                case "i": book.ignore(Int(f[1]) ?? 0, nowMs: Int64(f[2]) ?? 0); results.append("-")
+                case "v":
+                    let rows = book.visible(role: roleOf(f[1]), nowMs: Int64(f[2]) ?? 0)
+                    results.append("[" + rows.map { "\($0.id):\($0.name):\($0.dbm):\($0.near ? 1 : 0)" }.joined(separator: "|") + "]")
+                default:
+                    let prompt = book.promptFor(role: roleOf(f[1]), nowMs: Int64(f[2]) ?? 0)
+                    results.append(prompt.map { String($0.id) } ?? "-")
+                }
+            }
+            report.record(c, c.matches { w in
+                w.beginArray("results")
+                for r in results { w.stringItem(r) }
+                w.endArray()
+            })
+        }
+        report.verify(atLeast: 53)
+    }
+
+    // MARK: ratelimit.jsonl
 
     @Test func rateLimitScripts() throws {
         var report = Report(file: "ratelimit.jsonl")
@@ -416,19 +521,21 @@ struct SongTapGoldenTests {
     @Test func handshakeClock() throws {
         var report = Report(file: "handshake.jsonl")
         for c in try Self.cases("handshake.jsonl") {
-            let ms: Int64
             switch c.fn {
-            case "senderStart": ms = SongTapHandshake.senderStartMs(Self.long(c.input, "now"))
-            case "receiverStart": ms = SongTapHandshake.receiverStartMs(receiptMs: Self.long(c.input, "receipt"), rttMs: Self.long(c.input, "rtt"))
-            case "impulseAge": ms = SongTapHandshake.impulseAgeMs(nowMs: Self.long(c.input, "now"), impulseMs: Self.long(c.input, "impulse"))
+            case "constants":
+                report.record(c, c.matches { $0.long("goDelay", SongTapHandshake.goDelayMs); $0.long("maxRtt", SongTapHandshake.maxRttMs) })
+            case "impulseAge":
+                let ms = SongTapHandshake.impulseAgeMs(nowMs: Self.long(c.input, "now"), impulseMs: Self.long(c.input, "impulse"))
+                report.record(c, c.matches { $0.long("ms", ms) })
             case "peerImpulse":
-                ms = SongTapHandshake.peerImpulseLocalMs(receiptMs: Self.long(c.input, "receipt"), ageMs: Self.long(c.input, "age"),
-                                                         rttMs: Self.long(c.input, "rtt"))
-            default: report.record(c, false); continue
+                let ms = SongTapHandshake.peerImpulseLocalMs(receiptMs: Self.long(c.input, "receipt"), ageMs: Self.long(c.input, "age"),
+                                                             rttMs: Self.long(c.input, "rtt"))
+                report.record(c, c.matches { $0.long("ms", ms) })
+            default:
+                report.record(c, false)
             }
-            report.record(c, c.matches { $0.long("ms", ms) })
         }
-        report.verify(atLeast: 20)
+        report.verify(atLeast: 11)
     }
 
     // MARK: wire.jsonl
@@ -443,7 +550,11 @@ struct SongTapGoldenTests {
                     $0.string("sendService", SongTapWire.serviceSend); $0.string("receiveService", SongTapWire.serviceReceive)
                     $0.string("info", SongTapWire.charInfo); $0.string("offer", SongTapWire.charOffer)
                     $0.string("control", SongTapWire.charControl); $0.string("event", SongTapWire.charEvent)
+                    $0.string("name", SongTapWire.charName)
                     $0.int("notReady", SongTapWire.errorNotReady); $0.int("mtu", SongTapWire.wantedMtu)
+                    $0.int("eventGo", SongTapWire.eventGo); $0.int("eventOfferReady", SongTapWire.eventOfferReady)
+                    $0.int("eventOfferWithdrawn", SongTapWire.eventOfferWithdrawn); $0.int("eventTap", SongTapWire.eventTap)
+                    $0.int("advertCompanyId", SongTapWire.advertCompanyId); $0.int("advertVersion", SongTapWire.advertVersion)
                 })
             case "infoEncode":
                 let out = SongTapWire.encodeInfo(ageMs: Self.long(c.input, "age"))
@@ -477,6 +588,33 @@ struct SongTapGoldenTests {
             case "isGo":
                 let go = SongTapWire.isGo(Self.bytes(hex))
                 report.record(c, c.matches { $0.bool("go", go) })
+            case "offerReadyEncode":
+                report.record(c, c.matches { Self.writeHex(&$0, "hex", SongTapWire.encodeOfferReady()) })
+            case "offerWithdrawnEncode":
+                report.record(c, c.matches { Self.writeHex(&$0, "hex", SongTapWire.encodeOfferWithdrawn()) })
+            case "tapEventEncode":
+                report.record(c, c.matches { Self.writeHex(&$0, "hex", SongTapWire.encodeTapEvent()) })
+            case "isOfferReady":
+                let v = SongTapWire.isOfferReady(Self.bytes(hex))
+                report.record(c, c.matches { $0.bool("offerReady", v) })
+            case "isOfferWithdrawn":
+                let v = SongTapWire.isOfferWithdrawn(Self.bytes(hex))
+                report.record(c, c.matches { $0.bool("withdrawn", v) })
+            case "isTapEvent":
+                let v = SongTapWire.isTapEvent(Self.bytes(hex))
+                report.record(c, c.matches { $0.bool("tapEvent", v) })
+            case "nameEncode":
+                let out = SongTapWire.encodeName(Self.string(c.input, "name"))
+                report.record(c, c.matches { Self.writeHex(&$0, "hex", out) })
+            case "advertEncode":
+                let out = SongTapWire.encodeAdvertName(Self.string(c.input, "name"))
+                report.record(c, c.matches { Self.writeHex(&$0, "hex", out) })
+            case "nameDecode":
+                let out = SongTapWire.decodeName(Self.bytes(hex))
+                report.record(c, c.matches { Self.writeOptional(&$0, "name", out) })
+            case "advertDecode":
+                let out = SongTapWire.decodeAdvertName(Self.bytes(hex))
+                report.record(c, c.matches { Self.writeOptional(&$0, "name", out) })
             case "roleOfService":
                 let role = SongTapWire.roleOfService(Self.string(c.input, "uuid"))
                 report.record(c, c.matches { Self.writeOptional(&$0, "role", role?.rawValue) })
@@ -486,14 +624,18 @@ struct SongTapGoldenTests {
         }
         #expect(report.counts["infoEncode"] ?? 0 >= 8)
         #expect(report.counts["controlDecode"] ?? 0 >= 17)
-        report.verify(atLeast: 50)
+        #expect(report.counts["nameEncode"] ?? 0 >= 26)
+        #expect(report.counts["advertDecode"] ?? 0 >= 10)
+        report.verify(atLeast: 149)
     }
 
     // MARK: The folder itself
 
     @Test func theManifestListsEveryFileWithItsHash() throws {
         let manifest = try Self.lines("MANIFEST.sha256")
-        #expect(manifest.count == 12)
+        // The Android folder also carries the Pixl ring code's four files (another port's goldens); they are copied so the manifest
+        // is the one Android generated and every hash in it can be checked.
+        #expect(manifest.count == 19)
         var names: [String] = []
         for entry in manifest {
             let hash = String(entry.prefix(64))
@@ -502,8 +644,20 @@ struct SongTapGoldenTests {
             let digest = TestSHA256.hex(Array(try Self.fixtureData(name)))
             #expect(digest == hash, "\(name) is not the file Android generated (was it edited, or re-encoded with CRLF?)")
         }
-        #expect(Set(names) == ["payload.jsonl", "link.jsonl", "signing.jsonl", "session.jsonl", "detector.jsonl", "impulse.jsonl",
-                               "ratelimit.jsonl", "timeline.jsonl", "haptics.jsonl", "handshake.jsonl", "wire.jsonl", "README.md"])
+        #expect(Set(names) == ["payload.jsonl", "link.jsonl", "signing.jsonl", "session.jsonl", "detector.jsonl", "names.jsonl", "nearby.jsonl",
+                               "impulse.jsonl", "peertap.jsonl", "ratelimit.jsonl", "timeline.jsonl", "haptics.jsonl", "handshake.jsonl",
+                               "wire.jsonl", "ring-layout.jsonl", "ring-rs.jsonl", "ring-payload.jsonl", "ring-timeline.jsonl", "README.md"])
+    }
+
+    /// The spec 6 helper for an advertisement: the Song Tap manufacturer block (company id little endian, then version and name) wins over the
+    /// local name; either goes through the same cleaning.
+    @Test func advertisedNameFromManufacturerBlockOrLocalName() {
+        let block = [UInt8(0xFF), 0xFF] + SongTapWire.encodeAdvertName("Hoa's Pixel")
+        #expect(SongTapWire.advertisedName(manufacturerData: block, localName: "Other") == "Hoa's Pixel")
+        #expect(SongTapWire.advertisedName(manufacturerData: nil, localName: "  Ann   B ") == "Ann B")
+        #expect(SongTapWire.advertisedName(manufacturerData: [0x4C, 0x00, 0x01, 0x41], localName: "Zed") == "Zed")
+        #expect(SongTapWire.advertisedName(manufacturerData: [0xFF, 0xFF, 0x02, 0x41], localName: nil) == nil)
+        #expect(SongTapWire.advertisedName(manufacturerData: [0xFF, 0xFF], localName: "") == nil)
     }
 
     @Test func theSpecVersionFileIsTheCodesVersion() throws {
