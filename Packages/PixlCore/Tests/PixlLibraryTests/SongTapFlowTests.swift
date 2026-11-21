@@ -301,6 +301,41 @@ struct SongTapFlowTests {
         #expect(engine.session.phase == .cancelled)
     }
 
+    @MainActor @Test func aCodeScannedWhileACardWaitsForAddDoesNotReplaceTheCardOrWhatUndoRemoves() {
+        let port = FakePort()
+        let engine = Self.engine(port)
+        engine.arm(.receive, askFirst: true)
+        engine.scanned(Self.link(for: Self.offerPayload(at: port.now)))
+        #expect(engine.session.phase == .offered)
+        let other = SongTapPayloads.make(nowMs: port.now, ytVideoId: "aaaaaaaaaaa", spotifyId: nil, isrc: nil, title: "Another song",
+                                         artist: "Someone", durationMs: 200_000, artUrl: nil)!
+        engine.scanned(Self.link(for: other))
+        #expect(engine.ui.card?.title == "Never Gonna Give You Up", "the card still shows the song that waits for Add")
+        engine.accept()
+        #expect(port.saved.count == 1 && port.saved[0].songKey == "dQw4w9WgXcQ", "Add saves the song the card showed")
+        engine.saveFinished(.saved(SongTapCard(videoId: "dQw4w9WgXcQ", songId: "id", title: "t", artist: "a", artUrl: nil)), for: port.saved[0])
+        engine.undo()
+        #expect(port.log.filter { $0.hasPrefix("undo:") } == ["undo:dQw4w9WgXcQ"])
+    }
+
+    @MainActor @Test func overBluetoothTheSenderIsToldAfterTheSaveAndTheUndoWindowWaitsForTheBeam() {
+        let port = FakePort()
+        let engine = Self.engine(port)
+        engine.arm(.receive, askFirst: false)
+        engine.handle(.peerFound(1))
+        engine.handle(.peerNear(1))
+        engine.handle(.tap(peer: 1))
+        engine.handle(.offer(peer: 1, payload: SongTapPayloads.encode(Self.offerPayload(at: port.now))!, senderKey: 7))
+        #expect(engine.session.phase == .transferring)
+        #expect(!port.log.contains("ack:1"), "not before the save is done")
+        engine.saveFinished(.saved(SongTapCard(videoId: "dQw4w9WgXcQ", songId: "id", title: "t", artist: "a", artUrl: nil)), for: port.saved[0])
+        #expect(port.log.contains("ack:1"))
+        #expect(port.log.contains("dismissIn:\(SongTapEngine.goGraceMs + SongTapSession.undoWindowMs)"))
+        engine.handle(.go(peer: 1, rttMs: 40))
+        #expect(engine.ui.beamRole == .receive)
+        #expect(port.log.last { $0 == "cancelDismiss" || $0.hasPrefix("dismissIn:") } == "cancelDismiss", "the beam owns the end now")
+    }
+
     @MainActor @Test func theSenderShowsACodeAndTakesItDownWhenDone() throws {
         let port = FakePort()
         let engine = Self.engine(port)

@@ -74,7 +74,7 @@ public enum SongTapTimeline {
     public static let offTop = -1_100
     private static let glowPeak = 500
     private static let glowRiseMs: Int64 = 150
-    private static let glowFallEndMs: Int64 = 1_300
+    public static let glowFallEndMs: Int64 = 1_300
 
     // MARK: Easing, all permille in and out
 

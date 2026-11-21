@@ -136,6 +136,8 @@ public final class SongTapEngine {
     public static let qrRefreshMs: Int64 = 240_000
     /// The same code seen again within this long is the same beam.
     public static let sameScanMs: Int64 = 10_000
+    /// After a save over Bluetooth, how long to wait for the sender's go before the Undo window starts without a beam.
+    public static let goGraceMs: Int64 = 3_000
 
     public weak var port: (any SongTapPort)?
 
@@ -145,12 +147,17 @@ public final class SongTapEngine {
     }
 
     private var pendingOffer: SongTapPayload?
+    /// The offer the session accepted and is acting on (set only when the session took it, never by a mere arrival).
     private var incoming: SongTapPayload?
+    /// An offer that has arrived and is being put to the session: it becomes `incoming` only if the session takes it.
+    private var candidate: SongTapPayload?
     private var lastScanText: String?
     private var lastScanAtMs: Int64 = 0
     private var dismissPending = false
     /// The video the last save put in the library (a song that came without one was matched to a video first).
     private var savedVideoId: String?
+    /// The song key the save that produced `savedVideoId` was for.
+    private var savedKey = ""
     private var dispatching = false
     private var queued: [SongTapSessionEvent] = []
 
@@ -278,8 +285,9 @@ public final class SongTapEngine {
             let window = peer == 0 ? SongTapSigning.qrWindowMs : SongTapSigning.offerWindowMs
             if case .ok(let payload) = SongTapPayloads.decode(bytes),
                SongTapSigning.isFresh(tsMs: payload.ts, nowMs: now(), windowMs: window) {
-                incoming = payload
-                ui.card = Self.card(of: payload)
+                // Written down only once the session has taken it (see `step`): an offer it ignored (one already being asked
+                // about, or being saved) must not replace the card or the song that Undo would remove.
+                candidate = payload
                 dispatch(.offerReceived(peer: peer, videoId: payload.songKey, senderKey: senderKey, nowMs: now()))
             } else {
                 dispatch(.offerRejected)
@@ -299,6 +307,7 @@ public final class SongTapEngine {
         case .saved(let card):
             if !stillWanted { port?.undoSave(videoId: card.videoId); return }
             savedVideoId = card.videoId
+            savedKey = payload.songKey
             ui.card = card
             dispatch(.saveResult(.saved, nowMs: now()))
         case .alreadyHad(let card):
@@ -326,8 +335,18 @@ public final class SongTapEngine {
 
     private func step(_ event: SongTapSessionEvent) {
         let before = session.phase
+        let previous = session
         let r = SongTapSession.reduce(session, event)
         session = r.state
+        if case .offerReceived(_, let videoId, _, _) = event {
+            let offered = candidate
+            candidate = nil
+            if let offered, offered.songKey == videoId, previous.videoId != videoId, session.videoId == videoId,
+               session.phase == .offered || session.phase == .transferring {
+                incoming = offered
+                ui.card = Self.card(of: offered)
+            }
+        }
         updateUi(after: event)
         for effect in r.effects { perform(effect) }
         // A code is up only while an offer is on the table.
@@ -379,6 +398,8 @@ public final class SongTapEngine {
         case .sendDecline(let peer): port.sendDecline(peer: peer)
         case .abortTransfer(let peer): port.abortTransfer(peer: peer)
         case .startBeam(let role, let startMs):
+            // From here the beam owns the end of the result (the receiver's card goes with the beam's own end).
+            if dismissPending { dismissPending = false; port.cancelDismiss() }
             let reduced = port.reducedMotion()
             ui.beamStartMs = startMs
             ui.beamRole = role
@@ -387,10 +408,13 @@ public final class SongTapEngine {
             port.scheduleBeamEnd(afterMs: max(0, end))
         case .saveSong:
             savedVideoId = nil
+            savedKey = ""
             if let payload = incoming { port.save(payload) }
         case .undoSave(let songKey):
             port.cancelSave()
-            let videoId = savedVideoId ?? ui.card.map(\.videoId).flatMap { $0.isEmpty ? nil : $0 } ?? incoming?.ytVideoId ?? songKey
+            // What this session's save added, by the session's own song key; never whatever the card happens to show.
+            let videoId = savedVideoId.flatMap { savedKey == songKey && !$0.isEmpty ? $0 : nil }
+                ?? incoming.flatMap { $0.songKey == songKey ? $0.ytVideoId : nil } ?? songKey
             port.undoSave(videoId: videoId)
         case .haptic(let cue):
             // A beam (playing, or about to: any phone found over Bluetooth) does its own vibrating from the timeline's cue
@@ -417,7 +441,11 @@ public final class SongTapEngine {
         // A saved card that came with a beam is put away by the beam's own end (its Undo chip lives inside it).
         if phase == .saved && ui.beamRole == .receive { return }
         dismissPending = true
-        port?.scheduleDismiss(afterMs: phase == .saved ? SongTapSession.undoWindowMs : Self.resultMs)
+        // Over Bluetooth the receiver saves first and the sender's go (which starts the beam) arrives a moment later: the Undo
+        // window must not begin before the beam does, or the card would be taken away in the middle of it.
+        let waitForBeam = phase == .saved && session.role == .receive && session.peer != 0
+        let stay = phase == .saved ? SongTapSession.undoWindowMs : Self.resultMs
+        port?.scheduleDismiss(afterMs: waitForBeam ? Self.goGraceMs + stay : stay)
     }
 
     private func cancelJobs() {
