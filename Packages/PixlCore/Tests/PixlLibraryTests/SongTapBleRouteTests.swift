@@ -293,7 +293,9 @@ struct SongTapBleRouteTests {
     @Test func ackAndDeclineFromTheReceiverReachTheSessionAndGoIsSentToThatReceiver() {
         let rig = Self.sender()
         let peer = rig.founds.last!
+        rig.route.publishOffer(peer: 0, payload: Self.payloadBytes)
         _ = rig.route.serverControl(client: "c", value: SongTapWire.encodeHello(challenge: [UInt8](repeating: 0, count: 16))!)
+        #expect(rig.route.serverOffer(client: "c") != nil)
         _ = rig.route.serverControl(client: "c", value: SongTapWire.encodeAck())
         #expect(rig.acks == [peer])
         rig.route.sendGo(peer: peer, startMs: 5)
@@ -336,8 +338,117 @@ struct SongTapBleRouteTests {
 
         _ = rig.route.serverControl(client: "c", value: SongTapWire.encodeHello(challenge: [UInt8](repeating: 0, count: 16))!)
         rig.route.publishOffer(peer: 0, payload: Self.payloadBytes)
+        _ = rig.route.serverControl(client: "bystander", value: SongTapWire.encodeHello(challenge: [UInt8](repeating: 9, count: 16))!)
+        rig.route.serverClientGone(client: "bystander")
+        #expect(rig.losts.isEmpty, "a phone that never read the offer leaving is nothing")
+        #expect(rig.route.serverOffer(client: "c") != nil)
         rig.route.serverClientGone(client: "c")
         #expect(rig.losts.count == 1)
+    }
+
+    @Test func ackDeclineAndGoBelongToThePhoneThatReadTheOfferAndNobodyElse() {
+        let rig = Self.sender()
+        let peer = rig.founds.last!
+        rig.route.publishOffer(peer: 0, payload: Self.payloadBytes)
+        _ = rig.route.serverControl(client: "reader", value: SongTapWire.encodeHello(challenge: [UInt8](repeating: 1, count: 16))!)
+        _ = rig.route.serverControl(client: "stranger", value: SongTapWire.encodeHello(challenge: [UInt8](repeating: 2, count: 16))!)
+        #expect(rig.route.serverOffer(client: "reader") != nil)
+        // Once somebody has read it, nobody else is given it, and nobody else can answer for it.
+        #expect(rig.route.serverOffer(client: "stranger") == nil)
+        _ = rig.route.serverControl(client: "stranger", value: SongTapWire.encodeAck())
+        _ = rig.route.serverControl(client: "stranger", value: SongTapWire.encodeDecline())
+        #expect(rig.acks.isEmpty)
+        #expect(rig.declines.isEmpty)
+        rig.route.sendGo(peer: peer, startMs: 0)
+        #expect(rig.radio.goNotifications.isEmpty)
+        _ = rig.route.serverControl(client: "reader", value: SongTapWire.encodeAck())
+        #expect(rig.acks.count == 1)
+        rig.route.sendGo(peer: peer, startMs: 0)
+        #expect(rig.radio.goNotifications == ["reader"])
+    }
+
+    @Test func aLateAckFromTheLastOffersReceiverIsNotAnAckForTheNextOffer() {
+        let rig = Self.sender()
+        rig.route.publishOffer(peer: 0, payload: Self.payloadBytes)
+        _ = rig.route.serverControl(client: "first", value: SongTapWire.encodeHello(challenge: [UInt8](repeating: 1, count: 16))!)
+        #expect(rig.route.serverOffer(client: "first") != nil)
+        rig.route.withdrawOffer() // timed out
+        rig.route.publishOffer(peer: 0, payload: Self.payloadBytes)
+        _ = rig.route.serverControl(client: "first", value: SongTapWire.encodeAck())
+        #expect(rig.acks.isEmpty)
+        _ = rig.route.serverControl(client: "second", value: SongTapWire.encodeHello(challenge: [UInt8](repeating: 3, count: 16))!)
+        #expect(rig.route.serverOffer(client: "second") != nil)
+        _ = rig.route.serverControl(client: "second", value: SongTapWire.encodeAck())
+        #expect(rig.acks.count == 1)
+    }
+
+    @Test func whenAPhoneToldTheSenderItTappedOnlyThatPhoneIsGivenTheOffer() {
+        let rig = Self.sender()
+        rig.touch("R", .receive, samples: 3)
+        _ = rig.route.serverControl(client: "tapper", value: SongTapWire.encodeTap(ageMs: 30))
+        #expect(!rig.taps.isEmpty)
+        rig.route.publishOffer(peer: 0, payload: Self.payloadBytes)
+        _ = rig.route.serverControl(client: "tapper", value: SongTapWire.encodeHello(challenge: [UInt8](repeating: 1, count: 16))!)
+        _ = rig.route.serverControl(client: "other", value: SongTapWire.encodeHello(challenge: [UInt8](repeating: 2, count: 16))!)
+        #expect(rig.route.serverOffer(client: "other") == nil)
+        #expect(rig.route.serverOffer(client: "tapper") != nil)
+    }
+
+    @Test func anotherPhonesJumpDoesNotMakeAReceiversTapMessageCount() {
+        let rig = BleRig()
+        rig.route.start(role: .send)
+        rig.settle("R", .receive, rssi: -62)
+        rig.settle("Q", .receive, rssi: -90)
+        rig.touch("Q", .receive, rssi: -66, samples: 4) // Q jumps; R, the phone being followed, does not
+        _ = rig.route.serverControl(client: "c", value: SongTapWire.encodeTap(ageMs: 30))
+        #expect(rig.taps.isEmpty)
+    }
+
+    @Test func aJerkTheOtherPhoneClaimsShortensTheHoldOnlyWhenItIsClose() {
+        let close = BleRig()
+        close.route.start(role: .receive)
+        close.settle("S", .send, rssi: -62)
+        close.listener.onConnected(address: "S", ok: true)
+        close.touch("S", .send, rssi: -40, samples: 2)
+        close.listener.onInfoRead(address: "S", value: SongTapWire.encodeInfo(ageMs: 0))
+        close.touch("S", .send, rssi: -40, samples: 2)
+        #expect(close.taps.count == 1, "200 ms into the jump, the dwell is 400")
+
+        let far = BleRig()
+        far.route.start(role: .receive)
+        far.settle("S", .send, rssi: -90)
+        far.listener.onConnected(address: "S", ok: true)
+        far.touch("S", .send, rssi: -66, samples: 2)
+        far.listener.onInfoRead(address: "S", value: SongTapWire.encodeInfo(ageMs: 0))
+        far.touch("S", .send, rssi: -66, samples: 4)
+        #expect(far.taps.isEmpty)
+    }
+
+    @Test func aFloodOfMadeUpAddressesIsBoundedAndForgotten() {
+        let rig = BleRig()
+        rig.route.start(role: .receive)
+        rig.settle("S", .send, rssi: -62)
+        for i in 0..<(SongTapBleTuning.maxPeers * 3) {
+            rig.see("fake\(i)", .send, -90)
+            if i % 5 == 0 { rig.see("S", .send, -62) } // the phone being followed keeps being heard
+        }
+        #expect(rig.radio.count("forget:") >= SongTapBleTuning.maxPeers * 2 - 1)
+        #expect(rig.route.glow > 0, "the phone being followed is never pushed out")
+    }
+
+    @Test func aConnectionThatNeverComesUpIsGivenUpAndAnOfferStillWaitingFailsTheBeam() {
+        let rig = BleRig()
+        rig.route.start(role: .receive)
+        rig.settle("S", .send, rssi: -60)
+        let peer = rig.founds.last!
+        #expect(rig.radio.calls.contains("connect:S"))
+        rig.route.readOffer(peer: peer)
+        for _ in 0..<40 {
+            rig.see("S", .send, -60) // the phone keeps advertising but never answers the connection
+            rig.scheduler.pump()
+        }
+        #expect(rig.radio.calls.contains("disconnect:S"))
+        #expect(rig.losts.contains(peer))
     }
 
     @Test func aFrameThatWouldNotFitOneAttributeIsSentWithoutItsArt() throws {

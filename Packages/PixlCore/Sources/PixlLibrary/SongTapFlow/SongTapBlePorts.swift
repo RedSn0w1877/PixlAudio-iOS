@@ -69,6 +69,13 @@ public protocol SongTapBleRadio: AnyObject {
     func notifyGo(client: String)
     /// Server: drop a client.
     func dropClient(client: String)
+    /// The route no longer tracks the phone at `address`: let go of whatever the radio keeps for it (a scan result is an
+    /// object per address, and a flood of made-up addresses must not pile up).
+    func forget(address: String)
+}
+
+public extension SongTapBleRadio {
+    func forget(address: String) {}
 }
 
 /// The two clocks Song Tap uses: a monotonic one for signal and motion timing, the wall clock for signed offers.

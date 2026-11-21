@@ -28,8 +28,17 @@ public enum SongTapBleTuning {
     /// The sender may not have its offer ready when the receiver first reads it; ask again this often.
     public static let readRetryMs: Int64 = 250
     public static let maxReadAttempts = 10
-    /// A sender takes a receiver's tap message as a tap when its own detector saw the signal jump within this long.
+    /// A sender takes a receiver's tap message as a tap when its own detector saw that receiver's signal jump within this long.
     public static let peerTapJumpWindowMs: Int64 = 1_500
+    /// A jerk the other phone reports only counts when its signal is at least this strong. The other phone's word cannot be
+    /// checked (anything that advertises our service can claim it was jerked just now), so it may shorten the hold only for a
+    /// phone that is close, never for one that is merely in the room.
+    public static let peerImpulseMinDbm = -62
+    /// At most this many phones are tracked at once; a flood of made-up addresses pushes out the one heard longest ago (never
+    /// the one being followed).
+    public static let maxPeers = 24
+    /// A connection that has not come up in this long is given up (the phone may still be advertising but not answering).
+    public static let connectTimeoutMs: Int64 = 3_000
     /// A signed frame is the payload plus this many bytes (see `SongTapSigning.encodeFrame`).
     public static let frameOverheadBytes = 142
 }
@@ -75,6 +84,8 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
         var inTransfer = false
         var lastFire = SongTapFireReason.none
         var lastFireMs: Int64 = -1
+        var lastJumpMs: Int64 = -1
+        var connectStartedMs: Int64 = 0
 
         init(id: Int, address: String) {
             self.id = id
@@ -99,13 +110,15 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
     private var byId: [Int: Peer] = [:]
     private var focus: Peer?
     private var ownImpulseMs: Int64 = -1
-    private var lastJumpAnyMs: Int64 = -1
 
-    // The sender's side.
+    // The sender's side. Three separate facts about who is talking to our GATT server, because a control write is only
+    // believed from the phone it is about: `tapClient` wrote the tap message, `offerClient` read the offer, `ackClient`
+    // acknowledged it. An acknowledgement or a decline from any other connection is ignored, and Go goes to `ackClient`.
     private var signer: (any SongTapSignerPort)?
     private var offer: [UInt8]?
     private var challenges: [String: [UInt8]] = [:]
-    private var lastClient: String?
+    private var tapClient: String?
+    private var offerClient: String?
     private var ackClient: String?
 
     // Events wait here until the call that raised them is over.
@@ -212,10 +225,10 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
         signer = nil
         offer = nil
         challenges.removeAll()
-        lastClient = nil
+        tapClient = nil
+        offerClient = nil
         ackClient = nil
         ownImpulseMs = -1
-        lastJumpAnyMs = -1
         setGlow(0)
         setStatus(.idle)
     }
@@ -226,11 +239,17 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
         defer { drain() }
         if !started || role != .send { return }
         offer = fit(payload)
+        // A new offer starts with nobody having read or acknowledged it: a late answer to the last one is not an answer to this.
+        offerClient = nil
+        ackClient = nil
         diag.log(clock.elapsedMs(), offer == nil ? "offer does not fit one frame" : "offer ready (\(payload.count) bytes)")
     }
 
     public func withdrawOffer() {
         offer = nil
+        offerClient = nil
+        ackClient = nil
+        tapClient = nil
     }
 
     /// A signed frame has to fit one attribute: drop the optional parts, art first, until it does.
@@ -252,7 +271,7 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
 
     public func sendGo(peer: Int, startMs: Int64) {
         defer { drain() }
-        guard let client = ackClient ?? lastClient else { return }
+        guard let client = ackClient else { return }
         radio.notifyGo(client: client)
         diag.log(clock.elapsedMs(), "go sent")
     }
@@ -265,13 +284,18 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
 
     public func serverOffer(client: String) -> [UInt8]? {
         if !started || role != .send { return nil }
-        guard let payload = offer, let challenge = challenges[client], let key = signer else { return nil }
+        guard let payload = offer else { return nil }
+        // Only the phone that tapped (and, once somebody has read it, only that reader) is given the offer.
+        if let taker = tapClient, taker != client { return nil }
+        if let reader = offerClient, reader != client { return nil }
+        guard let challenge = challenges[client], let key = signer else { return nil }
         let ts = clock.wallMs()
         guard let message = SongTapSigning.signingBytes(payload: payload, challenge: challenge, timestampMs: ts),
               let signature = key.sign(message) else { return nil }
         let frame = SongTapSigning.encodeFrame(SongTapSignedOffer(payload: payload, timestampMs: ts, publicKey: key.publicKey, signature: signature))
         // A challenge answers one read: the receiver sends a new one for the next beam.
         challenges[client] = nil
+        if frame != nil { offerClient = client }
         diag.log(clock.elapsedMs(), frame == nil ? "frame too big" : "offer read by a receiver (\(frame?.count ?? 0) bytes)")
         return frame
     }
@@ -284,20 +308,30 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
         switch message {
         case .hello(let challenge):
             challenges[client] = challenge
-            lastClient = client
         case .ack:
-            ackClient = client
-            lastClient = client
-            diag.log(t, "ack from receiver")
-            if let f = focus { emit(.ack(peer: f.id)) }
+            if offer == nil || client != offerClient {
+                diag.log(t, "ack from a phone that did not read the offer, ignored")
+            } else {
+                ackClient = client
+                diag.log(t, "ack from receiver")
+                if let f = focus { emit(.ack(peer: f.id)) }
+            }
         case .decline:
-            diag.log(t, "declined by receiver")
-            if let f = focus { emit(.declined(peer: f.id)) }
+            if offer == nil || client != offerClient {
+                diag.log(t, "decline from a phone that did not read the offer, ignored")
+            } else {
+                diag.log(t, "declined by receiver")
+                if let f = focus { emit(.declined(peer: f.id)) }
+            }
         case .tap(let ageMs):
-            lastClient = client
-            let sawJump = lastJumpAnyMs >= 0 && t - lastJumpAnyMs <= SongTapBleTuning.peerTapJumpWindowMs
+            // The tap is believed when this phone saw the signal of the phone it is following jump just now.
+            let f = focus
+            let sawJump = f != nil && f!.lastJumpMs >= 0 && t - f!.lastJumpMs <= SongTapBleTuning.peerTapJumpWindowMs
             diag.log(t, "receiver reports a tap (jerk \(ageMs) ms ago), own jump \(sawJump ? "seen" : "not seen")")
-            if let f = focus, f.role == .receive, sawJump { emit(.tap(peer: f.id)) }
+            if let f, f.role == .receive, sawJump, offer == nil {
+                tapClient = client
+                emit(.tap(peer: f.id))
+            }
         }
         return true
     }
@@ -305,9 +339,10 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
     public func serverClientGone(client: String) {
         defer { drain() }
         challenges[client] = nil
-        let had = ackClient == client || lastClient == client
+        let had = ackClient == client || offerClient == client
         if ackClient == client { ackClient = nil }
-        if lastClient == client { lastClient = nil }
+        if offerClient == client { offerClient = nil }
+        if tapClient == client { tapClient = nil }
         // A receiver leaving in the middle of a beam is a lost peer; leaving afterwards is nothing.
         if had && offer != nil, let f = focus { emit(.peerLost(f.id)) }
     }
@@ -352,7 +387,7 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
     public func abort(peer: Int) {
         defer { drain() }
         if role == .send {
-            if let c = ackClient { radio.dropClient(client: c) }
+            if let c = ackClient ?? offerClient { radio.dropClient(client: c) }
             return
         }
         guard let p = byId[peer] else { return }
@@ -383,6 +418,7 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
 
     private func connect(_ p: Peer, _ t: Int64) {
         p.conn = .connecting
+        p.connectStartedMs = t
         radio.connect(address: p.address)
         diag.log(t, "connecting to #\(p.id)")
     }
@@ -514,7 +550,8 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
         offer = nil
         challenges.removeAll()
         ackClient = nil
-        lastClient = nil
+        offerClient = nil
+        tapClient = nil
         setGlow(0)
         ticking = false
         scheduler.stopTicking()
@@ -533,6 +570,7 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
         if let known = peers[address] {
             p = known
         } else {
+            if peers.count >= SongTapBleTuning.maxPeers { evictOldest() }
             p = Peer(id: nextPeerId, address: address)
             nextPeerId += 1
             peers[address] = p
@@ -543,14 +581,14 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
         p.lastSeenMs = t
         p.rssi = rssi
 
-        let impulse = ownImpulseMs >= p.peerImpulseLocalMs ? ownImpulseMs : p.peerImpulseLocalMs
+        let impulse = impulseFor(p, own: ownImpulseMs)
         let wasHeld = p.detector.heldSinceMs >= 0
         let step = SongTapDetector.step(p.detector, SongTapRssiSample(tMs: t, rssi: rssi), impulseMs: impulse)
         p.detector = step.state
         p.glow = step.glowPermille
         if step.state.near { p.lastNearMs = t }
         let jumping = step.state.heldSinceMs >= 0
-        if jumping || step.fire != .none { lastJumpAnyMs = t }
+        if jumping || step.fire != .none { p.lastJumpMs = t }
         if jumping && !wasHeld { onJumpStart(p, t) }
 
         updateFocus(t, p)
@@ -571,6 +609,24 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
     private func dbm(_ q: Int) -> Int { SongTapDetector.floorDiv(q, songTapRssiScale) }
 
     private func strength(_ p: Peer) -> Int { dbm(p.detector.fastQ) }
+
+    /// The latest jerk the detector may use for `p`: this phone's own, or the peer's word when it is close enough to be believed.
+    private func impulseFor(_ p: Peer, own: Int64) -> Int64 {
+        let peer = p.peerImpulseLocalMs
+        if own >= peer { return own }
+        let close = p.detector.started && dbm(p.detector.fastQ) >= SongTapBleTuning.peerImpulseMinDbm
+        return close ? peer : own
+    }
+
+    private func evictOldest() {
+        var oldest: Peer?
+        for q in peers.values where q !== focus && (oldest == nil || q.lastSeenMs < oldest!.lastSeenMs) { oldest = q }
+        guard let gone = oldest else { return }
+        peers[gone.address] = nil
+        byId[gone.id] = nil
+        if gone.conn != .closed { radio.disconnect(address: gone.address) }
+        radio.forget(address: gone.address)
+    }
 
     /// The jump has started: a receiver asks the sender how long ago it was jerked.
     private func onJumpStart(_ p: Peer, _ t: Int64) {
@@ -641,6 +697,7 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
             peers[p.address] = nil
             byId[p.id] = nil
             if p.conn != .closed { radio.disconnect(address: p.address) }
+            radio.forget(address: p.address)
             if p === focus {
                 focus = nil
                 setGlow(0)
@@ -652,6 +709,15 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
             var best: Peer?
             for p in peers.values.sorted(by: { $0.id < $1.id }) where best == nil || strength(p) > strength(best!) { best = p }
             if let best { setFocus(best, t) }
+        }
+        // A connection that never comes up is given up, so the peer can be tried again instead of staying "connecting".
+        for p in peers.values where p.conn == .connecting && t - p.connectStartedMs > SongTapBleTuning.connectTimeoutMs {
+            radio.disconnect(address: p.address)
+            p.conn = .closed
+            p.writes.removeAll()
+            p.nextConnectAtMs = t + SongTapBleTuning.reconnectMs
+            diag.log(t, "connection to #\(p.id) timed out")
+            if p.inTransfer { failTransfer(p) }
         }
         if let f = focus {
             if f.conn == .ready && !f.inTransfer && !f.detector.near && t - f.lastNearMs > SongTapBleTuning.idleDisconnectMs {

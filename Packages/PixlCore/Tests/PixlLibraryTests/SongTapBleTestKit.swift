@@ -123,6 +123,7 @@ final class FakeRadio: SongTapBleRadio {
     func writeControl(address: String, value: [UInt8]) { calls.append("write:\(address)"); controlWrites.append(value) }
     func notifyGo(client: String) { calls.append("go:\(client)"); goNotifications.append(client) }
     func dropClient(client: String) { calls.append("drop:\(client)"); dropped.append(client) }
+    func forget(address: String) { calls.append("forget:\(address)") }
 
     func count(_ prefix: String) -> Int { calls.filter { $0.hasPrefix(prefix) }.count }
 }

@@ -320,6 +320,10 @@ final class SongTapBluetoothRadio: SongTapBleRadio {
         central.connect(peripheral, options: nil)
     }
 
+    func forget(address: String) {
+        seen[address] = nil
+    }
+
     func disconnect(address: String) {
         guard let client = clients.removeValue(forKey: address) else { return }
         central?.cancelPeripheralConnection(client.peripheral)
