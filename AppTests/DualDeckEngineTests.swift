@@ -1,5 +1,6 @@
 import AVFoundation
 import Darwin
+import MediaPlayer
 import PixlAudioCore
 import PixlModel
 import Synchronization
@@ -104,6 +105,77 @@ final class DualDeckEngineTests: XCTestCase {
     }
 
     // MARK: Crossfade
+
+    func testDoubledStreamDurationUsesCatalogEndForNowPlayingAndNaturalAdvance() async throws {
+        let source = try TestAudio.sine(frequency: 440, seconds: 12)
+        let next = try TestAudio.sine(frequency: 550, seconds: 4)
+        let songs = [TestAudio.song(source, id: "sp:catalog", seconds: 6),
+                     TestAudio.song(next, id: "f:next", seconds: 4)]
+        let engine = makeEngine()
+        defer { engine.stop() }
+        engine.setQueue(songs, startIndex: 0, startPositionMs: 4_000, playWhenReady: false)
+        let loaded = await waitUntil(timeout: 5) { engine.activeItem?.playerItem.status == .readyToPlay }
+        XCTAssertTrue(loaded)
+        let item = try XCTUnwrap(engine.activeItem)
+        XCTAssertEqual(item.assetDurationSeconds, 12, accuracy: 0.001)
+        XCTAssertEqual(item.playerItem.forwardPlaybackEndTime.seconds, 6, accuracy: 0.001)
+        XCTAssertEqual(engine.plannedHandOver?.transitionPointMs, 5_000)
+        let controller = NowPlayingController(engine: engine)
+        controller.update()
+        let info = try XCTUnwrap(MPNowPlayingInfoCenter.default().nowPlayingInfo)
+        XCTAssertEqual(info[MPMediaItemPropertyPlaybackDuration] as? Double, 6)
+        XCTAssertEqual(info[MPNowPlayingInfoPropertyPlaybackRate] as? Double, 0)
+
+        var transitions: [String] = []
+        engine.onItemTransition = { new, _, automatic in
+            if automatic, let new { transitions.append(new.id) }
+        }
+        engine.play()
+        // Exercise the natural-end fallback too (as when the next stream misses its preroll).
+        engine.cancelCrossfadePlan()
+        try await waitForAudio(engine)
+        let advanced = await waitUntil(timeout: 4) { engine.activeItem?.song.id == "f:next" }
+        XCTAssertTrue(advanced)
+        XCTAssertEqual(transitions, ["f:next"])
+        XCTAssertTrue(engine.playWhenReady)
+    }
+
+    func testImportedFileWithStaleLibraryDurationKeepsItsFullAudio() async throws {
+        let file = try TestAudio.sine(frequency: 440, seconds: 4)
+        let song = TestAudio.song(file, id: "f:import", seconds: 2)
+        let engine = makeEngine()
+        defer { engine.stop() }
+        engine.setQueue([song], startIndex: 0, startPositionMs: 0, playWhenReady: false)
+        let loaded = await waitUntil(timeout: 5) { engine.activeItem != nil }
+        XCTAssertTrue(loaded)
+        let item = try XCTUnwrap(engine.activeItem)
+        XCTAssertEqual(item.durationSeconds, 4, accuracy: 0.001)
+        XCTAssertFalse(item.playerItem.forwardPlaybackEndTime.isNumeric)
+        XCTAssertEqual(item.seekTarget(20), 4, "a seek cannot report a position beyond the imported file")
+    }
+
+    func testSeekCompletionWhileThePresentationClockIsStillBehind() async throws {
+        let file = try TestAudio.sine(frequency: 440, seconds: 4)
+        let engine = makeEngine()
+        defer { engine.stop() }
+        engine.setQueue([TestAudio.song(file, seconds: 4)], startIndex: 0, startPositionMs: 0, playWhenReady: false)
+        let ready = await waitUntil(timeout: 5) { engine.activeItem?.playerItem.status == .readyToPlay }
+        XCTAssertTrue(ready)
+        let item = try XCTUnwrap(engine.activeItem)
+        // Leave the actual clock paused at zero and deliver the callbacks in a controlled order.
+        item.seekGeneration = 1
+        item.seekTargetSeconds = 3
+        item.completeSeek(generation: 1, finished: true)
+        XCTAssertNil(item.seekTargetSeconds, "preroll is free to proceed after completion")
+        XCTAssertEqual(item.positionSeconds, 3)
+        item.seekGeneration = 2
+        item.seekTargetSeconds = 1
+        item.completeSeek(generation: 1, finished: false)
+        XCTAssertEqual(item.seekTargetSeconds, 1, "a superseded completion cannot consume a newer seek")
+        XCTAssertEqual(item.positionSeconds, 1, "a backward seek replaces the previous target immediately")
+        item.completeSeek(generation: 2, finished: false)
+        XCTAssertLessThan(item.positionSeconds, 0.1, "an interrupted seek returns to the actual clock")
+    }
 
     func testCrossfadeOverlapsBothDecksWithTheirGainCurves() async throws {
         let a = try TestAudio.sine(frequency: 440, seconds: 3.5)

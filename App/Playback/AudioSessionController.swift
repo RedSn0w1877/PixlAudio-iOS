@@ -181,9 +181,6 @@ final class AudioSessionController {
         isActive = false
     }
 
-    /// The output sample rate (for EQ coefficient design).
-    var outputSampleRate: Double { session.sampleRate > 0 ? session.sampleRate : 44_100 }
-
     /// Human-readable output route (Device capabilities screen).
     var routeDescription: String {
         session.currentRoute.outputs.map { "\($0.portName) (\($0.portType.rawValue))" }.joined(separator: ", ")
