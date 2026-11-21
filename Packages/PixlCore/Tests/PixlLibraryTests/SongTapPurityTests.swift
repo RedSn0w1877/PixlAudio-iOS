@@ -166,7 +166,7 @@ struct SongTapPurityTests {
         let names = Set(try swiftFiles(under: folder).map { ($0 as NSString).lastPathComponent })
         for expected in ["SongTapText", "SongTapPayload", "SongTapLink", "SongTapSigning", "SongTapSession", "SongTapRateLimits",
                          "SongTapDetector", "SongTapTimeline", "SongTapHandshake",
-                         "RingCodeLayout", "Gf256", "ReedSolomon", "RingCodePayload", "RingCodeTimeline",
+                         "RingCodeLayout", "Gf256", "ReedSolomon", "RingCodePayload", "RingCodeTimeline", "RingFlow",
                          "RingCodeRenderer", "RingCodeStyle", "RingScanner"] {
             #expect(names.contains("\(expected).swift"), "\(expected).swift is missing")
         }
