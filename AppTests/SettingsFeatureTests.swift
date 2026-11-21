@@ -22,7 +22,7 @@ final class SettingsFeatureTests: XCTestCase {
     func testMainListOrderMatchesAndroid() {
         let everyday = [
             "accounts", "appearance", "playback", "equalizer", "lyrics", "sing", "behavior", "library", "ai",
-            "backup_restore", "about",
+            "endless", "backup_restore", "about",
         ]
         XCTAssertEqual(SettingsMainEntry.ordered(developerMode: false).map(\.id), everyday)
         XCTAssertEqual(SettingsMainEntry.ordered(developerMode: true).map(\.id),

@@ -67,7 +67,7 @@ nonisolated enum SettingsMainEntry: Hashable, Identifiable, Sendable {
     /// Library & storage, AI features, Backup & Restore, About.
     static let everyday: [SettingsMainEntry] = [
         .accounts, .category(.appearance), .category(.playback), .category(.equalizer), .category(.lyrics),
-        .category(.sing), .category(.behavior), .category(.library), .category(.ai), .category(.backupRestore),
+        .category(.sing), .category(.behavior), .category(.library), .category(.ai), .category(.endless), .category(.backupRestore),
         .category(.about),
     ]
 
@@ -93,6 +93,7 @@ nonisolated enum SettingsMainEntry: Hashable, Identifiable, Sendable {
             case .sing: "music.mic"
             case .behavior: "hand.tap"
             case .ai: "sparkles"
+            case .endless: "infinity"
             case .backupRestore: "doc.badge.arrow.up"
             case .developer: "chevron.left.forwardslash.chevron.right"
             case .deviceCapabilities: "cpu"
@@ -114,6 +115,7 @@ nonisolated enum SettingsMainEntry: Hashable, Identifiable, Sendable {
             case .sing: return dark ? (0xFF5E3A22, 0xFFFFDBC9) : (0xFFFFDBC9, 0xFF3A1900)
             case .behavior: return dark ? (0xFF3E4C63, 0xFFD7E3FF) : (0xFFD7E3FF, 0xFF253347)
             case .ai: return dark ? (0xFF004F58, 0xFF88FAFF) : (0xFFCCE8EA, 0xFF004F58)
+            case .endless: return dark ? (0xFF1F4D45, 0xFFBFF2E6) : (0xFFBFF2E6, 0xFF00201B)
             case .backupRestore: return dark ? (0xFF3B4869, 0xFFD9E2FF) : (0xFFD9E2FF, 0xFF27304E)
             case .developer: return dark ? (0xFF324F34, 0xFFCBEFD0) : (0xFFCBEFD0, 0xFF042106)
             case .equalizer: return dark ? (0xFF6E4E13, 0xFFFFDEAC) : (0xFFFFDEAC, 0xFF281900)
@@ -160,6 +162,7 @@ extension SettingsCategory {
         case .sing: L10n.settingsMainSingTitle
         case .behavior: L10n.settingsMainBehaviorTitle
         case .ai: L10n.settingsCategoryAiTitle
+        case .endless: EndlessStrings.settingsTitle
         case .backupRestore: L10n.settingsCategoryBackupTitle
         case .developer: L10n.settingsMainDeveloperTitle
         case .deviceCapabilities: L10n.settingsMainDeviceCapabilitiesTitle
@@ -177,6 +180,7 @@ extension SettingsCategory {
         case .sing: L10n.settingsMainSingSubtitle
         case .behavior: L10n.settingsMainBehaviorSubtitle
         case .ai: L10n.settingsMainAiSubtitle
+        case .endless: EndlessStrings.settingsSubtitle
         case .backupRestore: L10n.settingsMainBackupSubtitle
         case .developer: L10n.settingsMainDeveloperSubtitle
         case .deviceCapabilities: L10n.settingsMainDeviceCapabilitiesSubtitle
@@ -287,6 +291,7 @@ struct SettingsCategoryContent: View {
         case .sing: SingSettingsSection()
         case .behavior: BehaviorSettingsSection()
         case .ai: AISettingsSection()
+        case .endless: EndlessSettingsSection()
         case .backupRestore: BackupSettingsSection()
         case .developer: DeveloperSettingsSection()
         case .equalizer, .deviceCapabilities, .about: EmptyView()

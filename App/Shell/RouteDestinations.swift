@@ -68,6 +68,7 @@ struct SheetDestination: View {
             case .aiPlaylist: AiPlaylistSheet().pixlSheet(detents: [.tallGlass])
             case .taisChat: TaisChatSheet().pixlSheet(detents: [.tallGlass])
             case .spatialAudio(let fromPlayer): SpatialAudioSheet(fromPlayer: fromPlayer) // sizes its own detent
+            case .askHost: TaisChatSheet(hostMode: true).pixlSheet(detents: [.tallGlass])
             case .howPicksWork: HowPicksWorkSheet().pixlSheet()
             case .whyThisSong(let songId, let whyKey, let whyArg):
                 WhyThisSongRoute(songId: songId, whyKey: whyKey, whyArg: whyArg).pixlSheet()
@@ -97,6 +98,7 @@ struct CoverDestination: View {
             case .aiPlaylistLab: AiPlaylistLabView()
             case .backupImport: BackupImportCover()
             case .backupExport: BackupExportCover()
+            case .endlessIntro: EndlessIntroView()
             }
         }
         // The Connect volume pop-up over the lyrics screen and the other covers.

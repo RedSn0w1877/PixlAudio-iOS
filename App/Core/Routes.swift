@@ -61,6 +61,8 @@ nonisolated enum SettingsCategory: String, Hashable, Sendable, CaseIterable, Ide
     case sing = "sing"
     case behavior = "behavior"
     case ai = "ai"
+    /// Endless Listening's own small category (host notes, how it works): shown without developer mode.
+    case endless = "endless"
     case backupRestore = "backup_restore"
     case developer = "developer"
     case deviceCapabilities = "device_capabilities"
@@ -80,6 +82,7 @@ nonisolated enum SettingsCategory: String, Hashable, Sendable, CaseIterable, Ide
         case .sing: "Sing"
         case .behavior: "Gestures & haptics"
         case .ai: "AI features"
+        case .endless: "Endless Listening"
         case .backupRestore: "Backup & Restore"
         case .developer: "Developer"
         case .deviceCapabilities: "Device capabilities"
@@ -98,6 +101,7 @@ nonisolated enum SettingsCategory: String, Hashable, Sendable, CaseIterable, Ide
         case .sing: "music.mic"
         case .behavior: "hand.tap"
         case .ai: "sparkles"
+        case .endless: "infinity"
         case .backupRestore: "externaldrive"
         case .developer: "hammer"
         case .deviceCapabilities: "iphone.gen3"
@@ -246,6 +250,8 @@ nonisolated enum AppSheet: Hashable, Sendable, Identifiable {
     case howPicksWork
     /// The music brain (docs/brain-spec.md, 8.8): the sheet behind a pick's reason line. The queue presents it itself.
     case whyThisSong(songId: String, whyKey: String, whyArg: String)
+    /// Endless Listening, "Ask the host" (Ask Taizo in host mode), from the player. The queue presents it itself, over its own sheet.
+    case askHost
 
     var id: String {
         switch self {
@@ -263,6 +269,7 @@ nonisolated enum AppSheet: Hashable, Sendable, Identifiable {
         case .spatialAudio(let fromPlayer): fromPlayer ? "spatialAudio.player" : "spatialAudio.settings"
         case .howPicksWork: "howPicksWork"
         case .whyThisSong(let id, _, _): "whyThisSong.\(id)"
+        case .askHost: "askHost"
         }
     }
 }
@@ -285,6 +292,8 @@ nonisolated enum AppCover: Hashable, Sendable, Identifiable {
     /// Stage 15: the restore and export flows of Settings › Backup & Restore, presented from the root.
     case backupImport
     case backupExport
+    /// Endless Listening's three-page introduction (first open of its card, the card's menu, Settings).
+    case endlessIntro
 
     var id: String {
         switch self {
@@ -296,6 +305,7 @@ nonisolated enum AppCover: Hashable, Sendable, Identifiable {
         case .aiPlaylistLab: "aiPlaylistLab"
         case .backupImport: "backupImport"
         case .backupExport: "backupExport"
+        case .endlessIntro: "endlessIntro"
         }
     }
 }

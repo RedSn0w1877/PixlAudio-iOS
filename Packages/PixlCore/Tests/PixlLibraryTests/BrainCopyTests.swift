@@ -147,6 +147,39 @@ struct BrainCopyTests {
         }
     }
 
+    /// Endless Listening, milestone E1: the words are Android's `strings_endless.xml`; the introduction's copy is exact; nothing says "learn",
+    /// a word the app never says, or the name of another service's feature.
+    @Test func theWordsOfEndlessListeningAreAndroidsAndNameNothingElse() throws {
+        let strings = try String(contentsOf: appRoot.appendingPathComponent("Features/Brain/EndlessStrings.swift"), encoding: .utf8)
+        let all = literals(strings)
+        for text in [
+            "Endless Listening", "Play a few songs first. Endless Listening starts from what you play.",
+            "Starts from \\(names) and keeps going.", "Starts from what you play and keeps going.", "Keeps going",
+            "More about Endless Listening", "How it works", "Keeps going from what you play, until you stop it", "Ask the host",
+            "Something new", "Back to familiar", "Why this song", "More upbeat", "Slower", "Surprise me",
+            "Okay. The next songs lean towards new music.", "Okay. The next songs lean towards what you know.",
+            "Music that keeps going.", "Endless Listening starts from what you play and keeps adding more until you stop it.",
+            "A host, if you want one.", "Short notes between songs say why something is here. Ask for something new, or why a song was picked.",
+            "You decide.", "Choose how much is new, skip anything, and turn the notes off any time.",
+            "Start listening", "Not now", "Host notes", "Replay the introduction",
+        ] {
+            #expect(all.contains(text), "missing: \(text)")
+        }
+        var sources = [("EndlessStrings.swift", strings)]
+        for name in ["Features/Brain/EndlessIntroView.swift", "Features/Brain/EndlessHostViews.swift",
+                     "Features/Settings/Categories/EndlessSettingsSection.swift"] {
+            sources.append((name, try String(contentsOf: appRoot.appendingPathComponent(name), encoding: .utf8)))
+        }
+        for (name, text) in sources {
+            for literal in literals(text) {
+                let lower = literal.lowercased()
+                #expect(!lower.contains("learn"), "\(name) says learn: \(literal)")
+                #expect(!lower.contains("spotify dj") && !lower.contains("apple"), "\(name) names another feature: \(literal)")
+                for word in forbidden { #expect(!lower.contains(word), "\(name) says \(word): \(literal)") }
+            }
+        }
+    }
+
     @Test func theScanReadsLiteralsAndSkipsComments() {
         let found = literals("let a = \"One \\(x) two\" // \"not this\"\n/* \"nor this\" */ let b = \"Three\"")
         #expect(found == ["One \\(x) two", "Three"])
