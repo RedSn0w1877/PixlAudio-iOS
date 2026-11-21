@@ -165,3 +165,9 @@ same loudness). Start Endless Listening from the Home card; a card appears when 
 Skip while it talks (stops at once, music back in about a tenth of a second); pause; unplug headphones; take a call; play with crossfade on. Developer mode ›
 Endless Listening › Host voice log shows each decision and why (`too_soon`, `transition`, `short_left`, `route_changed`, ...): use it to calibrate the numbers
 in `HostVoice`.
+
+## CI (E2)
+
+- Round 1, run 44863345792 (on `683b05d`): core and app both green on the first try (`App/` compiled, `HostDuckTests` and the new tap test passed on CI).
+- Locally: the whole `Packages/PixlCore` suite passed except one stage 3 test, `BrainLearnerEngineTests.theLearnedWeightsRankOnlyWhileTheGateHasThemOnAndNeverInAControlSession`,
+  which timed out under the full run's load (13 s) and passes alone and in a second run of the whole `PixlLibraryTests` target (1021 tests). Not touched by this milestone.
