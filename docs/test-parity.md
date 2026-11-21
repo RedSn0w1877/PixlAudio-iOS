@@ -1071,3 +1071,14 @@ Android has no tests for a RunPod/R2 pipeline; everything here is new.
 | `TaizoContext.HOST_ADDENDUM` | 0 | `Host addendum` (1, PixlNet) | PixlNet | added | The addendum follows the cached blocks and names no word the app never says. |
 | (the intro's bars) | 0 | `Endless Listening introduction` (1) | PixlLibrary | added | The five bar heights stay in range and never move together. |
 | `presentation/components/BrainCopyTest` (+1: `strings_endless.xml`) | 1 | `BrainCopyTests.theWordsOfEndlessListeningAreAndroidsAndNameNothingElse` | PixlLibrary | ported | Reads `EndlessStrings.swift` and `EndlessIntroView.swift` as text. |
+
+## Endless Listening, milestone E2 (2026-11-21, branch `endless-listening`)
+
+| Android test | Tests | iOS test | Target | Status | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `:brain` `HostVoiceTest` + golden `hostvoice.jsonl` | 16 + 638 lines | `BrainHostVoiceTests` (`goldenMatchesAndroid`: 430 `decide`, 120 `cancel`, 70 `ramp`, 17 `line`, 1 `estimate`; `theHostVoiceFileIsInTheManifest`; the unit cases; `theNumbersAreTheOnesOnAndroid`) | PixlLibrary | ported | The golden file, README and MANIFEST are Android's, copied byte for byte (the manifest has 47 files). |
+| `data/service/player/HostVoiceLogTest` | 3 | `HostVoiceSupportTests` (the log: the last twenty, newest first; add never changes its argument; the line an entry reads as) | PixlLibrary | ported | `HostVoiceLog` is in `BrainStore/`. |
+| (Android picks the voice inside `HostSpeaker`) | 0 | `HostVoiceSupportTests` (the choice of the voice: own English, US English, any English; quality; never novelty or personal) | PixlLibrary | added | `HostVoiceChoice` is pure; the app only lists the installed voices. |
+| `data/service/player/HostDuckTest` | 10 | `HostDuckTests` (ramp down and up, the quick way back, an abort gives the level back at once and says why, never held twice) + `ProcessingTapTests.testTheHostDuckScalesTheSignalAndKeepsReplayGain` | AppTests | ported | Android tests the volume writes; here the duck is a gain in the tap, measured offline through the real tap. CI only. |
+| `data/preferences/EndlessSettingsPreferenceTest` | 2 | none | - | not ported | The switch is one `UserDefaults` key read in `EndlessState` (default false); no store to test. |
+| `presentation/components/BrainCopyTest` (reads all of `strings_endless.xml`) | 1 | `BrainCopyTests.theWordsOfEndlessListeningAreAndroidsAndNameNothingElse` (the new strings added; `HostVoiceController`, `HostSpeaker` and `HostDuck` read as text too) | PixlLibrary | ported | |

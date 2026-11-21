@@ -162,12 +162,20 @@ struct BrainCopyTests {
             "A host, if you want one.", "Short notes between songs say why something is here. Ask for something new, or why a song was picked.",
             "You decide.", "Choose how much is new, skip anything, and turn the notes off any time.",
             "Start listening", "Not now", "Host notes", "Replay the introduction",
+            // Milestone E2: the spoken host (Android `strings_endless.xml`, word for word).
+            "Host notes, spoken notes and how it works", "Spoken host notes",
+            "The host says a note out loud now and then, with the music turned down. Uses the voice on this phone.",
+            "Test the voice", "Hear how the host sounds", "Starting the voice", "This is how the host sounds.",
+            "This phone has no English voice that works without the internet.", "The host is talking right now.",
+            "Not during a call.", "The voice did not start. Try again.", "Host voice log",
+            "The last 20 notes: said or skipped, and why", "Nothing yet.", "Close",
         ] {
             #expect(all.contains(text), "missing: \(text)")
         }
         var sources = [("EndlessStrings.swift", strings)]
         for name in ["Features/Brain/EndlessIntroView.swift", "Features/Brain/EndlessHostViews.swift",
-                     "Features/Settings/Categories/EndlessSettingsSection.swift"] {
+                     "Features/Settings/Categories/EndlessSettingsSection.swift", "Services/Brain/HostVoiceController.swift",
+                     "Playback/HostSpeaker.swift", "Playback/HostDuck.swift"] {
             sources.append((name, try String(contentsOf: appRoot.appendingPathComponent(name), encoding: .utf8)))
         }
         for (name, text) in sources {

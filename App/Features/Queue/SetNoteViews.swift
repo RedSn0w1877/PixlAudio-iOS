@@ -75,9 +75,12 @@ struct SetNoteRowLabel: View {
 }
 
 /// The note under the player's artist line (Android `SetNoteLine`), or nothing. Reads the queue and the current index itself, so only this
-/// line is re-evaluated when they change.
+/// line is re-evaluated when they change. While Endless Listening is the queue (`onAskHost` given) the note is the host's card with "Ask the
+/// host" beside it, and a song with no note shows the lone button.
 struct PlayerSetNoteLine: View {
     let color: Color
+    /// Opens Ask Taizo in host mode; nil for every queue that is not Endless Listening.
+    var onAskHost: (() -> Void)?
 
     @Environment(PlaybackStore.self) private var playback
     @Environment(AppEnvironment.self) private var env
@@ -91,8 +94,18 @@ struct PlayerSetNoteLine: View {
         let queue = playback.queue
         let current = playback.currentIndex ?? -1
         let hostActive = env.endless.wantsHostNotes
+        let note = memo.notes(queue: queue, currentIndex: current, heard: heard, host: hostFacts, stamp: hostStamp).current
         VStack(spacing: 0) {
-            if let note = memo.notes(queue: queue, currentIndex: current, heard: heard, host: hostFacts, stamp: hostStamp).current {
+            if let onAskHost {
+                if let note {
+                    HostNoteCard(text: note, onAskHost: onAskHost, color: color, glass: true)
+                        .padding(.top, 6)
+                } else {
+                    AskHostButton(action: onAskHost)
+                        .padding(.top, 6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else if let note {
                 Text(note)
                     .pixlFont(.labelLarge)
                     .foregroundStyle(color)

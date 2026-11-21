@@ -93,3 +93,75 @@ island names on the card (they need the atlas); the cadence of host notes in a r
 - Round 2, run 44856992899 (on `d615ed9`): core green; the app job failed twice on the known flaky `StoreTests.testPlaybackStoreWithDemoEngine`
   (one failure of 664, a 50 ms timing test over the demo engine) and passed on the second `gh run rerun --failed`: green. The screenshot UI tests are not part of the push run.
 - Locally: the whole `Packages/PixlCore` suite ran before round 2's fix with those two failures only; the three affected tests pass after it.
+
+---
+
+# Milestone E2 (iOS): spoken host notes, host cards
+
+Port of Android's E2 (`endless-listening` commits `6a17b25`, `b3d615e`, `33c5b3d`, `857b95e`; its handoff has a "For the iOS port" part). **Nothing here has
+run on a phone.** Only `Packages/PixlCore` compiles on the Windows machine; `App/` is compiled by CI alone. Sound behaviour is a trace of the code.
+
+## What was built
+
+### The pure core (PixlLibrary), tested
+
+- `Brain/HostVoice.swift`: `decide` (speak / wait / skip with a stable reason word, the first reason that holds ends it), `cancelReason` (a line stops at
+  once on off, notes off, a skip, a pause, a transition, a lost focus, a call, a route change, a foreign volume write, or after 8 s), `ramp` (the duck,
+  in thousandths), `line` (the note cleaned for a voice: "&" is said "and", marks a voice reads badly become spaces, at most 160 characters, two sentences,
+  12 words each, none of the words the app never says; a note that is too long is not said, never cut), `estimateMs`. It reproduces Android's
+  `hostvoice.jsonl` bit for bit (638 lines: 430 decide, 120 cancel, 70 ramp, 17 line, 1 estimate). The golden file, `README.md` and `MANIFEST.sha256` were
+  copied from Android's branch unchanged (the manifest has 47 files; no older golden file changed). Standard-library Swift only (`BrainPurityTests`).
+- `BrainStore/HostVoiceLog.swift` (the last 20 decisions, newest first, and the line each reads as) and `BrainStore/HostVoiceChoice.swift` (which installed
+  voice: the listener's own English first, else US English, else any English; better quality first; never a novelty or personal voice).
+
+### The app (App/), compiled on CI only
+
+- The duck: `AudioEffectsParameters.duckGain`, one atomic every tap multiplies in last (`ProcessingTap`, after the crossfade and the deck's fixed gain; a new
+  item starts at the level the duck has, so there is no jump). `Playback/HostDuck.swift` is its only writer: a step every 24 ms from `HostVoice.ramp`
+  (250 ms down to 0.35, 400 ms up, 120 ms when a line was cut short); `abort` gives the level back at once. `DualDeckEngine.fade` aborts it when two decks
+  start to overlap (a crossfade, a rendition switch), `rebuildAfterMediaServicesReset` aborts it, and the controller aborts it on an interruption.
+  `DualDeckEngine+Host.swift` lets the controller read the decks (playing, song ids, position and what is left, `hostCanDuck`).
+- The voice: `Playback/HostSpeaker.swift`, `AVSpeechSynthesizer`, created on the first line (or Test the voice) and handed back when the host is disarmed.
+  The session is not touched: no category change, no `.duckOthers`, no activation, `usesApplicationAudioSession` stays on.
+- `Services/Brain/HostVoiceController.swift` (the port of `HostVoiceStateHolder`): armed only while Spoken host notes, Host notes and the Endless station
+  are all on. With the switch off nothing is registered (the app's start only reads one `UserDefaults` flag). Armed, it watches the song, the play state
+  and the three switches through `withObservationTracking`, and the route and interruption notifications. On each new song it makes the very note the
+  player shows (`SetNoteLines.forQueue` over the same window, history and host facts as `PlayerSetNoteLine`), `HostVoice.line`, and asks `decide` (300 ms
+  at most between asks) until the answer is speak or skip. To speak: `hostDuck.begin()`, 250 ms, check `cancelReason`, speak, poll `cancelReason` every
+  100 ms, `hostDuck.end()`. Every end writes one entry to the log (20, in memory). Calls come from `CXCallObserver` (an interruption also pauses the music).
+- Host cards: `HostNoteCard` (Liquid Glass shape in the player, a flat tint in the queue's rows; no close button, skipping dismisses it). The player's card has
+  "Ask the host" beside the note (the lone capsule when the song has no note); the queue's rows show the card while Endless Listening is the queue.
+- Settings › Endless Listening: Host notes, **Spoken host notes (off by default, greyed while Host notes is off)**, Test the voice (says a sample, ducks
+  like a note when it can, refuses during a call or while a note is being said, says why in a toast), How it works; developer mode adds Advanced › Host voice
+  log (a sheet with the last 20: spoke / stopped: reason / skipped: reason). The same words as Android (`EndlessStrings`).
+
+## Deviations from Android
+
+E2-1. The duck is a gain inside the tap, not the player's volume: nothing else writes it, so Android's "a foreign write ends the duck" case does not exist
+here (`volumeTaken` is never true), and Sing and Spatial audio need no special refusal. It is still refused while a transition runs, a hand-over is
+scheduled, the session is not active or the music is not really playing (`hostCanDuck`).
+E2-2. The voice is chosen by `HostVoiceChoice` (Android picks inside `HostSpeaker`); a phone with no installed English voice stays silent and the log says `no_voice`.
+E2-3. The voice is ready as soon as the synthesizer is created, so `voice_pending` never happens on iOS.
+E2-4. The player's card is glass, the queue's flat (rows scroll and are dragged).
+E2-5. No `AudioDeviceCallback` grace period: iOS posts the route notification only for a real change.
+E2-6. The host does not speak while the app's own player side is gone (as Android): the queue comes from the player store.
+
+## Cut
+
+Nothing from the brief. `ci/check-forbidden.sh` needed no change (`CallKit` and `AVFoundation` were already allowed).
+
+## Not verified on a phone
+
+The sound and quality of the installed voices and whether an English voice exists by default; that the synthesizer speaking through the app's `.playback`
+session (long-form audio policy) never pauses or reroutes the music; the duck against a crossfade, ReplayGain on and off, Sing and Spatial audio; speech
+cancelled at once on skip, pause, a call and a route change; `CXCallObserver` during a real call; the 1.5 s, 4 s, 15 s and 8 s numbers; the cards' look in the
+player and the queue; Test the voice with music playing; the battery of an armed host (it asks every 300 ms for up to 15 s on a song with a note, and every
+100 ms while a line is said).
+
+## How to test on a phone
+
+Settings › Endless Listening: switch Spoken host notes on, tap Test the voice with a song playing (the song dips, the sample is heard, the song returns at the
+same loudness). Start Endless Listening from the Home card; a card appears when a song has a note and the voice says the same words 1.5 s into that song.
+Skip while it talks (stops at once, music back in about a tenth of a second); pause; unplug headphones; take a call; play with crossfade on. Developer mode ›
+Endless Listening › Host voice log shows each decision and why (`too_soon`, `transition`, `short_left`, `route_changed`, ...): use it to calibrate the numbers
+in `HostVoice`.

@@ -371,12 +371,9 @@ private struct PlayerMetadataRow: View {
                     .onLongPressGesture(minimumDuration: 0.5) { navigateToArtist(song.primaryArtist.id) }
                     .accessibilityAddTraits(.isButton)
                     .accessibilityHint("Opens the artist")
-                PlayerSetNoteLine(color: theme.onPrimaryContainer.opacity(0.7))
-                // "Ask the host" (Endless Listening): only while that station is the queue.
-                if env.brain.autoplay.isEndless {
-                    AskHostButton { router.present(AppSheet.askHost) }
-                        .padding(.top, 6)
-                }
+                // The note, and "Ask the host" with it (Endless Listening: only while that station is the queue).
+                PlayerSetNoteLine(color: theme.onPrimaryContainer.opacity(0.7),
+                                  onAskHost: env.brain.autoplay.isEndless ? { router.present(AppSheet.askHost) } : nil)
             }
             .padding(.vertical, 4)
             .frame(maxWidth: .infinity, alignment: .leading)

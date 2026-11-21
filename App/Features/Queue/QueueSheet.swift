@@ -249,7 +249,10 @@ struct QueueSheet: View {
                         // The note is part of its row: it moves with the row when it is dragged, and the row's own height is what sets the
                         // drag's pitch (measured on the row, below, not on the note).
                         VStack(spacing: 8) {
-                            if let note { SetNoteRowLabel(text: note) }
+                            if let note {
+                                // Endless Listening: the host's note is a small card; every other queue keeps the quiet line.
+                                if hostActive { HostNoteCard(text: note).padding(.horizontal, 16) } else { SetNoteRowLabel(text: note) }
+                            }
                             QueueSongRow(song: song, isCurrent: isCurrent,
                                      isPlaying: isCurrent && playback.isPlaying, canReorder: canReorder,
                                      isDragging: reorder.draggingIndex == index,
