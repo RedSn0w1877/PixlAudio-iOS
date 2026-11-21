@@ -200,12 +200,12 @@ readings go to the core as they are (offset 0), and NORMAL is its own tuning unc
 | Radio | the local name carries the short name (iOS may cut it), the Name characteristic, Android's manufacturer block read from `CBAdvertisementDataManufacturerDataKey`, `notify(client:value:)` for events; no way to set the advertising power | LOW advertising power, scan response block |
 | Not built (Android only) | the Pixel's RSSI offset and its 2 s Calibrate button (the iPhone is the reference) | `RssiCalibration` |
 
-## The Pixl ring code, pure core and scanner (2026-11-21, branch `everything`, milestone R1; Android `handoff/2026-11-21-ring-code.md`)
+## The Pixl ring code, pure core, scanner and screen (2026-11-21, branch `everything`, milestones R1 and R2; Android `handoff/2026-11-21-ring-code.md`)
 
 The code style that replaces the plain QR as the visual fallback of Song Tap: an album-art disc, five rings of round dots (big =
-1, small = 0), an orange start dot, the video id and a session tag under Reed-Solomon. This milestone is the pure core, the
-renderer and the scanner in PixlCore, nothing on a screen yet (the Song Tap screen, the camera and the SwiftUI Canvas drawing are
-the next milestone, on both apps). Notes: `docs/handoff/2026-11-21-ring-code.md`.
+1, small = 0), an orange start dot, the video id and a session tag under Reed-Solomon. R1 was the pure core, the renderer and the
+scanner in PixlCore; R2 (2026-11-21) is the screen: the SwiftUI drawing, the AVFoundation camera, the flow and Developer mode's
+diagnostics. Notes: `docs/handoff/2026-11-21-ring-code.md`.
 
 | Part | iOS | Android |
 |---|---|---|
@@ -213,5 +213,9 @@ the next milestone, on both apps). Notes: `docs/handoff/2026-11-21-ring-code.md`
 | Image side | `.../SongTap/ring/image/` (`RingCodeStyle`, `RingCodeRenderer`, `RingScanner` with `RingScanAccumulator`): Double and Foundation maths allowed here and only here (the purity test checks it), same constants and steps as Kotlin | `.../ring/image/` |
 | Pictures | the Swift renderer draws the shared scenes of `Fixtures/songtap-ring/scenes.jsonl` byte for byte like the Kotlin one (12 of 12 on Windows) and the Swift scanner reads the Kotlin renders (12 of 12) | `RingCodeRenderer`, `RingScanner` |
 | Colour | `RingCodeStyle.palette(accent)`: dots = the app accent (darkened toward tone 30 until 7:1 against the plate), plate = tone 95 of the same hue, chroma at most 8, the orange start dot fixed; flat plate, never Liquid Glass | the device colour (Material You primary), same rule |
-| App wiring | not yet: no screen, no AVFoundation camera, no Canvas drawing, no Info.plist change (camera and Bluetooth strings were added with Song Tap) | not yet |
-| Order of ways to beam | Bluetooth tap, then the ring code, then "Use QR code instead" after about 6 s of failed scanning (next milestone) | the same |
+| Flow rules | `SongTap/ring/RingFlow.swift` (integers only): `RingReceiveFlow` (three equal reads, `RingCodeGuard` freshness and replay, the QR offered after 6 s of a scan that reads nothing, at once with no camera, after a camera failure, a scanner too slow, an expired or failed-lookup code), `RingSendRules`, `RingSendPlan`; Android's `RingFlowTest` cases one for one | `RingFlow.kt` |
+| Receiver glue | `SongTapFlow/RingScanSession.swift` (the flow + clock + lookup with a 10 s timeout + hand-over, main actor), `RingCodeSongs.swift` (a `get_queue` row to the card's payload: allowed art hosts, text cleaned like a beam's), `SongTapEngine.ringOffer` (the song then takes the same consent, rate limits, save and Undo as a scanned QR); the lookup is `AppRingCodeLookup` over the brain's anonymous `RadioSource.hydrate` | `RingCodeResolver` (InnerTube `get_queue`), `SongTapStateHolder` |
+| Camera | `App/Services/SongTap/RingCodeCamera.swift`: `AVCaptureVideoDataOutput` 1280 x 720, 4:2:0 biplanar, late frames dropped, one queue, near-focus; `RingFrameBuilder` (PixlCore: row copy and a 64 KB lookup for the hue map) and `RingScanPacer` (110 ms gap, twice a slow scan's length, "too slow" over 450 ms on average, as Android) | `RingCodeCamera` (CameraX), `RingFrameBuilder`, `RingScanPacer` |
+| Drawing | `App/Features/SongTap/RingCodeView.swift`: one `Canvas` in a `TimelineView` (30 fps idle, display rate in a beam, paused off screen, in the background, and with Reduce Motion when nothing beams), a cached path for the big dots and one for the small, the timeline from PixlCore; flat plate and flat round dots (never glass), the art disc, the pill | `RingCodeView` (`drawWithCache`) |
+| Screens | Song Tap: the sender shows the ring code instead of the QR (fresh tag every 60 s, "Use QR code instead" after 6 s, a song with no video id goes straight to the QR with a line saying why); the receiver scans the ring code, the QR scanner only behind "Use QR code instead" (with "Back to the Song Tap code"); Developer mode: Settings › Song Tap › Ring code diagnostics | `SongTapScreen`, `RingCodeDiagnosticsScreen` |
+| Order of ways to beam | Bluetooth tap, then the ring code, then "Use QR code instead" after about 6 s of failed scanning or when the camera cannot run the scanner; the QR is never beside the ring code | the same |
