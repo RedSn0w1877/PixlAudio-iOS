@@ -1,6 +1,7 @@
 import Accelerate
 import AVFoundation
 import PixlAudioCore
+import PixlLibrary
 import PixlModel
 import Synchronization
 import XCTest
@@ -138,6 +139,21 @@ final class ProcessingTapTests: XCTestCase {
         item.replayGainVolume.store(ReplayGain.gainDbToVolume(-6))
         let output = try await render(url, item: item)
         XCTAssertEqual(20 * log10(gain(output, input: input, skip: 0.05)), -6, accuracy: 0.1)
+    }
+
+    /// The spoken host's duck (Endless Listening): a gain that multiplies last, so the music plays at 0.35 of what it was, and a
+    /// ReplayGain level is kept (the two multiply, nothing is replaced).
+    func testTheHostDuckScalesTheSignalAndKeepsReplayGain() async throws {
+        let url = try TestAudio.sine(frequency: 440, seconds: 1)
+        let input = try await render(url)
+        let ducked = AudioEffectsParameters()
+        ducked.duckGain.store(Float(HostVoice.duckPermille) / Float(HostVoice.permilleFull))
+        let output = try await render(url, effects: ducked)
+        XCTAssertEqual(gain(output, input: input, skip: 0.05), 0.35, accuracy: 0.005)
+        let item = TapItemParameters()
+        item.replayGainVolume.store(ReplayGain.gainDbToVolume(-6))
+        let both = try await render(url, effects: ducked, item: item)
+        XCTAssertEqual(20 * log10(gain(both, input: input, skip: 0.05)), -6 + 20 * log10(0.35), accuracy: 0.15)
     }
 
     func testReplayGainBoostIsCappedAtUnityLikeAndroid() async throws {

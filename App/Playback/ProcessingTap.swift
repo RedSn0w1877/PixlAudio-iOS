@@ -14,7 +14,7 @@ import Synchronization
 /// the loudness pre-gain → virtualizer (stereo width) → limiter when any boost is on → mid/side instrumental fallback
 /// → Spatial audio's on-device stage (cloud audio spec 7: the song's own audio only, while Spatial audio is active;
 /// it replaces the virtualizer, which fades out along the stage's ramp, and ends in the soft limiter) → the crossfade
-/// gain g(t) evaluated from the item's own media time, ramped per buffer → fixed deck gain.
+/// gain g(t) evaluated from the item's own media time, ramped per buffer → fixed deck gain → the spoken host's duck (Endless Listening).
 ///
 /// The same tap works for `AVPlayerItem.audioMix` (playback) and `AVAssetReaderAudioMixOutput.audioMix` (offline:
 /// the tests measure the chain that way).
@@ -115,6 +115,8 @@ nonisolated final class TapContext: @unchecked Sendable {
     // Gain stages (value carried across buffers so changes ramp without zipper noise).
     private var currentReplayGain: Float = 1
     private var currentFixedGain: Float = 1
+    /// The spoken host's duck as of the last buffer (`AudioEffectsParameters.duckGain`).
+    private var currentDuckGain: Float = 1
     private var framesSincePrepare = 0
     /// Music Haptics detector (scalars only: no allocation on the render thread). Re-created in `prepare` for the rate.
     private var hapticAnalyzer = MusicHapticAnalyzer(sampleRate: 44_100)
@@ -174,6 +176,8 @@ nonisolated final class TapContext: @unchecked Sendable {
         prepareSpatial()
         currentReplayGain = effectiveReplayGain()
         currentFixedGain = item.fixedGain.load()
+        // An item that starts while the host speaks starts at the ducked level (no jump back up).
+        currentDuckGain = effects.duckGain.load()
         rebuildBiquad()
     }
 
@@ -388,6 +392,10 @@ nonisolated final class TapContext: @unchecked Sendable {
         let fixed = item.fixedGain.load()
         applyGainRamp(from: currentFixedGain, to: fixed, frames: frames)
         currentFixedGain = fixed
+        // 5. The spoken host's duck: one atomic load per buffer, no work at all while it is 1.
+        let duck = effects.duckGain.load()
+        applyGainRamp(from: currentDuckGain, to: duck, frames: frames)
+        currentDuckGain = duck
 
         item.lastPeak.store(peak(frames: frames))
         runHapticAnalysis(frames: frames)

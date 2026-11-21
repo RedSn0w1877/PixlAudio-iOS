@@ -82,6 +82,9 @@ nonisolated final class AudioEffectsParameters: @unchecked Sendable {
     private let settingsLock = Mutex<EqualizerSettings>(EqualizerSettings())
     /// Mid/side vocal attenuation 0…1 (0 = off).
     let midSideAttenuation = AtomicFloat(0)
+    /// The spoken host's duck (Endless Listening): a gain 0…1 every tap applies last, after the crossfade and the deck's fixed gain. 1 = the
+    /// music as it is. It only ever multiplies, so ReplayGain, Spatial audio and Sing keep their own levels. `HostDuck` is the single writer.
+    let duckGain = AtomicFloat(1)
     /// Allow ReplayGain gains above unity (+6 dB max) through the soft limiter. Android caps at 1 (parity: false).
     let allowReplayGainBoost = Atomic<Bool>(false)
     /// The rate the published coefficients were designed for.

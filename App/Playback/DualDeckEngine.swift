@@ -22,6 +22,8 @@ final class DualDeckEngine: PlaybackEngine {
     let effects: AudioEffectsParameters
     let factory: DeckItemFactory
     let replayGainReader = ReplayGainReader()
+    /// The spoken host's duck (Endless Listening): the music's level while a host note is said. See `HostDuck`.
+    let hostDuck: HostDuck
 
     private(set) var deckA: Deck
     private(set) var deckB: Deck
@@ -60,7 +62,10 @@ final class DualDeckEngine: PlaybackEngine {
     var plannedTransition: CrossfadePlan?
     /// A gapless hand-over waiting for its host time (the incoming deck is already scheduled).
     var scheduledHandOver: ScheduledHandOver?
-    var fade: FadeRun?
+    var fade: FadeRun? {
+        // Two decks overlapping: the host's duck is given back at once (a crossfade reads and writes the levels itself).
+        didSet { if oldValue == nil, fade != nil { hostDuck.abort(reason: "transition") } }
+    }
     var fadeMonitorTask: Task<Void, Never>?
     var nextPlanId = 0
 
@@ -115,6 +120,7 @@ final class DualDeckEngine: PlaybackEngine {
         self.session = session
         self.effects = effects
         self.factory = factory
+        hostDuck = HostDuck(effects: effects)
         let first = Deck(name: "A")
         deckA = first
         deckB = Deck(name: "B")
@@ -861,6 +867,7 @@ final class DualDeckEngine: PlaybackEngine {
     private func rebuildAfterMediaServicesReset() {
         let position = currentPositionMs()
         let wasPlaying = playWhenReady
+        hostDuck.abort(reason: "reset")
         cancelCrossfadePlan()
         fadeMonitorTask?.cancel()
         fade = nil
