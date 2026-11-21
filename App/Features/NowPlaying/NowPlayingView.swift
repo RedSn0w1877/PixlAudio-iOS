@@ -372,6 +372,11 @@ private struct PlayerMetadataRow: View {
                     .accessibilityAddTraits(.isButton)
                     .accessibilityHint("Opens the artist")
                 PlayerSetNoteLine(color: theme.onPrimaryContainer.opacity(0.7))
+                // "Ask the host" (Endless Listening): only while that station is the queue.
+                if env.brain.autoplay.isEndless {
+                    AskHostButton { router.present(AppSheet.askHost) }
+                        .padding(.top, 6)
+                }
             }
             .padding(.vertical, 4)
             .frame(maxWidth: .infinity, alignment: .leading)

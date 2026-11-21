@@ -26,6 +26,10 @@ import SwiftUI
 /// a Confirm / Cancel card. The header's menu starts a new chat or reopens one of the last five. Reached from Home's
 /// sparkles button, the full player's sparkles circle and Settings › AI features.
 struct TaisChatSheet: View {
+    /// Opened from "Ask the host" of Endless Listening: the host's chips show above the composer and typed text carries the host's short
+    /// addendum (`TaisChatModel.hostMode`).
+    var hostMode = false
+
     @Environment(AppEnvironment.self) private var env
     @Environment(\.appTheme) private var theme
     @Environment(\.dismiss) private var dismiss
@@ -49,6 +53,7 @@ struct TaisChatSheet: View {
     static let cloudDemoScript = ["What's this song about?", "Make me a road-trip playlist from my library"]
 
     var body: some View {
+        @Bindable var chat = model
         let isEmpty = model.messages.isEmpty
         let thinking = model.isThinking
         Group {
@@ -66,11 +71,19 @@ struct TaisChatSheet: View {
             if !isEmpty { header(thinking: thinking) }
         }
         .safeAreaBar(edge: .bottom) {
-            TaizoComposer(model: model, onSend: { send(nil) })
+            VStack(spacing: 0) {
+                if hostMode { HostChipsRow(enabled: !thinking, onChip: { model.hostChip($0) }) }
+                TaizoComposer(model: model, onSend: { send(nil) })
+            }
+        }
+        // "Why this song" from the host's chips: the existing sheet, over the chat.
+        .sheet(item: $chat.hostWhy) { ref in
+            WhyThisSongSheet(song: ref.song, why: ref.why).pixlSheet()
         }
         .animation(.spring(response: 0.55, dampingFraction: 0.86), value: isEmpty)
         .onAppear {
             sheetVisible = true
+            model.hostMode = hostMode
             model.restoreIfNeeded()
             // The on-device model loads while the user types (nothing in UI tests or with a cloud assistant).
             env.ai.prewarm(.chat)
@@ -78,7 +91,10 @@ struct TaisChatSheet: View {
                 personalSuggestions = TaizoSuggestion.personal(from: env.home.content.statsOverview)
             }
         }
-        .onDisappear { sheetVisible = false }
+        .onDisappear {
+            sheetVisible = false
+            if hostMode { model.hostMode = false }
+        }
         .task {
             guard model.messages.isEmpty else { return }
             if env.launch.screen == .taisChatConversation { await model.runScript(Self.demoScript) }

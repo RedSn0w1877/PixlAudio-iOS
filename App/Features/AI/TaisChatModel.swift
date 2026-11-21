@@ -37,6 +37,13 @@ nonisolated enum TaisChatMessage: Identifiable, Sendable, Equatable {
     }
 }
 
+/// The song and reason "Why this song" is asked about from the host's chips.
+nonisolated struct HostWhyRef: Identifiable, Equatable, Sendable {
+    let song: Song
+    let why: QueueWhy
+    var id: String { song.id }
+}
+
 /// Ask Taizo's state (Android `TaisChatViewModel`, upgraded 2026-10-23). Held by `AIService`, so the conversation
 /// survives closing and reopening the sheet.
 ///
@@ -89,6 +96,11 @@ final class TaisChatModel {
     @ObservationIgnored private var streamingReply: (id: Int, progress: ClaudeTurnProgress, grounding: TaizoGrounding)?
     /// What an on-device or plain-provider chat knows (the listener's own words), when there is no cloud toolbox.
     @ObservationIgnored private let deviceGrounding = TaizoGrounding()
+    /// The chat was opened from "Ask the host" of Endless Listening: a typed request carries the host's short addendum (after the cached
+    /// blocks of the system prompt), and the sheet shows the host's chips. Set by the sheet while it is open.
+    var hostMode = false
+    /// "Why this song" was asked of the host: the sheet shows the existing sheet over the chat.
+    var hostWhy: HostWhyRef?
 
     /// Android `TAIZO_SUGGESTIONS` (sent as "Play some <x> songs"; the chips are `TaizoSuggestion.moods`).
     static let suggestions = ["Chill acoustic", "Energetic rock", "Sad indie", "Party anthems", "Focus beats", "Feel-good pop"]
@@ -126,6 +138,62 @@ final class TaisChatModel {
             guard let pending = enqueue() else { continue }
             await respond(to: pending)
         }
+    }
+
+    // MARK: The host's chips (Endless Listening)
+
+    /// A chip of the host. Every one is answered on the phone: the novelty switch, five songs built for the change put next in the queue, or
+    /// the existing "Why this song" sheet. Nothing is sent to a model, so a chip costs no part of the monthly allowance.
+    func hostChip(_ chip: HostChip) {
+        guard !isThinking else { return }
+        let label = EndlessStrings.label(of: chip)
+        resolveAllConfirmations(false)
+        messages.append(.user(id: makeId(), text: label))
+        let thinkingId = makeId()
+        messages.append(.thinking(id: thinkingId, prompt: label))
+        turnTask = Task { [weak self] in
+            guard let self else { return }
+            let reply = await self.runHostChip(chip)
+            guard !Task.isCancelled else { return }
+            self.replace(thinkingId, with: .textReply(id: self.makeId(), text: reply, isError: false))
+        }
+    }
+
+    private func runHostChip(_ chip: HostChip) async -> String {
+        let environment: @MainActor @Sendable () -> AppEnvironment?
+        let tools: TaizoToolbox?
+        if let assistant {
+            let made = toolbox ?? assistant.toolbox()
+            toolbox = made
+            tools = made
+            environment = made.environment
+        } else {
+            tools = nil
+            environment = { nil }
+        }
+        guard let env = environment() else { return EndlessStrings.replyNothing }
+        if let level = chip.noveltyLevel {
+            env.brainActions.setNovelty(level)
+            return chip == .new ? EndlessStrings.replyNew : EndlessStrings.replyFamiliar
+        }
+        if chip == .why {
+            let queue = playback.queue
+            guard let index = playback.currentIndex, index >= 0, index < queue.count else { return EndlessStrings.replyNoSong }
+            let song = queue[index]
+            guard let why = env.brain.autoplay.why[song.id] else { return EndlessStrings.replyNoWhy }
+            hostWhy = HostWhyRef(song: song, why: why)
+            return EndlessStrings.replyWhy
+        }
+        guard let change = chip.steerChange, let tools else { return EndlessStrings.replyNothing }
+        let outcome = await tools.music.hostSteer(change: change, environment: environment)
+        if outcome.applied {
+            switch chip {
+            case .upbeat: return EndlessStrings.replyUpbeat
+            case .slower: return EndlessStrings.replySlower
+            default: return EndlessStrings.replySurprise
+            }
+        }
+        return outcome.note.isEmpty ? EndlessStrings.replyNothing : outcome.note
     }
 
     private func enqueue() -> (prompt: String, thinkingId: Int)? {
@@ -287,7 +355,7 @@ final class TaisChatModel {
         streamingReply = (replyId, progress, grounding)
         defer { streamingReply = nil }
         let loop = ClaudeToolLoop(
-            client: client, system: record.system, tools: tools, serverTools: TaizoAssistant.serverTools,
+            client: client, system: hostMode ? TaizoAssistant.withHostAddendum(record.system) : record.system, tools: tools, serverTools: TaizoAssistant.serverTools,
             effort: .medium, stream: true,
             confirm: { [weak self] question in await self?.askConfirmation(question) ?? false },
             onEvent: { [weak self] event in await self?.handle(event, replyId: replyId, progress: progress) },

@@ -37,6 +37,11 @@ struct QueueSheet: View {
     @State private var setNoteMemo = SetNoteMemo()
     /// The songs of the next few rows that the listener has a recorded play of; nil until read (a note is true or absent).
     @State private var heardIds: Set<String>?
+    /// What the host of Endless Listening may say about the next rows (nil for any other queue or with the host's notes off).
+    @State private var hostFacts: SetNoteLines.HostFacts?
+    @State private var hostStamp = 0
+    /// "Ask the host": Ask Taizo in host mode over the queue (Endless Listening only).
+    @State private var showsAskHost = false
     @State private var showsHowPicksWork = false
     /// The drag's state lives in its own observable model: a drag event re-runs the visible rows' offset modifiers,
     /// not this sheet's body.
@@ -127,6 +132,9 @@ struct QueueSheet: View {
         .sheet(isPresented: $showsHowPicksWork) {
             HowPicksWorkSheet().pixlSheet()
         }
+        .sheet(isPresented: $showsAskHost) {
+            TaisChatSheet(hostMode: true).pixlSheet(detents: [.tallGlass])
+        }
         // "Not for me" from a row's song sheet or from "Why this song": the bar with Undo shows over the queue.
         .brainNoticeBar(bottomPadding: 96)
         .fullScreenCover(isPresented: $showsSaveAsPlaylist) {
@@ -167,6 +175,11 @@ struct QueueSheet: View {
                 Text(Self.countLabel(count))
                     .pixlFont(.bodyMedium)
                     .foregroundStyle(theme.onSurfaceVariant)
+                // Endless Listening: the host is one tap away from the queue (only while that station is the queue).
+                if env.brain.autoplay.isEndless {
+                    AskHostButton { showsAskHost = true }
+                        .padding(.top, 4)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             HStack(spacing: 8) {
@@ -219,7 +232,8 @@ struct QueueSheet: View {
         let whyLines = env.brain.autoplay.why
         let currentIndex = playback.currentIndex ?? -1
         // By the position of the row in the queue: a song queued twice has its note on one row only.
-        let setNotes = setNoteMemo.notes(queue: queue, currentIndex: currentIndex, heard: heardIds).byIndex
+        let hostActive = env.endless.wantsHostNotes
+        let setNotes = setNoteMemo.notes(queue: queue, currentIndex: currentIndex, heard: heardIds, host: hostFacts, stamp: hostStamp).byIndex
         return ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 8) {
@@ -276,9 +290,11 @@ struct QueueSheet: View {
             .scrollEdgeEffectStyle(.soft, for: .top)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
             // The plays behind the notes are read when the window of the queue changes, on the brain's own actors (never on the main thread).
-            .task(id: setNoteMemo.key(queue: queue, currentIndex: currentIndex)) {
-                heardIds = await SetNoteHistoryLoader.heard(SetNoteLines.window(queue, currentIndex: currentIndex),
-                                                            repository: env.brain.repository, engine: env.brain.engine)
+            .task(id: setNoteMemo.key(queue: queue, currentIndex: currentIndex, host: hostActive)) {
+                let window = SetNoteLines.window(queue, currentIndex: currentIndex)
+                heardIds = await SetNoteHistoryLoader.heard(window, repository: env.brain.repository, engine: env.brain.engine)
+                hostFacts = hostActive ? await env.endless.hostFacts(window: window) : nil
+                hostStamp &+= 1
             }
             .onChange(of: locateRequest) { _, _ in
                 guard currentDisplay >= 0 else { return }

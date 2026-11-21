@@ -15,6 +15,8 @@ final class TaizoMusic {
     nonisolated struct Prepared: Sendable {
         let runner: MusicToolRunner
         let playable: any AssistantPlayable
+        /// The engine behind both, for the host's chips (`hostSteer`).
+        let engine: BrainAssistantEngine
     }
 
     private var prepared: Prepared?
@@ -33,7 +35,7 @@ final class TaizoMusic {
             mixes: mixes, engine: engine, repository: repository, parts: env.brain.stage2b?.parts, yourSound: env.brain.yourSound,
             host: host, library: { await MainActor.run { environment()?.library.songs ?? [] } },
             assisted: { rid in await assistCache?.read().tagRids.contains(rid) ?? false })
-        let made = Prepared(runner: MusicToolRunner(backend: backend, grounding: grounding), playable: backend)
+        let made = Prepared(runner: MusicToolRunner(backend: backend, grounding: grounding), playable: backend, engine: backend)
         prepared = made
         return made
     }
@@ -57,6 +59,13 @@ final class TaizoMusic {
     }
 
     func mixTitle(_ mixId: String) async -> String { await prepared?.runner.mixTitle(mixId) ?? "Made for you" }
+
+    /// A chip of the host (Endless Listening): `steer_session`, scope session, run directly with no model: five songs built for the change
+    /// go next in the queue. What it cannot do, it says (no energy data, nothing playing).
+    func hostSteer(change: String, environment: @escaping @MainActor @Sendable () -> AppEnvironment?) async -> AssistantSteerOutcome {
+        guard let prepared = prepare(environment) else { return AssistantSteerOutcome(applied: false) }
+        return await prepared.engine.steer(change: change, target: "", scope: "session")
+    }
 
     /// "Start a station from X" with no network and no model (docs/brain-spec.md, 14 stage 4): X is tried as an artist of the library, a
     /// genre of the atlas, a playlist and an album of the listener's, in that order, through the same host call the chat's `start_station`
