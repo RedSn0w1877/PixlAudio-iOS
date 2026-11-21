@@ -170,6 +170,8 @@ nonisolated enum AppRoute: Hashable, Sendable {
     case cloudQueue
     /// Song Tap diagnostics (Developer mode, Settings › Song Tap): the live numbers behind the tap detector.
     case songTapDiagnostics
+    /// Ring code diagnostics (Developer mode, Settings › Song Tap): the scanner's picture and numbers, and the code at this phone's colour.
+    case ringCodeDiagnostics
 
     // Accounts
     case accounts
@@ -221,6 +223,7 @@ nonisolated enum AppRoute: Hashable, Sendable {
         case .cloudProcessing: "cloudProcessing"
         case .cloudQueue: "cloudQueue"
         case .songTapDiagnostics: "songTapDiagnostics"
+        case .ringCodeDiagnostics: "ringCodeDiagnostics"
         case .accounts: "accounts"
         case .spotifyDashboard: "spotifyDashboard"
         case .spotifyBrowse: "spotifyBrowse"

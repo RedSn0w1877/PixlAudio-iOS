@@ -153,6 +153,75 @@ nonisolated enum SongTapStrings {
     static func dropWaiting(_ name: String) -> String { String(localized: "Waiting for \(name)") }
     static var dropOtherPhone: String { String(localized: "the other phone") }
 
+    // MARK: The ring code: the sender shows it, the receiver scans it. The plain QR code is the last resort.
+
+    static var ringDescription: String { String(localized: "Song Tap code for the song that is playing") }
+    static var ringHint: String { String(localized: "Hold this up for the other phone to scan. Keep it flat and the screen bright.") }
+    static var ringSent: String { String(localized: "Sent") }
+    static var useQr: String { String(localized: "Use QR code instead") }
+    static var ringNoVideo: String { String(localized: "This song has no video yet, so it can only be shared with a QR code.") }
+    static var ringScanHint: String { String(localized: "Point the camera at the other phone's code and keep the whole code in view.") }
+    static var ringLookingUp: String { String(localized: "Looking up the song") }
+    static var ringExpired: String { String(localized: "That code has run out. Ask for a new one.") }
+    static var ringClock: String { String(localized: "That code is from the future. Check the date and time on this phone.") }
+    static var ringLookupFailed: String { String(localized: "Couldn't look the song up. Check your connection, or use the QR code.") }
+    static var ringReplay: String { String(localized: "You already took that code.") }
+    static var ringCameraFailed: String { String(localized: "The camera couldn't start for the code scanner.") }
+    static var ringSlow: String { String(localized: "Reading the code is slow on this phone.") }
+    static var ringNoCamera: String { String(localized: "This phone has no camera for the code scanner.") }
+    static var backToRing: String { String(localized: "Back to the Song Tap code") }
+    static var qrScanHint: String { String(localized: "Point the camera at the QR code on the other phone.") }
+
+    /// The line under the receiver's camera: what the scan is doing or why it did not take a code. Nil when there is nothing to say.
+    static func ringScanLine(_ view: RingScanView, hasCamera: Bool, waiting: Bool) -> String? {
+        if view.stage == .resolving { return ringLookingUp }
+        switch view.message {
+        case .expired: return ringExpired
+        case .clock: return ringClock
+        case .lookupFailed: return ringLookupFailed
+        case .replay: return ringReplay
+        case .none: break
+        }
+        if view.stage == .unavailable { return hasCamera ? ringCameraFailed : ringNoCamera }
+        return waiting ? ringScanHint : nil
+    }
+
+    // MARK: Developer mode: Ring code diagnostics
+
+    static var ringDiagTitle: String { String(localized: "Ring code diagnostics") }
+    static var ringDiagSettingsSubtitle: String { String(localized: "Look at a code through the camera and check how it draws") }
+    static var ringDiagCamera: String { String(localized: "Camera") }
+    static var ringDiagCameraHint: String { String(localized: "What the scanner sees: the plate's circle in green, the start dot in orange.") }
+    static var ringDiagNumbers: String { String(localized: "Last scan") }
+    static var ringDiagYes: String { String(localized: "found") }
+    static var ringDiagNo: String { String(localized: "not found") }
+    static var ringDiagSlots: String { String(localized: "Slots") }
+    static var ringDiagSlotsHint: String { String(localized: "Each dot is a slot, brighter where the scanner was surer. Dim means it was a guess.") }
+    static var ringDiagResults: String { String(localized: "Last 20 results") }
+    static var ringDiagResultsEmpty: String { String(localized: "Nothing read yet.") }
+    static var ringDiagPreview: String { String(localized: "Colours on this phone") }
+    static var ringDiagPreviewHint: String { String(localized: "The code at this phone's own colour, in light and dark mode, with its contrast against the plate.") }
+    static var ringDiagLight: String { String(localized: "Light mode") }
+    static var ringDiagDark: String { String(localized: "Dark mode") }
+    static var ringDiagDarkened: String { String(localized: "The device colour was darkened to keep 7 to 1.") }
+    static var ringDiagPlayBeam: String { String(localized: "Play the beam") }
+    static var ringDiagTooSlow: String { String(localized: "The scanner is too slow on this phone, so the QR code would be offered.") }
+    static func ringDiagStats(fps: Int, scans: Int, millis: String, width: Int, height: Int) -> String {
+        String(localized: "\(fps) frames a second, \(scans) scans a second, last scan \(millis) ms, frame \(width) x \(height)")
+    }
+    static func ringDiagFound(plate: Bool, marker: Bool, matched: Int, candidates: Int) -> String {
+        let plateText = plate ? ringDiagYes : ringDiagNo
+        let markerText = marker ? ringDiagYes : ringDiagNo
+        return String(localized: "Plate \(plateText), start dot \(markerText), dots matched \(matched) of 200, outline candidates \(candidates)")
+    }
+    static func ringDiagRs(fixed: Int, erasures: Int, residual: String) -> String {
+        String(localized: "Reed-Solomon fixed \(fixed), erasures \(erasures), residual \(residual) px")
+    }
+    static func ringDiagOutcome(_ outcome: String) -> String { String(localized: "Result: \(outcome)") }
+    static func ringDiagContrast(dot: String, plate: String, contrast: String, tone: Int) -> String {
+        String(localized: "Dots \(dot) on plate \(plate), contrast \(contrast) to 1, dot tone \(tone)")
+    }
+
     // MARK: Things that did not work
 
     static func notice(_ notice: SongTapNotice) -> String {

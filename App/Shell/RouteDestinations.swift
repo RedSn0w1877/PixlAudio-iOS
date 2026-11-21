@@ -42,6 +42,7 @@ struct RouteDestination: View {
         case .cloudProcessing: CloudProcessingSettingsView()
         case .cloudQueue: CloudQueueView()
         case .songTapDiagnostics: SongTapDiagnosticsView()
+        case .ringCodeDiagnostics: RingCodeDiagnosticsView()
         case .accounts: AccountsView()
         case .spotifyDashboard: SpotifyDashboardView()
         case .spotifyBrowse(let query): SpotifyBrowseView(query: query)

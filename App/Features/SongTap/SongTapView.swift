@@ -7,7 +7,9 @@ import UIKit
 ///
 /// Send: the song that is playing, large; touch the backs of the two phones together and it flies off the top of this screen into
 /// the other phone. Receive: wait, and a Liquid Glass card with the song enters from the top. A glow at the top edge grows as the
-/// other phone comes close. A code (shown or scanned) does the same job without Bluetooth and is one tap away on both sides.
+/// other phone comes close. A code (shown or scanned) does the same job without Bluetooth and is one tap away on both sides: the Pixl
+/// ring code first (the sender shows it, the receiver scans it with its own scanner), the plain QR code last, only as "Use QR code
+/// instead" once the ring scan has failed for about six seconds or the camera cannot run it.
 ///
 /// It is armed only while it is on screen and PixlAudio is in the foreground: leaving the screen or the app disarms, stops the
 /// camera, the radio and the sensor, and cancels every timer. The beam is drawn by `SongTapBeam.swift` from the pure timeline in
@@ -23,8 +25,12 @@ struct SongTapView: View {
     @State private var useCode = false
     @State private var scanning = false
     @State private var camera: SongTapCamera?
+    /// The ring code scanner's camera, and whether the listener moved on to the plain QR scan (the last resort).
+    @State private var ringCamera: RingCodeCamera?
+    @State private var qrMode = false
     @State private var cameraStatus = SongTapCameraAccess.current()
     @State private var rootHeight: CGFloat = 0
+    @State private var rootWidth: CGFloat = 0
     @State private var pulseAt: Date?
     /// A phone the listener picked from the nearby list, waiting for its "Song drop to X?" answer.
     @State private var picked: SongTapNearbyEntry?
@@ -79,7 +85,10 @@ struct SongTapView: View {
                     .transition(.opacity)
             }
         }
-        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { rootHeight = $0 }
+        .onGeometryChange(for: CGSize.self) { $0.size } action: {
+            rootHeight = $0.height
+            rootWidth = $0.width
+        }
         .sensoryFeedback(trigger: controller.hapticSerial) { _, _ in
             HapticsPreference.isEnabled ? Self.feedback(for: controller.hapticCue) : nil
         }
@@ -92,6 +101,8 @@ struct SongTapView: View {
             // Reduce Motion is read now, not from the last beam: the flag on the state is only set when a beam starts.
             if (phase == .offered || phase == .transferring), ui.session.peer != 0, !controller.reducedMotion() { pulseAt = Date() }
         }
+        // A beam in progress closes the ring scan, the end of it opens it again.
+        .onChange(of: ui.phase) { _, _ in syncCamera(controller) }
         .task(id: pulseAt) {
             guard pulseAt != nil else { return }
             try? await Task.sleep(for: .milliseconds(700))
@@ -128,10 +139,12 @@ struct SongTapView: View {
         .onChange(of: mode) { _, new in
             useCode = false
             scanning = false
+            qrMode = false
             controller.switchRole(new)
             sync(controller)
         }
         .onChange(of: scanning) { _, _ in sync(controller) }
+        .onChange(of: qrMode) { _, _ in syncCamera(controller) }
         .onChange(of: env.playback.current?.id) { _, _ in controller.nowPlayingChanged(env.playback.current) }
         .accessibilityIdentifier("screen.songTap")
     }
@@ -160,11 +173,33 @@ struct SongTapView: View {
             return
         }
         controller.arm(mode)
+        syncCamera(controller)
+    }
+
+    /// Which camera runs, if any: the ring code scanner while the Receive side is open and waiting for a song, the QR scanner only after
+    /// the listener asked for it, none at all otherwise (and so none in the background or on another screen).
+    private func syncCamera(_ controller: SongTapController) {
         cameraStatus = SongTapCameraAccess.current()
-        if mode == .receive, scanning, cameraStatus == .allowed {
+        guard controller.allowed, scenePhase == .active, mode == .receive, scanning else {
+            stopCamera()
+            return
+        }
+        guard RingCodeCamera.exists else {
+            // No camera at all: the scan opens in its "cannot run" state, which offers the QR.
+            if !qrMode, controller.ringScan.stage == .idle { controller.ringScanStart(cameraAvailable: false) }
+            return
+        }
+        guard cameraStatus == .allowed else {
+            stopCamera()
+            return
+        }
+        if qrMode {
+            stopRingCamera(controller)
             startCamera(controller)
         } else {
-            stopCamera()
+            camera?.stop()
+            let phase = controller.ui.phase
+            if phase == .armed || phase == .found || phase == .near { startRingCamera(controller) } else { stopRingCamera(controller) }
         }
     }
 
@@ -176,8 +211,23 @@ struct SongTapView: View {
         active.start()
     }
 
+    private func startRingCamera(_ controller: SongTapController) {
+        let active = ringCamera ?? RingCodeCamera(sink: controller.ringSink)
+        ringCamera = active
+        // One scan session per time on screen while waiting: the scan's clock (for the QR button) starts once, not at every update.
+        if controller.ringScan.stage == .idle { controller.ringScanStart(cameraAvailable: true) }
+        active.start()
+    }
+
+    private func stopRingCamera(_ controller: SongTapController) {
+        ringCamera?.stop()
+        controller.ringScanStop()
+    }
+
     private func stopCamera() {
         camera?.stop()
+        ringCamera?.stop()
+        env.songTap.ringScanStop()
     }
 
     private static func feedback(for cue: SongTapHapticCue) -> SensoryFeedback {
@@ -309,9 +359,23 @@ struct SongTapView: View {
     @ViewBuilder
     private func sendContent(_ controller: SongTapController, _ ui: SongTapUiState) -> some View {
         if let playing = ui.nowPlaying {
-            SongTapBeamArtwork(artUrl: playing.artUrl, beamRole: ui.beamRole, beamStartMs: ui.beamStartMs, reduced: ui.beamReduced,
-                               rootHeight: rootHeight, size: 248)
+            // The Pixl ring code: the playing song's artwork in the middle, the dots in the app's accent colour around it.
+            let ring = controller.ringSlots
+            let ringShown = useCode && controller.codeKind == .ring && ring != nil
+            if ringShown, let ring {
+                let side = min(max(rootWidth - 32, 0), 380)
+                RingCodeView(slots: ring, palette: RingPalettes.palette(for: theme.argb(\.primary)), approach: controller.glow,
+                             beamStartMs: ui.beamRole == .send ? ui.beamStartMs : 0, rootHeight: rootHeight,
+                             pillText: SongTapStrings.ringSent, reduced: ui.beamRole == nil ? nil : ui.beamReduced) {
+                    ArtworkView(source: ArtworkSource(uriString: playing.artUrl), size: max(side * 0.56, 1), cornerRadius: side * 0.28)
+                }
+                .frame(width: side, height: side)
                 .padding(.top, 8)
+            } else {
+                SongTapBeamArtwork(artUrl: playing.artUrl, beamRole: ui.beamRole, beamStartMs: ui.beamStartMs, reduced: ui.beamReduced,
+                                   rootHeight: rootHeight, size: 248)
+                    .padding(.top, 8)
+            }
             VStack(spacing: 2) {
                 Text(playing.title)
                     .pixlFont(.titleLarge)
@@ -332,7 +396,7 @@ struct SongTapView: View {
                 let status = statusLine(ui)
                 if armed {
                     armedCard(controller, ui)
-                } else {
+                } else if !useCode {
                     Text(status ?? SongTapStrings.sendHint)
                         .pixlFont(.titleSmall)
                         .foregroundStyle(status != nil ? theme.primary : theme.onSurfaceVariant)
@@ -350,7 +414,24 @@ struct SongTapView: View {
                 }
                 if armed {
                     EmptyView()
+                } else if ringShown {
+                    Text(SongTapStrings.ringHint)
+                        .pixlFont(.bodyMedium)
+                        .foregroundStyle(theme.onSurfaceVariant)
+                        .multilineTextAlignment(.center)
+                    // The QR is the last resort: offered once the code has been up for a few seconds without being taken, never beside it.
+                    RingQrOffer(onUseQr: { controller.showQrInstead() })
+                    plainButton(SongTapStrings.backToTap, id: "songTap.hideCode") {
+                        useCode = false
+                        controller.hideCode()
+                    }
                 } else if useCode, let code = ui.code {
+                    if controller.ringNote == .noVideo {
+                        Text(SongTapStrings.ringNoVideo)
+                            .pixlFont(.bodyMedium)
+                            .foregroundStyle(theme.onSurfaceVariant)
+                            .multilineTextAlignment(.center)
+                    }
                     SongTapQrView(text: code, accessibilityText: SongTapStrings.codeDescription)
                     Text(SongTapStrings.codeHint)
                         .pixlFont(.bodyMedium)
@@ -448,8 +529,14 @@ struct SongTapView: View {
     @ViewBuilder
     private func receiveContent(_ controller: SongTapController, _ ui: SongTapUiState) -> some View {
         if scanning {
-            scanner(controller)
-            plainButton(SongTapStrings.backToTap, id: "songTap.backToTap") { scanning = false }
+            scanner(controller, ui)
+            if qrMode {
+                plainButton(SongTapStrings.backToRing, id: "songTap.backToRing") { qrMode = false }
+            }
+            plainButton(SongTapStrings.backToTap, id: "songTap.backToTap") {
+                scanning = false
+                qrMode = false
+            }
         } else {
             ZStack {
                 Circle().fill(theme.surfaceContainerHigh)
@@ -470,50 +557,99 @@ struct SongTapView: View {
         }
     }
 
-    /// The camera, behind its permission: asked for the first time the listener chooses to scan a code, and nowhere else.
+    /// The camera, behind its permission: asked for the first time the listener chooses to scan a code, and nowhere else. The Pixl ring
+    /// code scanner is the default; the plain QR scanner opens only when the listener asks for it.
     @ViewBuilder
-    private func scanner(_ controller: SongTapController) -> some View {
-        switch cameraStatus {
-        case .allowed:
-            VStack(alignment: .leading, spacing: 12) {
+    private func scanner(_ controller: SongTapController, _ ui: SongTapUiState) -> some View {
+        if !RingCodeCamera.exists && !qrMode {
+            // No camera at all: say so, and offer the QR (the scan session is already in its "cannot run" state).
+            ringScanner(controller, ui, preview: false)
+        } else {
+            switch cameraStatus {
+            case .allowed:
+                if qrMode { qrScanner } else { ringScanner(controller, ui, preview: true) }
+            case .notAsked:
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(SongTapStrings.cameraNeeded)
+                        .pixlFont(.bodyLarge)
+                        .foregroundStyle(theme.onSurfaceVariant)
+                    prominentButton(SongTapStrings.allowCamera, id: "songTap.allowCamera") {
+                        Task {
+                            _ = await SongTapCameraAccess.request()
+                            sync(controller)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            case .blocked:
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(SongTapStrings.cameraBlocked)
+                        .pixlFont(.bodyLarge)
+                        .foregroundStyle(theme.onSurfaceVariant)
+                    prominentButton(SongTapStrings.openSettings, id: "songTap.openSettings") {
+                        if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    /// The plain QR scanner: the last resort.
+    private var qrScanner: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 28, style: .continuous).fill(theme.surfaceContainerHighest)
+                if let camera {
+                    SongTapCameraPreview(camera: camera)
+                        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                }
+            }
+            .aspectRatio(1, contentMode: .fit)
+            .accessibilityHidden(true)
+            Text(SongTapStrings.qrScanHint)
+                .pixlFont(.bodyMedium)
+                .foregroundStyle(theme.onSurfaceVariant)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The Pixl ring code scanner: the camera with a circle to hold the code in, what the scan is doing, and "Use QR code instead" only
+    /// when the scan has failed for about six seconds or the camera cannot run it.
+    private func ringScanner(_ controller: SongTapController, _ ui: SongTapUiState, preview: Bool) -> some View {
+        let scan = controller.ringScan
+        let waiting = ui.phase == .armed || ui.phase == .found || ui.phase == .near
+        let live = preview && waiting && (scan.stage == .scanning || scan.stage == .resolving)
+        let line = SongTapStrings.ringScanLine(scan, hasCamera: RingCodeCamera.exists, waiting: waiting)
+        return VStack(spacing: 12) {
+            if live {
                 ZStack {
                     RoundedRectangle(cornerRadius: 28, style: .continuous).fill(theme.surfaceContainerHighest)
-                    if let camera {
-                        SongTapCameraPreview(camera: camera)
+                    if let ringCamera {
+                        SongTapCameraPreview(camera: ringCamera)
                             .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
                     }
+                    // A guide for where to hold the code: the camera is not aimed at anything else.
+                    Circle()
+                        .stroke(Color.white.opacity(0.55), lineWidth: 2)
+                        .padding(26)
                 }
                 .aspectRatio(1, contentMode: .fit)
                 .accessibilityHidden(true)
-                Text(SongTapStrings.scanHint)
+            }
+            if let line {
+                Text(line)
                     .pixlFont(.bodyMedium)
-                    .foregroundStyle(theme.onSurfaceVariant)
+                    .foregroundStyle(scan.message == .none ? theme.onSurfaceVariant : theme.error)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("songTap.ringScanLine")
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        case .notAsked:
-            VStack(alignment: .leading, spacing: 12) {
-                Text(SongTapStrings.cameraNeeded)
-                    .pixlFont(.bodyLarge)
-                    .foregroundStyle(theme.onSurfaceVariant)
-                prominentButton(SongTapStrings.allowCamera, id: "songTap.allowCamera") {
-                    Task {
-                        _ = await SongTapCameraAccess.request()
-                        sync(controller)
-                    }
-                }
+            if scan.qrOffered {
+                textButton(SongTapStrings.useQr, id: "songTap.useQr") { qrMode = true }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        case .blocked:
-            VStack(alignment: .leading, spacing: 12) {
-                Text(SongTapStrings.cameraBlocked)
-                    .pixlFont(.bodyLarge)
-                    .foregroundStyle(theme.onSurfaceVariant)
-                prominentButton(SongTapStrings.openSettings, id: "songTap.openSettings") {
-                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: The card
@@ -652,5 +788,34 @@ struct SongTapView: View {
         }
         .buttonStyle(PressScaleButtonStyle(pressedScale: 0.94))
         .accessibilityIdentifier(id)
+    }
+}
+
+/// "Use QR code instead" under the ring code, shown once the code has been up for six seconds without being taken. A view of its own so
+/// the timer starts with the code and a new code (a fresh tag every minute) does not start it over.
+private struct RingQrOffer: View {
+    let onUseQr: () -> Void
+    @Environment(\.appTheme) private var theme
+    @State private var offered = false
+
+    var body: some View {
+        Group {
+            if offered {
+                Button(action: onUseQr) {
+                    Text(SongTapStrings.useQr)
+                        .pixlFont(.titleMedium, weight: .semibold)
+                        .foregroundStyle(theme.primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .contentShape(.capsule)
+                }
+                .buttonStyle(PressScaleButtonStyle(pressedScale: 0.94))
+                .accessibilityIdentifier("songTap.useQr")
+            }
+        }
+        .task {
+            try? await Task.sleep(for: .milliseconds(RingSendRules.qrOfferAfterMs))
+            if !Task.isCancelled { offered = true }
+        }
     }
 }

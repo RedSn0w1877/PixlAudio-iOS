@@ -20,6 +20,14 @@ final class SongTapController: SongTapPort {
     private(set) var hapticCue: SongTapHapticCue = .tick
     private(set) var hapticSerial = 0
 
+    /// Sender: which code is on screen (the ring code, or the plain QR as the last resort), the ring code's dots (a new one with a fresh
+    /// tag every minute), and why a QR came up by itself.
+    private(set) var codeKind: RingCodeKind?
+    private(set) var ringSlots: RingCodeSlots?
+    private(set) var ringNote: RingSendNote?
+    /// Receiver: what the ring scan is doing, and whether "Use QR code instead" is on offer.
+    private(set) var ringScan = RingScanView.idle
+
     let settings: SongTapSettings
 
     @ObservationIgnored private let engine = SongTapEngine()
@@ -42,13 +50,23 @@ final class SongTapController: SongTapPort {
     @ObservationIgnored private var showCodeTask: Task<Void, Never>?
     @ObservationIgnored private var approveTask: Task<Void, Never>?
     @ObservationIgnored private var targetRefreshTask: Task<Void, Never>?
+    /// The ring code receiver's rules over time (three reads, the freshness and replay guard, when the QR is offered), in PixlCore.
+    @ObservationIgnored private let ringSession: RingScanSession
+    @ObservationIgnored private var ringTickTask: Task<Void, Never>?
+    /// The numbers behind the ring scanner, for Developer mode's Ring code diagnostics: copies pictures only while that screen is open.
+    @ObservationIgnored let ringDiagnostics = RingCodeDiagnostics()
+    /// The sender chose "Use QR code instead": a rebuilt code stays a QR until the listener leaves.
+    @ObservationIgnored private var qrPreferred = false
+    @ObservationIgnored private var ringSerial = 0
     /// The song that plays, as the Song Tap screen last heard of it.
     @ObservationIgnored private var playingSong: Song?
     /// Song Drop: the song picked from a song's options is what is offered, instead of the one that plays, until the screen is left.
     @ObservationIgnored private var dropSong: Song?
 
-    init(settings: SongTapSettings, receiver: SongTapReceiver, sender: SongTapSender, playback: PlaybackStore) {
+    init(settings: SongTapSettings, receiver: SongTapReceiver, sender: SongTapSender, playback: PlaybackStore,
+         ringLookup: any RingCodeLookup) {
         self.settings = settings
+        ringSession = RingScanSession(lookup: ringLookup, clock: { currentTimeMillis() })
         self.receiver = receiver
         self.sender = sender
         self.playback = playback
@@ -71,6 +89,9 @@ final class SongTapController: SongTapPort {
         ble.setSensitivity(settings.sensitivity)
         engine.setSensitivity(settings.sensitivity)
         engine.setAllowed(settings.allowed)
+        ringSession.onView = { [weak self] view in self?.ringScan = view }
+        // The song a ring code named goes through the same consent, save and Undo as every other beam.
+        ringSession.onSong = { [weak self] song in self?.engine.ringOffer(song) }
     }
 
     /// A code has no peer (0); a phone found over Bluetooth has a number.
@@ -96,6 +117,8 @@ final class SongTapController: SongTapPort {
 
     func disarm() {
         engine.disarm()
+        qrPreferred = false
+        ringScanStop()
         showCodeTask?.cancel()
         showCodeTask = nil
         nowPlayingTask?.cancel()
@@ -204,7 +227,7 @@ final class SongTapController: SongTapPort {
         guard let song = offeredSong else { engine.setNowPlaying(nil); return }
         // A code that is up is for the song that plays: when the track changes, the code changes with it.
         if ui.session.role == .send, ui.session.phase == .offered, ui.session.peer == 0, ui.code != nil {
-            hideCode()
+            hideCode(keepQrChoice: true)
             showCode()
         }
         // A phone the listener said yes to is offered the new song at once (not at the next refresh).
@@ -219,7 +242,9 @@ final class SongTapController: SongTapPort {
         }
     }
 
-    /// Sender: put the song that is playing up as a code.
+    /// Sender: put the song that is playing up as a code. A song with a video id gets the Pixl ring code, made again with a fresh tag every
+    /// minute. A song that was never matched to a video has nothing the ring code could carry, so it goes straight to the QR code and the
+    /// screen says why (`ringNote`).
     func showCode() {
         let song = offeredSong
         showCodeTask?.cancel()
@@ -229,16 +254,109 @@ final class SongTapController: SongTapPort {
             // Hiding the code (or leaving Send) while the payload was being made cancels this: the session must not be put
             // into "offered" with nothing on screen to answer it.
             guard !Task.isCancelled else { return }
+            let plan = RingSendPlan.of(videoId: payload?.ytVideoId, qrPreferred: qrPreferred)
+            codeKind = payload == nil ? nil : plan.kind
+            ringNote = payload == nil ? nil : plan.note
+            ringSlots = nil
+            if payload != nil, plan.kind == .ring, let video = payload?.ytVideoId { makeRing(video) }
             engine.showCode(payload)
-            if payload != nil { startRefresh() }
+            if payload != nil {
+                if plan.kind == .ring { startRingRefresh() } else { startRefresh() }
+            }
         }
     }
 
-    func hideCode() {
+    /// The listener is done with the code (or the song changed under it: then the choice of QR is kept).
+    func hideCode(keepQrChoice: Bool = false) {
+        if !keepQrChoice { qrPreferred = false }
         refreshTask?.cancel()
         showCodeTask?.cancel()
         showCodeTask = nil
         engine.hideCode()
+    }
+
+    /// "Use QR code instead": the ring code gives way to the plain QR code for the same song. Offered by the screen after the code has been
+    /// up for six seconds without being taken; the two are never shown together.
+    func showQrInstead() {
+        guard ui.session.role == .send, ui.session.phase == .offered, ui.session.peer == 0, let song = offeredSong else { return }
+        qrPreferred = true
+        refreshTask?.cancel()
+        codeKind = .qr
+        ringSlots = nil
+        refreshTask = Task { [sender] in
+            guard let fresh = await sender.payload(for: song, nowMs: currentTimeMillis()), !Task.isCancelled else { return }
+            engine.refreshCode(fresh)
+            startRefresh()
+        }
+    }
+
+    /// A ring code for `videoId` with a fresh tag: this minute's bucket and a random byte.
+    private func makeRing(_ videoId: String) {
+        var generator = SystemRandomNumberGenerator()
+        let random = Int(UInt8.random(in: 0...255, using: &generator))
+        guard let bits = RingCodePayloads.encodeSlots(videoId: videoId, minuteBucket: RingCodePayloads.bucketOf(nowMs: currentTimeMillis()),
+                                                      random: random) else { return }
+        ringSerial += 1
+        ringSlots = RingCodeSlots(bits: bits, serial: ringSerial)
+    }
+
+    /// While a ring code is up it is made again with a fresh tag every `RingSendRules.codeLifeMs`, for the song that plays at that moment.
+    private func startRingRefresh() {
+        refreshTask?.cancel()
+        refreshTask = Task { [weak self, sender] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(RingSendRules.codeLifeMs))
+                guard !Task.isCancelled, let self else { return }
+                guard ui.session.phase == .offered, ui.session.peer == 0, codeKind == .ring, let song = offeredSong else { return }
+                let video = await sender.payload(for: song, nowMs: currentTimeMillis())?.ytVideoId
+                guard !Task.isCancelled, RingSendRules.canRing(video), let video else { return }
+                makeRing(video)
+            }
+        }
+    }
+
+    // MARK: The ring code, receiving
+
+    /// Where the ring camera's queue reports: the diagnostics (which copies only while its screen is open) and the scan itself.
+    var ringSink: RingCodeCamera.Sink {
+        let diagnostics = ringDiagnostics
+        var sink = RingCodeCamera.Sink()
+        sink.onFrame = { now in diagnostics.onFrame(nowMs: now) }
+        sink.onScan = { [weak self] frame, result, details, rotation, now in
+            diagnostics.record(frame: frame, result: result, diagnostics: details, rotationDegrees: rotation, nowMs: now)
+            Task { @MainActor in self?.ringScanned(result) }
+        }
+        sink.onSlow = { [weak self] in
+            diagnostics.onSlow()
+            Task { @MainActor in self?.ringSession.scannerTooSlow() }
+        }
+        sink.onFailed = { [weak self] in Task { @MainActor in self?.ringSession.cameraFailed() } }
+        return sink
+    }
+
+    /// The receiver opened the camera for a ring code. `cameraAvailable` is false on a phone with no camera.
+    func ringScanStart(cameraAvailable: Bool) {
+        ringSession.start(cameraAvailable: cameraAvailable)
+        ringTickTask?.cancel()
+        ringTickTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(RingScanSession.tickMs))
+                self?.ringSession.tick()
+            }
+        }
+    }
+
+    /// The camera closed (the screen was left, the listener went back, or a code was taken).
+    func ringScanStop() {
+        ringTickTask?.cancel()
+        ringTickTask = nil
+        ringSession.stop()
+    }
+
+    /// One scanner result (handed over from the camera's queue). Three equal fresh decodes in a row start the lookup of the song.
+    private func ringScanned(_ result: RingScanResult) {
+        guard ui.session.role == .receive else { return }
+        ringSession.offer(result)
     }
 
     /// The camera read `text`.
@@ -373,7 +491,15 @@ final class SongTapController: SongTapPort {
 
     func markFirstBeamAccepted() { settings.markFirstBeamAccepted() }
 
-    func uiChanged(_ ui: SongTapUiState) { self.ui = ui }
+    func uiChanged(_ ui: SongTapUiState) {
+        self.ui = ui
+        // The ring code is on screen only while a code offer is on the table.
+        if codeKind != nil, ui.session.phase != .offered || ui.session.target != 0 {
+            codeKind = nil
+            ringSlots = nil
+            ringNote = nil
+        }
+    }
 
     // MARK: The code's refresh
 
@@ -407,7 +533,8 @@ enum SongTapHub {
         let songLibrary = AppSongTapLibrary(library: library, persistence: persistence, importer: importer, editor: editor,
                                             search: env.spotify.bridge.search)
         let made = SongTapController(settings: SongTapSettings(), receiver: SongTapReceiver(library: songLibrary),
-                                     sender: SongTapSender(ids: AppSongTapSongIds(persistence: persistence)), playback: env.playback)
+                                     sender: SongTapSender(ids: AppSongTapSongIds(persistence: persistence)), playback: env.playback,
+                                     ringLookup: AppRingCodeLookup(source: env.youtube.radioSource))
         controller = made
         return made
     }

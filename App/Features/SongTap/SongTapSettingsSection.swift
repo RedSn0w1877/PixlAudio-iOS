@@ -39,6 +39,11 @@ struct SongTapSettingsSection: View {
                                     systemImage: "waveform.path.ecg", showsChevron: true, identifier: "settings.songTap.diagnostics") {
                         router.push(.songTapDiagnostics)
                     }
+                    SettingsItemRow(title: SongTapStrings.ringDiagTitle, subtitle: SongTapStrings.ringDiagSettingsSubtitle,
+                                    systemImage: "circle.dotted", showsChevron: true,
+                                    identifier: "settings.songTap.ringDiagnostics") {
+                        router.push(.ringCodeDiagnostics)
+                    }
                 }
             }
         }

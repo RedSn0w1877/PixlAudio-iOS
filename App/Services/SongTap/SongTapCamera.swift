@@ -84,14 +84,17 @@ nonisolated enum SongTapCameraAccess {
     }
 }
 
-/// The camera's picture, behind the Receive card.
+/// The camera's picture, behind the Receive card: the QR camera's session or the ring code camera's.
 struct SongTapCameraPreview: UIViewRepresentable {
-    let camera: SongTapCamera
+    let session: AVCaptureSession
+
+    init(camera: SongTapCamera) { session = camera.session }
+    init(camera: RingCodeCamera) { session = camera.session }
 
     func makeUIView(context: Context) -> PreviewView {
         let view = PreviewView()
         view.previewLayer.videoGravity = .resizeAspectFill
-        view.previewLayer.session = camera.session
+        view.previewLayer.session = session
         return view
     }
 
