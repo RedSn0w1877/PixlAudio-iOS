@@ -47,14 +47,22 @@ final class SongTapTaskScheduler: SongTapBleScheduler {
 @MainActor
 final class SongTapMotionSource: SongTapImpulseSource {
     private var motion: SongTapMotion?
+    private var profile = SongTapSensitivity.default
 
     func start(onImpulse: @escaping @MainActor (Int64) -> Void) {
         motion?.stop()
         let made = SongTapMotion { tMs in
             DispatchQueue.main.async { MainActor.assumeIsolated { onImpulse(tMs) } }
         }
+        made.setProfile(profile)
         motion = made
         made.start()
+    }
+
+    /// Normal and High differ in how sharp a jerk has to be (1800 and 900 milli g); live, the next reading uses it.
+    func setSensitivity(_ profile: SongTapSensitivity) {
+        self.profile = profile
+        motion?.setProfile(profile)
     }
 
     func stop() {
@@ -69,6 +77,21 @@ nonisolated final class SongTapMotion: @unchecked Sendable {
     private let queue = OperationQueue()
     private let onImpulse: @Sendable (Int64) -> Void
     private var state = SongTapImpulseState.initial
+    /// Written from the main thread, read on the sensor queue: one small value behind a lock.
+    private let profileLock = NSLock()
+    private var profile = SongTapSensitivity.default
+
+    func setProfile(_ value: SongTapSensitivity) {
+        profileLock.lock()
+        profile = value
+        profileLock.unlock()
+    }
+
+    private func currentProfile() -> SongTapSensitivity {
+        profileLock.lock()
+        defer { profileLock.unlock() }
+        return profile
+    }
 
     init(onImpulse: @escaping @Sendable (Int64) -> Void) {
         self.onImpulse = onImpulse
@@ -85,7 +108,7 @@ nonisolated final class SongTapMotion: @unchecked Sendable {
             let tMs = Int64(data.timestamp * 1000)
             let sample = SongTapAccelSample(tMs: tMs, xMg: Int(data.acceleration.x * 1000), yMg: Int(data.acceleration.y * 1000),
                                             zMg: Int(data.acceleration.z * 1000))
-            let step = SongTapImpulse.step(state, sample)
+            let step = SongTapImpulse.step(state, sample, profile: currentProfile())
             state = step.state
             if step.impulse { onImpulse(tMs) }
         }

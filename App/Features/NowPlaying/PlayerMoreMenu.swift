@@ -67,6 +67,9 @@ struct PlayerMoreMenu<MenuShape: Shape>: View {
                 if let shareURL {
                     ShareLink(item: shareURL) { Label("Share", systemImage: "square.and.arrow.up") }
                 }
+                Button { SongDrop.start(song, env: env, router: router) } label: {
+                    Label(SongTapStrings.dropButton, systemImage: "iphone.radiowaves.left.and.right")
+                }
                 Button { router.present(AppCover.songTap) } label: {
                     Label(SongTapStrings.title, systemImage: "iphone.radiowaves.left.and.right")
                     Text(UserDefaults.standard.bool(forKey: SongTapSettings.Keys.allow) ? SongTapStrings.menuOn : SongTapStrings.menuOff)

@@ -116,6 +116,8 @@ struct SongTapReceiveBeamCard: View {
     let card: SongTapCard
     let phase: SongTapPhase
     let alreadyHad: Bool
+    /// The sender's name ("From Ann"), when known.
+    var from: String?
     let beamStartMs: Int64
     let reduced: Bool
     let rootHeight: CGFloat
@@ -171,6 +173,13 @@ struct SongTapReceiveBeamCard: View {
         VStack(spacing: 6) {
             art
             VStack(spacing: 2) {
+                if let from {
+                    Text(SongTapStrings.from(from))
+                        .pixlFont(.labelLarge)
+                        .foregroundStyle(theme.primary)
+                        .lineLimit(1)
+                        .padding(.bottom, 4)
+                }
                 Text(card.title)
                     .pixlFont(.titleMedium)
                     .foregroundStyle(theme.onSurface)

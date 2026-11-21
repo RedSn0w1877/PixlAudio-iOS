@@ -74,7 +74,7 @@ nonisolated enum SongTapStrings {
     static var statusFound: String { String(localized: "Phone nearby. Hold the backs together.") }
     static var statusNear: String { String(localized: "Almost there. Touch the phones together.") }
     static var statusSent: String { String(localized: "Sent") }
-    static var sendHint: String { String(localized: "Touch the backs of the two phones together.") }
+    static var sendHint: String { String(localized: "Pick a phone below, then touch the phones together.") }
     static var receiveHint: String { String(localized: "Touch the back of your phone to the one playing the song.") }
     static var useCode: String { String(localized: "Use a code instead") }
     static var scanCode: String { String(localized: "Scan a code instead") }
@@ -102,6 +102,56 @@ nonisolated enum SongTapStrings {
     static var diagCopied: String { String(localized: "Copied") }
     static var diagClear: String { String(localized: "Clear") }
     static var diagTuning: String { String(localized: "Thresholds") }
+    static var diagScale: String { String(localized: "Signal scale") }
+    static var diagScaleHint: String {
+        String(localized: "This iPhone is the reference scale, so its readings go in as they are, with an offset of 0: touching about -33 dBm, resting 20 to 30 cm apart about -60.")
+    }
+    static var diagProfile: String { String(localized: "Sensitivity profile") }
+    static var diagGateNow: String { String(localized: "Gate now") }
+    static var diagHoldLevel: String { String(localized: "Gentle hold fires at") }
+    static var diagPeerTap: String { String(localized: "One-sided tap") }
+
+    // MARK: Sensitivity (Settings > Song Tap, and the diagnostics screen)
+
+    static var sensitivityTitle: String { String(localized: "Sensitivity") }
+    static func sensitivitySubtitle(_ value: String) -> String { String(localized: "How little it takes to count as a tap: \(value)") }
+    static var sensitivityNormal: String { String(localized: "Normal") }
+    static var sensitivityHigh: String { String(localized: "High") }
+    static var sensitivityDialogTitle: String { String(localized: "Sensitivity") }
+    static var sensitivityDialogBody: String { String(localized: "High reacts to a smaller, quicker touch. Normal needs a firmer one.") }
+
+    static func sensitivityName(_ value: SongTapSensitivity) -> String {
+        value == .high ? sensitivityHigh : sensitivityNormal
+    }
+
+    // MARK: Your name (Settings > Song Tap)
+
+    static var nameTitle: String { String(localized: "Your name") }
+    static func nameSubtitle(_ name: String) -> String { String(localized: "Other phones see \(name)") }
+    static var nameDialogTitle: String { String(localized: "Your name") }
+    static var nameDialogBody: String { String(localized: "Other phones show this when you share a song with them. Up to 20 characters.") }
+    static func nameCounter(_ used: Int, _ max: Int) -> String { String(localized: "\(used) of \(max)") }
+    static var nameSave: String { String(localized: "Save") }
+    static var nameUseDevice: String { String(localized: "Use my phone's name") }
+    static func from(_ name: String) -> String { String(localized: "From \(name)") }
+
+    // MARK: Song Drop
+
+    static var dropButton: String { String(localized: "Song Drop") }
+    static var dropButtonLabel: String { String(localized: "Song Drop: share this song with a phone nearby") }
+    static var dropNearbyTitle: String { String(localized: "Phones nearby") }
+    static var dropNearbyEmpty: String { String(localized: "No phones nearby yet. Ask them to open Song Tap and choose Receive.") }
+    static var dropSignalClose: String { String(localized: "Close") }
+    static var dropSignalNearby: String { String(localized: "Nearby") }
+    static func dropConfirmTitle(_ name: String) -> String { String(localized: "Song drop to \(name)?") }
+    static func dropConfirmBody(_ title: String) -> String { String(localized: "\(title) will be shared when you touch the phones together.") }
+    static var dropYes: String { String(localized: "Yes") }
+    static var dropNo: String { String(localized: "No") }
+    static var dropArmedTitle: String { String(localized: "Tap phones together to share") }
+    static func dropArmedTo(_ name: String) -> String { String(localized: "Sharing with \(name)") }
+    static var dropArmedCancel: String { String(localized: "Cancel") }
+    static func dropWaiting(_ name: String) -> String { String(localized: "Waiting for \(name)") }
+    static var dropOtherPhone: String { String(localized: "the other phone") }
 
     // MARK: Things that did not work
 

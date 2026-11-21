@@ -29,6 +29,7 @@ struct SongTapDiagnosticsView: View {
                     .foregroundStyle(theme.onSurfaceVariant)
             } else {
                 modeSwitch(controller)
+                sensitivityPicker(controller)
                 block(SongTapStrings.diagSignal) {
                     line("status", snapshot.status.rawValue)
                     line("following", snapshot.focus.isEmpty ? "-" : snapshot.focus)
@@ -36,11 +37,31 @@ struct SongTapDiagnosticsView: View {
                     line("signal now", "\(snapshot.rssi) dBm")
                     line("smoothed", "\(snapshot.smoothed) dBm")
                     line("baseline", "\(snapshot.baseline) dBm")
-                    line("jump", "\(snapshot.jump) dB   (fires at \(SongTapTuning.jumpDb))")
+                    line("jump", "\(snapshot.jump) dB   (fires at \(profile.jumpDb))")
                     line("held for", snapshot.heldMs < 0 ? "-" : "\(snapshot.heldMs) ms")
                     line("near", snapshot.near ? "yes" : "no")
                     line("connection", snapshot.connection)
                     line("readings", String(snapshot.samples))
+                }
+                block(SongTapStrings.diagScale) {
+                    line("signal now, raw", "\(snapshot.rssi) dBm")
+                    line("offset", "\(snapshot.offsetDb) dB")
+                    line("signal now, normalised", "\(snapshot.normalised) dBm")
+                    line("smoothed, normalised", "\(snapshot.smoothed) dBm")
+                    line("baseline, normalised", "\(snapshot.baseline) dBm")
+                    Text(SongTapStrings.diagScaleHint)
+                        .pixlFont(.bodySmall)
+                        .foregroundStyle(theme.onSurfaceVariant)
+                        .padding(.top, 4)
+                }
+                block(SongTapStrings.diagGateNow) {
+                    line("gate now", snapshot.gate)
+                    line("may connect and beam", snapshot.mayConnect ? "yes" : "no")
+                    line("shown in the picker", snapshot.listed ? "yes" : "no")
+                    line("offer in hand", snapshot.offerInHand ? "yes" : "no")
+                    line("names", snapshot.names.isEmpty ? "-" : snapshot.names)
+                    line("advertises", SongTapNames.advertName(SongTapNames.orFallback(controller.name)))
+                    line("full name", SongTapNames.orFallback(controller.name))
                 }
                 block(SongTapStrings.diagMotion) {
                     line("this phone's last jerk", ageText(snapshot.ownJerkAgeMs))
@@ -50,12 +71,17 @@ struct SongTapDiagnosticsView: View {
                     line("state", snapshot.detector)
                     line("last tap", snapshot.lastFire)
                     line("session", ui.phase.code)
+                    line(SongTapStrings.diagPeerTap, snapshot.peerTap)
                 }
                 block(SongTapStrings.diagTuning) {
-                    line("jump", "\(SongTapTuning.jumpDb) dB, hold \(SongTapTuning.holdMs) ms, dwell \(SongTapTuning.dwellMs) ms")
-                    line("jerk window", "\(SongTapTuning.impulseWindowMs) ms, at least \(SongTapTuning.jerkMilliG) milli g")
-                    line("near", "from \(SongTapTuning.nearEnterDbm) to \(SongTapTuning.nearExitDbm) dBm")
-                    line("cooldown", "\(SongTapTuning.cooldownMs) ms")
+                    line(SongTapStrings.diagProfile, profile.code)
+                    line("jump", "\(profile.jumpDb) dB, hold \(profile.holdMs) ms, dwell \(profile.dwellMs) ms")
+                    line("jerk window", "\(profile.impulseWindowMs) ms, at least \(profile.jerkMilliG) milli g (optional)")
+                    line("tap near gate", "in at \(SongTapTuning.nearEnterDbm), out at \(SongTapTuning.nearExitDbm) dBm")
+                    line("list gate", "in at \(SongTapTuning.listEnterDbm), out at \(SongTapTuning.listExitDbm) dBm")
+                    line(SongTapStrings.diagHoldLevel, "\(SongTapTuning.closeHoldDbm) dBm for \(SongTapTuning.closeHoldMs) ms, again below \(SongTapTuning.closeReleaseDbm)")
+                    line("cooldown", "\(profile.cooldownMs) ms")
+                    line("advertising power", "set by iOS (cannot be chosen)")
                 }
 
                 Text(SongTapStrings.diagMarks)
@@ -116,6 +142,36 @@ struct SongTapDiagnosticsView: View {
     /// Armed only while this screen is up in the foreground, like the main screen.
     private func sync(_ controller: SongTapController) {
         if controller.allowed, scenePhase == .active { controller.arm(mode) } else { controller.disarm() }
+    }
+
+    /// The profile the live numbers are read against.
+    private var profile: SongTapSensitivity { SongTapSensitivity.fromCode(snapshot.profile) }
+
+    private func sensitivityPicker(_ controller: SongTapController) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(SongTapStrings.sensitivityTitle)
+                .pixlFont(.titleSmall)
+                .foregroundStyle(theme.onSurface)
+            GlassEffectContainer(spacing: 8) {
+                HStack(spacing: 8) {
+                    ForEach(SongTapSensitivity.allCases, id: \.self) { value in
+                        let selected = controller.sensitivity == value
+                        Button { controller.setSensitivity(value) } label: {
+                            Text(SongTapStrings.sensitivityName(value))
+                                .pixlFont(.labelLarge)
+                                .foregroundStyle(selected ? theme.onPrimary : theme.onSurface)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .contentShape(.capsule)
+                        }
+                        .buttonStyle(.plain)
+                        .pixlGlass(in: Capsule(), tint: selected ? theme.primary.opacity(GlassTint.prominent) : nil, interactive: true)
+                        .accessibilityAddTraits(selected ? .isSelected : [])
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func ageText(_ ms: Int64) -> String { ms < 0 ? "none lately" : "\(ms) ms ago" }
