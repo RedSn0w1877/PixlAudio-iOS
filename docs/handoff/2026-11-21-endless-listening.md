@@ -83,3 +83,13 @@ island names on the card (they need the atlas); the cadence of host notes in a r
 3. Within the next few songs a row shows a short note ("From your ... side.", "Released in ...", ...), one per five songs at most, none on a song a set note already describes.
 4. "Ask the host": each chip answers in one line; "Slower" puts five songs next; "Something new" moves the switch to Discover.
 5. Settings › Endless Listening › Host notes off: the notes go. How it works replays the three pages.
+
+## CI
+
+- Round 1, run 44855584431 (on `4a1de24`): `App/` compiled on the first try. Two real failures in the core job, both mine and fixed in `d615ed9`:
+  `BrainPurityTests` (the pure `Brain/` folder is standard-library Swift only: `EndlessIntro.swift` imported Foundation and called `sin`, so it moved to
+  `BrainStore/`) and `BrainGoldenTests.theManifestListsEveryFileWithItsHash` (the manifest has 46 files now). The app job's only failure was the known
+  flaky `DualDeckEngineTests.testCrossfadeOverlapsBothDecksWithTheirGainCurves`.
+- Round 2, run 44856992899 (on `d615ed9`): core green; the app job failed twice on the known flaky `StoreTests.testPlaybackStoreWithDemoEngine`
+  (one failure of 664, a 50 ms timing test over the demo engine) and passed on the second `gh run rerun --failed`: green. The screenshot UI tests are not part of the push run.
+- Locally: the whole `Packages/PixlCore` suite ran before round 2's fix with those two failures only; the three affected tests pass after it.
