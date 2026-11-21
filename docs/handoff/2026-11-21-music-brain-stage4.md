@@ -426,3 +426,14 @@ Android's `music-brain` HEAD is `48cc163`; its golden files did not change after
 8. First Listen on a fresh library: no line in the queue about "your side". After a few days of listening, one appears.
 9. Settings: turn "Let Taizo help the engine" on, let a refresh run, then turn it off: the genres it wrote are gone at once.
 10. Drag a song 10 rows down a queue that has a note in it: it lands one row from where you aimed at most.
+
+## CI (review pass)
+
+- Round 1 (`eb92542`): `core` green; `app` failed to compile: a local function inside the `MainActor.run` closure of `TaizoAssistantHost.startStation`
+  read main-actor state (`novelty`, `setNovelty`) from a nonisolated context. Fixed by marking the local function `@MainActor` (`66e70de`).
+- Round 2 (`66e70de`, run 44839429114): `core` green; `app` built and ran the unit tests. Attempt 1: `TasteAdjustmentStoreTests.testChangesSurviveARelaunch`
+  failed (it waits for an off-main file write with a polling loop; the taste store is untouched by this pass; it passed on the next attempt).
+  Attempt 2: `DualDeckEngineTests.testCrossfadeOverlapsBothDecksWithTheirGainCurves` failed (the known flaky one). Attempt 3: **success**, `ipa`
+  skipped as before.
+- Local: whole PixlCore suite green (PixlLibrary 969 tests, PixlNet 340, PixlBackup 157, PixlLyrics 202, PixlFoundation 160, PixlModel 74 and 684 in
+  the other targets); `bash ci/check-forbidden.sh` OK; `ci/parse-check.ps1` OK on every App file this pass changed.
