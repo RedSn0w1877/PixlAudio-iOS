@@ -13,6 +13,8 @@ import PixlModel
 
 public actor HomePlanBuilder {
     static let albumWindowMs: Int64 = 14 * 24 * 60 * 60 * 1000
+    /// The `mixId` of the Endless Listening card.
+    public static let endlessId = "endless"
 
     private let mixes: BrainMixes
     private let homeRows: BrainHomeRows?
@@ -162,9 +164,12 @@ public actor HomePlanBuilder {
             inputs.append(HomePlanner.ShelfIn(type: shelf.type, id: "\(index):\(shelf.id)", items: items))
         }
 
-        // Made for you: the lists as cards.
-        if !cards.isEmpty {
-            addShelf(PlanShelf(type: HomePlanner.madeForYou, id: "made_for_you", titleKey: "made_for_you", mixes: cards))
+        // Made for you: the lists as cards. Endless Listening leads the shelf: a station, not a list (it is in no served_list row and in no
+        // other mix of the day), so it is on the shelf only.
+        let endless = await endlessCard(now)
+        if !cards.isEmpty || endless != nil {
+            addShelf(PlanShelf(type: HomePlanner.madeForYou, id: "made_for_you", titleKey: "made_for_you",
+                               mixes: (endless.map { [$0] } ?? []) + cards))
         }
         // Because you listened to X (at most two, the newest anchors by different artists): their saved rows.
         if let homeRows {
@@ -256,6 +261,22 @@ public actor HomePlanBuilder {
         return HomePlan(generatedAtMs: now, planKey: HomePlanner.planKey(nowMs: now, tzOffsetMin: tz), taste: taste,
                         daypart: HomePlanner.daypart(nowMs: now, tzOffsetMin: tz), weekday: HomePlanner.weekday(nowMs: now, tzOffsetMin: tz),
                         hero: planHero, mixes: cards, shelves: out, islandFitAtMs: islands?.fitAtMs ?? 0)
+    }
+
+    /// The Endless Listening card: present when there are at least two seeds to start from (one for each island, or the top artists), so
+    /// the station is more than one song's radio. `PlanMix.subtitle` holds the names of the islands the seeds stand for (real names only,
+    /// "" for none). Nothing is fetched.
+    private func endlessCard(_ now: Int64) async -> PlanMix? {
+        let seeds = await mixes.endlessSeeds(now: now)
+        if seeds.count < 2 { return nil }
+        var covers: [String] = []
+        for s in seeds {
+            if let art = s.song.albumArtUriString, !art.isEmpty, !covers.contains(art) { covers.append(art) }
+            if covers.count >= 3 { break }
+        }
+        return PlanMix(mixId: Self.endlessId, kind: MixKinds.endless, number: 0,
+                       subtitle: await mixes.endlessIslandNames(seeds).prefix(3).joined(separator: ", "),
+                       count: seeds.count, covers: covers, builtAtMs: now)
     }
 
     /// "Your weekday nights": the daypart mix of the island that leads this bucket of the week. Absent until the bucket has

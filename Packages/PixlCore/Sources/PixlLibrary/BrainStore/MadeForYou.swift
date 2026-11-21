@@ -109,23 +109,30 @@ extension BrainMixes {
     /// real ones only.
     func islandSubtitle(_ island: Islands.Island, nowMs: Int64) async -> String {
         guard let parts else { return "" }
+        let genreText = await islandGenreName(island)
+        var names: [Int64: String] = [:]
+        for t in await parts.libraryRids.all(nowMs: nowMs) where t.aid != 0 && names[t.aid] == nil {
+            names[t.aid] = BrainLibraryIndex.primaryArtistName(t.song)
+        }
+        let artists = island.topArtists.prefix(2).compactMap { names[$0] }.filter { !BrainText.isBlank($0) }
+        return [genreText, artists.joined(separator: ", ")].filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
+    /// "Soft pop & R&B": the island's name by its two highest-lift genres only, "" when the island is not named (too few of its tracks
+    /// have a genre). An island is named only when enough of it has a genre (unknown stays unknown), and only by a genre among its
+    /// biggest shares.
+    func islandGenreName(_ island: Islands.Island) async -> String {
+        guard let parts else { return "" }
         var genres: [String] = []
-        // An island is named only when enough of it has a genre (unknown stays unknown), and only by a genre among its biggest
-        // shares; otherwise the subtitle is the artists alone.
         if let atlas = await parts.atlas.atlas(), await taggedShare(island) >= Self.nameMinTagged {
             let lift = island.liftTags.filter { island.topTags.contains($0) }
             for id in IslandNames.pick(atlas, lift) {
                 if let name = AtlasNames.genreName(atlas, id) { genres.append(name) }
             }
         }
-        var names: [Int64: String] = [:]
-        for t in await parts.libraryRids.all(nowMs: nowMs) where t.aid != 0 && names[t.aid] == nil {
-            names[t.aid] = BrainLibraryIndex.primaryArtistName(t.song)
-        }
-        let artists = island.topArtists.prefix(2).compactMap { names[$0] }.filter { !BrainText.isBlank($0) }
         var genreText = genres.joined(separator: " & ")
         if let first = genreText.first { genreText = first.uppercased() + genreText.dropFirst() }
-        return [genreText, artists.joined(separator: ", ")].filter { !$0.isEmpty }.joined(separator: " · ")
+        return genreText
     }
 
     /// At least this share of an island's tracks must have a genre before the island gets a genre name.

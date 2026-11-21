@@ -222,6 +222,9 @@ public enum MixKinds {
     /// "Your weekday nights" (stage 3, 6.2): the island that fits this bucket of the week, 25 tracks, 15% new. Planned like a Daily
     /// Mix of an island.
     public static let daypart: Int32 = 6
+    /// The Endless Listening card of "Made for you". Not a list: it has no `served_list` row and no `MixSpec`; a tap starts (or picks up)
+    /// the station `Station.sourceEndless`.
+    public static let endless: Int32 = 7
 
     /// Planned by `StationPlanner`; the others are `ListMixes`.
     public static func usesPlanner(_ kind: Int32) -> Bool { kind == daily || kind == your || kind == firstListen || kind == daypart }

@@ -72,6 +72,20 @@ public enum TaizoAssistant {
         [ClaudeSystemBlock(instructions), ClaudeSystemBlock(context, cacheBreakpoint: true)]
     }
 
+    /// Endless Listening, "Ask the host": added after the cache breakpoint (the cached prefix is the same with or without it) while the chat
+    /// was opened from the host's button. It changes how short and how focused the reply is; the grounding rules above stay exactly as they
+    /// are. The wording is Android's (`TaizoContext.HOST_ADDENDUM`).
+    public static let hostAddendum = """
+        The listener opened this chat from Endless Listening, where you are the host. Answer in one or two short sentences about the music \
+        that is playing and coming up. To change what comes next call steer_session (scope session for this queue; always only if they ask for a \
+        lasting change). Look with a tool before you say why something is in the queue, and say only what the tool returned.
+        """
+
+    /// `blocks` with the host's addendum after them (never saved with the conversation: it is added to the request only).
+    public static func withHostAddendum(_ blocks: [ClaudeSystemBlock]) -> [ClaudeSystemBlock] {
+        blocks + [ClaudeSystemBlock(hostAddendum)]
+    }
+
     /// The server tools the assistant may use.
     public static let serverTools: [ClaudeServerTool] = [.webSearch, .webFetch]
 

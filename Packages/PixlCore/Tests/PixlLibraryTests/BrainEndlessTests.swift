@@ -1,4 +1,5 @@
 import Foundation
+import PixlModel
 import Testing
 @testable import PixlLibrary
 
@@ -246,6 +247,14 @@ struct BrainEndlessTests {
         #expect(endless.id == Station.endless(seedMediaIds: ["10", "11"], title: "Endless Listening", nowMs: 99).id)
     }
 
+    @Test func theRadiosOfEveryIslandSeedAreAsked() {
+        let seeds = ["a", "b", "c", "d", "e"]
+        let station = Station.endless(seedMediaIds: seeds, title: "Endless Listening", nowMs: 1)
+        // The pool of a station is seeded from every one of its seeds, and the two re-seeds fit beside them.
+        #expect(StationReseed.seedIds(primary: "a", station: station, reseedIds: ["x", "y"]) == ["a", "b", "c", "d", "e", "x", "y"])
+        #expect(StationReseed.seedIds(primary: "a", station: station, reseedIds: []) == seeds)
+    }
+
     @Test func stringsSavedBeforeSource6ExistedStillDecodeAndASourceBeyondItIsRefused() {
         let sep = "\u{1F}"
         let kind = String(Session.seedStationSong)
@@ -263,5 +272,139 @@ struct BrainEndlessTests {
         #expect(Station.decode([kind, "m1", "T", "A", "7", "7", "m1"].joined(separator: sep)) == nil)
         #expect(Station.decode(nil) == nil)
         #expect(Station.decode("") == nil)
+    }
+}
+
+/// The host's notes of Endless Listening in the queue (Android `SetNoteLinesHostTest`): they come from real facts only, never share a track
+/// with a set note, and come at most once in five tracks. Without host facts the queue has the set notes alone.
+@Suite("Host notes on the queue")
+struct SetNoteLinesHostTests {
+    private func library(_ id: String, _ artist: String, genre: String? = nil, year: Int = 0) -> Song {
+        Song(id: id, title: "T\(id)", artist: artist, artistId: 1, artists: [ArtistRef(id: 1, name: artist, isPrimary: true)], album: "A",
+             albumId: 7, path: "", contentUriString: "content://x/\(id)", albumArtUriString: nil, duration: 1_000, genre: genre,
+             year: year, mimeType: nil, bitrate: nil, sampleRate: nil)
+    }
+
+    private func outside(_ id: String, _ artist: String) -> Song {
+        Song(id: "yt:" + id, title: "T\(id)", artist: artist, artistId: -1, artists: [ArtistRef(id: -1, name: artist, isPrimary: true)],
+             album: "A", albumId: -1, path: "", contentUriString: "pixlstream://\(id)", albumArtUriString: nil, duration: 1_000,
+             genre: nil, mimeType: nil, bitrate: nil, sampleRate: nil)
+    }
+
+    private func facts(islands: [String: String] = [:], why: [String: String] = [:],
+                       genreFact: @escaping @Sendable (String) -> String = { _ in "" }) -> SetNoteLines.HostFacts {
+        SetNoteLines.HostFacts(islandOf: islands, whyKeyOf: why, genreFact: genreFact)
+    }
+
+    private var eight: [Song] { (1...8).map { library("\($0)", "Artist \($0)") } }
+
+    @Test func withoutHostFactsTheQueueHasNoHostNote() {
+        #expect(SetNoteLines.forQueue(eight, currentIndex: 0, heard: [], host: nil).byIndex.isEmpty)
+        #expect(SetNoteLines.forQueue(eight, currentIndex: 0, heard: []).byIndex.isEmpty)
+    }
+
+    @Test func anIslandNameMakesANoteAndTheNextOneIsAtLeastFiveTracksLater() {
+        var islands: [String: String] = [:]
+        for song in eight { islands[song.id] = "Soft pop" }
+        let notes = SetNoteLines.forQueue(eight, currentIndex: 0, heard: [], host: facts(islands: islands))
+        #expect(Set(notes.byIndex.keys) == [0, 5])
+        #expect(notes.byIndex[0] == "From your Soft pop side.")
+        #expect(notes.current == "From your Soft pop side.")
+    }
+
+    @Test func aNewReleaseByAnArtistYouPlayComesFirstAndATrackNothingIsKnownAboutHasNoNote() {
+        let queue = [library("1", "Clairo"), library("2", "Mono")]
+        let notes = SetNoteLines.forQueue(queue, currentIndex: 0, heard: [], host: facts(why: ["1": "new_release"]))
+        #expect(notes.byIndex == [0: "New from Clairo, an artist you play."])
+        #expect(SetNoteLines.forQueue(queue, currentIndex: 0, heard: [], host: facts()).byIndex.isEmpty)
+    }
+
+    @Test func aYearOrAShortGenreFactIsUsedOnlyWhenItIsReallyThere() {
+        let withYear = [library("1", "A", year: 1999), library("2", "B")]
+        #expect(SetNoteLines.forQueue(withYear, currentIndex: 0, heard: [], host: facts()).byIndex == [0: "Released in 1999."])
+        #expect(SetNoteLines.forQueue([library("1", "A", year: 12)], currentIndex: 0, heard: [], host: facts()).byIndex.isEmpty)
+        let withGenre = [library("1", "A", genre: "Shoegaze")]
+        let fact = facts(genreFact: { $0 == "Shoegaze" ? "Guitar noise as a wall of sound. More text after." : "" })
+        #expect(SetNoteLines.forQueue(withGenre, currentIndex: 0, heard: [], host: fact).byIndex == [0: "Shoegaze: Guitar noise as a wall of sound."])
+        // A description too long to say as it stands is not shortened: the note is dropped.
+        let long = facts(genreFact: { _ in "A very long description that goes on and on past what a short note can hold at all, honestly." })
+        #expect(SetNoteLines.forQueue(withGenre, currentIndex: 0, heard: [], host: long).byIndex.isEmpty)
+    }
+
+    @Test func aTrackNeverHasTwoNotesASetNoteKeepsTheHostAwayFromTheTracksItDescribes() {
+        let queue = [library("1", "A", genre: "pop"), library("2", "B", genre: "pop"), library("3", "C", genre: "pop"),
+                     outside("aaaaaaaaaa4", "D"), library("5", "E"), library("6", "F"), library("7", "G"), library("8", "H")]
+        var islands: [String: String] = [:]
+        for song in queue { islands[song.id] = "Soft pop" }
+        let result = SetNoteLines.forQueue(queue, currentIndex: 0, heard: ["1", "2", "3"], host: facts(islands: islands))
+        // The set note is on the first of its three tracks; the host speaks again only after the five tracks it covers.
+        #expect(result.byIndex[0] == "Three from your pop side, then something new from D.")
+        #expect(result.byIndex.keys.filter { (1...4).contains($0) }.isEmpty)
+        #expect(Set(result.byIndex.keys) == [0, 5])
+        #expect(result.byIndex[5] == "From your Soft pop side.")
+    }
+}
+
+/// Where the seeds come from (Android `BrainMixesTest`, the two Endless Listening cases): the Your Mix shortlist, the top artists without
+/// islands, and nothing for an empty library.
+@Suite("Endless Listening seeds")
+struct EndlessSeedSourceTests {
+    @Test func seedsFromTheTopArtistsWhenThereAreNoIslandsOneLibrarySongEachAtMostFive() async throws {
+        let world = BrainMixesTests.World()
+        defer { world.tidy() }
+        let repository = world.repository()
+        await world.listen(repository)
+        let mixes = world.mixes(repository, world.engine(repository))
+        let seeds = await mixes.endlessSeeds(now: BrainMixesTests.start)
+        #expect(seeds.count == 5)
+        #expect(Set(seeds.map(\.aid)).count == 5, "one seed for each artist")
+        #expect(Set(seeds.map(\.song.id)).count == 5)
+        #expect(seeds.allSatisfy { $0.islandId == -1 }, "no islands: the seeds stand for artists")
+        #expect(seeds.allSatisfy { $0.song.id.hasPrefix("lib") }, "library songs only")
+        // No island, no island name: the card says nothing it cannot back.
+        #expect(await mixes.endlessIslandNames(seeds).isEmpty)
+    }
+
+    @Test func noSeedsInALibraryWithNothingInIt() async {
+        let world = BrainMixesTests.World()
+        defer { world.tidy() }
+        world.libraryOverride.value = []
+        let repository = world.repository()
+        let mixes = world.mixes(repository, world.engine(repository))
+        #expect(await mixes.endlessSeeds(now: BrainMixesTests.start).isEmpty)
+    }
+}
+
+/// The chips of "Ask the host" (Android `HostChip`): six, in this order, and what each one asks of the phone.
+@Suite("Ask the host chips")
+struct HostChipTests {
+    @Test func sixChipsInOrderEachWithOneThingToDo() {
+        #expect(HostChip.allCases == [.new, .familiar, .why, .upbeat, .slower, .surprise])
+        #expect(HostChip.new.noveltyLevel == Novelty.discover)
+        #expect(HostChip.familiar.noveltyLevel == Novelty.familiar)
+        #expect(HostChip.upbeat.steerChange == "energy_up")
+        #expect(HostChip.slower.steerChange == "energy_down")
+        #expect(HostChip.surprise.steerChange == "more_new")
+        for chip in HostChip.allCases {
+            let actions = [chip.noveltyLevel != nil, chip.steerChange != nil, chip == .why].filter { $0 }
+            #expect(actions.count == 1, "\(chip) does one thing")
+        }
+    }
+}
+
+@Suite("Endless Listening introduction")
+struct EndlessIntroTests {
+    @Test func theBarsStayInRangeAndNeverMoveTogether() {
+        for bar in 0..<EndlessIntro.barCount {
+            for step in 0..<400 {
+                let v = EndlessIntro.scale(bar: bar, seconds: Double(step) * 0.05)
+                #expect(v >= EndlessIntro.minScale - 1e-9 && v <= 1.0 + 1e-9)
+            }
+        }
+        let at = (0..<EndlessIntro.barCount).map { EndlessIntro.scale(bar: $0, seconds: 3.0) }
+        #expect(Set(at.map { ($0 * 1000).rounded() }).count == EndlessIntro.barCount)
+        #expect(EndlessIntro.stillScales.count == EndlessIntro.barCount)
+        #expect(EndlessIntro.stillScales.allSatisfy { $0 >= EndlessIntro.minScale && $0 <= 1.0 })
+        #expect(EndlessIntro.pageCount == 3)
     }
 }

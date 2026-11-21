@@ -702,3 +702,22 @@ private actor UsageBox {
         #expect(ClaudeKeyShares.redact("x-api-key: \(key)", key: key) == "x-api-key: [redacted]")
     }
 }
+
+/// Endless Listening, "Ask the host": the addendum is one more block after the cached ones, and the cached prefix is the same with it.
+@Suite("Host addendum")
+struct HostAddendumTests {
+    @Test func theAddendumFollowsTheCachedBlocksAndChangesNothingBeforeIt() {
+        let plain = TaizoAssistant.system(context: "<listening_context>x</listening_context>")
+        let host = TaizoAssistant.withHostAddendum(plain)
+        #expect(host.count == plain.count + 1)
+        #expect(Array(host.prefix(plain.count)) == plain)
+        #expect(host.last?.text == TaizoAssistant.hostAddendum)
+        #expect(host.last?.cacheBreakpoint == false)
+        #expect(plain.last?.cacheBreakpoint == true)
+        let said = TaizoAssistant.hostAddendum.lowercased()
+        #expect(said.contains("steer_session") && said.contains("one or two short sentences"))
+        for word in ["lossless", "hi-res", "dolby", "atmos", "claude", "anthropic", "binilyrics", "enhanced", "learn", "spotify dj"] {
+            #expect(!said.contains(word))
+        }
+    }
+}

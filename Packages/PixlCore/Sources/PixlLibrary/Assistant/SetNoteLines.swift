@@ -39,15 +39,33 @@ public enum SetNoteLines {
         return SetNotes.Slot(artist: (played || fresh) ? BrainFeedback.artistOf(song) : "", genre: SetNotes.firstGenre(song.genre), known: played)
     }
 
-    /// The notes of `queue` from `currentIndex`. `heard` nil means the history is not loaded yet: no note is made (a note is true or absent).
-    public static func forQueue(_ queue: [Song], currentIndex: Int, heard: Set<String>?) -> Result {
+    /// What the host of Endless Listening knows about the window's songs, all of it real: the name of the taste island a library song sits
+    /// in, and the reason key of an engine pick (`WhyLine` name). `genreFact` is the atlas' description of a genre ("" when the atlas does
+    /// not describe it).
+    public struct HostFacts: Sendable {
+        public let islandOf: [String: String]
+        public let whyKeyOf: [String: String]
+        public let genreFact: @Sendable (String) -> String
+
+        public init(islandOf: [String: String], whyKeyOf: [String: String], genreFact: @escaping @Sendable (String) -> String) {
+            self.islandOf = islandOf
+            self.whyKeyOf = whyKeyOf
+            self.genreFact = genreFact
+        }
+    }
+
+    /// The notes of `queue` from `currentIndex`. `heard` nil means the history is not loaded yet: no note is made (a note is true or
+    /// absent). With `host` (Endless Listening, the host's notes on) the host-only notes of `HostNotes` join the set notes: never on a
+    /// track that already has one, and at most one note of either kind per five tracks.
+    public static func forQueue(_ queue: [Song], currentIndex: Int, heard: Set<String>?, host: HostFacts? = nil) -> Result {
         guard let heard, currentIndex >= 0, currentIndex < queue.count else { return .none }
         let end = min(queue.count, currentIndex + lookahead)
         var slots: [SetNotes.Slot] = []
         slots.reserveCapacity(end - currentIndex)
         for i in currentIndex..<end { slots.append(slot(of: queue[i], heard: heard)) }
         let notes = SetNotes.notes(slots)
-        if notes.isEmpty { return .none }
+        let hostNotes = host.map { HostNotes.notes(hostSlots(queue, currentIndex, end, $0), taken: taken(notes)) } ?? []
+        if notes.isEmpty && hostNotes.isEmpty { return .none }
         var byIndex: [Int: String] = [:]
         var current: String?
         for n in notes {
@@ -55,7 +73,37 @@ public enum SetNoteLines {
             if n.index == 0 { current = text }
             byIndex[currentIndex + n.index] = text
         }
+        for n in hostNotes {
+            let text = HostNotes.text(n)
+            if n.index == 0 { current = text }
+            byIndex[currentIndex + n.index] = text
+        }
         return Result(byIndex: byIndex, current: current)
+    }
+
+    /// The set notes as the tracks they describe: a note's own tracks, and the new track it ends on.
+    public static func taken(_ notes: [SetNotes.Note]) -> [HostNotes.Taken] {
+        notes.map { HostNotes.Taken(index: $0.index, span: $0.count + ($0.newArtist.isEmpty ? 0 : 1)) }
+    }
+
+    private static func hostSlots(_ queue: [Song], _ from: Int, _ end: Int, _ host: HostFacts) -> [HostNotes.Slot] {
+        var out: [HostNotes.Slot] = []
+        out.reserveCapacity(end - from)
+        for i in from..<end {
+            let song = queue[i]
+            let genre = SetNotes.firstGenre(song.genre)
+            let why = host.whyKeyOf[song.id]
+            out.append(HostNotes.Slot(
+                artist: BrainFeedback.artistOf(song),
+                genre: genre,
+                genreFact: genre.isEmpty ? "" : host.genreFact(genre),
+                year: song.year,
+                island: host.islandOf[song.id] ?? "",
+                // "New from an artist you play": the engine's own reason for the pick (the saved releases hold only artists the listener plays).
+                newFromPlayedArtist: why == "new_release",
+                sideways: why == "adjacent_genre"))
+        }
+        return out
     }
 
     /// The songs a note looks at (the current one and the next few), so the history is read for those only.
